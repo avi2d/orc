@@ -1,5 +1,6 @@
-import { Data, Effect, FileSystem, Stream } from "effect"
+import { Data, Effect, FileSystem, type Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { within } from "./nono-profile"
 
 export class NonoProviderError extends Data.TaggedError("NonoProviderError")<{
   readonly reason: string
@@ -69,4 +70,41 @@ export const resolveDeveloperDir = (
     return yield* fs.realPath(result.stdout.trim()).pipe(
       Effect.mapError((cause) => new NonoProviderError({ reason: `orc nono provider: cannot resolve the developer folder: ${String(cause)}` }))
     )
+  })
+
+export interface Runtime {
+  readonly binDir: string
+  readonly installDir: string
+}
+
+// A mise shim links to mise itself, so only a file that keeps the tool's name is the tool.
+export const resolveRuntime = (
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  name: string,
+  searchPath: string,
+  home: string
+): Effect.Effect<Runtime | null, NonoProviderError> =>
+  Effect.gen(function*() {
+    for (const dir of searchPath.split(":").filter((entry) => path.isAbsolute(entry))) {
+      const candidate = Bun.which(name, { PATH: dir })
+      if (candidate === null) {
+        continue
+      }
+      const real = yield* fs.realPath(candidate).pipe(
+        Effect.mapError((cause) => new NonoProviderError({ reason: `orc nono provider: cannot resolve ${name}: ${String(cause)}` }))
+      )
+      if (path.basename(real) !== name) {
+        continue
+      }
+      const binDir = path.dirname(real)
+      const installDir = path.dirname(binDir)
+      if (within(installDir, home)) {
+        return yield* new NonoProviderError({
+          reason: `orc nono provider: ${name} at ${real} has no install folder of its own below the home folder`
+        })
+      }
+      return { binDir, installDir }
+    }
+    return null
   })

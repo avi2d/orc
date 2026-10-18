@@ -3,7 +3,9 @@ import { chmod, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs
 import { homedir, tmpdir, userInfo } from "node:os"
 import { basename, join, relative } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
-import { Schema } from "effect"
+import { BunServices } from "@effect/platform-bun"
+import { Effect, FileSystem, Path, Result, Schema } from "effect"
+import { resolveRuntime } from "../../src/host"
 import { buildNonoRunArgs, buildSandboxEnv, NonoProviderError, nonoSandboxProvider } from "../../src/nono"
 import { buildNonoProfile, runtimeReadFiles, toolchainReadPaths } from "../../src/nono-profile"
 
@@ -12,6 +14,17 @@ const roots = {
   gitData: "/tmp/orc-test/git-data",
   piSessionDir: "/tmp/orc-test/session"
 }
+
+const noHost = { developerDir: null, runtimeDirs: [] }
+
+// nono refuses a HOME whose state root falls under the /var or /tmp it grants, so the fixture home is not under the system temp dir.
+const fixtureHome = await mkdtemp(join(process.cwd(), ".orc-nono-home-"))
+await writeFile(join(fixtureHome, ".gitconfig"), "")
+const fixtureGitEnv = { PATH: Bun.env.PATH ?? "", HOME: fixtureHome, GIT_CONFIG_GLOBAL: join(fixtureHome, ".gitconfig"), GIT_CONFIG_NOSYSTEM: "1" }
+
+afterAll(async () => {
+  await rm(fixtureHome, { recursive: true, force: true })
+})
 
 const sentinelHeader = "Authorization: Basic b3JjLXNlbnRpbmVsOnNlY3JldA=="
 
@@ -60,7 +73,7 @@ const manifestOf = (profilePath: string, home: string) =>
 
 const createError = async (worktree: string, piSessionDir: string, env: Record<string, string> = {}): Promise<unknown> =>
   nonoSandboxProvider({ piSessionDir })
-    .create({ worktreePath: worktree, hostRepoPath: worktree, mounts: [], env })
+    .create({ worktreePath: worktree, hostRepoPath: worktree, mounts: [], env: { HOME: fixtureHome, ...env } })
     .then(async (handle) => {
       await handle.close()
       return null
@@ -75,7 +88,7 @@ const refusalOf = async (worktree: string, piSessionDir: string, env: Record<str
 }
 
 const git = (args: ReadonlyArray<string>, cwd: string): void => {
-  const result = Bun.spawnSync(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" })
+  const result = Bun.spawnSync(["git", ...args], { cwd, env: fixtureGitEnv, stdout: "pipe", stderr: "pipe" })
   if (result.exitCode !== 0) {
     throw new Error(`git ${args.join(" ")} failed: ${result.stderr.toString()}`)
   }
@@ -94,7 +107,7 @@ const checkoutWithSubmodule = async (dir: string): Promise<string> => {
 }
 
 const extraHeaderOrigins = (cwd: string): ReadonlyArray<string> =>
-  Bun.spawnSync(["git", "config", "--show-origin", "--get-all", "http.extraHeader"], { cwd, stdout: "pipe", stderr: "pipe" })
+  Bun.spawnSync(["git", "config", "--show-origin", "--get-all", "http.extraHeader"], { cwd, env: fixtureGitEnv, stdout: "pipe", stderr: "pipe" })
     .stdout.toString().split("\n").filter((line) => line !== "").map((line) => line.slice(0, line.indexOf("\t")))
 
 describe("the policy nono resolves from the profile", () => {
@@ -122,7 +135,7 @@ describe("the policy nono resolves from the profile", () => {
       })
     )
     profilePath = join(dir, "profile.json")
-    await writeFile(profilePath, JSON.stringify(buildNonoProfile(resolvedRoots, null)))
+    await writeFile(profilePath, JSON.stringify(buildNonoProfile(resolvedRoots, noHost)))
   })
 
   afterAll(async () => {
@@ -202,7 +215,7 @@ describe("the policy nono resolves from the profile", () => {
     skipReason("needs nono on PATH to resolve the profile", "resolves to exactly the grants the profile names, whatever the user's default profile says"),
     async () => {
       const { grants } = (await manifestOf(profilePath, home)).filesystem
-      const platformReadFiles = process.platform === "darwin" ? buildNonoProfile(resolvedRoots, null).platform_overrides.macos.filesystem.read_file : []
+      const platformReadFiles = process.platform === "darwin" ? buildNonoProfile(resolvedRoots, noHost).platform_overrides.macos.filesystem.read_file : []
       const expected = new Set([
         ...toolchainReadPaths.map((path) => `read directory ${path}`),
         ...[...runtimeReadFiles, ...platformReadFiles].map((path) => `read file ${path}`),
@@ -212,6 +225,47 @@ describe("the policy nono resolves from the profile", () => {
       expect(new Set(grants.map((grant) => `${grant.access} ${grant.type} ${grant.path}`))).toEqual(expected)
     }
   )
+})
+
+const runtimeAt = (searchPath: string, home: string) =>
+  Effect.runPromise(
+    Effect.gen(function*() {
+      return yield* resolveRuntime(yield* FileSystem.FileSystem, yield* Path.Path, "bun", searchPath, home)
+    }).pipe(Effect.provide(BunServices.layer), Effect.result)
+  )
+
+describe("resolveRuntime", () => {
+  test("follows mise's shims past to the install folder, never to the shim or mise itself", async () => {
+    const dir = await realpath(await mkdtemp(join(tmpdir(), "orc-nono-runtime-")))
+    try {
+      const install = join(dir, "installs", "bun", "9.9.9")
+      await mkdir(join(dir, "shims"))
+      await mkdir(join(install, "bin"), { recursive: true })
+      await writeFile(join(dir, "mise"), "#!/bin/sh\n", { mode: 0o755 })
+      await symlink(join(dir, "mise"), join(dir, "shims", "bun"))
+      await writeFile(join(install, "bin", "bun"), "#!/bin/sh\n", { mode: 0o755 })
+      const result = await runtimeAt(`${join(dir, "shims")}:${join(install, "bin")}`, join(dir, "home"))
+      expect(result).toEqual(Result.succeed({ binDir: join(install, "bin"), installDir: install }))
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("refuses a runtime whose install folder would be the home folder", async () => {
+    const home = await realpath(await mkdtemp(join(tmpdir(), "orc-nono-runtime-home-")))
+    try {
+      await mkdir(join(home, "bin"))
+      await writeFile(join(home, "bin", "bun"), "#!/bin/sh\n", { mode: 0o755 })
+      const result = await runtimeAt(join(home, "bin"), home)
+      expect(Result.isFailure(result) && result.failure instanceof NonoProviderError).toBe(true)
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  test("finds nothing when no folder on the PATH holds the runtime", async () => {
+    expect(await runtimeAt("/nonexistent-orc-bin", "/nonexistent-orc-home")).toEqual(Result.succeed(null))
+  })
 })
 
 describe("buildNonoRunArgs", () => {
@@ -232,7 +286,7 @@ describe("buildSandboxEnv", () => {
       await mkdir(home)
       await mkdir(session)
       await writeFile(join(home, ".gitconfig"), "[user]\n\tname = host user\n")
-      const env = buildSandboxEnv({ PATH: Bun.env.PATH, HOME: home }, session)
+      const env = buildSandboxEnv({ PATH: Bun.env.PATH, HOME: home }, session, [])
       for (const args of [
         ["config", "--global", "--add", "safe.directory", "/w/copy"],
         ["config", "--global", "user.name", "orc agent"],
@@ -240,7 +294,7 @@ describe("buildSandboxEnv", () => {
       ]) {
         expect(Bun.spawnSync(["git", ...args], { cwd: dir, env }).exitCode).toBe(0)
       }
-      const read = Bun.spawnSync(["git", "config", "--file", join(session, "gitconfig"), "user.name"])
+      const read = Bun.spawnSync(["git", "config", "--file", join(session, "gitconfig"), "user.name"], { env: fixtureGitEnv })
       expect(read.stdout.toString()).toBe("orc agent\n")
       expect(await Bun.file(join(home, ".gitconfig")).text()).toBe("[user]\n\tname = host user\n")
     } finally {
@@ -255,12 +309,13 @@ describe("buildSandboxEnv", () => {
       const host = {
         PATH: Bun.env.PATH ?? "/usr/bin:/bin",
         HOME: home,
+        GIT_CONFIG_NOSYSTEM: "1",
         GIT_CONFIG_COUNT: "1",
         GIT_CONFIG_KEY_0: "http.extraHeader",
         GIT_CONFIG_VALUE_0: sentinelHeader
       }
       expect(await gitConfigExtraHeader(host, home)).toBe(`${sentinelHeader}\n${sentinelHeader}\n`)
-      expect(await gitConfigExtraHeader(buildSandboxEnv(host, join(home, "session")), home)).toBe("")
+      expect(await gitConfigExtraHeader(buildSandboxEnv(host, join(home, "session"), []), home)).toBe("")
     } finally {
       await rm(home, { recursive: true, force: true })
     }
@@ -318,7 +373,7 @@ describe("nonoSandboxProvider", () => {
       git(["init", "-q", "-b", "orc/task"], dir)
       await writeFile(join(dir, ".git", "push-auth.conf"), `[http]\n\textraHeader = Authorization: Bearer ${sentinelToken}\n`)
       git(["config", "includeIf.onbranch:main.path", "push-auth.conf"], dir)
-      const active = Bun.spawnSync(["git", "config", "--get", "http.extraHeader"], { cwd: dir })
+      const active = Bun.spawnSync(["git", "config", "--get", "http.extraHeader"], { cwd: dir, env: fixtureGitEnv })
       expect(active.exitCode).toBe(1)
       const reason = await refusalOf(dir, join(dir, ".session"))
       expect(reason).toContain(`${await realpath(join(dir, ".git", "push-auth.conf"))} carries a credential in http.extraheader`)
@@ -371,7 +426,7 @@ describe("nonoSandboxProvider", () => {
       await writeFile(join(dir, ".git", "self.inc"), "[include]\n\tpath = again/self.inc\n")
       await symlink(".", join(dir, ".git", "again"))
       git(["config", "includeIf.onbranch:never.path", "self.inc"], dir)
-      const gitReads = Bun.spawnSync(["git", "config", "--includes", "--file", join(dir, ".git", "self.inc"), "--list"], { stdout: "pipe", stderr: "pipe" })
+      const gitReads = Bun.spawnSync(["git", "config", "--includes", "--file", join(dir, ".git", "self.inc"), "--list"], { env: fixtureGitEnv, stdout: "pipe", stderr: "pipe" })
       expect(gitReads.stderr.toString()).toContain("exceeded maximum include depth")
       const reason = await refusalOf(dir, join(dir, ".session"))
       expect(reason).toContain("is included deeper than git reads")

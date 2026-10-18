@@ -9,7 +9,16 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path, Schema, Stream } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { type HostCommandResult, NonoProviderError, resolveDeveloperDir, resolveHostBinary, runHostCommand, type Spawner } from "./host"
+import { homedir } from "node:os"
+import {
+  type HostCommandResult,
+  NonoProviderError,
+  resolveDeveloperDir,
+  resolveHostBinary,
+  resolveRuntime,
+  runHostCommand,
+  type Spawner
+} from "./host"
 import { credentialBearingKeys, includePathKeys, includeTargets, submoduleCheckouts } from "./git-config"
 import { buildNonoProfile, type NonoSandboxRoots, within } from "./nono-profile"
 
@@ -21,11 +30,9 @@ export const buildNonoRunArgs = (
 
 const inheritedEnvNames: ReadonlyArray<string> = ["PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TERM"]
 
-// Sandcastle writes safe.directory and the commit identity with `git config --global`, so the global config must be writable.
-export const buildSandboxEnv = (
-  hostEnv: Readonly<Record<string, string | undefined>>,
-  piSessionDir: string
-): Readonly<Record<string, string>> & { readonly TMPDIR: string } => {
+const sandboxRuntimes: ReadonlyArray<string> = ["bun", "node", "pi"]
+
+const inheritedEnv = (hostEnv: Readonly<Record<string, string | undefined>>): Record<string, string> => {
   const env: Record<string, string> = {}
   for (const name of inheritedEnvNames) {
     const value = hostEnv[name]
@@ -33,13 +40,30 @@ export const buildSandboxEnv = (
       env[name] = value
     }
   }
+  return env
+}
+
+// Sandcastle writes safe.directory and the commit identity with `git config --global`, so the global config must be writable.
+export const buildSandboxEnv = (
+  hostEnv: Readonly<Record<string, string | undefined>>,
+  piSessionDir: string,
+  runtimeBinDirs: ReadonlyArray<string>
+): Readonly<Record<string, string>> & { readonly TMPDIR: string } => {
+  const env = inheritedEnv(hostEnv)
   return {
     ...env,
+    PATH: [...runtimeBinDirs, ...(hostEnv.PATH === undefined ? [] : [hostEnv.PATH])].join(":"),
     TMPDIR: `${piSessionDir}/tmp`,
     GIT_CONFIG_GLOBAL: `${piSessionDir}/gitconfig`,
     GIT_CONFIG_SYSTEM: "/dev/null"
   }
 }
+
+export const buildHostGitEnv = (hostEnv: Readonly<Record<string, string | undefined>>): Record<string, string> => ({
+  ...inheritedEnv(hostEnv),
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_NOSYSTEM: "1"
+})
 
 export { NonoProviderError }
 
@@ -52,16 +76,21 @@ export interface NonoSandboxProvider extends BindMountSandboxProvider {
   readonly create: (options: BindMountCreateOptions) => Promise<BindMountSandboxHandle>
 }
 
+interface HostGit {
+  readonly binary: string
+  readonly env: Record<string, string>
+}
+
 const resolveGitDataDir = (
   spawner: Spawner,
   path: Path.Path,
-  gitBinary: string,
+  { binary, env }: HostGit,
   worktree: string
 ): Effect.Effect<string, NonoProviderError> =>
   Effect.gen(function*() {
     const result = yield* runHostCommand(
       spawner,
-      ChildProcess.make(gitBinary, ["rev-parse", "--git-common-dir"], { cwd: worktree })
+      ChildProcess.make(binary, ["rev-parse", "--git-common-dir"], { cwd: worktree, env, extendEnv: false })
     )
     if (result.exitCode !== 0) {
       return yield* new NonoProviderError({
@@ -107,11 +136,6 @@ const checkoutConfigs = (fs: FileSystem.FileSystem, path: Path.Path, checkout: s
 
 // Git refuses to read a config whose includes nest deeper than this.
 const maxIncludeDepth = 10
-
-interface HostGit {
-  readonly binary: string
-  readonly env: Record<string, string>
-}
 
 const readGitConfig = (spawner: Spawner, { binary, env }: HostGit, file: string, query: ReadonlyArray<string>, matchless: boolean) =>
   runHostCommand(spawner, ChildProcess.make(binary, ["config", "--file", file, "--no-includes", "-z", ...query], { env, extendEnv: false })).pipe(
@@ -166,7 +190,7 @@ const resolveRoots = (
   spawner: Spawner,
   fs: FileSystem.FileSystem,
   path: Path.Path,
-  gitBinary: string,
+  hostGit: HostGit,
   worktree: string,
   piSessionDir: string
 ): Effect.Effect<NonoSandboxRoots, NonoProviderError | PlatformError> =>
@@ -176,7 +200,7 @@ const resolveRoots = (
         return yield* new NonoProviderError({ reason: `orc nono provider: sandbox root must be absolute: ${root}` })
       }
     }
-    const gitData = yield* resolveGitDataDir(spawner, path, gitBinary, worktree)
+    const gitData = yield* resolveGitDataDir(spawner, path, hostGit, worktree)
     yield* fs.makeDirectory(piSessionDir, { recursive: true })
     return {
       worktree: yield* fs.realPath(worktree),
@@ -261,17 +285,20 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const worktree = createOptions.worktreePath
-      const gitBinary = yield* resolveHostBinary(fs, "git")
-      const roots = yield* resolveRoots(spawner, fs, path, gitBinary, worktree, options.piSessionDir)
-      const env = buildSandboxEnv({ ...Bun.env, ...createOptions.env }, roots.piSessionDir)
-      yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, { binary: gitBinary, env })
+      const hostEnv = { ...Bun.env, ...createOptions.env }
+      const hostGit = { binary: yield* resolveHostBinary(fs, "git"), env: buildHostGitEnv(hostEnv) }
+      const roots = yield* resolveRoots(spawner, fs, path, hostGit, worktree, options.piSessionDir)
+      yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, hostGit)
+      const runtimes = (yield* Effect.forEach(sandboxRuntimes, (name) => resolveRuntime(fs, path, name, Bun.env.PATH ?? "", homedir())))
+        .filter((runtime) => runtime !== null)
+      const env = buildSandboxEnv(hostEnv, roots.piSessionDir, runtimes.map((runtime) => runtime.binDir))
       const developerDir = yield* resolveDeveloperDir(spawner, fs, env)
       const nonoBinary = yield* resolveHostBinary(fs, "nono")
       const nono = (args: ReadonlyArray<string>) => ChildProcess.make(nonoBinary, args, { env, extendEnv: false })
       const profileDir = yield* fs.makeTempDirectory({ prefix: "orc-nono-" })
       const profilePath = path.join(profileDir, "profile.json")
       const hostTrustedPaths = [profileDir, nonoBinary, path.dirname(nonoBinary)]
-      yield* fs.writeFileString(profilePath, `${JSON.stringify(buildNonoProfile(roots, developerDir), null, 2)}\n`).pipe(
+      yield* fs.writeFileString(profilePath, `${JSON.stringify(buildNonoProfile(roots, { developerDir, runtimeDirs: runtimes.map((runtime) => runtime.installDir) }), null, 2)}\n`).pipe(
         Effect.andThen(() => checkProfile(spawner, nono, profilePath, hostTrustedPaths)),
         Effect.andThen(() => fs.makeDirectory(env.TMPDIR, { recursive: true })),
         Effect.onError(() => fs.remove(profileDir, { recursive: true }).pipe(Effect.result))

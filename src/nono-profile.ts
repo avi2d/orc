@@ -70,7 +70,15 @@ const outermost = (paths: ReadonlyArray<string>): ReadonlyArray<string> =>
     paths.indexOf(candidate) === index && !paths.some((other) => other !== candidate && within(other, candidate))
   )
 
-export const buildNonoProfile = (roots: NonoSandboxRoots, developerDir: string | null) => ({
+export interface HostRuntime {
+  readonly developerDir: string | null
+  readonly runtimeDirs: ReadonlyArray<string>
+}
+
+const runtimeReads = (runtimeDirs: ReadonlyArray<string>): ReadonlyArray<string> =>
+  runtimeDirs.filter((dir) => !toolchainReadPaths.some((granted) => within(granted, dir)))
+
+export const buildNonoProfile = (roots: NonoSandboxRoots, host: HostRuntime) => ({
   meta: {
     name: "orc-nono-agent",
     description: "orc agent sandbox: the isolated copy, its git data and Pi's session folder"
@@ -85,7 +93,7 @@ export const buildNonoProfile = (roots: NonoSandboxRoots, developerDir: string |
   },
   filesystem: {
     allow: outermost([roots.worktree, roots.gitData, roots.piSessionDir]),
-    read: toolchainReadPaths,
+    read: [...toolchainReadPaths, ...runtimeReads(host.runtimeDirs)],
     write: [],
     allow_file: [],
     read_file: runtimeReadFiles,
@@ -122,7 +130,7 @@ export const buildNonoProfile = (roots: NonoSandboxRoots, developerDir: string |
   platform_overrides: {
     macos: {
       filesystem: {
-        read: developerReads(developerDir),
+        read: developerReads(host.developerDir),
         // Callers name paths through these system symlinks; reading the link opens nothing behind it.
         read_file: ["/var", "/tmp", "/var/db/xcode_select_link"]
       }

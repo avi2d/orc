@@ -20,10 +20,19 @@ const credentialEnv = {
   GIT_CONFIG_VALUE_0: `Authorization: ${sentinelAuthorization}`
 }
 
+// nono refuses a HOME whose state root falls under the /var or /tmp it grants, so the fixture home is not under the system temp dir.
+const fixtureHome = await mkdtemp(join(process.cwd(), ".orc-nono-home-"))
+await writeFile(join(fixtureHome, ".gitconfig"), "")
+const fixtureGitEnv = { PATH: Bun.env.PATH ?? "", HOME: fixtureHome, GIT_CONFIG_GLOBAL: join(fixtureHome, ".gitconfig"), GIT_CONFIG_NOSYSTEM: "1" }
+
+afterAll(async () => {
+  await rm(fixtureHome, { recursive: true, force: true })
+})
+
 const runGit = async (
   args: ReadonlyArray<string>,
   cwd: string,
-  env: Record<string, string | undefined> = Bun.env
+  env: Record<string, string> = fixtureGitEnv
 ): Promise<{ exitCode: number; output: string }> => {
   const proc = Bun.spawn(["git", ...args], { cwd, env, stdout: "pipe", stderr: "pipe" })
   const [stdout, stderr, exitCode] = await Promise.all([
@@ -142,7 +151,7 @@ describe("nono sandbox provider", () => {
       worktreePath: copy,
       hostRepoPath: copy,
       mounts: [],
-      env: { ...credentialEnv, NONO_ALLOW: outside }
+      env: { ...credentialEnv, HOME: fixtureHome, NONO_ALLOW: outside }
     })
   })
 
@@ -167,6 +176,12 @@ describe("nono sandbox provider", () => {
     const result = await execOrThrow("/bin/sh -c 'echo shell-ok' && git --version && bun --version")
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toBe(`shell-ok\ngit version ${(await runGit(["--version"], copy)).output.trim().replace("git version ", "")}\n${Bun.version}\n`)
+  })
+
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "runs the host's node and Pi, whose files live outside the roots"), async () => {
+    const host = Bun.spawnSync(["sh", "-c", "node --version && pi --version"], { env: fixtureGitEnv })
+    const result = await execOrThrow("node --version && pi --version")
+    expect({ exitCode: result.exitCode, stdout: result.stdout }).toEqual({ exitCode: 0, stdout: host.stdout.toString() })
   })
 
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "runs the system git in /usr/bin"), async () => {
@@ -323,9 +338,9 @@ describe("nono sandbox provider", () => {
       const control = await Bun.connect({ unix: socketPath, socket: { data: () => {} } })
       control.end()
       await firstConnection.promise
-      const result = await execOrThrow(`bun -e 'await Bun.connect({ unix: "${socketPath}", socket: { data() {} } }); console.log("connected"); process.exit(0)'`)
+      const result = await execOrThrow(`bun -e 'console.log("started"); await Bun.connect({ unix: "${socketPath}", socket: { data() {} } }); console.log("connected"); process.exit(0)'`)
       expect(result.exitCode).not.toBe(0)
-      expect(result.stdout).not.toContain("connected")
+      expect(result.stdout).toBe("started\n")
       expect(connections).toBe(1)
     } finally {
       listener.stop(true)
@@ -376,7 +391,7 @@ describe("nono sandbox provider", () => {
 
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "refuses git push for want of the credential a host push uses"), async () => {
     const control = await runGit(["push", "-q", remoteUrl, "HEAD:refs/heads/host-control"], copy, {
-      ...Bun.env,
+      ...fixtureGitEnv,
       ...credentialEnv
     })
     expect(control).toEqual({ exitCode: 0, output: "" })
@@ -441,7 +456,7 @@ describe("nono sandbox provider", () => {
       worktreePath: copy,
       hostRepoPath: copy,
       mounts: [],
-      env: { PATH: `${plantedDir}:${Bun.env.PATH ?? ""}` }
+      env: { HOME: fixtureHome, PATH: `${plantedDir}:${Bun.env.PATH ?? ""}` }
     })
     try {
       const result = await planted.exec("echo sandboxed")
@@ -455,7 +470,7 @@ describe("nono sandbox provider", () => {
 
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "refuses a session folder that would hold its own profile"), async () => {
     const error = await nonoSandboxProvider({ piSessionDir: tmpdir() })
-      .create({ worktreePath: copy, hostRepoPath: copy, mounts: [], env: {} })
+      .create({ worktreePath: copy, hostRepoPath: copy, mounts: [], env: { HOME: fixtureHome } })
       .then(() => null, (cause: unknown) => cause)
     expect(error).toBeInstanceOf(NonoProviderError)
     if (error instanceof NonoProviderError) {
