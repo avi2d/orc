@@ -96,12 +96,13 @@ const runHostCommand = (
 const resolveGitDataDir = (
   spawner: Spawner,
   path: Path.Path,
+  gitBinary: string,
   worktree: string
 ): Effect.Effect<string, NonoProviderError> =>
   Effect.gen(function*() {
     const result = yield* runHostCommand(
       spawner,
-      ChildProcess.make("git", ["rev-parse", "--git-common-dir"], { cwd: worktree })
+      ChildProcess.make(gitBinary, ["rev-parse", "--git-common-dir"], { cwd: worktree })
     )
     if (result.exitCode !== 0) {
       return yield* new NonoProviderError({
@@ -148,8 +149,13 @@ const checkoutConfigs = (fs: FileSystem.FileSystem, path: Path.Path, checkout: s
 // Git refuses to read a config whose includes nest deeper than this.
 const maxIncludeDepth = 10
 
-const readGitConfig = (spawner: Spawner, env: Record<string, string>, file: string, query: ReadonlyArray<string>, matchless: boolean) =>
-  runHostCommand(spawner, ChildProcess.make("git", ["config", "--file", file, "--no-includes", "-z", ...query], { env, extendEnv: false })).pipe(
+interface HostGit {
+  readonly binary: string
+  readonly env: Record<string, string>
+}
+
+const readGitConfig = (spawner: Spawner, { binary, env }: HostGit, file: string, query: ReadonlyArray<string>, matchless: boolean) =>
+  runHostCommand(spawner, ChildProcess.make(binary, ["config", "--file", file, "--no-includes", "-z", ...query], { env, extendEnv: false })).pipe(
     Effect.flatMap((result) => {
       if (result.exitCode === 0 || (matchless && result.exitCode === 1 && result.stderr === "")) {
         return Effect.succeed(result.stdout)
@@ -164,7 +170,7 @@ const refuseCredentialBearingCheckout = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
   roots: NonoSandboxRoots,
-  sandboxEnv: Record<string, string>
+  hostGit: HostGit
 ): Effect.Effect<void, NonoProviderError> =>
   Effect.gen(function*() {
     const topLevel = [...(yield* gitDirConfigs(fs, path, roots.gitData)), ...(yield* checkoutConfigs(fs, path, roots.worktree))]
@@ -179,14 +185,14 @@ const refuseCredentialBearingCheckout = (
         return yield* new NonoProviderError({ reason: `orc nono provider: the git config ${file} is included deeper than git reads` })
       }
       seen.add(file)
-      const listing = yield* readGitConfig(spawner, sandboxEnv, file, ["--list"], false)
+      const listing = yield* readGitConfig(spawner, hostGit, file, ["--list"], false)
       const offending = credentialBearingKeys(listing)
       if (offending.length > 0) {
         return yield* new NonoProviderError({
           reason: `orc nono provider: the git config ${file} carries a credential in ${offending.join(", ")}`
         })
       }
-      const includes = yield* readGitConfig(spawner, sandboxEnv, file, ["--type=path", "--get-regexp", includePathKeys], true)
+      const includes = yield* readGitConfig(spawner, hostGit, file, ["--type=path", "--get-regexp", includePathKeys], true)
       pending.push(...includeTargets(path, file, includes).map((target) => ({ file: target, depth: depth + 1 })))
       if (path.basename(file) === ".gitmodules") {
         for (const checkout of submoduleCheckouts(path, file, listing).filter((dir) => within(roots.worktree, dir))) {
@@ -196,12 +202,13 @@ const refuseCredentialBearingCheckout = (
     }
   })
 
-const resolveNonoBinary = (fs: FileSystem.FileSystem): Effect.Effect<string, NonoProviderError> => {
-  const found = Bun.which("nono")
+// The caller's env PATH may name tools inside the copy, so a host binary is found on the host's own PATH.
+const resolveHostBinary = (fs: FileSystem.FileSystem, name: string): Effect.Effect<string, NonoProviderError> => {
+  const found = Bun.which(name)
   return found === null
-    ? Effect.fail(new NonoProviderError({ reason: "orc nono provider: nono is not on the host PATH" }))
+    ? Effect.fail(new NonoProviderError({ reason: `orc nono provider: ${name} is not on the host PATH` }))
     : fs.realPath(found).pipe(
-      Effect.mapError((cause) => new NonoProviderError({ reason: `orc nono provider: cannot resolve nono: ${String(cause)}` }))
+      Effect.mapError((cause) => new NonoProviderError({ reason: `orc nono provider: cannot resolve ${name}: ${String(cause)}` }))
     )
 }
 
@@ -210,6 +217,7 @@ const resolveRoots = (
   spawner: Spawner,
   fs: FileSystem.FileSystem,
   path: Path.Path,
+  gitBinary: string,
   worktree: string,
   piSessionDir: string
 ): Effect.Effect<NonoSandboxRoots, NonoProviderError | PlatformError> =>
@@ -219,7 +227,7 @@ const resolveRoots = (
         return yield* new NonoProviderError({ reason: `orc nono provider: sandbox root must be absolute: ${root}` })
       }
     }
-    const gitData = yield* resolveGitDataDir(spawner, path, worktree)
+    const gitData = yield* resolveGitDataDir(spawner, path, gitBinary, worktree)
     yield* fs.makeDirectory(piSessionDir, { recursive: true })
     return {
       worktree: yield* fs.realPath(worktree),
@@ -304,10 +312,11 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const worktree = createOptions.worktreePath
-      const roots = yield* resolveRoots(spawner, fs, path, worktree, options.piSessionDir)
+      const gitBinary = yield* resolveHostBinary(fs, "git")
+      const roots = yield* resolveRoots(spawner, fs, path, gitBinary, worktree, options.piSessionDir)
       const env = buildSandboxEnv({ ...Bun.env, ...createOptions.env }, roots.piSessionDir)
-      yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, env)
-      const nonoBinary = yield* resolveNonoBinary(fs)
+      yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, { binary: gitBinary, env })
+      const nonoBinary = yield* resolveHostBinary(fs, "nono")
       const nono = (args: ReadonlyArray<string>) => ChildProcess.make(nonoBinary, args, { env, extendEnv: false })
       const profileDir = yield* fs.makeTempDirectory({ prefix: "orc-nono-" })
       const profilePath = path.join(profileDir, "profile.json")

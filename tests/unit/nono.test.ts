@@ -58,16 +58,16 @@ const manifestOf = (profilePath: string, home: string) =>
   runNono(CapabilityManifest, ["profile", "show", profilePath, "--format", "manifest"], home)
 
 
-const createError = async (worktree: string, piSessionDir: string): Promise<unknown> =>
+const createError = async (worktree: string, piSessionDir: string, env: Record<string, string> = {}): Promise<unknown> =>
   nonoSandboxProvider({ piSessionDir })
-    .create({ worktreePath: worktree, hostRepoPath: worktree, mounts: [], env: {} })
+    .create({ worktreePath: worktree, hostRepoPath: worktree, mounts: [], env })
     .then(async (handle) => {
       await handle.close()
       return null
     }, (cause: unknown) => cause)
 
-const refusalOf = async (worktree: string, piSessionDir: string): Promise<string> => {
-  const error = await createError(worktree, piSessionDir)
+const refusalOf = async (worktree: string, piSessionDir: string, env: Record<string, string> = {}): Promise<string> => {
+  const error = await createError(worktree, piSessionDir, env)
   if (!(error instanceof NonoProviderError)) {
     throw new Error(`expected a NonoProviderError, got ${String(error)}`)
   }
@@ -572,6 +572,21 @@ describe("nonoSandboxProvider", () => {
       }
     }
   )
+
+  test("scans the checkout with the host's git, not a git the caller's PATH finds in the copy", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-nono-cred-"))
+    try {
+      git(["init", "-q"], dir)
+      git(["config", "http.extraHeader", `Authorization: Bearer ${sentinelToken}`], dir)
+      await mkdir(join(dir, "bin"))
+      await writeFile(join(dir, "bin", "git"), `#!/bin/sh\ntouch "${join(dir, "ran-outside-nono")}"\n`, { mode: 0o755 })
+      const reason = await refusalOf(dir, join(dir, ".session"), { PATH: `${join(dir, "bin")}:${Bun.env.PATH}` })
+      expect(reason).toContain("carries a credential in http.extraheader")
+      expect(await Bun.file(join(dir, "ran-outside-nono")).exists()).toBe(false)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 
   test("refuses to create a sandbox when the worktree is not a git checkout", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-nono-plain-"))
