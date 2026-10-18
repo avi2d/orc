@@ -9,7 +9,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Data, Effect, FileSystem, Path, Schema, Stream } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { credentialBearingKeys, includeTargets, submoduleCheckouts } from "./git-config"
+import { credentialBearingKeys, includePathKeys, includeTargets, submoduleCheckouts } from "./git-config"
 import { buildNonoProfile, type NonoSandboxRoots, within } from "./nono-profile"
 
 export const buildNonoRunArgs = (
@@ -145,43 +145,52 @@ const checkoutConfigs = (fs: FileSystem.FileSystem, path: Path.Path, checkout: s
     return [path.join(checkout, ".gitmodules"), ...embedded]
   })
 
+// Git refuses to read a config whose includes nest deeper than this.
+const maxIncludeDepth = 10
+
+const readGitConfig = (spawner: Spawner, env: Record<string, string>, file: string, query: ReadonlyArray<string>, matchless: boolean) =>
+  runHostCommand(spawner, ChildProcess.make("git", ["config", "--file", file, "--no-includes", "-z", ...query], { env, extendEnv: false })).pipe(
+    Effect.flatMap((result) => {
+      if (result.exitCode === 0 || (matchless && result.exitCode === 1 && result.stderr === "")) {
+        return Effect.succeed(result.stdout)
+      }
+      return Effect.fail(new NonoProviderError({ reason: `orc nono provider: cannot read the git config ${file}: ${result.stderr.trim()}` }))
+    })
+  )
+
 // The sandbox can read every config in the git data, every .gitmodules and embedded submodule git dir in the checkout, and every file they include, active or not.
 const refuseCredentialBearingCheckout = (
   spawner: Spawner,
   fs: FileSystem.FileSystem,
   path: Path.Path,
   roots: NonoSandboxRoots,
-  home: string | undefined,
-  gitEnv: Record<string, string>
+  sandboxEnv: Record<string, string>
 ): Effect.Effect<void, NonoProviderError> =>
   Effect.gen(function*() {
-    const pending = [...(yield* gitDirConfigs(fs, path, roots.gitData)), ...(yield* checkoutConfigs(fs, path, roots.worktree))]
+    const topLevel = [...(yield* gitDirConfigs(fs, path, roots.gitData)), ...(yield* checkoutConfigs(fs, path, roots.worktree))]
+    const pending = topLevel.map((file) => ({ file, depth: 0 }))
     const seen = new Set<string>()
-    for (let candidate = pending.shift(); candidate !== undefined; candidate = pending.shift()) {
-      const file = yield* fs.realPath(candidate).pipe(unlessAbsent<string | undefined>(undefined, candidate))
-      if (file === undefined || seen.has(file)) {
+    for (let next = pending.shift(); next !== undefined; next = pending.shift()) {
+      const { file, depth } = next
+      if (seen.has(file) || !(yield* fs.stat(file).pipe(Effect.as(true), unlessAbsent(false, file)))) {
         continue
       }
-      seen.add(file)
-      const listing = yield* runHostCommand(
-        spawner,
-        ChildProcess.make("git", ["config", "--file", file, "--no-includes", "--list", "-z"], { env: gitEnv, extendEnv: false })
-      )
-      if (listing.exitCode !== 0) {
-        return yield* new NonoProviderError({
-          reason: `orc nono provider: cannot read the git config ${file}: ${listing.stderr.trim()}`
-        })
+      if (depth > maxIncludeDepth) {
+        return yield* new NonoProviderError({ reason: `orc nono provider: the git config ${file} is included deeper than git reads` })
       }
-      const offending = credentialBearingKeys(listing.stdout)
+      seen.add(file)
+      const listing = yield* readGitConfig(spawner, sandboxEnv, file, ["--list"], false)
+      const offending = credentialBearingKeys(listing)
       if (offending.length > 0) {
         return yield* new NonoProviderError({
           reason: `orc nono provider: the git config ${file} carries a credential in ${offending.join(", ")}`
         })
       }
-      pending.push(...includeTargets(path, home, file, listing.stdout))
+      const includes = yield* readGitConfig(spawner, sandboxEnv, file, ["--type=path", "--get-regexp", includePathKeys], true)
+      pending.push(...includeTargets(path, file, includes).map((target) => ({ file: target, depth: depth + 1 })))
       if (path.basename(file) === ".gitmodules") {
-        for (const checkout of submoduleCheckouts(path, file, listing.stdout).filter((dir) => within(roots.worktree, dir))) {
-          pending.push(...(yield* checkoutConfigs(fs, path, checkout)))
+        for (const checkout of submoduleCheckouts(path, file, listing).filter((dir) => within(roots.worktree, dir))) {
+          pending.push(...(yield* checkoutConfigs(fs, path, checkout)).map((nested) => ({ file: nested, depth: 0 })))
         }
       }
     }
@@ -297,7 +306,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const worktree = createOptions.worktreePath
       const roots = yield* resolveRoots(spawner, fs, path, worktree, options.piSessionDir)
       const env = buildSandboxEnv({ ...Bun.env, ...createOptions.env }, roots.piSessionDir)
-      yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, env.HOME, buildSandboxEnv(Bun.env, roots.piSessionDir))
+      yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, env)
       const nonoBinary = yield* resolveNonoBinary(fs)
       const nono = (args: ReadonlyArray<string>) => ChildProcess.make(nonoBinary, args, { env, extendEnv: false })
       const profileDir = yield* fs.makeTempDirectory({ prefix: "orc-nono-" })

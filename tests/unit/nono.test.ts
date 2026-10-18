@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
-import { homedir, tmpdir } from "node:os"
-import { join } from "node:path"
+import { chmod, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises"
+import { homedir, tmpdir, userInfo } from "node:os"
+import { join, relative } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { Schema } from "effect"
 import { buildNonoRunArgs, buildSandboxEnv, NonoProviderError, nonoSandboxProvider } from "../../src/nono"
@@ -14,6 +14,8 @@ const roots = {
 }
 
 const sentinelHeader = "Authorization: Basic b3JjLXNlbnRpbmVsOnNlY3JldA=="
+
+const within = (root: string, target: string): boolean => target === root || target.startsWith(`${root}/`)
 
 const gitConfigExtraHeader = async (env: Record<string, string>, cwd: string): Promise<string> => {
   const proc = Bun.spawn(["git", "config", "--get-all", "http.extraHeader"], { cwd, env, stdout: "pipe", stderr: "pipe" })
@@ -64,12 +66,24 @@ const createError = async (worktree: string, piSessionDir: string): Promise<unkn
       return null
     }, (cause: unknown) => cause)
 
+const refusalOf = async (worktree: string, piSessionDir: string): Promise<string> => {
+  const error = await createError(worktree, piSessionDir)
+  if (!(error instanceof NonoProviderError)) {
+    throw new Error(`expected a NonoProviderError, got ${String(error)}`)
+  }
+  return error.reason
+}
+
 const git = (args: ReadonlyArray<string>, cwd: string): void => {
   const result = Bun.spawnSync(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" })
   if (result.exitCode !== 0) {
     throw new Error(`git ${args.join(" ")} failed: ${result.stderr.toString()}`)
   }
 }
+
+const extraHeaderOrigins = (cwd: string): ReadonlyArray<string> =>
+  Bun.spawnSync(["git", "config", "--show-origin", "--get-all", "http.extraHeader"], { cwd, stdout: "pipe", stderr: "pipe" })
+    .stdout.toString().split("\n").filter((line) => line !== "").map((line) => line.slice(0, line.indexOf("\t")))
 
 describe("the policy nono resolves from the profile", () => {
   let dir = ""
@@ -121,9 +135,9 @@ describe("the policy nono resolves from the profile", () => {
     skipReason("needs nono on PATH to resolve the profile", "grants no access to the user's global git config"),
     async () => {
       const { grants } = (await manifestOf(profilePath, home)).filesystem
-      const globalConfigs = [join(homedir(), ".gitconfig"), join(homedir(), ".config", "git")]
+      const globalConfigs = [home, homedir()].flatMap((user) => [join(user, ".gitconfig"), join(user, ".config", "git")])
       for (const grant of grants) {
-        expect(globalConfigs.some((config) => config === grant.path || config.startsWith(`${grant.path}/`))).toBe(false)
+        expect(globalConfigs.filter((config) => within(grant.path, config) || within(config, grant.path))).toEqual([])
       }
     }
   )
@@ -326,12 +340,9 @@ describe("nonoSandboxProvider", () => {
       try {
         git(["init", "-q"], dir)
         git(["config", key, value], dir)
-        const error = await createError(dir, join(dir, ".session"))
-        expect(error).toBeInstanceOf(NonoProviderError)
-        if (error instanceof NonoProviderError) {
-          expect(error.reason).toContain(`carries a credential in ${reported}`)
-          expect(error.reason).not.toContain(sentinelToken)
-        }
+        const reason = await refusalOf(dir, join(dir, ".session"))
+        expect(reason).toContain(`carries a credential in ${reported}`)
+        expect(reason).not.toContain(sentinelToken)
       } finally {
         await rm(dir, { recursive: true, force: true })
       }
@@ -344,12 +355,9 @@ describe("nonoSandboxProvider", () => {
       git(["init", "-q"], dir)
       await writeFile(join(dir, "included.gitconfig"), `[http]\n\textraHeader = Authorization: Bearer ${sentinelToken}\n`)
       git(["config", "include.path", join(dir, "included.gitconfig")], dir)
-      const error = await createError(dir, join(dir, ".session"))
-      expect(error).toBeInstanceOf(NonoProviderError)
-      if (error instanceof NonoProviderError) {
-        expect(error.reason).toContain("carries a credential in http.extraheader")
-        expect(error.reason).not.toContain(sentinelToken)
-      }
+      const reason = await refusalOf(dir, join(dir, ".session"))
+      expect(reason).toContain("carries a credential in http.extraheader")
+      expect(reason).not.toContain(sentinelToken)
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -363,11 +371,61 @@ describe("nonoSandboxProvider", () => {
       git(["config", "includeIf.onbranch:main.path", "push-auth.conf"], dir)
       const active = Bun.spawnSync(["git", "config", "--get", "http.extraHeader"], { cwd: dir })
       expect(active.exitCode).toBe(1)
-      const error = await createError(dir, join(dir, ".session"))
-      expect(error).toBeInstanceOf(NonoProviderError)
-      if (error instanceof NonoProviderError) {
-        expect(error.reason).toContain(`${await realpath(join(dir, ".git", "push-auth.conf"))} carries a credential in http.extraheader`)
+      const reason = await refusalOf(dir, join(dir, ".session"))
+      expect(reason).toContain(`${await realpath(join(dir, ".git", "push-auth.conf"))} carries a credential in http.extraheader`)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("refuses a checkout whose include resolves relative to the path git opened, not the include's symlink target", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-nono-cred-"))
+    try {
+      git(["init", "-q"], dir)
+      await mkdir(join(dir, "cfg"))
+      await writeFile(join(dir, "cfg", "base.inc"), "[include]\n\tpath = auth.inc\n")
+      await symlink(join("cfg", "base.inc"), join(dir, "shared.inc"))
+      await writeFile(join(dir, "auth.inc"), `[http]\n\textraHeader = Authorization: Bearer ${sentinelToken}\n`)
+      git(["config", "include.path", "../shared.inc"], dir)
+      expect(extraHeaderOrigins(dir)).toEqual(["file:.git/../auth.inc"])
+      const reason = await refusalOf(dir, join(dir, ".session"))
+      expect(reason).toContain(`${await realpath(dir)}/.git/../auth.inc carries a credential in http.extraheader`)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test.skipIf(!process.cwd().startsWith(`${userInfo().homedir}/`))(
+    skipReason("needs the working directory under the user's home", "refuses a checkout whose ~user/ include carries an http extraHeader"),
+    async () => {
+      const dir = await mkdtemp(join(tmpdir(), "orc-nono-cred-"))
+      const outside = await mkdtemp(join(process.cwd(), ".orc-nono-include-"))
+      try {
+        git(["init", "-q"], dir)
+        const included = join(outside, "auth.inc")
+        await writeFile(included, `[http]\n\textraHeader = Authorization: Bearer ${sentinelToken}\n`)
+        git(["config", "include.path", `~${userInfo().username}/${relative(userInfo().homedir, included)}`], dir)
+        expect(extraHeaderOrigins(dir)).toEqual([`file:${included}`])
+        const reason = await refusalOf(dir, join(dir, ".session"))
+        expect(reason).toContain(`${included} carries a credential in http.extraheader`)
+      } finally {
+        await rm(dir, { recursive: true, force: true })
+        await rm(outside, { recursive: true, force: true })
       }
+    }
+  )
+
+  test("refuses a checkout whose inactive include recurses through a symlinked directory, as git would", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-nono-cred-"))
+    try {
+      git(["init", "-q"], dir)
+      await writeFile(join(dir, ".git", "self.inc"), "[include]\n\tpath = again/self.inc\n")
+      await symlink(".", join(dir, ".git", "again"))
+      git(["config", "includeIf.onbranch:never.path", "self.inc"], dir)
+      const gitReads = Bun.spawnSync(["git", "config", "--includes", "--file", join(dir, ".git", "self.inc"), "--list"], { stdout: "pipe", stderr: "pipe" })
+      expect(gitReads.stderr.toString()).toContain("exceeded maximum include depth")
+      const reason = await refusalOf(dir, join(dir, ".session"))
+      expect(reason).toContain("is included deeper than git reads")
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -383,11 +441,8 @@ describe("nonoSandboxProvider", () => {
       git(["config", "extensions.worktreeConfig", "true"], main)
       git(["config", "--worktree", "http.extraHeader", `Authorization: Bearer ${sentinelToken}`], main)
       git(["worktree", "add", "-q", join(dir, "linked")], main)
-      const error = await createError(join(dir, "linked"), join(dir, "session"))
-      expect(error).toBeInstanceOf(NonoProviderError)
-      if (error instanceof NonoProviderError) {
-        expect(error.reason).toContain(`${await realpath(join(main, ".git", "config.worktree"))} carries a credential in http.extraheader`)
-      }
+      const reason = await refusalOf(join(dir, "linked"), join(dir, "session"))
+      expect(reason).toContain(`${await realpath(join(main, ".git", "config.worktree"))} carries a credential in http.extraheader`)
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -407,12 +462,9 @@ describe("nonoSandboxProvider", () => {
       git(["-c", "protocol.file.allow=always", "submodule", "add", "-q", dependency, "dep"], main)
       const submoduleGitDir = join(main, ".git", "modules", "dep")
       git(["config", "remote.origin.url", `https://${sentinelToken}@github.com/orc/dep.git`], submoduleGitDir)
-      const error = await createError(main, join(dir, "session"))
-      expect(error).toBeInstanceOf(NonoProviderError)
-      if (error instanceof NonoProviderError) {
-        expect(error.reason).toContain(`${await realpath(join(submoduleGitDir, "config"))} carries a credential in remote.url`)
-        expect(error.reason).not.toContain(sentinelToken)
-      }
+      const reason = await refusalOf(main, join(dir, "session"))
+      expect(reason).toContain(`${await realpath(join(submoduleGitDir, "config"))} carries a credential in remote.url`)
+      expect(reason).not.toContain(sentinelToken)
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -430,11 +482,8 @@ describe("nonoSandboxProvider", () => {
         join(nested, "worktrees", "linked", "config.worktree"),
         `[http]\n\textraHeader = Authorization: Bearer ${sentinelToken}\n`
       )
-      const error = await createError(dir, join(dir, ".session"))
-      expect(error).toBeInstanceOf(NonoProviderError)
-      if (error instanceof NonoProviderError) {
-        expect(error.reason).toContain(`${await realpath(join(nested, "worktrees", "linked", "config.worktree"))} carries a credential in http.extraheader`)
-      }
+      const reason = await refusalOf(dir, join(dir, ".session"))
+      expect(reason).toContain(`${await realpath(join(nested, "worktrees", "linked", "config.worktree"))} carries a credential in http.extraheader`)
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -446,12 +495,9 @@ describe("nonoSandboxProvider", () => {
       git(["init", "-q"], dir)
       git(["config", "--file", ".gitmodules", "submodule.dep.path", "dep"], dir)
       git(["config", "--file", ".gitmodules", "submodule.dep.url", `https://${sentinelToken}@github.com/orc/dep.git`], dir)
-      const error = await createError(dir, join(dir, ".session"))
-      expect(error).toBeInstanceOf(NonoProviderError)
-      if (error instanceof NonoProviderError) {
-        expect(error.reason).toContain(`${await realpath(join(dir, ".gitmodules"))} carries a credential in submodule.url`)
-        expect(error.reason).not.toContain(sentinelToken)
-      }
+      const reason = await refusalOf(dir, join(dir, ".session"))
+      expect(reason).toContain(`${await realpath(join(dir, ".gitmodules"))} carries a credential in submodule.url`)
+      expect(reason).not.toContain(sentinelToken)
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -466,11 +512,8 @@ describe("nonoSandboxProvider", () => {
       await mkdir(join(dir, "vendor", "dep"), { recursive: true })
       git(["config", "--file", ".gitmodules", "submodule.inner.path", "inner"], join(dir, "vendor", "dep"))
       git(["config", "--file", ".gitmodules", "submodule.inner.url", `https://x:${sentinelToken}@github.com/orc/inner.git`], join(dir, "vendor", "dep"))
-      const error = await createError(dir, join(dir, ".session"))
-      expect(error).toBeInstanceOf(NonoProviderError)
-      if (error instanceof NonoProviderError) {
-        expect(error.reason).toContain(`${await realpath(join(dir, "vendor", "dep", ".gitmodules"))} carries a credential in submodule.url`)
-      }
+      const reason = await refusalOf(dir, join(dir, ".session"))
+      expect(reason).toContain(`${await realpath(join(dir, "vendor", "dep", ".gitmodules"))} carries a credential in submodule.url`)
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -485,11 +528,8 @@ describe("nonoSandboxProvider", () => {
       await mkdir(join(dir, "dep"))
       git(["init", "-q"], join(dir, "dep"))
       git(["config", "http.extraHeader", `Authorization: Bearer ${sentinelToken}`], join(dir, "dep"))
-      const error = await createError(dir, join(dir, ".session"))
-      expect(error).toBeInstanceOf(NonoProviderError)
-      if (error instanceof NonoProviderError) {
-        expect(error.reason).toContain(`${await realpath(join(dir, "dep", ".git", "config"))} carries a credential in http.extraheader`)
-      }
+      const reason = await refusalOf(dir, join(dir, ".session"))
+      expect(reason).toContain(`${await realpath(join(dir, "dep", ".git", "config"))} carries a credential in http.extraheader`)
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -504,11 +544,8 @@ describe("nonoSandboxProvider", () => {
       git(["config", "http.extraHeader", `Authorization: Bearer ${sentinelToken}`], join(dir, ".git", "modules", "dep"))
       await mkdir(locked, { recursive: true })
       await chmod(locked, 0o000)
-      const error = await createError(dir, join(dir, ".session"))
-      expect(error).toBeInstanceOf(NonoProviderError)
-      if (error instanceof NonoProviderError) {
-        expect(error.reason).toContain(`cannot scan ${await realpath(join(dir, ".git", "modules"))} for credentials`)
-      }
+      const reason = await refusalOf(dir, join(dir, ".session"))
+      expect(reason).toContain(`cannot scan ${await realpath(join(dir, ".git", "modules"))} for credentials`)
     } finally {
       await chmod(locked, 0o755)
       await rm(dir, { recursive: true, force: true })
@@ -539,11 +576,8 @@ describe("nonoSandboxProvider", () => {
   test("refuses to create a sandbox when the worktree is not a git checkout", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-nono-plain-"))
     try {
-      const error = await createError(dir, join(dir, "session"))
-      expect(error).toBeInstanceOf(NonoProviderError)
-      if (error instanceof NonoProviderError) {
-        expect(error.reason).toContain("cannot resolve git data dir")
-      }
+      const reason = await refusalOf(dir, join(dir, "session"))
+      expect(reason).toContain("cannot resolve git data dir")
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

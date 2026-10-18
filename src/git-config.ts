@@ -43,18 +43,9 @@ export const submoduleCheckouts = (path: Path.Path, gitmodules: string, listing:
     key.startsWith("submodule.") && key.endsWith(".path") ? [path.resolve(path.dirname(gitmodules), value)] : []
   )
 
-export const includeTargets = (
-  path: Path.Path,
-  home: string | undefined,
-  file: string,
-  listing: string
-): ReadonlyArray<string> =>
-  entries(listing).flatMap(([key, value]) => {
-    if (key !== "include.path" && !(key.startsWith("includeif.") && key.endsWith(".path"))) {
-      return []
-    }
-    if (!value.startsWith("~/")) {
-      return [path.resolve(path.dirname(file), value)]
-    }
-    return home === undefined ? [] : [path.join(home, value.slice(2))]
-  })
+export const includePathKeys = "^include(if\\..*)?\\.path$"
+
+// The listing is `git config --type=path --get-regexp -z` over includePathKeys, so git has already expanded each pathname.
+// Normalizing `..` or resolving the including file's symlinks would name a different file than the one git opens.
+export const includeTargets = (path: Path.Path, file: string, listing: string): ReadonlyArray<string> =>
+  entries(listing).map(([, value]) => (path.isAbsolute(value) ? value : `${path.dirname(file)}/${value}`))
