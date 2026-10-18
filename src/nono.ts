@@ -94,7 +94,7 @@ const resolveGitDataDir = (
     )
     if (result.exitCode !== 0) {
       return yield* new NonoProviderError({
-        reason: `orc nono provider: cannot resolve git data dir for ${worktree}: ${result.stderr.trim()}`
+        message: `orc nono provider: cannot resolve git data dir for ${worktree}: ${result.stderr.trim()}`
       })
     }
     const raw = result.stdout.trim()
@@ -106,7 +106,7 @@ const unlessAbsent = <A>(absent: A, target: string) => (effect: Effect.Effect<A,
   effect.pipe(
     Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(absent)),
     Effect.mapError((cause) =>
-      new NonoProviderError({ reason: `orc nono provider: cannot scan ${target} for credentials: ${cause.message}` })
+      new NonoProviderError({ message: `orc nono provider: cannot scan ${target} for credentials: ${cause.message}` })
     )
   )
 
@@ -143,7 +143,7 @@ const readGitConfig = (spawner: Spawner, { binary, env }: HostGit, file: string,
       if (result.exitCode === 0 || (matchless && result.exitCode === 1 && result.stderr === "")) {
         return Effect.succeed(result.stdout)
       }
-      return Effect.fail(new NonoProviderError({ reason: `orc nono provider: cannot read the git config ${file}: ${result.stderr.trim()}` }))
+      return Effect.fail(new NonoProviderError({ message: `orc nono provider: cannot read the git config ${file}: ${result.stderr.trim()}` }))
     })
   )
 
@@ -165,14 +165,14 @@ const refuseCredentialBearingCheckout = (
         continue
       }
       if (depth > maxIncludeDepth) {
-        return yield* new NonoProviderError({ reason: `orc nono provider: the git config ${file} is included deeper than git reads` })
+        return yield* new NonoProviderError({ message: `orc nono provider: the git config ${file} is included deeper than git reads` })
       }
       seen.add(file)
       const listing = yield* readGitConfig(spawner, hostGit, file, ["--list"], false)
       const offending = credentialBearingKeys(listing)
       if (offending.length > 0) {
         return yield* new NonoProviderError({
-          reason: `orc nono provider: the git config ${file} carries a credential in ${offending.join(", ")}`
+          message: `orc nono provider: the git config ${file} carries a credential in ${offending.join(", ")}`
         })
       }
       const includes = yield* readGitConfig(spawner, hostGit, file, ["--type=path", "--get-regexp", includePathKeys], true)
@@ -197,7 +197,7 @@ const resolveRoots = (
   Effect.gen(function*() {
     for (const root of [worktree, piSessionDir]) {
       if (!path.isAbsolute(root)) {
-        return yield* new NonoProviderError({ reason: `orc nono provider: sandbox root must be absolute: ${root}` })
+        return yield* new NonoProviderError({ message: `orc nono provider: sandbox root must be absolute: ${root}` })
       }
     }
     const gitData = yield* resolveGitDataDir(spawner, path, hostGit, worktree)
@@ -212,7 +212,7 @@ const resolveRoots = (
 const requireSuccess = (action: string) => (result: HostCommandResult): Effect.Effect<HostCommandResult, NonoProviderError> =>
   result.exitCode === 0
     ? Effect.succeed(result)
-    : Effect.fail(new NonoProviderError({ reason: `orc nono provider: cannot ${action}: ${result.stderr.trim()}` }))
+    : Effect.fail(new NonoProviderError({ message: `orc nono provider: cannot ${action}: ${result.stderr.trim()}` }))
 
 interface Sandbox {
   readonly nonoBinary: string
@@ -257,7 +257,7 @@ const checkProfile = (
     const validation = yield* runHostCommand(spawner, nono(["profile", "validate", profilePath]))
     if (validation.exitCode !== 0) {
       return yield* new NonoProviderError({
-        reason: `orc nono provider: profile failed validation: ${validation.stderr.trim()}`
+        message: `orc nono provider: profile failed validation: ${validation.stderr.trim()}`
       })
     }
     for (const trusted of hostTrustedPaths) {
@@ -267,12 +267,12 @@ const checkProfile = (
       )
       const verdict = yield* Schema.decodeEffect(NonoWhyVerdict)(write.stdout).pipe(
         Effect.mapError((cause) =>
-          new NonoProviderError({ reason: `orc nono provider: cannot read nono's write verdict: ${String(cause)}` })
+          new NonoProviderError({ message: `orc nono provider: cannot read nono's write verdict: ${String(cause)}` })
         )
       )
       if (verdict.status !== "denied") {
         return yield* new NonoProviderError({
-          reason: `orc nono provider: the sandbox could write ${trusted}, which the host runs or reads as policy`
+          message: `orc nono provider: the sandbox could write ${trusted}, which the host runs or reads as policy`
         })
       }
     }
@@ -323,11 +323,11 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
           return runOwned(
             fs.realPath(cwd).pipe(
               Effect.mapError((cause) =>
-                new NonoProviderError({ reason: `orc nono provider: cannot resolve working directory ${cwd}: ${String(cause)}` })
+                new NonoProviderError({ message: `orc nono provider: cannot resolve working directory ${cwd}: ${String(cause)}` })
               ),
               Effect.filterOrFail(
                 (realCwd) => [roots.worktree, roots.gitData, roots.piSessionDir].some((root) => within(root, realCwd)),
-                () => new NonoProviderError({ reason: `orc nono provider: working directory is outside the sandbox roots: ${cwd}` })
+                () => new NonoProviderError({ message: `orc nono provider: working directory is outside the sandbox roots: ${cwd}` })
               ),
               Effect.andThen((realCwd) => sandboxed(command, { cwd: realCwd, stdin, onLine: execOptions?.onLine })),
               Effect.map(({ stdout, stderr, exitCode }) => ({ stdout, stderr, exitCode })),

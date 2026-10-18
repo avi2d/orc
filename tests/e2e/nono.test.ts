@@ -3,6 +3,7 @@ import { chmod, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs
 import { homedir, tmpdir, userInfo } from "node:os"
 import { basename, join, relative } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
+import { createSandbox } from "@ai-hero/sandcastle"
 import { Schema } from "effect"
 import { buildNonoRunArgs, buildSandboxEnv, NonoProviderError, nonoSandboxProvider } from "../../src/nono"
 import { buildNonoProfile, runtimeReadFiles, toolchainReadPaths } from "../../src/nono-profile"
@@ -82,7 +83,7 @@ const refusalOf = async (worktree: string, piSessionDir: string, env: Record<str
   if (!(error instanceof NonoProviderError)) {
     throw new Error(`expected a NonoProviderError, got ${String(error)}`)
   }
-  return error.reason
+  return error.message
 }
 
 const git = (args: ReadonlyArray<string>, cwd: string): void => {
@@ -529,6 +530,41 @@ describe("nonoSandboxProvider", () => {
       expect(reason).toContain("carries a credential in http.extraheader")
       expect(await Bun.file(join(dir, "ran-outside-nono")).exists()).toBe(false)
     } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("Sandcastle's createSandbox reports the provider's refusal reason", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-nono-sandcastle-"))
+    const saved = { HOME: Bun.env.HOME, GIT_CONFIG_GLOBAL: Bun.env.GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM: Bun.env.GIT_CONFIG_NOSYSTEM }
+    Object.assign(Bun.env, { HOME: fixtureGitEnv.HOME, GIT_CONFIG_GLOBAL: fixtureGitEnv.GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM: "1" })
+    try {
+      git(["init", "-q", "-b", "main"], dir)
+      await writeFile(join(dir, ".gitignore"), ".sandcastle/\n")
+      git(["add", "-A"], dir)
+      git(["-c", "user.name=orc", "-c", "user.email=orc@example.com", "commit", "-q", "-m", "seed"], dir)
+      git(["remote", "add", "origin", `https://x-access-token:${sentinelToken}@github.com/orc/x.git`], dir)
+      await mkdir(join(dir, ".sandcastle"))
+      await writeFile(join(dir, ".sandcastle", ".env"), `HOME=${fixtureHome}\n`)
+      const error = await createSandbox({ branch: "orc/refused", sandbox: nonoSandboxProvider({ piSessionDir: join(dir, "session") }), cwd: dir })
+        .then(async (sandbox) => {
+          await sandbox.close()
+          return null
+        }, (cause: unknown) => cause)
+      expect(error).toBeInstanceOf(Error)
+      if (error instanceof Error) {
+        expect(error.message).toContain("Provider 'orc-nono' create failed: orc nono provider: the git config")
+        expect(error.message).toContain("carries a credential in remote.url")
+        expect(error.message).not.toContain(sentinelToken)
+      }
+    } finally {
+      for (const [key, value] of Object.entries(saved)) {
+        if (value === undefined) {
+          delete Bun.env[key]
+        } else {
+          Bun.env[key] = value
+        }
+      }
       await rm(dir, { recursive: true, force: true })
     }
   })

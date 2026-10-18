@@ -366,7 +366,7 @@ describe("nono sandbox provider", () => {
       const error = await execOrThrow("touch cwd-probe", { cwd: link }).then(() => null, (cause: unknown) => cause)
       expect(error).toBeInstanceOf(NonoProviderError)
       if (error instanceof NonoProviderError) {
-        expect(error.reason).toContain("outside the sandbox roots")
+        expect(error.message).toContain("outside the sandbox roots")
       }
       expect(await exists(join(outside, "cwd-probe"))).toBe(false)
     } finally {
@@ -474,7 +474,7 @@ describe("nono sandbox provider", () => {
       .then(() => null, (cause: unknown) => cause)
     expect(error).toBeInstanceOf(NonoProviderError)
     if (error instanceof NonoProviderError) {
-      expect(error.reason).toContain("the sandbox could write")
+      expect(error.message).toContain("the sandbox could write")
     }
   })
 

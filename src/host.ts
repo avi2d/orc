@@ -3,7 +3,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { type Runtime, runtimeOf } from "./nono-profile"
 
 export class NonoProviderError extends Data.TaggedError("NonoProviderError")<{
-  readonly reason: string
+  readonly message: string
 }> {}
 
 export type Spawner = ChildProcessSpawner.ChildProcessSpawner["Service"]
@@ -42,7 +42,7 @@ export const runHostCommand = (
     return { stdout: new TextDecoder().decode(stdoutBytes), stdoutBytes, stderr, exitCode: code }
   })).pipe(
     Effect.mapError(
-      (cause) => new NonoProviderError({ reason: `orc nono provider: command failed to run: ${String(cause)}` })
+      (cause) => new NonoProviderError({ message: `orc nono provider: command failed to run: ${String(cause)}` })
     )
   )
 
@@ -50,9 +50,9 @@ export const runHostCommand = (
 export const resolveHostBinary = (fs: FileSystem.FileSystem, name: string): Effect.Effect<string, NonoProviderError> => {
   const found = Bun.which(name)
   return found === null
-    ? Effect.fail(new NonoProviderError({ reason: `orc nono provider: ${name} is not on the host PATH` }))
+    ? Effect.fail(new NonoProviderError({ message: `orc nono provider: ${name} is not on the host PATH` }))
     : fs.realPath(found).pipe(
-      Effect.mapError((cause) => new NonoProviderError({ reason: `orc nono provider: cannot resolve ${name}: ${String(cause)}` }))
+      Effect.mapError((cause) => new NonoProviderError({ message: `orc nono provider: cannot resolve ${name}: ${String(cause)}` }))
     )
 }
 
@@ -68,7 +68,7 @@ export const resolveDeveloperDir = (
       return null
     }
     return yield* fs.realPath(result.stdout.trim()).pipe(
-      Effect.mapError((cause) => new NonoProviderError({ reason: `orc nono provider: cannot resolve the developer folder: ${String(cause)}` }))
+      Effect.mapError((cause) => new NonoProviderError({ message: `orc nono provider: cannot resolve the developer folder: ${String(cause)}` }))
     )
   })
 
@@ -88,7 +88,7 @@ export const resolveRuntime = (
         continue
       }
       const real = yield* fs.realPath(candidate).pipe(
-        Effect.mapError((cause) => new NonoProviderError({ reason: `orc nono provider: cannot resolve ${name}: ${String(cause)}` }))
+        Effect.mapError((cause) => new NonoProviderError({ message: `orc nono provider: cannot resolve ${name}: ${String(cause)}` }))
       )
       if (path.basename(real) === "mise") {
         shimmed = true
@@ -97,14 +97,14 @@ export const resolveRuntime = (
       const runtime = runtimeOf(candidate, real, home)
       if (runtime === null) {
         return yield* new NonoProviderError({
-          reason: `orc nono provider: ${name} at ${real} is in neither a toolchain folder nor one mise install folder, so the sandbox is granted no folder for it`
+          message: `orc nono provider: ${name} at ${real} is in neither a toolchain folder nor one mise install folder, so the sandbox is granted no folder for it`
         })
       }
       return runtime
     }
     if (shimmed) {
       return yield* new NonoProviderError({
-        reason: `orc nono provider: ${name} is on the PATH only as a mise shim; put its mise install folder on the PATH`
+        message: `orc nono provider: ${name} is on the PATH only as a mise shim; put its mise install folder on the PATH`
       })
     }
     return null
