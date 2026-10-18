@@ -477,4 +477,31 @@ describe("nono sandbox provider", () => {
       expect(error.reason).toContain("the sandbox could write")
     }
   })
+
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "stops every running and later command once close resolves"), async () => {
+    const lateMarkers = [join(copy, "late-foreground"), join(copy, "late-background")]
+    const sandbox = await nonoSandboxProvider({ piSessionDir: session }).create({ worktreePath: copy, hostRepoPath: copy, mounts: [], env: { HOME: fixtureHome } })
+    const started = sandbox.exec(`(trap '' TERM; sleep 2; touch "${lateMarkers[1]}") & trap '' TERM; sleep 2; touch "${lateMarkers[0]}"`)
+    const outcome = started.then(() => "resolved", () => "rejected")
+    let settled = false
+    void outcome.then(() => {
+      settled = true
+    })
+    await Bun.sleep(500)
+    await sandbox.close()
+    await Bun.sleep(0)
+    expect(settled).toBe(true)
+    expect(await outcome).toBe("rejected")
+    await Bun.sleep(2500)
+    expect(await Promise.all(lateMarkers.map(exists))).toEqual([false, false])
+    const source = join(outside, "after-close-source")
+    await writeFile(source, "after close\n")
+    const afterClose = await Promise.all([
+      sandbox.exec(`touch "${join(copy, "late-exec")}"`),
+      sandbox.copyFileIn(source, join(copy, "late-copy-in")),
+      sandbox.copyFileOut(join(copy, "seed.txt"), join(outside, "late-copy-out"))
+    ].map((pending) => pending.then(() => "resolved", () => "rejected")))
+    expect(afterClose).toEqual(["rejected", "rejected", "rejected"])
+    expect(await Promise.all([join(copy, "late-exec"), join(copy, "late-copy-in"), join(outside, "late-copy-out")].map(exists))).toEqual([false, false, false])
+  })
 })

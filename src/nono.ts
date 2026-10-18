@@ -6,7 +6,7 @@ import {
   type ExecResult
 } from "@ai-hero/sandcastle"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, FileSystem, Path, Schema, Stream } from "effect"
+import { Effect, Exit, FiberSet, FileSystem, Path, Schema, Scope, Stream } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { homedir } from "node:os"
@@ -239,7 +239,8 @@ const runSandboxed = (
       cwd: run.cwd,
       env: sandbox.env,
       extendEnv: false,
-      stdin: run.stdin
+      stdin: run.stdin,
+      forceKillAfter: "1 second"
     }),
     { onLine: run.onLine }
   )
@@ -305,6 +306,8 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
         Effect.onError(() => fs.remove(profileDir, { recursive: true }).pipe(Effect.result))
       )
       const sandboxed = (command: string, run: SandboxedRun) => runSandboxed(spawner, { nonoBinary, profilePath, env }, command, run)
+      const lifetime = yield* Scope.make()
+      const runOwned = yield* FiberSet.makeRuntimePromise().pipe(Scope.provide(lifetime))
       return {
         worktreePath: worktree,
         exec: (
@@ -316,10 +319,8 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
           }
         ): Promise<ExecResult> => {
           const cwd = execOptions?.cwd ?? worktree
-          const stdin = execOptions?.stdin === undefined
-            ? "ignore"
-            : Stream.fromIterable([new TextEncoder().encode(execOptions.stdin)])
-          return Effect.runPromise(
+          const stdin = execOptions?.stdin === undefined ? "ignore" : Stream.fromIterable([new TextEncoder().encode(execOptions.stdin)])
+          return runOwned(
             fs.realPath(cwd).pipe(
               Effect.mapError((cause) =>
                 new NonoProviderError({ reason: `orc nono provider: cannot resolve working directory ${cwd}: ${String(cause)}` })
@@ -335,7 +336,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
           )
         },
         copyFileIn: (hostPath: string, sandboxPath: string): Promise<void> =>
-          Effect.runPromise(
+          runOwned(
             fs.readFile(hostPath).pipe(
               Effect.andThen((bytes) =>
                 sandboxed(`mkdir -p -- "$(dirname -- "$1")" && cat > "$1"`, {
@@ -350,7 +351,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
             )
           ),
         copyFileOut: (sandboxPath: string, hostPath: string): Promise<void> =>
-          Effect.runPromise(
+          runOwned(
             sandboxed(`cat -- "$1"`, { cwd: roots.worktree, stdin: "ignore", positional: [sandboxPath] }).pipe(
               Effect.andThen(requireSuccess(`copy ${sandboxPath} out of the sandbox`)),
               Effect.andThen(({ stdoutBytes }) =>
@@ -363,7 +364,8 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
           ),
         close: (): Promise<void> =>
           Effect.runPromise(
-            fs.remove(profileDir, { recursive: true }).pipe(
+            Scope.close(lifetime, Exit.void).pipe(
+              Effect.andThen(() => fs.remove(profileDir, { recursive: true })),
               // A leftover rendered profile is litter, never a teardown failure.
               Effect.result,
               Effect.asVoid,
