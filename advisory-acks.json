@@ -1,0 +1,32 @@
+[
+  {
+    "package": "qs",
+    "id": "GHSA-4mjr-xmp4-gh2g",
+    "until": "2026-11-16",
+    "reason": "qs 6.15.1 arrives through the mutation tooling's typed-rest-client, which only the CI mutation jobs load; the orc binary never imports it"
+  },
+  {
+    "package": "qs",
+    "id": "GHSA-q8mj-m7cp-5q26",
+    "until": "2026-11-16",
+    "reason": "qs 6.15.1 arrives through the mutation tooling's typed-rest-client, which only the CI mutation jobs load; the orc binary never imports it"
+  },
+  {
+    "package": "qs",
+    "id": "GHSA-x5fp-wj9c-mxmx",
+    "until": "2026-11-16",
+    "reason": "qs 6.15.1 arrives through the mutation tooling's typed-rest-client, which only the CI mutation jobs load; the orc binary never imports it"
+  },
+  {
+    "package": "smol-toml",
+    "id": "GHSA-7w5x-hrqm-74c2",
+    "until": "2026-11-16",
+    "reason": "smol-toml 1.7.0 arrives through the mutation runner, which only the CI mutation jobs load; the orc binary never parses TOML"
+  },
+  {
+    "package": "smol-toml",
+    "id": "GHSA-r4xh-jqrq-34v2",
+    "until": "2026-11-16",
+    "reason": "smol-toml 1.7.0 arrives through the mutation runner, which only the CI mutation jobs load; the orc binary never parses TOML"
+  }
+]

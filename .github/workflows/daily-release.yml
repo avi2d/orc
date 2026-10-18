@@ -1,0 +1,52 @@
+name: daily-release
+on:
+  schedule:
+    - cron: "29 3 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  pull-request:
+    if: github.event_name != 'push'
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    concurrency:
+      group: release-pull-request
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: open or refresh the release pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bunx checks-release-pr ci.yml
+  tag:
+    if: "github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore: release ')"
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: tag the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bunx checks-release-tag release.yml

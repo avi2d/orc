@@ -1,0 +1,2 @@
+[test]
+pathIgnorePatterns = ["**/tests/quarantine/**", "**/tests/live/**", "**/tests/pixel/**", "repos/**"]
