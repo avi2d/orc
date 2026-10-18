@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, realpath, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
@@ -216,11 +216,31 @@ describe("nono sandbox provider", () => {
     }
   })
 
-  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "a working directory outside the roots grants no write"), async () => {
-    const result = await execOrThrow("touch cwd-probe && echo escaped", { cwd: outside })
-    expect(result.exitCode).not.toBe(0)
-    expect(result.stdout).not.toContain("escaped")
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "rejects a working directory outside the roots"), async () => {
+    const error = await execOrThrow("touch cwd-probe", { cwd: outside }).then(() => null, (cause: unknown) => cause)
+    expect(error).toBeInstanceOf(NonoProviderError)
     expect(await exists(join(outside, "cwd-probe"))).toBe(false)
+  })
+
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "rejects a symlinked working directory that leads outside the roots"), async () => {
+    const link = join(copy, "outside-link")
+    await symlink(outside, link)
+    try {
+      const error = await execOrThrow("touch cwd-probe", { cwd: link }).then(() => null, (cause: unknown) => cause)
+      expect(error).toBeInstanceOf(NonoProviderError)
+      if (error instanceof NonoProviderError) {
+        expect(error.reason).toContain("outside the sandbox roots")
+      }
+      expect(await exists(join(outside, "cwd-probe"))).toBe(false)
+    } finally {
+      await rm(link)
+    }
+  })
+
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "accepts a working directory inside the session folder"), async () => {
+    const result = await execOrThrow("pwd", { cwd: session })
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toBe(`${await realpath(session)}\n`)
   })
 
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "no host credential reaches the command"), async () => {
@@ -247,13 +267,35 @@ describe("nono sandbox provider", () => {
     expect(refs.output).toBe("refs/heads/host-control\n")
   })
 
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "a nono planted on the caller's PATH is never run on the host"), async () => {
+    const plantedDir = join(copy, "planted-bin")
+    const marker = join(outside, "planted-ran")
+    await mkdir(plantedDir, { recursive: true })
+    await writeFile(join(plantedDir, "nono"), `#!/bin/sh\ntouch ${marker}\necho planted\n`)
+    await chmod(join(plantedDir, "nono"), 0o755)
+    const planted = await nonoSandboxProvider({ piSessionDir: session }).create({
+      worktreePath: copy,
+      hostRepoPath: copy,
+      mounts: [],
+      env: { PATH: `${plantedDir}:${Bun.env.PATH ?? ""}` }
+    })
+    try {
+      const result = await planted.exec("echo sandboxed")
+      expect(result.stdout).toBe("sandboxed\n")
+      expect(await exists(marker)).toBe(false)
+    } finally {
+      await planted.close()
+      await rm(plantedDir, { recursive: true, force: true })
+    }
+  })
+
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "refuses a session folder that would hold its own profile"), async () => {
     const error = await nonoSandboxProvider({ piSessionDir: tmpdir() })
       .create({ worktreePath: copy, hostRepoPath: copy, mounts: [], env: {} })
       .then(() => null, (cause: unknown) => cause)
     expect(error).toBeInstanceOf(NonoProviderError)
     if (error instanceof NonoProviderError) {
-      expect(error.reason).toContain("could rewrite its own profile")
+      expect(error.reason).toContain("the sandbox could write")
     }
   })
 })
