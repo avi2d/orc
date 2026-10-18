@@ -7,13 +7,13 @@ export const RUN_HISTORY_SCHEMA_VERSION = 1
 export const RUNS_JSON_SCHEMA = "orc.runs.v1" as const
 
 const RunStatusSchema = Schema.Literals(["running", "succeeded", "failed"])
-export type RunStatus = typeof RunStatusSchema.Type
+type RunStatus = typeof RunStatusSchema.Type
 const StepStatusSchema = Schema.Literals(["running", "passed", "failed", "skipped"])
-export type StepStatus = typeof StepStatusSchema.Type
+type StepStatus = typeof StepStatusSchema.Type
 const EvidenceDirectionSchema = Schema.Literals(["in", "out"])
-export type EvidenceDirection = typeof EvidenceDirectionSchema.Type
+type EvidenceDirection = typeof EvidenceDirectionSchema.Type
 const ScoreValueSchema = Schema.Literals([1, 2, 3, 4, 5])
-export type ScoreValue = typeof ScoreValueSchema.Type
+type ScoreValue = typeof ScoreValueSchema.Type
 
 export class UnsupportedSchemaVersion extends Data.TaggedError("UnsupportedSchemaVersion")<{
   readonly found: number
@@ -62,18 +62,6 @@ export interface StepInput {
   readonly piSessionFile?: string | null | undefined
 }
 
-export interface StepRecord {
-  readonly id: number
-  readonly runId: string
-  readonly name: string
-  readonly attempt: number
-  readonly status: StepStatus
-  readonly started: string
-  readonly ended: string | null
-  readonly agentFile: string | null
-  readonly piSessionFile: string | null
-}
-
 export interface EvidenceInput {
   readonly stepId: number
   readonly direction: EvidenceDirection
@@ -94,7 +82,7 @@ export interface ScoreInput {
   readonly scoredAt: string
 }
 
-export interface RunJsonEntry {
+interface RunJsonEntry {
   readonly id: string
   readonly project: string
   readonly branch: string
