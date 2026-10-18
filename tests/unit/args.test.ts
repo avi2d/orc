@@ -25,4 +25,20 @@ describe("parseArgs", () => {
   test("an extra argument is a usage error", () => {
     expect(parseArgs(["--version", "extra"])).toEqual({ kind: "UsageError", detail: "unexpected argument: extra" })
   })
+
+  test("runs lists recent runs", () => {
+    expect(parseArgs(["runs"])).toEqual({ kind: "ListRuns", json: false })
+  })
+
+  test("runs --json lists recent runs as JSON", () => {
+    expect(parseArgs(["runs", "--json"])).toEqual({ kind: "ListRuns", json: true })
+  })
+
+  test("an unknown runs flag is a usage error", () => {
+    expect(parseArgs(["runs", "--frobnicate"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --frobnicate" })
+  })
+
+  test("an extra runs argument is a usage error", () => {
+    expect(parseArgs(["runs", "--json", "extra"])).toEqual({ kind: "UsageError", detail: "unexpected argument: extra" })
+  })
 })
