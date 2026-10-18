@@ -36,6 +36,6 @@ An unknown flag prints the usage text and exits 1.
 | `src/nono-profile.ts` | The nono profile that lets a command write only the copy, its git data and the Pi session folder |
 | `src/git-config.ts` | The git config parsing that finds the credentials, includes and submodules a checkout carries |
 | `tests/unit` | The in-process unit tests |
-| `tests/e2e` | The tests that run `src/bin.ts` as a process |
+| `tests/e2e` | The tests that run `src/bin.ts`, git or nono as a process |
 | `tests/live` | The tests that run commands in a real nono sandbox, through `ORC_NONO_E2E=1 bun run test:live` |
 | `.no-mistakes.yaml` | The check commands no-mistakes and CI run |
