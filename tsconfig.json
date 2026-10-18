@@ -1,6 +1,8 @@
 {
   "extends": "@avi2dg/checks/tsconfig.effect.json",
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "types": ["bun"],
     "module": "ESNext",
     "target": "ESNext",

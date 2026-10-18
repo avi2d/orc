@@ -5,6 +5,7 @@
     "": {
       "name": "orc",
       "dependencies": {
+        "@ai-hero/sandcastle": "0.12.0",
         "@effect/platform-bun": "4.0.0",
         "effect": "4.0.0",
       },
@@ -30,6 +31,8 @@
     "@effect/platform-node-shared": "4.0.0",
   },
   "packages": {
+    "@ai-hero/sandcastle": ["@ai-hero/sandcastle@0.12.0", "", { "dependencies": { "@clack/prompts": "^1.1.0" }, "peerDependencies": { "@daytona/sdk": "^0.164.0", "@vercel/sandbox": ">=1.0.0" }, "optionalPeers": ["@daytona/sdk", "@vercel/sandbox"], "bin": { "sandcastle": "dist/main.js" } }, "sha512-kdQ414rM8t1QiWeqZ3Klz4KSd0PqQG4bRVuqGpRDUomWhojSZkEAc1tbcEcThVmBEaHkCt8LmYR49vqEPNIoYQ=="],
+
     "@avi2dg/checks": ["@avi2dg/checks@0.44.0", "", { "dependencies": { "@commitlint/cli": "21.2.3", "@commitlint/config-conventional": "21.2.3", "@effect/platform-bun": "4.0.0", "@effect/platform-node-shared": "4.0.0", "@total-typescript/ts-reset": "0.6.1", "commonmark": "0.31.2", "knip": "6.38.0", "minimatch": "10.2.6" }, "peerDependencies": { "@axe-core/playwright": "4.13.0", "@effect/tsgo": "0.45.0", "@swc/core": "1.16.2", "dependency-cruiser": "18.4.0", "effect": "4.0.0", "html-validate": "11.16.0", "jscpd": "5.3.2", "oxlint": "1.83.0", "oxlint-tsgolint": "7.0.2002", "playwright-core": "1.63.0", "postcss-html": "2.0.0", "stylelint": "17.16.0", "typescript": "7.0.2" }, "optionalPeers": ["@axe-core/playwright", "html-validate", "playwright-core", "postcss-html", "stylelint"], "bin": { "checks-copy": "src/docs/copy.ts", "checks-docs": "src/docs/docs.ts", "checks-lint": "src/core/lint.ts", "checks-test": "src/testing/test.ts", "checks-flake": "src/testing/flake.ts", "checks-unused": "src/complexity/unused.ts", "checks-vendor": "src/dependencies/vendor.ts", "checks-browser": "src/quality/browser/browser.ts", "checks-exports": "src/complexity/exports.ts", "checks-imports": "src/dependencies/imports.ts", "checks-secrets": "src/delivery/secrets.ts", "checks-mutation": "src/testing/mutation.ts", "checks-changelog": "src/delivery/changelog-write.ts", "checks-ci-wiring": "src/delivery/ci-wiring.ts", "checks-docs-only": "src/delivery/docs-only.ts", "checks-advisories": "src/dependencies/advisories.ts", "checks-release-pr": "src/delivery/release-pr.ts", "checks-repetition": "src/complexity/repetition.ts", "checks-no-plain-js": "src/quality/no-plain-js.ts", "checks-release-tag": "src/delivery/release-tag.ts", "checks-test-layout": "src/testing/test-layout.ts", "checks-comment-gate": "src/quality/comment-gate.ts", "checks-commit-title": "src/delivery/commit-title.ts", "checks-effect-scope": "src/quality/effect-scope.ts", "checks-lint-coverage": "src/quality/lint-coverage.sh", "checks-release-notes": "src/delivery/release-notes.ts", "checks-mutation-scope": "src/testing/mutation-scope.ts", "checks-release-report": "src/delivery/release-report.ts", "checks-subsumed-tests": "src/testing/subsumed-tests.ts", "checks-commit-identity": "src/delivery/commit-identity.ts", "checks-frontend-syntax": "src/quality/frontend-syntax.ts", "checks-mutation-compare": "src/testing/mutation-compare.ts", "checks-quarantine-clock": "src/testing/quarantine-clock.ts", "checks-mutation-baseline": "src/testing/mutation-baseline.ts", "checks-suppressions-ratchet": "src/complexity/suppressions-ratchet.ts" } }, "sha512-6rGyjruqJJNtQcfqvRoYrNiZ0cQLfyDODTFWIx6jjjDhWfXrKq8y43XbP1taJBULBFkOwAvbaen5elXa9avGgw=="],
 
     "@babel/code-frame": ["@babel/code-frame@8.0.6", "", { "dependencies": { "@babel/helper-validator-identifier": "^8.0.6", "js-tokens": "^10.0.0" } }, "sha512-uMHhvmDmwFiLuiozaoRYTZHqMFuu3fem/X9JY78lohAuLoh8LSGGC8JqUzo2cVuBsBxkjMZNk56CE7ock8Xxkw=="],
@@ -105,6 +108,10 @@
     "@babel/traverse": ["@babel/traverse@8.0.7", "", { "dependencies": { "@babel/code-frame": "^8.0.6", "@babel/generator": "^8.0.6", "@babel/helper-globals": "^8.0.6", "@babel/parser": "^8.0.7", "@babel/template": "^8.0.0", "@babel/types": "^8.0.6", "obug": "^3.0.0" } }, "sha512-bVV0brinsTWgc6ptSIoQo3GbITtl0VZAqEUJbHHcyfDPEu+q/fEvlYEa+6H85HoK8IdksKBFtKJbJFZ6Kff+zg=="],
 
     "@babel/types": ["@babel/types@8.0.6", "", { "dependencies": { "@babel/helper-string-parser": "^8.0.6", "@babel/helper-validator-identifier": "^8.0.6" } }, "sha512-c+xgSWboV2pdwXP67BUWDVRHi2BO5Q3KwxyFVs7taVTY+fsK47/L51ZXQoV9rozHJDNHvJ4v4WEsI/IlxV2l2A=="],
+
+    "@clack/core": ["@clack/core@1.5.1", "", { "dependencies": { "fast-wrap-ansi": "^0.2.0", "sisteransi": "^1.0.5" } }, "sha512-iHTrHA8MtVuLl2TfZySmcKv1qO2PoyC9Z7pfSDozEuV5vtY3/wcOPKJXlqJ5Oq2Cx5DDGQGAMVx6HZfRRoVEbQ=="],
+
+    "@clack/prompts": ["@clack/prompts@1.8.1", "", { "dependencies": { "@clack/core": "1.5.1", "fast-string-width": "^3.0.2", "fast-wrap-ansi": "^0.2.0", "sisteransi": "^1.0.5" } }, "sha512-dlT1m5e/0yUL0kRNcQn7yGLVThkgbB0Ga/1AmfDDC/8ik6AIiSf2QLQO2zPYvefsHP0aFgxO93cVLCCfDp7kzQ=="],
 
     "@commitlint/cli": ["@commitlint/cli@21.2.3", "", { "dependencies": { "@commitlint/config-conventional": "^21.2.3", "@commitlint/format": "^21.2.3", "@commitlint/lint": "^21.2.3", "@commitlint/load": "^21.2.3", "@commitlint/read": "^21.2.3", "@commitlint/types": "^21.2.3", "tinyexec": "^1.0.0", "yargs": "^18.0.0" }, "bin": { "commitlint": "cli.js" } }, "sha512-5yOX6IRjcrIReCxpyAd04hgI/yhUMpVBJ/ouwFV0wk9yx5+fYRDWZWJ5h55Tbedgfol+5m2mU5nqzbB8g3v0vQ=="],
 

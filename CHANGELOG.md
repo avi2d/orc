@@ -8,4 +8,4 @@ Released 2026-10-18.
 
 ### Features
 
-- scaffold orc with the checks kit and orc --version
+- scaffold orc with the checks kit and an orc --version command [#1](https://github.com/avi2d/orc/pull/1)
