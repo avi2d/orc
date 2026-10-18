@@ -5,6 +5,8 @@ import { join } from "node:path"
 import {
   buildNonoArgv,
   buildNonoProfile,
+  buildSandboxEnv,
+  buildSessionGitConfigContents,
   NonoProviderError,
   nonoSandboxProvider,
   scrubGitHubCredentials
@@ -22,13 +24,18 @@ describe("buildNonoProfile", () => {
     expect(profile.filesystem.allow).toEqual([roots.worktree, roots.gitData, roots.piSessionDir])
   })
 
-  test("every filesystem grant stays inside the three roots", () => {
+  test("excludes the default system-temp write groups and keeps /dev writable", () => {
+    const profile = buildNonoProfile(roots)
+    expect(profile.groups.exclude).toEqual(expect.arrayContaining(["system_write_macos", "system_write_linux"]))
+    expect(profile.filesystem.write).toEqual(["/dev"])
+  })
+
+  test("every directory grant stays inside the three roots", () => {
     const profile = buildNonoProfile(roots)
     const allowed = [roots.worktree, roots.gitData, roots.piSessionDir]
     const grants = [
       ...profile.filesystem.allow,
       ...profile.filesystem.read,
-      ...profile.filesystem.write,
       ...profile.filesystem.allow_file,
       ...profile.filesystem.read_file,
       ...profile.filesystem.write_file,
@@ -69,6 +76,34 @@ describe("buildNonoProfile", () => {
     expect(profile.security.signal_mode).toBe("isolated")
     expect(profile.security.capability_elevation).toBe(false)
     expect(profile.workdir.access).toBe("readwrite")
+  })
+})
+
+describe("buildSessionGitConfigContents", () => {
+  test("renders only the copied identity", () => {
+    expect(
+      buildSessionGitConfigContents({ userName: "Orc Live", userEmail: "orc-live@example.com" })
+    ).toBe("[user]\n\tname = Orc Live\n\temail = orc-live@example.com\n")
+  })
+
+  test("renders an empty document without an identity", () => {
+    expect(buildSessionGitConfigContents({ userName: undefined, userEmail: undefined })).toBe("")
+  })
+})
+
+describe("buildSandboxEnv", () => {
+  test("keeps temp files and git config inside the session folder", () => {
+    const env = buildSandboxEnv(
+      { PATH: "/bin", TMPDIR: "/tmp/host" },
+      { sessionTmpDir: "/sessions/run/tmp", sessionGitConfigPath: "/sessions/run/gitconfig" }
+    )
+    expect(env.TMPDIR).toBe("/sessions/run/tmp")
+    expect(env.TMP).toBe("/sessions/run/tmp")
+    expect(env.TEMP).toBe("/sessions/run/tmp")
+    expect(env.GIT_CONFIG_GLOBAL).toBe("/sessions/run/gitconfig")
+    expect(env.GIT_CONFIG_NOSYSTEM).toBe("1")
+    expect(env.GIT_TERMINAL_PROMPT).toBe("0")
+    expect(env.PATH).toBe("/bin")
   })
 })
 
