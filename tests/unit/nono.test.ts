@@ -81,6 +81,18 @@ const git = (args: ReadonlyArray<string>, cwd: string): void => {
   }
 }
 
+const checkoutWithSubmodule = async (dir: string): Promise<string> => {
+  const dependency = join(dir, "dependency")
+  const main = join(dir, "main")
+  for (const repo of [dependency, main]) {
+    await mkdir(repo)
+    git(["init", "-q"], repo)
+    git(["-c", "user.name=orc", "-c", "user.email=orc@example.com", "commit", "-q", "--allow-empty", "-m", "seed"], repo)
+  }
+  git(["-c", "protocol.file.allow=always", "submodule", "add", "-q", dependency, "dep"], main)
+  return main
+}
+
 const extraHeaderOrigins = (cwd: string): ReadonlyArray<string> =>
   Bun.spawnSync(["git", "config", "--show-origin", "--get-all", "http.extraHeader"], { cwd, stdout: "pipe", stderr: "pipe" })
     .stdout.toString().split("\n").filter((line) => line !== "").map((line) => line.slice(0, line.indexOf("\t")))
@@ -330,7 +342,11 @@ const credentialBearingConfigs: ReadonlyArray<readonly [string, ReadonlyArray<st
   ["a remote URL with userinfo", ["remote.origin.url", `https://${sentinelToken}@github.com/orc/x.git`], "remote.url"],
   ["a push URL with userinfo", ["remote.origin.pushurl", `https://x:${sentinelToken}@github.com/orc/x.git`], "remote.pushurl"],
   ["an insteadOf rewrite to a URL with userinfo", [`url.https://x:${sentinelToken}@github.com/.insteadOf`, "https://github.com/"], "url.insteadof"],
-  ["a submodule URL with userinfo", ["submodule.dep.url", `https://${sentinelToken}@github.com/orc/dep.git`], "submodule.url"]
+  ["a submodule URL with userinfo", ["submodule.dep.url", `https://${sentinelToken}@github.com/orc/dep.git`], "submodule.url"],
+  ["an explicit-helper remote URL with userinfo", ["remote.origin.url", `https::https://x:${sentinelToken}@github.com/orc/x.git`], "remote.url"],
+  ["an explicit-helper push URL with userinfo", ["remote.origin.pushurl", `https::https://${sentinelToken}@github.com/orc/x.git`], "remote.pushurl"],
+  ["an explicit-helper submodule URL with userinfo", ["submodule.dep.url", `https::https://x:${sentinelToken}@github.com/orc/dep.git`], "submodule.url"],
+  ["an explicit-helper pushInsteadOf target with userinfo", [`url.https::https://x:${sentinelToken}@github.com/.pushInsteadOf`, "https://github.com/"], "url.pushinsteadof"]
 ]
 
 describe("nonoSandboxProvider", () => {
@@ -451,15 +467,7 @@ describe("nonoSandboxProvider", () => {
   test("refuses a checkout whose submodule's own git config carries a credential-bearing remote URL", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-nono-cred-"))
     try {
-      const dependency = join(dir, "dependency")
-      const main = join(dir, "main")
-      await mkdir(dependency)
-      await mkdir(main)
-      for (const repo of [dependency, main]) {
-        git(["init", "-q"], repo)
-        git(["-c", "user.name=orc", "-c", "user.email=orc@example.com", "commit", "-q", "--allow-empty", "-m", "seed"], repo)
-      }
-      git(["-c", "protocol.file.allow=always", "submodule", "add", "-q", dependency, "dep"], main)
+      const main = await checkoutWithSubmodule(dir)
       const submoduleGitDir = join(main, ".git", "modules", "dep")
       git(["config", "remote.origin.url", `https://${sentinelToken}@github.com/orc/dep.git`], submoduleGitDir)
       const reason = await refusalOf(main, join(dir, "session"))
@@ -557,15 +565,7 @@ describe("nonoSandboxProvider", () => {
     async () => {
       const dir = await mkdtemp(join(tmpdir(), "orc-nono-clean-"))
       try {
-        const dependency = join(dir, "dependency")
-        const main = join(dir, "main")
-        await mkdir(dependency)
-        await mkdir(main)
-        for (const repo of [dependency, main]) {
-          git(["init", "-q"], repo)
-          git(["-c", "user.name=orc", "-c", "user.email=orc@example.com", "commit", "-q", "--allow-empty", "-m", "seed"], repo)
-        }
-        git(["-c", "protocol.file.allow=always", "submodule", "add", "-q", dependency, "dep"], main)
+        const main = await checkoutWithSubmodule(dir)
         expect(await createError(main, join(dir, "session"))).toBeNull()
       } finally {
         await rm(dir, { recursive: true, force: true })

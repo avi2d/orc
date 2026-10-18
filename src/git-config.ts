@@ -1,12 +1,12 @@
 import type { Path } from "effect"
 
+// Git hands the address after a `<transport>::` prefix to git-remote-<transport> as the URL it connects to.
+const explicitHelperPrefix = /^[A-Za-z0-9][A-Za-z0-9+.-]*::/
+
 // An http(s) URL's userinfo is sent as the request's credentials.
 const credentialBearingUrl = (raw: string): boolean => {
-  if (!URL.canParse(raw)) {
-    return false
-  }
-  const url = new URL(raw)
-  return url.password !== "" || (url.username !== "" && (url.protocol === "https:" || url.protocol === "http:"))
+  const url = URL.parse(raw.replace(explicitHelperPrefix, ""))
+  return url !== null && (url.password !== "" || (url.username !== "" && (url.protocol === "https:" || url.protocol === "http:")))
 }
 
 const urlRewriteSuffixes: ReadonlyArray<string> = [".insteadof", ".pushinsteadof"]
