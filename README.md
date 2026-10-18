@@ -1,7 +1,9 @@
 # orc
 Orc takes one task and turns it into one pull request.
 It starts from a command in the terminal that takes the task as text or as a file.
-It makes an isolated copy of the project on a new branch, runs the Pi agent inside a nono sandbox, runs the project's checks, and hands the branch to no-mistakes, which reviews it, pushes it and opens the PR.
+It makes an isolated copy of the project on a new branch.
+It runs the Pi agent inside a nono sandbox, then runs the project's checks.
+It hands the branch to no-mistakes, which reviews it, pushes it and opens the PR.
 You read the PR and merge it, since orc never merges.
 
 ## Before you begin
@@ -21,6 +23,7 @@ To install orc:
 To print the orc version, run `bun run src/bin.ts --version`.
 
 Orc prints `orc 0.1.0` and exits 0.
+`--help` or `-h` prints the usage text and exits 0.
 An unknown flag prints the usage text and exits 1.
 
 ## Where things are
@@ -30,5 +33,5 @@ An unknown flag prints the usage text and exits 1.
 | `src/bin.ts` | The orc entry point |
 | `src/args.ts` | The flag parsing for the orc command |
 | `tests/unit` | The in-process unit tests |
-| `tests/e2e` | The tests that run the built command |
+| `tests/e2e` | The tests that run `src/bin.ts` as a process |
 | `.no-mistakes.yaml` | The check commands no-mistakes and CI run |
