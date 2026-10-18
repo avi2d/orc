@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, realpath, rm, stat, symlink, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, realpath, rename, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
@@ -163,6 +163,12 @@ describe("nono sandbox provider", () => {
     expect(await exists(join(copy, "probe-inside"))).toBe(true)
   })
 
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "runs bun, git and the system shell"), async () => {
+    const result = await execOrThrow("/bin/sh -c 'echo shell-ok' && git --version && bun --version")
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toBe(`shell-ok\ngit version ${(await runGit(["--version"], copy)).output.trim().replace("git version ", "")}\n${Bun.version}\n`)
+  })
+
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "streams stdout lines to onLine"), async () => {
     const seen: Array<string> = []
     const result = await execOrThrow("printf 'one\\ntwo\\n'", { onLine: (line) => seen.push(line) })
@@ -188,7 +194,7 @@ describe("nono sandbox provider", () => {
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "gives commands a temp dir inside the session folder"), async () => {
     const result = await execOrThrow("touch \"$TMPDIR/probe\" && printf %s \"$TMPDIR\"")
     expect(result.exitCode).toBe(0)
-    expect(result.stdout).toBe(join(session, "tmp"))
+    expect(result.stdout).toBe(join(await realpath(session), "tmp"))
     expect(await exists(join(session, "tmp", "probe"))).toBe(true)
   })
 
@@ -265,6 +271,48 @@ describe("nono sandbox provider", () => {
     expect(unauthorizedRequests).toBeGreaterThan(unauthorizedBefore)
     const refs = await runGit(["for-each-ref", "--format=%(refname)"], join(remoteRoot, "repo.git"))
     expect(refs.output).toBe("refs/heads/host-control\n")
+  })
+
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "a user default profile that grants another write path does not widen the sandbox"), async () => {
+    const home = await mkdtemp(join(process.cwd(), ".orc-nono-home-"))
+    await mkdir(join(home, ".config", "nono", "profiles"), { recursive: true })
+    await writeFile(
+      join(home, ".config", "nono", "profiles", "default.json"),
+      JSON.stringify({ meta: { name: "default", description: "widens" }, filesystem: { allow: [outside] } })
+    )
+    const widened = await nonoSandboxProvider({ piSessionDir: session }).create({
+      worktreePath: copy,
+      hostRepoPath: copy,
+      mounts: [],
+      env: { HOME: home }
+    })
+    try {
+      const target = join(outside, "widened-probe")
+      const result = await widened.exec(`touch ${target} && echo escaped`)
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stdout).not.toContain("escaped")
+      expect(await exists(target)).toBe(false)
+    } finally {
+      await widened.close()
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "swapping the git data for a symlink to outside retargets no grant"), async () => {
+    const swapped = await execOrThrow(`mv .git .git-moved && ln -s ${outside} .git && echo swapped`)
+    try {
+      expect(swapped.stdout).toBe("swapped\n")
+      const target = join(outside, "retargeted-probe")
+      const result = await execOrThrow(`touch .git/retargeted-probe && echo escaped`)
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stdout).not.toContain("escaped")
+      expect(await exists(target)).toBe(false)
+    } finally {
+      await rm(join(copy, ".git"), { force: true })
+      if (await exists(join(copy, ".git-moved"))) {
+        await rename(join(copy, ".git-moved"), join(copy, ".git"))
+      }
+    }
   })
 
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "a nono planted on the caller's PATH is never run on the host"), async () => {

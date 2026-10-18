@@ -7,69 +7,10 @@ import {
 } from "@ai-hero/sandcastle"
 import { BunServices } from "@effect/platform-bun"
 import { Data, Effect, FileSystem, Path, Schema, Stream } from "effect"
+import type { PlatformError } from "effect/PlatformError"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-
-export interface NonoSandboxRoots {
-  readonly worktree: string
-  readonly gitData: string
-  readonly piSessionDir: string
-}
-
-// Every group here grants reads only.
-const readOnlyToolchainGroups: ReadonlyArray<string> = [
-  "node_runtime",
-  "bun_runtime",
-  "mise_manager",
-  "nix_runtime",
-  "unlink_protection"
-]
-
-// The default base grants writes to the system temp directories and /dev through these.
-const systemWriteGroups: ReadonlyArray<string> = ["system_write_macos", "system_write_linux"]
-
-export const buildNonoProfile = (roots: NonoSandboxRoots) => ({
-  meta: {
-    name: "orc-nono-agent",
-    description: "orc agent sandbox: the isolated copy, its git data and Pi's session folder"
-  },
-  extends: "default",
-  groups: {
-    include: readOnlyToolchainGroups,
-    exclude: systemWriteGroups
-  },
-  security: {
-    signal_mode: "isolated",
-    capability_elevation: false
-  },
-  filesystem: {
-    allow: [roots.worktree, roots.gitData, roots.piSessionDir],
-    read: [],
-    write: [],
-    allow_file: [],
-    read_file: [],
-    write_file: ["/dev/null"],
-    unix_socket: [],
-    unix_socket_bind: [],
-    unix_socket_dir: [],
-    unix_socket_dir_bind: [],
-    unix_socket_subtree: [],
-    unix_socket_subtree_bind: [],
-    deny: [],
-    bypass_protection: [],
-    suppress_save_prompt: ["/"]
-  },
-  network: {
-    allow_domain: [],
-    credentials: [],
-    open_port: [],
-    listen_port: [],
-    no_proxy: [],
-    upstream_bypass: []
-  },
-  workdir: {
-    access: "none"
-  }
-}) as const
+import { credentialBearingKeys, includeTargets } from "./git-config"
+import { buildNonoProfile, type NonoSandboxRoots, within } from "./nono-profile"
 
 export const buildNonoRunArgs = (profilePath: string, command: string): ReadonlyArray<string> => [
   "run",
@@ -168,57 +109,43 @@ const resolveGitDataDir = (
     return path.isAbsolute(raw) ? raw : path.join(worktree, raw)
   })
 
-// An http(s) URL's userinfo is sent as the request's credentials.
-const credentialBearingUrl = (raw: string): boolean => {
-  if (!URL.canParse(raw)) {
-    return false
-  }
-  const url = new URL(raw)
-  return url.password !== "" || (url.username !== "" && (url.protocol === "https:" || url.protocol === "http:"))
-}
-
-const urlRewriteSuffixes: ReadonlyArray<string> = [".insteadof", ".pushinsteadof"]
-
-// Git lowercases the section and variable name of every key it lists.
-const credentialBearingEntry = (key: string, value: string): boolean => {
-  if (key.startsWith("http.") && key.endsWith(".extraheader")) {
-    return true
-  }
-  if (key.startsWith("credential.") && key.endsWith(".helper")) {
-    return true
-  }
-  if (key.startsWith("remote.") && (key.endsWith(".url") || key.endsWith(".pushurl"))) {
-    return credentialBearingUrl(value)
-  }
-  const rewrite = urlRewriteSuffixes.find((suffix) => key.startsWith("url.") && key.endsWith(suffix))
-  return rewrite !== undefined && credentialBearingUrl(key.slice("url.".length, -rewrite.length))
-}
-
+// Every config file in the git data is readable from the sandbox, and so is every file they include, active or not.
 const refuseCredentialBearingCheckout = (
   spawner: Spawner,
-  worktree: string,
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  gitData: string,
+  home: string | undefined,
   gitEnv: Record<string, string>
 ): Effect.Effect<void, NonoProviderError> =>
   Effect.gen(function*() {
-    const listing = yield* runHostCommand(
-      spawner,
-      ChildProcess.make("git", ["config", "--list", "-z"], { cwd: worktree, env: gitEnv, extendEnv: false })
+    const worktreeConfigs = yield* fs.readDirectory(path.join(gitData, "worktrees")).pipe(
+      Effect.map((names) => names.map((name) => path.join(gitData, "worktrees", name, "config.worktree"))),
+      Effect.orElseSucceed((): ReadonlyArray<string> => [])
     )
-    if (listing.exitCode !== 0) {
-      return yield* new NonoProviderError({
-        reason: `orc nono provider: cannot read the git config of ${worktree}: ${listing.stderr.trim()}`
-      })
-    }
-    const offending = listing.stdout.split("\0").flatMap((entry) => {
-      const newline = entry.indexOf("\n")
-      const key = newline === -1 ? entry : entry.slice(0, newline)
-      const sectionAndVariable = `${key.slice(0, key.indexOf("."))}${key.slice(key.lastIndexOf("."))}`
-      return credentialBearingEntry(key, newline === -1 ? "" : entry.slice(newline + 1)) ? [sectionAndVariable] : []
-    })
-    if (offending.length > 0) {
-      return yield* new NonoProviderError({
-        reason: `orc nono provider: the git config of ${worktree} carries a credential in ${offending.join(", ")}`
-      })
+    const pending = [path.join(gitData, "config"), path.join(gitData, "config.worktree"), ...worktreeConfigs]
+    const seen = new Set<string>()
+    for (let file = pending.shift(); file !== undefined; file = pending.shift()) {
+      if (seen.has(file) || !(yield* fs.exists(file).pipe(Effect.orElseSucceed(() => false)))) {
+        continue
+      }
+      seen.add(file)
+      const listing = yield* runHostCommand(
+        spawner,
+        ChildProcess.make("git", ["config", "--file", file, "--no-includes", "--list", "-z"], { env: gitEnv, extendEnv: false })
+      )
+      if (listing.exitCode !== 0) {
+        return yield* new NonoProviderError({
+          reason: `orc nono provider: cannot read the git config ${file}: ${listing.stderr.trim()}`
+        })
+      }
+      const offending = credentialBearingKeys(listing.stdout)
+      if (offending.length > 0) {
+        return yield* new NonoProviderError({
+          reason: `orc nono provider: the git config ${file} carries a credential in ${offending.join(", ")}`
+        })
+      }
+      pending.push(...includeTargets(path, home, file, listing.stdout))
     }
   })
 
@@ -230,6 +157,29 @@ const resolveNonoBinary = (fs: FileSystem.FileSystem): Effect.Effect<string, Non
       Effect.mapError((cause) => new NonoProviderError({ reason: `orc nono provider: cannot resolve nono: ${String(cause)}` }))
     )
 }
+
+// nono resolves a grant's symlinks afresh on every run, so only canonical roots keep their meaning.
+const resolveRoots = (
+  spawner: Spawner,
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  worktree: string,
+  piSessionDir: string
+): Effect.Effect<NonoSandboxRoots, NonoProviderError | PlatformError> =>
+  Effect.gen(function*() {
+    for (const root of [worktree, piSessionDir]) {
+      if (!path.isAbsolute(root)) {
+        return yield* new NonoProviderError({ reason: `orc nono provider: sandbox root must be absolute: ${root}` })
+      }
+    }
+    const gitData = yield* resolveGitDataDir(spawner, path, worktree)
+    yield* fs.makeDirectory(piSessionDir, { recursive: true })
+    return {
+      worktree: yield* fs.realPath(worktree),
+      gitData: yield* fs.realPath(gitData),
+      piSessionDir: yield* fs.realPath(piSessionDir)
+    }
+  })
 
 const NonoWhyVerdict = Schema.fromJsonString(Schema.Struct({ status: Schema.Literals(["allowed", "denied"]) }))
 
@@ -264,8 +214,6 @@ const checkProfile = (
     }
   })
 
-const insideAny = (path: Path.Path, roots: ReadonlyArray<string>, target: string): boolean =>
-  roots.some((root) => target === root || target.startsWith(`${root}${path.sep}`))
 
 export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSandboxProvider => {
   const create = (createOptions: BindMountCreateOptions): Promise<BindMountSandboxHandle> => {
@@ -274,27 +222,18 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const worktree = createOptions.worktreePath
-      const gitData = yield* resolveGitDataDir(spawner, path, worktree)
-      const roots: NonoSandboxRoots = { worktree, gitData, piSessionDir: options.piSessionDir }
-      for (const root of [roots.worktree, roots.gitData, roots.piSessionDir] as const) {
-        if (!path.isAbsolute(root)) {
-          return yield* new NonoProviderError({
-            reason: `orc nono provider: sandbox root must be absolute: ${root}`
-          })
-        }
-      }
+      const roots = yield* resolveRoots(spawner, fs, path, worktree, options.piSessionDir)
       const tmpDir = path.join(roots.piSessionDir, "tmp")
-      yield* refuseCredentialBearingCheckout(spawner, worktree, buildSandboxEnv(Bun.env, tmpDir))
-      const nonoBinary = yield* resolveNonoBinary(fs)
       const env = buildSandboxEnv({ ...Bun.env, ...createOptions.env }, tmpDir)
+      yield* refuseCredentialBearingCheckout(spawner, fs, path, roots.gitData, env.HOME, buildSandboxEnv(Bun.env, tmpDir))
+      const nonoBinary = yield* resolveNonoBinary(fs)
       const nono = (args: ReadonlyArray<string>) => ChildProcess.make(nonoBinary, args, { env, extendEnv: false })
       const profileDir = yield* fs.makeTempDirectory({ prefix: "orc-nono-" })
       const profilePath = path.join(profileDir, "profile.json")
       const hostTrustedPaths = [profileDir, nonoBinary, path.dirname(nonoBinary)]
-      const canonicalRoots = yield* fs.writeFileString(profilePath, `${JSON.stringify(buildNonoProfile(roots), null, 2)}\n`).pipe(
+      yield* fs.writeFileString(profilePath, `${JSON.stringify(buildNonoProfile(roots), null, 2)}\n`).pipe(
         Effect.andThen(() => checkProfile(spawner, nono, profilePath, hostTrustedPaths)),
         Effect.andThen(() => fs.makeDirectory(tmpDir, { recursive: true })),
-        Effect.andThen(() => Effect.forEach([roots.worktree, roots.gitData, roots.piSessionDir], (root) => fs.realPath(root))),
         Effect.onError(() => fs.remove(profileDir, { recursive: true }).pipe(Effect.result))
       )
       return {
@@ -317,7 +256,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
                 new NonoProviderError({ reason: `orc nono provider: cannot resolve working directory ${cwd}: ${String(cause)}` })
               ),
               Effect.filterOrFail(
-                (realCwd) => insideAny(path, canonicalRoots, realCwd),
+                (realCwd) => [roots.worktree, roots.gitData, roots.piSessionDir].some((root) => within(root, realCwd)),
                 () => new NonoProviderError({ reason: `orc nono provider: working directory is outside the sandbox roots: ${cwd}` })
               ),
               Effect.andThen((realCwd) =>

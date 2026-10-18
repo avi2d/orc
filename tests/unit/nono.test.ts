@@ -4,7 +4,8 @@ import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { Schema } from "effect"
-import { buildNonoProfile, buildNonoRunArgs, buildSandboxEnv, NonoProviderError, nonoSandboxProvider } from "../../src/nono"
+import { buildNonoRunArgs, buildSandboxEnv, NonoProviderError, nonoSandboxProvider } from "../../src/nono"
+import { buildNonoProfile, toolchainReadPaths } from "../../src/nono-profile"
 
 const roots = {
   worktree: "/tmp/orc-test/worktree",
@@ -22,9 +23,10 @@ const gitConfigExtraHeader = async (env: Record<string, string>, cwd: string): P
 
 const runNono = async <S extends Schema.ConstraintDecoder<unknown>>(
   schema: S,
-  args: ReadonlyArray<string>
+  args: ReadonlyArray<string>,
+  home: string
 ): Promise<S["Type"]> => {
-  const proc = Bun.spawn(["nono", ...args], { stdout: "pipe", stderr: "pipe" })
+  const proc = Bun.spawn(["nono", ...args], { env: { PATH: Bun.env.PATH, HOME: home }, stdout: "pipe", stderr: "pipe" })
   const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited])
   expect(exitCode).toBe(0)
   return Schema.decodeUnknownSync(schema)(JSON.parse(stdout))
@@ -39,8 +41,9 @@ const CapabilityManifest = Schema.Struct({
 
 const ResolvedProfile = Schema.Struct({ network: Schema.Struct({ credentials: Schema.Array(Schema.String) }) })
 
-const manifestOf = (profilePath: string) =>
-  runNono(CapabilityManifest, ["profile", "show", profilePath, "--format", "manifest"])
+const manifestOf = (profilePath: string, home: string) =>
+  runNono(CapabilityManifest, ["profile", "show", profilePath, "--format", "manifest"], home)
+
 
 const createError = async (worktree: string, piSessionDir: string): Promise<unknown> =>
   nonoSandboxProvider({ piSessionDir })
@@ -61,13 +64,26 @@ describe("the policy nono resolves from the profile", () => {
   let dir = ""
   let resolvedRoots = roots
   let profilePath = ""
+  let home = ""
+  let widened = ""
 
   beforeAll(async () => {
     dir = await realpath(await mkdtemp(join(tmpdir(), "orc-nono-policy-")))
     resolvedRoots = { worktree: join(dir, "copy"), gitData: join(dir, "git"), piSessionDir: join(dir, "session") }
-    for (const root of Object.values(resolvedRoots)) {
-      await mkdir(root)
+    home = join(dir, "home")
+    widened = join(dir, "widened")
+    for (const created of [...Object.values(resolvedRoots), widened, join(home, ".config", "nono", "profiles")]) {
+      await mkdir(created, { recursive: true })
     }
+    await writeFile(
+      join(home, ".config", "nono", "profiles", "default.json"),
+      JSON.stringify({
+        meta: { name: "default", description: "a user default that widens every profile built on it" },
+        groups: { include: ["system_write_macos", "system_write_linux"] },
+        filesystem: { allow: [widened] },
+        network: { credentials: ["github"] }
+      })
+    )
     profilePath = join(dir, "profile.json")
     await writeFile(profilePath, JSON.stringify(buildNonoProfile(resolvedRoots)))
   })
@@ -79,7 +95,7 @@ describe("the policy nono resolves from the profile", () => {
   test.skipIf(Bun.which("nono") === null)(
     skipReason("needs nono on PATH to resolve the profile", "grants writes to the three roots and /dev/null and nothing more"),
     async () => {
-      const { grants } = (await manifestOf(profilePath)).filesystem
+      const { grants } = (await manifestOf(profilePath, home)).filesystem
       const writable = grants.filter((grant) => grant.access.includes("write")).map((grant) => `${grant.type} ${grant.path}`)
       expect(writable.toSorted((a, b) => a.localeCompare(b))).toEqual([
         `directory ${resolvedRoots.gitData}`,
@@ -93,7 +109,7 @@ describe("the policy nono resolves from the profile", () => {
   test.skipIf(Bun.which("nono") === null)(
     skipReason("needs nono on PATH to resolve the profile", "grants no access to the user's global git config"),
     async () => {
-      const { grants } = (await manifestOf(profilePath)).filesystem
+      const { grants } = (await manifestOf(profilePath, home)).filesystem
       const globalConfigs = [join(homedir(), ".gitconfig"), join(homedir(), ".config", "git")]
       for (const grant of grants) {
         expect(globalConfigs.some((config) => config === grant.path || config.startsWith(`${grant.path}/`))).toBe(false)
@@ -104,9 +120,24 @@ describe("the policy nono resolves from the profile", () => {
   test.skipIf(Bun.which("nono") === null)(
     skipReason("needs nono on PATH to resolve the profile", "routes no credential through nono's proxy"),
     async () => {
-      const resolved = await runNono(ResolvedProfile, ["profile", "show", profilePath, "--json"])
+      const resolved = await runNono(ResolvedProfile, ["profile", "show", profilePath, "--json"], home)
       expect(resolved.network.credentials).toEqual([])
-      expect((await manifestOf(profilePath)).network.mode).toBe("unrestricted")
+      expect((await manifestOf(profilePath, home)).network.mode).toBe("unrestricted")
+    }
+  )
+
+  test.skipIf(Bun.which("nono") === null)(
+    skipReason("needs nono on PATH to resolve the profile", "resolves to exactly the grants the profile names, whatever the user's default profile says"),
+    async () => {
+      const { grants } = (await manifestOf(profilePath, home)).filesystem
+      const platformReadFiles = process.platform === "darwin" ? buildNonoProfile(resolvedRoots).platform_overrides.macos.filesystem.read_file : []
+      const expected = new Set([
+        ...toolchainReadPaths.map((path) => `read directory ${path.startsWith("~/") ? join(home, path.slice(2)) : path}`),
+        ...platformReadFiles.map((path) => `read file ${path}`),
+        ...Object.values(resolvedRoots).map((root) => `readwrite directory ${root}`),
+        "write file /dev/null"
+      ])
+      expect(new Set(grants.map((grant) => `${grant.access} ${grant.type} ${grant.path}`))).toEqual(expected)
     }
   )
 })
@@ -117,26 +148,25 @@ describe("buildNonoProfile", () => {
     expect(profile.filesystem.allow).toEqual([roots.worktree, roots.gitData, roots.piSessionDir])
   })
 
-  test("every directory grant is a root and the only file grant is writing /dev/null", () => {
-    const profile = buildNonoProfile(roots)
-    const directoryGrants = [
-      ...profile.filesystem.allow,
-      ...profile.filesystem.read,
-      ...profile.filesystem.write,
-      ...profile.filesystem.unix_socket_dir,
-      ...profile.filesystem.unix_socket_dir_bind,
-      ...profile.filesystem.unix_socket_subtree,
-      ...profile.filesystem.unix_socket_subtree_bind
+  test("drops a root nested in another, so no grant can be retargeted through a writable one", () => {
+    const nested = { worktree: "/w/copy", gitData: "/w/copy/.git", piSessionDir: "/w/copy/.pi/session" }
+    expect(buildNonoProfile(nested).filesystem.allow).toEqual(["/w/copy"])
+    expect(buildNonoProfile({ ...nested, piSessionDir: "/w/copy-session" }).filesystem.allow).toEqual(["/w/copy", "/w/copy-session"])
+  })
+
+  test("the only writable grants are the roots and /dev/null, and no socket is granted", () => {
+    const { filesystem } = buildNonoProfile(roots)
+    expect([...filesystem.allow, ...filesystem.write]).toEqual([roots.worktree, roots.gitData, roots.piSessionDir])
+    expect([...filesystem.allow_file, ...filesystem.write_file]).toEqual(["/dev/null"])
+    const sockets = [
+      ...filesystem.unix_socket,
+      ...filesystem.unix_socket_bind,
+      ...filesystem.unix_socket_dir,
+      ...filesystem.unix_socket_dir_bind,
+      ...filesystem.unix_socket_subtree,
+      ...filesystem.unix_socket_subtree_bind
     ]
-    const fileGrants = [
-      ...profile.filesystem.allow_file,
-      ...profile.filesystem.read_file,
-      ...profile.filesystem.write_file,
-      ...profile.filesystem.unix_socket,
-      ...profile.filesystem.unix_socket_bind
-    ]
-    expect(directoryGrants).toEqual([roots.worktree, roots.gitData, roots.piSessionDir])
-    expect(fileGrants).toEqual(["/dev/null"])
+    expect(sockets).toEqual([])
   })
 
   test("the working directory adds no grant", () => {
@@ -150,9 +180,8 @@ describe("buildNonoProfile", () => {
     expect(profile.filesystem.suppress_save_prompt).toEqual(["/"])
   })
 
-  test("extends the default base with an isolated security posture", () => {
+  test("keeps an isolated security posture", () => {
     const profile = buildNonoProfile(roots)
-    expect(profile.extends).toBe("default")
     expect(profile.security.signal_mode).toBe("isolated")
     expect(profile.security.capability_elevation).toBe(false)
   })
@@ -267,6 +296,44 @@ describe("nonoSandboxProvider", () => {
       if (error instanceof NonoProviderError) {
         expect(error.reason).toContain("carries a credential in http.extraheader")
         expect(error.reason).not.toContain(sentinelToken)
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("refuses a checkout whose inactive conditional include carries an http extraHeader", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-nono-cred-"))
+    try {
+      git(["init", "-q", "-b", "orc/task"], dir)
+      await writeFile(join(dir, ".git", "push-auth.conf"), `[http]\n\textraHeader = Authorization: Bearer ${sentinelToken}\n`)
+      git(["config", "includeIf.onbranch:main.path", "push-auth.conf"], dir)
+      const active = Bun.spawnSync(["git", "config", "--get", "http.extraHeader"], { cwd: dir })
+      expect(active.exitCode).toBe(1)
+      const error = await createError(dir, join(dir, ".session"))
+      expect(error).toBeInstanceOf(NonoProviderError)
+      if (error instanceof NonoProviderError) {
+        expect(error.reason).toContain(`${await realpath(join(dir, ".git", "push-auth.conf"))} carries a credential in http.extraheader`)
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("refuses a linked worktree whose common git data holds another worktree's credential-bearing config", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-nono-cred-"))
+    try {
+      const main = join(dir, "main")
+      await mkdir(main)
+      git(["init", "-q"], main)
+      git(["-c", "user.name=orc", "-c", "user.email=orc@example.com", "commit", "-q", "--allow-empty", "-m", "seed"], main)
+      git(["config", "extensions.worktreeConfig", "true"], main)
+      git(["config", "--worktree", "http.extraHeader", `Authorization: Bearer ${sentinelToken}`], main)
+      git(["worktree", "add", "-q", join(dir, "linked")], main)
+      const error = await createError(join(dir, "linked"), join(dir, "session"))
+      expect(error).toBeInstanceOf(NonoProviderError)
+      if (error instanceof NonoProviderError) {
+        expect(error.reason).toContain(`${await realpath(join(main, ".git", "config.worktree"))} carries a credential in http.extraheader`)
       }
     } finally {
       await rm(dir, { recursive: true, force: true })
