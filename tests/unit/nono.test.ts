@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
@@ -439,6 +439,102 @@ describe("nonoSandboxProvider", () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
+
+  test("refuses a fresh clone whose .gitmodules carries a credential-bearing submodule URL", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-nono-cred-"))
+    try {
+      git(["init", "-q"], dir)
+      git(["config", "--file", ".gitmodules", "submodule.dep.path", "dep"], dir)
+      git(["config", "--file", ".gitmodules", "submodule.dep.url", `https://${sentinelToken}@github.com/orc/dep.git`], dir)
+      const error = await createError(dir, join(dir, ".session"))
+      expect(error).toBeInstanceOf(NonoProviderError)
+      if (error instanceof NonoProviderError) {
+        expect(error.reason).toContain(`${await realpath(join(dir, ".gitmodules"))} carries a credential in submodule.url`)
+        expect(error.reason).not.toContain(sentinelToken)
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("refuses a checkout whose checked-out submodule's own .gitmodules carries a credential-bearing URL", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-nono-cred-"))
+    try {
+      git(["init", "-q"], dir)
+      git(["config", "--file", ".gitmodules", "submodule.dep.path", "vendor/dep"], dir)
+      git(["config", "--file", ".gitmodules", "submodule.dep.url", "https://github.com/orc/dep.git"], dir)
+      await mkdir(join(dir, "vendor", "dep"), { recursive: true })
+      git(["config", "--file", ".gitmodules", "submodule.inner.path", "inner"], join(dir, "vendor", "dep"))
+      git(["config", "--file", ".gitmodules", "submodule.inner.url", `https://x:${sentinelToken}@github.com/orc/inner.git`], join(dir, "vendor", "dep"))
+      const error = await createError(dir, join(dir, ".session"))
+      expect(error).toBeInstanceOf(NonoProviderError)
+      if (error instanceof NonoProviderError) {
+        expect(error.reason).toContain(`${await realpath(join(dir, "vendor", "dep", ".gitmodules"))} carries a credential in submodule.url`)
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("refuses a checkout whose embedded submodule git dir carries an http extraHeader", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-nono-cred-"))
+    try {
+      git(["init", "-q"], dir)
+      git(["config", "--file", ".gitmodules", "submodule.dep.path", "dep"], dir)
+      git(["config", "--file", ".gitmodules", "submodule.dep.url", "https://github.com/orc/dep.git"], dir)
+      await mkdir(join(dir, "dep"))
+      git(["init", "-q"], join(dir, "dep"))
+      git(["config", "http.extraHeader", `Authorization: Bearer ${sentinelToken}`], join(dir, "dep"))
+      const error = await createError(dir, join(dir, ".session"))
+      expect(error).toBeInstanceOf(NonoProviderError)
+      if (error instanceof NonoProviderError) {
+        expect(error.reason).toContain(`${await realpath(join(dir, "dep", ".git", "config"))} carries a credential in http.extraheader`)
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("refuses a checkout whose git data cannot be fully scanned, rather than skipping what it could not read", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-nono-cred-"))
+    const locked = join(dir, ".git", "modules", "other", "objects")
+    try {
+      git(["init", "-q"], dir)
+      git(["init", "-q", "--bare", join(dir, ".git", "modules", "dep")], dir)
+      git(["config", "http.extraHeader", `Authorization: Bearer ${sentinelToken}`], join(dir, ".git", "modules", "dep"))
+      await mkdir(locked, { recursive: true })
+      await chmod(locked, 0o000)
+      const error = await createError(dir, join(dir, ".session"))
+      expect(error).toBeInstanceOf(NonoProviderError)
+      if (error instanceof NonoProviderError) {
+        expect(error.reason).toContain(`cannot scan ${await realpath(join(dir, ".git", "modules"))} for credentials`)
+      }
+    } finally {
+      await chmod(locked, 0o755)
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test.skipIf(Bun.which("nono") === null)(
+    skipReason("needs nono on PATH to create a sandbox", "accepts a checkout whose submodules carry no credential"),
+    async () => {
+      const dir = await mkdtemp(join(tmpdir(), "orc-nono-clean-"))
+      try {
+        const dependency = join(dir, "dependency")
+        const main = join(dir, "main")
+        await mkdir(dependency)
+        await mkdir(main)
+        for (const repo of [dependency, main]) {
+          git(["init", "-q"], repo)
+          git(["-c", "user.name=orc", "-c", "user.email=orc@example.com", "commit", "-q", "--allow-empty", "-m", "seed"], repo)
+        }
+        git(["-c", "protocol.file.allow=always", "submodule", "add", "-q", dependency, "dep"], main)
+        expect(await createError(main, join(dir, "session"))).toBeNull()
+      } finally {
+        await rm(dir, { recursive: true, force: true })
+      }
+    }
+  )
 
   test("refuses to create a sandbox when the worktree is not a git checkout", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-nono-plain-"))

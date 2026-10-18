@@ -38,6 +38,11 @@ export const credentialBearingKeys = (listing: string): ReadonlyArray<string> =>
     credentialBearingEntry(key, value) ? [`${key.slice(0, key.indexOf("."))}${key.slice(key.lastIndexOf("."))}`] : []
   )
 
+export const submoduleCheckouts = (path: Path.Path, gitmodules: string, listing: string): ReadonlyArray<string> =>
+  entries(listing).flatMap(([key, value]) =>
+    key.startsWith("submodule.") && key.endsWith(".path") ? [path.resolve(path.dirname(gitmodules), value)] : []
+  )
+
 export const includeTargets = (
   path: Path.Path,
   home: string | undefined,

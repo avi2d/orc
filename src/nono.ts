@@ -9,7 +9,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Data, Effect, FileSystem, Path, Schema, Stream } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { credentialBearingKeys, includeTargets } from "./git-config"
+import { credentialBearingKeys, includeTargets, submoduleCheckouts } from "./git-config"
 import { buildNonoProfile, type NonoSandboxRoots, within } from "./nono-profile"
 
 export const buildNonoRunArgs = (
@@ -112,31 +112,54 @@ const resolveGitDataDir = (
     return path.isAbsolute(raw) ? raw : path.join(worktree, raw)
   })
 
-const gitDirsUnder = (fs: FileSystem.FileSystem, path: Path.Path, root: string): Effect.Effect<ReadonlyArray<string>> =>
-  fs.readDirectory(root, { recursive: true }).pipe(
-    Effect.map((entries) => entries.filter((entry) => path.basename(entry) === "HEAD").map((entry) => path.join(root, path.dirname(entry)))),
-    Effect.orElseSucceed((): ReadonlyArray<string> => [])
+// A file that cannot be read may hold a credential, so only a missing one is skipped.
+const unlessAbsent = <A>(absent: A, target: string) => (effect: Effect.Effect<A, PlatformError>): Effect.Effect<A, NonoProviderError> =>
+  effect.pipe(
+    Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(absent)),
+    Effect.mapError((cause) =>
+      new NonoProviderError({ reason: `orc nono provider: cannot scan ${target} for credentials: ${cause.message}` })
+    )
   )
 
-// Every config file in the git data is readable from the sandbox: its own, its linked worktrees', every submodule's at any depth, and every file they include, active or not.
+const gitDirsUnder = (fs: FileSystem.FileSystem, path: Path.Path, root: string) =>
+  fs.readDirectory(root, { recursive: true }).pipe(
+    Effect.map((entries) => entries.filter((entry) => path.basename(entry) === "HEAD").map((entry) => path.join(root, path.dirname(entry)))),
+    unlessAbsent<ReadonlyArray<string>>([], root)
+  )
+
+const gitDirConfigs = (fs: FileSystem.FileSystem, path: Path.Path, gitDir: string) =>
+  Effect.gen(function*() {
+    const gitDirs = [
+      gitDir,
+      ...(yield* gitDirsUnder(fs, path, path.join(gitDir, "worktrees"))),
+      ...(yield* gitDirsUnder(fs, path, path.join(gitDir, "modules")))
+    ]
+    return gitDirs.flatMap((dir) => [path.join(dir, "config"), path.join(dir, "config.worktree")])
+  })
+
+const checkoutConfigs = (fs: FileSystem.FileSystem, path: Path.Path, checkout: string) =>
+  Effect.gen(function*() {
+    const dotGit = path.join(checkout, ".git")
+    const info = yield* fs.stat(dotGit).pipe(Effect.map((stat) => stat.type), unlessAbsent<string>("absent", dotGit))
+    const embedded = info === "Directory" ? yield* gitDirConfigs(fs, path, dotGit) : []
+    return [path.join(checkout, ".gitmodules"), ...embedded]
+  })
+
+// The sandbox can read every config in the git data, every .gitmodules and embedded submodule git dir in the checkout, and every file they include, active or not.
 const refuseCredentialBearingCheckout = (
   spawner: Spawner,
   fs: FileSystem.FileSystem,
   path: Path.Path,
-  gitData: string,
+  roots: NonoSandboxRoots,
   home: string | undefined,
   gitEnv: Record<string, string>
 ): Effect.Effect<void, NonoProviderError> =>
   Effect.gen(function*() {
-    const gitDirs = [
-      gitData,
-      ...(yield* gitDirsUnder(fs, path, path.join(gitData, "worktrees"))),
-      ...(yield* gitDirsUnder(fs, path, path.join(gitData, "modules")))
-    ]
-    const pending = gitDirs.flatMap((gitDir) => [path.join(gitDir, "config"), path.join(gitDir, "config.worktree")])
+    const pending = [...(yield* gitDirConfigs(fs, path, roots.gitData)), ...(yield* checkoutConfigs(fs, path, roots.worktree))]
     const seen = new Set<string>()
-    for (let file = pending.shift(); file !== undefined; file = pending.shift()) {
-      if (seen.has(file) || !(yield* fs.exists(file).pipe(Effect.orElseSucceed(() => false)))) {
+    for (let candidate = pending.shift(); candidate !== undefined; candidate = pending.shift()) {
+      const file = yield* fs.realPath(candidate).pipe(unlessAbsent<string | undefined>(undefined, candidate))
+      if (file === undefined || seen.has(file)) {
         continue
       }
       seen.add(file)
@@ -156,6 +179,11 @@ const refuseCredentialBearingCheckout = (
         })
       }
       pending.push(...includeTargets(path, home, file, listing.stdout))
+      if (path.basename(file) === ".gitmodules") {
+        for (const checkout of submoduleCheckouts(path, file, listing.stdout).filter((dir) => within(roots.worktree, dir))) {
+          pending.push(...(yield* checkoutConfigs(fs, path, checkout)))
+        }
+      }
     }
   })
 
@@ -269,7 +297,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const worktree = createOptions.worktreePath
       const roots = yield* resolveRoots(spawner, fs, path, worktree, options.piSessionDir)
       const env = buildSandboxEnv({ ...Bun.env, ...createOptions.env }, roots.piSessionDir)
-      yield* refuseCredentialBearingCheckout(spawner, fs, path, roots.gitData, env.HOME, buildSandboxEnv(Bun.env, roots.piSessionDir))
+      yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, env.HOME, buildSandboxEnv(Bun.env, roots.piSessionDir))
       const nonoBinary = yield* resolveNonoBinary(fs)
       const nono = (args: ReadonlyArray<string>) => ChildProcess.make(nonoBinary, args, { env, extendEnv: false })
       const profileDir = yield* fs.makeTempDirectory({ prefix: "orc-nono-" })
