@@ -70,13 +70,34 @@ const outermost = (paths: ReadonlyArray<string>): ReadonlyArray<string> =>
     paths.indexOf(candidate) === index && !paths.some((other) => other !== candidate && within(other, candidate))
   )
 
+export interface Runtime {
+  readonly binDir: string
+  readonly installDir: string | null
+}
+
+const parentOf = (file: string): string => file.slice(0, file.lastIndexOf("/"))
+
+const inToolchain = (file: string): boolean => toolchainReadPaths.some((granted) => within(granted, file))
+
+// A folder found by walking up from a program may hold configuration, so only a toolchain folder or one mise version's own folder is read.
+export const runtimeOf = (candidate: string, real: string, home: string): Runtime | null => {
+  const binDir = parentOf(candidate)
+  if (inToolchain(candidate) && inToolchain(real)) {
+    return { binDir, installDir: null }
+  }
+  const installs = `${home}/.local/share/mise/installs/`
+  const parts = real.startsWith(installs) ? real.slice(installs.length).split("/") : []
+  if (parts.length < 3) {
+    return null
+  }
+  const installDir = `${installs}${parts.slice(0, 2).join("/")}`
+  return within(installDir, candidate) ? { binDir, installDir } : null
+}
+
 export interface HostRuntime {
   readonly developerDir: string | null
   readonly runtimeDirs: ReadonlyArray<string>
 }
-
-const runtimeReads = (runtimeDirs: ReadonlyArray<string>): ReadonlyArray<string> =>
-  runtimeDirs.filter((dir) => !toolchainReadPaths.some((granted) => within(granted, dir)))
 
 export const buildNonoProfile = (roots: NonoSandboxRoots, host: HostRuntime) => ({
   meta: {
@@ -93,7 +114,7 @@ export const buildNonoProfile = (roots: NonoSandboxRoots, host: HostRuntime) => 
   },
   filesystem: {
     allow: outermost([roots.worktree, roots.gitData, roots.piSessionDir]),
-    read: [...toolchainReadPaths, ...runtimeReads(host.runtimeDirs)],
+    read: [...toolchainReadPaths, ...host.runtimeDirs],
     write: [],
     allow_file: [],
     read_file: runtimeReadFiles,

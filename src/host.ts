@@ -1,6 +1,6 @@
 import { Data, Effect, FileSystem, type Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { within } from "./nono-profile"
+import { type Runtime, runtimeOf } from "./nono-profile"
 
 export class NonoProviderError extends Data.TaggedError("NonoProviderError")<{
   readonly reason: string
@@ -72,12 +72,7 @@ export const resolveDeveloperDir = (
     )
   })
 
-export interface Runtime {
-  readonly binDir: string
-  readonly installDir: string
-}
-
-// A mise shim links to mise itself, so only a file that keeps the tool's name is the tool.
+// A mise shim is a link to mise itself, so it names no tool and the tool is looked for further along the PATH.
 export const resolveRuntime = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
@@ -86,6 +81,7 @@ export const resolveRuntime = (
   home: string
 ): Effect.Effect<Runtime | null, NonoProviderError> =>
   Effect.gen(function*() {
+    let shimmed = false
     for (const dir of searchPath.split(":").filter((entry) => path.isAbsolute(entry))) {
       const candidate = Bun.which(name, { PATH: dir })
       if (candidate === null) {
@@ -94,17 +90,22 @@ export const resolveRuntime = (
       const real = yield* fs.realPath(candidate).pipe(
         Effect.mapError((cause) => new NonoProviderError({ reason: `orc nono provider: cannot resolve ${name}: ${String(cause)}` }))
       )
-      if (path.basename(real) !== name) {
+      if (path.basename(real) === "mise") {
+        shimmed = true
         continue
       }
-      const binDir = path.dirname(real)
-      const installDir = path.dirname(binDir)
-      if (within(installDir, home)) {
+      const runtime = runtimeOf(candidate, real, home)
+      if (runtime === null) {
         return yield* new NonoProviderError({
-          reason: `orc nono provider: ${name} at ${real} has no install folder of its own below the home folder`
+          reason: `orc nono provider: ${name} at ${real} is in neither a toolchain folder nor one mise install folder, so the sandbox is granted no folder for it`
         })
       }
-      return { binDir, installDir }
+      return runtime
+    }
+    if (shimmed) {
+      return yield* new NonoProviderError({
+        reason: `orc nono provider: ${name} is on the PATH only as a mise shim; put its mise install folder on the PATH`
+      })
     }
     return null
   })

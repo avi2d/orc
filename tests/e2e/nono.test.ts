@@ -3,9 +3,7 @@ import { chmod, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs
 import { homedir, tmpdir, userInfo } from "node:os"
 import { basename, join, relative } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
-import { BunServices } from "@effect/platform-bun"
-import { Effect, FileSystem, Path, Result, Schema } from "effect"
-import { resolveRuntime } from "../../src/host"
+import { Schema } from "effect"
 import { buildNonoRunArgs, buildSandboxEnv, NonoProviderError, nonoSandboxProvider } from "../../src/nono"
 import { buildNonoProfile, runtimeReadFiles, toolchainReadPaths } from "../../src/nono-profile"
 
@@ -225,47 +223,6 @@ describe("the policy nono resolves from the profile", () => {
       expect(new Set(grants.map((grant) => `${grant.access} ${grant.type} ${grant.path}`))).toEqual(expected)
     }
   )
-})
-
-const runtimeAt = (searchPath: string, home: string) =>
-  Effect.runPromise(
-    Effect.gen(function*() {
-      return yield* resolveRuntime(yield* FileSystem.FileSystem, yield* Path.Path, "bun", searchPath, home)
-    }).pipe(Effect.provide(BunServices.layer), Effect.result)
-  )
-
-describe("resolveRuntime", () => {
-  test("follows mise's shims past to the install folder, never to the shim or mise itself", async () => {
-    const dir = await realpath(await mkdtemp(join(tmpdir(), "orc-nono-runtime-")))
-    try {
-      const install = join(dir, "installs", "bun", "9.9.9")
-      await mkdir(join(dir, "shims"))
-      await mkdir(join(install, "bin"), { recursive: true })
-      await writeFile(join(dir, "mise"), "#!/bin/sh\n", { mode: 0o755 })
-      await symlink(join(dir, "mise"), join(dir, "shims", "bun"))
-      await writeFile(join(install, "bin", "bun"), "#!/bin/sh\n", { mode: 0o755 })
-      const result = await runtimeAt(`${join(dir, "shims")}:${join(install, "bin")}`, join(dir, "home"))
-      expect(result).toEqual(Result.succeed({ binDir: join(install, "bin"), installDir: install }))
-    } finally {
-      await rm(dir, { recursive: true, force: true })
-    }
-  })
-
-  test("refuses a runtime whose install folder would be the home folder", async () => {
-    const home = await realpath(await mkdtemp(join(tmpdir(), "orc-nono-runtime-home-")))
-    try {
-      await mkdir(join(home, "bin"))
-      await writeFile(join(home, "bin", "bun"), "#!/bin/sh\n", { mode: 0o755 })
-      const result = await runtimeAt(join(home, "bin"), home)
-      expect(Result.isFailure(result) && result.failure instanceof NonoProviderError).toBe(true)
-    } finally {
-      await rm(home, { recursive: true, force: true })
-    }
-  })
-
-  test("finds nothing when no folder on the PATH holds the runtime", async () => {
-    expect(await runtimeAt("/nonexistent-orc-bin", "/nonexistent-orc-home")).toEqual(Result.succeed(null))
-  })
 })
 
 describe("buildNonoRunArgs", () => {

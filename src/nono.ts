@@ -291,14 +291,15 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, hostGit)
       const runtimes = (yield* Effect.forEach(sandboxRuntimes, (name) => resolveRuntime(fs, path, name, Bun.env.PATH ?? "", homedir())))
         .filter((runtime) => runtime !== null)
-      const env = buildSandboxEnv(hostEnv, roots.piSessionDir, runtimes.map((runtime) => runtime.binDir))
+      const env = buildSandboxEnv(hostEnv, roots.piSessionDir, [...new Set(runtimes.map((runtime) => runtime.binDir))])
+      const runtimeDirs = runtimes.flatMap((runtime) => runtime.installDir === null ? [] : [runtime.installDir])
       const developerDir = yield* resolveDeveloperDir(spawner, fs, env)
       const nonoBinary = yield* resolveHostBinary(fs, "nono")
       const nono = (args: ReadonlyArray<string>) => ChildProcess.make(nonoBinary, args, { env, extendEnv: false })
       const profileDir = yield* fs.makeTempDirectory({ prefix: "orc-nono-" })
       const profilePath = path.join(profileDir, "profile.json")
       const hostTrustedPaths = [profileDir, nonoBinary, path.dirname(nonoBinary)]
-      yield* fs.writeFileString(profilePath, `${JSON.stringify(buildNonoProfile(roots, { developerDir, runtimeDirs: runtimes.map((runtime) => runtime.installDir) }), null, 2)}\n`).pipe(
+      yield* fs.writeFileString(profilePath, `${JSON.stringify(buildNonoProfile(roots, { developerDir, runtimeDirs }), null, 2)}\n`).pipe(
         Effect.andThen(() => checkProfile(spawner, nono, profilePath, hostTrustedPaths)),
         Effect.andThen(() => fs.makeDirectory(env.TMPDIR, { recursive: true })),
         Effect.onError(() => fs.remove(profileDir, { recursive: true }).pipe(Effect.result))

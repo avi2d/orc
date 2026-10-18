@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { buildHostGitEnv, buildNonoRunArgs, buildSandboxEnv } from "../../src/nono"
-import { buildNonoProfile } from "../../src/nono-profile"
+import { buildNonoProfile, runtimeOf } from "../../src/nono-profile"
 
 const roots = {
   worktree: "/tmp/orc-test/worktree",
@@ -58,12 +58,33 @@ describe("buildNonoProfile", () => {
     expect(buildNonoProfile(roots, noHost).platform_overrides.macos.filesystem.read).toEqual([])
   })
 
-  test("reads a runtime's own install folder, unless a toolchain grant already covers it", () => {
-    const bun = "/Users/test/.local/share/mise/installs/bun/1.4.3"
-    const brewNode = "/opt/homebrew/Cellar/node/24.1.0"
-    const { read } = buildNonoProfile(roots, { ...noHost, runtimeDirs: [bun, brewNode] }).filesystem
-    expect(read.filter((grant) => grant.startsWith("/Users/"))).toEqual([bun])
-    expect(read).not.toContain(brewNode)
+  test("adds no grant for a node in /usr/local/bin, so /usr/local/etc stays unreadable", () => {
+    const node = runtimeOf("/usr/local/bin/node", "/usr/local/bin/node", "/Users/test")
+    expect(node).toEqual({ binDir: "/usr/local/bin", installDir: null })
+    const { read } = buildNonoProfile(roots, { ...noHost, runtimeDirs: node?.installDir == null ? [] : [node.installDir] }).filesystem
+    expect(read.filter((grant) => grant === "/usr/local" || "/usr/local/etc/gitconfig".startsWith(`${grant}/`))).toEqual([])
+  })
+
+  test("keeps a Homebrew runtime on its public bin folder, with no grant of its own", () => {
+    expect(runtimeOf("/opt/homebrew/bin/node", "/opt/homebrew/Cellar/node/24.1.0/bin/node", "/Users/test"))
+      .toEqual({ binDir: "/opt/homebrew/bin", installDir: null })
+  })
+
+  test("reads only one mise version's folder, for its own binary and for an npm alias inside it", () => {
+    const installs = "/Users/test/.local/share/mise/installs"
+    expect(runtimeOf(`${installs}/bun/1.4.3/bin/bun`, `${installs}/bun/1.4.3/bin/bun`, "/Users/test"))
+      .toEqual({ binDir: `${installs}/bun/1.4.3/bin`, installDir: `${installs}/bun/1.4.3` })
+    expect(
+      runtimeOf(`${installs}/node/24.1.0/bin/pi`, `${installs}/node/24.1.0/lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js`, "/Users/test")
+    ).toEqual({ binDir: `${installs}/node/24.1.0/bin`, installDir: `${installs}/node/24.1.0` })
+  })
+
+  test("guesses no folder for a runtime outside the toolchain and outside one mise version", () => {
+    expect(runtimeOf("/Users/test/.npm-global/bin/pi", "/Users/test/.npm-global/lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js", "/Users/test"))
+      .toBeNull()
+    expect(runtimeOf("/Users/test/bin/node", "/Users/test/.local/share/mise/installs/node/24.1.0/bin/node", "/Users/test")).toBeNull()
+    expect(runtimeOf("/Users/test/.local/share/mise/installs/bun", "/Users/test/.local/share/mise/installs/bun", "/Users/test")).toBeNull()
+    expect(runtimeOf("/usr/local/bin/node", "/Users/test/node/bin/node", "/Users/test")).toBeNull()
   })
 
   test("keeps an isolated security posture", () => {
