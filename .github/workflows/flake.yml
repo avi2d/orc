@@ -1,0 +1,23 @@
+name: flake
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  flake:
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - run: bunx checks-flake --runs 10 --report flake-report.json
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: flake-report
+          path: flake-report.json
+          retention-days: 7

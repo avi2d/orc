@@ -1,0 +1,55 @@
+{
+  "extends": "@avi2dg/checks/tsconfig.effect.json",
+  "compilerOptions": {
+    "types": ["bun"],
+    "module": "ESNext",
+    "target": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "diagnosticSeverity": {
+          "anyUnknownInErrorContext": "error",
+          "unsafeEffectTypeAssertion": "error",
+          "missingEffectError": "error",
+          "unknownInEffectCatch": "error",
+          "globalErrorInEffectFailure": "error",
+          "catchUnfailableEffect": "error",
+          "catchAllToMapError": "error",
+          "missingReturnYieldStar": "error",
+          "floatingEffect": "error",
+          "outdatedApi": "error",
+          "globalErrorInEffectCatch": "error"
+        },
+        "overrides": [
+          {
+            "include": [
+              "**/*.ts",
+              "**/*.tsx",
+              "**/*.mts",
+              "**/*.cts"
+            ],
+            "exclude": [
+              "tests/**",
+              "**/*.test.ts",
+              "**/*.test.tsx"
+            ],
+            "options": {
+              "diagnosticSeverity": {
+                "nodeBuiltinImport": "error",
+                "asyncFunction": "error",
+                "newPromise": "error",
+                "extendsNativeError": "error",
+                "processEnv": "error",
+                "processEnvInEffect": "error"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

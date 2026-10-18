@@ -1,0 +1,5 @@
+{
+  "path": ["src"],
+  "format": ["typescript"],
+  "ignore": ["**/*.d.ts"]
+}

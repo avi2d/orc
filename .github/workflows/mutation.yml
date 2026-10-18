@@ -1,0 +1,32 @@
+name: mutation
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mutation:
+    runs-on: [self-hosted, Linux, X64, winbox]
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: restore previous baseline state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bunx checks-mutation-baseline reports/stryker-incremental.json
+      - run: bunx stryker run --incremental
+      - name: save baseline state
+        if: github.ref == 'refs/heads/main'
+        run: bunx checks-mutation-baseline --save reports/stryker-incremental.json reports/mutation/mutation.json
+      - name: prune superseded baselines
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bunx checks-mutation-baseline --prune

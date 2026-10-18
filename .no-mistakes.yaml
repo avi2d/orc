@@ -1,0 +1,4 @@
+commands:
+  lint: bun run lint
+  typecheck: bun run typecheck
+  test: bun run test

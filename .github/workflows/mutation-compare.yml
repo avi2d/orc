@@ -1,0 +1,40 @@
+name: mutation-compare
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  mutation-compare:
+    runs-on: [self-hosted, Linux, X64, winbox]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - run: bunx stryker run
+      - id: base
+        run: |
+          base=$(git merge-base HEAD origin/main)
+          if git cat-file -e "$base:stryker.conf.mjs"; then
+            echo "sha=$base" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::merge-base $base has no stryker.conf.mjs, so no mutation baseline exists to compare against"
+          fi
+      - if: steps.base.outputs.sha != ''
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+        run: |
+          base_worktree="$RUNNER_TEMP/mutation-base-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          echo "BASE_WORKTREE=$base_worktree" >> "$GITHUB_ENV"
+          git worktree prune
+          git worktree add "$base_worktree" "$BASE_SHA"
+          (cd "$base_worktree" && bun install --frozen-lockfile && bunx stryker run)
+      - if: steps.base.outputs.sha != ''
+        run: bunx checks-mutation-compare --advisory "$BASE_WORKTREE/reports/mutation/mutation.json" reports/mutation/mutation.json
+      - if: always() && env.BASE_WORKTREE != ''
+        run: |
+          git worktree remove --force "$BASE_WORKTREE"
+          git worktree prune
