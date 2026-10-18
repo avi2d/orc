@@ -6,25 +6,15 @@ import {
   type ExecResult
 } from "@ai-hero/sandcastle"
 import { BunServices } from "@effect/platform-bun"
-import { Data, Effect, FileSystem, Path, Stream } from "effect"
+import { Data, Effect, FileSystem, Path, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 
-/**
- * The three writable roots of an orc agent sandbox.
- *
- * Every path the nono profile grants write access to derives from exactly
- * one of these roots, so nothing outside them can be expressed:
- * - `worktree`: the isolated copy the agent works in.
- * - `gitData`: the git common dir the copy's commits go into.
- * - `piSessionDir`: Pi's session folder for this run.
- */
 export interface NonoSandboxRoots {
   readonly worktree: string
   readonly gitData: string
   readonly piSessionDir: string
 }
 
-/** A nono profile document as orc writes it for one sandbox. */
 export interface NonoProfile {
   readonly meta: {
     readonly name: string
@@ -57,7 +47,6 @@ export interface NonoProfile {
     readonly suppress_save_prompt: ReadonlyArray<string>
   }
   readonly network: {
-    readonly block: true
     readonly allow_domain: ReadonlyArray<string>
     readonly credentials: ReadonlyArray<string>
     readonly open_port: ReadonlyArray<number>
@@ -66,33 +55,22 @@ export interface NonoProfile {
     readonly upstream_bypass: ReadonlyArray<string>
   }
   readonly workdir: {
-    readonly access: "readwrite"
+    readonly access: "none"
   }
 }
 
-/**
- * Read-only toolchain groups the profile adds on top of the default base.
- * Every group here grants reads only; writes stay confined to the roots.
- * `nix_runtime` covers the Nix store shell this Mac resolves `sh` from,
- * `mise_manager` covers the mise installs of node and bun, and
- * `unlink_protection` blocks deletion everywhere except writable paths.
- */
-const nonoGroups: ReadonlyArray<string> = [
+// Every group here grants reads only.
+const readOnlyToolchainGroups: ReadonlyArray<string> = [
   "node_runtime",
   "bun_runtime",
   "mise_manager",
   "nix_runtime",
-  "git_config",
   "unlink_protection"
 ]
 
-/**
- * Build the nono profile for one sandbox from its three writable roots.
- * The profile extends `default` (which denies credentials, keychains,
- * browser data, macOS private data, shell history and shell configs),
- * blocks all network, declares no credential of any kind, and grants
- * read-write access to the three roots and nothing else.
- */
+// The default base grants writes to the system temp directories and /dev through these.
+const systemWriteGroups: ReadonlyArray<string> = ["system_write_macos", "system_write_linux"]
+
 export const buildNonoProfile = (roots: NonoSandboxRoots): NonoProfile => ({
   meta: {
     name: "orc-nono-agent",
@@ -100,8 +78,8 @@ export const buildNonoProfile = (roots: NonoSandboxRoots): NonoProfile => ({
   },
   extends: "default",
   groups: {
-    include: nonoGroups,
-    exclude: []
+    include: readOnlyToolchainGroups,
+    exclude: systemWriteGroups
   },
   security: {
     signal_mode: "isolated",
@@ -113,7 +91,7 @@ export const buildNonoProfile = (roots: NonoSandboxRoots): NonoProfile => ({
     write: [],
     allow_file: [],
     read_file: [],
-    write_file: [],
+    write_file: ["/dev/null"],
     unix_socket: [],
     unix_socket_bind: [],
     unix_socket_dir: [],
@@ -125,7 +103,6 @@ export const buildNonoProfile = (roots: NonoSandboxRoots): NonoProfile => ({
     suppress_save_prompt: ["/"]
   },
   network: {
-    block: true,
     allow_domain: [],
     credentials: [],
     open_port: [],
@@ -134,80 +111,47 @@ export const buildNonoProfile = (roots: NonoSandboxRoots): NonoProfile => ({
     upstream_bypass: []
   },
   workdir: {
-    access: "readwrite"
+    access: "none"
   }
 })
 
-/** Inputs for one `nono run` invocation wrapping a sandboxed command. */
-export interface NonoCommandInput {
-  readonly nonoBinary: string
-  readonly profilePath: string
-  readonly command: string
-}
-
-/**
- * Build the argv that runs one command inside the sandbox.
- * The command travels as a single `sh -c` argument so the sandbox sees
- * exactly the string Sandcastle handed the provider, with no host-side
- * interpolation. Silent mode keeps nono's banner off the command's stdout,
- * which Sandcastle parses as agent output.
- */
-export const buildNonoArgv = (input: NonoCommandInput): readonly [string, ...Array<string>] => [
-  input.nonoBinary,
+export const buildNonoArgv = (profilePath: string, command: string): readonly [string, ...Array<string>] => [
+  "nono",
   "run",
   "--silent",
   "--profile",
-  input.profilePath,
-  // The handle always spawns with the worktree as its working directory,
-  // which nono gates behind this flag even though the profile allows it.
-  "--allow-cwd",
+  profilePath,
   "--",
   "sh",
   "-c",
-  input.command
+  command
 ]
 
-/**
- * GitHub credential variables stripped from every child environment.
- * The profile already grants no credential, and this makes doubly sure no
- * ambient `gh` token from the host can reach `git push` inside the sandbox.
- */
-const githubCredentialVars: ReadonlyArray<string> = [
-  "GH_TOKEN",
-  "GITHUB_TOKEN",
-  "GH_ENTERPRISE_TOKEN",
-  "GITHUB_ENTERPRISE_TOKEN"
-]
+const inheritedEnvNames: ReadonlyArray<string> = ["PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TERM"]
 
-/** Copy an env mapping without any GitHub credential variable. */
-export const scrubGitHubCredentials = (
-  env: Record<string, string | undefined>
-): Record<string, string | undefined> => {
-  const scrubbed: Record<string, string | undefined> = { ...env }
-  for (const name of githubCredentialVars) {
-    delete scrubbed[name]
+export const buildSandboxEnv = (
+  hostEnv: Readonly<Record<string, string | undefined>>,
+  tmpDir: string
+): Record<string, string> => {
+  const env: Record<string, string> = {}
+  for (const name of inheritedEnvNames) {
+    const value = hostEnv[name]
+    if (value !== undefined) {
+      env[name] = value
+    }
   }
-  return scrubbed
+  return { ...env, TMPDIR: tmpDir, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" }
 }
 
-/** Every failure the orc nono provider can report. */
 export class NonoProviderError extends Data.TaggedError("NonoProviderError")<{
   readonly reason: string
 }> {}
 
-/** Options for the orc nono sandbox provider. */
 export interface NonoSandboxProviderOptions {
-  /** Pi's session folder for this run, the third writable root. */
   readonly piSessionDir: string
-  /** nono binary to invoke. Defaults to `nono` on PATH. */
-  readonly nonoBinary?: string | undefined
 }
 
-/**
- * The orc nono provider: a Sandcastle bind-mount provider whose handle
- * `create` is part of the contract. Sandcastle 0.12.0's types omit the
- * runtime `create`, so this interface restores it.
- */
+// Sandcastle 0.12.0's provider type omits the runtime `create`.
 export interface NonoSandboxProvider extends BindMountSandboxProvider {
   readonly create: (options: BindMountCreateOptions) => Promise<BindMountSandboxHandle>
 }
@@ -229,19 +173,21 @@ const runHostCommand = (
 ): Effect.Effect<HostCommandResult, NonoProviderError> =>
   Effect.scoped(Effect.gen(function*() {
     const onLine = options?.onLine
+    const stdoutChunks: Array<string> = []
     const handle = yield* spawner.spawn(command)
-    const [lines, stderr, exitCode] = yield* Effect.all([
+    const [, stderr, exitCode] = yield* Effect.all([
       handle.stdout.pipe(
         Stream.decodeText(),
+        Stream.tap((chunk) => Effect.sync(() => stdoutChunks.push(chunk))),
         Stream.splitLines,
         Stream.tap((line) => onLine === undefined ? Effect.void : Effect.sync(() => onLine(line))),
-        Stream.runCollect
+        Stream.runDrain
       ),
       handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
       handle.exitCode
     ], { concurrency: "unbounded" })
     const code: number = exitCode
-    return { stdout: lines.join("\n"), stderr, exitCode: code }
+    return { stdout: stdoutChunks.join(""), stderr, exitCode: code }
   })).pipe(
     Effect.mapError(
       (cause) => new NonoProviderError({ reason: `orc nono provider: command failed to run: ${String(cause)}` })
@@ -267,22 +213,43 @@ const resolveGitDataDir = (
     return path.isAbsolute(raw) ? raw : path.join(worktree, raw)
   })
 
-/**
- * A Sandcastle bind-mount provider that wraps every command in
- * `nono run`, following the local-process shape from Sandcastle's README.
- * The provider builds a fresh nono profile from the run's three writable
- * roots (isolated copy, git data, Pi session folder), validates it, and
- * runs each command under it with no network, no credentials, and a
- * scrubbed environment. The sandbox handle's worktree is the host
- * worktree, so file copies are plain filesystem copies.
- */
+const NonoWhyVerdict = Schema.fromJsonString(Schema.Struct({ status: Schema.Literals(["allowed", "denied"]) }))
+
+const checkProfile = (
+  spawner: Spawner,
+  nono: (args: ReadonlyArray<string>) => ChildProcess.Command,
+  profilePath: string,
+  profileDir: string
+): Effect.Effect<void, NonoProviderError> =>
+  Effect.gen(function*() {
+    const validation = yield* runHostCommand(spawner, nono(["profile", "validate", profilePath]))
+    if (validation.exitCode !== 0) {
+      return yield* new NonoProviderError({
+        reason: `orc nono provider: profile failed validation: ${validation.stderr.trim()}`
+      })
+    }
+    const profileWrite = yield* runHostCommand(
+      spawner,
+      nono(["why", "--json", "--profile", profilePath, "--path", profileDir, "--op", "write"])
+    )
+    const verdict = yield* Schema.decodeEffect(NonoWhyVerdict)(profileWrite.stdout).pipe(
+      Effect.mapError((cause) =>
+        new NonoProviderError({ reason: `orc nono provider: cannot read nono's profile verdict: ${String(cause)}` })
+      )
+    )
+    if (verdict.status !== "denied") {
+      return yield* new NonoProviderError({
+        reason: `orc nono provider: the sandbox could rewrite its own profile in ${profileDir}`
+      })
+    }
+  })
+
 export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSandboxProvider => {
   const create = (createOptions: BindMountCreateOptions): Promise<BindMountSandboxHandle> => {
     const program = Effect.gen(function*() {
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const nonoBinary = options.nonoBinary ?? "nono"
       const worktree = createOptions.worktreePath
       const gitData = yield* resolveGitDataDir(spawner, path, worktree)
       const roots: NonoSandboxRoots = { worktree, gitData, piSessionDir: options.piSessionDir }
@@ -293,19 +260,16 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
           })
         }
       }
+      const tmpDir = path.join(roots.piSessionDir, "tmp")
+      const env = buildSandboxEnv({ ...Bun.env, ...createOptions.env }, tmpDir)
+      const nono = (args: ReadonlyArray<string>) => ChildProcess.make("nono", args, { env, extendEnv: false })
       const profileDir = yield* fs.makeTempDirectory({ prefix: "orc-nono-" })
       const profilePath = path.join(profileDir, "profile.json")
-      yield* fs.writeFileString(profilePath, `${JSON.stringify(buildNonoProfile(roots), null, 2)}\n`)
-      const validation = yield* runHostCommand(
-        spawner,
-        ChildProcess.make(nonoBinary, ["profile", "validate", profilePath])
+      yield* fs.writeFileString(profilePath, `${JSON.stringify(buildNonoProfile(roots), null, 2)}\n`).pipe(
+        Effect.andThen(() => checkProfile(spawner, nono, profilePath, profileDir)),
+        Effect.andThen(() => fs.makeDirectory(tmpDir, { recursive: true })),
+        Effect.onError(() => fs.remove(profileDir, { recursive: true }).pipe(Effect.result))
       )
-      if (validation.exitCode !== 0) {
-        return yield* new NonoProviderError({
-          reason: `orc nono provider: profile failed validation: ${validation.stderr.trim()}`
-        })
-      }
-      const baseEnv = scrubGitHubCredentials({ ...Bun.env, ...createOptions.env })
       return {
         worktreePath: worktree,
         exec: (
@@ -316,7 +280,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
             readonly stdin?: string | undefined
           }
         ): Promise<ExecResult> => {
-          const [binary, ...args] = buildNonoArgv({ nonoBinary, profilePath, command })
+          const [binary, ...args] = buildNonoArgv(profilePath, command)
           const stdin = execOptions?.stdin === undefined
             ? "ignore"
             : Stream.fromIterable([new TextEncoder().encode(execOptions.stdin)])
@@ -325,7 +289,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
               spawner,
               ChildProcess.make(binary, args, {
                 cwd: execOptions?.cwd ?? worktree,
-                env: baseEnv,
+                env,
                 extendEnv: false,
                 stdin
               }),
@@ -350,9 +314,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
         close: (): Promise<void> =>
           Effect.runPromise(
             fs.remove(profileDir, { recursive: true }).pipe(
-              // Best-effort cleanup of the rendered profile: keep the
-              // outcome as a value, then drop it, so leftover temp files
-              // are litter and never a sandbox teardown failure.
+              // A leftover rendered profile is litter, never a teardown failure.
               Effect.result,
               Effect.asVoid,
               Effect.provide(BunServices.layer)
