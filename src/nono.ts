@@ -54,6 +54,8 @@ export const buildSandboxEnv = (
     ...env,
     PATH: [...runtimeBinDirs, ...(hostEnv.PATH === undefined ? [] : [hostEnv.PATH])].join(":"),
     TMPDIR: `${piSessionDir}/tmp`,
+    // xcrun finds its default cache through confstr, not TMPDIR, and without a writable cache every /usr/bin/git call reruns xcodebuild -find.
+    xcrun_db: `${piSessionDir}/tmp/xcrun_db`,
     GIT_CONFIG_GLOBAL: `${piSessionDir}/gitconfig`,
     GIT_CONFIG_SYSTEM: "/dev/null"
   }

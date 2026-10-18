@@ -188,7 +188,8 @@ describe("nono sandbox provider", () => {
     const result = await execOrThrow("/usr/bin/git --version")
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toStartWith("git version ")
-  })
+    expect(result.stderr).not.toContain("couldn't create cache file")
+  }, 15_000)
 
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "reads none of the user's git configs, by their own path or the Data volume's"), async () => {
     const home = await mkdtemp(join(process.cwd(), ".orc-nono-home-"))

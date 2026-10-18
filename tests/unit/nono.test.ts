@@ -151,6 +151,7 @@ describe("buildSandboxEnv", () => {
   test("points the temp dir and the global git config into the session folder and drops the system git config", () => {
     const env = buildSandboxEnv(hostEnv, "/tmp/orc-test/session", [])
     expect(env.TMPDIR).toBe("/tmp/orc-test/session/tmp")
+    expect(env.xcrun_db).toBe("/tmp/orc-test/session/tmp/xcrun_db")
     expect(env.GIT_CONFIG_GLOBAL).toBe("/tmp/orc-test/session/gitconfig")
     expect(env.GIT_CONFIG_SYSTEM).toBe("/dev/null")
   })
