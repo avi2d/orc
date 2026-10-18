@@ -317,5 +317,6 @@ export const formatRunsTable = (runs: ReadonlyArray<RunRecord>): string => {
       widths[index] = Math.max(widths[index] ?? 0, cell.length)
     })
   }
-  return table.map((row) => row.map((cell, index) => cell.padEnd(widths[index] ?? cell.length)).join("  ")).join("\n")
+  return table.map((row) => row.map((cell, index) => cell.padEnd(widths[index] ?? cell.length)).join("  ").trimEnd())
+    .join("\n")
 }

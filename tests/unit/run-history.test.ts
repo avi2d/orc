@@ -329,4 +329,24 @@ describe("formatRunsTable", () => {
     expect(row).toContain("orc/x")
     expect(row).toContain("running")
   })
+
+  test("lines end at their last cell, as column -t prints them", () => {
+    const run: RunRecord = {
+      id: "run-1",
+      project: "orc",
+      branch: "orc/x",
+      taskFile: "task.md",
+      status: "running",
+      started: "2026-10-18T10:00:00.000Z",
+      ended: null,
+      prLink: null,
+      endReason: null
+    }
+    const table = formatRunsTable([run, { ...run, id: "run-2", prLink: "https://github.com/avi2d/orc/pull/1" }])
+    expect(table.split("\n")).toEqual([
+      "ID     PROJECT  BRANCH  STATUS   PR",
+      "run-1  orc      orc/x   running  -",
+      "run-2  orc      orc/x   running  https://github.com/avi2d/orc/pull/1"
+    ])
+  })
 })
