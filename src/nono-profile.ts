@@ -91,6 +91,9 @@ export const buildNonoProfile = (roots: NonoSandboxRoots) => ({
   workdir: {
     access: "none"
   },
+  linux: {
+    af_unix_mediation: "pathname"
+  },
   platform_overrides: {
     macos: {
       // Callers name paths through these system symlinks; reading the link opens nothing behind it.

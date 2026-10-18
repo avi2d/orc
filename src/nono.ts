@@ -12,23 +12,19 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { credentialBearingKeys, includeTargets } from "./git-config"
 import { buildNonoProfile, type NonoSandboxRoots, within } from "./nono-profile"
 
-export const buildNonoRunArgs = (profilePath: string, command: string): ReadonlyArray<string> => [
-  "run",
-  "--silent",
-  "--profile",
-  profilePath,
-  "--",
-  "sh",
-  "-c",
-  command
-]
+export const buildNonoRunArgs = (
+  profilePath: string,
+  command: string,
+  positional: ReadonlyArray<string> = []
+): ReadonlyArray<string> => ["run", "--silent", "--profile", profilePath, "--", "sh", "-c", command, "sh", ...positional]
 
 const inheritedEnvNames: ReadonlyArray<string> = ["PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TERM"]
 
+// Sandcastle writes safe.directory and the commit identity with `git config --global`, so the global config must be writable.
 export const buildSandboxEnv = (
   hostEnv: Readonly<Record<string, string | undefined>>,
-  tmpDir: string
-): Record<string, string> => {
+  piSessionDir: string
+): Readonly<Record<string, string>> & { readonly TMPDIR: string } => {
   const env: Record<string, string> = {}
   for (const name of inheritedEnvNames) {
     const value = hostEnv[name]
@@ -36,7 +32,12 @@ export const buildSandboxEnv = (
       env[name] = value
     }
   }
-  return { ...env, TMPDIR: tmpDir, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" }
+  return {
+    ...env,
+    TMPDIR: `${piSessionDir}/tmp`,
+    GIT_CONFIG_GLOBAL: `${piSessionDir}/gitconfig`,
+    GIT_CONFIG_SYSTEM: "/dev/null"
+  }
 }
 
 export class NonoProviderError extends Data.TaggedError("NonoProviderError")<{
@@ -56,6 +57,7 @@ type Spawner = ChildProcessSpawner.ChildProcessSpawner["Service"]
 
 interface HostCommandResult {
   readonly stdout: string
+  readonly stdoutBytes: Uint8Array
   readonly stderr: string
   readonly exitCode: number
 }
@@ -69,12 +71,12 @@ const runHostCommand = (
 ): Effect.Effect<HostCommandResult, NonoProviderError> =>
   Effect.scoped(Effect.gen(function*() {
     const onLine = options?.onLine
-    const stdoutChunks: Array<string> = []
+    const stdoutChunks: Array<Uint8Array> = []
     const handle = yield* spawner.spawn(command)
     const [, stderr, exitCode] = yield* Effect.all([
       handle.stdout.pipe(
-        Stream.decodeText(),
         Stream.tap((chunk) => Effect.sync(() => stdoutChunks.push(chunk))),
+        Stream.decodeText(),
         Stream.splitLines,
         Stream.tap((line) => onLine === undefined ? Effect.void : Effect.sync(() => onLine(line))),
         Stream.runDrain
@@ -83,7 +85,8 @@ const runHostCommand = (
       handle.exitCode
     ], { concurrency: "unbounded" })
     const code: number = exitCode
-    return { stdout: stdoutChunks.join(""), stderr, exitCode: code }
+    const stdoutBytes = Buffer.concat(stdoutChunks)
+    return { stdout: new TextDecoder().decode(stdoutBytes), stdoutBytes, stderr, exitCode: code }
   })).pipe(
     Effect.mapError(
       (cause) => new NonoProviderError({ reason: `orc nono provider: command failed to run: ${String(cause)}` })
@@ -181,6 +184,41 @@ const resolveRoots = (
     }
   })
 
+const requireSuccess = (action: string) => (result: HostCommandResult): Effect.Effect<HostCommandResult, NonoProviderError> =>
+  result.exitCode === 0
+    ? Effect.succeed(result)
+    : Effect.fail(new NonoProviderError({ reason: `orc nono provider: cannot ${action}: ${result.stderr.trim()}` }))
+
+interface Sandbox {
+  readonly nonoBinary: string
+  readonly profilePath: string
+  readonly env: Readonly<Record<string, string>>
+}
+
+interface SandboxedRun {
+  readonly cwd: string
+  readonly stdin: "ignore" | Stream.Stream<Uint8Array>
+  readonly onLine?: ((line: string) => void) | undefined
+  readonly positional?: ReadonlyArray<string>
+}
+
+const runSandboxed = (
+  spawner: Spawner,
+  sandbox: Sandbox,
+  command: string,
+  run: SandboxedRun
+): Effect.Effect<HostCommandResult, NonoProviderError> =>
+  runHostCommand(
+    spawner,
+    ChildProcess.make(sandbox.nonoBinary, buildNonoRunArgs(sandbox.profilePath, command, run.positional), {
+      cwd: run.cwd,
+      env: sandbox.env,
+      extendEnv: false,
+      stdin: run.stdin
+    }),
+    { onLine: run.onLine }
+  )
+
 const NonoWhyVerdict = Schema.fromJsonString(Schema.Struct({ status: Schema.Literals(["allowed", "denied"]) }))
 
 const checkProfile = (
@@ -223,9 +261,8 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const path = yield* Path.Path
       const worktree = createOptions.worktreePath
       const roots = yield* resolveRoots(spawner, fs, path, worktree, options.piSessionDir)
-      const tmpDir = path.join(roots.piSessionDir, "tmp")
-      const env = buildSandboxEnv({ ...Bun.env, ...createOptions.env }, tmpDir)
-      yield* refuseCredentialBearingCheckout(spawner, fs, path, roots.gitData, env.HOME, buildSandboxEnv(Bun.env, tmpDir))
+      const env = buildSandboxEnv({ ...Bun.env, ...createOptions.env }, roots.piSessionDir)
+      yield* refuseCredentialBearingCheckout(spawner, fs, path, roots.gitData, env.HOME, buildSandboxEnv(Bun.env, roots.piSessionDir))
       const nonoBinary = yield* resolveNonoBinary(fs)
       const nono = (args: ReadonlyArray<string>) => ChildProcess.make(nonoBinary, args, { env, extendEnv: false })
       const profileDir = yield* fs.makeTempDirectory({ prefix: "orc-nono-" })
@@ -233,9 +270,10 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const hostTrustedPaths = [profileDir, nonoBinary, path.dirname(nonoBinary)]
       yield* fs.writeFileString(profilePath, `${JSON.stringify(buildNonoProfile(roots), null, 2)}\n`).pipe(
         Effect.andThen(() => checkProfile(spawner, nono, profilePath, hostTrustedPaths)),
-        Effect.andThen(() => fs.makeDirectory(tmpDir, { recursive: true })),
+        Effect.andThen(() => fs.makeDirectory(env.TMPDIR, { recursive: true })),
         Effect.onError(() => fs.remove(profileDir, { recursive: true }).pipe(Effect.result))
       )
+      const sandboxed = (command: string, run: SandboxedRun) => runSandboxed(spawner, { nonoBinary, profilePath, env }, command, run)
       return {
         worktreePath: worktree,
         exec: (
@@ -259,33 +297,36 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
                 (realCwd) => [roots.worktree, roots.gitData, roots.piSessionDir].some((root) => within(root, realCwd)),
                 () => new NonoProviderError({ reason: `orc nono provider: working directory is outside the sandbox roots: ${cwd}` })
               ),
-              Effect.andThen((realCwd) =>
-                runHostCommand(
-                  spawner,
-                  ChildProcess.make(nonoBinary, buildNonoRunArgs(profilePath, command), {
-                    cwd: realCwd,
-                    env,
-                    extendEnv: false,
-                    stdin
-                  }),
-                  { onLine: execOptions?.onLine }
-                )
-              ),
+              Effect.andThen((realCwd) => sandboxed(command, { cwd: realCwd, stdin, onLine: execOptions?.onLine })),
+              Effect.map(({ stdout, stderr, exitCode }) => ({ stdout, stderr, exitCode })),
               Effect.provide(BunServices.layer)
             )
           )
         },
         copyFileIn: (hostPath: string, sandboxPath: string): Promise<void> =>
           Effect.runPromise(
-            fs.makeDirectory(path.dirname(sandboxPath), { recursive: true }).pipe(
-              Effect.andThen(() => fs.copy(hostPath, sandboxPath)),
+            fs.readFile(hostPath).pipe(
+              Effect.andThen((bytes) =>
+                sandboxed(`mkdir -p -- "$(dirname -- "$1")" && cat > "$1"`, {
+                  cwd: roots.worktree,
+                  stdin: Stream.fromIterable([bytes]),
+                  positional: [sandboxPath]
+                })
+              ),
+              Effect.andThen(requireSuccess(`copy ${hostPath} into the sandbox at ${sandboxPath}`)),
+              Effect.asVoid,
               Effect.provide(BunServices.layer)
             )
           ),
         copyFileOut: (sandboxPath: string, hostPath: string): Promise<void> =>
           Effect.runPromise(
-            fs.makeDirectory(path.dirname(hostPath), { recursive: true }).pipe(
-              Effect.andThen(() => fs.copy(sandboxPath, hostPath)),
+            sandboxed(`cat -- "$1"`, { cwd: roots.worktree, stdin: "ignore", positional: [sandboxPath] }).pipe(
+              Effect.andThen(requireSuccess(`copy ${sandboxPath} out of the sandbox`)),
+              Effect.andThen(({ stdoutBytes }) =>
+                fs.makeDirectory(path.dirname(hostPath), { recursive: true }).pipe(
+                  Effect.andThen(() => fs.writeFile(hostPath, stdoutBytes))
+                )
+              ),
               Effect.provide(BunServices.layer)
             )
           ),

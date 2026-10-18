@@ -39,7 +39,18 @@ const CapabilityManifest = Schema.Struct({
   network: Schema.Struct({ mode: Schema.String })
 })
 
-const ResolvedProfile = Schema.Struct({ network: Schema.Struct({ credentials: Schema.Array(Schema.String) }) })
+const ResolvedProfile = Schema.Struct({
+  network: Schema.Struct({ credentials: Schema.Array(Schema.String) }),
+  linux: Schema.Struct({ af_unix_mediation: Schema.String }),
+  filesystem: Schema.Struct({
+    unix_socket: Schema.Array(Schema.String),
+    unix_socket_bind: Schema.Array(Schema.String),
+    unix_socket_dir: Schema.Array(Schema.String),
+    unix_socket_dir_bind: Schema.Array(Schema.String),
+    unix_socket_subtree: Schema.Array(Schema.String),
+    unix_socket_subtree_bind: Schema.Array(Schema.String)
+  })
+})
 
 const manifestOf = (profilePath: string, home: string) =>
   runNono(CapabilityManifest, ["profile", "show", profilePath, "--format", "manifest"], home)
@@ -127,6 +138,15 @@ describe("the policy nono resolves from the profile", () => {
   )
 
   test.skipIf(Bun.which("nono") === null)(
+    skipReason("needs nono on PATH to resolve the profile", "mediates Linux pathname Unix sockets with no socket granted"),
+    async () => {
+      const resolved = await runNono(ResolvedProfile, ["profile", "show", profilePath, "--json"], home)
+      expect(resolved.linux.af_unix_mediation).toBe("pathname")
+      expect(Object.values(resolved.filesystem).flat()).toEqual([])
+    }
+  )
+
+  test.skipIf(Bun.which("nono") === null)(
     skipReason("needs nono on PATH to resolve the profile", "resolves to exactly the grants the profile names, whatever the user's default profile says"),
     async () => {
       const { grants } = (await manifestOf(profilePath, home)).filesystem
@@ -197,14 +217,22 @@ describe("buildNonoRunArgs", () => {
       "--",
       "sh",
       "-c",
-      "git status"
+      "git status",
+      "sh"
     ])
   })
 
   test("passes hostile commands through verbatim", () => {
     const command = "echo 'a; rm -rf /' && $(touch evil)"
     const argv = buildNonoRunArgs("/tmp/p.json", command)
-    expect(argv[argv.length - 1]).toBe(command)
+    expect(argv[argv.indexOf("-c") + 1]).toBe(command)
+  })
+
+  test("hands positional arguments to the shell as $1 and on, never as script text", () => {
+    const hostile = "/w/copy/$(touch evil) \"quoted\""
+    const argv = buildNonoRunArgs("/tmp/p.json", "printf %s \"$1\"", [hostile])
+    const proc = Bun.spawnSync(argv.slice(argv.indexOf("--") + 1))
+    expect(proc.stdout.toString()).toBe(hostile)
   })
 })
 
@@ -222,7 +250,7 @@ describe("buildSandboxEnv", () => {
   }
 
   test("passes no credential-bearing or nono-override variable through", () => {
-    const env = buildSandboxEnv(hostEnv, "/tmp/orc-test/session/tmp")
+    const env = buildSandboxEnv(hostEnv, "/tmp/orc-test/session")
     for (const name of ["GH_TOKEN", "GITHUB_TOKEN", "GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0", "NONO_ALLOW"]) {
       expect(env[name]).toBeUndefined()
     }
@@ -230,11 +258,35 @@ describe("buildSandboxEnv", () => {
     expect(env.HOME).toBe(hostEnv.HOME)
   })
 
-  test("points the temp dir at the session folder and git at empty global and system config", () => {
-    const env = buildSandboxEnv(hostEnv, "/tmp/orc-test/session/tmp")
+  test("points the temp dir and the global git config into the session folder and drops the system git config", () => {
+    const env = buildSandboxEnv(hostEnv, "/tmp/orc-test/session")
     expect(env.TMPDIR).toBe("/tmp/orc-test/session/tmp")
-    expect(env.GIT_CONFIG_GLOBAL).toBe("/dev/null")
+    expect(env.GIT_CONFIG_GLOBAL).toBe("/tmp/orc-test/session/gitconfig")
     expect(env.GIT_CONFIG_SYSTEM).toBe("/dev/null")
+  })
+
+  test("Sandcastle's git setup writes the global config into the session folder, not the user's", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-nono-gitsetup-"))
+    try {
+      const home = join(dir, "home")
+      const session = join(dir, "session")
+      await mkdir(home)
+      await mkdir(session)
+      await writeFile(join(home, ".gitconfig"), "[user]\n\tname = host user\n")
+      const env = buildSandboxEnv({ PATH: Bun.env.PATH, HOME: home }, session)
+      for (const args of [
+        ["config", "--global", "--add", "safe.directory", "/w/copy"],
+        ["config", "--global", "user.name", "orc agent"],
+        ["config", "--global", "user.email", "orc@example.com"]
+      ]) {
+        expect(Bun.spawnSync(["git", ...args], { cwd: dir, env }).exitCode).toBe(0)
+      }
+      const read = Bun.spawnSync(["git", "config", "--file", join(session, "gitconfig"), "user.name"])
+      expect(read.stdout.toString()).toBe("orc agent\n")
+      expect(await Bun.file(join(home, ".gitconfig")).text()).toBe("[user]\n\tname = host user\n")
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   test("git sees no http.extraHeader from GIT_CONFIG_COUNT or the user's global config", async () => {
@@ -249,7 +301,7 @@ describe("buildSandboxEnv", () => {
         GIT_CONFIG_VALUE_0: sentinelHeader
       }
       expect(await gitConfigExtraHeader(host, home)).toBe(`${sentinelHeader}\n${sentinelHeader}\n`)
-      expect(await gitConfigExtraHeader(buildSandboxEnv(host, join(home, "tmp")), home)).toBe("")
+      expect(await gitConfigExtraHeader(buildSandboxEnv(host, join(home, "session")), home)).toBe("")
     } finally {
       await rm(home, { recursive: true, force: true })
     }

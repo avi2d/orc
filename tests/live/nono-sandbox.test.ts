@@ -169,6 +169,64 @@ describe("nono sandbox provider", () => {
     expect(result.stdout).toBe(`shell-ok\ngit version ${(await runGit(["--version"], copy)).output.trim().replace("git version ", "")}\n${Bun.version}\n`)
   })
 
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "runs Sandcastle's git setup"), async () => {
+    for (const command of [
+      `git config --global --add safe.directory "${copy}"`,
+      `git config --global user.name "orc agent"`,
+      `git config --global user.email "orc@example.com"`
+    ]) {
+      const result = await execOrThrow(command)
+      expect(result).toEqual({ stdout: "", stderr: "", exitCode: 0 })
+    }
+    expect((await execOrThrow("git config --global user.name")).stdout).toBe("orc agent\n")
+  })
+
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "copies files in and out byte for byte, replacing what was there"), async () => {
+    if (handle === null) {
+      throw new Error("sandbox handle was not created")
+    }
+    const hostSide = await mkdtemp(join(process.cwd(), ".orc-nono-transfer-"))
+    try {
+      const bytes = new Uint8Array([0, 255, 13, 10, 0xe2, 0x82, 0xac, 1])
+      await writeFile(join(hostSide, "a"), bytes)
+      await handle.copyFileIn(join(hostSide, "a"), join(copy, "transfer", "nested", "f"))
+      expect(new Uint8Array(await Bun.file(join(copy, "transfer", "nested", "f")).arrayBuffer())).toEqual(bytes)
+      await writeFile(join(hostSide, "a"), "second")
+      await handle.copyFileIn(join(hostSide, "a"), join(copy, "transfer", "nested", "f"))
+      expect(await Bun.file(join(copy, "transfer", "nested", "f")).text()).toBe("second")
+      await handle.copyFileOut(join(copy, "transfer", "nested", "f"), join(hostSide, "out", "f"))
+      await writeFile(join(copy, "transfer", "nested", "f"), bytes)
+      await handle.copyFileOut(join(copy, "transfer", "nested", "f"), join(hostSide, "out", "f"))
+      expect(new Uint8Array(await Bun.file(join(hostSide, "out", "f")).arrayBuffer())).toEqual(bytes)
+    } finally {
+      await rm(hostSide, { recursive: true, force: true })
+      await rm(join(copy, "transfer"), { recursive: true, force: true })
+    }
+  })
+
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "refuses file transfers through a symlink that leads outside the roots"), async () => {
+    if (handle === null) {
+      throw new Error("sandbox handle was not created")
+    }
+    const hostSide = await mkdtemp(join(process.cwd(), ".orc-nono-transfer-"))
+    try {
+      await writeFile(join(outside, "host-secret"), "host secret\n")
+      await writeFile(join(hostSide, "payload"), "payload\n")
+      const linked = await execOrThrow(`ln -s ${outside} imports && echo linked`)
+      expect(linked.stdout).toBe("linked\n")
+      const copiedIn = await handle.copyFileIn(join(hostSide, "payload"), join(copy, "imports", "new-file")).then(() => null, (cause: unknown) => cause)
+      expect(copiedIn).toBeInstanceOf(NonoProviderError)
+      expect(await exists(join(outside, "new-file"))).toBe(false)
+      const copiedOut = await handle.copyFileOut(join(copy, "imports", "host-secret"), join(hostSide, "exported")).then(() => null, (cause: unknown) => cause)
+      expect(copiedOut).toBeInstanceOf(NonoProviderError)
+      expect(await exists(join(hostSide, "exported"))).toBe(false)
+    } finally {
+      await rm(join(copy, "imports"), { force: true })
+      await rm(join(outside, "host-secret"), { force: true })
+      await rm(hostSide, { recursive: true, force: true })
+    }
+  })
+
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "streams stdout lines to onLine"), async () => {
     const seen: Array<string> = []
     const result = await execOrThrow("printf 'one\\ntwo\\n'", { onLine: (line) => seen.push(line) })
