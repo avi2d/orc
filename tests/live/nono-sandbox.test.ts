@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, realpath, rename, rm, stat, symlink, writeFile } from "node:fs/promises"
-import { homedir, tmpdir } from "node:os"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import type { BindMountSandboxHandle } from "@ai-hero/sandcastle"
@@ -175,14 +175,22 @@ describe("nono sandbox provider", () => {
     expect(result.stdout).toStartWith("git version ")
   })
 
-  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "reads none of the host's git configs, by their own path or the Data volume's"), async () => {
-    const configs = ["/private/etc/gitconfig", "/usr/local/etc/gitconfig", "/opt/homebrew/etc/gitconfig", join(homedir(), ".gitconfig"), join(homedir(), ".config", "git", "config")]
-    for (const config of [...configs, ...configs.map((path) => `/System/Volumes/Data${path}`)]) {
-      if (!(await exists(config))) {
-        continue
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "reads none of the user's git configs, by their own path or the Data volume's"), async () => {
+    const home = await mkdtemp(join(process.cwd(), ".orc-nono-home-"))
+    const configs = [join(home, ".gitconfig"), join(home, ".config", "git", "config")]
+    await mkdir(join(home, ".config", "git"), { recursive: true })
+    for (const config of configs) {
+      await writeFile(config, `[http]\n\textraHeader = Authorization: ${sentinelAuthorization}\n`)
+    }
+    const sandbox = await nonoSandboxProvider({ piSessionDir: session }).create({ worktreePath: copy, hostRepoPath: copy, mounts: [], env: { HOME: home } })
+    try {
+      for (const config of [...configs, ...configs.map((path) => `/System/Volumes/Data${path}`)]) {
+        const result = await sandbox.exec(`cat -- ${JSON.stringify(config)}`)
+        expect({ config, exitCode: result.exitCode, stdout: result.stdout }).toEqual({ config, exitCode: 1, stdout: "" })
       }
-      const result = await execOrThrow(`cat -- ${JSON.stringify(config)}`)
-      expect({ config, exitCode: result.exitCode, stdout: result.stdout }).toEqual({ config, exitCode: 1, stdout: "" })
+    } finally {
+      await sandbox.close()
+      await rm(home, { recursive: true, force: true })
     }
   })
 

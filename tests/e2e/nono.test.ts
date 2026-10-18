@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises"
 import { homedir, tmpdir, userInfo } from "node:os"
-import { join, relative } from "node:path"
+import { basename, join, relative } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { Schema } from "effect"
 import { buildNonoRunArgs, buildSandboxEnv, NonoProviderError, nonoSandboxProvider } from "../../src/nono"
-import { buildNonoProfile, toolchainReadPaths } from "../../src/nono-profile"
+import { buildNonoProfile, runtimeReadFiles, toolchainReadPaths } from "../../src/nono-profile"
 
 const roots = {
   worktree: "/tmp/orc-test/worktree",
@@ -53,19 +53,6 @@ const ResolvedProfile = Schema.Struct({
     unix_socket_subtree_bind: Schema.Array(Schema.String)
   })
 })
-
-const WhyVerdict = Schema.fromJsonString(Schema.Struct({ status: Schema.String }))
-
-// nono why exits non-zero for a denied path, so only its verdict is read.
-const readVerdict = async (profilePath: string, path: string, home: string): Promise<string> => {
-  const proc = Bun.spawn(["nono", "why", "--json", "--profile", profilePath, "--path", path, "--op", "read"], {
-    env: { PATH: Bun.env.PATH, HOME: home },
-    stdout: "pipe",
-    stderr: "pipe"
-  })
-  const [stdout] = await Promise.all([new Response(proc.stdout).text(), proc.exited])
-  return Schema.decodeSync(WhyVerdict)(stdout).status
-}
 
 const manifestOf = (profilePath: string, home: string) =>
   runNono(CapabilityManifest, ["profile", "show", profilePath, "--format", "manifest"], home)
@@ -176,19 +163,20 @@ describe("the policy nono resolves from the profile", () => {
     }
   )
 
-  test.skipIf(Bun.which("nono") === null || process.platform !== "darwin")(
-    skipReason("needs nono on macOS, whose sandbox can deny a file inside a read grant", "denies reads of every git config git loads from outside the checkout"),
+  test.skipIf(Bun.which("nono") === null)(
+    skipReason("needs nono on PATH to resolve the profile", "reads no configuration folder, git config or home folder outside the roots"),
     async () => {
-      // nono why refuses a HOME whose state root falls under the /var or /tmp it grants, as the shared fixture home does.
-      const userHome = await mkdtemp(join(process.cwd(), ".orc-nono-home-"))
-      try {
-        const configs = ["/etc/gitconfig", "/usr/local/etc/gitconfig", "/opt/homebrew/etc/gitconfig", join(userHome, ".gitconfig"), join(userHome, ".config", "git", "config")]
-        for (const config of [...configs, ...configs.map((path) => `/System/Volumes/Data${path}`)]) {
-          expect({ config, status: await readVerdict(profilePath, config, userHome) }).toEqual({ config, status: "denied" })
-        }
-      } finally {
-        await rm(userHome, { recursive: true, force: true })
-      }
+      const configFolders = ["/etc", "/private/etc", "/usr/local/etc", "/opt/homebrew/etc", home]
+      const { grants } = (await manifestOf(profilePath, home)).filesystem
+      const outsideRoots = grants.filter((grant) =>
+        grant.access.includes("read") && !Object.values(resolvedRoots).some((root) => within(root, grant.path))
+      )
+      expect(outsideRoots.filter((grant) =>
+        (grant.type === "directory" && basename(grant.path) === "etc") ||
+        basename(grant.path).includes("gitconfig") ||
+        configFolders.some((folder) => within(grant.path, folder)) ||
+        within(home, grant.path)
+      )).toEqual([])
     }
   )
 
@@ -216,8 +204,8 @@ describe("the policy nono resolves from the profile", () => {
       const { grants } = (await manifestOf(profilePath, home)).filesystem
       const platformReadFiles = process.platform === "darwin" ? buildNonoProfile(resolvedRoots, null).platform_overrides.macos.filesystem.read_file : []
       const expected = new Set([
-        ...toolchainReadPaths.map((path) => `read directory ${path.startsWith("~/") ? join(home, path.slice(2)) : path}`),
-        ...platformReadFiles.map((path) => `read file ${path}`),
+        ...toolchainReadPaths.map((path) => `read directory ${path}`),
+        ...[...runtimeReadFiles, ...platformReadFiles].map((path) => `read file ${path}`),
         ...Object.values(resolvedRoots).map((root) => `readwrite directory ${root}`),
         "write file /dev/null"
       ])

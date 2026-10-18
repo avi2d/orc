@@ -18,38 +18,38 @@ const nonoImplicitGroups: ReadonlyArray<string> = [
   "dangerous_commands_linux"
 ]
 
+const packagePrefixReads = (prefix: string): ReadonlyArray<string> =>
+  ["bin", "lib", "libexec", "Cellar", "opt", "share"].map((dir) => `${prefix}/${dir}`)
+
+// Folders of programs, libraries and certificates are read whole; no folder git or its includes read configuration from is.
 export const toolchainReadPaths: ReadonlyArray<string> = [
   "/bin",
   "/sbin",
-  "/usr",
+  "/usr/bin",
+  "/usr/sbin",
+  "/usr/lib",
+  "/usr/libexec",
+  "/usr/share",
+  ...packagePrefixReads("/usr/local"),
+  ...packagePrefixReads("/opt/homebrew"),
   "/lib",
   "/lib64",
-  "/etc",
   "/dev",
-  "/run",
   "/nix",
-  "/opt/homebrew",
   "/System/Library",
   "/System/Volumes/Preboot/Cryptexes/OS",
-  "/private/etc",
   "/private/var/db/dyld",
   "/private/var/db/timezone",
   "/private/var/select",
-  "/private/var/run",
-  "~/.bun",
-  "~/.local/share/mise",
-  "~/.nix-profile",
-  "~/.local/state/nix"
+  "/etc/ssl/certs"
 ]
 
-const hostGitConfigs: ReadonlyArray<string> = [
-  "/etc/gitconfig",
-  "/private/etc/gitconfig",
-  "/usr/local/etc/gitconfig",
-  "/opt/homebrew/etc/gitconfig",
-  "$HOME/.gitconfig",
-  // nono 0.80.0 lets reads through a denied directory, so only the file is named.
-  "$HOME/.config/git/config"
+export const runtimeReadFiles: ReadonlyArray<string> = [
+  "/etc/hosts",
+  "/etc/resolv.conf",
+  "/etc/localtime",
+  "/etc/ssl/cert.pem",
+  "/etc/ssl/openssl.cnf"
 ]
 
 // Apple's git shim loads the whole Xcode bundle around its developer folder and checks the licence it records.
@@ -88,7 +88,7 @@ export const buildNonoProfile = (roots: NonoSandboxRoots, developerDir: string |
     read: toolchainReadPaths,
     write: [],
     allow_file: [],
-    read_file: [],
+    read_file: runtimeReadFiles,
     write_file: ["/dev/null"],
     unix_socket: [],
     unix_socket_bind: [],
@@ -124,9 +124,7 @@ export const buildNonoProfile = (roots: NonoSandboxRoots, developerDir: string |
       filesystem: {
         read: developerReads(developerDir),
         // Callers name paths through these system symlinks; reading the link opens nothing behind it.
-        read_file: ["/var", "/tmp", "/var/db/xcode_select_link"],
-        // Landlock cannot deny inside a read grant, so nono refuses these on Linux.
-        deny: [...hostGitConfigs, ...hostGitConfigs.map((config) => `/System/Volumes/Data${config}`)]
+        read_file: ["/var", "/tmp", "/var/db/xcode_select_link"]
       }
     }
   }
