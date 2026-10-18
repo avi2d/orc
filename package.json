@@ -13,9 +13,11 @@
     "build": "bun build src/bin.ts --outdir dist --target bun && checks-effect-scope && checks-changelog",
     "lint": "oxlint && checks-lint",
     "typecheck": "tsc --noEmit && effect-tsgo diagnostics --project tsconfig.json --format text --strict",
-    "test": "checks-test"
+    "test": "checks-test",
+    "test:live": "checks-test --tier=live"
   },
   "dependencies": {
+    "@ai-hero/sandcastle": "0.12.0",
     "@effect/platform-bun": "4.0.0",
     "effect": "4.0.0"
   },
