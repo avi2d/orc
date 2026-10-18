@@ -26,12 +26,20 @@ Orc prints `orc 0.1.0` and exits 0.
 `--help` or `-h` prints the usage text and exits 0.
 An unknown flag prints the usage text and exits 1.
 
+## Seeing runs
+
+To list recent runs, run `bun run src/bin.ts runs`.
+Orc keeps its records in `~/.orc`, outside every project repo.
+To print the same facts as JSON, run `bun run src/bin.ts runs --json`.
+Every JSON document names its version first as `schema`, starting at `orc.runs.v1`.
+
 ## Where things are
 
 | Path | What it holds |
 | --- | --- |
 | `src/bin.ts` | The orc entry point |
 | `src/args.ts` | The flag parsing for the orc command |
+| `src/run-history.ts` | The `~/.orc` home folder, the SQLite run history and `orc runs` |
 | `src/nono.ts` | The Sandcastle sandbox provider that runs each command in `nono run` |
 | `src/host.ts` | The host-side processes and tools the provider runs outside nono |
 | `src/nono-profile.ts` | The nono profile that lets a command write only the copy, its git data and the Pi session folder |
