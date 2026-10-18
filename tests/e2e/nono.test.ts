@@ -319,7 +319,7 @@ describe("nonoSandboxProvider", () => {
   })
 
   test.skipIf(!process.cwd().startsWith(`${userInfo().homedir}/`))(
-    skipReason("needs the working directory under the user's home", "refuses a checkout whose ~user/ include carries an http extraHeader"),
+    skipReason("needs the working directory under the user's home", "refuses a checkout whose ~user/ include carries an http extraHeader", "local"),
     async () => {
       const dir = await mkdtemp(join(tmpdir(), "orc-nono-cred-"))
       const outside = await mkdtemp(join(process.cwd(), ".orc-nono-include-"))
