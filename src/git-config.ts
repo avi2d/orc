@@ -19,7 +19,7 @@ const credentialBearingEntry = (key: string, value: string): boolean => {
   if (key.startsWith("credential.") && key.endsWith(".helper")) {
     return true
   }
-  if (key.startsWith("remote.") && (key.endsWith(".url") || key.endsWith(".pushurl"))) {
+  if ((key.startsWith("remote.") || key.startsWith("submodule.")) && (key.endsWith(".url") || key.endsWith(".pushurl"))) {
     return credentialBearingUrl(value)
   }
   const rewrite = urlRewriteSuffixes.find((suffix) => key.startsWith("url.") && key.endsWith(suffix))

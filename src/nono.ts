@@ -112,7 +112,13 @@ const resolveGitDataDir = (
     return path.isAbsolute(raw) ? raw : path.join(worktree, raw)
   })
 
-// Every config file in the git data is readable from the sandbox, and so is every file they include, active or not.
+const gitDirsUnder = (fs: FileSystem.FileSystem, path: Path.Path, root: string): Effect.Effect<ReadonlyArray<string>> =>
+  fs.readDirectory(root, { recursive: true }).pipe(
+    Effect.map((entries) => entries.filter((entry) => path.basename(entry) === "HEAD").map((entry) => path.join(root, path.dirname(entry)))),
+    Effect.orElseSucceed((): ReadonlyArray<string> => [])
+  )
+
+// Every config file in the git data is readable from the sandbox: its own, its linked worktrees', every submodule's at any depth, and every file they include, active or not.
 const refuseCredentialBearingCheckout = (
   spawner: Spawner,
   fs: FileSystem.FileSystem,
@@ -122,11 +128,12 @@ const refuseCredentialBearingCheckout = (
   gitEnv: Record<string, string>
 ): Effect.Effect<void, NonoProviderError> =>
   Effect.gen(function*() {
-    const worktreeConfigs = yield* fs.readDirectory(path.join(gitData, "worktrees")).pipe(
-      Effect.map((names) => names.map((name) => path.join(gitData, "worktrees", name, "config.worktree"))),
-      Effect.orElseSucceed((): ReadonlyArray<string> => [])
-    )
-    const pending = [path.join(gitData, "config"), path.join(gitData, "config.worktree"), ...worktreeConfigs]
+    const gitDirs = [
+      gitData,
+      ...(yield* gitDirsUnder(fs, path, path.join(gitData, "worktrees"))),
+      ...(yield* gitDirsUnder(fs, path, path.join(gitData, "modules")))
+    ]
+    const pending = gitDirs.flatMap((gitDir) => [path.join(gitDir, "config"), path.join(gitDir, "config.worktree")])
     const seen = new Set<string>()
     for (let file = pending.shift(); file !== undefined; file = pending.shift()) {
       if (seen.has(file) || !(yield* fs.exists(file).pipe(Effect.orElseSucceed(() => false)))) {

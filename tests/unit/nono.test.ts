@@ -315,7 +315,8 @@ const credentialBearingConfigs: ReadonlyArray<readonly [string, ReadonlyArray<st
   ["a credential helper", ["credential.helper", `!echo password=${sentinelToken}`], "credential.helper"],
   ["a remote URL with userinfo", ["remote.origin.url", `https://${sentinelToken}@github.com/orc/x.git`], "remote.url"],
   ["a push URL with userinfo", ["remote.origin.pushurl", `https://x:${sentinelToken}@github.com/orc/x.git`], "remote.pushurl"],
-  ["an insteadOf rewrite to a URL with userinfo", [`url.https://x:${sentinelToken}@github.com/.insteadOf`, "https://github.com/"], "url.insteadof"]
+  ["an insteadOf rewrite to a URL with userinfo", [`url.https://x:${sentinelToken}@github.com/.insteadOf`, "https://github.com/"], "url.insteadof"],
+  ["a submodule URL with userinfo", ["submodule.dep.url", `https://${sentinelToken}@github.com/orc/dep.git`], "submodule.url"]
 ]
 
 describe("nonoSandboxProvider", () => {
@@ -386,6 +387,53 @@ describe("nonoSandboxProvider", () => {
       expect(error).toBeInstanceOf(NonoProviderError)
       if (error instanceof NonoProviderError) {
         expect(error.reason).toContain(`${await realpath(join(main, ".git", "config.worktree"))} carries a credential in http.extraheader`)
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("refuses a checkout whose submodule's own git config carries a credential-bearing remote URL", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-nono-cred-"))
+    try {
+      const dependency = join(dir, "dependency")
+      const main = join(dir, "main")
+      await mkdir(dependency)
+      await mkdir(main)
+      for (const repo of [dependency, main]) {
+        git(["init", "-q"], repo)
+        git(["-c", "user.name=orc", "-c", "user.email=orc@example.com", "commit", "-q", "--allow-empty", "-m", "seed"], repo)
+      }
+      git(["-c", "protocol.file.allow=always", "submodule", "add", "-q", dependency, "dep"], main)
+      const submoduleGitDir = join(main, ".git", "modules", "dep")
+      git(["config", "remote.origin.url", `https://${sentinelToken}@github.com/orc/dep.git`], submoduleGitDir)
+      const error = await createError(main, join(dir, "session"))
+      expect(error).toBeInstanceOf(NonoProviderError)
+      if (error instanceof NonoProviderError) {
+        expect(error.reason).toContain(`${await realpath(join(submoduleGitDir, "config"))} carries a credential in remote.url`)
+        expect(error.reason).not.toContain(sentinelToken)
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("refuses a checkout whose nested submodule's linked worktree config carries an http extraHeader", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-nono-cred-"))
+    try {
+      git(["init", "-q"], dir)
+      const nested = join(dir, ".git", "modules", "outer", "modules", "inner")
+      git(["init", "-q", "--bare", nested], dir)
+      await mkdir(join(nested, "worktrees", "linked"), { recursive: true })
+      await writeFile(join(nested, "worktrees", "linked", "HEAD"), "ref: refs/heads/main\n")
+      await writeFile(
+        join(nested, "worktrees", "linked", "config.worktree"),
+        `[http]\n\textraHeader = Authorization: Bearer ${sentinelToken}\n`
+      )
+      const error = await createError(dir, join(dir, ".session"))
+      expect(error).toBeInstanceOf(NonoProviderError)
+      if (error instanceof NonoProviderError) {
+        expect(error.reason).toContain(`${await realpath(join(nested, "worktrees", "linked", "config.worktree"))} carries a credential in http.extraheader`)
       }
     } finally {
       await rm(dir, { recursive: true, force: true })
