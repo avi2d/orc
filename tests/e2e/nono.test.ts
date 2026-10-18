@@ -155,6 +155,15 @@ describe("the policy nono resolves from the profile", () => {
   )
 
   test.skipIf(Bun.which("nono") === null)(
+    skipReason("needs nono on PATH to resolve the profile", "grants no access to the macOS Data volume, which holds every user's files under another path"),
+    async () => {
+      const dataVolume = "/System/Volumes/Data"
+      const { grants } = (await manifestOf(profilePath, home)).filesystem
+      expect(grants.filter((grant) => within(grant.path, dataVolume) || within(dataVolume, grant.path))).toEqual([])
+    }
+  )
+
+  test.skipIf(Bun.which("nono") === null)(
     skipReason("needs nono on PATH to resolve the profile", "routes no credential through nono's proxy"),
     async () => {
       const resolved = await runNono(ResolvedProfile, ["profile", "show", profilePath, "--json"], home)

@@ -280,6 +280,39 @@ describe("nono sandbox provider", () => {
     }
   })
 
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "refuses a connection to a host Unix socket, the way a container daemon is reached"), async () => {
+    const socketPath = join(root, "host.sock")
+    let connections = 0
+    const firstConnection = Promise.withResolvers<void>()
+    const listener = Bun.listen({
+      unix: socketPath,
+      socket: {
+        open: () => {
+          connections += 1
+          firstConnection.resolve()
+        },
+        data: () => {}
+      }
+    })
+    try {
+      const control = await Bun.connect({ unix: socketPath, socket: { data: () => {} } })
+      control.end()
+      await firstConnection.promise
+      const result = await execOrThrow(`bun -e 'await Bun.connect({ unix: "${socketPath}", socket: { data() {} } }); console.log("connected"); process.exit(0)'`)
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stdout).not.toContain("connected")
+      expect(connections).toBe(1)
+    } finally {
+      listener.stop(true)
+    }
+  })
+
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "still resolves host names through the system resolver"), async () => {
+    const result = await execOrThrow(`bun -e 'import { lookup } from "node:dns/promises"; console.log((await lookup("example.com")).family)'`)
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toMatch(/^[46]\n$/)
+  })
+
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "rejects a working directory outside the roots"), async () => {
     const error = await execOrThrow("touch cwd-probe", { cwd: outside }).then(() => null, (cause: unknown) => cause)
     expect(error).toBeInstanceOf(NonoProviderError)

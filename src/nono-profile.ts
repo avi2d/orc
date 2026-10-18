@@ -29,7 +29,8 @@ export const toolchainReadPaths: ReadonlyArray<string> = [
   "/run",
   "/nix",
   "/opt/homebrew",
-  "/System",
+  "/System/Library",
+  "/System/Volumes/Preboot/Cryptexes/OS",
   "/Library/Developer/CommandLineTools",
   "/private/etc",
   "/private/var/db/dyld",
@@ -94,6 +95,11 @@ export const buildNonoProfile = (roots: NonoSandboxRoots) => ({
   linux: {
     af_unix_mediation: "pathname"
   },
+  // nono's unrestricted macOS network allows connect() to every Unix socket, and empty socket grants revoke none.
+  unsafe_macos_seatbelt_rules: [
+    "(deny network-outbound (regex #\"^/\"))",
+    "(allow network-outbound (path \"/private/var/run/mDNSResponder\"))"
+  ],
   platform_overrides: {
     macos: {
       // Callers name paths through these system symlinks; reading the link opens nothing behind it.
