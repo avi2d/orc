@@ -33,6 +33,7 @@ An unknown flag prints the usage text and exits 1.
 | `src/bin.ts` | The orc entry point |
 | `src/args.ts` | The flag parsing for the orc command |
 | `src/nono.ts` | The Sandcastle sandbox provider that runs each command in `nono run` |
+| `src/host.ts` | The host-side processes and tools the provider runs outside nono |
 | `src/nono-profile.ts` | The nono profile that lets a command write only the copy, its git data and the Pi session folder |
 | `src/git-config.ts` | The git config parsing that finds the credentials, includes and submodules a checkout carries |
 | `tests/unit` | The in-process unit tests |

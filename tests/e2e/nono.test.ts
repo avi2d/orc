@@ -54,6 +54,19 @@ const ResolvedProfile = Schema.Struct({
   })
 })
 
+const WhyVerdict = Schema.fromJsonString(Schema.Struct({ status: Schema.String }))
+
+// nono why exits non-zero for a denied path, so only its verdict is read.
+const readVerdict = async (profilePath: string, path: string, home: string): Promise<string> => {
+  const proc = Bun.spawn(["nono", "why", "--json", "--profile", profilePath, "--path", path, "--op", "read"], {
+    env: { PATH: Bun.env.PATH, HOME: home },
+    stdout: "pipe",
+    stderr: "pipe"
+  })
+  const [stdout] = await Promise.all([new Response(proc.stdout).text(), proc.exited])
+  return Schema.decodeSync(WhyVerdict)(stdout).status
+}
+
 const manifestOf = (profilePath: string, home: string) =>
   runNono(CapabilityManifest, ["profile", "show", profilePath, "--format", "manifest"], home)
 
@@ -122,7 +135,7 @@ describe("the policy nono resolves from the profile", () => {
       })
     )
     profilePath = join(dir, "profile.json")
-    await writeFile(profilePath, JSON.stringify(buildNonoProfile(resolvedRoots)))
+    await writeFile(profilePath, JSON.stringify(buildNonoProfile(resolvedRoots, null)))
   })
 
   afterAll(async () => {
@@ -163,6 +176,22 @@ describe("the policy nono resolves from the profile", () => {
     }
   )
 
+  test.skipIf(Bun.which("nono") === null || process.platform !== "darwin")(
+    skipReason("needs nono on macOS, whose sandbox can deny a file inside a read grant", "denies reads of every git config git loads from outside the checkout"),
+    async () => {
+      // nono why refuses a HOME whose state root falls under the /var or /tmp it grants, as the shared fixture home does.
+      const userHome = await mkdtemp(join(process.cwd(), ".orc-nono-home-"))
+      try {
+        const configs = ["/etc/gitconfig", "/usr/local/etc/gitconfig", "/opt/homebrew/etc/gitconfig", join(userHome, ".gitconfig"), join(userHome, ".config", "git", "config")]
+        for (const config of [...configs, ...configs.map((path) => `/System/Volumes/Data${path}`)]) {
+          expect({ config, status: await readVerdict(profilePath, config, userHome) }).toEqual({ config, status: "denied" })
+        }
+      } finally {
+        await rm(userHome, { recursive: true, force: true })
+      }
+    }
+  )
+
   test.skipIf(Bun.which("nono") === null)(
     skipReason("needs nono on PATH to resolve the profile", "routes no credential through nono's proxy"),
     async () => {
@@ -185,7 +214,7 @@ describe("the policy nono resolves from the profile", () => {
     skipReason("needs nono on PATH to resolve the profile", "resolves to exactly the grants the profile names, whatever the user's default profile says"),
     async () => {
       const { grants } = (await manifestOf(profilePath, home)).filesystem
-      const platformReadFiles = process.platform === "darwin" ? buildNonoProfile(resolvedRoots).platform_overrides.macos.filesystem.read_file : []
+      const platformReadFiles = process.platform === "darwin" ? buildNonoProfile(resolvedRoots, null).platform_overrides.macos.filesystem.read_file : []
       const expected = new Set([
         ...toolchainReadPaths.map((path) => `read directory ${path.startsWith("~/") ? join(home, path.slice(2)) : path}`),
         ...platformReadFiles.map((path) => `read file ${path}`),

@@ -12,18 +12,18 @@ const sentinelHeader = "Authorization: Basic b3JjLXNlbnRpbmVsOnNlY3JldA=="
 
 describe("buildNonoProfile", () => {
   test("grants read-write access to exactly the three roots", () => {
-    const profile = buildNonoProfile(roots)
+    const profile = buildNonoProfile(roots, null)
     expect(profile.filesystem.allow).toEqual([roots.worktree, roots.gitData, roots.piSessionDir])
   })
 
   test("drops a root nested in another, so no grant can be retargeted through a writable one", () => {
     const nested = { worktree: "/w/copy", gitData: "/w/copy/.git", piSessionDir: "/w/copy/.pi/session" }
-    expect(buildNonoProfile(nested).filesystem.allow).toEqual(["/w/copy"])
-    expect(buildNonoProfile({ ...nested, piSessionDir: "/w/copy-session" }).filesystem.allow).toEqual(["/w/copy", "/w/copy-session"])
+    expect(buildNonoProfile(nested, null).filesystem.allow).toEqual(["/w/copy"])
+    expect(buildNonoProfile({ ...nested, piSessionDir: "/w/copy-session" }, null).filesystem.allow).toEqual(["/w/copy", "/w/copy-session"])
   })
 
   test("the only writable grants are the roots and /dev/null, and no socket is granted", () => {
-    const { filesystem } = buildNonoProfile(roots)
+    const { filesystem } = buildNonoProfile(roots, null)
     expect([...filesystem.allow, ...filesystem.write]).toEqual([roots.worktree, roots.gitData, roots.piSessionDir])
     expect([...filesystem.allow_file, ...filesystem.write_file]).toEqual(["/dev/null"])
     const sockets = [
@@ -38,18 +38,26 @@ describe("buildNonoProfile", () => {
   })
 
   test("the working directory adds no grant", () => {
-    expect(buildNonoProfile(roots).workdir.access).toBe("none")
+    expect(buildNonoProfile(roots, null).workdir.access).toBe("none")
   })
 
   test("declares no deny exemption and mutes only the save prompt", () => {
-    const profile = buildNonoProfile(roots)
+    const profile = buildNonoProfile(roots, null)
     expect(profile.filesystem.deny).toEqual([])
     expect(profile.filesystem.bypass_protection).toEqual([])
     expect(profile.filesystem.suppress_save_prompt).toEqual(["/"])
   })
 
+  test("lets Apple's git shim read the Xcode bundle around the developer folder, and only that folder otherwise", () => {
+    const xcode = buildNonoProfile(roots, "/Applications/Xcode.app/Contents/Developer").platform_overrides.macos.filesystem.read
+    expect(xcode).toEqual(["/Applications/Xcode.app/Contents", "/Library/Preferences/com.apple.dt.Xcode.plist"])
+    const commandLineTools = buildNonoProfile(roots, "/Library/Developer/CommandLineTools").platform_overrides.macos.filesystem.read
+    expect(commandLineTools).toEqual(["/Library/Developer/CommandLineTools"])
+    expect(buildNonoProfile(roots, null).platform_overrides.macos.filesystem.read).toEqual([])
+  })
+
   test("keeps an isolated security posture", () => {
-    const profile = buildNonoProfile(roots)
+    const profile = buildNonoProfile(roots, null)
     expect(profile.security.signal_mode).toBe("isolated")
     expect(profile.security.capability_elevation).toBe(false)
   })

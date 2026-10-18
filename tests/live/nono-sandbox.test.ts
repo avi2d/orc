@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, realpath, rename, rm, stat, symlink, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import type { BindMountSandboxHandle } from "@ai-hero/sandcastle"
@@ -167,6 +167,23 @@ describe("nono sandbox provider", () => {
     const result = await execOrThrow("/bin/sh -c 'echo shell-ok' && git --version && bun --version")
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toBe(`shell-ok\ngit version ${(await runGit(["--version"], copy)).output.trim().replace("git version ", "")}\n${Bun.version}\n`)
+  })
+
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "runs the system git in /usr/bin"), async () => {
+    const result = await execOrThrow("/usr/bin/git --version")
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toStartWith("git version ")
+  })
+
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "reads none of the host's git configs, by their own path or the Data volume's"), async () => {
+    const configs = ["/private/etc/gitconfig", "/usr/local/etc/gitconfig", "/opt/homebrew/etc/gitconfig", join(homedir(), ".gitconfig"), join(homedir(), ".config", "git", "config")]
+    for (const config of [...configs, ...configs.map((path) => `/System/Volumes/Data${path}`)]) {
+      if (!(await exists(config))) {
+        continue
+      }
+      const result = await execOrThrow(`cat -- ${JSON.stringify(config)}`)
+      expect({ config, exitCode: result.exitCode, stdout: result.stdout }).toEqual({ config, exitCode: 1, stdout: "" })
+    }
   })
 
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "runs Sandcastle's git setup"), async () => {

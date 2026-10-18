@@ -31,7 +31,6 @@ export const toolchainReadPaths: ReadonlyArray<string> = [
   "/opt/homebrew",
   "/System/Library",
   "/System/Volumes/Preboot/Cryptexes/OS",
-  "/Library/Developer/CommandLineTools",
   "/private/etc",
   "/private/var/db/dyld",
   "/private/var/db/timezone",
@@ -43,6 +42,26 @@ export const toolchainReadPaths: ReadonlyArray<string> = [
   "~/.local/state/nix"
 ]
 
+const hostGitConfigs: ReadonlyArray<string> = [
+  "/etc/gitconfig",
+  "/private/etc/gitconfig",
+  "/usr/local/etc/gitconfig",
+  "/opt/homebrew/etc/gitconfig",
+  "$HOME/.gitconfig",
+  // nono 0.80.0 lets reads through a denied directory, so only the file is named.
+  "$HOME/.config/git/config"
+]
+
+// Apple's git shim loads the whole Xcode bundle around its developer folder and checks the licence it records.
+const developerReads = (developerDir: string | null): ReadonlyArray<string> => {
+  if (developerDir === null) {
+    return []
+  }
+  return developerDir.endsWith(".app/Contents/Developer")
+    ? [developerDir.slice(0, -"/Developer".length), "/Library/Preferences/com.apple.dt.Xcode.plist"]
+    : [developerDir]
+}
+
 export const within = (root: string, target: string): boolean => target === root || target.startsWith(`${root}/`)
 
 // A grant nested in another can be retargeted by a write through the outer one.
@@ -51,7 +70,7 @@ const outermost = (paths: ReadonlyArray<string>): ReadonlyArray<string> =>
     paths.indexOf(candidate) === index && !paths.some((other) => other !== candidate && within(other, candidate))
   )
 
-export const buildNonoProfile = (roots: NonoSandboxRoots) => ({
+export const buildNonoProfile = (roots: NonoSandboxRoots, developerDir: string | null) => ({
   meta: {
     name: "orc-nono-agent",
     description: "orc agent sandbox: the isolated copy, its git data and Pi's session folder"
@@ -102,8 +121,13 @@ export const buildNonoProfile = (roots: NonoSandboxRoots) => ({
   ],
   platform_overrides: {
     macos: {
-      // Callers name paths through these system symlinks; reading the link opens nothing behind it.
-      filesystem: { read_file: ["/var", "/tmp"] }
+      filesystem: {
+        read: developerReads(developerDir),
+        // Callers name paths through these system symlinks; reading the link opens nothing behind it.
+        read_file: ["/var", "/tmp", "/var/db/xcode_select_link"],
+        // Landlock cannot deny inside a read grant, so nono refuses these on Linux.
+        deny: [...hostGitConfigs, ...hostGitConfigs.map((config) => `/System/Volumes/Data${config}`)]
+      }
     }
   }
 }) as const

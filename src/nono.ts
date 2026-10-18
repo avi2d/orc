@@ -6,9 +6,10 @@ import {
   type ExecResult
 } from "@ai-hero/sandcastle"
 import { BunServices } from "@effect/platform-bun"
-import { Data, Effect, FileSystem, Path, Schema, Stream } from "effect"
+import { Effect, FileSystem, Path, Schema, Stream } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { type HostCommandResult, NonoProviderError, resolveDeveloperDir, resolveHostBinary, runHostCommand, type Spawner } from "./host"
 import { credentialBearingKeys, includePathKeys, includeTargets, submoduleCheckouts } from "./git-config"
 import { buildNonoProfile, type NonoSandboxRoots, within } from "./nono-profile"
 
@@ -40,9 +41,7 @@ export const buildSandboxEnv = (
   }
 }
 
-export class NonoProviderError extends Data.TaggedError("NonoProviderError")<{
-  readonly reason: string
-}> {}
+export { NonoProviderError }
 
 export interface NonoSandboxProviderOptions {
   readonly piSessionDir: string
@@ -52,46 +51,6 @@ export interface NonoSandboxProviderOptions {
 export interface NonoSandboxProvider extends BindMountSandboxProvider {
   readonly create: (options: BindMountCreateOptions) => Promise<BindMountSandboxHandle>
 }
-
-type Spawner = ChildProcessSpawner.ChildProcessSpawner["Service"]
-
-interface HostCommandResult {
-  readonly stdout: string
-  readonly stdoutBytes: Uint8Array
-  readonly stderr: string
-  readonly exitCode: number
-}
-
-const runHostCommand = (
-  spawner: Spawner,
-  command: ChildProcess.Command,
-  options?: {
-    readonly onLine?: ((line: string) => void) | undefined
-  }
-): Effect.Effect<HostCommandResult, NonoProviderError> =>
-  Effect.scoped(Effect.gen(function*() {
-    const onLine = options?.onLine
-    const stdoutChunks: Array<Uint8Array> = []
-    const handle = yield* spawner.spawn(command)
-    const [, stderr, exitCode] = yield* Effect.all([
-      handle.stdout.pipe(
-        Stream.tap((chunk) => Effect.sync(() => stdoutChunks.push(chunk))),
-        Stream.decodeText(),
-        Stream.splitLines,
-        Stream.tap((line) => onLine === undefined ? Effect.void : Effect.sync(() => onLine(line))),
-        Stream.runDrain
-      ),
-      handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
-      handle.exitCode
-    ], { concurrency: "unbounded" })
-    const code: number = exitCode
-    const stdoutBytes = Buffer.concat(stdoutChunks)
-    return { stdout: new TextDecoder().decode(stdoutBytes), stdoutBytes, stderr, exitCode: code }
-  })).pipe(
-    Effect.mapError(
-      (cause) => new NonoProviderError({ reason: `orc nono provider: command failed to run: ${String(cause)}` })
-    )
-  )
 
 const resolveGitDataDir = (
   spawner: Spawner,
@@ -202,16 +161,6 @@ const refuseCredentialBearingCheckout = (
     }
   })
 
-// The caller's env PATH may name tools inside the copy, so a host binary is found on the host's own PATH.
-const resolveHostBinary = (fs: FileSystem.FileSystem, name: string): Effect.Effect<string, NonoProviderError> => {
-  const found = Bun.which(name)
-  return found === null
-    ? Effect.fail(new NonoProviderError({ reason: `orc nono provider: ${name} is not on the host PATH` }))
-    : fs.realPath(found).pipe(
-      Effect.mapError((cause) => new NonoProviderError({ reason: `orc nono provider: cannot resolve ${name}: ${String(cause)}` }))
-    )
-}
-
 // nono resolves a grant's symlinks afresh on every run, so only canonical roots keep their meaning.
 const resolveRoots = (
   spawner: Spawner,
@@ -316,12 +265,13 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const roots = yield* resolveRoots(spawner, fs, path, gitBinary, worktree, options.piSessionDir)
       const env = buildSandboxEnv({ ...Bun.env, ...createOptions.env }, roots.piSessionDir)
       yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, { binary: gitBinary, env })
+      const developerDir = yield* resolveDeveloperDir(spawner, fs, env)
       const nonoBinary = yield* resolveHostBinary(fs, "nono")
       const nono = (args: ReadonlyArray<string>) => ChildProcess.make(nonoBinary, args, { env, extendEnv: false })
       const profileDir = yield* fs.makeTempDirectory({ prefix: "orc-nono-" })
       const profilePath = path.join(profileDir, "profile.json")
       const hostTrustedPaths = [profileDir, nonoBinary, path.dirname(nonoBinary)]
-      yield* fs.writeFileString(profilePath, `${JSON.stringify(buildNonoProfile(roots), null, 2)}\n`).pipe(
+      yield* fs.writeFileString(profilePath, `${JSON.stringify(buildNonoProfile(roots, developerDir), null, 2)}\n`).pipe(
         Effect.andThen(() => checkProfile(spawner, nono, profilePath, hostTrustedPaths)),
         Effect.andThen(() => fs.makeDirectory(env.TMPDIR, { recursive: true })),
         Effect.onError(() => fs.remove(profileDir, { recursive: true }).pipe(Effect.result))
