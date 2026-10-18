@@ -30,7 +30,6 @@ An unknown flag prints the usage text and exits 1.
 
 To list recent runs, run `bun run src/bin.ts runs`.
 Orc keeps its records in `~/.orc`, outside every project repo.
-Set `ORC_HOME` to point orc at another home folder, which every test uses so it never touches the real one.
 To print the same facts as JSON, run `bun run src/bin.ts runs --json`.
 Every JSON document names its version first as `schema`, starting at `orc.runs.v1`.
 

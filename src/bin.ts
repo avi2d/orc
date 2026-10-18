@@ -6,17 +6,26 @@ import packageJson from "../package.json" with { type: "json" }
 import { parseArgs } from "./args"
 import {
   formatRunsTable,
+  type HistoryError,
   listRuns,
   openDatabase,
-  resolveHomeDir,
+  orcHomeDir,
   runsJson,
+  SqliteFailure,
   UnsupportedSchemaVersion
 } from "./run-history"
 
 const usage = "Usage: orc [--version] [--help] | orc runs [--json]"
 
-const unsupportedVersionMessage = (cause: UnsupportedSchemaVersion): string =>
-  `unsupported schema version ${cause.found}, expected ${cause.expected}`
+const historyErrorMessage = (error: HistoryError): string => {
+  if (error instanceof UnsupportedSchemaVersion) {
+    return `unsupported schema version ${error.found}, expected ${error.expected}`
+  }
+  if (error instanceof SqliteFailure) {
+    return error.cause instanceof Error ? error.cause.message : String(error.cause)
+  }
+  return String(error)
+}
 
 const program = Effect.gen(function*() {
   const args = parseArgs(Bun.argv.slice(2))
@@ -30,20 +39,15 @@ const program = Effect.gen(function*() {
       break
     }
     case "ListRuns": {
-      const text = yield* Effect.gen(function*() {
-        const db = yield* openDatabase(resolveHomeDir(Bun.env.ORC_HOME))
-        const runs = yield* listRuns(db)
-        db.close()
-        return args.json ? JSON.stringify(runsJson(runs)) : formatRunsTable(runs)
-      }).pipe(
+      const text = yield* Effect.acquireUseRelease(
+        openDatabase(orcHomeDir()),
+        (db) => listRuns(db),
+        (db) => Effect.sync(() => db.close())
+      ).pipe(
+        Effect.map((runs) => args.json ? JSON.stringify(runsJson(runs)) : formatRunsTable(runs)),
         Effect.provide(BunServices.layer),
-        Effect.catchTag("UnsupportedSchemaVersion", (cause) =>
-          Console.error(`orc: cannot read the run history: ${unsupportedVersionMessage(cause)}`).pipe(
-            Effect.andThen(Effect.fail("run history unavailable"))
-          )
-        ),
-        Effect.catch((cause) =>
-          Console.error(`orc: cannot read the run history: ${String(cause)}`).pipe(
+        Effect.catch((error) =>
+          Console.error(`orc: cannot read the run history: ${historyErrorMessage(error)}`).pipe(
             Effect.andThen(Effect.fail("run history unavailable"))
           )
         )

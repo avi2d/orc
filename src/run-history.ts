@@ -20,6 +20,13 @@ export class UnsupportedSchemaVersion extends Data.TaggedError("UnsupportedSchem
   readonly expected: number
 }> {}
 
+export class SqliteFailure extends Data.TaggedError("SqliteFailure")<{
+  readonly cause: unknown
+}> {}
+
+const sqlite = <A>(use: () => A): Effect.Effect<A, SqliteFailure> =>
+  Effect.try({ try: use, catch: (cause) => new SqliteFailure({ cause }) })
+
 export interface RunInput {
   readonly id: string
   readonly project: string
@@ -100,10 +107,9 @@ export interface RunsJsonDocument {
   readonly runs: ReadonlyArray<RunJsonEntry>
 }
 
-export type HistoryError = PlatformError | Schema.SchemaError | UnsupportedSchemaVersion
+export type HistoryError = PlatformError | Schema.SchemaError | UnsupportedSchemaVersion | SqliteFailure
 
-export const resolveHomeDir = (orcHome: string | undefined): string =>
-  orcHome === undefined || orcHome === "" ? `${homedir()}/.orc` : orcHome
+export const orcHomeDir = (): string => `${homedir()}/.orc`
 
 const schemaStatements: ReadonlyArray<string> = [
   "CREATE TABLE IF NOT EXISTS runs (" +
@@ -156,6 +162,24 @@ const schemaStatements: ReadonlyArray<string> = [
 
 const SchemaVersionRow = Schema.Struct({ user_version: Schema.Finite })
 
+const migrate = (db: Database): Effect.Effect<void, HistoryError> =>
+  Effect.gen(function*() {
+    const versionRow = yield* sqlite(() => db.query("PRAGMA user_version").get())
+    const current = (yield* Schema.decodeUnknownEffect(SchemaVersionRow)(versionRow)).user_version
+    if (current === RUN_HISTORY_SCHEMA_VERSION) {
+      return
+    }
+    if (current !== 0) {
+      return yield* new UnsupportedSchemaVersion({ found: current, expected: RUN_HISTORY_SCHEMA_VERSION })
+    }
+    yield* sqlite(() => {
+      for (const statement of schemaStatements) {
+        db.run(statement)
+      }
+      db.run(`PRAGMA user_version = ${RUN_HISTORY_SCHEMA_VERSION}`)
+    })
+  })
+
 export const openDatabase = (
   homeDir: string
 ): Effect.Effect<Database, HistoryError, FileSystem.FileSystem | Path.Path> =>
@@ -163,74 +187,74 @@ export const openDatabase = (
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     yield* fs.makeDirectory(homeDir, { recursive: true })
-    const db = new Database(path.join(homeDir, "orc.sqlite"), { create: true })
-    const current = (yield* Schema.decodeUnknownEffect(SchemaVersionRow)(db.query("PRAGMA user_version").get())).user_version
-    if (current === RUN_HISTORY_SCHEMA_VERSION) {
-      return db
-    }
-    if (current !== 0) {
-      db.close()
-      return yield* new UnsupportedSchemaVersion({ found: current, expected: RUN_HISTORY_SCHEMA_VERSION })
-    }
-    for (const statement of schemaStatements) {
-      db.run(statement)
-    }
-    db.run(`PRAGMA user_version = ${RUN_HISTORY_SCHEMA_VERSION}`)
-    return db
+    const db = yield* sqlite(() => new Database(path.join(homeDir, "orc.sqlite"), { create: true }))
+    return yield* migrate(db).pipe(
+      Effect.as(db),
+      Effect.onError(() => Effect.sync(() => db.close()))
+    )
   })
 
-export const recordRun = (db: Database, input: RunInput): void => {
-  db.query(
-    "INSERT INTO runs (id, project, branch, task_file, status, started, ended, pr_link, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).run(
-    input.id,
-    input.project,
-    input.branch,
-    input.taskFile,
-    input.status,
-    input.started,
-    input.ended ?? null,
-    input.prLink ?? null,
-    input.endReason ?? null
+export const recordRun = (db: Database, input: RunInput): Effect.Effect<void, SqliteFailure> =>
+  sqlite(() => {
+    db.query(
+      "INSERT INTO runs (id, project, branch, task_file, status, started, ended, pr_link, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      input.id,
+      input.project,
+      input.branch,
+      input.taskFile,
+      input.status,
+      input.started,
+      input.ended ?? null,
+      input.prLink ?? null,
+      input.endReason ?? null
+    )
+  })
+
+export const recordStep = (db: Database, input: StepInput): Effect.Effect<number, SqliteFailure> =>
+  sqlite(() =>
+    Number(
+      db.query(
+        "INSERT INTO steps (run_id, name, attempt, status, started, ended, agent_file, pi_session_file) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      ).run(
+        input.runId,
+        input.name,
+        input.attempt,
+        input.status,
+        input.started,
+        input.ended ?? null,
+        input.agentFile ?? null,
+        input.piSessionFile ?? null
+      ).lastInsertRowid
+    )
   )
-}
 
-export const recordStep = (db: Database, input: StepInput): number => {
-  const result = db.query(
-    "INSERT INTO steps (run_id, name, attempt, status, started, ended, agent_file, pi_session_file) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-  ).run(
-    input.runId,
-    input.name,
-    input.attempt,
-    input.status,
-    input.started,
-    input.ended ?? null,
-    input.agentFile ?? null,
-    input.piSessionFile ?? null
+export const recordEvidence = (db: Database, input: EvidenceInput): Effect.Effect<number, SqliteFailure> =>
+  sqlite(() =>
+    Number(
+      db.query(
+        "INSERT INTO evidence (step_id, direction, path, kind) VALUES (?, ?, ?, ?)"
+      ).run(input.stepId, input.direction, input.path, input.kind).lastInsertRowid
+    )
   )
-  return Number(result.lastInsertRowid)
-}
 
-export const recordEvidence = (db: Database, input: EvidenceInput): number => {
-  const result = db.query(
-    "INSERT INTO evidence (step_id, direction, path, kind) VALUES (?, ?, ?, ?)"
-  ).run(input.stepId, input.direction, input.path, input.kind)
-  return Number(result.lastInsertRowid)
-}
+export const recordSignal = (db: Database, input: SignalInput): Effect.Effect<number, SqliteFailure> =>
+  sqlite(() =>
+    Number(
+      db.query(
+        "INSERT INTO signals (step_id, name, value) VALUES (?, ?, ?)"
+      ).run(input.stepId, input.name, input.value).lastInsertRowid
+    )
+  )
 
-export const recordSignal = (db: Database, input: SignalInput): number => {
-  const result = db.query(
-    "INSERT INTO signals (step_id, name, value) VALUES (?, ?, ?)"
-  ).run(input.stepId, input.name, input.value)
-  return Number(result.lastInsertRowid)
-}
-
-export const recordScore = (db: Database, input: ScoreInput): number => {
-  const result = db.query(
-    "INSERT INTO scores (step_id, score, note, scored_at) VALUES (?, ?, ?, ?)"
-  ).run(input.stepId, input.score, input.note, input.scoredAt)
-  return Number(result.lastInsertRowid)
-}
+export const recordScore = (db: Database, input: ScoreInput): Effect.Effect<number, SqliteFailure> =>
+  sqlite(() =>
+    Number(
+      db.query(
+        "INSERT INTO scores (step_id, score, note, scored_at) VALUES (?, ?, ?, ?)"
+      ).run(input.stepId, input.score, input.note, input.scoredAt).lastInsertRowid
+    )
+  )
 
 const RunSqlRowSchema = Schema.Struct({
   id: Schema.String,
@@ -244,12 +268,16 @@ const RunSqlRowSchema = Schema.Struct({
   end_reason: Schema.NullOr(Schema.String)
 })
 
-export const listRuns = (db: Database, limit = 20): Effect.Effect<ReadonlyArray<RunRecord>, Schema.SchemaError> =>
-  Schema.decodeUnknownEffect(Schema.Array(RunSqlRowSchema))(
+export const listRuns = (
+  db: Database,
+  limit = 20
+): Effect.Effect<ReadonlyArray<RunRecord>, Schema.SchemaError | SqliteFailure> =>
+  sqlite(() =>
     db.query(
       "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason FROM runs ORDER BY started DESC, id ASC LIMIT ?"
     ).all(limit)
   ).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(RunSqlRowSchema))),
     Effect.map((rows) =>
       rows.map((row) => ({
         id: row.id,

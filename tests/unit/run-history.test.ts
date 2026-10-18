@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, rm, stat } from "node:fs/promises"
-import { homedir, tmpdir } from "node:os"
+import { mkdtemp, rm, stat, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Database } from "bun:sqlite"
 import { BunServices } from "@effect/platform-bun"
@@ -16,7 +16,6 @@ import {
   recordScore,
   recordSignal,
   recordStep,
-  resolveHomeDir,
   runsJson,
   type RunRecord,
 } from "../../src/run-history"
@@ -128,23 +127,28 @@ describe("openDatabase", () => {
       expect(message).toContain("unsupported schema version")
     })
   })
-})
 
-describe("resolveHomeDir", () => {
-  test("an ORC_HOME value wins over the default", () => {
-    expect(resolveHomeDir("/tmp/orc-test-home")).toBe("/tmp/orc-test-home")
-  })
-
-  test("a missing or empty ORC_HOME falls back to ~/.orc", () => {
-    expect(resolveHomeDir(undefined)).toBe(join(homedir(), ".orc"))
-    expect(resolveHomeDir("")).toBe(join(homedir(), ".orc"))
+  test("a file that is not a database fails as a SqliteFailure", async () => {
+    await withHome(async (home) => {
+      await writeFile(join(home, "orc.sqlite"), "this is not a sqlite database ".repeat(8))
+      const message = await Effect.runPromise(
+        openDatabase(home).pipe(
+          Effect.provide(BunServices.layer),
+          Effect.as("opened"),
+          Effect.catchTag("SqliteFailure", (failure) => Effect.succeed(`sqlite failure: ${String(failure.cause)}`)),
+          Effect.catch((cause) => Effect.succeed(`another failure: ${String(cause)}`))
+        )
+      )
+      expect(message).toContain("sqlite failure")
+      expect(message).toContain("file is not a database")
+    })
   })
 })
 
 describe("record and list runs", () => {
   test("lists runs newest first with every recorded field", async () => {
     await openTemp(async (_home, db) => {
-      recordRun(db, {
+      Effect.runSync(recordRun(db, {
         id: "run-old",
         project: "orc",
         branch: "orc/old",
@@ -154,15 +158,15 @@ describe("record and list runs", () => {
         ended: "2026-10-16T10:05:00.000Z",
         prLink: "https://github.com/avi2d/orc/pull/1",
         endReason: "pr opened"
-      })
-      recordRun(db, {
+      }))
+      Effect.runSync(recordRun(db, {
         id: "run-new",
         project: "orc",
         branch: "orc/new",
         taskFile: "task.md",
         status: "running",
         started: "2026-10-17T10:00:00.000Z"
-      })
+      }))
       const runs = await readRuns(db)
       expect(runs.map((run) => run.id)).toEqual(["run-new", "run-old"])
       const finished = runs.find((run) => run.id === "run-old")
@@ -180,15 +184,15 @@ describe("record and list runs", () => {
 
   test("records steps, evidence, signals and scores against their parents", async () => {
     await openTemp(async (_home, db) => {
-      recordRun(db, {
+      Effect.runSync(recordRun(db, {
         id: "run-1",
         project: "orc",
         branch: "orc/x",
         taskFile: "task.md",
         status: "running",
         started: "2026-10-18T10:00:00.000Z"
-      })
-      const stepId = recordStep(db, {
+      }))
+      const stepId = Effect.runSync(recordStep(db, {
         runId: "run-1",
         name: "implement",
         attempt: 1,
@@ -197,10 +201,10 @@ describe("record and list runs", () => {
         ended: "2026-10-18T10:02:00.000Z",
         agentFile: "implementer.md",
         piSessionFile: "session.jsonl"
-      })
-      recordEvidence(db, { stepId, direction: "in", path: "task.md", kind: "task" })
-      recordSignal(db, { stepId, name: "commits", value: "2" })
-      recordScore(db, { stepId, score: 5, note: "clean", scoredAt: "2026-10-18T11:00:00.000Z" })
+      }))
+      Effect.runSync(recordEvidence(db, { stepId, direction: "in", path: "task.md", kind: "task" }))
+      Effect.runSync(recordSignal(db, { stepId, name: "commits", value: "2" }))
+      Effect.runSync(recordScore(db, { stepId, score: 5, note: "clean", scoredAt: "2026-10-18T11:00:00.000Z" }))
       const steps = db.query("SELECT run_id, name, status FROM steps").all()
       expect(steps).toEqual([{ run_id: "run-1", name: "implement", status: "passed" }])
       expect(db.query("SELECT direction, path FROM evidence").all()).toEqual([{ direction: "in", path: "task.md" }])
@@ -226,21 +230,21 @@ describe("record and list runs", () => {
 
   test("rejects a score outside 1 to 5", async () => {
     await openTemp(async (_home, db) => {
-      recordRun(db, {
+      Effect.runSync(recordRun(db, {
         id: "run-1",
         project: "orc",
         branch: "orc/x",
         taskFile: "task.md",
         status: "running",
         started: "2026-10-18T10:00:00.000Z"
-      })
-      const stepId = recordStep(db, {
+      }))
+      const stepId = Effect.runSync(recordStep(db, {
         runId: "run-1",
         name: "implement",
         attempt: 1,
         status: "passed",
         started: "2026-10-18T10:00:00.000Z"
-      })
+      }))
       expect(() =>
         db.query("INSERT INTO scores (step_id, score, note, scored_at) VALUES (?, ?, ?, ?)").run(
           stepId,
