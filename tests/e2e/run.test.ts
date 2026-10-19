@@ -3,14 +3,20 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect } from "effect"
-import { runAgentStep } from "../../src/run"
+import { Effect, FileSystem, Path } from "effect"
+import { ChildProcessSpawner } from "effect/process"
+import type { AgentFile } from "../../src/agents"
+import { orcCompletionLine } from "../../src/pi"
+import { runAgentStep, runWithHistory, type SandboxRun } from "../../src/run"
+import type { OrcRunReport } from "../../src/run-record"
+import { listRuns, openDatabase, type RunRecord } from "../../src/run-history"
 
-const git = (dir: string, args: ReadonlyArray<string>): void => {
+const git = (dir: string, args: ReadonlyArray<string>): string => {
   const result = Bun.spawnSync(["git", ...args], { cwd: dir })
   if (result.exitCode !== 0) {
     throw new Error("the git fixture failed: git " + args.join(" "))
   }
+  return result.stdout.toString().trim()
 }
 
 const withRepo = async (use: (dir: string) => Promise<void>): Promise<void> => {
@@ -110,6 +116,141 @@ describe("runAgentStep refusals", () => {
         await mkdir(agentsDir, { recursive: true })
         await writeFile(join(agentsDir, "implementer.md"), "---\nmodel: example.com/other-model\nthinking: low\ntools: read\n---\nDo it.\n")
         expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test", agentsDir })).toContain("routes only opencode-go models")
+      })
+    })
+  })
+})
+
+const implementer: AgentFile = {
+  kind: "implementer",
+  model: "opencode-go/muse-spark",
+  thinking: "high",
+  tools: ["read", "bash"],
+  body: "Do the task.",
+  path: "bundled/implementer.md",
+  source: "bundled"
+}
+
+const sessionId = "0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"
+const prompt = "Read the task. When the work is committed on this branch, print " + orcCompletionLine + " on its own line and stop."
+
+const entry = (message: Record<string, unknown>): string => JSON.stringify({ type: "message", message })
+
+const sessionEnding = (final: Record<string, unknown>): string =>
+  [
+    JSON.stringify({ type: "session", version: 3, id: sessionId, timestamp: "2026-10-19T10:00:00.000Z", cwd: "/sandbox/repo" }),
+    entry({ role: "user", content: [{ type: "text", text: prompt }] }),
+    entry({
+      role: "assistant",
+      content: [{ type: "text", text: "Plan, then print\n" + orcCompletionLine }, { type: "toolCall", id: "call_1", name: "bash", arguments: { command: "git commit -am work" } }],
+      stopReason: "toolUse",
+      usage: { input: 100, output: 20 }
+    }),
+    entry({ role: "toolResult", toolCallId: "call_1", toolName: "bash", content: [{ type: "text", text: "[orc/test 1a2b3c4] work" }], isError: false }),
+    entry(final)
+  ].join("\n") + "\n"
+
+const providerErrorEchoingPrompt = { role: "assistant", content: [], stopReason: "error", errorMessage: "400 invalid request: " + prompt, usage: { input: 0, output: 0 } }
+
+const cleanFinish = { role: "assistant", content: [{ type: "text", text: "Committed.\n" + orcCompletionLine }], stopReason: "stop", rawStopReason: "completed", usage: { input: 50, output: 5 } }
+
+const commitOnBranch = async (dir: string, branch: string): Promise<string> => {
+  git(dir, ["checkout", "-q", "-b", branch])
+  await writeFile(join(dir, "work.txt"), "work\n")
+  git(dir, ["add", "work.txt"])
+  git(dir, ["commit", "-qm", "work"])
+  const sha = git(dir, ["rev-parse", "HEAD"])
+  git(dir, ["checkout", "-q", "-"])
+  return sha
+}
+
+interface StepOutcome {
+  readonly report: OrcRunReport
+  readonly run: RunRecord | undefined
+  readonly steps: unknown
+  readonly evidence: string
+}
+
+const runStep = (dir: string, home: string, sandbox: SandboxRun): Promise<StepOutcome> =>
+  Effect.runPromise(
+    Effect.gen(function*() {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+      const runDir = path.join(home, "runs", "step-run-1")
+      yield* fs.makeDirectory(path.join(runDir, "sessions"), { recursive: true })
+      return yield* Effect.acquireUseRelease(
+        openDatabase(home),
+        (db) =>
+          Effect.gen(function*() {
+            const report = yield* runWithHistory(db, {
+              fs, path, spawner, git: Bun.which("git") ?? "git", projectDir: dir, runId: "step-run-1", runDir,
+              piSessionDir: path.join(runDir, "session"), hostSessionsDir: path.join(runDir, "sessions"),
+              taskPath: path.join(runDir, "task.md"), agent: implementer, branch: "orc/test", started: "2026-10-19T10:00:00.000Z"
+            }, sandbox)
+            const runs = yield* listRuns(db)
+            const steps = db.query("SELECT name, status FROM steps WHERE run_id = ?").all("step-run-1")
+            const evidence = yield* fs.readFileString(path.join(runDir, "implement-1.md"))
+            return { report, run: runs.find((run) => run.id === "step-run-1"), steps, evidence }
+          }),
+        (db) => Effect.sync(() => db.close())
+      )
+    }).pipe(Effect.provide(BunServices.layer))
+  )
+
+const capturedSession = (home: string, jsonl: string): Promise<void> => {
+  const dir = join(home, "runs", "step-run-1", "sessions", "--sandbox-repo--")
+  return mkdir(dir, { recursive: true }).then(() => writeFile(join(dir, "2026-10-19T10-00-00-000Z_" + sessionId + ".jsonl"), jsonl))
+}
+
+const sandboxResult = (sha: string, final: Record<string, unknown>): SandboxRun => async () => ({
+  iterations: [{ sessionId }],
+  completionSignal: orcCompletionLine,
+  stdout: JSON.stringify({ type: "message_end", message: final }),
+  commits: [{ sha }],
+  branch: "orc/test"
+})
+
+describe("runWithHistory decides the implement step", () => {
+  test("a provider error echoing the prompt is recorded failed even with a new commit", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await commitOnBranch(dir, "orc/test")
+        await capturedSession(home, sessionEnding(providerErrorEchoingPrompt))
+        const outcome = await runStep(dir, home, sandboxResult(sha, providerErrorEchoingPrompt))
+        expect(outcome.report.commits.map((commit) => commit.sha)).toEqual([sha])
+        expect(outcome.report.completed).toBe(false)
+        expect(outcome.run?.status).toBe("failed")
+        expect(outcome.steps).toEqual([{ name: "implement", status: "failed" }])
+      })
+    })
+  })
+
+  test("a clean final reply with the marker and a new commit is recorded succeeded", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await commitOnBranch(dir, "orc/test")
+        await capturedSession(home, sessionEnding(cleanFinish))
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish))
+        expect(outcome.report.completed).toBe(true)
+        expect(outcome.report.inputTokens).toBe(150)
+        expect(outcome.run?.status).toBe("succeeded")
+        expect(outcome.steps).toEqual([{ name: "implement", status: "passed" }])
+      })
+    })
+  })
+
+  test("an agent run that rejects is recorded failed with its reason and evidence", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const outcome = await runStep(dir, home, async () => {
+          throw new Error("pi exited with code 1")
+        })
+        expect(outcome.report.completed).toBe(false)
+        expect(outcome.run?.status).toBe("failed")
+        expect(outcome.run?.endReason ?? "").toContain("pi exited with code 1")
+        expect(outcome.steps).toEqual([{ name: "implement", status: "failed" }])
+        expect(outcome.evidence).toContain("pi exited with code 1")
       })
     })
   })

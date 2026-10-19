@@ -27,7 +27,7 @@ export const piWithTools = (agent: AgentFile, sessions: PiSessionDirs): AgentPro
   }
 }
 
-const UsageTotals = Schema.Struct({ input: Schema.Number, output: Schema.Number })
+const UsageTotals = Schema.Struct({ input: Schema.Finite, output: Schema.Finite })
 
 export type PiTokenUse = typeof UsageTotals.Type
 
@@ -48,20 +48,28 @@ const TextBlock = Schema.Struct({ type: Schema.String, text: Schema.optional(Sch
 
 const AssistantLine = Schema.Struct({
   type: Schema.Literal("message"),
-  message: Schema.Struct({ role: Schema.Literal("assistant"), content: Schema.Array(TextBlock) })
+  message: Schema.Struct({
+    role: Schema.Literal("assistant"),
+    stopReason: Schema.optional(Schema.String),
+    content: Schema.Array(TextBlock)
+  })
 })
 
 const decodeAssistantLine = Schema.decodeUnknownOption(Schema.fromJsonString(AssistantLine))
 
-// Sandcastle matches the completion marker anywhere in the agent output, including a Pi error payload that echoes the prompt back. Only the agent's own text counts.
-export const sessionPrintedSignal = (jsonl: string, signal: string): boolean =>
-  jsonl.split("\n").some((line) =>
-    Option.match(decodeAssistantLine(line), {
-      onNone: () => false,
-      onSome: (entry) =>
-        entry.message.content.some((block) => block.type === "text" && (block.text ?? "").includes(signal))
-    })
-  )
+const finalAssistantMessage = (jsonl: string) =>
+  jsonl.split("\n").flatMap((line) => Option.toArray(decodeAssistantLine(line))).at(-1)?.message
+
+const printsOnOwnLine = (text: string, signal: string): boolean =>
+  text.split("\n").some((line) => line.trim() === signal)
+
+// Sandcastle matches the completion marker anywhere in the agent output, including a Pi error payload that echoes the prompt back. Only a cleanly stopped final reply counts.
+export const sessionPrintedSignal = (jsonl: string, signal: string): boolean => {
+  const final = finalAssistantMessage(jsonl)
+  return final !== undefined &&
+    final.stopReason === "stop" &&
+    final.content.some((block) => block.type === "text" && printsOnOwnLine(block.text ?? "", signal))
+}
 
 export const sumPiUsage = (jsonl: string): PiTokenUse => {
   let input = 0

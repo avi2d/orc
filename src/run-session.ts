@@ -41,17 +41,15 @@ const findCapturedSession = (
   sessionId: string
 ): Effect.Effect<string | null, OrcRunError> =>
   Effect.gen(function*() {
-    const dirs = yield* fs.readDirectory(hostSessionsDir).pipe(
-      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot list the sessions folder: " + String(cause) }))
-    )
+    const dirs = yield* fs.readDirectory(hostSessionsDir)
     for (const dir of dirs) {
-      const files = yield* fs.readDirectory(path.join(hostSessionsDir, dir)).pipe(
-        Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot list the sessions folder: " + String(cause) }))
-      )
+      const files = yield* fs.readDirectory(path.join(hostSessionsDir, dir))
       const found = files.find((entry) => entry.endsWith(sessionId + ".jsonl"))
       if (found !== undefined) {
         return path.join(dir, found)
       }
     }
     return null
-  })
+  }).pipe(
+    Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot list the sessions folder: " + String(cause) }))
+  )

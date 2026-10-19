@@ -4,7 +4,8 @@ import { BunServices } from "@effect/platform-bun"
 import { Console, Effect } from "effect"
 import packageJson from "../package.json" with { type: "json" }
 import { parseArgs } from "./args"
-import { formatReport, runAgentStep } from "./run"
+import { runAgentStep } from "./run"
+import { formatReport } from "./run-record"
 import {
   formatHistoryError,
   formatRunsTable,
@@ -55,6 +56,9 @@ const program = Effect.gen(function*() {
         )
       )
       yield* Console.log(formatReport(report))
+      if (!report.completed) {
+        return yield* Effect.fail("agent step failed")
+      }
       break
     }
     case "UsageError": {

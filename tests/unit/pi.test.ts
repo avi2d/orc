@@ -67,26 +67,41 @@ describe("sumPiUsage", () => {
 describe("sessionPrintedSignal", () => {
   const line = (entry: unknown): string => JSON.stringify(entry)
   const text = (textBody: string): unknown => ({ type: "text", text: textBody })
-  const assistant = (content: ReadonlyArray<unknown>): string =>
-    line({ type: "message", message: { role: "assistant", content } })
-  const promptEcho = line({
-    type: "message",
-    message: { role: "user", content: [text("print " + orcCompletionLine + " on its own line and stop")] }
-  })
+  const assistant = (content: ReadonlyArray<unknown>, stopReason: string, extra: Record<string, unknown> = {}): string =>
+    line({ type: "message", message: { role: "assistant", content, stopReason, ...extra } })
+  const promptText = "print " + orcCompletionLine + " on its own line and stop"
+  const promptEcho = line({ type: "message", message: { role: "user", content: [text(promptText)] } })
   test("rejects a session where only the echoed prompt and thinking name the marker", () => {
     const jsonl = [
       promptEcho,
-      assistant([{ type: "thinking", thinking: "the prompt wants " + orcCompletionLine }]),
+      assistant([{ type: "thinking", thinking: "the prompt wants " + orcCompletionLine }], "stop"),
       line({ type: "message", message: { role: "toolResult", content: [text("error: " + orcCompletionLine)] } })
     ].join("\n")
     expect(sessionPrintedSignal(jsonl, orcCompletionLine)).toBe(false)
   })
-  test("accepts the marker in agent text beside thinking blocks", () => {
+  test("accepts the marker on its own line in a final reply that stopped cleanly", () => {
     const jsonl = [
       promptEcho,
-      assistant([{ type: "thinking", thinking: "done" }, text("Committed.\n" + orcCompletionLine)])
+      assistant([{ type: "toolCall", id: "call_1", name: "bash", arguments: { command: "git commit -am work" } }], "toolUse"),
+      assistant([{ type: "thinking", thinking: "done" }, text("Committed.\n" + orcCompletionLine)], "stop", { rawStopReason: "completed" })
     ].join("\n")
     expect(sessionPrintedSignal(jsonl, orcCompletionLine)).toBe(true)
+  })
+  test("rejects a marker printed mid-run when the final reply is a provider error echoing the prompt", () => {
+    const jsonl = [
+      promptEcho,
+      assistant([text("Plan:\n" + orcCompletionLine), { type: "toolCall", id: "call_1", name: "bash", arguments: { command: "git commit -am work" } }], "toolUse"),
+      assistant([], "error", { errorMessage: "400 invalid request: " + promptText })
+    ].join("\n")
+    expect(sessionPrintedSignal(jsonl, orcCompletionLine)).toBe(false)
+  })
+  test("rejects a marker the final reply mentions inside a sentence", () => {
+    const jsonl = assistant([text("I will print " + orcCompletionLine + " once the tests pass.")], "stop")
+    expect(sessionPrintedSignal(jsonl, orcCompletionLine)).toBe(false)
+  })
+  test("rejects a final reply cut short by the length limit", () => {
+    const jsonl = assistant([text(orcCompletionLine)], "length")
+    expect(sessionPrintedSignal(jsonl, orcCompletionLine)).toBe(false)
   })
   test("ignores blank lines and entries without assistant text", () => {
     expect(sessionPrintedSignal("", orcCompletionLine)).toBe(false)

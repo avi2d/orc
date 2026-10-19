@@ -1,14 +1,15 @@
-import { run as runSandbox, type RunResult } from "@ai-hero/sandcastle"
+import { run as runSandbox, type AgentProvider, type RunResult } from "@ai-hero/sandcastle"
 import { Effect, FileSystem, Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { Database } from "bun:sqlite"
 import { homedir } from "node:os"
 import { resolveAgentFile, type AgentFile } from "./agents"
 import { nonoSandboxProvider } from "./nono"
-import { canRouteModel, loginCheckCommand, modelCredentialFor, piAgentModels, type ModelCredential } from "./nono-profile"
+import { canRouteModel, loginCheckCommand, modelCredentialFor, piAgentModels } from "./nono-profile"
 import { buildImplementPrompt, orcCompletionLine, piWithTools, sessionPrintedSignal } from "./pi"
 import { OrcRunError, describeCause, readSession } from "./run-session"
-import { formatHistoryError, openDatabase, orcHomeDir, recordEvidence, recordRun, recordSignal, recordStep } from "./run-history"
+import { openDatabase, orcHomeDir } from "./run-history"
+import { failedReport, historyFailure, recordHistory, writeEvidence, type HistoryRun, type OrcRunCommit, type OrcRunReport } from "./run-record"
 
 export interface OrcRunRequest {
   readonly cwd: string
@@ -19,32 +20,7 @@ export interface OrcRunRequest {
   readonly agentsDir?: string | undefined
 }
 
-interface OrcRunCommit {
-  readonly sha: string
-  readonly subject: string
-}
-
-export interface OrcRunReport {
-  readonly runId: string
-  readonly runDir: string
-  readonly branch: string
-  readonly agentPath: string
-  readonly agentSource: string
-  readonly model: string
-  readonly sessionId: string | null
-  readonly sessionFile: string | null
-  readonly commits: ReadonlyArray<OrcRunCommit>
-  readonly inputTokens: number
-  readonly outputTokens: number
-  readonly completed: boolean
-  readonly markerVerified: boolean
-  readonly endReason: string
-}
-
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
-
-const historyFailure = (action: string, cause: unknown): OrcRunError =>
-  new OrcRunError({ message: "orc: cannot " + action + " the run history: " + formatHistoryError(cause) })
 
 const newRunId = (): string => {
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15)
@@ -101,22 +77,6 @@ const exists = (fs: FileSystem.FileSystem, path: string): Effect.Effect<boolean,
   fs.exists(path).pipe(
     Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot stat " + path + ": " + String(cause) }))
   )
-
-export const formatReport = (report: OrcRunReport): string =>
-  [
-    "run id: " + report.runId,
-    "run folder: " + report.runDir,
-    "branch: " + report.branch,
-    "agent file: " + report.agentPath + " (" + report.agentSource + ")",
-    "model: " + report.model,
-    "pi session: " + (report.sessionId ?? "none"),
-    "session file: " + (report.sessionFile ?? "none"),
-    "commits: " + report.commits.length.toString() + report.commits.map((commit) => " " + commit.sha).join(","),
-    "input tokens: " + report.inputTokens.toString(),
-    "output tokens: " + report.outputTokens.toString(),
-    "status: " + (report.completed ? "completed" : report.markerVerified ? "no commit" : "incomplete"),
-    report.endReason
-  ].join("\n")
 
 interface Checkout {
   readonly git: string
@@ -241,57 +201,49 @@ export const runAgentStep = (
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the agent models file: " + String(cause) }))
     )
     const started = new Date().toISOString()
+    const runInNono: SandboxRun = (agentProvider) =>
+      runSandbox({
+        agent: agentProvider,
+        sandbox: nonoSandboxProvider({ piSessionDir: folders.piSessionDir, piAgentDir: folders.piAgentDir, modelCredential: credential }),
+        prompt: buildImplementPrompt(agent, folders.sandboxTaskPath),
+        cwd: checkout.projectDir,
+        branchStrategy: { type: "branch", branch: checkout.branch },
+        completionSignal: orcCompletionLine,
+        logging: { type: "file", path: path.join(folders.runDir, "agent.log") },
+        name: "orc-" + runId
+      })
     const report = yield* Effect.acquireUseRelease(
       openDatabase(home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
       (db) => runWithHistory(db, {
-        fs, path, spawner, git: checkout.git, projectDir: checkout.projectDir, home, runId,
-        runDir: folders.runDir, piSessionDir: folders.piSessionDir, piAgentDir: folders.piAgentDir,
-        hostSessionsDir: folders.hostSessionsDir, taskPath: folders.taskPath, sandboxTaskPath: folders.sandboxTaskPath,
-        agent, credential, branch: checkout.branch, started
-      }),
+        fs, path, spawner, git: checkout.git, projectDir: checkout.projectDir, runId,
+        runDir: folders.runDir, piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir,
+        taskPath: folders.taskPath, agent, branch: checkout.branch, started
+      }, runInNono),
       (db) => Effect.sync(() => db.close())
     )
     return report
   })
 
-interface HistoryRun {
-  readonly fs: FileSystem.FileSystem
-  readonly path: Path.Path
-  readonly spawner: ChildProcessSpawner.ChildProcessSpawner["Service"]
-  readonly git: string
-  readonly projectDir: string
-  readonly home: string
-  readonly runId: string
-  readonly runDir: string
-  readonly piSessionDir: string
-  readonly piAgentDir: string
-  readonly hostSessionsDir: string
-  readonly taskPath: string
-  readonly sandboxTaskPath: string
-  readonly agent: AgentFile
-  readonly credential: ModelCredential
-  readonly branch: string
-  readonly started: string
-}
+export type SandboxRun = (agent: AgentProvider) => Promise<RunResult>
 
-const runWithHistory = (db: Database, run: HistoryRun): Effect.Effect<OrcRunReport, OrcRunError> =>
+export const runWithHistory = (db: Database, run: HistoryRun, runInSandbox: SandboxRun): Effect.Effect<OrcRunReport, OrcRunError> =>
+  Effect.gen(function*() {
+    const report = yield* implement(run, runInSandbox).pipe(
+      Effect.catchTag("OrcRunError", (error) => Effect.succeed(failedReport(run, error.message)))
+    )
+    yield* writeEvidence(run, report)
+    yield* recordHistory(db, run, report)
+    return report
+  })
+
+const implement = (run: HistoryRun, runInSandbox: SandboxRun): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
     const agentProvider = piWithTools(run.agent, {
       hostSessionsDir: run.hostSessionsDir,
       sandboxSessionsDir: run.piSessionDir
     })
     const result: RunResult = yield* Effect.tryPromise({
-      try: () =>
-        runSandbox({
-          agent: agentProvider,
-          sandbox: nonoSandboxProvider({ piSessionDir: run.piSessionDir, piAgentDir: run.piAgentDir, modelCredential: run.credential }),
-          prompt: buildImplementPrompt(run.agent, run.sandboxTaskPath),
-          cwd: run.projectDir,
-          branchStrategy: { type: "branch", branch: run.branch },
-          completionSignal: orcCompletionLine,
-          logging: { type: "file", path: run.path.join(run.runDir, "agent.log") },
-          name: "orc-" + run.runId
-        }),
+      try: () => runInSandbox(agentProvider),
       catch: (cause) => new OrcRunError({ message: "orc: the agent run failed: " + describeCause(cause) })
     })
     const sessionId = result.iterations.map((iteration) => iteration.sessionId).find((id) => id !== undefined) ?? null
@@ -305,9 +257,9 @@ const runWithHistory = (db: Database, run: HistoryRun): Effect.Effect<OrcRunRepo
     const verified = signaled && session.jsonl !== null && sessionPrintedSignal(session.jsonl, orcCompletionLine)
     const completed = verified && commits.length > 0
     const endReason = !verified
-      ? "Pi never printed " + orcCompletionLine + " in its own output."
+      ? "Pi's final reply did not stop cleanly with " + orcCompletionLine + " on its own line."
       : (commits.length > 0 ? "Pi committed " + commits.length.toString() + " on " + result.branch + "." : "Pi printed ORC_COMPLETE but made no commit on " + result.branch + ".")
-    const report: OrcRunReport = {
+    return {
       runId: run.runId,
       runDir: run.runDir,
       branch: result.branch,
@@ -323,74 +275,4 @@ const runWithHistory = (db: Database, run: HistoryRun): Effect.Effect<OrcRunRepo
       markerVerified: verified,
       endReason
     }
-    yield* writeEvidence(run, report)
-    yield* recordHistory(db, run, report, session.jsonl !== null)
-    return report
   })
-
-const writeEvidence = (run: HistoryRun, report: OrcRunReport): Effect.Effect<void, OrcRunError> => {
-  const lines = [
-    "Implement step for task " + run.taskPath + ".",
-    "Agent file " + report.agentPath + " (" + report.agentSource + ") names model " + report.model + " with tools " + run.agent.tools.join(", ") + ".",
-    report.sessionId === null ? "Pi stored no session." : "Pi session " + report.sessionId + " is stored at " + (report.sessionFile ?? "an unknown path") + ".",
-    report.markerVerified ? "Pi printed " + orcCompletionLine + "." : "Pi stopped without printing " + orcCompletionLine + ".",
-    report.commits.length === 0 ? "Pi made no commit on " + report.branch + "." : "Commits on " + report.branch + ".",
-    ...report.commits.map((commit) => commit.sha + " " + commit.subject),
-    "Pi consumed " + report.inputTokens.toString() + " input tokens and " + report.outputTokens.toString() + " output tokens.",
-  ]
-  return run.fs.writeFileString(run.path.join(run.runDir, "implement-1.md"), lines.join("\n") + "\n").pipe(
-    Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the evidence file: " + String(cause) }))
-  )
-}
-
-const recordHistory = (
-  db: Database,
-  run: HistoryRun,
-  report: OrcRunReport,
-  hasSession: boolean
-): Effect.Effect<void, OrcRunError> =>
-  Effect.gen(function*() {
-    const ended = new Date().toISOString()
-    const failed = (action: string) => (cause: unknown) => historyFailure(action, cause)
-    yield* recordRun(db, {
-      id: run.runId,
-      project: run.projectDir,
-      branch: report.branch,
-      taskFile: run.taskPath,
-      status: report.completed ? "succeeded" : "failed",
-      started: run.started,
-      ended,
-      endReason: report.endReason
-    }).pipe(Effect.mapError(failed("record the run in")))
-    const stepId = yield* recordStep(db, {
-      runId: run.runId,
-      name: "implement",
-      attempt: 1,
-      status: report.completed ? "passed" : "failed",
-      started: run.started,
-      ended,
-      agentFile: report.agentPath,
-      piSessionFile: report.sessionFile
-    }).pipe(Effect.mapError(failed("record the step in")))
-    yield* recordEvidence(db, { stepId, direction: "in", path: run.taskPath, kind: "task" }).pipe(
-      Effect.mapError(failed("record the task evidence in"))
-    )
-    yield* recordEvidence(db, { stepId, direction: "out", path: run.path.join(run.runDir, "implement-1.md"), kind: "evidence" }).pipe(
-      Effect.mapError(failed("record the evidence file in"))
-    )
-    if (hasSession && report.sessionFile !== null) {
-      yield* recordEvidence(db, { stepId, direction: "out", path: report.sessionFile, kind: "session" }).pipe(
-        Effect.mapError(failed("record the session evidence in"))
-      )
-    }
-    for (const signal of [
-      { name: "input-tokens", value: report.inputTokens.toString() },
-      { name: "output-tokens", value: report.outputTokens.toString() },
-      { name: "commit-count", value: report.commits.length.toString() }
-    ]) {
-      yield* recordSignal(db, { stepId, name: signal.name, value: signal.value }).pipe(
-        Effect.mapError(failed("record the signals in"))
-      )
-    }
-  })
-

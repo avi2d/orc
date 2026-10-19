@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import packageJson from "../../package.json" with { type: "json" }
@@ -64,7 +64,18 @@ describe("orc bin", () => {
   test("run with no pi login refuses the keychain-only setup", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-bin-login-"))
     const home = await mkdtemp(join(tmpdir(), "orc-bin-home-"))
+    const fakeBin = join(home, "bin")
     try {
+      await mkdir(fakeBin)
+      await writeFile(join(fakeBin, "pi"), [
+        "#!/bin/sh",
+        "if [ \"$1\" = auth ] && [ \"$2\" = check ]; then echo \"$*\" >> \"$(dirname \"$0\")/auth-checks\"; echo not_ready; exit 1; fi",
+        "echo \"$*\" >> \"$(dirname \"$0\")/other-calls\"",
+        "exit 2"
+      ].join("\n") + "\n")
+      await writeFile(join(fakeBin, "node"), "#!/bin/sh\nexit 1\n")
+      await chmod(join(fakeBin, "pi"), 0o755)
+      await chmod(join(fakeBin, "node"), 0o755)
       const git = (args: ReadonlyArray<string>): void => {
         const result = Bun.spawnSync(["git", ...args], { cwd: dir, env: { ...process.env, HOME: home } })
         if (result.exitCode !== 0) {
@@ -77,9 +88,16 @@ describe("orc bin", () => {
       await writeFile(join(dir, "task.md"), "Do nothing.\n")
       git(["add", "task.md"])
       git(["commit", "-qm", "task"])
-      const result = await runOrc(["run", "task.md", "--branch", "orc/test"], dir, { HOME: home, PI_CODING_AGENT_DIR: undefined })
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test"], dir, {
+        HOME: home,
+        PI_CODING_AGENT_DIR: undefined,
+        PATH: fakeBin + ":" + (process.env["PATH"] ?? "")
+      })
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toContain("keychain-only setup is refused")
+      expect(await readFile(join(fakeBin, "auth-checks"), "utf8")).toBe("auth check --provider opencode-go\n")
+      expect(await Bun.file(join(fakeBin, "other-calls")).exists()).toBe(false)
+      expect(Bun.spawnSync(["git", "rev-parse", "--verify", "-q", "orc/test"], { cwd: dir }).exitCode).not.toBe(0)
     } finally {
       await rm(dir, { recursive: true, force: true })
       await rm(home, { recursive: true, force: true })
