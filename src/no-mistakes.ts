@@ -1,5 +1,6 @@
-import { Effect, Stream } from "effect"
+import { Effect } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { collectOutput } from "./git-run"
 import { hostGitSafetyEnv } from "./host"
 import { hasTable, scalar, splitRow, table, trimmedLines } from "./toon"
 
@@ -198,12 +199,7 @@ const spawnNoMistakes = (input: NoMistakesInput, args: ReadonlyArray<string>): E
       env: { ...hostGitSafetyEnv, PATH: input.git.slice(0, input.git.lastIndexOf("/")) + ":" + input.pathEnv },
       extendEnv: true
     }))
-    const [stdout, stderr, exitCode] = yield* Effect.all([
-      handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
-      handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
-      handle.exitCode
-    ], { concurrency: "unbounded" })
-    return { stdout, stderr, exitCode }
+    return yield* collectOutput(handle)
   })).pipe(
     Effect.catch((cause) => Effect.succeed({ stdout: "", stderr: "no-mistakes failed to run: " + String(cause), exitCode: -1 }))
   )
