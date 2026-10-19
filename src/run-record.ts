@@ -90,10 +90,11 @@ const runStatus = (report: OrcRunReport): string => {
   if ((report.commits ?? []).length === 0) {
     return "no commit"
   }
-  if (report.checksRounds === null || report.checksRounds.some((round) => !round.passed)) {
+  const finalRound = report.checksRounds?.at(-1)
+  if (finalRound === undefined || !finalRound.passed) {
     return "checks failed"
   }
-  return "no PR"
+  return "no-mistakes " + (report.noMistakes?.status ?? "never ran") + (report.prLink === null ? ", no PR" : ", PR open")
 }
 
 const noMistakesSummary = (record: NoMistakesRecord): string =>

@@ -1,6 +1,5 @@
 import { Effect, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { OrcRunError } from "./run-session"
 
 export interface NoMistakesFinding {
   readonly id: string
@@ -37,46 +36,65 @@ export interface NoMistakesInput {
   readonly worktreeDir: string
 }
 
+interface ParkedGate {
+  readonly step: string
+  readonly stage: "approval" | "fix-review"
+}
+
 interface ParsedRun {
   readonly status: string
   readonly outcome: string
   readonly prLink: string
-  readonly gate: string | null
-  readonly parked: boolean
+  readonly gate: ParkedGate | null
   readonly terminal: boolean
   readonly findings: ReadonlyArray<NoMistakesFinding>
+  readonly fixes: ReadonlyArray<NoMistakesFinding>
 }
 
 type GateAnswer =
-  | { readonly kind: "fix"; readonly ids: ReadonlyArray<string> }
+  | { readonly kind: "fix"; readonly ids: ReadonlyArray<string>; readonly ignore: ReadonlyArray<string> }
+  | { readonly kind: "approve" }
   | { readonly kind: "refuse"; readonly reason: string }
 
-const maxDriveRounds = 20
+type Sent =
+  | { readonly kind: "start" }
+  | { readonly kind: "respond"; readonly gate: ParkedGate }
+  | { readonly kind: "reattach" }
+
+const maxGatesAnswered = 20
+
+const terminalStatuses = new Set(["completed", "failed", "cancelled", "checks_passed"])
+
+const greenOutcomes = new Set(["checks-passed", "passed"])
+
+const escapes: Readonly<Record<string, string>> = { "\\": "\\", "\"": "\"", n: "\n", r: "\r", t: "\t" }
 
 const trimmedLines = (output: string): Array<string> => output.split("\n").map((line) => line.trim())
 
-const unquote = (value: string): string => {
+const decode = (value: string): string => {
   const text = value.trim()
   const quoted = text.length >= 2 && text.startsWith("\"") && text.endsWith("\"")
-  return quoted ? text.slice(1, -1) : text
+  return quoted ? text.slice(1, -1).replace(/\\(.)/g, (_, char: string) => escapes[char] ?? char) : text
 }
 
 const scalar = (output: string, key: string): string => {
   const line = trimmedLines(output).find((candidate) => candidate.startsWith(key + ":"))
-  return line === undefined ? "" : unquote(line.slice(key.length + 1))
+  return line === undefined ? "" : decode(line.slice(key.length + 1))
 }
 
 const splitRow = (row: string): Array<string> => {
   const cells: Array<string> = []
   let cell = ""
   let quoted = false
+  let escaped = false
   for (const char of row.trim()) {
-    if (char === "\"") {
+    if (escaped) {
+      escaped = false
+    } else if (quoted && char === "\\") {
+      escaped = true
+    } else if (char === "\"") {
       quoted = !quoted
-      cell += char
-      continue
-    }
-    if (char === "," && !quoted) {
+    } else if (char === "," && !quoted) {
       cells.push(cell)
       cell = ""
       continue
@@ -84,23 +102,24 @@ const splitRow = (row: string): Array<string> => {
     cell += char
   }
   cells.push(cell)
-  return cells.map(unquote)
+  return cells.map(decode)
 }
-const gateFindings = (output: string): ReadonlyArray<NoMistakesFinding> => {
+
+const findingsTable = (output: string, name: "findings" | "fixes"): ReadonlyArray<NoMistakesFinding> => {
   const lines = trimmedLines(output)
-  const headerIndex = lines.findIndex((line) => /^findings\[\d+\]\{[^}]*\}:$/.test(line))
-  if (headerIndex === -1) {
+  const header = new RegExp("^" + name + "\\[(\\d+)\\]\\{([^}]*)\\}:$")
+  const headerIndex = lines.findIndex((line) => header.test(line))
+  const match = header.exec(lines[headerIndex] ?? "")
+  if (match === null) {
     return []
   }
-  const count = Number(lines[headerIndex].slice("findings[".length).split("]")[0])
-  const header = lines[headerIndex] ?? ""
-  const columns = header.slice(header.indexOf("{") + 1, header.indexOf("}")).split(",").map((name) => name.trim())
-  const rows = lines.slice(headerIndex + 1).filter((line) => line !== "").slice(0, count)
+  const columns = match[2].split(",").map((column) => column.trim())
+  const rows = lines.slice(headerIndex + 1).filter((line) => line !== "").slice(0, Number(match[1]))
   return rows.map((row) => {
     const cells = splitRow(row)
-    const cell = (name: string): string => {
-      const index = columns.indexOf(name)
-      return index === -1 || index >= cells.length ? "" : cells[index] ?? ""
+    const cell = (column: string): string => {
+      const index = columns.indexOf(column)
+      return index === -1 ? "" : cells[index] ?? ""
     }
     return {
       id: cell("id"),
@@ -123,7 +142,7 @@ const parkedStep = (output: string): string | null => {
   return null
 }
 
-const readGate = (output: string): string | null => {
+const gateStep = (output: string): string | null => {
   const named = scalar(output, "gate")
   if (named !== "") {
     return named
@@ -135,25 +154,32 @@ const readGate = (output: string): string | null => {
   return parkedStep(output)
 }
 
+const inFixReview = (output: string, step: string): boolean =>
+  trimmedLines(output).some((line) => {
+    const cells = splitRow(line)
+    return line === "status: fix_review" || (cells[0] === step && cells[1] === "fix_review")
+  })
+
+const readGate = (output: string): ParkedGate | null => {
+  const step = gateStep(output)
+  return step === null ? null : { step, stage: inFixReview(output, step) ? "fix-review" : "approval" }
+}
+
 export const parseRun = (output: string): ParsedRun => {
   const status = scalar(output, "status")
-  const gate = readGate(output)
-  const parked = gate !== null ||
-    trimmedLines(output).some((line) => line.startsWith("awaiting_agent:")) ||
-    status === "awaiting_approval" ||
-    status === "fix_review"
+  const outcome = scalar(output, "outcome")
   return {
     status,
-    outcome: scalar(output, "outcome"),
+    outcome,
     prLink: scalar(output, "pr"),
-    gate,
-    parked,
-    terminal: status === "completed" || status === "failed" || status === "cancelled",
-    findings: gateFindings(output)
+    gate: readGate(output),
+    terminal: outcome !== "" || terminalStatuses.has(status),
+    findings: findingsTable(output, "findings"),
+    fixes: findingsTable(output, "fixes")
   }
 }
 
-export const answerForGate = (gate: string, findings: ReadonlyArray<NoMistakesFinding>): GateAnswer => {
+export const answerForGate = (gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>): GateAnswer => {
   const question = findings.find((finding) => finding.id.startsWith("question-"))
   if (question !== undefined) {
     return { kind: "refuse", reason: "open review question " + question.id + " needs his word" }
@@ -162,38 +188,47 @@ export const answerForGate = (gate: string, findings: ReadonlyArray<NoMistakesFi
   if (asked !== undefined) {
     return { kind: "refuse", reason: "finding " + asked.id + " is marked ask-user and needs his word" }
   }
-  const other = findings.find((finding) => finding.action !== "" && finding.action !== "auto-fix")
+  const other = findings.find((finding) => finding.action !== "auto-fix" && finding.action !== "no-op")
   if (other !== undefined) {
     return { kind: "refuse", reason: "finding " + other.id + " needs an answer orc cannot give" }
   }
-  if (findings.length === 0) {
-    return { kind: "refuse", reason: "the " + gate + " gate names no finding orc can fix" }
+  if (gate.stage === "fix-review") {
+    return { kind: "approve" }
   }
-  return { kind: "fix", ids: findings.map((finding) => finding.id) }
-}
-
-const remember = (
-  seen: Array<NoMistakesFinding>,
-  known: Set<string>,
-  findings: ReadonlyArray<NoMistakesFinding>
-): void => {
-  for (const finding of findings) {
-    if (!known.has(finding.id)) {
-      known.add(finding.id)
-      seen.push(finding)
+  const fixable = findings.filter((finding) => finding.action === "auto-fix")
+  if (fixable.length > 0) {
+    return {
+      kind: "fix",
+      ids: fixable.map((finding) => finding.id),
+      ignore: findings.filter((finding) => finding.action === "no-op").map((finding) => finding.id)
     }
   }
+  if (findings.length > 0) {
+    return { kind: "approve" }
+  }
+  return { kind: "refuse", reason: "the " + gate.step + " gate names no finding orc can fix" }
 }
 
+const respondArgs = (answer: Exclude<GateAnswer, { readonly kind: "refuse" }>): ReadonlyArray<string> =>
+  answer.kind === "approve"
+    ? ["axi", "respond", "--action", "approve"]
+    : ["axi", "respond", "--action", "fix", "--findings", answer.ids.join(","), ...(answer.ignore.length === 0 ? [] : ["--ignore", answer.ignore.join(",")])]
+
+const findingKey = (finding: NoMistakesFinding): string =>
+  finding.id === "" ? finding.file + "\n" + finding.description : finding.id
+
 const firstLine = (text: string): string => text.split("\n").map((line) => line.trim()).find((line) => line !== "") ?? "the pipeline gave no reason"
-const spawnNoMistakes = (
-  spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
-  pathEnv: string,
-  args: ReadonlyArray<string>,
-  cwd: string
-): Effect.Effect<NoMistakesCommand, OrcRunError> =>
+
+const errorDetail = (command: NoMistakesCommand): string => {
+  const reported = scalar(command.stdout, "error")
+  return reported === "" ? firstLine(command.stderr + "\n" + command.stdout) : reported
+}
+
+const prNote = (prLink: string | null): string => prLink === null ? "No PR opens." : "The PR " + prLink + " is open but not ready."
+
+const spawnNoMistakes = (input: NoMistakesInput, args: ReadonlyArray<string>): Effect.Effect<NoMistakesCommand> =>
   Effect.scoped(Effect.gen(function*() {
-    const handle = yield* spawner.spawn(ChildProcess.make("no-mistakes", [...args], { cwd, env: { PATH: pathEnv }, extendEnv: true }))
+    const handle = yield* input.spawner.spawn(ChildProcess.make("no-mistakes", [...args], { cwd: input.worktreeDir, env: { PATH: input.pathEnv }, extendEnv: true }))
     const [stdout, stderr, exitCode] = yield* Effect.all([
       handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
       handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
@@ -201,139 +236,101 @@ const spawnNoMistakes = (
     ], { concurrency: "unbounded" })
     return { stdout, stderr, exitCode }
   })).pipe(
-    Effect.mapError((cause) => cause instanceof OrcRunError ? cause : new OrcRunError({ message: "orc: no-mistakes failed to run: " + String(cause) }))
+    Effect.catch((cause) => Effect.succeed({ stdout: "", stderr: "no-mistakes failed to run: " + String(cause), exitCode: -1 }))
   )
 
-const refused = (
-  seen: ReadonlyArray<NoMistakesFinding>,
-  gatesAnswered: number,
-  gate: string | null,
-  prLink: string | null,
-  reason: string,
-  started: string
-): NoMistakesRecord => ({
-  status: "refused",
-  gate,
-  findings: seen,
-  gatesAnswered,
-  prLink,
-  result: "no-mistakes stopped" + (gate === null ? "." : " at the " + gate + " gate.") + " " + reason + ". No PR opens.",
-  started,
-  ended: new Date().toISOString()
-})
+interface DriveLog {
+  readonly read: (output: string) => ParsedRun
+  readonly gatesAnswered: () => number
+  readonly countGate: () => void
+  readonly refuse: (gate: ParkedGate | null, reason: string) => NoMistakesRecord
+  readonly fail: (reason: string) => NoMistakesRecord
+  readonly finish: (parsed: ParsedRun) => NoMistakesRecord
+}
 
-const finished = (
-  parsed: ParsedRun,
-  seen: ReadonlyArray<NoMistakesFinding>,
-  gatesAnswered: number,
-  started: string
-): NoMistakesRecord => {
-  const ended = new Date().toISOString()
-  if (parsed.status === "completed" && parsed.outcome !== "failed" && parsed.prLink !== "") {
-    return {
-      status: "passed",
-      gate: null,
-      findings: seen,
-      gatesAnswered,
-      prLink: parsed.prLink,
-      result: "no-mistakes opened " + parsed.prLink + " and CI is green.",
-      started,
-      ended
-    }
-  }
-  return {
-    status: "failed",
-    gate: null,
-    findings: seen,
+const openDriveLog = (started: string): DriveLog => {
+  const findings: Array<NoMistakesFinding> = []
+  const known = new Set<string>()
+  let gatesAnswered = 0
+  let prLink: string | null = null
+  const close = (status: NoMistakesStatus, gate: ParkedGate | null, result: string): NoMistakesRecord => ({
+    status,
+    gate: gate === null ? null : gate.step,
+    findings,
     gatesAnswered,
-    prLink: parsed.prLink === "" ? null : parsed.prLink,
-    result: "no-mistakes ended " + parsed.status + (parsed.outcome === "" ? "" : " with outcome " + parsed.outcome) + ". No PR opens.",
+    prLink,
+    result,
     started,
-    ended
+    ended: new Date().toISOString()
+  })
+  const fail = (reason: string): NoMistakesRecord => close("failed", null, reason + ". " + prNote(prLink))
+  return {
+    read: (output) => {
+      const parsed = parseRun(output)
+      for (const finding of [...parsed.findings, ...parsed.fixes]) {
+        if (!known.has(findingKey(finding))) {
+          known.add(findingKey(finding))
+          findings.push(finding)
+        }
+      }
+      prLink = parsed.prLink === "" ? prLink : parsed.prLink
+      return parsed
+    },
+    gatesAnswered: () => gatesAnswered,
+    countGate: () => {
+      gatesAnswered += 1
+    },
+    refuse: (gate, reason) =>
+      close("refused", gate, "no-mistakes stopped" + (gate === null ? "." : " at the " + gate.step + " gate.") + " " + reason + ". " + prNote(prLink)),
+    fail,
+    finish: (parsed) =>
+      greenOutcomes.has(parsed.outcome) && prLink !== null
+        ? close("passed", null, "no-mistakes opened " + prLink + " and CI is green.")
+        : fail("no-mistakes ended " + (parsed.outcome === "" ? parsed.status : "with outcome " + parsed.outcome))
   }
 }
 
-const linkOrNull = (link: string): string | null => link === "" ? null : link
-
-interface CollectedFindings {
-  readonly seen: Array<NoMistakesFinding>
-  readonly known: Set<string>
+const stopWithoutGate = (input: NoMistakesInput, log: DriveLog, sent: Sent, command: NoMistakesCommand): Effect.Effect<NoMistakesRecord> => {
+  if (sent.kind === "start") {
+    return Effect.succeed(log.fail("no-mistakes refused to start: " + errorDetail(command)))
+  }
+  if (sent.kind === "respond") {
+    return Effect.succeed(log.refuse(sent.gate, "no-mistakes refused the answer: " + errorDetail(command)))
+  }
+  return spawnNoMistakes(input, ["axi", "status"]).pipe(Effect.map((status) => {
+    const resting = log.read(status.stdout)
+    return resting.terminal ? log.finish(resting) : log.fail("no-mistakes left no gate and no outcome: " + errorDetail(command))
+  }))
 }
 
-type DriveNext =
-  | { readonly kind: "output"; readonly command: NoMistakesCommand; readonly answered: boolean }
-  | { readonly kind: "record"; readonly record: NoMistakesRecord }
+const gateAnswer = (log: DriveLog, gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>): GateAnswer =>
+  log.gatesAnswered() >= maxGatesAnswered
+    ? { kind: "refuse", reason: "orc answered " + maxGatesAnswered.toString() + " gates without reaching an outcome" }
+    : answerForGate(gate, findings)
 
-const answerGate = (
-  input: NoMistakesInput,
-  parsed: ParsedRun,
-  collected: CollectedFindings,
-  gatesAnswered: number,
-  started: string
-): Effect.Effect<DriveNext, OrcRunError> =>
+export const driveNoMistakes = (input: NoMistakesInput): Effect.Effect<NoMistakesRecord> =>
   Effect.gen(function*() {
-    const answer = answerForGate(parsed.gate ?? "unknown", parsed.findings)
-    if (answer.kind === "refuse") {
-      return { kind: "record", record: refused(collected.seen, gatesAnswered, parsed.gate, linkOrNull(parsed.prLink), answer.reason, started) }
-    }
-    const fixed = yield* spawnNoMistakes(input.spawner, input.pathEnv, ["axi", "respond", "--action", "fix", "--findings", answer.ids.join(",")], input.worktreeDir)
-    if (fixed.exitCode !== 0) {
-      return { kind: "record", record: refused(collected.seen, gatesAnswered, parsed.gate, linkOrNull(parsed.prLink), "no-mistakes refused the fix: " + firstLine(fixed.stderr), started) }
-    }
-    return { kind: "output", command: fixed, answered: true }
-  })
-
-const reattach = (
-  input: NoMistakesInput,
-  failed: NoMistakesCommand,
-  collected: CollectedFindings,
-  gatesAnswered: number,
-  started: string
-): Effect.Effect<DriveNext, OrcRunError> =>
-  Effect.gen(function*() {
-    const rerun = yield* spawnNoMistakes(input.spawner, input.pathEnv, ["axi", "run"], input.worktreeDir)
-    if (rerun.exitCode === 0) {
-      return { kind: "output", command: rerun, answered: false }
-    }
-    const status = yield* spawnNoMistakes(input.spawner, input.pathEnv, ["axi", "status"], input.worktreeDir)
-    if (status.exitCode !== 0) {
-      return yield* new OrcRunError({ message: "orc: no-mistakes left no gate and no outcome: " + firstLine(failed.stderr) })
-    }
-    const resting = parseRun(status.stdout)
-    remember(collected.seen, collected.known, resting.findings)
-    if (resting.terminal) {
-      return { kind: "record", record: finished(resting, collected.seen, gatesAnswered, started) }
-    }
-    return yield* new OrcRunError({ message: "orc: no-mistakes left no gate and no outcome while the run is still " + (resting.status === "" ? "running" : resting.status) })
-  })
-
-export const driveNoMistakes = (input: NoMistakesInput): Effect.Effect<NoMistakesRecord, OrcRunError> =>
-  Effect.gen(function*() {
-    const started = new Date().toISOString()
-    const collected: CollectedFindings = { seen: [], known: new Set<string>() }
-    let gatesAnswered = 0
-    let current = yield* spawnNoMistakes(input.spawner, input.pathEnv, ["axi", "run", "--intent-file", input.taskFile], input.worktreeDir)
-    if (current.exitCode !== 0) {
-      return yield* new OrcRunError({ message: "orc: no-mistakes refused to start: " + firstLine(current.stderr) })
-    }
-    for (let round = 0; ; round += 1) {
-      if (round > maxDriveRounds) {
-        return yield* new OrcRunError({ message: "orc: no-mistakes parked at " + maxDriveRounds.toString() + " gates without reaching an outcome" })
-      }
-      const parsed = parseRun(current.stdout)
-      remember(collected.seen, collected.known, parsed.findings)
+    const log = openDriveLog(new Date().toISOString())
+    let sent: Sent = { kind: "start" }
+    let current = yield* spawnNoMistakes(input, ["axi", "run", "--intent-file", input.taskFile])
+    for (;;) {
+      const parsed = log.read(current.stdout)
       if (parsed.terminal) {
-        return finished(parsed, collected.seen, gatesAnswered, started)
+        return log.finish(parsed)
       }
-      const next = parsed.parked && parsed.gate !== null
-        ? yield* answerGate(input, parsed, collected, gatesAnswered, started)
-        : yield* reattach(input, current, collected, gatesAnswered, started)
-      if (next.kind === "record") {
-        return next.record
+      if (parsed.gate !== null) {
+        const answer = gateAnswer(log, parsed.gate, parsed.findings)
+        if (answer.kind === "refuse") {
+          return log.refuse(parsed.gate, answer.reason)
+        }
+        current = yield* spawnNoMistakes(input, respondArgs(answer))
+        sent = { kind: "respond", gate: parsed.gate }
+        log.countGate()
+      } else if (current.exitCode === 0) {
+        current = yield* spawnNoMistakes(input, ["axi", "run"])
+        sent = { kind: "reattach" }
+      } else {
+        return yield* stopWithoutGate(input, log, sent, current)
       }
-      if (next.answered) {
-        gatesAnswered += 1
-      }
-      current = next.command
     }
   })

@@ -117,6 +117,18 @@ export const passedWithPr: NoMistakesReply = {
   ].join("\n") + "\n"
 }
 
+export const checksPassedWhileMonitoring: NoMistakesReply = {
+  stdout: [
+    "run:",
+    "  id: \"01STUB\"",
+    "  branch: orc/test",
+    "  status: running",
+    "  head: abc1234",
+    "  pr: \"https://github.com/o/r/pull/7\"",
+    "outcome: checks-passed"
+  ].join("\n") + "\n"
+}
+
 const stubNoMistakes = async (replies: ReadonlyArray<NoMistakesReply>): Promise<{ readonly dir: string; readonly calls: string }> => {
   const dir = await mkdtemp(join(tmpdir(), "orc-nm-stub-"))
   const repliesDir = join(dir, "replies")

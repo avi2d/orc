@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { readFile, realpath, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { capturedSession, cleanFinish, commitOnBranch, passedWithPr, runStep, sandboxResult, sessionEnding, withHome, withRepo, type NoMistakesReply } from "./run-helpers"
+import { capturedSession, checksPassedWhileMonitoring, cleanFinish, commitOnBranch, passedWithPr, runStep, sandboxResult, sessionEnding, withHome, withRepo, type NoMistakesReply } from "./run-helpers"
 
 const fixableGate: NoMistakesReply = {
   stdout: [
@@ -17,6 +17,40 @@ const fixableGate: NoMistakesReply = {
     "gate: review"
   ].join("\n") + "\n"
 }
+
+const fixReviewGate: NoMistakesReply = {
+  stdout: [
+    "run:",
+    "  id: \"01STUB\"",
+    "  branch: orc/test",
+    "  status: running",
+    "  awaiting_agent: parked 0m05s",
+    "  head: def5678",
+    "  pr: \"\"",
+    "gate:",
+    "  step: review",
+    "  status: fix_review",
+    "findings[1]{id,severity,file,line,action,description}:",
+    "  R7,warning,notes.md,,auto-fix,spelling"
+  ].join("\n") + "\n"
+}
+
+const finalOutcome = (status: string, outcome: string, pr: string): NoMistakesReply => ({
+  stdout: [
+    "run:",
+    "  id: \"01STUB\"",
+    "  branch: orc/test",
+    "  status: " + status,
+    "  head: abc1234",
+    "  pr: \"" + pr + "\"",
+    "outcome: " + outcome
+  ].join("\n") + "\n",
+  exitCode: outcome === "failed" || outcome === "cancelled" ? 1 : 0
+})
+
+const lintPasses = async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 })
+
+const nmCallLines = (calls: string): ReadonlyArray<string> => calls.split("\n").filter((line) => line !== "")
 
 const readyToCheck = async (dir: string, home: string): Promise<string> => {
   const sha = await commitOnBranch(dir, "orc/test")
@@ -145,6 +179,124 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         const reason = outcome.run?.endReason ?? ""
         expect(reason).toContain("protected path")
         expect(reason).toContain("No PR opens")
+      })
+    })
+  })
+
+  test("checks-passed while the CI monitor keeps watching records the ready PR without reattaching", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await readyToCheck(dir, home)
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [checksPassedWhileMonitoring])
+        expect(nmCallLines(outcome.nmCalls)).toHaveLength(2)
+        expect(outcome.report.completed).toBe(true)
+        expect(outcome.report.noMistakes?.status).toBe("passed")
+        expect(outcome.run?.prLink).toBe("https://github.com/o/r/pull/7")
+      })
+    })
+  })
+
+  test("passed-with-skips keeps the PR link but never claims green CI", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await readyToCheck(dir, home)
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [finalOutcome("completed", "passed-with-skips", "https://github.com/o/r/pull/7")])
+        expect(outcome.report.completed).toBe(false)
+        expect(outcome.report.noMistakes?.status).toBe("failed")
+        expect(outcome.report.prLink).toBe("https://github.com/o/r/pull/7")
+        expect(outcome.run?.endReason).toContain("passed-with-skips")
+        expect(outcome.run?.endReason).not.toContain("CI is green")
+        expect(outcome.run?.endReason).not.toContain("No PR opens")
+      })
+    })
+  })
+
+  test("a failed outcome exiting 1 after the PR opened keeps the checks, the PR and no-mistakes.txt", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await readyToCheck(dir, home)
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [finalOutcome("failed", "failed", "https://github.com/o/r/pull/7")])
+        expect(outcome.report.checksRounds).toHaveLength(1)
+        expect(outcome.report.noMistakes?.status).toBe("failed")
+        expect(outcome.run?.prLink).toBe("https://github.com/o/r/pull/7")
+        expect(outcome.steps).toContainEqual({ name: "no-mistakes", status: "failed" })
+        const text = await readFile(join(home, "runs", "step-run-1", "no-mistakes.txt"), "utf8")
+        expect(text).toContain("PR: https://github.com/o/r/pull/7")
+        expect(text).toContain("outcome failed")
+      })
+    })
+  })
+
+  test("a fix answered with a failed pipeline is recorded as failed, not as a refused fix", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await readyToCheck(dir, home)
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [fixableGate, finalOutcome("failed", "failed", "")])
+        expect(nmCallLines(outcome.nmCalls)).toHaveLength(4)
+        expect(outcome.report.noMistakes?.status).toBe("failed")
+        expect(outcome.report.noMistakes?.gatesAnswered).toBe(1)
+        expect(outcome.run?.endReason).not.toContain("refused the fix")
+      })
+    })
+  })
+
+  test("a start refused with an error on stdout keeps the checks and names the error", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await readyToCheck(dir, home)
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [
+          { stdout: "error: no-mistakes is not initialized in this repository\nhelp[1]:\n  Run `no-mistakes init`\n", exitCode: 1 }
+        ])
+        expect(outcome.report.checksRounds).toHaveLength(1)
+        expect(outcome.report.noMistakes?.status).toBe("failed")
+        expect(outcome.run?.endReason).toContain("not initialized")
+        const text = await readFile(join(home, "runs", "step-run-1", "no-mistakes.txt"), "utf8")
+        expect(text).toContain("no-mistakes result: failed")
+      })
+    })
+  })
+
+  test("the fix review after a requested fix is accepted with approve", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await readyToCheck(dir, home)
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [fixableGate, fixReviewGate, checksPassedWhileMonitoring])
+        expect(nmCallLines(outcome.nmCalls).filter((line) => line.startsWith("axi "))).toEqual([
+          "axi run --intent-file " + join(home, "runs", "step-run-1", "task.md"),
+          "axi respond --action fix --findings R7",
+          "axi respond --action approve"
+        ])
+        expect(outcome.report.completed).toBe(true)
+        expect(outcome.report.noMistakes?.gatesAnswered).toBe(2)
+      })
+    })
+  })
+
+  test("a gate with an auto-fix and a no-op finding fixes the one and declines the other", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await readyToCheck(dir, home)
+        const mixedGate: NoMistakesReply = { stdout: fixableGate.stdout.replace("findings[1]", "findings[2]").replace("auto-fix,spelling", "auto-fix,spelling\n    R8,info,notes.md,,no-op,style note") }
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [mixedGate, checksPassedWhileMonitoring])
+        expect(nmCallLines(outcome.nmCalls)).toContain("axi respond --action fix --findings R7 --ignore R8")
+        expect(outcome.report.completed).toBe(true)
+        expect(outcome.report.noMistakes?.findings.map((finding) => finding.id)).toEqual(["R7", "R8"])
+      })
+    })
+  })
+
+  test("findings the pipeline fixed by itself are recorded from the final fixes table", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await readyToCheck(dir, home)
+        const withFixes: NoMistakesReply = {
+          stdout: checksPassedWhileMonitoring.stdout + "fixes[1]{id,severity,file,line,description}:\n  L1,warning,src/a.ts,3,unused import\n"
+        }
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [withFixes])
+        expect(outcome.report.noMistakes?.findings.map((finding) => finding.id)).toEqual(["L1"])
+        expect(outcome.signals).toContainEqual({ name: "finding-count", value: "1" })
+        const text = await readFile(join(home, "runs", "step-run-1", "no-mistakes.txt"), "utf8")
+        expect(text).toContain("L1 warning src/a.ts:3 unused import")
       })
     })
   })
