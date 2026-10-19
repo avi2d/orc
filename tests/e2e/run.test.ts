@@ -3,46 +3,9 @@ import { chmod, exists, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, FileSystem, Path } from "effect"
-import { ChildProcessSpawner } from "effect/process"
-import type { AgentFile } from "../../src/agents"
-import { hostGitShim } from "../../src/host"
-import { orcCompletionLine } from "../../src/pi"
-import { runAgentStep, runWithHistory, type SandboxOps } from "../../src/run"
-import type { OrcRunReport } from "../../src/run-record"
-import { listRuns, openDatabase, type RunRecord } from "../../src/run-history"
-
-const git = (dir: string, args: ReadonlyArray<string>): string => {
-  const result = Bun.spawnSync(["git", ...args], { cwd: dir })
-  if (result.exitCode !== 0) {
-    throw new Error("the git fixture failed: git " + args.join(" "))
-  }
-  return result.stdout.toString().trim()
-}
-
-const withRepo = async (use: (dir: string) => Promise<void>): Promise<void> => {
-  const dir = await mkdtemp(join(tmpdir(), "orc-run-unit-"))
-  try {
-    git(dir, ["init", "-q"])
-    git(dir, ["config", "user.name", "orc test"])
-    git(dir, ["config", "user.email", "orc@test.invalid"])
-    await writeFile(join(dir, "seed.txt"), "seed\n")
-    git(dir, ["add", "seed.txt"])
-    git(dir, ["commit", "-qm", "seed"])
-    await use(dir)
-  } finally {
-    await rm(dir, { recursive: true, force: true })
-  }
-}
-
-const withHome = async (use: (home: string) => Promise<void>): Promise<void> => {
-  const home = await mkdtemp(join(tmpdir(), "orc-run-home-"))
-  try {
-    await use(home)
-  } finally {
-    await rm(home, { recursive: true, force: true })
-  }
-}
+import { Effect } from "effect"
+import { runAgentStep } from "../../src/run"
+import { capturedSession, cleanFinish, commitOnBranch, git, passedWithPr, providerErrorEchoingPrompt, runStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
 const refusal = (input: {
   readonly cwd: string
@@ -162,113 +125,6 @@ describe("runAgentStep refusals", () => {
   })
 })
 
-const implementer: AgentFile = {
-  kind: "implementer",
-  model: "opencode-go/muse-spark",
-  thinking: "high",
-  tools: ["read", "bash"],
-  body: "Do the task.",
-  path: "bundled/implementer.md",
-  source: "bundled"
-}
-
-const sessionId = "0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"
-const prompt = "Read the task. When the work is committed on this branch, print " + orcCompletionLine + " on its own line and stop."
-
-const entry = (message: Record<string, unknown>): string => JSON.stringify({ type: "message", message })
-
-const sessionEnding = (final: Record<string, unknown>): string =>
-  [
-    JSON.stringify({ type: "session", version: 3, id: sessionId, timestamp: "2026-10-19T10:00:00.000Z", cwd: "/sandbox/repo" }),
-    entry({ role: "user", content: [{ type: "text", text: prompt }] }),
-    entry({
-      role: "assistant",
-      content: [{ type: "text", text: "Plan, then print\n" + orcCompletionLine }, { type: "toolCall", id: "call_1", name: "bash", arguments: { command: "git commit -am work" } }],
-      stopReason: "toolUse",
-      usage: { input: 100, output: 20 }
-    }),
-    entry({ role: "toolResult", toolCallId: "call_1", toolName: "bash", content: [{ type: "text", text: "[orc/test 1a2b3c4] work" }], isError: false }),
-    entry(final)
-  ].join("\n") + "\n"
-
-const providerErrorEchoingPrompt = { role: "assistant", content: [], stopReason: "error", errorMessage: "400 invalid request: " + prompt, usage: { input: 0, output: 0 } }
-
-const cleanFinish = { role: "assistant", content: [{ type: "text", text: "Committed.\n" + orcCompletionLine }], stopReason: "stop", rawStopReason: "completed", usage: { input: 50, output: 5 } }
-
-const commitOnBranch = async (dir: string, branch: string): Promise<string> => {
-  git(dir, ["checkout", "-q", "-b", branch])
-  await writeFile(join(dir, "work.txt"), "work\n")
-  git(dir, ["add", "work.txt"])
-  git(dir, ["commit", "-qm", "work"])
-  const sha = git(dir, ["rev-parse", "HEAD"])
-  git(dir, ["checkout", "-q", "-"])
-  return sha
-}
-
-interface StepOutcome {
-  readonly report: OrcRunReport
-  readonly run: RunRecord | undefined
-  readonly steps: unknown
-  readonly signals: unknown
-  readonly evidence: string
-}
-
-const unexpectedChecks: SandboxOps["execCheck"] = async () => {
-  throw new Error("checks ran before implement completed")
-}
-
-const runStep = (dir: string, home: string, sandbox: SandboxOps["runAgent"], execCheck: SandboxOps["execCheck"] = unexpectedChecks): Promise<StepOutcome> =>
-  Effect.runPromise(
-    Effect.gen(function*() {
-      const fs = yield* FileSystem.FileSystem
-      const path = yield* Path.Path
-      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-      const runDir = path.join(home, "runs", "step-run-1")
-      yield* fs.makeDirectory(path.join(runDir, "sessions"), { recursive: true })
-      const hostGit = yield* hostGitShim(fs, path, Bun.which("git") ?? "git")
-      return yield* Effect.acquireUseRelease(
-        openDatabase(home),
-        (db) =>
-          Effect.gen(function*() {
-            const report = yield* runWithHistory(db, {
-              fs, path, spawner, git: hostGit, projectDir: dir, runId: "step-run-1", runDir,
-              piSessionDir: path.join(runDir, "session"), hostSessionsDir: path.join(runDir, "sessions"),
-              taskPath: path.join(runDir, "task.md"), agent: implementer, fixer, branch: "orc/test", started: "2026-10-19T10:00:00.000Z",
-              worktreeDir: dir
-            }, { runAgent: sandbox, execCheck })
-            const runs = yield* listRuns(db)
-            const steps = db.query("SELECT name, status FROM steps WHERE run_id = ?").all("step-run-1")
-            const signals = db.query("SELECT name, value FROM signals ORDER BY name").all()
-            const evidence = yield* fs.readFileString(path.join(runDir, "implement-1.md"))
-            return { report, run: runs.find((run) => run.id === "step-run-1"), steps, signals, evidence }
-          }),
-        (db) => Effect.sync(() => db.close())
-      )
-    }).pipe(Effect.scoped, Effect.provide(BunServices.layer))
-  )
-
-const fixer: AgentFile = {
-  kind: "fixer",
-  model: "opencode-go/muse-spark",
-  thinking: "high",
-  tools: ["read", "bash"],
-  body: "Fix the failure.",
-  path: "bundled/fixer.md",
-  source: "bundled"
-}
-
-const capturedSession = (home: string, jsonl: string): Promise<void> => {
-  const dir = join(home, "runs", "step-run-1", "sessions", "--sandbox-repo--")
-  return mkdir(dir, { recursive: true }).then(() => writeFile(join(dir, "2026-10-19T10-00-00-000Z_" + sessionId + ".jsonl"), jsonl))
-}
-
-const sandboxResult = (sha: string, final: Record<string, unknown>): SandboxOps["runAgent"] => async () => ({
-  iterations: [{ sessionId }],
-  completionSignal: orcCompletionLine,
-  stdout: JSON.stringify({ type: "message_end", message: final }),
-  commits: [{ sha }]
-})
-
 describe("runWithHistory decides the implement step", () => {
   test("a provider error echoing the prompt is recorded failed even with a new commit", async () => {
     await withRepo(async (dir) => {
@@ -290,14 +146,15 @@ describe("runWithHistory decides the implement step", () => {
         const sha = await commitOnBranch(dir, "orc/test")
         await capturedSession(home, sessionEnding(cleanFinish))
         await writeFile(join(dir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }))
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [passedWithPr])
         expect(outcome.report.completed).toBe(true)
         expect(outcome.report.tokens).toEqual({ input: 150, output: 25 })
         expect(outcome.report.fixAttempts).toBe(0)
         expect(outcome.report.checksRounds?.map((round) => round.passed)).toEqual([true])
         expect(outcome.run?.status).toBe("succeeded")
-        expect(outcome.run?.endReason).toBe("Pi made 1 commit on orc/test, and the checks passed.")
-        expect(outcome.steps).toEqual([{ name: "implement", status: "passed" }, { name: "checks", status: "passed" }])
+        expect(outcome.run?.endReason).toBe("Pi made 1 commit on orc/test, and the checks passed. no-mistakes opened https://github.com/o/r/pull/7 and CI is green.")
+        expect(outcome.run?.prLink).toBe("https://github.com/o/r/pull/7")
+        expect(outcome.steps).toEqual([{ name: "implement", status: "passed" }, { name: "checks", status: "passed" }, { name: "no-mistakes", status: "passed" }])
       })
     })
   })
@@ -348,7 +205,7 @@ describe("runWithHistory runs the project checks and fixes failures", () => {
         const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async (command) => {
           seen.push(command)
           return { stdout: command + " ok", stderr: "", exitCode: 0 }
-        })
+        }, [passedWithPr])
         expect(outcome.report.completed).toBe(true)
         expect(seen).toEqual(["bun run lint", "bun run typecheck"])
         expect(outcome.report.checksRounds?.map((round) => round.passed)).toEqual([true])
@@ -358,7 +215,7 @@ describe("runWithHistory runs the project checks and fixes failures", () => {
         const text = await readFile(file, "utf8")
         expect(text).toContain("check lint: bun run lint")
         expect(text).toContain("exit 0: passed")
-        expect(outcome.steps).toEqual([{ name: "implement", status: "passed" }, { name: "checks", status: "passed" }])
+        expect(outcome.steps).toEqual([{ name: "implement", status: "passed" }, { name: "checks", status: "passed" }, { name: "no-mistakes", status: "passed" }])
         expect(outcome.signals).toContainEqual({ name: "check lint", value: "passed" })
         expect(outcome.signals).toContainEqual({ name: "check typecheck", value: "passed" })
       })
@@ -385,7 +242,7 @@ describe("runWithHistory runs the project checks and fixes failures", () => {
               : { stdout: "lint ok", stderr: "", exitCode: 0 }
           }
           return { stdout: "typecheck ok", stderr: "", exitCode: 0 }
-        })
+        }, [passedWithPr])
         expect(outcome.report.completed).toBe(true)
         expect(outcome.report.fixAttempts).toBe(1)
         expect(outcome.report.checksRounds?.map((round) => round.passed)).toEqual([false, true])
@@ -395,13 +252,14 @@ describe("runWithHistory runs the project checks and fixes failures", () => {
         expect(agentCalls.length).toBe(2)
         expect(agentCalls[1]).toContain("checks-1.txt")
         expect(agentCalls[1]).toContain("fix-1.log")
-        expect(outcome.run?.endReason).toBe("Pi made 2 commits on orc/test, and the checks passed.")
-        expect(outcome.steps).toHaveLength(4)
+        expect(outcome.run?.endReason).toBe("Pi made 2 commits on orc/test, and the checks passed. no-mistakes opened https://github.com/o/r/pull/7 and CI is green.")
+        expect(outcome.steps).toHaveLength(5)
         expect(outcome.steps).toEqual(expect.arrayContaining([
           { name: "implement", status: "passed" },
           { name: "checks", status: "failed" },
           { name: "fix", status: "passed" },
-          { name: "checks", status: "passed" }
+          { name: "checks", status: "passed" },
+          { name: "no-mistakes", status: "passed" }
         ]))
       })
     })
@@ -423,6 +281,7 @@ describe("runWithHistory runs the project checks and fixes failures", () => {
             ? { stdout: "", stderr: "lint blew up", exitCode: 1 }
             : { stdout: "typecheck ok", stderr: "", exitCode: 0 })
         expect(agentRuns).toBe(4)
+        expect(outcome.nmCalls).toBe("")
         expect(outcome.report.completed).toBe(false)
         expect(outcome.report.fixAttempts).toBe(3)
         expect(outcome.report.checksRounds?.map((round) => round.passed)).toEqual([false, false, false, false])

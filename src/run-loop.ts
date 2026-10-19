@@ -5,6 +5,7 @@ import { buildFixPrompt, maxFixAttempts, readChecksCommands, runChecksRound, typ
 import { runGit } from "./git-run"
 import { buildImplementPrompt, orcCompletionLine, piWithTools, sessionPrintedSignal, type PiTokenUse } from "./pi"
 import { OrcRunError, describeCause, noSession, readSession } from "./run-session"
+import { driveNoMistakes } from "./no-mistakes"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
 
 export interface SandboxOps {
@@ -153,7 +154,9 @@ export const runFull = (run: HistoryRun, ops: SandboxOps): Effect.Effect<OrcRunR
       sessionFile: done.sessionFile,
       tokens: done.tokens,
       markerVerified: done.markerVerified,
-      implementPassed: done.completed
+      implementPassed: done.completed,
+      prLink: null,
+      noMistakes: null
     }
     if (!done.completed) {
       return { ...base, commits: done.commits, completed: false, checksRounds: null, fixes: [], fixAttempts: 0, endReason: done.endReason }
@@ -179,14 +182,17 @@ export const runFull = (run: HistoryRun, ops: SandboxOps): Effect.Effect<OrcRunR
         checks: outcome.outcomes.map((check) => ({ name: check.name, passed: check.passed }))
       })
       if (failed.length === 0) {
+        const noMistakes = yield* driveNoMistakes({ spawner: run.spawner, pathEnv: run.noMistakesPath, taskFile: run.taskPath, worktreeDir: run.worktreeDir })
         return {
           ...base,
           commits,
-          completed: true,
+          completed: noMistakes.status === "passed",
           checksRounds: rounds,
           fixes,
           fixAttempts: fixes.length,
-          endReason: "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + ", and the checks passed."
+          prLink: noMistakes.prLink,
+          noMistakes,
+          endReason: "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + ", and the checks passed. " + noMistakes.result
         }
       }
       if (fixes.length >= maxFixAttempts) {
