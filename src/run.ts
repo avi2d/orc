@@ -192,7 +192,7 @@ export const runAgentStep = (
     const git = yield* openHostGit(fs, path)
     const checkout = yield* openCheckout(fs, path, spawner, git, request.cwd, request.branch, runId)
     const runDir = path.join(home, "runs", runId)
-    const { folders, agent, credential } = yield* Effect.gen(function*() {
+    const prepared = yield* Effect.gen(function*() {
       const folders = yield* prepareRunFolders(fs, path, runDir, request.taskFile)
       const agent: AgentFile = yield* resolveAgentFile("implementer", {
         projectDir: checkout.projectDir,
@@ -223,6 +223,7 @@ export const runAgentStep = (
     }).pipe(
       Effect.onError(() => fs.remove(runDir, { recursive: true }).pipe(Effect.result))
     )
+    const { folders, agent, credential } = prepared
     const started = new Date().toISOString()
     const runInNono: SandboxRun = (agentProvider) =>
       runSandbox({

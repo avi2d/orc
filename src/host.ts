@@ -37,7 +37,7 @@ const inertRepositoryKeys = [
 const shellQuote = (arg: string): string => "'" + arg.replace(/'/g, "'\\''") + "'"
 
 // The sandbox writes the repository config host git reads, and per-submodule ignore settings are keyed by names it picks, so the shim checks what git would read before every host git command.
-export const hostGitShimScript = (realGit: string): string =>
+const hostGitShimScript = (realGit: string): string =>
   [
     "#!/bin/sh",
     "set -f",
