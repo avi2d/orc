@@ -259,6 +259,7 @@ describe("runWithHistory decides the implement step", () => {
         expect(outcome.report.completed).toBe(true)
         expect(outcome.report.tokens).toEqual({ input: 150, output: 25 })
         expect(outcome.run?.status).toBe("succeeded")
+        expect(outcome.run?.endReason).toBe("Pi made 1 commit on orc/test.")
         expect(outcome.steps).toEqual([{ name: "implement", status: "passed" }])
       })
     })

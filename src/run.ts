@@ -284,7 +284,7 @@ const implement = (run: HistoryRun, runInSandbox: SandboxRun): Effect.Effect<Orc
     const completed = verified && commits.length > 0
     const endReason = sessionRead.failure ?? (!verified
       ? "Pi's final reply did not stop cleanly with " + orcCompletionLine + " on its own line."
-      : (commits.length > 0 ? "Pi committed " + commits.length.toString() + " on " + result.branch + "." : "Pi printed ORC_COMPLETE but made no commit on " + result.branch + "."))
+      : (commits.length > 0 ? "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + result.branch + "." : "Pi printed ORC_COMPLETE but made no commit on " + result.branch + "."))
     return {
       runId: run.runId,
       runDir: run.runDir,

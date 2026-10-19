@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { runAgentStep } from "../../src/run"
@@ -15,7 +16,7 @@ const git = (dir: string, args: ReadonlyArray<string>): void => {
 }
 
 describe("orc run through the agent step", () => {
-  test.skipIf(process.env["ORC_PI_E2E"] !== "1")("a live agent run commits on its branch", async () => {
+  test.skipIf(process.env["ORC_PI_E2E"] !== "1")(skipReason("needs ORC_PI_E2E=1 and an opencode-go Pi login on the host", "a live agent run commits on its branch"), async () => {
     const repo = await mkdtemp(join(tmpdir(), "orc-agent-repo-"))
     const home = await mkdtemp(join(tmpdir(), "orc-agent-home-"))
     try {
