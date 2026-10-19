@@ -4,7 +4,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { Database } from "bun:sqlite"
 import { homedir } from "node:os"
 import { resolveAgentFile, type AgentFile } from "./agents"
-import { hostGitSafetyEnv, hostGitShim, withHostGitSafety } from "./host"
+import { hostGitRefusalExit, hostGitSafetyEnv, hostGitShim, withHostGitSafety } from "./host"
 import { nonoSandboxProvider } from "./nono"
 import { canRouteModel, loginCheckCommand, modelCredentialFor, piAgentModels } from "./nono-profile"
 import { buildImplementPrompt, orcCompletionLine, piWithTools, sessionPrintedSignal } from "./pi"
@@ -45,11 +45,14 @@ const runGit = (
 ): Effect.Effect<{ readonly stdout: string; readonly exitCode: number }, OrcRunError> =>
   Effect.scoped(Effect.gen(function*() {
     const handle = yield* spawner.spawn(ChildProcess.make(git, [...args], { cwd, env: gitEnv(), extendEnv: false }))
-    const [stdout, , exitCode] = yield* Effect.all([
+    const [stdout, stderr, exitCode] = yield* Effect.all([
       handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
-      handle.stderr.pipe(Stream.decodeText(), Stream.runDrain),
+      handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
       handle.exitCode
     ], { concurrency: "unbounded" })
+    if (exitCode === hostGitRefusalExit) {
+      return yield* refuse(stderr.trim())
+    }
     return { stdout, exitCode }
   })).pipe(
     Effect.mapError((cause) => cause instanceof OrcRunError ? cause : new OrcRunError({ message: "orc: git failed to run: " + String(cause) }))

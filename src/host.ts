@@ -8,24 +8,35 @@ export class NonoProviderError extends Data.TaggedError("NonoProviderError")<{
 
 export type Spawner = ChildProcessSpawner.ChildProcessSpawner["Service"]
 
-// The sandbox can write the repository config and hooks host git reads; config from the environment outranks both.
+// The sandbox can write the hooks host git runs and the submodule git dirs it recurses into; config from the environment outranks both.
 export const hostGitSafetyEnv = {
-  GIT_CONFIG_COUNT: "5",
-  GIT_CONFIG_KEY_0: "core.fsmonitor",
-  GIT_CONFIG_VALUE_0: "false",
-  GIT_CONFIG_KEY_1: "core.hooksPath",
-  GIT_CONFIG_VALUE_1: "/dev/null",
-  GIT_CONFIG_KEY_2: "log.showSignature",
+  GIT_ALLOW_PROTOCOL: "file:git:ssh:http:https",
+  GIT_CONFIG_COUNT: "4",
+  GIT_CONFIG_KEY_0: "core.hooksPath",
+  GIT_CONFIG_VALUE_0: "/dev/null",
+  GIT_CONFIG_KEY_1: "diff.ignoreSubmodules",
+  GIT_CONFIG_VALUE_1: "all",
+  GIT_CONFIG_KEY_2: "submodule.recurse",
   GIT_CONFIG_VALUE_2: "false",
-  GIT_CONFIG_KEY_3: "diff.ignoreSubmodules",
-  GIT_CONFIG_VALUE_3: "all",
-  GIT_CONFIG_KEY_4: "submodule.recurse",
-  GIT_CONFIG_VALUE_4: "false"
+  GIT_CONFIG_KEY_3: "fetch.recurseSubmodules",
+  GIT_CONFIG_VALUE_3: "false"
 } as const
+
+export const hostGitRefusalExit = 97
+
+// Git keeps adding repository config that runs a program, so only keys known to run none pass.
+const inertRepositoryKeys = [
+  "core\\.(repositoryformatversion|filemode|bare|logallrefupdates|ignorecase|precomposeunicode|symlinks|autocrlf|eol)",
+  "extensions\\.(objectformat|refstorage|worktreeconfig)",
+  "remote\\..*\\.(url|pushurl|fetch|push|tagopt|prune|mirror)",
+  "branch\\..*\\.(remote|merge|pushremote|description)",
+  "submodule\\..*\\.(url|active|ignore)",
+  "user\\.(name|email)"
+]
 
 const shellQuote = (arg: string): string => "'" + arg.replace(/'/g, "'\\''") + "'"
 
-// Filter drivers and per-submodule ignore settings are keyed by names the sandbox picks, so no fixed config can cover them; the shim names each one git would read and overrides it from the environment.
+// The sandbox writes the repository config host git reads, and per-submodule ignore settings are keyed by names it picks, so the shim checks what git would read before every host git command.
 export const hostGitShimScript = (realGit: string): string =>
   [
     "#!/bin/sh",
@@ -33,14 +44,21 @@ export const hostGitShimScript = (realGit: string): string =>
     "IFS='",
     "'",
     "git=" + shellQuote(realGit),
+    "if ! listing=$(\"$git\" config --list --show-scope --name-only); then",
+    "  echo 'orc: git cannot read the repository config, so orc runs no git command here' >&2",
+    "  exit " + hostGitRefusalExit.toString(),
+    "fi",
+    "refused=$(printf '%s\\n' \"$listing\" | awk -F '\\t' '$1 == \"local\" || $1 == \"worktree\" { print $2 }' | grep -Ev " +
+      shellQuote("^(" + inertRepositoryKeys.join("|") + ")$") + ")",
+    "if [ -n \"$refused\" ]; then",
+    "  echo \"orc: the repository git config sets $(printf '%s ' $refused)and orc lets host git read only config that runs no program\" >&2",
+    "  exit " + hostGitRefusalExit.toString(),
+    "fi",
     "n=${GIT_CONFIG_COUNT:-0}",
     "override() {",
     "  export \"GIT_CONFIG_KEY_$n=$1\" \"GIT_CONFIG_VALUE_$n=$2\"",
     "  n=$((n + 1))",
     "}",
-    "for key in $(\"$git\" config --name-only --get-regexp '^filter\\..*\\.(clean|smudge|process)$' 2>/dev/null); do",
-    "  override \"$key\" ''",
-    "done",
     "top=$(\"$git\" rev-parse --show-toplevel 2>/dev/null)",
     "submodules='^submodule\\..*\\.(path|ignore)$'",
     "for key in $(\"$git\" config --name-only --get-regexp \"$submodules\" 2>/dev/null) \\",

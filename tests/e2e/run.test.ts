@@ -340,7 +340,7 @@ describe("host git ignores programs the sandbox can name in the repository", () 
       await withHome(async (home) => {
         const fsmonitor = await markerScript(home, "fsmonitor")
         git(dir, ["config", "core.fsmonitor", fsmonitor.script])
-        expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home, branch: "orc/test" })).toContain("cannot read the task file")
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home, branch: "orc/test" })).toContain("core.fsmonitor")
         expect(await fsmonitor.ran()).toBe(false)
         plainGit(dir, ["status", "--porcelain"])
         expect(await fsmonitor.ran()).toBe(true)
@@ -367,7 +367,7 @@ describe("host git runs no filter the sandbox can name in the repository", () =>
         const filter = await markerScript(home, "filter")
         await plantFilter(dir, join(dir, ".git"), "seed.txt", filter.script)
         backdate(join(dir, "seed.txt"))
-        expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home, branch: "orc/test" })).toContain("cannot read the task file")
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home, branch: "orc/test" })).toContain("filter.planted.by.sandbox.clean")
         expect(await filter.ran()).toBe(false)
         backdate(join(dir, "seed.txt"))
         const outcome = await runStep(dir, home, async () => {
@@ -406,6 +406,50 @@ describe("host git runs no filter the sandbox can name in the repository", () =>
         expect(await filter.ran()).toBe(false)
         plainGit(dir, ["status", "--porcelain"])
         expect(await filter.ran()).toBe(true)
+      })
+    })
+  })
+})
+
+describe("host git runs no transport program the sandbox can name in the repository", () => {
+  test("a planted ssh command is refused before orc's git and Sandcastle's fetch run it", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const ssh = await markerScript(home, "ssh")
+        git(dir, ["config", "core.sshCommand", ssh.script])
+        git(dir, ["remote", "add", "origin", "ssh://git.example.invalid/repo.git"])
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home, branch: "orc/test" })).toContain("core.sshcommand")
+        const outcome = await runStep(dir, home, async () => {
+          plainGit(dir, ["fetch", "origin", "orc/test"])
+          return { iterations: [], stdout: "", commits: [], branch: "orc/test" }
+        })
+        expect(outcome.report.completed).toBe(false)
+        expect(await ssh.ran()).toBe(false)
+        plainGit(dir, ["fetch", "origin", "orc/test"])
+        expect(await ssh.ran()).toBe(true)
+      })
+    })
+  })
+
+  test("a planted upload-pack program for a local remote is refused", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const uploadPack = await markerScript(home, "upload-pack")
+        git(dir, ["remote", "add", "origin", dir])
+        git(dir, ["config", "remote.origin.uploadpack", uploadPack.script])
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home, branch: "orc/test" })).toContain("remote.origin.uploadpack")
+        expect(await uploadPack.ran()).toBe(false)
+        plainGit(dir, ["fetch", "origin"])
+        expect(await uploadPack.ran()).toBe(true)
+      })
+    })
+  })
+
+  test("a repository whose config names only a remote and an identity still runs", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        git(dir, ["remote", "add", "origin", "https://example.invalid/repo.git"])
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home, branch: "orc/test" })).toContain("cannot read the task file")
       })
     })
   })
