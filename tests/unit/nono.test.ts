@@ -145,7 +145,19 @@ describe("buildSandboxEnv", () => {
 
   test("host git reads no global or system config and no credential from the env", () => {
     const env = buildHostGitEnv(hostEnv)
-    expect(env).toEqual({ PATH: hostEnv.PATH, HOME: hostEnv.HOME, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" })
+    expect(env).toEqual({
+      PATH: hostEnv.PATH,
+      HOME: hostEnv.HOME,
+      GIT_CONFIG_COUNT: "3",
+      GIT_CONFIG_KEY_0: "core.fsmonitor",
+      GIT_CONFIG_VALUE_0: "false",
+      GIT_CONFIG_KEY_1: "core.hooksPath",
+      GIT_CONFIG_VALUE_1: "/dev/null",
+      GIT_CONFIG_KEY_2: "log.showSignature",
+      GIT_CONFIG_VALUE_2: "false",
+      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_CONFIG_NOSYSTEM: "1"
+    })
   })
 
   test("the provider declares no env; create time builds the sandbox env", () => {

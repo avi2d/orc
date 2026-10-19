@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
@@ -290,6 +290,58 @@ describe("runWithHistory decides the implement step", () => {
         expect(outcome.signals).toEqual([{ name: "commit-count", value: "1" }])
         expect(outcome.evidence).toContain(sha + " work")
         expect(outcome.evidence).not.toContain("0 input tokens")
+      })
+    })
+  })
+})
+
+const markerScript = async (dir: string, name: string): Promise<{ readonly script: string; readonly ran: () => Promise<boolean> }> => {
+  const script = join(dir, name)
+  const marker = join(dir, name + "-ran")
+  await writeFile(script, "#!/bin/sh\ntouch '" + marker + "'\n")
+  await chmod(script, 0o755)
+  return { script, ran: () => Bun.file(marker).exists() }
+}
+
+const plainGit = (cwd: string, args: ReadonlyArray<string>): void => {
+  Bun.spawnSync(["git", ...args], { cwd, env: { ...process.env }, stdout: "ignore", stderr: "ignore" })
+}
+
+describe("host git ignores programs the sandbox can name in the repository", () => {
+  test("Sandcastle's host git during the run runs no repository fsmonitor or hook", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const fsmonitor = await markerScript(home, "fsmonitor")
+        const hook = await markerScript(home, "post-checkout")
+        git(dir, ["config", "core.fsmonitor", fsmonitor.script])
+        await mkdir(join(dir, ".git", "hooks"), { recursive: true })
+        await Bun.write(join(dir, ".git", "hooks", "post-checkout"), Bun.file(hook.script))
+        await chmod(join(dir, ".git", "hooks", "post-checkout"), 0o755)
+        const outcome = await runStep(dir, home, async () => {
+          plainGit(dir, ["status", "--porcelain"])
+          plainGit(dir, ["worktree", "add", "-q", join(home, "sandcastle-worktree"), "-b", "orc/test"])
+          return { iterations: [], stdout: "", commits: [], branch: "orc/test" }
+        })
+        expect(outcome.report.completed).toBe(false)
+        expect(await fsmonitor.ran()).toBe(false)
+        expect(await hook.ran()).toBe(false)
+        plainGit(dir, ["status", "--porcelain"])
+        plainGit(dir, ["worktree", "add", "-q", join(home, "after-worktree"), "-b", "orc/after"])
+        expect(await fsmonitor.ran()).toBe(true)
+        expect(await hook.ran()).toBe(true)
+      })
+    })
+  })
+
+  test("orc's own checkout status runs no repository fsmonitor", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const fsmonitor = await markerScript(home, "fsmonitor")
+        git(dir, ["config", "core.fsmonitor", fsmonitor.script])
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home, branch: "orc/test" })).toContain("cannot read the task file")
+        expect(await fsmonitor.ran()).toBe(false)
+        plainGit(dir, ["status", "--porcelain"])
+        expect(await fsmonitor.ran()).toBe(true)
       })
     })
   })

@@ -4,6 +4,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { Database } from "bun:sqlite"
 import { homedir } from "node:os"
 import { resolveAgentFile, type AgentFile } from "./agents"
+import { hostGitSafetyEnv, withHostGitSafety } from "./host"
 import { nonoSandboxProvider } from "./nono"
 import { canRouteModel, loginCheckCommand, modelCredentialFor, piAgentModels } from "./nono-profile"
 import { buildImplementPrompt, orcCompletionLine, piWithTools, sessionPrintedSignal } from "./pi"
@@ -31,6 +32,7 @@ const newRunId = (): string => {
 const gitEnv = (): Record<string, string> => ({
   PATH: Bun.env.PATH ?? "",
   HOME: Bun.env.HOME ?? "",
+  ...hostGitSafetyEnv,
   GIT_CONFIG_GLOBAL: "/dev/null",
   GIT_CONFIG_NOSYSTEM: "1"
 })
@@ -251,7 +253,7 @@ const implement = (run: HistoryRun, runInSandbox: SandboxRun): Effect.Effect<Orc
     const result: RunResult = yield* Effect.tryPromise({
       try: () => runInSandbox(agentProvider),
       catch: (cause) => new OrcRunError({ message: "orc: the agent run failed: " + describeCause(cause) })
-    })
+    }).pipe(withHostGitSafety)
     const sessionId = result.iterations.map((iteration) => iteration.sessionId).find((id) => id !== undefined) ?? null
     const sessionRead = yield* readSession(run, agentProvider.sessionStorage, sessionId).pipe(
       Effect.map((session) => ({ session, failure: null })),

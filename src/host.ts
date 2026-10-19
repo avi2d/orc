@@ -8,6 +8,38 @@ export class NonoProviderError extends Data.TaggedError("NonoProviderError")<{
 
 export type Spawner = ChildProcessSpawner.ChildProcessSpawner["Service"]
 
+// The sandbox can write the repository config and hooks host git reads; config from the environment outranks both.
+export const hostGitSafetyEnv = {
+  GIT_CONFIG_COUNT: "3",
+  GIT_CONFIG_KEY_0: "core.fsmonitor",
+  GIT_CONFIG_VALUE_0: "false",
+  GIT_CONFIG_KEY_1: "core.hooksPath",
+  GIT_CONFIG_VALUE_1: "/dev/null",
+  GIT_CONFIG_KEY_2: "log.showSignature",
+  GIT_CONFIG_VALUE_2: "false"
+} as const
+
+// Sandcastle spawns host git with the process env, so the safety config has to sit there while it runs.
+export const withHostGitSafety = <A, E>(use: Effect.Effect<A, E>): Effect.Effect<A, E> =>
+  Effect.acquireUseRelease(
+    Effect.sync(() => {
+      const saved = Object.keys(hostGitSafetyEnv).map((name) => [name, Bun.env[name]] as const)
+      Object.assign(Bun.env, hostGitSafetyEnv)
+      return saved
+    }),
+    () => use,
+    (saved) =>
+      Effect.sync(() => {
+        for (const [name, value] of saved) {
+          if (value === undefined) {
+            delete Bun.env[name]
+          } else {
+            Bun.env[name] = value
+          }
+        }
+      })
+  )
+
 export const resolvePiAgentDir = (
   fs: FileSystem.FileSystem,
   piSessionDir: string,

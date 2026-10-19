@@ -32,17 +32,17 @@ const checkoutWithSession = async (dir: string): Promise<{ readonly worktree: st
 const needsNono = test.skipIf(Bun.which("nono") === null)
 
 describe("the agent directory", () => {
-  needsNono(skipReason("needs nono on PATH to create a sandbox", "exposes PI_CODING_AGENT_DIR inside the sandbox", "local"), async () => {
+  needsNono(skipReason("needs nono on PATH to create a sandbox", "exposes the agent dir the caller passes inside the sandbox", "local"), async () => {
     const dir = await mkdtemp(join(process.cwd(), ".orc-nono-agent-"))
     try {
       const { worktree, session } = await checkoutWithSession(dir)
-      const agentDir = join(await realpath(session), "agent")
+      const agentDir = join(await realpath(session), "pi-agent")
       await mkdir(agentDir, { recursive: true })
-      const handle = await nonoSandboxProvider({ piSessionDir: session }).create({
+      const handle = await nonoSandboxProvider({ piSessionDir: session, piAgentDir: agentDir }).create({
         worktreePath: worktree,
         hostRepoPath: worktree,
         mounts: [],
-        env: { HOME: fixtureHome, PI_CODING_AGENT_DIR: agentDir }
+        env: { HOME: fixtureHome }
       })
       try {
         const result = await handle.exec("printenv PI_CODING_AGENT_DIR")
@@ -56,17 +56,17 @@ describe("the agent directory", () => {
     }
   })
 
-  needsNono(skipReason("needs nono on PATH to create a sandbox", "refuses a PI_CODING_AGENT_DIR outside the session dir", "local"), async () => {
+  needsNono(skipReason("needs nono on PATH to create a sandbox", "refuses an agent dir outside the session dir", "local"), async () => {
     const dir = await mkdtemp(join(process.cwd(), ".orc-nono-agent-"))
     try {
       const { worktree, session } = await checkoutWithSession(dir)
       const outside = join(dir, "elsewhere")
       await mkdir(outside, { recursive: true })
-      const error = await nonoSandboxProvider({ piSessionDir: session }).create({
+      const error = await nonoSandboxProvider({ piSessionDir: session, piAgentDir: outside }).create({
         worktreePath: worktree,
         hostRepoPath: worktree,
         mounts: [],
-        env: { HOME: fixtureHome, PI_CODING_AGENT_DIR: outside }
+        env: { HOME: fixtureHome }
       }).then(async (handle) => {
         await handle.close()
         return null
@@ -80,15 +80,17 @@ describe("the agent directory", () => {
     }
   })
 
-  needsNono(skipReason("needs nono on PATH to create a sandbox", "defaults PI_CODING_AGENT_DIR to the agent folder under the session dir", "local"), async () => {
+  needsNono(skipReason("needs nono on PATH to create a sandbox", "ignores an ambient PI_CODING_AGENT_DIR and uses the agent folder under the session dir", "local"), async () => {
     const dir = await mkdtemp(join(process.cwd(), ".orc-nono-agent-"))
     try {
       const { worktree, session } = await checkoutWithSession(dir)
+      const ambient = join(dir, "operator-agent")
+      await mkdir(ambient, { recursive: true })
       const handle = await nonoSandboxProvider({ piSessionDir: session }).create({
         worktreePath: worktree,
         hostRepoPath: worktree,
         mounts: [],
-        env: { HOME: fixtureHome }
+        env: { HOME: fixtureHome, PI_CODING_AGENT_DIR: ambient }
       })
       try {
         const result = await handle.exec("printenv PI_CODING_AGENT_DIR")
@@ -116,11 +118,11 @@ describe("the model credential profile", () => {
       if (credential === null) {
         throw new Error("the fixture model names no credential")
       }
-      const handle = await nonoSandboxProvider({ piSessionDir: session, modelCredential: credential }).create({
+      const handle = await nonoSandboxProvider({ piSessionDir: session, piAgentDir: agentDir, modelCredential: credential }).create({
         worktreePath: worktree,
         hostRepoPath: worktree,
         mounts: [],
-        env: { HOME: fixtureHome, PI_CODING_AGENT_DIR: agentDir }
+        env: { HOME: fixtureHome }
       })
       try {
         const result = await handle.exec("printenv PI_CODING_AGENT_DIR && echo sandboxed")

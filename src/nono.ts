@@ -12,6 +12,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { homedir } from "node:os"
 import {
   type HostCommandResult,
+  hostGitSafetyEnv,
   NonoProviderError,
   resolveDeveloperDir,
   resolveHostBinary,
@@ -74,6 +75,7 @@ const sandboxEnv = (
 
 export const buildHostGitEnv = (hostEnv: Readonly<Record<string, string | undefined>>): Record<string, string> => ({
   ...inheritedEnv(hostEnv),
+  ...hostGitSafetyEnv,
   GIT_CONFIG_GLOBAL: "/dev/null",
   GIT_CONFIG_NOSYSTEM: "1"
 })
@@ -306,7 +308,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, hostGit)
       const runtimes = (yield* Effect.forEach(sandboxRuntimes, (name) => resolveRuntime(fs, path, name, Bun.env.PATH ?? "", homedir())))
         .filter((runtime) => runtime !== null)
-      const agentDir = yield* resolvePiAgentDir(fs, roots.piSessionDir, hostEnv["PI_CODING_AGENT_DIR"] ?? options.piAgentDir)
+      const agentDir = yield* resolvePiAgentDir(fs, roots.piSessionDir, options.piAgentDir)
       const env = sandboxEnv(hostEnv, roots.piSessionDir, runtimes.map((runtime) => runtime.binDir), agentDir)
       const runtimeDirs = runtimes.flatMap((runtime) => runtime.installDir === null ? [] : [runtime.installDir])
       const developerDir = yield* resolveDeveloperDir(spawner, fs, env)
