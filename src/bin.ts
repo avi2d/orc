@@ -4,28 +4,21 @@ import { BunServices } from "@effect/platform-bun"
 import { Console, Effect } from "effect"
 import packageJson from "../package.json" with { type: "json" }
 import { parseArgs } from "./args"
+import { runAgentStep } from "./run"
+import { formatReport } from "./run-record"
 import {
+  formatHistoryError,
   formatRunsTable,
   type HistoryError,
   listRuns,
   openDatabase,
   orcHomeDir,
-  runsJson,
-  SqliteFailure,
-  UnsupportedSchemaVersion
+  runsJson
 } from "./run-history"
 
-const usage = "Usage: orc [--version] [--help] | orc runs [--json]"
+const usage = "Usage: orc [--version] [--help] | orc runs [--json] | orc run <task-file> [--branch <name>]"
 
-const historyErrorMessage = (error: HistoryError): string => {
-  if (error instanceof UnsupportedSchemaVersion) {
-    return `unsupported schema version ${error.found}, expected ${error.expected}`
-  }
-  if (error instanceof SqliteFailure) {
-    return error.cause instanceof Error ? error.cause.message : String(error.cause)
-  }
-  return String(error)
-}
+const historyErrorMessage = (error: HistoryError): string => formatHistoryError(error)
 
 const program = Effect.gen(function*() {
   const args = parseArgs(Bun.argv.slice(2))
@@ -53,6 +46,19 @@ const program = Effect.gen(function*() {
         )
       )
       yield* Console.log(text)
+      break
+    }
+    case "RunAgent": {
+      const report = yield* runAgentStep({ cwd: process.cwd(), taskFile: args.taskFile, branch: args.branch }).pipe(
+        Effect.provide(BunServices.layer),
+        Effect.catchTag("OrcRunError", (error) =>
+          Console.error(error.message).pipe(Effect.andThen(Effect.fail("agent step refused")))
+        )
+      )
+      yield* Console.log(formatReport(report))
+      if (!report.completed) {
+        return yield* Effect.fail("agent step failed")
+      }
       break
     }
     case "UsageError": {

@@ -15,7 +15,7 @@ type EvidenceDirection = typeof EvidenceDirectionSchema.Type
 const ScoreValueSchema = Schema.Literals([1, 2, 3, 4, 5])
 type ScoreValue = typeof ScoreValueSchema.Type
 
-export class UnsupportedSchemaVersion extends Data.TaggedError("UnsupportedSchemaVersion")<{
+class UnsupportedSchemaVersion extends Data.TaggedError("UnsupportedSchemaVersion")<{
   readonly found: number
   readonly expected: number
 }> {}
@@ -96,6 +96,16 @@ export interface RunsJsonDocument {
 }
 
 export type HistoryError = PlatformError | Schema.SchemaError | UnsupportedSchemaVersion | SqliteFailure
+
+export const formatHistoryError = (error: unknown): string => {
+  if (error instanceof UnsupportedSchemaVersion) {
+    return "unsupported schema version " + error.found + ", expected " + error.expected
+  }
+  if (error instanceof SqliteFailure) {
+    return error.cause instanceof Error ? error.cause.message : String(error.cause)
+  }
+  return String(error)
+}
 
 export const orcHomeDir = (): string => `${homedir()}/.orc`
 

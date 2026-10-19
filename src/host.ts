@@ -1,12 +1,134 @@
-import { Data, Effect, FileSystem, type Path, Stream } from "effect"
+import { Data, Effect, FileSystem, type Path, type PlatformError, type Scope, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { type Runtime, runtimeOf } from "./nono-profile"
+import { type Runtime, runtimeOf, within } from "./nono-profile"
 
 export class NonoProviderError extends Data.TaggedError("NonoProviderError")<{
   readonly message: string
 }> {}
 
 export type Spawner = ChildProcessSpawner.ChildProcessSpawner["Service"]
+
+// The sandbox can write the hooks host git runs and the submodule git dirs it recurses into; config from the environment outranks both.
+export const hostGitSafetyEnv = {
+  GIT_ALLOW_PROTOCOL: "file:git:ssh:http:https",
+  GIT_CONFIG_COUNT: "4",
+  GIT_CONFIG_KEY_0: "core.hooksPath",
+  GIT_CONFIG_VALUE_0: "/dev/null",
+  GIT_CONFIG_KEY_1: "diff.ignoreSubmodules",
+  GIT_CONFIG_VALUE_1: "all",
+  GIT_CONFIG_KEY_2: "submodule.recurse",
+  GIT_CONFIG_VALUE_2: "false",
+  GIT_CONFIG_KEY_3: "fetch.recurseSubmodules",
+  GIT_CONFIG_VALUE_3: "false"
+} as const
+
+export const hostGitRefusalExit = 97
+
+// Git keeps adding repository config that runs a program, so only keys known to run none pass.
+const inertRepositoryKeys = [
+  "core\\.(repositoryformatversion|filemode|bare|logallrefupdates|ignorecase|precomposeunicode|symlinks|autocrlf|eol)",
+  "extensions\\.(objectformat|refstorage|worktreeconfig)",
+  "remote\\..*\\.(url|pushurl|fetch|push|tagopt|prune|mirror)",
+  "branch\\..*\\.(remote|merge|pushremote|description)",
+  "submodule\\..*\\.(url|active|ignore)",
+  "user\\.(name|email)"
+]
+
+const shellQuote = (arg: string): string => "'" + arg.replace(/'/g, "'\\''") + "'"
+
+// The sandbox writes the repository config host git reads, and per-submodule ignore settings are keyed by names it picks, so the shim checks what git would read before every host git command.
+const hostGitShimScript = (realGit: string): string =>
+  [
+    "#!/bin/sh",
+    "set -f",
+    "IFS='",
+    "'",
+    "git=" + shellQuote(realGit),
+    "if ! listing=$(\"$git\" config --list --show-scope --name-only); then",
+    "  echo 'orc: git cannot read the repository config, so orc runs no git command here' >&2",
+    "  exit " + hostGitRefusalExit.toString(),
+    "fi",
+    "refused=$(printf '%s\\n' \"$listing\" | awk -F '\\t' '$1 == \"local\" || $1 == \"worktree\" { print $2 }' | grep -Ev " +
+      shellQuote("^(" + inertRepositoryKeys.join("|") + ")$") + ")",
+    "if [ -n \"$refused\" ]; then",
+    "  echo \"orc: the repository git config sets $(printf '%s ' $refused)and orc lets host git read only config that runs no program\" >&2",
+    "  exit " + hostGitRefusalExit.toString(),
+    "fi",
+    "n=${GIT_CONFIG_COUNT:-0}",
+    "override() {",
+    "  export \"GIT_CONFIG_KEY_$n=$1\" \"GIT_CONFIG_VALUE_$n=$2\"",
+    "  n=$((n + 1))",
+    "}",
+    "top=$(\"$git\" rev-parse --show-toplevel 2>/dev/null)",
+    "submodules='^submodule\\..*\\.(path|ignore)$'",
+    "for key in $(\"$git\" config --name-only --get-regexp \"$submodules\" 2>/dev/null) \\",
+    "  $(\"$git\" config --file \"$top/.gitmodules\" --name-only --get-regexp \"$submodules\" 2>/dev/null) \\",
+    "  $(\"$git\" config --blob :.gitmodules --name-only --get-regexp \"$submodules\" 2>/dev/null) \\",
+    "  $(\"$git\" config --blob HEAD:.gitmodules --name-only --get-regexp \"$submodules\" 2>/dev/null); do",
+    "  override \"${key%.*}.ignore\" all",
+    "done",
+    "export GIT_CONFIG_COUNT=$n",
+    "exec \"$git\" \"$@\""
+  ].join("\n") + "\n"
+
+export const hostGitShim = (
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  realGit: string
+): Effect.Effect<string, PlatformError.PlatformError, Scope.Scope> =>
+  Effect.gen(function*() {
+    const dir = yield* fs.makeTempDirectoryScoped({ prefix: "orc-git-" })
+    const shim = path.join(dir, "git")
+    yield* fs.writeFileString(shim, hostGitShimScript(realGit), { mode: 0o755 })
+    return shim
+  })
+
+// Sandcastle spawns host git with the process env and finds it on the process PATH, so both have to name the shim while it runs.
+export const withHostGitSafety = (hostGit: string) => <A, E>(use: Effect.Effect<A, E>): Effect.Effect<A, E> =>
+  Effect.acquireUseRelease(
+    Effect.sync(() => {
+      const safety = { ...hostGitSafetyEnv, PATH: hostGit.slice(0, hostGit.lastIndexOf("/")) + ":" + (Bun.env.PATH ?? "") }
+      const saved = Object.keys(safety).map((name) => [name, Bun.env[name]] as const)
+      Object.assign(Bun.env, safety)
+      return saved
+    }),
+    () => use,
+    (saved) =>
+      Effect.sync(() => {
+        for (const [name, value] of saved) {
+          if (value === undefined) {
+            delete Bun.env[name]
+          } else {
+            Bun.env[name] = value
+          }
+        }
+      })
+  )
+
+export const resolvePiAgentDir = (
+  fs: FileSystem.FileSystem,
+  piSessionDir: string,
+  configured: string | undefined
+): Effect.Effect<Record<string, string>, NonoProviderError> =>
+  Effect.gen(function*() {
+    const dir = configured ?? `${piSessionDir}/agent`
+    if (configured !== undefined) {
+      const real = yield* fs.realPath(configured).pipe(
+        Effect.mapError((cause) =>
+          new NonoProviderError({ message: `orc nono provider: cannot resolve PI_CODING_AGENT_DIR ${configured}: ${String(cause)}` })
+        )
+      )
+      if (!within(piSessionDir, real)) {
+        return yield* new NonoProviderError({ message: `orc nono provider: PI_CODING_AGENT_DIR sits outside the session dir: ${configured}` })
+      }
+    }
+    yield* fs.makeDirectory(dir, { recursive: true }).pipe(
+      Effect.mapError((cause) =>
+        new NonoProviderError({ message: `orc nono provider: cannot create the agent dir ${dir}: ${String(cause)}` })
+      )
+    )
+    return { PI_CODING_AGENT_DIR: dir }
+  })
 
 export interface HostCommandResult {
   readonly stdout: string

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { buildHostGitEnv, buildNonoRunArgs, buildSandboxEnv } from "../../src/nono"
+import { buildHostGitEnv, buildNonoRunArgs, buildSandboxEnv, nonoSandboxProvider } from "../../src/nono"
 import { buildNonoProfile, runtimeOf } from "../../src/nono-profile"
 
 const roots = {
@@ -145,7 +145,26 @@ describe("buildSandboxEnv", () => {
 
   test("host git reads no global or system config and no credential from the env", () => {
     const env = buildHostGitEnv(hostEnv)
-    expect(env).toEqual({ PATH: hostEnv.PATH, HOME: hostEnv.HOME, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" })
+    expect(env).toEqual({
+      PATH: hostEnv.PATH,
+      HOME: hostEnv.HOME,
+      GIT_ALLOW_PROTOCOL: "file:git:ssh:http:https",
+      GIT_CONFIG_COUNT: "4",
+      GIT_CONFIG_KEY_0: "core.hooksPath",
+      GIT_CONFIG_VALUE_0: "/dev/null",
+      GIT_CONFIG_KEY_1: "diff.ignoreSubmodules",
+      GIT_CONFIG_VALUE_1: "all",
+      GIT_CONFIG_KEY_2: "submodule.recurse",
+      GIT_CONFIG_VALUE_2: "false",
+      GIT_CONFIG_KEY_3: "fetch.recurseSubmodules",
+      GIT_CONFIG_VALUE_3: "false",
+      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_CONFIG_NOSYSTEM: "1"
+    })
+  })
+
+  test("the provider declares no env; create time builds the sandbox env", () => {
+    expect(nonoSandboxProvider({ piSessionDir: "/tmp/orc-test/session" }).env).toEqual({})
   })
 
   test("points the temp dir and the global git config into the session folder and drops the system git config", () => {
