@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { runAgentStep } from "../../src/run"
-import { capturedSession, cleanFinish, commitOnBranch, git, passedWithPr, providerErrorEchoingPrompt, runStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
+import { capturedSession, cleanFinish, commitOnBranch, git, passedWithPr, recordedNothing, providerErrorEchoingPrompt, runStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
 const refusal = (input: {
   readonly cwd: string
@@ -146,7 +146,7 @@ describe("runWithHistory decides the implement step", () => {
         const sha = await commitOnBranch(dir, "orc/test")
         await capturedSession(home, sessionEnding(cleanFinish))
         await writeFile(join(dir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [passedWithPr])
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [passedWithPr, recordedNothing])
         expect(outcome.report.completed).toBe(true)
         expect(outcome.report.tokens).toEqual({ input: 150, output: 25 })
         expect(outcome.report.fixAttempts).toBe(0)
@@ -205,7 +205,7 @@ describe("runWithHistory runs the project checks and fixes failures", () => {
         const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async (command) => {
           seen.push(command)
           return { stdout: command + " ok", stderr: "", exitCode: 0 }
-        }, [passedWithPr])
+        }, [passedWithPr, recordedNothing])
         expect(outcome.report.completed).toBe(true)
         expect(seen).toEqual(["bun run lint", "bun run typecheck"])
         expect(outcome.report.checksRounds?.map((round) => round.passed)).toEqual([true])
@@ -242,7 +242,7 @@ describe("runWithHistory runs the project checks and fixes failures", () => {
               : { stdout: "lint ok", stderr: "", exitCode: 0 }
           }
           return { stdout: "typecheck ok", stderr: "", exitCode: 0 }
-        }, [passedWithPr])
+        }, [passedWithPr, recordedNothing])
         expect(outcome.report.completed).toBe(true)
         expect(outcome.report.fixAttempts).toBe(1)
         expect(outcome.report.checksRounds?.map((round) => round.passed)).toEqual([false, true])

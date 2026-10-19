@@ -129,6 +129,19 @@ export const checksPassedWhileMonitoring: NoMistakesReply = {
   ].join("\n") + "\n"
 }
 
+export const recordedNothing: NoMistakesReply = {
+  stdout: [
+    "run:",
+    "  id: \"01STUB\"",
+    "  branch: orc/test",
+    "  status: running",
+    "  pr: \"https://github.com/o/r/pull/7\"",
+    "  steps[2]{step,status,findings,duration_ms}:",
+    "    review,completed,0,3928",
+    "    ci,running,0,0"
+  ].join("\n") + "\n"
+}
+
 const stubNoMistakes = async (replies: ReadonlyArray<NoMistakesReply>): Promise<{ readonly dir: string; readonly calls: string }> => {
   const dir = await mkdtemp(join(tmpdir(), "orc-nm-stub-"))
   const repliesDir = join(dir, "replies")
@@ -148,10 +161,12 @@ const stubNoMistakes = async (replies: ReadonlyArray<NoMistakesReply>): Promise<
   await writeFile(count, "1")
   const script = ["#!/bin/sh", "echo \"$@\" >> \"" + calls + "\"", "pwd >> \"" + calls + "\"",
     "git status --porcelain > /dev/null 2>&1",
-    "n=$(cat \"" + count + "\")", "cat \"" + repliesDir + "\"/\"$n\"",
+    "n=$(cat \"" + count + "\")", "echo $((n + 1)) > \"" + count + "\"",
+    "if [ ! -f \"" + repliesDir + "\"/\"$n\" ]; then echo 'unexpected no-mistakes call' >&2; exit 1; fi",
+    "cat \"" + repliesDir + "\"/\"$n\"",
     "code=$(cat \"" + repliesDir + "\"/\"$n\".exit 2>/dev/null || echo 0)",
     "err=\"" + repliesDir + "\"/\"$n\".err", "if [ -f \"$err\" ]; then cat \"$err\" >&2; fi",
-    "echo $((n + 1)) > \"" + count + "\"", "exit \"$code\""].join("\n") + "\n"
+    "exit \"$code\""].join("\n") + "\n"
   await writeFile(join(dir, "no-mistakes"), script)
   await chmod(join(dir, "no-mistakes"), 0o755)
   return { dir, calls }

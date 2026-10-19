@@ -1,6 +1,7 @@
 import { Effect, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { hostGitSafetyEnv } from "./host"
+import { hasTable, scalar, splitRow, table, trimmedLines } from "./toon"
 
 export interface NoMistakesFinding {
   readonly id: string
@@ -74,60 +75,6 @@ const maxGatesAnswered = 20
 const terminalStatuses = new Set(["completed", "failed", "cancelled", "checks_passed"])
 
 const greenOutcomes = new Set(["checks-passed", "passed"])
-
-const escapes: Readonly<Record<string, string>> = { "\\": "\\", "\"": "\"", n: "\n", r: "\r", t: "\t" }
-
-const trimmedLines = (output: string): Array<string> => output.split("\n").map((line) => line.trim())
-
-const decode = (value: string): string => {
-  const text = value.trim()
-  const quoted = text.length >= 2 && text.startsWith("\"") && text.endsWith("\"")
-  return quoted ? text.slice(1, -1).replace(/\\(.)/g, (_, char: string) => escapes[char] ?? char) : text
-}
-
-const scalar = (output: string, key: string): string => {
-  const line = trimmedLines(output).find((candidate) => candidate.startsWith(key + ":"))
-  return line === undefined ? "" : decode(line.slice(key.length + 1))
-}
-
-const splitRow = (row: string): Array<string> => {
-  const cells: Array<string> = []
-  let cell = ""
-  let quoted = false
-  let escaped = false
-  for (const char of row.trim()) {
-    if (escaped) {
-      escaped = false
-    } else if (quoted && char === "\\") {
-      escaped = true
-    } else if (char === "\"") {
-      quoted = !quoted
-    } else if (char === "," && !quoted) {
-      cells.push(cell)
-      cell = ""
-      continue
-    }
-    cell += char
-  }
-  cells.push(cell)
-  return cells.map(decode)
-}
-
-const table = (output: string, name: string): ReadonlyArray<ReadonlyMap<string, string>> => {
-  const lines = trimmedLines(output)
-  const header = new RegExp("^" + name + "\\[(\\d+)\\]\\{([^}]*)\\}:$")
-  const headerIndex = lines.findIndex((line) => header.test(line))
-  const match = header.exec(lines[headerIndex] ?? "")
-  if (match === null) {
-    return []
-  }
-  const columns = match[2].split(",").map((column) => column.trim())
-  const rows = lines.slice(headerIndex + 1).filter((line) => line !== "").slice(0, Number(match[1]))
-  return rows.map((row) => {
-    const cells = splitRow(row)
-    return new Map(columns.map((column, index) => [column, cells[index] ?? ""]))
-  })
-}
 
 const findingsTable = (output: string): ReadonlyArray<NoMistakesFinding> =>
   table(output, "findings").map((row) => ({
@@ -373,21 +320,43 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending> =>
     }
   })
 
-const collectRecordedFindings = (input: NoMistakesInput, log: DriveLog, runId: string): Effect.Effect<void> =>
+const unreadable = (command: NoMistakesCommand, name: string, args: ReadonlyArray<string>): string | null => {
+  if (command.exitCode !== 0 || scalar(command.stdout, "error") !== "") {
+    return "no-mistakes " + args.join(" ") + " failed: " + errorDetail(command)
+  }
+  return hasTable(command.stdout, name) ? null : "no-mistakes " + args.join(" ") + " printed no " + name + " table"
+}
+
+const collectRecordedFindings = (input: NoMistakesInput, log: DriveLog, runId: string): Effect.Effect<string | null> =>
   Effect.gen(function*() {
-    const status = yield* spawnNoMistakes(input, ["axi", "status", "--run", runId])
+    const statusArgs = ["axi", "status", "--run", runId]
+    const status = yield* spawnNoMistakes(input, statusArgs)
+    const statusFailure = unreadable(status, "steps", statusArgs)
+    if (statusFailure !== null) {
+      return statusFailure
+    }
     for (const step of stepsWithFindings(status.stdout)) {
-      const logs = yield* spawnNoMistakes(input, ["axi", "logs", "--run", runId, "--step", step])
+      const logsArgs = ["axi", "logs", "--run", runId, "--step", step]
+      const logs = yield* spawnNoMistakes(input, logsArgs)
+      const logsFailure = unreadable(logs, "findings", logsArgs)
+      if (logsFailure !== null) {
+        return logsFailure
+      }
       log.remember(step, findingsTable(logs.stdout))
     }
+    return null
   })
+
+const withUnreadFindings = (ending: Ending, failure: string): Ending => ({
+  status: ending.status === "passed" ? "failed" : ending.status,
+  gate: ending.gate,
+  result: ending.result + " orc could not read the findings no-mistakes recorded: " + failure + "."
+})
 
 export const driveNoMistakes = (input: NoMistakesInput): Effect.Effect<NoMistakesRecord> =>
   Effect.gen(function*() {
     const log = openDriveLog(new Date().toISOString())
     const ending = yield* drive(input, log)
-    if (log.runId() !== "") {
-      yield* collectRecordedFindings(input, log, log.runId())
-    }
-    return log.close(ending)
+    const failure = log.runId() === "" ? null : yield* collectRecordedFindings(input, log, log.runId())
+    return log.close(failure === null ? ending : withUnreadFindings(ending, failure))
   })
