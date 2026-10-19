@@ -28,13 +28,13 @@ An unknown flag prints the usage text and exits 1.
 
 ## Running a task
 
-To run the agent step on a task, run `bun run src/bin.ts run <task-file>` inside a clean git checkout of the project.
+To run a task, run `bun run src/bin.ts run <task-file>` inside a clean git checkout of the project.
 Orc refuses a checkout with uncommitted changes.
 Orc commits to a new branch named `orc/<run-id>`, or to the name you pass with `--branch <name>`.
 A branch name may hold only letters, digits, `.`, `_`, `-` and `/`.
 Orc also refuses a checkout whose own git config sets any key outside a short list known to run no program.
 
-The run needs `git`, `nono`, `pi` and `node` on the host PATH.
+The run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
 It also needs an opencode-go login in Pi, which `pi auth check --provider opencode-go` confirms.
 Orc reads that login through Pi on the host and hands it to the sandbox, so a keychain-only setup is refused.
 
@@ -47,11 +47,18 @@ Orc takes the implementer agent file from the first of these that exists:
 An agent file opens with a `---` header naming `model`, `thinking` and `tools`, and its body holds the instructions.
 Orc routes only `opencode-go` models through the sandbox and refuses any other model.
 
-Orc records the run as succeeded only when two facts hold.
+Once the checks pass, orc runs `no-mistakes axi run` on the branch with the task as its intent.
+At each gate orc asks no-mistakes to fix the findings marked `auto-fix`, ignores those marked `no-op`, and accepts the fix review.
+Orc refuses a gate holding an `ask-user` finding or an open review question, and leaves that gate parked for you to answer.
+
+Orc records the run as succeeded only when four facts hold.
 Pi's final reply in its captured session stopped cleanly with `ORC_COMPLETE` on its own line.
 The branch holds at least one new commit.
+The project's checks pass.
+no-mistakes opened the PR and reported CI green.
 Otherwise orc records the run as failed with the reason and exits 1.
 Each run keeps its task, evidence, agent log and Pi session in `~/.orc/runs/<run-id>`.
+Its `no-mistakes.txt` and the run history hold the no-mistakes findings, their count, the gates orc answered, the final result and the PR link.
 
 ## Seeing runs
 
@@ -72,6 +79,8 @@ Every JSON document names its version first as `schema`, starting at `orc.runs.v
 | `src/pi.ts` | The Pi agent command, its prompt and the check of its final reply |
 | `src/agents.ts` | The agent file parsing and lookup |
 | `agents` | The bundled agent files |
+| `src/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
+| `src/toon.ts` | The reading of the TOON output no-mistakes prints |
 | `src/run-history.ts` | The `~/.orc` home folder, the SQLite run history and `orc runs` |
 | `src/nono.ts` | The Sandcastle sandbox provider that runs each command in `nono run` |
 | `src/host.ts` | The host-side processes and tools the provider runs outside nono, and the guard on host git |

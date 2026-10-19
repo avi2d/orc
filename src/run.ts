@@ -228,7 +228,8 @@ export const runAgentStep = (
       fs, path, spawner, git: checkout.git, projectDir: checkout.projectDir, runId,
       runDir: folders.runDir, piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir,
       taskPath: folders.taskPath, agent, fixer, branch: checkout.branch, started,
-      worktreeDir: sandbox.worktreePath
+      worktreeDir: sandbox.worktreePath,
+      noMistakesPath: hostPath ?? ""
     }
     const report = yield* Effect.acquireUseRelease(
       openDatabase(home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),

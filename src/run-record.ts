@@ -3,6 +3,7 @@ import type { ChildProcessSpawner } from "effect/process"
 import type { Database } from "bun:sqlite"
 import type { AgentFile } from "./agents"
 import { orcCompletionLine, type PiTokenUse } from "./pi"
+import type { NoMistakesFinding, NoMistakesRecord } from "./no-mistakes"
 import { OrcRunError } from "./run-session"
 import { formatHistoryError, recordEvidence, recordRun, recordSignal, recordStep } from "./run-history"
 
@@ -50,6 +51,8 @@ export interface OrcRunReport {
   readonly checksRounds: ReadonlyArray<ChecksRoundSummary> | null
   readonly fixes: ReadonlyArray<RecordedFixAttempt>
   readonly fixAttempts: number
+  readonly prLink: string | null
+  readonly noMistakes: NoMistakesRecord | null
   readonly endReason: string
 }
 
@@ -71,9 +74,47 @@ export const formatReport = (report: OrcRunReport): string =>
     "checks: " + (report.checksRounds === null
       ? "never ran"
       : report.checksRounds.length.toString() + (report.checksRounds.length === 1 ? " round" : " rounds") + ", " + report.fixAttempts.toString() + (report.fixAttempts === 1 ? " fix attempt" : " fix attempts")),
-    "status: " + (report.completed ? "completed" : !report.markerVerified ? "incomplete" : (report.commits ?? []).length === 0 ? "no commit" : "checks failed"),
+    "pr: " + (report.prLink ?? "none"),
+    "no-mistakes: " + (report.noMistakes === null ? "never ran" : noMistakesSummary(report.noMistakes)),
+    "status: " + runStatus(report),
     report.endReason
   ].join("\n")
+
+const runStatus = (report: OrcRunReport): string => {
+  if (report.completed) {
+    return "completed"
+  }
+  if (!report.markerVerified) {
+    return "incomplete"
+  }
+  if ((report.commits ?? []).length === 0) {
+    return "no commit"
+  }
+  const finalRound = report.checksRounds?.at(-1)
+  if (finalRound === undefined || !finalRound.passed) {
+    return "checks failed"
+  }
+  return "no-mistakes " + (report.noMistakes?.status ?? "never ran") + (report.prLink === null ? ", no PR" : ", PR open")
+}
+
+const noMistakesSummary = (record: NoMistakesRecord): string =>
+  record.status + ", " + record.findings.length.toString() + (record.findings.length === 1 ? " finding" : " findings") + ", " +
+  record.gatesAnswered.toString() + (record.gatesAnswered === 1 ? " gate answered" : " gates answered")
+
+const noMistakesFile = (run: HistoryRun): string => run.path.join(run.runDir, "no-mistakes.txt")
+
+const findingLine = (finding: NoMistakesFinding): string =>
+  [finding.id, finding.severity, finding.file + (finding.line === "" ? "" : ":" + finding.line), finding.action, finding.description].filter((part) => part !== "").join(" ")
+
+const noMistakesText = (record: NoMistakesRecord): string =>
+  [
+    "no-mistakes result: " + record.status,
+    "PR: " + (record.prLink ?? "none"),
+    "findings: " + record.findings.length.toString(),
+    "gates answered: " + record.gatesAnswered.toString(),
+    ...record.findings.map(findingLine),
+    record.result
+  ].join("\n") + "\n"
 
 export interface HistoryRun {
   readonly fs: FileSystem.FileSystem
@@ -91,6 +132,7 @@ export interface HistoryRun {
   readonly branch: string
   readonly started: string
   readonly worktreeDir: string
+  readonly noMistakesPath: string
 }
 
 export const failedReport = (run: HistoryRun, reason: string): OrcRunReport => ({
@@ -110,6 +152,8 @@ export const failedReport = (run: HistoryRun, reason: string): OrcRunReport => (
   checksRounds: null,
   fixes: [],
   fixAttempts: 0,
+  prLink: null,
+  noMistakes: null,
   endReason: reason
 })
 
@@ -134,7 +178,12 @@ export const writeEvidence = (run: HistoryRun, report: OrcRunReport): Effect.Eff
       ]),
     report.endReason
   ]
-  return run.fs.writeFileString(run.path.join(run.runDir, "implement-1.md"), lines.join("\n") + "\n").pipe(
+  const implement = run.fs.writeFileString(run.path.join(run.runDir, "implement-1.md"), lines.join("\n") + "\n")
+  const noMistakes = report.noMistakes === null
+    ? Effect.void
+    : run.fs.writeFileString(noMistakesFile(run), noMistakesText(report.noMistakes))
+  return implement.pipe(
+    Effect.andThen(noMistakes),
     Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the evidence file: " + String(cause) }))
   )
 }
@@ -155,6 +204,7 @@ export const recordHistory = (
       status: report.completed ? "succeeded" : "failed",
       started: run.started,
       ended,
+      prLink: report.prLink,
       endReason: report.endReason
     }).pipe(Effect.mapError(failed("record the run in")))
     const stepId = yield* recordStep(db, {
@@ -189,7 +239,48 @@ export const recordHistory = (
     for (const fix of report.fixes) {
       yield* recordFixAttempt(db, run, fix, failed)
     }
+    if (report.noMistakes !== null) {
+      yield* recordNoMistakesStep(db, run, report.noMistakes, failed)
+    }
   })
+
+const recordNoMistakesStep = (
+  db: Database,
+  run: HistoryRun,
+  record: NoMistakesRecord,
+  failed: (action: string) => (cause: unknown) => OrcRunError
+): Effect.Effect<void, OrcRunError> =>
+  Effect.gen(function*() {
+    const stepId = yield* recordStep(db, {
+      runId: run.runId,
+      name: "no-mistakes",
+      attempt: 1,
+      status: record.status === "passed" ? "passed" : "failed",
+      started: record.started,
+      ended: record.ended,
+      agentFile: null,
+      piSessionFile: null
+    }).pipe(Effect.mapError(failed("record the no-mistakes step in")))
+    yield* recordEvidence(db, { stepId, direction: "in", path: run.taskPath, kind: "task" }).pipe(
+      Effect.mapError(failed("record the task evidence in"))
+    )
+    yield* recordEvidence(db, { stepId, direction: "out", path: noMistakesFile(run), kind: "no-mistakes" }).pipe(
+      Effect.mapError(failed("record the no-mistakes evidence in"))
+    )
+    for (const signal of noMistakesSignals(record)) {
+      yield* recordSignal(db, { stepId, name: signal.name, value: signal.value }).pipe(
+        Effect.mapError(failed("record the no-mistakes signals in"))
+      )
+    }
+  })
+
+const noMistakesSignals = (record: NoMistakesRecord): ReadonlyArray<{ readonly name: string; readonly value: string }> => [
+  { name: "finding-count", value: record.findings.length.toString() },
+  { name: "result", value: record.status },
+  { name: "gates-answered", value: record.gatesAnswered.toString() },
+  ...(record.gate === null ? [] : [{ name: "gate", value: record.gate }]),
+  ...(record.prLink === null ? [] : [{ name: "pr-link", value: record.prLink }])
+]
 
 const recordChecksRound = (
   db: Database,
