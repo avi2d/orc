@@ -1,12 +1,37 @@
 import { Data, Effect, FileSystem, type Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { type Runtime, runtimeOf } from "./nono-profile"
+import { type Runtime, runtimeOf, within } from "./nono-profile"
 
 export class NonoProviderError extends Data.TaggedError("NonoProviderError")<{
   readonly message: string
 }> {}
 
 export type Spawner = ChildProcessSpawner.ChildProcessSpawner["Service"]
+
+export const resolvePiAgentDir = (
+  fs: FileSystem.FileSystem,
+  piSessionDir: string,
+  configured: string | undefined
+): Effect.Effect<Record<string, string>, NonoProviderError> =>
+  Effect.gen(function*() {
+    const dir = configured ?? `${piSessionDir}/agent`
+    if (configured !== undefined) {
+      const real = yield* fs.realPath(configured).pipe(
+        Effect.mapError((cause) =>
+          new NonoProviderError({ message: `orc nono provider: cannot resolve PI_CODING_AGENT_DIR ${configured}: ${String(cause)}` })
+        )
+      )
+      if (!within(piSessionDir, real)) {
+        return yield* new NonoProviderError({ message: `orc nono provider: PI_CODING_AGENT_DIR sits outside the session dir: ${configured}` })
+      }
+    }
+    yield* fs.makeDirectory(dir, { recursive: true }).pipe(
+      Effect.mapError((cause) =>
+        new NonoProviderError({ message: `orc nono provider: cannot create the agent dir ${dir}: ${String(cause)}` })
+      )
+    )
+    return { PI_CODING_AGENT_DIR: dir }
+  })
 
 export interface HostCommandResult {
   readonly stdout: string

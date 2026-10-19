@@ -15,12 +15,13 @@ import {
   NonoProviderError,
   resolveDeveloperDir,
   resolveHostBinary,
+  resolvePiAgentDir,
   resolveRuntime,
   runHostCommand,
   type Spawner
 } from "./host"
 import { credentialBearingKeys, includePathKeys, includeTargets, submoduleCheckouts } from "./git-config"
-import { buildNonoProfile, type NonoSandboxRoots, within } from "./nono-profile"
+import { selectNonoProfile, type ModelCredential, type NonoSandboxRoots, within } from "./nono-profile"
 
 export const buildNonoRunArgs = (
   profilePath: string,
@@ -61,6 +62,16 @@ export const buildSandboxEnv = (
   }
 }
 
+const sandboxEnv = (
+  hostEnv: NodeJS.ProcessEnv,
+  piSessionDir: string,
+  runtimeBinDirs: ReadonlyArray<string>,
+  agentDir: Record<string, string>
+): Readonly<Record<string, string>> & { readonly TMPDIR: string } => ({
+  ...buildSandboxEnv(hostEnv, piSessionDir, [...new Set(runtimeBinDirs)]),
+  ...agentDir
+})
+
 export const buildHostGitEnv = (hostEnv: Readonly<Record<string, string | undefined>>): Record<string, string> => ({
   ...inheritedEnv(hostEnv),
   GIT_CONFIG_GLOBAL: "/dev/null",
@@ -71,6 +82,8 @@ export { NonoProviderError }
 
 export interface NonoSandboxProviderOptions {
   readonly piSessionDir: string
+  readonly piAgentDir?: string | undefined
+  readonly modelCredential?: ModelCredential | undefined
 }
 
 // Sandcastle 0.12.0's provider type omits the runtime `create`.
@@ -269,7 +282,7 @@ const checkProfile = (
       )
       const verdict = yield* Schema.decodeEffect(NonoWhyVerdict)(write.stdout).pipe(
         Effect.mapError((cause) =>
-          new NonoProviderError({ message: `orc nono provider: cannot read nono's write verdict: ${String(cause)}` })
+          new NonoProviderError({ message: `orc nono provider: cannot read nono's write verdict for ${trusted} (exit ${write.exitCode}): ${write.stdout.slice(0, 200)} ${write.stderr.slice(0, 500)}: ${String(cause)}` })
         )
       )
       if (verdict.status !== "denied") {
@@ -287,14 +300,14 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const worktree = createOptions.worktreePath
       const hostEnv = { ...Bun.env, ...createOptions.env }
       const hostGit = { binary: yield* resolveHostBinary(fs, "git"), env: buildHostGitEnv(hostEnv) }
-      const roots = yield* resolveRoots(spawner, fs, path, hostGit, worktree, options.piSessionDir)
+      const roots = yield* resolveRoots(spawner, fs, path, hostGit, createOptions.worktreePath, options.piSessionDir)
       yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, hostGit)
       const runtimes = (yield* Effect.forEach(sandboxRuntimes, (name) => resolveRuntime(fs, path, name, Bun.env.PATH ?? "", homedir())))
         .filter((runtime) => runtime !== null)
-      const env = buildSandboxEnv(hostEnv, roots.piSessionDir, [...new Set(runtimes.map((runtime) => runtime.binDir))])
+      const agentDir = yield* resolvePiAgentDir(fs, roots.piSessionDir, hostEnv["PI_CODING_AGENT_DIR"] ?? options.piAgentDir)
+      const env = sandboxEnv(hostEnv, roots.piSessionDir, runtimes.map((runtime) => runtime.binDir), agentDir)
       const runtimeDirs = runtimes.flatMap((runtime) => runtime.installDir === null ? [] : [runtime.installDir])
       const developerDir = yield* resolveDeveloperDir(spawner, fs, env)
       const nonoBinary = yield* resolveHostBinary(fs, "nono")
@@ -302,7 +315,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const profileDir = yield* fs.makeTempDirectory({ prefix: "orc-nono-" })
       const profilePath = path.join(profileDir, "profile.json")
       const hostTrustedPaths = [profileDir, nonoBinary, path.dirname(nonoBinary)]
-      yield* fs.writeFileString(profilePath, `${JSON.stringify(buildNonoProfile(roots, { developerDir, runtimeDirs }), null, 2)}\n`).pipe(
+      yield* fs.writeFileString(profilePath, `${JSON.stringify(selectNonoProfile(roots, { developerDir, runtimeDirs }, options.modelCredential), null, 2)}\n`).pipe(
         Effect.andThen(() => checkProfile(spawner, nono, profilePath, hostTrustedPaths)),
         Effect.andThen(() => fs.makeDirectory(env.TMPDIR, { recursive: true })),
         Effect.onError(() => fs.remove(profileDir, { recursive: true }).pipe(Effect.result))
@@ -311,7 +324,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const lifetime = yield* Scope.make()
       const runOwned = yield* FiberSet.makeRuntimePromise().pipe(Scope.provide(lifetime))
       return {
-        worktreePath: worktree,
+        worktreePath: createOptions.worktreePath,
         exec: (
           command: string,
           execOptions?: {
@@ -320,7 +333,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
             readonly stdin?: string | undefined
           }
         ): Promise<ExecResult> => {
-          const cwd = execOptions?.cwd ?? worktree
+          const cwd = execOptions?.cwd ?? createOptions.worktreePath
           const stdin = execOptions?.stdin === undefined ? "ignore" : Stream.fromIterable([new TextEncoder().encode(execOptions.stdin)])
           return runOwned(
             fs.realPath(cwd).pipe(

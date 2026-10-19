@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { buildHostGitEnv, buildNonoRunArgs, buildSandboxEnv } from "../../src/nono"
+import { buildHostGitEnv, buildNonoRunArgs, buildSandboxEnv, nonoSandboxProvider } from "../../src/nono"
 import { buildNonoProfile, runtimeOf } from "../../src/nono-profile"
 
 const roots = {
@@ -146,6 +146,10 @@ describe("buildSandboxEnv", () => {
   test("host git reads no global or system config and no credential from the env", () => {
     const env = buildHostGitEnv(hostEnv)
     expect(env).toEqual({ PATH: hostEnv.PATH, HOME: hostEnv.HOME, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" })
+  })
+
+  test("the provider declares no env; create time builds the sandbox env", () => {
+    expect(nonoSandboxProvider({ piSessionDir: "/tmp/orc-test/session" }).env).toEqual({})
   })
 
   test("points the temp dir and the global git config into the session folder and drops the system git config", () => {

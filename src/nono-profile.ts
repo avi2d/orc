@@ -99,6 +99,105 @@ export interface HostRuntime {
   readonly runtimeDirs: ReadonlyArray<string>
 }
 
+export interface ModelCredential {
+  readonly provider: string
+  readonly name: string
+  readonly upstream: string
+  readonly envVar: string
+  readonly captureCommand: ReadonlyArray<string>
+}
+
+export interface HostTools {
+  readonly piBinary: string
+  readonly nodeBinary: string
+  readonly homeDir: string
+}
+
+export const modelCredentialFor = (model: string, host: HostTools): ModelCredential | null => {
+  const slash = model.indexOf("/")
+  const provider = slash === -1 ? model : model.slice(0, slash)
+  if (provider !== "opencode-go") {
+    return null
+  }
+  return {
+    provider,
+    name: "opencode_go",
+    upstream: "https://opencode.ai/zen/go/v1",
+    envVar: "OPENCODE_GO_KEY",
+    // nono spawns capture under its own sandbox-shaped env, where PI_CODING_AGENT_DIR points at the run session instead of the operator login.
+    captureCommand: [
+      "/bin/sh",
+      "-c",
+      "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" unset PI_CODING_AGENT_DIR; exec \"$1\" auth print-api-key --provider opencode-go",
+      host.nodeBinary,
+      host.piBinary,
+      host.homeDir
+    ]
+  }
+}
+
+export const piAgentModels = (credential: ModelCredential): string =>
+  JSON.stringify({ providers: { [credential.provider]: { apiKey: "$" + credential.envVar } } }, null, 2) + "\n"
+
+interface CredentialRoute {
+  readonly upstream: string
+  readonly credential_key: string
+  readonly inject_header: string
+  readonly credential_format: string
+  readonly env_var: string
+}
+
+interface CredentialCapture {
+  readonly command: ReadonlyArray<string>
+  readonly timeout_secs: number
+  readonly cache_ttl_secs: number
+}
+
+export type AgentNonoProfile = Omit<ReturnType<typeof buildNonoProfile>, "network"> & {
+  readonly network: Omit<ReturnType<typeof buildNonoProfile>["network"], "credentials"> & {
+    readonly credentials: ReadonlyArray<string>
+    readonly custom_credentials: Record<string, CredentialRoute>
+  }
+  readonly credential_capture: Record<string, CredentialCapture>
+}
+
+export const buildAgentNonoProfile = (
+  roots: NonoSandboxRoots,
+  host: HostRuntime,
+  credential: ModelCredential
+): AgentNonoProfile => {
+  const base = buildNonoProfile(roots, host)
+  return {
+    ...base,
+    network: {
+      ...base.network,
+      credentials: [credential.name],
+      custom_credentials: {
+        [credential.name]: {
+          upstream: credential.upstream,
+          credential_key: "cmd://" + credential.name,
+          inject_header: "Authorization",
+          credential_format: "Bearer {}",
+          env_var: credential.envVar
+        }
+      }
+    },
+    credential_capture: {
+      [credential.name]: {
+        command: [...credential.captureCommand],
+        timeout_secs: 15,
+        cache_ttl_secs: 900
+      }
+    }
+  }
+}
+export const selectNonoProfile = (
+  roots: NonoSandboxRoots,
+  host: HostRuntime,
+  credential: ModelCredential | undefined
+): ReturnType<typeof buildNonoProfile> | AgentNonoProfile =>
+  credential === undefined ? buildNonoProfile(roots, host) : buildAgentNonoProfile(roots, host, credential)
+
 export const buildNonoProfile = (roots: NonoSandboxRoots, host: HostRuntime) => ({
   meta: {
     name: "orc-nono-agent",

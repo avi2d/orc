@@ -41,4 +41,24 @@ describe("parseArgs", () => {
   test("an extra runs argument is a usage error", () => {
     expect(parseArgs(["runs", "--json", "extra"])).toEqual({ kind: "UsageError", detail: "unexpected argument: extra" })
   })
+
+  test("run without a task file is a usage error", () => {
+    expect(parseArgs(["run"])).toEqual({ kind: "UsageError", detail: "orc run takes a task file" })
+  })
+
+  test("run takes a task file and no branch", () => {
+    expect(parseArgs(["run", "task.md"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: undefined })
+  })
+
+  test("run takes a task file and a branch", () => {
+    expect(parseArgs(["run", "task.md", "--branch", "orc/demo"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo" })
+  })
+
+  test("run rejects a flag it does not know", () => {
+    expect(parseArgs(["run", "task.md", "--json"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --json" })
+  })
+
+  test("run rejects a branch flag without a name", () => {
+    expect(parseArgs(["run", "task.md", "--branch"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --branch" })
+  })
 })
