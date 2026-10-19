@@ -1,0 +1,208 @@
+import type { AgentProvider, ExecResult, SandboxRunResult } from "@ai-hero/sandcastle"
+import { Effect } from "effect"
+import { withHostGitSafety } from "./host"
+import { buildFixPrompt, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
+import { runGit } from "./git-run"
+import { buildImplementPrompt, orcCompletionLine, piWithTools, sessionPrintedSignal, type PiTokenUse } from "./pi"
+import { OrcRunError, describeCause, noSession, readSession } from "./run-session"
+import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
+
+export interface SandboxOps {
+  readonly runAgent: (agent: AgentProvider, prompt: string, logFile: string) => Promise<SandboxRunResult>
+  readonly execCheck: (command: string) => Promise<ExecResult>
+}
+
+interface AgentOutcome {
+  readonly sessionId: string | null
+  readonly sessionFile: string | null
+  readonly commits: Array<OrcRunCommit>
+  readonly tokens: PiTokenUse | null
+  readonly completed: boolean
+  readonly markerVerified: boolean
+  readonly endReason: string
+}
+
+const collectCommits = (
+  run: HistoryRun,
+  made: ReadonlyArray<{ readonly sha: string }>
+): Effect.Effect<Array<OrcRunCommit>, OrcRunError> =>
+  Effect.gen(function*() {
+    const commits: Array<OrcRunCommit> = []
+    for (const commit of made) {
+      const subject = yield* runGit(run.spawner, run.git, ["log", "-1", "--format=%s", commit.sha], run.projectDir).pipe(
+        Effect.map((logged) => logged.exitCode === 0 ? logged.stdout.trim() : ""),
+        Effect.orElseSucceed(() => "")
+      )
+      commits.push({ sha: commit.sha, subject })
+    }
+    return commits
+  })
+
+interface CapturedAgentRun {
+  readonly sessionId: string | null
+  readonly sessionFile: string | null
+  readonly commits: Array<OrcRunCommit>
+  readonly tokens: PiTokenUse | null
+  readonly jsonl: string | null
+  readonly failure: string | null
+}
+
+const sessionOf = (
+  run: HistoryRun,
+  storage: { readonly readHostSession: (cwd: string, id: string) => Promise<string | undefined> } | undefined,
+  result: SandboxRunResult
+): Effect.Effect<CapturedAgentRun, OrcRunError> =>
+  Effect.gen(function*() {
+    const sessionId = result.iterations.map((iteration) => iteration.sessionId).find((id) => id !== undefined) ?? null
+    const sessionRead = yield* readSession(run, storage, sessionId).pipe(
+      Effect.map((session) => ({ session, failure: null })),
+      Effect.catchTag("OrcRunError", (error) => Effect.succeed({ session: noSession, failure: error.message }))
+    )
+    const commits = yield* collectCommits(run, result.commits)
+    return { sessionId, sessionFile: sessionRead.session.file, commits, tokens: sessionRead.session.usage, failure: sessionRead.failure, jsonl: sessionRead.session.jsonl }
+  })
+
+const verifiedMarker = (result: SandboxRunResult, jsonl: string | null): boolean =>
+  result.completionSignal === orcCompletionLine && jsonl !== null && sessionPrintedSignal(jsonl, orcCompletionLine)
+
+const implement = (run: HistoryRun, runAgent: SandboxOps["runAgent"]): Effect.Effect<AgentOutcome, OrcRunError> =>
+  Effect.gen(function*() {
+    const agentProvider = piWithTools(run.agent, {
+      hostSessionsDir: run.hostSessionsDir,
+      sandboxSessionsDir: run.piSessionDir
+    })
+    const result: SandboxRunResult = yield* Effect.tryPromise({
+      try: () => runAgent(agentProvider, buildImplementPrompt(run.agent, run.path.join(run.piSessionDir, "task.md")), "agent.log"),
+      catch: (cause) => new OrcRunError({ message: "orc: the agent run failed: " + describeCause(cause) })
+    }).pipe(withHostGitSafety(run.git))
+    const session = yield* sessionOf(run, agentProvider.sessionStorage, result)
+    const verified = verifiedMarker(result, session.jsonl)
+    const completed = verified && session.commits.length > 0
+    const endReason = session.failure ?? (!verified
+      ? "Pi's final reply did not stop cleanly with " + orcCompletionLine + " on its own line."
+      : (session.commits.length > 0
+        ? "Pi made " + session.commits.length.toString() + (session.commits.length === 1 ? " commit" : " commits") + " on " + run.branch + "."
+        : "Pi printed ORC_COMPLETE but made no commit on " + run.branch + "."))
+    return {
+      sessionId: session.sessionId,
+      sessionFile: session.sessionFile,
+      commits: session.commits,
+      tokens: session.tokens,
+      completed,
+      markerVerified: verified,
+      endReason
+    }
+  })
+
+const fixOnce = (
+  run: HistoryRun,
+  runAgent: SandboxOps["runAgent"],
+  evidenceFile: string,
+  attempt: number
+): Effect.Effect<{ readonly fix: RecordedFixAttempt; readonly commits: ReadonlyArray<OrcRunCommit> }, OrcRunError> =>
+  Effect.gen(function*() {
+    const started = new Date().toISOString()
+    const fixerProvider = piWithTools(run.fixer, {
+      hostSessionsDir: run.hostSessionsDir,
+      sandboxSessionsDir: run.piSessionDir
+    })
+    const result: SandboxRunResult = yield* Effect.tryPromise({
+      try: () => runAgent(fixerProvider, buildFixPrompt(run.fixer, evidenceFile), "fix-" + attempt + ".log"),
+      catch: (cause) => new OrcRunError({ message: "orc: the fix run failed: " + describeCause(cause) })
+    }).pipe(withHostGitSafety(run.git))
+    const session = yield* sessionOf(run, fixerProvider.sessionStorage, result)
+    const verified = verifiedMarker(result, session.jsonl)
+    const ended = new Date().toISOString()
+    return {
+      fix: {
+        attempt,
+        status: verified ? "passed" : "failed",
+        started,
+        ended,
+        agentFile: run.fixer.path,
+        sessionFile: session.sessionFile,
+        evidenceIn: evidenceFile,
+        commits: session.commits.length,
+        tokens: session.tokens
+      },
+      commits: session.commits
+    }
+  })
+
+const readProjectChecks = (run: HistoryRun): Effect.Effect<ReadonlyArray<ChecksCommand>, OrcRunError> =>
+  run.fs.readFileString(run.path.join(run.worktreeDir, ".no-mistakes.yaml")).pipe(
+    Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the checks config .no-mistakes.yaml: " + String(cause) })),
+    Effect.flatMap((text) =>
+      readChecksCommands(text, ".no-mistakes.yaml").pipe(
+        Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
+      )
+    )
+  )
+
+export const runFull = (run: HistoryRun, ops: SandboxOps): Effect.Effect<OrcRunReport, OrcRunError> =>
+  Effect.gen(function*() {
+    const done = yield* implement(run, ops.runAgent)
+    const base = {
+      runId: run.runId,
+      runDir: run.runDir,
+      branch: run.branch,
+      agentPath: run.agent.path,
+      agentSource: run.agent.source,
+      model: run.agent.model,
+      sessionId: done.sessionId,
+      sessionFile: done.sessionFile,
+      tokens: done.tokens,
+      markerVerified: done.markerVerified,
+      implementPassed: done.completed
+    }
+    if (!done.completed) {
+      return { ...base, commits: done.commits, completed: false, checksRounds: null, fixes: [], fixAttempts: 0, endReason: done.endReason }
+    }
+    const rounds: Array<ChecksRoundSummary> = []
+    const fixes: Array<RecordedFixAttempt> = []
+    const commits = [...done.commits]
+    for (let round = 1; round <= maxFixAttempts + 1; round += 1) {
+      const started = new Date().toISOString()
+      const commands = yield* readProjectChecks(run)
+      const outcome = yield* runChecksRound(ops.execCheck, run.fs, run.path, run.runDir, round, commands).pipe(
+        Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
+      )
+      const ended = new Date().toISOString()
+      const failed = outcome.outcomes.filter((check) => !check.passed).map((check) => check.name)
+      rounds.push({
+        round,
+        file: outcome.file,
+        started,
+        ended,
+        passed: failed.length === 0,
+        failed,
+        checks: outcome.outcomes.map((check) => ({ name: check.name, passed: check.passed }))
+      })
+      if (failed.length === 0) {
+        return {
+          ...base,
+          commits,
+          completed: true,
+          checksRounds: rounds,
+          fixes,
+          fixAttempts: fixes.length,
+          endReason: "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + ", and the checks passed."
+        }
+      }
+      if (fixes.length >= maxFixAttempts) {
+        return {
+          ...base,
+          commits,
+          completed: false,
+          checksRounds: rounds,
+          fixes,
+          fixAttempts: fixes.length,
+          endReason: "The " + failed.join(", ") + " check" + (failed.length === 1 ? "" : "s") + " still failed after " + maxFixAttempts.toString() + " fix attempts; see " + outcome.file + ". No PR opens."
+        }
+      }
+      const fixed = yield* fixOnce(run, ops.runAgent, outcome.file, fixes.length + 1)
+      fixes.push(fixed.fix)
+      commits.push(...fixed.commits)
+    }
+    return yield* new OrcRunError({ message: "orc: the checks loop ended without a result" })
+  })

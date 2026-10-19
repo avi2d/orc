@@ -11,6 +11,28 @@ export interface OrcRunCommit {
   readonly subject: string
 }
 
+export interface ChecksRoundSummary {
+  readonly round: number
+  readonly file: string
+  readonly started: string
+  readonly ended: string
+  readonly passed: boolean
+  readonly failed: ReadonlyArray<string>
+  readonly checks: ReadonlyArray<{ readonly name: string; readonly passed: boolean }>
+}
+
+export interface RecordedFixAttempt {
+  readonly attempt: number
+  readonly status: "passed" | "failed"
+  readonly started: string
+  readonly ended: string
+  readonly agentFile: string
+  readonly sessionFile: string | null
+  readonly evidenceIn: string
+  readonly commits: number
+  readonly tokens: PiTokenUse | null
+}
+
 export interface OrcRunReport {
   readonly runId: string
   readonly runDir: string
@@ -24,6 +46,10 @@ export interface OrcRunReport {
   readonly tokens: PiTokenUse | null
   readonly completed: boolean
   readonly markerVerified: boolean
+  readonly implementPassed: boolean
+  readonly checksRounds: ReadonlyArray<ChecksRoundSummary> | null
+  readonly fixes: ReadonlyArray<RecordedFixAttempt>
+  readonly fixAttempts: number
   readonly endReason: string
 }
 
@@ -42,7 +68,10 @@ export const formatReport = (report: OrcRunReport): string =>
     "commits: " + (report.commits === null ? "unknown" : report.commits.length.toString() + report.commits.map((commit) => " " + commit.sha).join(",")),
     "input tokens: " + (report.tokens === null ? "unknown" : report.tokens.input.toString()),
     "output tokens: " + (report.tokens === null ? "unknown" : report.tokens.output.toString()),
-    "status: " + (report.completed ? "completed" : report.markerVerified ? "no commit" : "incomplete"),
+    "checks: " + (report.checksRounds === null
+      ? "never ran"
+      : report.checksRounds.length.toString() + (report.checksRounds.length === 1 ? " round" : " rounds") + ", " + report.fixAttempts.toString() + (report.fixAttempts === 1 ? " fix attempt" : " fix attempts")),
+    "status: " + (report.completed ? "completed" : !report.markerVerified ? "incomplete" : (report.commits ?? []).length === 0 ? "no commit" : "checks failed"),
     report.endReason
   ].join("\n")
 
@@ -58,8 +87,10 @@ export interface HistoryRun {
   readonly hostSessionsDir: string
   readonly taskPath: string
   readonly agent: AgentFile
+  readonly fixer: AgentFile
   readonly branch: string
   readonly started: string
+  readonly worktreeDir: string
 }
 
 export const failedReport = (run: HistoryRun, reason: string): OrcRunReport => ({
@@ -75,6 +106,10 @@ export const failedReport = (run: HistoryRun, reason: string): OrcRunReport => (
   tokens: null,
   completed: false,
   markerVerified: false,
+  implementPassed: false,
+  checksRounds: null,
+  fixes: [],
+  fixAttempts: 0,
   endReason: reason
 })
 
@@ -91,6 +126,12 @@ export const writeEvidence = (run: HistoryRun, report: OrcRunReport): Effect.Eff
     report.tokens === null
       ? "Pi's token use is unknown."
       : "Pi consumed " + report.tokens.input.toString() + " input tokens and " + report.tokens.output.toString() + " output tokens.",
+    ...(report.checksRounds === null
+      ? []
+      : [
+        "Checks ran " + report.checksRounds.length.toString() + (report.checksRounds.length === 1 ? " round" : " rounds") + " with " + report.fixAttempts.toString() + (report.fixAttempts === 1 ? " fix attempt" : " fix attempts") + ".",
+        "Checks evidence: " + report.checksRounds.map((round) => run.path.basename(round.file)).join(", ") + "."
+      ]),
     report.endReason
   ]
   return run.fs.writeFileString(run.path.join(run.runDir, "implement-1.md"), lines.join("\n") + "\n").pipe(
@@ -120,7 +161,7 @@ export const recordHistory = (
       runId: run.runId,
       name: "implement",
       attempt: 1,
-      status: report.completed ? "passed" : "failed",
+      status: report.implementPassed ? "passed" : "failed",
       started: run.started,
       ended,
       agentFile: report.agentPath,
@@ -142,7 +183,81 @@ export const recordHistory = (
         Effect.mapError(failed("record the signals in"))
       )
     }
+    for (const round of report.checksRounds ?? []) {
+      yield* recordChecksRound(db, run, round, failed)
+    }
+    for (const fix of report.fixes) {
+      yield* recordFixAttempt(db, run, fix, failed)
+    }
   })
+
+const recordChecksRound = (
+  db: Database,
+  run: HistoryRun,
+  round: ChecksRoundSummary,
+  failed: (action: string) => (cause: unknown) => OrcRunError
+): Effect.Effect<void, OrcRunError> =>
+  Effect.gen(function*() {
+    const checksId = yield* recordStep(db, {
+      runId: run.runId,
+      name: "checks",
+      attempt: round.round,
+      status: round.passed ? "passed" : "failed",
+      started: round.started,
+      ended: round.ended,
+      agentFile: null,
+      piSessionFile: null
+    }).pipe(Effect.mapError(failed("record the checks step in")))
+    yield* recordEvidence(db, { stepId: checksId, direction: "out", path: round.file, kind: "checks" }).pipe(
+      Effect.mapError(failed("record the checks evidence in"))
+    )
+    for (const check of round.checks) {
+      yield* recordSignal(db, { stepId: checksId, name: "check " + check.name, value: check.passed ? "passed" : "failed" }).pipe(
+        Effect.mapError(failed("record the check signals in"))
+      )
+    }
+  })
+
+const recordFixAttempt = (
+  db: Database,
+  run: HistoryRun,
+  fix: RecordedFixAttempt,
+  failed: (action: string) => (cause: unknown) => OrcRunError
+): Effect.Effect<void, OrcRunError> =>
+  Effect.gen(function*() {
+    const fixId = yield* recordStep(db, {
+      runId: run.runId,
+      name: "fix",
+      attempt: fix.attempt,
+      status: fix.status,
+      started: fix.started,
+      ended: fix.ended,
+      agentFile: fix.agentFile,
+      piSessionFile: fix.sessionFile
+    }).pipe(Effect.mapError(failed("record the fix step in")))
+    yield* recordEvidence(db, { stepId: fixId, direction: "in", path: fix.evidenceIn, kind: "checks" }).pipe(
+      Effect.mapError(failed("record the fix evidence in"))
+    )
+    if (fix.sessionFile !== null) {
+      yield* recordEvidence(db, { stepId: fixId, direction: "out", path: fix.sessionFile, kind: "session" }).pipe(
+        Effect.mapError(failed("record the fix session in"))
+      )
+    }
+    yield* recordSignal(db, { stepId: fixId, name: "commit-count", value: fix.commits.toString() }).pipe(
+      Effect.mapError(failed("record the fix signals in"))
+    )
+    for (const signal of fixTokenSignals(fix)) {
+      yield* recordSignal(db, { stepId: fixId, name: signal.name, value: signal.value }).pipe(
+        Effect.mapError(failed("record the fix signals in"))
+      )
+    }
+  })
+
+const fixTokenSignals = (fix: RecordedFixAttempt): ReadonlyArray<{ readonly name: string; readonly value: string }> =>
+  fix.tokens === null ? [] : [
+    { name: "input-tokens", value: fix.tokens.input.toString() },
+    { name: "output-tokens", value: fix.tokens.output.toString() }
+  ]
 
 const measuredSignals = (report: OrcRunReport): ReadonlyArray<{ readonly name: string; readonly value: string }> => [
   ...(report.tokens === null ? [] : [
