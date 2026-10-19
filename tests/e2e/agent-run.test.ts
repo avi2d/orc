@@ -31,7 +31,7 @@ describe("orc run through the agent step", () => {
         )
       )
       expect(report.completed).toBe(true)
-      expect(report.commits.length).toBe(1)
+      expect(report.commits?.length).toBe(1)
       const log = Bun.spawnSync(["git", "log", "orc/e2e-agent", "--format=%s"], { cwd: repo })
       expect(log.exitCode).toBe(0)
       const runs = await Effect.runPromise(

@@ -188,6 +188,7 @@ interface StepOutcome {
   readonly report: OrcRunReport
   readonly run: RunRecord | undefined
   readonly steps: unknown
+  readonly signals: unknown
   readonly evidence: string
 }
 
@@ -210,8 +211,9 @@ const runStep = (dir: string, home: string, sandbox: SandboxRun): Promise<StepOu
             }, sandbox)
             const runs = yield* listRuns(db)
             const steps = db.query("SELECT name, status FROM steps WHERE run_id = ?").all("step-run-1")
+            const signals = db.query("SELECT name, value FROM signals ORDER BY name").all()
             const evidence = yield* fs.readFileString(path.join(runDir, "implement-1.md"))
-            return { report, run: runs.find((run) => run.id === "step-run-1"), steps, evidence }
+            return { report, run: runs.find((run) => run.id === "step-run-1"), steps, signals, evidence }
           }),
         (db) => Effect.sync(() => db.close())
       )
@@ -238,7 +240,7 @@ describe("runWithHistory decides the implement step", () => {
         const sha = await commitOnBranch(dir, "orc/test")
         await capturedSession(home, sessionEnding(providerErrorEchoingPrompt))
         const outcome = await runStep(dir, home, sandboxResult(sha, providerErrorEchoingPrompt))
-        expect(outcome.report.commits.map((commit) => commit.sha)).toEqual([sha])
+        expect(outcome.report.commits?.map((commit) => commit.sha)).toEqual([sha])
         expect(outcome.report.completed).toBe(false)
         expect(outcome.run?.status).toBe("failed")
         expect(outcome.steps).toEqual([{ name: "implement", status: "failed" }])
@@ -253,7 +255,7 @@ describe("runWithHistory decides the implement step", () => {
         await capturedSession(home, sessionEnding(cleanFinish))
         const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish))
         expect(outcome.report.completed).toBe(true)
-        expect(outcome.report.inputTokens).toBe(150)
+        expect(outcome.report.tokens).toEqual({ input: 150, output: 25 })
         expect(outcome.run?.status).toBe("succeeded")
         expect(outcome.steps).toEqual([{ name: "implement", status: "passed" }])
       })
@@ -271,6 +273,23 @@ describe("runWithHistory decides the implement step", () => {
         expect(outcome.run?.endReason ?? "").toContain("pi exited with code 1")
         expect(outcome.steps).toEqual([{ name: "implement", status: "failed" }])
         expect(outcome.evidence).toContain("pi exited with code 1")
+        expect(outcome.evidence).not.toContain("made no commit")
+        expect(outcome.signals).toEqual([])
+      })
+    })
+  })
+
+  test("a run whose Pi session was never captured keeps its commits and records no token counts", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await commitOnBranch(dir, "orc/test")
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish))
+        expect(outcome.report.completed).toBe(false)
+        expect(outcome.report.commits?.map((commit) => commit.sha)).toEqual([sha])
+        expect(outcome.report.tokens).toBeNull()
+        expect(outcome.signals).toEqual([{ name: "commit-count", value: "1" }])
+        expect(outcome.evidence).toContain(sha + " work")
+        expect(outcome.evidence).not.toContain("0 input tokens")
       })
     })
   })

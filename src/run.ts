@@ -7,7 +7,7 @@ import { resolveAgentFile, type AgentFile } from "./agents"
 import { nonoSandboxProvider } from "./nono"
 import { canRouteModel, loginCheckCommand, modelCredentialFor, piAgentModels } from "./nono-profile"
 import { buildImplementPrompt, orcCompletionLine, piWithTools, sessionPrintedSignal } from "./pi"
-import { OrcRunError, describeCause, readSession } from "./run-session"
+import { OrcRunError, describeCause, noSession, readSession } from "./run-session"
 import { openDatabase, orcHomeDir } from "./run-history"
 import { failedReport, historyFailure, recordHistory, writeEvidence, type HistoryRun, type OrcRunCommit, type OrcRunReport } from "./run-record"
 
@@ -253,18 +253,25 @@ const implement = (run: HistoryRun, runInSandbox: SandboxRun): Effect.Effect<Orc
       catch: (cause) => new OrcRunError({ message: "orc: the agent run failed: " + describeCause(cause) })
     })
     const sessionId = result.iterations.map((iteration) => iteration.sessionId).find((id) => id !== undefined) ?? null
-    const session = yield* readSession(run, agentProvider.sessionStorage, sessionId)
+    const sessionRead = yield* readSession(run, agentProvider.sessionStorage, sessionId).pipe(
+      Effect.map((session) => ({ session, failure: null })),
+      Effect.catchTag("OrcRunError", (error) => Effect.succeed({ session: noSession, failure: error.message }))
+    )
+    const session = sessionRead.session
     const commits: Array<OrcRunCommit> = []
     for (const commit of result.commits) {
-      const logged = yield* runGit(run.spawner, run.git, ["log", "-1", "--format=%s", commit.sha], run.projectDir)
-      commits.push({ sha: commit.sha, subject: logged.exitCode === 0 ? logged.stdout.trim() : "" })
+      const subject = yield* runGit(run.spawner, run.git, ["log", "-1", "--format=%s", commit.sha], run.projectDir).pipe(
+        Effect.map((logged) => logged.exitCode === 0 ? logged.stdout.trim() : ""),
+        Effect.orElseSucceed(() => "")
+      )
+      commits.push({ sha: commit.sha, subject })
     }
     const signaled = result.completionSignal === orcCompletionLine
     const verified = signaled && session.jsonl !== null && sessionPrintedSignal(session.jsonl, orcCompletionLine)
     const completed = verified && commits.length > 0
-    const endReason = !verified
+    const endReason = sessionRead.failure ?? (!verified
       ? "Pi's final reply did not stop cleanly with " + orcCompletionLine + " on its own line."
-      : (commits.length > 0 ? "Pi committed " + commits.length.toString() + " on " + result.branch + "." : "Pi printed ORC_COMPLETE but made no commit on " + result.branch + ".")
+      : (commits.length > 0 ? "Pi committed " + commits.length.toString() + " on " + result.branch + "." : "Pi printed ORC_COMPLETE but made no commit on " + result.branch + "."))
     return {
       runId: run.runId,
       runDir: run.runDir,
@@ -275,8 +282,7 @@ const implement = (run: HistoryRun, runInSandbox: SandboxRun): Effect.Effect<Orc
       sessionId,
       sessionFile: session.file,
       commits,
-      inputTokens: session.inputTokens,
-      outputTokens: session.outputTokens,
+      tokens: session.usage,
       completed,
       markerVerified: verified,
       endReason

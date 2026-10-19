@@ -2,7 +2,7 @@ import { Effect, type FileSystem, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { Database } from "bun:sqlite"
 import type { AgentFile } from "./agents"
-import { orcCompletionLine } from "./pi"
+import { orcCompletionLine, type PiTokenUse } from "./pi"
 import { OrcRunError } from "./run-session"
 import { formatHistoryError, recordEvidence, recordRun, recordSignal, recordStep } from "./run-history"
 
@@ -20,9 +20,8 @@ export interface OrcRunReport {
   readonly model: string
   readonly sessionId: string | null
   readonly sessionFile: string | null
-  readonly commits: ReadonlyArray<OrcRunCommit>
-  readonly inputTokens: number
-  readonly outputTokens: number
+  readonly commits: ReadonlyArray<OrcRunCommit> | null
+  readonly tokens: PiTokenUse | null
   readonly completed: boolean
   readonly markerVerified: boolean
   readonly endReason: string
@@ -40,9 +39,9 @@ export const formatReport = (report: OrcRunReport): string =>
     "model: " + report.model,
     "pi session: " + (report.sessionId ?? "none"),
     "session file: " + (report.sessionFile ?? "none"),
-    "commits: " + report.commits.length.toString() + report.commits.map((commit) => " " + commit.sha).join(","),
-    "input tokens: " + report.inputTokens.toString(),
-    "output tokens: " + report.outputTokens.toString(),
+    "commits: " + (report.commits === null ? "unknown" : report.commits.length.toString() + report.commits.map((commit) => " " + commit.sha).join(",")),
+    "input tokens: " + (report.tokens === null ? "unknown" : report.tokens.input.toString()),
+    "output tokens: " + (report.tokens === null ? "unknown" : report.tokens.output.toString()),
     "status: " + (report.completed ? "completed" : report.markerVerified ? "no commit" : "incomplete"),
     report.endReason
   ].join("\n")
@@ -72,9 +71,8 @@ export const failedReport = (run: HistoryRun, reason: string): OrcRunReport => (
   model: run.agent.model,
   sessionId: null,
   sessionFile: null,
-  commits: [],
-  inputTokens: 0,
-  outputTokens: 0,
+  commits: null,
+  tokens: null,
   completed: false,
   markerVerified: false,
   endReason: reason
@@ -85,10 +83,14 @@ export const writeEvidence = (run: HistoryRun, report: OrcRunReport): Effect.Eff
     "Implement step for task " + run.taskPath + ".",
     "Agent file " + report.agentPath + " (" + report.agentSource + ") names model " + report.model + " with tools " + run.agent.tools.join(", ") + ".",
     report.sessionId === null ? "Pi stored no session." : "Pi session " + report.sessionId + " is stored at " + (report.sessionFile ?? "an unknown path") + ".",
-    report.markerVerified ? "Pi printed " + orcCompletionLine + "." : "Pi stopped without printing " + orcCompletionLine + ".",
-    report.commits.length === 0 ? "Pi made no commit on " + report.branch + "." : "Commits on " + report.branch + ".",
-    ...report.commits.map((commit) => commit.sha + " " + commit.subject),
-    "Pi consumed " + report.inputTokens.toString() + " input tokens and " + report.outputTokens.toString() + " output tokens.",
+    report.markerVerified ? "Pi printed " + orcCompletionLine + "." : "orc could not verify that Pi printed " + orcCompletionLine + ".",
+    report.commits === null
+      ? "orc could not tell which commits Pi made on " + report.branch + "."
+      : report.commits.length === 0 ? "Pi made no commit on " + report.branch + "." : "Commits on " + report.branch + ".",
+    ...(report.commits ?? []).map((commit) => commit.sha + " " + commit.subject),
+    report.tokens === null
+      ? "Pi's token use is unknown."
+      : "Pi consumed " + report.tokens.input.toString() + " input tokens and " + report.tokens.output.toString() + " output tokens.",
     report.endReason
   ]
   return run.fs.writeFileString(run.path.join(run.runDir, "implement-1.md"), lines.join("\n") + "\n").pipe(
@@ -135,13 +137,17 @@ export const recordHistory = (
         Effect.mapError(failed("record the session evidence in"))
       )
     }
-    for (const signal of [
-      { name: "input-tokens", value: report.inputTokens.toString() },
-      { name: "output-tokens", value: report.outputTokens.toString() },
-      { name: "commit-count", value: report.commits.length.toString() }
-    ]) {
+    for (const signal of measuredSignals(report)) {
       yield* recordSignal(db, { stepId, name: signal.name, value: signal.value }).pipe(
         Effect.mapError(failed("record the signals in"))
       )
     }
   })
+
+const measuredSignals = (report: OrcRunReport): ReadonlyArray<{ readonly name: string; readonly value: string }> => [
+  ...(report.tokens === null ? [] : [
+    { name: "input-tokens", value: report.tokens.input.toString() },
+    { name: "output-tokens", value: report.tokens.output.toString() }
+  ]),
+  ...(report.commits === null ? [] : [{ name: "commit-count", value: report.commits.length.toString() }])
+]
