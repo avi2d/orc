@@ -182,7 +182,7 @@ export const runFull = (run: HistoryRun, ops: SandboxOps): Effect.Effect<OrcRunR
         checks: outcome.outcomes.map((check) => ({ name: check.name, passed: check.passed }))
       })
       if (failed.length === 0) {
-        const noMistakes = yield* driveNoMistakes({ spawner: run.spawner, pathEnv: run.noMistakesPath, taskFile: run.taskPath, worktreeDir: run.worktreeDir })
+        const noMistakes = yield* driveNoMistakes({ spawner: run.spawner, pathEnv: run.noMistakesPath, git: run.git, taskFile: run.taskPath, worktreeDir: run.worktreeDir })
         return {
           ...base,
           commits,

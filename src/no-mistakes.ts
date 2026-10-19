@@ -1,5 +1,6 @@
 import { Effect, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { hostGitSafetyEnv } from "./host"
 
 export interface NoMistakesFinding {
   readonly id: string
@@ -32,6 +33,7 @@ interface NoMistakesCommand {
 export interface NoMistakesInput {
   readonly spawner: ChildProcessSpawner.ChildProcessSpawner["Service"]
   readonly pathEnv: string
+  readonly git: string
   readonly taskFile: string
   readonly worktreeDir: string
 }
@@ -45,10 +47,16 @@ interface ParsedRun {
   readonly status: string
   readonly outcome: string
   readonly prLink: string
+  readonly runId: string
   readonly gate: ParkedGate | null
   readonly terminal: boolean
   readonly findings: ReadonlyArray<NoMistakesFinding>
-  readonly fixes: ReadonlyArray<NoMistakesFinding>
+}
+
+interface Ending {
+  readonly status: NoMistakesStatus
+  readonly gate: ParkedGate | null
+  readonly result: string
 }
 
 type GateAnswer =
@@ -105,7 +113,7 @@ const splitRow = (row: string): Array<string> => {
   return cells.map(decode)
 }
 
-const findingsTable = (output: string, name: "findings" | "fixes"): ReadonlyArray<NoMistakesFinding> => {
+const table = (output: string, name: string): ReadonlyArray<ReadonlyMap<string, string>> => {
   const lines = trimmedLines(output)
   const header = new RegExp("^" + name + "\\[(\\d+)\\]\\{([^}]*)\\}:$")
   const headerIndex = lines.findIndex((line) => header.test(line))
@@ -117,20 +125,25 @@ const findingsTable = (output: string, name: "findings" | "fixes"): ReadonlyArra
   const rows = lines.slice(headerIndex + 1).filter((line) => line !== "").slice(0, Number(match[1]))
   return rows.map((row) => {
     const cells = splitRow(row)
-    const cell = (column: string): string => {
-      const index = columns.indexOf(column)
-      return index === -1 ? "" : cells[index] ?? ""
-    }
-    return {
-      id: cell("id"),
-      severity: cell("severity"),
-      file: cell("file"),
-      line: cell("line"),
-      action: cell("action"),
-      description: cell("description")
-    }
+    return new Map(columns.map((column, index) => [column, cells[index] ?? ""]))
   })
 }
+
+const findingsTable = (output: string): ReadonlyArray<NoMistakesFinding> =>
+  table(output, "findings").map((row) => ({
+    id: row.get("id") ?? "",
+    severity: row.get("severity") ?? "",
+    file: row.get("file") ?? "",
+    line: row.get("line") ?? "",
+    action: row.get("action") ?? "",
+    description: row.get("description") ?? ""
+  }))
+
+const stepsWithFindings = (output: string): ReadonlyArray<string> =>
+  table(output, "steps")
+    .filter((row) => Number.parseInt(row.get("findings") ?? "", 10) > 0)
+    .map((row) => row.get("step") ?? "")
+    .filter((step) => step !== "")
 
 const parkedStep = (output: string): string | null => {
   for (const line of trimmedLines(output)) {
@@ -172,10 +185,10 @@ export const parseRun = (output: string): ParsedRun => {
     status,
     outcome,
     prLink: scalar(output, "pr"),
+    runId: scalar(output, "id"),
     gate: readGate(output),
     terminal: outcome !== "" || terminalStatuses.has(status),
-    findings: findingsTable(output, "findings"),
-    fixes: findingsTable(output, "fixes")
+    findings: findingsTable(output)
   }
 }
 
@@ -214,8 +227,8 @@ const respondArgs = (answer: Exclude<GateAnswer, { readonly kind: "refuse" }>): 
     ? ["axi", "respond", "--action", "approve"]
     : ["axi", "respond", "--action", "fix", "--findings", answer.ids.join(","), ...(answer.ignore.length === 0 ? [] : ["--ignore", answer.ignore.join(",")])]
 
-const findingKey = (finding: NoMistakesFinding): string =>
-  finding.id === "" ? finding.file + "\n" + finding.description : finding.id
+const findingKey = (step: string, finding: NoMistakesFinding): string =>
+  step + "\n" + (finding.id === "" ? finding.file + "\n" + finding.description : finding.id)
 
 const firstLine = (text: string): string => text.split("\n").map((line) => line.trim()).find((line) => line !== "") ?? "the pipeline gave no reason"
 
@@ -224,11 +237,20 @@ const errorDetail = (command: NoMistakesCommand): string => {
   return reported === "" ? firstLine(command.stderr + "\n" + command.stdout) : reported
 }
 
+const waitElapsed = (command: NoMistakesCommand): boolean => /^wait of \S+ elapsed/.test(scalar(command.stdout, "error"))
+
+const rejected = (command: NoMistakesCommand, parsed: ParsedRun): boolean =>
+  !parsed.terminal && !waitElapsed(command) && (command.exitCode !== 0 || scalar(command.stdout, "error") !== "")
+
 const prNote = (prLink: string | null): string => prLink === null ? "No PR opens." : "The PR " + prLink + " is open but not ready."
 
 const spawnNoMistakes = (input: NoMistakesInput, args: ReadonlyArray<string>): Effect.Effect<NoMistakesCommand> =>
   Effect.scoped(Effect.gen(function*() {
-    const handle = yield* input.spawner.spawn(ChildProcess.make("no-mistakes", [...args], { cwd: input.worktreeDir, env: { PATH: input.pathEnv }, extendEnv: true }))
+    const handle = yield* input.spawner.spawn(ChildProcess.make("no-mistakes", [...args], {
+      cwd: input.worktreeDir,
+      env: { ...hostGitSafetyEnv, PATH: input.git.slice(0, input.git.lastIndexOf("/")) + ":" + input.pathEnv },
+      extendEnv: true
+    }))
     const [stdout, stderr, exitCode] = yield* Effect.all([
       handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
       handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
@@ -241,11 +263,14 @@ const spawnNoMistakes = (input: NoMistakesInput, args: ReadonlyArray<string>): E
 
 interface DriveLog {
   readonly read: (output: string) => ParsedRun
+  readonly remember: (step: string, findings: ReadonlyArray<NoMistakesFinding>) => void
+  readonly runId: () => string
   readonly gatesAnswered: () => number
   readonly countGate: () => void
-  readonly refuse: (gate: ParkedGate | null, reason: string) => NoMistakesRecord
-  readonly fail: (reason: string) => NoMistakesRecord
-  readonly finish: (parsed: ParsedRun) => NoMistakesRecord
+  readonly refuse: (gate: ParkedGate | null, reason: string) => Ending
+  readonly fail: (reason: string) => Ending
+  readonly finish: (parsed: ParsedRun) => Ending
+  readonly close: (ending: Ending) => NoMistakesRecord
 }
 
 const openDriveLog = (started: string): DriveLog => {
@@ -253,44 +278,54 @@ const openDriveLog = (started: string): DriveLog => {
   const known = new Set<string>()
   let gatesAnswered = 0
   let prLink: string | null = null
-  const close = (status: NoMistakesStatus, gate: ParkedGate | null, result: string): NoMistakesRecord => ({
-    status,
-    gate: gate === null ? null : gate.step,
-    findings,
-    gatesAnswered,
-    prLink,
-    result,
-    started,
-    ended: new Date().toISOString()
-  })
-  const fail = (reason: string): NoMistakesRecord => close("failed", null, reason + ". " + prNote(prLink))
+  let runId = ""
+  const remember = (step: string, seen: ReadonlyArray<NoMistakesFinding>): void => {
+    for (const finding of seen) {
+      if (!known.has(findingKey(step, finding))) {
+        known.add(findingKey(step, finding))
+        findings.push(finding)
+      }
+    }
+  }
+  const fail = (reason: string): Ending => ({ status: "failed", gate: null, result: reason + ". " + prNote(prLink) })
   return {
     read: (output) => {
       const parsed = parseRun(output)
-      for (const finding of [...parsed.findings, ...parsed.fixes]) {
-        if (!known.has(findingKey(finding))) {
-          known.add(findingKey(finding))
-          findings.push(finding)
-        }
-      }
+      remember(parsed.gate?.step ?? "", parsed.findings)
       prLink = parsed.prLink === "" ? prLink : parsed.prLink
+      runId = parsed.runId === "" ? runId : parsed.runId
       return parsed
     },
+    remember,
+    runId: () => runId,
     gatesAnswered: () => gatesAnswered,
     countGate: () => {
       gatesAnswered += 1
     },
-    refuse: (gate, reason) =>
-      close("refused", gate, "no-mistakes stopped" + (gate === null ? "." : " at the " + gate.step + " gate.") + " " + reason + ". " + prNote(prLink)),
+    refuse: (gate, reason) => ({
+      status: "refused",
+      gate,
+      result: "no-mistakes stopped" + (gate === null ? "." : " at the " + gate.step + " gate.") + " " + reason + ". " + prNote(prLink)
+    }),
     fail,
     finish: (parsed) =>
       greenOutcomes.has(parsed.outcome) && prLink !== null
-        ? close("passed", null, "no-mistakes opened " + prLink + " and CI is green.")
-        : fail("no-mistakes ended " + (parsed.outcome === "" ? parsed.status : "with outcome " + parsed.outcome))
+        ? { status: "passed", gate: null, result: "no-mistakes opened " + prLink + " and CI is green." }
+        : fail("no-mistakes ended " + (parsed.outcome === "" ? parsed.status : "with outcome " + parsed.outcome)),
+    close: (ending) => ({
+      status: ending.status,
+      gate: ending.gate === null ? null : ending.gate.step,
+      findings,
+      gatesAnswered,
+      prLink,
+      result: ending.result,
+      started,
+      ended: new Date().toISOString()
+    })
   }
 }
 
-const stopWithoutGate = (input: NoMistakesInput, log: DriveLog, sent: Sent, command: NoMistakesCommand): Effect.Effect<NoMistakesRecord> => {
+const stopOnRejection = (input: NoMistakesInput, log: DriveLog, sent: Sent, command: NoMistakesCommand): Effect.Effect<Ending> => {
   if (sent.kind === "start") {
     return Effect.succeed(log.fail("no-mistakes refused to start: " + errorDetail(command)))
   }
@@ -308,29 +343,51 @@ const gateAnswer = (log: DriveLog, gate: ParkedGate, findings: ReadonlyArray<NoM
     ? { kind: "refuse", reason: "orc answered " + maxGatesAnswered.toString() + " gates without reaching an outcome" }
     : answerForGate(gate, findings)
 
-export const driveNoMistakes = (input: NoMistakesInput): Effect.Effect<NoMistakesRecord> =>
+const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending> =>
   Effect.gen(function*() {
-    const log = openDriveLog(new Date().toISOString())
     let sent: Sent = { kind: "start" }
     let current = yield* spawnNoMistakes(input, ["axi", "run", "--intent-file", input.taskFile])
     for (;;) {
       const parsed = log.read(current.stdout)
+      const refused = rejected(current, parsed)
+      if (sent.kind === "respond" && !refused) {
+        log.countGate()
+      }
       if (parsed.terminal) {
         return log.finish(parsed)
       }
-      if (parsed.gate !== null) {
-        const answer = gateAnswer(log, parsed.gate, parsed.findings)
-        if (answer.kind === "refuse") {
-          return log.refuse(parsed.gate, answer.reason)
-        }
-        current = yield* spawnNoMistakes(input, respondArgs(answer))
-        sent = { kind: "respond", gate: parsed.gate }
-        log.countGate()
-      } else if (current.exitCode === 0) {
+      if (refused) {
+        return yield* stopOnRejection(input, log, sent, current)
+      }
+      if (parsed.gate === null) {
         current = yield* spawnNoMistakes(input, ["axi", "run"])
         sent = { kind: "reattach" }
-      } else {
-        return yield* stopWithoutGate(input, log, sent, current)
+        continue
       }
+      const answer = gateAnswer(log, parsed.gate, parsed.findings)
+      if (answer.kind === "refuse") {
+        return log.refuse(parsed.gate, answer.reason)
+      }
+      current = yield* spawnNoMistakes(input, respondArgs(answer))
+      sent = { kind: "respond", gate: parsed.gate }
     }
+  })
+
+const collectRecordedFindings = (input: NoMistakesInput, log: DriveLog, runId: string): Effect.Effect<void> =>
+  Effect.gen(function*() {
+    const status = yield* spawnNoMistakes(input, ["axi", "status", "--run", runId])
+    for (const step of stepsWithFindings(status.stdout)) {
+      const logs = yield* spawnNoMistakes(input, ["axi", "logs", "--run", runId, "--step", step])
+      log.remember(step, findingsTable(logs.stdout))
+    }
+  })
+
+export const driveNoMistakes = (input: NoMistakesInput): Effect.Effect<NoMistakesRecord> =>
+  Effect.gen(function*() {
+    const log = openDriveLog(new Date().toISOString())
+    const ending = yield* drive(input, log)
+    if (log.runId() !== "") {
+      yield* collectRecordedFindings(input, log, log.runId())
+    }
+    return log.close(ending)
   })

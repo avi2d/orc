@@ -147,6 +147,7 @@ const stubNoMistakes = async (replies: ReadonlyArray<NoMistakesReply>): Promise<
   await writeFile(calls, "")
   await writeFile(count, "1")
   const script = ["#!/bin/sh", "echo \"$@\" >> \"" + calls + "\"", "pwd >> \"" + calls + "\"",
+    "git status --porcelain > /dev/null 2>&1",
     "n=$(cat \"" + count + "\")", "cat \"" + repliesDir + "\"/\"$n\"",
     "code=$(cat \"" + repliesDir + "\"/\"$n\".exit 2>/dev/null || echo 0)",
     "err=\"" + repliesDir + "\"/\"$n\".err", "if [ -f \"$err\" ]; then cat \"$err\" >&2; fi",
