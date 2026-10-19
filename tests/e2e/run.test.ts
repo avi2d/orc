@@ -6,6 +6,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../src/agents"
+import { hostGitShim } from "../../src/host"
 import { orcCompletionLine } from "../../src/pi"
 import { runAgentStep, runWithHistory, type SandboxRun } from "../../src/run"
 import type { OrcRunReport } from "../../src/run-record"
@@ -200,12 +201,13 @@ const runStep = (dir: string, home: string, sandbox: SandboxRun): Promise<StepOu
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
       const runDir = path.join(home, "runs", "step-run-1")
       yield* fs.makeDirectory(path.join(runDir, "sessions"), { recursive: true })
+      const hostGit = yield* hostGitShim(fs, path, Bun.which("git") ?? "git")
       return yield* Effect.acquireUseRelease(
         openDatabase(home),
         (db) =>
           Effect.gen(function*() {
             const report = yield* runWithHistory(db, {
-              fs, path, spawner, git: Bun.which("git") ?? "git", projectDir: dir, runId: "step-run-1", runDir,
+              fs, path, spawner, git: hostGit, projectDir: dir, runId: "step-run-1", runDir,
               piSessionDir: path.join(runDir, "session"), hostSessionsDir: path.join(runDir, "sessions"),
               taskPath: path.join(runDir, "task.md"), agent: implementer, branch: "orc/test", started: "2026-10-19T10:00:00.000Z"
             }, sandbox)
@@ -217,7 +219,7 @@ const runStep = (dir: string, home: string, sandbox: SandboxRun): Promise<StepOu
           }),
         (db) => Effect.sync(() => db.close())
       )
-    }).pipe(Effect.provide(BunServices.layer))
+    }).pipe(Effect.scoped, Effect.provide(BunServices.layer))
   )
 
 const capturedSession = (home: string, jsonl: string): Promise<void> => {
@@ -342,6 +344,68 @@ describe("host git ignores programs the sandbox can name in the repository", () 
         expect(await fsmonitor.ran()).toBe(false)
         plainGit(dir, ["status", "--porcelain"])
         expect(await fsmonitor.ran()).toBe(true)
+      })
+    })
+  })
+})
+
+const plantFilter = async (dir: string, gitDir: string, file: string, script: string): Promise<void> => {
+  git(dir, ["config", "filter.planted.by.sandbox.clean", script])
+  git(dir, ["config", "filter.planted.by.sandbox.smudge", script])
+  await mkdir(join(gitDir, "info"), { recursive: true })
+  await writeFile(join(gitDir, "info", "attributes"), file + " filter=planted.by.sandbox\n")
+}
+
+const backdate = (file: string): void => {
+  Bun.spawnSync(["touch", "-m", "-t", "202001010000", file])
+}
+
+describe("host git runs no filter the sandbox can name in the repository", () => {
+  test("orc's checkout status and Sandcastle's host git run no repository filter, whatever its driver name", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const filter = await markerScript(home, "filter")
+        await plantFilter(dir, join(dir, ".git"), "seed.txt", filter.script)
+        backdate(join(dir, "seed.txt"))
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home, branch: "orc/test" })).toContain("cannot read the task file")
+        expect(await filter.ran()).toBe(false)
+        backdate(join(dir, "seed.txt"))
+        const outcome = await runStep(dir, home, async () => {
+          plainGit(dir, ["status", "--porcelain"])
+          plainGit(dir, ["worktree", "add", "-q", join(home, "sandcastle-worktree"), "-b", "orc/test"])
+          return { iterations: [], stdout: "", commits: [], branch: "orc/test" }
+        })
+        expect(outcome.report.completed).toBe(false)
+        expect(await filter.ran()).toBe(false)
+        backdate(join(dir, "seed.txt"))
+        plainGit(dir, ["status", "--porcelain"])
+        expect(await filter.ran()).toBe(true)
+      })
+    })
+  })
+
+  test("orc's checkout status runs no filter a submodule's own config names", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const upstream = join(home, "upstream")
+        await mkdir(upstream)
+        git(upstream, ["init", "-q"])
+        git(upstream, ["config", "user.name", "orc test"])
+        git(upstream, ["config", "user.email", "orc@test.invalid"])
+        await writeFile(join(upstream, "inner.txt"), "inner\n")
+        git(upstream, ["add", "inner.txt"])
+        git(upstream, ["commit", "-qm", "inner"])
+        git(dir, ["-c", "protocol.file.allow=always", "submodule", "-q", "add", upstream, "sm"])
+        git(dir, ["config", "--file", ".gitmodules", "submodule.sm.ignore", "none"])
+        git(dir, ["add", ".gitmodules"])
+        git(dir, ["commit", "-qm", "submodule"])
+        const filter = await markerScript(home, "filter")
+        await plantFilter(join(dir, "sm"), join(dir, ".git", "modules", "sm"), "inner.txt", filter.script)
+        backdate(join(dir, "sm", "inner.txt"))
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home, branch: "orc/test" })).toContain("cannot read the task file")
+        expect(await filter.ran()).toBe(false)
+        plainGit(dir, ["status", "--porcelain"])
+        expect(await filter.ran()).toBe(true)
       })
     })
   })

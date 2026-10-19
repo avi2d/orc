@@ -1,10 +1,10 @@
 import { run as runSandbox, type AgentProvider, type RunResult } from "@ai-hero/sandcastle"
-import { Effect, FileSystem, Path, Stream } from "effect"
+import { Effect, FileSystem, Path, type Scope, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { Database } from "bun:sqlite"
 import { homedir } from "node:os"
 import { resolveAgentFile, type AgentFile } from "./agents"
-import { hostGitSafetyEnv, withHostGitSafety } from "./host"
+import { hostGitSafetyEnv, hostGitShim, withHostGitSafety } from "./host"
 import { nonoSandboxProvider } from "./nono"
 import { canRouteModel, loginCheckCommand, modelCredentialFor, piAgentModels } from "./nono-profile"
 import { buildImplementPrompt, orcCompletionLine, piWithTools, sessionPrintedSignal } from "./pi"
@@ -93,15 +93,12 @@ const openCheckout = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
+  git: string,
   cwd: string,
   branchName: string | undefined,
   runId: string
 ): Effect.Effect<Checkout, OrcRunError> =>
   Effect.gen(function*() {
-    const git = Bun.which("git")
-    if (git === null) {
-      return yield* refuse("orc: git is not on the host PATH")
-    }
     const top = yield* runGit(spawner, git, ["rev-parse", "--show-toplevel"], cwd)
     if (top.exitCode !== 0) {
       return yield* refuse("orc: " + cwd + " sits in no git checkout")
@@ -172,16 +169,27 @@ const prepareRunFolders = (
     return { runDir, piSessionDir, piAgentDir, hostSessionsDir, taskPath, sandboxTaskPath }
   })
 
+const openHostGit = (fs: FileSystem.FileSystem, path: Path.Path): Effect.Effect<string, OrcRunError, Scope.Scope> => {
+  const realGit = Bun.which("git")
+  return realGit === null
+    ? refuse("orc: git is not on the host PATH")
+    : hostGitShim(fs, path, realGit).pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the host git shim: " + String(cause) }))
+    )
+}
+
 export const runAgentStep = (
   request: OrcRunRequest
 ): Effect.Effect<OrcRunReport, OrcRunError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.gen(function*() {
+  Effect.scoped(Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const home = request.homeDir ?? orcHomeDir()
     const runId = request.runId ?? newRunId()
-    const checkout = yield* openCheckout(fs, path, spawner, request.cwd, request.branch, runId)
+    const hostPath = Bun.env.PATH
+    const git = yield* openHostGit(fs, path)
+    const checkout = yield* openCheckout(fs, path, spawner, git, request.cwd, request.branch, runId)
     const folders = yield* prepareRunFolders(fs, path, home, runId, request.taskFile)
     const agent: AgentFile = yield* resolveAgentFile("implementer", {
       projectDir: checkout.projectDir,
@@ -212,7 +220,7 @@ export const runAgentStep = (
     const runInNono: SandboxRun = (agentProvider) =>
       runSandbox({
         agent: agentProvider,
-        sandbox: nonoSandboxProvider({ piSessionDir: folders.piSessionDir, piAgentDir: folders.piAgentDir, modelCredential: credential }),
+        sandbox: nonoSandboxProvider({ piSessionDir: folders.piSessionDir, piAgentDir: folders.piAgentDir, modelCredential: credential, hostPath }),
         prompt: buildImplementPrompt(agent, folders.sandboxTaskPath),
         cwd: checkout.projectDir,
         branchStrategy: { type: "branch", branch: checkout.branch },
@@ -230,7 +238,7 @@ export const runAgentStep = (
       (db) => Effect.sync(() => db.close())
     )
     return report
-  })
+  }))
 
 export type SandboxRun = (agent: AgentProvider) => Promise<RunResult>
 
@@ -253,7 +261,7 @@ const implement = (run: HistoryRun, runInSandbox: SandboxRun): Effect.Effect<Orc
     const result: RunResult = yield* Effect.tryPromise({
       try: () => runInSandbox(agentProvider),
       catch: (cause) => new OrcRunError({ message: "orc: the agent run failed: " + describeCause(cause) })
-    }).pipe(withHostGitSafety)
+    }).pipe(withHostGitSafety(run.git))
     const sessionId = result.iterations.map((iteration) => iteration.sessionId).find((id) => id !== undefined) ?? null
     const sessionRead = yield* readSession(run, agentProvider.sessionStorage, sessionId).pipe(
       Effect.map((session) => ({ session, failure: null })),

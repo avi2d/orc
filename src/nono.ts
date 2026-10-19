@@ -86,6 +86,7 @@ export interface NonoSandboxProviderOptions {
   readonly piSessionDir: string
   readonly piAgentDir?: string | undefined
   readonly modelCredential?: ModelCredential | undefined
+  readonly hostPath?: string | undefined
 }
 
 // Sandcastle 0.12.0's provider type omits the runtime `create`.
@@ -302,7 +303,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const hostEnv = { ...Bun.env, ...createOptions.env }
+      const hostEnv = { ...Bun.env, ...(options.hostPath === undefined ? {} : { PATH: options.hostPath }), ...createOptions.env }
       const hostGit = { binary: yield* resolveHostBinary(fs, "git"), env: buildHostGitEnv(hostEnv) }
       const roots = yield* resolveRoots(spawner, fs, path, hostGit, createOptions.worktreePath, options.piSessionDir)
       yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, hostGit)

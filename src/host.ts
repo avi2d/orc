@@ -1,4 +1,4 @@
-import { Data, Effect, FileSystem, type Path, Stream } from "effect"
+import { Data, Effect, FileSystem, type Path, type PlatformError, type Scope, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { type Runtime, runtimeOf, within } from "./nono-profile"
 
@@ -10,21 +10,68 @@ export type Spawner = ChildProcessSpawner.ChildProcessSpawner["Service"]
 
 // The sandbox can write the repository config and hooks host git reads; config from the environment outranks both.
 export const hostGitSafetyEnv = {
-  GIT_CONFIG_COUNT: "3",
+  GIT_CONFIG_COUNT: "5",
   GIT_CONFIG_KEY_0: "core.fsmonitor",
   GIT_CONFIG_VALUE_0: "false",
   GIT_CONFIG_KEY_1: "core.hooksPath",
   GIT_CONFIG_VALUE_1: "/dev/null",
   GIT_CONFIG_KEY_2: "log.showSignature",
-  GIT_CONFIG_VALUE_2: "false"
+  GIT_CONFIG_VALUE_2: "false",
+  GIT_CONFIG_KEY_3: "diff.ignoreSubmodules",
+  GIT_CONFIG_VALUE_3: "all",
+  GIT_CONFIG_KEY_4: "submodule.recurse",
+  GIT_CONFIG_VALUE_4: "false"
 } as const
 
-// Sandcastle spawns host git with the process env, so the safety config has to sit there while it runs.
-export const withHostGitSafety = <A, E>(use: Effect.Effect<A, E>): Effect.Effect<A, E> =>
+const shellQuote = (arg: string): string => "'" + arg.replace(/'/g, "'\\''") + "'"
+
+// Filter drivers and per-submodule ignore settings are keyed by names the sandbox picks, so no fixed config can cover them; the shim names each one git would read and overrides it from the environment.
+export const hostGitShimScript = (realGit: string): string =>
+  [
+    "#!/bin/sh",
+    "set -f",
+    "IFS='",
+    "'",
+    "git=" + shellQuote(realGit),
+    "n=${GIT_CONFIG_COUNT:-0}",
+    "override() {",
+    "  export \"GIT_CONFIG_KEY_$n=$1\" \"GIT_CONFIG_VALUE_$n=$2\"",
+    "  n=$((n + 1))",
+    "}",
+    "for key in $(\"$git\" config --name-only --get-regexp '^filter\\..*\\.(clean|smudge|process)$' 2>/dev/null); do",
+    "  override \"$key\" ''",
+    "done",
+    "top=$(\"$git\" rev-parse --show-toplevel 2>/dev/null)",
+    "submodules='^submodule\\..*\\.(path|ignore)$'",
+    "for key in $(\"$git\" config --name-only --get-regexp \"$submodules\" 2>/dev/null) \\",
+    "  $(\"$git\" config --file \"$top/.gitmodules\" --name-only --get-regexp \"$submodules\" 2>/dev/null) \\",
+    "  $(\"$git\" config --blob :.gitmodules --name-only --get-regexp \"$submodules\" 2>/dev/null) \\",
+    "  $(\"$git\" config --blob HEAD:.gitmodules --name-only --get-regexp \"$submodules\" 2>/dev/null); do",
+    "  override \"${key%.*}.ignore\" all",
+    "done",
+    "export GIT_CONFIG_COUNT=$n",
+    "exec \"$git\" \"$@\""
+  ].join("\n") + "\n"
+
+export const hostGitShim = (
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  realGit: string
+): Effect.Effect<string, PlatformError.PlatformError, Scope.Scope> =>
+  Effect.gen(function*() {
+    const dir = yield* fs.makeTempDirectoryScoped({ prefix: "orc-git-" })
+    const shim = path.join(dir, "git")
+    yield* fs.writeFileString(shim, hostGitShimScript(realGit), { mode: 0o755 })
+    return shim
+  })
+
+// Sandcastle spawns host git with the process env and finds it on the process PATH, so both have to name the shim while it runs.
+export const withHostGitSafety = (hostGit: string) => <A, E>(use: Effect.Effect<A, E>): Effect.Effect<A, E> =>
   Effect.acquireUseRelease(
     Effect.sync(() => {
-      const saved = Object.keys(hostGitSafetyEnv).map((name) => [name, Bun.env[name]] as const)
-      Object.assign(Bun.env, hostGitSafetyEnv)
+      const safety = { ...hostGitSafetyEnv, PATH: hostGit.slice(0, hostGit.lastIndexOf("/")) + ":" + (Bun.env.PATH ?? "") }
+      const saved = Object.keys(safety).map((name) => [name, Bun.env[name]] as const)
+      Object.assign(Bun.env, safety)
       return saved
     }),
     () => use,
