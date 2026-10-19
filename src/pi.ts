@@ -44,6 +44,25 @@ const usageOf = (line: string): PiTokenUse =>
     onSome: (entry) => entry.message.usage ?? noUsage
   })
 
+const TextBlock = Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String) })
+
+const AssistantLine = Schema.Struct({
+  type: Schema.Literal("message"),
+  message: Schema.Struct({ role: Schema.Literal("assistant"), content: Schema.Array(TextBlock) })
+})
+
+const decodeAssistantLine = Schema.decodeUnknownOption(Schema.fromJsonString(AssistantLine))
+
+// Sandcastle matches the completion marker anywhere in the agent output, including a Pi error payload that echoes the prompt back. Only the agent's own text counts.
+export const sessionPrintedSignal = (jsonl: string, signal: string): boolean =>
+  jsonl.split("\n").some((line) =>
+    Option.match(decodeAssistantLine(line), {
+      onNone: () => false,
+      onSome: (entry) =>
+        entry.message.content.some((block) => block.type === "text" && (block.text ?? "").includes(signal))
+    })
+  )
+
 export const sumPiUsage = (jsonl: string): PiTokenUse => {
   let input = 0
   let output = 0

@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { AgentFile } from "../../src/agents"
-import { buildImplementPrompt, orcCompletionLine, piWithTools, sumPiUsage, toolFlag } from "../../src/pi"
+import { buildImplementPrompt, orcCompletionLine, piWithTools, sessionPrintedSignal, sumPiUsage, toolFlag } from "../../src/pi"
 
 const q = String.fromCharCode(39)
 const backslash = String.fromCharCode(92)
@@ -61,6 +61,36 @@ describe("sumPiUsage", () => {
   })
   test("an empty session sums to zero", () => {
     expect(sumPiUsage("")).toEqual({ input: 0, output: 0 })
+  })
+})
+
+describe("sessionPrintedSignal", () => {
+  const line = (entry: unknown): string => JSON.stringify(entry)
+  const text = (textBody: string): unknown => ({ type: "text", text: textBody })
+  const assistant = (content: ReadonlyArray<unknown>): string =>
+    line({ type: "message", message: { role: "assistant", content } })
+  const promptEcho = line({
+    type: "message",
+    message: { role: "user", content: [text("print " + orcCompletionLine + " on its own line and stop")] }
+  })
+  test("rejects a session where only the echoed prompt and thinking name the marker", () => {
+    const jsonl = [
+      promptEcho,
+      assistant([{ type: "thinking", thinking: "the prompt wants " + orcCompletionLine }]),
+      line({ type: "message", message: { role: "toolResult", content: [text("error: " + orcCompletionLine)] } })
+    ].join("\n")
+    expect(sessionPrintedSignal(jsonl, orcCompletionLine)).toBe(false)
+  })
+  test("accepts the marker in agent text beside thinking blocks", () => {
+    const jsonl = [
+      promptEcho,
+      assistant([{ type: "thinking", thinking: "done" }, text("Committed.\n" + orcCompletionLine)])
+    ].join("\n")
+    expect(sessionPrintedSignal(jsonl, orcCompletionLine)).toBe(true)
+  })
+  test("ignores blank lines and entries without assistant text", () => {
+    expect(sessionPrintedSignal("", orcCompletionLine)).toBe(false)
+    expect(sessionPrintedSignal("not json\n" + line({ type: "session", id: "x" }), orcCompletionLine)).toBe(false)
   })
 })
 

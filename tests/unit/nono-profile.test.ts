@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { buildAgentNonoProfile, buildNonoProfile, modelCredentialFor, piAgentModels } from "../../src/nono-profile"
+import { buildAgentNonoProfile, buildNonoProfile, canRouteModel, loginCheckCommand, modelCredentialFor, piAgentModels } from "../../src/nono-profile"
 
 const credential = {
   provider: "opencode-go",
@@ -27,6 +27,32 @@ describe("modelCredentialFor", () => {
   test("refuses models from other providers", () => {
     expect(modelCredentialFor("anthropic/claude", tools)).toBeNull()
     expect(modelCredentialFor("local-model", tools)).toBeNull()
+  })
+})
+
+describe("canRouteModel", () => {
+  test("routes only opencode-go models", () => {
+    expect(canRouteModel("opencode-go/muse-spark")).toBe(true)
+    expect(canRouteModel("anthropic/claude")).toBe(false)
+    expect(canRouteModel("local-model")).toBe(false)
+  })
+})
+
+describe("loginCheckCommand", () => {
+  test("checks the operator login without printing the credential", () => {
+    expect(loginCheckCommand(tools)).toEqual([
+      "/bin/sh",
+      "-c",
+      "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" unset PI_CODING_AGENT_DIR; exec \"$1\" auth check --provider opencode-go",
+      "/host/bin/node",
+      "/host/bin/pi",
+      "/host/home"
+    ])
+  })
+  test("shapes the shell exactly like the capture so the check answers for the same login", () => {
+    const check = loginCheckCommand(tools).slice(0, 3).join(" ")
+    const capture = ["/bin/sh", "-c", credential.captureCommand[2]].join(" ")
+    expect(check.split(";")[0]).toBe(capture.split(";")[0])
   })
 })
 

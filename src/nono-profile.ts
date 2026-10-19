@@ -113,10 +113,15 @@ export interface HostTools {
   readonly homeDir: string
 }
 
+export const canRouteModel = (model: string): boolean => {
+  const slash = model.indexOf("/")
+  return (slash === -1 ? model : model.slice(0, slash)) === "opencode-go"
+}
+
 export const modelCredentialFor = (model: string, host: HostTools): ModelCredential | null => {
   const slash = model.indexOf("/")
   const provider = slash === -1 ? model : model.slice(0, slash)
-  if (provider !== "opencode-go") {
+  if (!canRouteModel(model)) {
     return null
   }
   return {
@@ -135,6 +140,15 @@ export const modelCredentialFor = (model: string, host: HostTools): ModelCredent
     ]
   }
 }
+
+export const loginCheckCommand = (host: HostTools): ReadonlyArray<string> => [
+  "/bin/sh",
+  "-c",
+  "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" unset PI_CODING_AGENT_DIR; exec \"$1\" auth check --provider opencode-go",
+  host.nodeBinary,
+  host.piBinary,
+  host.homeDir
+]
 
 export const piAgentModels = (credential: ModelCredential): string =>
   JSON.stringify({ providers: { [credential.provider]: { apiKey: "$" + credential.envVar } } }, null, 2) + "\n"

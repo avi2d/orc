@@ -5,8 +5,8 @@ import type { Database } from "bun:sqlite"
 import { homedir } from "node:os"
 import { resolveAgentFile, type AgentFile } from "./agents"
 import { nonoSandboxProvider } from "./nono"
-import { modelCredentialFor, piAgentModels, type ModelCredential } from "./nono-profile"
-import { buildImplementPrompt, orcCompletionLine, piWithTools } from "./pi"
+import { canRouteModel, loginCheckCommand, modelCredentialFor, piAgentModels, type ModelCredential } from "./nono-profile"
+import { buildImplementPrompt, orcCompletionLine, piWithTools, sessionPrintedSignal } from "./pi"
 import { OrcRunError, describeCause, readSession } from "./run-session"
 import { formatHistoryError, openDatabase, orcHomeDir, recordEvidence, recordRun, recordSignal, recordStep } from "./run-history"
 
@@ -37,6 +37,7 @@ export interface OrcRunReport {
   readonly inputTokens: number
   readonly outputTokens: number
   readonly completed: boolean
+  readonly markerVerified: boolean
   readonly endReason: string
 }
 
@@ -76,6 +77,26 @@ const runGit = (
     Effect.mapError((cause) => cause instanceof OrcRunError ? cause : new OrcRunError({ message: "orc: git failed to run: " + String(cause) }))
   )
 
+const runLoginCheck = (
+  spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
+  host: { readonly piBinary: string; readonly nodeBinary: string; readonly homeDir: string },
+  cwd: string
+): Effect.Effect<void, OrcRunError> =>
+  Effect.scoped(Effect.gen(function*() {
+    const parts = loginCheckCommand(host)
+    const handle = yield* spawner.spawn(ChildProcess.make(parts[0], parts.slice(1), { cwd }))
+    const [, , exitCode] = yield* Effect.all([
+      handle.stdout.pipe(Stream.decodeText(), Stream.runDrain),
+      handle.stderr.pipe(Stream.decodeText(), Stream.runDrain),
+      handle.exitCode
+    ], { concurrency: "unbounded" })
+    if (exitCode !== 0) {
+      return yield* refuse("orc: pi auth check found no opencode-go credential, so this keychain-only setup is refused; add an opencode-go login to pi on the host and rerun")
+    }
+  })).pipe(
+    Effect.mapError((cause) => cause instanceof OrcRunError ? cause : new OrcRunError({ message: "orc: the login check failed to run: " + String(cause) }))
+  )
+
 const exists = (fs: FileSystem.FileSystem, path: string): Effect.Effect<boolean, OrcRunError> =>
   fs.exists(path).pipe(
     Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot stat " + path + ": " + String(cause) }))
@@ -93,7 +114,7 @@ export const formatReport = (report: OrcRunReport): string =>
     "commits: " + report.commits.length.toString() + report.commits.map((commit) => " " + commit.sha).join(","),
     "input tokens: " + report.inputTokens.toString(),
     "output tokens: " + report.outputTokens.toString(),
-    "status: " + (report.completed ? (report.commits.length > 0 ? "completed" : "no commit") : "incomplete"),
+    "status: " + (report.completed ? "completed" : report.markerVerified ? "no commit" : "incomplete"),
     report.endReason
   ].join("\n")
 
@@ -200,17 +221,22 @@ export const runAgentStep = (
       agentsDir: request.agentsDir
     }).pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
     const piBinary = Bun.which("pi")
+    const nodeBinary = Bun.which("node")
+    const operatorHome = homedir()
+    if (!canRouteModel(agent.model)) {
+      return yield* refuse("orc: the agent file names model " + agent.model + ", and orc routes only opencode-go models through the sandbox")
+    }
     if (piBinary === null) {
       return yield* refuse("orc: pi is not on the host PATH")
     }
-    const nodeBinary = Bun.which("node")
     if (nodeBinary === null) {
       return yield* refuse("orc: node is not on the host PATH")
     }
-    const credential = modelCredentialFor(agent.model, { piBinary, nodeBinary, homeDir: homedir() })
+    const credential = modelCredentialFor(agent.model, { piBinary, nodeBinary, homeDir: operatorHome })
     if (credential === null) {
       return yield* refuse("orc: the agent file names model " + agent.model + ", and orc routes only opencode-go models through the sandbox")
     }
+    yield* runLoginCheck(spawner, { piBinary, nodeBinary, homeDir: operatorHome }, checkout.projectDir)
     yield* fs.writeFileString(path.join(folders.piAgentDir, "models.json"), piAgentModels(credential)).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the agent models file: " + String(cause) }))
     )
@@ -275,10 +301,12 @@ const runWithHistory = (db: Database, run: HistoryRun): Effect.Effect<OrcRunRepo
       const logged = yield* runGit(run.spawner, run.git, ["log", "-1", "--format=%s", commit.sha], run.projectDir)
       commits.push({ sha: commit.sha, subject: logged.exitCode === 0 ? logged.stdout.trim() : "" })
     }
-    const completed = result.completionSignal === orcCompletionLine
-    const endReason = completed
-      ? (commits.length > 0 ? "Pi committed " + commits.length.toString() + " on " + result.branch + "." : "Pi printed ORC_COMPLETE but made no commit on " + result.branch + ".")
-      : "Pi stopped without printing ORC_COMPLETE."
+    const signaled = result.completionSignal === orcCompletionLine
+    const verified = signaled && session.jsonl !== null && sessionPrintedSignal(session.jsonl, orcCompletionLine)
+    const completed = verified && commits.length > 0
+    const endReason = !verified
+      ? "Pi never printed " + orcCompletionLine + " in its own output."
+      : (commits.length > 0 ? "Pi committed " + commits.length.toString() + " on " + result.branch + "." : "Pi printed ORC_COMPLETE but made no commit on " + result.branch + ".")
     const report: OrcRunReport = {
       runId: run.runId,
       runDir: run.runDir,
@@ -292,6 +320,7 @@ const runWithHistory = (db: Database, run: HistoryRun): Effect.Effect<OrcRunRepo
       inputTokens: session.inputTokens,
       outputTokens: session.outputTokens,
       completed,
+      markerVerified: verified,
       endReason
     }
     yield* writeEvidence(run, report)
@@ -304,7 +333,7 @@ const writeEvidence = (run: HistoryRun, report: OrcRunReport): Effect.Effect<voi
     "Implement step for task " + run.taskPath + ".",
     "Agent file " + report.agentPath + " (" + report.agentSource + ") names model " + report.model + " with tools " + run.agent.tools.join(", ") + ".",
     report.sessionId === null ? "Pi stored no session." : "Pi session " + report.sessionId + " is stored at " + (report.sessionFile ?? "an unknown path") + ".",
-    report.completed ? "Pi printed " + orcCompletionLine + "." : "Pi stopped without printing " + orcCompletionLine + ".",
+    report.markerVerified ? "Pi printed " + orcCompletionLine + "." : "Pi stopped without printing " + orcCompletionLine + ".",
     report.commits.length === 0 ? "Pi made no commit on " + report.branch + "." : "Commits on " + report.branch + ".",
     ...report.commits.map((commit) => commit.sha + " " + commit.subject),
     "Pi consumed " + report.inputTokens.toString() + " input tokens and " + report.outputTokens.toString() + " output tokens.",
@@ -328,7 +357,7 @@ const recordHistory = (
       project: run.projectDir,
       branch: report.branch,
       taskFile: run.taskPath,
-      status: "succeeded",
+      status: report.completed ? "succeeded" : "failed",
       started: run.started,
       ended,
       endReason: report.endReason
@@ -337,7 +366,7 @@ const recordHistory = (
       runId: run.runId,
       name: "implement",
       attempt: 1,
-      status: report.completed && report.commits.length > 0 ? "passed" : "failed",
+      status: report.completed ? "passed" : "failed",
       started: run.started,
       ended,
       agentFile: report.agentPath,
