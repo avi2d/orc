@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, exists, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { chmod, exists, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
@@ -8,7 +8,7 @@ import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../src/agents"
 import { hostGitShim } from "../../src/host"
 import { orcCompletionLine } from "../../src/pi"
-import { runAgentStep, runWithHistory, type SandboxRun } from "../../src/run"
+import { runAgentStep, runWithHistory, type SandboxOps } from "../../src/run"
 import type { OrcRunReport } from "../../src/run-record"
 import { listRuns, openDatabase, type RunRecord } from "../../src/run-history"
 
@@ -136,6 +136,7 @@ describe("runAgentStep refusals", () => {
         git(dir, ["commit", "-qm", "task"])
         await mkdir(agentsDir, { recursive: true })
         await writeFile(join(agentsDir, "implementer.md"), "---\nmodel: example.com/other-model\nthinking: low\ntools: read\n---\nDo it.\n")
+        await writeFile(join(agentsDir, "fixer.md"), "---\nmodel: opencode-go/muse-spark\nthinking: high\ntools: read\n---\nFix it.\n")
         expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test", agentsDir })).toContain("routes only opencode-go models")
       })
     })
@@ -153,6 +154,7 @@ describe("runAgentStep refusals", () => {
         git(dir, ["commit", "-qm", "task"])
         await mkdir(agentsDir, { recursive: true })
         await writeFile(join(agentsDir, "implementer.md"), "---\nmodel: example.com/other-model\nthinking: low\ntools: read\n---\nDo it.\n")
+        await writeFile(join(agentsDir, "fixer.md"), "---\nmodel: opencode-go/muse-spark\nthinking: high\ntools: read\n---\nFix it.\n")
         expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test", agentsDir })).toContain("routes only opencode-go models")
         expect(await exists(runDir)).toBe(false)
       })
@@ -211,7 +213,11 @@ interface StepOutcome {
   readonly evidence: string
 }
 
-const runStep = (dir: string, home: string, sandbox: SandboxRun): Promise<StepOutcome> =>
+const unexpectedChecks: SandboxOps["execCheck"] = async () => {
+  throw new Error("checks ran before implement completed")
+}
+
+const runStep = (dir: string, home: string, sandbox: SandboxOps["runAgent"], execCheck: SandboxOps["execCheck"] = unexpectedChecks): Promise<StepOutcome> =>
   Effect.runPromise(
     Effect.gen(function*() {
       const fs = yield* FileSystem.FileSystem
@@ -227,8 +233,9 @@ const runStep = (dir: string, home: string, sandbox: SandboxRun): Promise<StepOu
             const report = yield* runWithHistory(db, {
               fs, path, spawner, git: hostGit, projectDir: dir, runId: "step-run-1", runDir,
               piSessionDir: path.join(runDir, "session"), hostSessionsDir: path.join(runDir, "sessions"),
-              taskPath: path.join(runDir, "task.md"), agent: implementer, branch: "orc/test", started: "2026-10-19T10:00:00.000Z"
-            }, sandbox)
+              taskPath: path.join(runDir, "task.md"), agent: implementer, fixer, branch: "orc/test", started: "2026-10-19T10:00:00.000Z",
+              worktreeDir: dir
+            }, { runAgent: sandbox, execCheck })
             const runs = yield* listRuns(db)
             const steps = db.query("SELECT name, status FROM steps WHERE run_id = ?").all("step-run-1")
             const signals = db.query("SELECT name, value FROM signals ORDER BY name").all()
@@ -240,17 +247,26 @@ const runStep = (dir: string, home: string, sandbox: SandboxRun): Promise<StepOu
     }).pipe(Effect.scoped, Effect.provide(BunServices.layer))
   )
 
+const fixer: AgentFile = {
+  kind: "fixer",
+  model: "opencode-go/muse-spark",
+  thinking: "high",
+  tools: ["read", "bash"],
+  body: "Fix the failure.",
+  path: "bundled/fixer.md",
+  source: "bundled"
+}
+
 const capturedSession = (home: string, jsonl: string): Promise<void> => {
   const dir = join(home, "runs", "step-run-1", "sessions", "--sandbox-repo--")
   return mkdir(dir, { recursive: true }).then(() => writeFile(join(dir, "2026-10-19T10-00-00-000Z_" + sessionId + ".jsonl"), jsonl))
 }
 
-const sandboxResult = (sha: string, final: Record<string, unknown>): SandboxRun => async () => ({
+const sandboxResult = (sha: string, final: Record<string, unknown>): SandboxOps["runAgent"] => async () => ({
   iterations: [{ sessionId }],
   completionSignal: orcCompletionLine,
   stdout: JSON.stringify({ type: "message_end", message: final }),
-  commits: [{ sha }],
-  branch: "orc/test"
+  commits: [{ sha }]
 })
 
 describe("runWithHistory decides the implement step", () => {
@@ -268,17 +284,20 @@ describe("runWithHistory decides the implement step", () => {
     })
   })
 
-  test("a clean final reply with the marker and a new commit is recorded succeeded", async () => {
+  test("a clean final reply with the marker and a new commit runs the checks and is recorded succeeded", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await commitOnBranch(dir, "orc/test")
         await capturedSession(home, sessionEnding(cleanFinish))
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish))
+        await writeFile(join(dir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }))
         expect(outcome.report.completed).toBe(true)
         expect(outcome.report.tokens).toEqual({ input: 150, output: 25 })
+        expect(outcome.report.fixAttempts).toBe(0)
+        expect(outcome.report.checksRounds?.map((round) => round.passed)).toEqual([true])
         expect(outcome.run?.status).toBe("succeeded")
-        expect(outcome.run?.endReason).toBe("Pi made 1 commit on orc/test.")
-        expect(outcome.steps).toEqual([{ name: "implement", status: "passed" }])
+        expect(outcome.run?.endReason).toBe("Pi made 1 commit on orc/test, and the checks passed.")
+        expect(outcome.steps).toEqual([{ name: "implement", status: "passed" }, { name: "checks", status: "passed" }])
       })
     })
   })
@@ -311,6 +330,112 @@ describe("runWithHistory decides the implement step", () => {
         expect(outcome.signals).toEqual([{ name: "commit-count", value: "1" }])
         expect(outcome.evidence).toContain(sha + " work")
         expect(outcome.evidence).not.toContain("0 input tokens")
+      })
+    })
+  })
+})
+
+describe("runWithHistory runs the project checks and fixes failures", () => {
+  const yaml = "commands:\n  lint: bun run lint\n  typecheck: bun run typecheck\n"
+
+  test("a passing checks run records the round, its evidence file and its signals", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await commitOnBranch(dir, "orc/test")
+        await capturedSession(home, sessionEnding(cleanFinish))
+        await writeFile(join(dir, ".no-mistakes.yaml"), yaml)
+        const seen: Array<string> = []
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async (command) => {
+          seen.push(command)
+          return { stdout: command + " ok", stderr: "", exitCode: 0 }
+        })
+        expect(outcome.report.completed).toBe(true)
+        expect(seen).toEqual(["bun run lint", "bun run typecheck"])
+        expect(outcome.report.checksRounds?.map((round) => round.passed)).toEqual([true])
+        expect(outcome.report.fixAttempts).toBe(0)
+        const file = outcome.report.checksRounds?.[0]?.file ?? ""
+        expect(file.endsWith("checks-1.txt")).toBe(true)
+        const text = await readFile(file, "utf8")
+        expect(text).toContain("check lint: bun run lint")
+        expect(text).toContain("exit 0: passed")
+        expect(outcome.steps).toEqual([{ name: "implement", status: "passed" }, { name: "checks", status: "passed" }])
+        expect(outcome.signals).toContainEqual({ name: "check lint", value: "passed" })
+        expect(outcome.signals).toContainEqual({ name: "check typecheck", value: "passed" })
+      })
+    })
+  })
+
+  test("a failure fixed on the second round ends completed with one fix attempt", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await commitOnBranch(dir, "orc/test")
+        await capturedSession(home, sessionEnding(cleanFinish))
+        await writeFile(join(dir, ".no-mistakes.yaml"), yaml)
+        let lintRuns = 0
+        const agentCalls: Array<string> = []
+        const agent = sandboxResult(sha, cleanFinish)
+        const outcome = await runStep(dir, home, async (provider, seen, logFile) => {
+          agentCalls.push(seen + " // " + logFile)
+          return agent(provider, seen, logFile)
+        }, async (command) => {
+          if (command === "bun run lint") {
+            lintRuns += 1
+            return lintRuns === 1
+              ? { stdout: "", stderr: "lint blew up", exitCode: 1 }
+              : { stdout: "lint ok", stderr: "", exitCode: 0 }
+          }
+          return { stdout: "typecheck ok", stderr: "", exitCode: 0 }
+        })
+        expect(outcome.report.completed).toBe(true)
+        expect(outcome.report.fixAttempts).toBe(1)
+        expect(outcome.report.checksRounds?.map((round) => round.passed)).toEqual([false, true])
+        expect(outcome.report.checksRounds?.[0]?.failed).toEqual(["lint"])
+        expect(outcome.report.fixes.map((fix) => fix.status)).toEqual(["passed"])
+        expect(outcome.report.fixes[0]?.evidenceIn.endsWith("checks-1.txt")).toBe(true)
+        expect(agentCalls.length).toBe(2)
+        expect(agentCalls[1]).toContain("checks-1.txt")
+        expect(agentCalls[1]).toContain("fix-1.log")
+        expect(outcome.run?.endReason).toBe("Pi made 2 commits on orc/test, and the checks passed.")
+        expect(outcome.steps).toHaveLength(4)
+        expect(outcome.steps).toEqual(expect.arrayContaining([
+          { name: "implement", status: "passed" },
+          { name: "checks", status: "failed" },
+          { name: "fix", status: "passed" },
+          { name: "checks", status: "passed" }
+        ]))
+      })
+    })
+  })
+
+  test("three failed fix attempts end the run naming the failing check and its output, with no PR", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await commitOnBranch(dir, "orc/test")
+        await capturedSession(home, sessionEnding(cleanFinish))
+        await writeFile(join(dir, ".no-mistakes.yaml"), yaml)
+        let agentRuns = 0
+        const agent = sandboxResult(sha, cleanFinish)
+        const outcome = await runStep(dir, home, async (provider, seen, logFile) => {
+          agentRuns += 1
+          return agent(provider, seen, logFile)
+        }, async (command) =>
+          command === "bun run lint"
+            ? { stdout: "", stderr: "lint blew up", exitCode: 1 }
+            : { stdout: "typecheck ok", stderr: "", exitCode: 0 })
+        expect(agentRuns).toBe(4)
+        expect(outcome.report.completed).toBe(false)
+        expect(outcome.report.fixAttempts).toBe(3)
+        expect(outcome.report.checksRounds?.map((round) => round.passed)).toEqual([false, false, false, false])
+        expect(outcome.report.fixes.map((fix) => fix.attempt)).toEqual([1, 2, 3])
+        const reason = outcome.run?.endReason ?? ""
+        expect(reason).toContain("lint")
+        expect(reason).toContain("checks-4.txt")
+        expect(reason).toContain("No PR opens")
+        expect(outcome.run?.status).toBe("failed")
+        expect(outcome.run?.prLink).toBeNull()
+        expect(outcome.report.checksRounds?.[3]?.file.endsWith("checks-4.txt")).toBe(true)
+        const text = await readFile(outcome.report.checksRounds?.[3]?.file ?? "", "utf8")
+        expect(text).toContain("lint blew up")
       })
     })
   })
