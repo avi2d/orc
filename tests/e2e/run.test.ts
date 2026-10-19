@@ -98,6 +98,26 @@ describe("runAgentStep refusals", () => {
     })
   })
 
+  test("a branch name the host shell would expand is refused, naming it", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        for (const branch of ["orc/$USER", "orc/`id`", "orc/$(id)", "orc/a\"b"]) {
+          const message = await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch })
+          expect(message).toContain(branch)
+          expect(message).toContain("shell metacharacter")
+        }
+      })
+    })
+  })
+
+  test("the branch named after the run id passes the branch checks", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home })).toContain("cannot read the task file")
+      })
+    })
+  })
+
   test("a missing task file is refused", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {

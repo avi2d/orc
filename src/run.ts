@@ -84,6 +84,9 @@ interface Checkout {
   readonly branch: string
 }
 
+// Sandcastle interpolates the branch into host shell commands, so any other character can be expanded or run.
+const shellSafeBranch = /^[A-Za-z0-9._/-]+$/
+
 const openCheckout = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
@@ -118,6 +121,9 @@ const openCheckout = (
       return yield* refuse("orc: the checkout at " + projectDir + " holds " + dirty.toString() + " uncommitted changes, so commit or stash them before orc runs")
     }
     const branch = branchName ?? ("orc/" + runId)
+    if (!shellSafeBranch.test(branch)) {
+      return yield* refuse("orc: " + branch + " holds a shell metacharacter, so orc takes only letters, digits, '.', '_', '-' and '/' in a branch name")
+    }
     const named = yield* runGit(spawner, git, ["check-ref-format", "--branch", branch], projectDir)
     if (named.exitCode !== 0) {
       return yield* refuse("orc: " + branch + " is no usable branch name")
