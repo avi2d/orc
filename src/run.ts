@@ -145,12 +145,10 @@ interface RunFolders {
 const prepareRunFolders = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
-  home: string,
-  runId: string,
+  runDir: string,
   taskFile: string
 ): Effect.Effect<RunFolders, OrcRunError> =>
   Effect.gen(function*() {
-    const runDir = path.join(home, "runs", runId)
     const piSessionDir = path.join(runDir, "session")
     const piAgentDir = path.join(piSessionDir, "agent")
     const hostSessionsDir = path.join(runDir, "sessions")
@@ -193,31 +191,37 @@ export const runAgentStep = (
     const hostPath = Bun.env.PATH
     const git = yield* openHostGit(fs, path)
     const checkout = yield* openCheckout(fs, path, spawner, git, request.cwd, request.branch, runId)
-    const folders = yield* prepareRunFolders(fs, path, home, runId, request.taskFile)
-    const agent: AgentFile = yield* resolveAgentFile("implementer", {
-      projectDir: checkout.projectDir,
-      orcHome: home,
-      agentsDir: request.agentsDir
-    }).pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
-    const piBinary = Bun.which("pi")
-    const nodeBinary = Bun.which("node")
-    const operatorHome = homedir()
-    if (!canRouteModel(agent.model)) {
-      return yield* refuse("orc: the agent file names model " + agent.model + ", and orc routes only opencode-go models through the sandbox")
-    }
-    if (piBinary === null) {
-      return yield* refuse("orc: pi is not on the host PATH")
-    }
-    if (nodeBinary === null) {
-      return yield* refuse("orc: node is not on the host PATH")
-    }
-    const credential = modelCredentialFor(agent.model, { piBinary, nodeBinary, homeDir: operatorHome })
-    if (credential === null) {
-      return yield* refuse("orc: the agent file names model " + agent.model + ", and orc routes only opencode-go models through the sandbox")
-    }
-    yield* runLoginCheck(spawner, { piBinary, nodeBinary, homeDir: operatorHome }, checkout.projectDir)
-    yield* fs.writeFileString(path.join(folders.piAgentDir, "models.json"), piAgentModels(credential)).pipe(
-      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the agent models file: " + String(cause) }))
+    const runDir = path.join(home, "runs", runId)
+    const { folders, agent, credential } = yield* Effect.gen(function*() {
+      const folders = yield* prepareRunFolders(fs, path, runDir, request.taskFile)
+      const agent: AgentFile = yield* resolveAgentFile("implementer", {
+        projectDir: checkout.projectDir,
+        orcHome: home,
+        agentsDir: request.agentsDir
+      }).pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
+      const piBinary = Bun.which("pi")
+      const nodeBinary = Bun.which("node")
+      const operatorHome = homedir()
+      if (!canRouteModel(agent.model)) {
+        return yield* refuse("orc: the agent file names model " + agent.model + ", and orc routes only opencode-go models through the sandbox")
+      }
+      if (piBinary === null) {
+        return yield* refuse("orc: pi is not on the host PATH")
+      }
+      if (nodeBinary === null) {
+        return yield* refuse("orc: node is not on the host PATH")
+      }
+      const credential = modelCredentialFor(agent.model, { piBinary, nodeBinary, homeDir: operatorHome })
+      if (credential === null) {
+        return yield* refuse("orc: the agent file names model " + agent.model + ", and orc routes only opencode-go models through the sandbox")
+      }
+      yield* runLoginCheck(spawner, { piBinary, nodeBinary, homeDir: operatorHome }, checkout.projectDir)
+      yield* fs.writeFileString(path.join(folders.piAgentDir, "models.json"), piAgentModels(credential)).pipe(
+        Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the agent models file: " + String(cause) }))
+      )
+      return { folders, agent, credential }
+    }).pipe(
+      Effect.onError(() => fs.remove(runDir, { recursive: true }).pipe(Effect.result))
     )
     const started = new Date().toISOString()
     const runInNono: SandboxRun = (agentProvider) =>

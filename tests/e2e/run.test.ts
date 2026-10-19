@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { chmod, exists, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
@@ -137,6 +137,24 @@ describe("runAgentStep refusals", () => {
         await mkdir(agentsDir, { recursive: true })
         await writeFile(join(agentsDir, "implementer.md"), "---\nmodel: example.com/other-model\nthinking: low\ntools: read\n---\nDo it.\n")
         expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test", agentsDir })).toContain("routes only opencode-go models")
+      })
+    })
+  })
+
+  test("a run refused after its run folder is made leaves no run folder behind", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const runDir = join(home, "runs", "test-run-1")
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home, branch: "orc/test" })).toContain("cannot read the task file")
+        expect(await exists(runDir)).toBe(false)
+        const agentsDir = join(home, "agents")
+        await writeFile(join(dir, "task.md"), "Do nothing.\n")
+        git(dir, ["add", "task.md"])
+        git(dir, ["commit", "-qm", "task"])
+        await mkdir(agentsDir, { recursive: true })
+        await writeFile(join(agentsDir, "implementer.md"), "---\nmodel: example.com/other-model\nthinking: low\ntools: read\n---\nDo it.\n")
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test", agentsDir })).toContain("routes only opencode-go models")
+        expect(await exists(runDir)).toBe(false)
       })
     })
   })
