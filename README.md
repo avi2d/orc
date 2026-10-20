@@ -69,6 +69,7 @@ Orc keeps its records in `~/.orc`, outside every project repo.
 To print the same facts as JSON, run `bun run src/bin.ts runs --json`.
 Every JSON document names its version first as `schema`, starting at `orc.runs.v1`.
 To see one run step by step, run `bun run src/bin.ts show <run-id>`.
+It lists each step with its agent, session, signals, latest score and evidence, every file as a full link.
 To print the same facts as JSON, run `bun run src/bin.ts show <run-id> --json`.
 Its JSON document names its version first as `schema`, starting at `orc.show.v1`.
 
@@ -79,7 +80,8 @@ Its JSON document names its version first as `schema`, starting at `orc.show.v1`
 | `src/bin.ts` | The orc entry point |
 | `src/args.ts` | The flag parsing for the orc command |
 | `src/run.ts` | The `orc run` agent step: checkout checks, login preflight and the sandboxed Pi run |
-| `src/run-record.ts` | The run report, its evidence file and its history rows |
+| `src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
+| `src/history-write.ts` | The history rows a finished run records |
 | `src/report.ts` | The `report.md` shape and the signal facts it carries |
 | `src/show.ts` | The `orc show` reading of one run from the history |
 | `src/run-session.ts` | The reading of the captured Pi session |
