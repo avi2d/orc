@@ -305,7 +305,7 @@ export interface BranchStep {
 const BranchStepRowSchema = Schema.Struct({
   name: Schema.String,
   status: Schema.String,
-  attempt: Schema.Number,
+  attempt: Schema.Finite,
   pi_session_file: Schema.NullOr(Schema.String)
 })
 
