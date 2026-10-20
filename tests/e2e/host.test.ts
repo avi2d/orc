@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path, Result } from "effect"
-import { NonoProviderError, resolveRuntime } from "../../src/host"
+import { hostGitShimScript, NonoProviderError, resolveRuntime } from "../../src/host"
 
 const runtimeAt = (name: string, searchPath: string, home: string) =>
   Effect.runPromise(
@@ -85,5 +85,47 @@ describe("resolveRuntime", () => {
 
   test("finds nothing when no folder on the PATH holds the runtime", async () => {
     expect(await runtimeAt("bun", "/nonexistent-orc-bin", "/nonexistent-orc-home")).toEqual(Result.succeed(null))
+  })
+})
+
+const withShimRepo = async (keys: Record<string, string>, use: (shim: string, dir: string) => Promise<void>): Promise<void> => {
+  const dir = await realpath(await mkdtemp(join(tmpdir(), "orc-git-shim-")))
+  try {
+    const realGit = Bun.which("git") ?? "git"
+    const shim = join(dir, "git")
+    await writeFile(shim, hostGitShimScript(realGit), { mode: 0o755 })
+    const init = Bun.spawnSync([realGit, "init", "-q", dir])
+    expect(init.exitCode).toBe(0)
+    for (const [key, value] of Object.entries(keys)) {
+      const set = Bun.spawnSync([realGit, "config", key, value], { cwd: dir })
+      expect(set.exitCode).toBe(0)
+    }
+    await use(shim, dir)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+}
+
+const shimEnv = (): Record<string, string> => ({
+  PATH: process.env.PATH ?? "",
+  HOME: process.env.HOME ?? "",
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_NOSYSTEM: "1"
+})
+
+describe("hostGitShim", () => {
+  test("lets the gate keys no-mistakes writes into a worktree pass", async () => {
+    await withShimRepo({ "receive.advertisePushOptions": "true", "core.hooksPath": "/tmp/orc-evil-hooks" }, async (shim, dir) => {
+      const result = Bun.spawnSync([shim, "rev-parse", "--is-bare-repository"], { cwd: dir, env: shimEnv() })
+      expect(result.exitCode).toBe(0)
+    })
+  })
+
+  test("refuses a credential helper the sandbox writes into a worktree", async () => {
+    await withShimRepo({ "credential.helper": "store" }, async (shim, dir) => {
+      const result = Bun.spawnSync([shim, "rev-parse", "--is-bare-repository"], { cwd: dir, env: shimEnv() })
+      expect(result.exitCode).toBe(97)
+      expect(result.stderr.toString()).toContain("only config that runs no program")
+    })
   })
 })
