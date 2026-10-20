@@ -23,6 +23,7 @@ export interface ResumePlan {
   readonly inheritedFixes: ReadonlyArray<RecordedFixAttempt>
   readonly fixSessionId: string | null
   readonly fixSessionFile: string | null
+  readonly fixRunning: boolean
 }
 
 interface AgentOutcome {

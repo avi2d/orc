@@ -84,6 +84,7 @@ interface PriorProgress {
   readonly implementSessionId: string | null
   readonly fixSource: string | null
   readonly fixSessionId: string | null
+  readonly fixRunning: boolean
   readonly storedFixes: ReadonlyArray<StoredFix>
 }
 
@@ -101,7 +102,7 @@ const readPriorProgress = (db: Database, run: HistoryRun, prior: RunRecord): Eff
       ? yield* latestSessionFile(run, [run.path.join(priorDir, "session", "agent", "sessions")])
       : null
     const implementSource = interruptedImplement
-      ? liveFile
+      ? (liveFile ?? implementFile)
       : (implementFile ?? (yield* latestSessionFile(run, [run.path.join(priorDir, "sessions")])))
     const implementSessionId = sessionIdFromFile(implementSource)
     const storedFixes = implementPassed
@@ -112,7 +113,7 @@ const readPriorProgress = (db: Database, run: HistoryRun, prior: RunRecord): Eff
       ? sessionIdFromFile(liveFile)
       : null
     const fixSource = liveFixId !== null ? liveFile : storedFixFile
-    return { priorId: prior.id, implementPassed, checksPassed, implementSource, implementSessionId, fixSource, fixSessionId: liveFixId ?? sessionIdFromFile(storedFixFile), storedFixes }
+    return { priorId: prior.id, implementPassed, checksPassed, implementSource, implementSessionId, fixSource, fixSessionId: liveFixId ?? sessionIdFromFile(storedFixFile), fixRunning: interruptedFix, storedFixes }
   })
 
 const carrySessionFile = (run: HistoryRun, source: string | null, sessionId: string | null): Effect.Effect<string | null, OrcRunError> =>
@@ -170,7 +171,7 @@ const inheritedCompletion = (
 export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<ResumePlan, OrcRunError> =>
   Effect.gen(function*() {
     const allow = run.allow ?? false
-    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null }
+    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false }
     const prior = yield* latestRunForBranch(db, run.projectDir, run.branch).pipe(
       Effect.mapError((cause) => historyFailure("read", cause))
     )
@@ -182,10 +183,9 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
     const carriedFix = yield* carrySessionFile(run, progress.fixSource, progress.fixSessionId)
     const skipImplement = progress.implementPassed
     const skipChecks = progress.implementPassed && progress.checksPassed
-    if (!skipChecks) {
-      return { implementSessionId: progress.implementSessionId, implementSessionFile: carriedImplement, skipImplement, skipChecks, allow, inheritedRounds: [], inheritedFixes: [], fixSessionId: progress.fixSessionId, fixSessionFile: carriedFix }
-    }
-    const inherited = yield* inheritedCompletion(db, run, progress.priorId, progress.storedFixes)
+    const inherited = progress.implementPassed
+      ? yield* inheritedCompletion(db, run, progress.priorId, progress.storedFixes)
+      : { inheritedRounds: [], inheritedFixes: [] }
     return {
       implementSessionId: progress.implementSessionId,
       implementSessionFile: carriedImplement,
@@ -195,6 +195,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       inheritedRounds: inherited.inheritedRounds,
       inheritedFixes: inherited.inheritedFixes,
       fixSessionId: progress.fixSessionId,
-      fixSessionFile: carriedFix
+      fixSessionFile: carriedFix,
+      fixRunning: progress.fixRunning
     }
   })

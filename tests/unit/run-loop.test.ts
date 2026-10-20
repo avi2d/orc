@@ -22,7 +22,6 @@ import {
 } from "../../src/history-write"
 import { buildResumePlan } from "../../src/run-resume"
 import type { HistoryRun } from "../../src/run-record"
-import * as runLoop from "../../src/run-loop"
 import { runFull, type RunCheckpoints, type SandboxOps } from "../../src/run-loop"
 
 const implementer: AgentFile = {
@@ -244,8 +243,48 @@ describe("resumed runs publish inherited progress atomically", () => {
 })
 
 describe("runFull has no checkpoint-free mode", () => {
-  test("the fallback and its defaults are gone", () => {
-    expect("noCheckpoints" in runLoop).toBe(false)
-    expect(runFull.length).toBe(4)
+  test("omitted checkpoints fail before agent or check work runs", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "project")
+        await mkdir(project, { recursive: true })
+        const git = await stubGit(home)
+        const run = await Effect.runPromise(historyFor("next-x", home, project, "2026-10-19T10:00:00.000Z", git, ""))
+        const plan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow: false, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false }
+        let agentCalls = 0
+        let checkCalls = 0
+        const ops: SandboxOps = {
+          runAgent: async () => {
+            agentCalls += 1
+            throw new Error("checkpoint-free agent work")
+          },
+          execCheck: async () => {
+            checkCalls += 1
+            return { stdout: "", stderr: "", exitCode: 0 }
+          }
+        }
+        const exit = await Effect.runPromiseExit((runFull as unknown as (run: HistoryRun, ops: SandboxOps, resume: typeof plan) => Effect.Effect<unknown, unknown>)(run, ops, plan))
+        expect(exit._tag).toBe("Failure")
+        expect(agentCalls).toBe(0)
+        expect(checkCalls).toBe(0)
+        let checkpointedAgentCalls = 0
+        const failingOps: SandboxOps = {
+          runAgent: async () => {
+            checkpointedAgentCalls += 1
+            throw new Error("checkpointed agent work")
+          },
+          execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 })
+        }
+        const checkpoints = runLoopCheckpoints(db, run)
+        const checkpointedExit = await Effect.runPromiseExit(runFull(run, failingOps, plan, checkpoints))
+        expect(checkpointedExit._tag).toBe("Failure")
+        expect(checkpointedAgentCalls).toBe(1)
+        const steps = await Effect.runPromise(stepsForRun(db, "next-x"))
+        expect(steps.some((step) => step.name === "implement")).toBe(true)
+      } finally {
+        db.close()
+      }
+    })
   })
 })

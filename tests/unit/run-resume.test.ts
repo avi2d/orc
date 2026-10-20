@@ -9,6 +9,7 @@ import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../src/agents"
 import { openDatabase, recordRun, recordStep } from "../../src/run-history"
 import { buildResumePlan, resolveTaskFile } from "../../src/run-resume"
+import { recordResumePublish } from "../../src/history-write"
 import type { HistoryRun } from "../../src/run-record"
 
 const implementer: AgentFile = {
@@ -200,6 +201,75 @@ describe("resume binds task selection to the saved intent", () => {
       }
     })
   })
+
+describe("reinterrupted continuations survive every handover", () => {
+  test("a second interruption keeps the recovered implementation and its intent", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "repo")
+        const priorDir = join(home, "runs", "prior-a")
+        await mkdir(priorDir, { recursive: true })
+        await writeFile(join(priorDir, "task.md"), "Do the thing.\n")
+        await seedRun(db, "prior-a", project, join(priorDir, "task.md"), "running", "2026-10-19T09:00:00.000Z")
+        await seedStep(db, "prior-a", "implement", "running", "2026-10-19T09:00:00.000Z", null)
+        const liveId = "aaa111"
+        await writeSession(join(priorDir, "session", "agent", "sessions", "enc"), "2026-10-19T09-30-00-000Z", liveId, new Date("2026-10-19T09:30:00.000Z"))
+        const runB = await Effect.runPromise(historyFor("next-b", home, project, "2026-10-19T10:00:00.000Z"))
+        const planB = await Effect.runPromise(buildResumePlan(db, runB))
+        expect(planB.implementSessionId).toBe(liveId)
+        await mkdir(runB.runDir, { recursive: true })
+        await writeFile(runB.taskPath, "Do the thing.\n")
+        await Effect.runPromise(recordResumePublish(db, runB, planB))
+        const runC = await Effect.runPromise(historyFor("next-c", home, project, "2026-10-19T11:00:00.000Z"))
+        const planC = await Effect.runPromise(buildResumePlan(db, runC))
+        expect(planC.implementSessionId).toBe(liveId)
+        expect(planC.skipImplement).toBe(false)
+        expect(planC.implementSessionFile ?? "").toContain(liveId)
+        const changed = join(home, "changed.md")
+        await writeFile(changed, "Do the other thing.\n")
+        expect(await taskOutcome(db, project, changed)).toContain("refuses")
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a second interruption keeps the recovered fixer instead of starting fresh", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "repo")
+        const priorDir = join(home, "runs", "prior-a")
+        const exportDir = join(priorDir, "sessions", "enc")
+        const implementId = "aaa111"
+        const fixId = "bbb222"
+        const implementExport = await writeSession(exportDir, "2026-10-19T09-10-00-000Z", implementId, new Date("2026-10-19T09:10:00.000Z"))
+        const liveDir = join(priorDir, "session", "agent", "sessions", "enc")
+        await writeSession(liveDir, "2026-10-19T09-10-00-000Z", implementId, new Date("2026-10-19T09:10:00.000Z"))
+        await writeSession(liveDir, "2026-10-19T09-40-00-000Z", fixId, new Date("2026-10-19T09:40:00.000Z"))
+        await mkdir(priorDir, { recursive: true })
+        await writeFile(join(priorDir, "task.md"), "Do the thing.\n")
+        await seedRun(db, "prior-a", project, join(priorDir, "task.md"), "running", "2026-10-19T09:00:00.000Z")
+        await seedStep(db, "prior-a", "implement", "passed", "2026-10-19T09:00:00.000Z", implementExport)
+        await seedStep(db, "prior-a", "fix", "running", "2026-10-19T09:35:00.000Z", null)
+        const runB = await Effect.runPromise(historyFor("next-b", home, project, "2026-10-19T10:00:00.000Z"))
+        const planB = await Effect.runPromise(buildResumePlan(db, runB))
+        expect(planB.fixSessionId).toBe(fixId)
+        await mkdir(runB.runDir, { recursive: true })
+        await writeFile(runB.taskPath, "Do the thing.\n")
+        await Effect.runPromise(recordResumePublish(db, runB, planB))
+        const runC = await Effect.runPromise(historyFor("next-c", home, project, "2026-10-19T11:00:00.000Z"))
+        const planC = await Effect.runPromise(buildResumePlan(db, runC))
+        expect(planC.skipImplement).toBe(true)
+        expect(planC.fixSessionId).toBe(fixId)
+        expect(planC.fixSessionFile ?? "").toContain(fixId)
+      } finally {
+        db.close()
+      }
+    })
+  })
+})
 
   test("an unreadable saved task refuses rather than accepting supplied intent", async () => {
     await withHome(async (home) => {
