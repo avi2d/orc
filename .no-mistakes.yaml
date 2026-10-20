@@ -1,4 +1,5 @@
 commands:
+  prepare: bun install
   lint: bun run lint
   typecheck: bun run typecheck
   test: bun run test
