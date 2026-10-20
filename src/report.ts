@@ -56,7 +56,7 @@ export interface OrcRunReport {
 export const findingLine = (finding: NoMistakesFinding): string =>
   [finding.id, finding.severity, finding.file + (finding.line === "" ? "" : ":" + finding.line), finding.action, finding.description].filter((part) => part !== "").join(" ")
 
-const measuredSignals = (report: OrcRunReport): ReadonlyArray<{ readonly name: string; readonly value: string }> => [
+export const measuredSignals = (report: Pick<OrcRunReport, "tokens" | "commits">): ReadonlyArray<{ readonly name: string; readonly value: string }> => [
   ...(report.tokens === null ? [] : [
     { name: "input-tokens", value: report.tokens.input.toString() },
     { name: "output-tokens", value: report.tokens.output.toString() }

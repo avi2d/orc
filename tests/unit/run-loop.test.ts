@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Database } from "bun:sqlite"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, FileSystem, Path } from "effect"
+import { Effect, Exit, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../src/agents"
 import { listRuns, openDatabase, recordRun, recordStep } from "../../src/run-history"
@@ -264,8 +264,8 @@ describe("runFull has no checkpoint-free mode", () => {
             return { stdout: "", stderr: "", exitCode: 0 }
           }
         }
-        const exit = await Effect.runPromiseExit((runFull as unknown as (run: HistoryRun, ops: SandboxOps, resume: typeof plan) => Effect.Effect<unknown, unknown>)(run, ops, plan))
-        expect(exit._tag).toBe("Failure")
+        const exit = await Effect.runPromiseExit(Reflect.apply(runFull, null, [run, ops, plan]))
+        expect(Exit.isFailure(exit)).toBe(true)
         expect(agentCalls).toBe(0)
         expect(checkCalls).toBe(0)
         let checkpointedAgentCalls = 0
@@ -278,7 +278,7 @@ describe("runFull has no checkpoint-free mode", () => {
         }
         const checkpoints = runLoopCheckpoints(db, run)
         const checkpointedExit = await Effect.runPromiseExit(runFull(run, failingOps, plan, checkpoints))
-        expect(checkpointedExit._tag).toBe("Failure")
+        expect(Exit.isFailure(checkpointedExit)).toBe(true)
         expect(checkpointedAgentCalls).toBe(1)
         const steps = await Effect.runPromise(stepsForRun(db, "next-x"))
         expect(steps.some((step) => step.name === "implement")).toBe(true)

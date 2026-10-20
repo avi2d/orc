@@ -6,7 +6,7 @@ import type { ChecksRoundSummary, OrcRunReport, RecordedFixAttempt } from "./rep
 import { OrcRunError } from "./run-session"
 import { formatHistoryError, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, stepIdFor, updateRun, updateStep } from "./run-history"
 import type { EvidenceInput, SignalInput, StepInput } from "./run-history"
-import { noMistakesSignals } from "./report"
+import { measuredSignals, noMistakesSignals } from "./report"
 import type { ResumePlan } from "./run-loop"
 
 type EvidenceRow = Omit<EvidenceInput, "stepId">
@@ -51,15 +51,7 @@ const planImplementDone = (
   sessionEvidence: report.sessionFile === null
     ? null
     : { direction: "out", path: report.sessionFile, kind: "session" },
-  signals: [
-    ...(report.tokens === null
-      ? []
-      : [
-        { name: "input-tokens", value: report.tokens.input.toString() },
-        { name: "output-tokens", value: report.tokens.output.toString() }
-      ]),
-    ...(report.commits === null ? [] : [{ name: "commit-count", value: report.commits.length.toString() }])
-  ]
+  signals: measuredSignals(report)
 })
 
 const planChecksDone = (runId: string, round: ChecksRoundSummary): PlannedChecks => ({
