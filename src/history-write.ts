@@ -1,11 +1,11 @@
 import { Effect } from "effect"
 import type { Database } from "bun:sqlite"
 import type { NoMistakesRecord } from "./no-mistakes"
-import type { HistoryRun } from "./run-record"
+import { noMistakesFile, type HistoryRun } from "./run-record"
 import type { ChecksRoundSummary, OrcRunReport, RecordedFixAttempt } from "./report"
 import { OrcRunError } from "./run-session"
 import { formatHistoryError, recordEvidence, recordRun, recordSignal, recordStep } from "./run-history"
-import { measuredSignals, noMistakesSignals } from "./report"
+import { checksLoopSteps, measuredSignals, noMistakesSignals } from "./report"
 
 export const historyFailure = (action: string, cause: unknown): OrcRunError =>
   new OrcRunError({ message: "orc: cannot " + action + " the run history: " + formatHistoryError(cause) })
@@ -55,11 +55,8 @@ export const recordHistory = (
         Effect.mapError(failed("record the signals in"))
       )
     }
-    for (const round of report.checksRounds ?? []) {
-      yield* recordChecksRound(db, run, round, failed)
-    }
-    for (const fix of report.fixes) {
-      yield* recordFixAttempt(db, run, fix, failed)
+    for (const step of checksLoopSteps(report)) {
+      yield* step.kind === "checks" ? recordChecksRound(db, run, step.round, failed) : recordFixAttempt(db, run, step.fix, failed)
     }
     if (report.noMistakes !== null) {
       yield* recordNoMistakesStep(db, run, report.noMistakes, failed)
@@ -95,8 +92,6 @@ const recordNoMistakesStep = (
       )
     }
   })
-
-const noMistakesFile = (run: HistoryRun): string => run.path.join(run.runDir, "no-mistakes.txt")
 
 const recordChecksRound = (
   db: Database,

@@ -5,7 +5,7 @@ import { orcCompletionLine } from "./pi"
 import type { NoMistakesRecord } from "./no-mistakes"
 import { OrcRunError } from "./run-session"
 import { toFileUrl } from "./run-history"
-import { findingLine, reportFileName, reportMarkdown, type OrcRunReport } from "./report"
+import { findingLine, reportFileName, reportMarkdown, runStatus, type OrcRunReport } from "./report"
 
 export type { ChecksRoundSummary, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./report"
 
@@ -31,13 +31,13 @@ export interface HistoryRun {
 export const formatReport = (report: OrcRunReport): string =>
   [
     "run id: " + report.runId,
-    "run folder: " + report.runDir,
+    "run folder: " + toFileUrl(report.runDir),
     "report: " + toFileUrl(report.runDir + "/" + reportFileName),
     "branch: " + report.branch,
-    "agent file: " + report.agentPath + " (" + report.agentSource + ")",
+    "agent file: " + toFileUrl(report.agentPath) + " (" + report.agentSource + ")",
     "model: " + report.model,
     "pi session: " + (report.sessionId ?? "none"),
-    "session file: " + (report.sessionFile ?? "none"),
+    "session file: " + (report.sessionFile === null ? "none" : toFileUrl(report.sessionFile)),
     "commits: " + (report.commits === null ? "unknown" : report.commits.length.toString() + report.commits.map((commit) => " " + commit.sha).join(",")),
     "input tokens: " + (report.tokens === null ? "unknown" : report.tokens.input.toString()),
     "output tokens: " + (report.tokens === null ? "unknown" : report.tokens.output.toString()),
@@ -50,28 +50,11 @@ export const formatReport = (report: OrcRunReport): string =>
     report.endReason
   ].join("\n")
 
-const runStatus = (report: OrcRunReport): string => {
-  if (report.completed) {
-    return "completed"
-  }
-  if (!report.markerVerified) {
-    return "incomplete"
-  }
-  if ((report.commits ?? []).length === 0) {
-    return "no commit"
-  }
-  const finalRound = report.checksRounds?.at(-1)
-  if (finalRound === undefined || !finalRound.passed) {
-    return "checks failed"
-  }
-  return "no-mistakes " + (report.noMistakes?.status ?? "never ran") + (report.prLink === null ? ", no PR" : ", PR open")
-}
-
 const noMistakesSummary = (record: NoMistakesRecord): string =>
   record.status + ", " + record.findings.length.toString() + (record.findings.length === 1 ? " finding" : " findings") + ", " +
   record.gatesAnswered.toString() + (record.gatesAnswered === 1 ? " gate answered" : " gates answered")
 
-const noMistakesFile = (run: HistoryRun): string => run.path.join(run.runDir, "no-mistakes.txt")
+export const noMistakesFile = (run: HistoryRun): string => run.path.join(run.runDir, "no-mistakes.txt")
 
 const noMistakesText = (record: NoMistakesRecord): string =>
   [
@@ -139,10 +122,11 @@ export const writeEvidence = (run: HistoryRun, report: OrcRunReport): Effect.Eff
 export const writeReport = (run: HistoryRun, report: OrcRunReport): Effect.Effect<void, OrcRunError> => {
   const file = run.path.join(run.runDir, reportFileName)
   return run.fs.readFileString(run.taskPath).pipe(
-    Effect.orElseSucceed(() => ""),
+    Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the task file for the report: " + String(cause) })),
     Effect.flatMap((taskText) =>
-      run.fs.writeFileString(file, reportMarkdown(taskText, toFileUrl(run.taskPath), toFileUrl(file), report))
-    ),
-    Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the report file: " + String(cause) }))
+      run.fs.writeFileString(file, reportMarkdown(taskText, toFileUrl(run.taskPath), toFileUrl(file), report)).pipe(
+        Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the report file: " + String(cause) }))
+      )
+    )
   )
 }

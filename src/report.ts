@@ -72,13 +72,22 @@ export const noMistakesSignals = (record: NoMistakesRecord): ReadonlyArray<{ rea
   ...(record.prLink === null ? [] : [{ name: "pr-link", value: record.prLink }])
 ]
 
+type ChecksLoopStep =
+  | { readonly kind: "checks"; readonly round: ChecksRoundSummary }
+  | { readonly kind: "fix"; readonly fix: RecordedFixAttempt }
+
+export const checksLoopSteps = (report: OrcRunReport): ReadonlyArray<ChecksLoopStep> =>
+  (report.checksRounds ?? []).flatMap((round): ReadonlyArray<ChecksLoopStep> => {
+    const fix = report.fixes.find((attempt) => attempt.attempt === round.round)
+    return fix === undefined ? [{ kind: "checks", round }] : [{ kind: "checks", round }, { kind: "fix", fix }]
+  })
+
 const stepLines = (report: OrcRunReport): Array<string> => {
   const lines = ["- implement: " + (report.implementPassed ? "passed" : "failed")]
-  for (const round of report.checksRounds ?? []) {
-    lines.push(checksLine(round.round, round.passed, round.failed, round.file))
-  }
-  for (const fix of report.fixes) {
-    lines.push("- fix " + fix.attempt.toString() + ": " + fix.status + " " + toFileUrl(fix.evidenceIn))
+  for (const step of checksLoopSteps(report)) {
+    lines.push(step.kind === "checks"
+      ? checksLine(step.round.round, step.round.passed, step.round.failed, step.round.file)
+      : "- fix " + step.fix.attempt.toString() + ": " + step.fix.status + " " + toFileUrl(step.fix.evidenceIn))
   }
   if (report.noMistakes !== null) {
     lines.push(noMistakesLine(report.noMistakes.status, report.noMistakes.gate))
@@ -133,7 +142,7 @@ const headLines = (taskText: string, taskFileUrl: string, reportUrl: string, rep
   }
   lines.push("")
   lines.push("Branch: " + report.branch)
-  lines.push("Status: " + reportStatus(report))
+  lines.push("Status: " + runStatus(report))
   lines.push("PR: " + (report.prLink ?? "none"))
   lines.push("Report: " + reportUrl)
   lines.push("")
@@ -174,7 +183,7 @@ const tailLines = (report: OrcRunReport): Array<string> => {
 export const reportMarkdown = (taskText: string, taskFileUrl: string, reportUrl: string, report: OrcRunReport): string =>
   [...headLines(taskText, taskFileUrl, reportUrl, report), ...tailLines(report)].join("\n") + "\n"
 
-const reportStatus = (report: OrcRunReport): string => {
+export const runStatus = (report: OrcRunReport): string => {
   if (report.completed) {
     return "completed"
   }

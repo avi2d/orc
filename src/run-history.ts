@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite"
 import { Data, Effect, FileSystem, Path, Schema } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { homedir } from "node:os"
+import { pathToFileURL } from "node:url"
 
 export const RUN_HISTORY_SCHEMA_VERSION = 1
 export const RUNS_JSON_SCHEMA = "orc.runs.v1" as const
@@ -294,7 +295,7 @@ export const listRuns = (
     )
   )
 
-export const toFileUrl = (path: string): string => "file://" + encodeURI(path)
+export const toFileUrl = (path: string): string => pathToFileURL(path).href
 
 export const runsJson = (runs: ReadonlyArray<RunRecord>): RunsJsonDocument => ({
   schema: RUNS_JSON_SCHEMA,

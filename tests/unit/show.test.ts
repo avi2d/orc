@@ -107,6 +107,61 @@ describe("readShow", () => {
   })
 })
 
+describe("readShow orders and links", () => {
+  test("steps read in execution order even when a fix was recorded after the recheck it caused", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await fixture(db)
+        await Effect.runPromise(recordStep(db, {
+          runId: "show-1",
+          name: "checks",
+          attempt: 2,
+          status: "passed",
+          started: "2026-10-18T10:04:00.000Z",
+          ended: "2026-10-18T10:04:30.000Z"
+        }))
+        await Effect.runPromise(recordStep(db, {
+          runId: "show-1",
+          name: "fix",
+          attempt: 1,
+          status: "passed",
+          started: "2026-10-18T10:03:10.000Z",
+          ended: "2026-10-18T10:03:50.000Z"
+        }))
+        const document = await Effect.runPromise(readShow(db, "show-1"))
+        expect(document?.steps.map((step) => step.name + " " + step.attempt.toString())).toEqual(["implement 1", "checks 1", "fix 1", "checks 2"])
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a '#' in a path is escaped so the link names the file rather than a fragment", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await Effect.runPromise(recordRun(db, {
+          id: "hash-1",
+          project: "orc",
+          branch: "orc/demo",
+          taskFile: "/Users/alex#work/.orc/runs/hash-1/task.md",
+          status: "failed",
+          started: "2026-10-18T10:00:00.000Z",
+          ended: "2026-10-18T10:05:00.000Z",
+          prLink: null,
+          endReason: "done"
+        }))
+        const document = await Effect.runPromise(readShow(db, "hash-1"))
+        expect(document?.run.taskFileUrl).toBe("file:///Users/alex%23work/.orc/runs/hash-1/task.md")
+        expect(document?.run.reportUrl).toBe("file:///Users/alex%23work/.orc/runs/hash-1/report.md")
+      } finally {
+        db.close()
+      }
+    })
+  })
+})
+
 describe("show JSON", () => {
   test("the schema field comes first and the document round trips", async () => {
     await withHome(async (home) => {
@@ -165,6 +220,8 @@ describe("formatShow", () => {
         expect(text).toContain("file:///tmp/show-home/runs/show-1/task.md")
         expect(text).toContain("file:///tmp/show-home/runs/show-1/report.md")
         expect(text).toContain("file:///tmp/show-home/runs/show-1/checks-1.txt")
+        expect(text).toMatch(/^  agent: file:\/\/\/\S+\/bundled\/implementer\.md$/m)
+        expect(text).toContain("  session: file:///tmp/show-home/runs/show-1/sessions/x.jsonl")
         expect(text).toContain("https://github.com/avi2d/orc/pull/7")
       } finally {
         db.close()

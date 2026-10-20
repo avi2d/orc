@@ -115,7 +115,7 @@ export const readShow = (
       "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason FROM runs WHERE id = ?"
     ).get(runId),
     steps: db.query(
-      "SELECT id, run_id, name, attempt, status, started, ended, agent_file, pi_session_file FROM steps WHERE run_id = ? ORDER BY id ASC"
+      "SELECT id, run_id, name, attempt, status, started, ended, agent_file, pi_session_file FROM steps WHERE run_id = ? ORDER BY started ASC, id ASC"
     ).all(runId)
   })).pipe(
     Effect.flatMap(({ run, steps }) =>
@@ -197,7 +197,7 @@ export const formatShow = (document: ShowJsonDocument): string => {
   for (const step of document.steps) {
     lines.push("")
     lines.push("step " + step.name + " #" + step.attempt.toString() + ": " + step.status)
-    lines.push("  agent: " + (step.agentFile ?? "none"))
+    lines.push("  agent: " + (step.agentFile === null ? "none" : toFileUrl(step.agentFile)))
     lines.push("  session: " + (step.piSessionFile === null ? "none" : toFileUrl(step.piSessionFile)))
     for (const signal of step.signals) {
       lines.push("  signal " + signal.name + ": " + signal.value)

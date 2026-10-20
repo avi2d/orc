@@ -60,7 +60,7 @@ Otherwise orc records the run as failed with the reason and exits 1.
 Each run keeps its task, evidence, agent log and Pi session in `~/.orc/runs/<run-id>`.
 Its `no-mistakes.txt` and the run history hold the no-mistakes findings, their count, the gates orc answered, the final result and the PR link.
 Its `report.md` carries the task, the branch, the status, the PR, the steps, the evidence, the signals, the findings and the result.
-The terminal report names the run folder, the PR and the report as full links.
+The terminal report names the run folder, the agent file, the session file and the report as full links, beside the PR link.
 
 ## Seeing runs
 
