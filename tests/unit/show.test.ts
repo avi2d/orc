@@ -238,11 +238,11 @@ describe("formatShow", () => {
         if (document === null) {
           throw new Error("missing fixture")
         }
-        const checks = document.steps[1]
+        const checks = document.steps.at(1)
         if (checks === undefined) {
           throw new Error("missing checks step")
         }
-        const unnoted = { ...document, steps: [{ ...checks, score: { score: 3, note: "", scoredAt: "2026-10-20T10:05:00Z" } }] }
+        const unnoted = { ...document, steps: [{ ...checks, score: { score: 3 as const, note: "", scoredAt: "2026-10-20T10:05:00Z" } }] }
         expect(formatShow(unnoted)).toContain("  score: 3 (2026-10-20T10:05:00Z)")
       } finally {
         db.close()
