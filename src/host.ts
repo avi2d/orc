@@ -26,8 +26,12 @@ export const hostGitSafetyEnv = {
 export const hostGitRefusalExit = 97
 
 // Git keeps adding repository config that runs a program, so only keys known to run none pass.
+// no-mistakes writes receive.advertisepushoptions and core.hooksPath into the worktree it drives, and refusing either stops its run.
+// receive.advertisepushoptions is read only by receive-pack, which orc never runs.
+// Every host git orc spawns pins core.hooksPath to /dev/null at command scope, so a repo value never runs.
 const inertRepositoryKeys = [
-  "core\\.(repositoryformatversion|filemode|bare|logallrefupdates|ignorecase|precomposeunicode|symlinks|autocrlf|eol)",
+  "core\\.(repositoryformatversion|filemode|bare|logallrefupdates|ignorecase|precomposeunicode|symlinks|autocrlf|eol|hookspath)",
+  "receive\\.advertisepushoptions",
   "extensions\\.(objectformat|refstorage|worktreeconfig)",
   "remote\\..*\\.(url|pushurl|fetch|push|tagopt|prune|mirror)",
   "branch\\..*\\.(remote|merge|pushremote|description)",
@@ -38,7 +42,7 @@ const inertRepositoryKeys = [
 const shellQuote = (arg: string): string => "'" + arg.replace(/'/g, "'\\''") + "'"
 
 // The sandbox writes the repository config host git reads, and per-submodule ignore settings are keyed by names it picks, so the shim checks what git would read before every host git command.
-const hostGitShimScript = (realGit: string): string =>
+export const hostGitShimScript = (realGit: string): string =>
   [
     "#!/bin/sh",
     "set -f",
