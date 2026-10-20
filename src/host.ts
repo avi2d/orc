@@ -133,16 +133,12 @@ export const resolvePiAgentDir = (
 
 export interface SandboxShims {
   readonly shimDir: string
-  readonly cacheDir: string
-  readonly parentTsconfig: string | undefined
 }
 
 export const prepareSandboxShims = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
-  piSessionDir: string,
-  gitData: string,
-  homeDir: string
+  piSessionDir: string
 ): Effect.Effect<SandboxShims, NonoProviderError> =>
   Effect.gen(function*() {
     const shimDir = path.join(piSessionDir, "shims")
@@ -156,10 +152,7 @@ export const prepareSandboxShims = (
         new NonoProviderError({ message: `orc nono provider: cannot write the mktemp shim in ${shimDir}: ${String(cause)}` })
       )
     )
-    const cacheDir = path.join(homeDir, ".cache", "avi2dg-checks")
-    const parentTsconfig = path.join(path.dirname(gitData), "tsconfig.json")
-    const parentExists = yield* fs.exists(parentTsconfig).pipe(Effect.orElseSucceed(() => false))
-    return { shimDir, cacheDir, parentTsconfig: parentExists ? parentTsconfig : undefined }
+    return { shimDir }
   })
 
 export interface HostCommandResult {

@@ -3,7 +3,7 @@ export type OrcArgs =
   | { readonly kind: "PrintHelp" }
   | { readonly kind: "ListRuns"; readonly json: boolean }
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
-  | { readonly kind: "RunAgent"; readonly taskFile: string; readonly branch: string | undefined; readonly allow: boolean }
+  | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly branch: string | undefined; readonly allow: boolean }
   | { readonly kind: "UsageError"; readonly detail: string }
 
 const parseShowArgs = (rest: readonly string[]): OrcArgs => {
@@ -28,21 +28,28 @@ const parseRunArgs = (rest: readonly string[]): OrcArgs => {
   if (rest.length === 0) {
     return { kind: "UsageError", detail: "orc run takes a task file" }
   }
-  const taskFile = rest[0] ?? ""
-  const flags = rest.slice(1)
-  const allow = flags.includes("--allow")
-  const kept = flags.filter((flag) => flag !== "--allow")
-  if (kept.length === 0) {
-    return { kind: "RunAgent", taskFile, branch: undefined, allow }
-  }
+  const allow = rest.includes("--allow")
+  const kept = rest.filter((flag) => flag !== "--allow")
   if (kept.length === 2 && kept[0] === "--branch") {
     const name = kept[1] ?? ""
     if (name === "" || name.startsWith("--")) {
       return { kind: "UsageError", detail: "unexpected argument: --branch" }
     }
+    return { kind: "RunAgent", taskFile: null, branch: name, allow }
+  }
+  const taskFile = kept[0] ?? ""
+  const flags = kept.slice(1)
+  if (flags.length === 0) {
+    return { kind: "RunAgent", taskFile, branch: undefined, allow }
+  }
+  if (flags.length === 2 && flags[0] === "--branch") {
+    const name = flags[1] ?? ""
+    if (name === "" || name.startsWith("--")) {
+      return { kind: "UsageError", detail: "unexpected argument: --branch" }
+    }
     return { kind: "RunAgent", taskFile, branch: name, allow }
   }
-  const stray = kept[0] === "--branch" ? "--branch" : (kept[0] ?? "")
+  const stray = flags[0] === "--branch" ? "--branch" : (flags[0] ?? "")
   return { kind: "UsageError", detail: `unexpected argument: ${stray}` }
 }
 

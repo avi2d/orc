@@ -349,6 +349,77 @@ export const stepsForRun = (
     Effect.map((rows) => rows.map((row) => ({ name: row.name, status: row.status, attempt: row.attempt, piSessionFile: row.pi_session_file })))
   )
 
+export const updateRun = (db: Database, id: string, patch: { readonly status: RunStatus; readonly ended: string | null; readonly prLink: string | null; readonly endReason: string | null }): Effect.Effect<void, SqliteFailure> =>
+  sqlite(() => {
+    db.query("UPDATE runs SET status = ?, ended = ?, pr_link = ?, end_reason = ? WHERE id = ?").run(patch.status, patch.ended, patch.prLink, patch.endReason, id)
+  })
+
+export interface StoredChecksRound {
+  readonly round: number
+  readonly file: string
+  readonly started: string
+  readonly ended: string
+  readonly passed: boolean
+  readonly checks: ReadonlyArray<{ readonly name: string; readonly passed: boolean }>
+}
+
+export interface StoredFix {
+  readonly attempt: number
+  readonly status: string
+  readonly started: string
+  readonly ended: string
+  readonly agentFile: string | null
+  readonly sessionFile: string | null
+  readonly evidenceIn: string
+  readonly commits: number
+  readonly inputTokens: number | null
+  readonly outputTokens: number | null
+}
+
+export const checksRoundsForRun = (db: Database, runId: string): Effect.Effect<ReadonlyArray<StoredChecksRound>, Schema.SchemaError | SqliteFailure> =>
+  sqlite(() => db.query("SELECT id, attempt, status, started, ended FROM steps WHERE run_id = ? AND name = ? ORDER BY attempt ASC").all(runId, "checks") as ReadonlyArray<Record<string, unknown>>).pipe(
+    Effect.flatMap((steps) =>
+      Effect.forEach(steps, (step) =>
+        Effect.gen(function*() {
+          const id = (step as { readonly id: number }).id
+          const attempt = (step as { readonly attempt: number }).attempt
+          const status = (step as { readonly status: string }).status
+          const started = (step as { readonly started: string }).started
+          const ended = (step as { readonly ended: string | null }).ended ?? started
+          const evidenceRows = yield* sqlite(() => db.query("SELECT path FROM evidence WHERE step_id = ? AND kind = ? ORDER BY id ASC LIMIT 1").all(id) as ReadonlyArray<Record<string, unknown>>)
+          const file = (evidenceRows[0] as { readonly path: string } | undefined)?.path ?? ""
+          const signalRows = yield* sqlite(() => db.query("SELECT name, value FROM signals WHERE step_id = ? ORDER BY name ASC").all(id) as ReadonlyArray<{ readonly name: string; readonly value: string }>)
+          const checks = signalRows.filter((signal) => signal.name.startsWith("check ")).map((signal) => ({ name: signal.name.slice(6), passed: signal.value === "passed" }))
+          return { round: attempt, file, started, ended, passed: status === "passed", checks }
+        })
+    )
+  )
+
+export const fixesForRun = (db: Database, runId: string): Effect.Effect<ReadonlyArray<StoredFix>, Schema.SchemaError | SqliteFailure> =>
+  sqlite(() => db.query("SELECT id, attempt, status, started, ended, agent_file, pi_session_file FROM steps WHERE run_id = ? AND name = ? ORDER BY attempt ASC").all(runId, "fix") as ReadonlyArray<Record<string, unknown>>).pipe(
+    Effect.flatMap((steps) =>
+      Effect.forEach(steps, (step) =>
+        Effect.gen(function*() {
+          const id = (step as { readonly id: number }).id
+          const evidenceRows = yield* sqlite(() => db.query("SELECT path FROM evidence WHERE step_id = ? AND kind = ? ORDER BY id ASC LIMIT 1").all(id, "checks") as ReadonlyArray<Record<string, unknown>>)
+          const signalRows = yield* sqlite(() => db.query("SELECT name, value FROM signals WHERE step_id = ?").all(id) as ReadonlyArray<{ readonly name: string; readonly value: string }>)
+          const byName = new Map(signalRows.map((signal) => [signal.name, signal.value] as const))
+          return {
+            attempt: (step as { readonly attempt: number }).attempt,
+            status: (step as { readonly status: string }).status,
+            started: (step as { readonly started: string }).started,
+            ended: (step as { readonly ended: string | null }).ended ?? (step as { readonly started: string }).started,
+            agentFile: (step as { readonly agent_file: string | null }).agent_file,
+            sessionFile: (step as { readonly pi_session_file: string | null }).pi_session_file,
+            evidenceIn: ((evidenceRows[0] as { readonly path: string } | undefined)?.path ?? ""),
+            commits: Number.parseInt(byName.get("commit-count") ?? "0", 10),
+            inputTokens: byName.has("input-tokens") ? Number.parseInt(byName.get("input-tokens") ?? "0", 10) : null,
+            outputTokens: byName.has("output-tokens") ? Number.parseInt(byName.get("output-tokens") ?? "0", 10) : null
+          }
+        })
+    )
+  )
+
 export const sessionIdFromFile = (file: string | null): string | null => {
   if (file === null) {
     return null

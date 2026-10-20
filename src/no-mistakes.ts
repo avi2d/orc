@@ -142,16 +142,12 @@ export const parseRun = (output: string): ParsedRun => {
 }
 
 export const answerForGate = (gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>, allow = false): GateAnswer => {
-  const question = findings.find((finding) => finding.id.startsWith("question-"))
-  if (question !== undefined && !allow) {
-    return { kind: "refuse", reason: "open review question " + question.id + " needs your word" }
-  }
   const asked = findings.find((finding) => finding.action === "ask-user")
   if (asked !== undefined && !allow) {
     return { kind: "refuse", reason: "finding " + asked.id + " is marked ask-user and needs your word" }
   }
-  const worded = allow ? findings.filter((finding) => finding.action === "ask-user" || finding.id.startsWith("question-")) : []
-  const rest = allow ? findings.filter((finding) => finding.action !== "ask-user" && !finding.id.startsWith("question-")) : findings
+  const worded = allow ? findings.filter((finding) => finding.action === "ask-user") : []
+  const rest = allow ? findings.filter((finding) => finding.action !== "ask-user") : findings
   const other = rest.find((finding) => finding.action !== "auto-fix" && finding.action !== "no-op")
   if (other !== undefined) {
     return { kind: "refuse", reason: "finding " + other.id + " needs an answer orc cannot give" }

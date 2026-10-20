@@ -97,8 +97,6 @@ export const runtimeOf = (candidate: string, real: string, home: string): Runtim
 export interface HostRuntime {
   readonly developerDir: string | null
   readonly runtimeDirs: ReadonlyArray<string>
-  readonly cacheDir?: string | undefined
-  readonly parentTsconfig?: string | undefined
 }
 
 export interface ModelCredential {
@@ -228,11 +226,11 @@ export const buildNonoProfile = (roots: NonoSandboxRoots, host: HostRuntime) => 
     capability_elevation: false
   },
   filesystem: {
-    allow: outermost([roots.worktree, roots.gitData, roots.piSessionDir, ...(host.cacheDir === undefined ? [] : [host.cacheDir])]),
+    allow: outermost([roots.worktree, roots.gitData, roots.piSessionDir]),
     read: [...toolchainReadPaths, ...host.runtimeDirs],
     write: [],
     allow_file: [],
-    read_file: [...runtimeReadFiles, ...(host.parentTsconfig === undefined ? [] : [host.parentTsconfig])],
+    read_file: [...runtimeReadFiles],
     write_file: ["/dev/null"],
     unix_socket: [],
     unix_socket_bind: [],
