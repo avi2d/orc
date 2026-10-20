@@ -36,7 +36,7 @@ const checkoutWithSession = async (dir: string): Promise<{ readonly worktree: st
 }
 
 const noNono = Bun.which("nono") === null
-const insideSandbox = Bun.env.PI_SESSION_FILE !== undefined
+const insideSandbox = Bun.env.PI_SESSION_FILE !== undefined || Bun.env.NONO_CAP_FILE !== undefined
 
 // Starting a nono sandbox runs past bun's 5s default while the rest of the suite runs beside it.
 const sandboxTimeout = 30_000
