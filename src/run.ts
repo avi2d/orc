@@ -101,7 +101,7 @@ const openCheckout = (
     }
     const branch = branchName ?? ("orc/" + runId)
     if (!shellSafeBranch.test(branch)) {
-      return yield* refuse("orc: " + branch + " holds a shell metacharacter, so orc takes only letters, digits, '.', '_', '-' and '/' in a branch name")
+      return yield* refuse("orc: Sandcastle interpolates " + branch + " into host shell commands, so a branch holding a shell metacharacter is refused and orc takes only letters, digits, '.', '_', '-' and '/' in a branch name")
     }
     const named = yield* runGit(spawner, git, ["check-ref-format", "--branch", branch], projectDir)
     if (named.exitCode !== 0) {
