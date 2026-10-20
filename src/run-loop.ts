@@ -225,7 +225,7 @@ export const runFull = (run: HistoryRun, ops: SandboxOps, resume?: ResumePlan): 
     for (let round = 1; round <= maxFixAttempts + 1; round += 1) {
       const started = new Date().toISOString()
       const commands = yield* readProjectChecks(run)
-      const outcome = yield* runChecksRound(ops.execCheck, run.fs, run.path, run.runDir, round, commands).pipe(
+      const outcome = yield* runChecksRound(ops.execCheck, run.fs, run.path, run.piSessionDir, round, commands).pipe(
         Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
       )
       const ended = new Date().toISOString()
