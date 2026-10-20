@@ -2,3 +2,4 @@ node_modules/
 dist/
 reports/
 .stryker-tmp/
+.orc-home/
