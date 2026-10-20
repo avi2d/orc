@@ -67,11 +67,15 @@ describe("parseArgs", () => {
   })
 
   test("run takes a task file and no branch", () => {
-    expect(parseArgs(["run", "task.md"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: undefined })
+    expect(parseArgs(["run", "task.md"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: undefined, allow: false })
   })
 
   test("run takes a task file and a branch", () => {
-    expect(parseArgs(["run", "task.md", "--branch", "orc/demo"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo" })
+    expect(parseArgs(["run", "task.md", "--branch", "orc/demo"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", allow: false })
+  })
+
+  test("run takes a branch and the word after a refusal", () => {
+    expect(parseArgs(["run", "task.md", "--branch", "orc/demo", "--allow"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", allow: true })
   })
 
   test("run rejects a flag it does not know", () => {

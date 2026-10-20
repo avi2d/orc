@@ -3,7 +3,7 @@ export type OrcArgs =
   | { readonly kind: "PrintHelp" }
   | { readonly kind: "ListRuns"; readonly json: boolean }
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
-  | { readonly kind: "RunAgent"; readonly taskFile: string; readonly branch: string | undefined }
+  | { readonly kind: "RunAgent"; readonly taskFile: string; readonly branch: string | undefined; readonly allow: boolean }
   | { readonly kind: "UsageError"; readonly detail: string }
 
 const parseShowArgs = (rest: readonly string[]): OrcArgs => {
@@ -28,15 +28,22 @@ const parseRunArgs = (rest: readonly string[]): OrcArgs => {
   if (rest.length === 0) {
     return { kind: "UsageError", detail: "orc run takes a task file" }
   }
-  const taskFile = rest[0]
+  const taskFile = rest[0] ?? ""
   const flags = rest.slice(1)
-  if (flags.length === 0) {
-    return { kind: "RunAgent", taskFile, branch: undefined }
+  const allow = flags.includes("--allow")
+  const kept = flags.filter((flag) => flag !== "--allow")
+  if (kept.length === 0) {
+    return { kind: "RunAgent", taskFile, branch: undefined, allow }
   }
-  if (flags.length !== 2 || flags[0] !== "--branch") {
-    return { kind: "UsageError", detail: `unexpected argument: ${flags[0]}` }
+  if (kept.length === 2 && kept[0] === "--branch") {
+    const name = kept[1] ?? ""
+    if (name === "" || name.startsWith("--")) {
+      return { kind: "UsageError", detail: "unexpected argument: --branch" }
+    }
+    return { kind: "RunAgent", taskFile, branch: name, allow }
   }
-  return { kind: "RunAgent", taskFile, branch: flags[1] }
+  const stray = kept[0] === "--branch" ? "--branch" : (kept[0] ?? "")
+  return { kind: "UsageError", detail: `unexpected argument: ${stray}` }
 }
 
 export const parseArgs = (args: readonly string[]): OrcArgs => {

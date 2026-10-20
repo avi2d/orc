@@ -10,10 +10,10 @@ import { canRouteModel, loginCheckCommand, modelCredentialFor, piAgentModels } f
 import { runGit } from "./git-run"
 import { orcCompletionLine } from "./pi"
 import { OrcRunError, describeCause } from "./run-session"
-import { openDatabase, orcHomeDir } from "./run-history"
+import { latestRunForBranch, openDatabase, orcHomeDir, sessionIdFromFile, stepsForRun } from "./run-history"
 import { historyFailure, recordHistory } from "./history-write"
 import { failedReport, writeEvidence, writeReport, type HistoryRun, type OrcRunReport } from "./run-record"
-import { runFull, type SandboxOps } from "./run-loop"
+import { runFull, type ResumePlan, type SandboxOps } from "./run-loop"
 
 export type { SandboxOps }
 
@@ -21,6 +21,7 @@ export interface OrcRunRequest {
   readonly cwd: string
   readonly taskFile: string
   readonly branch?: string | undefined
+  readonly allow?: boolean | undefined
   readonly homeDir?: string | undefined
   readonly runId?: string | undefined
   readonly agentsDir?: string | undefined
@@ -215,13 +216,14 @@ export const runAgentStep = (
       catch: (cause) => new OrcRunError({ message: "orc: the sandbox failed to start: " + describeCause(cause) })
     }).pipe(withHostGitSafety(git))
     const ops: SandboxOps = {
-      runAgent: (agentProvider, prompt, logFile) =>
+      runAgent: (agentProvider, prompt, logFile, resumeSession) =>
         sandbox.run({
           agent: agentProvider,
           prompt,
           completionSignal: orcCompletionLine,
           logging: { type: "file", path: path.join(folders.runDir, logFile) },
-          name: "orc-" + runId
+          name: "orc-" + runId,
+          ...(resumeSession === undefined ? {} : { resumeSession })
         }),
       execCheck: (command) => sandbox.exec(command)
     }
@@ -230,7 +232,8 @@ export const runAgentStep = (
       runDir: folders.runDir, piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir,
       taskPath: folders.taskPath, agent, fixer, branch: checkout.branch, started,
       worktreeDir: sandbox.worktreePath,
-      noMistakesPath: hostPath ?? ""
+      noMistakesPath: hostPath ?? "",
+      allow: request.allow ?? false
     }
     const report = yield* Effect.acquireUseRelease(
       openDatabase(home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
@@ -242,9 +245,54 @@ export const runAgentStep = (
     return report
   }))
 
+const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<ResumePlan, OrcRunError> =>
+  Effect.gen(function*() {
+    const allow = run.allow ?? false
+    const empty: ResumePlan = { implementSessionId: null, skipImplement: false, skipChecks: false, allow }
+    const prior = yield* latestRunForBranch(db, run.projectDir, run.branch).pipe(
+      Effect.mapError((cause) => historyFailure("read", cause))
+    )
+    if (prior === null || prior.id === run.runId) {
+      return empty
+    }
+    const steps = yield* stepsForRun(db, prior.id).pipe(
+      Effect.mapError((cause) => historyFailure("read", cause))
+    )
+    const implementPassed = steps.some((step) => step.name === "implement" && step.status === "passed")
+    const checksPassed = steps.some((step) => step.name === "checks" && step.status === "passed")
+    const sessionFiles: Array<string> = []
+    for (const step of steps) {
+      if (step.piSessionFile !== null) {
+        sessionFiles.push(step.piSessionFile)
+      }
+    }
+    const source = sessionFiles.length === 0 ? null : (sessionFiles[sessionFiles.length - 1] ?? null)
+    const sessionId = sessionIdFromFile(source)
+    if (source !== null && sessionId !== null) {
+      const carried = yield* run.fs.readFileString(source).pipe(
+        Effect.map((text) => text),
+        Effect.orElseSucceed(() => null)
+      )
+      if (carried !== null) {
+        const target = run.path.join(run.hostSessionsDir, "resumed", source.slice(source.lastIndexOf("/") + 1))
+        yield* run.fs.makeDirectory(run.path.dirname(target), { recursive: true }).pipe(
+          Effect.andThen(() => run.fs.writeFileString(target, carried)),
+          Effect.orElseSucceed(() => undefined)
+        )
+      }
+    }
+    return {
+      implementSessionId: sessionId,
+      skipImplement: implementPassed,
+      skipChecks: implementPassed && checksPassed,
+      allow
+    }
+  })
+
 export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
-    const report = yield* runFull(run, ops).pipe(
+    const resume = yield* buildResumePlan(db, run)
+    const report = yield* runFull(run, ops, resume).pipe(
       Effect.catchTag("OrcRunError", (error) => Effect.succeed(failedReport(run, error.message)))
     )
     yield* writeEvidence(run, report)

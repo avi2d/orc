@@ -9,8 +9,15 @@ import { driveNoMistakes } from "./no-mistakes"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
 
 export interface SandboxOps {
-  readonly runAgent: (agent: AgentProvider, prompt: string, logFile: string) => Promise<SandboxRunResult>
+  readonly runAgent: (agent: AgentProvider, prompt: string, logFile: string, resumeSession?: string) => Promise<SandboxRunResult>
   readonly execCheck: (command: string) => Promise<ExecResult>
+}
+
+export interface ResumePlan {
+  readonly implementSessionId: string | null
+  readonly skipImplement: boolean
+  readonly skipChecks: boolean
+  readonly allow: boolean
 }
 
 interface AgentOutcome {
@@ -66,14 +73,43 @@ const sessionOf = (
 const verifiedMarker = (result: SandboxRunResult, jsonl: string | null): boolean =>
   result.completionSignal === orcCompletionLine && jsonl !== null && sessionPrintedSignal(jsonl, orcCompletionLine)
 
-const implement = (run: HistoryRun, runAgent: SandboxOps["runAgent"]): Effect.Effect<AgentOutcome, OrcRunError> =>
+const resumedCommits = (run: HistoryRun): Effect.Effect<Array<OrcRunCommit>, OrcRunError> =>
+  runGit(run.spawner, run.git, ["log", run.branch, "--not", "HEAD", "--format=%H%x1f%s"], run.projectDir).pipe(
+    Effect.map((logged) => {
+      if (logged.exitCode !== 0) {
+        return []
+      }
+      return logged.stdout.split("\n").filter((line) => line.trim() !== "").map((line) => {
+        const cut = line.indexOf("\x1f")
+        return cut === -1 ? { sha: line.trim(), subject: "" } : { sha: line.slice(0, cut).trim(), subject: line.slice(cut + 1).trim() }
+      })
+    }),
+    Effect.orElseSucceed(() => [] as Array<OrcRunCommit>)
+  )
+
+const resumedOutcome = (run: HistoryRun, sessionId: string | null): Effect.Effect<AgentOutcome, OrcRunError> =>
+  Effect.gen(function*() {
+    const commits = yield* resumedCommits(run)
+    const done = commits.length > 0
+    return {
+      sessionId,
+      sessionFile: null,
+      commits,
+      tokens: null,
+      completed: done,
+      markerVerified: done,
+      endReason: "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + "."
+    }
+  })
+
+const implement = (run: HistoryRun, runAgent: SandboxOps["runAgent"], resumeSession: string | null): Effect.Effect<AgentOutcome, OrcRunError> =>
   Effect.gen(function*() {
     const agentProvider = piWithTools(run.agent, {
       hostSessionsDir: run.hostSessionsDir,
       sandboxSessionsDir: run.piSessionDir
     })
     const result: SandboxRunResult = yield* Effect.tryPromise({
-      try: () => runAgent(agentProvider, buildImplementPrompt(run.agent, run.path.join(run.piSessionDir, "task.md")), "agent.log"),
+      try: () => runAgent(agentProvider, buildImplementPrompt(run.agent, run.path.join(run.piSessionDir, "task.md")), "agent.log", resumeSession ?? undefined),
       catch: (cause) => new OrcRunError({ message: "orc: the agent run failed: " + describeCause(cause) })
     }).pipe(withHostGitSafety(run.git))
     const session = yield* sessionOf(run, agentProvider.sessionStorage, result)
@@ -140,9 +176,28 @@ const readProjectChecks = (run: HistoryRun): Effect.Effect<ReadonlyArray<ChecksC
     )
   )
 
-export const runFull = (run: HistoryRun, ops: SandboxOps): Effect.Effect<OrcRunReport, OrcRunError> =>
+const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: boolean): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
-    const done = yield* implement(run, ops.runAgent)
+    const noMistakes = yield* driveNoMistakes({ spawner: run.spawner, pathEnv: run.noMistakesPath, git: run.git, taskFile: run.taskPath, worktreeDir: run.worktreeDir, allow })
+    return {
+      ...base,
+      commits,
+      completed: noMistakes.status === "passed",
+      checksRounds: rounds,
+      fixes,
+      fixAttempts: fixes.length,
+      prLink: noMistakes.prLink,
+      noMistakes,
+      endReason: "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + ", and the checks passed. " + noMistakes.result
+    }
+  })
+
+export const runFull = (run: HistoryRun, ops: SandboxOps, resume?: ResumePlan): Effect.Effect<OrcRunReport, OrcRunError> =>
+  Effect.gen(function*() {
+    const plan: ResumePlan = resume ?? { implementSessionId: null, skipImplement: false, skipChecks: false, allow: run.allow ?? false }
+    const done = plan.skipImplement
+      ? yield* resumedOutcome(run, plan.implementSessionId)
+      : yield* implement(run, ops.runAgent, plan.implementSessionId)
     const base = {
       runId: run.runId,
       runDir: run.runDir,
@@ -164,6 +219,9 @@ export const runFull = (run: HistoryRun, ops: SandboxOps): Effect.Effect<OrcRunR
     const rounds: Array<ChecksRoundSummary> = []
     const fixes: Array<RecordedFixAttempt> = []
     const commits = [...done.commits]
+    if (plan.skipChecks) {
+      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow)
+    }
     for (let round = 1; round <= maxFixAttempts + 1; round += 1) {
       const started = new Date().toISOString()
       const commands = yield* readProjectChecks(run)
@@ -182,7 +240,7 @@ export const runFull = (run: HistoryRun, ops: SandboxOps): Effect.Effect<OrcRunR
         checks: outcome.outcomes.map((check) => ({ name: check.name, passed: check.passed }))
       })
       if (failed.length === 0) {
-        const noMistakes = yield* driveNoMistakes({ spawner: run.spawner, pathEnv: run.noMistakesPath, git: run.git, taskFile: run.taskPath, worktreeDir: run.worktreeDir })
+        const noMistakes = yield* driveNoMistakes({ spawner: run.spawner, pathEnv: run.noMistakesPath, git: run.git, taskFile: run.taskPath, worktreeDir: run.worktreeDir, allow: plan.allow })
         return {
           ...base,
           commits,
