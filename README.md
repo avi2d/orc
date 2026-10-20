@@ -32,6 +32,9 @@ To run a task, run `bun run src/bin.ts run <task-file>` inside a clean git check
 Orc refuses a checkout with uncommitted changes.
 Orc commits to a new branch named `orc/<run-id>`, or to the name you pass with `--branch <name>`.
 A branch name may hold only letters, digits, `.`, `_`, `-` and `/`.
+To resume the branch after a stop, run `bun run src/bin.ts run <task-file> --branch <name>` again and orc skips the steps the run history marks passed.
+On resume Sandcastle reuses the branch worktree, Pi resumes its prior session, and orc reattaches to no-mistakes with the same intent.
+After a refusal, run the same resume command with `--allow` and no-mistakes takes the word for `ask-user` gates.
 Orc also refuses a checkout whose own git config sets any key outside a short list known to run no program.
 
 The run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
