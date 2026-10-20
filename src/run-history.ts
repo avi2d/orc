@@ -2,17 +2,19 @@ import { Database } from "bun:sqlite"
 import { Data, Effect, FileSystem, Path, Schema } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { homedir } from "node:os"
+import { pathToFileURL } from "node:url"
 
 export const RUN_HISTORY_SCHEMA_VERSION = 1
 export const RUNS_JSON_SCHEMA = "orc.runs.v1" as const
+export const SHOW_JSON_SCHEMA = "orc.show.v1" as const
 
-const RunStatusSchema = Schema.Literals(["running", "succeeded", "failed"])
+export const RunStatusSchema = Schema.Literals(["running", "succeeded", "failed"])
 type RunStatus = typeof RunStatusSchema.Type
-const StepStatusSchema = Schema.Literals(["running", "passed", "failed", "skipped"])
+export const StepStatusSchema = Schema.Literals(["running", "passed", "failed", "skipped"])
 type StepStatus = typeof StepStatusSchema.Type
-const EvidenceDirectionSchema = Schema.Literals(["in", "out"])
+export const EvidenceDirectionSchema = Schema.Literals(["in", "out"])
 type EvidenceDirection = typeof EvidenceDirectionSchema.Type
-const ScoreValueSchema = Schema.Literals([1, 2, 3, 4, 5])
+export const ScoreValueSchema = Schema.Literals([1, 2, 3, 4, 5])
 type ScoreValue = typeof ScoreValueSchema.Type
 
 class UnsupportedSchemaVersion extends Data.TaggedError("UnsupportedSchemaVersion")<{
@@ -24,7 +26,7 @@ export class SqliteFailure extends Data.TaggedError("SqliteFailure")<{
   readonly cause: unknown
 }> {}
 
-const sqlite = <A>(use: () => A): Effect.Effect<A, SqliteFailure> =>
+export const sqlite = <A>(use: () => A): Effect.Effect<A, SqliteFailure> =>
   Effect.try({ try: use, catch: (cause) => new SqliteFailure({ cause }) })
 
 export interface RunInput {
@@ -82,18 +84,20 @@ export interface ScoreInput {
   readonly scoredAt: string
 }
 
-interface RunJsonEntry {
-  readonly id: string
-  readonly project: string
-  readonly branch: string
-  readonly status: RunStatus
-  readonly prLink: string | null
-}
+const RunJsonEntrySchema = Schema.Struct({
+  id: Schema.String,
+  project: Schema.String,
+  branch: Schema.String,
+  status: RunStatusSchema,
+  prLink: Schema.NullOr(Schema.String)
+})
 
-export interface RunsJsonDocument {
-  readonly schema: typeof RUNS_JSON_SCHEMA
-  readonly runs: ReadonlyArray<RunJsonEntry>
-}
+const RunsJsonSchema = Schema.Struct({
+  schema: Schema.Literal(RUNS_JSON_SCHEMA),
+  runs: Schema.Array(RunJsonEntrySchema)
+})
+
+export type RunsJsonDocument = typeof RunsJsonSchema.Type
 
 export type HistoryError = PlatformError | Schema.SchemaError | UnsupportedSchemaVersion | SqliteFailure
 
@@ -254,7 +258,7 @@ export const recordScore = (db: Database, input: ScoreInput): Effect.Effect<numb
     )
   )
 
-const RunSqlRowSchema = Schema.Struct({
+export const RunSqlRowSchema = Schema.Struct({
   id: Schema.String,
   project: Schema.String,
   branch: Schema.String,
@@ -291,6 +295,8 @@ export const listRuns = (
     )
   )
 
+export const toFileUrl = (path: string): string => pathToFileURL(path).href
+
 export const runsJson = (runs: ReadonlyArray<RunRecord>): RunsJsonDocument => ({
   schema: RUNS_JSON_SCHEMA,
   runs: runs.map((run) => ({
@@ -301,6 +307,12 @@ export const runsJson = (runs: ReadonlyArray<RunRecord>): RunsJsonDocument => ({
     prLink: run.prLink
   }))
 })
+
+export const encodeRunsJson = (runs: ReadonlyArray<RunRecord>): Effect.Effect<string, Schema.SchemaError> =>
+  Schema.encodeEffect(RunsJsonSchema)(runsJson(runs)).pipe(Effect.map((encoded) => JSON.stringify(encoded)))
+
+export const decodeRunsJson = (value: unknown): Effect.Effect<RunsJsonDocument, Schema.SchemaError> =>
+  Schema.decodeUnknownEffect(RunsJsonSchema)(value)
 
 export const formatRunsTable = (runs: ReadonlyArray<RunRecord>): string => {
   if (runs.length === 0) {

@@ -199,7 +199,7 @@ describe("parseRun reads the recorded TOON shapes", () => {
   })
 })
 
-describe("answerForGate refuses only what needs his word", () => {
+describe("answerForGate refuses only what needs your word", () => {
   test("a finding marked ask-user names that finding", () => {
     const parsed = parseRun(parked)
     const answer = answerForGate(approvalGate, parsed.findings)
@@ -207,6 +207,7 @@ describe("answerForGate refuses only what needs his word", () => {
     if (answer.kind === "refuse") {
       expect(answer.reason).toContain("r2")
       expect(answer.reason).toContain("ask-user")
+      expect(answer.reason).toContain("needs your word")
     }
   })
 
@@ -216,6 +217,7 @@ describe("answerForGate refuses only what needs his word", () => {
     expect(answer.kind).toBe("refuse")
     if (answer.kind === "refuse") {
       expect(answer.reason).toContain("question-3")
+      expect(answer.reason).toContain("needs your word")
     }
   })
 

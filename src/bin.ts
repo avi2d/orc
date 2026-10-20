@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import type { Database } from "bun:sqlite"
 import { runMain } from "@effect/platform-bun/BunRuntime"
 import { BunServices } from "@effect/platform-bun"
 import { Console, Effect } from "effect"
@@ -6,19 +7,25 @@ import packageJson from "../package.json" with { type: "json" }
 import { parseArgs } from "./args"
 import { runAgentStep } from "./run"
 import { formatReport } from "./run-record"
-import {
-  formatHistoryError,
-  formatRunsTable,
-  type HistoryError,
-  listRuns,
-  openDatabase,
-  orcHomeDir,
-  runsJson
-} from "./run-history"
+import { encodeRunsJson, formatHistoryError, formatRunsTable, listRuns, openDatabase, orcHomeDir } from "./run-history"
+import { encodeShowJson, formatShow, readShow } from "./show"
 
-const usage = "Usage: orc [--version] [--help] | orc runs [--json] | orc run <task-file> [--branch <name>]"
+const usage = "Usage: orc [--version] [--help] | orc runs [--json] | orc show <run> [--json] | orc run <task-file> [--branch <name>]"
 
-const historyErrorMessage = (error: HistoryError): string => formatHistoryError(error)
+const readFailure = (error: unknown): string =>
+  typeof error === "string" ? error : "orc: cannot read the run history: " + formatHistoryError(error)
+
+const readHistory = <A, E>(use: (db: Database) => Effect.Effect<A, E>) =>
+  Effect.acquireUseRelease(
+    openDatabase(orcHomeDir()),
+    use,
+    (db) => Effect.sync(() => db.close())
+  ).pipe(
+    Effect.provide(BunServices.layer),
+    Effect.catch((error) =>
+      Console.error(readFailure(error)).pipe(Effect.andThen(Effect.fail("run history unavailable")))
+    )
+  )
 
 const program = Effect.gen(function*() {
   const args = parseArgs(Bun.argv.slice(2))
@@ -32,20 +39,25 @@ const program = Effect.gen(function*() {
       break
     }
     case "ListRuns": {
-      const text = yield* Effect.acquireUseRelease(
-        openDatabase(orcHomeDir()),
-        (db) => listRuns(db),
-        (db) => Effect.sync(() => db.close())
-      ).pipe(
-        Effect.map((runs) => args.json ? JSON.stringify(runsJson(runs)) : formatRunsTable(runs)),
-        Effect.provide(BunServices.layer),
-        Effect.catch((error) =>
-          Console.error(`orc: cannot read the run history: ${historyErrorMessage(error)}`).pipe(
-            Effect.andThen(Effect.fail("run history unavailable"))
-          )
-        )
-      )
-      yield* Console.log(text)
+      const runs = yield* readHistory((db) => listRuns(db))
+      if (args.json) {
+        yield* Console.log(yield* encodeRunsJson(runs))
+      } else {
+        yield* Console.log(formatRunsTable(runs))
+      }
+      break
+    }
+    case "ShowRun": {
+      const document = yield* readHistory((db) => readShow(db, args.id))
+      if (document === null) {
+        yield* Console.error("orc: unknown run " + args.id)
+        return yield* Effect.fail("run history unavailable")
+      }
+      if (args.json) {
+        yield* Console.log(yield* encodeShowJson(document))
+      } else {
+        yield* Console.log(formatShow(document))
+      }
       break
     }
     case "RunAgent": {

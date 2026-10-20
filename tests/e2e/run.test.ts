@@ -253,14 +253,16 @@ describe("runWithHistory runs the project checks and fixes failures", () => {
         expect(agentCalls[1]).toContain("checks-1.txt")
         expect(agentCalls[1]).toContain("fix-1.log")
         expect(outcome.run?.endReason).toBe("Pi made 2 commits on orc/test, and the checks passed. no-mistakes opened https://github.com/o/r/pull/7 and CI is green.")
-        expect(outcome.steps).toHaveLength(5)
-        expect(outcome.steps).toEqual(expect.arrayContaining([
+        expect(outcome.steps).toEqual([
           { name: "implement", status: "passed" },
           { name: "checks", status: "failed" },
           { name: "fix", status: "passed" },
           { name: "checks", status: "passed" },
           { name: "no-mistakes", status: "passed" }
-        ]))
+        ])
+        const report = await readFile(join(home, "runs", "step-run-1", "report.md"), "utf8")
+        const steps = report.split("## Steps")[1]?.split("## Evidence")[0]?.trim().split("\n").map((line) => line.split(":")[0])
+        expect(steps).toEqual(["- implement", "- checks round 1", "- fix 1", "- checks round 2", "- no-mistakes"])
       })
     })
   })

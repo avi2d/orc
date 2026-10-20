@@ -59,6 +59,8 @@ no-mistakes opened the PR and reported CI green.
 Otherwise orc records the run as failed with the reason and exits 1.
 Each run keeps its task, evidence, agent log and Pi session in `~/.orc/runs/<run-id>`.
 Its `no-mistakes.txt` and the run history hold the no-mistakes findings, their count, the gates orc answered, the final result and the PR link.
+Its `report.md` carries the task, the branch, the status, the PR, the steps, the evidence, the signals, the findings and the result.
+The terminal report names the run folder, the agent file, the session file and the report as full links, beside the PR link.
 
 ## Seeing runs
 
@@ -66,6 +68,10 @@ To list recent runs, run `bun run src/bin.ts runs`.
 Orc keeps its records in `~/.orc`, outside every project repo.
 To print the same facts as JSON, run `bun run src/bin.ts runs --json`.
 Every JSON document names its version first as `schema`, starting at `orc.runs.v1`.
+To see one run step by step, run `bun run src/bin.ts show <run-id>`.
+It lists each step with its agent, session, signals, latest score and evidence, every file as a full link.
+To print the same facts as JSON, run `bun run src/bin.ts show <run-id> --json`.
+Its JSON document names its version first as `schema`, starting at `orc.show.v1`.
 
 ## Where things are
 
@@ -74,7 +80,10 @@ Every JSON document names its version first as `schema`, starting at `orc.runs.v
 | `src/bin.ts` | The orc entry point |
 | `src/args.ts` | The flag parsing for the orc command |
 | `src/run.ts` | The `orc run` agent step: checkout checks, login preflight and the sandboxed Pi run |
-| `src/run-record.ts` | The run report, its evidence file and its history rows |
+| `src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
+| `src/history-write.ts` | The history rows a finished run records |
+| `src/report.ts` | The `report.md` shape and the signal facts it carries |
+| `src/show.ts` | The `orc show` reading of one run from the history |
 | `src/run-session.ts` | The reading of the captured Pi session |
 | `src/pi.ts` | The Pi agent command, its prompt and the check of its final reply |
 | `src/agents.ts` | The agent file parsing and lookup |
