@@ -32,6 +32,9 @@ To run a task, run `bun run src/bin.ts run <task-file>` inside a clean git check
 Orc refuses a checkout with uncommitted changes.
 Orc commits to a new branch named `orc/<run-id>`, or to the name you pass with `--branch <name>`.
 A branch name may hold only letters, digits, `.`, `_`, `-` and `/`.
+To resume the branch after a stop, run `bun run src/bin.ts run --branch <name>` and orc skips the steps the run history marks passed.
+On resume Sandcastle reuses the branch worktree, Pi resumes its prior session, and orc reattaches to no-mistakes with the same intent.
+After a refusal, run the same resume command with `--allow` and no-mistakes takes the word for `ask-user` gates.
 Orc also refuses a checkout whose own git config sets any key outside a short list known to run no program.
 
 The run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
@@ -49,7 +52,7 @@ Orc routes only `opencode-go` models through the sandbox and refuses any other m
 
 Once the checks pass, orc runs `no-mistakes axi run` on the branch with the task as its intent.
 At each gate orc asks no-mistakes to fix the findings marked `auto-fix`, ignores those marked `no-op`, and accepts the fix review.
-Orc refuses a gate holding an `ask-user` finding or an open review question, and leaves that gate parked for you to answer.
+Orc refuses a gate holding an open review question, and without `--allow` it also refuses a gate holding an `ask-user` finding, and leaves that gate parked for you to answer.
 
 Orc records the run as succeeded only when four facts hold.
 Pi's final reply in its captured session stopped cleanly with `ORC_COMPLETE` on its own line.
@@ -81,7 +84,7 @@ Its JSON document names its version first as `schema`, starting at `orc.show.v1`
 | `src/args.ts` | The flag parsing for the orc command |
 | `src/run.ts` | The `orc run` agent step: checkout checks, login preflight and the sandboxed Pi run |
 | `src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
-| `src/history-write.ts` | The history rows a finished run records |
+| `src/history-write.ts` | The history checkpoints a run records as each step starts and ends |
 | `src/report.ts` | The `report.md` shape and the signal facts it carries |
 | `src/show.ts` | The `orc show` reading of one run from the history |
 | `src/run-session.ts` | The reading of the captured Pi session |

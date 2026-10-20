@@ -33,7 +33,7 @@ describe("the run report", () => {
         expect(report).toContain("PR: https://github.com/o/r/pull/7")
         expect(report).toContain("## Steps")
         expect(report).toContain("- implement: passed")
-        expect(report).toContain("- checks round 1: passed file://" + runDir + "/checks-1.txt")
+        expect(report).toContain("- checks round 1: passed file://" + runDir + "/session/checks-1.txt")
         expect(report).toContain("- no-mistakes: passed")
         expect(report).toContain("## Evidence")
         expect(report).toContain("- task: file://" + runDir + "/task.md")

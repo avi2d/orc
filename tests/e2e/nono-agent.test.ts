@@ -1,11 +1,17 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { NonoProviderError, nonoSandboxProvider } from "../../src/nono"
 import { modelCredentialFor } from "../../src/nono-profile"
 
-const fixtureHome = await mkdtemp(join(process.cwd(), ".orc-nono-agent-home-"))
+const systemTempRoots = ["/tmp", "/private/tmp", "/var", "/private/var"]
+const underSystemTemp = (candidate: string): boolean =>
+  systemTempRoots.some((root) => candidate === root || candidate.startsWith(root + "/"))
+const homeBase = (cwd: string, systemTmp: string): string =>
+  !underSystemTemp(cwd) ? cwd : (!underSystemTemp(systemTmp) ? systemTmp : cwd)
+const fixtureHome = await mkdtemp(join(homeBase(process.cwd(), tmpdir()), ".orc-nono-agent-home-"))
 await writeFile(join(fixtureHome, ".gitconfig"), "")
 const fixtureGitEnv = { PATH: Bun.env.PATH ?? "", HOME: fixtureHome, GIT_CONFIG_GLOBAL: join(fixtureHome, ".gitconfig"), GIT_CONFIG_NOSYSTEM: "1" }
 
@@ -30,12 +36,13 @@ const checkoutWithSession = async (dir: string): Promise<{ readonly worktree: st
 }
 
 const noNono = Bun.which("nono") === null
+const insideSandbox = Bun.env.PI_SESSION_FILE !== undefined || Bun.env.NONO_CAP_FILE !== undefined
 
 // Starting a nono sandbox runs past bun's 5s default while the rest of the suite runs beside it.
 const sandboxTimeout = 30_000
 
 describe("the agent directory", () => {
-  test.skipIf(noNono)(skipReason("needs nono on PATH to create a sandbox", "exposes the agent dir the caller passes inside the sandbox"), async () => {
+  test.skipIf(noNono || insideSandbox)(skipReason("needs nono on PATH to create a sandbox", "exposes the agent dir the caller passes inside the sandbox"), async () => {
     const dir = await mkdtemp(join(process.cwd(), ".orc-nono-agent-"))
     try {
       const { worktree, session } = await checkoutWithSession(dir)
@@ -83,7 +90,7 @@ describe("the agent directory", () => {
     }
   }, sandboxTimeout)
 
-  test.skipIf(noNono)(skipReason("needs nono on PATH to create a sandbox", "ignores an ambient PI_CODING_AGENT_DIR and uses the agent folder under the session dir"), async () => {
+  test.skipIf(noNono || insideSandbox)(skipReason("needs nono on PATH to create a sandbox", "ignores an ambient PI_CODING_AGENT_DIR and uses the agent folder under the session dir"), async () => {
     const dir = await mkdtemp(join(process.cwd(), ".orc-nono-agent-"))
     try {
       const { worktree, session } = await checkoutWithSession(dir)
@@ -109,7 +116,7 @@ describe("the agent directory", () => {
 })
 
 describe("the model credential profile", () => {
-  test.skipIf(noNono)(skipReason("needs nono on PATH to create a sandbox", "validates the credential profile and runs the sandbox"), async () => {
+  test.skipIf(noNono || insideSandbox)(skipReason("needs nono on PATH to create a sandbox", "validates the credential profile and runs the sandbox"), async () => {
     const dir = await mkdtemp(join(process.cwd(), ".orc-nono-agent-"))
     try {
       const { worktree, session } = await checkoutWithSession(dir)

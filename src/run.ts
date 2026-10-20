@@ -10,17 +10,20 @@ import { canRouteModel, loginCheckCommand, modelCredentialFor, piAgentModels } f
 import { runGit } from "./git-run"
 import { orcCompletionLine } from "./pi"
 import { OrcRunError, describeCause } from "./run-session"
-import { openDatabase, orcHomeDir } from "./run-history"
-import { historyFailure, recordHistory } from "./history-write"
+import { openDatabase, orcHomeDir, updateStep } from "./run-history"
+import { stepsForRun } from "./history-resume"
+import { buildResumePlan, resolveTaskFile } from "./run-resume"
+import { finishRun, historyFailure, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordRunStart } from "./history-write"
 import { failedReport, writeEvidence, writeReport, type HistoryRun, type OrcRunReport } from "./run-record"
-import { runFull, type SandboxOps } from "./run-loop"
+import { runFull, type RunCheckpoints, type SandboxOps } from "./run-loop"
 
 export type { SandboxOps }
 
 export interface OrcRunRequest {
   readonly cwd: string
-  readonly taskFile: string
+  readonly taskFile: string | null | undefined
   readonly branch?: string | undefined
+  readonly allow?: boolean | undefined
   readonly homeDir?: string | undefined
   readonly runId?: string | undefined
   readonly agentsDir?: string | undefined
@@ -100,7 +103,7 @@ const openCheckout = (
     }
     const branch = branchName ?? ("orc/" + runId)
     if (!shellSafeBranch.test(branch)) {
-      return yield* refuse("orc: " + branch + " holds a shell metacharacter, so orc takes only letters, digits, '.', '_', '-' and '/' in a branch name")
+      return yield* refuse("orc: Sandcastle interpolates " + branch + " into host shell commands, so a branch holding a shell metacharacter is refused and orc takes only letters, digits, '.', '_', '-' and '/' in a branch name")
     }
     const named = yield* runGit(spawner, git, ["check-ref-format", "--branch", branch], projectDir)
     if (named.exitCode !== 0) {
@@ -155,6 +158,88 @@ const openHostGit = (fs: FileSystem.FileSystem, path: Path.Path): Effect.Effect<
     )
 }
 
+type ModelCredential = NonNullable<ReturnType<typeof modelCredentialFor>>
+
+interface PreparedAgents {
+  readonly folders: RunFolders
+  readonly agent: AgentFile
+  readonly fixer: AgentFile
+  readonly credential: ModelCredential
+}
+
+const prepareAgents = (
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
+  checkout: Checkout,
+  home: string,
+  runDir: string,
+  effectiveTaskFile: string,
+  agentsDir: string | undefined
+): Effect.Effect<PreparedAgents, OrcRunError, FileSystem.FileSystem | Path.Path> =>
+  Effect.gen(function*() {
+    const folders = yield* prepareRunFolders(fs, path, runDir, effectiveTaskFile)
+    const agent: AgentFile = yield* resolveAgentFile("implementer", {
+      projectDir: checkout.projectDir,
+      orcHome: home,
+      agentsDir
+    }).pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
+    const fixer: AgentFile = yield* resolveAgentFile("fixer", {
+      projectDir: checkout.projectDir,
+      orcHome: home,
+      agentsDir
+    }).pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
+    const piBinary = Bun.which("pi")
+    const nodeBinary = Bun.which("node")
+    const operatorHome = homedir()
+    if (!canRouteModel(agent.model)) {
+      return yield* refuse("orc: the agent file names model " + agent.model + ", and orc routes only opencode-go models through the sandbox")
+    }
+    if (piBinary === null) {
+      return yield* refuse("orc: pi is not on the host PATH")
+    }
+    if (nodeBinary === null) {
+      return yield* refuse("orc: node is not on the host PATH")
+    }
+    const credential = modelCredentialFor(agent.model, { piBinary, nodeBinary, homeDir: operatorHome })
+    if (credential === null) {
+      return yield* refuse("orc: the agent file names model " + agent.model + ", and orc routes only opencode-go models through the sandbox")
+    }
+    yield* runLoginCheck(spawner, { piBinary, nodeBinary, homeDir: operatorHome }, checkout.projectDir)
+    yield* fs.writeFileString(path.join(folders.piAgentDir, "models.json"), piAgentModels(credential)).pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the agent models file: " + String(cause) }))
+    )
+    return { folders, agent, fixer, credential }
+  })
+
+const readTaskFile = (
+  fs: FileSystem.FileSystem,
+  home: string,
+  checkout: Checkout,
+  supplied: string | null | undefined
+): Effect.Effect<string, OrcRunError, FileSystem.FileSystem | Path.Path> =>
+  Effect.acquireUseRelease(
+    openDatabase(home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
+    (db) => resolveTaskFile(db, fs, checkout.branch, checkout.projectDir, supplied),
+    (db) => Effect.sync(() => db.close())
+  )
+
+const openSandboxForRun = (
+  git: string,
+  checkout: Checkout,
+  folders: RunFolders,
+  credential: ModelCredential,
+  hostPath: string | undefined
+): Effect.Effect<Sandbox, OrcRunError> =>
+  Effect.tryPromise({
+    try: () => createSandbox({
+      branch: checkout.branch,
+      sandbox: nonoSandboxProvider({ piSessionDir: folders.piSessionDir, piAgentDir: folders.piAgentDir, modelCredential: credential, hostPath }),
+      cwd: checkout.projectDir
+    }),
+    catch: (cause) => new OrcRunError({ message: "orc: the sandbox failed to start: " + describeCause(cause) })
+  }).pipe(withHostGitSafety(git))
+
 export const runAgentStep = (
   request: OrcRunRequest
 ): Effect.Effect<OrcRunReport, OrcRunError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
@@ -168,60 +253,21 @@ export const runAgentStep = (
     const git = yield* openHostGit(fs, path)
     const checkout = yield* openCheckout(fs, path, spawner, git, request.cwd, request.branch, runId)
     const runDir = path.join(home, "runs", runId)
-    const prepared = yield* Effect.gen(function*() {
-      const folders = yield* prepareRunFolders(fs, path, runDir, request.taskFile)
-      const agent: AgentFile = yield* resolveAgentFile("implementer", {
-        projectDir: checkout.projectDir,
-        orcHome: home,
-        agentsDir: request.agentsDir
-      }).pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
-      const fixer: AgentFile = yield* resolveAgentFile("fixer", {
-        projectDir: checkout.projectDir,
-        orcHome: home,
-        agentsDir: request.agentsDir
-      }).pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
-      const piBinary = Bun.which("pi")
-      const nodeBinary = Bun.which("node")
-      const operatorHome = homedir()
-      if (!canRouteModel(agent.model)) {
-        return yield* refuse("orc: the agent file names model " + agent.model + ", and orc routes only opencode-go models through the sandbox")
-      }
-      if (piBinary === null) {
-        return yield* refuse("orc: pi is not on the host PATH")
-      }
-      if (nodeBinary === null) {
-        return yield* refuse("orc: node is not on the host PATH")
-      }
-      const credential = modelCredentialFor(agent.model, { piBinary, nodeBinary, homeDir: operatorHome })
-      if (credential === null) {
-        return yield* refuse("orc: the agent file names model " + agent.model + ", and orc routes only opencode-go models through the sandbox")
-      }
-      yield* runLoginCheck(spawner, { piBinary, nodeBinary, homeDir: operatorHome }, checkout.projectDir)
-      yield* fs.writeFileString(path.join(folders.piAgentDir, "models.json"), piAgentModels(credential)).pipe(
-        Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the agent models file: " + String(cause) }))
-      )
-      return { folders, agent, fixer, credential }
-    }).pipe(
+    const effectiveTaskFile = yield* readTaskFile(fs, home, checkout, request.taskFile)
+    const { folders, agent, fixer, credential } = yield* prepareAgents(fs, path, spawner, checkout, home, runDir, effectiveTaskFile, request.agentsDir).pipe(
       Effect.onError(() => fs.remove(runDir, { recursive: true }).pipe(Effect.result))
     )
-    const { folders, agent, fixer, credential } = prepared
     const started = new Date().toISOString()
-    const sandbox: Sandbox = yield* Effect.tryPromise({
-      try: () => createSandbox({
-        branch: checkout.branch,
-        sandbox: nonoSandboxProvider({ piSessionDir: folders.piSessionDir, piAgentDir: folders.piAgentDir, modelCredential: credential, hostPath }),
-        cwd: checkout.projectDir
-      }),
-      catch: (cause) => new OrcRunError({ message: "orc: the sandbox failed to start: " + describeCause(cause) })
-    }).pipe(withHostGitSafety(git))
+    const sandbox: Sandbox = yield* openSandboxForRun(git, checkout, folders, credential, hostPath)
     const ops: SandboxOps = {
-      runAgent: (agentProvider, prompt, logFile) =>
+      runAgent: (agentProvider, prompt, logFile, resumeSession) =>
         sandbox.run({
           agent: agentProvider,
           prompt,
           completionSignal: orcCompletionLine,
           logging: { type: "file", path: path.join(folders.runDir, logFile) },
-          name: "orc-" + runId
+          name: "orc-" + runId,
+          ...(resumeSession === undefined ? {} : { resumeSession })
         }),
       execCheck: (command) => sandbox.exec(command)
     }
@@ -230,7 +276,8 @@ export const runAgentStep = (
       runDir: folders.runDir, piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir,
       taskPath: folders.taskPath, agent, fixer, branch: checkout.branch, started,
       worktreeDir: sandbox.worktreePath,
-      noMistakesPath: hostPath ?? ""
+      noMistakesPath: hostPath ?? "",
+      allow: request.allow ?? false
     }
     const report = yield* Effect.acquireUseRelease(
       openDatabase(home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
@@ -244,11 +291,47 @@ export const runAgentStep = (
 
 export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
-    const report = yield* runFull(run, ops).pipe(
-      Effect.catchTag("OrcRunError", (error) => Effect.succeed(failedReport(run, error.message)))
+    const resume = yield* buildResumePlan(db, run)
+    yield* recordRunStart(db, run)
+    for (const round of resume.inheritedRounds) {
+      yield* recordChecksDone(db, run.runId, round)
+    }
+    for (const fix of resume.inheritedFixes) {
+      yield* recordFixDone(db, run.runId, fix)
+    }
+    const checkpoints: RunCheckpoints = {
+      implementStart: (started) => recordImplementStart(db, run, started),
+      implementDone: (outcome, started, ended) => recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: outcome.sessionFile, tokens: outcome.tokens, commits: outcome.commits, implementPassed: outcome.completed }, started, ended),
+      checksRoundStart: (round, started) => recordChecksStart(db, run.runId, round, started),
+      checksRoundDone: (round) => recordChecksDone(db, run.runId, round),
+      fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer.path, started),
+      fixDone: (fix) => recordFixDone(db, run.runId, fix),
+      noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
+      noMistakesDone: (record) => recordNoMistakesDone(db, run, record)
+    }
+    const report = yield* runFull(run, ops, resume, checkpoints).pipe(
+      Effect.catchTag("OrcRunError", (error) =>
+        Effect.gen(function*() {
+          const existing = yield* stepsForRun(db, run.runId).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<{ readonly name: string; readonly status: string; readonly attempt: number }>))
+          const now = new Date().toISOString()
+          for (const step of existing) {
+            if (step.status === "running") {
+              yield* updateStep(db, run.runId, step.name, step.attempt, { status: "failed", ended: now }).pipe(Effect.orElseSucceed(() => false))
+            }
+          }
+          if (!existing.some((step) => step.name === "implement")) {
+            yield* recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: null, tokens: null, commits: null, implementPassed: false }, run.started, now).pipe(Effect.orElseSucceed(() => undefined))
+          }
+          const failed = failedReport(run, error.message)
+          yield* writeEvidence(run, failed).pipe(Effect.orElseSucceed(() => undefined))
+          yield* writeReport(run, failed).pipe(Effect.orElseSucceed(() => undefined))
+          yield* finishRun(db, run.runId, failed, new Date().toISOString()).pipe(Effect.orElseSucceed(() => undefined))
+          return failed
+        })
+      )
     )
     yield* writeEvidence(run, report)
     yield* writeReport(run, report)
-    yield* recordHistory(db, run, report)
+    yield* finishRun(db, run.runId, report, new Date().toISOString())
     return report
   })

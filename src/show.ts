@@ -32,9 +32,9 @@ const ShowScoreSchema = Schema.Struct({
 })
 
 const ShowStepSchema = Schema.Struct({
-  id: Schema.Number,
+  id: Schema.Finite,
   name: Schema.String,
-  attempt: Schema.Number,
+  attempt: Schema.Finite,
   status: StepStatusSchema,
   started: Schema.String,
   ended: Schema.NullOr(Schema.String),
@@ -75,10 +75,10 @@ export const decodeShowJson = (value: unknown): Effect.Effect<ShowJsonDocument, 
   Schema.decodeUnknownEffect(ShowJsonSchema)(value)
 
 const StepSqlRowSchema = Schema.Struct({
-  id: Schema.Number,
+  id: Schema.Finite,
   run_id: Schema.String,
   name: Schema.String,
-  attempt: Schema.Number,
+  attempt: Schema.Finite,
   status: StepStatusSchema,
   started: Schema.String,
   ended: Schema.NullOr(Schema.String),
@@ -87,7 +87,7 @@ const StepSqlRowSchema = Schema.Struct({
 })
 
 const EvidenceSqlRowSchema = Schema.Struct({
-  step_id: Schema.Number,
+  step_id: Schema.Finite,
   direction: EvidenceDirectionSchema,
   path: Schema.String,
   kind: Schema.String
@@ -159,7 +159,7 @@ export const readShow = (
         const separator = runRow.task_file.lastIndexOf("/")
         const runDir = separator < 0 ? "." : runRow.task_file.slice(0, separator)
         const report = reportPathForRunDir(runDir)
-        return yield* Schema.decodeUnknownEffect(ShowJsonSchema)({
+        return yield* Schema.decodeEffect(ShowJsonSchema)({
           schema: SHOW_JSON_SCHEMA,
           run: {
             id: runRow.id,

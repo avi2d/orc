@@ -38,6 +38,7 @@ export interface NoMistakesInput {
   readonly git: string
   readonly taskFile: string
   readonly worktreeDir: string
+  readonly allow?: boolean | undefined
 }
 
 interface ParkedGate {
@@ -140,31 +141,33 @@ export const parseRun = (output: string): ParsedRun => {
   }
 }
 
-export const answerForGate = (gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>): GateAnswer => {
+export const answerForGate = (gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>, allow = false): GateAnswer => {
   const question = findings.find((finding) => finding.id.startsWith("question-"))
   if (question !== undefined) {
-    return { kind: "refuse", reason: "open review question " + question.id + " needs your word" }
+    return { kind: "refuse", reason: "finding " + question.id + " is a question and needs your word" }
   }
   const asked = findings.find((finding) => finding.action === "ask-user")
-  if (asked !== undefined) {
+  if (asked !== undefined && !allow) {
     return { kind: "refuse", reason: "finding " + asked.id + " is marked ask-user and needs your word" }
   }
-  const other = findings.find((finding) => finding.action !== "auto-fix" && finding.action !== "no-op")
+  const worded = allow ? findings.filter((finding) => finding.action === "ask-user") : []
+  const rest = allow ? findings.filter((finding) => finding.action !== "ask-user") : findings
+  const other = rest.find((finding) => finding.action !== "auto-fix" && finding.action !== "no-op")
   if (other !== undefined) {
     return { kind: "refuse", reason: "finding " + other.id + " needs an answer orc cannot give" }
   }
   if (gate.stage === "fix-review") {
     return { kind: "approve" }
   }
-  const fixable = findings.filter((finding) => finding.action === "auto-fix")
+  const fixable = rest.filter((finding) => finding.action === "auto-fix")
   if (fixable.length > 0) {
     return {
       kind: "fix",
       ids: fixable.map((finding) => finding.id),
-      ignore: findings.filter((finding) => finding.action === "no-op").map((finding) => finding.id)
+      ignore: [...rest.filter((finding) => finding.action === "no-op"), ...worded].map((finding) => finding.id)
     }
   }
-  if (findings.length > 0) {
+  if (rest.length > 0 || worded.length > 0) {
     return { kind: "approve" }
   }
   return { kind: "refuse", reason: "the " + gate.step + " gate names no finding orc can fix" }
@@ -281,10 +284,10 @@ const stopOnRejection = (input: NoMistakesInput, log: DriveLog, sent: Sent, comm
   }))
 }
 
-const gateAnswer = (log: DriveLog, gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>): GateAnswer =>
+const gateAnswer = (input: NoMistakesInput, log: DriveLog, gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>): GateAnswer =>
   log.gatesAnswered() >= maxGatesAnswered
     ? { kind: "refuse", reason: "orc answered " + maxGatesAnswered.toString() + " gates without reaching an outcome" }
-    : answerForGate(gate, findings)
+    : answerForGate(gate, findings, input.allow ?? false)
 
 const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending> =>
   Effect.gen(function*() {
@@ -307,7 +310,7 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending> =>
         sent = { kind: "reattach" }
         continue
       }
-      const answer = gateAnswer(log, parsed.gate, parsed.findings)
+      const answer = gateAnswer(input, log, parsed.gate, parsed.findings)
       if (answer.kind === "refuse") {
         return log.refuse(parsed.gate, answer.reason)
       }

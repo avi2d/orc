@@ -1,4 +1,5 @@
-import { Data, Effect, FileSystem, type Path, type PlatformError, type Scope, Stream } from "effect"
+import { BunServices } from "@effect/platform-bun"
+import { Data, Effect, Exit, FileSystem, type Path, type PlatformError, Scope, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { type Runtime, runtimeOf, within } from "./nono-profile"
 
@@ -134,6 +135,30 @@ export const resolvePiAgentDir = (
     return { PI_CODING_AGENT_DIR: dir }
   })
 
+export interface SandboxShims {
+  readonly shimDir: string
+}
+
+export const prepareSandboxShims = (
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  piSessionDir: string
+): Effect.Effect<SandboxShims, NonoProviderError> =>
+  Effect.gen(function*() {
+    const shimDir = path.join(piSessionDir, "shims")
+    yield* fs.makeDirectory(shimDir, { recursive: true }).pipe(
+      Effect.mapError((cause) =>
+        new NonoProviderError({ message: `orc nono provider: cannot create the mktemp shim dir ${shimDir}: ${String(cause)}` })
+      )
+    )
+    yield* fs.writeFileString(path.join(shimDir, "mktemp"), "#!/bin/sh\nif [ \"$1\" = \"-d\" ] && [ $# -eq 1 ]; then\n  exec /usr/bin/mktemp -d \"${TMPDIR:-/tmp}/tmp.XXXXXX\"\nfi\nexec /usr/bin/mktemp \"$@\"\n", { mode: 0o755 }).pipe(
+      Effect.mapError((cause) =>
+        new NonoProviderError({ message: `orc nono provider: cannot write the mktemp shim in ${shimDir}: ${String(cause)}` })
+      )
+    )
+    return { shimDir }
+  })
+
 export interface HostCommandResult {
   readonly stdout: string
   readonly stdoutBytes: Uint8Array
@@ -235,3 +260,20 @@ export const resolveRuntime = (
     }
     return null
   })
+
+export const closeNonoSandbox = (lifetime: Scope.Closeable, profileDir: string, shimDir: string): Promise<void> =>
+  Effect.runPromise(
+    Scope.close(lifetime, Exit.void).pipe(
+      Effect.andThen(() =>
+        Effect.gen(function*() {
+          const fs = yield* FileSystem.FileSystem
+          yield* fs.remove(profileDir, { recursive: true })
+          yield* fs.remove(shimDir, { recursive: true })
+        })
+      ),
+      // A leftover rendered profile is litter, never a teardown failure.
+      Effect.result,
+      Effect.asVoid,
+      Effect.provide(BunServices.layer)
+    )
+  )

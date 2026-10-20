@@ -1,0 +1,16 @@
+#!/bin/sh
+# macOS mktemp ignores TMPDIR for directory mode and uses confstr temp Nono denies.
+# Forcing the directory into TMPDIR keeps coverage in the session tmp Nono grants.
+if [ "$1" = "-d" ]; then
+  for arg in "$@"; do
+    case "$arg" in
+      -p|*/*) exec /usr/bin/mktemp "$@";;
+    esac
+  done
+  shift
+  if [ $# -eq 0 ]; then
+    exec /usr/bin/mktemp -d -p "${TMPDIR:-/tmp}" tmp.XXXXXX
+  fi
+  exec /usr/bin/mktemp -d -p "${TMPDIR:-/tmp}" "$@"
+fi
+exec /usr/bin/mktemp "$@"

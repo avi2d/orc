@@ -230,7 +230,7 @@ export const buildNonoProfile = (roots: NonoSandboxRoots, host: HostRuntime) => 
     read: [...toolchainReadPaths, ...host.runtimeDirs],
     write: [],
     allow_file: [],
-    read_file: runtimeReadFiles,
+    read_file: [...runtimeReadFiles],
     write_file: ["/dev/null"],
     unix_socket: [],
     unix_socket_bind: [],

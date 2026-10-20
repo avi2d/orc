@@ -100,7 +100,8 @@ export const runChecksRound = (
       sections.push(sectionOf(outcome, result.stdout, result.stderr))
     }
     const file = path.join(runDir, checksFileName(round))
-    yield* fs.writeFileString(file, sections.join("\n\n") + "\n").pipe(
+    yield* fs.makeDirectory(path.dirname(file), { recursive: true }).pipe(
+      Effect.andThen(() => fs.writeFileString(file, sections.join("\n\n") + "\n")),
       Effect.mapError((cause) => new ChecksError({ message: "orc: cannot write the checks evidence file: " + String(cause) }))
     )
     return { round, file, outcomes }

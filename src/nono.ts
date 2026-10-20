@@ -6,14 +6,16 @@ import {
   type ExecResult
 } from "@ai-hero/sandcastle"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, Exit, FiberSet, FileSystem, Path, Schema, Scope, Stream } from "effect"
+import { Effect, FiberSet, FileSystem, Path, Schema, Scope, Stream } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { homedir } from "node:os"
 import {
+  closeNonoSandbox,
   type HostCommandResult,
   hostGitSafetyEnv,
   NonoProviderError,
+  prepareSandboxShims,
   resolveDeveloperDir,
   resolveHostBinary,
   resolvePiAgentDir,
@@ -296,7 +298,6 @@ const checkProfile = (
     }
   })
 
-
 export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSandboxProvider => {
   const create = (createOptions: BindMountCreateOptions): Promise<BindMountSandboxHandle> => {
     const program = Effect.gen(function*() {
@@ -307,10 +308,10 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const hostGit = { binary: yield* resolveHostBinary(fs, "git"), env: buildHostGitEnv(hostEnv) }
       const roots = yield* resolveRoots(spawner, fs, path, hostGit, createOptions.worktreePath, options.piSessionDir)
       yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, hostGit)
-      const runtimes = (yield* Effect.forEach(sandboxRuntimes, (name) => resolveRuntime(fs, path, name, Bun.env.PATH ?? "", homedir())))
-        .filter((runtime) => runtime !== null)
+      const runtimes = (yield* Effect.forEach(sandboxRuntimes, (name) => resolveRuntime(fs, path, name, Bun.env.PATH ?? "", homedir()))).filter((runtime) => runtime !== null)
       const agentDir = yield* resolvePiAgentDir(fs, roots.piSessionDir, options.piAgentDir)
-      const env = sandboxEnv(hostEnv, roots.piSessionDir, runtimes.map((runtime) => runtime.binDir), agentDir)
+      const shims = yield* prepareSandboxShims(fs, path, roots.piSessionDir)
+      const env = sandboxEnv(hostEnv, roots.piSessionDir, [shims.shimDir, ...runtimes.map((runtime) => runtime.binDir)], agentDir)
       const runtimeDirs = runtimes.flatMap((runtime) => runtime.installDir === null ? [] : [runtime.installDir])
       const developerDir = yield* resolveDeveloperDir(spawner, fs, env)
       const nonoBinary = yield* resolveHostBinary(fs, "nono")
@@ -380,16 +381,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
               Effect.provide(BunServices.layer)
             )
           ),
-        close: (): Promise<void> =>
-          Effect.runPromise(
-            Scope.close(lifetime, Exit.void).pipe(
-              Effect.andThen(() => fs.remove(profileDir, { recursive: true })),
-              // A leftover rendered profile is litter, never a teardown failure.
-              Effect.result,
-              Effect.asVoid,
-              Effect.provide(BunServices.layer)
-            )
-          )
+        close: (): Promise<void> => closeNonoSandbox(lifetime, profileDir, shims.shimDir)
       } satisfies BindMountSandboxHandle
     })
     return Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(BunServices.layer)))

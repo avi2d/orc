@@ -11,7 +11,8 @@
   },
   "scripts": {
     "build": "bun build src/bin.ts --outdir dist --target bun && checks-effect-scope && checks-changelog",
-    "lint": "oxlint && checks-lint",
+    "lint": "mkdir -p .orc-home && HOME=$PWD/.orc-home PATH=$PWD/scripts:$PATH oxlint && HOME=$PWD/.orc-home PATH=$PWD/scripts:$PATH checks-lint",
+    "postinstall": "bun scripts/patch-knip-jiti.ts",
     "typecheck": "tsc --noEmit && effect-tsgo diagnostics --project tsconfig.json --format text --strict",
     "test": "checks-test",
     "test:live": "checks-test --tier=live"

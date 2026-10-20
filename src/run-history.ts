@@ -295,6 +295,43 @@ export const listRuns = (
     )
   )
 
+export const updateRun = (db: Database, id: string, patch: { readonly status: RunStatus; readonly ended: string | null; readonly prLink: string | null; readonly endReason: string | null }): Effect.Effect<void, SqliteFailure> =>
+  sqlite(() => {
+    db.query("UPDATE runs SET status = ?, ended = ?, pr_link = ?, end_reason = ? WHERE id = ?").run(patch.status, patch.ended, patch.prLink, patch.endReason, id)
+  })
+
+const StepIdRowSchema = Schema.Struct({ id: Schema.Finite })
+
+export const stepIdFor = (db: Database, runId: string, name: string, attempt: number): Effect.Effect<number | null, Schema.SchemaError | SqliteFailure> =>
+  sqlite(() => db.query("SELECT id FROM steps WHERE run_id = ? AND name = ? AND attempt = ? ORDER BY id ASC LIMIT 1").get(runId, name, attempt)).pipe(
+    Effect.flatMap((row) =>
+      row === null || row === undefined
+        ? Effect.succeed(null)
+        : Schema.decodeUnknownEffect(StepIdRowSchema)(row).pipe(Effect.map((decoded) => decoded.id))
+    )
+  )
+
+const StepUpdateResultSchema = Schema.Struct({ changes: Schema.Union([Schema.Finite, Schema.BigInt]) })
+
+export const updateStep = (db: Database, runId: string, name: string, attempt: number, patch: { readonly status: StepStatus; readonly ended: string | null; readonly piSessionFile?: string | null | undefined }): Effect.Effect<boolean, Schema.SchemaError | SqliteFailure> =>
+  sqlite(() =>
+    db.query("UPDATE steps SET status = ?, ended = ?, pi_session_file = COALESCE(?, pi_session_file) WHERE run_id = ? AND name = ? AND attempt = ?").run(patch.status, patch.ended, patch.piSessionFile ?? null, runId, name, attempt)
+  ).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(StepUpdateResultSchema)),
+    Effect.map((decoded) => Number(decoded.changes) > 0)
+  )
+
+export const sessionIdFromFile = (file: string | null): string | null => {
+  if (file === null) {
+    return null
+  }
+  const base = file.slice(file.lastIndexOf("/") + 1)
+  const bare = base.endsWith(".jsonl") ? base.slice(0, -6) : base
+  const cut = bare.lastIndexOf("_")
+  const candidate = cut === -1 ? bare : bare.slice(cut + 1)
+  return candidate === "" ? null : candidate
+}
+
 export const toFileUrl = (path: string): string => pathToFileURL(path).href
 
 export const runsJson = (runs: ReadonlyArray<RunRecord>): RunsJsonDocument => ({
