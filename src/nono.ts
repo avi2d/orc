@@ -14,6 +14,7 @@ import {
   type HostCommandResult,
   hostGitSafetyEnv,
   NonoProviderError,
+  prepareSandboxShims,
   resolveDeveloperDir,
   resolveHostBinary,
   resolvePiAgentDir,
@@ -307,10 +308,10 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const hostGit = { binary: yield* resolveHostBinary(fs, "git"), env: buildHostGitEnv(hostEnv) }
       const roots = yield* resolveRoots(spawner, fs, path, hostGit, createOptions.worktreePath, options.piSessionDir)
       yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, hostGit)
-      const runtimes = (yield* Effect.forEach(sandboxRuntimes, (name) => resolveRuntime(fs, path, name, Bun.env.PATH ?? "", homedir())))
-        .filter((runtime) => runtime !== null)
+      const runtimes = (yield* Effect.forEach(sandboxRuntimes, (name) => resolveRuntime(fs, path, name, Bun.env.PATH ?? "", homedir()))).filter((runtime) => runtime !== null)
       const agentDir = yield* resolvePiAgentDir(fs, roots.piSessionDir, options.piAgentDir)
-      const env = sandboxEnv(hostEnv, roots.piSessionDir, runtimes.map((runtime) => runtime.binDir), agentDir)
+      const shims = yield* prepareSandboxShims(fs, path, roots.piSessionDir, roots.gitData, (hostEnv as Record<string, string | undefined>).HOME ?? homedir())
+      const env = sandboxEnv(hostEnv, roots.piSessionDir, [shims.shimDir, ...runtimes.map((runtime) => runtime.binDir)], agentDir)
       const runtimeDirs = runtimes.flatMap((runtime) => runtime.installDir === null ? [] : [runtime.installDir])
       const developerDir = yield* resolveDeveloperDir(spawner, fs, env)
       const nonoBinary = yield* resolveHostBinary(fs, "nono")
@@ -318,7 +319,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const profileDir = yield* fs.makeTempDirectory({ prefix: "orc-nono-" })
       const profilePath = path.join(profileDir, "profile.json")
       const hostTrustedPaths = [profileDir, nonoBinary, path.dirname(nonoBinary)]
-      yield* fs.writeFileString(profilePath, `${JSON.stringify(selectNonoProfile(roots, { developerDir, runtimeDirs }, options.modelCredential), null, 2)}\n`).pipe(
+      yield* fs.writeFileString(profilePath, `${JSON.stringify(selectNonoProfile(roots, { developerDir, runtimeDirs, cacheDir: shims.cacheDir, parentTsconfig: shims.parentTsconfig }, options.modelCredential), null, 2)}\n`).pipe(
         Effect.andThen(() => checkProfile(spawner, nono, profilePath, hostTrustedPaths)),
         Effect.andThen(() => fs.makeDirectory(env.TMPDIR, { recursive: true })),
         Effect.onError(() => fs.remove(profileDir, { recursive: true }).pipe(Effect.result))
@@ -384,6 +385,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
           Effect.runPromise(
             Scope.close(lifetime, Exit.void).pipe(
               Effect.andThen(() => fs.remove(profileDir, { recursive: true })),
+              Effect.andThen(() => fs.remove(shims.shimDir, { recursive: true })),
               // A leftover rendered profile is litter, never a teardown failure.
               Effect.result,
               Effect.asVoid,

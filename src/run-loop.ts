@@ -240,18 +240,7 @@ export const runFull = (run: HistoryRun, ops: SandboxOps, resume?: ResumePlan): 
         checks: outcome.outcomes.map((check) => ({ name: check.name, passed: check.passed }))
       })
       if (failed.length === 0) {
-        const noMistakes = yield* driveNoMistakes({ spawner: run.spawner, pathEnv: run.noMistakesPath, git: run.git, taskFile: run.taskPath, worktreeDir: run.worktreeDir, allow: plan.allow })
-        return {
-          ...base,
-          commits,
-          completed: noMistakes.status === "passed",
-          checksRounds: rounds,
-          fixes,
-          fixAttempts: fixes.length,
-          prLink: noMistakes.prLink,
-          noMistakes,
-          endReason: "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + ", and the checks passed. " + noMistakes.result
-        }
+        return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow)
       }
       if (fixes.length >= maxFixAttempts) {
         return {

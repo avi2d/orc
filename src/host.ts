@@ -130,6 +130,37 @@ export const resolvePiAgentDir = (
     return { PI_CODING_AGENT_DIR: dir }
   })
 
+export interface SandboxShims {
+  readonly shimDir: string
+  readonly cacheDir: string
+  readonly parentTsconfig: string | undefined
+}
+
+export const prepareSandboxShims = (
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  piSessionDir: string,
+  gitData: string,
+  homeDir: string
+): Effect.Effect<SandboxShims, NonoProviderError> =>
+  Effect.gen(function*() {
+    const shimDir = path.join(piSessionDir, "shims")
+    yield* fs.makeDirectory(shimDir, { recursive: true }).pipe(
+      Effect.mapError((cause) =>
+        new NonoProviderError({ message: `orc nono provider: cannot create the mktemp shim dir ${shimDir}: ${String(cause)}` })
+      )
+    )
+    yield* fs.writeFileString(path.join(shimDir, "mktemp"), "#!/bin/sh\nif [ \"$1\" = \"-d\" ] && [ $# -eq 1 ]; then\n  exec /usr/bin/mktemp -d \"${TMPDIR:-/tmp}/tmp.XXXXXX\"\nfi\nexec /usr/bin/mktemp \"$@\"\n", { mode: 0o755 }).pipe(
+      Effect.mapError((cause) =>
+        new NonoProviderError({ message: `orc nono provider: cannot write the mktemp shim in ${shimDir}: ${String(cause)}` })
+      )
+    )
+    const cacheDir = path.join(homeDir, ".cache", "avi2dg-checks")
+    const parentTsconfig = path.join(path.dirname(gitData), "tsconfig.json")
+    const parentExists = yield* fs.exists(parentTsconfig).pipe(Effect.orElseSucceed(() => false))
+    return { shimDir, cacheDir, parentTsconfig: parentExists ? parentTsconfig : undefined }
+  })
+
 export interface HostCommandResult {
   readonly stdout: string
   readonly stdoutBytes: Uint8Array

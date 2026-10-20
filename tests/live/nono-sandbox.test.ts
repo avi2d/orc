@@ -21,7 +21,12 @@ const credentialEnv = {
 }
 
 // nono refuses a HOME whose state root falls under the /var or /tmp it grants, so the fixture home is not under the system temp dir.
-const fixtureHome = await mkdtemp(join(process.cwd(), ".orc-nono-home-"))
+const systemTempRoots = ["/tmp", "/private/tmp", "/var", "/private/var"]
+const underSystemTemp = (candidate: string): boolean =>
+  systemTempRoots.some((root) => candidate === root || candidate.startsWith(root + "/"))
+const homeBase = (cwd: string, systemTmp: string): string =>
+  !underSystemTemp(cwd) ? cwd : (!underSystemTemp(systemTmp) ? systemTmp : cwd)
+const fixtureHome = await mkdtemp(join(homeBase(process.cwd(), tmpdir()), ".orc-nono-home-"))
 await writeFile(join(fixtureHome, ".gitconfig"), "")
 const fixtureGitEnv = { PATH: Bun.env.PATH ?? "", HOME: fixtureHome, GIT_CONFIG_GLOBAL: join(fixtureHome, ".gitconfig"), GIT_CONFIG_NOSYSTEM: "1" }
 
