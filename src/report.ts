@@ -56,7 +56,7 @@ export interface OrcRunReport {
 export const findingLine = (finding: NoMistakesFinding): string =>
   [finding.id, finding.severity, finding.file + (finding.line === "" ? "" : ":" + finding.line), finding.action, finding.description].filter((part) => part !== "").join(" ")
 
-export const measuredSignals = (report: OrcRunReport): ReadonlyArray<{ readonly name: string; readonly value: string }> => [
+const measuredSignals = (report: OrcRunReport): ReadonlyArray<{ readonly name: string; readonly value: string }> => [
   ...(report.tokens === null ? [] : [
     { name: "input-tokens", value: report.tokens.input.toString() },
     { name: "output-tokens", value: report.tokens.output.toString() }
@@ -76,7 +76,7 @@ type ChecksLoopStep =
   | { readonly kind: "checks"; readonly round: ChecksRoundSummary }
   | { readonly kind: "fix"; readonly fix: RecordedFixAttempt }
 
-export const checksLoopSteps = (report: OrcRunReport): ReadonlyArray<ChecksLoopStep> =>
+const checksLoopSteps = (report: OrcRunReport): ReadonlyArray<ChecksLoopStep> =>
   (report.checksRounds ?? []).flatMap((round): ReadonlyArray<ChecksLoopStep> => {
     const fix = report.fixes.find((attempt) => attempt.attempt === round.round)
     return fix === undefined ? [{ kind: "checks", round }] : [{ kind: "checks", round }, { kind: "fix", fix }]

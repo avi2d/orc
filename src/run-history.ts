@@ -295,142 +295,30 @@ export const listRuns = (
     )
   )
 
-export interface BranchStep {
-  readonly name: string
-  readonly status: string
-  readonly attempt: number
-  readonly piSessionFile: string | null
-}
-
-const BranchStepRowSchema = Schema.Struct({
-  name: Schema.String,
-  status: Schema.String,
-  attempt: Schema.Finite,
-  pi_session_file: Schema.NullOr(Schema.String)
-})
-
-export const latestRunForBranch = (
-  db: Database,
-  project: string,
-  branch: string
-): Effect.Effect<RunRecord | null, Schema.SchemaError | SqliteFailure> =>
-  sqlite(() =>
-    db.query(
-      "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason FROM runs WHERE project = ? AND branch = ? ORDER BY started DESC, id DESC LIMIT 1"
-    ).get(project, branch)
-  ).pipe(
-    Effect.flatMap((row) =>
-      row === null || row === undefined
-        ? Effect.succeed(null)
-        : Schema.decodeUnknownEffect(RunSqlRowSchema)(row).pipe(
-          Effect.map((decoded) => ({
-            id: decoded.id,
-            project: decoded.project,
-            branch: decoded.branch,
-            taskFile: decoded.task_file,
-            status: decoded.status,
-            started: decoded.started,
-            ended: decoded.ended,
-            prLink: decoded.pr_link,
-            endReason: decoded.end_reason
-          }))
-        )
-    )
-  )
-
-export const stepsForRun = (
-  db: Database,
-  runId: string
-): Effect.Effect<ReadonlyArray<BranchStep>, Schema.SchemaError | SqliteFailure> =>
-  sqlite(() =>
-    db.query("SELECT name, status, attempt, pi_session_file FROM steps WHERE run_id = ? ORDER BY id ASC").all(runId)
-  ).pipe(
-    Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(BranchStepRowSchema))),
-    Effect.map((rows) => rows.map((row) => ({ name: row.name, status: row.status, attempt: row.attempt, piSessionFile: row.pi_session_file })))
-  )
-
 export const updateRun = (db: Database, id: string, patch: { readonly status: RunStatus; readonly ended: string | null; readonly prLink: string | null; readonly endReason: string | null }): Effect.Effect<void, SqliteFailure> =>
   sqlite(() => {
     db.query("UPDATE runs SET status = ?, ended = ?, pr_link = ?, end_reason = ? WHERE id = ?").run(patch.status, patch.ended, patch.prLink, patch.endReason, id)
   })
 
-export const stepIdFor = (db: Database, runId: string, name: string, attempt: number): Effect.Effect<number | null, SqliteFailure> =>
-  sqlite(() => db.query("SELECT id FROM steps WHERE run_id = ? AND name = ? AND attempt = ? ORDER BY id ASC LIMIT 1").get(runId, name, attempt) as { readonly id: number } | null).pipe(
-    Effect.map((row) => row?.id ?? null)
-  )
+const StepIdRowSchema = Schema.Struct({ id: Schema.Finite })
 
-export const updateStep = (db: Database, runId: string, name: string, attempt: number, patch: { readonly status: StepStatus; readonly ended: string | null; readonly piSessionFile?: string | null | undefined }): Effect.Effect<boolean, SqliteFailure> =>
-  sqlite(() => {
-    const done = db.query("UPDATE steps SET status = ?, ended = ?, pi_session_file = COALESCE(?, pi_session_file) WHERE run_id = ? AND name = ? AND attempt = ?").run(patch.status, patch.ended, patch.piSessionFile ?? null, runId, name, attempt) as unknown as { readonly changes: number | bigint }
-    return Number(done.changes) > 0
-  })
-
-export interface StoredChecksRound {
-  readonly round: number
-  readonly file: string
-  readonly started: string
-  readonly ended: string
-  readonly passed: boolean
-  readonly checks: ReadonlyArray<{ readonly name: string; readonly passed: boolean }>
-}
-
-export interface StoredFix {
-  readonly attempt: number
-  readonly status: string
-  readonly started: string
-  readonly ended: string
-  readonly agentFile: string | null
-  readonly sessionFile: string | null
-  readonly evidenceIn: string
-  readonly commits: number
-  readonly inputTokens: number | null
-  readonly outputTokens: number | null
-}
-
-export const checksRoundsForRun = (db: Database, runId: string): Effect.Effect<ReadonlyArray<StoredChecksRound>, Schema.SchemaError | SqliteFailure> =>
-  sqlite(() => db.query("SELECT id, attempt, status, started, ended FROM steps WHERE run_id = ? AND name = ? ORDER BY attempt ASC").all(runId, "checks") as ReadonlyArray<Record<string, unknown>>).pipe(
-    Effect.flatMap((steps) =>
-      Effect.forEach(steps, (step) =>
-        Effect.gen(function*() {
-          const id = (step as { readonly id: number }).id
-          const attempt = (step as { readonly attempt: number }).attempt
-          const status = (step as { readonly status: string }).status
-          const started = (step as { readonly started: string }).started
-          const ended = (step as { readonly ended: string | null }).ended ?? started
-          const evidenceRows = yield* sqlite(() => db.query("SELECT path FROM evidence WHERE step_id = ? AND kind = ? ORDER BY id ASC LIMIT 1").all(id, "checks") as ReadonlyArray<Record<string, unknown>>)
-          const file = (evidenceRows[0] as { readonly path: string } | undefined)?.path ?? ""
-          const signalRows = yield* sqlite(() => db.query("SELECT name, value FROM signals WHERE step_id = ? ORDER BY name ASC").all(id) as ReadonlyArray<{ readonly name: string; readonly value: string }>)
-          const checks = signalRows.filter((signal) => signal.name.startsWith("check ")).map((signal) => ({ name: signal.name.slice(6), passed: signal.value === "passed" }))
-          return { round: attempt, file, started, ended, passed: status === "passed", checks }
-        })
-      )
+export const stepIdFor = (db: Database, runId: string, name: string, attempt: number): Effect.Effect<number | null, Schema.SchemaError | SqliteFailure> =>
+  sqlite(() => db.query("SELECT id FROM steps WHERE run_id = ? AND name = ? AND attempt = ? ORDER BY id ASC LIMIT 1").get(runId, name, attempt)).pipe(
+    Effect.flatMap((row) =>
+      row === null || row === undefined
+        ? Effect.succeed(null)
+        : Schema.decodeUnknownEffect(StepIdRowSchema)(row).pipe(Effect.map((decoded) => decoded.id))
     )
   )
 
-export const fixesForRun = (db: Database, runId: string): Effect.Effect<ReadonlyArray<StoredFix>, Schema.SchemaError | SqliteFailure> =>
-  sqlite(() => db.query("SELECT id, attempt, status, started, ended, agent_file, pi_session_file FROM steps WHERE run_id = ? AND name = ? ORDER BY attempt ASC").all(runId, "fix") as ReadonlyArray<Record<string, unknown>>).pipe(
-    Effect.flatMap((steps) =>
-      Effect.forEach(steps, (step) =>
-        Effect.gen(function*() {
-          const id = (step as { readonly id: number }).id
-          const evidenceRows = yield* sqlite(() => db.query("SELECT path FROM evidence WHERE step_id = ? AND kind = ? ORDER BY id ASC LIMIT 1").all(id, "checks") as ReadonlyArray<Record<string, unknown>>)
-          const signalRows = yield* sqlite(() => db.query("SELECT name, value FROM signals WHERE step_id = ?").all(id) as ReadonlyArray<{ readonly name: string; readonly value: string }>)
-          const byName = new Map(signalRows.map((signal) => [signal.name, signal.value] as const))
-          return {
-            attempt: (step as { readonly attempt: number }).attempt,
-            status: (step as { readonly status: string }).status,
-            started: (step as { readonly started: string }).started,
-            ended: (step as { readonly ended: string | null }).ended ?? (step as { readonly started: string }).started,
-            agentFile: (step as { readonly agent_file: string | null }).agent_file,
-            sessionFile: (step as { readonly pi_session_file: string | null }).pi_session_file,
-            evidenceIn: ((evidenceRows[0] as { readonly path: string } | undefined)?.path ?? ""),
-            commits: Number.parseInt(byName.get("commit-count") ?? "0", 10),
-            inputTokens: byName.has("input-tokens") ? Number.parseInt(byName.get("input-tokens") ?? "0", 10) : null,
-            outputTokens: byName.has("output-tokens") ? Number.parseInt(byName.get("output-tokens") ?? "0", 10) : null
-          }
-        })
-      )
-    )
+const StepUpdateResultSchema = Schema.Struct({ changes: Schema.Union([Schema.Finite, Schema.BigInt]) })
+
+export const updateStep = (db: Database, runId: string, name: string, attempt: number, patch: { readonly status: StepStatus; readonly ended: string | null; readonly piSessionFile?: string | null | undefined }): Effect.Effect<boolean, Schema.SchemaError | SqliteFailure> =>
+  sqlite(() =>
+    db.query("UPDATE steps SET status = ?, ended = ?, pi_session_file = COALESCE(?, pi_session_file) WHERE run_id = ? AND name = ? AND attempt = ?").run(patch.status, patch.ended, patch.piSessionFile ?? null, runId, name, attempt)
+  ).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(StepUpdateResultSchema)),
+    Effect.map((decoded) => Number(decoded.changes) > 0)
   )
 
 export const sessionIdFromFile = (file: string | null): string | null => {

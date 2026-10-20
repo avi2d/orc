@@ -24,7 +24,7 @@ export interface ResumePlan {
   readonly fixSessionId: string | null
 }
 
-export interface AgentOutcome {
+interface AgentOutcome {
   readonly sessionId: string | null
   readonly sessionFile: string | null
   readonly commits: Array<OrcRunCommit>
@@ -45,7 +45,7 @@ export interface RunCheckpoints {
   readonly noMistakesDone: (record: import("./no-mistakes").NoMistakesRecord) => Effect.Effect<void, OrcRunError>
 }
 
-export const noCheckpoints: RunCheckpoints = {
+const noCheckpoints: RunCheckpoints = {
   implementStart: () => Effect.void,
   implementDone: () => Effect.void,
   checksRoundStart: () => Effect.void,
@@ -224,6 +224,63 @@ const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; read
     }
   })
 
+type ImplementBase = Parameters<typeof finishAfterChecks>[1]
+
+const runChecksFixLoop = (
+  run: HistoryRun,
+  ops: SandboxOps,
+  base: ImplementBase,
+  rounds: Array<ChecksRoundSummary>,
+  fixes: Array<RecordedFixAttempt>,
+  commits: Array<OrcRunCommit>,
+  plan: ResumePlan,
+  checkpoints: RunCheckpoints
+): Effect.Effect<OrcRunReport, OrcRunError> =>
+  Effect.gen(function*() {
+    for (let round = 1; round <= maxFixAttempts + 1; round += 1) {
+      const started = new Date().toISOString()
+      yield* checkpoints.checksRoundStart(round, started)
+      const commands = yield* readProjectChecks(run)
+      const outcome = yield* runChecksRound(ops.execCheck, run.fs, run.path, run.piSessionDir, round, commands).pipe(
+        Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
+      )
+      const ended = new Date().toISOString()
+      const failed = outcome.outcomes.filter((check) => !check.passed).map((check) => check.name)
+      const summary: ChecksRoundSummary = {
+        round,
+        file: outcome.file,
+        started,
+        ended,
+        passed: failed.length === 0,
+        failed,
+        checks: outcome.outcomes.map((check) => ({ name: check.name, passed: check.passed }))
+      }
+      rounds.push(summary)
+      yield* checkpoints.checksRoundDone(summary)
+      if (failed.length === 0) {
+        return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, checkpoints)
+      }
+      if (fixes.length >= maxFixAttempts) {
+        return {
+          ...base,
+          commits,
+          completed: false,
+          checksRounds: rounds,
+          fixes,
+          fixAttempts: fixes.length,
+          endReason: "The " + failed.join(", ") + " check" + (failed.length === 1 ? "" : "s") + " still failed after " + maxFixAttempts.toString() + " fix attempts; see " + outcome.file + ". No PR opens."
+        }
+      }
+      const attempt = fixes.length + 1
+      yield* checkpoints.fixStart(attempt, new Date().toISOString())
+      const fixed = yield* fixOnce(run, ops.runAgent, outcome.file, attempt, attempt === 1 ? plan.fixSessionId : null)
+      fixes.push(fixed.fix)
+      yield* checkpoints.fixDone(fixed.fix)
+      commits.push(...fixed.commits)
+    }
+    return yield* new OrcRunError({ message: "orc: the checks loop ended without a result" })
+  })
+
 export const runFull = (run: HistoryRun, ops: SandboxOps, resume?: ResumePlan, checkpoints: RunCheckpoints = noCheckpoints): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
     const plan: ResumePlan = resume ?? { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow: run.allow ?? false, inheritedRounds: [], inheritedFixes: [], fixSessionId: null }
@@ -233,7 +290,7 @@ export const runFull = (run: HistoryRun, ops: SandboxOps, resume?: ResumePlan, c
       ? yield* resumedOutcome(run, plan.implementSessionId, plan.implementSessionFile)
       : yield* implement(run, ops.runAgent, plan.implementSessionId)
     yield* checkpoints.implementDone(done, implementStarted, new Date().toISOString())
-    const base = {
+    const base: ImplementBase = {
       runId: run.runId,
       runDir: run.runDir,
       branch: run.branch,
@@ -257,45 +314,5 @@ export const runFull = (run: HistoryRun, ops: SandboxOps, resume?: ResumePlan, c
     if (plan.skipChecks) {
       return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, checkpoints)
     }
-    for (let round = 1; round <= maxFixAttempts + 1; round += 1) {
-      const started = new Date().toISOString()
-      yield* checkpoints.checksRoundStart(round, started)
-      const commands = yield* readProjectChecks(run)
-      const outcome = yield* runChecksRound(ops.execCheck, run.fs, run.path, run.piSessionDir, round, commands).pipe(
-        Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
-      )
-      const ended = new Date().toISOString()
-      const failed = outcome.outcomes.filter((check) => !check.passed).map((check) => check.name)
-      rounds.push({
-        round,
-        file: outcome.file,
-        started,
-        ended,
-        passed: failed.length === 0,
-        failed,
-        checks: outcome.outcomes.map((check) => ({ name: check.name, passed: check.passed }))
-      })
-      yield* checkpoints.checksRoundDone(rounds[rounds.length - 1] as ChecksRoundSummary)
-      if (failed.length === 0) {
-        return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, checkpoints)
-      }
-      if (fixes.length >= maxFixAttempts) {
-        return {
-          ...base,
-          commits,
-          completed: false,
-          checksRounds: rounds,
-          fixes,
-          fixAttempts: fixes.length,
-          endReason: "The " + failed.join(", ") + " check" + (failed.length === 1 ? "" : "s") + " still failed after " + maxFixAttempts.toString() + " fix attempts; see " + outcome.file + ". No PR opens."
-        }
-      }
-      const attempt = fixes.length + 1
-      yield* checkpoints.fixStart(attempt, new Date().toISOString())
-      const fixed = yield* fixOnce(run, ops.runAgent, outcome.file, attempt, attempt === 1 ? plan.fixSessionId : null)
-      fixes.push(fixed.fix)
-      yield* checkpoints.fixDone(fixed.fix)
-      commits.push(...fixed.commits)
-    }
-    return yield* new OrcRunError({ message: "orc: the checks loop ended without a result" })
+    return yield* runChecksFixLoop(run, ops, base, rounds, fixes, commits, plan, checkpoints)
   })
