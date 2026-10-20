@@ -1,8 +1,9 @@
 import type { AgentProvider, ExecResult, SandboxRunResult } from "@ai-hero/sandcastle"
 import { Effect } from "effect"
+import { ChildProcess } from "effect/process"
 import { withHostGitSafety } from "./host"
 import { buildFixPrompt, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
-import { runGit } from "./git-run"
+import { collectOutput, runGit } from "./git-run"
 import { buildImplementPrompt, orcCompletionLine, piWithTools, sessionPrintedSignal, type PiTokenUse } from "./pi"
 import { OrcRunError, describeCause, noSession, readSession } from "./run-session"
 import { driveNoMistakes } from "./no-mistakes"
@@ -167,6 +168,27 @@ const fixOnce = (
     }
   })
 
+const installWorktreeDependencies = (run: HistoryRun): Effect.Effect<void, OrcRunError> =>
+  Effect.gen(function*() {
+    const manifest = run.path.join(run.worktreeDir, "package.json")
+    const present = yield* run.fs.exists(manifest).pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot stat package.json in the Sandcastle worktree: " + String(cause) }))
+    )
+    if (!present) {
+      return
+    }
+    const bun = Bun.which("bun") ?? "bun"
+    const result = yield* Effect.scoped(Effect.gen(function*() {
+      const handle = yield* run.spawner.spawn(ChildProcess.make(bun, ["install", "--frozen-lockfile"], { cwd: run.worktreeDir, env: { PATH: Bun.env.PATH ?? "", HOME: Bun.env.HOME ?? "" }, extendEnv: false }))
+      return yield* collectOutput(handle)
+    })).pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: "orc: bun install in the Sandcastle worktree failed to run: " + String(cause) }))
+    )
+    if (result.exitCode !== 0) {
+      return yield* new OrcRunError({ message: "orc: bun install in the Sandcastle worktree failed with exit " + result.exitCode.toString() + ": " + result.stderr.trim() })
+    }
+  })
+
 const readProjectChecks = (run: HistoryRun): Effect.Effect<ReadonlyArray<ChecksCommand>, OrcRunError> =>
   run.fs.readFileString(run.path.join(run.worktreeDir, ".no-mistakes.yaml")).pipe(
     Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the checks config .no-mistakes.yaml: " + String(cause) })),
@@ -225,6 +247,7 @@ export const runFull = (run: HistoryRun, ops: SandboxOps, resume?: ResumePlan): 
     }
     for (let round = 1; round <= maxFixAttempts + 1; round += 1) {
       const started = new Date().toISOString()
+      yield* installWorktreeDependencies(run)
       const commands = yield* readProjectChecks(run)
       const outcome = yield* runChecksRound(ops.execCheck, run.fs, run.path, run.piSessionDir, round, commands).pipe(
         Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
