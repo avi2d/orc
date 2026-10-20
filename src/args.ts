@@ -14,8 +14,12 @@ const parseShowArgs = (rest: readonly string[]): OrcArgs => {
   if (flags.length === 0) {
     return { kind: "ShowRun", id, json: false }
   }
-  if (flags.length !== 1 || flags[0] !== "--json") {
-    return { kind: "UsageError", detail: `unexpected argument: ${flags[0]}` }
+  const [flag, ...extra] = flags
+  if (flag !== "--json") {
+    return { kind: "UsageError", detail: `unexpected argument: ${flag}` }
+  }
+  if (extra.length > 0) {
+    return { kind: "UsageError", detail: `unexpected argument: ${extra[0]}` }
   }
   return { kind: "ShowRun", id, json: true }
 }

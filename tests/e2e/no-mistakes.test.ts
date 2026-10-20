@@ -185,7 +185,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         const sha = await readyToCheck(dir, home)
         const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [
           fixableGate,
-          { stdout: "", stderr: "refused: protected path docs/launch.md needs his word", exitCode: 1 },
+          { stdout: "", stderr: "refused: protected path docs/launch.md needs your word", exitCode: 1 },
           recordedNothing
         ])
         expect(axiCalls(outcome.nmCalls)).toEqual(["axi run --intent-file " + join(home, "runs", "step-run-1", "task.md"), "axi respond --action fix --findings R7", statusLookup])

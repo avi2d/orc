@@ -228,4 +228,25 @@ describe("formatShow", () => {
       }
     })
   })
+
+  test("a score with an empty note prints the score and its time with single spaces", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await fixture(db)
+        const document = await Effect.runPromise(readShow(db, "show-1"))
+        if (document === null) {
+          throw new Error("missing fixture")
+        }
+        const checks = document.steps[1]
+        if (checks === undefined) {
+          throw new Error("missing checks step")
+        }
+        const unnoted = { ...document, steps: [{ ...checks, score: { score: 3, note: "", scoredAt: "2026-10-20T10:05:00Z" } }] }
+        expect(formatShow(unnoted)).toContain("  score: 3 (2026-10-20T10:05:00Z)")
+      } finally {
+        db.close()
+      }
+    })
+  })
 })

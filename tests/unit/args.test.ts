@@ -58,6 +58,10 @@ describe("parseArgs", () => {
     expect(parseArgs(["show", "step-run-1", "--frobnicate"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --frobnicate" })
   })
 
+  test("show names the stray token after --json, as runs does", () => {
+    expect(parseArgs(["show", "step-run-1", "--json", "extra"])).toEqual({ kind: "UsageError", detail: "unexpected argument: extra" })
+  })
+
   test("run without a task file is a usage error", () => {
     expect(parseArgs(["run"])).toEqual({ kind: "UsageError", detail: "orc run takes a task file" })
   })

@@ -214,4 +214,4 @@ export const formatShow = (document: ShowJsonDocument): string => {
 }
 
 const scoreLine = (score: ShowJsonDocument["steps"][number]["score"]): string =>
-  "  score: " + (score === null ? "none" : score.score.toString() + " " + score.note + " (" + score.scoredAt + ")")
+  "  score: " + (score === null ? "none" : [score.score.toString(), score.note, "(" + score.scoredAt + ")"].filter((part) => part !== "").join(" "))

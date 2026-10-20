@@ -143,11 +143,11 @@ export const parseRun = (output: string): ParsedRun => {
 export const answerForGate = (gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>): GateAnswer => {
   const question = findings.find((finding) => finding.id.startsWith("question-"))
   if (question !== undefined) {
-    return { kind: "refuse", reason: "open review question " + question.id + " needs his word" }
+    return { kind: "refuse", reason: "open review question " + question.id + " needs your word" }
   }
   const asked = findings.find((finding) => finding.action === "ask-user")
   if (asked !== undefined) {
-    return { kind: "refuse", reason: "finding " + asked.id + " is marked ask-user and needs his word" }
+    return { kind: "refuse", reason: "finding " + asked.id + " is marked ask-user and needs your word" }
   }
   const other = findings.find((finding) => finding.action !== "auto-fix" && finding.action !== "no-op")
   if (other !== undefined) {
