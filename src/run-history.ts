@@ -354,6 +354,17 @@ export const updateRun = (db: Database, id: string, patch: { readonly status: Ru
     db.query("UPDATE runs SET status = ?, ended = ?, pr_link = ?, end_reason = ? WHERE id = ?").run(patch.status, patch.ended, patch.prLink, patch.endReason, id)
   })
 
+export const stepIdFor = (db: Database, runId: string, name: string, attempt: number): Effect.Effect<number | null, SqliteFailure> =>
+  sqlite(() => db.query("SELECT id FROM steps WHERE run_id = ? AND name = ? AND attempt = ? ORDER BY id ASC LIMIT 1").get(runId, name, attempt) as { readonly id: number } | null).pipe(
+    Effect.map((row) => row?.id ?? null)
+  )
+
+export const updateStep = (db: Database, runId: string, name: string, attempt: number, patch: { readonly status: StepStatus; readonly ended: string | null; readonly piSessionFile?: string | null | undefined }): Effect.Effect<boolean, SqliteFailure> =>
+  sqlite(() => {
+    const done = db.query("UPDATE steps SET status = ?, ended = ?, pi_session_file = COALESCE(?, pi_session_file) WHERE run_id = ? AND name = ? AND attempt = ?").run(patch.status, patch.ended, patch.piSessionFile ?? null, runId, name, attempt) as unknown as { readonly changes: number | bigint }
+    return Number(done.changes) > 0
+  })
+
 export interface StoredChecksRound {
   readonly round: number
   readonly file: string
@@ -386,12 +397,13 @@ export const checksRoundsForRun = (db: Database, runId: string): Effect.Effect<R
           const status = (step as { readonly status: string }).status
           const started = (step as { readonly started: string }).started
           const ended = (step as { readonly ended: string | null }).ended ?? started
-          const evidenceRows = yield* sqlite(() => db.query("SELECT path FROM evidence WHERE step_id = ? AND kind = ? ORDER BY id ASC LIMIT 1").all(id) as ReadonlyArray<Record<string, unknown>>)
+          const evidenceRows = yield* sqlite(() => db.query("SELECT path FROM evidence WHERE step_id = ? AND kind = ? ORDER BY id ASC LIMIT 1").all(id, "checks") as ReadonlyArray<Record<string, unknown>>)
           const file = (evidenceRows[0] as { readonly path: string } | undefined)?.path ?? ""
           const signalRows = yield* sqlite(() => db.query("SELECT name, value FROM signals WHERE step_id = ? ORDER BY name ASC").all(id) as ReadonlyArray<{ readonly name: string; readonly value: string }>)
           const checks = signalRows.filter((signal) => signal.name.startsWith("check ")).map((signal) => ({ name: signal.name.slice(6), passed: signal.value === "passed" }))
           return { round: attempt, file, started, ended, passed: status === "passed", checks }
         })
+      )
     )
   )
 
@@ -417,6 +429,7 @@ export const fixesForRun = (db: Database, runId: string): Effect.Effect<Readonly
             outputTokens: byName.has("output-tokens") ? Number.parseInt(byName.get("output-tokens") ?? "0", 10) : null
           }
         })
+      )
     )
   )
 

@@ -1,5 +1,5 @@
 import { createSandbox, type Sandbox } from "@ai-hero/sandcastle"
-import { Effect, FileSystem, Path, type Scope, Stream } from "effect"
+import { Effect, FileSystem, Option, Path, type Scope, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { Database } from "bun:sqlite"
 import { homedir } from "node:os"
@@ -10,8 +10,8 @@ import { canRouteModel, loginCheckCommand, modelCredentialFor, piAgentModels } f
 import { runGit } from "./git-run"
 import { orcCompletionLine } from "./pi"
 import { OrcRunError, describeCause } from "./run-session"
-import { checksRoundsForRun, fixesForRun, latestRunForBranch, openDatabase, orcHomeDir, sessionIdFromFile, stepsForRun } from "./run-history"
-import { finishRun, historyFailure, recordImplementDone, recordChecksDone, recordFixDone, recordNoMistakesDone, recordRunStart } from "./history-write"
+import { checksRoundsForRun, fixesForRun, latestRunForBranch, openDatabase, orcHomeDir, sessionIdFromFile, stepsForRun, updateStep } from "./run-history"
+import { finishRun, historyFailure, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordRunStart } from "./history-write"
 import { failedReport, writeEvidence, writeReport, type HistoryRun, type OrcRunReport } from "./run-record"
 import { runFull, type ResumePlan, type RunCheckpoints, type SandboxOps } from "./run-loop"
 
@@ -169,7 +169,30 @@ export const runAgentStep = (
     const git = yield* openHostGit(fs, path)
     const checkout = yield* openCheckout(fs, path, spawner, git, request.cwd, request.branch, runId)
     const runDir = path.join(home, "runs", runId)
-    const effectiveTaskFile = request.taskFile ?? (yield* Effect.acquireUseRelease(openDatabase(home), (db) => latestRunForBranch(db, checkout.projectDir, checkout.branch).pipe(Effect.mapError((cause) => historyFailure("read", cause))), (db) => Effect.sync(() => db.close())).pipe(Effect.flatMap((prior) => prior === null ? refuse("orc: no previous run for branch " + checkout.branch + ", so pass a task file") : Effect.succeed(prior.taskFile))))
+    const effectiveTaskFile = yield* Effect.acquireUseRelease(
+      openDatabase(home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
+      (db) => Effect.gen(function*() {
+        const prior = yield* latestRunForBranch(db, checkout.projectDir, checkout.branch).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
+        if (request.taskFile === undefined || request.taskFile === null) {
+          if (prior === null) {
+            return yield* refuse("orc: no previous run for branch " + checkout.branch + ", so pass a task file")
+          }
+          return prior.taskFile
+        }
+        if (prior !== null) {
+          const steps = yield* stepsForRun(db, prior.id).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
+          if (steps.some((step) => step.name === "implement" && step.status === "passed")) {
+            const saved = yield* fs.readFileString(prior.taskFile).pipe(Effect.orElseSucceed(() => null))
+            const supplied = yield* fs.readFileString(request.taskFile).pipe(Effect.orElseSucceed(() => null))
+            if (saved !== null && supplied !== null && saved !== supplied) {
+              return yield* refuse("orc: the task file changed since branch " + checkout.branch + " passed a step, so resume refuses new intent with old progress")
+            }
+          }
+        }
+        return request.taskFile
+      }),
+      (db) => Effect.sync(() => db.close())
+    )
     const prepared = yield* Effect.gen(function*() {
       const folders = yield* prepareRunFolders(fs, path, runDir, effectiveTaskFile)
       const agent: AgentFile = yield* resolveAgentFile("implementer", {
@@ -246,10 +269,32 @@ export const runAgentStep = (
     return report
   }))
 
+const latestDiskSession = (run: HistoryRun, priorId: string): Effect.Effect<string | null, OrcRunError> =>
+  Effect.gen(function*() {
+    const dir = run.path.join(run.path.dirname(run.runDir), priorId, "sessions")
+    const top = yield* run.fs.readDirectory(dir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
+    const found: Array<{ readonly file: string; readonly mtime: number }> = []
+    for (const sub of top) {
+      const files = yield* run.fs.readDirectory(run.path.join(dir, sub)).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
+      for (const file of files) {
+        if (!file.endsWith(".jsonl")) {
+          continue
+        }
+        const full = run.path.join(dir, sub, file)
+        const info = yield* run.fs.stat(full).pipe(Effect.orElseSucceed(() => null))
+        found.push({ file: full, mtime: info === null ? 0 : Option.match(info.mtime, { onNone: () => 0, onSome: (at) => at.getTime() }) })
+      }
+    }
+    if (found.length === 0) {
+      return null
+    }
+    return [...found].sort((a, b) => b.mtime - a.mtime)[0]?.file ?? null
+  })
+
 const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<ResumePlan, OrcRunError> =>
   Effect.gen(function*() {
     const allow = run.allow ?? false
-    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow, inheritedRounds: [], inheritedFixes: [] }
+    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow, inheritedRounds: [], inheritedFixes: [], fixSessionId: null }
     const prior = yield* latestRunForBranch(db, run.projectDir, run.branch).pipe(
       Effect.mapError((cause) => historyFailure("read", cause))
     )
@@ -267,7 +312,8 @@ const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<ResumePla
         sessionFiles.push(step.piSessionFile)
       }
     }
-    const source = sessionFiles.length === 0 ? null : (sessionFiles[sessionFiles.length - 1] ?? null)
+    const stored = sessionFiles.length === 0 ? null : (sessionFiles[sessionFiles.length - 1] ?? null)
+    const source = stored ?? (yield* latestDiskSession(run, prior.id))
     const sessionId = sessionIdFromFile(source)
     let carriedFile: string | null = source
     if (source !== null && sessionId !== null) {
@@ -286,11 +332,19 @@ const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<ResumePla
     }
     const skipImplement = implementPassed
     const skipChecks = implementPassed && checksPassed
+    const storedFixes = implementPassed
+      ? yield* fixesForRun(db, prior.id).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
+      : []
+    let fixSessionId: string | null = null
+    for (const fix of storedFixes) {
+      if (fix.sessionFile !== null) {
+        fixSessionId = fix.sessionFile
+      }
+    }
     if (!skipChecks) {
-      return { implementSessionId: sessionId, implementSessionFile: carriedFile, skipImplement, skipChecks, allow, inheritedRounds: [], inheritedFixes: [] }
+      return { implementSessionId: sessionId, implementSessionFile: carriedFile, skipImplement, skipChecks, allow, inheritedRounds: [], inheritedFixes: [], fixSessionId }
     }
     const storedRounds = yield* checksRoundsForRun(db, prior.id).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
-    const storedFixes = yield* fixesForRun(db, prior.id).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
     return {
       implementSessionId: sessionId,
       implementSessionFile: carriedFile,
@@ -298,7 +352,8 @@ const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<ResumePla
       skipChecks,
       allow,
       inheritedRounds: storedRounds.filter((round) => round.file !== "").map((round) => ({ round: round.round, file: round.file, started: round.started, ended: round.ended, passed: round.passed, failed: round.checks.filter((check) => !check.passed).map((check) => check.name), checks: [...round.checks] })),
-      inheritedFixes: storedFixes.filter((fix) => fix.evidenceIn !== "").map((fix) => ({ attempt: fix.attempt, status: fix.status === "passed" ? "passed" as const : "failed" as const, started: fix.started, ended: fix.ended, agentFile: fix.agentFile ?? run.fixer.path, sessionFile: fix.sessionFile, evidenceIn: fix.evidenceIn, commits: fix.commits, tokens: fix.inputTokens === null || fix.outputTokens === null ? null : { input: fix.inputTokens, output: fix.outputTokens } }))
+      inheritedFixes: storedFixes.filter((fix) => fix.evidenceIn !== "").map((fix) => ({ attempt: fix.attempt, status: fix.status === "passed" ? "passed" as const : "failed" as const, started: fix.started, ended: fix.ended, agentFile: fix.agentFile ?? run.fixer.path, sessionFile: fix.sessionFile, evidenceIn: fix.evidenceIn, commits: fix.commits, tokens: fix.inputTokens === null || fix.outputTokens === null ? null : { input: fix.inputTokens, output: fix.outputTokens } })),
+      fixSessionId
     }
   })
 
@@ -306,18 +361,34 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
   Effect.gen(function*() {
     const resume = yield* buildResumePlan(db, run)
     yield* recordRunStart(db, run)
+    for (const round of resume.inheritedRounds) {
+      yield* recordChecksDone(db, run.runId, round)
+    }
+    for (const fix of resume.inheritedFixes) {
+      yield* recordFixDone(db, run.runId, fix)
+    }
     const checkpoints: RunCheckpoints = {
+      implementStart: (started) => recordImplementStart(db, run, started),
       implementDone: (outcome, started, ended) => recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: outcome.sessionFile, tokens: outcome.tokens, commits: outcome.commits, implementPassed: outcome.completed }, started, ended),
+      checksRoundStart: (round, started) => recordChecksStart(db, run.runId, round, started),
       checksRoundDone: (round) => recordChecksDone(db, run.runId, round),
+      fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer.path, started),
       fixDone: (fix) => recordFixDone(db, run.runId, fix),
+      noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
       noMistakesDone: (record) => recordNoMistakesDone(db, run, record)
     }
     const report = yield* runFull(run, ops, resume, checkpoints).pipe(
       Effect.catchTag("OrcRunError", (error) =>
         Effect.gen(function*() {
-          const existing = yield* stepsForRun(db, run.runId).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<{ readonly name: string }>))
+          const existing = yield* stepsForRun(db, run.runId).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<{ readonly name: string; readonly status: string; readonly attempt: number }>))
+          const now = new Date().toISOString()
+          for (const step of existing) {
+            if (step.status === "running") {
+              yield* updateStep(db, run.runId, step.name, step.attempt, { status: "failed", ended: now }).pipe(Effect.orElseSucceed(() => false))
+            }
+          }
           if (!existing.some((step) => step.name === "implement")) {
-            yield* recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: null, tokens: null, commits: null, implementPassed: false }, run.started, new Date().toISOString()).pipe(Effect.orElseSucceed(() => undefined))
+            yield* recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: null, tokens: null, commits: null, implementPassed: false }, run.started, now).pipe(Effect.orElseSucceed(() => undefined))
           }
           const failed = failedReport(run, error.message)
           yield* writeEvidence(run, failed).pipe(Effect.orElseSucceed(() => undefined))
