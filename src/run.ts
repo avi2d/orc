@@ -248,7 +248,7 @@ export const runAgentStep = (
 const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<ResumePlan, OrcRunError> =>
   Effect.gen(function*() {
     const allow = run.allow ?? false
-    const empty: ResumePlan = { implementSessionId: null, skipImplement: false, skipChecks: false, allow }
+    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow }
     const prior = yield* latestRunForBranch(db, run.projectDir, run.branch).pipe(
       Effect.mapError((cause) => historyFailure("read", cause))
     )
@@ -268,6 +268,7 @@ const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<ResumePla
     }
     const source = sessionFiles.length === 0 ? null : (sessionFiles[sessionFiles.length - 1] ?? null)
     const sessionId = sessionIdFromFile(source)
+    let carriedFile: string | null = source
     if (source !== null && sessionId !== null) {
       const carried = yield* run.fs.readFileString(source).pipe(
         Effect.map((text) => text),
@@ -279,10 +280,12 @@ const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<ResumePla
           Effect.andThen(() => run.fs.writeFileString(target, carried)),
           Effect.orElseSucceed(() => undefined)
         )
+        carriedFile = target
       }
     }
     return {
       implementSessionId: sessionId,
+      implementSessionFile: carriedFile,
       skipImplement: implementPassed,
       skipChecks: implementPassed && checksPassed,
       allow

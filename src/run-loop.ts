@@ -15,6 +15,7 @@ export interface SandboxOps {
 
 export interface ResumePlan {
   readonly implementSessionId: string | null
+  readonly implementSessionFile: string | null
   readonly skipImplement: boolean
   readonly skipChecks: boolean
   readonly allow: boolean
@@ -87,13 +88,13 @@ const resumedCommits = (run: HistoryRun): Effect.Effect<Array<OrcRunCommit>, Orc
     Effect.orElseSucceed(() => [] as Array<OrcRunCommit>)
   )
 
-const resumedOutcome = (run: HistoryRun, sessionId: string | null): Effect.Effect<AgentOutcome, OrcRunError> =>
+const resumedOutcome = (run: HistoryRun, sessionId: string | null, sessionFile: string | null): Effect.Effect<AgentOutcome, OrcRunError> =>
   Effect.gen(function*() {
     const commits = yield* resumedCommits(run)
     const done = commits.length > 0
     return {
       sessionId,
-      sessionFile: null,
+      sessionFile,
       commits,
       tokens: null,
       completed: done,
@@ -194,9 +195,9 @@ const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; read
 
 export const runFull = (run: HistoryRun, ops: SandboxOps, resume?: ResumePlan): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
-    const plan: ResumePlan = resume ?? { implementSessionId: null, skipImplement: false, skipChecks: false, allow: run.allow ?? false }
+    const plan: ResumePlan = resume ?? { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow: run.allow ?? false }
     const done = plan.skipImplement
-      ? yield* resumedOutcome(run, plan.implementSessionId)
+      ? yield* resumedOutcome(run, plan.implementSessionId, plan.implementSessionFile)
       : yield* implement(run, ops.runAgent, plan.implementSessionId)
     const base = {
       runId: run.runId,
