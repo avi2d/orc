@@ -11,7 +11,8 @@ import { runGit } from "./git-run"
 import { orcCompletionLine } from "./pi"
 import { OrcRunError, describeCause } from "./run-session"
 import { openDatabase, orcHomeDir } from "./run-history"
-import { failedReport, historyFailure, recordHistory, writeEvidence, type HistoryRun, type OrcRunReport } from "./run-record"
+import { historyFailure, recordHistory } from "./history-write"
+import { failedReport, writeEvidence, writeReport, type HistoryRun, type OrcRunReport } from "./run-record"
 import { runFull, type SandboxOps } from "./run-loop"
 
 export type { SandboxOps }
@@ -247,6 +248,7 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       Effect.catchTag("OrcRunError", (error) => Effect.succeed(failedReport(run, error.message)))
     )
     yield* writeEvidence(run, report)
+    yield* writeReport(run, report)
     yield* recordHistory(db, run, report)
     return report
   })

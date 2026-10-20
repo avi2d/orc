@@ -42,6 +42,22 @@ describe("parseArgs", () => {
     expect(parseArgs(["runs", "--json", "extra"])).toEqual({ kind: "UsageError", detail: "unexpected argument: extra" })
   })
 
+  test("show takes a run id", () => {
+    expect(parseArgs(["show", "step-run-1"])).toEqual({ kind: "ShowRun", id: "step-run-1", json: false })
+  })
+
+  test("show --json takes a run id as JSON", () => {
+    expect(parseArgs(["show", "step-run-1", "--json"])).toEqual({ kind: "ShowRun", id: "step-run-1", json: true })
+  })
+
+  test("show without a run id is a usage error", () => {
+    expect(parseArgs(["show"])).toEqual({ kind: "UsageError", detail: "orc show takes a run id" })
+  })
+
+  test("show rejects a flag it does not know", () => {
+    expect(parseArgs(["show", "step-run-1", "--frobnicate"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --frobnicate" })
+  })
+
   test("run without a task file is a usage error", () => {
     expect(parseArgs(["run"])).toEqual({ kind: "UsageError", detail: "orc run takes a task file" })
   })

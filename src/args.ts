@@ -2,8 +2,23 @@ export type OrcArgs =
   | { readonly kind: "PrintVersion" }
   | { readonly kind: "PrintHelp" }
   | { readonly kind: "ListRuns"; readonly json: boolean }
+  | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
   | { readonly kind: "RunAgent"; readonly taskFile: string; readonly branch: string | undefined }
   | { readonly kind: "UsageError"; readonly detail: string }
+
+const parseShowArgs = (rest: readonly string[]): OrcArgs => {
+  if (rest.length === 0) {
+    return { kind: "UsageError", detail: "orc show takes a run id" }
+  }
+  const [id, ...flags] = rest
+  if (flags.length === 0) {
+    return { kind: "ShowRun", id, json: false }
+  }
+  if (flags.length !== 1 || flags[0] !== "--json") {
+    return { kind: "UsageError", detail: `unexpected argument: ${flags[0]}` }
+  }
+  return { kind: "ShowRun", id, json: true }
+}
 
 const parseRunArgs = (rest: readonly string[]): OrcArgs => {
   if (rest.length === 0) {
@@ -37,6 +52,9 @@ export const parseArgs = (args: readonly string[]): OrcArgs => {
       return { kind: "UsageError", detail: `unexpected argument: ${extra[0]}` }
     }
     return { kind: "ListRuns", json: true }
+  }
+  if (first === "show") {
+    return parseShowArgs(rest)
   }
   if (first === "run") {
     return parseRunArgs(rest)
