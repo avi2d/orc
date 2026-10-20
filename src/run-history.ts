@@ -196,11 +196,10 @@ export const openDatabase = (
     )
   })
 
-export const recordRun = (db: Database, input: RunInput): Effect.Effect<void, SqliteFailure> =>
-  sqlite(() => {
-    db.query(
-      "INSERT INTO runs (id, project, branch, task_file, status, started, ended, pr_link, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ).run(
+export const insertRun = (db: Database, input: RunInput): void => {
+  db.query(
+    "INSERT INTO runs (id, project, branch, task_file, status, started, ended, pr_link, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(
       input.id,
       input.project,
       input.branch,
@@ -211,11 +210,13 @@ export const recordRun = (db: Database, input: RunInput): Effect.Effect<void, Sq
       input.prLink ?? null,
       input.endReason ?? null
     )
-  })
+}
 
-export const recordStep = (db: Database, input: StepInput): Effect.Effect<number, SqliteFailure> =>
-  sqlite(() =>
-    Number(
+export const recordRun = (db: Database, input: RunInput): Effect.Effect<void, SqliteFailure> =>
+  sqlite(() => insertRun(db, input))
+
+export const insertStep = (db: Database, input: StepInput): number =>
+  Number(
       db.query(
         "INSERT INTO steps (run_id, name, attempt, status, started, ended, agent_file, pi_session_file) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
       ).run(
@@ -228,26 +229,30 @@ export const recordStep = (db: Database, input: StepInput): Effect.Effect<number
         input.agentFile ?? null,
         input.piSessionFile ?? null
       ).lastInsertRowid
-    )
   )
 
-export const recordEvidence = (db: Database, input: EvidenceInput): Effect.Effect<number, SqliteFailure> =>
-  sqlite(() =>
-    Number(
+export const recordStep = (db: Database, input: StepInput): Effect.Effect<number, SqliteFailure> =>
+  sqlite(() => insertStep(db, input))
+
+export const insertEvidence = (db: Database, input: EvidenceInput): number =>
+  Number(
       db.query(
         "INSERT INTO evidence (step_id, direction, path, kind) VALUES (?, ?, ?, ?)"
       ).run(input.stepId, input.direction, input.path, input.kind).lastInsertRowid
-    )
   )
 
-export const recordSignal = (db: Database, input: SignalInput): Effect.Effect<number, SqliteFailure> =>
-  sqlite(() =>
-    Number(
+export const recordEvidence = (db: Database, input: EvidenceInput): Effect.Effect<number, SqliteFailure> =>
+  sqlite(() => insertEvidence(db, input))
+
+export const insertSignal = (db: Database, input: SignalInput): number =>
+  Number(
       db.query(
         "INSERT INTO signals (step_id, name, value) VALUES (?, ?, ?)"
       ).run(input.stepId, input.name, input.value).lastInsertRowid
-    )
   )
+
+export const recordSignal = (db: Database, input: SignalInput): Effect.Effect<number, SqliteFailure> =>
+  sqlite(() => insertSignal(db, input))
 
 export const recordScore = (db: Database, input: ScoreInput): Effect.Effect<number, SqliteFailure> =>
   sqlite(() =>

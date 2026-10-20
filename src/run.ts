@@ -13,7 +13,7 @@ import { OrcRunError, describeCause } from "./run-session"
 import { openDatabase, orcHomeDir, updateStep } from "./run-history"
 import { stepsForRun } from "./history-resume"
 import { buildResumePlan, resolveTaskFile } from "./run-resume"
-import { finishRun, historyFailure, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordRunStart } from "./history-write"
+import { finishRun, historyFailure, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordResumePublish } from "./history-write"
 import { failedReport, writeEvidence, writeReport, type HistoryRun, type OrcRunReport } from "./run-record"
 import { runFull, type RunCheckpoints, type SandboxOps } from "./run-loop"
 
@@ -292,19 +292,13 @@ export const runAgentStep = (
 export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
     const resume = yield* buildResumePlan(db, run)
-    yield* recordRunStart(db, run)
-    for (const round of resume.inheritedRounds) {
-      yield* recordChecksDone(db, run.runId, round)
-    }
-    for (const fix of resume.inheritedFixes) {
-      yield* recordFixDone(db, run.runId, fix)
-    }
+    yield* recordResumePublish(db, run, resume)
     const checkpoints: RunCheckpoints = {
-      implementStart: (started) => recordImplementStart(db, run, started),
+      implementStart: (started) => recordImplementStart(db, run, started, resume.implementSessionFile ?? undefined),
       implementDone: (outcome, started, ended) => recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: outcome.sessionFile, tokens: outcome.tokens, commits: outcome.commits, implementPassed: outcome.completed }, started, ended),
       checksRoundStart: (round, started) => recordChecksStart(db, run.runId, round, started),
       checksRoundDone: (round) => recordChecksDone(db, run.runId, round),
-      fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer.path, started),
+      fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer.path, started, attempt === 1 ? resume.fixSessionFile ?? undefined : undefined),
       fixDone: (fix) => recordFixDone(db, run.runId, fix),
       noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
       noMistakesDone: (record) => recordNoMistakesDone(db, run, record)

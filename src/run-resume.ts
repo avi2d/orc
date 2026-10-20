@@ -40,30 +40,34 @@ const refuseOnChangedIntent = (
 ): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
     const steps = yield* stepsForRun(db, prior.id).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
-    if (!steps.some((step) => step.name === "implement" && step.status === "passed")) {
+    if (steps.length === 0) {
       return
     }
     const saved = yield* fs.readFileString(prior.taskFile).pipe(Effect.orElseSucceed(() => null))
     const current = yield* fs.readFileString(supplied).pipe(Effect.orElseSucceed(() => null))
-    if (saved !== null && current !== null && saved !== current) {
-      return yield* refuse("orc: the task file changed since branch " + branch + " passed a step, so resume refuses new intent with old progress")
+    if (saved === null || current === null) {
+      return yield* refuse("orc: the saved task for branch " + branch + " cannot be read, so resume refuses to reuse its progress with new intent")
+    }
+    if (saved !== current) {
+      return yield* refuse("orc: the task file changed since branch " + branch + " recorded progress, so resume refuses new intent with old progress")
     }
   })
 
-const latestDiskSession = (run: HistoryRun, priorId: string): Effect.Effect<string | null, OrcRunError> =>
+const latestSessionFile = (run: HistoryRun, dirs: ReadonlyArray<string>): Effect.Effect<string | null, OrcRunError> =>
   Effect.gen(function*() {
-    const dir = run.path.join(run.path.dirname(run.runDir), priorId, "sessions")
-    const top = yield* run.fs.readDirectory(dir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
     const found: Array<{ readonly file: string; readonly mtime: number }> = []
-    for (const sub of top) {
-      const files = yield* run.fs.readDirectory(run.path.join(dir, sub)).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
-      for (const file of files) {
-        if (!file.endsWith(".jsonl")) {
-          continue
+    for (const dir of dirs) {
+      const top = yield* run.fs.readDirectory(dir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
+      for (const sub of top) {
+        const files = yield* run.fs.readDirectory(run.path.join(dir, sub)).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
+        for (const file of files) {
+          if (!file.endsWith(".jsonl")) {
+            continue
+          }
+          const full = run.path.join(dir, sub, file)
+          const info = yield* run.fs.stat(full).pipe(Effect.orElseSucceed(() => null))
+          found.push({ file: full, mtime: info === null ? 0 : Option.match(info.mtime, { onNone: () => 0, onSome: (at) => at.getTime() }) })
         }
-        const full = run.path.join(dir, sub, file)
-        const info = yield* run.fs.stat(full).pipe(Effect.orElseSucceed(() => null))
-        found.push({ file: full, mtime: info === null ? 0 : Option.match(info.mtime, { onNone: () => 0, onSome: (at) => at.getTime() }) })
       }
     }
     if (found.length === 0) {
@@ -76,29 +80,45 @@ interface PriorProgress {
   readonly priorId: string
   readonly implementPassed: boolean
   readonly checksPassed: boolean
-  readonly source: string | null
-  readonly sessionId: string | null
+  readonly implementSource: string | null
+  readonly implementSessionId: string | null
+  readonly fixSource: string | null
+  readonly fixSessionId: string | null
   readonly storedFixes: ReadonlyArray<StoredFix>
 }
 
 const readPriorProgress = (db: Database, run: HistoryRun, prior: RunRecord): Effect.Effect<PriorProgress, OrcRunError> =>
   Effect.gen(function*() {
     const steps = yield* stepsForRun(db, prior.id).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
-    const implementPassed = steps.some((step) => step.name === "implement" && step.status === "passed")
+    const implementSteps = steps.filter((step) => step.name === "implement")
+    const implementPassed = implementSteps.some((step) => step.status === "passed")
     const checksPassed = steps.some((step) => step.name === "checks" && step.status === "passed")
-    const sessionFiles = steps.flatMap((step) => step.piSessionFile === null ? [] : [step.piSessionFile])
-    const stored = sessionFiles.length === 0 ? null : (sessionFiles[sessionFiles.length - 1] ?? null)
-    const source = stored ?? (yield* latestDiskSession(run, prior.id))
+    const implementFile = implementSteps.flatMap((step) => step.piSessionFile === null ? [] : [step.piSessionFile]).at(-1) ?? null
+    const interruptedImplement = implementSteps.some((step) => step.status === "running")
+    const interruptedFix = steps.some((step) => step.name === "fix" && step.status === "running")
+    const priorDir = run.path.join(run.path.dirname(run.runDir), prior.id)
+    const liveFile = interruptedImplement || interruptedFix
+      ? yield* latestSessionFile(run, [run.path.join(priorDir, "session", "agent", "sessions")])
+      : null
+    const implementSource = interruptedImplement
+      ? liveFile
+      : (implementFile ?? (yield* latestSessionFile(run, [run.path.join(priorDir, "sessions")])))
+    const implementSessionId = sessionIdFromFile(implementSource)
     const storedFixes = implementPassed
       ? yield* fixesForRun(db, prior.id).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
       : []
-    return { priorId: prior.id, implementPassed, checksPassed, source, sessionId: sessionIdFromFile(source), storedFixes }
+    const storedFixFile = storedFixes.flatMap((fix) => fix.sessionFile === null ? [] : [fix.sessionFile]).at(-1) ?? null
+    const liveFixId = interruptedFix && liveFile !== null && sessionIdFromFile(liveFile) !== implementSessionId
+      ? sessionIdFromFile(liveFile)
+      : null
+    const fixSource = liveFixId !== null ? liveFile : storedFixFile
+    return { priorId: prior.id, implementPassed, checksPassed, implementSource, implementSessionId, fixSource, fixSessionId: liveFixId ?? sessionIdFromFile(storedFixFile), storedFixes }
   })
 
 const carrySessionFile = (run: HistoryRun, source: string | null, sessionId: string | null): Effect.Effect<string | null, OrcRunError> =>
   Effect.gen(function*() {
     if (source === null || sessionId === null) {
-      return source
+      return null
     }
     const carried = yield* run.fs.readFileString(source).pipe(
       Effect.map((text) => text),
@@ -114,16 +134,6 @@ const carrySessionFile = (run: HistoryRun, source: string | null, sessionId: str
     )
     return target
   })
-
-const fixSessionFor = (storedFixes: ReadonlyArray<StoredFix>): string | null => {
-  let fixSessionId: string | null = null
-  for (const fix of storedFixes) {
-    if (fix.sessionFile !== null) {
-      fixSessionId = fix.sessionFile
-    }
-  }
-  return fixSessionId
-}
 
 const inheritedCompletion = (
   db: Database,
@@ -160,7 +170,7 @@ const inheritedCompletion = (
 export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<ResumePlan, OrcRunError> =>
   Effect.gen(function*() {
     const allow = run.allow ?? false
-    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow, inheritedRounds: [], inheritedFixes: [], fixSessionId: null }
+    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null }
     const prior = yield* latestRunForBranch(db, run.projectDir, run.branch).pipe(
       Effect.mapError((cause) => historyFailure("read", cause))
     )
@@ -168,22 +178,23 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       return empty
     }
     const progress = yield* readPriorProgress(db, run, prior)
-    const carriedFile = yield* carrySessionFile(run, progress.source, progress.sessionId)
+    const carriedImplement = yield* carrySessionFile(run, progress.implementSource, progress.implementSessionId)
+    const carriedFix = yield* carrySessionFile(run, progress.fixSource, progress.fixSessionId)
     const skipImplement = progress.implementPassed
     const skipChecks = progress.implementPassed && progress.checksPassed
-    const fixSessionId = fixSessionFor(progress.storedFixes)
     if (!skipChecks) {
-      return { implementSessionId: progress.sessionId, implementSessionFile: carriedFile, skipImplement, skipChecks, allow, inheritedRounds: [], inheritedFixes: [], fixSessionId }
+      return { implementSessionId: progress.implementSessionId, implementSessionFile: carriedImplement, skipImplement, skipChecks, allow, inheritedRounds: [], inheritedFixes: [], fixSessionId: progress.fixSessionId, fixSessionFile: carriedFix }
     }
     const inherited = yield* inheritedCompletion(db, run, progress.priorId, progress.storedFixes)
     return {
-      implementSessionId: progress.sessionId,
-      implementSessionFile: carriedFile,
+      implementSessionId: progress.implementSessionId,
+      implementSessionFile: carriedImplement,
       skipImplement,
       skipChecks,
       allow,
       inheritedRounds: inherited.inheritedRounds,
       inheritedFixes: inherited.inheritedFixes,
-      fixSessionId
+      fixSessionId: progress.fixSessionId,
+      fixSessionFile: carriedFix
     }
   })

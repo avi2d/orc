@@ -22,6 +22,7 @@ export interface ResumePlan {
   readonly inheritedRounds: ReadonlyArray<ChecksRoundSummary>
   readonly inheritedFixes: ReadonlyArray<RecordedFixAttempt>
   readonly fixSessionId: string | null
+  readonly fixSessionFile: string | null
 }
 
 interface AgentOutcome {
@@ -44,17 +45,6 @@ export interface RunCheckpoints {
   readonly noMistakesStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly noMistakesDone: (record: import("./no-mistakes").NoMistakesRecord) => Effect.Effect<void, OrcRunError>
 }
-
-const noCheckpoints: RunCheckpoints = {
-  implementStart: () => Effect.void,
-  implementDone: () => Effect.void,
-  checksRoundStart: () => Effect.void,
-  checksRoundDone: () => Effect.void,
-  fixStart: () => Effect.void,
-  fixDone: () => Effect.void,
-  noMistakesStart: () => Effect.void,
-  noMistakesDone: () => Effect.void
-};
 
 const collectCommits = (
   run: HistoryRun,
@@ -281,15 +271,18 @@ const runChecksFixLoop = (
     return yield* new OrcRunError({ message: "orc: the checks loop ended without a result" })
   })
 
-export const runFull = (run: HistoryRun, ops: SandboxOps, resume?: ResumePlan, checkpoints: RunCheckpoints = noCheckpoints): Effect.Effect<OrcRunReport, OrcRunError> =>
+export const runFull = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
-    const plan: ResumePlan = resume ?? { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow: run.allow ?? false, inheritedRounds: [], inheritedFixes: [], fixSessionId: null }
+    const plan = resume
     const implementStarted = run.started
-    yield* checkpoints.implementStart(implementStarted)
     const done = plan.skipImplement
       ? yield* resumedOutcome(run, plan.implementSessionId, plan.implementSessionFile)
-      : yield* implement(run, ops.runAgent, plan.implementSessionId)
-    yield* checkpoints.implementDone(done, implementStarted, new Date().toISOString())
+      : yield* Effect.gen(function*() {
+        yield* checkpoints.implementStart(implementStarted)
+        const outcome = yield* implement(run, ops.runAgent, plan.implementSessionId)
+        yield* checkpoints.implementDone(outcome, implementStarted, new Date().toISOString())
+        return outcome
+      })
     const base: ImplementBase = {
       runId: run.runId,
       runDir: run.runDir,
