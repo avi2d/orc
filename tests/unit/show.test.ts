@@ -404,6 +404,97 @@ describe("orc score step selection", () => {
   })
 })
 
+describe("orc score addresses each resumed checks row", () => {
+  test("a step id scores one row when an attempt ran twice after resume", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await Effect.runPromise(recordRun(db, {
+          id: "resume-checks-1",
+          project: "orc",
+          branch: "orc/demo",
+          taskFile: "/tmp/show-home/runs/resume-checks-1/task.md",
+          status: "running",
+          started: "2026-10-18T10:00:00.000Z"
+        }))
+        await Effect.runPromise(recordStep(db, {
+          runId: "resume-checks-1",
+          name: "checks",
+          attempt: 1,
+          status: "failed",
+          started: "2026-10-18T10:01:00.000Z",
+          ended: "2026-10-18T10:02:00.000Z"
+        }))
+        await Effect.runPromise(recordStep(db, {
+          runId: "resume-checks-1",
+          name: "checks",
+          attempt: 2,
+          status: "failed",
+          started: "2026-10-18T10:03:00.000Z",
+          ended: "2026-10-18T10:04:00.000Z"
+        }))
+        await Effect.runPromise(recordStep(db, {
+          runId: "resume-checks-1",
+          name: "checks",
+          attempt: 1,
+          status: "failed",
+          started: "2026-10-18T10:10:00.000Z",
+          ended: "2026-10-18T10:11:00.000Z"
+        }))
+        await Effect.runPromise(recordStep(db, {
+          runId: "resume-checks-1",
+          name: "checks",
+          attempt: 2,
+          status: "passed",
+          started: "2026-10-18T10:12:00.000Z",
+          ended: "2026-10-18T10:13:00.000Z"
+        }))
+        const shown = await Effect.runPromise(readShow(db, "resume-checks-1"))
+        expect(shown?.steps.map((step) => step.started)).toEqual([
+          "2026-10-18T10:01:00.000Z",
+          "2026-10-18T10:03:00.000Z",
+          "2026-10-18T10:10:00.000Z",
+          "2026-10-18T10:12:00.000Z"
+        ])
+        const freshFirst = shown?.steps[2]
+        if (freshFirst === undefined) {
+          throw new Error("missing fresh checks round 1")
+        }
+        await Effect.runPromise(recordStepScore(db, {
+          runId: "resume-checks-1",
+          step: freshFirst.id.toString(),
+          score: 2,
+          note: "fresh first",
+          scoredAt: "2026-10-18T14:00:00.000Z"
+        }))
+        const scored = await Effect.runPromise(readShow(db, "resume-checks-1"))
+        expect(scored?.steps[0]?.score).toBeNull()
+        expect(scored?.steps[1]?.score).toBeNull()
+        expect(scored?.steps[2]?.score).toEqual({ score: 2, note: "fresh first", scoredAt: "2026-10-18T14:00:00.000Z" })
+        expect(scored?.steps[3]?.score).toBeNull()
+        await Effect.runPromise(recordRun(db, {
+          id: "resume-checks-2",
+          project: "orc",
+          branch: "orc/other",
+          taskFile: "/tmp/show-home/runs/resume-checks-2/task.md",
+          status: "running",
+          started: "2026-10-18T10:00:00.000Z"
+        }))
+        const crossRun = await Effect.runPromise(recordStepScore(db, {
+          runId: "resume-checks-2",
+          step: freshFirst.id.toString(),
+          score: 5,
+          note: "",
+          scoredAt: "2026-10-18T15:00:00.000Z"
+        }).pipe(Effect.flip))
+        expect(crossRun).toBeInstanceOf(UnknownStep)
+      } finally {
+        db.close()
+      }
+    })
+  })
+})
+
 describe("formatShow", () => {
   test("every file prints as a full file link beside its result, signals and score", async () => {
     await withHome(async (home) => {

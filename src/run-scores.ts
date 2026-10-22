@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite"
 import { Data, Effect, Schema } from "effect"
-import { ScoreValueSchema, recordScore, sqlite, stepIdFor, type SqliteFailure } from "./run-history"
+import { ScoreValueSchema, recordScore, sqlite, type SqliteFailure } from "./run-history"
 
 export class UnknownRun extends Data.TaggedError("UnknownRun")<{
   readonly runId: string
@@ -50,16 +50,33 @@ export const recordStepScore = (
     if (runRow === null || runRow === undefined) {
       return yield* new UnknownRun({ runId: input.runId })
     }
-    const selector = selectStep(input.step)
-    if (selector.attempt !== null) {
-      const known = yield* stepIdFor(db, input.runId, selector.name, selector.attempt)
-      if (known === null) {
+    if (/^[1-9][0-9]*$/.test(input.step)) {
+      const wanted = Number(input.step)
+      const byId = yield* sqlite(() =>
+        db.query("SELECT id FROM steps WHERE run_id = ? AND id = ? LIMIT 1").get(input.runId, wanted)
+      )
+      if (byId === null || byId === undefined) {
         return yield* new UnknownStep({ runId: input.runId, step: input.step })
       }
-      const score = yield* Schema.decodeUnknownEffect(ScoreValueSchema)(input.score).pipe(
+      const byIdStepId = (yield* Schema.decodeUnknownEffect(StepIdRowSchema)(byId)).id
+      const byIdScore = yield* Schema.decodeUnknownEffect(ScoreValueSchema)(input.score).pipe(
         Effect.mapError(() => new InvalidScore({ score: input.score }))
       )
-      return yield* recordScore(db, { stepId: known, score, note: input.note, scoredAt: input.scoredAt })
+      return yield* recordScore(db, { stepId: byIdStepId, score: byIdScore, note: input.note, scoredAt: input.scoredAt })
+    }
+    const selector = selectStep(input.step)
+    if (selector.attempt !== null) {
+      const attemptRow = yield* sqlite(() =>
+        db.query("SELECT id FROM steps WHERE run_id = ? AND name = ? AND attempt = ? ORDER BY started DESC, id DESC LIMIT 1").get(input.runId, selector.name, selector.attempt)
+      )
+      if (attemptRow === null || attemptRow === undefined) {
+        return yield* new UnknownStep({ runId: input.runId, step: input.step })
+      }
+      const attemptStepId = (yield* Schema.decodeUnknownEffect(StepIdRowSchema)(attemptRow)).id
+      const attemptScore = yield* Schema.decodeUnknownEffect(ScoreValueSchema)(input.score).pipe(
+        Effect.mapError(() => new InvalidScore({ score: input.score }))
+      )
+      return yield* recordScore(db, { stepId: attemptStepId, score: attemptScore, note: input.note, scoredAt: input.scoredAt })
     }
     const stepRow = yield* sqlite(() =>
       db.query("SELECT id FROM steps WHERE run_id = ? AND name = ? ORDER BY started DESC, id DESC LIMIT 1").get(input.runId, selector.name)

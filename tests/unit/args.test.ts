@@ -82,6 +82,16 @@ describe("parseArgs", () => {
     })
   })
 
+  test("score passes a step id through orc score", () => {
+    expect(parseArgs(["score", "show-1", "42", "4"])).toEqual({
+      kind: "ScoreStep",
+      runId: "show-1",
+      step: "42",
+      score: 4,
+      note: ""
+    })
+  })
+
   test("score keeps an empty note when orc score omits it", () => {
     expect(parseArgs(["score", "show-1", "implement", "4"])).toEqual({
       kind: "ScoreStep",
