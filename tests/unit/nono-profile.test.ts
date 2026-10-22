@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { BunServices } from "@effect/platform-bun"
+import { Effect } from "effect"
 import { buildAgentNonoProfile, buildNonoProfile, canRouteModel, loginCheckCommand, modelCredentialFor, piAgentModels } from "../../src/nono-profile"
 
 const credential = {
@@ -64,9 +66,9 @@ describe("piAgentModels", () => {
 })
 
 describe("buildAgentNonoProfile", () => {
-  test("keeps the base mounts and adds the credential route with its capture", () => {
-    const base = buildNonoProfile(roots, host)
-    const profile = buildAgentNonoProfile(roots, host, credential)
+  test("keeps the base mounts and adds the credential route with its capture", async () => {
+    const base = await Effect.runPromise(buildNonoProfile(roots, host).pipe(Effect.provide(BunServices.layer)))
+    const profile = await Effect.runPromise(buildAgentNonoProfile(roots, host, credential).pipe(Effect.provide(BunServices.layer)))
     expect(profile.filesystem).toEqual(base.filesystem)
     expect(profile.network.allow_domain).toEqual(base.network.allow_domain)
     expect(profile.network.credentials).toEqual(["opencode_go"])

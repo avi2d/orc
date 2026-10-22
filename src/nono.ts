@@ -319,7 +319,8 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const profileDir = yield* fs.makeTempDirectory({ prefix: "orc-nono-" })
       const profilePath = path.join(profileDir, "profile.json")
       const hostTrustedPaths = [profileDir, nonoBinary, path.dirname(nonoBinary)]
-      yield* fs.writeFileString(profilePath, `${JSON.stringify(selectNonoProfile(roots, { developerDir, runtimeDirs }, options.modelCredential), null, 2)}\n`).pipe(
+      const profile = yield* selectNonoProfile(roots, { developerDir, runtimeDirs }, options.modelCredential)
+      yield* fs.writeFileString(profilePath, `${JSON.stringify(profile, null, 2)}\n`).pipe(
         Effect.andThen(() => checkProfile(spawner, nono, profilePath, hostTrustedPaths)),
         Effect.andThen(() => fs.makeDirectory(env.TMPDIR, { recursive: true })),
         Effect.onError(() => fs.remove(profileDir, { recursive: true }).pipe(Effect.result))

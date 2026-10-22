@@ -1,3 +1,5 @@
+import { Effect, FileSystem } from "effect"
+
 export interface NonoSandboxRoots {
   readonly worktree: string
   readonly gitData: string
@@ -44,13 +46,23 @@ export const toolchainReadPaths: ReadonlyArray<string> = [
   "/etc/ssl/certs"
 ]
 
-export const runtimeReadFiles: ReadonlyArray<string> = [
-  "/etc/hosts",
-  "/etc/resolv.conf",
-  "/etc/localtime",
-  "/etc/ssl/cert.pem",
-  "/etc/ssl/openssl.cnf"
-]
+const certPemPath = "/etc/ssl/cert.pem"
+
+const certPemIsSymlink: Effect.Effect<boolean, never, FileSystem.FileSystem> = Effect.gen(function*() {
+  const fs = yield* FileSystem.FileSystem
+  return yield* fs.readLink(certPemPath).pipe(
+    Effect.as(true),
+    Effect.orElseSucceed(() => false)
+  )
+})
+
+// A link grant reaches only its target, so the link path stays denied.
+export const runtimeReadFiles: Effect.Effect<ReadonlyArray<string>, never, FileSystem.FileSystem> = Effect.gen(function*() {
+  const drop = process.platform === "darwin" && (yield* certPemIsSymlink)
+  return drop
+    ? ["/etc/hosts", "/etc/resolv.conf", "/etc/localtime", "/etc/ssl/openssl.cnf"]
+    : ["/etc/hosts", "/etc/resolv.conf", "/etc/localtime", certPemPath, "/etc/ssl/openssl.cnf"]
+})
 
 // Apple's git shim loads the whole Xcode bundle around its developer folder and checks the licence it records.
 const developerReads = (developerDir: string | null): ReadonlyArray<string> => {
@@ -167,8 +179,10 @@ interface CredentialCapture {
   readonly cache_ttl_secs: number
 }
 
-export type AgentNonoProfile = Omit<ReturnType<typeof buildNonoProfile>, "network"> & {
-  readonly network: Omit<ReturnType<typeof buildNonoProfile>["network"], "credentials"> & {
+export type NonoProfile = Effect.Success<ReturnType<typeof buildNonoProfile>>
+
+export type AgentNonoProfile = Omit<NonoProfile, "network"> & {
+  readonly network: Omit<NonoProfile["network"], "credentials"> & {
     readonly credentials: ReadonlyArray<string>
     readonly custom_credentials: Record<string, CredentialRoute>
   }
@@ -179,8 +193,8 @@ export const buildAgentNonoProfile = (
   roots: NonoSandboxRoots,
   host: HostRuntime,
   credential: ModelCredential
-): AgentNonoProfile => {
-  const base = buildNonoProfile(roots, host)
+): Effect.Effect<AgentNonoProfile, never, FileSystem.FileSystem> => Effect.gen(function*() {
+  const base = yield* buildNonoProfile(roots, host)
   return {
     ...base,
     network: {
@@ -204,15 +218,19 @@ export const buildAgentNonoProfile = (
       }
     }
   }
-}
+})
 export const selectNonoProfile = (
   roots: NonoSandboxRoots,
   host: HostRuntime,
   credential: ModelCredential | undefined
-): ReturnType<typeof buildNonoProfile> | AgentNonoProfile =>
+): Effect.Effect<NonoProfile | AgentNonoProfile, never, FileSystem.FileSystem> =>
   credential === undefined ? buildNonoProfile(roots, host) : buildAgentNonoProfile(roots, host, credential)
 
-export const buildNonoProfile = (roots: NonoSandboxRoots, host: HostRuntime) => ({
+const profileWithFiles = (
+  roots: NonoSandboxRoots,
+  host: HostRuntime,
+  readFile: ReadonlyArray<string>
+) => ({
   meta: {
     name: "orc-nono-agent",
     description: "orc agent sandbox: the isolated copy, its git data and Pi's session folder"
@@ -230,7 +248,7 @@ export const buildNonoProfile = (roots: NonoSandboxRoots, host: HostRuntime) => 
     read: [...toolchainReadPaths, ...host.runtimeDirs],
     write: [],
     allow_file: [],
-    read_file: [...runtimeReadFiles],
+    read_file: [...readFile],
     write_file: ["/dev/null"],
     unix_socket: [],
     unix_socket_bind: [],
@@ -271,3 +289,10 @@ export const buildNonoProfile = (roots: NonoSandboxRoots, host: HostRuntime) => 
     }
   }
 }) as const
+
+export const buildNonoProfile = (
+  roots: NonoSandboxRoots,
+  host: HostRuntime
+): Effect.Effect<ReturnType<typeof profileWithFiles>, never, FileSystem.FileSystem> => Effect.gen(function*() {
+  return profileWithFiles(roots, host, yield* runtimeReadFiles)
+})
