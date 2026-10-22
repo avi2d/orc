@@ -46,6 +46,81 @@ describe("parseArgs", () => {
   test("show names the stray token after --json, as runs does", () => {
     expect(parseArgs(["show", "step-run-1", "--json", "extra"])).toEqual({ kind: "UsageError", detail: "unexpected argument: extra" })
   })
+    test("score records a score with a note through orc score", () => {
+    expect(parseArgs(["score", "show-1", "implement", "5", "clean"])).toEqual({
+      kind: "ScoreStep",
+      runId: "show-1",
+      step: "implement",
+      score: 5,
+      note: "clean"
+    })
+  })
+
+  test("score passes an attempt selector through orc score", () => {
+    expect(parseArgs(["score", "show-1", "fix#1", "4"])).toEqual({
+      kind: "ScoreStep",
+      runId: "show-1",
+      step: "fix#1",
+      score: 4,
+      note: ""
+    })
+  })
+
+  test("score passes a step id through orc score", () => {
+    expect(parseArgs(["score", "show-1", "42", "4"])).toEqual({
+      kind: "ScoreStep",
+      runId: "show-1",
+      step: "42",
+      score: 4,
+      note: ""
+    })
+  })
+
+  test("score keeps an empty note when orc score omits it", () => {
+    expect(parseArgs(["score", "show-1", "implement", "4"])).toEqual({
+      kind: "ScoreStep",
+      runId: "show-1",
+      step: "implement",
+      score: 4,
+      note: ""
+    })
+  })
+
+  test("score refuses 0 through orc score", () => {
+    expect(parseArgs(["score", "show-1", "implement", "0"])).toEqual({
+      kind: "UsageError",
+      detail: 'orc score takes a score from 1 to 5, got "0"'
+    })
+  })
+
+  test("score refuses 6 through orc score", () => {
+    expect(parseArgs(["score", "show-1", "implement", "6"])).toEqual({
+      kind: "UsageError",
+      detail: 'orc score takes a score from 1 to 5, got "6"'
+    })
+  })
+
+  test("score refuses a non-integer through orc score", () => {
+    expect(parseArgs(["score", "show-1", "implement", "2.5"])).toEqual({
+      kind: "UsageError",
+      detail: 'orc score takes a score from 1 to 5, got "2.5"'
+    })
+  })
+
+  test("score without enough arguments is a usage error for orc score", () => {
+    expect(parseArgs(["score", "show-1", "implement"])).toEqual({
+      kind: "UsageError",
+      detail: "orc score takes a run id, a step name, a score from 1 to 5 and an optional note"
+    })
+  })
+
+  test("score names the stray token for orc score", () => {
+    expect(parseArgs(["score", "show-1", "implement", "5", "note", "extra"])).toEqual({
+      kind: "UsageError",
+      detail: "unexpected argument for orc score: extra"
+    })
+  })
+
   test("run without a task file is a usage error", () => {
     expect(parseArgs(["run"])).toEqual({ kind: "UsageError", detail: "orc run takes a task file" })
   })
