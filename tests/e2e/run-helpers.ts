@@ -5,6 +5,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../src/agents"
+import type { QuestionAnswer } from "../../src/no-mistakes"
 import { hostGitShim } from "../../src/host"
 import { orcCompletionLine } from "../../src/pi"
 import { runWithHistory, type SandboxOps } from "../../src/run"
@@ -173,7 +174,7 @@ const stubNoMistakes = async (replies: ReadonlyArray<NoMistakesReply>): Promise<
 }
 
 const unexpectedNoMistakes: ReadonlyArray<NoMistakesReply> = [{ stdout: "", stderr: "unexpected no-mistakes call", exitCode: 1 }]
-export const runStep = (dir: string, home: string, sandbox: SandboxOps["runAgent"], execCheck: SandboxOps["execCheck"] = unexpectedChecks, nmReplies: ReadonlyArray<NoMistakesReply> = unexpectedNoMistakes): Promise<StepOutcome & { readonly nmCalls: string }> =>
+export const runStep = (dir: string, home: string, sandbox: SandboxOps["runAgent"], execCheck: SandboxOps["execCheck"] = unexpectedChecks, nmReplies: ReadonlyArray<NoMistakesReply> = unexpectedNoMistakes, answers: ReadonlyArray<QuestionAnswer> = []): Promise<StepOutcome & { readonly nmCalls: string }> =>
   Effect.runPromise(
     Effect.gen(function*() {
       const fs = yield* FileSystem.FileSystem
@@ -193,7 +194,8 @@ export const runStep = (dir: string, home: string, sandbox: SandboxOps["runAgent
               piSessionDir: path.join(runDir, "session"), hostSessionsDir: path.join(runDir, "sessions"),
               taskPath: path.join(runDir, "task.md"), agent: implementer, fixer, branch: "orc/test", started: "2026-10-19T10:00:00.000Z",
               worktreeDir: dir,
-              noMistakesPath: stub.dir + ":" + (process.env.PATH ?? "")
+              noMistakesPath: stub.dir + ":" + (process.env.PATH ?? ""),
+              answers
             }, { runAgent: sandbox, execCheck })
             const runs = yield* listRuns(db)
             const steps = db.query("SELECT name, status FROM steps WHERE run_id = ?").all("step-run-1")

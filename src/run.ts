@@ -16,6 +16,7 @@ import { buildResumePlan, resolveTaskFile } from "./run-resume"
 import { finishRun, historyFailure, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordResumePublish } from "./history-write"
 import { failedReport, writeEvidence, writeReport, type HistoryRun, type OrcRunReport } from "./run-record"
 import { runFull, type RunCheckpoints, type SandboxOps } from "./run-loop"
+import type { AllowWord, QuestionAnswer } from "./no-mistakes"
 
 export type { SandboxOps }
 
@@ -23,7 +24,8 @@ export interface OrcRunRequest {
   readonly cwd: string
   readonly taskFile: string | null | undefined
   readonly branch?: string | undefined
-  readonly allow?: boolean | undefined
+  readonly allow?: ReadonlyArray<AllowWord> | undefined
+  readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
   readonly homeDir?: string | undefined
   readonly runId?: string | undefined
   readonly agentsDir?: string | undefined
@@ -277,7 +279,8 @@ export const runAgentStep = (
       taskPath: folders.taskPath, agent, fixer, branch: checkout.branch, started,
       worktreeDir: sandbox.worktreePath,
       noMistakesPath: hostPath ?? "",
-      allow: request.allow ?? false
+      allow: request.allow ?? [],
+      answers: request.answers ?? []
     }
     const report = yield* Effect.acquireUseRelease(
       openDatabase(home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),

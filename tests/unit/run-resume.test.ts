@@ -56,7 +56,7 @@ const historyFor = (runId: string, home: string, projectDir: string, started: st
       hostSessionsDir: path.join(runDir, "sessions"),
       taskPath: path.join(runDir, "task.md"),
       agent: implementer, fixer, branch: "orc/test", started,
-      worktreeDir: projectDir, noMistakesPath: "", allow: false
+      worktreeDir: projectDir, noMistakesPath: "", allow: [], answers: []
     }
     return run
   }).pipe(Effect.provide(BunServices.layer))

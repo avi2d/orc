@@ -2,17 +2,26 @@ import { Effect } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { collectOutput } from "./git-run"
 import { hostGitSafetyEnv } from "./host"
-import { hasTable, scalar, splitRow, table, trimmedLines } from "./toon"
-
-export interface NoMistakesFinding {
-  readonly id: string
-  readonly severity: string
-  readonly file: string
-  readonly line: string
-  readonly action: string
-  readonly description: string
-}
-
+import {
+  answerArgsFor,
+  answerForGate,
+  findingsTable,
+  missingReason,
+  omittedQuestionIds,
+  openQuestionsIn,
+  parseRun,
+  respondArgs,
+  stepsWithFindings,
+  type AllowWord,
+  type GateAnswer,
+  type NoMistakesFinding,
+  type ParkedGate,
+  type ParsedRun,
+  type QuestionAnswer
+} from "./no-mistakes-gate"
+import { hasTable, scalar } from "./toon"
+export { answerArgsFor, answerForGate, askUserWord, omittedQuestionIds, parseRun } from "./no-mistakes-gate"
+export type { AllowWord, NoMistakesFinding, QuestionAnswer } from "./no-mistakes-gate"
 type NoMistakesStatus = "passed" | "refused" | "failed"
 
 export interface NoMistakesRecord {
@@ -38,22 +47,8 @@ export interface NoMistakesInput {
   readonly git: string
   readonly taskFile: string
   readonly worktreeDir: string
-  readonly allow?: boolean | undefined
-}
-
-interface ParkedGate {
-  readonly step: string
-  readonly stage: "approval" | "fix-review"
-}
-
-interface ParsedRun {
-  readonly status: string
-  readonly outcome: string
-  readonly prLink: string
-  readonly runId: string
-  readonly gate: ParkedGate | null
-  readonly terminal: boolean
-  readonly findings: ReadonlyArray<NoMistakesFinding>
+  readonly allow?: ReadonlyArray<AllowWord> | undefined
+  readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
 }
 
 interface Ending {
@@ -62,121 +57,15 @@ interface Ending {
   readonly result: string
 }
 
-type GateAnswer =
-  | { readonly kind: "fix"; readonly ids: ReadonlyArray<string>; readonly ignore: ReadonlyArray<string> }
-  | { readonly kind: "approve" }
-  | { readonly kind: "refuse"; readonly reason: string }
-
 type Sent =
   | { readonly kind: "start" }
   | { readonly kind: "respond"; readonly gate: ParkedGate }
+  | { readonly kind: "answer"; readonly gate: ParkedGate }
   | { readonly kind: "reattach" }
 
 const maxGatesAnswered = 20
 
-const terminalStatuses = new Set(["completed", "failed", "cancelled", "checks_passed"])
-
 const greenOutcomes = new Set(["checks-passed", "passed"])
-
-const findingsTable = (output: string): ReadonlyArray<NoMistakesFinding> =>
-  table(output, "findings").map((row) => ({
-    id: row.get("id") ?? "",
-    severity: row.get("severity") ?? "",
-    file: row.get("file") ?? "",
-    line: row.get("line") ?? "",
-    action: row.get("action") ?? "",
-    description: row.get("description") ?? ""
-  }))
-
-const stepsWithFindings = (output: string): ReadonlyArray<string> =>
-  table(output, "steps")
-    .filter((row) => Number.parseInt(row.get("findings") ?? "", 10) > 0)
-    .map((row) => row.get("step") ?? "")
-    .filter((step) => step !== "")
-
-const parkedStep = (output: string): string | null => {
-  for (const line of trimmedLines(output)) {
-    const cells = splitRow(line)
-    if (cells.length >= 2 && (cells[1] === "awaiting_approval" || cells[1] === "fix_review")) {
-      return cells[0] === "" ? null : (cells[0] ?? null)
-    }
-  }
-  return null
-}
-
-const gateStep = (output: string): string | null => {
-  const named = scalar(output, "gate")
-  if (named !== "") {
-    return named
-  }
-  if (trimmedLines(output).some((line) => line === "gate:")) {
-    const step = scalar(output, "step")
-    return step === "" ? "unknown" : step
-  }
-  return parkedStep(output)
-}
-
-const inFixReview = (output: string, step: string): boolean =>
-  trimmedLines(output).some((line) => {
-    const cells = splitRow(line)
-    return line === "status: fix_review" || (cells[0] === step && cells[1] === "fix_review")
-  })
-
-const readGate = (output: string): ParkedGate | null => {
-  const step = gateStep(output)
-  return step === null ? null : { step, stage: inFixReview(output, step) ? "fix-review" : "approval" }
-}
-
-export const parseRun = (output: string): ParsedRun => {
-  const status = scalar(output, "status")
-  const outcome = scalar(output, "outcome")
-  return {
-    status,
-    outcome,
-    prLink: scalar(output, "pr"),
-    runId: scalar(output, "id"),
-    gate: readGate(output),
-    terminal: outcome !== "" || terminalStatuses.has(status),
-    findings: findingsTable(output)
-  }
-}
-
-export const answerForGate = (gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>, allow = false): GateAnswer => {
-  const question = findings.find((finding) => finding.id.startsWith("question-"))
-  if (question !== undefined) {
-    return { kind: "refuse", reason: "finding " + question.id + " is a question and needs your word" }
-  }
-  const asked = findings.find((finding) => finding.action === "ask-user")
-  if (asked !== undefined && !allow) {
-    return { kind: "refuse", reason: "finding " + asked.id + " is marked ask-user and needs your word" }
-  }
-  const worded = allow ? findings.filter((finding) => finding.action === "ask-user") : []
-  const rest = allow ? findings.filter((finding) => finding.action !== "ask-user") : findings
-  const other = rest.find((finding) => finding.action !== "auto-fix" && finding.action !== "no-op")
-  if (other !== undefined) {
-    return { kind: "refuse", reason: "finding " + other.id + " needs an answer orc cannot give" }
-  }
-  if (gate.stage === "fix-review") {
-    return { kind: "approve" }
-  }
-  const fixable = rest.filter((finding) => finding.action === "auto-fix")
-  if (fixable.length > 0) {
-    return {
-      kind: "fix",
-      ids: fixable.map((finding) => finding.id),
-      ignore: [...rest.filter((finding) => finding.action === "no-op"), ...worded].map((finding) => finding.id)
-    }
-  }
-  if (rest.length > 0 || worded.length > 0) {
-    return { kind: "approve" }
-  }
-  return { kind: "refuse", reason: "the " + gate.step + " gate names no finding orc can fix" }
-}
-
-const respondArgs = (answer: Exclude<GateAnswer, { readonly kind: "refuse" }>): ReadonlyArray<string> =>
-  answer.kind === "approve"
-    ? ["axi", "respond", "--action", "approve"]
-    : ["axi", "respond", "--action", "fix", "--findings", answer.ids.join(","), ...(answer.ignore.length === 0 ? [] : ["--ignore", answer.ignore.join(",")])]
 
 const findingKey = (step: string, finding: NoMistakesFinding): string =>
   step + "\n" + (finding.id === "" ? finding.file + "\n" + finding.description : finding.id)
@@ -275,7 +164,7 @@ const stopOnRejection = (input: NoMistakesInput, log: DriveLog, sent: Sent, comm
   if (sent.kind === "start") {
     return Effect.succeed(log.fail("no-mistakes refused to start: " + errorDetail(command)))
   }
-  if (sent.kind === "respond") {
+  if (sent.kind === "respond" || sent.kind === "answer") {
     return Effect.succeed(log.refuse(sent.gate, "no-mistakes refused the answer: " + errorDetail(command)))
   }
   return spawnNoMistakes(input, ["axi", "status"]).pipe(Effect.map((status) => {
@@ -287,35 +176,88 @@ const stopOnRejection = (input: NoMistakesInput, log: DriveLog, sent: Sent, comm
 const gateAnswer = (input: NoMistakesInput, log: DriveLog, gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>): GateAnswer =>
   log.gatesAnswered() >= maxGatesAnswered
     ? { kind: "refuse", reason: "orc answered " + maxGatesAnswered.toString() + " gates without reaching an outcome" }
-    : answerForGate(gate, findings, input.allow ?? false)
+    : answerForGate(gate, findings, input.allow ?? [])
+
+type CurrentStep =
+  | { readonly kind: "stop"; readonly ending: Ending }
+  | { readonly kind: "reattach"; readonly command: NoMistakesCommand }
+  | { readonly kind: "parked"; readonly parsed: ParsedRun; readonly gate: ParkedGate }
+
+const stepCurrent = (input: NoMistakesInput, log: DriveLog, sent: Sent, current: NoMistakesCommand): Effect.Effect<CurrentStep> =>
+  Effect.gen(function*() {
+    const parsed = log.read(current.stdout)
+    const refused = rejected(current, parsed)
+    if ((sent.kind === "respond" || sent.kind === "answer") && !refused) {
+      log.countGate()
+    }
+    if (parsed.terminal) {
+      return { kind: "stop", ending: log.finish(parsed) }
+    }
+    if (refused) {
+      const ending = yield* stopOnRejection(input, log, sent, current)
+      return { kind: "stop", ending }
+    }
+    if (parsed.gate === null) {
+      const command = yield* spawnNoMistakes(input, ["axi", "run"])
+      return { kind: "reattach", command }
+    }
+    return { kind: "parked", parsed, gate: parsed.gate }
+  })
+
+type OpenOutcome =
+  | { readonly kind: "ending"; readonly ending: Ending }
+  | { readonly kind: "answered"; readonly command: NoMistakesCommand }
+
+const serveOpenQuestions = (input: NoMistakesInput, log: DriveLog, gate: ParkedGate, open: ReadonlyArray<NoMistakesFinding>): Effect.Effect<OpenOutcome> =>
+  Effect.gen(function*() {
+    const supplied = new Map((input.answers ?? []).map((entry) => [entry.question, entry.answer] as const))
+    const missing = open.filter((finding) => !supplied.has(finding.id))
+    if (missing.length > 0) {
+      return { kind: "ending", ending: log.refuse(gate, missingReason(missing)) }
+    }
+    for (let index = 0; index < open.length - 1; index += 1) {
+      const pending = open[index] ?? { id: "", description: "" }
+      const reply = yield* spawnNoMistakes(input, answerArgsFor(pending.id, supplied.get(pending.id) ?? ""))
+      if (reply.exitCode !== 0 || scalar(reply.stdout, "error") !== "") {
+        const ending = yield* stopOnRejection(input, log, { kind: "answer", gate }, reply)
+        return { kind: "ending", ending }
+      }
+    }
+    const last = open[open.length - 1] ?? { id: "", description: "" }
+    const command = yield* spawnNoMistakes(input, answerArgsFor(last.id, supplied.get(last.id) ?? ""))
+    return { kind: "answered", command }
+  })
 
 const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending> =>
   Effect.gen(function*() {
     let sent: Sent = { kind: "start" }
     let current = yield* spawnNoMistakes(input, ["axi", "run", "--intent-file", input.taskFile])
     for (;;) {
-      const parsed = log.read(current.stdout)
-      const refused = rejected(current, parsed)
-      if (sent.kind === "respond" && !refused) {
-        log.countGate()
+      const step: CurrentStep = yield* stepCurrent(input, log, sent, current)
+      if (step.kind === "stop") {
+        return step.ending
       }
-      if (parsed.terminal) {
-        return log.finish(parsed)
-      }
-      if (refused) {
-        return yield* stopOnRejection(input, log, sent, current)
-      }
-      if (parsed.gate === null) {
-        current = yield* spawnNoMistakes(input, ["axi", "run"])
+      if (step.kind === "reattach") {
+        current = step.command
         sent = { kind: "reattach" }
         continue
       }
-      const answer = gateAnswer(input, log, parsed.gate, parsed.findings)
+      const open = openQuestionsIn(step.parsed.findings, omittedQuestionIds(current.stdout))
+      if (open.length > 0) {
+        const outcome: OpenOutcome = yield* serveOpenQuestions(input, log, step.gate, open)
+        if (outcome.kind === "ending") {
+          return outcome.ending
+        }
+        current = outcome.command
+        sent = { kind: "answer", gate: step.gate }
+        continue
+      }
+      const answer = gateAnswer(input, log, step.gate, step.parsed.findings)
       if (answer.kind === "refuse") {
-        return log.refuse(parsed.gate, answer.reason)
+        return log.refuse(step.gate, answer.reason)
       }
       current = yield* spawnNoMistakes(input, respondArgs(answer))
-      sent = { kind: "respond", gate: parsed.gate }
+      sent = { kind: "respond", gate: step.gate }
     }
   })
 
