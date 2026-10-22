@@ -182,7 +182,7 @@ interface CredentialCapture {
 export type NonoProfile = Effect.Success<ReturnType<typeof buildNonoProfile>>
 
 export type AgentNonoProfile = Omit<NonoProfile, "network"> & {
-  readonly network: Omit<ReturnType<typeof buildNonoProfile>["network"], "credentials"> & {
+  readonly network: Omit<NonoProfile["network"], "credentials"> & {
     readonly credentials: ReadonlyArray<string>
     readonly custom_credentials: Record<string, CredentialRoute>
   }
