@@ -67,15 +67,31 @@ describe("parseArgs", () => {
   })
 
   test("run takes a task file and no branch", () => {
-    expect(parseArgs(["run", "task.md"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: undefined, allow: false })
+    expect(parseArgs(["run", "task.md"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: undefined, allow: [] })
   })
 
   test("run takes a task file and a branch", () => {
-    expect(parseArgs(["run", "task.md", "--branch", "orc/demo"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", allow: false })
+    expect(parseArgs(["run", "task.md", "--branch", "orc/demo"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", allow: [] })
   })
 
   test("run takes a branch and the word after a refusal", () => {
-    expect(parseArgs(["run", "task.md", "--branch", "orc/demo", "--allow"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", allow: true })
+    expect(parseArgs(["run", "task.md", "--branch", "orc/demo", "--allow", "ask-user"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", allow: ["ask-user"] })
+  })
+
+  test("run takes the question word after a refusal", () => {
+    expect(parseArgs(["run", "task.md", "--branch", "orc/demo", "--allow", "question"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", allow: ["question"] })
+  })
+
+  test("run takes both words after refusals", () => {
+    expect(parseArgs(["run", "task.md", "--branch", "orc/demo", "--allow", "ask-user", "--allow", "question"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", allow: ["ask-user", "question"] })
+  })
+
+  test("run rejects the wordless flag after a refusal", () => {
+    expect(parseArgs(["run", "task.md", "--branch", "orc/demo", "--allow"])).toEqual({ kind: "UsageError", detail: "orc run takes a word after --allow" })
+  })
+
+  test("run rejects an unknown word for the flag", () => {
+    expect(parseArgs(["run", "task.md", "--allow", "push"])).toEqual({ kind: "UsageError", detail: "unknown word for --allow: push" })
   })
 
   test("run rejects a flag it does not know", () => {

@@ -83,7 +83,7 @@ const historyFor = (runId: string, home: string, projectDir: string, started: st
       hostSessionsDir: path.join(runDir, "sessions"),
       taskPath: path.join(runDir, "task.md"),
       agent: implementer, fixer, branch: "orc/test", started,
-      worktreeDir: projectDir, noMistakesPath, allow: false
+      worktreeDir: projectDir, noMistakesPath, allow: []
     }
     return run
   }).pipe(Effect.provide(BunServices.layer))
@@ -251,7 +251,7 @@ describe("runFull has no checkpoint-free mode", () => {
         await mkdir(project, { recursive: true })
         const git = await stubGit(home)
         const run = await Effect.runPromise(historyFor("next-x", home, project, "2026-10-19T10:00:00.000Z", git, ""))
-        const plan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow: false, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false }
+        const plan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow: [], inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false }
         let agentCalls = 0
         let checkCalls = 0
         const ops: SandboxOps = {

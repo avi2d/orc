@@ -26,7 +26,7 @@ export interface HistoryRun {
   readonly started: string
   readonly worktreeDir: string
   readonly noMistakesPath: string
-  readonly allow?: boolean | undefined
+  readonly allow?: ReadonlyArray<string> | undefined
 }
 
 export const formatReport = (report: OrcRunReport): string =>

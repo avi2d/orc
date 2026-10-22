@@ -1,10 +1,12 @@
+import { askUserWord, questionWord } from "./no-mistakes"
 export type OrcArgs =
   | { readonly kind: "PrintVersion" }
   | { readonly kind: "PrintHelp" }
   | { readonly kind: "ListRuns"; readonly json: boolean }
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
-  | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly branch: string | undefined; readonly allow: boolean }
+  | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly branch: string | undefined; readonly allow: ReadonlyArray<string> }
   | { readonly kind: "UsageError"; readonly detail: string }
+const allowWords: ReadonlyArray<string> = [askUserWord, questionWord]
 
 const parseShowArgs = (rest: readonly string[]): OrcArgs => {
   if (rest.length === 0) {
@@ -24,12 +26,34 @@ const parseShowArgs = (rest: readonly string[]): OrcArgs => {
   return { kind: "ShowRun", id, json: true }
 }
 
-const parseRunArgs = (rest: readonly string[]): OrcArgs => {
-  if (rest.length === 0) {
-    return { kind: "UsageError", detail: "orc run takes a task file" }
+type AllowSplit =
+  | { readonly kind: "ok"; readonly allow: ReadonlyArray<string>; readonly kept: ReadonlyArray<string> }
+  | { readonly kind: "error"; readonly detail: string }
+const readAllowWord = (word: string): string | null =>
+  word === "" || word.startsWith("--") ? null : (allowWords.includes(word) ? word : null)
+const splitAllowArgs = (rest: readonly string[]): AllowSplit => {
+  const allow: Array<string> = []
+  const kept: Array<string> = []
+  for (let index = 0; index < rest.length; index += 1) {
+    const token = rest[index] ?? ""
+    if (token !== "--allow") {
+      kept.push(token)
+      continue
+    }
+    const word = rest[index + 1] ?? ""
+    if (word === "" || word.startsWith("--")) {
+      return { kind: "error", detail: "orc run takes a word after --allow" }
+    }
+    const named = readAllowWord(word)
+    if (named === null) {
+      return { kind: "error", detail: "unknown word for --allow: " + word }
+    }
+    allow.push(named)
+    index += 1
   }
-  const allow = rest.includes("--allow")
-  const kept = rest.filter((flag) => flag !== "--allow")
+  return { kind: "ok", allow, kept }
+}
+const runAgentWithKept = (kept: ReadonlyArray<string>, allow: ReadonlyArray<string>): OrcArgs => {
   if (kept.length === 2 && kept[0] === "--branch") {
     const name = kept[1] ?? ""
     if (name === "" || name.startsWith("--")) {
@@ -51,6 +75,16 @@ const parseRunArgs = (rest: readonly string[]): OrcArgs => {
   }
   const stray = flags[0] === "--branch" ? "--branch" : (flags[0] ?? "")
   return { kind: "UsageError", detail: `unexpected argument: ${stray}` }
+}
+const parseRunArgs = (rest: readonly string[]): OrcArgs => {
+  if (rest.length === 0) {
+    return { kind: "UsageError", detail: "orc run takes a task file" }
+  }
+  const split = splitAllowArgs(rest)
+  if (split.kind === "error") {
+    return { kind: "UsageError", detail: split.detail }
+  }
+  return runAgentWithKept(split.kept, split.allow)
 }
 
 export const parseArgs = (args: readonly string[]): OrcArgs => {

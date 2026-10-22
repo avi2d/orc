@@ -170,7 +170,7 @@ const inheritedCompletion = (
 
 export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<ResumePlan, OrcRunError> =>
   Effect.gen(function*() {
-    const allow = run.allow ?? false
+    const allow = run.allow ?? []
     const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false }
     const prior = yield* latestRunForBranch(db, run.projectDir, run.branch).pipe(
       Effect.mapError((cause) => historyFailure("read", cause))

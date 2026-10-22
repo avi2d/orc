@@ -32,13 +32,15 @@ interface NoMistakesCommand {
   readonly exitCode: number
 }
 
+export const askUserWord = "ask-user"
+export const questionWord = "question"
 export interface NoMistakesInput {
   readonly spawner: ChildProcessSpawner.ChildProcessSpawner["Service"]
   readonly pathEnv: string
   readonly git: string
   readonly taskFile: string
   readonly worktreeDir: string
-  readonly allow?: boolean | undefined
+  readonly allow?: ReadonlyArray<string> | undefined
 }
 
 interface ParkedGate {
@@ -141,17 +143,21 @@ export const parseRun = (output: string): ParsedRun => {
   }
 }
 
-export const answerForGate = (gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>, allow = false): GateAnswer => {
+export const answerForGate = (gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>, allow: ReadonlyArray<string> = []): GateAnswer => {
+  const questionAllowed = allow.includes(questionWord)
+  const askUserAllowed = allow.includes(askUserWord)
   const question = findings.find((finding) => finding.id.startsWith("question-"))
-  if (question !== undefined) {
-    return { kind: "refuse", reason: "finding " + question.id + " is a question and needs your word" }
+  if (question !== undefined && !questionAllowed) {
+    return { kind: "refuse", reason: "finding " + question.id + " is a question and needs your word on a rerun with --allow question" }
   }
-  const asked = findings.find((finding) => finding.action === "ask-user")
-  if (asked !== undefined && !allow) {
-    return { kind: "refuse", reason: "finding " + asked.id + " is marked ask-user and needs your word" }
+  const excusedQuestions = questionAllowed ? findings.filter((finding) => finding.id.startsWith("question-")) : []
+  const remaining = excusedQuestions.length === 0 ? findings : findings.filter((finding) => !finding.id.startsWith("question-"))
+  const asked = remaining.find((finding) => finding.action === "ask-user")
+  if (asked !== undefined && !askUserAllowed) {
+    return { kind: "refuse", reason: "finding " + asked.id + " is marked ask-user and needs your word on a rerun with --allow ask-user" }
   }
-  const worded = allow ? findings.filter((finding) => finding.action === "ask-user") : []
-  const rest = allow ? findings.filter((finding) => finding.action !== "ask-user") : findings
+  const worded = [...excusedQuestions, ...(askUserAllowed ? remaining.filter((finding) => finding.action === "ask-user") : [])]
+  const rest = askUserAllowed ? remaining.filter((finding) => finding.action !== "ask-user") : remaining
   const other = rest.find((finding) => finding.action !== "auto-fix" && finding.action !== "no-op")
   if (other !== undefined) {
     return { kind: "refuse", reason: "finding " + other.id + " needs an answer orc cannot give" }
@@ -287,7 +293,7 @@ const stopOnRejection = (input: NoMistakesInput, log: DriveLog, sent: Sent, comm
 const gateAnswer = (input: NoMistakesInput, log: DriveLog, gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>): GateAnswer =>
   log.gatesAnswered() >= maxGatesAnswered
     ? { kind: "refuse", reason: "orc answered " + maxGatesAnswered.toString() + " gates without reaching an outcome" }
-    : answerForGate(gate, findings, input.allow ?? false)
+    : answerForGate(gate, findings, input.allow ?? [])
 
 const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending> =>
   Effect.gen(function*() {

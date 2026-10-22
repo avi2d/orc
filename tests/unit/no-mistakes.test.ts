@@ -208,6 +208,7 @@ describe("answerForGate refuses only what needs your word", () => {
       expect(answer.reason).toContain("r2")
       expect(answer.reason).toContain("ask-user")
       expect(answer.reason).toContain("needs your word")
+      expect(answer.reason).toContain("--allow ask-user")
     }
   })
 
@@ -218,7 +219,23 @@ describe("answerForGate refuses only what needs your word", () => {
     if (answer.kind === "refuse") {
       expect(answer.reason).toContain("question-3")
       expect(answer.reason).toContain("needs your word")
+      expect(answer.reason).toContain("--allow question")
     }
+  })
+
+  test("the ask-user word answers the ask-user gate", () => {
+    const parsed = parseRun(parked)
+    expect(answerForGate(approvalGate, parsed.findings, ["ask-user"])).toEqual({ kind: "fix", ids: ["r1"], ignore: ["r2"] })
+  })
+
+  test("the question word answers the open review question", () => {
+    const question = parseRun(parked.replace("r2,error,b.go,,ask-user,changes product behavior", "question-3,info,,,ask-user,Which scope should the report cover?"))
+    expect(answerForGate(approvalGate, question.findings, ["question", "ask-user"])).toEqual({ kind: "fix", ids: ["r1"], ignore: ["question-3"] })
+  })
+
+  test("the wrong word leaves the other gate refused", () => {
+    const parsed = parseRun(parked)
+    expect(answerForGate(approvalGate, parsed.findings, ["question"]).kind).toBe("refuse")
   })
 
   test("a gate naming no finding is refused, never approved blind", () => {
