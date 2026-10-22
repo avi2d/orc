@@ -54,12 +54,12 @@ const certPemIsSymlink = (): boolean => {
   }
 }
 
-// A granted link resolves to its target.
+// A link grant reaches only its target, so the link path stays denied.
 export const runtimeReadFiles: ReadonlyArray<string> = [
   "/etc/hosts",
   "/etc/resolv.conf",
   "/etc/localtime",
-  ...(certPemIsSymlink() ? [] : ["/etc/ssl/cert.pem"]),
+  ...(process.platform === "darwin" && certPemIsSymlink() ? [] : ["/etc/ssl/cert.pem"]),
   "/etc/ssl/openssl.cnf"
 ]
 
