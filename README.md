@@ -34,8 +34,8 @@ Orc commits to a new branch named `orc/<run-id>`, or to the name you pass with `
 A branch name may hold only letters, digits, `.`, `_`, `-` and `/`.
 To resume the branch after a stop, run `bun run src/bin.ts run --branch <name>` and orc skips the steps the run history marks passed.
 On resume Sandcastle reuses the branch worktree, Pi resumes its prior session, and orc reattaches to no-mistakes with the same intent.
-After a refusal, run the same no-mistakes resume command with `--allow` and the name from the report.
-No-mistakes takes the word for that `--allow` kind.
+After a refusal, run the same resume command with `--allow` and the name from the report, or with `--answer` and the captain's answer for a question.
+No-mistakes takes the word for that `--allow` kind, and the answer for that question.
 Orc also refuses a checkout whose own git config sets any key outside a short list known to run no program.
 
 The run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
@@ -53,7 +53,8 @@ Orc routes only `opencode-go` models through the sandbox and refuses any other m
 
 Once the checks pass, orc runs `no-mistakes axi run` on the branch with the task as its intent.
 At each gate orc asks no-mistakes to fix the findings marked `auto-fix`, ignores those marked `no-op`, and accepts the fix review.
-Orc refuses a no-mistakes gate holding an open review question without `--allow question`.
+Orc refuses a no-mistakes gate holding an open review question without an `--answer` for that question.
+Rerun with `--answer question-<id>="<text>"` and orc answers every open question before any gate response.
 Orc refuses a no-mistakes gate holding an `ask-user` finding without `--allow ask-user`.
 Orc leaves that no-mistakes gate parked for you to answer.
 

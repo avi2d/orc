@@ -24,6 +24,7 @@ export interface OrcRunRequest {
   readonly taskFile: string | null | undefined
   readonly branch?: string | undefined
   readonly allow?: ReadonlyArray<string> | undefined
+  readonly answers?: ReadonlyArray<import("./no-mistakes").QuestionAnswer> | undefined
   readonly homeDir?: string | undefined
   readonly runId?: string | undefined
   readonly agentsDir?: string | undefined
@@ -277,7 +278,8 @@ export const runAgentStep = (
       taskPath: folders.taskPath, agent, fixer, branch: checkout.branch, started,
       worktreeDir: sandbox.worktreePath,
       noMistakesPath: hostPath ?? "",
-      allow: request.allow ?? []
+      allow: request.allow ?? [],
+      answers: request.answers ?? []
     }
     const report = yield* Effect.acquireUseRelease(
       openDatabase(home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),

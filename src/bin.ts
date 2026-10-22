@@ -10,7 +10,7 @@ import { formatReport } from "./run-record"
 import { encodeRunsJson, formatHistoryError, formatRunsTable, listRuns, openDatabase, orcHomeDir } from "./run-history"
 import { encodeShowJson, formatShow, readShow } from "./show"
 
-const usage = "Usage: orc [--version] [--help] | orc runs [--json] | orc show <run> [--json] | orc run [<task-file>] [--branch <name>] [--allow ask-user] [--allow question]"
+const usage = "Usage: orc [--version] [--help] | orc runs [--json] | orc show <run> [--json] | orc run [<task-file>] [--branch <name>] [--allow ask-user] [--answer question-<id>=\"<text>\"]"
 
 const readFailure = (error: unknown): string =>
   typeof error === "string" ? error : "orc: cannot read the run history: " + formatHistoryError(error)
@@ -61,7 +61,7 @@ const program = Effect.gen(function*() {
       break
     }
     case "RunAgent": {
-      const report = yield* runAgentStep({ cwd: process.cwd(), taskFile: args.taskFile, branch: args.branch, allow: args.allow }).pipe(
+      const report = yield* runAgentStep({ cwd: process.cwd(), taskFile: args.taskFile, branch: args.branch, allow: args.allow, answers: args.answers }).pipe(
         Effect.provide(BunServices.layer),
         Effect.catchTag("OrcRunError", (error) =>
           Console.error(error.message).pipe(Effect.andThen(Effect.fail("agent step refused")))

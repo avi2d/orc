@@ -2,7 +2,7 @@ import { Effect, type FileSystem, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "./agents"
 import { orcCompletionLine } from "./pi"
-import type { NoMistakesRecord } from "./no-mistakes"
+import type { NoMistakesRecord, QuestionAnswer } from "./no-mistakes"
 import { OrcRunError } from "./run-session"
 import { toFileUrl } from "./run-history"
 import { findingLine, reportFileName, reportMarkdown, runStatus, type OrcRunReport } from "./report"
@@ -27,6 +27,7 @@ export interface HistoryRun {
   readonly worktreeDir: string
   readonly noMistakesPath: string
   readonly allow?: ReadonlyArray<string> | undefined
+  readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
 }
 
 export const formatReport = (report: OrcRunReport): string =>

@@ -33,7 +33,10 @@ interface NoMistakesCommand {
 }
 
 export const askUserWord = "ask-user"
-export const questionWord = "question"
+export interface QuestionAnswer {
+  readonly question: string
+  readonly answer: string
+}
 export interface NoMistakesInput {
   readonly spawner: ChildProcessSpawner.ChildProcessSpawner["Service"]
   readonly pathEnv: string
@@ -41,6 +44,7 @@ export interface NoMistakesInput {
   readonly taskFile: string
   readonly worktreeDir: string
   readonly allow?: ReadonlyArray<string> | undefined
+  readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
 }
 
 interface ParkedGate {
@@ -72,6 +76,7 @@ type GateAnswer =
 type Sent =
   | { readonly kind: "start" }
   | { readonly kind: "respond"; readonly gate: ParkedGate }
+  | { readonly kind: "answer"; readonly gate: ParkedGate }
   | { readonly kind: "reattach" }
 
 const maxGatesAnswered = 20
@@ -143,21 +148,28 @@ export const parseRun = (output: string): ParsedRun => {
   }
 }
 
+const isQuestion = (finding: NoMistakesFinding): boolean => finding.id.startsWith("question-")
+
+const questionReason = (question: NoMistakesFinding): string => {
+  const quoted = question.description === "" ? "" : ` "${question.description}"`
+  return `finding ${question.id} is a question${quoted} and needs your answer on a rerun with --answer ${question.id}="<answer>"`
+}
+
+export const answerArgsFor = (question: string, answer: string): ReadonlyArray<string> =>
+  ["axi", "answer", "--question", question, "--answer", answer]
+
 export const answerForGate = (gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>, allow: ReadonlyArray<string> = []): GateAnswer => {
-  const questionAllowed = allow.includes(questionWord)
-  const askUserAllowed = allow.includes(askUserWord)
-  const question = findings.find((finding) => finding.id.startsWith("question-"))
-  if (question !== undefined && !questionAllowed) {
-    return { kind: "refuse", reason: "finding " + question.id + " is a question and needs your word on a rerun with --allow question" }
+  const question = findings.find(isQuestion)
+  if (question !== undefined) {
+    return { kind: "refuse", reason: questionReason(question) }
   }
-  const excusedQuestions = questionAllowed ? findings.filter((finding) => finding.id.startsWith("question-")) : []
-  const remaining = excusedQuestions.length === 0 ? findings : findings.filter((finding) => !finding.id.startsWith("question-"))
-  const asked = remaining.find((finding) => finding.action === "ask-user")
+  const askUserAllowed = allow.includes(askUserWord)
+  const asked = findings.find((finding) => finding.action === "ask-user")
   if (asked !== undefined && !askUserAllowed) {
     return { kind: "refuse", reason: "finding " + asked.id + " is marked ask-user and needs your word on a rerun with --allow ask-user" }
   }
-  const worded = [...excusedQuestions, ...(askUserAllowed ? remaining.filter((finding) => finding.action === "ask-user") : [])]
-  const rest = askUserAllowed ? remaining.filter((finding) => finding.action !== "ask-user") : remaining
+  const worded = askUserAllowed ? findings.filter((finding) => finding.action === "ask-user") : []
+  const rest = askUserAllowed ? findings.filter((finding) => finding.action !== "ask-user") : findings
   const other = rest.find((finding) => finding.action !== "auto-fix" && finding.action !== "no-op")
   if (other !== undefined) {
     return { kind: "refuse", reason: "finding " + other.id + " needs an answer orc cannot give" }
@@ -281,7 +293,7 @@ const stopOnRejection = (input: NoMistakesInput, log: DriveLog, sent: Sent, comm
   if (sent.kind === "start") {
     return Effect.succeed(log.fail("no-mistakes refused to start: " + errorDetail(command)))
   }
-  if (sent.kind === "respond") {
+  if (sent.kind === "respond" || sent.kind === "answer") {
     return Effect.succeed(log.refuse(sent.gate, "no-mistakes refused the answer: " + errorDetail(command)))
   }
   return spawnNoMistakes(input, ["axi", "status"]).pipe(Effect.map((status) => {
@@ -302,7 +314,7 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending> =>
     for (;;) {
       const parsed = log.read(current.stdout)
       const refused = rejected(current, parsed)
-      if (sent.kind === "respond" && !refused) {
+      if ((sent.kind === "respond" || sent.kind === "answer") && !refused) {
         log.countGate()
       }
       if (parsed.terminal) {
@@ -314,6 +326,27 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending> =>
       if (parsed.gate === null) {
         current = yield* spawnNoMistakes(input, ["axi", "run"])
         sent = { kind: "reattach" }
+        continue
+      }
+      const open = parsed.findings.filter(isQuestion)
+      if (open.length > 0) {
+        const supplied = new Map((input.answers ?? []).map((entry) => [entry.question, entry.answer] as const))
+        const missing = open.find((finding) => !supplied.has(finding.id))
+        if (missing !== undefined) {
+          return log.refuse(parsed.gate, questionReason(missing))
+        }
+        for (let index = 0; index < open.length; index += 1) {
+          const pending = open[index] ?? { id: "", description: "" }
+          const reply = yield* spawnNoMistakes(input, answerArgsFor(pending.id, supplied.get(pending.id) ?? ""))
+          if (index < open.length - 1) {
+            if (reply.exitCode !== 0 || scalar(reply.stdout, "error") !== "") {
+              return yield* stopOnRejection(input, log, { kind: "answer", gate: parsed.gate }, reply)
+            }
+            continue
+          }
+          current = reply
+          sent = { kind: "answer", gate: parsed.gate }
+        }
         continue
       }
       const answer = gateAnswer(input, log, parsed.gate, parsed.findings)

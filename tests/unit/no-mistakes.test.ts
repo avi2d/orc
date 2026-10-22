@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { answerForGate, parseRun, type NoMistakesFinding } from "../../src/no-mistakes"
+import { answerArgsFor, answerForGate, parseRun, type NoMistakesFinding } from "../../src/no-mistakes"
 import { formatReport, type OrcRunReport } from "../../src/run-record"
 
 const approvalGate = { step: "review", stage: "approval" } as const
@@ -212,14 +212,14 @@ describe("answerForGate refuses only what needs your word", () => {
     }
   })
 
-  test("an open review question names that question", () => {
+  test("an open review question names the question and its answer rerun", () => {
     const question = parseRun(parked.replace("r2,error,b.go,,ask-user,changes product behavior", "question-3,info,,,ask-user,Which scope should the report cover?"))
     const answer = answerForGate(approvalGate, question.findings)
     expect(answer.kind).toBe("refuse")
     if (answer.kind === "refuse") {
       expect(answer.reason).toContain("question-3")
-      expect(answer.reason).toContain("needs your word")
-      expect(answer.reason).toContain("--allow question")
+      expect(answer.reason).toContain("Which scope should the report cover?")
+      expect(answer.reason).toContain("--answer question-3=")
     }
   })
 
@@ -228,14 +228,11 @@ describe("answerForGate refuses only what needs your word", () => {
     expect(answerForGate(approvalGate, parsed.findings, ["ask-user"])).toEqual({ kind: "fix", ids: ["r1"], ignore: ["r2"] })
   })
 
-  test("the question word answers the open review question", () => {
+  test("an open review question stays refused past the allow word and fix review", () => {
     const question = parseRun(parked.replace("r2,error,b.go,,ask-user,changes product behavior", "question-3,info,,,ask-user,Which scope should the report cover?"))
-    expect(answerForGate(approvalGate, question.findings, ["question", "ask-user"])).toEqual({ kind: "fix", ids: ["r1"], ignore: ["question-3"] })
-  })
-
-  test("the wrong word leaves the other gate refused", () => {
-    const parsed = parseRun(parked)
-    expect(answerForGate(approvalGate, parsed.findings, ["question"]).kind).toBe("refuse")
+    expect(answerForGate(approvalGate, question.findings, ["ask-user"]).kind).toBe("refuse")
+    expect(answerForGate(fixReview, question.findings, ["ask-user"]).kind).toBe("refuse")
+    expect(answerArgsFor("question-3", "Use the wide scope")).toEqual(["axi", "answer", "--question", "question-3", "--answer", "Use the wide scope"])
   })
 
   test("a gate naming no finding is refused, never approved blind", () => {

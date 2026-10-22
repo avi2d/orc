@@ -5,7 +5,7 @@ import { buildFixPrompt, maxFixAttempts, readChecksCommands, runChecksRound, typ
 import { runGit } from "./git-run"
 import { buildImplementPrompt, orcCompletionLine, piWithTools, sessionPrintedSignal, type PiTokenUse } from "./pi"
 import { OrcRunError, describeCause, noSession, readSession } from "./run-session"
-import { driveNoMistakes } from "./no-mistakes"
+import { driveNoMistakes, type QuestionAnswer } from "./no-mistakes"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
 
 export interface SandboxOps {
@@ -19,6 +19,7 @@ export interface ResumePlan {
   readonly skipImplement: boolean
   readonly skipChecks: boolean
   readonly allow: ReadonlyArray<string>
+  readonly answers: ReadonlyArray<QuestionAnswer>
   readonly inheritedRounds: ReadonlyArray<ChecksRoundSummary>
   readonly inheritedFixes: ReadonlyArray<RecordedFixAttempt>
   readonly fixSessionId: string | null
@@ -197,10 +198,10 @@ const readProjectChecks = (run: HistoryRun): Effect.Effect<ReadonlyArray<ChecksC
     )
   )
 
-const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<string>, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError> =>
+const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<string>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
     yield* checkpoints.noMistakesStart(new Date().toISOString())
-    const noMistakes = yield* driveNoMistakes({ spawner: run.spawner, pathEnv: run.noMistakesPath, git: run.git, taskFile: run.taskPath, worktreeDir: run.worktreeDir, allow })
+    const noMistakes = yield* driveNoMistakes({ spawner: run.spawner, pathEnv: run.noMistakesPath, git: run.git, taskFile: run.taskPath, worktreeDir: run.worktreeDir, allow, answers })
     yield* checkpoints.noMistakesDone(noMistakes)
     return {
       ...base,
@@ -249,7 +250,7 @@ const runChecksFixLoop = (
       rounds.push(summary)
       yield* checkpoints.checksRoundDone(summary)
       if (failed.length === 0) {
-        return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, checkpoints)
+        return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints)
       }
       if (fixes.length >= maxFixAttempts) {
         return {
@@ -306,7 +307,7 @@ export const runFull = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, ch
     const fixes: Array<RecordedFixAttempt> = [...plan.inheritedFixes]
     const commits = [...done.commits]
     if (plan.skipChecks) {
-      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, checkpoints)
+      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints)
     }
     return yield* runChecksFixLoop(run, ops, base, rounds, fixes, commits, plan, checkpoints)
   })
