@@ -33,6 +33,7 @@ interface NoMistakesCommand {
 }
 
 export const askUserWord = "ask-user"
+export type AllowWord = typeof askUserWord
 export interface QuestionAnswer {
   readonly question: string
   readonly answer: string
@@ -43,7 +44,7 @@ export interface NoMistakesInput {
   readonly git: string
   readonly taskFile: string
   readonly worktreeDir: string
-  readonly allow?: ReadonlyArray<string> | undefined
+  readonly allow?: ReadonlyArray<AllowWord> | undefined
   readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
 }
 
@@ -158,20 +159,8 @@ const questionReason = (question: NoMistakesFinding): string => {
 const missingReason = (missing: ReadonlyArray<NoMistakesFinding>): string =>
   missing.map(questionReason).join("; ")
 
-export const omittedQuestionIds = (output: string): ReadonlyArray<string> => {
-  const scalarIds = scalar(output, "review-questions-omitted").match(/question-[A-Za-z0-9-]+/g) ?? []
-  const noticeIds = trimmedLines(output)
-    .filter((line) => /further review question\(s\) omitted for length/i.test(line))
-    .flatMap((line) => line.match(/question-[A-Za-z0-9-]+/g) ?? [])
-  const seen = new Set<string>()
-  return [...scalarIds, ...noticeIds].filter((id) => {
-    if (seen.has(id)) {
-      return false
-    }
-    seen.add(id)
-    return true
-  })
-}
+export const omittedQuestionIds = (output: string): ReadonlyArray<string> =>
+  scalar(output, "review-questions-omitted").match(/question-[A-Za-z0-9-]+/g) ?? []
 
 const openQuestionsIn = (findings: ReadonlyArray<NoMistakesFinding>, omittedIds: ReadonlyArray<string>): ReadonlyArray<NoMistakesFinding> => {
   const rendered = findings.filter(isQuestion)
@@ -185,8 +174,8 @@ const openQuestionsIn = (findings: ReadonlyArray<NoMistakesFinding>, omittedIds:
 export const answerArgsFor = (question: string, answer: string): ReadonlyArray<string> =>
   ["axi", "answer", "--question", question, "--answer", answer]
 
-export const answerForGate = (gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>, allow: ReadonlyArray<string> = [], omittedIds: ReadonlyArray<string> = []): GateAnswer => {
-  const open = openQuestionsIn(findings, omittedIds)
+export const answerForGate = (gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>, allow: ReadonlyArray<AllowWord> = []): GateAnswer => {
+  const open = findings.filter(isQuestion)
   if (open.length > 0) {
     return { kind: "refuse", reason: missingReason(open) }
   }
@@ -329,10 +318,10 @@ const stopOnRejection = (input: NoMistakesInput, log: DriveLog, sent: Sent, comm
   }))
 }
 
-const gateAnswer = (input: NoMistakesInput, log: DriveLog, gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>, omittedIds: ReadonlyArray<string>): GateAnswer =>
+const gateAnswer = (input: NoMistakesInput, log: DriveLog, gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>): GateAnswer =>
   log.gatesAnswered() >= maxGatesAnswered
     ? { kind: "refuse", reason: "orc answered " + maxGatesAnswered.toString() + " gates without reaching an outcome" }
-    : answerForGate(gate, findings, input.allow ?? [], omittedIds)
+    : answerForGate(gate, findings, input.allow ?? [])
 
 const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending> =>
   Effect.gen(function*() {
@@ -377,7 +366,7 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending> =>
         }
         continue
       }
-      const answer = gateAnswer(input, log, parsed.gate, parsed.findings, omitted)
+      const answer = gateAnswer(input, log, parsed.gate, parsed.findings)
       if (answer.kind === "refuse") {
         return log.refuse(parsed.gate, answer.reason)
       }

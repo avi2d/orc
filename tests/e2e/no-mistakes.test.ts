@@ -232,8 +232,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
             "  findings[2]{id,severity,file,line,action,description}:",
             "    question-3,info,,,ask-user,Which scope should the report cover?",
             "    question-4,info,,,ask-user,Which retries are allowed?",
-            "... 1 further review question(s) omitted for length.",
-            "review-questions-omitted: question-5",
+            "review-questions-omitted: 1 further review question(s) are open and have no row of their own. This gate releases only once EVERY open question is answered, so answer these by id as well, with: no-mistakes axi answer --question <id> --answer \"<your answer>\". Omitted question ids: question-5",
             "gate: review"
           ].join("\n") + "\n"
         }
@@ -268,8 +267,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
             "  findings[2]{id,severity,file,line,action,description}:",
             "    question-3,info,,,ask-user,Which scope should the report cover?",
             "    question-4,info,,,ask-user,Which retries are allowed?",
-            "... 1 further review question(s) omitted for length.",
-            "review-questions-omitted: question-5",
+            "review-questions-omitted: 1 further review question(s) are open and have no row of their own. This gate releases only once EVERY open question is answered, so answer these by id as well, with: no-mistakes axi answer --question <id> --answer \"<your answer>\". Omitted question ids: question-5",
             "gate: review"
           ].join("\n") + "\n"
         }

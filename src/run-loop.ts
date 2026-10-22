@@ -5,7 +5,7 @@ import { buildFixPrompt, maxFixAttempts, readChecksCommands, runChecksRound, typ
 import { runGit } from "./git-run"
 import { buildImplementPrompt, orcCompletionLine, piWithTools, sessionPrintedSignal, type PiTokenUse } from "./pi"
 import { OrcRunError, describeCause, noSession, readSession } from "./run-session"
-import { driveNoMistakes, type QuestionAnswer } from "./no-mistakes"
+import { driveNoMistakes, type AllowWord, type QuestionAnswer } from "./no-mistakes"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
 
 export interface SandboxOps {
@@ -18,7 +18,7 @@ export interface ResumePlan {
   readonly implementSessionFile: string | null
   readonly skipImplement: boolean
   readonly skipChecks: boolean
-  readonly allow: ReadonlyArray<string>
+  readonly allow: ReadonlyArray<AllowWord>
   readonly answers: ReadonlyArray<QuestionAnswer>
   readonly inheritedRounds: ReadonlyArray<ChecksRoundSummary>
   readonly inheritedFixes: ReadonlyArray<RecordedFixAttempt>
@@ -198,7 +198,7 @@ const readProjectChecks = (run: HistoryRun): Effect.Effect<ReadonlyArray<ChecksC
     )
   )
 
-const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<string>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError> =>
+const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
     yield* checkpoints.noMistakesStart(new Date().toISOString())
     const noMistakes = yield* driveNoMistakes({ spawner: run.spawner, pathEnv: run.noMistakesPath, git: run.git, taskFile: run.taskPath, worktreeDir: run.worktreeDir, allow, answers })

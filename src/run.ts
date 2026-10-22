@@ -16,6 +16,7 @@ import { buildResumePlan, resolveTaskFile } from "./run-resume"
 import { finishRun, historyFailure, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordResumePublish } from "./history-write"
 import { failedReport, writeEvidence, writeReport, type HistoryRun, type OrcRunReport } from "./run-record"
 import { runFull, type RunCheckpoints, type SandboxOps } from "./run-loop"
+import type { AllowWord, QuestionAnswer } from "./no-mistakes"
 
 export type { SandboxOps }
 
@@ -23,8 +24,8 @@ export interface OrcRunRequest {
   readonly cwd: string
   readonly taskFile: string | null | undefined
   readonly branch?: string | undefined
-  readonly allow?: ReadonlyArray<string> | undefined
-  readonly answers?: ReadonlyArray<import("./no-mistakes").QuestionAnswer> | undefined
+  readonly allow?: ReadonlyArray<AllowWord> | undefined
+  readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
   readonly homeDir?: string | undefined
   readonly runId?: string | undefined
   readonly agentsDir?: string | undefined

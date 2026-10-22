@@ -200,32 +200,9 @@ describe("parseRun reads the recorded TOON shapes", () => {
 })
 
 describe("omitted review questions", () => {
-  test("ids from the omission scalar are omitted ids", () => {
-    const output = parked.replace("gate: review", "review-questions-omitted: question-5,question-6\ngate: review")
+  test("ids from the omission notice are omitted ids", () => {
+    const output = parked.replace("gate: review", "review-questions-omitted: 2 further review question(s) are open and have no row of their own. This gate releases only once EVERY open question is answered, so answer these by id as well, with: no-mistakes axi answer --question <id> --answer \"<your answer>\". Omitted question ids: question-5, question-6\ngate: review")
     expect(omittedQuestionIds(output)).toEqual(["question-5", "question-6"])
-  })
-  test("ids trailing the omission sentence are omitted ids", () => {
-    const output = parked.replace("gate: review", "... 2 further review question(s) omitted for length: question-7, question-8.\ngate: review")
-    expect(omittedQuestionIds(output)).toEqual(["question-7", "question-8"])
-  })
-  test("answerForGate refuses naming an omitted question without a row", () => {
-    const question = parseRun(parked.replace("r2,error,b.go,,ask-user,changes product behavior", "question-3,info,,,ask-user,Which scope should the report cover?"))
-    const answer = answerForGate(approvalGate, question.findings, [], ["question-5"])
-    expect(answer.kind).toBe("refuse")
-    if (answer.kind === "refuse") {
-      expect(answer.reason).toContain("question-3")
-      expect(answer.reason).toContain("question-5")
-      expect(answer.reason).toContain("--answer question-3=")
-      expect(answer.reason).toContain("--answer question-5=")
-    }
-  })
-  test("an omitted id matching a rendered row is named once", () => {
-    const question = parseRun(parked.replace("r2,error,b.go,,ask-user,changes product behavior", "question-3,info,,,ask-user,Which scope should the report cover?"))
-    const answer = answerForGate(approvalGate, question.findings, [], ["question-3"])
-    expect(answer.kind).toBe("refuse")
-    if (answer.kind === "refuse") {
-      expect(answer.reason.match(/--answer question-3=/g)).toHaveLength(1)
-    }
   })
 })
 describe("answerForGate refuses only what needs your word", () => {
