@@ -14,7 +14,8 @@ import {
   recordRun,
   recordScore,
   recordSignal,
-  recordStep
+  recordStep,
+  recordStepScore
 } from "../../src/run-history"
 import { decodeShowJson, encodeShowJson, formatShow, readShow } from "../../src/show"
 
@@ -155,6 +156,100 @@ describe("readShow orders and links", () => {
         const document = await Effect.runPromise(readShow(db, "hash-1"))
         expect(document?.run.taskFileUrl).toBe("file:///Users/alex%23work/.orc/runs/hash-1/task.md")
         expect(document?.run.reportUrl).toBe("file:///Users/alex%23work/.orc/runs/hash-1/report.md")
+      } finally {
+        db.close()
+      }
+    })
+  })
+})
+
+describe("orc score latest wins in orc show", () => {
+  test("a later orc score replaces the earlier score in orc show", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await fixture(db)
+        await Effect.runPromise(recordStepScore(db, {
+          runId: "show-1",
+          step: "implement",
+          score: 2,
+          note: "thin",
+          scoredAt: "2026-10-18T12:00:00.000Z"
+        }))
+        await Effect.runPromise(recordStepScore(db, {
+          runId: "show-1",
+          step: "implement",
+          score: 5,
+          note: "clearer",
+          scoredAt: "2026-10-18T13:00:00.000Z"
+        }))
+        const document = await Effect.runPromise(readShow(db, "show-1"))
+        expect(document?.steps[0]?.score).toEqual({ score: 5, note: "clearer", scoredAt: "2026-10-18T13:00:00.000Z" })
+        const rows = db.query("SELECT score FROM scores ORDER BY id ASC").all() as Array<{ score: number }>
+        expect(rows.map((row) => row.score).slice(-2)).toEqual([2, 5])
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("orc score refuses an unknown run with no write to orc show", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await fixture(db)
+        const failure = await Effect.runPromise(recordStepScore(db, {
+          runId: "missing",
+          step: "implement",
+          score: 4,
+          note: "",
+          scoredAt: "2026-10-18T12:00:00.000Z"
+        }).pipe(Effect.flip))
+        expect(failure._tag).toBe("UnknownRun")
+        const count = (db.query("SELECT COUNT(*) AS total FROM scores").get() as { total: number }).total
+        expect(count).toBe(1)
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("orc score refuses an unknown step with no write to orc show", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await fixture(db)
+        const failure = await Effect.runPromise(recordStepScore(db, {
+          runId: "show-1",
+          step: "missing-step",
+          score: 4,
+          note: "",
+          scoredAt: "2026-10-18T12:00:00.000Z"
+        }).pipe(Effect.flip))
+        expect(failure._tag).toBe("UnknownStep")
+        const count = (db.query("SELECT COUNT(*) AS total FROM scores").get() as { total: number }).total
+        expect(count).toBe(1)
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("orc score refuses a score outside 1 to 5 with no write to orc show", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await fixture(db)
+        const failure = await Effect.runPromise(recordStepScore(db, {
+          runId: "show-1",
+          step: "implement",
+          score: 6,
+          note: "too high",
+          scoredAt: "2026-10-18T12:00:00.000Z"
+        }).pipe(Effect.flip))
+        expect(failure._tag).toBe("InvalidScore")
+        const count = (db.query("SELECT COUNT(*) AS total FROM scores").get() as { total: number }).total
+        expect(count).toBe(1)
       } finally {
         db.close()
       }

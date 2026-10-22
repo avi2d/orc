@@ -3,6 +3,7 @@ export type OrcArgs =
   | { readonly kind: "PrintHelp" }
   | { readonly kind: "ListRuns"; readonly json: boolean }
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
+  | { readonly kind: "ScoreStep"; readonly runId: string; readonly step: string; readonly score: number; readonly note: string }
   | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly branch: string | undefined; readonly allow: boolean }
   | { readonly kind: "UsageError"; readonly detail: string }
 
@@ -22,6 +23,23 @@ const parseShowArgs = (rest: readonly string[]): OrcArgs => {
     return { kind: "UsageError", detail: `unexpected argument: ${extra[0]}` }
   }
   return { kind: "ShowRun", id, json: true }
+}
+
+const parseScoreArgs = (rest: readonly string[]): OrcArgs => {
+  if (rest.length < 3) {
+    return { kind: "UsageError", detail: "orc score takes a run id, a step name, a score from 1 to 5 and an optional note" }
+  }
+  if (rest.length > 4) {
+    return { kind: "UsageError", detail: `unexpected argument for orc score: ${rest[4]}` }
+  }
+  const runId = rest[0] as string
+  const step = rest[1] as string
+  const scoreText = rest[2] as string
+  if (!/^[1-5]$/.test(scoreText)) {
+    return { kind: "UsageError", detail: `orc score takes a score from 1 to 5, got "${scoreText}"` }
+  }
+  const note = rest.length === 4 ? (rest[3] as string) : ""
+  return { kind: "ScoreStep", runId, step, score: Number(scoreText), note }
 }
 
 const parseRunArgs = (rest: readonly string[]): OrcArgs => {
@@ -73,6 +91,9 @@ export const parseArgs = (args: readonly string[]): OrcArgs => {
   }
   if (first === "show") {
     return parseShowArgs(rest)
+  }
+  if (first === "score") {
+    return parseScoreArgs(rest)
   }
   if (first === "run") {
     return parseRunArgs(rest)

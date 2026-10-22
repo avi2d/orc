@@ -7,10 +7,10 @@ import packageJson from "../package.json" with { type: "json" }
 import { parseArgs } from "./args"
 import { runAgentStep } from "./run"
 import { formatReport } from "./run-record"
-import { encodeRunsJson, formatHistoryError, formatRunsTable, listRuns, openDatabase, orcHomeDir } from "./run-history"
+import { encodeRunsJson, formatHistoryError, formatRunsTable, listRuns, openDatabase, orcHomeDir, recordStepScore } from "./run-history"
 import { encodeShowJson, formatShow, readShow } from "./show"
 
-const usage = "Usage: orc [--version] [--help] | orc runs [--json] | orc show <run> [--json] | orc run [<task-file>] [--branch <name>] [--allow]"
+const usage = "Usage: orc [--version] [--help] | orc runs [--json] | orc show <run> [--json] | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--branch <name>] [--allow]"
 
 const readFailure = (error: unknown): string =>
   typeof error === "string" ? error : "orc: cannot read the run history: " + formatHistoryError(error)
@@ -58,6 +58,40 @@ const program = Effect.gen(function*() {
       } else {
         yield* Console.log(formatShow(document))
       }
+      break
+    }
+    case "ScoreStep": {
+      yield* Effect.acquireUseRelease(
+        openDatabase(orcHomeDir()),
+        (db) =>
+          recordStepScore(db, {
+            runId: args.runId,
+            step: args.step,
+            score: args.score,
+            note: args.note,
+            scoredAt: new Date().toISOString()
+          }),
+        (db) => Effect.sync(() => db.close())
+      ).pipe(
+        Effect.provide(BunServices.layer),
+        Effect.catchTag("UnknownRun", (error) =>
+          Console.error("orc score: unknown run " + error.runId).pipe(Effect.andThen(Effect.fail("orc score refused")))
+        ),
+        Effect.catchTag("UnknownStep", (error) =>
+          Console.error("orc score: unknown step " + error.step + " in run " + error.runId).pipe(
+            Effect.andThen(Effect.fail("orc score refused"))
+          )
+        ),
+        Effect.catchTag("InvalidScore", (error) =>
+          Console.error(`orc score takes a score from 1 to 5, got "${error.score}"`).pipe(
+            Effect.andThen(Effect.fail("orc score refused"))
+          )
+        ),
+        Effect.catch((error) =>
+          Console.error(readFailure(error)).pipe(Effect.andThen(Effect.fail("run history unavailable")))
+        )
+      )
+      yield* Console.log(`orc score recorded ${args.score} for ${args.step} in ${args.runId}`)
       break
     }
     case "RunAgent": {
