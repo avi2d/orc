@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
+import { BunServices } from "@effect/platform-bun"
+import { Effect } from "effect"
 import { buildHostGitEnv, buildNonoRunArgs, buildSandboxEnv, nonoSandboxProvider } from "../../src/nono"
-import { buildNonoProfile, runtimeOf } from "../../src/nono-profile"
+import { buildNonoProfile, runtimeOf, type HostRuntime, type NonoSandboxRoots } from "../../src/nono-profile"
 
 const roots = {
   worktree: "/tmp/orc-test/worktree",
@@ -10,22 +12,25 @@ const roots = {
 
 const noHost = { developerDir: null, runtimeDirs: [] }
 
+const profileFor = (input: NonoSandboxRoots, host: HostRuntime) =>
+  Effect.runPromise(buildNonoProfile(input, host).pipe(Effect.provide(BunServices.layer)))
+
 const sentinelHeader = "Authorization: Basic b3JjLXNlbnRpbmVsOnNlY3JldA=="
 
 describe("buildNonoProfile", () => {
-  test("grants read-write access to exactly the three roots", () => {
-    const profile = buildNonoProfile(roots, noHost)
+  test("grants read-write access to exactly the three roots", async () => {
+    const profile = await profileFor(roots, noHost)
     expect(profile.filesystem.allow).toEqual([roots.worktree, roots.gitData, roots.piSessionDir])
   })
 
-  test("drops a root nested in another, so no grant can be retargeted through a writable one", () => {
+  test("drops a root nested in another, so no grant can be retargeted through a writable one", async () => {
     const nested = { worktree: "/w/copy", gitData: "/w/copy/.git", piSessionDir: "/w/copy/.pi/session" }
-    expect(buildNonoProfile(nested, noHost).filesystem.allow).toEqual(["/w/copy"])
-    expect(buildNonoProfile({ ...nested, piSessionDir: "/w/copy-session" }, noHost).filesystem.allow).toEqual(["/w/copy", "/w/copy-session"])
+    expect((await profileFor(nested, noHost)).filesystem.allow).toEqual(["/w/copy"])
+    expect((await profileFor({ ...nested, piSessionDir: "/w/copy-session" }, noHost)).filesystem.allow).toEqual(["/w/copy", "/w/copy-session"])
   })
 
-  test("the only writable grants are the roots and /dev/null, and no socket is granted", () => {
-    const { filesystem } = buildNonoProfile(roots, noHost)
+  test("the only writable grants are the roots and /dev/null, and no socket is granted", async () => {
+    const { filesystem } = await profileFor(roots, noHost)
     expect([...filesystem.allow, ...filesystem.write]).toEqual([roots.worktree, roots.gitData, roots.piSessionDir])
     expect([...filesystem.allow_file, ...filesystem.write_file]).toEqual(["/dev/null"])
     const sockets = [
@@ -39,29 +44,29 @@ describe("buildNonoProfile", () => {
     expect(sockets).toEqual([])
   })
 
-  test("the working directory adds no grant", () => {
-    expect(buildNonoProfile(roots, noHost).workdir.access).toBe("none")
+  test("the working directory adds no grant", async () => {
+    expect((await profileFor(roots, noHost)).workdir.access).toBe("none")
   })
 
-  test("declares no deny exemption and mutes only the save prompt", () => {
-    const profile = buildNonoProfile(roots, noHost)
+  test("declares no deny exemption and mutes only the save prompt", async () => {
+    const profile = await profileFor(roots, noHost)
     expect(profile.filesystem.deny).toEqual([])
     expect(profile.filesystem.bypass_protection).toEqual([])
     expect(profile.filesystem.suppress_save_prompt).toEqual(["/"])
   })
 
-  test("lets Apple's git shim read the Xcode bundle around the developer folder, and only that folder otherwise", () => {
-    const xcode = buildNonoProfile(roots, { ...noHost, developerDir: "/Applications/Xcode.app/Contents/Developer" }).platform_overrides.macos.filesystem.read
+  test("lets Apple's git shim read the Xcode bundle around the developer folder, and only that folder otherwise", async () => {
+    const xcode = (await profileFor(roots, { ...noHost, developerDir: "/Applications/Xcode.app/Contents/Developer" })).platform_overrides.macos.filesystem.read
     expect(xcode).toEqual(["/Applications/Xcode.app/Contents", "/Library/Preferences/com.apple.dt.Xcode.plist"])
-    const commandLineTools = buildNonoProfile(roots, { ...noHost, developerDir: "/Library/Developer/CommandLineTools" }).platform_overrides.macos.filesystem.read
+    const commandLineTools = (await profileFor(roots, { ...noHost, developerDir: "/Library/Developer/CommandLineTools" })).platform_overrides.macos.filesystem.read
     expect(commandLineTools).toEqual(["/Library/Developer/CommandLineTools"])
-    expect(buildNonoProfile(roots, noHost).platform_overrides.macos.filesystem.read).toEqual([])
+    expect((await profileFor(roots, noHost)).platform_overrides.macos.filesystem.read).toEqual([])
   })
 
-  test("adds no grant for a node in /usr/local/bin, so /usr/local/etc stays unreadable", () => {
+  test("adds no grant for a node in /usr/local/bin, so /usr/local/etc stays unreadable", async () => {
     const node = runtimeOf("/usr/local/bin/node", "/usr/local/bin/node", "/Users/test")
     expect(node).toEqual({ binDir: "/usr/local/bin", installDir: null })
-    const { read } = buildNonoProfile(roots, { ...noHost, runtimeDirs: node?.installDir == null ? [] : [node.installDir] }).filesystem
+    const { read } = (await profileFor(roots, { ...noHost, runtimeDirs: node?.installDir == null ? [] : [node.installDir] })).filesystem
     expect(read.filter((grant) => grant === "/usr/local" || "/usr/local/etc/gitconfig".startsWith(`${grant}/`))).toEqual([])
   })
 
@@ -87,8 +92,8 @@ describe("buildNonoProfile", () => {
     expect(runtimeOf("/usr/local/bin/node", "/Users/test/node/bin/node", "/Users/test")).toBeNull()
   })
 
-  test("keeps an isolated security posture", () => {
-    const profile = buildNonoProfile(roots, noHost)
+  test("keeps an isolated security posture", async () => {
+    const profile = await profileFor(roots, noHost)
     expect(profile.security.signal_mode).toBe("isolated")
     expect(profile.security.capability_elevation).toBe(false)
   })

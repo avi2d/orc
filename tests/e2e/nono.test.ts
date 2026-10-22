@@ -4,7 +4,8 @@ import { homedir, tmpdir, userInfo } from "node:os"
 import { basename, join, relative } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { createSandbox } from "@ai-hero/sandcastle"
-import { Schema } from "effect"
+import { BunServices } from "@effect/platform-bun"
+import { Effect, Schema } from "effect"
 import { buildNonoRunArgs, buildSandboxEnv, NonoProviderError, nonoSandboxProvider } from "../../src/nono"
 import { buildNonoProfile, runtimeReadFiles, toolchainReadPaths } from "../../src/nono-profile"
 
@@ -139,7 +140,8 @@ describe("the policy nono resolves from the profile", () => {
       })
     )
     profilePath = join(dir, "profile.json")
-    await writeFile(profilePath, JSON.stringify(buildNonoProfile(resolvedRoots, noHost)))
+    const written = await Effect.runPromise(buildNonoProfile(resolvedRoots, noHost).pipe(Effect.provide(BunServices.layer)))
+    await writeFile(profilePath, JSON.stringify(written))
   })
 
   afterAll(async () => {
@@ -219,10 +221,12 @@ describe("the policy nono resolves from the profile", () => {
     skipReason("needs nono on PATH to resolve the profile", "resolves to exactly the grants the profile names, whatever the user's default profile says"),
     async () => {
       const { grants } = (await manifestOf(profilePath, home)).filesystem
-      const platformReadFiles = process.platform === "darwin" ? buildNonoProfile(resolvedRoots, noHost).platform_overrides.macos.filesystem.read_file : []
+      const readFiles = await Effect.runPromise(runtimeReadFiles.pipe(Effect.provide(BunServices.layer)))
+      const platform = await Effect.runPromise(buildNonoProfile(resolvedRoots, noHost).pipe(Effect.provide(BunServices.layer)))
+      const platformReadFiles = process.platform === "darwin" ? platform.platform_overrides.macos.filesystem.read_file : []
       const expected = new Set([
         ...toolchainReadPaths.map((path) => `read directory ${path}`),
-        ...[...runtimeReadFiles, ...platformReadFiles].map((path) => `read file ${path}`),
+        ...[...readFiles, ...platformReadFiles].map((path) => `read file ${path}`),
         ...Object.values(resolvedRoots).map((root) => `readwrite directory ${root}`),
         "write file /dev/null"
       ])
