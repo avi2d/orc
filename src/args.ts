@@ -6,7 +6,6 @@ export type OrcArgs =
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
   | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly branch: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
   | { readonly kind: "UsageError"; readonly detail: string }
-const allowWords: ReadonlyArray<typeof askUserWord> = [askUserWord]
 const questionPrefix = "question-"
 const parseShowArgs = (rest: readonly string[]): OrcArgs => {
   if (rest.length === 0) {
@@ -28,8 +27,6 @@ const parseShowArgs = (rest: readonly string[]): OrcArgs => {
 type RunSplit =
   | { readonly kind: "ok"; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer>; readonly kept: ReadonlyArray<string> }
   | { readonly kind: "error"; readonly detail: string }
-const readAllowWord = (word: string): typeof askUserWord | null =>
-  allowWords.includes(word as typeof askUserWord) ? (word as typeof askUserWord) : null
 type AnswerParse =
   | { readonly kind: "ok"; readonly value: QuestionAnswer }
   | { readonly kind: "error"; readonly detail: string }
@@ -48,6 +45,34 @@ const parseAnswerAssignment = (raw: string): AnswerParse => {
   }
   return { kind: "ok", value: { question, answer } }
 }
+type AllowTake =
+  | { readonly kind: "ok"; readonly word: typeof askUserWord }
+  | { readonly kind: "error"; readonly detail: string }
+const takeAllowWord = (rest: readonly string[], index: number): AllowTake => {
+  const word = rest[index + 1] ?? ""
+  if (word === "" || word.startsWith("--")) {
+    return { kind: "error", detail: "orc run takes a word after --allow" }
+  }
+  return word === askUserWord ? { kind: "ok", word } : { kind: "error", detail: "unknown word for --allow: " + word }
+}
+type AnswerTake =
+  | { readonly kind: "ok"; readonly value: QuestionAnswer }
+  | { readonly kind: "error"; readonly detail: string }
+const takeAnswerValue = (rest: readonly string[], index: number, seen: Set<string>): AnswerTake => {
+  const raw = rest[index + 1] ?? ""
+  if (raw === "" || raw.startsWith("--")) {
+    return { kind: "error", detail: "orc run takes an answer after --answer" }
+  }
+  const parsed = parseAnswerAssignment(raw)
+  if (parsed.kind === "error") {
+    return parsed
+  }
+  if (seen.has(parsed.value.question)) {
+    return { kind: "error", detail: "duplicate answer for --answer: " + parsed.value.question }
+  }
+  seen.add(parsed.value.question)
+  return parsed
+}
 const splitRunArgs = (rest: readonly string[]): RunSplit => {
   const allow: Array<typeof askUserWord> = []
   const answers: Array<QuestionAnswer> = []
@@ -56,32 +81,20 @@ const splitRunArgs = (rest: readonly string[]): RunSplit => {
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index] ?? ""
     if (token === "--allow") {
-      const word = rest[index + 1] ?? ""
-      if (word === "" || word.startsWith("--")) {
-        return { kind: "error", detail: "orc run takes a word after --allow" }
+      const taken = takeAllowWord(rest, index)
+      if (taken.kind === "error") {
+        return taken
       }
-      const named = readAllowWord(word)
-      if (named === null) {
-        return { kind: "error", detail: "unknown word for --allow: " + word }
-      }
-      allow.push(named)
+      allow.push(taken.word)
       index += 1
       continue
     }
     if (token === "--answer") {
-      const raw = rest[index + 1] ?? ""
-      if (raw === "" || raw.startsWith("--")) {
-        return { kind: "error", detail: "orc run takes an answer after --answer" }
+      const taken = takeAnswerValue(rest, index, seen)
+      if (taken.kind === "error") {
+        return taken
       }
-      const parsed = parseAnswerAssignment(raw)
-      if (parsed.kind === "error") {
-        return parsed
-      }
-      if (seen.has(parsed.value.question)) {
-        return { kind: "error", detail: "duplicate answer for --answer: " + parsed.value.question }
-      }
-      seen.add(parsed.value.question)
-      answers.push(parsed.value)
+      answers.push(taken.value)
       index += 1
       continue
     }
