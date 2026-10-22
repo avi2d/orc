@@ -44,10 +44,13 @@ export const toolchainReadPaths: ReadonlyArray<string> = [
   "/etc/ssl/certs"
 ]
 
-// Nono canonicalizes every granted file, so the profile withholds macOS cert.pem that the system withholds with Operation not permitted.
-export const runtimeReadFiles: ReadonlyArray<string> = process.platform === "darwin"
-  ? ["/etc/hosts", "/etc/resolv.conf", "/etc/localtime", "/etc/ssl/openssl.cnf"]
-  : ["/etc/hosts", "/etc/resolv.conf", "/etc/localtime", "/etc/ssl/cert.pem", "/etc/ssl/openssl.cnf"]
+export const runtimeReadFiles: ReadonlyArray<string> = [
+  "/etc/hosts",
+  "/etc/resolv.conf",
+  "/etc/localtime",
+  "/etc/ssl/cert.pem",
+  "/etc/ssl/openssl.cnf"
+]
 
 // Apple's git shim loads the whole Xcode bundle around its developer folder and checks the licence it records.
 const developerReads = (developerDir: string | null): ReadonlyArray<string> => {

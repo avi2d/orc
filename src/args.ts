@@ -4,9 +4,9 @@ export type OrcArgs =
   | { readonly kind: "PrintHelp" }
   | { readonly kind: "ListRuns"; readonly json: boolean }
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
-  | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly branch: string | undefined; readonly allow: ReadonlyArray<string>; readonly answers: ReadonlyArray<QuestionAnswer> }
+  | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly branch: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
   | { readonly kind: "UsageError"; readonly detail: string }
-const allowWords: ReadonlyArray<string> = [askUserWord]
+const allowWords: ReadonlyArray<typeof askUserWord> = [askUserWord]
 const questionPrefix = "question-"
 const parseShowArgs = (rest: readonly string[]): OrcArgs => {
   if (rest.length === 0) {
@@ -26,42 +26,30 @@ const parseShowArgs = (rest: readonly string[]): OrcArgs => {
   return { kind: "ShowRun", id, json: true }
 }
 type RunSplit =
-  | { readonly kind: "ok"; readonly allow: ReadonlyArray<string>; readonly answers: ReadonlyArray<QuestionAnswer>; readonly kept: ReadonlyArray<string> }
+  | { readonly kind: "ok"; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer>; readonly kept: ReadonlyArray<string> }
   | { readonly kind: "error"; readonly detail: string }
-const readAllowWord = (word: string): string | null =>
-  word === "" || word.startsWith("--") ? null : (allowWords.includes(word) ? word : null)
-const readAnswerAssignment = (raw: string): QuestionAnswer | null => {
+const readAllowWord = (word: string): typeof askUserWord | null =>
+  allowWords.includes(word as typeof askUserWord) ? (word as typeof askUserWord) : null
+type AnswerParse =
+  | { readonly kind: "ok"; readonly value: QuestionAnswer }
+  | { readonly kind: "error"; readonly detail: string }
+const parseAnswerAssignment = (raw: string): AnswerParse => {
   const cut = raw.indexOf("=")
   if (cut === -1) {
-    return null
+    return { kind: "error", detail: "orc run takes question-id=text after --answer" }
   }
   const question = raw.slice(0, cut)
   const answer = raw.slice(cut + 1)
-  if (!question.startsWith(questionPrefix) || question.length === questionPrefix.length) {
-    return null
-  }
-  if (/\s/.test(question) || answer === "") {
-    return null
-  }
-  return { question, answer }
-}
-const answerErrorFor = (raw: string): string => {
-  if (!raw.includes("=")) {
-    return "orc run takes question-id=text after --answer"
-  }
-  const cut = raw.indexOf("=")
-  const question = raw.slice(0, cut)
-  const answer = raw.slice(cut + 1)
-  if ((!question.startsWith(questionPrefix) || question.length === questionPrefix.length || /\s/.test(question)) && question !== "") {
-    return "unknown question for --answer: " + question
-  }
   if (question === "" || answer === "") {
-    return "orc run takes question-id=text after --answer"
+    return { kind: "error", detail: "orc run takes question-id=text after --answer" }
   }
-  return "unknown question for --answer: " + question
+  if (!question.startsWith(questionPrefix) || question.length === questionPrefix.length || /\s/.test(question)) {
+    return { kind: "error", detail: "unknown question for --answer: " + question }
+  }
+  return { kind: "ok", value: { question, answer } }
 }
 const splitRunArgs = (rest: readonly string[]): RunSplit => {
-  const allow: Array<string> = []
+  const allow: Array<typeof askUserWord> = []
   const answers: Array<QuestionAnswer> = []
   const seen = new Set<string>()
   const kept: Array<string> = []
@@ -85,39 +73,23 @@ const splitRunArgs = (rest: readonly string[]): RunSplit => {
       if (raw === "" || raw.startsWith("--")) {
         return { kind: "error", detail: "orc run takes an answer after --answer" }
       }
-      const parsed = readAnswerAssignment(raw)
-      if (parsed === null) {
-        return { kind: "error", detail: answerErrorFor(raw) }
+      const parsed = parseAnswerAssignment(raw)
+      if (parsed.kind === "error") {
+        return parsed
       }
-      if (seen.has(parsed.question)) {
-        return { kind: "error", detail: "duplicate answer for --answer: " + parsed.question }
+      if (seen.has(parsed.value.question)) {
+        return { kind: "error", detail: "duplicate answer for --answer: " + parsed.value.question }
       }
-      seen.add(parsed.question)
-      answers.push(parsed)
+      seen.add(parsed.value.question)
+      answers.push(parsed.value)
       index += 1
-      continue
-    }
-    if (token.startsWith("--answer=")) {
-      const raw = token.slice("--answer=".length)
-      if (raw === "") {
-        return { kind: "error", detail: "orc run takes an answer after --answer" }
-      }
-      const parsed = readAnswerAssignment(raw)
-      if (parsed === null) {
-        return { kind: "error", detail: answerErrorFor(raw) }
-      }
-      if (seen.has(parsed.question)) {
-        return { kind: "error", detail: "duplicate answer for --answer: " + parsed.question }
-      }
-      seen.add(parsed.question)
-      answers.push(parsed)
       continue
     }
     kept.push(token)
   }
   return { kind: "ok", allow, answers, kept }
 }
-const runAgentWithKept = (kept: ReadonlyArray<string>, allow: ReadonlyArray<string>, answers: ReadonlyArray<QuestionAnswer>): OrcArgs => {
+const runAgentWithKept = (kept: ReadonlyArray<string>, allow: ReadonlyArray<typeof askUserWord>, answers: ReadonlyArray<QuestionAnswer>): OrcArgs => {
   if (kept.length === 2 && kept[0] === "--branch") {
     const name = kept[1] ?? ""
     if (name === "" || name.startsWith("--")) {

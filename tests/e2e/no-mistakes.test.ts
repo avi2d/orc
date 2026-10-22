@@ -158,6 +158,64 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
       })
     })
   })
+  test("an open review question is answered verbatim before any gate response", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await readyToCheck(dir, home)
+        const questionGate: NoMistakesReply = {
+          stdout: [
+            "run:",
+            "  id: \"01STUB\"",
+            "  branch: orc/test",
+            "  status: awaiting_approval",
+            "  awaiting_agent: parked 2m10s",
+            "  head: abc1234",
+            "  pr: \"\"",
+            "  findings[1]{id,severity,file,line,action,description}:",
+            "    question-3,info,,,ask-user,Which scope should the report cover?",
+            "gate: review"
+          ].join("\n") + "\n"
+        }
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [questionGate, fixableGate, passedWithPr, recordedNothing], [{ question: "question-3", answer: "Use the wide scope" }])
+        const calls = axiCalls(outcome.nmCalls)
+        expect(calls).toContain("axi answer --question question-3 --answer Use the wide scope")
+        expect(calls.indexOf("axi answer --question question-3 --answer Use the wide scope")).toBeLessThan(calls.findIndex((line) => line.startsWith("axi respond")))
+        expect(calls.filter((line) => line.startsWith("axi respond")).some((line) => line.includes("question-3"))).toBe(false)
+        expect(outcome.nmCalls).not.toContain("--ignore question-3")
+        expect(outcome.report.completed).toBe(true)
+        expect(outcome.report.noMistakes?.gatesAnswered).toBe(2)
+      })
+    })
+  })
+  test("an open review question without an answer refuses naming the question and sends no response", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await readyToCheck(dir, home)
+        const questionGate: NoMistakesReply = {
+          stdout: [
+            "run:",
+            "  id: \"01STUB\"",
+            "  branch: orc/test",
+            "  status: awaiting_approval",
+            "  awaiting_agent: parked 2m10s",
+            "  head: abc1234",
+            "  pr: \"\"",
+            "  findings[1]{id,severity,file,line,action,description}:",
+            "    question-3,info,,,ask-user,Which scope should the report cover?",
+            "gate: review"
+          ].join("\n") + "\n"
+        }
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [questionGate, recordedNothing])
+        expect(axiCalls(outcome.nmCalls)).toEqual(["axi run --intent-file " + join(home, "runs", "step-run-1", "task.md"), statusLookup])
+        expect(outcome.report.completed).toBe(false)
+        expect(outcome.report.noMistakes?.status).toBe("refused")
+        const reason = outcome.run?.endReason ?? ""
+        expect(reason).toContain("question-3")
+        expect(reason).toContain("Which scope should the report cover?")
+        expect(reason).toContain("--answer question-3=")
+      })
+    })
+  })
   test("a drive call with no gate or outcome reattaches without flags", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {

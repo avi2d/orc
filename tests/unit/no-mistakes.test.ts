@@ -232,6 +232,14 @@ describe("answerForGate refuses only what needs your word", () => {
     const question = parseRun(parked.replace("r2,error,b.go,,ask-user,changes product behavior", "question-3,info,,,ask-user,Which scope should the report cover?"))
     expect(answerForGate(approvalGate, question.findings, ["ask-user"]).kind).toBe("refuse")
     expect(answerForGate(fixReview, question.findings, ["ask-user"]).kind).toBe("refuse")
+    const both = answerForGate(approvalGate, [{ ...stubFinding("question-3", "ask-user"), description: "Which scope should the report cover?" }, { ...stubFinding("question-4", "ask-user"), description: "Which retries are allowed?" }])
+    expect(both.kind).toBe("refuse")
+    if (both.kind === "refuse") {
+      expect(both.reason).toContain("question-3")
+      expect(both.reason).toContain("question-4")
+      expect(both.reason).toContain("--answer question-3=")
+      expect(both.reason).toContain("--answer question-4=")
+    }
     expect(answerArgsFor("question-3", "Use the wide scope")).toEqual(["axi", "answer", "--question", "question-3", "--answer", "Use the wide scope"])
   })
 

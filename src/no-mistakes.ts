@@ -155,13 +155,16 @@ const questionReason = (question: NoMistakesFinding): string => {
   return `finding ${question.id} is a question${quoted} and needs your answer on a rerun with --answer ${question.id}="<answer>"`
 }
 
+const missingReason = (missing: ReadonlyArray<NoMistakesFinding>): string =>
+  missing.map(questionReason).join("; ")
+
 export const answerArgsFor = (question: string, answer: string): ReadonlyArray<string> =>
   ["axi", "answer", "--question", question, "--answer", answer]
 
 export const answerForGate = (gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>, allow: ReadonlyArray<string> = []): GateAnswer => {
-  const question = findings.find(isQuestion)
-  if (question !== undefined) {
-    return { kind: "refuse", reason: questionReason(question) }
+  const openQuestions = findings.filter(isQuestion)
+  if (openQuestions.length > 0) {
+    return { kind: "refuse", reason: missingReason(openQuestions) }
   }
   const askUserAllowed = allow.includes(askUserWord)
   const asked = findings.find((finding) => finding.action === "ask-user")
@@ -331,9 +334,9 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending> =>
       const open = parsed.findings.filter(isQuestion)
       if (open.length > 0) {
         const supplied = new Map((input.answers ?? []).map((entry) => [entry.question, entry.answer] as const))
-        const missing = open.find((finding) => !supplied.has(finding.id))
-        if (missing !== undefined) {
-          return log.refuse(parsed.gate, questionReason(missing))
+        const missing = open.filter((finding) => !supplied.has(finding.id))
+        if (missing.length > 0) {
+          return log.refuse(parsed.gate, missingReason(missing))
         }
         for (let index = 0; index < open.length; index += 1) {
           const pending = open[index] ?? { id: "", description: "" }
