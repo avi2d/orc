@@ -1,3 +1,5 @@
+import { lstatSync } from "node:fs"
+
 export interface NonoSandboxRoots {
   readonly worktree: string
   readonly gitData: string
@@ -44,12 +46,20 @@ export const toolchainReadPaths: ReadonlyArray<string> = [
   "/etc/ssl/certs"
 ]
 
-// No grant opens the macOS bundle: the link resolves through a seal the sandbox cannot traverse, and its target moves with each update.
+const certPemIsSymlink = (): boolean => {
+  try {
+    return lstatSync("/etc/ssl/cert.pem").isSymbolicLink()
+  } catch {
+    return false
+  }
+}
+
+// A granted link resolves to its target.
 export const runtimeReadFiles: ReadonlyArray<string> = [
   "/etc/hosts",
   "/etc/resolv.conf",
   "/etc/localtime",
-  ...(process.platform === "darwin" ? [] : ["/etc/ssl/cert.pem"]),
+  ...(certPemIsSymlink() ? [] : ["/etc/ssl/cert.pem"]),
   "/etc/ssl/openssl.cnf"
 ]
 

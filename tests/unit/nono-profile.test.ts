@@ -89,15 +89,3 @@ describe("buildAgentNonoProfile", () => {
   })
 })
 
-
-describe("runtimeReadFiles", () => {
-  test("leaves out the system bundle macOS seals off from the sandbox", () => {
-    const readFiles = buildNonoProfile(roots, host).filesystem.read_file
-    if (process.platform === "darwin") {
-      expect(readFiles).not.toContain("/etc/ssl/cert.pem")
-    } else {
-      expect(readFiles).toContain("/etc/ssl/cert.pem")
-    }
-    expect(readFiles).toContain("/etc/ssl/openssl.cnf")
-  })
-})

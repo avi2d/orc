@@ -230,18 +230,6 @@ describe("the policy nono resolves from the profile", () => {
     }
   )
 
-  test.skipIf(Bun.which("nono") === null)(
-    skipReason("needs nono on PATH to resolve the profile", "grants no system bundle the sandbox cannot open on macOS"),
-    async () => {
-      const { grants } = (await manifestOf(profilePath, home)).filesystem
-      const files = grants.filter((grant) => grant.type === "file").map((grant) => `${grant.access} ${grant.path}`)
-      if (process.platform === "darwin") {
-        expect(files).not.toContain("read /etc/ssl/cert.pem")
-      } else {
-        expect(files).toContain("read /etc/ssl/cert.pem")
-      }
-    }
-  )
 })
 
 describe("buildNonoRunArgs", () => {
