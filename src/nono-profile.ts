@@ -48,7 +48,8 @@ export const runtimeReadFiles: ReadonlyArray<string> = [
   "/etc/hosts",
   "/etc/resolv.conf",
   "/etc/localtime",
-  "/etc/ssl/cert.pem",
+  // nono canonicalizes every read_file grant and macOS denies lstat on /etc/ssl/cert.pem.
+  ...(process.platform === "darwin" ? [] : ["/etc/ssl/cert.pem"]),
   "/etc/ssl/openssl.cnf"
 ]
 

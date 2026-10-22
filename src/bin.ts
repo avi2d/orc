@@ -7,7 +7,8 @@ import packageJson from "../package.json" with { type: "json" }
 import { parseArgs } from "./args"
 import { runAgentStep } from "./run"
 import { formatReport } from "./run-record"
-import { encodeRunsJson, formatHistoryError, formatRunsTable, listRuns, openDatabase, orcHomeDir, recordStepScore } from "./run-history"
+import { encodeRunsJson, formatHistoryError, formatRunsTable, listRuns, openDatabase, orcHomeDir } from "./run-history"
+import { recordStepScore } from "./run-scores"
 import { encodeShowJson, formatShow, readShow } from "./show"
 
 const usage = "Usage: orc [--version] [--help] | orc runs [--json] | orc show <run> [--json] | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--branch <name>] [--allow]"

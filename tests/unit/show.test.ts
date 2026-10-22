@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { Database } from "bun:sqlite"
 import { BunServices } from "@effect/platform-bun"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import {
   decodeRunsJson,
   encodeRunsJson,
@@ -14,9 +14,9 @@ import {
   recordRun,
   recordScore,
   recordSignal,
-  recordStep,
-  recordStepScore
+  recordStep
 } from "../../src/run-history"
+import { InvalidScore, recordStepScore, UnknownRun, UnknownStep } from "../../src/run-scores"
 import { decodeShowJson, encodeShowJson, formatShow, readShow } from "../../src/show"
 
 const withHome = async (use: (home: string) => Promise<void>): Promise<void> => {
@@ -185,7 +185,7 @@ describe("orc score latest wins in orc show", () => {
         }))
         const document = await Effect.runPromise(readShow(db, "show-1"))
         expect(document?.steps[0]?.score).toEqual({ score: 5, note: "clearer", scoredAt: "2026-10-18T13:00:00.000Z" })
-        const rows = db.query("SELECT score FROM scores ORDER BY id ASC").all() as Array<{ score: number }>
+        const rows = Schema.decodeUnknownSync(Schema.Array(Schema.Struct({ score: Schema.Finite })))(db.query("SELECT score FROM scores ORDER BY id ASC").all())
         expect(rows.map((row) => row.score).slice(-2)).toEqual([2, 5])
       } finally {
         db.close()
@@ -205,8 +205,8 @@ describe("orc score latest wins in orc show", () => {
           note: "",
           scoredAt: "2026-10-18T12:00:00.000Z"
         }).pipe(Effect.flip))
-        expect(failure._tag).toBe("UnknownRun")
-        const count = (db.query("SELECT COUNT(*) AS total FROM scores").get() as { total: number }).total
+        expect(failure).toBeInstanceOf(UnknownRun)
+        const count = Schema.decodeUnknownSync(Schema.Struct({ total: Schema.Finite }))(db.query("SELECT COUNT(*) AS total FROM scores").get()).total
         expect(count).toBe(1)
       } finally {
         db.close()
@@ -226,8 +226,8 @@ describe("orc score latest wins in orc show", () => {
           note: "",
           scoredAt: "2026-10-18T12:00:00.000Z"
         }).pipe(Effect.flip))
-        expect(failure._tag).toBe("UnknownStep")
-        const count = (db.query("SELECT COUNT(*) AS total FROM scores").get() as { total: number }).total
+        expect(failure).toBeInstanceOf(UnknownStep)
+        const count = Schema.decodeUnknownSync(Schema.Struct({ total: Schema.Finite }))(db.query("SELECT COUNT(*) AS total FROM scores").get()).total
         expect(count).toBe(1)
       } finally {
         db.close()
@@ -247,8 +247,8 @@ describe("orc score latest wins in orc show", () => {
           note: "too high",
           scoredAt: "2026-10-18T12:00:00.000Z"
         }).pipe(Effect.flip))
-        expect(failure._tag).toBe("InvalidScore")
-        const count = (db.query("SELECT COUNT(*) AS total FROM scores").get() as { total: number }).total
+        expect(failure).toBeInstanceOf(InvalidScore)
+        const count = Schema.decodeUnknownSync(Schema.Struct({ total: Schema.Finite }))(db.query("SELECT COUNT(*) AS total FROM scores").get()).total
         expect(count).toBe(1)
       } finally {
         db.close()

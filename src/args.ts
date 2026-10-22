@@ -32,13 +32,13 @@ const parseScoreArgs = (rest: readonly string[]): OrcArgs => {
   if (rest.length > 4) {
     return { kind: "UsageError", detail: `unexpected argument for orc score: ${rest[4]}` }
   }
-  const runId = rest[0] as string
-  const step = rest[1] as string
-  const scoreText = rest[2] as string
+  const runId = rest[0]
+  const step = rest[1]
+  const scoreText = rest[2]
   if (!/^[1-5]$/.test(scoreText)) {
     return { kind: "UsageError", detail: `orc score takes a score from 1 to 5, got "${scoreText}"` }
   }
-  const note = rest.length === 4 ? (rest[3] as string) : ""
+  const note = rest.length === 4 ? rest[3] : ""
   return { kind: "ScoreStep", runId, step, score: Number(scoreText), note }
 }
 
