@@ -296,6 +296,114 @@ describe("show JSON", () => {
   })
 })
 
+describe("orc score step selection", () => {
+  test("plain fix scores the latest fix in execution order after resume publish order", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await Effect.runPromise(recordRun(db, {
+          id: "resume-score-1",
+          project: "orc",
+          branch: "orc/demo",
+          taskFile: "/tmp/show-home/runs/resume-score-1/task.md",
+          status: "running",
+          started: "2026-10-18T10:00:00.000Z"
+        }))
+        await Effect.runPromise(recordStep(db, {
+          runId: "resume-score-1",
+          name: "fix",
+          attempt: 2,
+          status: "running",
+          started: "2026-10-18T10:06:00.000Z"
+        }))
+        await Effect.runPromise(recordStep(db, {
+          runId: "resume-score-1",
+          name: "fix",
+          attempt: 1,
+          status: "passed",
+          started: "2026-10-18T10:03:10.000Z",
+          ended: "2026-10-18T10:03:50.000Z"
+        }))
+        await Effect.runPromise(recordStepScore(db, {
+          runId: "resume-score-1",
+          step: "fix",
+          score: 5,
+          note: "latest",
+          scoredAt: "2026-10-18T12:00:00.000Z"
+        }))
+        const document = await Effect.runPromise(readShow(db, "resume-score-1"))
+        expect(document?.steps.map((step) => step.attempt)).toEqual([1, 2])
+        expect(document?.steps[0]?.score).toBeNull()
+        expect(document?.steps[1]?.score).toEqual({ score: 5, note: "latest", scoredAt: "2026-10-18T12:00:00.000Z" })
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("fix with an attempt scores that attempt and leaves the other attempt alone", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await Effect.runPromise(recordRun(db, {
+          id: "attempt-score-1",
+          project: "orc",
+          branch: "orc/demo",
+          taskFile: "/tmp/show-home/runs/attempt-score-1/task.md",
+          status: "running",
+          started: "2026-10-18T10:00:00.000Z"
+        }))
+        await Effect.runPromise(recordStep(db, {
+          runId: "attempt-score-1",
+          name: "fix",
+          attempt: 1,
+          status: "passed",
+          started: "2026-10-18T10:03:10.000Z",
+          ended: "2026-10-18T10:03:50.000Z"
+        }))
+        await Effect.runPromise(recordStep(db, {
+          runId: "attempt-score-1",
+          name: "fix",
+          attempt: 2,
+          status: "passed",
+          started: "2026-10-18T10:06:00.000Z",
+          ended: "2026-10-18T10:06:40.000Z"
+        }))
+        await Effect.runPromise(recordStepScore(db, {
+          runId: "attempt-score-1",
+          step: "fix#1",
+          score: 2,
+          note: "thin",
+          scoredAt: "2026-10-18T12:00:00.000Z"
+        }))
+        const first = await Effect.runPromise(readShow(db, "attempt-score-1"))
+        expect(first?.steps[0]?.score).toEqual({ score: 2, note: "thin", scoredAt: "2026-10-18T12:00:00.000Z" })
+        expect(first?.steps[1]?.score).toBeNull()
+        await Effect.runPromise(recordStepScore(db, {
+          runId: "attempt-score-1",
+          step: "fix",
+          score: 5,
+          note: "clearer",
+          scoredAt: "2026-10-18T13:00:00.000Z"
+        }))
+        const second = await Effect.runPromise(readShow(db, "attempt-score-1"))
+        expect(second?.steps[0]?.score).toEqual({ score: 2, note: "thin", scoredAt: "2026-10-18T12:00:00.000Z" })
+        expect(second?.steps[1]?.score).toEqual({ score: 5, note: "clearer", scoredAt: "2026-10-18T13:00:00.000Z" })
+        const refusal = await Effect.runPromise(recordStepScore(db, {
+          runId: "attempt-score-1",
+          step: "fix#9",
+          score: 4,
+          note: "",
+          scoredAt: "2026-10-18T14:00:00.000Z"
+        }).pipe(Effect.flip))
+        expect(refusal).toBeInstanceOf(UnknownStep)
+      } finally {
+        db.close()
+      }
+    })
+  })
+})
+
 describe("formatShow", () => {
   test("every file prints as a full file link beside its result, signals and score", async () => {
     await withHome(async (home) => {
