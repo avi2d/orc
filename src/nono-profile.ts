@@ -44,11 +44,12 @@ export const toolchainReadPaths: ReadonlyArray<string> = [
   "/etc/ssl/certs"
 ]
 
+// No grant opens the macOS bundle: the link resolves through a seal the sandbox cannot traverse, and its target moves with each update.
 export const runtimeReadFiles: ReadonlyArray<string> = [
   "/etc/hosts",
   "/etc/resolv.conf",
   "/etc/localtime",
-  "/etc/ssl/cert.pem",
+  ...(process.platform === "darwin" ? [] : ["/etc/ssl/cert.pem"]),
   "/etc/ssl/openssl.cnf"
 ]
 
