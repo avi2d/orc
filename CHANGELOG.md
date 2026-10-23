@@ -2,6 +2,19 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.3.0
+
+Released 2026-10-23.
+
+### Features
+
+- **no-mistakes:** per-kind --allow word and --answer for open questions [#13](https://github.com/avi2d/orc/pull/13)
+- add orc score command for rating run steps [#12](https://github.com/avi2d/orc/pull/12)
+
+### Fixes
+
+- drop unreadable macOS certificate grant from nono profile [#14](https://github.com/avi2d/orc/pull/14)
+
 ## 0.2.0
 
 Released 2026-10-21.

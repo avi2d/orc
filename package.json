@@ -1,6 +1,6 @@
 {
   "name": "orc",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "One task to one pull request: Pi in a nono sandbox, the project's checks, then no-mistakes",
   "repository": "https://github.com/avi2d/orc.git",
