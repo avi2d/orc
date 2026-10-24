@@ -37,6 +37,10 @@ On resume Sandcastle reuses the branch worktree, Pi resumes its prior session, a
 After a refusal, run the same resume command with `--allow` and the name from the report, or with `--answer` and the captain's answer for a question.
 No-mistakes takes the word for that `--allow` kind, and the answer for that question.
 Orc also refuses a checkout whose own git config sets any key outside a short list known to run no program.
+To refuse checkouts carrying a marker file, set `ORC_REFUSE_MARKERS` to comma separated marker names.
+Orc trims padding around each name and drops blank entries.
+Orc checks each marker in the project directory and its parent and refuses a checkout carrying one.
+An unset `ORC_REFUSE_MARKERS` names no marker and refuses no checkout for a marker.
 
 The run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
 It also needs an opencode-go login in Pi, which `pi auth check --provider opencode-go` confirms.
