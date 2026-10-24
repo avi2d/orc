@@ -43,7 +43,7 @@ const parseScoreArgs = (rest: readonly string[]): OrcArgs => {
 }
 
 type RunSplit =
-  | { readonly kind: "ok"; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer>; readonly kept: ReadonlyArray<string> }
+  | { readonly kind: "ok"; readonly branch: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer>; readonly kept: ReadonlyArray<string> }
   | { readonly kind: "error"; readonly detail: string }
 type AnswerParse =
   | { readonly kind: "ok"; readonly value: QuestionAnswer }
@@ -91,67 +91,72 @@ const takeAnswerValue = (rest: readonly string[], index: number, seen: Set<strin
   seen.add(parsed.value.question)
   return parsed
 }
+const takeBranchName = (rest: readonly string[], index: number, taken: string | undefined): string | null => {
+  const name = rest[index + 1] ?? ""
+  return taken !== undefined || name === "" || name.startsWith("--") ? null : name
+}
+interface RunFlags {
+  branch: string | undefined
+  readonly allow: Array<typeof askUserWord>
+  readonly answers: Array<QuestionAnswer>
+  readonly seen: Set<string>
+}
+type FlagTake = { readonly kind: "taken" } | { readonly kind: "error"; readonly detail: string }
+const valueFlags = new Set(["--branch", "--allow", "--answer"])
+const takeValueFlag = (rest: readonly string[], index: number, flags: RunFlags): FlagTake => {
+  if (rest[index] === "--branch") {
+    const name = takeBranchName(rest, index, flags.branch)
+    if (name === null) {
+      return { kind: "error", detail: "unexpected argument: --branch" }
+    }
+    flags.branch = name
+    return { kind: "taken" }
+  }
+  if (rest[index] === "--allow") {
+    const taken = takeAllowWord(rest, index)
+    if (taken.kind === "error") {
+      return taken
+    }
+    flags.allow.push(taken.word)
+    return { kind: "taken" }
+  }
+  const taken = takeAnswerValue(rest, index, flags.seen)
+  if (taken.kind === "error") {
+    return taken
+  }
+  flags.answers.push(taken.value)
+  return { kind: "taken" }
+}
 const splitRunArgs = (rest: readonly string[]): RunSplit => {
-  const allow: Array<typeof askUserWord> = []
-  const answers: Array<QuestionAnswer> = []
-  const seen = new Set<string>()
+  const flags: RunFlags = { branch: undefined, allow: [], answers: [], seen: new Set() }
   const kept: Array<string> = []
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index] ?? ""
-    if (token === "--allow") {
-      const taken = takeAllowWord(rest, index)
-      if (taken.kind === "error") {
-        return taken
-      }
-      allow.push(taken.word)
-      index += 1
+    if (!valueFlags.has(token)) {
+      kept.push(token)
       continue
     }
-    if (token === "--answer") {
-      const taken = takeAnswerValue(rest, index, seen)
-      if (taken.kind === "error") {
-        return taken
-      }
-      answers.push(taken.value)
-      index += 1
-      continue
+    const taken = takeValueFlag(rest, index, flags)
+    if (taken.kind === "error") {
+      return taken
     }
-    kept.push(token)
+    index += 1
   }
-  return { kind: "ok", allow, answers, kept }
-}
-const runAgentWithKept = (kept: ReadonlyArray<string>, allow: ReadonlyArray<typeof askUserWord>, answers: ReadonlyArray<QuestionAnswer>): OrcArgs => {
-  if (kept.length === 2 && kept[0] === "--branch") {
-    const name = kept[1] ?? ""
-    if (name === "" || name.startsWith("--")) {
-      return { kind: "UsageError", detail: "unexpected argument: --branch" }
-    }
-    return { kind: "RunAgent", taskFile: null, branch: name, allow, answers }
-  }
-  const taskFile = kept[0] ?? ""
-  const flags = kept.slice(1)
-  if (flags.length === 0) {
-    return { kind: "RunAgent", taskFile, branch: undefined, allow, answers }
-  }
-  if (flags.length === 2 && flags[0] === "--branch") {
-    const name = flags[1] ?? ""
-    if (name === "" || name.startsWith("--")) {
-      return { kind: "UsageError", detail: "unexpected argument: --branch" }
-    }
-    return { kind: "RunAgent", taskFile, branch: name, allow, answers }
-  }
-  const stray = flags[0] === "--branch" ? "--branch" : (flags[0] ?? "")
-  return { kind: "UsageError", detail: `unexpected argument: ${stray}` }
+  return { kind: "ok", branch: flags.branch, allow: flags.allow, answers: flags.answers, kept }
 }
 const parseRunArgs = (rest: readonly string[]): OrcArgs => {
-  if (rest.length === 0) {
-    return { kind: "UsageError", detail: "orc run takes a task file" }
-  }
   const split = splitRunArgs(rest)
   if (split.kind === "error") {
     return { kind: "UsageError", detail: split.detail }
   }
-  return runAgentWithKept(split.kept, split.allow, split.answers)
+  if (split.kept.length === 0 && split.branch === undefined) {
+    return { kind: "UsageError", detail: "orc run takes a task file" }
+  }
+  if (split.kept.length > 1) {
+    return { kind: "UsageError", detail: `unexpected argument: ${split.kept[1]}` }
+  }
+  const taskFile = split.kept.length === 1 ? split.kept[0] : null
+  return { kind: "RunAgent", taskFile, branch: split.branch, allow: split.allow, answers: split.answers }
 }
 export const parseArgs = (args: readonly string[]): OrcArgs => {
   if (args.length === 0) {

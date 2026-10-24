@@ -130,6 +130,21 @@ describe("parseArgs", () => {
   test("run takes a task file and a branch", () => {
     expect(parseArgs(["run", "task.md", "--branch", "orc/demo"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", allow: [], answers: [] })
   })
+  test("run takes the branch before the task file", () => {
+    expect(parseArgs(["run", "--branch", "orc/demo", "task.md"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", allow: [], answers: [] })
+  })
+  test("run takes a branch alone to resume it", () => {
+    expect(parseArgs(["run", "--branch", "orc/demo"])).toEqual({ kind: "RunAgent", taskFile: null, branch: "orc/demo", allow: [], answers: [] })
+  })
+  test("run without a task file or a branch to resume is a usage error", () => {
+    expect(parseArgs(["run", "--allow", "ask-user"])).toEqual({ kind: "UsageError", detail: "orc run takes a task file" })
+  })
+  test("run rejects a second task file", () => {
+    expect(parseArgs(["run", "task.md", "other.md"])).toEqual({ kind: "UsageError", detail: "unexpected argument: other.md" })
+  })
+  test("run rejects a second branch", () => {
+    expect(parseArgs(["run", "task.md", "--branch", "orc/a", "--branch", "orc/b"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --branch" })
+  })
   test("run takes a branch and the word after a refusal", () => {
     expect(parseArgs(["run", "task.md", "--branch", "orc/demo", "--allow", "ask-user"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", allow: ["ask-user"], answers: [] })
   })
