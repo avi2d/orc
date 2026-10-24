@@ -406,6 +406,21 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     })
   })
 
+  test("a no-mistakes too old for --intent-file names the release orc needs", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await readyToCheck(dir, home)
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [
+          { stdout: "", stderr: "unknown flag: --intent-file\n", exitCode: 1 }
+        ])
+        expect(outcome.report.noMistakes?.status).toBe("failed")
+        expect(outcome.run?.endReason).toContain("no-mistakes refused to start: unknown flag: --intent-file")
+        expect(outcome.run?.endReason).toContain("v1.90.0 or later")
+        expect(outcome.run?.endReason).toContain("ORC_NO_MISTAKES_BIN")
+      })
+    })
+  })
+
   test("the fix review after a requested fix is accepted with approve", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { answerArgsFor, answerForGate, omittedQuestionIds, parseRun, type NoMistakesFinding } from "../../src/no-mistakes"
+import { answerArgsFor, answerForGate, noMistakesBinary, omittedQuestionIds, parseRun, type NoMistakesFinding } from "../../src/no-mistakes"
 import { formatReport, type OrcRunReport } from "../../src/run-record"
 
 const approvalGate = { step: "review", stage: "approval" } as const
@@ -335,5 +335,13 @@ describe("formatReport names the phase the run stopped in", () => {
 
   test("a final failing checks round reads as checks failed", () => {
     expect(statusLine(formatReport(report({ checksRounds: [round(1, true), round(2, false)] })))).toBe("status: checks failed")
+  })
+})
+
+describe("noMistakesBinary", () => {
+  test("ORC_NO_MISTAKES_BIN names the binary, and unset or blank leaves no-mistakes on the PATH", () => {
+    expect(noMistakesBinary("/opt/nm/bin/no-mistakes")).toBe("/opt/nm/bin/no-mistakes")
+    expect(noMistakesBinary(undefined)).toBe("no-mistakes")
+    expect(noMistakesBinary("  ")).toBe("no-mistakes")
   })
 })

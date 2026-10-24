@@ -5,7 +5,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../src/agents"
-import type { QuestionAnswer } from "../../src/no-mistakes"
+import { subprocessNoMistakesRunner, type QuestionAnswer } from "../../src/no-mistakes"
 import { hostGitShim } from "../../src/host"
 import { orcCompletionLine } from "../../src/pi"
 import { runWithHistory, type SandboxOps } from "../../src/run"
@@ -194,7 +194,7 @@ export const runStep = (dir: string, home: string, sandbox: SandboxOps["runAgent
               piSessionDir: path.join(runDir, "session"), hostSessionsDir: path.join(runDir, "sessions"),
               taskPath: path.join(runDir, "task.md"), agent: implementer, fixer, branch: "orc/test", started: "2026-10-19T10:00:00.000Z",
               worktreeDir: dir,
-              noMistakesPath: stub.dir + ":" + (process.env.PATH ?? ""),
+              noMistakes: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: stub.dir + ":" + (process.env.PATH ?? ""), git: hostGit, worktreeDir: dir }),
               answers
             }, { runAgent: sandbox, execCheck })
             const runs = yield* listRuns(db)
