@@ -1,13 +1,22 @@
 {
   "name": "orc",
   "version": "0.3.0",
-  "private": true,
   "description": "One task to one pull request: Pi in a nono sandbox, the project's checks, then no-mistakes",
-  "repository": "https://github.com/avi2d/orc.git",
+  "license": "MIT",
   "author": "avi2d <avi2dg@gmail.com>",
   "type": "module",
   "bin": {
     "orc": "src/bin.ts"
+  },
+  "files": [
+    "CHANGELOG.md",
+    "README.md",
+    "agents/",
+    "scripts/patch-knip-jiti.ts",
+    "src/"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "bun build src/bin.ts --outdir dist --target bun && checks-effect-scope && checks-changelog",

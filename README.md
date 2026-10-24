@@ -73,6 +73,7 @@ The terminal report names the run folder, the agent file, the session file and t
 
 To list recent runs, run `bun run src/bin.ts runs`.
 Orc keeps its records in `~/.orc`, outside every project repo.
+Set `ORC_HOME` to keep them somewhere else.
 To print the same facts as JSON, run `bun run src/bin.ts runs --json`.
 Every JSON document names its version first as `schema`, starting at `orc.runs.v1`.
 To see one run step by step, run `bun run src/bin.ts show <run-id>`.

@@ -5,7 +5,7 @@ permissions:
   contents: read
 jobs:
   mutation-compare:
-    runs-on: [self-hosted, Linux, X64, winbox]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:

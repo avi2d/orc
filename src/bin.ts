@@ -18,7 +18,7 @@ const readFailure = (error: unknown): string =>
 
 const readHistory = <A, E>(use: (db: Database) => Effect.Effect<A, E>) =>
   Effect.acquireUseRelease(
-    openDatabase(orcHomeDir()),
+    openDatabase(orcHomeDir(Bun.env.ORC_HOME)),
     use,
     (db) => Effect.sync(() => db.close())
   ).pipe(
@@ -63,7 +63,7 @@ const program = Effect.gen(function*() {
     }
     case "ScoreStep": {
       yield* Effect.acquireUseRelease(
-        openDatabase(orcHomeDir()),
+        openDatabase(orcHomeDir(Bun.env.ORC_HOME)),
         (db) =>
           recordStepScore(db, {
             runId: args.runId,

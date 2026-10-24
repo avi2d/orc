@@ -111,7 +111,8 @@ export const formatHistoryError = (error: unknown): string => {
   return String(error)
 }
 
-export const orcHomeDir = (): string => `${homedir()}/.orc`
+export const orcHomeDir = (override?: string): string =>
+  override === undefined || override === "" ? `${homedir()}/.orc` : override
 
 const schemaStatements: ReadonlyArray<string> = [
   "CREATE TABLE IF NOT EXISTS runs (" +

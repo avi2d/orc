@@ -73,14 +73,18 @@ interface Checkout {
 // Sandcastle interpolates the branch into host shell commands, so any other character can be expanded or run.
 const shellSafeBranch = /^[A-Za-z0-9._/-]+$/
 
-const openCheckout = (
+export const parseRefuseMarkers = (value: string | undefined): ReadonlyArray<string> =>
+  value === undefined ? [] : value.split(",").map((entry) => entry.trim()).filter((entry) => entry !== "")
+
+export const openCheckout = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
   git: string,
   cwd: string,
   branchName: string | undefined,
-  runId: string
+  runId: string,
+  refuseMarkers: ReadonlyArray<string>
 ): Effect.Effect<Checkout, OrcRunError> =>
   Effect.gen(function*() {
     const top = yield* runGit(spawner, git, ["rev-parse", "--show-toplevel"], cwd)
@@ -90,9 +94,10 @@ const openCheckout = (
     const projectDir = yield* fs.realPath(top.stdout.trim()).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot resolve the checkout: " + String(cause) }))
     )
-    for (const candidate of [path.join(projectDir, ".fm-slot-owner"), path.join(path.dirname(projectDir), ".fm-slot-owner")]) {
+    const candidates = refuseMarkers.flatMap((marker) => [path.join(projectDir, marker), path.join(path.dirname(projectDir), marker)])
+    for (const candidate of candidates) {
       if (yield* exists(fs, candidate)) {
-        return yield* refuse("orc: " + candidate + " marks a firstmate checkout, and orc refuses to run in one")
+        return yield* refuse("orc: " + candidate + " marks this checkout as refused, so orc refuses to run in it")
       }
     }
     const status = yield* runGit(spawner, git, ["status", "--porcelain"], projectDir)
@@ -249,11 +254,11 @@ export const runAgentStep = (
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const home = request.homeDir ?? orcHomeDir()
+    const home = request.homeDir ?? orcHomeDir(Bun.env.ORC_HOME)
     const runId = request.runId ?? newRunId()
     const hostPath = Bun.env.PATH
     const git = yield* openHostGit(fs, path)
-    const checkout = yield* openCheckout(fs, path, spawner, git, request.cwd, request.branch, runId)
+    const checkout = yield* openCheckout(fs, path, spawner, git, request.cwd, request.branch, runId, parseRefuseMarkers(Bun.env.ORC_REFUSE_MARKERS))
     const runDir = path.join(home, "runs", runId)
     const effectiveTaskFile = yield* readTaskFile(fs, home, checkout, request.taskFile)
     const { folders, agent, fixer, credential } = yield* prepareAgents(fs, path, spawner, checkout, home, runDir, effectiveTaskFile, request.agentsDir).pipe(

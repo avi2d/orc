@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { mkdtemp, rm, stat, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { Database } from "bun:sqlite"
 import { BunServices } from "@effect/platform-bun"
@@ -11,6 +11,7 @@ import {
   formatRunsTable,
   listRuns,
   openDatabase,
+  orcHomeDir,
   recordEvidence,
   recordRun,
   recordScore,
@@ -142,6 +143,20 @@ describe("openDatabase", () => {
       expect(message).toContain("sqlite failure")
       expect(message).toContain("file is not a database")
     })
+  })
+})
+
+describe("orcHomeDir", () => {
+  test("defaults to ~/.orc", () => {
+    expect(orcHomeDir()).toBe(`${homedir()}/.orc`)
+  })
+
+  test("an override names the run-history directory", () => {
+    expect(orcHomeDir("/tmp/orc-elsewhere")).toBe("/tmp/orc-elsewhere")
+  })
+
+  test("an empty override falls back to ~/.orc", () => {
+    expect(orcHomeDir("")).toBe(`${homedir()}/.orc`)
   })
 })
 
