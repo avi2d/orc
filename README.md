@@ -37,6 +37,10 @@ On resume Sandcastle reuses the branch worktree, Pi resumes its prior session, a
 After a refusal, run the same resume command with `--allow` and the name from the report, or with `--answer` and the captain's answer for a question.
 No-mistakes takes the word for that `--allow` kind, and the answer for that question.
 Orc also refuses a checkout whose own git config sets any key outside a short list known to run no program.
+To refuse checkouts carrying a marker file, set `ORC_REFUSE_MARKERS` to comma separated marker names.
+Orc trims padding around each name and drops blank entries.
+Orc checks each marker in the project directory and its parent and refuses a checkout carrying one.
+An unset `ORC_REFUSE_MARKERS` names no marker and refuses no checkout for a marker.
 
 The run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
 It also needs an opencode-go login in Pi, which `pi auth check --provider opencode-go` confirms.
@@ -44,7 +48,7 @@ Orc reads that login through Pi on the host and hands it to the sandbox, so a ke
 
 Orc takes the implementer agent file from the first of these that exists:
 
-1. `~/.orc/agents/implementer.md`
+1. `$ORC_HOME/agents/implementer.md`, default `~/.orc/agents/implementer.md` when `ORC_HOME` is unset or empty
 1. `.orc/agents/implementer.md` in the project
 1. `agents/implementer.md` bundled with orc
 
@@ -64,7 +68,7 @@ The branch holds at least one new commit.
 The project's checks pass.
 no-mistakes opened the PR and reported CI green.
 Otherwise orc records the run as failed with the reason and exits 1.
-Each run keeps its task, evidence, agent log and Pi session in `~/.orc/runs/<run-id>`.
+Each run keeps its task, evidence, agent log and Pi session in `$ORC_HOME/runs/<run-id>`, default `~/.orc/runs/<run-id>` when `ORC_HOME` is unset or empty.
 Its `no-mistakes.txt` and the run history hold the no-mistakes findings, their count, the gates orc answered, the final result and the PR link.
 Its `report.md` carries the task, the branch, the status, the PR, the steps, the evidence, the signals, the findings and the result.
 The terminal report names the run folder, the agent file, the session file and the report as full links, beside the PR link.
@@ -73,6 +77,7 @@ The terminal report names the run folder, the agent file, the session file and t
 
 To list recent runs, run `bun run src/bin.ts runs`.
 Orc keeps its records in `~/.orc`, outside every project repo.
+Set `ORC_HOME` to keep them somewhere else.
 To print the same facts as JSON, run `bun run src/bin.ts runs --json`.
 Every JSON document names its version first as `schema`, starting at `orc.runs.v1`.
 To see one run step by step, run `bun run src/bin.ts show <run-id>`.
@@ -103,7 +108,7 @@ Orc score keeps one row per score and orc show prints the latest score beside th
 | `agents` | The bundled agent files |
 | `src/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
 | `src/toon.ts` | The reading of the TOON output no-mistakes prints |
-| `src/run-history.ts` | The `~/.orc` home folder, the SQLite run history and `orc runs` |
+| `src/run-history.ts` | The records home, the SQLite run history and `orc runs` |
 | `src/nono.ts` | The Sandcastle sandbox provider that runs each command in `nono run` |
 | `src/host.ts` | The host-side processes and tools the provider runs outside nono, and the guard on host git |
 | `src/nono-profile.ts` | The nono profile that lets a command write only the copy, its git data and the Pi session folder, and routes the model credential |

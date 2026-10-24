@@ -18,7 +18,7 @@ const readFailure = (error: unknown): string =>
 
 const readHistory = <A, E>(use: (db: Database) => Effect.Effect<A, E>) =>
   Effect.acquireUseRelease(
-    openDatabase(orcHomeDir()),
+    openDatabase(orcHomeDir(Bun.env.ORC_HOME)),
     use,
     (db) => Effect.sync(() => db.close())
   ).pipe(
@@ -63,7 +63,7 @@ const program = Effect.gen(function*() {
     }
     case "ScoreStep": {
       yield* Effect.acquireUseRelease(
-        openDatabase(orcHomeDir()),
+        openDatabase(orcHomeDir(Bun.env.ORC_HOME)),
         (db) =>
           recordStepScore(db, {
             runId: args.runId,
@@ -75,19 +75,18 @@ const program = Effect.gen(function*() {
         (db) => Effect.sync(() => db.close())
       ).pipe(
         Effect.provide(BunServices.layer),
-        Effect.catchTag("UnknownRun", (error) =>
-          Console.error("orc score: unknown run " + error.runId).pipe(Effect.andThen(Effect.fail("orc score refused")))
-        ),
-        Effect.catchTag("UnknownStep", (error) =>
-          Console.error("orc score: unknown step " + error.step + " in run " + error.runId).pipe(
-            Effect.andThen(Effect.fail("orc score refused"))
-          )
-        ),
-        Effect.catchTag("InvalidScore", (error) =>
-          Console.error(`orc score takes a score from 1 to 5, got "${error.score}"`).pipe(
-            Effect.andThen(Effect.fail("orc score refused"))
-          )
-        ),
+        Effect.catchTags({
+          UnknownRun: (error) =>
+            Console.error("orc score: unknown run " + error.runId).pipe(Effect.andThen(Effect.fail("orc score refused"))),
+          UnknownStep: (error) =>
+            Console.error("orc score: unknown step " + error.step + " in run " + error.runId).pipe(
+              Effect.andThen(Effect.fail("orc score refused"))
+            ),
+          InvalidScore: (error) =>
+            Console.error(`orc score takes a score from 1 to 5, got "${error.score}"`).pipe(
+              Effect.andThen(Effect.fail("orc score refused"))
+            )
+        }),
         Effect.catch((error) =>
           Console.error(readFailure(error)).pipe(Effect.andThen(Effect.fail("run history unavailable")))
         )

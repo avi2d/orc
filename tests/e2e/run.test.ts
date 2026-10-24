@@ -3,8 +3,9 @@ import { chmod, exists, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect } from "effect"
-import { runAgentStep } from "../../src/run"
+import { Effect, FileSystem, Path } from "effect"
+import { ChildProcessSpawner } from "effect/process"
+import { openCheckout, runAgentStep } from "../../src/run"
 import { capturedSession, cleanFinish, commitOnBranch, git, passedWithPr, recordedNothing, providerErrorEchoingPrompt, runStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
 const refusal = (input: {
@@ -43,13 +44,29 @@ describe("runAgentStep refusals", () => {
     })
   })
 
-  test("a firstmate checkout is refused", async () => {
+  test("a checkout carrying a refused marker is refused", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
-        await writeFile(join(dir, ".fm-slot-owner"), "some-slot\n")
-        git(dir, ["add", ".fm-slot-owner"])
+        await writeFile(join(dir, ".slot-owner"), "some-slot\n")
+        git(dir, ["add", ".slot-owner"])
         git(dir, ["commit", "-qm", "slot marker"])
-        expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home })).toContain("firstmate checkout")
+        process.env.ORC_REFUSE_MARKERS = ".slot-owner"
+        try {
+          expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home })).toContain("marks this checkout as refused")
+        } finally {
+          delete process.env.ORC_REFUSE_MARKERS
+        }
+      })
+    })
+  })
+
+  test("a checkout carrying a marker no list names is not refused for it", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        await writeFile(join(dir, ".slot-owner"), "some-slot\n")
+        git(dir, ["add", ".slot-owner"])
+        git(dir, ["commit", "-qm", "slot marker"])
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home })).toContain("cannot read the task file")
       })
     })
   })
@@ -121,6 +138,39 @@ describe("runAgentStep refusals", () => {
         expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test", agentsDir })).toContain("routes only opencode-go models")
         expect(await exists(runDir)).toBe(false)
       })
+    })
+  })
+})
+
+describe("openCheckout refuse markers", () => {
+  const attempt = (dir: string, markers: ReadonlyArray<string>): Promise<string> =>
+    Effect.runPromise(
+      Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+        yield* openCheckout(fs, path, spawner, Bun.which("git") ?? "git", dir, "orc/test-markers", "test-run-1", markers)
+        return "opened"
+      }).pipe(Effect.scoped, Effect.provide(BunServices.layer), Effect.catchTag("OrcRunError", (cause) => Effect.succeed(cause.message)))
+    )
+
+  test("an empty list opens a checkout carrying a marker file", async () => {
+    await withRepo(async (dir) => {
+      await writeFile(join(dir, ".slot-owner"), "some-slot\n")
+      git(dir, ["add", ".slot-owner"])
+      git(dir, ["commit", "-qm", "slot marker"])
+      expect(await attempt(dir, [])).toBe("opened")
+    })
+  })
+
+  test("a matching marker refuses the checkout naming the marker", async () => {
+    await withRepo(async (dir) => {
+      await writeFile(join(dir, ".slot-owner"), "some-slot\n")
+      git(dir, ["add", ".slot-owner"])
+      git(dir, ["commit", "-qm", "slot marker"])
+      const message = await attempt(dir, [".slot-owner"])
+      expect(message).toContain(".slot-owner")
+      expect(message).toContain("marks this checkout as refused")
     })
   })
 })
