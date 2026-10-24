@@ -24,7 +24,7 @@ import {
   type Spawner
 } from "./host"
 import { credentialBearingKeys, includePathKeys, includeTargets, submoduleCheckouts } from "./git-config"
-import { selectNonoProfile, type ModelCredential, type NonoSandboxRoots, within } from "./nono-profile"
+import { defaultToolchainResolver, selectNonoProfile, type ModelCredential, type NonoSandboxRoots, type ToolchainResolver, within } from "./nono-profile"
 
 export const buildNonoRunArgs = (
   profilePath: string,
@@ -89,6 +89,7 @@ export interface NonoSandboxProviderOptions {
   readonly piAgentDir?: string | undefined
   readonly modelCredential?: ModelCredential | undefined
   readonly hostPath?: string | undefined
+  readonly toolchain?: ToolchainResolver | undefined
 }
 
 // Sandcastle 0.12.0's provider type omits the runtime `create`.
@@ -308,7 +309,8 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const hostGit = { binary: yield* resolveHostBinary(fs, "git"), env: buildHostGitEnv(hostEnv) }
       const roots = yield* resolveRoots(spawner, fs, path, hostGit, createOptions.worktreePath, options.piSessionDir)
       yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, hostGit)
-      const runtimes = (yield* Effect.forEach(sandboxRuntimes, (name) => resolveRuntime(fs, path, name, Bun.env.PATH ?? "", homedir()))).filter((runtime) => runtime !== null)
+      const toolchain = options.toolchain ?? defaultToolchainResolver(homedir())
+      const runtimes = (yield* Effect.forEach(sandboxRuntimes, (name) => resolveRuntime(fs, path, name, Bun.env.PATH ?? "", toolchain))).filter((runtime) => runtime !== null)
       const agentDir = yield* resolvePiAgentDir(fs, roots.piSessionDir, options.piAgentDir)
       const shims = yield* prepareSandboxShims(fs, path, roots.piSessionDir)
       const env = sandboxEnv(hostEnv, roots.piSessionDir, [shims.shimDir, ...runtimes.map((runtime) => runtime.binDir)], agentDir)
@@ -319,7 +321,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const profileDir = yield* fs.makeTempDirectory({ prefix: "orc-nono-" })
       const profilePath = path.join(profileDir, "profile.json")
       const hostTrustedPaths = [profileDir, nonoBinary, path.dirname(nonoBinary)]
-      const profile = yield* selectNonoProfile(roots, { developerDir, runtimeDirs }, options.modelCredential)
+      const profile = yield* selectNonoProfile(roots, { developerDir, toolchainFolders: toolchain.folders, runtimeDirs }, options.modelCredential)
       yield* fs.writeFileString(profilePath, `${JSON.stringify(profile, null, 2)}\n`).pipe(
         Effect.andThen(() => checkProfile(spawner, nono, profilePath, hostTrustedPaths)),
         Effect.andThen(() => fs.makeDirectory(env.TMPDIR, { recursive: true })),

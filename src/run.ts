@@ -6,7 +6,7 @@ import { homedir } from "node:os"
 import { resolveAgentFile, type AgentFile } from "./agents"
 import { hostGitShim, withHostGitSafety } from "./host"
 import { nonoSandboxProvider } from "./nono"
-import { canRouteModel, loginCheckCommand, modelCredentialFor, piAgentModels } from "./nono-profile"
+import { canRouteModel, defaultToolchainResolver, loginCheckCommand, modelCredentialFor, piAgentModels, type ToolchainResolver, withInstallFolders, within } from "./nono-profile"
 import { runGit } from "./git-run"
 import { orcCompletionLine } from "./pi"
 import { OrcRunError, describeCause } from "./run-session"
@@ -75,6 +75,24 @@ const shellSafeBranch = /^[A-Za-z0-9._/-]+$/
 
 export const parseRefuseMarkers = (value: string | undefined): ReadonlyArray<string> =>
   value === undefined ? [] : value.split(",").map((entry) => entry.trim()).filter((entry) => entry !== "")
+
+// The sandbox reads each folder whole, so a folder holding HOME would hand it the operator's credentials.
+export const toolchainFromEnv = (value: string | undefined, home: string): Effect.Effect<ToolchainResolver, OrcRunError> =>
+  Effect.gen(function*() {
+    const entries = (value ?? "").split(":").map((entry) => entry.trim()).filter((entry) => entry !== "")
+    const folders: Array<string> = []
+    for (const entry of entries) {
+      const folder = entry.replace(/\/+$/, "")
+      if (!entry.startsWith("/")) {
+        return yield* refuse("orc: ORC_TOOLCHAIN_DIRS names " + entry + ", which is not an absolute path")
+      }
+      if (folder === "" || within(folder, home)) {
+        return yield* refuse("orc: ORC_TOOLCHAIN_DIRS names " + entry + ", which holds HOME, and the sandbox reads each named folder whole")
+      }
+      folders.push(folder)
+    }
+    return withInstallFolders(defaultToolchainResolver(home), folders)
+  })
 
 export const openCheckout = (
   fs: FileSystem.FileSystem,
@@ -239,12 +257,13 @@ const openSandboxForRun = (
   checkout: Checkout,
   folders: RunFolders,
   credential: ModelCredential,
-  hostPath: string | undefined
+  hostPath: string | undefined,
+  toolchain: ToolchainResolver
 ): Effect.Effect<Sandbox, OrcRunError> =>
   Effect.tryPromise({
     try: () => createSandbox({
       branch: checkout.branch,
-      sandbox: nonoSandboxProvider({ piSessionDir: folders.piSessionDir, piAgentDir: folders.piAgentDir, modelCredential: credential, hostPath }),
+      sandbox: nonoSandboxProvider({ piSessionDir: folders.piSessionDir, piAgentDir: folders.piAgentDir, modelCredential: credential, hostPath, toolchain }),
       cwd: checkout.projectDir
     }),
     catch: (cause) => new OrcRunError({ message: "orc: the sandbox failed to start: " + describeCause(cause) })
@@ -260,6 +279,7 @@ export const runAgentStep = (
     const home = orcHomeDir(request.homeDir ?? Bun.env.ORC_HOME)
     const runId = request.runId ?? newRunId()
     const hostPath = Bun.env.PATH
+    const toolchain = yield* toolchainFromEnv(Bun.env.ORC_TOOLCHAIN_DIRS, homedir())
     const git = yield* openHostGit(fs, path)
     const checkout = yield* openCheckout(fs, path, spawner, git, request.cwd, request.branch, runId, parseRefuseMarkers(Bun.env.ORC_REFUSE_MARKERS))
     const runDir = path.join(home, "runs", runId)
@@ -270,7 +290,7 @@ export const runAgentStep = (
       Effect.onError(() => fs.remove(runDir, { recursive: true }).pipe(Effect.result))
     )
     const started = new Date().toISOString()
-    const sandbox: Sandbox = yield* openSandboxForRun(git, checkout, folders, credential, hostPath)
+    const sandbox: Sandbox = yield* openSandboxForRun(git, checkout, folders, credential, hostPath, toolchain)
     const ops: SandboxOps = {
       runAgent: (agentProvider, prompt, logFile, resumeSession) =>
         sandbox.run({
