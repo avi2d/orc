@@ -5,7 +5,7 @@ import type { Database } from "bun:sqlite"
 import { homedir } from "node:os"
 import { resolveAgentFile, type AgentFile } from "./agents"
 import { hostGitShim, withHostGitSafety } from "./host"
-import { nonoSandboxProvider } from "./nono"
+import { inheritedEnv, nonoSandboxProvider } from "./nono"
 import { canRouteModel, defaultToolchainResolver, loginCheckCommand, modelCredentialFor, piAgentModels, type ToolchainResolver, withInstallFolders, within } from "./nono-profile"
 import { runGit } from "./git-run"
 import { orcCompletionLine } from "./pi"
@@ -46,14 +46,15 @@ const runLoginCheck = (
 ): Effect.Effect<void, OrcRunError> =>
   Effect.scoped(Effect.gen(function*() {
     const parts = loginCheckCommand(host)
-    const handle = yield* spawner.spawn(ChildProcess.make(parts[0], parts.slice(1), { cwd }))
+    // nono runs the credential capture with only these variables, so a key the check finds anywhere else never reaches the sandbox.
+    const handle = yield* spawner.spawn(ChildProcess.make(parts[0], parts.slice(1), { cwd, env: inheritedEnv(Bun.env), extendEnv: false }))
     const [, , exitCode] = yield* Effect.all([
       handle.stdout.pipe(Stream.decodeText(), Stream.runDrain),
       handle.stderr.pipe(Stream.decodeText(), Stream.runDrain),
       handle.exitCode
     ], { concurrency: "unbounded" })
     if (exitCode !== 0) {
-      return yield* refuse("orc: pi auth check found no opencode-go credential, so this keychain-only setup is refused; add an opencode-go login to pi on the host and rerun")
+      return yield* refuse("orc: pi auth check found no opencode-go login, so a key held only in the keychain or in an environment variable is refused; add an opencode-go login to pi on the host and rerun")
     }
   })).pipe(
     Effect.mapError((cause) => cause instanceof OrcRunError ? cause : new OrcRunError({ message: "orc: the login check failed to run: " + String(cause) }))

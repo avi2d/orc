@@ -36,7 +36,7 @@ const inheritedEnvNames: ReadonlyArray<string> = ["PATH", "HOME", "USER", "LOGNA
 
 const sandboxRuntimes: ReadonlyArray<string> = ["bun", "node", "pi"]
 
-const inheritedEnv = (hostEnv: Readonly<Record<string, string | undefined>>): Record<string, string> => {
+export const inheritedEnv = (hostEnv: Readonly<Record<string, string | undefined>>): Record<string, string> => {
   const env: Record<string, string> = {}
   for (const name of inheritedEnvNames) {
     const value = hostEnv[name]
