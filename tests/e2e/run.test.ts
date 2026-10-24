@@ -184,6 +184,7 @@ describe("runWithHistory decides the implement step", () => {
         const outcome = await runStep(dir, home, sandboxResult(sha, providerErrorEchoingPrompt))
         expect(outcome.report.commits?.map((commit) => commit.sha)).toEqual([sha])
         expect(outcome.report.completed).toBe(false)
+        expect(outcome.run?.endReason).toStartWith("Pi's final reply did not stop cleanly with ORC_COMPLETE on its own line. It ended in an error: 400 invalid request: ")
         expect(outcome.run?.status).toBe("failed")
         expect(outcome.steps).toEqual([{ name: "implement", status: "failed" }])
       })
