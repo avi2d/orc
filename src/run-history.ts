@@ -2,8 +2,7 @@ import { Database } from "bun:sqlite"
 import { Data, Effect, FileSystem, Path, Schema } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { homedir } from "node:os"
-import { resolve } from "node:path"
-import { pathToFileURL } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 export const RUN_HISTORY_SCHEMA_VERSION = 1
 export const RUNS_JSON_SCHEMA = "orc.runs.v1" as const
@@ -112,8 +111,9 @@ export const formatHistoryError = (error: unknown): string => {
   return String(error)
 }
 
+// Effect scope refuses node:path here, so a file URL resolves the override.
 export const orcHomeDir = (override?: string): string =>
-  override === undefined || override === "" ? `${homedir()}/.orc` : resolve(override)
+  override === undefined || override === "" ? `${homedir()}/.orc` : fileURLToPath(new URL(override, pathToFileURL(process.cwd() + "/")))
 
 const schemaStatements: ReadonlyArray<string> = [
   "CREATE TABLE IF NOT EXISTS runs (" +
