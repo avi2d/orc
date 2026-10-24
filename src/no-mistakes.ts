@@ -158,7 +158,8 @@ export const noMistakesVersionProblem = (options: NoMistakesHost, cwd: string): 
     }
     const version = versionIn(reply.stdout)
     return version !== null && olderThanMinimum(version)
-      ? "orc: " + options.binary + " is no-mistakes " + version.join(".") + ", and orc sends the axi commands of " + minimumName + " or later, so upgrade no-mistakes or point ORC_NO_MISTAKES_BIN at a newer one"
+      ? "orc: " + options.binary + " is no-mistakes " + version.join(".") + ", and orc sends the axi commands of " + minimumName + " or later" +
+        "; download a newer release from https://github.com/kunchenguid/no-mistakes/releases, where it may be marked prerelease and the install script skips it, or point ORC_NO_MISTAKES_BIN at a newer one"
       : null
   }))
 

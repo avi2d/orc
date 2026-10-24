@@ -13,7 +13,7 @@ You read the PR and merge it, since orc never merges.
 - nono from https://nono.sh, tested on 0.80.0.
 - Node, tested on 24.22.1.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with an opencode-go login.
-- no-mistakes v1.90.0 or later from https://github.com/kunchenguid/no-mistakes, tested on v1.100.2.
+- no-mistakes v1.90.0 or later, tested on v1.100.2, installed as [Installing no-mistakes](#installing-no-mistakes) says.
 
 ## Install
 
@@ -22,6 +22,19 @@ To install orc:
 1. Run `git clone https://github.com/avi2d/orc.git` to clone the repository.
 1. Run `cd orc` to enter it.
 1. Run `bun install --frozen-lockfile` to install the pinned dependencies.
+
+## Installing no-mistakes
+
+Upstream's install script fetches the release GitHub marks latest, and upstream marks the releases after v1.84.0 as prereleases, so the script installs a release orc refuses.
+To install v1.100.2 instead:
+
+1. Pick the archive for your machine: `no-mistakes-v1.100.2-darwin-arm64.tar.gz`, `no-mistakes-v1.100.2-darwin-amd64.tar.gz`, `no-mistakes-v1.100.2-linux-arm64.tar.gz` or `no-mistakes-v1.100.2-linux-amd64.tar.gz`.
+1. Run `mkdir -p ~/.local/bin` to make the folder it goes in.
+1. Run `curl -fsSL https://github.com/kunchenguid/no-mistakes/releases/download/v1.100.2/ARCHIVE | tar xz -C ~/.local/bin no-mistakes`, with the archive in place of `ARCHIVE`.
+1. Put `~/.local/bin` on your PATH.
+1. Run `no-mistakes --version` to check it.
+
+no-mistakes prints `no-mistakes version v1.100.2`.
 
 ## Print the version
 

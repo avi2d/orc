@@ -30,6 +30,7 @@ describe("the no-mistakes version orc drives", () => {
       const problem = await versionProblem(printsVersion(version))
       expect(problem).toContain(version.slice(1))
       expect(problem).toContain("v1.90.0 or later")
+      expect(problem).toContain("https://github.com/kunchenguid/no-mistakes/releases")
     }
   })
 
