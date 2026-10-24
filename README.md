@@ -44,7 +44,7 @@ Orc reads that login through Pi on the host and hands it to the sandbox, so a ke
 
 Orc takes the implementer agent file from the first of these that exists:
 
-1. `~/.orc/agents/implementer.md`
+1. `$ORC_HOME/agents/implementer.md`, default `~/.orc/agents/implementer.md` when `ORC_HOME` is unset or empty
 1. `.orc/agents/implementer.md` in the project
 1. `agents/implementer.md` bundled with orc
 
@@ -64,7 +64,7 @@ The branch holds at least one new commit.
 The project's checks pass.
 no-mistakes opened the PR and reported CI green.
 Otherwise orc records the run as failed with the reason and exits 1.
-Each run keeps its task, evidence, agent log and Pi session in `~/.orc/runs/<run-id>`.
+Each run keeps its task, evidence, agent log and Pi session in `$ORC_HOME/runs/<run-id>`, default `~/.orc/runs/<run-id>` when `ORC_HOME` is unset or empty.
 Its `no-mistakes.txt` and the run history hold the no-mistakes findings, their count, the gates orc answered, the final result and the PR link.
 Its `report.md` carries the task, the branch, the status, the PR, the steps, the evidence, the signals, the findings and the result.
 The terminal report names the run folder, the agent file, the session file and the report as full links, beside the PR link.
@@ -104,7 +104,7 @@ Orc score keeps one row per score and orc show prints the latest score beside th
 | `agents` | The bundled agent files |
 | `src/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
 | `src/toon.ts` | The reading of the TOON output no-mistakes prints |
-| `src/run-history.ts` | The `~/.orc` home folder, the SQLite run history and `orc runs` |
+| `src/run-history.ts` | The records home, the SQLite run history and `orc runs` |
 | `src/nono.ts` | The Sandcastle sandbox provider that runs each command in `nono run` |
 | `src/host.ts` | The host-side processes and tools the provider runs outside nono, and the guard on host git |
 | `src/nono-profile.ts` | The nono profile that lets a command write only the copy, its git data and the Pi session folder, and routes the model credential |
