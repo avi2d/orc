@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { buildAgentNonoProfile, buildNonoProfile, canRouteModel, loginCheckCommand, modelCredentialFor, piAgentModels } from "../../src/nono-profile"
+import { buildAgentNonoProfile, buildNonoProfile, canRouteModel, defaultToolchainFolders, loginCheckCommand, modelCredentialFor, piAgentModels } from "../../src/nono-profile"
 
 const credential = {
   provider: "opencode-go",
@@ -20,7 +20,7 @@ const roots = {
   taskTmp: "/work/tree/.orc/tmp"
 }
 
-const host = { developerDir: "/dev/dir", runtimeDirs: ["/run/bin"] }
+const host = { developerDir: "/dev/dir", toolchainFolders: defaultToolchainFolders, runtimeDirs: ["/run/bin"] }
 
 describe("modelCredentialFor", () => {
   test("routes opencode-go models to the zen proxy credential", () => {

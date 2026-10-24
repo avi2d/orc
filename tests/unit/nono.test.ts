@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { buildHostGitEnv, buildNonoRunArgs, buildSandboxEnv, nonoSandboxProvider } from "../../src/nono"
-import { buildNonoProfile, runtimeOf, type HostRuntime, type NonoSandboxRoots } from "../../src/nono-profile"
+import { buildNonoProfile, defaultToolchainFolders, defaultToolchainResolver, type HostRuntime, type NonoSandboxRoots } from "../../src/nono-profile"
 
 const roots = {
   worktree: "/tmp/orc-test/worktree",
@@ -10,7 +10,9 @@ const roots = {
   piSessionDir: "/tmp/orc-test/session"
 }
 
-const noHost = { developerDir: null, runtimeDirs: [] }
+const noHost = { developerDir: null, toolchainFolders: defaultToolchainFolders, runtimeDirs: [] }
+
+const runtimeOf = (candidate: string, real: string, home: string) => defaultToolchainResolver(home).runtimeOf(candidate, real)
 
 const profileFor = (input: NonoSandboxRoots, host: HostRuntime) =>
   Effect.runPromise(buildNonoProfile(input, host).pipe(Effect.provide(BunServices.layer)))
@@ -90,6 +92,13 @@ describe("buildNonoProfile", () => {
     expect(runtimeOf("/Users/test/bin/node", "/Users/test/.local/share/mise/installs/node/24.1.0/bin/node", "/Users/test")).toBeNull()
     expect(runtimeOf("/Users/test/.local/share/mise/installs/bun", "/Users/test/.local/share/mise/installs/bun", "/Users/test")).toBeNull()
     expect(runtimeOf("/usr/local/bin/node", "/Users/test/node/bin/node", "/Users/test")).toBeNull()
+  })
+
+  test("reads the toolchain folders a resolver names in place of the default layout", async () => {
+    const { read } = (await profileFor(roots, { ...noHost, toolchainFolders: ["/custom/tools"] })).filesystem
+    expect(read).toContain("/custom/tools")
+    expect(read).toContain("/usr/bin")
+    expect(read.filter((grant) => grant.startsWith("/opt/homebrew") || grant.startsWith("/usr/local"))).toEqual([])
   })
 
   test("keeps an isolated security posture", async () => {

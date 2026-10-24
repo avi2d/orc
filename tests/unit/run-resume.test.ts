@@ -10,6 +10,7 @@ import type { AgentFile } from "../../src/agents"
 import { openDatabase, recordRun, recordStep } from "../../src/run-history"
 import { buildResumePlan, resolveTaskFile } from "../../src/run-resume"
 import { recordResumePublish } from "../../src/history-write"
+import { subprocessNoMistakesRunner } from "../../src/no-mistakes"
 import type { HistoryRun } from "../../src/run-record"
 
 const implementer: AgentFile = {
@@ -56,7 +57,9 @@ const historyFor = (runId: string, home: string, projectDir: string, started: st
       hostSessionsDir: path.join(runDir, "sessions"),
       taskPath: path.join(runDir, "task.md"),
       agent: implementer, fixer, branch: "orc/test", started,
-      worktreeDir: projectDir, noMistakesPath: "", allow: [], answers: []
+      worktreeDir: projectDir,
+      noMistakes: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git: "git", worktreeDir: projectDir }),
+      allow: [], answers: []
     }
     return run
   }).pipe(Effect.provide(BunServices.layer))

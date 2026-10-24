@@ -21,6 +21,7 @@ import {
   recordResumePublish
 } from "../../src/history-write"
 import { buildResumePlan } from "../../src/run-resume"
+import { subprocessNoMistakesRunner } from "../../src/no-mistakes"
 import type { HistoryRun } from "../../src/run-record"
 import { runFull, type RunCheckpoints, type SandboxOps } from "../../src/run-loop"
 
@@ -83,7 +84,9 @@ const historyFor = (runId: string, home: string, projectDir: string, started: st
       hostSessionsDir: path.join(runDir, "sessions"),
       taskPath: path.join(runDir, "task.md"),
       agent: implementer, fixer, branch: "orc/test", started,
-      worktreeDir: projectDir, noMistakesPath, allow: [], answers: []
+      worktreeDir: projectDir,
+      noMistakes: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: noMistakesPath, git, worktreeDir: projectDir }),
+      allow: [], answers: []
     }
     return run
   }).pipe(Effect.provide(BunServices.layer))

@@ -51,6 +51,7 @@ const AssistantLine = Schema.Struct({
   message: Schema.Struct({
     role: Schema.Literal("assistant"),
     stopReason: Schema.optional(Schema.String),
+    errorMessage: Schema.optional(Schema.String),
     content: Schema.Array(TextBlock)
   })
 })
@@ -69,6 +70,14 @@ export const sessionPrintedSignal = (jsonl: string, signal: string): boolean => 
   return final !== undefined &&
     final.stopReason === "stop" &&
     final.content.some((block) => block.type === "text" && printsOnOwnLine(block.text ?? "", signal))
+}
+
+export const finalReplyError = (jsonl: string): string | null => {
+  const final = finalAssistantMessage(jsonl)
+  if (final === undefined || final.stopReason !== "error") {
+    return null
+  }
+  return final.errorMessage ?? "an unnamed error"
 }
 
 export const sumPiUsage = (jsonl: string): PiTokenUse => {

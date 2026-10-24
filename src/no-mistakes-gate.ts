@@ -24,6 +24,8 @@ export interface ParkedGate {
 export interface ParsedRun {
   readonly status: string
   readonly outcome: string
+  readonly error: string
+  readonly prSkipReason: string
   readonly prLink: string
   readonly runId: string
   readonly gate: ParkedGate | null
@@ -35,6 +37,8 @@ export type GateAnswer =
   | { readonly kind: "fix"; readonly ids: ReadonlyArray<string>; readonly ignore: ReadonlyArray<string> }
   | { readonly kind: "approve" }
   | { readonly kind: "refuse"; readonly reason: string }
+
+export type GateResponse = Exclude<GateAnswer, { readonly kind: "refuse" }>
 
 const terminalStatuses = new Set(["completed", "failed", "cancelled", "checks_passed"])
 
@@ -93,6 +97,8 @@ export const parseRun = (output: string): ParsedRun => {
   return {
     status,
     outcome,
+    error: scalar(output, "error"),
+    prSkipReason: table(output, "automatic_skips").find((row) => row.get("step") === "pr")?.get("reason") ?? "",
     prLink: scalar(output, "pr"),
     runId: scalar(output, "id"),
     gate: readGate(output),
@@ -159,7 +165,7 @@ export const answerForGate = (gate: ParkedGate, findings: ReadonlyArray<NoMistak
   return { kind: "refuse", reason: "the " + gate.step + " gate names no finding orc can fix" }
 }
 
-export const respondArgs = (answer: Exclude<GateAnswer, { readonly kind: "refuse" }>): ReadonlyArray<string> =>
+export const respondArgs = (answer: GateResponse): ReadonlyArray<string> =>
   answer.kind === "approve"
     ? ["axi", "respond", "--action", "approve"]
     : ["axi", "respond", "--action", "fix", "--findings", answer.ids.join(","), ...(answer.ignore.length === 0 ? [] : ["--ignore", answer.ignore.join(",")])]

@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { AgentFile } from "../../src/agents"
-import { buildImplementPrompt, orcCompletionLine, piWithTools, sessionPrintedSignal, sumPiUsage, toolFlag } from "../../src/pi"
+import { buildImplementPrompt, finalReplyError, orcCompletionLine, piWithTools, sessionPrintedSignal, sumPiUsage, toolFlag } from "../../src/pi"
 
 const q = String.fromCharCode(39)
 const backslash = String.fromCharCode(92)
@@ -64,11 +64,12 @@ describe("sumPiUsage", () => {
   })
 })
 
+const line = (entry: unknown): string => JSON.stringify(entry)
+const text = (textBody: string): unknown => ({ type: "text", text: textBody })
+const assistant = (content: ReadonlyArray<unknown>, stopReason: string, extra: Record<string, unknown> = {}): string =>
+  line({ type: "message", message: { role: "assistant", content, stopReason, ...extra } })
+
 describe("sessionPrintedSignal", () => {
-  const line = (entry: unknown): string => JSON.stringify(entry)
-  const text = (textBody: string): unknown => ({ type: "text", text: textBody })
-  const assistant = (content: ReadonlyArray<unknown>, stopReason: string, extra: Record<string, unknown> = {}): string =>
-    line({ type: "message", message: { role: "assistant", content, stopReason, ...extra } })
   const promptText = "print " + orcCompletionLine + " on its own line and stop"
   const promptEcho = line({ type: "message", message: { role: "user", content: [text(promptText)] } })
   test("rejects a session where only the echoed prompt and thinking name the marker", () => {
@@ -106,6 +107,23 @@ describe("sessionPrintedSignal", () => {
   test("ignores blank lines and entries without assistant text", () => {
     expect(sessionPrintedSignal("", orcCompletionLine)).toBe(false)
     expect(sessionPrintedSignal("not json\n" + line({ type: "session", id: "x" }), orcCompletionLine)).toBe(false)
+  })
+})
+
+describe("finalReplyError", () => {
+  test("names the error a final reply ended in", () => {
+    const jsonl = [
+      assistant([], "error", { errorMessage: "opencode-go API error (503): 503 \"Service Unavailable\"" }),
+      line({ type: "context_edit" })
+    ].join("\n")
+    expect(finalReplyError(jsonl)).toBe("opencode-go API error (503): 503 \"Service Unavailable\"")
+  })
+  test("names nothing for a reply that stopped cleanly after an earlier error", () => {
+    const jsonl = [
+      assistant([], "error", { errorMessage: "opencode-go API error (503): 503 \"Service Unavailable\"" }),
+      assistant([text(orcCompletionLine)], "stop")
+    ].join("\n")
+    expect(finalReplyError(jsonl)).toBeNull()
   })
 })
 

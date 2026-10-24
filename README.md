@@ -1,3 +1,6 @@
+---
+audience: consumers
+---
 # orc
 Orc takes one task and turns it into one pull request.
 It starts from a command in the terminal that takes the task as text or as a file.
@@ -9,30 +12,71 @@ You read the PR and merge it, since orc never merges.
 ## Before you begin
 
 - Bun 1.4.3, the version `.bun-version` pins.
+- Git, tested on 2.56.0.
+- nono from https://nono.sh, tested on 0.80.0.
+- Node, tested on 24.22.1.
+- Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with an opencode-go login.
+- no-mistakes v1.90.0 or later, tested on v1.100.2, installed as [Installing no-mistakes](#installing-no-mistakes) says.
 
 ## Install
 
 To install orc:
 
-1. Run `gh repo clone avi2d/orc` to clone the repository.
+1. Run `git clone https://github.com/avi2d/orc.git` to clone the repository.
 1. Run `cd orc` to enter it.
 1. Run `bun install --frozen-lockfile` to install the pinned dependencies.
+1. Run `pwd` to print the orc checkout path.
+
+The commands below write that path as `/path/to/orc`.
+Replace it with the path the previous step printed.
+
+## Installing no-mistakes
+
+Upstream's install script fetches the release GitHub marks latest, and upstream marks releases after v1.84.0 as prereleases, so the script installs a release orc refuses.
+To install v1.100.2 instead:
+
+1. Pick the archive for your machine: `no-mistakes-v1.100.2-darwin-arm64.tar.gz`, `no-mistakes-v1.100.2-darwin-amd64.tar.gz`, `no-mistakes-v1.100.2-linux-arm64.tar.gz` or `no-mistakes-v1.100.2-linux-amd64.tar.gz`.
+1. Run `mkdir -p ~/.local/bin` to make the folder it goes in.
+1. Run `curl -fsSL https://github.com/kunchenguid/no-mistakes/releases/download/v1.100.2/ARCHIVE | tar xz -C ~/.local/bin no-mistakes`, with the archive in place of `ARCHIVE`.
+1. Put `~/.local/bin` on your PATH.
+1. Run `no-mistakes --version` to check it.
+
+no-mistakes prints `no-mistakes version v1.100.2`.
+
+no-mistakes reviews with its own agent, which `agent` in `~/.no-mistakes/config.yaml` names.
+Its daemon finds that agent on the PATH your login shell sets, not the PATH of the shell that runs orc.
+With `agent: auto` it takes the first agent it finds, so to review with Pi:
+
+1. Set `agent: pi` in `~/.no-mistakes/config.yaml`.
+1. Put the folder holding `pi` on the PATH in your login shell profile, such as `~/.zprofile`.
+1. Run `no-mistakes daemon restart`.
+
+no-mistakes opens the PR only for an origin on a provider it supports, such as GitHub.
+For another origin it pushes the branch and skips the `pr` and `ci` steps, and orc's result names that skip and its reason.
 
 ## Print the version
 
-To print the orc version, run `bun run src/bin.ts --version`.
+To print the orc version, run `bun run /path/to/orc/src/bin.ts --version` from any folder.
 
-Orc prints `orc 0.1.0` and exits 0.
+Orc prints `orc` and the version `package.json` names, and exits 0.
 `--help` or `-h` prints the usage text and exits 0.
 An unknown flag prints the usage text and exits 1.
 
 ## Running a task
 
-To run a task, run `bun run src/bin.ts run <task-file>` inside a clean git checkout of the project.
+To run a task, enter a clean git checkout of the target project and run `bun run /path/to/orc/src/bin.ts run <task-file>`.
+Before the first task, add a `.no-mistakes.yaml` file to the target project root with at least one named check under `commands`.
+Commit that file before running orc.
+For example, a project checked by `bun run test` keeps this `.no-mistakes.yaml` file.
+```yaml
+commands:
+  test: bun run test
+```
+Replace the command with the project's real check command.
 Orc refuses a checkout with uncommitted changes.
 Orc commits to a new branch named `orc/<run-id>`, or to the name you pass with `--branch <name>`.
 A branch name may hold only letters, digits, `.`, `_`, `-` and `/`.
-To resume the branch after a stop, run `bun run src/bin.ts run --branch <name>` and orc skips the steps the run history marks passed.
+To resume the branch after a stop, enter the same target checkout and run `bun run /path/to/orc/src/bin.ts run --branch <name>` and orc skips the steps the run history marks passed.
 On resume Sandcastle reuses the branch worktree, Pi resumes its prior session, and orc reattaches to no-mistakes with the same intent.
 After a refusal, run the same resume command with `--allow` and the name from the report, or with `--answer` and the captain's answer for a question.
 No-mistakes takes the word for that `--allow` kind, and the answer for that question.
@@ -43,8 +87,12 @@ Orc checks each marker in the project directory and its parent and refuses a che
 An unset `ORC_REFUSE_MARKERS` names no marker and refuses no checkout for a marker.
 
 The run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
+Orc runs `no-mistakes --version` before the sandbox starts and refuses a release older than v1.90.0.
 It also needs an opencode-go login in Pi, which `pi auth check --provider opencode-go` confirms.
-Orc reads that login through Pi on the host and hands it to the sandbox, so a keychain-only setup is refused.
+Orc reads that login through Pi on the host and hands it to the sandbox.
+nono reads it with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE` and `TERM` set, and orc's check runs the same way.
+So a key held only in the keychain or in an environment variable such as `OPENCODE_API_KEY` is refused, and a login Pi's `/login` stores in `~/.pi/agent/auth.json` works.
+If nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc's result names that error.
 
 Orc takes the implementer agent file from the first of these that exists:
 
@@ -73,18 +121,76 @@ Its `no-mistakes.txt` and the run history hold the no-mistakes findings, their c
 Its `report.md` carries the task, the branch, the status, the PR, the steps, the evidence, the signals, the findings and the result.
 The terminal report names the run folder, the agent file, the session file and the report as full links, beside the PR link.
 
+## Choosing the no-mistakes binary
+
+To drive a no-mistakes binary the PATH does not find first:
+
+1. Set `ORC_NO_MISTAKES_BIN` to the path of that binary.
+1. Run the task as usual.
+
+An unset or blank `ORC_NO_MISTAKES_BIN` runs the `no-mistakes` the PATH finds.
+Orc refuses a binary whose `--version` fails, naming the binary and where to install no-mistakes.
+Orc refuses a release older than v1.90.0, naming its version and the minimum.
+Orc refuses a binary that prints no version.
+A no-mistakes call that fails on an unknown flag or command names v1.90.0 in the run's result.
+`src/no-mistakes.ts` drives no-mistakes through the `NoMistakesRunner` interface, and `subprocessNoMistakesRunner` is the runner `src/run.ts` builds.
+
+## What the no-mistakes fork adds
+
+Orc is developed against the avi2d/no-mistakes fork, and runs on upstream no-mistakes too.
+The fork sends and prints the same axi commands, flags and fields as upstream v1.100.2.
+These fork changes alter what a run meets, and the table names what happens on upstream without each.
+
+| Fork change | What happens on upstream |
+| --- | --- |
+| A fresh run may replace an aborted run's unpublished mirror head | After a run aborts before its push and a commit leaves the branch, orc reports `no-mistakes refused to start` with `refusing to reconcile private mirror ref`, and the task needs a new branch |
+| A fix round may only add commits | A fix agent that rebases or amends leaves the run failed and its branch off the recorded head, and orc reports the run failed with no-mistakes' error |
+| Commits a fix agent makes take the worktree identity | A fix commit can carry the `no-mistakes <no-mistakes@local>` identity, so a project whose checks hold commit identity fails CI, and orc reports the run failed |
+| A `reviewer_chain` setting falls through to the next reviewer when one is out of quota | Upstream has no `reviewer_chain`, so a reviewer out of quota fails the review step, and orc reports the run failed with no-mistakes' error |
+| `pr.title_max_length` shortens a drafted PR title over the limit | Upstream has no `pr.title_max_length` and keeps the drafted title whole, so a project whose checks limit title length fails CI, and orc reports the run failed |
+| The review step runs no agent when a branch changes only doc files or only workflow `cron:` values | Upstream reviews those branches with its agent, so the run spends a review and can stop at a review gate orc answers |
+| Under `rebase.strategy: merge`, a CI conflict repair merges the base into the published branch | Upstream's repair rebases the published branch, so the next push can be refused, and orc reports the run failed with no-mistakes' error |
+
+When a no-mistakes run ends failed, orc's result carries the error no-mistakes printed for it.
+
+## Granting toolchain folders to the sandbox
+
+The sandbox reads the system folders, the Homebrew and `/usr/local` program folders, `/nix` and the one mise install folder each of `bun`, `node` and `pi` resolves to.
+Orc refuses a runtime the PATH finds anywhere else, naming the runtime and its path.
+To run a runtime from another install folder, such as the one Bun's own installer makes in your home:
+
+1. Set `ORC_TOOLCHAIN_DIRS` to the install folders, separated by colons.
+1. Run the task as usual.
+
+Orc grants a named folder only when a runtime and the file its link points to both sit inside it.
+Orc refuses a relative entry and a folder that holds HOME, because the sandbox reads each granted folder whole.
+`src/nono-profile.ts` holds the `ToolchainResolver` interface and the default layout, and `src/nono.ts` takes another resolver through its `toolchain` option.
+
+## The agent provider contract
+
+Orc runs Pi through Sandcastle's `pi` agent provider, and another Sandcastle provider takes its place on these terms.
+
+- Orc passes `ORC_COMPLETE` as the completion signal, and its prompt asks the agent to print it on its own line once the work is committed.
+- The provider reports the session id of each iteration, and its session storage reads that session's JSONL back from the host sessions folder.
+- The host session file name ends in the session id and `.jsonl`, which is how orc finds the file and records the id for a resume.
+- Orc counts the step complete only when the session's final assistant message stopped with `stop` and holds `ORC_COMPLETE` on its own line.
+- On resume orc passes the recorded id as `resumeSession`, and the provider continues that session instead of starting a new one.
+- Orc sums the `usage` input and output counts each session message carries into the run's token totals.
+
+`src/pi.ts` builds the provider and checks the final reply, and `src/run-loop.ts` reads the session after each run.
+
 ## Seeing runs
 
-To list recent runs, run `bun run src/bin.ts runs`.
+To list recent runs, run `bun run /path/to/orc/src/bin.ts runs`.
 Orc keeps its records in `~/.orc`, outside every project repo.
 Set `ORC_HOME` to keep them somewhere else.
-To print the same facts as JSON, run `bun run src/bin.ts runs --json`.
+To print the same facts as JSON, run `bun run /path/to/orc/src/bin.ts runs --json`.
 Every JSON document names its version first as `schema`, starting at `orc.runs.v1`.
-To see one run step by step, run `bun run src/bin.ts show <run-id>`.
+To see one run step by step, run `bun run /path/to/orc/src/bin.ts show <run-id>`.
 It lists each step with its agent, session, signals, latest score and evidence, every file as a full link.
-To print the same facts as JSON, run `bun run src/bin.ts show <run-id> --json`.
+To print the same facts as JSON, run `bun run /path/to/orc/src/bin.ts show <run-id> --json`.
 Its JSON document names its version first as `schema`, starting at `orc.show.v1`.
-To score a step, run `bun run src/bin.ts score <run-id> <step> <1 to 5> [note]`.
+To score a step, run `bun run /path/to/orc/src/bin.ts score <run-id> <step> <1 to 5> [note]`.
 Use fix#1 to score the first fix attempt and plain fix scores the latest attempt in execution order.
 Use the step id from orc show JSON to score one resumed checks row when an attempt ran twice.
 Orc score refuses a score outside 1 to 5 with no write.

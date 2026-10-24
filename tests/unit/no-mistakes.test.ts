@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { answerArgsFor, answerForGate, omittedQuestionIds, parseRun, type NoMistakesFinding } from "../../src/no-mistakes"
+import { Effect } from "effect"
+import { answerArgsFor, answerForGate, driveNoMistakes, noMistakesBinary, omittedQuestionIds, parseRun, type NoMistakesFinding, type NoMistakesRunner } from "../../src/no-mistakes"
 import { formatReport, type OrcRunReport } from "../../src/run-record"
 
 const approvalGate = { step: "review", stage: "approval" } as const
@@ -335,5 +336,90 @@ describe("formatReport names the phase the run stopped in", () => {
 
   test("a final failing checks round reads as checks failed", () => {
     expect(statusLine(formatReport(report({ checksRounds: [round(1, true), round(2, false)] })))).toBe("status: checks failed")
+  })
+})
+
+describe("noMistakesBinary", () => {
+  test("ORC_NO_MISTAKES_BIN names the binary, and unset or blank leaves no-mistakes on the PATH", () => {
+    expect(noMistakesBinary("/opt/nm/bin/no-mistakes")).toBe("/opt/nm/bin/no-mistakes")
+    expect(noMistakesBinary(undefined)).toBe("no-mistakes")
+    expect(noMistakesBinary("  ")).toBe("no-mistakes")
+  })
+})
+
+// The failed run no-mistakes printed for run 01M5EH9DXNBCAYWRHSF7VM1480, with the step table cut to the step that failed.
+const failedRun = [
+  "run:",
+  "  id: \"01M5EH9DXNBCAYWRHSF7VM1480\"",
+  "  branch: fm/tui-dash-captain-log",
+  "  status: failed",
+  "  steps[2]{step,status,findings,duration_ms}:",
+  "    test,completed,0,582251",
+  "    lint,failed,12,963128",
+  "outcome: failed",
+  "error: \"step lint failed: agent lint: pi output parse: invalid character '.' looking for beginning of object key string\""
+].join("\n")
+
+// The lint findings no-mistakes printed for that run, cut to the first.
+const failedRunLogs = [
+  "step: lint",
+  "run: \"01M5EH9DXNBCAYWRHSF7VM1480\"",
+  "findings[1]{id,severity,file,action,description}:",
+  "  lint-1,warning,packages/dashboard/src/ledger.ts,ask-user,ledgerGroups exceeds cognitive complexity 15 with 18"
+].join("\n")
+
+const endedFailed: NoMistakesRunner = {
+  start: () => Effect.succeed({ stdout: failedRun, stderr: "", exitCode: 0 }),
+  reattach: Effect.succeed({ stdout: failedRun, stderr: "", exitCode: 0 }),
+  respond: () => Effect.die("no gate is parked"),
+  answer: () => Effect.die("no question is open"),
+  status: () => Effect.succeed({ stdout: failedRun, stderr: "", exitCode: 0 }),
+  logs: () => Effect.succeed({ stdout: failedRunLogs, stderr: "", exitCode: 0 })
+}
+
+// What no-mistakes v1.100.2 printed for a run pushed to an origin with no PR provider.
+const skippedPr = [
+  "id: \"01M5QDS73AKNTMFA0F0V3BCX24\"",
+  "branch: orc/greet-world",
+  "status: completed",
+  "findings: none",
+  "steps[9]{step,status,findings,duration_ms}:",
+  "  intent,completed,0,0",
+  "  rebase,completed,0,320",
+  "  review,completed,0,19171",
+  "  test,completed,0,27824",
+  "  document,completed,0,17349",
+  "  lint,completed,0,102",
+  "  push,completed,0,436",
+  "  pr,skipped,0,13",
+  "  ci,skipped,0,12",
+  "automatic_skips[2]{step,reason}:",
+  "  pr,provider unknown is not supported yet",
+  "  ci,provider unknown is not supported yet",
+  "outcome: passed-with-skips"
+].join("\n")
+
+const endedSkippingPr: NoMistakesRunner = {
+  ...endedFailed,
+  start: () => Effect.succeed({ stdout: skippedPr, stderr: "", exitCode: 0 }),
+  status: () => Effect.succeed({ stdout: skippedPr, stderr: "", exitCode: 0 }),
+  logs: () => Effect.succeed({ stdout: "findings: none", stderr: "", exitCode: 0 })
+}
+
+describe("driveNoMistakes", () => {
+  test("a run that skips the pr step carries the reason no-mistakes gave", async () => {
+    const record = await Effect.runPromise(driveNoMistakes({ runner: endedSkippingPr, taskFile: "/task.md" }))
+    expect(record.result).toBe("no-mistakes ended with outcome passed-with-skips, and it skipped the pr step: provider unknown is not supported yet. No PR opens.")
+  })
+
+  test("a run that ends failed carries the error no-mistakes gave for it", async () => {
+    const record = await Effect.runPromise(driveNoMistakes({ runner: endedFailed, taskFile: "/task.md" }))
+    expect(record.status).toBe("failed")
+    expect(record.result).toBe("no-mistakes ended with outcome failed: step lint failed: agent lint: pi output parse: invalid character '.' looking for beginning of object key string. No PR opens.")
+  })
+
+  test("the error of a failed run beside its steps table still lets orc read the recorded findings", async () => {
+    const record = await Effect.runPromise(driveNoMistakes({ runner: endedFailed, taskFile: "/task.md" }))
+    expect(record.findings.map((finding) => finding.id)).toEqual(["lint-1"])
   })
 })

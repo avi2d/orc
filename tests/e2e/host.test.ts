@@ -5,11 +5,12 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path, Result } from "effect"
 import { hostGitShimScript, NonoProviderError, resolveRuntime } from "../../src/host"
+import { defaultToolchainResolver } from "../../src/nono-profile"
 
 const runtimeAt = (name: string, searchPath: string, home: string) =>
   Effect.runPromise(
     Effect.gen(function*() {
-      return yield* resolveRuntime(yield* FileSystem.FileSystem, yield* Path.Path, name, searchPath, home)
+      return yield* resolveRuntime(yield* FileSystem.FileSystem, yield* Path.Path, name, searchPath, defaultToolchainResolver(home))
     }).pipe(Effect.provide(BunServices.layer), Effect.result)
   )
 

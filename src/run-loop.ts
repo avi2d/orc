@@ -3,7 +3,7 @@ import { Effect } from "effect"
 import { withHostGitSafety } from "./host"
 import { buildFixPrompt, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
 import { runGit } from "./git-run"
-import { buildImplementPrompt, orcCompletionLine, piWithTools, sessionPrintedSignal, type PiTokenUse } from "./pi"
+import { buildImplementPrompt, finalReplyError, orcCompletionLine, piWithTools, sessionPrintedSignal, type PiTokenUse } from "./pi"
 import { OrcRunError, describeCause, noSession, readSession } from "./run-session"
 import { driveNoMistakes, type AllowWord, type QuestionAnswer } from "./no-mistakes"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
@@ -120,6 +120,11 @@ const resumedOutcome = (run: HistoryRun, sessionId: string | null, sessionFile: 
     }
   })
 
+const replyErrorNote = (jsonl: string | null): string => {
+  const error = jsonl === null ? null : finalReplyError(jsonl)
+  return error === null ? "" : " It ended in an error: " + error
+}
+
 const implement = (run: HistoryRun, runAgent: SandboxOps["runAgent"], resumeSession: string | null): Effect.Effect<AgentOutcome, OrcRunError> =>
   Effect.gen(function*() {
     const agentProvider = piWithTools(run.agent, {
@@ -137,7 +142,7 @@ const implement = (run: HistoryRun, runAgent: SandboxOps["runAgent"], resumeSess
     const commits = [...session.commits, ...prior.filter((commit) => !seen.has(commit.sha))]
     const completed = verified && commits.length > 0
     const endReason = session.failure ?? (!verified
-      ? "Pi's final reply did not stop cleanly with " + orcCompletionLine + " on its own line."
+      ? "Pi's final reply did not stop cleanly with " + orcCompletionLine + " on its own line." + replyErrorNote(session.jsonl)
       : (commits.length > 0
         ? "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + "."
         : "Pi printed ORC_COMPLETE but made no commit on " + run.branch + "."))
@@ -201,7 +206,7 @@ const readProjectChecks = (run: HistoryRun): Effect.Effect<ReadonlyArray<ChecksC
 const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
     yield* checkpoints.noMistakesStart(new Date().toISOString())
-    const noMistakes = yield* driveNoMistakes({ spawner: run.spawner, pathEnv: run.noMistakesPath, git: run.git, taskFile: run.taskPath, worktreeDir: run.worktreeDir, allow, answers })
+    const noMistakes = yield* driveNoMistakes({ runner: run.noMistakes, taskFile: run.taskPath, allow, answers })
     yield* checkpoints.noMistakesDone(noMistakes)
     return {
       ...base,

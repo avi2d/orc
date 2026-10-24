@@ -7,7 +7,7 @@ import { createSandbox } from "@ai-hero/sandcastle"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
 import { buildNonoRunArgs, buildSandboxEnv, NonoProviderError, nonoSandboxProvider } from "../../src/nono"
-import { buildNonoProfile, runtimeReadFiles, toolchainReadPaths } from "../../src/nono-profile"
+import { buildNonoProfile, defaultToolchainFolders, runtimeReadFiles, systemReadPaths } from "../../src/nono-profile"
 
 const roots = {
   worktree: "/tmp/orc-test/worktree",
@@ -15,7 +15,7 @@ const roots = {
   piSessionDir: "/tmp/orc-test/session"
 }
 
-const noHost = { developerDir: null, runtimeDirs: [] }
+const noHost = { developerDir: null, toolchainFolders: defaultToolchainFolders, runtimeDirs: [] }
 
 // nono refuses a HOME whose state root falls under the /var or /tmp it grants, so the fixture home is not under the system temp dir.
 const systemTempRoots = ["/tmp", "/private/tmp", "/var", "/private/var"]
@@ -225,7 +225,7 @@ describe("the policy nono resolves from the profile", () => {
       const platform = await Effect.runPromise(buildNonoProfile(resolvedRoots, noHost).pipe(Effect.provide(BunServices.layer)))
       const platformReadFiles = process.platform === "darwin" ? platform.platform_overrides.macos.filesystem.read_file : []
       const expected = new Set([
-        ...toolchainReadPaths.map((path) => `read directory ${path}`),
+        ...[...systemReadPaths, ...defaultToolchainFolders].map((path) => `read directory ${path}`),
         ...[...readFiles, ...platformReadFiles].map((path) => `read file ${path}`),
         ...Object.values(resolvedRoots).map((root) => `readwrite directory ${root}`),
         "write file /dev/null"

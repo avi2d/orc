@@ -24,7 +24,7 @@ const packagePrefixReads = (prefix: string): ReadonlyArray<string> =>
   ["bin", "lib", "libexec", "Cellar", "opt", "share"].map((dir) => `${prefix}/${dir}`)
 
 // Folders of programs, libraries and certificates are read whole; no folder git or its includes read configuration from is.
-export const toolchainReadPaths: ReadonlyArray<string> = [
+export const systemReadPaths: ReadonlyArray<string> = [
   "/bin",
   "/sbin",
   "/usr/bin",
@@ -32,12 +32,9 @@ export const toolchainReadPaths: ReadonlyArray<string> = [
   "/usr/lib",
   "/usr/libexec",
   "/usr/share",
-  ...packagePrefixReads("/usr/local"),
-  ...packagePrefixReads("/opt/homebrew"),
   "/lib",
   "/lib64",
   "/dev",
-  "/nix",
   "/System/Library",
   "/System/Volumes/Preboot/Cryptexes/OS",
   "/private/var/db/dyld",
@@ -87,12 +84,25 @@ export interface Runtime {
   readonly installDir: string | null
 }
 
+// The sandbox reads every folder whole, so none may hold configuration git or its includes read.
+export interface ToolchainResolver {
+  readonly folders: ReadonlyArray<string>
+  readonly runtimeOf: (candidate: string, real: string) => Runtime | null
+}
+
 const parentOf = (file: string): string => file.slice(0, file.lastIndexOf("/"))
 
-const inToolchain = (file: string): boolean => toolchainReadPaths.some((granted) => within(granted, file))
+export const defaultToolchainFolders: ReadonlyArray<string> = [
+  ...packagePrefixReads("/usr/local"),
+  ...packagePrefixReads("/opt/homebrew"),
+  "/nix"
+]
+
+const inToolchain = (file: string): boolean =>
+  [...systemReadPaths, ...defaultToolchainFolders].some((granted) => within(granted, file))
 
 // A folder found by walking up from a program may hold configuration, so only a toolchain folder or one mise version's own folder is read.
-export const runtimeOf = (candidate: string, real: string, home: string): Runtime | null => {
+const defaultRuntimeOf = (candidate: string, real: string, home: string): Runtime | null => {
   const binDir = parentOf(candidate)
   if (inToolchain(candidate) && inToolchain(real)) {
     return { binDir, installDir: null }
@@ -106,8 +116,24 @@ export const runtimeOf = (candidate: string, real: string, home: string): Runtim
   return within(installDir, candidate) ? { binDir, installDir } : null
 }
 
+export const defaultToolchainResolver = (home: string): ToolchainResolver => ({
+  folders: defaultToolchainFolders,
+  runtimeOf: (candidate, real) => defaultRuntimeOf(candidate, real, home)
+})
+
+// Each install folder is read only once a runtime the sandbox runs resolves inside it.
+export const withInstallFolders = (base: ToolchainResolver, installFolders: ReadonlyArray<string>): ToolchainResolver => ({
+  folders: base.folders,
+  runtimeOf: (candidate, real) => {
+    const found = base.runtimeOf(candidate, real)
+    const installDir = installFolders.find((folder) => within(folder, candidate) && within(folder, real))
+    return found ?? (installDir === undefined ? null : { binDir: parentOf(candidate), installDir })
+  }
+})
+
 export interface HostRuntime {
   readonly developerDir: string | null
+  readonly toolchainFolders: ReadonlyArray<string>
   readonly runtimeDirs: ReadonlyArray<string>
 }
 
@@ -245,7 +271,7 @@ const profileWithFiles = (
   },
   filesystem: {
     allow: outermost([roots.worktree, roots.gitData, roots.piSessionDir]),
-    read: [...toolchainReadPaths, ...host.runtimeDirs],
+    read: [...systemReadPaths, ...host.toolchainFolders, ...host.runtimeDirs],
     write: [],
     allow_file: [],
     read_file: [...readFile],

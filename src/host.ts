@@ -1,7 +1,7 @@
 import { BunServices } from "@effect/platform-bun"
 import { Data, Effect, Exit, FileSystem, type Path, type PlatformError, Scope, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { type Runtime, runtimeOf, within } from "./nono-profile"
+import { type Runtime, type ToolchainResolver, within } from "./nono-profile"
 
 export class NonoProviderError extends Data.TaggedError("NonoProviderError")<{
   readonly message: string
@@ -229,7 +229,7 @@ export const resolveRuntime = (
   path: Path.Path,
   name: string,
   searchPath: string,
-  home: string
+  toolchain: ToolchainResolver
 ): Effect.Effect<Runtime | null, NonoProviderError> =>
   Effect.gen(function*() {
     let shimmed = false
@@ -245,10 +245,10 @@ export const resolveRuntime = (
         shimmed = true
         continue
       }
-      const runtime = runtimeOf(candidate, real, home)
+      const runtime = toolchain.runtimeOf(candidate, real)
       if (runtime === null) {
         return yield* new NonoProviderError({
-          message: `orc nono provider: ${name} at ${real} is in neither a toolchain folder nor one mise install folder, so the sandbox is granted no folder for it`
+          message: `orc nono provider: ${name} at ${real} is in neither a toolchain folder nor one mise install folder, so the sandbox is granted no folder for it; name its install folder in ORC_TOOLCHAIN_DIRS`
         })
       }
       return runtime
