@@ -36,6 +36,17 @@ To install v1.100.2 instead:
 
 no-mistakes prints `no-mistakes version v1.100.2`.
 
+no-mistakes reviews with its own agent, which `agent` in `~/.no-mistakes/config.yaml` names.
+Its daemon finds that agent on the PATH your login shell sets, not the PATH of the shell that runs orc.
+With `agent: auto` it takes the first agent it finds, so to review with Pi:
+
+1. Set `agent: pi` in `~/.no-mistakes/config.yaml`.
+1. Put the folder holding `pi` on the PATH in your login shell profile, such as `~/.zprofile`.
+1. Run `no-mistakes daemon restart`.
+
+no-mistakes opens the PR only for an origin on a provider it supports, such as GitHub.
+For another origin it pushes the branch and skips the `pr` and `ci` steps, and orc's result names that skip and its reason.
+
 ## Print the version
 
 To print the orc version, run `bun run src/bin.ts --version`.
@@ -63,7 +74,9 @@ An unset `ORC_REFUSE_MARKERS` names no marker and refuses no checkout for a mark
 The run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
 Orc runs `no-mistakes --version` before the sandbox starts and refuses a release older than v1.90.0.
 It also needs an opencode-go login in Pi, which `pi auth check --provider opencode-go` confirms.
-Orc reads that login through Pi on the host and hands it to the sandbox, so a keychain-only setup is refused.
+Orc reads that login through Pi on the host and hands it to the sandbox.
+nono reads it with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE` and `TERM` set, and orc's check runs the same way.
+So a key held only in the keychain or in an environment variable such as `OPENCODE_API_KEY` is refused, and a login Pi's `/login` stores in `~/.pi/agent/auth.json` works.
 
 Orc takes the implementer agent file from the first of these that exists:
 
