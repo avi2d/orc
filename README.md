@@ -22,6 +22,10 @@ To install orc:
 1. Run `git clone https://github.com/avi2d/orc.git` to clone the repository.
 1. Run `cd orc` to enter it.
 1. Run `bun install --frozen-lockfile` to install the pinned dependencies.
+1. Run `pwd` to print the orc checkout path.
+
+The commands below write that path as `/path/to/orc`.
+Replace it with the path the previous step printed.
 
 ## Installing no-mistakes
 
@@ -49,7 +53,7 @@ For another origin it pushes the branch and skips the `pr` and `ci` steps, and o
 
 ## Print the version
 
-To print the orc version, run `bun run src/bin.ts --version`.
+To print the orc version, run `bun run /path/to/orc/src/bin.ts --version` from any folder.
 
 Orc prints `orc` and the version `package.json` names, and exits 0.
 `--help` or `-h` prints the usage text and exits 0.
@@ -57,11 +61,19 @@ An unknown flag prints the usage text and exits 1.
 
 ## Running a task
 
-To run a task, run `bun run src/bin.ts run <task-file>` inside a clean git checkout of the project.
+To run a task, enter a clean git checkout of the target project and run `bun run /path/to/orc/src/bin.ts run <task-file>`.
+Before the first task, add a `.no-mistakes.yaml` file to the target project root with at least one named check under `commands`.
+Commit that file before running orc.
+For example, a project checked by `bun run test` keeps this `.no-mistakes.yaml` file.
+```yaml
+commands:
+  test: bun run test
+```
+Replace the command with the project's real check command.
 Orc refuses a checkout with uncommitted changes.
 Orc commits to a new branch named `orc/<run-id>`, or to the name you pass with `--branch <name>`.
 A branch name may hold only letters, digits, `.`, `_`, `-` and `/`.
-To resume the branch after a stop, run `bun run src/bin.ts run --branch <name>` and orc skips the steps the run history marks passed.
+To resume the branch after a stop, enter the same target checkout and run `bun run /path/to/orc/src/bin.ts run --branch <name>` and orc skips the steps the run history marks passed.
 On resume Sandcastle reuses the branch worktree, Pi resumes its prior session, and orc reattaches to no-mistakes with the same intent.
 After a refusal, run the same resume command with `--allow` and the name from the report, or with `--answer` and the captain's answer for a question.
 No-mistakes takes the word for that `--allow` kind, and the answer for that question.
@@ -116,7 +128,7 @@ To drive a no-mistakes binary the PATH does not find first:
 An unset or blank `ORC_NO_MISTAKES_BIN` runs the `no-mistakes` the PATH finds.
 Orc refuses a binary whose `--version` fails, naming the binary and where to install no-mistakes.
 Orc refuses a release older than v1.90.0, naming its version and the minimum.
-Orc accepts a binary that prints no version, so a wrapper script works.
+Orc refuses a binary that prints no version.
 A no-mistakes call that fails on an unknown flag or command names v1.90.0 in the run's result.
 `src/no-mistakes.ts` drives no-mistakes through the `NoMistakesRunner` interface, and `subprocessNoMistakesRunner` is the runner `src/run.ts` builds.
 
@@ -166,16 +178,16 @@ Orc runs Pi through Sandcastle's `pi` agent provider, and another Sandcastle pro
 
 ## Seeing runs
 
-To list recent runs, run `bun run src/bin.ts runs`.
+To list recent runs, run `bun run /path/to/orc/src/bin.ts runs`.
 Orc keeps its records in `~/.orc`, outside every project repo.
 Set `ORC_HOME` to keep them somewhere else.
-To print the same facts as JSON, run `bun run src/bin.ts runs --json`.
+To print the same facts as JSON, run `bun run /path/to/orc/src/bin.ts runs --json`.
 Every JSON document names its version first as `schema`, starting at `orc.runs.v1`.
-To see one run step by step, run `bun run src/bin.ts show <run-id>`.
+To see one run step by step, run `bun run /path/to/orc/src/bin.ts show <run-id>`.
 It lists each step with its agent, session, signals, latest score and evidence, every file as a full link.
-To print the same facts as JSON, run `bun run src/bin.ts show <run-id> --json`.
+To print the same facts as JSON, run `bun run /path/to/orc/src/bin.ts show <run-id> --json`.
 Its JSON document names its version first as `schema`, starting at `orc.show.v1`.
-To score a step, run `bun run src/bin.ts score <run-id> <step> <1 to 5> [note]`.
+To score a step, run `bun run /path/to/orc/src/bin.ts score <run-id> <step> <1 to 5> [note]`.
 Use fix#1 to score the first fix attempt and plain fix scores the latest attempt in execution order.
 Use the step id from orc show JSON to score one resumed checks row when an attempt ran twice.
 Orc score refuses a score outside 1 to 5 with no write.

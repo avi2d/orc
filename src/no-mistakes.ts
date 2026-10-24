@@ -149,7 +149,6 @@ const olderThanMinimum = (version: ReadonlyArray<number>): boolean => {
   return differs !== -1 && (version[differs] ?? 0) < (minimumNoMistakes[differs] ?? 0)
 }
 
-// A wrapper set through ORC_NO_MISTAKES_BIN may print no version, so only a version older than the minimum is refused.
 export const noMistakesVersionProblem = (options: NoMistakesHost, cwd: string): Effect.Effect<string | null> =>
   spawnBinary(options, cwd, ["--version"]).pipe(Effect.map((reply) => {
     if (reply.exitCode !== 0) {
@@ -157,7 +156,11 @@ export const noMistakesVersionProblem = (options: NoMistakesHost, cwd: string): 
         "; install no-mistakes " + minimumName + " or later from https://github.com/kunchenguid/no-mistakes or point ORC_NO_MISTAKES_BIN at it"
     }
     const version = versionIn(reply.stdout)
-    return version !== null && olderThanMinimum(version)
+    if (version === null) {
+      return "orc: " + options.binary + " printed no no-mistakes version, and orc sends the axi commands of " + minimumName + " or later" +
+        "; download a newer release from https://github.com/kunchenguid/no-mistakes/releases, where it may be marked prerelease and the install script skips it, or point ORC_NO_MISTAKES_BIN at a newer one"
+    }
+    return olderThanMinimum(version)
       ? "orc: " + options.binary + " is no-mistakes " + version.join(".") + ", and orc sends the axi commands of " + minimumName + " or later" +
         "; download a newer release from https://github.com/kunchenguid/no-mistakes/releases, where it may be marked prerelease and the install script skips it, or point ORC_NO_MISTAKES_BIN at a newer one"
       : null

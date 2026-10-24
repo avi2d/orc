@@ -40,8 +40,10 @@ describe("the no-mistakes version orc drives", () => {
     }
   })
 
-  test("a binary that prints no version is accepted", async () => {
-    expect(await versionProblem("echo 'a wrapper'")).toBeNull()
+  test("a binary that prints no version is refused naming the binary and the minimum", async () => {
+    const problem = await versionProblem("echo 'a wrapper'")
+    expect(problem).toContain("printed no no-mistakes version")
+    expect(problem).toContain("v1.90.0 or later")
   })
 
   test("a binary whose --version fails is refused naming the binary and the install", async () => {
