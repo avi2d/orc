@@ -212,7 +212,7 @@ const openDriveLog = (started: string): DriveLog => {
     finish: (parsed) =>
       greenOutcomes.has(parsed.outcome) && prLink !== null
         ? { status: "passed", gate: null, result: "no-mistakes opened " + prLink + " and CI is green." }
-        : fail("no-mistakes ended " + (parsed.outcome === "" ? parsed.status : "with outcome " + parsed.outcome)),
+        : fail("no-mistakes ended " + (parsed.outcome === "" ? parsed.status : "with outcome " + parsed.outcome) + (parsed.error === "" ? "" : ": " + parsed.error)),
     close: (ending) => ({
       status: ending.status,
       gate: ending.gate === null ? null : ending.gate.step,
@@ -327,11 +327,14 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending> =>
     }
   })
 
+// A failed run's status exits 0 with the run's own error beside its table, so the error alone does not mean the command failed.
 const unreadable = (command: NoMistakesReply, name: string, asked: string): string | null => {
-  if (command.exitCode !== 0 || scalar(command.stdout, "error") !== "") {
-    return "no-mistakes " + asked + " failed: " + errorDetail(command)
+  if (command.exitCode === 0 && hasTable(command.stdout, name)) {
+    return null
   }
-  return hasTable(command.stdout, name) ? null : "no-mistakes " + asked + " printed no " + name + " table"
+  return command.exitCode !== 0 || scalar(command.stdout, "error") !== ""
+    ? "no-mistakes " + asked + " failed: " + errorDetail(command)
+    : "no-mistakes " + asked + " printed no " + name + " table"
 }
 
 const collectRecordedFindings = (input: NoMistakesInput, log: DriveLog, runId: string): Effect.Effect<string | null> =>

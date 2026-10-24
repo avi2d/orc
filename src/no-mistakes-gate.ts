@@ -24,6 +24,7 @@ export interface ParkedGate {
 export interface ParsedRun {
   readonly status: string
   readonly outcome: string
+  readonly error: string
   readonly prLink: string
   readonly runId: string
   readonly gate: ParkedGate | null
@@ -95,6 +96,7 @@ export const parseRun = (output: string): ParsedRun => {
   return {
     status,
     outcome,
+    error: scalar(output, "error"),
     prLink: scalar(output, "pr"),
     runId: scalar(output, "id"),
     gate: readGate(output),

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { answerArgsFor, answerForGate, noMistakesBinary, omittedQuestionIds, parseRun, type NoMistakesFinding } from "../../src/no-mistakes"
+import { Effect } from "effect"
+import { answerArgsFor, answerForGate, driveNoMistakes, noMistakesBinary, omittedQuestionIds, parseRun, type NoMistakesFinding, type NoMistakesRunner } from "../../src/no-mistakes"
 import { formatReport, type OrcRunReport } from "../../src/run-record"
 
 const approvalGate = { step: "review", stage: "approval" } as const
@@ -343,5 +344,48 @@ describe("noMistakesBinary", () => {
     expect(noMistakesBinary("/opt/nm/bin/no-mistakes")).toBe("/opt/nm/bin/no-mistakes")
     expect(noMistakesBinary(undefined)).toBe("no-mistakes")
     expect(noMistakesBinary("  ")).toBe("no-mistakes")
+  })
+})
+
+// The failed run no-mistakes printed for run 01M5EH9DXNBCAYWRHSF7VM1480, with the step table cut to the step that failed.
+const failedRun = [
+  "run:",
+  "  id: \"01M5EH9DXNBCAYWRHSF7VM1480\"",
+  "  branch: fm/tui-dash-captain-log",
+  "  status: failed",
+  "  steps[2]{step,status,findings,duration_ms}:",
+  "    test,completed,0,582251",
+  "    lint,failed,12,963128",
+  "outcome: failed",
+  "error: \"step lint failed: agent lint: pi output parse: invalid character '.' looking for beginning of object key string\""
+].join("\n")
+
+// The lint findings no-mistakes printed for that run, cut to the first.
+const failedRunLogs = [
+  "step: lint",
+  "run: \"01M5EH9DXNBCAYWRHSF7VM1480\"",
+  "findings[1]{id,severity,file,action,description}:",
+  "  lint-1,warning,packages/dashboard/src/ledger.ts,ask-user,ledgerGroups exceeds cognitive complexity 15 with 18"
+].join("\n")
+
+const endedFailed: NoMistakesRunner = {
+  start: () => Effect.succeed({ stdout: failedRun, stderr: "", exitCode: 0 }),
+  reattach: Effect.succeed({ stdout: failedRun, stderr: "", exitCode: 0 }),
+  respond: () => Effect.die("no gate is parked"),
+  answer: () => Effect.die("no question is open"),
+  status: () => Effect.succeed({ stdout: failedRun, stderr: "", exitCode: 0 }),
+  logs: () => Effect.succeed({ stdout: failedRunLogs, stderr: "", exitCode: 0 })
+}
+
+describe("driveNoMistakes", () => {
+  test("a run that ends failed carries the error no-mistakes gave for it", async () => {
+    const record = await Effect.runPromise(driveNoMistakes({ runner: endedFailed, taskFile: "/task.md" }))
+    expect(record.status).toBe("failed")
+    expect(record.result).toBe("no-mistakes ended with outcome failed: step lint failed: agent lint: pi output parse: invalid character '.' looking for beginning of object key string. No PR opens.")
+  })
+
+  test("the error of a failed run beside its steps table still lets orc read the recorded findings", async () => {
+    const record = await Effect.runPromise(driveNoMistakes({ runner: endedFailed, taskFile: "/task.md" }))
+    expect(record.findings.map((finding) => finding.id)).toEqual(["lint-1"])
   })
 })
