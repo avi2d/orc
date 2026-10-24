@@ -9,12 +9,17 @@ You read the PR and merge it, since orc never merges.
 ## Before you begin
 
 - Bun 1.4.3, the version `.bun-version` pins.
+- Git, tested on 2.56.0.
+- nono from https://nono.sh, tested on 0.80.0.
+- Node, tested on 24.22.1.
+- Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with an opencode-go login.
+- no-mistakes v1.90.0 or later from https://github.com/kunchenguid/no-mistakes, tested on v1.100.2.
 
 ## Install
 
 To install orc:
 
-1. Run `gh repo clone avi2d/orc` to clone the repository.
+1. Run `git clone https://github.com/avi2d/orc.git` to clone the repository.
 1. Run `cd orc` to enter it.
 1. Run `bun install --frozen-lockfile` to install the pinned dependencies.
 
@@ -22,7 +27,7 @@ To install orc:
 
 To print the orc version, run `bun run src/bin.ts --version`.
 
-Orc prints `orc 0.1.0` and exits 0.
+Orc prints `orc` and the version `package.json` names, and exits 0.
 `--help` or `-h` prints the usage text and exits 0.
 An unknown flag prints the usage text and exits 1.
 
@@ -43,6 +48,7 @@ Orc checks each marker in the project directory and its parent and refuses a che
 An unset `ORC_REFUSE_MARKERS` names no marker and refuses no checkout for a marker.
 
 The run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
+Orc runs `no-mistakes --version` before the sandbox starts and refuses a release older than v1.90.0.
 It also needs an opencode-go login in Pi, which `pi auth check --provider opencode-go` confirms.
 Orc reads that login through Pi on the host and hands it to the sandbox, so a keychain-only setup is refused.
 
@@ -72,6 +78,61 @@ Each run keeps its task, evidence, agent log and Pi session in `$ORC_HOME/runs/<
 Its `no-mistakes.txt` and the run history hold the no-mistakes findings, their count, the gates orc answered, the final result and the PR link.
 Its `report.md` carries the task, the branch, the status, the PR, the steps, the evidence, the signals, the findings and the result.
 The terminal report names the run folder, the agent file, the session file and the report as full links, beside the PR link.
+
+## Choosing the no-mistakes binary
+
+To drive a no-mistakes binary the PATH does not find first:
+
+1. Set `ORC_NO_MISTAKES_BIN` to the path of that binary.
+1. Run the task as usual.
+
+An unset or blank `ORC_NO_MISTAKES_BIN` runs the `no-mistakes` the PATH finds.
+Orc refuses a binary whose `--version` fails, naming the binary and where to install no-mistakes.
+Orc refuses a release older than v1.90.0, naming its version and the minimum.
+Orc accepts a binary that prints no version, so a wrapper script works.
+A no-mistakes call that fails on an unknown flag or command names v1.90.0 in the run's result.
+`src/no-mistakes.ts` drives no-mistakes through the `NoMistakesRunner` interface, and `subprocessNoMistakesRunner` is the runner `src/run.ts` builds.
+
+## What the no-mistakes fork adds
+
+Orc is developed against the avi2d/no-mistakes fork, and runs on upstream no-mistakes too.
+The fork sends and prints the same axi commands, flags and fields as upstream v1.100.2.
+These fork changes alter what a run meets, and the table names what happens on upstream without each.
+
+| Fork change | What happens on upstream |
+| --- | --- |
+| A fresh run may replace an aborted run's unpublished mirror head | After a run aborts before its push and a commit leaves the branch, orc reports `no-mistakes refused to start` with `refusing to reconcile private mirror ref`, and the task needs a new branch |
+| A fix round may only add commits | A fix agent that rebases or amends leaves the run failed and its branch off the recorded head, and orc reports the run failed with no-mistakes' error |
+| Commits a fix agent makes take the worktree identity | A fix commit can carry the `no-mistakes <no-mistakes@local>` identity, so a project whose checks hold commit identity fails CI, and orc reports the run failed |
+| A `reviewer_chain` setting falls through to the next reviewer when one is out of quota | Upstream has no `reviewer_chain`, so a reviewer out of quota fails the review step, and orc reports the run failed with no-mistakes' error |
+
+When a no-mistakes run ends failed, orc's result carries the error no-mistakes printed for it.
+
+## Granting toolchain folders to the sandbox
+
+The sandbox reads the system folders, the Homebrew and `/usr/local` program folders, `/nix` and the one mise install folder each of `bun`, `node` and `pi` resolves to.
+Orc refuses a runtime the PATH finds anywhere else, naming the runtime and its path.
+To run a runtime from another install folder, such as the one Bun's own installer makes in your home:
+
+1. Set `ORC_TOOLCHAIN_DIRS` to the install folders, separated by colons.
+1. Run the task as usual.
+
+Orc grants a named folder only when a runtime and the file its link points to both sit inside it.
+Orc refuses a relative entry and a folder that holds HOME, because the sandbox reads each granted folder whole.
+`src/nono-profile.ts` holds the `ToolchainResolver` interface and the default layout, and `src/nono.ts` takes another resolver through its `toolchain` option.
+
+## The agent provider contract
+
+Orc runs Pi through Sandcastle's `pi` agent provider, and another Sandcastle provider takes its place on these terms.
+
+- Orc passes `ORC_COMPLETE` as the completion signal, and its prompt asks the agent to print it on its own line once the work is committed.
+- The provider reports the session id of each iteration, and its session storage reads that session's JSONL back from the host sessions folder.
+- The host session file name ends in the session id and `.jsonl`, which is how orc finds the file and records the id for a resume.
+- Orc counts the step complete only when the session's final assistant message stopped with `stop` and holds `ORC_COMPLETE` on its own line.
+- On resume orc passes the recorded id as `resumeSession`, and the provider continues that session instead of starting a new one.
+- Orc sums the `usage` input and output counts each session message carries into the run's token totals.
+
+`src/pi.ts` builds the provider and checks the final reply, and `src/run-loop.ts` reads the session after each run.
 
 ## Seeing runs
 
