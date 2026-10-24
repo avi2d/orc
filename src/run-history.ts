@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite"
 import { Data, Effect, FileSystem, Path, Schema } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { homedir } from "node:os"
+import { resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 
 export const RUN_HISTORY_SCHEMA_VERSION = 1
@@ -112,7 +113,7 @@ export const formatHistoryError = (error: unknown): string => {
 }
 
 export const orcHomeDir = (override?: string): string =>
-  override === undefined || override === "" ? `${homedir()}/.orc` : override
+  override === undefined || override === "" ? `${homedir()}/.orc` : resolve(override)
 
 const schemaStatements: ReadonlyArray<string> = [
   "CREATE TABLE IF NOT EXISTS runs (" +
