@@ -77,6 +77,7 @@ It also needs an opencode-go login in Pi, which `pi auth check --provider openco
 Orc reads that login through Pi on the host and hands it to the sandbox.
 nono reads it with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE` and `TERM` set, and orc's check runs the same way.
 So a key held only in the keychain or in an environment variable such as `OPENCODE_API_KEY` is refused, and a login Pi's `/login` stores in `~/.pi/agent/auth.json` works.
+If nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc's result names that error.
 
 Orc takes the implementer agent file from the first of these that exists:
 
