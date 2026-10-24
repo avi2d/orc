@@ -1,3 +1,6 @@
+---
+audience: consumers
+---
 # orc
 Orc takes one task and turns it into one pull request.
 It starts from a command in the terminal that takes the task as text or as a file.
@@ -29,7 +32,7 @@ Replace it with the path the previous step printed.
 
 ## Installing no-mistakes
 
-Upstream's install script fetches the release GitHub marks latest, and upstream marks the releases after v1.84.0 as prereleases, so the script installs a release orc refuses.
+Upstream's install script fetches the release GitHub marks latest, and upstream marks releases after v1.84.0 as prereleases, so the script installs a release orc refuses.
 To install v1.100.2 instead:
 
 1. Pick the archive for your machine: `no-mistakes-v1.100.2-darwin-arm64.tar.gz`, `no-mistakes-v1.100.2-darwin-amd64.tar.gz`, `no-mistakes-v1.100.2-linux-arm64.tar.gz` or `no-mistakes-v1.100.2-linux-amd64.tar.gz`.
