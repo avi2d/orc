@@ -377,7 +377,41 @@ const endedFailed: NoMistakesRunner = {
   logs: () => Effect.succeed({ stdout: failedRunLogs, stderr: "", exitCode: 0 })
 }
 
+// What no-mistakes v1.100.2 printed for a run pushed to an origin with no PR provider.
+const skippedPr = [
+  "id: \"01M5QDS73AKNTMFA0F0V3BCX24\"",
+  "branch: orc/greet-world",
+  "status: completed",
+  "findings: none",
+  "steps[9]{step,status,findings,duration_ms}:",
+  "  intent,completed,0,0",
+  "  rebase,completed,0,320",
+  "  review,completed,0,19171",
+  "  test,completed,0,27824",
+  "  document,completed,0,17349",
+  "  lint,completed,0,102",
+  "  push,completed,0,436",
+  "  pr,skipped,0,13",
+  "  ci,skipped,0,12",
+  "automatic_skips[2]{step,reason}:",
+  "  pr,provider unknown is not supported yet",
+  "  ci,provider unknown is not supported yet",
+  "outcome: passed-with-skips"
+].join("\n")
+
+const endedSkippingPr: NoMistakesRunner = {
+  ...endedFailed,
+  start: () => Effect.succeed({ stdout: skippedPr, stderr: "", exitCode: 0 }),
+  status: () => Effect.succeed({ stdout: skippedPr, stderr: "", exitCode: 0 }),
+  logs: () => Effect.succeed({ stdout: "findings: none", stderr: "", exitCode: 0 })
+}
+
 describe("driveNoMistakes", () => {
+  test("a run that skips the pr step carries the reason no-mistakes gave", async () => {
+    const record = await Effect.runPromise(driveNoMistakes({ runner: endedSkippingPr, taskFile: "/task.md" }))
+    expect(record.result).toBe("no-mistakes ended with outcome passed-with-skips, and it skipped the pr step: provider unknown is not supported yet. No PR opens.")
+  })
+
   test("a run that ends failed carries the error no-mistakes gave for it", async () => {
     const record = await Effect.runPromise(driveNoMistakes({ runner: endedFailed, taskFile: "/task.md" }))
     expect(record.status).toBe("failed")

@@ -163,6 +163,11 @@ export const noMistakesVersionProblem = (options: NoMistakesHost, cwd: string): 
       : null
   }))
 
+const endedReason = (parsed: ParsedRun): string =>
+  "no-mistakes ended " + (parsed.outcome === "" ? parsed.status : "with outcome " + parsed.outcome) +
+  (parsed.error === "" ? "" : ": " + parsed.error) +
+  (parsed.prSkipReason === "" ? "" : ", and it skipped the pr step: " + parsed.prSkipReason)
+
 interface DriveLog {
   readonly read: (output: string) => ParsedRun
   readonly remember: (step: string, findings: ReadonlyArray<NoMistakesFinding>) => void
@@ -213,7 +218,7 @@ const openDriveLog = (started: string): DriveLog => {
     finish: (parsed) =>
       greenOutcomes.has(parsed.outcome) && prLink !== null
         ? { status: "passed", gate: null, result: "no-mistakes opened " + prLink + " and CI is green." }
-        : fail("no-mistakes ended " + (parsed.outcome === "" ? parsed.status : "with outcome " + parsed.outcome) + (parsed.error === "" ? "" : ": " + parsed.error)),
+        : fail(endedReason(parsed)),
     close: (ending) => ({
       status: ending.status,
       gate: ending.gate === null ? null : ending.gate.step,

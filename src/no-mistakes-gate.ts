@@ -25,6 +25,7 @@ export interface ParsedRun {
   readonly status: string
   readonly outcome: string
   readonly error: string
+  readonly prSkipReason: string
   readonly prLink: string
   readonly runId: string
   readonly gate: ParkedGate | null
@@ -97,6 +98,7 @@ export const parseRun = (output: string): ParsedRun => {
     status,
     outcome,
     error: scalar(output, "error"),
+    prSkipReason: table(output, "automatic_skips").find((row) => row.get("step") === "pr")?.get("reason") ?? "",
     prLink: scalar(output, "pr"),
     runId: scalar(output, "id"),
     gate: readGate(output),
