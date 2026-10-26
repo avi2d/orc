@@ -33,7 +33,7 @@
     "effect": "4.0.0"
   },
   "devDependencies": {
-    "@avi2dg/checks": "^0.44.0",
+    "@avi2dg/checks": "^0.52.0",
     "@effect/tsgo": "0.45.0",
     "@hughescr/stryker-bun-runner": "1.4.0",
     "@stryker-mutator/core": "10.0.0",
@@ -44,6 +44,9 @@
     "oxlint": "1.83.0",
     "oxlint-tsgolint": "7.0.2002",
     "typescript": "7.0.2"
+  },
+  "checks": {
+    "mutationRunner": ["self-hosted", "Linux", "X64", "winbox"]
   },
   "overrides": {
     "@effect/platform-node-shared": "4.0.0"
