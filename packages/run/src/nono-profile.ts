@@ -1,5 +1,12 @@
 import { Effect, FileSystem } from "effect"
 
+export interface CheckedModelWindow {
+  readonly ref: string
+  readonly provider: string
+  readonly id: string
+  readonly window: number
+}
+
 export interface NonoSandboxRoots {
   readonly worktree: string
   readonly gitData: string
@@ -188,8 +195,21 @@ export const loginCheckCommand = (host: HostTools): ReadonlyArray<string> => [
   host.homeDir
 ]
 
-export const piAgentModels = (credential: ModelCredential): string =>
-  JSON.stringify({ providers: { [credential.provider]: { apiKey: "$" + credential.envVar } } }, null, 2) + "\n"
+export const piAgentModels = (credential: ModelCredential, checked: ReadonlyArray<CheckedModelWindow>): string => {
+  const overridesByProvider = new Map<string, Record<string, { readonly contextWindow: number }>>()
+  for (const entry of checked) {
+    const overrides = overridesByProvider.get(entry.provider) ?? {}
+    overrides[entry.id] = { contextWindow: entry.window }
+    overridesByProvider.set(entry.provider, overrides)
+  }
+  const providers: Record<string, { readonly apiKey?: string; readonly modelOverrides?: Record<string, { readonly contextWindow: number }> }> = {
+    [credential.provider]: { apiKey: "$" + credential.envVar }
+  }
+  for (const [provider, modelOverrides] of overridesByProvider) {
+    providers[provider] = { ...providers[provider], modelOverrides }
+  }
+  return JSON.stringify({ providers }, null, 2) + "\n"
+}
 
 interface CredentialRoute {
   readonly upstream: string
