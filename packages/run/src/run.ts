@@ -234,7 +234,7 @@ const prepareAgents = (
     }
     const host: HostTools = { piBinary, nodeBinary, homeDir: operatorHome }
     yield* runLoginCheck(spawner, host, checkout.projectDir)
-    const windows = yield* readModelWindows(spawner, host, checkout.projectDir)
+    const windows = yield* readModelWindows(spawner, host, folders.runDir)
     const settings = yield* Effect.fromResult(contextMarkSettings([agent.model, fixer.model], windows)).pipe(
       Effect.mapError((message) => new OrcRunError({ message }))
     )

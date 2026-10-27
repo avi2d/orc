@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import packageJson from "../../package.json" with { type: "json" }
@@ -102,7 +102,7 @@ describe("orc bin", () => {
       await writeFile(join(fakeBin, "pi"), [
         "#!/bin/sh",
         "if [ \"$1\" = auth ]; then exit 0; fi",
-        "if [ \"$1\" = --mode ]; then cat > \"$(dirname \"$0\")/rpc-request\"; echo '" + reply + "'; exit 0; fi",
+        "if [ \"$1\" = --mode ]; then pwd > \"$(dirname \"$0\")/rpc-cwd\"; cat > \"$(dirname \"$0\")/rpc-request\"; echo '" + reply + "'; exit 0; fi",
         "exit 2"
       ].join("\n") + "\n")
       await writeFile(join(fakeBin, "no-mistakes"), "#!/bin/sh\necho 'no-mistakes version v1.101.0'\n")
@@ -120,6 +120,9 @@ describe("orc bin", () => {
       expect(result.stderr).toContain("the sandbox failed to start")
       expect(JSON.parse(await readFile(join(fakeBin, "rpc-request"), "utf8"))).toEqual({ id: "orc-models", type: "get_available_models" })
       const [runId] = await readdir(join(orcHome, "runs"))
+      const probeCwd = (await readFile(join(fakeBin, "rpc-cwd"), "utf8")).trim()
+      expect(await realpath(probeCwd)).not.toBe(await realpath(dir))
+      expect(await realpath(probeCwd)).toBe(await realpath(join(orcHome, "runs", runId)))
       const settings: unknown = JSON.parse(await readFile(join(orcHome, "runs", runId, "session", "agent", "settings.json"), "utf8"))
       expect(settings).toEqual({ compaction: { modelOverrides: { "opencode-go/muse-spark-1.3-contributor": { reserveTokens: 112_144 } } } })
       const models: unknown = JSON.parse(await readFile(join(orcHome, "runs", runId, "session", "agent", "models.json"), "utf8"))
