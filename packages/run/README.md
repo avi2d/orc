@@ -116,6 +116,12 @@ Orc takes the implementer agent file from the first of these that exists:
 An agent file opens with a `---` header naming `model`, `thinking` and `tools`, and its body holds the instructions.
 Orc routes only `opencode-go` models through the sandbox and refuses any other model.
 
+Pi in a run compacts its context once the context passes 150 thousand tokens, whatever the model's window.
+Pi starts compaction at the window minus `compaction.reserveTokens`, so orc asks the host's Pi for each agent model's window through `pi --mode rpc`.
+Orc writes the window minus 150000 as that model's reserve into the run's Pi folder, `session/agent/settings.json`, beside `models.json`.
+Orc pins each agent model window in `models.json` as that provider model override `contextWindow`.
+Orc refuses a model the host's Pi does not list, and a model whose window is 150 thousand tokens or less.
+
 Once the checks pass, orc runs `no-mistakes axi run` on the branch with the task as its intent.
 At each gate orc asks no-mistakes to fix the findings marked `auto-fix`, ignores those marked `no-op`, and accepts the fix review.
 Orc refuses a no-mistakes gate holding an open review question without an `--answer` for that question.
@@ -224,6 +230,7 @@ Orc score keeps one row per score and orc show prints the latest score beside th
 | `src/run-session.ts` | The reading of the captured Pi session |
 | `src/pi.ts` | The Pi agent command, its prompt and the check of its final reply |
 | `src/agents.ts` | The agent file parsing and lookup |
+| `src/context-mark.ts` | The 150 thousand token compaction mark orc writes into each run's Pi folder |
 | `agents` | The bundled agent files |
 | `src/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
 | `src/toon.ts` | The reading of the TOON output no-mistakes prints |

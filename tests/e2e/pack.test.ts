@@ -15,6 +15,7 @@ const expectedFiles = [
   "src/args.ts",
   "src/bin.ts",
   "src/checks.ts",
+  "src/context-mark.ts",
   "src/git-config.ts",
   "src/git-run.ts",
   "src/history-resume.ts",
