@@ -97,6 +97,3 @@ export const contextMarkJson = (checked: ReadonlyArray<CheckedModelWindow>): str
   }
   return JSON.stringify({ compaction: { modelOverrides } }, null, 2) + "\n"
 }
-
-export const contextMarkSettings = (models: ReadonlyArray<string>, windows: ModelWindows): Result.Result<string, string> =>
-  Result.map(checkedModelWindows(models, windows), contextMarkJson)
