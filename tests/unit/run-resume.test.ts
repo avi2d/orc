@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { Database } from "bun:sqlite"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
@@ -108,7 +108,7 @@ describe("resume recovers an interrupted agent from its live session", () => {
         expect(plan.implementSessionId).toBe(liveId)
         expect(plan.skipImplement).toBe(false)
         expect(plan.fixSessionId).toBeNull()
-        expect(plan.implementSessionFile ?? "").toContain(join("sessions", "resumed"))
+        expect(plan.implementSessionFile ?? "").toContain(join("sessions", "host"))
         expect(plan.implementSessionFile ?? "").toContain(liveId)
       } finally {
         db.close()
@@ -140,7 +140,7 @@ describe("resume recovers an interrupted agent from its live session", () => {
         expect(plan.implementSessionId).toBe(implementId)
         expect(plan.fixSessionId).toBe(fixId)
         expect(plan.fixSessionId ?? "").not.toContain("/")
-        expect(plan.fixSessionFile ?? "").toContain(join("sessions", "resumed"))
+        expect(plan.fixSessionFile ?? "").toContain(join("sessions", "host"))
         expect(plan.fixSessionFile ?? "").toContain(fixId)
       } finally {
         db.close()
@@ -165,6 +165,9 @@ describe("resume recovers an interrupted agent from its live session", () => {
         const plan = await Effect.runPromise(buildResumePlan(db, run))
         expect(plan.implementSessionId).toBe(liveId)
         expect(plan.skipImplement).toBe(false)
+        const nextSessions = noSandboxEnv({ piSessionDir: join(home, "runs", "next-1", "session"), hostSessionsDir: join(home, "runs", "next-1", "sessions") }).PI_CODING_AGENT_SESSION_DIR
+        expect(dirname(plan.implementSessionFile ?? "")).toBe(nextSessions)
+        expect(plan.implementSessionFile ?? "").toContain(liveId)
       } finally {
         db.close()
       }

@@ -128,7 +128,7 @@ const carrySessionFile = (run: HistoryRun, source: string | null, sessionId: str
     if (carried === null) {
       return source
     }
-    const target = run.path.join(run.hostSessionsDir, "resumed", source.slice(source.lastIndexOf("/") + 1))
+    const target = run.path.join(run.hostSessionsDir, "host", source.slice(source.lastIndexOf("/") + 1))
     yield* run.fs.makeDirectory(run.path.dirname(target), { recursive: true }).pipe(
       Effect.andThen(() => run.fs.writeFileString(target, carried)),
       Effect.orElseSucceed(() => undefined)
