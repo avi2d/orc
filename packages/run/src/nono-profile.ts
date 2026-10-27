@@ -205,12 +205,11 @@ export const piAgentModels = (credential: ModelCredential, models: ReadonlyArray
     overrides[id] = { contextWindow: window }
     overridesByProvider.set(provider, overrides)
   }
-  const providers: Record<string, unknown> = {
+  const providers: Record<string, { readonly apiKey?: string; readonly modelOverrides?: Record<string, { readonly contextWindow: number }> }> = {
     [credential.provider]: { apiKey: "$" + credential.envVar }
   }
   for (const [provider, modelOverrides] of overridesByProvider) {
-    const existing = providers[provider]
-    providers[provider] = typeof existing === "object" && existing !== null ? { ...(existing as Record<string, unknown>), modelOverrides } : { modelOverrides }
+    providers[provider] = { ...providers[provider], modelOverrides }
   }
   return JSON.stringify({ providers }, null, 2) + "\n"
 }
