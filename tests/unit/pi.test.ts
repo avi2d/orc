@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { AgentFile } from "../../src/agents"
-import { buildImplementPrompt, finalReplyError, orcCompletionLine, piWithTools, sessionPrintedSignal, sumPiUsage, toolFlag } from "../../src/pi"
+import type { AgentFile } from "../../packages/run/src/agents"
+import { buildImplementPrompt, finalReplyError, orcCompletionLine, piWithTools, sessionPrintedSignal, sumPiUsage, toolFlag } from "../../packages/run/src/pi"
 
 const q = String.fromCharCode(39)
 const backslash = String.fromCharCode(92)

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { parseArgs } from "../../src/args"
+import { parseArgs } from "../../packages/run/src/args"
 describe("parseArgs", () => {
   test("no flag is a usage error", () => {
     expect(parseArgs([])).toEqual({ kind: "UsageError", detail: "orc takes one flag" })

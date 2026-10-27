@@ -6,8 +6,8 @@ import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { createSandbox } from "@ai-hero/sandcastle"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
-import { buildNonoRunArgs, buildSandboxEnv, NonoProviderError, nonoSandboxProvider } from "../../src/nono"
-import { buildNonoProfile, defaultToolchainFolders, runtimeReadFiles, systemReadPaths } from "../../src/nono-profile"
+import { buildNonoRunArgs, buildSandboxEnv, NonoProviderError, nonoSandboxProvider } from "../../packages/run/src/nono"
+import { buildNonoProfile, defaultToolchainFolders, runtimeReadFiles, systemReadPaths } from "../../packages/run/src/nono-profile"
 
 const roots = {
   worktree: "/tmp/orc-test/worktree",

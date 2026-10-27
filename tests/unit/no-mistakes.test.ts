@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
-import { answerArgsFor, answerForGate, driveNoMistakes, noMistakesBinary, omittedQuestionIds, parseRun, type NoMistakesFinding, type NoMistakesRunner } from "../../src/no-mistakes"
-import { formatReport, type OrcRunReport } from "../../src/run-record"
+import { answerArgsFor, answerForGate, driveNoMistakes, noMistakesBinary, omittedQuestionIds, parseRun, type NoMistakesFinding, type NoMistakesRunner } from "../../packages/run/src/no-mistakes"
+import { formatReport, type OrcRunReport } from "../../packages/run/src/run-record"
 
 const approvalGate = { step: "review", stage: "approval" } as const
 const fixReview = { step: "review", stage: "fix-review" } as const

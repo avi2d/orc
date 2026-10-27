@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import packageJson from "../../package.json" with { type: "json" }
 
-const binPath = new URL("../../src/bin.ts", import.meta.url).pathname
+const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
 
 const runOrc = async (args: ReadonlyArray<string>, cwd?: string, env?: Record<string, string | undefined>): Promise<{ exitCode: number; stdout: string; stderr: string }> => {
   const proc = Bun.spawn([process.execPath, binPath, ...args], { stdout: "pipe", stderr: "pipe", cwd: cwd ?? process.cwd(), env: { ...process.env, ...env } })

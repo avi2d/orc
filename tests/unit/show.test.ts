@@ -15,9 +15,9 @@ import {
   recordScore,
   recordSignal,
   recordStep
-} from "../../src/run-history"
-import { InvalidScore, recordStepScore, UnknownRun, UnknownStep } from "../../src/run-scores"
-import { decodeShowJson, encodeShowJson, formatShow, readShow } from "../../src/show"
+} from "../../packages/run/src/run-history"
+import { InvalidScore, recordStepScore, UnknownRun, UnknownStep } from "../../packages/run/src/run-scores"
+import { decodeShowJson, encodeShowJson, formatShow, readShow } from "../../packages/run/src/show"
 
 const withHome = async (use: (home: string) => Promise<void>): Promise<void> => {
   const home = await mkdtemp(join(tmpdir(), "orc-show-"))

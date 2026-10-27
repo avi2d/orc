@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { formatReport } from "../../src/run-record"
+import { formatReport } from "../../packages/run/src/run-record"
 import {
   capturedSession,
   cleanFinish,

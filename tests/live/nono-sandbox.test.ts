@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import type { BindMountSandboxHandle } from "@ai-hero/sandcastle"
-import { NonoProviderError, nonoSandboxProvider } from "../../src/nono"
+import { NonoProviderError, nonoSandboxProvider } from "../../packages/run/src/nono"
 
 // Nesting a nono sandbox is forbidden inside an already-sandboxed macOS session, so these run on demand:
 //   ORC_NONO_E2E=1 bun run test:live

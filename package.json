@@ -1,40 +1,29 @@
 {
   "name": "orc",
   "version": "0.3.0",
+  "private": true,
   "description": "One task to one pull request: Pi in a nono sandbox, the project's checks, then no-mistakes",
   "license": "MIT",
   "repository": "https://github.com/avi2d/orc.git",
   "author": "avi2d <avi2dg@gmail.com>",
   "type": "module",
-  "bin": {
-    "orc": "src/bin.ts"
-  },
-  "files": [
-    "CHANGELOG.md",
-    "README.md",
-    "agents/",
-    "scripts/patch-knip-jiti.ts",
-    "src/"
+  "workspaces": [
+    "packages/*"
   ],
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
-    "build": "bun build src/bin.ts --outdir dist --target bun && checks-effect-scope && checks-changelog",
-    "lint": "mkdir -p .orc-home && HOME=$PWD/.orc-home PATH=$PWD/scripts:$PATH oxlint && HOME=$PWD/.orc-home PATH=$PWD/scripts:$PATH checks-lint",
-    "postinstall": "bun scripts/patch-knip-jiti.ts",
+    "build": "bun packages/run/scripts/sync-run-version.ts && bun build packages/run/src/bin.ts --outdir packages/run/dist --target bun && checks-effect-scope && checks-changelog && cp CHANGELOG.md packages/run/CHANGELOG.md",
+    "lint": "mkdir -p .orc-home && HOME=$PWD/.orc-home PATH=$PWD/packages/run/scripts:$PATH oxlint && HOME=$PWD/.orc-home PATH=$PWD/packages/run/scripts:$PATH checks-lint",
+    "postinstall": "bun packages/run/scripts/patch-knip-jiti.ts && cp CHANGELOG.md packages/run/CHANGELOG.md",
     "typecheck": "tsc --noEmit && effect-tsgo diagnostics --project tsconfig.json --format text --strict",
     "test": "checks-test",
     "test:live": "checks-test --tier=live"
   },
-  "dependencies": {
-    "@ai-hero/sandcastle": "0.12.0",
-    "@effect/platform-bun": "4.0.0",
-    "effect": "4.0.0"
-  },
   "devDependencies": {
+    "@ai-hero/sandcastle": "0.12.0",
     "@avi2dg/checks": "^0.52.0",
+    "@effect/platform-bun": "4.0.0",
     "@effect/tsgo": "0.45.0",
+    "effect": "4.0.0",
     "@hughescr/stryker-bun-runner": "1.4.0",
     "@stryker-mutator/core": "10.0.0",
     "@swc/core": "1.16.2",

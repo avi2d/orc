@@ -5,8 +5,8 @@ import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { runAgentStep } from "../../src/run"
-import { listRuns, openDatabase } from "../../src/run-history"
+import { runAgentStep } from "../../packages/run/src/run"
+import { listRuns, openDatabase } from "../../packages/run/src/run-history"
 
 const git = (dir: string, args: ReadonlyArray<string>): void => {
   const result = Bun.spawnSync(["git", ...args], { cwd: dir })
