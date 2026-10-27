@@ -9,7 +9,7 @@ const contextMarkTokens = 150_000
 export const modelListCommand = (host: HostTools): ReadonlyArray<string> => [
   "/bin/sh",
   "-c",
-  "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" unset PI_CODING_AGENT_DIR; exec \"$1\" --mode rpc --no-session --no-extensions --no-skills --no-context-files",
+  "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" unset PI_CODING_AGENT_DIR; exec \"$1\" --mode rpc --no-session --no-extensions --no-skills --no-context-files --offline",
   host.nodeBinary,
   host.piBinary,
   host.homeDir

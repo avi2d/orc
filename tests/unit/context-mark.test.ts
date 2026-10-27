@@ -60,6 +60,7 @@ describe("modelListCommand", () => {
     expect(list.slice(3)).toEqual(loginCheckCommand(tools).slice(3))
     expect(list[2]?.split(";")[0]).toBe(loginCheckCommand(tools)[2]?.split(";")[0])
     expect(list[2]).toContain("--mode rpc")
+    expect(list[2]).toContain("--offline")
     expect(JSON.parse(modelListRequest)).toEqual({ id: "orc-models", type: "get_available_models" })
   })
 })
