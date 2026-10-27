@@ -25,6 +25,13 @@ To install orc:
 1. Run `cd packages/run` to enter the run package.
 1. Run `bun link` to put the `orc` command on your PATH.
 
+## Move an old launcher to the run package
+
+After the release that moves orc into the run package, relink the Mac launcher on the Mac itself.
+Enter packages/run and run `bun link` to point the launcher at the new entry point.
+Then run `orc --version` and confirm it prints the version `packages/run/package.json` names.
+The release performs no automated handoff, so the captain runs these steps when the release lands.
+
 ## Installing no-mistakes
 
 Upstream's install script fetches the release GitHub marks latest, and upstream marks releases after v1.84.0 as prereleases, so the script installs a release orc refuses.
