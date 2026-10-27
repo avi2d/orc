@@ -221,7 +221,7 @@ Orc score keeps one row per score and orc show prints the latest score beside th
 | `src/host.ts` | The host-side processes and tools the provider runs outside nono, and the guard on host git |
 | `src/nono-profile.ts` | The nono profile that lets a command write only the copy, its git data and the Pi session folder, and routes the model credential |
 | `src/git-config.ts` | The git config parsing that finds the credentials, includes and submodules a checkout carries |
-| `tests/unit` | The in-process unit tests |
-| `tests/e2e` | The tests that run `src/bin.ts`, git or nono as a process, with a live Pi run through `ORC_PI_E2E=1` |
-| `tests/live` | The tests that run commands in a real nono sandbox, through `ORC_NONO_E2E=1 bun run test:live` |
-| `.no-mistakes.yaml` | The check commands no-mistakes and CI run |
+| `../../tests/unit` | The in-process unit tests at the workspace root |
+| `../../tests/e2e` | The tests that run `src/bin.ts`, git or nono as a process, with a live Pi run through `ORC_PI_E2E=1`, at the workspace root |
+| `../../tests/live` | The tests that run commands in a real nono sandbox, through `ORC_NONO_E2E=1 bun run test:live`, at the workspace root |
+| `../../.no-mistakes.yaml` | The check commands no-mistakes and CI run at the workspace root |
