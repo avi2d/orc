@@ -123,12 +123,22 @@ const alive = (pid: number): boolean => {
   }
 }
 
-const beatActions = (text: string): ReadonlyArray<{ readonly kind?: unknown; readonly task?: unknown; readonly note?: unknown }> => {
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null
+
+const beatActions = (text: string): ReadonlyArray<Record<string, unknown>> => {
   const document: unknown = JSON.parse(text)
   if (typeof document !== "object" || document === null || !("actions" in document) || !Array.isArray(document.actions)) {
     throw new Error("orc beat --json printed no action list: " + text)
   }
-  return document.actions as ReadonlyArray<{ readonly kind?: unknown; readonly task?: unknown; readonly note?: unknown }>
+  const actions: Array<Record<string, unknown>> = []
+  for (const entry of document.actions) {
+    if (!isRecord(entry)) {
+      throw new Error("orc beat --json printed no action list: " + text)
+    }
+    actions.push(entry)
+  }
+  return actions
 }
 
 const startedLines = async (fixture: Fixture): Promise<ReadonlyArray<string>> =>
@@ -205,7 +215,10 @@ describe("orc beat", () => {
       if (typeof document !== "object" || document === null || !("tasks" in document) || !Array.isArray(document.tasks)) {
         throw new Error("orc backlog --json printed no task list")
       }
-      const task = document.tasks[0] as { readonly status?: unknown; readonly outcome?: unknown }
+      const task: unknown = document.tasks[0]
+      if (!isRecord(task)) {
+        throw new Error("orc backlog --json printed a task with no id or status")
+      }
       expect(task.status).toBe("closed")
       expect(task.outcome).toBe("failed")
     })
@@ -231,14 +244,14 @@ describe("orc beat", () => {
   }, beatTimeout)
 
   test("the beat reports the start command's last lines instead of dropping them", async () => {
-    await withFixture({ mac: 1, winbox: 0, floorPercent: 15 }, async (fixture) => {
+    await withFixture({ mac: 5, winbox: 0, floorPercent: 15 }, async (fixture) => {
       const noter = ["sh", "-c", "echo \"ready $ORC_TASK_ID\""]
       await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({
-        machines: [{ name: "mac", slots: 1, start: noter }, { name: "winbox", slots: 0, start: ["true"] }],
+        machines: [{ name: "mac", slots: 5, start: noter }, { name: "winbox", slots: 0, start: ["true"] }],
         quota: { accounts: ["main"], floorPercent: 15 }
       }))
-      await addTasks(fixture, 5)
       for (let index = 1; index <= 5; index += 1) {
+        await addTasks(fixture, 1)
         const expected = "ready task-" + index
         if (index % 2 === 0) {
           const action = beatActions(await orcOk(fixture, ["beat", "--json"])).find((candidate) => candidate.task === "task-" + index)
@@ -261,7 +274,13 @@ describe("orc beat", () => {
       if (typeof document !== "object" || document === null || !("tasks" in document) || !Array.isArray(document.tasks)) {
         throw new Error("orc backlog --json printed no task list")
       }
-      const tasks = document.tasks as ReadonlyArray<{ readonly id?: unknown; readonly status?: unknown; readonly outcome?: unknown; readonly reason?: unknown }>
+      const tasks: Array<Record<string, unknown>> = []
+      for (const entry of document.tasks) {
+        if (!isRecord(entry)) {
+          throw new Error("orc backlog --json printed a task with no id or status")
+        }
+        tasks.push(entry)
+      }
       for (let index = 1; index <= 5; index += 1) {
         const task = tasks.find((candidate) => candidate.id === "task-" + index)
         expect(task?.status).toBe("closed")

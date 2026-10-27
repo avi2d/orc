@@ -1,5 +1,5 @@
-import { DateTime, Duration, Effect, Fiber, Ref, type FileSystem, Stream } from "effect"
-import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { DateTime, Duration, Effect, type FileSystem } from "effect"
+import type { ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimTask, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken } from "./backlog"
 import { checkoutOn, type ConfigError, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "./config"
 import { type QuotaReading, readQuota } from "./quota"
@@ -94,7 +94,7 @@ export const placeTask = (
     }
   }
   if (best === null) {
-    return { kind: "waits", reason: (pinned ?? "no machine with a checkout of " + project.name) + " has no room" }
+    return { kind: "waits", reason: pinned === null ? "no machine with a checkout of " + project.name + " has room" : pinned + " has no room" }
   }
   return { kind: "place", machine: best.machine, checkout: best.checkout }
 }
@@ -103,40 +103,99 @@ const lastLine = (text: string): string => text.trim().split("\n").at(-1)?.trim(
 
 const outputSettleMillis = 500
 
-const settleOutput = <A, E>(fiber: Fiber.RuntimeFiber<A, E>): Effect.Effect<void> =>
-  Fiber.join(fiber).pipe(
-    Effect.ignore,
-    Effect.timeoutOption({ duration: Duration.millis(outputSettleMillis) }),
-    Effect.flatMap((done) => done._tag === "Some" ? Effect.void : Fiber.interrupt(fiber))
-  )
-
 type StartResult = { readonly kind: "started"; readonly note: string } | { readonly kind: "failed"; readonly reason: string }
+
+const collectStream = (
+  stream: ReadableStream<Uint8Array> | null,
+  append: (text: string) => void
+): (() => void) => {
+  if (stream === null) {
+    return () => {}
+  }
+  const reader = stream.getReader()
+  const decoder = new TextDecoder()
+  let settled = false
+  const release = (): void => {
+    if (!settled) {
+      settled = true
+      reader.releaseLock()
+    }
+  }
+  const step = (): void => {
+    reader.read().then((next) => {
+      if (next.done) {
+        release()
+        return
+      }
+      append(decoder.decode(next.value, { stream: true }))
+      step()
+    }, release)
+  }
+  step()
+  return () => {
+    if (!settled) {
+      void reader.cancel().then(undefined, () => undefined)
+    }
+  }
+}
 
 const runStart = (
   machine: Machine,
   env: Record<string, string>
-): Effect.Effect<StartResult, never, ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.gen(function*() {
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const [command, ...args] = machine.start
-    const handle = yield* spawner.spawn(ChildProcess.make(command, args, { env, extendEnv: true, detached: false }))
-    const out = yield* Ref.make("")
-    const err = yield* Ref.make("")
-    const outFiber = yield* handle.stdout.pipe(Stream.decodeText(), Stream.runForEach((chunk) => Ref.update(out, (text) => text + chunk)), Effect.fork)
-    const errFiber = yield* handle.stderr.pipe(Stream.decodeText(), Stream.runForEach((chunk) => Ref.update(err, (text) => text + chunk)), Effect.fork)
-    const exitCode = yield* handle.exitCode
-    yield* Effect.all([settleOutput(outFiber), settleOutput(errFiber)], { concurrency: "unbounded" })
-    const [stdout, stderr] = yield* Effect.all([Ref.get(out), Ref.get(err)])
-    return exitCode === 0
-      ? { kind: "started", note: lastLine(stdout) } satisfies StartResult
-      : { kind: "failed", reason: "the start command exited " + exitCode + ": " + lastLine(stderr) } satisfies StartResult
+): Effect.Effect<StartResult> =>
+  Effect.try({
+    try: () => Bun.spawn([...machine.start], {
+      env: { ...Bun.env, ...env },
+      stdio: ["pipe", "pipe", "pipe"]
+    }),
+    catch: (cause) => "the start command did not run: " + (cause instanceof Error ? cause.message : String(cause))
   }).pipe(
-    Effect.scoped,
+    Effect.matchEffect({
+      onFailure: (reason) => Effect.succeed<StartResult>({ kind: "failed", reason }),
+      onSuccess: (child) =>
+        Effect.callback((resume: (effect: Effect.Effect<StartResult>) => void) => {
+            let stdout = ""
+            let stderr = ""
+            let finished = false
+            let timer: ReturnType<typeof setTimeout> | undefined
+            const cancelStdout = collectStream(child.stdout, (text) => {
+              stdout += text
+            })
+            const cancelStderr = collectStream(child.stderr, (text) => {
+              stderr += text
+            })
+            const finish = (result: StartResult): void => {
+              if (finished) {
+                return
+              }
+              finished = true
+              timer = setTimeout(() => {
+                cancelStdout()
+                cancelStderr()
+                resume(Effect.succeed(result))
+              }, outputSettleMillis)
+            }
+            void child.exited.then((code) => {
+              finish(code === 0
+                ? { kind: "started", note: lastLine(stdout) } satisfies StartResult
+                : { kind: "failed", reason: "the start command exited " + code + ": " + lastLine(stderr) } satisfies StartResult)
+            }, (cause: unknown) => {
+              finish({ kind: "failed", reason: "the start command did not run: " + (cause instanceof Error ? cause.message : String(cause)) })
+            })
+          return Effect.sync(() => {
+            clearTimeout(timer)
+            cancelStdout()
+            cancelStderr()
+            if (!finished) {
+              child.kill("SIGTERM")
+            }
+          })
+        })
+    }),
     Effect.timeoutOrElse({
       duration: Duration.seconds(startSeconds),
       orElse: () => Effect.succeed<StartResult>({ kind: "failed", reason: "the start command ran past " + startSeconds + " seconds" })
-    }),
-    Effect.catch((error) => Effect.succeed<StartResult>({ kind: "failed", reason: "the start command did not run: " + error.message }))
+    })
   )
 
 // Each beat writes its claim before it counts, so of two beats racing for a machine's last slot at least one sees both claims.

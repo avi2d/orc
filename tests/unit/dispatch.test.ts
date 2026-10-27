@@ -88,8 +88,8 @@ describe("task files", () => {
     const result = await run(Effect.result(parseTaskFile("new/task-9.md", "new", text)))
     expect(Result.isFailure(result)).toBe(true)
     if (Result.isFailure(result)) {
-      expect(result.error).toBeInstanceOf(TaskFileError)
-      expect((result.error as TaskFileError).file).toContain("task-9.md")
+      expect(result.failure).toBeInstanceOf(TaskFileError)
+      expect(result.failure.file).toContain("task-9.md")
     }
   })
   test("a file with no frontmatter is refused instead of read as an empty task", async () => {

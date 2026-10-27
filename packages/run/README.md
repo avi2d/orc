@@ -243,7 +243,8 @@ A task marked for a machine waits for a slot on that machine and never starts on
 The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE` and `ORC_TASK_ACCOUNT`.
 It must hand the task on and exit within two minutes.
 The start command must hand the task to something that outlives orc, such as pueue or ssh.
-Orc leaves the start command's children alone, but launchd and cron may end orc's process group when the beat exits, so a bare `runner &` does not hand the task off.
+Orc leaves the start command's children alone.
+Launchd and cron may end orc's process group when the beat exits, so a bare `runner &` does not hand the task off.
 A start command that exits non-zero closes the task as `start-failed` with its last line of stderr.
 To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1`.
 When a started task ends, run `orc backlog close <task-id> <done|failed> [reason]`.
