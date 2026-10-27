@@ -1,5 +1,11 @@
 import { Effect, FileSystem } from "effect"
-import type { CheckedModelWindow } from "./context-mark"
+
+export interface CheckedModelWindow {
+  readonly ref: string
+  readonly provider: string
+  readonly id: string
+  readonly window: number
+}
 
 export interface NonoSandboxRoots {
   readonly worktree: string

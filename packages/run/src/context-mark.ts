@@ -1,7 +1,7 @@
 import { Effect, Option, Result, Schema, Stream } from "effect"
 import { ChildProcess, type ChildProcessSpawner } from "effect/process"
 import { inheritedEnv } from "./nono"
-import type { HostTools } from "./nono-profile"
+import type { CheckedModelWindow, HostTools } from "./nono-profile"
 import { OrcRunError } from "./run-session"
 
 const contextMarkTokens = 150_000
@@ -62,13 +62,6 @@ export const readModelWindows = (
   })).pipe(
     Effect.mapError((cause) => cause instanceof OrcRunError ? cause : new OrcRunError({ message: "orc: the model list failed to run: " + String(cause) }))
   )
-
-export interface CheckedModelWindow {
-  readonly ref: string
-  readonly provider: string
-  readonly id: string
-  readonly window: number
-}
 
 export const checkedModelWindows = (
   models: ReadonlyArray<string>,
