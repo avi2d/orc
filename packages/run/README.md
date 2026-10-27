@@ -93,7 +93,7 @@ The default sandbox run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on t
 With `--sandbox none` the run needs the same tools except `nono`.
 Orc runs `no-mistakes --version` before the sandbox starts and refuses a release older than v1.90.0.
 It also needs an opencode-go login in Pi, which `pi auth check --provider opencode-go` confirms.
-Orc reads that login through Pi on the host and hands it to the sandbox.
+With the default sandbox, Orc reads that login through Pi on the host and hands it to the sandbox.
 nono reads it with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE` and `TERM` set, and orc's check runs the same way.
 So a key held only in the keychain or in an environment variable such as `OPENCODE_API_KEY` is refused, and a login Pi's `/login` stores in `~/.pi/agent/auth.json` works.
 If nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc's result names that error.
@@ -168,7 +168,7 @@ When a no-mistakes run ends failed, orc's result carries the error no-mistakes p
 
 ## Granting toolchain folders to the sandbox
 
-The sandbox reads the system folders, the Homebrew and `/usr/local` program folders, `/nix` and the one mise install folder each of `bun`, `node` and `pi` resolves to.
+With the default sandbox, the sandbox reads the system folders, the Homebrew and `/usr/local` program folders, `/nix` and the one mise install folder each of `bun`, `node` and `pi` resolves to.
 Orc refuses a runtime the PATH finds anywhere else, naming the runtime and its path.
 To run a runtime from another install folder, such as the one Bun's own installer makes in your home:
 
