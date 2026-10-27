@@ -6,12 +6,12 @@ import { Database } from "bun:sqlite"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import type { AgentFile } from "../../src/agents"
-import { openDatabase, recordRun, recordStep } from "../../src/run-history"
-import { buildResumePlan, resolveTaskFile } from "../../src/run-resume"
-import { recordResumePublish } from "../../src/history-write"
-import { subprocessNoMistakesRunner } from "../../src/no-mistakes"
-import type { HistoryRun } from "../../src/run-record"
+import type { AgentFile } from "../../packages/run/src/agents"
+import { openDatabase, recordRun, recordStep } from "../../packages/run/src/run-history"
+import { buildResumePlan, resolveTaskFile } from "../../packages/run/src/run-resume"
+import { recordResumePublish } from "../../packages/run/src/history-write"
+import { subprocessNoMistakesRunner } from "../../packages/run/src/no-mistakes"
+import type { HistoryRun } from "../../packages/run/src/run-record"
 
 const implementer: AgentFile = {
   kind: "implementer",

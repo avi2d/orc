@@ -4,8 +4,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path, Result } from "effect"
-import { hostGitShimScript, NonoProviderError, resolveRuntime } from "../../src/host"
-import { defaultToolchainResolver } from "../../src/nono-profile"
+import { hostGitShimScript, NonoProviderError, resolveRuntime } from "../../packages/run/src/host"
+import { defaultToolchainResolver } from "../../packages/run/src/nono-profile"
 
 const runtimeAt = (name: string, searchPath: string, home: string) =>
   Effect.runPromise(

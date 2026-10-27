@@ -5,7 +5,7 @@ import { ChildProcessSpawner } from "effect/process"
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { noMistakesVersionProblem } from "../../src/no-mistakes"
+import { noMistakesVersionProblem } from "../../packages/run/src/no-mistakes"
 
 const versionProblem = async (script: string): Promise<string | null> => {
   const dir = await mkdtemp(join(tmpdir(), "orc-nm-version-"))

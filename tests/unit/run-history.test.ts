@@ -19,7 +19,7 @@ import {
   recordStep,
   runsJson,
   type RunRecord,
-} from "../../src/run-history"
+} from "../../packages/run/src/run-history"
 
 const withHome = async (use: (home: string) => Promise<void>): Promise<void> => {
   const home = await mkdtemp(join(tmpdir(), "orc-home-"))

@@ -3,8 +3,8 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
-import { NonoProviderError, nonoSandboxProvider } from "../../src/nono"
-import { modelCredentialFor } from "../../src/nono-profile"
+import { NonoProviderError, nonoSandboxProvider } from "../../packages/run/src/nono"
+import { modelCredentialFor } from "../../packages/run/src/nono-profile"
 
 const systemTempRoots = ["/tmp", "/private/tmp", "/var", "/private/var"]
 const underSystemTemp = (candidate: string): boolean =>

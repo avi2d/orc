@@ -1,0 +1,30 @@
+{
+  "name": "@avi2dg/orc",
+  "version": "0.3.0",
+  "description": "One task to one pull request: Pi in a nono sandbox, the project's checks, then no-mistakes",
+  "license": "MIT",
+  "repository": "https://github.com/avi2d/orc.git",
+  "author": "avi2d <avi2dg@gmail.com>",
+  "type": "module",
+  "bin": {
+    "orc": "src/bin.ts"
+  },
+  "files": [
+    "CHANGELOG.md",
+    "README.md",
+    "agents/",
+    "scripts/patch-knip-jiti.ts",
+    "src/"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ai-hero/sandcastle": "0.12.0",
+    "@effect/platform-bun": "4.0.0",
+    "effect": "4.0.0"
+  },
+  "devDependencies": {
+    "@avi2dg/checks": "^0.52.0"
+  }
+}

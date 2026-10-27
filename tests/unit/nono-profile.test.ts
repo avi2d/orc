@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { buildAgentNonoProfile, buildNonoProfile, canRouteModel, defaultToolchainFolders, loginCheckCommand, modelCredentialFor, piAgentModels } from "../../src/nono-profile"
+import { buildAgentNonoProfile, buildNonoProfile, canRouteModel, defaultToolchainFolders, loginCheckCommand, modelCredentialFor, piAgentModels } from "../../packages/run/src/nono-profile"
 
 const credential = {
   provider: "opencode-go",

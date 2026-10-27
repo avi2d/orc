@@ -6,9 +6,9 @@ import { Database } from "bun:sqlite"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Exit, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import type { AgentFile } from "../../src/agents"
-import { listRuns, openDatabase, recordRun, recordStep } from "../../src/run-history"
-import { stepsForRun } from "../../src/history-resume"
+import type { AgentFile } from "../../packages/run/src/agents"
+import { listRuns, openDatabase, recordRun, recordStep } from "../../packages/run/src/run-history"
+import { stepsForRun } from "../../packages/run/src/history-resume"
 import {
   recordChecksDone,
   recordChecksStart,
@@ -19,11 +19,11 @@ import {
   recordNoMistakesDone,
   recordNoMistakesStart,
   recordResumePublish
-} from "../../src/history-write"
-import { buildResumePlan } from "../../src/run-resume"
-import { subprocessNoMistakesRunner } from "../../src/no-mistakes"
-import type { HistoryRun } from "../../src/run-record"
-import { runFull, type RunCheckpoints, type SandboxOps } from "../../src/run-loop"
+} from "../../packages/run/src/history-write"
+import { buildResumePlan } from "../../packages/run/src/run-resume"
+import { subprocessNoMistakesRunner } from "../../packages/run/src/no-mistakes"
+import type { HistoryRun } from "../../packages/run/src/run-record"
+import { runFull, type RunCheckpoints, type SandboxOps } from "../../packages/run/src/run-loop"
 
 const implementer: AgentFile = {
   kind: "implementer",

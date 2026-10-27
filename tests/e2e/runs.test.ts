@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
 import type { Database } from "bun:sqlite"
-import { openDatabase, recordRun } from "../../src/run-history"
+import { openDatabase, recordRun } from "../../packages/run/src/run-history"
 
 interface OrcResult {
   readonly exitCode: number
@@ -14,7 +14,7 @@ interface OrcResult {
 }
 
 const runOrc = async (args: ReadonlyArray<string>, home: string): Promise<OrcResult> => {
-  const proc = Bun.spawn([process.execPath, "src/bin.ts", ...args], {
+  const proc = Bun.spawn([process.execPath, "packages/run/src/bin.ts", ...args], {
     stdout: "pipe",
     stderr: "pipe",
     env: { ...process.env, HOME: home }

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Effect, Result } from "effect"
-import { parseRefuseMarkers, toolchainFromEnv } from "../../src/run"
+import { parseRefuseMarkers, toolchainFromEnv } from "../../packages/run/src/run"
 
 describe("parseRefuseMarkers", () => {
   test("no value names no marker", () => {
