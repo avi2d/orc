@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import packageJson from "../../package.json" with { type: "json" }
@@ -87,6 +87,63 @@ describe("orc bin", () => {
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toContain("a key held only in the keychain or in an environment variable is refused")
       expect(await Bun.file(join(fakeBin, "other-calls")).exists()).toBe(false)
+    })
+  })
+
+  test("run writes the 150000 token compaction mark into the run's Pi folder instead of leaving Pi's default reserve", async () => {
+    await withLoginFixture("echo ready; exit 0", async ({ dir, home, fakeBin }) => {
+      const reply = JSON.stringify({
+        id: "orc-models",
+        type: "response",
+        command: "get_available_models",
+        success: true,
+        data: { models: [{ provider: "opencode-go", id: "muse-spark-1.3-contributor", contextWindow: 262_144 }] }
+      })
+      await writeFile(join(fakeBin, "pi"), [
+        "#!/bin/sh",
+        "if [ \"$1\" = auth ]; then exit 0; fi",
+        "if [ \"$1\" = --mode ]; then cat > \"$(dirname \"$0\")/rpc-request\"; echo '" + reply + "'; exit 0; fi",
+        "exit 2"
+      ].join("\n") + "\n")
+      await writeFile(join(fakeBin, "no-mistakes"), "#!/bin/sh\necho 'no-mistakes version v1.101.0'\n")
+      await writeFile(join(fakeBin, "nono"), "#!/bin/sh\necho 'stopped before any sandbox' >&2\nexit 1\n")
+      await chmod(join(fakeBin, "no-mistakes"), 0o755)
+      await chmod(join(fakeBin, "nono"), 0o755)
+      const orcHome = join(home, "orc")
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test"], dir, {
+        HOME: home,
+        ORC_HOME: orcHome,
+        ORC_NO_MISTAKES_BIN: join(fakeBin, "no-mistakes"),
+        PI_CODING_AGENT_DIR: undefined,
+        PATH: fakeBin + ":" + (process.env["PATH"] ?? "")
+      })
+      expect(result.stderr).toContain("the sandbox failed to start")
+      expect(JSON.parse(await readFile(join(fakeBin, "rpc-request"), "utf8"))).toEqual({ id: "orc-models", type: "get_available_models" })
+      const [runId] = await readdir(join(orcHome, "runs"))
+      const settings: unknown = JSON.parse(await readFile(join(orcHome, "runs", runId, "session", "agent", "settings.json"), "utf8"))
+      expect(settings).toEqual({ compaction: { modelOverrides: { "opencode-go/muse-spark-1.3-contributor": { reserveTokens: 112_144 } } } })
+    })
+  })
+
+  test("run refuses a model pi does not list rather than starting a run with no context mark", async () => {
+    await withLoginFixture("echo ready; exit 0", async ({ dir, home, fakeBin }) => {
+      const reply = JSON.stringify({ id: "orc-models", type: "response", command: "get_available_models", success: true, data: { models: [] } })
+      await writeFile(join(fakeBin, "pi"), [
+        "#!/bin/sh",
+        "if [ \"$1\" = auth ]; then exit 0; fi",
+        "if [ \"$1\" = --mode ]; then cat > /dev/null; echo '" + reply + "'; exit 0; fi",
+        "exit 2"
+      ].join("\n") + "\n")
+      const orcHome = join(home, "orc")
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test"], dir, {
+        HOME: home,
+        ORC_HOME: orcHome,
+        PI_CODING_AGENT_DIR: undefined,
+        PATH: fakeBin + ":" + (process.env["PATH"] ?? "")
+      })
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain("pi lists no model opencode-go/muse-spark-1.3-contributor")
+      expect(await readdir(join(orcHome, "runs"))).toEqual([])
     })
   })
 })
