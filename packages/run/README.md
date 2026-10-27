@@ -8,7 +8,7 @@ You read the PR and merge it, since orc never merges.
 
 ## Before you begin
 
-- Bun 1.4.3, the version `.bun-version` pins.
+- Bun, at the version `.bun-version` pins.
 - Git, tested on 2.56.0.
 - nono from https://nono.sh, tested on 0.80.0.
 - Node, tested on 24.22.1.
@@ -69,10 +69,10 @@ An unknown flag prints the usage text and exits 1.
 To run a task, enter a clean git checkout of the target project and run `orc run <task-file>`.
 Before the first task, add a `.no-mistakes.yaml` file to the target project root with at least one named check under `commands`.
 Commit that file before running orc.
-For example, a project checked by `bun run test` keeps this `.no-mistakes.yaml` file.
+For example, a project checked by `bun test` keeps this `.no-mistakes.yaml` file.
 ```yaml
 commands:
-  test: bun run test
+  test: bun test
 ```
 Replace the command with the project's real check command.
 Orc refuses a checkout with uncommitted changes.
@@ -223,5 +223,5 @@ Orc score keeps one row per score and orc show prints the latest score beside th
 | `src/git-config.ts` | The git config parsing that finds the credentials, includes and submodules a checkout carries |
 | `../../tests/unit` | The in-process unit tests at the workspace root |
 | `../../tests/e2e` | The tests that run `src/bin.ts`, git or nono as a process, with a live Pi run through `ORC_PI_E2E=1`, at the workspace root |
-| `../../tests/live` | The tests that run commands in a real nono sandbox, through `ORC_NONO_E2E=1 bun run test:live`, at the workspace root |
+| `../../tests/live` | The tests that run commands in a real nono sandbox, through the `test:live` script at the workspace root with `ORC_NONO_E2E=1` set |
 | `../../.no-mistakes.yaml` | The check commands no-mistakes and CI run at the workspace root |
