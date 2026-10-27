@@ -2,7 +2,8 @@
 Orc takes one task and turns it into one pull request.
 It starts from a command in the terminal that takes the task as text or as a file.
 It makes an isolated copy of the project on a new branch.
-It runs the Pi agent inside a nono sandbox, then runs the project's checks.
+By default it runs the Pi agent inside a nono sandbox, then runs the project’s checks.
+With `--sandbox none` it runs Pi and the checks directly on the host.
 It hands the branch to no-mistakes, which reviews it, pushes it and opens the PR.
 You read the PR and merge it, since orc never merges.
 
@@ -10,7 +11,7 @@ You read the PR and merge it, since orc never merges.
 
 - Bun, at the version `.bun-version` pins.
 - Git, tested on 2.56.0.
-- nono from https://nono.sh, tested on 0.80.0.
+- nono from https://nono.sh, tested on 0.80.0, for the default sandbox.
 - Node, tested on 24.22.1.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with an opencode-go login.
 - no-mistakes v1.90.0 or later, tested on v1.100.2, installed as [Installing no-mistakes](#installing-no-mistakes) says.
@@ -88,7 +89,8 @@ Orc trims padding around each name and drops blank entries.
 Orc checks each marker in the project directory and its parent and refuses a checkout carrying one.
 An unset `ORC_REFUSE_MARKERS` names no marker and refuses no checkout for a marker.
 
-The run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
+The default sandbox run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
+With `--sandbox none` the run needs the same tools except `nono`.
 Orc runs `no-mistakes --version` before the sandbox starts and refuses a release older than v1.90.0.
 It also needs an opencode-go login in Pi, which `pi auth check --provider opencode-go` confirms.
 Orc reads that login through Pi on the host and hands it to the sandbox.
@@ -214,7 +216,7 @@ Orc score keeps one row per score and orc show prints the latest score beside th
 | --- | --- |
 | `src/bin.ts` | The orc entry point |
 | `src/args.ts` | The flag parsing for the orc command |
-| `src/run.ts` | The `orc run` agent step: checkout checks, login preflight and the sandboxed Pi run |
+| `src/run.ts` | The `orc run` agent step: checkout checks, login preflight and the Pi run in the selected sandbox |
 | `src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
 | `src/history-write.ts` | The history checkpoints a run records as each step starts and ends |
 | `src/report.ts` | The `report.md` shape and the signal facts it carries |
@@ -229,6 +231,7 @@ Orc score keeps one row per score and orc show prints the latest score beside th
 | `src/nono.ts` | The Sandcastle sandbox provider that runs each command in `nono run` |
 | `src/host.ts` | The host-side processes and tools the provider runs outside nono, and the guard on host git |
 | `src/nono-profile.ts` | The nono profile that lets a command write only the copy, its git data and the Pi session folder, and routes the model credential |
+| `src/no-sandbox.ts` | The Sandcastle provider that runs Pi and the checks directly on the host |
 | `src/git-config.ts` | The git config parsing that finds the credentials, includes and submodules a checkout carries |
 | `../../tests/unit` | The in-process unit tests at the workspace root |
 | `../../tests/e2e` | The tests that run `src/bin.ts`, git or nono as a process, with a live Pi run through `ORC_PI_E2E=1`, at the workspace root |
