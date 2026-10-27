@@ -114,6 +114,23 @@ const withFixture = async (shape: FixtureShape, body: (fixture: Fixture) => Prom
   }
 }
 
+const alive = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+const beatActions = (text: string): ReadonlyArray<{ readonly kind?: unknown; readonly task?: unknown; readonly note?: unknown }> => {
+  const document: unknown = JSON.parse(text)
+  if (typeof document !== "object" || document === null || !("actions" in document) || !Array.isArray(document.actions)) {
+    throw new Error("orc beat --json printed no action list: " + text)
+  }
+  return document.actions as ReadonlyArray<{ readonly kind?: unknown; readonly task?: unknown; readonly note?: unknown }>
+}
+
 const startedLines = async (fixture: Fixture): Promise<ReadonlyArray<string>> =>
   (await readFile(fixture.startLog, "utf8")).split("\n").filter((line) => line !== "").sort()
 
@@ -194,9 +211,10 @@ describe("orc beat", () => {
     })
   }, beatTimeout)
 
-  test("a start command that leaves a child holding stdout open still reports started at once instead of waiting for the pipe", async () => {
+  test("a start command that leaves a child behind still reports started at once and leaves the child running", async () => {
     await withFixture({ mac: 1, winbox: 0, floorPercent: 15 }, async (fixture) => {
-      const lingering = ["sh", "-c", "sleep 20 & echo handed-off"]
+      const pidFile = join(fixture.dir, "child.pid")
+      const lingering = ["sh", "-c", "sleep 30 & echo $! > '" + pidFile + "'; echo handed-off"]
       await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({
         machines: [{ name: "mac", slots: 1, start: lingering }, { name: "winbox", slots: 0, start: ["true"] }],
         quota: { accounts: ["main"], floorPercent: 15 }
@@ -205,6 +223,51 @@ describe("orc beat", () => {
       const before = Date.now()
       expect(await orcOk(fixture, ["beat"])).toContain("started task-1")
       expect(Date.now() - before).toBeLessThan(10_000)
+      const pid = Number(await readFile(pidFile, "utf8"))
+      expect(Number.isInteger(pid)).toBe(true)
+      expect(alive(pid)).toBe(true)
+      process.kill(pid)
+    })
+  }, beatTimeout)
+
+  test("the beat reports the start command's last lines instead of dropping them", async () => {
+    await withFixture({ mac: 1, winbox: 0, floorPercent: 15 }, async (fixture) => {
+      const noter = ["sh", "-c", "echo \"ready $ORC_TASK_ID\""]
+      await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({
+        machines: [{ name: "mac", slots: 1, start: noter }, { name: "winbox", slots: 0, start: ["true"] }],
+        quota: { accounts: ["main"], floorPercent: 15 }
+      }))
+      await addTasks(fixture, 5)
+      for (let index = 1; index <= 5; index += 1) {
+        const expected = "ready task-" + index
+        if (index % 2 === 0) {
+          const action = beatActions(await orcOk(fixture, ["beat", "--json"])).find((candidate) => candidate.task === "task-" + index)
+          expect(action?.kind).toBe("started")
+          expect(action?.note).toBe(expected)
+        } else {
+          expect(await orcOk(fixture, ["beat"])).toContain("started task-" + index + " on mac with main: " + expected)
+        }
+      }
+    })
+    await withFixture({ mac: 5, winbox: 0, floorPercent: 15 }, async (fixture) => {
+      const failer = ["sh", "-c", "echo \"no checkout for $ORC_TASK_ID\" >&2; exit 1"]
+      await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({
+        machines: [{ name: "mac", slots: 5, start: failer }, { name: "winbox", slots: 0, start: ["true"] }],
+        quota: { accounts: ["main"], floorPercent: 15 }
+      }))
+      await addTasks(fixture, 5)
+      await orcOk(fixture, ["beat"])
+      const document: unknown = JSON.parse(await orcOk(fixture, ["backlog", "--json"]))
+      if (typeof document !== "object" || document === null || !("tasks" in document) || !Array.isArray(document.tasks)) {
+        throw new Error("orc backlog --json printed no task list")
+      }
+      const tasks = document.tasks as ReadonlyArray<{ readonly id?: unknown; readonly status?: unknown; readonly outcome?: unknown; readonly reason?: unknown }>
+      for (let index = 1; index <= 5; index += 1) {
+        const task = tasks.find((candidate) => candidate.id === "task-" + index)
+        expect(task?.status).toBe("closed")
+        expect(task?.outcome).toBe("start-failed")
+        expect(task?.reason).toContain("no checkout for task-" + index)
+      }
     })
   }, beatTimeout)
 

@@ -101,6 +101,15 @@ export const placeTask = (
 
 const lastLine = (text: string): string => text.trim().split("\n").at(-1)?.trim().slice(0, noteLength) ?? ""
 
+const outputSettleMillis = 500
+
+const settleOutput = <A, E>(fiber: Fiber.RuntimeFiber<A, E>): Effect.Effect<void> =>
+  Fiber.join(fiber).pipe(
+    Effect.ignore,
+    Effect.timeoutOption({ duration: Duration.millis(outputSettleMillis) }),
+    Effect.flatMap((done) => done._tag === "Some" ? Effect.void : Fiber.interrupt(fiber))
+  )
+
 type StartResult = { readonly kind: "started"; readonly note: string } | { readonly kind: "failed"; readonly reason: string }
 
 const runStart = (
@@ -110,14 +119,14 @@ const runStart = (
   Effect.gen(function*() {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const [command, ...args] = machine.start
-    const handle = yield* spawner.spawn(ChildProcess.make(command, args, { env, extendEnv: true }))
+    const handle = yield* spawner.spawn(ChildProcess.make(command, args, { env, extendEnv: true, detached: false }))
     const out = yield* Ref.make("")
     const err = yield* Ref.make("")
     const outFiber = yield* handle.stdout.pipe(Stream.decodeText(), Stream.runForEach((chunk) => Ref.update(out, (text) => text + chunk)), Effect.fork)
     const errFiber = yield* handle.stderr.pipe(Stream.decodeText(), Stream.runForEach((chunk) => Ref.update(err, (text) => text + chunk)), Effect.fork)
     const exitCode = yield* handle.exitCode
-    yield* Fiber.interrupt(outFiber)
-    yield* Fiber.interrupt(errFiber)
+    yield* settleOutput(outFiber)
+    yield* settleOutput(errFiber)
     const [stdout, stderr] = yield* Effect.all([Ref.get(out), Ref.get(err)])
     return exitCode === 0
       ? { kind: "started", note: lastLine(stdout) } satisfies StartResult

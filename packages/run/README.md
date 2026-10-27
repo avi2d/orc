@@ -241,6 +241,7 @@ A zero exit leaves the taken file as the runner left it and reports the last std
 A task marked for a machine waits for a slot on that machine and never starts on another.
 The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE` and `ORC_TASK_ACCOUNT`.
 It must hand the task on and exit within two minutes.
+A child the start command leaves behind keeps running after the exit.
 A start command that exits non-zero closes the task as `start-failed` with its last line of stderr.
 To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1`.
 When a started task ends, run `orc backlog close <task-id> <done|failed> [reason]`.
