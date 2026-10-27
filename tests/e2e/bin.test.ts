@@ -122,6 +122,8 @@ describe("orc bin", () => {
       const [runId] = await readdir(join(orcHome, "runs"))
       const settings: unknown = JSON.parse(await readFile(join(orcHome, "runs", runId, "session", "agent", "settings.json"), "utf8"))
       expect(settings).toEqual({ compaction: { modelOverrides: { "opencode-go/muse-spark-1.3-contributor": { reserveTokens: 112_144 } } } })
+      const models: unknown = JSON.parse(await readFile(join(orcHome, "runs", runId, "session", "agent", "models.json"), "utf8"))
+      expect(models).toEqual({ providers: { "opencode-go": { apiKey: "$OPENCODE_GO_KEY", modelOverrides: { "muse-spark-1.3-contributor": { contextWindow: 262_144 } } } } })
     })
   })
 

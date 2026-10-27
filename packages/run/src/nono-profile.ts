@@ -188,8 +188,32 @@ export const loginCheckCommand = (host: HostTools): ReadonlyArray<string> => [
   host.homeDir
 ]
 
-export const piAgentModels = (credential: ModelCredential): string =>
-  JSON.stringify({ providers: { [credential.provider]: { apiKey: "$" + credential.envVar } } }, null, 2) + "\n"
+export const piAgentModels = (credential: ModelCredential, models: ReadonlyArray<string>, windows: ReadonlyMap<string, number>): string => {
+  const overridesByProvider = new Map<string, Record<string, { readonly contextWindow: number }>>()
+  for (const model of new Set(models)) {
+    const slash = model.indexOf("/")
+    if (slash === -1) {
+      continue
+    }
+    const window = windows.get(model)
+    if (window === undefined) {
+      continue
+    }
+    const provider = model.slice(0, slash)
+    const id = model.slice(slash + 1)
+    const overrides = overridesByProvider.get(provider) ?? {}
+    overrides[id] = { contextWindow: window }
+    overridesByProvider.set(provider, overrides)
+  }
+  const providers: Record<string, unknown> = {
+    [credential.provider]: { apiKey: "$" + credential.envVar }
+  }
+  for (const [provider, modelOverrides] of overridesByProvider) {
+    const existing = providers[provider]
+    providers[provider] = typeof existing === "object" && existing !== null ? { ...(existing as Record<string, unknown>), modelOverrides } : { modelOverrides }
+  }
+  return JSON.stringify({ providers }, null, 2) + "\n"
+}
 
 interface CredentialRoute {
   readonly upstream: string

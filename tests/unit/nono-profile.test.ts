@@ -60,8 +60,12 @@ describe("loginCheckCommand", () => {
 
 describe("piAgentModels", () => {
   test("points the provider at the injected credential variable", () => {
-    const parsed: unknown = JSON.parse(piAgentModels(credential))
+    const parsed: unknown = JSON.parse(piAgentModels(credential, [], new Map()))
     expect(parsed).toEqual({ providers: { "opencode-go": { apiKey: "$OPENCODE_GO_KEY" } } })
+  })
+  test("pins each agent window where the sandbox resolves it rather than leaving the built-in window", () => {
+    const parsed: unknown = JSON.parse(piAgentModels(credential, ["opencode-go/muse-spark-1.3-contributor"], new Map([["opencode-go/muse-spark-1.3-contributor", 262_144]])))
+    expect(parsed).toEqual({ providers: { "opencode-go": { apiKey: "$OPENCODE_GO_KEY", modelOverrides: { "muse-spark-1.3-contributor": { contextWindow: 262_144 } } } } })
   })
 })
 

@@ -238,7 +238,7 @@ const prepareAgents = (
     const settings = yield* Effect.fromResult(contextMarkSettings([agent.model, fixer.model], windows)).pipe(
       Effect.mapError((message) => new OrcRunError({ message }))
     )
-    yield* fs.writeFileString(path.join(folders.piAgentDir, "models.json"), piAgentModels(credential)).pipe(
+    yield* fs.writeFileString(path.join(folders.piAgentDir, "models.json"), piAgentModels(credential, [agent.model, fixer.model], windows)).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the agent models file: " + String(cause) }))
     )
     yield* fs.writeFileString(path.join(folders.piAgentDir, "settings.json"), settings).pipe(
