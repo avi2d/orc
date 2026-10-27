@@ -22,7 +22,7 @@ export interface Claim {
 
 export interface Started {
   readonly at: string
-  readonly note: string
+  readonly log: string
 }
 
 type Closing =
@@ -57,7 +57,7 @@ const Frontmatter = Schema.Struct({
   account: Schema.optional(Schema.String),
   taken_at: Schema.optional(Schema.String),
   started_at: Schema.optional(Schema.String),
-  start_note: Schema.optional(Schema.String),
+  start_log: Schema.optional(Schema.String),
   outcome: Schema.optional(Schema.Literals(["done", "failed", "start-failed"])),
   closed_at: Schema.optional(Schema.String),
   reason: Schema.optional(Schema.String)
@@ -72,7 +72,7 @@ const claimOf = (front: Frontmatter): Claim | null =>
     : { beat: front.beat, machine: front.taken_for, account: front.account, takenAt: front.taken_at }
 
 const startedOf = (front: Frontmatter): Started | null =>
-  front.started_at === undefined ? null : { at: front.started_at, note: front.start_note ?? "" }
+  front.started_at === undefined ? null : { at: front.started_at, log: front.start_log ?? "" }
 
 const closingOf = (front: Frontmatter, started: Started | null): Closing | null => {
   const reason = front.reason ?? ""
@@ -154,7 +154,7 @@ const claimFields = (claim: Claim | null): ReadonlyArray<string> =>
     ? []
     : [field("beat", claim.beat), field("taken_for", claim.machine), field("account", claim.account), field("taken_at", claim.takenAt)]
 
-const startedFields = (started: Started): ReadonlyArray<string> => [field("started_at", started.at), field("start_note", started.note)]
+const startedFields = (started: Started): ReadonlyArray<string> => [field("started_at", started.at), field("start_log", started.log)]
 
 const stateFields = (state: TaskState): ReadonlyArray<string> => {
   switch (state.kind) {

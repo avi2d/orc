@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { spawn } from "node:child_process"
+import { once } from "node:events"
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -114,35 +116,28 @@ const withFixture = async (shape: FixtureShape, body: (fixture: Fixture) => Prom
   }
 }
 
-const alive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch {
-    return false
-  }
-}
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null
-
-const beatActions = (text: string): ReadonlyArray<Record<string, unknown>> => {
-  const document: unknown = JSON.parse(text)
-  if (typeof document !== "object" || document === null || !("actions" in document) || !Array.isArray(document.actions)) {
-    throw new Error("orc beat --json printed no action list: " + text)
-  }
-  const actions: Array<Record<string, unknown>> = []
-  for (const entry of document.actions) {
-    if (!isRecord(entry)) {
-      throw new Error("orc beat --json printed no action list: " + text)
-    }
-    actions.push(entry)
-  }
-  return actions
-}
+const startSettleMillis = 300
+const startWaitMillis = 10_000
 
 const startedLines = async (fixture: Fixture): Promise<ReadonlyArray<string>> =>
   (await readFile(fixture.startLog, "utf8")).split("\n").filter((line) => line !== "").sort()
+
+const eventually = async <A>(read: () => Promise<A>, done: (value: A) => boolean): Promise<A> => {
+  const deadline = Date.now() + startWaitMillis
+  let value = await read()
+  while (!done(value) && Date.now() < deadline) {
+    await Bun.sleep(20)
+    value = await read()
+  }
+  return value
+}
+
+// The beat does not wait on a start command, so a start shows in the log only after it ran, and a duplicate only after both ran.
+const settledStarts = async (fixture: Fixture, count: number): Promise<ReadonlyArray<string>> => {
+  await eventually(() => startedLines(fixture), (lines) => lines.length >= count)
+  await Bun.sleep(startSettleMillis)
+  return startedLines(fixture)
+}
 
 const addTasks = async (fixture: Fixture, count: number, machine: (index: number) => string | null = () => null): Promise<void> => {
   for (let index = 0; index < count; index += 1) {
@@ -161,6 +156,35 @@ const raceTwoBeats = async (fixture: Fixture): Promise<void> => {
 const backlogTasks = async (fixture: Fixture): Promise<ReadonlyArray<TaskJson>> =>
   parseBacklogTasks(await orcOk(fixture, ["backlog", "--json"]))
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null
+
+const backlogTask = async (fixture: Fixture, id: string): Promise<Record<string, unknown> | undefined> => {
+  const document: unknown = JSON.parse(await orcOk(fixture, ["backlog", "--json"]))
+  if (!isRecord(document) || !Array.isArray(document.tasks)) {
+    throw new Error("orc backlog --json printed no task list")
+  }
+  const tasks: ReadonlyArray<unknown> = document.tasks
+  return tasks.filter(isRecord).find((task) => task.id === id)
+}
+
+const writeMachines = async (fixture: Fixture, start: ReadonlyArray<string>): Promise<void> => {
+  await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({
+    machines: [{ name: "mac", slots: 1, start }, { name: "winbox", slots: 0, start: ["true"] }],
+    quota: { accounts: ["main"], floorPercent: 15 }
+  }))
+}
+
+const endProcessGroup = (pid: number): void => {
+  try {
+    process.kill(-pid, "SIGKILL")
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "ESRCH")) {
+      throw error
+    }
+  }
+}
+
 const taskIds = (count: number): ReadonlyArray<string> => Array.from({ length: count }, (_, index) => "task-" + (index + 1))
 
 describe("orc beat", () => {
@@ -170,7 +194,7 @@ describe("orc beat", () => {
         await addTasks(fixture, 3, (index) => index === 0 ? "winbox" : null)
         await raceTwoBeats(fixture)
       }
-      const started = (await startedLines(fixture)).map((line) => line.split(" ")[0])
+      const started = (await settledStarts(fixture, 3 * raceRounds)).map((line) => line.split(" ")[0])
       expect(started).toEqual([...taskIds(3 * raceRounds)].sort())
       expect((await backlogTasks(fixture)).map((task) => task.status)).toEqual(taskIds(3 * raceRounds).map(() => "started"))
     })
@@ -181,11 +205,11 @@ describe("orc beat", () => {
       await addTasks(fixture, 2 * raceRounds)
       for (let round = 1; round <= raceRounds; round += 1) {
         await raceTwoBeats(fixture)
-        expect((await startedLines(fixture)).length).toBeLessThanOrEqual(round)
+        expect((await backlogTasks(fixture)).filter((task) => task.status === "started").length).toBeLessThanOrEqual(1)
         await orcOk(fixture, ["beat"])
-        expect(await startedLines(fixture)).toHaveLength(round)
         const running = (await backlogTasks(fixture)).filter((task) => task.status === "started")
         expect(running).toHaveLength(1)
+        expect(await settledStarts(fixture, round)).toHaveLength(round)
         await orcOk(fixture, ["backlog", "close", running[0]?.id ?? "", "done"])
       }
     })
@@ -195,98 +219,51 @@ describe("orc beat", () => {
     await withFixture({ mac: 20, winbox: 1, floorPercent: 15 }, async (fixture) => {
       await addTasks(fixture, 3, (index) => index < 2 ? "winbox" : null)
       expect(await orcOk(fixture, ["beat"])).toContain("waits task-2: winbox has no room")
-      expect(await startedLines(fixture)).toEqual(["task-1 winbox", "task-3 mac"])
+      expect(await settledStarts(fixture, 2)).toEqual(["task-1 winbox", "task-3 mac"])
       await orcOk(fixture, ["backlog", "close", "task-1", "done"])
       await orcOk(fixture, ["beat"])
-      expect(await startedLines(fixture)).toEqual(["task-1 winbox", "task-2 winbox", "task-3 mac"])
+      expect(await settledStarts(fixture, 3)).toEqual(["task-1 winbox", "task-2 winbox", "task-3 mac"])
     })
   }, beatTimeout)
 
-  test("a runner that closes before the start command exits leaves the task closed failed instead of stuck started", async () => {
+  test("a runner that closes its task at once leaves it closed failed instead of refused as not started", async () => {
     await withFixture({ mac: 1, winbox: 0, floorPercent: 15 }, async (fixture) => {
-      const closeFirst = ["sh", "-c", "\"" + process.execPath + "\" \"" + binPath + "\" backlog close \"$ORC_TASK_ID\" failed"]
-      await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({
-        machines: [{ name: "mac", slots: 1, start: closeFirst }, { name: "winbox", slots: 0, start: ["true"] }],
-        quota: { accounts: ["main"], floorPercent: 15 }
-      }))
+      await writeMachines(fixture, ["sh", "-c", "\"" + process.execPath + "\" \"" + binPath + "\" backlog close \"$ORC_TASK_ID\" failed"])
       await addTasks(fixture, 1)
       expect(await orcOk(fixture, ["beat"])).toContain("started task-1")
-      const document: unknown = JSON.parse(await orcOk(fixture, ["backlog", "--json"]))
-      if (typeof document !== "object" || document === null || !("tasks" in document) || !Array.isArray(document.tasks)) {
-        throw new Error("orc backlog --json printed no task list")
-      }
-      const task: unknown = document.tasks[0]
-      if (!isRecord(task)) {
-        throw new Error("orc backlog --json printed a task with no id or status")
-      }
-      expect(task.status).toBe("closed")
-      expect(task.outcome).toBe("failed")
+      const task = await eventually(() => backlogTask(fixture, "task-1"), (found) => found?.status === "closed")
+      expect(task?.status).toBe("closed")
+      expect(task?.outcome).toBe("failed")
     })
   }, beatTimeout)
 
-  test("a start command that leaves a child behind still reports started at once and leaves the child running", async () => {
+  test("a start command outlives the end of the beat's process group instead of dying with it", async () => {
     await withFixture({ mac: 1, winbox: 0, floorPercent: 15 }, async (fixture) => {
-      const pidFile = join(fixture.dir, "child.pid")
-      const lingering = ["sh", "-c", "sleep 30 & echo $! > '" + pidFile + "'; echo handed-off"]
-      await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({
-        machines: [{ name: "mac", slots: 1, start: lingering }, { name: "winbox", slots: 0, start: ["true"] }],
-        quota: { accounts: ["main"], floorPercent: 15 }
-      }))
+      const marker = join(fixture.dir, "handed-on")
+      await writeMachines(fixture, ["sh", "-c", "sleep 1; echo \"$ORC_TASK_ID\" > '" + marker + "'"])
       await addTasks(fixture, 1)
-      const before = Date.now()
-      expect(await orcOk(fixture, ["beat"])).toContain("started task-1")
-      expect(Date.now() - before).toBeLessThan(10_000)
-      const pid = Number(await readFile(pidFile, "utf8"))
-      expect(Number.isInteger(pid)).toBe(true)
-      expect(alive(pid)).toBe(true)
-      process.kill(pid)
+      const beat = spawn(process.execPath, [binPath, "beat"], {
+        cwd: fixture.dir,
+        detached: true,
+        stdio: "ignore",
+        env: { ...process.env, ...fixture.env }
+      })
+      const [exitCode] = await once(beat, "exit")
+      expect(exitCode).toBe(0)
+      endProcessGroup(beat.pid ?? 0)
+      expect(await eventually(() => readFile(marker, "utf8").catch(() => ""), (text) => text !== "")).toBe("task-1\n")
     })
   }, beatTimeout)
 
-  test("the beat reports the start command's last lines instead of dropping them", async () => {
-    await withFixture({ mac: 5, winbox: 0, floorPercent: 15 }, async (fixture) => {
-      const noter = ["sh", "-c", "echo \"ready $ORC_TASK_ID\""]
-      await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({
-        machines: [{ name: "mac", slots: 5, start: noter }, { name: "winbox", slots: 0, start: ["true"] }],
-        quota: { accounts: ["main"], floorPercent: 15 }
-      }))
-      for (let index = 1; index <= 5; index += 1) {
-        await addTasks(fixture, 1)
-        const expected = "ready task-" + index
-        if (index % 2 === 0) {
-          const action = beatActions(await orcOk(fixture, ["beat", "--json"])).find((candidate) => candidate.task === "task-" + index)
-          expect(action?.kind).toBe("started")
-          expect(action?.note).toBe(expected)
-        } else {
-          expect(await orcOk(fixture, ["beat"])).toContain("started task-" + index + " on mac with main: " + expected)
-        }
-      }
-    })
-    await withFixture({ mac: 5, winbox: 0, floorPercent: 15 }, async (fixture) => {
-      const failer = ["sh", "-c", "echo \"no checkout for $ORC_TASK_ID\" >&2; exit 1"]
-      await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({
-        machines: [{ name: "mac", slots: 5, start: failer }, { name: "winbox", slots: 0, start: ["true"] }],
-        quota: { accounts: ["main"], floorPercent: 15 }
-      }))
-      await addTasks(fixture, 5)
-      await orcOk(fixture, ["beat"])
-      const document: unknown = JSON.parse(await orcOk(fixture, ["backlog", "--json"]))
-      if (typeof document !== "object" || document === null || !("tasks" in document) || !Array.isArray(document.tasks)) {
-        throw new Error("orc backlog --json printed no task list")
-      }
-      const tasks: Array<Record<string, unknown>> = []
-      for (const entry of document.tasks) {
-        if (!isRecord(entry)) {
-          throw new Error("orc backlog --json printed a task with no id or status")
-        }
-        tasks.push(entry)
-      }
-      for (let index = 1; index <= 5; index += 1) {
-        const task = tasks.find((candidate) => candidate.id === "task-" + index)
-        expect(task?.status).toBe("closed")
-        expect(task?.outcome).toBe("start-failed")
-        expect(task?.reason).toContain("no checkout for task-" + index)
-      }
+  test("the start command's output goes to the task's log instead of the beat's output", async () => {
+    await withFixture({ mac: 1, winbox: 0, floorPercent: 15 }, async (fixture) => {
+      await writeMachines(fixture, ["sh", "-c", "echo \"out $ORC_TASK_ID\"; echo \"err $ORC_TASK_ID\" >&2"])
+      await addTasks(fixture, 1)
+      const log = join(fixture.dir, "home", "backlog", "logs", "task-1.log")
+      const output = await orcOk(fixture, ["beat"])
+      expect(output).toContain("started task-1 on mac with main, output to " + log)
+      expect(output).not.toContain("out task-1")
+      expect(await eventually(() => readFile(log, "utf8").catch(() => ""), (text) => text.includes("err"))).toBe("out task-1\nerr task-1\n")
     })
   }, beatTimeout)
 

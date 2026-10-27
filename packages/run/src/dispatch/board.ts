@@ -146,7 +146,7 @@ export const formatBoard = (view: BacklogView): string => {
 const actionLine = (action: BeatAction): string => {
   switch (action.kind) {
     case "started": {
-      return "started " + action.task + " on " + action.machine + " with " + action.account + (action.note === "" ? "" : ": " + action.note)
+      return "started " + action.task + " on " + action.machine + " with " + action.account + ", output to " + action.log
     }
     case "start-failed": {
       return "start failed " + action.task + " on " + action.machine + ": " + action.reason

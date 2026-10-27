@@ -1,12 +1,13 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, readdir, rm } from "node:fs/promises"
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, Result } from "effect"
+import { Effect, FileSystem, Layer, Result } from "effect"
+import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../packages/run/src/dispatch/args"
 import { addTask, claimTask, closeStartedTask, listTasks, releaseTask, writeTaken } from "../../packages/run/src/dispatch/backlog"
-import { placeTask } from "../../packages/run/src/dispatch/beat"
+import { placeTask, runBeat } from "../../packages/run/src/dispatch/beat"
 import { backlogJson, formatBoard } from "../../packages/run/src/dispatch/board"
 import type { DispatchConfig, Project } from "../../packages/run/src/dispatch/config"
 import { assessClauthStatus } from "../../packages/run/src/dispatch/quota"
@@ -36,6 +37,26 @@ const config: DispatchConfig = {
 const projects: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Users/a/orc", winbox: "/home/a/orc" } }]
 
 const newTask = (machine: string | null): TaskRecord => ({ spec: { ...spec, id: "task-1", machine }, state: { kind: "new" } })
+
+const clauthReply = JSON.stringify({
+  schema: 2,
+  profiles: [{ name: "main", auth_status: "ok", fetch_status: "Fresh", stale: false, windows: [{ label: "5h", utilization_pct: 10 }, { label: "7d", utilization_pct: 20 }] }]
+})
+
+// Answers clauth itself and reads the task file at the moment the beat asks for the start command, before any process runs.
+const recordingSpawner = (taskFile: string, seen: Array<string>): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner, never, ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem> =>
+  Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
+    const real = yield* ChildProcessSpawner.ChildProcessSpawner
+    const fs = yield* FileSystem.FileSystem
+    return ChildProcessSpawner.make((command) =>
+      ChildProcess.isStandardCommand(command) && command.command === "clauth"
+        ? real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + clauthReply + "\nJ"]))
+        : fs.readFileString(taskFile).pipe(
+          Effect.tap((text) => Effect.sync(() => seen.push(text))),
+          Effect.flatMap(() => real.spawn(command))
+        )
+    )
+  }))
 
 describe("parseDispatchArgs", () => {
   test("backlog with no argument shows the board, not JSON", () => {
@@ -79,7 +100,7 @@ describe("task files", () => {
   test("a body holding a --- line survives a write and a read instead of being cut there", async () => {
     const record: TaskRecord = {
       spec: { ...spec, id: "task-2", body: "Before\n---\nAfter\n" },
-      state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", note: "queued 12" } }
+      state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: "/home/captain/.orc/backlog/logs/task-2.log" } }
     }
     expect(await run(parseTaskFile("task-2.md", "taken", renderTaskFile(record)))).toEqual(record)
   })
@@ -182,11 +203,27 @@ describe("the backlog folders", () => {
     await withBacklog(async (root) => {
       const record = await run(addTask(root, spec))
       await run(claimTask(root, record.spec.id))
-      await run(writeTaken(root, { spec: record.spec, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", note: "" } } }))
+      await run(writeTaken(root, { spec: record.spec, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
       await run(closeStartedTask(root, record.spec.id, "done", "merged", "2026-10-27T11:00:00.000Z"))
       const tasks = await run(listTasks(root))
       expect(tasks.map((task) => task.state.kind)).toEqual(["closed"])
       expect(await readdir(join(root, "taken"))).toEqual([])
+    })
+  })
+})
+
+describe("the beat", () => {
+  test("the task file says started before the start command is spawned instead of after", async () => {
+    await withBacklog(async (root) => {
+      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["true"] }, { name: "winbox", slots: 0, start: ["true"] }] }))
+      await writeFile(join(root, "projects.json"), JSON.stringify({ projects }))
+      await run(addTask(root, spec))
+      const seen: Array<string> = []
+      const spawner = recordingSpawner(join(root, "taken", "task-1.md"), seen).pipe(Layer.provide(BunServices.layer))
+      const report = await Effect.runPromise(runBeat(root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+      expect(report.actions.map((action) => action.kind)).toEqual(["started"])
+      expect(seen).toHaveLength(1)
+      expect(seen[0]).toContain("started_at: ")
     })
   })
 })

@@ -16,6 +16,8 @@ export const isTaskId = (id: string): boolean => idPattern.test(id)
 interface BacklogPaths {
   readonly root: string
   readonly ids: string
+  readonly logs: string
+  readonly logFile: (id: string) => string
   readonly dispatchConfig: string
   readonly projects: string
   readonly folder: (folder: TaskFolder) => string
@@ -25,6 +27,8 @@ interface BacklogPaths {
 export const backlogPaths = (root: string): BacklogPaths => ({
   root,
   ids: root + "/ids",
+  logs: root + "/logs",
+  logFile: (id: string): string => root + "/logs/" + id + ".log",
   dispatchConfig: root + "/dispatch.json",
   projects: root + "/projects.json",
   folder: (folder: TaskFolder): string => root + "/" + folder,
@@ -38,7 +42,7 @@ export const ensureBacklog = (root: string): Effect.Effect<void, BacklogError, F
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const paths = backlogPaths(root)
-    for (const folder of [paths.ids, ...taskFolders.map(paths.folder)]) {
+    for (const folder of [paths.ids, paths.logs, ...taskFolders.map(paths.folder)]) {
       yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.mapError(platformFailure("make " + folder)))
     }
   })

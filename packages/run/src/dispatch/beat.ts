@@ -1,5 +1,5 @@
-import { DateTime, Duration, Effect, type FileSystem } from "effect"
-import type { ChildProcessSpawner } from "effect/process"
+import { DateTime, Effect, type FileSystem } from "effect"
+import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimTask, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken } from "./backlog"
 import { checkoutOn, type ConfigError, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "./config"
 import { type QuotaReading, readQuota } from "./quota"
@@ -12,7 +12,7 @@ export interface MachineRoom {
 }
 
 export type BeatAction =
-  | { readonly kind: "started"; readonly task: string; readonly machine: string; readonly account: string; readonly note: string }
+  | { readonly kind: "started"; readonly task: string; readonly machine: string; readonly account: string; readonly log: string }
   | { readonly kind: "start-failed"; readonly task: string; readonly machine: string; readonly reason: string }
   | { readonly kind: "lost"; readonly task: string }
   | { readonly kind: "given-back"; readonly task: string; readonly machine: string }
@@ -27,9 +27,6 @@ export interface BeatReport {
 }
 
 type BeatRequirements = FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
-
-const startSeconds = 120
-const noteLength = 200
 
 const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
@@ -99,103 +96,32 @@ export const placeTask = (
   return { kind: "place", machine: best.machine, checkout: best.checkout }
 }
 
-const lastLine = (text: string): string => text.trim().split("\n").at(-1)?.trim().slice(0, noteLength) ?? ""
+type StartResult = { readonly kind: "started" } | { readonly kind: "failed"; readonly reason: string }
 
-const outputSettleMillis = 500
+// Effect's spawner takes no file for stdio, so a shell sends the start command's output to the task's log.
+const logToTaskLog = ["sh", "-c", "exec \"$@\" >> \"$ORC_TASK_LOG\" 2>&1", "orc-start"] as const
 
-type StartResult = { readonly kind: "started"; readonly note: string } | { readonly kind: "failed"; readonly reason: string }
-
-const collectStream = (
-  stream: ReadableStream<Uint8Array> | null,
-  append: (text: string) => void
-): (() => void) => {
-  if (stream === null) {
-    return () => {}
-  }
-  const reader = stream.getReader()
-  const decoder = new TextDecoder()
-  let settled = false
-  const release = (): void => {
-    if (!settled) {
-      settled = true
-      reader.releaseLock()
-    }
-  }
-  const step = (): void => {
-    reader.read().then((next) => {
-      if (next.done) {
-        release()
-        return
-      }
-      append(decoder.decode(next.value, { stream: true }))
-      step()
-    }, release)
-  }
-  step()
-  return () => {
-    if (!settled) {
-      void reader.cancel().then(undefined, () => undefined)
-    }
-  }
-}
-
-const runStart = (
+// The start command leads its own session and is unreferenced before the scope closes, so the spawner leaves it running and the beat exits without it.
+const handOn = (
   machine: Machine,
   env: Record<string, string>
-): Effect.Effect<StartResult> =>
-  Effect.try({
-    try: () => Bun.spawn([...machine.start], {
-      env: { ...Bun.env, ...env },
-      stdio: ["pipe", "pipe", "pipe"]
-    }),
-    catch: (cause) => "the start command did not run: " + (cause instanceof Error ? cause.message : String(cause))
+): Effect.Effect<StartResult, never, ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+    const [shell, ...args] = logToTaskLog
+    const handle = yield* spawner.spawn(ChildProcess.make(shell, [...args, ...machine.start], {
+      env,
+      extendEnv: true,
+      detached: true,
+      stdin: "ignore",
+      stdout: "ignore",
+      stderr: "ignore"
+    }))
+    yield* Effect.asVoid(handle.unref)
+    return { kind: "started" } satisfies StartResult
   }).pipe(
-    Effect.matchEffect({
-      onFailure: (reason) => Effect.succeed<StartResult>({ kind: "failed", reason }),
-      onSuccess: (child) =>
-        Effect.callback((resume: (effect: Effect.Effect<StartResult>) => void) => {
-            let stdout = ""
-            let stderr = ""
-            let finished = false
-            let timer: ReturnType<typeof setTimeout> | undefined
-            const cancelStdout = collectStream(child.stdout, (text) => {
-              stdout += text
-            })
-            const cancelStderr = collectStream(child.stderr, (text) => {
-              stderr += text
-            })
-            const finish = (result: StartResult): void => {
-              if (finished) {
-                return
-              }
-              finished = true
-              timer = setTimeout(() => {
-                cancelStdout()
-                cancelStderr()
-                resume(Effect.succeed(result))
-              }, outputSettleMillis)
-            }
-            void child.exited.then((code) => {
-              finish(code === 0
-                ? { kind: "started", note: lastLine(stdout) } satisfies StartResult
-                : { kind: "failed", reason: "the start command exited " + code + ": " + lastLine(stderr) } satisfies StartResult)
-            }, (cause: unknown) => {
-              finish({ kind: "failed", reason: "the start command did not run: " + (cause instanceof Error ? cause.message : String(cause)) })
-            })
-          return Effect.sync(() => {
-            clearTimeout(timer)
-            cancelStdout()
-            cancelStderr()
-            if (!finished) {
-              child.kill("SIGTERM")
-            }
-          })
-        })
-    }),
-    Effect.timeoutOrElse({
-      duration: Duration.seconds(startSeconds),
-      orElse: () => Effect.succeed<StartResult>({ kind: "failed", reason: "the start command ran past " + startSeconds + " seconds" })
-    })
+    Effect.scoped,
+    Effect.catch((error) => Effect.succeed<StartResult>({ kind: "failed", reason: "the start command did not run: " + error.message }))
   )
 
 // Each beat writes its claim before it counts, so of two beats racing for a machine's last slot at least one sees both claims.
@@ -221,8 +147,10 @@ const startTask = (
       yield* releaseTask(root, taken)
       return { kind: "given-back", task: task.spec.id, machine: machine.name } satisfies BeatAction
     }
-    yield* writeTaken(root, { spec: task.spec, state: { kind: "started", claim, started: { at: yield* nowIso, note: "" } } })
-    const result = yield* runStart(machine, {
+    const log = backlogPaths(root).logFile(task.spec.id)
+    yield* writeTaken(root, { spec: task.spec, state: { kind: "started", claim, started: { at: yield* nowIso, log } } })
+    const result = yield* handOn(machine, {
+      ORC_TASK_LOG: log,
       ORC_TASK_ID: task.spec.id,
       ORC_TASK_FILE: backlogPaths(root).taskFile("taken", task.spec.id),
       ORC_TASK_PROJECT: task.spec.project,
@@ -231,7 +159,7 @@ const startTask = (
       ORC_TASK_ACCOUNT: claim.account
     })
     if (result.kind === "started") {
-      return { kind: "started", task: task.spec.id, machine: machine.name, account: claim.account, note: result.note } satisfies BeatAction
+      return { kind: "started", task: task.spec.id, machine: machine.name, account: claim.account, log } satisfies BeatAction
     }
     yield* publishClosed(root, {
       spec: task.spec,

@@ -228,7 +228,6 @@ To see the backlog, run `orc backlog`.
 It prints the new, taken and closed tasks side by side with the project list and each machine's busy slots beside them.
 To print the same facts as JSON, run `orc backlog --json`, whose document names its version first as `orc.backlog.v1`.
 To start what can start, run `orc beat`, from launchd or cron every few minutes.
-A launchd plist that relies on backgrounded children needs AbandonProcessGroup set to true.
 Each beat reads quota with `clauth status --json` and the room on each machine before it takes any task.
 A task starts only once three things hold:
 
@@ -237,15 +236,13 @@ A task starts only once three things hold:
 3. A Claude account has room at or above the floor.
 
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
-After the claim survives a recount the beat writes the task started in `taken` before it runs the start command, so a close from the runner lands on a started task.
-A zero exit leaves the taken file as the runner left it and reports the last stdout line in the beat only.
+After the claim survives a recount, the beat writes the task started before it runs the start command.
 A task marked for a machine waits for a slot on that machine and never starts on another.
 The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE` and `ORC_TASK_ACCOUNT`.
-It must hand the task on and exit within two minutes.
-The start command must hand the task to something that outlives orc, such as pueue or ssh.
-Orc leaves the start command's children alone.
-Launchd and cron may end orc's process group when the beat exits, so a bare `runner &` does not hand the task off.
-A start command that exits non-zero closes the task as `start-failed` with its last line of stderr.
+The beat starts it in its own session and does not wait for it, so it keeps running after the beat exits.
+Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
+From then on the task is the start command's to close, and one that fails leaves the task started until it is closed.
+A start command that cannot be spawned closes the task as `start-failed`.
 To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1`.
 When a started task ends, run `orc backlog close <task-id> <done|failed> [reason]`.
 
