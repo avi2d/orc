@@ -166,6 +166,8 @@ const schemaStatements: ReadonlyArray<string> = [
 
 const SchemaVersionRow = Schema.Struct({ user_version: Schema.Finite })
 
+const busyTimeoutMillis = 5000
+
 const migrate = (db: Database): Effect.Effect<void, HistoryError> =>
   Effect.gen(function*() {
     const versionRow = yield* sqlite(() => db.query("PRAGMA user_version").get())
@@ -192,7 +194,8 @@ export const openDatabase = (
     const path = yield* Path.Path
     yield* fs.makeDirectory(homeDir, { recursive: true })
     const db = yield* sqlite(() => new Database(path.join(homeDir, "orc.sqlite"), { create: true }))
-    return yield* migrate(db).pipe(
+    return yield* sqlite(() => db.run(`PRAGMA busy_timeout = ${busyTimeoutMillis}`)).pipe(
+      Effect.andThen(migrate(db)),
       Effect.as(db),
       Effect.onError(() => Effect.sync(() => db.close()))
     )
