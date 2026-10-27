@@ -19,6 +19,8 @@ const piStream = [
   JSON.stringify({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "Committed.\n" + orcCompletionLine } })
 ].join("\n") + "\n"
 
+const modelListReply = JSON.stringify({ id: "orc-models", type: "response", command: "get_available_models", success: true, data: { models: [{ provider: "opencode-go", id: "muse-spark-1.3-contributor", contextWindow: 262144 }] } })
+
 const noMistakesReplies = [
   ["run:", "  id: \"01STUB\"", "  branch: orc/test", "  status: completed", "  head: abc1234", "  pr: \"" + prUrl + "\"", "  findings: none", "outcome: passed"],
   ["run:", "  id: \"01STUB\"", "  branch: orc/test", "  status: running", "  pr: \"" + prUrl + "\"", "  steps[2]{step,status,findings,duration_ms}:", "    review,completed,0,3928", "    ci,running,0,0"]
@@ -57,6 +59,7 @@ const withNoSandboxFixture = async (body: (fixture: NoSandboxFixture) => Promise
     await writeFile(join(fakeBin, "stream.jsonl"), piStream)
     await writeScript(join(fakeBin, "pi"), [
       "if [ \"$1\" = auth ]; then exit 0; fi",
+      "if [ \"$1\" = --mode ]; then cat > /dev/null; echo '" + modelListReply + "'; exit 0; fi",
       "if [ \"$1\" != -p ]; then exit 2; fi",
       "cat > /dev/null",
       "pwd > \"" + fakeBin + "/pi-cwd\"",
