@@ -1,0 +1,108 @@
+import { Console, DateTime, Effect, FileSystem, Path } from "effect"
+import type { ChildProcessSpawner } from "effect/process"
+import type { DispatchArgs } from "./args"
+import { addTask, backlogPaths, BacklogError, closeStartedTask, isTaskId, listTasks } from "./backlog"
+import { readRoom, runBeat } from "./beat"
+import { backlogJson, type BacklogView, beatJson, formatBeat, formatBoard, type ProjectList, type RoomList } from "./board"
+import { checkoutOn, type ConfigError, type DispatchConfig, readDispatchConfig, readProjects } from "./config"
+import type { TaskFileError, TaskRecord } from "./task-record"
+
+type CommandArgs = Exclude<DispatchArgs, { readonly kind: "UsageError" }>
+
+export interface DispatchPlace {
+  readonly root: string
+  readonly cwd: string
+}
+
+type CliRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
+
+const failure = (error: BacklogError | ConfigError | TaskFileError): string =>
+  error instanceof BacklogError ? error.detail : error.file + ": " + error.detail
+
+type ConfigReading = { readonly kind: "read"; readonly config: DispatchConfig } | { readonly kind: "unread"; readonly reason: string }
+
+const readView = (root: string): Effect.Effect<BacklogView, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const paths = backlogPaths(root)
+    const tasks = yield* listTasks(root)
+    const reading = yield* readDispatchConfig(paths.dispatchConfig).pipe(
+      Effect.map((config): ConfigReading => ({ kind: "read", config })),
+      Effect.catchTag("ConfigError", (error) => Effect.succeed<ConfigReading>({ kind: "unread", reason: failure(error) }))
+    )
+    if (reading.kind === "unread") {
+      return { tasks, projects: reading, room: reading }
+    }
+    const projects = yield* readProjects(paths.projects, reading.config.machines).pipe(
+      Effect.map((list): ProjectList => ({ kind: "read", projects: list })),
+      Effect.catchTag("ConfigError", (error) => Effect.succeed<ProjectList>({ kind: "unread", reason: failure(error) }))
+    )
+    const room: RoomList = { kind: "read", room: readRoom(reading.config.machines, tasks) }
+    return { tasks, projects, room }
+  })
+
+const titleOf = (body: string): string =>
+  body.split("\n").map((line) => line.replace(/^#+\s*/, "").trim()).find((line) => line !== "") ?? ""
+
+const refuse = (detail: string) => Effect.fail(new BacklogError({ detail }))
+
+const refusedDependency = (dependsOn: ReadonlyArray<string>, tasks: ReadonlyArray<TaskRecord>): string | null =>
+  dependsOn.find((id) => !isTaskId(id) || !tasks.some((task) => task.spec.id === id)) ?? null
+
+const add = (args: Extract<CommandArgs, { readonly kind: "AddTask" }>, place: DispatchPlace) =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const paths = backlogPaths(place.root)
+    const config = yield* readDispatchConfig(paths.dispatchConfig)
+    const project = (yield* readProjects(paths.projects, config.machines)).find((candidate) => candidate.name === args.project)
+    if (project === undefined) {
+      return yield* refuse("the project " + args.project + " is not in " + paths.projects)
+    }
+    if (args.machine !== null && checkoutOn(project, args.machine) === null) {
+      return yield* refuse("the project " + args.project + " has no checkout on " + args.machine + " in " + paths.projects)
+    }
+    const dependency = refusedDependency(args.dependsOn, yield* listTasks(place.root))
+    if (dependency !== null) {
+      return yield* refuse("the backlog holds no task " + dependency)
+    }
+    const taskPath = path.resolve(place.cwd, args.taskFile)
+    const body = yield* fs.readFileString(taskPath).pipe(
+      Effect.mapError((error) => new BacklogError({ detail: "cannot read the task file " + taskPath + ": " + error.message }))
+    )
+    const title = titleOf(body)
+    if (title === "") {
+      return yield* refuse("the task file " + taskPath + " holds no text")
+    }
+    const created = DateTime.formatIso(yield* DateTime.now)
+    const record = yield* addTask(place.root, { title, project: project.name, machine: args.machine, dependsOn: args.dependsOn, created, body })
+    yield* Console.log("added " + record.spec.id + " for " + project.name + (args.machine === null ? "" : " on " + args.machine))
+  })
+
+const execute = (args: CommandArgs, place: DispatchPlace) =>
+  Effect.gen(function*() {
+    switch (args.kind) {
+      case "ShowBacklog": {
+        const view = yield* readView(place.root)
+        yield* Console.log(args.json ? JSON.stringify(backlogJson(view)) : formatBoard(view))
+        break
+      }
+      case "AddTask": {
+        yield* add(args, place)
+        break
+      }
+      case "CloseTask": {
+        const closedAt = DateTime.formatIso(yield* DateTime.now)
+        yield* closeStartedTask(place.root, args.id, args.outcome, args.reason, closedAt)
+        yield* Console.log("closed " + args.id + " " + args.outcome)
+        break
+      }
+      case "Beat": {
+        const report = yield* runBeat(place.root)
+        yield* Console.log(args.json ? JSON.stringify(beatJson(report)) : formatBeat(report))
+        break
+      }
+    }
+  })
+
+export const runDispatch = (args: CommandArgs, place: DispatchPlace): Effect.Effect<void, string, CliRequirements> =>
+  execute(args, place).pipe(Effect.mapError(failure))

@@ -1,3 +1,4 @@
+import { type DispatchArgs, parseDispatchArgs } from "./dispatch/args"
 import { askUserWord, type QuestionAnswer } from "./no-mistakes"
 const sandboxKinds = ["nono", "none"] as const
 export type SandboxKind = typeof sandboxKinds[number]
@@ -9,6 +10,7 @@ export type OrcArgs =
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
   | { readonly kind: "ScoreStep"; readonly runId: string; readonly step: string; readonly score: number; readonly note: string }
   | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly branch: string | undefined; readonly sandbox: SandboxKind; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
+  | { readonly kind: "Dispatch"; readonly args: Exclude<DispatchArgs, { readonly kind: "UsageError" }> }
   | { readonly kind: "UsageError"; readonly detail: string }
 const questionPrefix = "question-"
 const parseShowArgs = (rest: readonly string[]): OrcArgs => {
@@ -174,23 +176,26 @@ const parseRunArgs = (rest: readonly string[]): OrcArgs => {
   const taskFile = split.kept.length === 1 ? split.kept[0] : null
   return { kind: "RunAgent", taskFile, branch: split.branch, sandbox: split.sandbox ?? defaultSandbox, allow: split.allow, answers: split.answers }
 }
+const parseRunsArgs = (rest: readonly string[]): OrcArgs => {
+  if (rest.length === 0) {
+    return { kind: "ListRuns", json: false }
+  }
+  const [flag, ...extra] = rest
+  if (flag !== "--json") {
+    return { kind: "UsageError", detail: `unexpected argument: ${flag}` }
+  }
+  if (extra.length > 0) {
+    return { kind: "UsageError", detail: `unexpected argument: ${extra[0]}` }
+  }
+  return { kind: "ListRuns", json: true }
+}
 export const parseArgs = (args: readonly string[]): OrcArgs => {
   if (args.length === 0) {
     return { kind: "UsageError", detail: "orc takes one flag" }
   }
   const [first, ...rest] = args
   if (first === "runs") {
-    if (rest.length === 0) {
-      return { kind: "ListRuns", json: false }
-    }
-    const [flag, ...extra] = rest
-    if (flag !== "--json") {
-      return { kind: "UsageError", detail: `unexpected argument: ${flag}` }
-    }
-    if (extra.length > 0) {
-      return { kind: "UsageError", detail: `unexpected argument: ${extra[0]}` }
-    }
-    return { kind: "ListRuns", json: true }
+    return parseRunsArgs(rest)
   }
   if (first === "show") {
     return parseShowArgs(rest)
@@ -200,6 +205,10 @@ export const parseArgs = (args: readonly string[]): OrcArgs => {
   }
   if (first === "run") {
     return parseRunArgs(rest)
+  }
+  if (first === "backlog" || first === "beat") {
+    const dispatch = parseDispatchArgs(first, rest)
+    return dispatch.kind === "UsageError" ? dispatch : { kind: "Dispatch", args: dispatch }
   }
   if (rest.length > 0) {
     return { kind: "UsageError", detail: `unexpected argument: ${rest[0]}` }
