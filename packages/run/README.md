@@ -2,7 +2,7 @@
 Orc takes one task and turns it into one pull request.
 It starts from a command in the terminal that takes the task as text or as a file.
 It makes an isolated copy of the project on a new branch.
-By default it runs the Pi agent inside a nono sandbox, then runs the project’s checks.
+By default it runs the Pi agent inside a nono sandbox, then runs the project's checks.
 With `--sandbox none` it runs Pi and the checks directly on the host.
 It hands the branch to no-mistakes, which reviews it, pushes it and opens the PR.
 You read the PR and merge it, since orc never merges.

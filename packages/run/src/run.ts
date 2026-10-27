@@ -122,7 +122,7 @@ export const openCheckout = (
         return yield* refuse("orc: " + candidate + " marks this checkout as refused, so orc refuses to run in it")
       }
     }
-    const status = yield* runGit(spawner, git, ["status", "--porcelain"], projectDir)
+    const status = yield* runGit(spawner, git, ["status", "--porcelain", "--", ".", ":(exclude).sandcastle/worktrees"], projectDir)
     if (status.exitCode !== 0) {
       return yield* refuse("orc: git status failed in " + projectDir)
     }
