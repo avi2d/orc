@@ -1,4 +1,5 @@
 import { Effect, FileSystem } from "effect"
+import type { CheckedModelWindow } from "./context-mark"
 
 export interface NonoSandboxRoots {
   readonly worktree: string
@@ -188,22 +189,12 @@ export const loginCheckCommand = (host: HostTools): ReadonlyArray<string> => [
   host.homeDir
 ]
 
-export const piAgentModels = (credential: ModelCredential, models: ReadonlyArray<string>, windows: ReadonlyMap<string, number>): string => {
+export const piAgentModels = (credential: ModelCredential, checked: ReadonlyArray<CheckedModelWindow>): string => {
   const overridesByProvider = new Map<string, Record<string, { readonly contextWindow: number }>>()
-  for (const model of new Set(models)) {
-    const slash = model.indexOf("/")
-    if (slash === -1) {
-      continue
-    }
-    const window = windows.get(model)
-    if (window === undefined) {
-      continue
-    }
-    const provider = model.slice(0, slash)
-    const id = model.slice(slash + 1)
-    const overrides = overridesByProvider.get(provider) ?? {}
-    overrides[id] = { contextWindow: window }
-    overridesByProvider.set(provider, overrides)
+  for (const entry of checked) {
+    const overrides = overridesByProvider.get(entry.provider) ?? {}
+    overrides[entry.id] = { contextWindow: entry.window }
+    overridesByProvider.set(entry.provider, overrides)
   }
   const providers: Record<string, { readonly apiKey?: string; readonly modelOverrides?: Record<string, { readonly contextWindow: number }> }> = {
     [credential.provider]: { apiKey: "$" + credential.envVar }

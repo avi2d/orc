@@ -4,7 +4,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { Database } from "bun:sqlite"
 import { homedir } from "node:os"
 import { resolveAgentFile, type AgentFile } from "./agents"
-import { contextMarkSettings, readModelWindows } from "./context-mark"
+import { checkedModelWindows, contextMarkJson, readModelWindows } from "./context-mark"
 import { hostGitShim, withHostGitSafety } from "./host"
 import { inheritedEnv, nonoSandboxProvider } from "./nono"
 import { canRouteModel, defaultToolchainResolver, type HostTools, loginCheckCommand, modelCredentialFor, piAgentModels, type ToolchainResolver, withInstallFolders, within } from "./nono-profile"
@@ -235,13 +235,13 @@ const prepareAgents = (
     const host: HostTools = { piBinary, nodeBinary, homeDir: operatorHome }
     yield* runLoginCheck(spawner, host, checkout.projectDir)
     const windows = yield* readModelWindows(spawner, host, folders.runDir)
-    const settings = yield* Effect.fromResult(contextMarkSettings([agent.model, fixer.model], windows)).pipe(
+    const checked = yield* Effect.fromResult(checkedModelWindows([agent.model, fixer.model], windows)).pipe(
       Effect.mapError((message) => new OrcRunError({ message }))
     )
-    yield* fs.writeFileString(path.join(folders.piAgentDir, "models.json"), piAgentModels(credential, [agent.model, fixer.model], windows)).pipe(
+    yield* fs.writeFileString(path.join(folders.piAgentDir, "models.json"), piAgentModels(credential, checked)).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the agent models file: " + String(cause) }))
     )
-    yield* fs.writeFileString(path.join(folders.piAgentDir, "settings.json"), settings).pipe(
+    yield* fs.writeFileString(path.join(folders.piAgentDir, "settings.json"), contextMarkJson(checked)).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the agent settings file: " + String(cause) }))
     )
     return { folders, agent, fixer, credential }

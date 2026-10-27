@@ -63,18 +63,40 @@ export const readModelWindows = (
     Effect.mapError((cause) => cause instanceof OrcRunError ? cause : new OrcRunError({ message: "orc: the model list failed to run: " + String(cause) }))
   )
 
-// Pi takes no absolute compaction point, only a reserve below each model's window.
-export const contextMarkSettings = (models: ReadonlyArray<string>, windows: ModelWindows): Result.Result<string, string> => {
-  const modelOverrides: Record<string, { readonly reserveTokens: number }> = {}
+export interface CheckedModelWindow {
+  readonly ref: string
+  readonly provider: string
+  readonly id: string
+  readonly window: number
+}
+
+export const checkedModelWindows = (
+  models: ReadonlyArray<string>,
+  windows: ModelWindows
+): Result.Result<ReadonlyArray<CheckedModelWindow>, string> => {
+  const checked: Array<CheckedModelWindow> = []
   for (const model of new Set(models)) {
-    const window = windows.get(model)
+    const slash = model.indexOf("/")
+    const window = slash === -1 ? undefined : windows.get(model)
     if (window === undefined) {
       return Result.fail("orc: pi lists no model " + model + ", so orc cannot place the " + contextMarkTokens + " token context mark")
     }
     if (window <= contextMarkTokens) {
       return Result.fail("orc: model " + model + " holds " + window + " tokens, which does not reach the " + contextMarkTokens + " token context mark")
     }
-    modelOverrides[model] = { reserveTokens: window - contextMarkTokens }
+    checked.push({ ref: model, provider: model.slice(0, slash), id: model.slice(slash + 1), window })
   }
-  return Result.succeed(JSON.stringify({ compaction: { modelOverrides } }, null, 2) + "\n")
+  return Result.succeed(checked)
 }
+
+// Pi takes no absolute compaction point, only a reserve below each model's window.
+export const contextMarkJson = (checked: ReadonlyArray<CheckedModelWindow>): string => {
+  const modelOverrides: Record<string, { readonly reserveTokens: number }> = {}
+  for (const entry of checked) {
+    modelOverrides[entry.ref] = { reserveTokens: entry.window - contextMarkTokens }
+  }
+  return JSON.stringify({ compaction: { modelOverrides } }, null, 2) + "\n"
+}
+
+export const contextMarkSettings = (models: ReadonlyArray<string>, windows: ModelWindows): Result.Result<string, string> =>
+  Result.map(checkedModelWindows(models, windows), contextMarkJson)
