@@ -15,6 +15,7 @@ const expectedFiles = [
   "src/args.ts",
   "src/bin.ts",
   "src/checks.ts",
+  "src/context-mark.ts",
   "src/dispatch/args.ts",
   "src/dispatch/backlog.ts",
   "src/dispatch/beat.ts",
