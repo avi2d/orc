@@ -236,6 +236,8 @@ A task starts only once three things hold:
 3. A Claude account has room at or above the floor.
 
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
+After the claim survives a recount the beat writes the task started in `taken` before it runs the start command, so a close from the runner lands on a started task.
+A zero exit leaves the taken file as the runner left it and reports the last stdout line in the beat only.
 A task marked for a machine waits for a slot on that machine and never starts on another.
 The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE` and `ORC_TASK_ACCOUNT`.
 It must hand the task on and exit within two minutes.

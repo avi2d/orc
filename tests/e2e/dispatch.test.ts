@@ -175,6 +175,39 @@ describe("orc beat", () => {
     })
   }, beatTimeout)
 
+  test("a runner that closes before the start command exits leaves the task closed failed instead of stuck started", async () => {
+    await withFixture({ mac: 1, winbox: 0, floorPercent: 15 }, async (fixture) => {
+      const closeFirst = ["sh", "-c", "\"" + process.execPath + "\" \"" + binPath + "\" backlog close \"$ORC_TASK_ID\" failed"]
+      await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({
+        machines: [{ name: "mac", slots: 1, start: closeFirst }, { name: "winbox", slots: 0, start: ["true"] }],
+        quota: { accounts: ["main"], floorPercent: 15 }
+      }))
+      await addTasks(fixture, 1)
+      expect(await orcOk(fixture, ["beat"])).toContain("started task-1")
+      const document: unknown = JSON.parse(await orcOk(fixture, ["backlog", "--json"]))
+      if (typeof document !== "object" || document === null || !("tasks" in document) || !Array.isArray(document.tasks)) {
+        throw new Error("orc backlog --json printed no task list")
+      }
+      const task = document.tasks[0] as { readonly status?: unknown; readonly outcome?: unknown }
+      expect(task.status).toBe("closed")
+      expect(task.outcome).toBe("failed")
+    })
+  }, beatTimeout)
+
+  test("a start command that leaves a child holding stdout open still reports started at once instead of waiting for the pipe", async () => {
+    await withFixture({ mac: 1, winbox: 0, floorPercent: 15 }, async (fixture) => {
+      const lingering = ["sh", "-c", "sleep 20 & echo handed-off"]
+      await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({
+        machines: [{ name: "mac", slots: 1, start: lingering }, { name: "winbox", slots: 0, start: ["true"] }],
+        quota: { accounts: ["main"], floorPercent: 15 }
+      }))
+      await addTasks(fixture, 1)
+      const before = Date.now()
+      expect(await orcOk(fixture, ["beat"])).toContain("started task-1")
+      expect(Date.now() - before).toBeLessThan(10_000)
+    })
+  }, beatTimeout)
+
   test("a beat with no Claude account above the floor starts nothing", async () => {
     await withFixture({ mac: 4, winbox: 4, floorPercent: 90 }, async (fixture) => {
       await addTasks(fixture, 1)

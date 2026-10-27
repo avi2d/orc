@@ -1,4 +1,4 @@
-import type { BeatAction, BeatReport, MachineRoom } from "./beat"
+import { dependencyOpen, type BeatAction, type BeatReport, type MachineRoom } from "./beat"
 import type { Project } from "./config"
 import { describeQuota } from "./quota"
 import type { Claim, Started, TaskRecord } from "./task-record"
@@ -106,10 +106,7 @@ const sideBySide = (columns: ReadonlyArray<ReadonlyArray<string>>): string => {
 const pinOf = (record: TaskRecord): string => record.spec.machine === null ? "" : " @" + record.spec.machine
 
 const newCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>): string => {
-  const open = record.spec.dependsOn.filter((id) => {
-    const dependency = all.find((candidate) => candidate.spec.id === id)
-    return dependency?.state.kind !== "closed" || dependency.state.closing.outcome !== "done"
-  })
+  const open = record.spec.dependsOn.filter((id) => dependencyOpen(all.find((candidate) => candidate.spec.id === id)))
   const waits = open.length === 0 ? "" : " waits " + open.join(",")
   return record.spec.id + " " + record.spec.project + pinOf(record) + waits + " " + record.spec.title
 }

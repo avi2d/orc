@@ -1,4 +1,4 @@
-import { DateTime, Duration, Effect, type FileSystem, Stream } from "effect"
+import { DateTime, Duration, Effect, Fiber, Ref, type FileSystem, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimTask, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken } from "./backlog"
 import { checkoutOn, type ConfigError, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "./config"
@@ -44,13 +44,16 @@ export const readRoom = (machines: ReadonlyArray<Machine>, tasks: ReadonlyArray<
 
 const freeRoom = (room: MachineRoom): number => Math.max(0, room.slots - room.busy)
 
+export const dependencyOpen = (dependency: TaskRecord | undefined): boolean =>
+  dependency === undefined || dependency.state.kind !== "closed" || dependency.state.closing.outcome !== "done"
+
 const dependencyWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>): string | null => {
   for (const id of task.spec.dependsOn) {
     const dependency = tasks.find((candidate) => candidate.spec.id === id)
     if (dependency === undefined) {
       return "waits on " + id + ", which the backlog does not hold"
     }
-    if (dependency.state.kind !== "closed" || dependency.state.closing.outcome !== "done") {
+    if (dependencyOpen(dependency)) {
       return "waits on " + id
     }
   }
@@ -108,11 +111,14 @@ const runStart = (
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const [command, ...args] = machine.start
     const handle = yield* spawner.spawn(ChildProcess.make(command, args, { env, extendEnv: true }))
-    const [stdout, stderr, exitCode] = yield* Effect.all([
-      handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
-      handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
-      handle.exitCode
-    ], { concurrency: "unbounded" })
+    const out = yield* Ref.make("")
+    const err = yield* Ref.make("")
+    const outFiber = yield* handle.stdout.pipe(Stream.decodeText(), Stream.runForEach((chunk) => Ref.update(out, (text) => text + chunk)), Effect.fork)
+    const errFiber = yield* handle.stderr.pipe(Stream.decodeText(), Stream.runForEach((chunk) => Ref.update(err, (text) => text + chunk)), Effect.fork)
+    const exitCode = yield* handle.exitCode
+    yield* Fiber.interrupt(outFiber)
+    yield* Fiber.interrupt(errFiber)
+    const [stdout, stderr] = yield* Effect.all([Ref.get(out), Ref.get(err)])
     return exitCode === 0
       ? { kind: "started", note: lastLine(stdout) } satisfies StartResult
       : { kind: "failed", reason: "the start command exited " + exitCode + ": " + lastLine(stderr) } satisfies StartResult
@@ -148,6 +154,7 @@ const startTask = (
       yield* releaseTask(root, taken)
       return { kind: "given-back", task: task.spec.id, machine: machine.name } satisfies BeatAction
     }
+    yield* writeTaken(root, { spec: task.spec, state: { kind: "started", claim, started: { at: yield* nowIso, note: "" } } })
     const result = yield* runStart(machine, {
       ORC_TASK_ID: task.spec.id,
       ORC_TASK_FILE: backlogPaths(root).taskFile("taken", task.spec.id),
@@ -157,7 +164,6 @@ const startTask = (
       ORC_TASK_ACCOUNT: claim.account
     })
     if (result.kind === "started") {
-      yield* writeTaken(root, { spec: task.spec, state: { kind: "started", claim, started: { at: yield* nowIso, note: result.note } } })
       return { kind: "started", task: task.spec.id, machine: machine.name, account: claim.account, note: result.note } satisfies BeatAction
     }
     yield* publishClosed(root, {
@@ -203,8 +209,12 @@ const considerTask = (
     }
     const claim: Claim = { beat: context.beat, machine: placement.machine.name, account: context.account, takenAt: yield* nowIso }
     const action = yield* startTask(context.root, task, claim, placement.checkout, placement.machine)
-    if (action.kind !== "started" && slot !== undefined) {
-      slot.busy -= 1
+    if (slot !== undefined) {
+      if (action.kind === "given-back") {
+        slot.busy = slot.slots
+      } else if (action.kind !== "started") {
+        slot.busy -= 1
+      }
     }
     return action
   })

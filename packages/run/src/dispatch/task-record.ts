@@ -125,6 +125,10 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     const front = yield* Schema.decodeUnknownEffect(Frontmatter)(raw).pipe(
       Effect.mapError((error) => new TaskFileError({ file, detail: error.message }))
     )
+    const stem = file.split("/").at(-1)?.replace(/\.md$/, "")
+    if (front.id !== stem) {
+      return yield* new TaskFileError({ file, detail: "the frontmatter id " + front.id + " is not the file " + (stem ?? file) })
+    }
     const state = stateOf(folder, front)
     if (typeof state === "string") {
       return yield* new TaskFileError({ file, detail: state })

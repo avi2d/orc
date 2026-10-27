@@ -10,7 +10,7 @@ import { placeTask } from "../../packages/run/src/dispatch/beat"
 import { backlogJson, formatBoard } from "../../packages/run/src/dispatch/board"
 import type { DispatchConfig, Project } from "../../packages/run/src/dispatch/config"
 import { assessClauthStatus } from "../../packages/run/src/dispatch/quota"
-import { parseTaskFile, renderTaskFile, type TaskRecord } from "../../packages/run/src/dispatch/task-record"
+import { parseTaskFile, renderTaskFile, TaskFileError, type TaskRecord } from "../../packages/run/src/dispatch/task-record"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -82,6 +82,15 @@ describe("task files", () => {
       state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", note: "queued 12" } }
     }
     expect(await run(parseTaskFile("task-2.md", "taken", renderTaskFile(record)))).toEqual(record)
+  })
+  test("a copied file whose frontmatter id is not its own stem is refused instead of read as that task", async () => {
+    const text = "---\nid: task-3\ntitle: Fix the thing\nproject: orc\nmachine: null\ndepends_on: []\ncreated: 2026-10-27T10:00:00.000Z\n---\n# Fix the thing\n"
+    const result = await run(Effect.result(parseTaskFile("new/task-9.md", "new", text)))
+    expect(Result.isFailure(result)).toBe(true)
+    if (Result.isFailure(result)) {
+      expect(result.error).toBeInstanceOf(TaskFileError)
+      expect((result.error as TaskFileError).file).toContain("task-9.md")
+    }
   })
   test("a file with no frontmatter is refused instead of read as an empty task", async () => {
     const result = await run(Effect.result(parseTaskFile("task-1.md", "new", "# Just a title\n")))
