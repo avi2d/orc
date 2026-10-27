@@ -8,7 +8,8 @@ permissions:
   pull-requests: read
 jobs:
   checks:
-    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
+    # Untrusted PR code must not run on the self-hosted runner.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:

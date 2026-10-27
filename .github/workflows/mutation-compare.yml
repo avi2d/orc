@@ -5,7 +5,8 @@ permissions:
   contents: read
 jobs:
   mutation-compare:
-    runs-on: [self-hosted, Linux, X64, winbox]
+    # Untrusted PR code must not run on the self-hosted runner.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
