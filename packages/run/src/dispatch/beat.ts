@@ -125,8 +125,7 @@ const runStart = (
     const outFiber = yield* handle.stdout.pipe(Stream.decodeText(), Stream.runForEach((chunk) => Ref.update(out, (text) => text + chunk)), Effect.fork)
     const errFiber = yield* handle.stderr.pipe(Stream.decodeText(), Stream.runForEach((chunk) => Ref.update(err, (text) => text + chunk)), Effect.fork)
     const exitCode = yield* handle.exitCode
-    yield* settleOutput(outFiber)
-    yield* settleOutput(errFiber)
+    yield* Effect.all([settleOutput(outFiber), settleOutput(errFiber)], { concurrency: "unbounded" })
     const [stdout, stderr] = yield* Effect.all([Ref.get(out), Ref.get(err)])
     return exitCode === 0
       ? { kind: "started", note: lastLine(stdout) } satisfies StartResult
