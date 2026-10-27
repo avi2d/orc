@@ -99,7 +99,7 @@ const readPriorProgress = (db: Database, run: HistoryRun, prior: RunRecord): Eff
     const interruptedFix = steps.some((step) => step.name === "fix" && step.status === "running")
     const priorDir = run.path.join(run.path.dirname(run.runDir), prior.id)
     const liveFile = interruptedImplement || interruptedFix
-      ? yield* latestSessionFile(run, [run.path.join(priorDir, "session", "agent", "sessions")])
+      ? yield* latestSessionFile(run, [run.path.join(priorDir, "session", "agent", "sessions"), run.path.join(priorDir, "sessions")])
       : null
     const implementSource = interruptedImplement
       ? (liveFile ?? implementFile)

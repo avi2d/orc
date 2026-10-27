@@ -11,6 +11,7 @@ import { openDatabase, recordRun, recordStep } from "../../packages/run/src/run-
 import { buildResumePlan, resolveTaskFile } from "../../packages/run/src/run-resume"
 import { recordResumePublish } from "../../packages/run/src/history-write"
 import { subprocessNoMistakesRunner } from "../../packages/run/src/no-mistakes"
+import { noSandboxEnv } from "../../packages/run/src/no-sandbox"
 import type { HistoryRun } from "../../packages/run/src/run-record"
 
 const implementer: AgentFile = {
@@ -141,6 +142,29 @@ describe("resume recovers an interrupted agent from its live session", () => {
         expect(plan.fixSessionId ?? "").not.toContain("/")
         expect(plan.fixSessionFile ?? "").toContain(join("sessions", "resumed"))
         expect(plan.fixSessionFile ?? "").toContain(fixId)
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("an interrupted no-sandbox implementation resumes the session Pi wrote under sessions instead of starting fresh", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "repo")
+        const priorDir = join(home, "runs", "prior-1")
+        await mkdir(priorDir, { recursive: true })
+        await writeFile(join(priorDir, "task.md"), "Do the thing.\n")
+        await seedRun(db, "prior-1", project, join(priorDir, "task.md"), "running", "2026-10-19T09:00:00.000Z")
+        await seedStep(db, "prior-1", "implement", "running", "2026-10-19T09:00:00.000Z", null)
+        const liveId = "ccc333"
+        const sessionDir = noSandboxEnv({ piSessionDir: join(priorDir, "session"), hostSessionsDir: join(priorDir, "sessions") }).PI_CODING_AGENT_SESSION_DIR
+        await writeSession(sessionDir, "2026-10-19T09-30-00-000Z", liveId, new Date("2026-10-19T09:30:00.000Z"))
+        const run = await Effect.runPromise(historyFor("next-1", home, project, "2026-10-19T10:00:00.000Z"))
+        const plan = await Effect.runPromise(buildResumePlan(db, run))
+        expect(plan.implementSessionId).toBe(liveId)
+        expect(plan.skipImplement).toBe(false)
       } finally {
         db.close()
       }

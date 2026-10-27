@@ -22,6 +22,7 @@ const expectedFiles = [
   "src/host.ts",
   "src/no-mistakes-gate.ts",
   "src/no-mistakes.ts",
+  "src/no-sandbox.ts",
   "src/nono-profile.ts",
   "src/nono.ts",
   "src/pi.ts",

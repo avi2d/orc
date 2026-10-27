@@ -96,6 +96,15 @@ nono reads it with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC
 So a key held only in the keychain or in an environment variable such as `OPENCODE_API_KEY` is refused, and a login Pi's `/login` stores in `~/.pi/agent/auth.json` works.
 If nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc's result names that error.
 
+## Running without a sandbox
+
+To run Pi and the checks directly on the host, add `--sandbox none` to `orc run`, as in `orc run task.md --sandbox none`.
+`--sandbox nono`, the default, keeps the nono sandbox.
+Without a sandbox the run still gets its own worktree on its own branch, and nono need not be on the PATH.
+Pi runs with your own environment and Pi config, so it can read and write anything your user can.
+Orc points `GIT_CONFIG_GLOBAL` at a file in the run folder, so the commit identity Sandcastle sets never reaches your `~/.gitconfig`.
+Pi writes its session straight into the run's `sessions/host` folder.
+
 Orc takes the implementer agent file from the first of these that exists:
 
 1. `$ORC_HOME/agents/implementer.md`, default `~/.orc/agents/implementer.md` when `ORC_HOME` is unset or empty

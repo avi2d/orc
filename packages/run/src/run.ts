@@ -6,6 +6,8 @@ import { homedir } from "node:os"
 import { resolveAgentFile, type AgentFile } from "./agents"
 import { hostGitShim, withHostGitSafety } from "./host"
 import { inheritedEnv, nonoSandboxProvider } from "./nono"
+import { noSandboxProvider } from "./no-sandbox"
+import { defaultSandbox, type SandboxKind } from "./args"
 import { canRouteModel, defaultToolchainResolver, loginCheckCommand, modelCredentialFor, piAgentModels, type ToolchainResolver, withInstallFolders, within } from "./nono-profile"
 import { runGit } from "./git-run"
 import { orcCompletionLine } from "./pi"
@@ -24,6 +26,7 @@ export interface OrcRunRequest {
   readonly cwd: string
   readonly taskFile: string | null | undefined
   readonly branch?: string | undefined
+  readonly sandbox?: SandboxKind | undefined
   readonly allow?: ReadonlyArray<AllowWord> | undefined
   readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
   readonly homeDir?: string | undefined
@@ -254,6 +257,7 @@ const readTaskFile = (
   )
 
 const openSandboxForRun = (
+  kind: SandboxKind,
   git: string,
   checkout: Checkout,
   folders: RunFolders,
@@ -264,7 +268,9 @@ const openSandboxForRun = (
   Effect.tryPromise({
     try: () => createSandbox({
       branch: checkout.branch,
-      sandbox: nonoSandboxProvider({ piSessionDir: folders.piSessionDir, piAgentDir: folders.piAgentDir, modelCredential: credential, hostPath, toolchain }),
+      sandbox: kind === "none"
+        ? noSandboxProvider({ piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir })
+        : nonoSandboxProvider({ piSessionDir: folders.piSessionDir, piAgentDir: folders.piAgentDir, modelCredential: credential, hostPath, toolchain }),
       cwd: checkout.projectDir
     }),
     catch: (cause) => new OrcRunError({ message: "orc: the sandbox failed to start: " + describeCause(cause) })
@@ -291,7 +297,7 @@ export const runAgentStep = (
       Effect.onError(() => fs.remove(runDir, { recursive: true }).pipe(Effect.result))
     )
     const started = new Date().toISOString()
-    const sandbox: Sandbox = yield* openSandboxForRun(git, checkout, folders, credential, hostPath, toolchain)
+    const sandbox: Sandbox = yield* openSandboxForRun(request.sandbox ?? defaultSandbox, git, checkout, folders, credential, hostPath, toolchain)
     const ops: SandboxOps = {
       runAgent: (agentProvider, prompt, logFile, resumeSession) =>
         sandbox.run({
