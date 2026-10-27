@@ -229,7 +229,6 @@ To see the backlog, run `orc backlog`.
 It prints the new, taken and closed tasks side by side with the project list and each machine's busy slots beside them.
 To print the same facts as JSON, run `orc backlog --json`, whose document names its version first as `orc.backlog.v1`.
 To start what can start, run `orc beat`, from launchd or cron every few minutes.
-A launchd plist that relies on backgrounded children needs AbandonProcessGroup set to true.
 Each beat reads quota with `clauth status --json` and the room on each machine before it takes any task.
 A task starts only once three things hold:
 
@@ -241,13 +240,12 @@ The beat moves the task file from `new` to `taken` before it runs the start comm
 After the claim survives a recount, the beat writes the task started before it runs the start command.
 A task marked for a machine waits for a slot on that machine and never starts on another.
 The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE` and `ORC_TASK_ACCOUNT`.
-The beat starts it detached in its own session and never waits for it and never kills it.
-The start command hands the task to something that outlives orc, such as pueue or ssh.
-Orc leaves the start command children alone, but launchd and cron can end the beat process group at exit, so a bare `runner &` does not hand the task on.
+The beat starts it detached in its own session, never waits for it and never kills it.
+So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
 From then on the task is the start command's to close, and one that fails leaves the task started until it is closed.
-A start command that cannot be spawned closes the task as `start-failed`.
-A missing start command still spawns the log wrapper, so its exit 127 lands in the task log and the task stays started.
+A missing start command exits 127 into its log and leaves the task started.
+Only a failure to spawn the log wrapper closes the task as `start-failed`.
 To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1`.
 When a started task ends, run `orc backlog close <task-id> <done|failed> [reason]`.
 
