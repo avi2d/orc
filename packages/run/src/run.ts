@@ -244,6 +244,9 @@ const prepareAgents = (
     const checked = yield* Effect.fromResult(checkedModelWindows([agent.model, fixer.model], windows)).pipe(
       Effect.mapError((message) => new OrcRunError({ message }))
     )
+    if (sandboxKind === "none") {
+      return { folders, agent, fixer, credential }
+    }
     yield* fs.writeFileString(path.join(folders.piAgentDir, "models.json"), piAgentModels(credential, checked)).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the agent models file: " + String(cause) }))
     )

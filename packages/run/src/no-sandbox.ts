@@ -32,13 +32,6 @@ interface NoSandboxExecResult {
   readonly exitCode: number
 }
 
-interface NoSandboxInteractiveOptions {
-  readonly stdin: NodeJS.ReadableStream
-  readonly stdout: NodeJS.WritableStream
-  readonly stderr: NodeJS.WritableStream
-  readonly cwd?: string | undefined
-}
-
 interface NoSandboxCreateOptions {
   readonly worktreePath: string
   readonly env: Record<string, string>
@@ -47,7 +40,6 @@ interface NoSandboxCreateOptions {
 interface NoSandboxHandle {
   readonly worktreePath: string
   readonly exec: (command: string, options?: NoSandboxExecOptions) => Promise<NoSandboxExecResult>
-  readonly interactiveExec: (args: ReadonlyArray<string>, options: NoSandboxInteractiveOptions) => Promise<{ readonly exitCode: number }>
   readonly close: () => Promise<void>
 }
 
@@ -88,7 +80,7 @@ const fixedExec = (processEnv: Record<string, string>, fallbackCwd: string) =>
         if (proc.stdout !== null) {
           const lines = createInterface({ input: proc.stdout })
           lines.on("line", (line) => {
-            stdoutTail = appendTail(stdoutTail + "\n", line)
+            stdoutTail = appendTail(stdoutTail === "" ? "" : stdoutTail + "\n", line)
             onLine(line)
           })
         }
@@ -105,37 +97,18 @@ const fixedExec = (processEnv: Record<string, string>, fallbackCwd: string) =>
         let stderr = ""
         if (proc.stdout !== null) {
           proc.stdout.on("data", (chunk) => {
-            stdout = appendTail(stdout, chunk.toString())
+            stdout += chunk.toString()
           })
         }
         if (proc.stderr !== null) {
           proc.stderr.on("data", (chunk) => {
-            stderr = appendTail(stderr, chunk.toString())
+            stderr += chunk.toString()
           })
         }
         proc.on("close", (code) => {
           resolve({ stdout, stderr, exitCode: exitOf(code) })
         })
       }
-    })
-  }
-
-const fixedInteractiveExec = (processEnv: Record<string, string>, fallbackCwd: string) =>
-  (args: ReadonlyArray<string>, options: NoSandboxInteractiveOptions): Promise<{ readonly exitCode: number }> => {
-    const [cmd, ...rest] = args
-    return new Promise<{ readonly exitCode: number }>((resolve, reject) => {
-      const proc = spawn(cmd, rest, {
-        cwd: options.cwd ?? fallbackCwd,
-        env: processEnv,
-        stdio: [options.stdin, options.stdout, options.stderr],
-        shell: process.platform === "win32"
-      })
-      proc.on("error", (error) => {
-        reject(new Error("exec failed: " + (error instanceof Error ? error.message : String(error))))
-      })
-      proc.on("close", (code) => {
-        resolve({ exitCode: exitOf(code) })
-      })
     })
   }
 
@@ -147,8 +120,7 @@ export const noSandboxProvider = (dirs: NoSandboxDirs): NoSandboxProvider => {
     const processEnv: Record<string, string> = { ...(process.env as Record<string, string>), ...createOptions.env }
     return {
       ...handle,
-      exec: fixedExec(processEnv, handle.worktreePath),
-      interactiveExec: fixedInteractiveExec(processEnv, handle.worktreePath)
+      exec: fixedExec(processEnv, handle.worktreePath)
     }
   }
   return { ...base, create } as unknown as NoSandboxProvider
