@@ -13,7 +13,7 @@ You read the PR and merge it, since orc never merges.
 - Git, tested on 2.56.0.
 - nono from https://nono.sh, tested on 0.80.0, for the default sandbox.
 - Node, tested on 24.22.1.
-- Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with an opencode-go login.
+- Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with an opencode-go login for opencode-go models or the token file for Claude models that [Running on a Claude model](#running-on-a-claude-model) describes.
 - no-mistakes v1.90.0 or later, tested on v1.100.2, installed as [Installing no-mistakes](#installing-no-mistakes) says.
 
 ## Install
@@ -142,7 +142,9 @@ The terminal report names the run folder, the agent file, the session file and t
 To run Pi and the checks directly on the host, add `--sandbox none` to `orc run`, as in `orc run task.md --sandbox none`.
 `--sandbox nono`, the default, keeps the nono sandbox.
 Without a sandbox the run still gets its own worktree on its own branch, and nono need not be on the PATH.
-Pi runs with your own environment and Pi config, so it can read and write anything your user can.
+Pi runs with your own environment, so it can read and write anything your user can.
+On an opencode-go model Pi also reads your Pi config.
+On a Claude model Pi reads the run's own Pi folder instead, as [Running on a Claude model](#running-on-a-claude-model) describes.
 Orc points `GIT_CONFIG_GLOBAL` at a file in the run folder, so the commit identity Sandcastle sets never reaches your `~/.gitconfig`.
 Pi writes its session straight into the run's `sessions/host` folder.
 Resume takes the sandbox from the flag and not from the earlier run, so pass `--sandbox none` again to resume.
