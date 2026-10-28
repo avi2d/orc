@@ -32,7 +32,14 @@ const fakePueue = [
   "  status) cat \"$PUEUE_STATE/status.json\" ;;",
   "  log) if [ -f \"$PUEUE_STATE/log-$2.json\" ]; then cat \"$PUEUE_STATE/log-$2.json\"; else printf '{\"%s\":{\"output\":\"\"}}' \"$2\"; fi ;;",
   "  group)",
-  "    if [ \"$2\" = \"add\" ]; then printf '%s\\n' \"$@\" > \"$PUEUE_STATE/group-add-args.tmp\"; mv \"$PUEUE_STATE/group-add-args.tmp\" \"$PUEUE_STATE/group-add-args\"; echo \"Group orc created\";",
+  "    if [ \"$2\" = \"add\" ]; then printf '%s\\n' \"$@\" > \"$PUEUE_STATE/group-add-args.tmp\"; mv \"$PUEUE_STATE/group-add-args.tmp\" \"$PUEUE_STATE/group-add-args\";",
+  "      if [ -f \"$PUEUE_STATE/fail-add\" ]; then echo \"fake pueue cannot add groups\" >&2; exit 1; fi;",
+  "      if [ -f \"$PUEUE_STATE/groups.json\" ]; then groups=$(cat \"$PUEUE_STATE/groups.json\");",
+  "      else groups='{\"default\":{\"status\":\"Running\",\"parallel_tasks\":1},\"orc\":{\"status\":\"Running\",\"parallel_tasks\":1}}'; fi;",
+  "      case \"$groups\" in *\"\\\"$3\\\"\":*) echo \"Group \\\"$3\\\" already exists\" >&2; exit 1 ;; esac;",
+  "      if [ -f \"$PUEUE_STATE/groups.json\" ]; then stripped=$(printf '%s' \"$groups\" | sed 's/}$//'); printf '%s,\"%s\":{\"status\":\"Running\",\"parallel_tasks\":1}}' \"$stripped\" \"$3\" > \"$PUEUE_STATE/groups.json\"; fi;",
+  "      if [ -f \"$PUEUE_STATE/race-add\" ]; then echo \"Group \\\"$3\\\" already exists\" >&2; exit 1; fi;",
+  "      echo \"Group $3 created\";",
   "    elif [ \"$2\" = \"--json\" ]; then if [ -f \"$PUEUE_STATE/groups.json\" ]; then cat \"$PUEUE_STATE/groups.json\";",
   "    else printf '%s' '{\"default\":{\"status\":\"Running\",\"parallel_tasks\":1},\"orc\":{\"status\":\"Running\",\"parallel_tasks\":1}}'; fi;",
   "    else echo \"fake pueue has no group $2\" >&2; exit 2; fi ;;",
@@ -274,6 +281,43 @@ describe("orc runner start", () => {
       const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
       expect(result.exitCode).toBe(0)
       expect(await readFile(join(fixture.pueue, "group-add-args"), "utf8").catch(() => null)).toBeNull()
+    })
+  }, runnerTimeout)
+
+  test("a group added by a rival start is kept instead of failing the queue", async () => {
+    await withFixture(async (fixture) => {
+      await writeFile(join(fixture.pueue, "groups.json"), JSON.stringify({ default: { status: "Running", parallel_tasks: 1 } }))
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
+      await writeFile(join(fixture.pueue, "race-add"), "")
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toBe("queued task-9 as pueue task 77 in group orc\n")
+    })
+  }, runnerTimeout)
+
+  test("two simultaneous first starts both queue instead of losing one task", async () => {
+    await withFixture(async (fixture) => {
+      await writeFile(join(fixture.pueue, "groups.json"), JSON.stringify({ default: { status: "Running", parallel_tasks: 1 } }))
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
+      const [first, second] = await Promise.all([
+        queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" }),
+        queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+      ])
+      expect(first.exitCode).toBe(0)
+      expect(second.exitCode).toBe(0)
+      expect(first.stdout).toBe("queued task-9 as pueue task 77 in group orc\n")
+      expect(second.stdout).toBe("queued task-9 as pueue task 77 in group orc\n")
+    })
+  }, runnerTimeout)
+
+  test("a group creation failure without the group still fails the queue", async () => {
+    await withFixture(async (fixture) => {
+      await writeFile(join(fixture.pueue, "groups.json"), JSON.stringify({ default: { status: "Running", parallel_tasks: 1 } }))
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
+      await writeFile(join(fixture.pueue, "fail-add"), "")
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toBe("orc: pueue group exited 1: fake pueue cannot add groups\n")
     })
   }, runnerTimeout)
 

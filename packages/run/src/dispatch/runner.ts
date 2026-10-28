@@ -153,11 +153,25 @@ const readHeld = (task: string): Effect.Effect<PueueTask | null, RunnerError, Ch
 
 const PueueGroups = Schema.Record(Schema.String, Schema.Unknown)
 
-const ensureOrcGroup = (): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+const readOrcGroup = (): Effect.Effect<boolean, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   pueue(["group", "--json"]).pipe(
     Effect.flatMap((text) => decodeJson(text, PueueGroups, "pueue group --json")),
-    Effect.flatMap((groups) =>
-      Object.hasOwn(groups, orcGroup) ? Effect.void : pueue(["group", "add", orcGroup]).pipe(Effect.asVoid)
+    Effect.map((groups) => Object.hasOwn(groups, orcGroup))
+  )
+
+const ensureOrcGroup = (): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  readOrcGroup().pipe(
+    Effect.flatMap((present) =>
+      present
+        ? Effect.void
+        : pueue(["group", "add", orcGroup]).pipe(
+          Effect.asVoid,
+          Effect.catch((error) =>
+            readOrcGroup().pipe(
+              Effect.flatMap((now) => now ? Effect.void : Effect.fail(error))
+            )
+          )
+        )
     )
   )
 
