@@ -105,6 +105,12 @@ Orc takes the implementer agent file from the first of these that exists:
 An agent file opens with a `---` header naming `model`, `thinking` and `tools`, and its body holds the instructions.
 Orc routes only `opencode-go` models through the sandbox and refuses any other model.
 
+Pi in a run compacts its context once the context passes 150 thousand tokens, whatever the model's window.
+Pi starts compaction at the window minus `compaction.reserveTokens`, so orc asks the host's Pi for each agent model's window through `pi --mode rpc`.
+Orc writes the window minus 150000 as that model's reserve into the run's Pi folder, `session/agent/settings.json`, beside `models.json`.
+Orc pins each agent model window in `models.json` as that provider model override `contextWindow`.
+Orc refuses a model the host's Pi does not list, and a model whose window is 150 thousand tokens or less.
+
 Once the checks pass, orc runs `no-mistakes axi run` on the branch with the task as its intent.
 At each gate orc asks no-mistakes to fix the findings marked `auto-fix`, ignores those marked `no-op`, and accepts the fix review.
 Orc refuses a no-mistakes gate holding an open review question without an `--answer` for that question.
@@ -199,6 +205,76 @@ Orc score refuses a score outside 1 to 5 with no write.
 Orc score refuses an unknown run or an unknown step with no write.
 Orc score keeps one row per score and orc show prints the latest score beside the signals.
 
+## The backlog and the beat
+
+Orc keeps one backlog of tasks in `~/.orc/backlog`, one Markdown file per task with its facts in YAML frontmatter.
+`ORC_HOME` moves the backlog elsewhere when set.
+A task file sits in `new`, `taken` or `closed`, and the folder it sits in is its state.
+Two files beside the folders tell the beat where tasks may go.
+`dispatch.json` names each machine, its slots and its start command, and the Claude accounts with the floor of room each must keep:
+
+```json
+{
+  "machines": [
+    { "name": "mac", "slots": 2, "start": ["orc", "runner", "start"] },
+    { "name": "winbox", "slots": 4, "start": ["orc", "runner", "start", "--", "ssh", "winbox", "orc"] }
+  ],
+  "quota": { "accounts": ["main", "second"], "floorPercent": 15 }
+}
+```
+
+`projects.json` names each project and its checkout on each machine:
+
+```json
+{ "projects": [{ "name": "orc", "checkouts": { "mac": "/Users/me/code/orc", "winbox": "/home/me/code/orc" } }] }
+```
+
+To add a task, run `orc backlog add <project> <task-file>`.
+Add `--machine <name>` to run the task on that machine only, and `--depends-on <task-id>` once per task it waits for.
+To see the backlog, run `orc backlog`.
+It prints the new, taken and closed tasks side by side with the project list and each machine's busy slots beside them.
+To print the same facts as JSON, run `orc backlog --json`, whose document names its version first as `orc.backlog.v1`.
+To start what can start, run `orc beat`, from launchd or cron every few minutes.
+Each beat reads quota with `clauth status --json` and the room on each machine before it takes any task.
+A task starts only once three things hold:
+
+1. Every task it depends on closed done.
+2. Its project has a checkout on a machine with a free slot.
+3. A Claude account has room at or above the floor.
+
+The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
+After the claim survives a recount, the beat writes the task started before it runs the start command.
+A task marked for a machine waits for a slot on that machine and never starts on another.
+The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE` and `ORC_TASK_ACCOUNT`.
+The beat starts it detached in its own session, never waits for it and never kills it.
+So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
+Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
+From then on the task is the start command's to close, and one that fails leaves the task started until it is closed.
+A missing start command exits 127 into its log and leaves the task started.
+Only a failure to spawn the log wrapper closes the task as `start-failed`.
+To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1`.
+When a started task ends, run `orc backlog close <task-id> <done|failed> [reason]`.
+
+## The runner
+
+`orc runner start` is the start command that hands a task to pueue on its machine, so the run outlives the beat, the dispatcher and any SSH link to it.
+It reads the task from the beat's `ORC_TASK_*` variables and queues `orc run` in the checkout on branch `orc/<task-id>`, in the pueue group `orc`.
+The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
+The runner creates the `orc` group when the machine lacks it.
+The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
+A task pueue already holds in group `orc` is not queued again.
+
+To start on another machine, put the command that runs orc there after `--`, as in `orc runner start -- ssh winbox orc`.
+That runs `orc runner queue` on the far side and sends it the task as JSON on stdin, so the task text never passes through a remote shell.
+SSH can drop once pueue holds the run, since pueue on that machine owns it.
+Pueue runs the task with the environment of the command that queued it, so the command after `--` must give orc the `PATH` its runs need on that machine.
+The queue records the resolved absolute `ORC_HOME` with the task.
+
+To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh winbox orc` from another.
+It names pueue's state for the task and the orc run on `orc/<task-id>` with its PR.
+A task is queued, stashed, running, paused, succeeded or failed, or unknown when no pueue task in group `orc` holds it.
+To print the same facts as JSON, add `--json`, whose document names its version first as `orc.runner.v1`.
+
 ## Where things are
 
 | Path | What it holds |
@@ -213,6 +289,7 @@ Orc score keeps one row per score and orc show prints the latest score beside th
 | `src/run-session.ts` | The reading of the captured Pi session |
 | `src/pi.ts` | The Pi agent command, its prompt and the check of its final reply |
 | `src/agents.ts` | The agent file parsing and lookup |
+| `src/context-mark.ts` | The 150 thousand token compaction mark orc writes into each run's Pi folder |
 | `agents` | The bundled agent files |
 | `src/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
 | `src/toon.ts` | The reading of the TOON output no-mistakes prints |
@@ -221,7 +298,18 @@ Orc score keeps one row per score and orc show prints the latest score beside th
 | `src/host.ts` | The host-side processes and tools the provider runs outside nono, and the guard on host git |
 | `src/nono-profile.ts` | The nono profile that lets a command write only the copy, its git data and the Pi session folder, and routes the model credential |
 | `src/git-config.ts` | The git config parsing that finds the credentials, includes and submodules a checkout carries |
+| `src/dispatch/backlog.ts` | The backlog folders, the id reservation and the atomic take of a task |
+| `src/dispatch/task-record.ts` | The task file and its frontmatter |
+| `src/dispatch/config.ts` | The reading of `dispatch.json` and `projects.json` |
+| `src/dispatch/quota.ts` | The quota reading from `clauth status --json` and the pick of an account |
+| `src/dispatch/beat.ts` | The beat: room, placement, take and start |
+| `src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
+| `src/dispatch/runner.ts` | The runner: the start through pueue and the reading of a task's result |
+| `src/dispatch/pueue-status.ts` | The pueue status shapes and the held-task lookup the runner reads |
+| `src/dispatch/args.ts` | The flag parsing for `orc backlog`, `orc beat` and `orc runner` |
+| `src/dispatch/cli.ts` | The `orc backlog`, `orc beat` and `orc runner` commands |
 | `../../tests/unit` | The in-process unit tests at the workspace root |
 | `../../tests/e2e` | The tests that run `src/bin.ts`, git or nono as a process, with a live Pi run through `ORC_PI_E2E=1`, at the workspace root |
+| `../../tests/fixtures/pueue` | The pueue 4 status JSON the runner tests read |
 | `../../tests/live` | The tests that run commands in a real nono sandbox, through the `test:live` script at the workspace root with `ORC_NONO_E2E=1` set |
 | `../../.no-mistakes.yaml` | The check commands no-mistakes and CI run at the workspace root |

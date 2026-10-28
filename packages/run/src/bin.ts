@@ -4,14 +4,17 @@ import { runMain } from "@effect/platform-bun/BunRuntime"
 import { BunServices } from "@effect/platform-bun"
 import { Console, Effect } from "effect"
 import packageJson from "../package.json" with { type: "json" }
-import { parseArgs } from "./args"
+import { type OrcArgs, parseArgs } from "./args"
+import { dispatchUsage } from "./dispatch/args"
+import { runDispatch } from "./dispatch/cli"
+import { RunnerError } from "./dispatch/runner"
 import { runAgentStep } from "./run"
 import { formatReport } from "./run-record"
 import { encodeRunsJson, formatHistoryError, formatRunsTable, listRuns, openDatabase, orcHomeDir } from "./run-history"
 import { recordStepScore } from "./run-scores"
 import { encodeShowJson, formatShow, readShow } from "./show"
 
-const usage = "Usage: orc [--version] [--help] | orc runs [--json] | orc show <run> [--json] | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--branch <name>] [--allow ask-user] [--answer question-<id>=\"<text>\"]"
+const usage = "Usage: orc [--version] [--help] | orc runs [--json] | orc show <run> [--json] | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--branch <name>] [--allow ask-user] [--answer question-<id>=\"<text>\"] | " + dispatchUsage
 
 const readFailure = (error: unknown): string =>
   typeof error === "string" ? error : "orc: cannot read the run history: " + formatHistoryError(error)
@@ -26,6 +29,21 @@ const readHistory = <A, E>(use: (db: Database) => Effect.Effect<A, E>) =>
     Effect.catch((error) =>
       Console.error(readFailure(error)).pipe(Effect.andThen(Effect.fail("run history unavailable")))
     )
+  )
+
+const dispatch = (args: Extract<OrcArgs, { readonly kind: "Dispatch" }>["args"]) =>
+  runDispatch(args, {
+    home: orcHomeDir(Bun.env.ORC_HOME),
+    cwd: process.cwd(),
+    env: Bun.env,
+    self: [process.execPath, Bun.main],
+    stdin: Effect.tryPromise({
+      try: () => Bun.stdin.text(),
+      catch: (cause) => new RunnerError({ detail: "cannot read stdin: " + String(cause) })
+    })
+  }).pipe(
+    Effect.provide(BunServices.layer),
+    Effect.catch((detail) => Console.error("orc: " + detail).pipe(Effect.andThen(Effect.fail(detail))))
   )
 
 const program = Effect.gen(function*() {
@@ -106,6 +124,9 @@ const program = Effect.gen(function*() {
         return yield* Effect.fail("agent step failed")
       }
       break
+    }
+    case "Dispatch": {
+      return yield* dispatch(args.args)
     }
     case "UsageError": {
       yield* Console.error(`${args.detail}\n${usage}`)

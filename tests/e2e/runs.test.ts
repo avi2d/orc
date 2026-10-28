@@ -39,6 +39,9 @@ const RunsDocument = Schema.Struct({
   }))
 })
 
+const concurrentOpens = 8
+const concurrentOpenRounds = 6
+
 const openDb = (home: string): Promise<Database> =>
   Effect.runPromise(openDatabase(join(home, ".orc")).pipe(Effect.provide(BunServices.layer)))
 
@@ -60,6 +63,16 @@ describe("orc runs", () => {
       expect((await stat(join(home, ".orc", "orc.sqlite"))).isFile()).toBe(true)
     })
   })
+
+  test("concurrent first opens of a fresh home all list runs instead of one finding the history locked", async () => {
+    for (let round = 0; round < concurrentOpenRounds; round += 1) {
+      await withHome(async (home) => {
+        const results = await Promise.all(Array.from({ length: concurrentOpens }, () => runOrc(["runs"], home)))
+        expect(results.map((result) => result.stderr)).toEqual(results.map(() => ""))
+        expect(results.map((result) => result.exitCode)).toEqual(results.map(() => 0))
+      })
+    }
+  }, 60_000)
 
   test("a corrupt history file is reported on stderr with a non-zero exit", async () => {
     await withHome(async (home) => {
