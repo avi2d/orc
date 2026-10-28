@@ -1,0 +1,361 @@
+import { Data, Effect, FileSystem, Path, Schema, Stream } from "effect"
+import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { formatHistoryError, latestRunOnBranch, openDatabase, RunStatusSchema } from "../run-history"
+import type { Reach } from "./args"
+import { TaskId } from "./backlog"
+import { parseTaskFile } from "./task-record"
+
+const RUNNER_JSON_SCHEMA = "orc.runner.v1" as const
+
+const orcGroup = "orc"
+
+const outputLines = 20
+
+export class RunnerError extends Data.TaggedError("RunnerError")<{
+  readonly detail: string
+}> {}
+
+export type Command = readonly [string, ...Array<string>]
+
+const QueueRequest = Schema.Struct({
+  task: TaskId,
+  checkout: Schema.String.check(Schema.isPattern(/^\//)),
+  body: Schema.String
+})
+type QueueRequest = typeof QueueRequest.Type
+
+const PueueTask = Schema.Struct({
+  id: Schema.Int,
+  label: Schema.NullOr(Schema.String),
+  group: Schema.String,
+  status: Schema.Unknown
+})
+type PueueTask = typeof PueueTask.Type
+
+const PueueState = Schema.Struct({ tasks: Schema.Record(Schema.String, PueueTask) })
+
+const PueueResult = Schema.Union([
+  Schema.Literals(["Success", "Killed", "Errored", "DependencyFailed"]),
+  Schema.Struct({ Failed: Schema.Int }),
+  Schema.Struct({ FailedToSpawn: Schema.String })
+])
+
+const PueueStatus = Schema.Union([
+  Schema.Struct({ Done: Schema.Struct({ start: Schema.String, end: Schema.String, result: PueueResult }) }),
+  Schema.Struct({ Running: Schema.Struct({ start: Schema.String }) }),
+  Schema.Struct({ Paused: Schema.Struct({ start: Schema.String }) }),
+  Schema.Struct({ Queued: Schema.Struct({}) }),
+  Schema.Struct({ Stashed: Schema.Struct({}) }),
+  Schema.Struct({ Locked: Schema.Struct({}) })
+])
+type PueueStatus = typeof PueueStatus.Type
+
+const PueueLog = Schema.Record(Schema.String, Schema.Struct({ output: Schema.String }))
+
+const RunSummary = Schema.Struct({
+  id: Schema.String,
+  status: RunStatusSchema,
+  prLink: Schema.NullOr(Schema.String),
+  endReason: Schema.NullOr(Schema.String)
+})
+type RunSummary = typeof RunSummary.Type
+
+const heldFields = {
+  task: TaskId,
+  pueueTask: Schema.Int,
+  run: Schema.NullOr(RunSummary),
+  output: Schema.Array(Schema.String)
+}
+
+const RunnerResult = Schema.Union([
+  Schema.Struct({ task: TaskId, status: Schema.Literal("unknown") }),
+  Schema.Struct({ ...heldFields, status: Schema.Literals(["queued", "stashed"]) }),
+  Schema.Struct({ ...heldFields, status: Schema.Literals(["running", "paused"]), started: Schema.String }),
+  Schema.Struct({ ...heldFields, status: Schema.Literal("succeeded"), started: Schema.String, ended: Schema.String }),
+  Schema.Struct({ ...heldFields, status: Schema.Literal("failed"), started: Schema.String, ended: Schema.String, reason: Schema.String })
+])
+export type RunnerResult = typeof RunnerResult.Type
+
+const RunnerDocument = Schema.Struct({ schema: Schema.Literal(RUNNER_JSON_SCHEMA), result: RunnerResult })
+
+type RunnerRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
+
+const taskBranch = (task: string): string => "orc/" + task
+
+const refuse = (detail: string) => Effect.fail(new RunnerError({ detail }))
+
+interface Captured {
+  readonly exitCode: number
+  readonly stdout: string
+  readonly stderr: string
+}
+
+const capture = (command: Command, stdin: string | null): Effect.Effect<Captured, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+    const [program, ...args] = command
+    const handle = yield* spawner.spawn(ChildProcess.make(program, args, {
+      stdin: stdin === null ? "ignore" : Stream.fromIterable([new TextEncoder().encode(stdin)])
+    }))
+    const [stdout, stderr, exitCode] = yield* Effect.all([
+      handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
+      handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
+      handle.exitCode
+    ], { concurrency: "unbounded" })
+    return { exitCode, stdout, stderr }
+  }).pipe(
+    Effect.scoped,
+    Effect.mapError((error) => new RunnerError({ detail: command[0] + " did not run: " + error.message }))
+  )
+
+const pueue = (args: ReadonlyArray<string>): Effect.Effect<string, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  capture(["pueue", ...args], null).pipe(
+    Effect.flatMap((result) =>
+      result.exitCode === 0
+        ? Effect.succeed(result.stdout)
+        : refuse("pueue " + (args[0] ?? "") + " exited " + result.exitCode + ": " + result.stderr.trim())
+    )
+  )
+
+const decodeJson = <S extends Schema.Top & { readonly DecodingServices: never }>(
+  text: string,
+  schema: S,
+  what: string
+): Effect.Effect<S["Type"], RunnerError> =>
+  Effect.try({ try: (): unknown => JSON.parse(text), catch: () => new RunnerError({ detail: what + " printed no JSON" }) }).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(schema)),
+    Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: what + " printed JSON orc cannot read: " + error.message }))
+  )
+
+const heldTask = (tasks: Readonly<Record<string, PueueTask>>, task: string): PueueTask | null => {
+  let latest: PueueTask | null = null
+  for (const candidate of Object.values(tasks)) {
+    if (candidate.group === orcGroup && candidate.label === task && candidate.id > (latest?.id ?? -1)) {
+      latest = candidate
+    }
+  }
+  return latest
+}
+
+const readHeld = (task: string): Effect.Effect<PueueTask | null, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  pueue(["status", "--json"]).pipe(
+    Effect.flatMap((text) => decodeJson(text, PueueState, "pueue status --json")),
+    Effect.map((state) => heldTask(state.tasks, task))
+  )
+
+const requireFolder = (checkout: string): Effect.Effect<void, RunnerError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const info = yield* fs.stat(checkout).pipe(Effect.orElseSucceed(() => null))
+    if (info?.type !== "Directory") {
+      return yield* refuse("the checkout " + checkout + " is no folder on this machine")
+    }
+  })
+
+// The beat starts each task once, so this check keeps a rerun start from queueing a second run, not two starts racing.
+const queueTask = (
+  request: QueueRequest,
+  self: Command,
+  home: string
+): Effect.Effect<string, RunnerError, RunnerRequirements> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    yield* requireFolder(request.checkout)
+    const held = yield* readHeld(request.task)
+    if (held !== null) {
+      return request.task + " is already pueue task " + held.id + " in group " + orcGroup
+    }
+    const folder = home + "/runner"
+    const taskFile = folder + "/" + request.task + ".md"
+    yield* fs.makeDirectory(folder, { recursive: true }).pipe(
+      Effect.andThen(fs.writeFileString(taskFile, request.body)),
+      Effect.mapError((error) => new RunnerError({ detail: "cannot write " + taskFile + ": " + error.message }))
+    )
+    const id = yield* pueue([
+      "add", "--group", orcGroup, "--label", request.task, "--working-directory", request.checkout, "--print-task-id", "--escape", "--",
+      ...self, "run", taskFile, "--branch", taskBranch(request.task)
+    ])
+    return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
+  })
+
+export const queueFromText = (text: string, self: Command, home: string): Effect.Effect<string, RunnerError, RunnerRequirements> =>
+  decodeJson(text, QueueRequest, "the queue request on stdin").pipe(Effect.flatMap((request) => queueTask(request, self, home)))
+
+const requiredEnv = (env: Readonly<Record<string, string | undefined>>, name: string): Effect.Effect<string, RunnerError> => {
+  const value = env[name] ?? ""
+  return value === "" ? refuse("orc runner start reads " + name + ", which the beat sets") : Effect.succeed(value)
+}
+
+const readRequest = (env: Readonly<Record<string, string | undefined>>): Effect.Effect<QueueRequest, RunnerError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const task = yield* requiredEnv(env, "ORC_TASK_ID")
+    const file = yield* requiredEnv(env, "ORC_TASK_FILE")
+    const checkout = yield* requiredEnv(env, "ORC_TASK_CHECKOUT")
+    const text = yield* fs.readFileString(file).pipe(
+      Effect.mapError((error) => new RunnerError({ detail: "cannot read the task file " + file + ": " + error.message }))
+    )
+    const record = yield* parseTaskFile(file, "taken", text).pipe(
+      Effect.mapError((error) => new RunnerError({ detail: error.file + ": " + error.detail }))
+    )
+    return yield* Schema.decodeEffect(QueueRequest)({ task, checkout, body: record.spec.body }).pipe(
+      Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
+    )
+  })
+
+const handThrough = (command: Command, request: QueueRequest): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+    const [program, ...args] = command
+    const handle = yield* spawner.spawn(ChildProcess.make(program, [...args, "runner", "queue"], {
+      stdin: Stream.fromIterable([new TextEncoder().encode(JSON.stringify(request))]),
+      stdout: "inherit",
+      stderr: "inherit"
+    }))
+    const exitCode = yield* handle.exitCode
+    if (exitCode !== 0) {
+      return yield* refuse(command.join(" ") + " runner queue exited " + exitCode)
+    }
+  }).pipe(
+    Effect.scoped,
+    Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: command[0] + " did not run: " + error.message }))
+  )
+
+export const startTask = (
+  env: Readonly<Record<string, string | undefined>>,
+  reach: Reach,
+  self: Command,
+  home: string
+): Effect.Effect<string | null, RunnerError, RunnerRequirements> =>
+  Effect.gen(function*() {
+    const request = yield* readRequest(env)
+    if (reach.kind === "here") {
+      return yield* queueTask(request, self, home)
+    }
+    yield* handThrough(reach.command, request)
+    return null
+  })
+
+const failureReason = (result: typeof PueueResult.Type): string | null => {
+  if (result === "Success") {
+    return null
+  }
+  if (typeof result === "object") {
+    return "Failed" in result ? "orc exited " + result.Failed : "pueue could not start it: " + result.FailedToSpawn
+  }
+  switch (result) {
+    case "Killed": {
+      return "the run was killed"
+    }
+    case "Errored": {
+      return "pueue lost the run to an error"
+    }
+    case "DependencyFailed": {
+      return "a task it waited on failed"
+    }
+  }
+}
+
+const assessHeld = (
+  task: string,
+  pueueTask: number,
+  status: PueueStatus,
+  run: RunSummary | null,
+  output: ReadonlyArray<string>
+): RunnerResult => {
+  const held = { task, pueueTask, run, output }
+  if ("Done" in status) {
+    const { start, end, result } = status.Done
+    const reason = failureReason(result)
+    return reason === null
+      ? { ...held, status: "succeeded", started: start, ended: end }
+      : { ...held, status: "failed", started: start, ended: end, reason }
+  }
+  if ("Running" in status) {
+    return { ...held, status: "running", started: status.Running.start }
+  }
+  if ("Paused" in status) {
+    return { ...held, status: "paused", started: status.Paused.start }
+  }
+  return { ...held, status: "Stashed" in status ? "stashed" : "queued" }
+}
+
+const readOutput = (pueueTask: number): Effect.Effect<ReadonlyArray<string>, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  pueue(["log", String(pueueTask), "--json", "--lines", String(outputLines)]).pipe(
+    Effect.flatMap((text) => decodeJson(text, PueueLog, "pueue log --json")),
+    Effect.map((logs) => {
+      const key = String(pueueTask)
+      return Object.hasOwn(logs, key) ? logs[key].output.split("\n").filter((line) => line.trim() !== "") : []
+    })
+  )
+
+const readRun = (home: string, task: string): Effect.Effect<RunSummary | null, RunnerError, FileSystem.FileSystem | Path.Path> =>
+  Effect.acquireUseRelease(
+    openDatabase(home),
+    (db) => latestRunOnBranch(db, taskBranch(task)),
+    (db) => Effect.sync(() => db.close())
+  ).pipe(
+    Effect.map((run) => run === null ? null : { id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason }),
+    Effect.mapError((error) => new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
+  )
+
+export const readResult = (task: string, home: string): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
+  Effect.gen(function*() {
+    const held = yield* readHeld(task)
+    if (held === null) {
+      return { task, status: "unknown" } satisfies RunnerResult
+    }
+    const status = yield* Schema.decodeUnknownEffect(PueueStatus)(held.status).pipe(
+      Effect.mapError((error) => new RunnerError({ detail: "pueue reports a status orc cannot read for task " + held.id + ": " + error.message }))
+    )
+    const output = yield* readOutput(held.id)
+    const run = yield* readRun(home, task)
+    return assessHeld(task, held.id, status, run, output)
+  })
+
+export const readResultThrough = (command: Command, task: string): Effect.Effect<RunnerResult, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  capture([...command, "runner", "result", task, "--json"], null).pipe(
+    Effect.flatMap((result) =>
+      result.exitCode === 0
+        ? decodeJson(result.stdout, RunnerDocument, command.join(" ") + " runner result")
+        : refuse(command.join(" ") + " runner result exited " + result.exitCode + ": " + result.stderr.trim())
+    ),
+    Effect.map((document) => document.result)
+  )
+
+export const runnerJson = (result: RunnerResult): typeof RunnerDocument.Type => ({ schema: RUNNER_JSON_SCHEMA, result })
+
+const headLine = (result: RunnerResult): string => {
+  switch (result.status) {
+    case "unknown": {
+      return result.task + ": no pueue task in group " + orcGroup + " holds it"
+    }
+    case "queued":
+    case "stashed": {
+      return result.task + ": " + result.status + " as pueue task " + result.pueueTask
+    }
+    case "running":
+    case "paused": {
+      return result.task + ": " + result.status + " as pueue task " + result.pueueTask + " since " + result.started
+    }
+    case "succeeded": {
+      return result.task + ": succeeded as pueue task " + result.pueueTask + ", " + result.started + " to " + result.ended
+    }
+    case "failed": {
+      return result.task + ": failed as pueue task " + result.pueueTask + ", " + result.started + " to " + result.ended + ": " + result.reason
+    }
+  }
+}
+
+const runLine = (task: string, run: RunSummary | null): string =>
+  run === null
+    ? "orc holds no run on " + taskBranch(task)
+    : "orc run " + run.id + " " + run.status + (run.prLink === null ? "" : ", PR " + run.prLink) + (run.endReason === null ? "" : ": " + run.endReason)
+
+export const formatResult = (result: RunnerResult): string => {
+  if (result.status === "unknown") {
+    return headLine(result)
+  }
+  const output = result.output.length === 0 ? [] : ["last output:", ...result.output.map((line) => "  " + line)]
+  return [headLine(result), runLine(result.task, result.run), ...output].join("\n")
+}

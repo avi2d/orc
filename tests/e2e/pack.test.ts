@@ -23,6 +23,7 @@ const expectedFiles = [
   "src/dispatch/cli.ts",
   "src/dispatch/config.ts",
   "src/dispatch/quota.ts",
+  "src/dispatch/runner.ts",
   "src/dispatch/task-record.ts",
   "src/git-config.ts",
   "src/git-run.ts",

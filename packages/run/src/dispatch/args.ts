@@ -1,3 +1,7 @@
+import { isTaskId } from "./backlog"
+
+export type Reach = { readonly kind: "here" } | { readonly kind: "through"; readonly command: readonly [string, ...Array<string>] }
+
 export type DispatchArgs =
   | { readonly kind: "ShowBacklog"; readonly json: boolean }
   | {
@@ -9,10 +13,13 @@ export type DispatchArgs =
   }
   | { readonly kind: "CloseTask"; readonly id: string; readonly outcome: "done" | "failed"; readonly reason: string }
   | { readonly kind: "Beat"; readonly json: boolean }
+  | { readonly kind: "RunnerStart"; readonly reach: Reach }
+  | { readonly kind: "RunnerQueue" }
+  | { readonly kind: "RunnerResult"; readonly task: string; readonly json: boolean; readonly reach: Reach }
   | { readonly kind: "UsageError"; readonly detail: string }
 
 export const dispatchUsage =
-  "orc backlog [--json] | orc backlog add <project> <task-file> [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc beat [--json]"
+  "orc backlog [--json] | orc backlog add <project> <task-file> [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner result <task-id> [--json] [-- <command that runs orc there>]"
 
 const parseJsonFlag = (rest: ReadonlyArray<string>, json: (json: boolean) => DispatchArgs): DispatchArgs => {
   if (rest.length === 0) {
@@ -66,7 +73,46 @@ const parseClose = (rest: ReadonlyArray<string>): DispatchArgs => {
   return { kind: "CloseTask", id, outcome, reason }
 }
 
-export const parseDispatchArgs = (command: "backlog" | "beat", rest: ReadonlyArray<string>): DispatchArgs => {
+type ReachSplit = { readonly kind: "split"; readonly words: ReadonlyArray<string>; readonly reach: Reach } | { readonly kind: "UsageError"; readonly detail: string }
+
+const splitReach = (rest: ReadonlyArray<string>): ReachSplit => {
+  const cut = rest.indexOf("--")
+  if (cut === -1) {
+    return { kind: "split", words: rest, reach: { kind: "here" } }
+  }
+  const [first = "", ...others] = rest.slice(cut + 1)
+  if (first === "") {
+    return { kind: "UsageError", detail: "orc runner takes a command after --" }
+  }
+  return { kind: "split", words: rest.slice(0, cut), reach: { kind: "through", command: [first, ...others] } }
+}
+
+const parseRunner = (rest: ReadonlyArray<string>): DispatchArgs => {
+  const [verb = "", ...after] = rest
+  if (verb === "queue") {
+    return after.length === 0 ? { kind: "RunnerQueue" } : { kind: "UsageError", detail: "unexpected argument: " + (after[0] ?? "") }
+  }
+  if (verb !== "start" && verb !== "result") {
+    return { kind: "UsageError", detail: "orc runner takes start, queue or result" }
+  }
+  const split = splitReach(after)
+  if (split.kind === "UsageError") {
+    return split
+  }
+  if (verb === "start") {
+    return split.words.length === 0 ? { kind: "RunnerStart", reach: split.reach } : { kind: "UsageError", detail: "unexpected argument: " + (split.words[0] ?? "") }
+  }
+  const [task = "", ...flags] = split.words
+  if (!isTaskId(task)) {
+    return { kind: "UsageError", detail: "orc runner result takes a task id, got \"" + task + "\"" }
+  }
+  return parseJsonFlag(flags, (json) => ({ kind: "RunnerResult", task, json, reach: split.reach }))
+}
+
+export const parseDispatchArgs = (command: "backlog" | "beat" | "runner", rest: ReadonlyArray<string>): DispatchArgs => {
+  if (command === "runner") {
+    return parseRunner(rest)
+  }
   if (command === "beat") {
     return parseJsonFlag(rest, (json) => ({ kind: "Beat", json }))
   }

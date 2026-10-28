@@ -280,29 +280,36 @@ export const RunSqlRowSchema = Schema.Struct({
   end_reason: Schema.NullOr(Schema.String)
 })
 
+const runRecordOf = (row: typeof RunSqlRowSchema.Type): RunRecord => ({
+  id: row.id,
+  project: row.project,
+  branch: row.branch,
+  taskFile: row.task_file,
+  status: row.status,
+  started: row.started,
+  ended: row.ended,
+  prLink: row.pr_link,
+  endReason: row.end_reason
+})
+
+const runColumns = "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason FROM runs"
+
 export const listRuns = (
   db: Database,
   limit = 20
 ): Effect.Effect<ReadonlyArray<RunRecord>, Schema.SchemaError | SqliteFailure> =>
-  sqlite(() =>
-    db.query(
-      "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason FROM runs ORDER BY started DESC, id ASC LIMIT ?"
-    ).all(limit)
-  ).pipe(
+  sqlite(() => db.query(runColumns + " ORDER BY started DESC, id ASC LIMIT ?").all(limit)).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(RunSqlRowSchema))),
-    Effect.map((rows) =>
-      rows.map((row) => ({
-        id: row.id,
-        project: row.project,
-        branch: row.branch,
-        taskFile: row.task_file,
-        status: row.status,
-        started: row.started,
-        ended: row.ended,
-        prLink: row.pr_link,
-        endReason: row.end_reason
-      }))
-    )
+    Effect.map((rows) => rows.map(runRecordOf))
+  )
+
+export const latestRunOnBranch = (
+  db: Database,
+  branch: string
+): Effect.Effect<RunRecord | null, Schema.SchemaError | SqliteFailure> =>
+  sqlite(() => db.query(runColumns + " WHERE branch = ? ORDER BY started DESC, id ASC LIMIT 1").all(branch)).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(RunSqlRowSchema))),
+    Effect.map((rows) => rows.length === 0 ? null : runRecordOf(rows[0]))
   )
 
 export const updateRun = (db: Database, id: string, patch: { readonly status: RunStatus; readonly ended: string | null; readonly prLink: string | null; readonly endReason: string | null }): Effect.Effect<void, SqliteFailure> =>
