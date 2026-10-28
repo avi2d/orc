@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { Schema } from "effect"
 import { orcCompletionLine } from "../../packages/run/src/pi"
 
 const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
@@ -19,7 +20,13 @@ const piStream = [
   JSON.stringify({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "Committed.\n" + orcCompletionLine } })
 ].join("\n") + "\n"
 
-const modelListReply = JSON.stringify({ id: "orc-models", type: "response", command: "get_available_models", success: true, data: { models: [{ provider: "opencode-go", id: "muse-spark-1.3-contributor", contextWindow: 262144 }] } })
+const claudeModel = "claude-sonnet-4-5"
+
+const modelListReply = JSON.stringify({ id: "orc-models", type: "response", command: "get_available_models", success: true, data: { models: [{ provider: "opencode-go", id: "muse-spark-1.3-contributor", contextWindow: 262144 }, { provider: "anthropic", id: claudeModel, contextWindow: 200000 }] } })
+
+const claudeToken = "sk-ant-oat01-orc-e2e-fixture-token"
+
+const decodeClaudeModels = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct({ providers: Schema.Struct({ anthropic: Schema.Struct({ apiKey: Schema.String }) }) })))
 
 const noMistakesReplies = [
   ["run:", "  id: \"01STUB\"", "  branch: orc/test", "  status: completed", "  head: abc1234", "  pr: \"" + prUrl + "\"", "  findings: none", "outcome: passed"],
@@ -62,6 +69,8 @@ const withNoSandboxFixture = async (body: (fixture: NoSandboxFixture) => Promise
       "if [ \"$1\" = --mode ]; then cat > /dev/null; echo '" + modelListReply + "'; exit 0; fi",
       "if [ \"$1\" != -p ]; then exit 2; fi",
       "cat > /dev/null",
+      "echo \"$PI_CODING_AGENT_DIR\" > \"" + fakeBin + "/pi-agent-dir\"",
+      "if [ -f \"$PI_CODING_AGENT_DIR/models.json\" ]; then cp \"$PI_CODING_AGENT_DIR/models.json\" \"" + fakeBin + "/pi-models\"; fi",
       "pwd > \"" + fakeBin + "/pi-cwd\"",
       "git rev-parse --show-toplevel --path-format=absolute --git-common-dir --abbrev-ref HEAD > \"" + fakeBin + "/pi-git\"",
       "echo \"$GIT_CONFIG_GLOBAL\" > \"" + fakeBin + "/pi-gitconfig\"",
@@ -104,6 +113,39 @@ const withNoSandboxFixture = async (body: (fixture: NoSandboxFixture) => Promise
   }
 }
 
+const writeAgentFile = (file: string, model: string): Promise<void> =>
+  writeFile(file, "---\nmodel: " + model + "\nthinking: low\ntools: read, bash, edit\n---\nDo the task.\n")
+
+const asClaudeRun = async (fixture: NoSandboxFixture, tokenMode: number): Promise<Record<string, string>> => {
+  const agentsDir = join(fixture.env["ORC_HOME"] ?? "", "agents")
+  await mkdir(agentsDir, { recursive: true })
+  await writeAgentFile(join(agentsDir, "implementer.md"), "anthropic/" + claudeModel)
+  await writeAgentFile(join(agentsDir, "fixer.md"), "anthropic/" + claudeModel)
+  const secretDir = join(fixture.home, "..", "secret")
+  await mkdir(secretDir, { mode: 0o700 })
+  const tokenFile = join(secretDir, "claude-token")
+  await writeFile(tokenFile, claudeToken)
+  await chmod(tokenFile, tokenMode)
+  return { ...fixture.env, ORC_CLAUDE_TOKEN_FILE: tokenFile }
+}
+
+const filesUnder = async (dir: string): Promise<ReadonlyArray<string>> => {
+  const entries = await readdir(dir, { recursive: true, withFileTypes: true })
+  return entries.filter((entry) => entry.isFile()).map((entry) => join(entry.parentPath, entry.name))
+}
+
+const filesHolding = async (dirs: ReadonlyArray<string>, needle: string): Promise<ReadonlyArray<string>> => {
+  const holding: Array<string> = []
+  for (const dir of dirs) {
+    for (const file of await filesUnder(dir)) {
+      if ((await readFile(file)).includes(needle)) {
+        holding.push(file)
+      }
+    }
+  }
+  return holding
+}
+
 const runOrc = async (args: ReadonlyArray<string>, cwd: string, env: Record<string, string>): Promise<{ exitCode: number; stdout: string; stderr: string }> => {
   const proc = Bun.spawn([process.execPath, binPath, ...args], { stdout: "pipe", stderr: "pipe", cwd, env })
   const [stdout, stderr, exitCode] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
@@ -135,6 +177,48 @@ describe("orc run --sandbox none", () => {
       const result = await runOrc(["run", "task.md", "--branch", "orc/test"], repo, env)
       expect(result.exitCode).not.toBe(0)
       expect(await Bun.file(join(fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+})
+
+describe("orc run on a Claude model", () => {
+  test("hands Pi a run-owned agent folder whose key reads the token file, ends in one PR and leaves the token in no run, repo or home file", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const env = await asClaudeRun(fixture, 0o600)
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, env)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect(result.stdout).toContain(prUrl)
+      const nmCalls = (await readFile(join(fixture.fakeBin, "nm-calls"), "utf8")).split("\n").filter((line) => line !== "")
+      expect(nmCalls.filter((line) => line.startsWith("axi run")).length).toBe(1)
+      const agentDir = (await readFile(join(fixture.fakeBin, "pi-agent-dir"), "utf8")).trim()
+      expect(agentDir).toStartWith((env["ORC_HOME"] ?? "") + "/")
+      const apiKey = decodeClaudeModels(await readFile(join(fixture.fakeBin, "pi-models"), "utf8")).providers.anthropic.apiKey
+      expect(apiKey).toStartWith("!")
+      const resolved = Bun.spawnSync(["sh", "-c", apiKey.slice(1)], { env })
+      expect(resolved.stdout.toString()).toBe(claudeToken)
+      expect(await filesHolding([env["ORC_HOME"] ?? "", fixture.repo, fixture.home], claudeToken)).toEqual([])
+      expect(git(fixture.repo, ["log", "--all", "-p"], env)).not.toContain(claudeToken)
+      expect(await Bun.file(join(fixture.fakeBin, "nono-calls")).exists()).toBe(false)
+    })
+  }, 60_000)
+
+  test("in the nono sandbox is refused before Pi runs, naming --sandbox none", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const env = await asClaudeRun(fixture, 0o600)
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test"], fixture.repo, env)
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain("--sandbox none")
+      expect(await Bun.file(join(fixture.fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+
+  test("with a token file other users can read is refused before Pi runs", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const env = await asClaudeRun(fixture, 0o644)
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, env)
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain("has mode 644")
+      expect(await Bun.file(join(fixture.fakeBin, "pi-cwd")).exists()).toBe(false)
     })
   }, 60_000)
 })

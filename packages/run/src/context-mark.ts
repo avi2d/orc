@@ -40,14 +40,13 @@ export const readModelWindows = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
   host: HostTools,
   cwd: string,
-  preserveAgentDir = false
+  agentDir: string | undefined
 ): Effect.Effect<ModelWindows, OrcRunError> =>
   Effect.scoped(Effect.gen(function*() {
-    const parts = modelListCommand(host, preserveAgentDir)
-    const agentDir = Bun.env.PI_CODING_AGENT_DIR === undefined ? {} : { PI_CODING_AGENT_DIR: Bun.env.PI_CODING_AGENT_DIR }
+    const parts = modelListCommand(host, agentDir !== undefined)
     const handle = yield* spawner.spawn(ChildProcess.make(parts[0], parts.slice(1), {
       cwd,
-      env: preserveAgentDir ? { ...inheritedEnv(Bun.env), ...agentDir } : inheritedEnv(Bun.env),
+      env: agentDir === undefined ? inheritedEnv(Bun.env) : { ...inheritedEnv(Bun.env), PI_CODING_AGENT_DIR: agentDir },
       extendEnv: false,
       stdin: Stream.fromIterable([new TextEncoder().encode(modelListRequest)])
     }))
