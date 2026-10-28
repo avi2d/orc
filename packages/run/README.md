@@ -80,6 +80,7 @@ Orc refuses a checkout with uncommitted changes.
 Orc commits to a new branch named `orc/<run-id>`, or to the name you pass with `--branch <name>`.
 A branch name may hold only letters, digits, `.`, `_`, `-` and `/`.
 To resume the branch after a stop, enter the same target checkout and run `orc run --branch <name>` and orc skips the steps the run history marks passed.
+Resume takes the sandbox from the flag and not from the earlier run, so pass `--sandbox none` again when resuming a no-sandbox run.
 On resume Sandcastle reuses the branch worktree, Pi resumes its prior session, and orc reattaches to no-mistakes with the same intent.
 After a refusal, run the same resume command with `--allow` and the name from the report, or with `--answer` and the captain's answer for a question.
 No-mistakes takes the word for that `--allow` kind, and the answer for that question.
@@ -98,15 +99,6 @@ nono reads it with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC
 So a key held only in the keychain or in an environment variable such as `OPENCODE_API_KEY` is refused, and a login Pi's `/login` stores in `~/.pi/agent/auth.json` works.
 This refusal applies to `--sandbox none` as well, so write a key held only in an environment variable to the Pi auth file first.
 If nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc's result names that error.
-
-## Running without a sandbox
-
-To run Pi and the checks directly on the host, add `--sandbox none` to `orc run`, as in `orc run task.md --sandbox none`.
-`--sandbox nono`, the default, keeps the nono sandbox.
-Without a sandbox the run still gets its own worktree on its own branch, and nono need not be on the PATH.
-Pi runs with your own environment and Pi config, so it can read and write anything your user can.
-Orc points `GIT_CONFIG_GLOBAL` at a file in the run folder, so the commit identity Sandcastle sets never reaches your `~/.gitconfig`.
-Pi writes its session straight into the run's `sessions/host` folder.
 
 Orc takes the implementer agent file from the first of these that exists:
 
@@ -141,6 +133,16 @@ Each run keeps its task, evidence, agent log and Pi session in `$ORC_HOME/runs/<
 Its `no-mistakes.txt` and the run history hold the no-mistakes findings, their count, the gates orc answered, the final result and the PR link.
 Its `report.md` carries the task, the branch, the status, the PR, the steps, the evidence, the signals, the findings and the result.
 The terminal report names the run folder, the agent file, the session file and the report as full links, beside the PR link.
+
+## Running without a sandbox
+
+To run Pi and the checks directly on the host, add `--sandbox none` to `orc run`, as in `orc run task.md --sandbox none`.
+`--sandbox nono`, the default, keeps the nono sandbox.
+Without a sandbox the run still gets its own worktree on its own branch, and nono need not be on the PATH.
+Pi runs with your own environment and Pi config, so it can read and write anything your user can.
+Orc points `GIT_CONFIG_GLOBAL` at a file in the run folder, so the commit identity Sandcastle sets never reaches your `~/.gitconfig`.
+Pi writes its session straight into the run's `sessions/host` folder.
+Resume takes the sandbox from the flag and not from the earlier run, so pass `--sandbox none` again to resume.
 
 ## Choosing the no-mistakes binary
 

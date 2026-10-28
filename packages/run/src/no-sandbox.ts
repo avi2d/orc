@@ -112,7 +112,7 @@ const fixedExec = (processEnv: Record<string, string>, fallbackCwd: string) =>
     })
   }
 
-export const noSandboxProvider = (dirs: NoSandboxDirs, operatorEnv: Readonly<Record<string, string | undefined>> = process.env): NoSandboxProvider => {
+export const noSandboxProvider = (dirs: NoSandboxDirs, operatorEnv: Readonly<Record<string, string | undefined>>): NoSandboxProvider => {
   const base = noSandbox({ env: { ...noSandboxEnv(dirs) } })
   const baseCreate = (base as unknown as { readonly create: NoSandboxCreate }).create.bind(base)
   const create: NoSandboxCreate = async (createOptions) => {
