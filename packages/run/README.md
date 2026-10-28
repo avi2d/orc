@@ -116,11 +116,12 @@ Orc takes the implementer agent file from the first of these that exists:
 An agent file opens with a `---` header naming `model`, `thinking` and `tools`, and its body holds the instructions.
 Orc routes only `opencode-go` models through the sandbox and refuses any other model.
 
-Pi in a run compacts its context once the context passes 150 thousand tokens, whatever the model's window.
+With the default sandbox, Pi in a run compacts its context once the context passes 150 thousand tokens, whatever the model's window.
 Pi starts compaction at the window minus `compaction.reserveTokens`, so orc asks the host's Pi for each agent model's window through `pi --mode rpc`.
 Orc writes the window minus 150000 as that model's reserve into the run's Pi folder, `session/agent/settings.json`, beside `models.json`.
 Orc pins each agent model window in `models.json` as that provider model override `contextWindow`.
 Orc refuses a model the host's Pi does not list, and a model whose window is 150 thousand tokens or less.
+With `--sandbox none` Pi reads your Pi config, compaction included, so the fixed mark does not apply.
 
 Once the checks pass, orc runs `no-mistakes axi run` on the branch with the task as its intent.
 At each gate orc asks no-mistakes to fix the findings marked `auto-fix`, ignores those marked `no-op`, and accepts the fix review.
