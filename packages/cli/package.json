@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "The tui-dash command, composing the panel modules into the dashboard, opening one panel alone, printing reports and snapshots, or streaming alert events",
-  "repository": "https://github.com/avi2d/tui-dash.git",
+  "repository": "https://github.com/avi2d/orc.git",
   "author": "avi2d <avi2dg@gmail.com>",
   "license": "MIT",
   "type": "module",

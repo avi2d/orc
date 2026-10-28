@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "The alerts panel of the tui-dash dashboard, showing each alert rule, its limits, its last fire and the listener's verdict, and its one-frame print",
-  "repository": "https://github.com/avi2d/tui-dash.git",
+  "repository": "https://github.com/avi2d/orc.git",
   "author": "avi2d <avi2dg@gmail.com>",
   "license": "MIT",
   "type": "module",

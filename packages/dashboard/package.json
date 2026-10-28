@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "The dashboard host, laying out whichever panel modules it is handed by a layout setting, and owning no panel itself",
-  "repository": "https://github.com/avi2d/tui-dash.git",
+  "repository": "https://github.com/avi2d/orc.git",
   "author": "avi2d <avi2dg@gmail.com>",
   "license": "MIT",
   "type": "module",

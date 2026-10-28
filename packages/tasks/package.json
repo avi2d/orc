@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Standalone OpenTUI tasks tool for tui-dash, showing projects, one project's tasks and one task over the last 7 days, and the sampler that keeps each task's usage",
-  "repository": "https://github.com/avi2d/tui-dash.git",
+  "repository": "https://github.com/avi2d/orc.git",
   "author": "avi2d <avi2dg@gmail.com>",
   "license": "MIT",
   "type": "module",
