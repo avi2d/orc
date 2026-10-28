@@ -142,6 +142,7 @@ describe("tui-dash alerts --json", () => {
       stderr: "pipe",
     });
     const deadline = setTimeout(() => child.kill(), 25_000);
+    let observe: ReturnType<typeof setTimeout> | undefined;
     const seen: Array<AlertEvent> = [];
     let pending = "";
     const decoder = new TextDecoder();
@@ -151,11 +152,14 @@ describe("tui-dash alerts --json", () => {
         const lines = pending.split("\n");
         pending = lines.pop() ?? "";
         seen.push(...lines.filter((line) => line !== "").map((line) => decodeEvent(line)));
-        if (seen.some((event) => event.rule === "nightly")) break;
+        if (observe === undefined && seen.some((event) => event.rule === "nightly")) {
+          // Window covers five polls at everySeconds 0.2.
+          observe = setTimeout(() => child.kill(), 1000);
+        }
       }
-      await Bun.sleep(1000);
     } finally {
       clearTimeout(deadline);
+      if (observe !== undefined) clearTimeout(observe);
       child.kill();
       await child.exited;
     }
