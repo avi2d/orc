@@ -10,8 +10,6 @@ const RUNNER_JSON_SCHEMA = "orc.runner.v1" as const
 
 const orcGroup = "orc"
 
-const outputLines = 20
-
 export class RunnerError extends Data.TaggedError("RunnerError")<{
   readonly detail: string
 }> {}
@@ -52,8 +50,6 @@ const PueueStatus = Schema.Union([
 ])
 type PueueStatus = typeof PueueStatus.Type
 
-const PueueLog = Schema.Record(Schema.String, Schema.Struct({ output: Schema.String }))
-
 const RunSummary = Schema.Struct({
   id: Schema.String,
   status: RunStatusSchema,
@@ -65,8 +61,7 @@ type RunSummary = typeof RunSummary.Type
 const heldFields = {
   task: TaskId,
   pueueTask: Schema.Int,
-  run: Schema.NullOr(RunSummary),
-  output: Schema.Array(Schema.String)
+  run: Schema.NullOr(RunSummary)
 }
 
 const RunnerResult = Schema.Union([
@@ -314,10 +309,9 @@ const assessHeld = (
   task: string,
   pueueTask: number,
   status: PueueStatus,
-  run: RunSummary | null,
-  output: ReadonlyArray<string>
+  run: RunSummary | null
 ): RunnerResult => {
-  const held = { task, pueueTask, run, output }
+  const held = { task, pueueTask, run }
   if ("Done" in status) {
     const { start, end, result } = status.Done
     const reason = failureReason(result)
@@ -333,15 +327,6 @@ const assessHeld = (
   }
   return { ...held, status: "Stashed" in status ? "stashed" : "queued" }
 }
-
-const readOutput = (pueueTask: number): Effect.Effect<ReadonlyArray<string>, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  pueue(["log", String(pueueTask), "--json", "--lines", String(outputLines)]).pipe(
-    Effect.flatMap((text) => decodeJson(text, PueueLog, "pueue log --json")),
-    Effect.map((logs) => {
-      const key = String(pueueTask)
-      return Object.hasOwn(logs, key) ? logs[key].output.split("\n").filter((line) => line.trim() !== "") : []
-    })
-  )
 
 const readRun = (home: string, checkout: string, task: string): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
@@ -365,9 +350,8 @@ export const readResult = (task: string, home: string): Effect.Effect<RunnerResu
     const status = yield* Schema.decodeUnknownEffect(PueueStatus)(held.status).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "pueue reports a status orc cannot read for task " + held.id + ": " + error.message }))
     )
-    const output = yield* readOutput(held.id)
     const run = yield* readRun(home, held.path, task)
-    return assessHeld(task, held.id, status, run, output)
+    return assessHeld(task, held.id, status, run)
   })
 
 export const readResultThrough = (command: Command, task: string): Effect.Effect<RunnerResult, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
@@ -413,6 +397,5 @@ export const formatResult = (result: RunnerResult): string => {
   if (result.status === "unknown") {
     return headLine(result)
   }
-  const output = result.output.length === 0 ? [] : ["last output:", ...result.output.map((line) => "  " + line)]
-  return [headLine(result), runLine(result.task, result.run), ...output].join("\n")
+  return [headLine(result), runLine(result.task, result.run)].join("\n")
 }

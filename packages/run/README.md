@@ -271,7 +271,7 @@ Pueue runs the task with the environment of the command that queued it, so the c
 The queue records the resolved absolute `ORC_HOME` with the task.
 
 To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh winbox orc` from another.
-It names pueue's state for the task, the orc run on `orc/<task-id>` with its PR, and the run's last 20 lines of output.
+It names pueue's state for the task and the orc run on `orc/<task-id>` with its PR.
 A task is queued, stashed, running, paused, succeeded or failed, or unknown when no pueue task in group `orc` holds it.
 To print the same facts as JSON, add `--json`, whose document names its version first as `orc.runner.v1`.
 

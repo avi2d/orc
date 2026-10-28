@@ -30,30 +30,40 @@ const fakePueue = [
   "#!/bin/sh",
   "case \"$1\" in",
   "  status) cat \"$PUEUE_STATE/status.json\" ;;",
-  "  log) if [ -f \"$PUEUE_STATE/log-$2.json\" ]; then cat \"$PUEUE_STATE/log-$2.json\"; else printf '{\"%s\":{\"output\":\"\"}}' \"$2\"; fi ;;",
   "  group)",
   "    if [ \"$2\" = \"add\" ]; then printf '%s\\n' \"$@\" > \"$PUEUE_STATE/group-add-args.tmp\"; mv \"$PUEUE_STATE/group-add-args.tmp\" \"$PUEUE_STATE/group-add-args\";",
   "      if [ -f \"$PUEUE_STATE/fail-add\" ]; then echo \"fake pueue cannot add groups\" >&2; exit 1; fi;",
+  "      while ! mkdir \"$PUEUE_STATE/group-lock\" 2>/dev/null; do sleep 0.05; done;",
   "      if [ -f \"$PUEUE_STATE/groups.json\" ]; then groups=$(cat \"$PUEUE_STATE/groups.json\");",
   "      else groups='{\"default\":{\"status\":\"Running\",\"parallel_tasks\":1},\"orc\":{\"status\":\"Running\",\"parallel_tasks\":1}}'; fi;",
-  "      case \"$groups\" in *\"\\\"$3\\\"\":*) echo \"Group \\\"$3\\\" already exists\" >&2; exit 1 ;; esac;",
+  "      case \"$groups\" in *\"\\\"$3\\\"\":*) echo \"Group \\\"$3\\\" already exists\" >&2; rmdir \"$PUEUE_STATE/group-lock\"; exit 1 ;; esac;",
   "      if [ -f \"$PUEUE_STATE/groups.json\" ]; then stripped=$(printf '%s' \"$groups\" | sed 's/}$//'); printf '%s,\"%s\":{\"status\":\"Running\",\"parallel_tasks\":1}}' \"$stripped\" \"$3\" > \"$PUEUE_STATE/groups.json\"; fi;",
+  "      rmdir \"$PUEUE_STATE/group-lock\";",
   "      if [ -f \"$PUEUE_STATE/race-add\" ]; then echo \"Group \\\"$3\\\" already exists\" >&2; exit 1; fi;",
   "      echo \"Group $3 created\";",
-  "    elif [ \"$2\" = \"--json\" ]; then if [ -f \"$PUEUE_STATE/groups.json\" ]; then cat \"$PUEUE_STATE/groups.json\";",
-  "    else printf '%s' '{\"default\":{\"status\":\"Running\",\"parallel_tasks\":1},\"orc\":{\"status\":\"Running\",\"parallel_tasks\":1}}'; fi;",
+  "    elif [ \"$2\" = \"--json\" ]; then",
+  "      if [ -f \"$PUEUE_STATE/group-gate\" ]; then printf '%s\\n' \"$$\" >> \"$PUEUE_STATE/group-reads\"; while [ -f \"$PUEUE_STATE/group-gate\" ]; do sleep 0.05; done; fi;",
+  "      if [ -f \"$PUEUE_STATE/groups.json\" ]; then cat \"$PUEUE_STATE/groups.json\";",
+  "      else printf '%s' '{\"default\":{\"status\":\"Running\",\"parallel_tasks\":1},\"orc\":{\"status\":\"Running\",\"parallel_tasks\":1}}'; fi;",
   "    else echo \"fake pueue has no group $2\" >&2; exit 2; fi ;;",
   "  add)",
-  "    shift; : > \"$PUEUE_STATE/add-args.tmp\";",
+  "    shift; : > \"$PUEUE_STATE/add-args.tmp\"; label=\"\"; group=\"\";",
   "    while [ \"$#\" -gt 0 ]; do case \"$1\" in",
   "      --) printf '%s\\n' \"$1\" >> \"$PUEUE_STATE/add-args.tmp\"; shift; while [ \"$#\" -gt 0 ]; do printf '%s\\n' \"$1\" >> \"$PUEUE_STATE/add-args.tmp\"; shift; done; break ;;",
-  "      -w|--working-directory|-g|--group|-l|--label|-d|--delay|-a|--after|-o|--priority) printf '%s\\n' \"$1\" >> \"$PUEUE_STATE/add-args.tmp\"; shift; if [ \"$#\" -eq 0 ]; then echo \"fake pueue refuses add option without value\" >&2; exit 2; fi; case \"$1\" in -*) echo \"fake pueue refuses add option without value\" >&2; exit 2 ;; esac; printf '%s\\n' \"$1\" >> \"$PUEUE_STATE/add-args.tmp\"; shift ;;",
+  "      -w|--working-directory|-g|--group|-l|--label|-d|--delay|-a|--after|-o|--priority) flag=\"$1\"; printf '%s\\n' \"$1\" >> \"$PUEUE_STATE/add-args.tmp\"; shift; if [ \"$#\" -eq 0 ]; then echo \"fake pueue refuses add option without value\" >&2; exit 2; fi; case \"$1\" in -*) echo \"fake pueue refuses add option without value\" >&2; exit 2 ;; esac; case \"$flag\" in -g|--group) group=\"$1\" ;; -l|--label) label=\"$1\" ;; esac; printf '%s\\n' \"$1\" >> \"$PUEUE_STATE/add-args.tmp\"; shift ;;",
   "      -e|--escape|-i|--immediate|--follow|-s|--stashed|-p|--print-task-id) printf '%s\\n' \"$1\" >> \"$PUEUE_STATE/add-args.tmp\"; shift ;;",
   "      -*) echo \"fake pueue refuses add option $1\" >&2; exit 2 ;;",
   "      *) while [ \"$#\" -gt 0 ]; do printf '%s\\n' \"$1\" >> \"$PUEUE_STATE/add-args.tmp\"; shift; done; break ;;",
   "    esac; done;",
+  "    if [ -f \"$PUEUE_STATE/groups.json\" ]; then groups=$(cat \"$PUEUE_STATE/groups.json\");",
+  "    else groups='{\"default\":{\"status\":\"Running\",\"parallel_tasks\":1},\"orc\":{\"status\":\"Running\",\"parallel_tasks\":1}}'; fi;",
+  "    case \"$groups\" in *\"\\\"$group\\\"\":*) ;; *) echo \"fake pueue has no group $group\" >&2; exit 2 ;; esac;",
+  "    while ! mkdir \"$PUEUE_STATE/group-lock\" 2>/dev/null; do sleep 0.05; done;",
+  "    if [ -f \"$PUEUE_STATE/added-tasks\" ]; then n=$(wc -l < \"$PUEUE_STATE/added-tasks\"); else n=0; fi;",
+  "    id=$((77 + n)); printf '%s %s %s\\n' \"$label\" \"$group\" \"$id\" >> \"$PUEUE_STATE/added-tasks\";",
   "    mv \"$PUEUE_STATE/add-args.tmp\" \"$PUEUE_STATE/add-args\";",
-  "    printf '%s' \"$ORC_HOME\" > \"$PUEUE_STATE/add-env\"; echo 77 ;;",
+  "    printf '%s' \"$ORC_HOME\" > \"$PUEUE_STATE/add-env\";",
+  "    rmdir \"$PUEUE_STATE/group-lock\"; echo \"$id\" ;;",
   "  *) echo \"fake pueue has no $1\" >&2; exit 2 ;;",
   "esac",
   ""
@@ -295,18 +305,33 @@ describe("orc runner start", () => {
     })
   }, runnerTimeout)
 
-  test("two simultaneous first starts both queue instead of losing one task", async () => {
+  test("two simultaneous first starts queue both tasks into the orc group", async () => {
     await withFixture(async (fixture) => {
       await writeFile(join(fixture.pueue, "groups.json"), JSON.stringify({ default: { status: "Running", parallel_tasks: 1 } }))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      const [first, second] = await Promise.all([
+      await writeFile(join(fixture.pueue, "group-gate"), "")
+      const queued = Promise.all([
         queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" }),
-        queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+        queueWith(fixture, { task: "task-10", checkout: fixture.checkout, body: "# y\n" })
       ])
+      const deadline = Date.now() + startWaitMillis
+      while (Date.now() < deadline) {
+        const reads = await readFile(join(fixture.pueue, "group-reads"), "utf8").catch(() => "")
+        if (reads.split("\n").length > 2) {
+          break
+        }
+        await Bun.sleep(20)
+      }
+      await rm(join(fixture.pueue, "group-gate"), { force: true })
+      const [first, second] = await queued
       expect(first.exitCode).toBe(0)
       expect(second.exitCode).toBe(0)
-      expect(first.stdout).toBe("queued task-9 as pueue task 77 in group orc\n")
-      expect(second.stdout).toBe("queued task-9 as pueue task 77 in group orc\n")
+      expect(first.stdout).toMatch(/^queued task-9 as pueue task 7[78] in group orc\n$/)
+      expect(second.stdout).toMatch(/^queued task-10 as pueue task 7[78] in group orc\n$/)
+      const added = (await readFile(join(fixture.pueue, "added-tasks"), "utf8")).split("\n").slice(0, -1)
+      expect(added).toHaveLength(2)
+      expect(added.some((line) => /^task-9 orc 7[78]$/.test(line))).toBe(true)
+      expect(added.some((line) => /^task-10 orc 7[78]$/.test(line))).toBe(true)
     })
   }, runnerTimeout)
 
@@ -335,12 +360,12 @@ describe("orc runner result", () => {
     await withFixture(async (fixture) => {
       const statuses = await Promise.all(["task-1", "task-2", "task-3", "task-4", "task-5", "task-6", "task-7"].map(async (task) => resultJson(fixture, task)))
       expect(statuses).toEqual([
-        { schema: "orc.runner.v1", result: { task: "task-1", status: "succeeded", pueueTask: 655, run: null, output: ["hello"], started: "2026-10-28T02:36:39.176448491+03:00", ended: "2026-10-28T02:36:39.489650573+03:00" } },
-        { schema: "orc.runner.v1", result: { task: "task-2", status: "failed", pueueTask: 656, run: null, output: [], started: "2026-10-28T02:36:39.500714478+03:00", ended: "2026-10-28T02:36:39.813373536+03:00", reason: "orc exited 3" } },
-        { schema: "orc.runner.v1", result: { task: "task-3", status: "failed", pueueTask: 657, run: null, output: [], started: "2026-10-28T02:36:41.331824562+03:00", ended: "2026-10-28T02:36:42.246702792+03:00", reason: "the run was killed" } },
-        { schema: "orc.runner.v1", result: { task: "task-4", status: "queued", pueueTask: 658, run: null, output: [] } },
-        { schema: "orc.runner.v1", result: { task: "task-5", status: "stashed", pueueTask: 659, run: null, output: [] } },
-        { schema: "orc.runner.v1", result: { task: "task-6", status: "running", pueueTask: 660, run: null, output: [], started: "2026-10-28T02:36:41.331824562+03:00" } },
+        { schema: "orc.runner.v1", result: { task: "task-1", status: "succeeded", pueueTask: 655, run: null, started: "2026-10-28T02:36:39.176448491+03:00", ended: "2026-10-28T02:36:39.489650573+03:00" } },
+        { schema: "orc.runner.v1", result: { task: "task-2", status: "failed", pueueTask: 656, run: null, started: "2026-10-28T02:36:39.500714478+03:00", ended: "2026-10-28T02:36:39.813373536+03:00", reason: "orc exited 3" } },
+        { schema: "orc.runner.v1", result: { task: "task-3", status: "failed", pueueTask: 657, run: null, started: "2026-10-28T02:36:41.331824562+03:00", ended: "2026-10-28T02:36:42.246702792+03:00", reason: "the run was killed" } },
+        { schema: "orc.runner.v1", result: { task: "task-4", status: "queued", pueueTask: 658, run: null } },
+        { schema: "orc.runner.v1", result: { task: "task-5", status: "stashed", pueueTask: 659, run: null } },
+        { schema: "orc.runner.v1", result: { task: "task-6", status: "running", pueueTask: 660, run: null, started: "2026-10-28T02:36:41.331824562+03:00" } },
         { schema: "orc.runner.v1", result: { task: "task-7", status: "unknown" } }
       ])
     })
@@ -366,8 +391,6 @@ describe("orc runner result", () => {
       expect(await orcOk(fixture, ["runner", "result", "task-1"])).toBe([
         "task-1: succeeded as pueue task 655, 2026-10-28T02:36:39.176448491+03:00 to 2026-10-28T02:36:39.489650573+03:00",
         "orc run run-1 succeeded, PR https://github.com/avi2d/orc/pull/1",
-        "last output:",
-        "  hello",
         ""
       ].join("\n"))
     })
