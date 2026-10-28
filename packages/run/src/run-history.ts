@@ -166,6 +166,8 @@ const schemaStatements: ReadonlyArray<string> = [
 
 const SchemaVersionRow = Schema.Struct({ user_version: Schema.Finite })
 
+const busyTimeoutMillis = 5000
+
 const migrate = (db: Database): Effect.Effect<void, HistoryError> =>
   Effect.gen(function*() {
     const versionRow = yield* sqlite(() => db.query("PRAGMA user_version").get())
@@ -192,7 +194,8 @@ export const openDatabase = (
     const path = yield* Path.Path
     yield* fs.makeDirectory(homeDir, { recursive: true })
     const db = yield* sqlite(() => new Database(path.join(homeDir, "orc.sqlite"), { create: true }))
-    return yield* migrate(db).pipe(
+    return yield* sqlite(() => db.run(`PRAGMA busy_timeout = ${busyTimeoutMillis}`)).pipe(
+      Effect.andThen(migrate(db)),
       Effect.as(db),
       Effect.onError(() => Effect.sync(() => db.close()))
     )
@@ -277,29 +280,27 @@ export const RunSqlRowSchema = Schema.Struct({
   end_reason: Schema.NullOr(Schema.String)
 })
 
+const runRecordOf = (row: typeof RunSqlRowSchema.Type): RunRecord => ({
+  id: row.id,
+  project: row.project,
+  branch: row.branch,
+  taskFile: row.task_file,
+  status: row.status,
+  started: row.started,
+  ended: row.ended,
+  prLink: row.pr_link,
+  endReason: row.end_reason
+})
+
+const runColumns = "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason FROM runs"
+
 export const listRuns = (
   db: Database,
   limit = 20
 ): Effect.Effect<ReadonlyArray<RunRecord>, Schema.SchemaError | SqliteFailure> =>
-  sqlite(() =>
-    db.query(
-      "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason FROM runs ORDER BY started DESC, id ASC LIMIT ?"
-    ).all(limit)
-  ).pipe(
+  sqlite(() => db.query(runColumns + " ORDER BY started DESC, id ASC LIMIT ?").all(limit)).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(RunSqlRowSchema))),
-    Effect.map((rows) =>
-      rows.map((row) => ({
-        id: row.id,
-        project: row.project,
-        branch: row.branch,
-        taskFile: row.task_file,
-        status: row.status,
-        started: row.started,
-        ended: row.ended,
-        prLink: row.pr_link,
-        endReason: row.end_reason
-      }))
-    )
+    Effect.map((rows) => rows.map(runRecordOf))
   )
 
 export const updateRun = (db: Database, id: string, patch: { readonly status: RunStatus; readonly ended: string | null; readonly prLink: string | null; readonly endReason: string | null }): Effect.Effect<void, SqliteFailure> =>

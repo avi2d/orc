@@ -5,19 +5,25 @@ import { addTask, backlogPaths, BacklogError, closeStartedTask, isTaskId, listTa
 import { readRoom, runBeat } from "./beat"
 import { backlogJson, type BacklogView, beatJson, formatBeat, formatBoard, type ProjectList, type RoomList } from "./board"
 import { checkoutOn, type ConfigError, type DispatchConfig, readDispatchConfig, readProjects } from "./config"
+import { type Command, formatResult, queueFromText, readResult, readResultThrough, RunnerError, runnerJson, startTask } from "./runner"
 import type { TaskFileError, TaskRecord } from "./task-record"
 
 type CommandArgs = Exclude<DispatchArgs, { readonly kind: "UsageError" }>
 
 export interface DispatchPlace {
-  readonly root: string
+  readonly home: string
   readonly cwd: string
+  readonly env: Readonly<Record<string, string | undefined>>
+  readonly self: Command
+  readonly stdin: Effect.Effect<string, RunnerError>
 }
+
+const backlogRoot = (place: DispatchPlace): string => place.home + "/backlog"
 
 type CliRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
 
-const failure = (error: BacklogError | ConfigError | TaskFileError): string =>
-  error instanceof BacklogError ? error.detail : error.file + ": " + error.detail
+const failure = (error: BacklogError | ConfigError | TaskFileError | RunnerError): string =>
+  error instanceof BacklogError || error instanceof RunnerError ? error.detail : error.file + ": " + error.detail
 
 type ConfigReading = { readonly kind: "read"; readonly config: DispatchConfig } | { readonly kind: "unread"; readonly reason: string }
 
@@ -52,7 +58,7 @@ const add = (args: Extract<CommandArgs, { readonly kind: "AddTask" }>, place: Di
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    const paths = backlogPaths(place.root)
+    const paths = backlogPaths(backlogRoot(place))
     const config = yield* readDispatchConfig(paths.dispatchConfig)
     const project = (yield* readProjects(paths.projects, config.machines)).find((candidate) => candidate.name === args.project)
     if (project === undefined) {
@@ -61,7 +67,7 @@ const add = (args: Extract<CommandArgs, { readonly kind: "AddTask" }>, place: Di
     if (args.machine !== null && checkoutOn(project, args.machine) === null) {
       return yield* refuse("the project " + args.project + " has no checkout on " + args.machine + " in " + paths.projects)
     }
-    const dependency = refusedDependency(args.dependsOn, yield* listTasks(place.root))
+    const dependency = refusedDependency(args.dependsOn, yield* listTasks(backlogRoot(place)))
     if (dependency !== null) {
       return yield* refuse("the backlog holds no task " + dependency)
     }
@@ -74,7 +80,7 @@ const add = (args: Extract<CommandArgs, { readonly kind: "AddTask" }>, place: Di
       return yield* refuse("the task file " + taskPath + " holds no text")
     }
     const created = DateTime.formatIso(yield* DateTime.now)
-    const record = yield* addTask(place.root, { title, project: project.name, machine: args.machine, dependsOn: args.dependsOn, created, body })
+    const record = yield* addTask(backlogRoot(place), { title, project: project.name, machine: args.machine, dependsOn: args.dependsOn, created, body })
     yield* Console.log("added " + record.spec.id + " for " + project.name + (args.machine === null ? "" : " on " + args.machine))
   })
 
@@ -82,7 +88,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
   Effect.gen(function*() {
     switch (args.kind) {
       case "ShowBacklog": {
-        const view = yield* readView(place.root)
+        const view = yield* readView(backlogRoot(place))
         yield* Console.log(args.json ? JSON.stringify(backlogJson(view)) : formatBoard(view))
         break
       }
@@ -92,13 +98,31 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       }
       case "CloseTask": {
         const closedAt = DateTime.formatIso(yield* DateTime.now)
-        yield* closeStartedTask(place.root, args.id, args.outcome, args.reason, closedAt)
+        yield* closeStartedTask(backlogRoot(place), args.id, args.outcome, args.reason, closedAt)
         yield* Console.log("closed " + args.id + " " + args.outcome)
         break
       }
       case "Beat": {
-        const report = yield* runBeat(place.root)
+        const report = yield* runBeat(backlogRoot(place))
         yield* Console.log(args.json ? JSON.stringify(beatJson(report)) : formatBeat(report))
+        break
+      }
+      case "RunnerStart": {
+        const line = yield* startTask(place.env, args.reach, place.self, place.home)
+        if (line !== null) {
+          yield* Console.log(line)
+        }
+        break
+      }
+      case "RunnerQueue": {
+        yield* Console.log(yield* queueFromText(yield* place.stdin, place.self, place.home))
+        break
+      }
+      case "RunnerResult": {
+        const result = args.reach.kind === "here"
+          ? yield* readResult(args.task, place.home)
+          : yield* readResultThrough(args.reach.command, args.task)
+        yield* Console.log(args.json ? JSON.stringify(runnerJson(result)) : formatResult(result))
         break
       }
     }

@@ -1,4 +1,4 @@
-import { Data, Effect, FileSystem } from "effect"
+import { Data, Effect, FileSystem, Schema } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { parseTaskFile, renderTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 
@@ -12,6 +12,8 @@ const idPattern = /^task-(\d+)$/
 const taskNumber = (id: string): number => Number(idPattern.exec(id)?.[1] ?? Number.NaN)
 
 export const isTaskId = (id: string): boolean => idPattern.test(id)
+
+export const TaskId = Schema.String.check(Schema.isPattern(idPattern))
 
 interface BacklogPaths {
   readonly root: string

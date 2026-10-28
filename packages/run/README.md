@@ -216,8 +216,8 @@ Two files beside the folders tell the beat where tasks may go.
 ```json
 {
   "machines": [
-    { "name": "mac", "slots": 2, "start": ["orc-start-task"] },
-    { "name": "winbox", "slots": 4, "start": ["ssh", "winbox", "orc-start-task"] }
+    { "name": "mac", "slots": 2, "start": ["orc", "runner", "start"] },
+    { "name": "winbox", "slots": 4, "start": ["orc", "runner", "start", "--", "ssh", "winbox", "orc"] }
   ],
   "quota": { "accounts": ["main", "second"], "floorPercent": 15 }
 }
@@ -255,6 +255,26 @@ Only a failure to spawn the log wrapper closes the task as `start-failed`.
 To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1`.
 When a started task ends, run `orc backlog close <task-id> <done|failed> [reason]`.
 
+## The runner
+
+`orc runner start` is the start command that hands a task to pueue on its machine, so the run outlives the beat, the dispatcher and any SSH link to it.
+It reads the task from the beat's `ORC_TASK_*` variables and queues `orc run` in the checkout on branch `orc/<task-id>`, in the pueue group `orc`.
+The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
+The runner creates the `orc` group when the machine lacks it.
+The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
+A task pueue already holds in group `orc` is not queued again.
+
+To start on another machine, put the command that runs orc there after `--`, as in `orc runner start -- ssh winbox orc`.
+That runs `orc runner queue` on the far side and sends it the task as JSON on stdin, so the task text never passes through a remote shell.
+SSH can drop once pueue holds the run, since pueue on that machine owns it.
+Pueue runs the task with the environment of the command that queued it, so the command after `--` must give orc the `PATH` its runs need on that machine.
+The queue records the resolved absolute `ORC_HOME` with the task.
+
+To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh winbox orc` from another.
+It names pueue's state for the task and the orc run on `orc/<task-id>` with its PR.
+A task is queued, stashed, running, paused, succeeded or failed, or unknown when no pueue task in group `orc` holds it.
+To print the same facts as JSON, add `--json`, whose document names its version first as `orc.runner.v1`.
+
 ## Where things are
 
 | Path | What it holds |
@@ -284,9 +304,12 @@ When a started task ends, run `orc backlog close <task-id> <done|failed> [reason
 | `src/dispatch/quota.ts` | The quota reading from `clauth status --json` and the pick of an account |
 | `src/dispatch/beat.ts` | The beat: room, placement, take and start |
 | `src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
-| `src/dispatch/args.ts` | The flag parsing for `orc backlog` and `orc beat` |
-| `src/dispatch/cli.ts` | The `orc backlog` and `orc beat` commands |
+| `src/dispatch/runner.ts` | The runner: the start through pueue and the reading of a task's result |
+| `src/dispatch/pueue-status.ts` | The pueue status shapes and the held-task lookup the runner reads |
+| `src/dispatch/args.ts` | The flag parsing for `orc backlog`, `orc beat` and `orc runner` |
+| `src/dispatch/cli.ts` | The `orc backlog`, `orc beat` and `orc runner` commands |
 | `../../tests/unit` | The in-process unit tests at the workspace root |
 | `../../tests/e2e` | The tests that run `src/bin.ts`, git or nono as a process, with a live Pi run through `ORC_PI_E2E=1`, at the workspace root |
+| `../../tests/fixtures/pueue` | The pueue 4 status JSON the runner tests read |
 | `../../tests/live` | The tests that run commands in a real nono sandbox, through the `test:live` script at the workspace root with `ORC_NONO_E2E=1` set |
 | `../../.no-mistakes.yaml` | The check commands no-mistakes and CI run at the workspace root |

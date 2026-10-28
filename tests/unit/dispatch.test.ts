@@ -86,6 +86,38 @@ describe("parseDispatchArgs", () => {
   test("beat refuses an unknown argument instead of ignoring it", () => {
     expect(parseDispatchArgs("beat", ["--dry-run"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --dry-run" })
   })
+  test("runner start with no -- queues here", () => {
+    expect(parseDispatchArgs("runner", ["start"])).toEqual({ kind: "RunnerStart", reach: { kind: "here" } })
+  })
+  test("runner result hands every word after -- to the command instead of reading --json as its own", () => {
+    expect(parseDispatchArgs("runner", ["result", "task-1", "--", "ssh", "winbox", "orc", "--json"])).toEqual({
+      kind: "RunnerResult",
+      task: "task-1",
+      json: false,
+      reach: { kind: "through", command: ["ssh", "winbox", "orc", "--json"] }
+    })
+  })
+  test("runner result reads --json before -- as its own", () => {
+    expect(parseDispatchArgs("runner", ["result", "task-1", "--json", "--", "ssh", "winbox", "orc"])).toEqual({
+      kind: "RunnerResult",
+      task: "task-1",
+      json: true,
+      reach: { kind: "through", command: ["ssh", "winbox", "orc"] }
+    })
+  })
+  test("runner -- with no command is refused instead of reading here", () => {
+    expect(parseDispatchArgs("runner", ["start", "--"]).kind).toBe("UsageError")
+    expect(parseDispatchArgs("runner", ["result", "task-1", "--"]).kind).toBe("UsageError")
+  })
+  test("runner result refuses a word that is no task id instead of looking it up", () => {
+    expect(parseDispatchArgs("runner", ["result", "../task-1"]).kind).toBe("UsageError")
+  })
+  test("runner refuses stray words and verbs instead of ignoring them", () => {
+    expect(parseDispatchArgs("runner", ["start", "now"]).kind).toBe("UsageError")
+    expect(parseDispatchArgs("runner", ["queue", "task-1"]).kind).toBe("UsageError")
+    expect(parseDispatchArgs("runner", ["stop", "task-1"]).kind).toBe("UsageError")
+    expect(parseDispatchArgs("runner", []).kind).toBe("UsageError")
+  })
 })
 
 describe("task files", () => {
