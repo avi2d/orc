@@ -46,12 +46,13 @@ const newRunId = (): string => {
 const runLoginCheck = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
   host: { readonly piBinary: string; readonly nodeBinary: string; readonly homeDir: string },
-  cwd: string
+  cwd: string,
+  preserveAgentDir = false
 ): Effect.Effect<void, OrcRunError> =>
   Effect.scoped(Effect.gen(function*() {
-    const parts = loginCheckCommand(host)
-    // nono runs the credential capture with only these variables, so a key the check finds anywhere else never reaches the sandbox.
-    const handle = yield* spawner.spawn(ChildProcess.make(parts[0], parts.slice(1), { cwd, env: inheritedEnv(Bun.env), extendEnv: false }))
+    const parts = loginCheckCommand(host, preserveAgentDir)
+    const agentDir = Bun.env.PI_CODING_AGENT_DIR === undefined ? {} : { PI_CODING_AGENT_DIR: Bun.env.PI_CODING_AGENT_DIR }
+    const handle = yield* spawner.spawn(ChildProcess.make(parts[0], parts.slice(1), { cwd, env: preserveAgentDir ? { ...inheritedEnv(Bun.env), ...agentDir } : inheritedEnv(Bun.env), extendEnv: false }))
     const [, , exitCode] = yield* Effect.all([
       handle.stdout.pipe(Stream.decodeText(), Stream.runDrain),
       handle.stderr.pipe(Stream.decodeText(), Stream.runDrain),
@@ -205,7 +206,8 @@ const prepareAgents = (
   home: string,
   runDir: string,
   effectiveTaskFile: string,
-  agentsDir: string | undefined
+  agentsDir: string | undefined,
+  sandboxKind: SandboxKind
 ): Effect.Effect<PreparedAgents, OrcRunError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
     const folders = yield* prepareRunFolders(fs, path, runDir, effectiveTaskFile)
@@ -236,8 +238,9 @@ const prepareAgents = (
       return yield* refuse("orc: the agent file names model " + agent.model + ", and orc routes only opencode-go models through the sandbox")
     }
     const host: HostTools = { piBinary, nodeBinary, homeDir: operatorHome }
-    yield* runLoginCheck(spawner, host, checkout.projectDir)
-    const windows = yield* readModelWindows(spawner, host, folders.runDir)
+    const preserveAgentDir = sandboxKind === "none"
+    yield* runLoginCheck(spawner, host, checkout.projectDir, preserveAgentDir)
+    const windows = yield* readModelWindows(spawner, host, folders.runDir, preserveAgentDir)
     const checked = yield* Effect.fromResult(checkedModelWindows([agent.model, fixer.model], windows)).pipe(
       Effect.mapError((message) => new OrcRunError({ message }))
     )
@@ -301,7 +304,7 @@ export const runAgentStep = (
     const runDir = path.join(home, "runs", runId)
     const effectiveTaskFile = yield* readTaskFile(fs, home, checkout, request.taskFile)
     const noMistakes = { spawner, binary: noMistakesBinary(Bun.env.ORC_NO_MISTAKES_BIN), pathEnv: hostPath ?? "", git: checkout.git }
-    const { folders, agent, fixer, credential } = yield* prepareAgents(fs, path, spawner, checkout, home, runDir, effectiveTaskFile, request.agentsDir).pipe(
+    const { folders, agent, fixer, credential } = yield* prepareAgents(fs, path, spawner, checkout, home, runDir, effectiveTaskFile, request.agentsDir, request.sandbox ?? defaultSandbox).pipe(
       Effect.tap(() => requireNoMistakes(noMistakes, checkout.projectDir)),
       Effect.onError(() => fs.remove(runDir, { recursive: true }).pipe(Effect.result))
     )

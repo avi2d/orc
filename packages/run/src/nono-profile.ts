@@ -186,10 +186,10 @@ export const modelCredentialFor = (model: string, host: HostTools): ModelCredent
   }
 }
 
-export const loginCheckCommand = (host: HostTools): ReadonlyArray<string> => [
+export const loginCheckCommand = (host: HostTools, preserveAgentDir = false): ReadonlyArray<string> => [
   "/bin/sh",
   "-c",
-  "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" unset PI_CODING_AGENT_DIR; exec \"$1\" auth check --provider opencode-go",
+  preserveAgentDir ? "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" exec \"$1\" auth check --provider opencode-go" : "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" unset PI_CODING_AGENT_DIR; exec \"$1\" auth check --provider opencode-go",
   host.nodeBinary,
   host.piBinary,
   host.homeDir

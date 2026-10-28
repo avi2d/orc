@@ -1,3 +1,5 @@
+import { spawn } from "node:child_process"
+import { createInterface } from "node:readline"
 import type { NoSandboxProvider } from "@ai-hero/sandcastle"
 import { noSandbox } from "@ai-hero/sandcastle/sandboxes/no-sandbox"
 
@@ -18,4 +20,136 @@ export const noSandboxEnv = (dirs: NoSandboxDirs): NoSandboxEnv => ({
   PI_CODING_AGENT_SESSION_DIR: dirs.hostSessionsDir + "/host"
 })
 
-export const noSandboxProvider = (dirs: NoSandboxDirs): NoSandboxProvider => noSandbox({ env: { ...noSandboxEnv(dirs) } })
+interface NoSandboxExecOptions {
+  readonly onLine?: ((line: string) => void) | undefined
+  readonly cwd?: string | undefined
+  readonly stdin?: string | undefined
+}
+
+interface NoSandboxExecResult {
+  readonly stdout: string
+  readonly stderr: string
+  readonly exitCode: number
+}
+
+interface NoSandboxInteractiveOptions {
+  readonly stdin: NodeJS.ReadableStream
+  readonly stdout: NodeJS.WritableStream
+  readonly stderr: NodeJS.WritableStream
+  readonly cwd?: string | undefined
+}
+
+interface NoSandboxCreateOptions {
+  readonly worktreePath: string
+  readonly env: Record<string, string>
+}
+
+interface NoSandboxHandle {
+  readonly worktreePath: string
+  readonly exec: (command: string, options?: NoSandboxExecOptions) => Promise<NoSandboxExecResult>
+  readonly interactiveExec: (args: ReadonlyArray<string>, options: NoSandboxInteractiveOptions) => Promise<{ readonly exitCode: number }>
+  readonly close: () => Promise<void>
+}
+
+type NoSandboxCreate = (options: NoSandboxCreateOptions) => Promise<NoSandboxHandle>
+
+const signalExitCode = 128
+
+const exitOf = (code: number | null): number => code ?? signalExitCode
+
+const tailLimit = 65536
+
+const appendTail = (current: string, chunk: string): string => {
+  const next = current + chunk
+  return next.length > tailLimit ? next.slice(next.length - tailLimit) : next
+}
+
+const fixedExec = (processEnv: Record<string, string>, fallbackCwd: string) =>
+  (command: string, options?: NoSandboxExecOptions): Promise<NoSandboxExecResult> => {
+    const cwd = options?.cwd ?? fallbackCwd
+    const stdinText = options?.stdin
+    const onLine = options?.onLine
+    return new Promise<NoSandboxExecResult>((resolve, reject) => {
+      const proc = spawn("sh", ["-c", command], {
+        cwd,
+        env: processEnv,
+        stdio: [stdinText !== undefined ? "pipe" : "ignore", "pipe", "pipe"]
+      })
+      if (stdinText !== undefined && proc.stdin !== null) {
+        proc.stdin.write(stdinText)
+        proc.stdin.end()
+      }
+      proc.on("error", (error) => {
+        reject(new Error("exec failed: " + (error instanceof Error ? error.message : String(error))))
+      })
+      if (onLine !== undefined) {
+        let stdoutTail = ""
+        let stderrTail = ""
+        if (proc.stdout !== null) {
+          const lines = createInterface({ input: proc.stdout })
+          lines.on("line", (line) => {
+            stdoutTail = appendTail(stdoutTail + "\n", line)
+            onLine(line)
+          })
+        }
+        if (proc.stderr !== null) {
+          proc.stderr.on("data", (chunk) => {
+            stderrTail = appendTail(stderrTail, chunk.toString())
+          })
+        }
+        proc.on("close", (code) => {
+          resolve({ stdout: stdoutTail, stderr: stderrTail, exitCode: exitOf(code) })
+        })
+      } else {
+        let stdout = ""
+        let stderr = ""
+        if (proc.stdout !== null) {
+          proc.stdout.on("data", (chunk) => {
+            stdout = appendTail(stdout, chunk.toString())
+          })
+        }
+        if (proc.stderr !== null) {
+          proc.stderr.on("data", (chunk) => {
+            stderr = appendTail(stderr, chunk.toString())
+          })
+        }
+        proc.on("close", (code) => {
+          resolve({ stdout, stderr, exitCode: exitOf(code) })
+        })
+      }
+    })
+  }
+
+const fixedInteractiveExec = (processEnv: Record<string, string>, fallbackCwd: string) =>
+  (args: ReadonlyArray<string>, options: NoSandboxInteractiveOptions): Promise<{ readonly exitCode: number }> => {
+    const [cmd, ...rest] = args
+    return new Promise<{ readonly exitCode: number }>((resolve, reject) => {
+      const proc = spawn(cmd, rest, {
+        cwd: options.cwd ?? fallbackCwd,
+        env: processEnv,
+        stdio: [options.stdin, options.stdout, options.stderr],
+        shell: process.platform === "win32"
+      })
+      proc.on("error", (error) => {
+        reject(new Error("exec failed: " + (error instanceof Error ? error.message : String(error))))
+      })
+      proc.on("close", (code) => {
+        resolve({ exitCode: exitOf(code) })
+      })
+    })
+  }
+
+export const noSandboxProvider = (dirs: NoSandboxDirs): NoSandboxProvider => {
+  const base = noSandbox({ env: { ...noSandboxEnv(dirs) } })
+  const baseCreate = (base as unknown as { readonly create: NoSandboxCreate }).create.bind(base)
+  const create: NoSandboxCreate = async (createOptions) => {
+    const handle = await baseCreate(createOptions)
+    const processEnv: Record<string, string> = { ...(process.env as Record<string, string>), ...createOptions.env }
+    return {
+      ...handle,
+      exec: fixedExec(processEnv, handle.worktreePath),
+      interactiveExec: fixedInteractiveExec(processEnv, handle.worktreePath)
+    }
+  }
+  return { ...base, create } as unknown as NoSandboxProvider
+}
