@@ -169,7 +169,8 @@ describe("resume recovers an interrupted agent from its live session", () => {
         const plan = await Effect.runPromise(buildResumePlan(db, run))
         expect(plan.implementSessionId).toBe(liveId)
         const carried = await readFile(plan.implementSessionFile ?? "", "utf-8")
-        expect(JSON.parse(carried.split("\n")[0]).cwd).toBe(worktree)
+        const carriedHeader: unknown = JSON.parse(carried.split("\n")[0])
+        expect(typeof carriedHeader === "object" && carriedHeader !== null && "cwd" in carriedHeader ? carriedHeader.cwd : undefined).toBe(worktree)
       } finally {
         db.close()
       }
