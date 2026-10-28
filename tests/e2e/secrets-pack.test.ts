@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import packageJson from "../../package.json" with { type: "json" }
@@ -60,9 +60,13 @@ beforeAll(async () => {
   if (cloned.exitCode !== 0) {
     throw new Error("git clone failed: " + cloned.stderr.toString())
   }
-  await symlink(join(repoRoot, "node_modules"), join(clone, "node_modules"))
+  // A symlinked node_modules resolves each workspace package to this checkout's copy, so lint would read two trees.
+  const installed = Bun.spawnSync([process.execPath, "install", "--frozen-lockfile"], { cwd: clone })
+  if (installed.exitCode !== 0) {
+    throw new Error("bun install failed in the clone: " + installed.stderr.toString())
+  }
   base = git(["rev-parse", "HEAD"])
-})
+}, 120_000)
 
 afterAll(async () => {
   await rm(dir, { recursive: true, force: true })
