@@ -128,7 +128,7 @@ To configure the second machine, set these variables where the panel runs:
 
 | Variable | What it holds |
 | --- | --- |
-| `TUI_DASH_REMOTE_SESSION_QUOTA` | The shell command that prints the other machine's report, such as `ssh other-host 'cd orc && bun run session-quota-json'` |
+| `TUI_DASH_REMOTE_SESSION_QUOTA` | The shell command that prints the other machine's report, such as `ssh other-host 'bun orc/packages/cli/src/bin.ts report session-quota'` |
 | `TUI_DASH_REMOTE_MACHINE` | The other machine's name on its rows, `remote` when unset |
 | `TUI_DASH_MACHINE` | This machine's name on its rows, `local` when unset |
 
