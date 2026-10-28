@@ -8,7 +8,7 @@ permissions:
   id-token: write
 jobs:
   publish:
-    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
@@ -42,7 +42,7 @@ jobs:
         working-directory: packages/run
   github-release:
     needs: publish
-    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
