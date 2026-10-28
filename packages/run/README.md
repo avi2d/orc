@@ -98,7 +98,7 @@ With the default sandbox, Orc reads that login through Pi on the host and hands 
 nono reads it with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE` and `TERM` set, and orc's check runs the same way.
 So a key held only in the keychain or in an environment variable such as `OPENCODE_API_KEY` is refused, and a login Pi's `/login` stores in `~/.pi/agent/auth.json` works.
 This refusal applies to `--sandbox none` as well, so write a key held only in an environment variable to the Pi auth file first.
-If nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc's result names that error.
+With the default sandbox, if nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc's result names that error.
 
 Orc takes the implementer agent file from the first of these that exists:
 
@@ -111,8 +111,8 @@ Orc routes only `opencode-go` models and refuses any other model.
 
 With the default sandbox, Pi in a run compacts its context once the context passes 150 thousand tokens, whatever the model's window.
 Pi starts compaction at the window minus `compaction.reserveTokens`, so orc asks the host's Pi for each agent model's window through `pi --mode rpc`.
-Orc writes the window minus 150000 as that model's reserve into the run's Pi folder, `session/agent/settings.json`, beside `models.json`.
-Orc pins each agent model window in `models.json` as that provider model override `contextWindow`.
+With the default sandbox, Orc writes the window minus 150000 as that model's reserve into the run's Pi folder, `session/agent/settings.json`, beside `models.json`.
+With the default sandbox, Orc pins each agent model window in `models.json` as that provider model override `contextWindow`.
 Orc refuses a model the host's Pi does not list, and a model whose window is 150 thousand tokens or less, and this refusal applies to both sandboxes.
 With `--sandbox none` Pi reads your Pi config, compaction included, so the fixed mark does not apply.
 
@@ -179,13 +179,13 @@ When a no-mistakes run ends failed, orc's result carries the error no-mistakes p
 ## Granting toolchain folders to the sandbox
 
 With the default sandbox, the sandbox reads the system folders, the Homebrew and `/usr/local` program folders, `/nix` and the one mise install folder each of `bun`, `node` and `pi` resolves to.
-Orc refuses a runtime the PATH finds anywhere else, naming the runtime and its path.
+With the default sandbox, Orc refuses a runtime the PATH finds anywhere else, naming the runtime and its path.
 To run a runtime from another install folder, such as the one Bun's own installer makes in your home:
 
 1. Set `ORC_TOOLCHAIN_DIRS` to the install folders, separated by colons.
 1. Run the task as usual.
 
-Orc grants a named folder only when a runtime and the file its link points to both sit inside it.
+With the default sandbox, Orc grants a named folder only when a runtime and the file its link points to both sit inside it.
 Orc refuses a relative entry and a folder that holds HOME, because the sandbox reads each granted folder whole.
 `src/nono-profile.ts` holds the `ToolchainResolver` interface and the default layout, and `src/nono.ts` takes another resolver through its `toolchain` option.
 
