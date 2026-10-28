@@ -30,11 +30,11 @@ const spec = { title: "Fix the thing", project: "orc", machine: null, dependsOn:
 const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-10-27T10:01:00.000Z" }
 
 const config: DispatchConfig = {
-  machines: [{ name: "mac", slots: 1, start: ["true"] }, { name: "winbox", slots: 4, start: ["true"] }],
+  machines: [{ name: "mac", slots: 1, start: ["true"] }, { name: "linux", slots: 4, start: ["true"] }],
   quota: { accounts: ["main"], floorPercent: 15 }
 }
 
-const projects: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Users/a/orc", winbox: "/home/a/orc" } }]
+const projects: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Users/a/orc", linux: "/home/a/orc" } }]
 
 const newTask = (machine: string | null): TaskRecord => ({ spec: { ...spec, id: "task-1", machine }, state: { kind: "new" } })
 
@@ -75,7 +75,7 @@ describe("parseDispatchArgs", () => {
     })
   })
   test("add refuses a second --machine instead of keeping either", () => {
-    expect(parseDispatchArgs("backlog", ["add", "orc", "t.md", "--machine", "mac", "--machine", "winbox"]).kind).toBe("UsageError")
+    expect(parseDispatchArgs("backlog", ["add", "orc", "t.md", "--machine", "mac", "--machine", "linux"]).kind).toBe("UsageError")
   })
   test("add refuses a flag with no value instead of taking the next flag as it", () => {
     expect(parseDispatchArgs("backlog", ["add", "orc", "t.md", "--machine", "--depends-on", "task-1"]).kind).toBe("UsageError")
@@ -90,19 +90,19 @@ describe("parseDispatchArgs", () => {
     expect(parseDispatchArgs("runner", ["start"])).toEqual({ kind: "RunnerStart", reach: { kind: "here" } })
   })
   test("runner result hands every word after -- to the command instead of reading --json as its own", () => {
-    expect(parseDispatchArgs("runner", ["result", "task-1", "--", "ssh", "winbox", "orc", "--json"])).toEqual({
+    expect(parseDispatchArgs("runner", ["result", "task-1", "--", "ssh", "linux", "orc", "--json"])).toEqual({
       kind: "RunnerResult",
       task: "task-1",
       json: false,
-      reach: { kind: "through", command: ["ssh", "winbox", "orc", "--json"] }
+      reach: { kind: "through", command: ["ssh", "linux", "orc", "--json"] }
     })
   })
   test("runner result reads --json before -- as its own", () => {
-    expect(parseDispatchArgs("runner", ["result", "task-1", "--json", "--", "ssh", "winbox", "orc"])).toEqual({
+    expect(parseDispatchArgs("runner", ["result", "task-1", "--json", "--", "ssh", "linux", "orc"])).toEqual({
       kind: "RunnerResult",
       task: "task-1",
       json: true,
-      reach: { kind: "through", command: ["ssh", "winbox", "orc"] }
+      reach: { kind: "through", command: ["ssh", "linux", "orc"] }
     })
   })
   test("runner -- with no command is refused instead of reading here", () => {
@@ -178,21 +178,21 @@ describe("assessClauthStatus", () => {
 })
 
 describe("placeTask", () => {
-  const room = [{ machine: "mac", slots: 1, busy: 1 }, { machine: "winbox", slots: 4, busy: 0 }]
+  const room = [{ machine: "mac", slots: 1, busy: 1 }, { machine: "linux", slots: 4, busy: 0 }]
   test("a task marked for a full machine waits instead of going to a machine with room", () => {
     expect(placeTask(newTask("mac"), config, projects, room)).toEqual({ kind: "waits", reason: "mac has no room" })
   })
   test("a task marked for a machine goes there even when another has more room", () => {
-    const placement = placeTask(newTask("mac"), config, projects, [{ machine: "mac", slots: 1, busy: 0 }, { machine: "winbox", slots: 4, busy: 0 }])
+    const placement = placeTask(newTask("mac"), config, projects, [{ machine: "mac", slots: 1, busy: 0 }, { machine: "linux", slots: 4, busy: 0 }])
     expect(placement.kind === "place" ? placement.machine.name : placement.reason).toBe("mac")
   })
   test("an unmarked task goes to the machine with room instead of the first listed", () => {
     const placement = placeTask(newTask(null), config, projects, room)
-    expect(placement.kind === "place" ? [placement.machine.name, placement.checkout] : placement.reason).toEqual(["winbox", "/home/a/orc"])
+    expect(placement.kind === "place" ? [placement.machine.name, placement.checkout] : placement.reason).toEqual(["linux", "/home/a/orc"])
   })
   test("a task marked for a machine with no checkout of its project waits", () => {
     const onlyMac: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Users/a/orc" } }]
-    expect(placeTask(newTask("winbox"), config, onlyMac, room).kind).toBe("waits")
+    expect(placeTask(newTask("linux"), config, onlyMac, room).kind).toBe("waits")
   })
 })
 
@@ -247,7 +247,7 @@ describe("the backlog folders", () => {
 describe("the beat", () => {
   test("the task file says started before the start command is spawned instead of after", async () => {
     await withBacklog(async (root) => {
-      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["true"] }, { name: "winbox", slots: 0, start: ["true"] }] }))
+      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["true"] }, { name: "linux", slots: 0, start: ["true"] }] }))
       await writeFile(join(root, "projects.json"), JSON.stringify({ projects }))
       await run(addTask(root, spec))
       const seen: Array<string> = []
@@ -271,6 +271,6 @@ describe("the board", () => {
     const board = formatBoard({ tasks: [newTask("mac")], projects: { kind: "read", projects }, room: { kind: "read", room: [{ machine: "mac", slots: 1, busy: 0 }] } })
     const [header = "", first = ""] = board.split("\n")
     expect(header).toMatch(/^NEW \(1\) +TAKEN \(0\) +CLOSED \(0\) +PROJECTS$/)
-    expect(first).toMatch(/^task-1 orc @mac Fix the thing +orc on mac,winbox$/)
+    expect(first).toMatch(/^task-1 orc @mac Fix the thing +orc on mac,linux$/)
   })
 })

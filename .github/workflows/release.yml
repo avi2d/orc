@@ -8,7 +8,7 @@ permissions:
   id-token: write
 jobs:
   publish:
-    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
@@ -23,6 +23,12 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build
       - run: git diff --exit-code
+      - name: write the private pack
+        env:
+          PACK: ${{ secrets.CHECKS_SECRETS_PACK }}
+        run: |
+          printf '%s' "$PACK" > "$RUNNER_TEMP/secrets-pack.json"
+          echo "CHECKS_SECRETS_PACK=$RUNNER_TEMP/secrets-pack.json" >> "$GITHUB_ENV"
       - run: bun run lint
       - run: bun run typecheck
       - run: bun run test
@@ -36,7 +42,7 @@ jobs:
         working-directory: packages/run
   github-release:
     needs: publish
-    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:

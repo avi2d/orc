@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "build": "bun packages/run/scripts/sync-run-version.ts && bun build packages/run/src/bin.ts --outdir packages/run/dist --target bun && checks-effect-scope && checks-changelog && cp CHANGELOG.md packages/run/CHANGELOG.md",
-    "lint": "mkdir -p .orc-home && HOME=$PWD/.orc-home PATH=$PWD/packages/run/scripts:$PATH oxlint && HOME=$PWD/.orc-home PATH=$PWD/packages/run/scripts:$PATH checks-lint",
+    "lint": "mkdir -p .orc-home && HOME=$PWD/.orc-home PATH=$PWD/packages/run/scripts:$PATH oxlint && CHECKS_SECRETS_PACK=\"${CHECKS_SECRETS_PACK-$HOME/.config/checks/secrets-pack.json}\" HOME=$PWD/.orc-home PATH=$PWD/packages/run/scripts:$PATH checks-lint",
     "postinstall": "bun packages/run/scripts/patch-knip-jiti.ts && cp CHANGELOG.md packages/run/CHANGELOG.md",
     "typecheck": "tsc --noEmit && effect-tsgo diagnostics --project tsconfig.json --format text --strict",
     "test": "checks-test",
@@ -33,9 +33,6 @@
     "oxlint": "1.83.0",
     "oxlint-tsgolint": "7.0.2002",
     "typescript": "7.0.2"
-  },
-  "checks": {
-    "mutationRunner": ["self-hosted", "Linux", "X64", "winbox"]
   },
   "overrides": {
     "@effect/platform-node-shared": "4.0.0"

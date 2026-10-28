@@ -6,10 +6,10 @@ import { OrcRunError } from "./run-session"
 
 const contextMarkTokens = 150_000
 
-export const modelListCommand = (host: HostTools): ReadonlyArray<string> => [
+export const modelListCommand = (host: HostTools, preserveAgentDir = false): ReadonlyArray<string> => [
   "/bin/sh",
   "-c",
-  "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" unset PI_CODING_AGENT_DIR; exec \"$1\" --mode rpc --no-session --no-extensions --no-skills --no-context-files --offline",
+  preserveAgentDir ? "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" exec \"$1\" --mode rpc --no-session --no-extensions --no-skills --no-context-files --offline" : "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" unset PI_CODING_AGENT_DIR; exec \"$1\" --mode rpc --no-session --no-extensions --no-skills --no-context-files --offline",
   host.nodeBinary,
   host.piBinary,
   host.homeDir
@@ -39,13 +39,15 @@ export const parseModelWindows = (stdout: string): Option.Option<ModelWindows> =
 export const readModelWindows = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
   host: HostTools,
-  cwd: string
+  cwd: string,
+  preserveAgentDir = false
 ): Effect.Effect<ModelWindows, OrcRunError> =>
   Effect.scoped(Effect.gen(function*() {
-    const parts = modelListCommand(host)
+    const parts = modelListCommand(host, preserveAgentDir)
+    const agentDir = Bun.env.PI_CODING_AGENT_DIR === undefined ? {} : { PI_CODING_AGENT_DIR: Bun.env.PI_CODING_AGENT_DIR }
     const handle = yield* spawner.spawn(ChildProcess.make(parts[0], parts.slice(1), {
       cwd,
-      env: inheritedEnv(Bun.env),
+      env: preserveAgentDir ? { ...inheritedEnv(Bun.env), ...agentDir } : inheritedEnv(Bun.env),
       extendEnv: false,
       stdin: Stream.fromIterable([new TextEncoder().encode(modelListRequest)])
     }))

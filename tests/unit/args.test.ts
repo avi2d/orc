@@ -125,16 +125,16 @@ describe("parseArgs", () => {
     expect(parseArgs(["run"])).toEqual({ kind: "UsageError", detail: "orc run takes a task file" })
   })
   test("run takes a task file and no branch", () => {
-    expect(parseArgs(["run", "task.md"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: undefined, allow: [], answers: [] })
+    expect(parseArgs(["run", "task.md"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: undefined, sandbox: "nono", allow: [], answers: [] })
   })
   test("run takes a task file and a branch", () => {
-    expect(parseArgs(["run", "task.md", "--branch", "orc/demo"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", allow: [], answers: [] })
+    expect(parseArgs(["run", "task.md", "--branch", "orc/demo"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", sandbox: "nono", allow: [], answers: [] })
   })
   test("run takes the branch before the task file", () => {
-    expect(parseArgs(["run", "--branch", "orc/demo", "task.md"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", allow: [], answers: [] })
+    expect(parseArgs(["run", "--branch", "orc/demo", "task.md"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", sandbox: "nono", allow: [], answers: [] })
   })
   test("run takes a branch alone to resume it", () => {
-    expect(parseArgs(["run", "--branch", "orc/demo"])).toEqual({ kind: "RunAgent", taskFile: null, branch: "orc/demo", allow: [], answers: [] })
+    expect(parseArgs(["run", "--branch", "orc/demo"])).toEqual({ kind: "RunAgent", taskFile: null, branch: "orc/demo", sandbox: "nono", allow: [], answers: [] })
   })
   test("run without a task file or a branch to resume is a usage error", () => {
     expect(parseArgs(["run", "--allow", "ask-user"])).toEqual({ kind: "UsageError", detail: "orc run takes a task file" })
@@ -146,13 +146,13 @@ describe("parseArgs", () => {
     expect(parseArgs(["run", "task.md", "--branch", "orc/a", "--branch", "orc/b"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --branch" })
   })
   test("run takes a branch and the word after a refusal", () => {
-    expect(parseArgs(["run", "task.md", "--branch", "orc/demo", "--allow", "ask-user"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", allow: ["ask-user"], answers: [] })
+    expect(parseArgs(["run", "task.md", "--branch", "orc/demo", "--allow", "ask-user"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", sandbox: "nono", allow: ["ask-user"], answers: [] })
   })
   test("run takes the captain answer after a refusal", () => {
-    expect(parseArgs(["run", "task.md", "--branch", "orc/demo", "--answer", "question-3=Use the wide scope"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", allow: [], answers: [{ question: "question-3", answer: "Use the wide scope" }] })
+    expect(parseArgs(["run", "task.md", "--branch", "orc/demo", "--answer", "question-3=Use the wide scope"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", sandbox: "nono", allow: [], answers: [{ question: "question-3", answer: "Use the wide scope" }] })
   })
   test("run takes the word and the answer after refusals", () => {
-    expect(parseArgs(["run", "task.md", "--branch", "orc/demo", "--allow", "ask-user", "--answer", "question-3=Use the wide scope"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", allow: ["ask-user"], answers: [{ question: "question-3", answer: "Use the wide scope" }] })
+    expect(parseArgs(["run", "task.md", "--branch", "orc/demo", "--allow", "ask-user", "--answer", "question-3=Use the wide scope"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: "orc/demo", sandbox: "nono", allow: ["ask-user"], answers: [{ question: "question-3", answer: "Use the wide scope" }] })
   })
   test("run rejects the question word for the allow flag", () => {
     expect(parseArgs(["run", "task.md", "--branch", "orc/demo", "--allow", "question"])).toEqual({ kind: "UsageError", detail: "unknown word for --allow: question" })
@@ -180,5 +180,20 @@ describe("parseArgs", () => {
   })
   test("run rejects a branch flag without a name", () => {
     expect(parseArgs(["run", "task.md", "--branch"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --branch" })
+  })
+  test("run takes --sandbox none instead of the nono default", () => {
+    expect(parseArgs(["run", "task.md", "--sandbox", "none"])).toEqual({ kind: "RunAgent", taskFile: "task.md", branch: undefined, sandbox: "none", allow: [], answers: [] })
+  })
+  test("run takes --sandbox nono by name, not only as the default", () => {
+    expect(parseArgs(["run", "--sandbox", "nono", "--branch", "orc/demo"])).toEqual({ kind: "RunAgent", taskFile: null, branch: "orc/demo", sandbox: "nono", allow: [], answers: [] })
+  })
+  test("run rejects a sandbox kind it does not know instead of falling back to nono", () => {
+    expect(parseArgs(["run", "task.md", "--sandbox", "docker"])).toEqual({ kind: "UsageError", detail: "orc run takes --sandbox once, with nono or none" })
+  })
+  test("run rejects a sandbox flag without a kind instead of reading the task file as one", () => {
+    expect(parseArgs(["run", "task.md", "--sandbox"])).toEqual({ kind: "UsageError", detail: "orc run takes --sandbox once, with nono or none" })
+  })
+  test("run rejects a second sandbox flag instead of keeping the last", () => {
+    expect(parseArgs(["run", "task.md", "--sandbox", "none", "--sandbox", "nono"])).toEqual({ kind: "UsageError", detail: "orc run takes --sandbox once, with nono or none" })
   })
 })

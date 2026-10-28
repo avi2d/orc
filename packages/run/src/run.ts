@@ -7,6 +7,8 @@ import { resolveAgentFile, type AgentFile } from "./agents"
 import { checkedModelWindows, contextMarkJson, readModelWindows } from "./context-mark"
 import { hostGitShim, withHostGitSafety } from "./host"
 import { inheritedEnv, nonoSandboxProvider } from "./nono"
+import { noSandboxProvider } from "./no-sandbox"
+import { defaultSandbox, type SandboxKind } from "./args"
 import { canRouteModel, defaultToolchainResolver, type HostTools, loginCheckCommand, modelCredentialFor, piAgentModels, type ToolchainResolver, withInstallFolders, within } from "./nono-profile"
 import { runGit } from "./git-run"
 import { orcCompletionLine } from "./pi"
@@ -25,6 +27,7 @@ export interface OrcRunRequest {
   readonly cwd: string
   readonly taskFile: string | null | undefined
   readonly branch?: string | undefined
+  readonly sandbox?: SandboxKind | undefined
   readonly allow?: ReadonlyArray<AllowWord> | undefined
   readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
   readonly homeDir?: string | undefined
@@ -43,12 +46,13 @@ const newRunId = (): string => {
 const runLoginCheck = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
   host: { readonly piBinary: string; readonly nodeBinary: string; readonly homeDir: string },
-  cwd: string
+  cwd: string,
+  preserveAgentDir = false
 ): Effect.Effect<void, OrcRunError> =>
   Effect.scoped(Effect.gen(function*() {
-    const parts = loginCheckCommand(host)
-    // nono runs the credential capture with only these variables, so a key the check finds anywhere else never reaches the sandbox.
-    const handle = yield* spawner.spawn(ChildProcess.make(parts[0], parts.slice(1), { cwd, env: inheritedEnv(Bun.env), extendEnv: false }))
+    const parts = loginCheckCommand(host, preserveAgentDir)
+    const agentDir = Bun.env.PI_CODING_AGENT_DIR === undefined ? {} : { PI_CODING_AGENT_DIR: Bun.env.PI_CODING_AGENT_DIR }
+    const handle = yield* spawner.spawn(ChildProcess.make(parts[0], parts.slice(1), { cwd, env: preserveAgentDir ? { ...inheritedEnv(Bun.env), ...agentDir } : inheritedEnv(Bun.env), extendEnv: false }))
     const [, , exitCode] = yield* Effect.all([
       handle.stdout.pipe(Stream.decodeText(), Stream.runDrain),
       handle.stderr.pipe(Stream.decodeText(), Stream.runDrain),
@@ -120,7 +124,7 @@ export const openCheckout = (
         return yield* refuse("orc: " + candidate + " marks this checkout as refused, so orc refuses to run in it")
       }
     }
-    const status = yield* runGit(spawner, git, ["status", "--porcelain"], projectDir)
+    const status = yield* runGit(spawner, git, ["status", "--porcelain", "--", ".", ":(exclude).sandcastle/worktrees"], projectDir)
     if (status.exitCode !== 0) {
       return yield* refuse("orc: git status failed in " + projectDir)
     }
@@ -202,7 +206,8 @@ const prepareAgents = (
   home: string,
   runDir: string,
   effectiveTaskFile: string,
-  agentsDir: string | undefined
+  agentsDir: string | undefined,
+  sandboxKind: SandboxKind
 ): Effect.Effect<PreparedAgents, OrcRunError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
     const folders = yield* prepareRunFolders(fs, path, runDir, effectiveTaskFile)
@@ -233,11 +238,15 @@ const prepareAgents = (
       return yield* refuse("orc: the agent file names model " + agent.model + ", and orc routes only opencode-go models through the sandbox")
     }
     const host: HostTools = { piBinary, nodeBinary, homeDir: operatorHome }
-    yield* runLoginCheck(spawner, host, checkout.projectDir)
-    const windows = yield* readModelWindows(spawner, host, folders.runDir)
+    const preserveAgentDir = sandboxKind === "none"
+    yield* runLoginCheck(spawner, host, checkout.projectDir, preserveAgentDir)
+    const windows = yield* readModelWindows(spawner, host, folders.runDir, preserveAgentDir)
     const checked = yield* Effect.fromResult(checkedModelWindows([agent.model, fixer.model], windows)).pipe(
       Effect.mapError((message) => new OrcRunError({ message }))
     )
+    if (sandboxKind === "none") {
+      return { folders, agent, fixer, credential }
+    }
     yield* fs.writeFileString(path.join(folders.piAgentDir, "models.json"), piAgentModels(credential, checked)).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the agent models file: " + String(cause) }))
     )
@@ -263,17 +272,21 @@ const readTaskFile = (
   )
 
 const openSandboxForRun = (
+  kind: SandboxKind,
   git: string,
   checkout: Checkout,
   folders: RunFolders,
   credential: ModelCredential,
   hostPath: string | undefined,
-  toolchain: ToolchainResolver
+  toolchain: ToolchainResolver,
+  operatorEnv: Readonly<Record<string, string | undefined>>
 ): Effect.Effect<Sandbox, OrcRunError> =>
   Effect.tryPromise({
     try: () => createSandbox({
       branch: checkout.branch,
-      sandbox: nonoSandboxProvider({ piSessionDir: folders.piSessionDir, piAgentDir: folders.piAgentDir, modelCredential: credential, hostPath, toolchain }),
+      sandbox: kind === "none"
+        ? noSandboxProvider({ piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir }, operatorEnv)
+        : nonoSandboxProvider({ piSessionDir: folders.piSessionDir, piAgentDir: folders.piAgentDir, modelCredential: credential, hostPath, toolchain }),
       cwd: checkout.projectDir
     }),
     catch: (cause) => new OrcRunError({ message: "orc: the sandbox failed to start: " + describeCause(cause) })
@@ -288,6 +301,7 @@ export const runAgentStep = (
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const home = orcHomeDir(request.homeDir ?? Bun.env.ORC_HOME)
     const runId = request.runId ?? newRunId()
+    const operatorEnv = { ...Bun.env }
     const hostPath = Bun.env.PATH
     const toolchain = yield* toolchainFromEnv(Bun.env.ORC_TOOLCHAIN_DIRS, homedir())
     const git = yield* openHostGit(fs, path)
@@ -295,12 +309,12 @@ export const runAgentStep = (
     const runDir = path.join(home, "runs", runId)
     const effectiveTaskFile = yield* readTaskFile(fs, home, checkout, request.taskFile)
     const noMistakes = { spawner, binary: noMistakesBinary(Bun.env.ORC_NO_MISTAKES_BIN), pathEnv: hostPath ?? "", git: checkout.git }
-    const { folders, agent, fixer, credential } = yield* prepareAgents(fs, path, spawner, checkout, home, runDir, effectiveTaskFile, request.agentsDir).pipe(
+    const { folders, agent, fixer, credential } = yield* prepareAgents(fs, path, spawner, checkout, home, runDir, effectiveTaskFile, request.agentsDir, request.sandbox ?? defaultSandbox).pipe(
       Effect.tap(() => requireNoMistakes(noMistakes, checkout.projectDir)),
       Effect.onError(() => fs.remove(runDir, { recursive: true }).pipe(Effect.result))
     )
     const started = new Date().toISOString()
-    const sandbox: Sandbox = yield* openSandboxForRun(git, checkout, folders, credential, hostPath, toolchain)
+    const sandbox: Sandbox = yield* openSandboxForRun(request.sandbox ?? defaultSandbox, git, checkout, folders, credential, hostPath, toolchain, operatorEnv)
     const ops: SandboxOps = {
       runAgent: (agentProvider, prompt, logFile, resumeSession) =>
         sandbox.run({
