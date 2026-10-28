@@ -195,7 +195,14 @@ export const loginCheckCommand = (host: HostTools, preserveAgentDir = false): Re
   host.homeDir
 ]
 
-export const piAgentModels = (credential: ModelCredential, checked: ReadonlyArray<CheckedModelWindow>): string => {
+export interface ProviderKey {
+  readonly provider: string
+  readonly apiKey: string
+}
+
+export const providerKeyOf = (credential: ModelCredential): ProviderKey => ({ provider: credential.provider, apiKey: "$" + credential.envVar })
+
+export const piAgentModels = (key: ProviderKey, checked: ReadonlyArray<CheckedModelWindow>): string => {
   const overridesByProvider = new Map<string, Record<string, { readonly contextWindow: number }>>()
   for (const entry of checked) {
     const overrides = overridesByProvider.get(entry.provider) ?? {}
@@ -203,7 +210,7 @@ export const piAgentModels = (credential: ModelCredential, checked: ReadonlyArra
     overridesByProvider.set(entry.provider, overrides)
   }
   const providers: Record<string, { readonly apiKey?: string; readonly modelOverrides?: Record<string, { readonly contextWindow: number }> }> = {
-    [credential.provider]: { apiKey: "$" + credential.envVar }
+    [key.provider]: { apiKey: key.apiKey }
   }
   for (const [provider, modelOverrides] of overridesByProvider) {
     providers[provider] = { ...providers[provider], modelOverrides }

@@ -31,6 +31,7 @@ const expectedFiles = [
   "src/history-resume.ts",
   "src/history-write.ts",
   "src/host.ts",
+  "src/model-route.ts",
   "src/no-mistakes-gate.ts",
   "src/no-mistakes.ts",
   "src/no-sandbox.ts",
@@ -45,6 +46,7 @@ const expectedFiles = [
   "src/run-scores.ts",
   "src/run-session.ts",
   "src/run.ts",
+  "src/sandbox-plan.ts",
   "src/show.ts",
   "src/toon.ts"
 ]
