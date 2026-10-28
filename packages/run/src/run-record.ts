@@ -1,6 +1,7 @@
 import { Effect, type FileSystem, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "./agents"
+import type { SandboxKind } from "./args"
 import { orcCompletionLine } from "./pi"
 import type { AllowWord, NoMistakesRecord, NoMistakesRunner, QuestionAnswer } from "./no-mistakes"
 import { OrcRunError } from "./run-session"
@@ -23,6 +24,7 @@ export interface HistoryRun {
   readonly agent: AgentFile
   readonly fixer: AgentFile
   readonly branch: string
+  readonly sandbox: SandboxKind
   readonly started: string
   readonly worktreeDir: string
   readonly noMistakes: NoMistakesRunner

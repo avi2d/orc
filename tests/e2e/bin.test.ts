@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import type { Database } from "bun:sqlite"
+import { BunServices } from "@effect/platform-bun"
+import { Effect, Schema } from "effect"
 import packageJson from "../../package.json" with { type: "json" }
+import { openDatabase } from "../../packages/run/src/run-history"
 
 const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
 
@@ -151,7 +155,96 @@ describe("orc bin", () => {
       expect(await readdir(join(orcHome, "runs"))).toEqual([])
     })
   })
+
+  test("a run started without a sandbox resumes without one when the flag is dropped, instead of falling back to nono", async () => {
+    await withRunnableFixture(async ({ dir, env }) => {
+      const started = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], dir, env)
+      expect(started.stderr).not.toContain("the sandbox failed to start")
+      const resumed = await runOrc(["run", "--branch", "orc/test"], dir, env)
+      expect(resumed.stderr).not.toContain("the sandbox failed to start")
+      expect(await recordedSandboxes(env.ORC_HOME)).toEqual(["none", "none"])
+    })
+  })
+
+  test("a run recorded in nono resumes in nono when the flag is dropped, instead of reading the record as no sandbox", async () => {
+    await withRunnableFixture(async ({ dir, env }) => {
+      await seedRecordedRun(env.ORC_HOME, dir, "nono")
+      const resumed = await runOrc(["run", "--branch", "orc/test"], dir, env)
+      expect(resumed.exitCode).not.toBe(0)
+      expect(resumed.stderr).toContain("the sandbox failed to start")
+    })
+  })
+
+  test("a resume whose flag names another sandbox than the recorded one is refused instead of switching sandbox", async () => {
+    await withRunnableFixture(async ({ dir, env }) => {
+      await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], dir, env)
+      const resumed = await runOrc(["run", "--branch", "orc/test", "--sandbox", "nono"], dir, env)
+      expect(resumed.exitCode).not.toBe(0)
+      expect(resumed.stderr).toContain("branch orc/test started with --sandbox none, so resume refuses --sandbox nono; drop --sandbox to resume with none")
+      expect(await recordedSandboxes(env.ORC_HOME)).toEqual(["none"])
+    })
+  })
 })
+
+interface RunnableFixture {
+  readonly dir: string
+  readonly env: Record<string, string | undefined> & { readonly ORC_HOME: string }
+}
+
+const withRunnableFixture = (body: (fixture: RunnableFixture) => Promise<void>): Promise<void> =>
+  withLoginFixture("echo ready; exit 0", async ({ dir, home, fakeBin }) => {
+    const reply = JSON.stringify({
+      id: "orc-models",
+      type: "response",
+      command: "get_available_models",
+      success: true,
+      data: { models: [{ provider: "opencode-go", id: "muse-spark-1.3-contributor", contextWindow: 262_144 }] }
+    })
+    await writeFile(join(fakeBin, "pi"), [
+      "#!/bin/sh",
+      "if [ \"$1\" = auth ]; then exit 0; fi",
+      "if [ \"$1\" = --mode ]; then cat > /dev/null; echo '" + reply + "'; exit 0; fi",
+      "exit 2"
+    ].join("\n") + "\n")
+    await writeFile(join(fakeBin, "no-mistakes"), "#!/bin/sh\necho 'no-mistakes version v1.101.0'\n")
+    await writeFile(join(fakeBin, "nono"), "#!/bin/sh\necho 'stopped before any sandbox' >&2\nexit 1\n")
+    await chmod(join(fakeBin, "no-mistakes"), 0o755)
+    await chmod(join(fakeBin, "nono"), 0o755)
+    await body({
+      dir,
+      env: {
+        HOME: home,
+        ORC_HOME: join(home, "orc"),
+        ORC_NO_MISTAKES_BIN: join(fakeBin, "no-mistakes"),
+        PI_CODING_AGENT_DIR: undefined,
+        PATH: fakeBin + ":" + (process.env["PATH"] ?? "")
+      }
+    })
+  })
+
+const withHistory = async <A>(orcHome: string, use: (db: Database) => A): Promise<A> => {
+  const db = await Effect.runPromise(openDatabase(orcHome).pipe(Effect.provide(BunServices.layer)))
+  try {
+    return use(db)
+  } finally {
+    db.close()
+  }
+}
+
+const SandboxRowsSchema = Schema.Array(Schema.Struct({ sandbox: Schema.NullOr(Schema.String) }))
+
+const recordedSandboxes = (orcHome: string): Promise<ReadonlyArray<string | null>> =>
+  withHistory(orcHome, (db) =>
+    Schema.decodeUnknownSync(SandboxRowsSchema)(db.query("SELECT sandbox FROM runs ORDER BY started ASC, id ASC").all()).map((row) => row.sandbox)
+  )
+
+const seedRecordedRun = async (orcHome: string, dir: string, sandbox: string): Promise<void> => {
+  const project = await realpath(dir)
+  await withHistory(orcHome, (db) => {
+    db.query("INSERT INTO runs (id, project, branch, task_file, status, started, sandbox) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run("seeded-run", project, "orc/test", join(dir, "task.md"), "failed", "2026-10-19T10:00:00.000Z", sandbox)
+  })
+}
 
 interface LoginFixture {
   readonly dir: string

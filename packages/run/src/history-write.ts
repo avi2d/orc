@@ -101,7 +101,7 @@ export const recordResumePublish = (db: Database, run: HistoryRun, resume: Resum
       const publish = db.transaction(() => {
         insertRun(db, {
           id: run.runId, project: run.projectDir, branch: run.branch,
-          taskFile: run.taskPath, status: "running", started: run.started
+          taskFile: run.taskPath, status: "running", started: run.started, sandbox: run.sandbox
         })
         if (resume.skipImplement) {
           const planned = planImplementDone(run, {

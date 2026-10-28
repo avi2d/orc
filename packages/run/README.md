@@ -80,7 +80,9 @@ Orc refuses a checkout with uncommitted changes.
 Orc commits to a new branch named `orc/<run-id>`, or to the name you pass with `--branch <name>`.
 A branch name may hold only letters, digits, `.`, `_`, `-` and `/`.
 To resume the branch after a stop, enter the same target checkout and run `orc run --branch <name>` and orc skips the steps the run history marks passed.
-Resume takes the sandbox from the flag and not from the earlier run, so pass `--sandbox none` again when resuming a no-sandbox run.
+Resume takes the sandbox the earlier run recorded, so a no-sandbox run resumes without a sandbox with no flag.
+Orc refuses a resume whose `--sandbox` names another kind than the one recorded.
+A run recorded before orc stored the sandbox takes it from the flag, with nono as the default.
 On resume Sandcastle reuses the branch worktree, Pi resumes its prior session, and orc reattaches to no-mistakes with the same intent.
 After a refusal, run the same resume command with `--allow` and the name from the report, or with `--answer` and the captain's answer for a question.
 No-mistakes takes the word for that `--allow` kind, and the answer for that question.
@@ -143,7 +145,7 @@ Without a sandbox the run still gets its own worktree on its own branch, and non
 Pi runs with your own environment and Pi config, so it can read and write anything your user can.
 Orc points `GIT_CONFIG_GLOBAL` at a file in the run folder, so the commit identity Sandcastle sets never reaches your `~/.gitconfig`.
 Pi writes its session straight into the run's `sessions/host` folder.
-Resume takes the sandbox from the flag and not from the earlier run, so pass `--sandbox none` again to resume.
+Resume takes the sandbox from the earlier run, so `orc run --branch <name>` resumes it without a sandbox.
 
 ## Choosing the no-mistakes binary
 
