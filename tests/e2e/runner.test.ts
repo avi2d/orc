@@ -31,8 +31,11 @@ const fakePueue = [
   "case \"$1\" in",
   "  status) cat \"$PUEUE_STATE/status.json\" ;;",
   "  log) if [ -f \"$PUEUE_STATE/log-$2.json\" ]; then cat \"$PUEUE_STATE/log-$2.json\"; else printf '{\"%s\":{\"output\":\"\"}}' \"$2\"; fi ;;",
+  "  group)",
+  "    if [ \"$2\" = \"add\" ]; then printf '%s\\n' \"$@\" > \"$PUEUE_STATE/group-add-args.tmp\"; mv \"$PUEUE_STATE/group-add-args.tmp\" \"$PUEUE_STATE/group-add-args\"; echo \"Group orc created\";",
+  "    elif [ -f \"$PUEUE_STATE/groups.txt\" ]; then cat \"$PUEUE_STATE/groups.txt\";",
+  "    else printf 'Group \"default\"\\nGroup \"orc\"\\n'; fi ;;",
   "  add)",
-  "    if [ -n \"$PUEUE_ADD_REFUSES\" ]; then echo \"$PUEUE_ADD_REFUSES\" >&2; exit 1; fi",
   "    shift; printf '%s\\n' \"$@\" > \"$PUEUE_STATE/add-args.tmp\"; mv \"$PUEUE_STATE/add-args.tmp\" \"$PUEUE_STATE/add-args\"; echo 77 ;;",
   "  *) echo \"fake pueue has no $1\" >&2; exit 2 ;;",
   "esac",
@@ -126,7 +129,7 @@ const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>): Promi
 }
 
 const pueueAddFor = (home: string, checkout: string): ReadonlyArray<string> => [
-  "--group", "orc", "--label", "task-1", "--working-directory", checkout, "--print-task-id", "--escape", "--",
+  "--group", "orc", "--label", "task-1", "--working-directory", checkout, "--env", "ORC_HOME=" + home, "--print-task-id", "--escape", "--",
   process.execPath, binPath, "run", join(home, "runner", "task-1.md"), "--branch", "orc/task-1"
 ]
 
@@ -168,13 +171,22 @@ describe("orc runner start", () => {
     })
   }, runnerTimeout)
 
-  test("a missing orc group fails the start with pueue's own words instead of exiting clean", async () => {
+  test("a missing orc group is created before queueing instead of refusing the start", async () => {
     await withFixture(async (fixture) => {
+      await writeFile(join(fixture.pueue, "groups.txt"), "Group \"default\"\n")
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      const refusal = "Group orc doesn't exists. Use one of these: [\"default\"]"
-      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" }, { PUEUE_ADD_REFUSES: refusal })
-      expect(result.exitCode).not.toBe(0)
-      expect(result.stderr).toBe("orc: pueue add exited 1: " + refusal + "\n")
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toBe("queued task-9 as pueue task 77 in group orc\n")
+      expect((await readFile(join(fixture.pueue, "group-add-args"), "utf8")).split("\n").slice(0, -1)).toEqual(["group", "add", "orc"])
+    })
+  }, runnerTimeout)
+
+  test("an existing orc group is left alone instead of added again", async () => {
+    await withFixture(async (fixture) => {
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+      expect(result.exitCode).toBe(0)
+      expect(await readFile(join(fixture.pueue, "group-add-args"), "utf8").catch(() => null)).toBeNull()
     })
   }, runnerTimeout)
 
@@ -209,7 +221,7 @@ describe("orc runner result", () => {
       try {
         Effect.runSync(recordRun(db, {
           id: "run-1",
-          project: "orc",
+          project: "/checkout",
           branch: "orc/task-1",
           taskFile: "task.md",
           status: "succeeded",
@@ -227,6 +239,28 @@ describe("orc runner result", () => {
         "  hello",
         ""
       ].join("\n"))
+    })
+  }, runnerTimeout)
+
+  test("a run on the same branch in another checkout is not attached to the task", async () => {
+    await withFixture(async (fixture) => {
+      const db = await Effect.runPromise(openDatabase(fixture.home).pipe(Effect.provide(BunServices.layer)))
+      try {
+        Effect.runSync(recordRun(db, {
+          id: "run-other",
+          project: "/other-checkout",
+          branch: "orc/task-1",
+          taskFile: "task.md",
+          status: "succeeded",
+          started: "2026-10-28T02:36:39.200Z",
+          ended: "2026-10-28T02:36:39.400Z",
+          prLink: "https://github.com/avi2d/orc/pull/9"
+        }))
+      } finally {
+        db.close()
+      }
+      const document = await resultJson(fixture, "task-1") as { readonly result: { readonly run: unknown } }
+      expect(document.result.run).toBeNull()
     })
   }, runnerTimeout)
 

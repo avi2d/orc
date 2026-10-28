@@ -260,14 +260,15 @@ When a started task ends, run `orc backlog close <task-id> <done|failed> [reason
 `orc runner start` is the start command that hands a task to pueue on its machine, so the run outlives the beat, the dispatcher and any SSH link to it.
 It reads the task from the beat's `ORC_TASK_*` variables and queues `orc run` in the checkout on branch `orc/<task-id>`, in the pueue group `orc`.
 The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
-Pueue refuses the start when the machine has no `orc` group, and the refusal goes to the task's log.
+The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
 A task pueue already holds in group `orc` is not queued again.
 
 To start on another machine, put the command that runs orc there after `--`, as in `orc runner start -- ssh winbox orc`.
 That runs `orc runner queue` on the far side and sends it the task as JSON on stdin, so the task text never passes through a remote shell.
 SSH can drop once pueue holds the run, since pueue on that machine owns it.
-Pueue runs the task with the environment of the command that queued it, so the command after `--` must give orc the `PATH` and `ORC_HOME` its runs need on that machine.
+Pueue runs the task with the environment of the command that queued it, so the command after `--` must give orc the `PATH` its runs need on that machine.
+The queue records the resolved absolute `ORC_HOME` with the task.
 
 To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh winbox orc` from another.
 It names pueue's state for the task, the orc run on `orc/<task-id>` with its PR, and the run's last 20 lines of output.

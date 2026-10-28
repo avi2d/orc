@@ -1,6 +1,7 @@
 import { Data, Effect, FileSystem, Path, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { formatHistoryError, latestRunOnBranch, openDatabase, RunStatusSchema } from "../run-history"
+import { formatHistoryError, openDatabase, RunStatusSchema } from "../run-history"
+import { latestRunForBranch } from "../history-resume"
 import type { Reach } from "./args"
 import { TaskId } from "./backlog"
 import { parseTaskFile } from "./task-record"
@@ -28,6 +29,7 @@ const PueueTask = Schema.Struct({
   id: Schema.Int,
   label: Schema.NullOr(Schema.String),
   group: Schema.String,
+  path: Schema.String,
   status: Schema.Unknown
 })
 type PueueTask = typeof PueueTask.Type
@@ -143,6 +145,13 @@ const readHeld = (task: string): Effect.Effect<PueueTask | null, RunnerError, Ch
     Effect.map((state) => heldTask(state.tasks, task))
   )
 
+const ensureOrcGroup = (): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  pueue(["group"]).pipe(
+    Effect.flatMap((text) =>
+      new RegExp("\\borc\\b").test(text) ? Effect.void : pueue(["group", "add", orcGroup]).pipe(Effect.asVoid)
+    )
+  )
+
 const requireFolder = (checkout: string): Effect.Effect<void, RunnerError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
@@ -161,6 +170,7 @@ const queueTask = (
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     yield* requireFolder(request.checkout)
+    yield* ensureOrcGroup()
     const held = yield* readHeld(request.task)
     if (held !== null) {
       return request.task + " is already pueue task " + held.id + " in group " + orcGroup
@@ -172,7 +182,7 @@ const queueTask = (
       Effect.mapError((error) => new RunnerError({ detail: "cannot write " + taskFile + ": " + error.message }))
     )
     const id = yield* pueue([
-      "add", "--group", orcGroup, "--label", request.task, "--working-directory", request.checkout, "--print-task-id", "--escape", "--",
+      "add", "--group", orcGroup, "--label", request.task, "--working-directory", request.checkout, "--env", "ORC_HOME=" + home, "--print-task-id", "--escape", "--",
       ...self, "run", taskFile, "--branch", taskBranch(request.task)
     ])
     return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
@@ -289,10 +299,10 @@ const readOutput = (pueueTask: number): Effect.Effect<ReadonlyArray<string>, Run
     })
   )
 
-const readRun = (home: string, task: string): Effect.Effect<RunSummary | null, RunnerError, FileSystem.FileSystem | Path.Path> =>
+const readRun = (home: string, project: string, task: string): Effect.Effect<RunSummary | null, RunnerError, FileSystem.FileSystem | Path.Path> =>
   Effect.acquireUseRelease(
     openDatabase(home),
-    (db) => latestRunOnBranch(db, taskBranch(task)),
+    (db) => latestRunForBranch(db, project, taskBranch(task)),
     (db) => Effect.sync(() => db.close())
   ).pipe(
     Effect.map((run) => run === null ? null : { id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason }),
@@ -309,7 +319,7 @@ export const readResult = (task: string, home: string): Effect.Effect<RunnerResu
       Effect.mapError((error) => new RunnerError({ detail: "pueue reports a status orc cannot read for task " + held.id + ": " + error.message }))
     )
     const output = yield* readOutput(held.id)
-    const run = yield* readRun(home, task)
+    const run = yield* readRun(home, held.path, task)
     return assessHeld(task, held.id, status, run, output)
   })
 

@@ -303,15 +303,6 @@ export const listRuns = (
     Effect.map((rows) => rows.map(runRecordOf))
   )
 
-export const latestRunOnBranch = (
-  db: Database,
-  branch: string
-): Effect.Effect<RunRecord | null, Schema.SchemaError | SqliteFailure> =>
-  sqlite(() => db.query(runColumns + " WHERE branch = ? ORDER BY started DESC, id ASC LIMIT 1").all(branch)).pipe(
-    Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(RunSqlRowSchema))),
-    Effect.map((rows) => rows.length === 0 ? null : runRecordOf(rows[0]))
-  )
-
 export const updateRun = (db: Database, id: string, patch: { readonly status: RunStatus; readonly ended: string | null; readonly prLink: string | null; readonly endReason: string | null }): Effect.Effect<void, SqliteFailure> =>
   sqlite(() => {
     db.query("UPDATE runs SET status = ?, ended = ?, pr_link = ?, end_reason = ? WHERE id = ?").run(patch.status, patch.ended, patch.prLink, patch.endReason, id)
