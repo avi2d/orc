@@ -62,7 +62,7 @@ const fakePueue = [
   "    if [ -f \"$PUEUE_STATE/added-tasks\" ]; then n=$(wc -l < \"$PUEUE_STATE/added-tasks\"); else n=0; fi;",
   "    id=$((77 + n)); printf '%s %s %s\\n' \"$label\" \"$group\" \"$id\" >> \"$PUEUE_STATE/added-tasks\";",
   "    mv \"$PUEUE_STATE/add-args.tmp\" \"$PUEUE_STATE/add-args\";",
-  "    printf '%s' \"$ORC_HOME\" > \"$PUEUE_STATE/add-env\";",
+  "    printf '%s' \"$ORC_HOME\" > \"$PUEUE_STATE/add-env.tmp\"; mv \"$PUEUE_STATE/add-env.tmp\" \"$PUEUE_STATE/add-env\";",
   "    rmdir \"$PUEUE_STATE/group-lock\"; echo \"$id\" ;;",
   "  *) echo \"fake pueue has no $1\" >&2; exit 2 ;;",
   "esac",
