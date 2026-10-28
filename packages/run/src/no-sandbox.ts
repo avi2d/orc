@@ -1,5 +1,6 @@
-import { spawn } from "node:child_process"
-import { createInterface } from "node:readline"
+import { BunServices } from "@effect/platform-bun"
+import { Data, Effect, Stream } from "effect"
+import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { NoSandboxProvider } from "@ai-hero/sandcastle"
 import { noSandbox } from "@ai-hero/sandcastle/sandboxes/no-sandbox"
 
@@ -19,6 +20,10 @@ export const noSandboxEnv = (dirs: NoSandboxDirs): NoSandboxEnv => ({
   GIT_CONFIG_GLOBAL: dirs.piSessionDir + "/gitconfig",
   PI_CODING_AGENT_SESSION_DIR: dirs.hostSessionsDir + "/host"
 })
+
+class NoSandboxProviderError extends Data.TaggedError("NoSandboxProviderError")<{
+  readonly message: string
+}> {}
 
 interface NoSandboxExecOptions {
   readonly onLine?: ((line: string) => void) | undefined
@@ -45,9 +50,11 @@ interface NoSandboxHandle {
 
 type NoSandboxCreate = (options: NoSandboxCreateOptions) => Promise<NoSandboxHandle>
 
-const signalExitCode = 128
+export interface NoSandboxSandboxProvider extends NoSandboxProvider {
+  readonly create: NoSandboxCreate
+}
 
-const exitOf = (code: number | null): number => code ?? signalExitCode
+const signalExitCode = 128
 
 const tailLimit = 65536
 
@@ -56,80 +63,107 @@ const appendTail = (current: string, chunk: string): string => {
   return next.length > tailLimit ? next.slice(next.length - tailLimit) : next
 }
 
-const fixedExec = (processEnv: Record<string, string>, fallbackCwd: string) =>
-  (command: string, options?: NoSandboxExecOptions): Promise<NoSandboxExecResult> => {
-    const cwd = options?.cwd ?? fallbackCwd
-    const stdinText = options?.stdin
-    const onLine = options?.onLine
-    return new Promise<NoSandboxExecResult>((resolve, reject) => {
-      const proc = spawn("sh", ["-c", command], {
-        cwd,
-        env: processEnv,
-        stdio: [stdinText !== undefined ? "pipe" : "ignore", "pipe", "pipe"]
-      })
-      if (stdinText !== undefined && proc.stdin !== null) {
-        proc.stdin.write(stdinText)
-        proc.stdin.end()
-      }
-      proc.on("error", (error) => {
-        reject(new Error("exec failed: " + (error instanceof Error ? error.message : String(error))))
-      })
-      if (onLine !== undefined) {
-        let stdoutTail = ""
-        let stderrTail = ""
-        if (proc.stdout !== null) {
-          const lines = createInterface({ input: proc.stdout })
-          lines.on("line", (line) => {
-            stdoutTail = appendTail(stdoutTail === "" ? "" : stdoutTail + "\n", line)
-            onLine(line)
-          })
-        }
-        if (proc.stderr !== null) {
-          proc.stderr.on("data", (chunk) => {
-            stderrTail = appendTail(stderrTail, chunk.toString())
-          })
-        }
-        proc.on("close", (code) => {
-          resolve({ stdout: stdoutTail, stderr: stderrTail, exitCode: exitOf(code) })
-        })
-      } else {
-        let stdout = ""
-        let stderr = ""
-        if (proc.stdout !== null) {
-          proc.stdout.on("data", (chunk) => {
-            stdout += chunk.toString()
-          })
-        }
-        if (proc.stderr !== null) {
-          proc.stderr.on("data", (chunk) => {
-            stderr += chunk.toString()
-          })
-        }
-        proc.on("close", (code) => {
-          resolve({ stdout, stderr, exitCode: exitOf(code) })
-        })
-      }
-    })
-  }
+const isNoSandboxCreate = (value: unknown): value is NoSandboxCreate => typeof value === "function"
 
-export const noSandboxProvider = (dirs: NoSandboxDirs, operatorEnv: Readonly<Record<string, string | undefined>>): NoSandboxProvider => {
-  const base = noSandbox({ env: { ...noSandboxEnv(dirs) } })
-  const baseCreate = (base as unknown as { readonly create: NoSandboxCreate }).create.bind(base)
-  const create: NoSandboxCreate = async (createOptions) => {
-    const handle = await baseCreate(createOptions)
-    const processEnv: Record<string, string> = {}
-    for (const [key, value] of Object.entries(operatorEnv)) {
-      if (value !== undefined) {
-        processEnv[key] = value
+const execProgram = (
+  processEnv: Record<string, string>,
+  fallbackCwd: string,
+  command: string,
+  options: NoSandboxExecOptions | undefined
+): Effect.Effect<NoSandboxExecResult, NoSandboxProviderError, ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.scoped(
+    Effect.gen(function*() {
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+      const stdin: ChildProcess.CommandInput = options?.stdin === undefined
+        ? "ignore"
+        : Stream.fromIterable([new TextEncoder().encode(options.stdin)])
+      const handle = yield* spawner.spawn(
+        ChildProcess.make("sh", ["-c", command], { cwd: options?.cwd ?? fallbackCwd, env: processEnv, extendEnv: false, stdin })
+      )
+      const onLine = options?.onLine
+      if (onLine === undefined) {
+        const [stdout, stderr, exitCode] = yield* Effect.all(
+          [
+            handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
+            handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
+            handle.exitCode.pipe(
+              Effect.map((exit): number => exit),
+              Effect.orElseSucceed(() => signalExitCode)
+            )
+          ],
+          { concurrency: "unbounded" }
+        )
+        return { stdout, stderr, exitCode }
       }
-    }
-    for (const [key, value] of Object.entries(createOptions.env)) {
-      processEnv[key] = value
-    }
-    return {
-      ...handle,
-      exec: fixedExec(processEnv, handle.worktreePath)
-    }
-  }
-  return { ...base, create } as unknown as NoSandboxProvider
+      let stdoutTail = ""
+      let stderrTail = ""
+      const [, , streamedExit] = yield* Effect.all(
+        [
+          handle.stdout.pipe(
+            Stream.decodeText(),
+            Stream.splitLines,
+            Stream.tap((line) =>
+              Effect.sync(() => {
+                stdoutTail = appendTail(stdoutTail === "" ? "" : stdoutTail + "\n", line)
+                onLine(line)
+              })
+            ),
+            Stream.runDrain
+          ),
+          handle.stderr.pipe(
+            Stream.decodeText(),
+            Stream.tap((text) =>
+              Effect.sync(() => {
+                stderrTail = appendTail(stderrTail, text)
+              })
+            ),
+            Stream.runDrain
+          ),
+          handle.exitCode.pipe(
+            Effect.map((exit): number => exit),
+            Effect.orElseSucceed(() => signalExitCode)
+          )
+        ],
+        { concurrency: "unbounded" }
+      )
+      return { stdout: stdoutTail, stderr: stderrTail, exitCode: streamedExit }
+    })
+  ).pipe(
+    Effect.mapError((cause) => new NoSandboxProviderError({ message: `orc no-sandbox provider: exec failed: ${String(cause)}` }))
+  )
+
+const fixedExec = (processEnv: Record<string, string>, fallbackCwd: string) =>
+  (command: string, options?: NoSandboxExecOptions): Promise<NoSandboxExecResult> =>
+    Effect.runPromise(execProgram(processEnv, fallbackCwd, command, options).pipe(Effect.provide(BunServices.layer)))
+
+export const noSandboxProvider = (dirs: NoSandboxDirs, operatorEnv: Readonly<Record<string, string | undefined>>): NoSandboxSandboxProvider => {
+  const base = noSandbox({ env: { ...noSandboxEnv(dirs) } })
+  const candidate: unknown = "create" in base ? base.create : undefined
+  const baseCreate: NoSandboxCreate | undefined = isNoSandboxCreate(candidate) ? candidate : undefined
+  const create: NoSandboxCreate = (createOptions) =>
+    Effect.runPromise(
+      (baseCreate === undefined
+        ? Effect.fail(new NoSandboxProviderError({ message: "orc no-sandbox provider: the no-sandbox handle has no create" }))
+        : Effect.tryPromise({
+          try: () => baseCreate(createOptions),
+          catch: (cause) => new NoSandboxProviderError({ message: `orc no-sandbox provider: the sandbox failed to start: ${String(cause)}` })
+        })).pipe(
+        Effect.map((handle) => {
+          const processEnv: Record<string, string> = {}
+          for (const [key, value] of Object.entries(operatorEnv)) {
+            if (value !== undefined) {
+              processEnv[key] = value
+            }
+          }
+          for (const [key, value] of Object.entries(createOptions.env)) {
+            processEnv[key] = value
+          }
+          return {
+            ...handle,
+            exec: fixedExec(processEnv, handle.worktreePath)
+          }
+        })
+      )
+    )
+  return { ...base, create }
 }
