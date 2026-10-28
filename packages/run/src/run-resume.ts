@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite"
-import { Effect, FileSystem, Option } from "effect"
+import { Effect, FileSystem, Option, Schema } from "effect"
 import { checksRoundsForRun, fixesForRun, type StoredFix } from "./history-resume"
 import { sessionIdFromFile, type RunRecord } from "./run-history"
 import { latestRunForBranch, stepsForRun } from "./history-resume"
@@ -116,32 +116,28 @@ const readPriorProgress = (db: Database, run: HistoryRun, prior: RunRecord): Eff
     return { priorId: prior.id, implementPassed, checksPassed, implementSource, implementSessionId, fixSource, fixSessionId: liveFixId ?? sessionIdFromFile(storedFixFile), fixRunning: interruptedFix, storedFixes }
   })
 
-interface SessionLine {
-  readonly type?: unknown
-  readonly cwd?: unknown
-  readonly [key: string]: unknown
+const decodeJsonLine = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+const pointLineAt = (line: string, cwd: string): string => {
+  if (line === "") {
+    return line
+  }
+  const parsed = decodeJsonLine(line)
+  if (Option.isNone(parsed) || !isRecord(parsed.value)) {
+    return line
+  }
+  const entry = parsed.value
+  if (entry["type"] !== "session" || entry["cwd"] === cwd) {
+    return line
+  }
+  return JSON.stringify({ ...entry, cwd })
 }
 
 const pointSessionAt = (text: string, cwd: string): string =>
-  text.split("\n").map((line) => {
-    if (line === "") {
-      return line
-    }
-    let entry: SessionLine
-    try {
-      const parsed: unknown = JSON.parse(line)
-      if (typeof parsed !== "object" || parsed === null) {
-        return line
-      }
-      entry = parsed as SessionLine
-    } catch {
-      return line
-    }
-    if (entry.type !== "session" || entry.cwd === cwd) {
-      return line
-    }
-    return JSON.stringify({ ...entry, cwd })
-  }).join("\n")
+  text.split("\n").map((line) => pointLineAt(line, cwd)).join("\n")
 
 const carrySessionFile = (run: HistoryRun, source: string | null, sessionId: string | null): Effect.Effect<string | null, OrcRunError> =>
   Effect.gen(function*() {
