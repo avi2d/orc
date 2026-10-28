@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { Database } from "bun:sqlite"
@@ -142,6 +142,34 @@ describe("resume recovers an interrupted agent from its live session", () => {
         expect(plan.fixSessionId ?? "").not.toContain("/")
         expect(plan.fixSessionFile ?? "").toContain(join("sessions", "host"))
         expect(plan.fixSessionFile ?? "").toContain(fixId)
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a carried nono session header points at the new worktree instead of keeping the old checkout", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "repo")
+        const worktree = join(home, "wt")
+        const priorDir = join(home, "runs", "prior-1")
+        await mkdir(priorDir, { recursive: true })
+        await writeFile(join(priorDir, "task.md"), "Do the thing.\n")
+        await seedRun(db, "prior-1", project, join(priorDir, "task.md"), "running", "2026-10-19T09:00:00.000Z")
+        await seedStep(db, "prior-1", "implement", "running", "2026-10-19T09:00:00.000Z", null)
+        const liveId = "ddd444"
+        const liveDir = join(priorDir, "session", "agent", "sessions", "enc")
+        await mkdir(liveDir, { recursive: true })
+        const header = { type: "session", version: 3, id: liveId, timestamp: "2026-10-19T09:30:00.000Z", cwd: project }
+        await writeFile(join(liveDir, "2026-10-19T09-30-00-000Z_" + liveId + ".jsonl"), JSON.stringify(header) + "\n")
+        const base = await Effect.runPromise(historyFor("next-1", home, project, "2026-10-19T10:00:00.000Z"))
+        const run = { ...base, worktreeDir: worktree }
+        const plan = await Effect.runPromise(buildResumePlan(db, run))
+        expect(plan.implementSessionId).toBe(liveId)
+        const carried = await readFile(plan.implementSessionFile ?? "", "utf-8")
+        expect(JSON.parse(carried.split("\n")[0]).cwd).toBe(worktree)
       } finally {
         db.close()
       }
