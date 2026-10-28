@@ -84,7 +84,7 @@ const fakeClauth = (arrivals: string): string =>
 
 interface FixtureShape {
   readonly mac: number
-  readonly winbox: number
+  readonly linux: number
   readonly floorPercent: number
 }
 
@@ -102,11 +102,11 @@ const withFixture = async (shape: FixtureShape, body: (fixture: Fixture) => Prom
     await chmod(join(bin, "clauth"), 0o755)
     const start = ["sh", "-c", "sleep 0.1; echo \"$ORC_TASK_ID $ORC_TASK_MACHINE\" >> '" + startLog + "'"]
     await writeFile(join(backlog, "dispatch.json"), JSON.stringify({
-      machines: [{ name: "mac", slots: shape.mac, start }, { name: "winbox", slots: shape.winbox, start }],
+      machines: [{ name: "mac", slots: shape.mac, start }, { name: "linux", slots: shape.linux, start }],
       quota: { accounts: ["main"], floorPercent: shape.floorPercent }
     }))
     await writeFile(join(backlog, "projects.json"), JSON.stringify({
-      projects: [{ name: "orc", checkouts: { mac: join(dir, "mac-orc"), winbox: join(dir, "winbox-orc") } }]
+      projects: [{ name: "orc", checkouts: { mac: join(dir, "mac-orc"), linux: join(dir, "linux-orc") } }]
     }))
     await writeFile(join(dir, "task.md"), "# Do the thing\n")
     await writeFile(startLog, "")
@@ -170,7 +170,7 @@ const backlogTask = async (fixture: Fixture, id: string): Promise<Record<string,
 
 const writeMachines = async (fixture: Fixture, start: ReadonlyArray<string>): Promise<void> => {
   await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({
-    machines: [{ name: "mac", slots: 1, start }, { name: "winbox", slots: 0, start: ["true"] }],
+    machines: [{ name: "mac", slots: 1, start }, { name: "linux", slots: 0, start: ["true"] }],
     quota: { accounts: ["main"], floorPercent: 15 }
   }))
 }
@@ -189,9 +189,9 @@ const taskIds = (count: number): ReadonlyArray<string> => Array.from({ length: c
 
 describe("orc beat", () => {
   test("two beats on one backlog start each task once instead of twice", async () => {
-    await withFixture({ mac: 50, winbox: 50, floorPercent: 15 }, async (fixture) => {
+    await withFixture({ mac: 50, linux: 50, floorPercent: 15 }, async (fixture) => {
       for (let round = 0; round < raceRounds; round += 1) {
-        await addTasks(fixture, 3, (index) => index === 0 ? "winbox" : null)
+        await addTasks(fixture, 3, (index) => index === 0 ? "linux" : null)
         await raceTwoBeats(fixture)
       }
       const started = (await settledStarts(fixture, 3 * raceRounds)).map((line) => line.split(" ")[0])
@@ -201,7 +201,7 @@ describe("orc beat", () => {
   }, beatTimeout)
 
   test("two beats racing for one free slot never fill it twice", async () => {
-    await withFixture({ mac: 1, winbox: 0, floorPercent: 15 }, async (fixture) => {
+    await withFixture({ mac: 1, linux: 0, floorPercent: 15 }, async (fixture) => {
       await addTasks(fixture, 2 * raceRounds)
       for (let round = 1; round <= raceRounds; round += 1) {
         await raceTwoBeats(fixture)
@@ -216,18 +216,18 @@ describe("orc beat", () => {
   }, beatTimeout)
 
   test("a task marked for a machine runs only there instead of on the machine with more room", async () => {
-    await withFixture({ mac: 20, winbox: 1, floorPercent: 15 }, async (fixture) => {
-      await addTasks(fixture, 3, (index) => index < 2 ? "winbox" : null)
-      expect(await orcOk(fixture, ["beat"])).toContain("waits task-2: winbox has no room")
-      expect(await settledStarts(fixture, 2)).toEqual(["task-1 winbox", "task-3 mac"])
+    await withFixture({ mac: 20, linux: 1, floorPercent: 15 }, async (fixture) => {
+      await addTasks(fixture, 3, (index) => index < 2 ? "linux" : null)
+      expect(await orcOk(fixture, ["beat"])).toContain("waits task-2: linux has no room")
+      expect(await settledStarts(fixture, 2)).toEqual(["task-1 linux", "task-3 mac"])
       await orcOk(fixture, ["backlog", "close", "task-1", "done"])
       await orcOk(fixture, ["beat"])
-      expect(await settledStarts(fixture, 3)).toEqual(["task-1 winbox", "task-2 winbox", "task-3 mac"])
+      expect(await settledStarts(fixture, 3)).toEqual(["task-1 linux", "task-2 linux", "task-3 mac"])
     })
   }, beatTimeout)
 
   test("a runner that closes its task at once leaves it closed failed instead of refused as not started", async () => {
-    await withFixture({ mac: 1, winbox: 0, floorPercent: 15 }, async (fixture) => {
+    await withFixture({ mac: 1, linux: 0, floorPercent: 15 }, async (fixture) => {
       await writeMachines(fixture, ["sh", "-c", "\"" + process.execPath + "\" \"" + binPath + "\" backlog close \"$ORC_TASK_ID\" failed"])
       await addTasks(fixture, 1)
       expect(await orcOk(fixture, ["beat"])).toContain("started task-1")
@@ -238,7 +238,7 @@ describe("orc beat", () => {
   }, beatTimeout)
 
   test("a start command outlives the end of the beat's process group instead of dying with it", async () => {
-    await withFixture({ mac: 1, winbox: 0, floorPercent: 15 }, async (fixture) => {
+    await withFixture({ mac: 1, linux: 0, floorPercent: 15 }, async (fixture) => {
       const marker = join(fixture.dir, "handed-on")
       await writeMachines(fixture, ["sh", "-c", "sleep 1; echo \"$ORC_TASK_ID\" > '" + marker + "'"])
       await addTasks(fixture, 1)
@@ -256,7 +256,7 @@ describe("orc beat", () => {
   }, beatTimeout)
 
   test("the start command's output goes to the task's log instead of the beat's output", async () => {
-    await withFixture({ mac: 1, winbox: 0, floorPercent: 15 }, async (fixture) => {
+    await withFixture({ mac: 1, linux: 0, floorPercent: 15 }, async (fixture) => {
       await writeMachines(fixture, ["sh", "-c", "echo \"out $ORC_TASK_ID\"; echo \"err $ORC_TASK_ID\" >&2"])
       await addTasks(fixture, 1)
       const log = join(fixture.dir, "home", "backlog", "logs", "task-1.log")
@@ -268,7 +268,7 @@ describe("orc beat", () => {
   }, beatTimeout)
 
   test("a beat with no Claude account above the floor starts nothing", async () => {
-    await withFixture({ mac: 4, winbox: 4, floorPercent: 90 }, async (fixture) => {
+    await withFixture({ mac: 4, linux: 4, floorPercent: 90 }, async (fixture) => {
       await addTasks(fixture, 1)
       expect(await orcOk(fixture, ["beat"])).toContain("waits task-1: no Claude account has room")
       expect(await startedLines(fixture)).toEqual([])
@@ -276,7 +276,7 @@ describe("orc beat", () => {
   }, beatTimeout)
 
   test("adding a task for a project not in the list is refused instead of queued", async () => {
-    await withFixture({ mac: 1, winbox: 1, floorPercent: 15 }, async (fixture) => {
+    await withFixture({ mac: 1, linux: 1, floorPercent: 15 }, async (fixture) => {
       const result = await runOrc(fixture, ["backlog", "add", "web", "task.md"])
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toContain("the project web is not in")
