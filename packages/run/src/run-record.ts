@@ -54,7 +54,8 @@ export const formatReport = (report: OrcRunReport): string =>
 
 const noMistakesSummary = (record: NoMistakesRecord): string =>
   record.status + ", " + record.findings.length.toString() + (record.findings.length === 1 ? " finding" : " findings") + ", " +
-  record.gatesAnswered.toString() + (record.gatesAnswered === 1 ? " gate answered" : " gates answered")
+  record.gatesAnswered.toString() + (record.gatesAnswered === 1 ? " gate answered" : " gates answered") + ", " +
+  (record.reviewer === null ? "reviewer not named" : "reviewed by " + record.reviewer)
 
 export const noMistakesFile = (run: HistoryRun): string => run.path.join(run.runDir, "no-mistakes.txt")
 
@@ -62,6 +63,7 @@ const noMistakesText = (record: NoMistakesRecord): string =>
   [
     "no-mistakes result: " + record.status,
     "PR: " + (record.prLink ?? "none"),
+    "reviewer: " + (record.reviewer ?? "not named"),
     "findings: " + record.findings.length.toString(),
     "gates answered: " + record.gatesAnswered.toString(),
     ...record.findings.map(findingLine),
