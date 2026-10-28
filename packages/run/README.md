@@ -301,10 +301,10 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/history-write.ts` | The history checkpoints a run records as each step starts and ends |
 | `src/report.ts` | The `report.md` shape and the signal facts it carries |
 | `src/show.ts` | The `orc show` reading of one run from the history |
-| `src/run-session.ts` | The reading of the captured Pi session |
+| `src/run-session.ts` | The reading of the Pi session from the host sessions folder |
 | `src/pi.ts` | The Pi agent command, its prompt and the check of its final reply |
 | `src/agents.ts` | The agent file parsing and lookup |
-| `src/context-mark.ts` | The 150 thousand token compaction mark orc writes into each run's Pi folder |
+| `src/context-mark.ts` | The 150 thousand token compaction mark orc writes into the Pi folder for the default sandbox |
 | `agents` | The bundled agent files |
 | `src/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
 | `src/toon.ts` | The reading of the TOON output no-mistakes prints |
