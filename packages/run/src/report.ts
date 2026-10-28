@@ -69,7 +69,8 @@ export const noMistakesSignals = (record: NoMistakesRecord): ReadonlyArray<{ rea
   { name: "result", value: record.status },
   { name: "gates-answered", value: record.gatesAnswered.toString() },
   ...(record.gate === null ? [] : [{ name: "gate", value: record.gate }]),
-  ...(record.prLink === null ? [] : [{ name: "pr-link", value: record.prLink }])
+  ...(record.prLink === null ? [] : [{ name: "pr-link", value: record.prLink }]),
+  ...(record.reviewer === null ? [] : [{ name: "reviewer", value: record.reviewer }])
 ]
 
 type ChecksLoopStep =

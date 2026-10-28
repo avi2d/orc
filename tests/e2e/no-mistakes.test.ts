@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { access, readFile, realpath, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { capturedSession, checksPassedWhileMonitoring, cleanFinish, commitOnBranch, git, passedWithPr, recordedNothing, runStep, sandboxResult, sessionEnding, withHome, withRepo, type NoMistakesReply } from "./run-helpers"
+import { checksPassedWhileMonitoring, cleanFinish, git, passedWithPr, readyToCheck, recordedNothing, runStep, sandboxResult, withHome, withRepo, type NoMistakesReply } from "./run-helpers"
 
 const fixableGate: NoMistakesReply = {
   stdout: [
@@ -61,13 +61,6 @@ const statusLookup = "axi status --run 01STUB"
 const waitExpired: NoMistakesReply = {
   stdout: "error: wait of 8m0s elapsed while driving the run\nhelp[1]:\n  Run `no-mistakes axi status` to inspect the run, then reattach\n",
   exitCode: 1
-}
-
-const readyToCheck = async (dir: string, home: string): Promise<string> => {
-  const sha = await commitOnBranch(dir, "orc/test")
-  await capturedSession(home, sessionEnding(cleanFinish))
-  await writeFile(join(dir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
-  return sha
 }
 
 describe("runWithHistory hands the branch to no-mistakes", () => {

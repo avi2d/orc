@@ -131,6 +131,7 @@ no-mistakes opened the PR and reported CI green.
 Otherwise orc records the run as failed with the reason and exits 1.
 Each run keeps its task, evidence, agent log and Pi session in `$ORC_HOME/runs/<run-id>`, default `~/.orc/runs/<run-id>` when `ORC_HOME` is unset or empty.
 Its `no-mistakes.txt` and the run history hold the no-mistakes findings, their count, the gates orc answered, the final result and the PR link.
+They also name the reviewer that served the review, as `axi status` gives it in `reviewer_agent`, or say no-mistakes named none.
 Its `report.md` carries the task, the branch, the status, the PR, the steps, the evidence, the signals, the findings and the result.
 The terminal report names the run folder, the agent file, the session file and the report as full links, beside the PR link.
 
@@ -272,7 +273,8 @@ When a started task ends, run `orc backlog close <task-id> <done|failed> [reason
 
 ## The runner
 
-`orc runner start` is the start command that hands a task to pueue on its machine, so the run outlives the beat, the dispatcher and any SSH link to it.
+`orc runner start` is the start command that hands a task to pueue on its machine.
+The run then outlives the beat, the dispatcher and any SSH link to it.
 It reads the task from the beat's `ORC_TASK_*` variables and queues `orc run` in the checkout on branch `orc/<task-id>`, in the pueue group `orc`.
 The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
 The runner creates the `orc` group when the machine lacks it.
@@ -282,7 +284,8 @@ A task pueue already holds in group `orc` is not queued again.
 To start on another machine, put the command that runs orc there after `--`, as in `orc runner start -- ssh linux-box orc`.
 That runs `orc runner queue` on the far side and sends it the task as JSON on stdin, so the task text never passes through a remote shell.
 SSH can drop once pueue holds the run, since pueue on that machine owns it.
-Pueue runs the task with the environment of the command that queued it, so the command after `--` must give orc the `PATH` its runs need on that machine.
+Pueue runs the task with the environment of the command that queued it.
+So the command after `--` must give orc the `PATH` its runs need on that machine.
 The queue records the resolved absolute `ORC_HOME` with the task.
 
 To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh linux-box orc` from another.
