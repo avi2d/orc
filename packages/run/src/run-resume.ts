@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite"
-import { Effect, FileSystem, Option } from "effect"
+import { Effect, FileSystem, Option, Schema } from "effect"
 import { checksRoundsForRun, fixesForRun, type StoredFix } from "./history-resume"
 import { sessionIdFromFile, type RunRecord } from "./run-history"
 import { latestRunForBranch, stepsForRun } from "./history-resume"
@@ -99,7 +99,7 @@ const readPriorProgress = (db: Database, run: HistoryRun, prior: RunRecord): Eff
     const interruptedFix = steps.some((step) => step.name === "fix" && step.status === "running")
     const priorDir = run.path.join(run.path.dirname(run.runDir), prior.id)
     const liveFile = interruptedImplement || interruptedFix
-      ? yield* latestSessionFile(run, [run.path.join(priorDir, "session", "agent", "sessions")])
+      ? yield* latestSessionFile(run, [run.path.join(priorDir, "session", "agent", "sessions"), run.path.join(priorDir, "sessions")])
       : null
     const implementSource = interruptedImplement
       ? (liveFile ?? implementFile)
@@ -116,6 +116,29 @@ const readPriorProgress = (db: Database, run: HistoryRun, prior: RunRecord): Eff
     return { priorId: prior.id, implementPassed, checksPassed, implementSource, implementSessionId, fixSource, fixSessionId: liveFixId ?? sessionIdFromFile(storedFixFile), fixRunning: interruptedFix, storedFixes }
   })
 
+const decodeJsonLine = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+const pointLineAt = (line: string, cwd: string): string => {
+  if (line === "") {
+    return line
+  }
+  const parsed = decodeJsonLine(line)
+  if (Option.isNone(parsed) || !isRecord(parsed.value)) {
+    return line
+  }
+  const entry = parsed.value
+  if (entry["type"] !== "session" || entry["cwd"] === cwd) {
+    return line
+  }
+  return JSON.stringify({ ...entry, cwd })
+}
+
+const pointSessionAt = (text: string, cwd: string): string =>
+  text.split("\n").map((line) => pointLineAt(line, cwd)).join("\n")
+
 const carrySessionFile = (run: HistoryRun, source: string | null, sessionId: string | null): Effect.Effect<string | null, OrcRunError> =>
   Effect.gen(function*() {
     if (source === null || sessionId === null) {
@@ -128,9 +151,9 @@ const carrySessionFile = (run: HistoryRun, source: string | null, sessionId: str
     if (carried === null) {
       return source
     }
-    const target = run.path.join(run.hostSessionsDir, "resumed", source.slice(source.lastIndexOf("/") + 1))
+    const target = run.path.join(run.hostSessionsDir, "host", source.slice(source.lastIndexOf("/") + 1))
     yield* run.fs.makeDirectory(run.path.dirname(target), { recursive: true }).pipe(
-      Effect.andThen(() => run.fs.writeFileString(target, carried)),
+      Effect.andThen(() => run.fs.writeFileString(target, pointSessionAt(carried, run.worktreeDir))),
       Effect.orElseSucceed(() => undefined)
     )
     return target

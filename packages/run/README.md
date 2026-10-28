@@ -2,7 +2,8 @@
 Orc takes one task and turns it into one pull request.
 It starts from a command in the terminal that takes the task as text or as a file.
 It makes an isolated copy of the project on a new branch.
-It runs the Pi agent inside a nono sandbox, then runs the project's checks.
+By default it runs the Pi agent inside a nono sandbox, then runs the project's checks.
+With `--sandbox none` it runs Pi and the checks directly on the host.
 It hands the branch to no-mistakes, which reviews it, pushes it and opens the PR.
 You read the PR and merge it, since orc never merges.
 
@@ -10,7 +11,7 @@ You read the PR and merge it, since orc never merges.
 
 - Bun, at the version `.bun-version` pins.
 - Git, tested on 2.56.0.
-- nono from https://nono.sh, tested on 0.80.0.
+- nono from https://nono.sh, tested on 0.80.0, for the default sandbox.
 - Node, tested on 24.22.1.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with an opencode-go login.
 - no-mistakes v1.90.0 or later, tested on v1.100.2, installed as [Installing no-mistakes](#installing-no-mistakes) says.
@@ -79,6 +80,7 @@ Orc refuses a checkout with uncommitted changes.
 Orc commits to a new branch named `orc/<run-id>`, or to the name you pass with `--branch <name>`.
 A branch name may hold only letters, digits, `.`, `_`, `-` and `/`.
 To resume the branch after a stop, enter the same target checkout and run `orc run --branch <name>` and orc skips the steps the run history marks passed.
+Resume takes the sandbox from the flag and not from the earlier run, so pass `--sandbox none` again when resuming a no-sandbox run.
 On resume Sandcastle reuses the branch worktree, Pi resumes its prior session, and orc reattaches to no-mistakes with the same intent.
 After a refusal, run the same resume command with `--allow` and the name from the report, or with `--answer` and the captain's answer for a question.
 No-mistakes takes the word for that `--allow` kind, and the answer for that question.
@@ -88,13 +90,15 @@ Orc trims padding around each name and drops blank entries.
 Orc checks each marker in the project directory and its parent and refuses a checkout carrying one.
 An unset `ORC_REFUSE_MARKERS` names no marker and refuses no checkout for a marker.
 
-The run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
+The default sandbox run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
+With `--sandbox none` the run needs the same tools except `nono`.
 Orc runs `no-mistakes --version` before the sandbox starts and refuses a release older than v1.90.0.
 It also needs an opencode-go login in Pi, which `pi auth check --provider opencode-go` confirms.
-Orc reads that login through Pi on the host and hands it to the sandbox.
+With the default sandbox, Orc reads that login through Pi on the host and hands it to the sandbox.
 nono reads it with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE` and `TERM` set, and orc's check runs the same way.
 So a key held only in the keychain or in an environment variable such as `OPENCODE_API_KEY` is refused, and a login Pi's `/login` stores in `~/.pi/agent/auth.json` works.
-If nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc's result names that error.
+This refusal applies to `--sandbox none` as well, so write a key held only in an environment variable to the Pi auth file first.
+With the default sandbox, if nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc's result names that error.
 
 Orc takes the implementer agent file from the first of these that exists:
 
@@ -103,13 +107,14 @@ Orc takes the implementer agent file from the first of these that exists:
 1. `agents/implementer.md` bundled with orc
 
 An agent file opens with a `---` header naming `model`, `thinking` and `tools`, and its body holds the instructions.
-Orc routes only `opencode-go` models through the sandbox and refuses any other model.
+Orc routes only `opencode-go` models and refuses any other model.
 
-Pi in a run compacts its context once the context passes 150 thousand tokens, whatever the model's window.
+With the default sandbox, Pi in a run compacts its context once the context passes 150 thousand tokens, whatever the model's window.
 Pi starts compaction at the window minus `compaction.reserveTokens`, so orc asks the host's Pi for each agent model's window through `pi --mode rpc`.
-Orc writes the window minus 150000 as that model's reserve into the run's Pi folder, `session/agent/settings.json`, beside `models.json`.
-Orc pins each agent model window in `models.json` as that provider model override `contextWindow`.
-Orc refuses a model the host's Pi does not list, and a model whose window is 150 thousand tokens or less.
+With the default sandbox, Orc writes the window minus 150000 as that model's reserve into the run's Pi folder, `session/agent/settings.json`, beside `models.json`.
+With the default sandbox, Orc pins each agent model window in `models.json` as that provider model override `contextWindow`.
+Orc refuses a model the host's Pi does not list, and a model whose window is 150 thousand tokens or less, and this refusal applies to both sandboxes.
+With `--sandbox none` Pi reads your Pi config, compaction included, so the fixed mark does not apply.
 
 Once the checks pass, orc runs `no-mistakes axi run` on the branch with the task as its intent.
 At each gate orc asks no-mistakes to fix the findings marked `auto-fix`, ignores those marked `no-op`, and accepts the fix review.
@@ -128,6 +133,16 @@ Each run keeps its task, evidence, agent log and Pi session in `$ORC_HOME/runs/<
 Its `no-mistakes.txt` and the run history hold the no-mistakes findings, their count, the gates orc answered, the final result and the PR link.
 Its `report.md` carries the task, the branch, the status, the PR, the steps, the evidence, the signals, the findings and the result.
 The terminal report names the run folder, the agent file, the session file and the report as full links, beside the PR link.
+
+## Running without a sandbox
+
+To run Pi and the checks directly on the host, add `--sandbox none` to `orc run`, as in `orc run task.md --sandbox none`.
+`--sandbox nono`, the default, keeps the nono sandbox.
+Without a sandbox the run still gets its own worktree on its own branch, and nono need not be on the PATH.
+Pi runs with your own environment and Pi config, so it can read and write anything your user can.
+Orc points `GIT_CONFIG_GLOBAL` at a file in the run folder, so the commit identity Sandcastle sets never reaches your `~/.gitconfig`.
+Pi writes its session straight into the run's `sessions/host` folder.
+Resume takes the sandbox from the flag and not from the earlier run, so pass `--sandbox none` again to resume.
 
 ## Choosing the no-mistakes binary
 
@@ -163,14 +178,14 @@ When a no-mistakes run ends failed, orc's result carries the error no-mistakes p
 
 ## Granting toolchain folders to the sandbox
 
-The sandbox reads the system folders, the Homebrew and `/usr/local` program folders, `/nix` and the one mise install folder each of `bun`, `node` and `pi` resolves to.
-Orc refuses a runtime the PATH finds anywhere else, naming the runtime and its path.
+With the default sandbox, the sandbox reads the system folders, the Homebrew and `/usr/local` program folders, `/nix` and the one mise install folder each of `bun`, `node` and `pi` resolves to.
+With the default sandbox, Orc refuses a runtime the PATH finds anywhere else, naming the runtime and its path.
 To run a runtime from another install folder, such as the one Bun's own installer makes in your home:
 
 1. Set `ORC_TOOLCHAIN_DIRS` to the install folders, separated by colons.
 1. Run the task as usual.
 
-Orc grants a named folder only when a runtime and the file its link points to both sit inside it.
+With the default sandbox, Orc grants a named folder only when a runtime and the file its link points to both sit inside it.
 Orc refuses a relative entry and a folder that holds HOME, because the sandbox reads each granted folder whole.
 `src/nono-profile.ts` holds the `ToolchainResolver` interface and the default layout, and `src/nono.ts` takes another resolver through its `toolchain` option.
 
@@ -281,15 +296,15 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | --- | --- |
 | `src/bin.ts` | The orc entry point |
 | `src/args.ts` | The flag parsing for the orc command |
-| `src/run.ts` | The `orc run` agent step: checkout checks, login preflight and the sandboxed Pi run |
+| `src/run.ts` | The `orc run` agent step: checkout checks, login preflight and the Pi run in the selected sandbox |
 | `src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
 | `src/history-write.ts` | The history checkpoints a run records as each step starts and ends |
 | `src/report.ts` | The `report.md` shape and the signal facts it carries |
 | `src/show.ts` | The `orc show` reading of one run from the history |
-| `src/run-session.ts` | The reading of the captured Pi session |
+| `src/run-session.ts` | The reading of the Pi session from the host sessions folder |
 | `src/pi.ts` | The Pi agent command, its prompt and the check of its final reply |
 | `src/agents.ts` | The agent file parsing and lookup |
-| `src/context-mark.ts` | The 150 thousand token compaction mark orc writes into each run's Pi folder |
+| `src/context-mark.ts` | The 150 thousand token compaction mark orc writes into the Pi folder for the default sandbox |
 | `agents` | The bundled agent files |
 | `src/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
 | `src/toon.ts` | The reading of the TOON output no-mistakes prints |
@@ -297,6 +312,7 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/nono.ts` | The Sandcastle sandbox provider that runs each command in `nono run` |
 | `src/host.ts` | The host-side processes and tools the provider runs outside nono, and the guard on host git |
 | `src/nono-profile.ts` | The nono profile that lets a command write only the copy, its git data and the Pi session folder, and routes the model credential |
+| `src/no-sandbox.ts` | The Sandcastle provider that runs Pi and the checks directly on the host |
 | `src/git-config.ts` | The git config parsing that finds the credentials, includes and submodules a checkout carries |
 | `src/dispatch/backlog.ts` | The backlog folders, the id reservation and the atomic take of a task |
 | `src/dispatch/task-record.ts` | The task file and its frontmatter |

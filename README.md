@@ -1,7 +1,8 @@
 # orc
 
 Orc takes one task and turns it into one pull request.
-It runs the Pi agent inside a nono sandbox, then the project's checks, then no-mistakes.
+By default it runs the Pi agent in the nono sandbox, then the project checks, then no-mistakes.
+With `--sandbox none` it runs Pi and the checks directly on the host.
 This repository is a workspace with one package per area.
 Today it holds one package, the run package, which ships the orc command.
 

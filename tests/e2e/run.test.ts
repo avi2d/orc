@@ -44,6 +44,25 @@ describe("runAgentStep refusals", () => {
     })
   })
 
+  test("a stopped run's Sandcastle worktree does not count as uncommitted changes and block its resume", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        git(dir, ["worktree", "add", "-q", join(dir, ".sandcastle", "worktrees", "orc-test"), "-b", "orc/test"])
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test" })).toContain("cannot read the task file")
+      })
+    })
+  })
+
+  test("an untracked file beside the Sandcastle worktrees still counts as uncommitted", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        await mkdir(join(dir, ".sandcastle"))
+        await writeFile(join(dir, ".sandcastle", "notes.txt"), "uncommitted\n")
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home })).toContain("uncommitted changes")
+      })
+    })
+  })
+
   test("a checkout carrying a refused marker is refused", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
