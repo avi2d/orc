@@ -92,13 +92,19 @@ interface Captured {
   readonly stderr: string
 }
 
-const capture = (command: Command, stdin: string | null): Effect.Effect<Captured, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+const capture = (command: Command, stdin: string | null, env?: Record<string, string>): Effect.Effect<Captured, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const [program, ...args] = command
-    const handle = yield* spawner.spawn(ChildProcess.make(program, args, {
-      stdin: stdin === null ? "ignore" : Stream.fromIterable([new TextEncoder().encode(stdin)])
-    }))
+    const handle = yield* spawner.spawn(ChildProcess.make(program, args, env === undefined
+      ? {
+        stdin: stdin === null ? "ignore" : Stream.fromIterable([new TextEncoder().encode(stdin)])
+      }
+      : {
+        stdin: stdin === null ? "ignore" : Stream.fromIterable([new TextEncoder().encode(stdin)]),
+        env,
+        extendEnv: true
+      }))
     const [stdout, stderr, exitCode] = yield* Effect.all([
       handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
       handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
@@ -110,8 +116,8 @@ const capture = (command: Command, stdin: string | null): Effect.Effect<Captured
     Effect.mapError((error) => new RunnerError({ detail: command[0] + " did not run: " + error.message }))
   )
 
-const pueue = (args: ReadonlyArray<string>): Effect.Effect<string, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  capture(["pueue", ...args], null).pipe(
+const pueue = (args: ReadonlyArray<string>, env?: Record<string, string>): Effect.Effect<string, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  capture(["pueue", ...args], null, env).pipe(
     Effect.flatMap((result) =>
       result.exitCode === 0
         ? Effect.succeed(result.stdout)
@@ -145,12 +151,35 @@ const readHeld = (task: string): Effect.Effect<PueueTask | null, RunnerError, Ch
     Effect.map((state) => heldTask(state.tasks, task))
   )
 
+const PueueGroups = Schema.Record(Schema.String, Schema.Unknown)
+
 const ensureOrcGroup = (): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  pueue(["group"]).pipe(
-    Effect.flatMap((text) =>
-      new RegExp("\\borc\\b").test(text) ? Effect.void : pueue(["group", "add", orcGroup]).pipe(Effect.asVoid)
+  pueue(["group", "--json"]).pipe(
+    Effect.flatMap((text) => decodeJson(text, PueueGroups, "pueue group --json")),
+    Effect.flatMap((groups) =>
+      Object.hasOwn(groups, orcGroup) ? Effect.void : pueue(["group", "add", orcGroup]).pipe(Effect.asVoid)
     )
   )
+
+const resolveProjectDir = (checkout: string): Effect.Effect<string, never, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+    const fs = yield* FileSystem.FileSystem
+    const top = yield* Effect.scoped(
+      Effect.gen(function*() {
+        const handle = yield* spawner.spawn(ChildProcess.make("git", ["rev-parse", "--show-toplevel"], { cwd: checkout }))
+        const [stdout, exitCode] = yield* Effect.all([
+          handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
+          handle.exitCode
+        ], { concurrency: "unbounded" })
+        return { stdout, exitCode }
+      })
+    ).pipe(Effect.orElseSucceed(() => null))
+    if (top === null || top.exitCode !== 0 || top.stdout.trim() === "") {
+      return checkout
+    }
+    return yield* fs.realPath(top.stdout.trim()).pipe(Effect.orElseSucceed(() => top.stdout.trim()))
+  })
 
 const requireFolder = (checkout: string): Effect.Effect<void, RunnerError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
@@ -170,6 +199,7 @@ const queueTask = (
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     yield* requireFolder(request.checkout)
+    const project = yield* resolveProjectDir(request.checkout)
     yield* ensureOrcGroup()
     const held = yield* readHeld(request.task)
     if (held !== null) {
@@ -182,9 +212,9 @@ const queueTask = (
       Effect.mapError((error) => new RunnerError({ detail: "cannot write " + taskFile + ": " + error.message }))
     )
     const id = yield* pueue([
-      "add", "--group", orcGroup, "--label", request.task, "--working-directory", request.checkout, "--env", "ORC_HOME=" + home, "--print-task-id", "--escape", "--",
+      "add", "--group", orcGroup, "--label", request.task, "--working-directory", project, "--print-task-id", "--escape", "--",
       ...self, "run", taskFile, "--branch", taskBranch(request.task)
-    ])
+    ], { ORC_HOME: home })
     return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
   })
 
@@ -299,14 +329,17 @@ const readOutput = (pueueTask: number): Effect.Effect<ReadonlyArray<string>, Run
     })
   )
 
-const readRun = (home: string, project: string, task: string): Effect.Effect<RunSummary | null, RunnerError, FileSystem.FileSystem | Path.Path> =>
-  Effect.acquireUseRelease(
-    openDatabase(home),
-    (db) => latestRunForBranch(db, project, taskBranch(task)),
-    (db) => Effect.sync(() => db.close())
-  ).pipe(
-    Effect.map((run) => run === null ? null : { id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason }),
-    Effect.mapError((error) => new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
+const readRun = (home: string, checkout: string, task: string): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
+  Effect.gen(function*() {
+    const project = yield* resolveProjectDir(checkout)
+    const run = yield* Effect.acquireUseRelease(
+      openDatabase(home),
+      (db) => latestRunForBranch(db, project, taskBranch(task)),
+      (db) => Effect.sync(() => db.close())
+    )
+    return run === null ? null : { id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason }
+  }).pipe(
+    Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
   )
 
 export const readResult = (task: string, home: string): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>

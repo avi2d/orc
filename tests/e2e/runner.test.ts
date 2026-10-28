@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
@@ -33,10 +33,20 @@ const fakePueue = [
   "  log) if [ -f \"$PUEUE_STATE/log-$2.json\" ]; then cat \"$PUEUE_STATE/log-$2.json\"; else printf '{\"%s\":{\"output\":\"\"}}' \"$2\"; fi ;;",
   "  group)",
   "    if [ \"$2\" = \"add\" ]; then printf '%s\\n' \"$@\" > \"$PUEUE_STATE/group-add-args.tmp\"; mv \"$PUEUE_STATE/group-add-args.tmp\" \"$PUEUE_STATE/group-add-args\"; echo \"Group orc created\";",
-  "    elif [ -f \"$PUEUE_STATE/groups.txt\" ]; then cat \"$PUEUE_STATE/groups.txt\";",
-  "    else printf 'Group \"default\"\\nGroup \"orc\"\\n'; fi ;;",
+  "    elif [ \"$2\" = \"--json\" ]; then if [ -f \"$PUEUE_STATE/groups.json\" ]; then cat \"$PUEUE_STATE/groups.json\";",
+  "    else printf '%s' '{\"default\":{\"status\":\"Running\",\"parallel_tasks\":1},\"orc\":{\"status\":\"Running\",\"parallel_tasks\":1}}'; fi;",
+  "    else echo \"fake pueue has no group $2\" >&2; exit 2; fi ;;",
   "  add)",
-  "    shift; printf '%s\\n' \"$@\" > \"$PUEUE_STATE/add-args.tmp\"; mv \"$PUEUE_STATE/add-args.tmp\" \"$PUEUE_STATE/add-args\"; echo 77 ;;",
+  "    shift; : > \"$PUEUE_STATE/add-args.tmp\";",
+  "    while [ \"$#\" -gt 0 ]; do case \"$1\" in",
+  "      --) printf '%s\\n' \"$1\" >> \"$PUEUE_STATE/add-args.tmp\"; shift; while [ \"$#\" -gt 0 ]; do printf '%s\\n' \"$1\" >> \"$PUEUE_STATE/add-args.tmp\"; shift; done; break ;;",
+  "      -w|--working-directory|-g|--group|-l|--label|-d|--delay|-a|--after|-o|--priority) printf '%s\\n' \"$1\" >> \"$PUEUE_STATE/add-args.tmp\"; shift; if [ \"$#\" -eq 0 ]; then echo \"fake pueue refuses add option without value\" >&2; exit 2; fi; case \"$1\" in -*) echo \"fake pueue refuses add option without value\" >&2; exit 2 ;; esac; printf '%s\\n' \"$1\" >> \"$PUEUE_STATE/add-args.tmp\"; shift ;;",
+  "      -e|--escape|-i|--immediate|--follow|-s|--stashed|-p|--print-task-id) printf '%s\\n' \"$1\" >> \"$PUEUE_STATE/add-args.tmp\"; shift ;;",
+  "      -*) echo \"fake pueue refuses add option $1\" >&2; exit 2 ;;",
+  "      *) while [ \"$#\" -gt 0 ]; do printf '%s\\n' \"$1\" >> \"$PUEUE_STATE/add-args.tmp\"; shift; done; break ;;",
+  "    esac; done;",
+  "    mv \"$PUEUE_STATE/add-args.tmp\" \"$PUEUE_STATE/add-args\";",
+  "    printf '%s' \"$ORC_HOME\" > \"$PUEUE_STATE/add-env\"; echo 77 ;;",
   "  *) echo \"fake pueue has no $1\" >&2; exit 2 ;;",
   "esac",
   ""
@@ -119,6 +129,18 @@ const queuedArgs = async (fixture: Fixture): Promise<ReadonlyArray<string> | nul
   return null
 }
 
+const queuedEnv = async (fixture: Fixture): Promise<string | null> => {
+  const deadline = Date.now() + startWaitMillis
+  while (Date.now() < deadline) {
+    const text = await readFile(join(fixture.pueue, "add-env"), "utf8").catch(() => null)
+    if (text !== null) {
+      return text
+    }
+    await Bun.sleep(20)
+  }
+  return null
+}
+
 const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>): Promise<ReadonlyArray<string> | null> => {
   await fakeClauth(fixture)
   await writeMachine(fixture, start)
@@ -129,7 +151,7 @@ const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>): Promi
 }
 
 const pueueAddFor = (home: string, checkout: string): ReadonlyArray<string> => [
-  "--group", "orc", "--label", "task-1", "--working-directory", checkout, "--env", "ORC_HOME=" + home, "--print-task-id", "--escape", "--",
+  "--group", "orc", "--label", "task-1", "--working-directory", checkout, "--print-task-id", "--escape", "--",
   process.execPath, binPath, "run", join(home, "runner", "task-1.md"), "--branch", "orc/task-1"
 ]
 
@@ -140,6 +162,7 @@ describe("orc runner start", () => {
     await withFixture(async (fixture) => {
       const added = await beatStarts(fixture, [process.execPath, binPath, "runner", "start"])
       expect(added).toEqual(pueueAddFor(fixture.home, fixture.checkout))
+      expect(await queuedEnv(fixture)).toBe(fixture.home)
       expect(await readFile(join(fixture.home, "runner", "task-1.md"), "utf8")).toBe(await readFile(join(fixture.dir, "task.md"), "utf8"))
     })
   }, runnerTimeout)
@@ -149,7 +172,58 @@ describe("orc runner start", () => {
       const far = join(fixture.dir, "far-home")
       const added = await beatStarts(fixture, [process.execPath, binPath, "runner", "start", "--", ...orcThere(far)])
       expect(added).toEqual(pueueAddFor(far, fixture.checkout))
+      expect(await queuedEnv(fixture)).toBe(far)
       expect(await readFile(join(far, "runner", "task-1.md"), "utf8")).toBe(await readFile(join(fixture.dir, "task.md"), "utf8"))
+    })
+  }, runnerTimeout)
+
+  test("a relative ORC_HOME reaches the child resolved instead of relative", async () => {
+    await withFixture(async (fixture) => {
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" }, { ORC_HOME: "rel-home" })
+      expect(result.exitCode).toBe(0)
+      expect(await queuedEnv(fixture)).toBe(join(fixture.dir, "rel-home"))
+      expect(await readFile(join(fixture.dir, "rel-home", "runner", "task-9.md"), "utf8")).toBe("# x\n")
+    })
+  }, runnerTimeout)
+
+  test("a checkout inside the repository queues at the repository root instead of the subdirectory", async () => {
+    await withFixture(async (fixture) => {
+      const repo = join(fixture.dir, "repo")
+      const sub = join(repo, "packages", "run")
+      await mkdir(sub, { recursive: true })
+      const git = (args: ReadonlyArray<string>): void => {
+        const done = Bun.spawnSync(["git", ...args])
+        if (done.exitCode !== 0) {
+          throw new Error("git " + args.join(" ") + " failed: " + done.stderr.toString())
+        }
+      }
+      git(["init", "-q", repo])
+      git(["-C", repo, "config", "user.email", "orc@test"])
+      git(["-C", repo, "config", "user.name", "orc"])
+      git(["-C", repo, "commit", "-q", "--allow-empty", "-m", "init"])
+      const root = await realpath(repo)
+      const queued = await queueWith(fixture, { task: "task-9", checkout: sub, body: "# x\n" })
+      expect(queued.exitCode).toBe(0)
+      const args = (await readFile(join(fixture.pueue, "add-args"), "utf8")).split("\n").slice(0, -1)
+      expect(args[args.indexOf("--working-directory") + 1]).toBe(root)
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: { "77": { id: 77, label: "task-9", group: "orc", path: sub, status: { Queued: {} } } }, groups: {} }))
+      const db = await Effect.runPromise(openDatabase(fixture.home).pipe(Effect.provide(BunServices.layer)))
+      try {
+        Effect.runSync(recordRun(db, {
+          id: "run-root",
+          project: root,
+          branch: "orc/task-9",
+          taskFile: "task.md",
+          status: "succeeded",
+          started: "2026-10-28T02:36:39.200Z",
+          ended: "2026-10-28T02:36:39.400Z",
+          prLink: "https://github.com/avi2d/orc/pull/9"
+        }))
+      } finally {
+        db.close()
+      }
+      const document = await resultJson(fixture, "task-9") as { readonly result: { readonly run: unknown } }
+      expect(document.result.run).toEqual({ id: "run-root", status: "succeeded", prLink: "https://github.com/avi2d/orc/pull/9", endReason: null })
     })
   }, runnerTimeout)
 
@@ -173,11 +247,24 @@ describe("orc runner start", () => {
 
   test("a missing orc group is created before queueing instead of refusing the start", async () => {
     await withFixture(async (fixture) => {
-      await writeFile(join(fixture.pueue, "groups.txt"), "Group \"default\"\n")
+      await writeFile(join(fixture.pueue, "groups.json"), JSON.stringify({ default: { status: "Running", parallel_tasks: 1 } }))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
       const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toBe("queued task-9 as pueue task 77 in group orc\n")
+      expect((await readFile(join(fixture.pueue, "group-add-args"), "utf8")).split("\n").slice(0, -1)).toEqual(["group", "add", "orc"])
+    })
+  }, runnerTimeout)
+
+  test("a similarly named group is not mistaken for the orc group", async () => {
+    await withFixture(async (fixture) => {
+      await writeFile(join(fixture.pueue, "groups.json"), JSON.stringify({
+        default: { status: "Running", parallel_tasks: 1 },
+        "orc-proof": { status: "Running", parallel_tasks: 1 }
+      }))
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+      expect(result.exitCode).toBe(0)
       expect((await readFile(join(fixture.pueue, "group-add-args"), "utf8")).split("\n").slice(0, -1)).toEqual(["group", "add", "orc"])
     })
   }, runnerTimeout)
@@ -266,11 +353,26 @@ describe("orc runner result", () => {
 
   test("a result read through a command is the far side's result, not the reader's", async () => {
     await withFixture(async (fixture) => {
-      const near = join(fixture.dir, "near-home")
-      expect(await resultJson(fixture, "task-2", ["--", ...orcThere(fixture.home)])).toEqual(await resultJson(fixture, "task-2"))
-      expect(await orcOk(fixture, ["runner", "result", "task-2", "--", ...orcThere(fixture.home)], { ORC_HOME: near })).toBe(
-        "task-2: failed as pueue task 656, 2026-10-28T02:36:39.500714478+03:00 to 2026-10-28T02:36:39.813373536+03:00: orc exited 3\norc holds no run on orc/task-2\n"
-      )
+      const far = join(fixture.dir, "far-home")
+      const db = await Effect.runPromise(openDatabase(far).pipe(Effect.provide(BunServices.layer)))
+      try {
+        Effect.runSync(recordRun(db, {
+          id: "run-far",
+          project: "/checkout",
+          branch: "orc/task-2",
+          taskFile: "task.md",
+          status: "succeeded",
+          started: "2026-10-28T02:36:39.200Z",
+          ended: "2026-10-28T02:36:39.400Z",
+          prLink: "https://github.com/avi2d/orc/pull/2"
+        }))
+      } finally {
+        db.close()
+      }
+      const farResult = await resultJson(fixture, "task-2", ["--", ...orcThere(far)]) as { readonly result: { readonly run: unknown } }
+      const nearResult = await resultJson(fixture, "task-2") as { readonly result: { readonly run: unknown } }
+      expect(farResult.result.run).toEqual({ id: "run-far", status: "succeeded", prLink: "https://github.com/avi2d/orc/pull/2", endReason: null })
+      expect(nearResult.result.run).toBeNull()
     })
   }, runnerTimeout)
 })
