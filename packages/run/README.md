@@ -309,6 +309,6 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/dispatch/cli.ts` | The `orc backlog`, `orc beat` and `orc runner` commands |
 | `../../tests/unit` | The in-process unit tests at the workspace root |
 | `../../tests/e2e` | The tests that run `src/bin.ts`, git or nono as a process, with a live Pi run through `ORC_PI_E2E=1`, at the workspace root |
-| `../../tests/fixtures/pueue` | The pueue 4 status and log JSON the runner tests read |
+| `../../tests/fixtures/pueue` | The pueue 4 status JSON the runner tests read |
 | `../../tests/live` | The tests that run commands in a real nono sandbox, through the `test:live` script at the workspace root with `ORC_NONO_E2E=1` set |
 | `../../.no-mistakes.yaml` | The check commands no-mistakes and CI run at the workspace root |
