@@ -225,7 +225,7 @@ const prepareAgents = (
     const nodeBinary = Bun.which("node")
     const operatorHome = homedir()
     if (!canRouteModel(agent.model)) {
-      return yield* refuse("orc: the agent file names model " + agent.model + ", and orc routes only opencode-go models through the sandbox")
+      return yield* refuse("orc: the agent file names model " + agent.model + ", and orc routes only opencode-go models")
     }
     if (piBinary === null) {
       return yield* refuse("orc: pi is not on the host PATH")
@@ -235,7 +235,7 @@ const prepareAgents = (
     }
     const credential = modelCredentialFor(agent.model, { piBinary, nodeBinary, homeDir: operatorHome })
     if (credential === null) {
-      return yield* refuse("orc: the agent file names model " + agent.model + ", and orc routes only opencode-go models through the sandbox")
+      return yield* refuse("orc: the agent file names model " + agent.model + ", and orc routes only opencode-go models")
     }
     const host: HostTools = { piBinary, nodeBinary, homeDir: operatorHome }
     const preserveAgentDir = sandboxKind === "none"

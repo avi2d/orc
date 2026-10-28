@@ -126,7 +126,7 @@ describe("runAgentStep refusals", () => {
     })
   })
 
-  test("a model orc cannot route is refused", async () => {
+  test("a model orc cannot route is refused without claiming a sandbox", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const agentsDir = join(home, "agents")
@@ -136,7 +136,9 @@ describe("runAgentStep refusals", () => {
         await mkdir(agentsDir, { recursive: true })
         await writeFile(join(agentsDir, "implementer.md"), "---\nmodel: example.com/other-model\nthinking: low\ntools: read\n---\nDo it.\n")
         await writeFile(join(agentsDir, "fixer.md"), "---\nmodel: opencode-go/muse-spark\nthinking: high\ntools: read\n---\nFix it.\n")
-        expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test", agentsDir })).toContain("routes only opencode-go models")
+        const message = await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test", agentsDir })
+        expect(message).toContain("orc: the agent file names model example.com/other-model, and orc routes only opencode-go models")
+        expect(message).not.toContain("sandbox")
       })
     })
   })
