@@ -31,6 +31,7 @@ export interface NoMistakesRecord {
   readonly findings: ReadonlyArray<NoMistakesFinding>
   readonly gatesAnswered: number
   readonly prLink: string | null
+  readonly reviewer: string | null
   readonly result: string
   readonly started: string
   readonly ended: string
@@ -174,6 +175,7 @@ const endedReason = (parsed: ParsedRun): string =>
 interface DriveLog {
   readonly read: (output: string) => ParsedRun
   readonly remember: (step: string, findings: ReadonlyArray<NoMistakesFinding>) => void
+  readonly noteReviewer: (status: string) => void
   readonly runId: () => string
   readonly gatesAnswered: () => number
   readonly countGate: () => void
@@ -189,6 +191,7 @@ const openDriveLog = (started: string): DriveLog => {
   let gatesAnswered = 0
   let prLink: string | null = null
   let runId = ""
+  let reviewer: string | null = null
   const remember = (step: string, seen: ReadonlyArray<NoMistakesFinding>): void => {
     for (const finding of seen) {
       if (!known.has(findingKey(step, finding))) {
@@ -207,6 +210,10 @@ const openDriveLog = (started: string): DriveLog => {
       return parsed
     },
     remember,
+    noteReviewer: (status) => {
+      const named = scalar(status, "reviewer_agent")
+      reviewer = named === "" ? reviewer : named
+    },
     runId: () => runId,
     gatesAnswered: () => gatesAnswered,
     countGate: () => {
@@ -228,6 +235,7 @@ const openDriveLog = (started: string): DriveLog => {
       findings,
       gatesAnswered,
       prLink,
+      reviewer,
       result: ending.result,
       started,
       ended: new Date().toISOString()
@@ -353,6 +361,7 @@ const collectRecordedFindings = (input: NoMistakesInput, log: DriveLog, runId: s
     if (statusFailure !== null) {
       return statusFailure
     }
+    log.noteReviewer(status.stdout)
     for (const step of stepsWithFindings(status.stdout)) {
       const logs = yield* input.runner.logs(runId, step)
       const logsFailure = unreadable(logs, "findings", "axi logs --run " + runId + " --step " + step)

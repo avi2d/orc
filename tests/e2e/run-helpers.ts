@@ -230,3 +230,10 @@ export const sandboxResult = (sha: string, final: Record<string, unknown>): Sand
   stdout: JSON.stringify({ type: "message_end", message: final }),
   commits: [{ sha }]
 })
+
+export const readyToCheck = async (dir: string, home: string): Promise<string> => {
+  const sha = await commitOnBranch(dir, "orc/test")
+  await capturedSession(home, sessionEnding(cleanFinish))
+  await writeFile(join(dir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
+  return sha
+}

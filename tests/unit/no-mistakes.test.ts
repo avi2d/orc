@@ -329,7 +329,7 @@ describe("formatReport names the phase the run stopped in", () => {
       checksRounds: [round(1, false), round(2, true)],
       fixAttempts: 1,
       prLink: "https://github.com/o/r/pull/4",
-      noMistakes: { status: "refused", gate: "ci", findings: [], gatesAnswered: 0, prLink: "https://github.com/o/r/pull/4", result: "", started: "", ended: "" }
+      noMistakes: { status: "refused", gate: "ci", findings: [], gatesAnswered: 0, prLink: "https://github.com/o/r/pull/4", reviewer: null, result: "", started: "", ended: "" }
     }))
     expect(statusLine(text)).toBe("status: no-mistakes refused, PR open")
   })
