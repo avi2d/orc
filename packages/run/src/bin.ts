@@ -7,6 +7,7 @@ import packageJson from "../package.json" with { type: "json" }
 import { type OrcArgs, parseArgs } from "./args"
 import { dispatchUsage } from "./dispatch/args"
 import { runDispatch } from "./dispatch/cli"
+import { RunnerError } from "./dispatch/runner"
 import { runAgentStep } from "./run"
 import { formatReport } from "./run-record"
 import { encodeRunsJson, formatHistoryError, formatRunsTable, listRuns, openDatabase, orcHomeDir } from "./run-history"
@@ -31,7 +32,16 @@ const readHistory = <A, E>(use: (db: Database) => Effect.Effect<A, E>) =>
   )
 
 const dispatch = (args: Extract<OrcArgs, { readonly kind: "Dispatch" }>["args"]) =>
-  runDispatch(args, { root: orcHomeDir(Bun.env.ORC_HOME) + "/backlog", cwd: process.cwd() }).pipe(
+  runDispatch(args, {
+    home: orcHomeDir(Bun.env.ORC_HOME),
+    cwd: process.cwd(),
+    env: Bun.env,
+    self: [process.execPath, Bun.main],
+    stdin: Effect.tryPromise({
+      try: () => Bun.stdin.text(),
+      catch: (cause) => new RunnerError({ detail: "cannot read stdin: " + String(cause) })
+    })
+  }).pipe(
     Effect.provide(BunServices.layer),
     Effect.catch((detail) => Console.error("orc: " + detail).pipe(Effect.andThen(Effect.fail(detail))))
   )

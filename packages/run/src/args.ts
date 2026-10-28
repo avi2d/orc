@@ -206,7 +206,7 @@ export const parseArgs = (args: readonly string[]): OrcArgs => {
   if (first === "run") {
     return parseRunArgs(rest)
   }
-  if (first === "backlog" || first === "beat") {
+  if (first === "backlog" || first === "beat" || first === "runner") {
     const dispatch = parseDispatchArgs(first, rest)
     return dispatch.kind === "UsageError" ? dispatch : { kind: "Dispatch", args: dispatch }
   }
