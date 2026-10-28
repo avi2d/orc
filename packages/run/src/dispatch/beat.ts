@@ -1,7 +1,7 @@
 import { DateTime, Effect, type FileSystem } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimTask, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken } from "./backlog"
-import { checkoutOn, type ConfigError, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "./config"
+import { type Account, checkoutOn, type ConfigError, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "./config"
 import { type QuotaReading, readQuota } from "./quota"
 import type { Claim, TaskFileError, TaskRecord } from "./task-record"
 
@@ -138,7 +138,8 @@ const startTask = (
   task: TaskRecord,
   claim: Claim,
   checkout: string,
-  machine: Machine
+  machine: Machine,
+  tokenFile: string
 ): Effect.Effect<BeatAction, BacklogError | TaskFileError, BeatRequirements> =>
   Effect.gen(function*() {
     const taken: TaskRecord = { spec: task.spec, state: { kind: "taken", claim } }
@@ -156,7 +157,8 @@ const startTask = (
       ORC_TASK_PROJECT: task.spec.project,
       ORC_TASK_CHECKOUT: checkout,
       ORC_TASK_MACHINE: machine.name,
-      ORC_TASK_ACCOUNT: claim.account
+      ORC_TASK_ACCOUNT: claim.account,
+      ORC_TASK_TOKEN_FILE: tokenFile
     })
     if (result.kind === "started") {
       return { kind: "started", task: task.spec.id, machine: machine.name, account: claim.account, log } satisfies BeatAction
@@ -174,7 +176,7 @@ interface BeatContext {
   readonly config: DispatchConfig
   readonly projects: ReadonlyArray<Project>
   readonly tasks: ReadonlyArray<TaskRecord>
-  readonly account: string | null
+  readonly account: Account | null
   readonly live: Array<{ readonly machine: string; readonly slots: number; busy: number }>
 }
 
@@ -202,8 +204,8 @@ const considerTask = (
     if (slot !== undefined) {
       slot.busy += 1
     }
-    const claim: Claim = { beat: context.beat, machine: placement.machine.name, account: context.account, takenAt: yield* nowIso }
-    const action = yield* startTask(context.root, task, claim, placement.checkout, placement.machine)
+    const claim: Claim = { beat: context.beat, machine: placement.machine.name, account: context.account.name, takenAt: yield* nowIso }
+    const action = yield* startTask(context.root, task, claim, placement.checkout, placement.machine, context.account.tokenFile)
     if (slot !== undefined) {
       if (action.kind === "given-back") {
         slot.busy = slot.slots
@@ -224,7 +226,7 @@ export const runBeat = (
     const config = yield* readDispatchConfig(paths.dispatchConfig)
     const projects = yield* readProjects(paths.projects, config.machines)
     yield* ensureBacklog(root)
-    const quota = yield* readQuota(config.quota)
+    const quota = yield* readQuota({ accounts: config.quota.accounts.map((account) => account.name), floorPercent: config.quota.floorPercent })
     const tasks = yield* listTasks(root)
     const room = readRoom(config.machines, tasks)
     const context: BeatContext = {
@@ -233,7 +235,7 @@ export const runBeat = (
       config,
       projects,
       tasks,
-      account: quota.kind === "read" ? quota.pick : null,
+      account: quota.kind === "read" ? (config.quota.accounts.find((account) => account.name === quota.pick) ?? null) : null,
       live: room.map((entry) => ({ ...entry }))
     }
     const actions = yield* Effect.forEach(tasks.filter((task) => task.state.kind === "new"), (task) => considerTask(context, task))

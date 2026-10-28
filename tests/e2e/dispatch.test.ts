@@ -103,7 +103,7 @@ const withFixture = async (shape: FixtureShape, body: (fixture: Fixture) => Prom
     const start = ["sh", "-c", "sleep 0.1; echo \"$ORC_TASK_ID $ORC_TASK_MACHINE\" >> '" + startLog + "'"]
     await writeFile(join(backlog, "dispatch.json"), JSON.stringify({
       machines: [{ name: "mac", slots: shape.mac, start }, { name: "linux", slots: shape.linux, start }],
-      quota: { accounts: ["main"], floorPercent: shape.floorPercent }
+      quota: { accounts: [{ name: "main", tokenFile: join(dir, "main-token") }], floorPercent: shape.floorPercent }
     }))
     await writeFile(join(backlog, "projects.json"), JSON.stringify({
       projects: [{ name: "orc", checkouts: { mac: join(dir, "mac-orc"), linux: join(dir, "linux-orc") } }]
@@ -171,7 +171,7 @@ const backlogTask = async (fixture: Fixture, id: string): Promise<Record<string,
 const writeMachines = async (fixture: Fixture, start: ReadonlyArray<string>): Promise<void> => {
   await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({
     machines: [{ name: "mac", slots: 1, start }, { name: "linux", slots: 0, start: ["true"] }],
-    quota: { accounts: ["main"], floorPercent: 15 }
+    quota: { accounts: [{ name: "main", tokenFile: join(fixture.dir, "main-token") }], floorPercent: 15 }
   }))
 }
 

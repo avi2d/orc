@@ -13,7 +13,8 @@ You read the PR and merge it, since orc never merges.
 - Git, tested on 2.56.0.
 - nono from https://nono.sh, tested on 0.80.0, for the default sandbox.
 - Node, tested on 24.22.1.
-- Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with an opencode-go login for opencode-go models or the token file for Claude models that [Running on a Claude model](#running-on-a-claude-model) describes.
+- Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0.
+  An opencode-go model needs an opencode-go login, and a Claude model needs the token file [Running on a Claude model](#running-on-a-claude-model) describes.
 - no-mistakes v1.90.0 or later, tested on v1.100.2, installed as [Installing no-mistakes](#installing-no-mistakes) says.
 
 ## Install
@@ -249,7 +250,8 @@ Orc keeps one backlog of tasks in `~/.orc/backlog`, one Markdown file per task w
 `ORC_HOME` moves the backlog elsewhere when set.
 A task file sits in `new`, `taken` or `closed`, and the folder it sits in is its state.
 Two files beside the folders tell the beat where tasks may go.
-`dispatch.json` names each machine, its slots and its start command, and the Claude accounts with the floor of room each must keep:
+`dispatch.json` names each machine, its slots and its start command.
+It also names the Claude accounts, each with its token file, and the floor of room each must keep:
 
 ```json
 {
@@ -257,9 +259,18 @@ Two files beside the folders tell the beat where tasks may go.
     { "name": "mac", "slots": 2, "start": ["orc", "runner", "start"] },
     { "name": "linux-box", "slots": 4, "start": ["orc", "runner", "start", "--", "ssh", "linux-box", "orc"] }
   ],
-  "quota": { "accounts": ["main", "second"], "floorPercent": 15 }
+  "quota": {
+    "accounts": [
+      { "name": "main", "tokenFile": "/home/me/.orc/tokens/main" },
+      { "name": "second", "tokenFile": "/home/me/.orc/tokens/second" }
+    ],
+    "floorPercent": 15
+  }
 }
 ```
+
+Each `tokenFile` is an absolute path, and the file must sit at that path on every machine that runs a task.
+Make each token file readable only by its owner, as [Running on a Claude model](#running-on-a-claude-model) describes.
 
 `projects.json` names each project and its checkout on each machine:
 
@@ -283,7 +294,8 @@ A task starts only once three things hold:
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
 After the claim survives a recount, the beat writes the task started before it runs the start command.
 A task marked for a machine waits for a slot on that machine and never starts on another.
-The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE` and `ORC_TASK_ACCOUNT`.
+The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE`, `ORC_TASK_ACCOUNT` and `ORC_TASK_TOKEN_FILE`.
+`ORC_TASK_ACCOUNT` names the account the quota pick chose, and `ORC_TASK_TOKEN_FILE` is that account's token file path.
 The beat starts it detached in its own session, never waits for it and never kills it.
 So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
@@ -298,13 +310,19 @@ When a started task ends, run `orc backlog close <task-id> <done|failed> [reason
 `orc runner start` is the start command that hands a task to pueue on its machine.
 The run then outlives the beat, the dispatcher and any SSH link to it.
 It reads the task from the beat's `ORC_TASK_*` variables and queues `orc run` in the checkout on branch `orc/<task-id>`, in the pueue group `orc`.
+It queues the run with `--sandbox none` and with `ORC_CLAUDE_TOKEN_FILE` set to the path in `ORC_TASK_TOKEN_FILE`, so the run takes the Claude route on the picked account.
+It refuses a start without `ORC_TASK_TOKEN_FILE` and queues nothing.
+The runner hands on the token file's path and never reads the file.
+So the token stays out of the task file, its log, pueue and the run folder.
+The run still refuses a token file other users can read.
 The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
 The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
 A task pueue already holds in group `orc` is not queued again.
 
 To start on another machine, put the command that runs orc there after `--`, as in `orc runner start -- ssh linux-box orc`.
-That runs `orc runner queue` on the far side and sends it the task as JSON on stdin, so the task text never passes through a remote shell.
+That runs `orc runner queue` on the far side and sends it the task and the token file path as JSON on stdin.
+So the task text never passes through a remote shell.
 SSH can drop once pueue holds the run, since pueue on that machine owns it.
 Pueue runs the task with the environment of the command that queued it.
 So the command after `--` must give orc the `PATH` its runs need on that machine.
@@ -343,7 +361,7 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/git-config.ts` | The git config parsing that finds the credentials, includes and submodules a checkout carries |
 | `src/dispatch/backlog.ts` | The backlog folders, the id reservation and the atomic take of a task |
 | `src/dispatch/task-record.ts` | The task file and its frontmatter |
-| `src/dispatch/config.ts` | The reading of `dispatch.json` and `projects.json` |
+| `src/dispatch/config.ts` | The reading of `dispatch.json`, with each account's token file path, and `projects.json` |
 | `src/dispatch/quota.ts` | The quota reading from `clauth status --json` and the pick of an account |
 | `src/dispatch/beat.ts` | The beat: room, placement, take and start |
 | `src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |

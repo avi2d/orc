@@ -11,10 +11,18 @@ const Machine = Schema.Struct({
 })
 export type Machine = typeof Machine.Type
 
+const AbsolutePath = Schema.String.check(Schema.isPattern(/^\//))
+
+const Account = Schema.Struct({
+  name: Name,
+  tokenFile: AbsolutePath
+})
+export type Account = typeof Account.Type
+
 const DispatchConfigFile = Schema.Struct({
   machines: Schema.Array(Machine),
   quota: Schema.Struct({
-    accounts: Schema.NonEmptyArray(Name),
+    accounts: Schema.NonEmptyArray(Account),
     floorPercent: Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 }))
   })
 })
@@ -22,7 +30,7 @@ export type DispatchConfig = typeof DispatchConfigFile.Type
 
 const Project = Schema.Struct({
   name: Name,
-  checkouts: Schema.Record(Name, Schema.String.check(Schema.isPattern(/^\//)))
+  checkouts: Schema.Record(Name, AbsolutePath)
 })
 export type Project = typeof Project.Type
 
@@ -61,10 +69,14 @@ const readJsonFile = <S extends Schema.Top>(
 export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, ConfigError, FileSystem.FileSystem> =>
   readJsonFile(file, DispatchConfigFile).pipe(
     Effect.flatMap((config) => {
-      const duplicate = duplicateOf(config.machines.map((machine) => machine.name))
-      return duplicate === null
+      const machine = duplicateOf(config.machines.map((entry) => entry.name))
+      if (machine !== null) {
+        return Effect.fail(new ConfigError({ file, detail: "the machine " + machine + " is named twice" }))
+      }
+      const account = duplicateOf(config.quota.accounts.map((entry) => entry.name))
+      return account === null
         ? Effect.succeed(config)
-        : Effect.fail(new ConfigError({ file, detail: "the machine " + duplicate + " is named twice" }))
+        : Effect.fail(new ConfigError({ file, detail: "the account " + account + " is named twice" }))
     })
   )
 

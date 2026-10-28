@@ -9,7 +9,7 @@ import { parseDispatchArgs } from "../../packages/run/src/dispatch/args"
 import { addTask, claimTask, closeStartedTask, listTasks, releaseTask, writeTaken } from "../../packages/run/src/dispatch/backlog"
 import { placeTask, runBeat } from "../../packages/run/src/dispatch/beat"
 import { backlogJson, formatBoard } from "../../packages/run/src/dispatch/board"
-import type { DispatchConfig, Project } from "../../packages/run/src/dispatch/config"
+import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/dispatch/config"
 import { assessClauthStatus } from "../../packages/run/src/dispatch/quota"
 import { parseTaskFile, renderTaskFile, TaskFileError, type TaskRecord } from "../../packages/run/src/dispatch/task-record"
 
@@ -31,7 +31,7 @@ const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-
 
 const config: DispatchConfig = {
   machines: [{ name: "mac", slots: 1, start: ["true"] }, { name: "linux", slots: 4, start: ["true"] }],
-  quota: { accounts: ["main"], floorPercent: 15 }
+  quota: { accounts: [{ name: "main", tokenFile: "/secrets/main-token" }], floorPercent: 15 }
 }
 
 const projects: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Users/a/orc", linux: "/home/a/orc" } }]
@@ -148,6 +148,40 @@ describe("task files", () => {
   test("a file with no frontmatter is refused instead of read as an empty task", async () => {
     const result = await run(Effect.result(parseTaskFile("task-1.md", "new", "# Just a title\n")))
     expect(Result.isFailure(result)).toBe(true)
+  })
+})
+
+const configProblem = async (root: string, accounts: ReadonlyArray<object>): Promise<string | null> => {
+  const file = join(root, "dispatch.json")
+  await writeFile(file, JSON.stringify({ machines: config.machines, quota: { accounts, floorPercent: 15 } }))
+  return run(readDispatchConfig(file).pipe(
+    Effect.map(() => null),
+    Effect.catchTag("ConfigError", (error) => Effect.succeed(error.detail))
+  ))
+}
+
+describe("readDispatchConfig", () => {
+  test("keeps each account's token file path beside its name", async () => {
+    await withBacklog(async (root) => {
+      const file = join(root, "dispatch.json")
+      await writeFile(file, JSON.stringify(config))
+      expect((await run(readDispatchConfig(file))).quota.accounts).toEqual([{ name: "main", tokenFile: "/secrets/main-token" }])
+    })
+  })
+  test("refuses an account with no token file instead of starting its runs on none", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, [{ name: "main" }])).not.toBeNull()
+    })
+  })
+  test("refuses a relative token file path instead of resolving it against the run's folder", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, [{ name: "main", tokenFile: "secrets/main-token" }])).not.toBeNull()
+    })
+  })
+  test("refuses an account named twice instead of keeping either token file", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, [{ name: "main", tokenFile: "/a" }, { name: "main", tokenFile: "/b" }])).toBe("the account main is named twice")
+    })
   })
 })
 

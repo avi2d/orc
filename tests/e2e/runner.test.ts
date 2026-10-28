@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
+import { chmod, cp, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
@@ -12,8 +12,15 @@ const pueueFixtures = new URL("../fixtures/pueue", import.meta.url).pathname
 const startWaitMillis = 10_000
 const runnerTimeout = 60_000
 
+interface TokenFiles {
+  readonly main: string
+  readonly second: string
+}
+
 interface Fixture {
   readonly dir: string
+  readonly secrets: string
+  readonly tokenFiles: TokenFiles
   readonly home: string
   readonly checkout: string
   readonly pueue: string
@@ -63,11 +70,14 @@ const fakePueue = [
   "    id=$((77 + n)); printf '%s %s %s\\n' \"$label\" \"$group\" \"$id\" >> \"$PUEUE_STATE/added-tasks\";",
   "    mv \"$PUEUE_STATE/add-args.tmp\" \"$PUEUE_STATE/add-args\";",
   "    printf '%s' \"$ORC_HOME\" > \"$PUEUE_STATE/add-env.tmp\"; mv \"$PUEUE_STATE/add-env.tmp\" \"$PUEUE_STATE/add-env\";",
+  "    printf '%s' \"$ORC_CLAUDE_TOKEN_FILE\" > \"$PUEUE_STATE/add-token-file.tmp\"; mv \"$PUEUE_STATE/add-token-file.tmp\" \"$PUEUE_STATE/add-token-file\";",
   "    rmdir \"$PUEUE_STATE/group-lock\"; echo \"$id\" ;;",
   "  *) echo \"fake pueue has no $1\" >&2; exit 2 ;;",
   "esac",
   ""
 ].join("\n")
+
+const tokens = { main: "sk-ant-oat01-orc-runner-main-fixture", second: "sk-ant-oat01-orc-runner-second-fixture" } as const
 
 const withFixture = async (body: (fixture: Fixture) => Promise<void>): Promise<void> => {
   const dir = await mkdtemp(join(tmpdir(), "orc-runner-e2e-"))
@@ -79,12 +89,17 @@ const withFixture = async (body: (fixture: Fixture) => Promise<void>): Promise<v
     await mkdir(bin)
     await mkdir(join(home, "backlog"), { recursive: true })
     await mkdir(checkout)
+    const secrets = join(dir, "secrets")
+    await mkdir(secrets, { mode: 0o700 })
+    const tokenFiles = { main: join(secrets, "main-token"), second: join(secrets, "second-token") }
+    await writeFile(tokenFiles.main, tokens.main, { mode: 0o600 })
+    await writeFile(tokenFiles.second, tokens.second, { mode: 0o600 })
     await cp(pueueFixtures, pueue, { recursive: true })
     await writeFile(join(bin, "pueue"), fakePueue)
     await chmod(join(bin, "pueue"), 0o755)
     await writeFile(join(dir, "task.md"), "# Do the thing\n\nWith a body that holds 'quotes' and $dollars.\n")
     await writeFile(join(home, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { linux: checkout } }] }))
-    await body({ dir, home, checkout, pueue, env: { ORC_HOME: home, PUEUE_STATE: pueue, PATH: bin + ":" + (process.env.PATH ?? "") } })
+    await body({ dir, secrets, tokenFiles, home, checkout, pueue, env: { ORC_HOME: home, PUEUE_STATE: pueue, PATH: bin + ":" + (process.env.PATH ?? "") } })
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
@@ -126,33 +141,32 @@ const RunnerRun = Schema.Struct({ result: Schema.Struct({ run: Schema.Unknown })
 const writeMachine = async (fixture: Fixture, start: ReadonlyArray<string>): Promise<void> => {
   await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify({
     machines: [{ name: "linux", slots: 1, start }],
-    quota: { accounts: ["main"], floorPercent: 15 }
+    quota: { accounts: [{ name: "main", tokenFile: fixture.tokenFiles.main }, { name: "second", tokenFile: fixture.tokenFiles.second }], floorPercent: 15 }
   }))
 }
 
-const fakeClauth = async (fixture: Fixture): Promise<void> => {
-  const status = { schema: 2, profiles: [{ name: "main", auth_status: "ok", fetch_status: "Fresh", stale: false, windows: [{ label: "5h", utilization_pct: 10 }, { label: "7d", utilization_pct: 20 }] }] }
+type UsedPercent = Readonly<Record<keyof TokenFiles, number>>
+
+const mainHasMostRoom: UsedPercent = { main: 20, second: 70 }
+
+const fakeClauth = async (fixture: Fixture, used: UsedPercent): Promise<void> => {
+  const profiles = Object.entries(used).map(([name, percent]) => ({
+    name,
+    auth_status: "ok",
+    fetch_status: "Fresh",
+    stale: false,
+    windows: [{ label: "5h", utilization_pct: percent }, { label: "7d", utilization_pct: percent }]
+  }))
+  const status = { schema: 2, profiles }
   await writeFile(join(fixture.dir, "bin", "clauth"), "#!/bin/sh\ncat <<'J'\n" + JSON.stringify(status) + "\nJ\n")
   await chmod(join(fixture.dir, "bin", "clauth"), 0o755)
 }
 
-const queuedArgs = async (fixture: Fixture): Promise<ReadonlyArray<string> | null> => {
+const eventuallyRead = async (file: string, done: (text: string) => boolean = () => true): Promise<string | null> => {
   const deadline = Date.now() + startWaitMillis
   while (Date.now() < deadline) {
-    const text = await readFile(join(fixture.pueue, "add-args"), "utf8").catch(() => null)
-    if (text !== null) {
-      return text.split("\n").slice(0, -1)
-    }
-    await Bun.sleep(20)
-  }
-  return null
-}
-
-const queuedEnv = async (fixture: Fixture): Promise<string | null> => {
-  const deadline = Date.now() + startWaitMillis
-  while (Date.now() < deadline) {
-    const text = await readFile(join(fixture.pueue, "add-env"), "utf8").catch(() => null)
-    if (text !== null) {
+    const text = await readFile(file, "utf8").catch(() => null)
+    if (text !== null && done(text)) {
       return text
     }
     await Bun.sleep(20)
@@ -160,8 +174,33 @@ const queuedEnv = async (fixture: Fixture): Promise<string | null> => {
   return null
 }
 
-const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>): Promise<ReadonlyArray<string> | null> => {
-  await fakeClauth(fixture)
+const queuedArgs = async (fixture: Fixture): Promise<ReadonlyArray<string> | null> =>
+  (await eventuallyRead(join(fixture.pueue, "add-args")))?.split("\n").slice(0, -1) ?? null
+
+const queuedEnv = (fixture: Fixture): Promise<string | null> => eventuallyRead(join(fixture.pueue, "add-env"))
+
+const queuedTokenFile = (fixture: Fixture): Promise<string | null> => eventuallyRead(join(fixture.pueue, "add-token-file"))
+
+const taskLog = (fixture: Fixture): string => join(fixture.home, "backlog", "logs", "task-1.log")
+
+const filesUnder = async (dir: string): Promise<ReadonlyArray<string>> => {
+  const entries = await readdir(dir, { recursive: true, withFileTypes: true })
+  return entries.filter((entry) => entry.isFile()).map((entry) => join(entry.parentPath, entry.name))
+}
+
+const filesHoldingAToken = async (fixture: Fixture): Promise<ReadonlyArray<string>> => {
+  const holding: Array<string> = []
+  for (const file of await filesUnder(fixture.dir)) {
+    const text = await readFile(file, "utf8")
+    if (!file.startsWith(fixture.secrets + "/") && (text.includes(tokens.main) || text.includes(tokens.second))) {
+      holding.push(file)
+    }
+  }
+  return holding
+}
+
+const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>, used: UsedPercent = mainHasMostRoom): Promise<ReadonlyArray<string> | null> => {
+  await fakeClauth(fixture, used)
   await writeMachine(fixture, start)
   await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
   await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
@@ -171,7 +210,7 @@ const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>): Promi
 
 const pueueAddFor = (home: string, checkout: string): ReadonlyArray<string> => [
   "--group", "orc", "--label", "task-1", "--working-directory", checkout, "--print-task-id", "--escape", "--",
-  process.execPath, binPath, "run", join(home, "runner", "task-1.md"), "--branch", "orc/task-1"
+  process.execPath, binPath, "run", join(home, "runner", "task-1.md"), "--branch", "orc/task-1", "--sandbox", "none"
 ]
 
 const orcThere = (home: string): ReadonlyArray<string> => ["sh", "-c", "ORC_HOME='" + home + "' exec \"$0\" '" + binPath + "' \"$@\"", process.execPath]
@@ -182,6 +221,7 @@ describe("orc runner start", () => {
       const added = await beatStarts(fixture, [process.execPath, binPath, "runner", "start"])
       expect(added).toEqual(pueueAddFor(fixture.home, fixture.checkout))
       expect(await queuedEnv(fixture)).toBe(fixture.home)
+      expect(await queuedTokenFile(fixture)).toBe(fixture.tokenFiles.main)
       expect(await readFile(join(fixture.home, "runner", "task-1.md"), "utf8")).toBe(await readFile(join(fixture.dir, "task.md"), "utf8"))
     })
   }, runnerTimeout)
@@ -192,13 +232,59 @@ describe("orc runner start", () => {
       const added = await beatStarts(fixture, [process.execPath, binPath, "runner", "start", "--", ...orcThere(far)])
       expect(added).toEqual(pueueAddFor(far, fixture.checkout))
       expect(await queuedEnv(fixture)).toBe(far)
+      expect(await queuedTokenFile(fixture)).toBe(fixture.tokenFiles.main)
       expect(await readFile(join(far, "runner", "task-1.md"), "utf8")).toBe(await readFile(join(fixture.dir, "task.md"), "utf8"))
+    })
+  }, runnerTimeout)
+
+  test("the run gets the token file of the account the quota pick chose, not the first account listed", async () => {
+    await withFixture(async (fixture) => {
+      const added = await beatStarts(fixture, [process.execPath, binPath, "runner", "start"], { main: 70, second: 10 })
+      expect(added).toEqual(pueueAddFor(fixture.home, fixture.checkout))
+      expect(await queuedTokenFile(fixture)).toBe(fixture.tokenFiles.second)
+    })
+  }, runnerTimeout)
+
+  test("a task with no account at or above the floor is not queued instead of starting on a spent account", async () => {
+    await withFixture(async (fixture) => {
+      await fakeClauth(fixture, { main: 90, second: 95 })
+      await writeMachine(fixture, [process.execPath, binPath, "runner", "start"])
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+      expect(await orcOk(fixture, ["beat"])).toContain("waits task-1: no Claude account has room")
+      expect(await Bun.file(taskLog(fixture)).exists()).toBe(false)
+      expect(await Bun.file(join(fixture.pueue, "add-args")).exists()).toBe(false)
+    })
+  }, runnerTimeout)
+
+  test("a start whose environment names no token file is refused instead of queueing a run with no Claude token", async () => {
+    await withFixture(async (fixture) => {
+      await beatStarts(fixture, ["env", "-u", "ORC_TASK_TOKEN_FILE", process.execPath, binPath, "runner", "start"])
+      expect(await eventuallyRead(taskLog(fixture), (text) => text !== "")).toBe("orc: orc runner start reads ORC_TASK_TOKEN_FILE, which the beat sets\n")
+      expect(await Bun.file(join(fixture.pueue, "add-args")).exists()).toBe(false)
+    })
+  }, runnerTimeout)
+
+  test("a queue request naming a relative token file is refused before pueue is asked instead of queued", async () => {
+    await withFixture(async (fixture) => {
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, tokenFile: "secrets/main-token", body: "# x\n" })
+      expect(result.exitCode).not.toBe(0)
+      expect(await Bun.file(join(fixture.pueue, "add-args")).exists()).toBe(false)
+    })
+  }, runnerTimeout)
+
+  test("a start through a command leaves no token value in the task record, its log, either home or pueue's state", async () => {
+    await withFixture(async (fixture) => {
+      const far = join(fixture.dir, "far-home")
+      const added = await beatStarts(fixture, [process.execPath, binPath, "runner", "start", "--", ...orcThere(far)])
+      expect(added).toEqual(pueueAddFor(far, fixture.checkout))
+      expect(await eventuallyRead(taskLog(fixture), (text) => text.includes("queued task-1"))).toContain("queued task-1")
+      expect(await filesHoldingAToken(fixture)).toEqual([])
     })
   }, runnerTimeout)
 
   test("a relative ORC_HOME reaches the child resolved instead of relative", async () => {
     await withFixture(async (fixture) => {
-      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" }, { ORC_HOME: "rel-home" })
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, tokenFile: fixture.tokenFiles.main, body: "# x\n" }, { ORC_HOME: "rel-home" })
       expect(result.exitCode).toBe(0)
       expect(await queuedEnv(fixture)).toBe(join(fixture.dir, "rel-home"))
       expect(await readFile(join(fixture.dir, "rel-home", "runner", "task-9.md"), "utf8")).toBe("# x\n")
@@ -221,7 +307,7 @@ describe("orc runner start", () => {
       git(["-C", repo, "config", "user.name", "orc"])
       git(["-C", repo, "commit", "-q", "--allow-empty", "-m", "init"])
       const root = await realpath(repo)
-      const queued = await queueWith(fixture, { task: "task-9", checkout: sub, body: "# x\n" })
+      const queued = await queueWith(fixture, { task: "task-9", checkout: sub, tokenFile: fixture.tokenFiles.main, body: "# x\n" })
       expect(queued.exitCode).toBe(0)
       const args = (await readFile(join(fixture.pueue, "add-args"), "utf8")).split("\n").slice(0, -1)
       expect(args[args.indexOf("--working-directory") + 1]).toBe(root)
@@ -248,7 +334,7 @@ describe("orc runner start", () => {
 
   test("a task pueue already holds in group orc is not queued twice", async () => {
     await withFixture(async (fixture) => {
-      const result = await queueWith(fixture, { task: "task-1", checkout: fixture.checkout, body: "# Again\n" })
+      const result = await queueWith(fixture, { task: "task-1", checkout: fixture.checkout, tokenFile: fixture.tokenFiles.main, body: "# Again\n" })
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toBe("task-1 is already pueue task 655 in group orc\n")
       expect(await readFile(join(fixture.pueue, "add-args"), "utf8").catch(() => null)).toBeNull()
@@ -257,7 +343,7 @@ describe("orc runner start", () => {
 
   test("a checkout missing on the machine is refused before pueue is asked", async () => {
     await withFixture(async (fixture) => {
-      const result = await queueWith(fixture, { task: "task-9", checkout: join(fixture.dir, "nowhere"), body: "# x\n" })
+      const result = await queueWith(fixture, { task: "task-9", checkout: join(fixture.dir, "nowhere"), tokenFile: fixture.tokenFiles.main, body: "# x\n" })
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toBe("orc: the checkout " + join(fixture.dir, "nowhere") + " is no folder on this machine\n")
       expect(await readFile(join(fixture.pueue, "add-args"), "utf8").catch(() => null)).toBeNull()
@@ -268,7 +354,7 @@ describe("orc runner start", () => {
     await withFixture(async (fixture) => {
       await writeFile(join(fixture.pueue, "groups.json"), JSON.stringify({ default: { status: "Running", parallel_tasks: 1 } }))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, tokenFile: fixture.tokenFiles.main, body: "# x\n" })
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toBe("queued task-9 as pueue task 77 in group orc\n")
       expect((await readFile(join(fixture.pueue, "group-add-args"), "utf8")).split("\n").slice(0, -1)).toEqual(["group", "add", "orc"])
@@ -282,7 +368,7 @@ describe("orc runner start", () => {
         "orc-proof": { status: "Running", parallel_tasks: 1 }
       }))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, tokenFile: fixture.tokenFiles.main, body: "# x\n" })
       expect(result.exitCode).toBe(0)
       expect((await readFile(join(fixture.pueue, "group-add-args"), "utf8")).split("\n").slice(0, -1)).toEqual(["group", "add", "orc"])
     })
@@ -290,7 +376,7 @@ describe("orc runner start", () => {
 
   test("an existing orc group is left alone instead of added again", async () => {
     await withFixture(async (fixture) => {
-      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, tokenFile: fixture.tokenFiles.main, body: "# x\n" })
       expect(result.exitCode).toBe(0)
       expect(await readFile(join(fixture.pueue, "group-add-args"), "utf8").catch(() => null)).toBeNull()
     })
@@ -301,7 +387,7 @@ describe("orc runner start", () => {
       await writeFile(join(fixture.pueue, "groups.json"), JSON.stringify({ default: { status: "Running", parallel_tasks: 1 } }))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
       await writeFile(join(fixture.pueue, "race-add"), "")
-      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, tokenFile: fixture.tokenFiles.main, body: "# x\n" })
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toBe("queued task-9 as pueue task 77 in group orc\n")
     })
@@ -313,8 +399,8 @@ describe("orc runner start", () => {
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
       await writeFile(join(fixture.pueue, "group-gate"), "")
       const queued = Promise.all([
-        queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" }),
-        queueWith(fixture, { task: "task-10", checkout: fixture.checkout, body: "# y\n" })
+        queueWith(fixture, { task: "task-9", checkout: fixture.checkout, tokenFile: fixture.tokenFiles.main, body: "# x\n" }),
+        queueWith(fixture, { task: "task-10", checkout: fixture.checkout, tokenFile: fixture.tokenFiles.main, body: "# y\n" })
       ])
       const deadline = Date.now() + startWaitMillis
       while (Date.now() < deadline) {
@@ -342,7 +428,7 @@ describe("orc runner start", () => {
       await writeFile(join(fixture.pueue, "groups.json"), JSON.stringify({ default: { status: "Running", parallel_tasks: 1 } }))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
       await writeFile(join(fixture.pueue, "fail-add"), "")
-      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, tokenFile: fixture.tokenFiles.main, body: "# x\n" })
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toBe("orc: pueue group exited 1: fake pueue cannot add groups\n")
     })
