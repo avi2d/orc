@@ -112,12 +112,20 @@ const fixedExec = (processEnv: Record<string, string>, fallbackCwd: string) =>
     })
   }
 
-export const noSandboxProvider = (dirs: NoSandboxDirs): NoSandboxProvider => {
+export const noSandboxProvider = (dirs: NoSandboxDirs, operatorEnv: Readonly<Record<string, string | undefined>> = process.env): NoSandboxProvider => {
   const base = noSandbox({ env: { ...noSandboxEnv(dirs) } })
   const baseCreate = (base as unknown as { readonly create: NoSandboxCreate }).create.bind(base)
   const create: NoSandboxCreate = async (createOptions) => {
     const handle = await baseCreate(createOptions)
-    const processEnv: Record<string, string> = { ...(process.env as Record<string, string>), ...createOptions.env }
+    const processEnv: Record<string, string> = {}
+    for (const [key, value] of Object.entries(operatorEnv)) {
+      if (value !== undefined) {
+        processEnv[key] = value
+      }
+    }
+    for (const [key, value] of Object.entries(createOptions.env)) {
+      processEnv[key] = value
+    }
     return {
       ...handle,
       exec: fixedExec(processEnv, handle.worktreePath)

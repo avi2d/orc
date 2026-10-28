@@ -278,13 +278,14 @@ const openSandboxForRun = (
   folders: RunFolders,
   credential: ModelCredential,
   hostPath: string | undefined,
-  toolchain: ToolchainResolver
+  toolchain: ToolchainResolver,
+  operatorEnv: Readonly<Record<string, string | undefined>>
 ): Effect.Effect<Sandbox, OrcRunError> =>
   Effect.tryPromise({
     try: () => createSandbox({
       branch: checkout.branch,
       sandbox: kind === "none"
-        ? noSandboxProvider({ piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir })
+        ? noSandboxProvider({ piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir }, operatorEnv)
         : nonoSandboxProvider({ piSessionDir: folders.piSessionDir, piAgentDir: folders.piAgentDir, modelCredential: credential, hostPath, toolchain }),
       cwd: checkout.projectDir
     }),
@@ -300,6 +301,7 @@ export const runAgentStep = (
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const home = orcHomeDir(request.homeDir ?? Bun.env.ORC_HOME)
     const runId = request.runId ?? newRunId()
+    const operatorEnv = { ...Bun.env }
     const hostPath = Bun.env.PATH
     const toolchain = yield* toolchainFromEnv(Bun.env.ORC_TOOLCHAIN_DIRS, homedir())
     const git = yield* openHostGit(fs, path)
@@ -312,7 +314,7 @@ export const runAgentStep = (
       Effect.onError(() => fs.remove(runDir, { recursive: true }).pipe(Effect.result))
     )
     const started = new Date().toISOString()
-    const sandbox: Sandbox = yield* openSandboxForRun(request.sandbox ?? defaultSandbox, git, checkout, folders, credential, hostPath, toolchain)
+    const sandbox: Sandbox = yield* openSandboxForRun(request.sandbox ?? defaultSandbox, git, checkout, folders, credential, hostPath, toolchain, operatorEnv)
     const ops: SandboxOps = {
       runAgent: (agentProvider, prompt, logFile, resumeSession) =>
         sandbox.run({
