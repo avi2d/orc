@@ -217,7 +217,7 @@ Two files beside the folders tell the beat where tasks may go.
 {
   "machines": [
     { "name": "mac", "slots": 2, "start": ["orc", "runner", "start"] },
-    { "name": "winbox", "slots": 4, "start": ["orc", "runner", "start", "--", "ssh", "winbox", "orc"] }
+    { "name": "linux-box", "slots": 4, "start": ["orc", "runner", "start", "--", "ssh", "linux-box", "orc"] }
   ],
   "quota": { "accounts": ["main", "second"], "floorPercent": 15 }
 }
@@ -226,7 +226,7 @@ Two files beside the folders tell the beat where tasks may go.
 `projects.json` names each project and its checkout on each machine:
 
 ```json
-{ "projects": [{ "name": "orc", "checkouts": { "mac": "/Users/me/code/orc", "winbox": "/home/me/code/orc" } }] }
+{ "projects": [{ "name": "orc", "checkouts": { "mac": "/Users/me/code/orc", "linux-box": "/home/me/code/orc" } }] }
 ```
 
 To add a task, run `orc backlog add <project> <task-file>`.
@@ -264,13 +264,13 @@ The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
 A task pueue already holds in group `orc` is not queued again.
 
-To start on another machine, put the command that runs orc there after `--`, as in `orc runner start -- ssh winbox orc`.
+To start on another machine, put the command that runs orc there after `--`, as in `orc runner start -- ssh linux-box orc`.
 That runs `orc runner queue` on the far side and sends it the task as JSON on stdin, so the task text never passes through a remote shell.
 SSH can drop once pueue holds the run, since pueue on that machine owns it.
 Pueue runs the task with the environment of the command that queued it, so the command after `--` must give orc the `PATH` its runs need on that machine.
 The queue records the resolved absolute `ORC_HOME` with the task.
 
-To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh winbox orc` from another.
+To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh linux-box orc` from another.
 It names pueue's state for the task and the orc run on `orc/<task-id>` with its PR.
 A task is queued, stashed, running, paused, succeeded or failed, or unknown when no pueue task in group `orc` holds it.
 To print the same facts as JSON, add `--json`, whose document names its version first as `orc.runner.v1`.

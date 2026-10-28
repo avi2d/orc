@@ -35,7 +35,7 @@
     "typescript": "7.0.2"
   },
   "checks": {
-    "mutationRunner": ["self-hosted", "Linux", "X64", "winbox"]
+    "mutationRunner": ["ubuntu-latest"]
   },
   "overrides": {
     "@effect/platform-node-shared": "4.0.0"

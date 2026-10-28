@@ -5,7 +5,7 @@ permissions:
   contents: read
 jobs:
   mutation:
-    runs-on: [self-hosted, Linux, X64, winbox]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       actions: write

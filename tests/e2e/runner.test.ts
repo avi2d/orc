@@ -75,7 +75,7 @@ const withFixture = async (body: (fixture: Fixture) => Promise<void>): Promise<v
     const bin = join(dir, "bin")
     const pueue = join(dir, "pueue")
     const home = join(dir, "home")
-    const checkout = join(dir, "winbox-orc")
+    const checkout = join(dir, "linux-orc")
     await mkdir(bin)
     await mkdir(join(home, "backlog"), { recursive: true })
     await mkdir(checkout)
@@ -83,7 +83,7 @@ const withFixture = async (body: (fixture: Fixture) => Promise<void>): Promise<v
     await writeFile(join(bin, "pueue"), fakePueue)
     await chmod(join(bin, "pueue"), 0o755)
     await writeFile(join(dir, "task.md"), "# Do the thing\n\nWith a body that holds 'quotes' and $dollars.\n")
-    await writeFile(join(home, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { winbox: checkout } }] }))
+    await writeFile(join(home, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { linux: checkout } }] }))
     await body({ dir, home, checkout, pueue, env: { ORC_HOME: home, PUEUE_STATE: pueue, PATH: bin + ":" + (process.env.PATH ?? "") } })
   } finally {
     await rm(dir, { recursive: true, force: true })
@@ -125,7 +125,7 @@ const RunnerRun = Schema.Struct({ result: Schema.Struct({ run: Schema.Unknown })
 
 const writeMachine = async (fixture: Fixture, start: ReadonlyArray<string>): Promise<void> => {
   await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify({
-    machines: [{ name: "winbox", slots: 1, start }],
+    machines: [{ name: "linux", slots: 1, start }],
     quota: { accounts: ["main"], floorPercent: 15 }
   }))
 }
@@ -164,7 +164,7 @@ const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>): Promi
   await fakeClauth(fixture)
   await writeMachine(fixture, start)
   await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "winbox"])
+  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
   await orcOk(fixture, ["beat"])
   return queuedArgs(fixture)
 }
