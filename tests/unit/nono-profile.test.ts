@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Result } from "effect"
 import { checkedModelWindows } from "../../packages/run/src/context-mark"
-import { buildAgentNonoProfile, buildNonoProfile, canRouteModel, defaultToolchainFolders, loginCheckCommand, modelCredentialFor, piAgentModels } from "../../packages/run/src/nono-profile"
+import { buildAgentNonoProfile, buildNonoProfile, canRouteModel, defaultToolchainFolders, loginCheckCommand, modelCredentialFor, piAgentModels, providerKeyOf } from "../../packages/run/src/nono-profile"
 
 const credential = {
   provider: "opencode-go",
@@ -61,7 +61,7 @@ describe("loginCheckCommand", () => {
 
 describe("piAgentModels", () => {
   test("points the provider at the injected credential variable", () => {
-    const parsed: unknown = JSON.parse(piAgentModels(credential, []))
+    const parsed: unknown = JSON.parse(piAgentModels(providerKeyOf(credential), []))
     expect(parsed).toEqual({ providers: { "opencode-go": { apiKey: "$OPENCODE_GO_KEY" } } })
   })
   test("pins each agent window where the sandbox resolves it rather than leaving the built-in window", () => {
@@ -69,7 +69,7 @@ describe("piAgentModels", () => {
       ["opencode-go/muse-spark-1.3-contributor"],
       new Map([["opencode-go/muse-spark-1.3-contributor", 262_144]])
     ))
-    const parsed: unknown = JSON.parse(piAgentModels(credential, checked))
+    const parsed: unknown = JSON.parse(piAgentModels(providerKeyOf(credential), checked))
     expect(parsed).toEqual({ providers: { "opencode-go": { apiKey: "$OPENCODE_GO_KEY", modelOverrides: { "muse-spark-1.3-contributor": { contextWindow: 262_144 } } } } })
   })
 })
