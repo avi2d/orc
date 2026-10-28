@@ -34,9 +34,6 @@
     "oxlint-tsgolint": "7.0.2002",
     "typescript": "7.0.2"
   },
-  "checks": {
-    "mutationRunner": ["ubuntu-latest"]
-  },
   "overrides": {
     "@effect/platform-node-shared": "4.0.0"
   },
