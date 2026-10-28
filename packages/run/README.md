@@ -114,7 +114,7 @@ Orc takes the implementer agent file from the first of these that exists:
 1. `agents/implementer.md` bundled with orc
 
 An agent file opens with a `---` header naming `model`, `thinking` and `tools`, and its body holds the instructions.
-Orc routes only `opencode-go` models through the sandbox and refuses any other model.
+Orc routes only `opencode-go` models and refuses any other model.
 
 With the default sandbox, Pi in a run compacts its context once the context passes 150 thousand tokens, whatever the model's window.
 Pi starts compaction at the window minus `compaction.reserveTokens`, so orc asks the host's Pi for each agent model's window through `pi --mode rpc`.
