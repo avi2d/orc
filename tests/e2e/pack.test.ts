@@ -22,6 +22,7 @@ const expectedFiles = [
   "src/dispatch/board.ts",
   "src/dispatch/cli.ts",
   "src/dispatch/config.ts",
+  "src/dispatch/pueue-status.ts",
   "src/dispatch/quota.ts",
   "src/dispatch/runner.ts",
   "src/dispatch/task-record.ts",

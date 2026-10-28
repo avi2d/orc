@@ -305,6 +305,7 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/dispatch/beat.ts` | The beat: room, placement, take and start |
 | `src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
 | `src/dispatch/runner.ts` | The runner: the start through pueue and the reading of a task's result |
+| `src/dispatch/pueue-status.ts` | The pueue status shapes and the held-task lookup the runner reads |
 | `src/dispatch/args.ts` | The flag parsing for `orc backlog`, `orc beat` and `orc runner` |
 | `src/dispatch/cli.ts` | The `orc backlog`, `orc beat` and `orc runner` commands |
 | `../../tests/unit` | The in-process unit tests at the workspace root |

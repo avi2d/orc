@@ -3,7 +3,7 @@ import { chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "no
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import { openDatabase, recordRun } from "../../packages/run/src/run-history"
 
 const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
@@ -120,6 +120,8 @@ const queueWith = (fixture: Fixture, request: object, env: Record<string, string
 
 const resultJson = async (fixture: Fixture, task: string, through: ReadonlyArray<string> = []): Promise<unknown> =>
   JSON.parse(await orcOk(fixture, ["runner", "result", task, "--json", ...through]))
+
+const RunnerRun = Schema.Struct({ result: Schema.Struct({ run: Schema.Unknown }) })
 
 const writeMachine = async (fixture: Fixture, start: ReadonlyArray<string>): Promise<void> => {
   await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify({
@@ -239,7 +241,7 @@ describe("orc runner start", () => {
       } finally {
         db.close()
       }
-      const document = await resultJson(fixture, "task-9") as { readonly result: { readonly run: unknown } }
+      const document = Schema.decodeUnknownSync(RunnerRun)(await resultJson(fixture, "task-9"))
       expect(document.result.run).toEqual({ id: "run-root", status: "succeeded", prLink: "https://github.com/avi2d/orc/pull/9", endReason: null })
     })
   }, runnerTimeout)
@@ -413,7 +415,7 @@ describe("orc runner result", () => {
       } finally {
         db.close()
       }
-      const document = await resultJson(fixture, "task-1") as { readonly result: { readonly run: unknown } }
+      const document = Schema.decodeUnknownSync(RunnerRun)(await resultJson(fixture, "task-1"))
       expect(document.result.run).toBeNull()
     })
   }, runnerTimeout)
@@ -436,8 +438,8 @@ describe("orc runner result", () => {
       } finally {
         db.close()
       }
-      const farResult = await resultJson(fixture, "task-2", ["--", ...orcThere(far)]) as { readonly result: { readonly run: unknown } }
-      const nearResult = await resultJson(fixture, "task-2") as { readonly result: { readonly run: unknown } }
+      const farResult = Schema.decodeUnknownSync(RunnerRun)(await resultJson(fixture, "task-2", ["--", ...orcThere(far)]))
+      const nearResult = Schema.decodeUnknownSync(RunnerRun)(await resultJson(fixture, "task-2"))
       expect(farResult.result.run).toEqual({ id: "run-far", status: "succeeded", prLink: "https://github.com/avi2d/orc/pull/2", endReason: null })
       expect(nearResult.result.run).toBeNull()
     })

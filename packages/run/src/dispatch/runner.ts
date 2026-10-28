@@ -4,11 +4,10 @@ import { formatHistoryError, openDatabase, RunStatusSchema } from "../run-histor
 import { latestRunForBranch } from "../history-resume"
 import type { Reach } from "./args"
 import { TaskId } from "./backlog"
+import { heldTask, orcGroup, PueueResult, PueueState, PueueStatus, type PueueTask } from "./pueue-status"
 import { parseTaskFile } from "./task-record"
 
 const RUNNER_JSON_SCHEMA = "orc.runner.v1" as const
-
-const orcGroup = "orc"
 
 export class RunnerError extends Data.TaggedError("RunnerError")<{
   readonly detail: string
@@ -22,33 +21,6 @@ const QueueRequest = Schema.Struct({
   body: Schema.String
 })
 type QueueRequest = typeof QueueRequest.Type
-
-const PueueTask = Schema.Struct({
-  id: Schema.Int,
-  label: Schema.NullOr(Schema.String),
-  group: Schema.String,
-  path: Schema.String,
-  status: Schema.Unknown
-})
-type PueueTask = typeof PueueTask.Type
-
-const PueueState = Schema.Struct({ tasks: Schema.Record(Schema.String, PueueTask) })
-
-const PueueResult = Schema.Union([
-  Schema.Literals(["Success", "Killed", "Errored", "DependencyFailed"]),
-  Schema.Struct({ Failed: Schema.Int }),
-  Schema.Struct({ FailedToSpawn: Schema.String })
-])
-
-const PueueStatus = Schema.Union([
-  Schema.Struct({ Done: Schema.Struct({ start: Schema.String, end: Schema.String, result: PueueResult }) }),
-  Schema.Struct({ Running: Schema.Struct({ start: Schema.String }) }),
-  Schema.Struct({ Paused: Schema.Struct({ start: Schema.String }) }),
-  Schema.Struct({ Queued: Schema.Struct({}) }),
-  Schema.Struct({ Stashed: Schema.Struct({}) }),
-  Schema.Struct({ Locked: Schema.Struct({}) })
-])
-type PueueStatus = typeof PueueStatus.Type
 
 const RunSummary = Schema.Struct({
   id: Schema.String,
@@ -129,16 +101,6 @@ const decodeJson = <S extends Schema.Top & { readonly DecodingServices: never }>
     Effect.flatMap(Schema.decodeUnknownEffect(schema)),
     Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: what + " printed JSON orc cannot read: " + error.message }))
   )
-
-const heldTask = (tasks: Readonly<Record<string, PueueTask>>, task: string): PueueTask | null => {
-  let latest: PueueTask | null = null
-  for (const candidate of Object.values(tasks)) {
-    if (candidate.group === orcGroup && candidate.label === task && candidate.id > (latest?.id ?? -1)) {
-      latest = candidate
-    }
-  }
-  return latest
-}
 
 const readHeld = (task: string): Effect.Effect<PueueTask | null, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   pueue(["status", "--json"]).pipe(
