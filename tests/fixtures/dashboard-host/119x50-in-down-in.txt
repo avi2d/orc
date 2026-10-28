@@ -1,0 +1,50 @@
+ projects › kelp                                                                                                 08:02 
+┏━ kelp · tasks ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ↻ 10s ━┓                                                           
+┃   task               state   machine model  tests   time ┃                                                           
+┃   tasks-kelp-tend    working south   –          –    10h ┃                                                           
+┃   tasks-kelp-sort    waiting south   –          – 1h 57m ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┃                                                          ┃                                                           
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛                                                           
+ ↑↓ pick   ⏎/→ in   esc/← back   click to open   q quit                                                                

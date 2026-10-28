@@ -1,0 +1,19 @@
+estimates from north logs, upper bounds
+never quota
+! south unreachable
+  so shares count north alone
+  sh exited 255: ssh: connect to host
+  south.example.com port 22: Connection…
+  session           price  raw  ≤pp pp/h
+● claude work · assumed the only login
+5h window 0pp used
+none logged on north
+7d window 60pp used · fair 0.50pp/h each
+ahead of pace, over fair share flagged
+⚑ north shop-a…/1 w1  50%  63%  ≤30 30.0
+○ north ~/n… #00b001  50%  38%  ≤30 0.00
+● codex · joined by credential key
+7d window 10pp used · fair 1.25pp/h each
+behind pace
+● north ~/… pid 4242 100% 100%  ≤10 0.00
+off subscription · openai 1 call

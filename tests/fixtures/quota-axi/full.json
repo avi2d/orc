@@ -1,0 +1,1006 @@
+{
+  "generatedAt": "2026-10-13T20:18:15.620Z",
+  "schemaVersion": 5,
+  "providers": [
+    {
+      "provider": "claude",
+      "label": "Claude",
+      "source": "oauth",
+      "plan": "max",
+      "account": {
+        "accountId": "account-redacted",
+        "email": "user@example.com",
+        "organization": "org-redacted",
+        "identityStatus": "verified"
+      },
+      "windows": [
+        {
+          "id": "five_hour",
+          "label": "session",
+          "kind": "session",
+          "percentUsed": 2,
+          "resetsAt": "2026-10-13T21:30:00.123718+00:00",
+          "windowSeconds": 18000,
+          "percentRemaining": 98,
+          "pace": {
+            "status": "behind",
+            "timeRemainingPercent": 23.9139,
+            "elapsedPercent": 76.0861,
+            "reservePercentPoints": 74.0861,
+            "cycleBasis": "window_seconds",
+            "cycleSeconds": 18000,
+            "burnMultiple": 0.0263,
+            "projectedExhaustedAt": "2026-10-21T14:42:54.973Z",
+            "projectionConfidence": "established"
+          }
+        },
+        {
+          "id": "seven_day",
+          "label": "week",
+          "kind": "weekly",
+          "percentUsed": 69,
+          "resetsAt": "2026-10-16T17:00:00.123738+00:00",
+          "windowSeconds": 604800,
+          "percentRemaining": 31,
+          "pace": {
+            "status": "ahead",
+            "timeRemainingPercent": 40.8903,
+            "elapsedPercent": 59.1097,
+            "reservePercentPoints": -9.8903,
+            "cycleBasis": "window_seconds",
+            "cycleSeconds": 604800,
+            "burnMultiple": 1.1673,
+            "projectedExhaustedAt": "2026-10-15T16:55:09.538Z",
+            "projectionConfidence": "established"
+          }
+        },
+        {
+          "id": "model:fable",
+          "label": "Fable week",
+          "kind": "model",
+          "percentUsed": 0,
+          "resetsAt": "2026-10-16T17:00:00+00:00",
+          "windowSeconds": 604800,
+          "percentRemaining": 100,
+          "pace": {
+            "status": "behind",
+            "timeRemainingPercent": 40.8903,
+            "elapsedPercent": 59.1097,
+            "reservePercentPoints": 59.1097,
+            "cycleBasis": "window_seconds",
+            "cycleSeconds": 604800,
+            "burnMultiple": 0
+          }
+        }
+      ],
+      "attempts": [
+        {
+          "source": "keychain",
+          "status": "success"
+        },
+        {
+          "source": "oauth-profile",
+          "status": "success"
+        }
+      ],
+      "state": {
+        "status": "fresh",
+        "stale": false,
+        "refreshedAt": "2026-10-13T20:18:15.232Z",
+        "sourcesTried": [
+          "keychain",
+          "oauth-profile"
+        ]
+      },
+      "quotaSemantics": {
+        "status": "known",
+        "description": "Claude account windows bound every model. A model-specific window is an additional bound, so that model's effective remaining percentage is the minimum across the named windows.",
+        "effectiveAvailability": [
+          {
+            "scope": "all_models",
+            "status": "known",
+            "effectivePercentRemaining": 31,
+            "boundedBy": [
+              "five_hour",
+              "seven_day"
+            ],
+            "limitingWindowIds": [
+              "seven_day"
+            ],
+            "pace": {
+              "status": "mixed",
+              "aheadWindowIds": [
+                "seven_day"
+              ],
+              "behindWindowIds": [
+                "five_hour"
+              ],
+              "worstReservePercentPoints": -9.8903,
+              "worstReserveWindowId": "seven_day"
+            },
+            "runway": {
+              "status": "projected_exhaustion",
+              "usableRunwaySeconds": 160614,
+              "projectedExhaustedAt": "2026-10-15T16:55:09.538Z",
+              "limitingWindowId": "seven_day",
+              "projectionConfidence": "established"
+            },
+            "selection": {
+              "status": "known",
+              "spendPriority": -0.2797
+            }
+          },
+          {
+            "scope": "model:fable",
+            "status": "known",
+            "effectivePercentRemaining": 31,
+            "boundedBy": [
+              "five_hour",
+              "seven_day",
+              "model:fable"
+            ],
+            "limitingWindowIds": [
+              "seven_day"
+            ],
+            "pace": {
+              "status": "mixed",
+              "aheadWindowIds": [
+                "seven_day"
+              ],
+              "behindWindowIds": [
+                "five_hour",
+                "model:fable"
+              ],
+              "worstReservePercentPoints": -9.8903,
+              "worstReserveWindowId": "seven_day"
+            },
+            "runway": {
+              "status": "projected_exhaustion",
+              "usableRunwaySeconds": 160614,
+              "projectedExhaustedAt": "2026-10-15T16:55:09.538Z",
+              "limitingWindowId": "seven_day",
+              "projectionConfidence": "established"
+            },
+            "selection": {
+              "status": "known",
+              "spendPriority": 1.063
+            }
+          }
+        ]
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "codex",
+      "label": "Codex",
+      "source": "oauth",
+      "plan": "plus",
+      "account": {
+        "email": "user@example.com",
+        "accountId": "account-redacted"
+      },
+      "windows": [
+        {
+          "id": "five_hour",
+          "label": "session",
+          "kind": "session",
+          "percentUsed": 0,
+          "resetsAt": "2026-10-14T01:18:15.000Z",
+          "windowSeconds": 18000,
+          "percentRemaining": 100,
+          "pace": {
+            "status": "on_pace",
+            "timeRemainingPercent": 99.9966,
+            "elapsedPercent": 0.0034,
+            "reservePercentPoints": 0.0034,
+            "cycleBasis": "window_seconds",
+            "cycleSeconds": 18000,
+            "burnMultiple": 0
+          }
+        },
+        {
+          "id": "weekly",
+          "label": "week",
+          "kind": "weekly",
+          "percentUsed": 18,
+          "resetsAt": "2026-10-20T08:08:56.000Z",
+          "windowSeconds": 604800,
+          "percentRemaining": 82,
+          "pace": {
+            "status": "ahead",
+            "timeRemainingPercent": 92.7646,
+            "elapsedPercent": 7.2354,
+            "reservePercentPoints": -10.7646,
+            "cycleBasis": "window_seconds",
+            "cycleSeconds": 604800,
+            "burnMultiple": 2.4878,
+            "projectedExhaustedAt": "2026-10-16T03:40:45.000Z",
+            "projectionConfidence": "early"
+          }
+        }
+      ],
+      "credits": {
+        "remaining": 0,
+        "unlimited": false,
+        "unit": "credits"
+      },
+      "attempts": [
+        {
+          "source": "oauth",
+          "status": "success"
+        }
+      ],
+      "state": {
+        "status": "fresh",
+        "stale": false,
+        "refreshedAt": "2026-10-13T20:18:15.337Z",
+        "sourcesTried": [
+          "oauth"
+        ]
+      },
+      "accountKeys": [
+        "codex-home"
+      ],
+      "quotaSemantics": {
+        "status": "known",
+        "description": "Codex base account windows are applied as a bound to every model scope, including scopes that have named model windows of their own, so that model's effective remaining percentage is the minimum across the named windows. A named model window is an additional, separately metered budget the vendor reports alongside the base limit, so a base window at zero while that model's own windows all still report allowance is a contradiction between the two readings and is published as a bound conflict rather than as the model's exhaustion. Code-review windows describe a separate workload and are not included in model availability.",
+        "effectiveAvailability": [
+          {
+            "scope": "all_models",
+            "status": "known",
+            "effectivePercentRemaining": 82,
+            "boundedBy": [
+              "five_hour",
+              "weekly"
+            ],
+            "limitingWindowIds": [
+              "weekly"
+            ],
+            "pace": {
+              "status": "ahead",
+              "aheadWindowIds": [
+                "weekly"
+              ],
+              "onPaceWindowIds": [
+                "five_hour"
+              ],
+              "worstReservePercentPoints": -10.7646,
+              "worstReserveWindowId": "weekly"
+            },
+            "runway": {
+              "status": "projected_exhaustion",
+              "usableRunwaySeconds": 199349,
+              "projectedExhaustedAt": "2026-10-16T03:40:45.000Z",
+              "limitingWindowId": "weekly",
+              "projectionConfidence": "early"
+            },
+            "selection": {
+              "status": "known",
+              "spendPriority": -1.5286
+            }
+          }
+        ]
+      }
+    },
+    {
+      "provider": "cursor",
+      "label": "Cursor",
+      "source": "unavailable",
+      "windows": [],
+      "state": {
+        "status": "auth_required",
+        "stale": false,
+        "error": "Cursor sign-in required",
+        "sourcesTried": [
+          "state-vscdb",
+          "cli-keychain"
+        ]
+      },
+      "attempts": [
+        {
+          "source": "state-vscdb",
+          "status": "skipped",
+          "error": "credentials_missing"
+        },
+        {
+          "source": "cli-keychain",
+          "status": "skipped",
+          "error": "credentials_missing"
+        }
+      ],
+      "quotaSemantics": {
+        "status": "unknown",
+        "description": "No quota windows are available, so no effective remaining percentage can be computed.",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ],
+      "notSetUp": true
+    },
+    {
+      "provider": "copilot",
+      "label": "GitHub Copilot",
+      "source": "unavailable",
+      "windows": [],
+      "state": {
+        "status": "auth_required",
+        "stale": false,
+        "error": "GitHub Copilot sign-in required",
+        "sourcesTried": [
+          "apps-json",
+          "copilot-cli:keychain",
+          "gh:hosts.yml"
+        ]
+      },
+      "attempts": [
+        {
+          "source": "apps-json",
+          "status": "skipped",
+          "error": "credentials_missing"
+        },
+        {
+          "source": "copilot-cli:keychain",
+          "status": "skipped",
+          "error": "selected_account_unconfirmed",
+          "degraded": false
+        },
+        {
+          "source": "gh:hosts.yml",
+          "status": "skipped",
+          "error": "credentials_keyring_storage",
+          "credentialPresent": true
+        }
+      ],
+      "quotaSemantics": {
+        "status": "unknown",
+        "description": "No quota windows are available, so no effective remaining percentage can be computed.",
+        "effectiveAvailability": [],
+        "unresolvedWindowIds": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "grok",
+      "label": "Grok",
+      "source": "unavailable",
+      "windows": [],
+      "state": {
+        "status": "auth_required",
+        "stale": false,
+        "error": "Grok sign-in required",
+        "sourcesTried": [
+          "auth-json",
+          "pi:xai"
+        ],
+        "authStatus": "unusable"
+      },
+      "attempts": [
+        {
+          "source": "auth-json",
+          "status": "skipped",
+          "error": "credentials_missing"
+        },
+        {
+          "source": "pi:xai",
+          "status": "skipped",
+          "error": "credentials_missing"
+        }
+      ],
+      "quotaSemantics": {
+        "status": "unknown",
+        "description": "No quota windows are available, so no effective remaining percentage can be computed.",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ],
+      "notSetUp": true
+    },
+    {
+      "provider": "kimi",
+      "label": "Kimi",
+      "source": "unavailable",
+      "windows": [],
+      "state": {
+        "status": "auth_required",
+        "stale": false,
+        "error": "kimi_credential_unavailable",
+        "sourcesTried": [
+          "pi:kimi-coding",
+          "kimi-code-cli"
+        ]
+      },
+      "attempts": [
+        {
+          "source": "pi:kimi-coding",
+          "status": "skipped",
+          "error": "kimi_credential_unavailable"
+        },
+        {
+          "source": "kimi-code-cli",
+          "status": "skipped",
+          "error": "kimi_code_cli_credential_unavailable"
+        }
+      ],
+      "quotaSemantics": {
+        "status": "unknown",
+        "description": "No quota windows are available, so no effective remaining percentage can be computed.",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ],
+      "notSetUp": true
+    },
+    {
+      "provider": "zai",
+      "label": "Z.AI",
+      "source": "unavailable",
+      "windows": [],
+      "state": {
+        "status": "auth_required",
+        "stale": false,
+        "error": "zai_credential_unavailable",
+        "sourcesTried": [
+          "pi:zai",
+          "opencode:auth.json"
+        ]
+      },
+      "attempts": [
+        {
+          "source": "pi:zai",
+          "status": "skipped",
+          "error": "zai_credential_unavailable"
+        },
+        {
+          "source": "opencode:auth.json",
+          "status": "skipped",
+          "error": "zai_credential_unavailable"
+        }
+      ],
+      "quotaSemantics": {
+        "status": "unknown",
+        "description": "No quota windows are available, so no effective remaining percentage can be computed.",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ],
+      "notSetUp": true
+    },
+    {
+      "provider": "agy",
+      "label": "Antigravity",
+      "source": "unavailable",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "Antigravity/agy is not running",
+        "sourcesTried": [
+          "cli",
+          "loopback"
+        ]
+      },
+      "attempts": [
+        {
+          "source": "cli",
+          "status": "skipped",
+          "error": "agy CLI is not installed",
+          "degraded": false
+        },
+        {
+          "source": "loopback",
+          "status": "skipped",
+          "error": "Antigravity/agy is not running",
+          "degraded": false
+        }
+      ],
+      "quotaSemantics": {
+        "status": "unknown",
+        "description": "No quota windows are available, so no effective remaining percentage can be computed.",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ],
+      "notSetUp": true
+    },
+    {
+      "provider": "alibaba",
+      "label": "Alibaba Coding Plan",
+      "source": "unavailable",
+      "windows": [],
+      "state": {
+        "status": "unavailable",
+        "stale": false,
+        "error": "bl_cli_unavailable",
+        "sourcesTried": [
+          "bl-cli"
+        ]
+      },
+      "attempts": [
+        {
+          "source": "bl-cli",
+          "status": "skipped",
+          "error": "bl_cli_unavailable"
+        }
+      ],
+      "quotaSemantics": {
+        "status": "unknown",
+        "description": "No quota windows are available, so no effective remaining percentage can be computed.",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ],
+      "notSetUp": true
+    },
+    {
+      "provider": "opencode-go",
+      "label": "OpenCode Go",
+      "source": "api",
+      "plan": "OpenCode Go",
+      "windows": [
+        {
+          "id": "rolling",
+          "label": "rolling",
+          "kind": "unknown",
+          "percentUsed": 0,
+          "percentRemaining": 100,
+          "windowSeconds": 18000,
+          "resetsAt": "2026-10-14T01:18:15.187Z",
+          "pace": {
+            "status": "on_pace",
+            "timeRemainingPercent": 99.9976,
+            "elapsedPercent": 0.0024,
+            "reservePercentPoints": 0.0024,
+            "cycleBasis": "window_seconds",
+            "cycleSeconds": 18000,
+            "burnMultiple": 0
+          }
+        },
+        {
+          "id": "weekly",
+          "label": "weekly",
+          "kind": "weekly",
+          "percentUsed": 7,
+          "percentRemaining": 93,
+          "windowSeconds": 604800,
+          "resetsAt": "2026-10-19T00:00:00.000Z",
+          "pace": {
+            "status": "behind",
+            "timeRemainingPercent": 73.6284,
+            "elapsedPercent": 26.3716,
+            "reservePercentPoints": 19.3716,
+            "cycleBasis": "window_seconds",
+            "cycleSeconds": 604800,
+            "burnMultiple": 0.2654,
+            "projectedExhaustedAt": "2026-11-07T08:55:08.857Z",
+            "projectionConfidence": "established"
+          }
+        },
+        {
+          "id": "monthly",
+          "label": "monthly",
+          "kind": "monthly",
+          "percentUsed": 19,
+          "percentRemaining": 81,
+          "startsAt": "2026-10-08T10:51:51.000Z",
+          "resetsAt": "2026-11-08T10:51:51.000Z",
+          "pace": {
+            "status": "ahead",
+            "timeRemainingPercent": 82.6021,
+            "elapsedPercent": 17.3979,
+            "reservePercentPoints": -1.6021,
+            "cycleBasis": "starts_at_resets_at",
+            "cycleSeconds": 2678400,
+            "burnMultiple": 1.0921,
+            "projectedExhaustedAt": "2026-11-05T20:07:41.631Z",
+            "projectionConfidence": "established"
+          }
+        }
+      ],
+      "attempts": [
+        {
+          "source": "opencode:auth.json",
+          "status": "success"
+        }
+      ],
+      "state": {
+        "status": "fresh",
+        "stale": false,
+        "refreshedAt": "2026-10-13T20:18:15.239Z",
+        "sourcesTried": [
+          "opencode:auth.json"
+        ]
+      },
+      "quotaSemantics": {
+        "status": "known",
+        "description": "OpenCode Go's rolling, weekly, and monthly windows are stacked plan caps ($12 per rolling 5 hours, $30 per week, $60 per month) that jointly bound Go-plan usage, so effective remaining is the minimum across the named windows. A zeroed plan window blocks Go-plan requests; the vendor's free-model fallback or an opted-in Zen balance may still serve past it, which this endpoint does not report.",
+        "effectiveAvailability": [
+          {
+            "scope": "all_models",
+            "status": "known",
+            "effectivePercentRemaining": 81,
+            "boundedBy": [
+              "rolling",
+              "weekly",
+              "monthly"
+            ],
+            "limitingWindowIds": [
+              "monthly"
+            ],
+            "pace": {
+              "status": "mixed",
+              "aheadWindowIds": [
+                "monthly"
+              ],
+              "behindWindowIds": [
+                "weekly"
+              ],
+              "onPaceWindowIds": [
+                "rolling"
+              ],
+              "worstReservePercentPoints": -1.6021,
+              "worstReserveWindowId": "monthly"
+            },
+            "runway": {
+              "status": "projected_exhaustion",
+              "usableRunwaySeconds": 1986566,
+              "projectedExhaustedAt": "2026-11-05T20:07:41.631Z",
+              "limitingWindowId": "monthly",
+              "projectionConfidence": "established"
+            },
+            "selection": {
+              "status": "known",
+              "spendPriority": 0.0978
+            }
+          }
+        ]
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "commandcode",
+      "label": "Command Code",
+      "source": "unavailable",
+      "windows": [],
+      "state": {
+        "status": "auth_required",
+        "stale": false,
+        "error": "commandcode_sign_in_required",
+        "authStatus": "unusable",
+        "sourcesTried": [
+          "pi:commandcode",
+          "env:COMMAND_CODE_API_KEY",
+          "env:COMMANDCODE_API_KEY",
+          "commandcode-cli",
+          "omp:commandcode"
+        ]
+      },
+      "attempts": [
+        {
+          "source": "pi:commandcode",
+          "status": "skipped",
+          "error": "commandcode_sign_in_required"
+        },
+        {
+          "source": "env:COMMAND_CODE_API_KEY",
+          "status": "skipped",
+          "error": "commandcode_sign_in_required"
+        },
+        {
+          "source": "env:COMMANDCODE_API_KEY",
+          "status": "skipped",
+          "error": "commandcode_sign_in_required"
+        },
+        {
+          "source": "commandcode-cli",
+          "status": "skipped",
+          "error": "commandcode_sign_in_required"
+        },
+        {
+          "source": "omp:commandcode",
+          "status": "skipped",
+          "error": "commandcode_sign_in_required"
+        }
+      ],
+      "quotaSemantics": {
+        "status": "unknown",
+        "description": "No quota windows are available, so no effective remaining percentage can be computed.",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ],
+      "notSetUp": true
+    },
+    {
+      "provider": "minimax",
+      "label": "MiniMax",
+      "source": "unavailable",
+      "windows": [],
+      "state": {
+        "status": "auth_required",
+        "stale": false,
+        "error": "minimax_credential_unavailable",
+        "sourcesTried": [
+          "env:MINIMAX_API_KEY",
+          "pi:minimax",
+          "minimax:config.json"
+        ]
+      },
+      "attempts": [
+        {
+          "source": "env:MINIMAX_API_KEY",
+          "status": "skipped",
+          "error": "minimax_credential_unavailable"
+        },
+        {
+          "source": "pi:minimax",
+          "status": "skipped",
+          "error": "minimax_credential_unavailable"
+        },
+        {
+          "source": "minimax:config.json",
+          "status": "skipped",
+          "error": "minimax_credential_unavailable"
+        }
+      ],
+      "quotaSemantics": {
+        "status": "unknown",
+        "description": "No quota windows are available, so no effective remaining percentage can be computed.",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ],
+      "notSetUp": true
+    },
+    {
+      "provider": "mimo",
+      "label": "MiMo",
+      "source": "unavailable",
+      "windows": [],
+      "state": {
+        "status": "auth_required",
+        "stale": false,
+        "error": "mimo_credential_unavailable",
+        "sourcesTried": [
+          "env:MIMO_API_KEY",
+          "pi:xiaomi",
+          "pi:xiaomi-token-plan-sgp",
+          "pi:xiaomi-token-plan-cn",
+          "pi:xiaomi-token-plan-ams"
+        ]
+      },
+      "attempts": [
+        {
+          "source": "env:MIMO_API_KEY",
+          "status": "skipped",
+          "error": "mimo_credential_unavailable"
+        },
+        {
+          "source": "pi:xiaomi",
+          "status": "skipped",
+          "error": "mimo_credential_unavailable"
+        },
+        {
+          "source": "pi:xiaomi-token-plan-sgp",
+          "status": "skipped",
+          "error": "mimo_credential_unavailable"
+        },
+        {
+          "source": "pi:xiaomi-token-plan-cn",
+          "status": "skipped",
+          "error": "mimo_credential_unavailable"
+        },
+        {
+          "source": "pi:xiaomi-token-plan-ams",
+          "status": "skipped",
+          "error": "mimo_credential_unavailable"
+        }
+      ],
+      "quotaSemantics": {
+        "status": "unknown",
+        "description": "No quota windows are available, so no effective remaining percentage can be computed.",
+        "effectiveAvailability": [],
+        "unresolvedWindowIds": []
+      },
+      "accountKeys": [
+        "default"
+      ],
+      "notSetUp": true
+    },
+    {
+      "provider": "deepseek",
+      "label": "DeepSeek",
+      "source": "unavailable",
+      "windows": [],
+      "state": {
+        "status": "auth_required",
+        "stale": false,
+        "error": "deepseek_credential_unavailable",
+        "sourcesTried": [
+          "env:DEEPSEEK_API_KEY",
+          "pi:deepseek"
+        ]
+      },
+      "attempts": [
+        {
+          "source": "env:DEEPSEEK_API_KEY",
+          "status": "skipped",
+          "error": "deepseek_credential_unavailable"
+        },
+        {
+          "source": "pi:deepseek",
+          "status": "skipped",
+          "error": "deepseek_credential_unavailable"
+        }
+      ],
+      "quotaSemantics": {
+        "status": "unknown",
+        "description": "No quota windows are available, so no effective remaining percentage can be computed.",
+        "effectiveAvailability": [],
+        "unresolvedWindowIds": []
+      },
+      "accountKeys": [
+        "default"
+      ],
+      "notSetUp": true
+    },
+    {
+      "provider": "openrouter",
+      "label": "OpenRouter",
+      "source": "unavailable",
+      "windows": [],
+      "state": {
+        "status": "auth_required",
+        "stale": false,
+        "error": "openrouter_credential_unavailable",
+        "sourcesTried": [
+          "env:OPENROUTER_API_KEY",
+          "pi:openrouter"
+        ]
+      },
+      "attempts": [
+        {
+          "source": "env:OPENROUTER_API_KEY",
+          "status": "skipped",
+          "error": "openrouter_credential_unavailable"
+        },
+        {
+          "source": "pi:openrouter",
+          "status": "failed",
+          "error": "openrouter_credential_invalid"
+        }
+      ],
+      "quotaSemantics": {
+        "status": "unknown",
+        "description": "No quota windows are available, so no effective remaining percentage can be computed.",
+        "effectiveAvailability": [],
+        "unresolvedWindowIds": []
+      },
+      "accountKeys": [
+        "default"
+      ]
+    },
+    {
+      "provider": "elevenlabs",
+      "label": "ElevenLabs",
+      "source": "unavailable",
+      "windows": [],
+      "state": {
+        "status": "auth_required",
+        "stale": false,
+        "error": "elevenlabs_credential_unavailable",
+        "authStatus": "unusable",
+        "sourcesTried": [
+          "env:ELEVENLABS_API_KEY"
+        ]
+      },
+      "attempts": [
+        {
+          "source": "env:ELEVENLABS_API_KEY",
+          "status": "skipped",
+          "error": "elevenlabs_credential_unavailable"
+        }
+      ],
+      "quotaSemantics": {
+        "status": "unknown",
+        "description": "No quota windows are available, so no effective remaining percentage can be computed.",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ],
+      "notSetUp": true
+    },
+    {
+      "provider": "devin",
+      "label": "Devin",
+      "source": "unavailable",
+      "windows": [],
+      "state": {
+        "status": "auth_required",
+        "stale": false,
+        "error": "devin_credential_unavailable",
+        "authStatus": "unusable",
+        "remedyCommand": "devin auth login",
+        "sourcesTried": [
+          "env:WINDSURF_API_KEY",
+          "file:credentials.toml"
+        ]
+      },
+      "attempts": [
+        {
+          "source": "env:WINDSURF_API_KEY",
+          "status": "skipped",
+          "error": "devin_credential_unavailable"
+        },
+        {
+          "source": "file:credentials.toml",
+          "status": "skipped",
+          "error": "devin_credential_unavailable"
+        }
+      ],
+      "quotaSemantics": {
+        "status": "unknown",
+        "description": "No quota windows are available, so no effective remaining percentage can be computed.",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ],
+      "notSetUp": true
+    },
+    {
+      "provider": "muse",
+      "label": "Muse",
+      "source": "unavailable",
+      "windows": [],
+      "state": {
+        "status": "auth_required",
+        "stale": false,
+        "error": "muse_credential_unavailable",
+        "authStatus": "unusable",
+        "sourcesTried": [
+          "muse:auth.json",
+          "cli-keychain",
+          "env:META_API_KEY"
+        ]
+      },
+      "attempts": [
+        {
+          "source": "muse:auth.json",
+          "status": "skipped"
+        },
+        {
+          "source": "cli-keychain",
+          "status": "skipped"
+        },
+        {
+          "source": "env:META_API_KEY",
+          "status": "skipped"
+        }
+      ],
+      "quotaSemantics": {
+        "status": "unknown",
+        "description": "No quota windows are available, so no effective remaining percentage can be computed.",
+        "effectiveAvailability": []
+      },
+      "accountKeys": [
+        "default"
+      ],
+      "notSetUp": true
+    }
+  ]
+}

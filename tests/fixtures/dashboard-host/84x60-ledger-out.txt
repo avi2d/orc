@@ -1,0 +1,49 @@
+● claude main · max     quota, gluttons, queue, machines every 10s · alerts every 2s
+  5 hours    ━━━━━┃━━━━━━━━━━━━━━╸  98% left                        resets in 1h 11m
+  week       ━━━━━━╸──┃───────────  31% left  runs out in 1d 20h    resets in 2d 20h
+  fable week ━━━━━━━━━┃━━━━━━━━━━━ 100% left                        resets in 2d 20h
+● claude second · pro
+  week                                        read 10h 9m ago
+● codex · plus
+  5 hours    ━━━━━━━━━━━━━━━━━━━━┃ 100% left                        resets in 4h 59m
+  week       ━━━━━━━━━━━━━━━━━──┃─  82% left  may run out in 2d 7h  resets in 6d 11h
+● opencode-go
+  5 hours    ━━━━━━━━━━━━━━━━━━━━┃ 100% left                        resets in 4h 59m
+  week       ━━━━━━━━━━━━━━━┃━━━╸─  93% left                        resets in 5d 3h
+  month      ━━━━━━━━━━━━━━━━━┃───  81% left  runs out in 22d       resets in 25d
+
+⚑ shop is spending over its share of claude main's week
+⚑ my-home is spending over its share of claude main's week
+⚑ a no-mistakes run is spending over its share of claude main's week
+⚑ my-home is spending over its share of opencode-go's month
+
+queue    north · 2 running · 2 queued · 1 paused · gpu group paused
+         south · 1 running
+actions  shop · none queued
+
+north    cpu 11% · memory 5.5G of 31.3G
+gpu      NVIDIA GeForce RTX 3080 Laptop GPU · 9% · memory 1.8G of 16.0G
+south    cpu 42% · memory 12.0G of 64.0G
+gpu      NVIDIA GeForce RTX 4090 · 63% · memory 8.0G of 24.0G
+
+alerts
+alert    quota-pace
+limits   a window runs ahead of pace past its first tenth and runs out before its
+         reset
+         read every 1m
+fired    none recorded
+alert    heavy-load
+limits   north load ≥ 10 or memory used ≥ 90% · south load ≥ 16 or memory free < 15%
+         over for 5m · read every 30s
+fired    just now · south over memory · north over load
+verdict  expected, a nightly baseline runs on south
+alert    long-task
+limits   quiet 20m, then every 10m · past 3h in total
+         watches working, waiting and blocked · read every 30s
+fired    just now · Plot the bridge migration on north, quiet 30m
+verdict  none on this fire
+earlier  just now · Plot the bridge migration on north, quiet 15m
+         still moving the queue, let it run
+alert    nightly
+limits   no repository mapped to an owner home · read every 5m
+fired    none recorded

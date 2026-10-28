@@ -1,0 +1,16 @@
+{
+  "name": "@tui-dash/schedules",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Scheduled box for tui-dash, listing what runs next on each configured machine",
+  "repository": "https://github.com/avi2d/tui-dash.git",
+  "author": "avi2d <avi2dg@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@tui-dash/schema": "workspace:*",
+    "@tui-dash/ui": "workspace:*",
+    "effect": "4.0.0"
+  }
+}

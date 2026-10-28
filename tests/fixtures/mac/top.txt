@@ -1,0 +1,34 @@
+Processes: 680 total, 3 running, 677 sleeping, 2156 threads
+Load Avg: 2.31, 2.40, 2.41
+CPU usage: 4.12% user, 2.10% sys, 93.78% idle
+SharedLibs: 1234M resident, 0B data, 0B linkedit.
+MemRegions: 123456 total, 5432M resident, 123M private, 2345M shared.
+PhysMem: 13G used (2717M wired, 2259M compressor), 2691M unused.
+VM: 12T vsize, 1234M framework vsize, 0(0) swapins, 0(0) swapouts.
+Networks: packets: 123456/12G in, 65432/3456M out.
+Disks: 123456/12G read, 65432/3456M written.
+
+PID COMMAND %CPU
+1     launchd 0.0
+759   BlockBlock 0.0
+1430  Finder 0.0
+1441  Google Chrome Helper (Renderer) 0.0
+2113  XprotectService 0.0
+15980 wezterm-gui 0.0
+Processes: 680 total, 3 running, 677 sleeping, 2156 threads
+Load Avg: 2.17, 2.36, 2.40
+CPU usage: 9.50% user, 4.03% sys, 86.47% idle
+SharedLibs: 1234M resident, 0B data, 0B linkedit.
+MemRegions: 123456 total, 5432M resident, 123M private, 2345M shared.
+PhysMem: 13G used (2717M wired, 2259M compressor), 2691M unused.
+VM: 12T vsize, 1234M framework vsize, 0(0) swapins, 0(0) swapouts.
+Networks: packets: 123456/12G in, 65432/3456M out.
+Disks: 123456/12G read, 65432/3456M written.
+
+PID COMMAND %CPU
+1     launchd 0.0
+759   BlockBlock 0.1
+1430  Finder 0.2
+1441  Google Chrome Helper (Renderer) 3.1
+2113  XprotectService 0.0
+15980 wezterm-gui 15.2

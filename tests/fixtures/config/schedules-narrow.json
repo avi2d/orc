@@ -1,0 +1,22 @@
+{
+  "layout": {
+    "wide": [
+      {
+        "atLeast": { "columns": 240, "rows": 36 },
+        "rows": [
+          { "height": "auto", "atMost": 0.55, "least": 8, "cells": [{ "panel": "quota" }, { "tabs": ["session-quota", "alerts"] }] },
+          { "height": "fill", "cells": [{ "stack": [{ "panel": "resources" }, { "tabs": ["queues", "schedules"] }] }, { "panel": "tasks", "width": 2 }] }
+        ]
+      },
+      {
+        "atLeast": { "columns": 120, "rows": 36 },
+        "rows": [
+          { "height": "auto", "atMost": 0.55, "least": 8, "cells": [{ "panel": "quota" }, { "tabs": ["session-quota", "alerts"] }] },
+          { "height": "fill", "cells": [{ "stack": [{ "panel": "resources" }, { "tabs": ["queues", "schedules"] }] }, { "panel": "tasks", "width": 1 }] }
+        ]
+      }
+    ],
+    "narrow": ["quota", "session-quota", "queues", "schedules", "resources", "alerts", "tasks"],
+    "narrowGivesWay": ["alerts", "quota", "session-quota"]
+  }
+}

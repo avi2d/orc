@@ -1,0 +1,174 @@
+{
+  "tasks": {
+    "600": {
+      "id": 600,
+      "created_at": "2026-10-28T02:36:39.061814922+03:00",
+      "original_command": "sh -c echo boom; exit 3",
+      "command": "sh -c echo boom; exit 3",
+      "path": "/checkout",
+      "envs": {},
+      "group": "orc",
+      "dependencies": [],
+      "priority": 0,
+      "label": "task-1",
+      "status": {
+        "Done": {
+          "enqueued_at": "2026-10-28T02:36:39.061805554+03:00",
+          "start": "2026-10-28T02:36:39.500714478+03:00",
+          "end": "2026-10-28T02:36:39.813373536+03:00",
+          "result": {
+            "Failed": 3
+          }
+        }
+      }
+    },
+    "655": {
+      "id": 655,
+      "created_at": "2026-10-28T02:36:39.046811793+03:00",
+      "original_command": "echo hello",
+      "command": "echo hello",
+      "path": "/checkout",
+      "envs": {},
+      "group": "orc",
+      "dependencies": [],
+      "priority": 0,
+      "label": "task-1",
+      "status": {
+        "Done": {
+          "enqueued_at": "2026-10-28T02:36:39.046802416+03:00",
+          "start": "2026-10-28T02:36:39.176448491+03:00",
+          "end": "2026-10-28T02:36:39.489650573+03:00",
+          "result": "Success"
+        }
+      }
+    },
+    "656": {
+      "id": 656,
+      "created_at": "2026-10-28T02:36:39.061814922+03:00",
+      "original_command": "sh -c echo boom; exit 3",
+      "command": "sh -c echo boom; exit 3",
+      "path": "/checkout",
+      "envs": {},
+      "group": "orc",
+      "dependencies": [],
+      "priority": 0,
+      "label": "task-2",
+      "status": {
+        "Done": {
+          "enqueued_at": "2026-10-28T02:36:39.061805554+03:00",
+          "start": "2026-10-28T02:36:39.500714478+03:00",
+          "end": "2026-10-28T02:36:39.813373536+03:00",
+          "result": {
+            "Failed": 3
+          }
+        }
+      }
+    },
+    "657": {
+      "id": 657,
+      "created_at": "2026-10-28T02:36:41.080925312+03:00",
+      "original_command": "sleep 30",
+      "command": "sleep 30",
+      "path": "/checkout",
+      "envs": {},
+      "group": "orc",
+      "dependencies": [],
+      "priority": 0,
+      "label": "task-3",
+      "status": {
+        "Done": {
+          "enqueued_at": "2026-10-28T02:36:41.080914903+03:00",
+          "start": "2026-10-28T02:36:41.331824562+03:00",
+          "end": "2026-10-28T02:36:42.246702792+03:00",
+          "result": "Killed"
+        }
+      }
+    },
+    "658": {
+      "id": 658,
+      "created_at": "2026-10-28T02:36:41.098265410+03:00",
+      "original_command": "echo later",
+      "command": "echo later",
+      "path": "/checkout",
+      "envs": {},
+      "group": "orc",
+      "dependencies": [],
+      "priority": 0,
+      "label": "task-4",
+      "status": {
+        "Queued": {
+          "enqueued_at": "2026-10-28T02:36:41.098255993+03:00"
+        }
+      }
+    },
+    "659": {
+      "id": 659,
+      "created_at": "2026-10-28T02:36:41.113825170+03:00",
+      "original_command": "echo stash",
+      "command": "echo stash",
+      "path": "/checkout",
+      "envs": {},
+      "group": "orc",
+      "dependencies": [],
+      "priority": 0,
+      "label": "task-5",
+      "status": {
+        "Stashed": {
+          "enqueue_at": null
+        }
+      }
+    },
+    "660": {
+      "id": 660,
+      "created_at": "2026-10-28T02:36:41.080925312+03:00",
+      "original_command": "sleep 30",
+      "command": "sleep 30",
+      "path": "/checkout",
+      "envs": {},
+      "group": "orc",
+      "dependencies": [],
+      "priority": 0,
+      "label": "task-6",
+      "status": {
+        "Running": {
+          "enqueued_at": "2026-10-28T02:36:41.080914903+03:00",
+          "start": "2026-10-28T02:36:41.331824562+03:00"
+        }
+      }
+    },
+    "661": {
+      "id": 661,
+      "created_at": "2026-10-28T02:36:39.046811793+03:00",
+      "original_command": "echo hello",
+      "command": "echo hello",
+      "path": "/checkout",
+      "envs": {},
+      "group": "tests",
+      "dependencies": [],
+      "priority": 0,
+      "label": "task-7",
+      "status": {
+        "Done": {
+          "enqueued_at": "2026-10-28T02:36:39.046802416+03:00",
+          "start": "2026-10-28T02:36:39.176448491+03:00",
+          "end": "2026-10-28T02:36:39.489650573+03:00",
+          "result": "Success"
+        }
+      }
+    }
+  },
+  "groups": {
+    "default": {
+      "status": "Running",
+      "parallel_tasks": 1
+    },
+    "tests": {
+      "status": "Running",
+      "parallel_tasks": 2
+    },
+    "orc": {
+      "status": "Running",
+      "parallel_tasks": 1
+    }
+  }
+}

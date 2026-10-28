@@ -1,0 +1,17 @@
+estimates from north and south logs, upper bounds, never quota
+! south: pids 5150 5151 share pi logs in ~/work/api, so those logs read as ended
+  session                                                       price  raw  ≤pp pp/h
+● claude work · assumed the default login
+5h window 0pp used · none logged on north or south · south read another cycle
+7d window 60pp used · fair 0.25pp/h each · ahead of pace, over fair share flagged
+⚑ south ~/work/api w1                                             50%  20%  ≤30 30.0
+⚑ north shop-a1b2c3/1 w1                                          25%  50%  ≤15 15.0
+○ north ~/notes #00b001                                           25%  30%  ≤15 0.00
+● codex · joined by credential key
+7d window 10pp used · fair 1.25pp/h each · behind pace
+● north ~/api pid 4242                                           100% 100%  ≤10 0.00
+● opencode-go · assumed the only login
+30d window 20pp used · fair 0.23pp/h each · behind pace
+○ south ~/notes #00e001                                          100% 100%  ≤20 0.00
+off subscription · openai 3 calls
+1 call on no account quota-axi reports

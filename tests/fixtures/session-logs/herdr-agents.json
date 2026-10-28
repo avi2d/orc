@@ -1,0 +1,50 @@
+{
+ "id": "1",
+ "result": {
+  "type": "agent_list",
+  "agents": [
+   {
+    "agent": "pi",
+    "agent_session": {
+     "agent": "pi",
+     "kind": "path",
+     "source": "herdr:pi",
+     "value": "/home/tester/.pi/agent/sessions/--home-tester-.treehouse-shop-a1b2c3-1-shop--/2026-10-13T17-00-00-000Z_aaaaaaaa-0000-4000-8000-00000000a001.jsonl"
+    },
+    "agent_status": "working",
+    "cwd": "/home/tester/.treehouse/shop-a1b2c3/1/shop",
+    "pane_id": "w1A:p2"
+   },
+   {
+    "agent": "pi",
+    "agent_session": {
+     "agent": "pi",
+     "kind": "path",
+     "source": "herdr:pi",
+     "value": "/home/tester/.pi/agent/sessions/--home-tester-my-home--/2026-10-13T16-00-00-000Z_bbbbbbbb-0000-4000-8000-00000000b001.jsonl"
+    },
+    "agent_status": "idle",
+    "cwd": "/home/tester/my-home",
+    "pane_id": "w2B:p2"
+   },
+   {
+    "agent": "claude",
+    "agent_status": "idle",
+    "cwd": "/home/tester/elsewhere",
+    "pane_id": "w3C:p2"
+   },
+   {
+    "agent": "pi",
+    "agent_session": {
+     "agent": "pi",
+     "kind": "path",
+     "source": "herdr:pi",
+     "value": "/home/tester/.pi/agent/sessions/--home-tester-.treehouse-shop-a1b2c3-2-shop--/2026-10-10T10-00-00-000Z_eeeeeeee-0000-4000-8000-00000000e002.jsonl"
+    },
+    "agent_status": "done",
+    "cwd": "/home/tester/my-home/projects/shop",
+    "pane_id": "w4D:p2"
+   }
+  ]
+ }
+}

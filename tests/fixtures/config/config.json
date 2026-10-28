@@ -1,0 +1,29 @@
+{
+  "panels": {
+    "alerts": {
+      "heavyLoad": {
+        "machines": [
+          {
+            "name": "north",
+            "loadAtLeast": 10,
+            "memory": {
+              "usedAtLeastPercent": 90
+            }
+          },
+          {
+            "name": "south",
+            "loadAtLeast": 16,
+            "memory": {
+              "availableUnderPercent": 15
+            }
+          }
+        ]
+      },
+      "longTask": {
+        "quietMinutes": 20,
+        "repeatMinutes": 10,
+        "totalHours": 3
+      }
+    }
+  }
+}

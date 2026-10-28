@@ -1,0 +1,24 @@
+{
+  "name": "@tui-dash/session-quota",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone OpenTUI session quota panel, JSON contract and alert stream for tui-dash",
+  "repository": "https://github.com/avi2d/tui-dash.git",
+  "author": "avi2d <avi2dg@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "bin": {
+    "tui-dash-capture": "src/capture-bin.ts"
+  },
+  "scripts": {
+    "build": "bun build src/capture-bin.ts --outdir dist --target bun --minify"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "4.0.0",
+    "@opentui/core": "0.6.5",
+    "@tui-dash/schema": "workspace:*",
+    "@tui-dash/ui": "workspace:*",
+    "effect": "4.0.0"
+  }
+}

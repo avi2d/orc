@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-19T08:02:11.000Z",
+  "orchestrator": {
+    "name": "harbor",
+    "version": "0.9.0"
+  },
+  "tasks": [
+    {
+      "id": "tasks-pipe-full",
+      "title": "Fast-start review",
+      "project": "harbor",
+      "kind": "full review fix",
+      "state": "working",
+      "detail": "CI · 6 of 9 checks passed · running 10m",
+      "startedAt": "2026-10-19T06:00:00.000Z",
+      "firstStartedAt": "2026-10-19T06:00:00.000Z",
+      "endedAt": null,
+      "folders": [
+        "/home/example/work/harbor"
+      ],
+      "branches": [
+        "fm/tui-dash-fast-start"
+      ]
+    },
+    {
+      "id": "tasks-pipe-quick",
+      "title": "Runner fault fix",
+      "project": "harbor",
+      "kind": "quick fix",
+      "state": "working",
+      "detail": "CI · 3 of 5 checks passed · running 3m",
+      "startedAt": "2026-10-19T07:30:00.000Z",
+      "firstStartedAt": "2026-10-19T07:30:00.000Z",
+      "endedAt": null,
+      "folders": [
+        "/home/example/work/harbor"
+      ],
+      "branches": []
+    },
+    {
+      "id": "tasks-pipe-scout",
+      "title": "Access log scout",
+      "project": "harbor",
+      "kind": "scout",
+      "state": "waiting",
+      "detail": "needs a decision on 3 review findings · 5 awaiting",
+      "startedAt": "2026-10-19T07:00:00.000Z",
+      "firstStartedAt": "2026-10-19T07:00:00.000Z",
+      "endedAt": null,
+      "folders": [
+        "/home/example/work/harbor"
+      ],
+      "branches": []
+    },
+    {
+      "id": "tasks-pipe-local",
+      "title": "Local branch land",
+      "project": "harbor",
+      "kind": "local only",
+      "state": "done",
+      "detail": "landed",
+      "startedAt": "2026-10-19T05:00:00.000Z",
+      "firstStartedAt": "2026-10-19T05:00:00.000Z",
+      "endedAt": "2026-10-19T06:30:00.000Z",
+      "folders": [
+        "/home/example/work/harbor"
+      ],
+      "branches": []
+    },
+    {
+      "id": "tasks-pipe-build",
+      "title": "Runner rebuild",
+      "project": "harbor",
+      "kind": "build",
+      "state": "working",
+      "detail": "reproducing the runner fault",
+      "startedAt": "2026-10-19T07:00:00.000Z",
+      "firstStartedAt": "2026-10-19T07:00:00.000Z",
+      "endedAt": null,
+      "folders": [
+        "/home/example/work/harbor"
+      ],
+      "branches": []
+    },
+    {
+      "id": "orc-step-7",
+      "title": "Step seven run",
+      "project": "harbor",
+      "kind": "orc run",
+      "state": "working",
+      "detail": "writing the run report command",
+      "startedAt": "2026-10-19T07:45:00.000Z",
+      "firstStartedAt": "2026-10-19T07:45:00.000Z",
+      "endedAt": null,
+      "folders": [
+        "/home/example/work/harbor"
+      ],
+      "branches": [
+        "fm/orc-step-7"
+      ]
+    }
+  ],
+  "overhead": [],
+  "schedules": []
+}

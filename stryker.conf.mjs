@@ -2,9 +2,9 @@ import preset, { unitTestFiles } from "@avi2dg/checks/stryker.preset.js";
 
 export default {
   ...preset,
-  // packages/run/src/bin.ts only starts the orc program, which the unit tests this run loads never start.
+  // src/live and the src/*bin.ts entry points only run real processes and the real terminal, which the unit tests this run loads never start.
   // The runner's preload imports every mutated file, and an entry point runs its program and exits on import.
-  mutate: ["packages/run/src/**/*.ts", "!packages/run/src/bin.ts"],
+  mutate: ["packages/*/src/**/*.ts", "!packages/*/src/live/**", "!packages/*/src/*bin.ts"],
   bun: {
     ...preset.bun,
     testFiles: unitTestFiles(),

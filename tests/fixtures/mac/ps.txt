@@ -1,0 +1,6 @@
+    1   2.4  13328 /sbin/launchd
+  759   1.0  11968 /Library/Objective-See/BlockBlock/BlockBlock.app/Contents/MacOS/BlockBlock
+ 1430   0.0  80976 /System/Library/CoreServices/Finder.app/Contents/MacOS/Finder
+ 1441   1.6  81168 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/154.0.8037.58/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)
+ 2113   0.0   5456 /System/Library/PrivateFrameworks/XprotectFramework.framework/Versions/A/XPCServices/XprotectService.xpc/Contents/MacOS/XprotectService
+15980  15.4  66944 /Applications/WezTerm.app/Contents/MacOS/wezterm-gui

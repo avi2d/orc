@@ -1,0 +1,334 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-16T12:00:00.000Z",
+  "scope": "local",
+  "estimate": {
+    "basis": "local-logs",
+    "upperBound": true,
+    "priceRatios": {
+      "input": 1,
+      "output": 5,
+      "cacheRead": 0.1,
+      "cacheWrite": 2
+    }
+  },
+  "sources": {
+    "quota": {
+      "status": "ok"
+    },
+    "herdr": {
+      "status": "ok"
+    },
+    "processes": {
+      "status": "ok"
+    }
+  },
+  "ledger": {
+    "bridgeCopiesDropped": 0,
+    "repeatedLinesDropped": 2,
+    "emptyRowsDropped": 0,
+    "forkCopiesDropped": 0,
+    "repeatedCountsDropped": 0,
+    "unjoinedCalls": 1
+  },
+  "accounts": [
+    {
+      "provider": "claude",
+      "accountKey": "work",
+      "title": "claude work",
+      "joins": [
+        {
+          "kind": "default-account"
+        }
+      ],
+      "quota": {
+        "status": "ok"
+      }
+    },
+    {
+      "provider": "opencode-go",
+      "accountKey": null,
+      "title": "opencode-go",
+      "joins": [
+        {
+          "kind": "only-account"
+        }
+      ],
+      "quota": {
+        "status": "ok"
+      }
+    }
+  ],
+  "windows": [
+    {
+      "account": {
+        "provider": "claude",
+        "accountKey": "work",
+        "title": "claude work"
+      },
+      "id": "five_hour",
+      "label": "Session",
+      "kind": "session",
+      "startsAt": "2026-10-16T07:00:00.000Z",
+      "resetsAt": "2026-10-16T12:00:00.000Z",
+      "usedPoints": 80,
+      "leftPoints": 20,
+      "pace": "unknown",
+      "elapsedFraction": 1,
+      "gate": {
+        "aheadOfPace": false,
+        "pastFirstTenth": true,
+        "open": false
+      },
+      "sustainablePointsPerHour": null,
+      "activeSessions": 1,
+      "fairPointsPerHour": null,
+      "observed": {
+        "calls": 1,
+        "tokens": {
+          "input": 0,
+          "output": 100,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 100
+        }
+      },
+      "unattributedPoints": 0,
+      "sessions": [
+        {
+          "session": "pane:w1",
+          "label": "~/work/api w1",
+          "calls": 1,
+          "tokens": {
+            "input": 0,
+            "output": 100,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 100
+          },
+          "trailingHourTokens": {
+            "input": 0,
+            "output": 100,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 100
+          },
+          "raw": {
+            "share": 1,
+            "contributionPoints": 80,
+            "pointsPerHour": 80
+          },
+          "priced": {
+            "share": 1,
+            "contributionPoints": 80,
+            "pointsPerHour": 80
+          },
+          "flagged": false
+        }
+      ]
+    },
+    {
+      "account": {
+        "provider": "claude",
+        "accountKey": "work",
+        "title": "claude work"
+      },
+      "id": "seven_day",
+      "label": "Weekly",
+      "kind": "weekly",
+      "startsAt": "2026-10-12T20:00:00.000Z",
+      "resetsAt": "2026-10-19T20:00:00.000Z",
+      "usedPoints": 60,
+      "leftPoints": 40,
+      "pace": "ahead",
+      "elapsedFraction": 0.5238095238095238,
+      "gate": {
+        "aheadOfPace": true,
+        "pastFirstTenth": true,
+        "open": true
+      },
+      "sustainablePointsPerHour": 0.5,
+      "activeSessions": 1,
+      "fairPointsPerHour": 0.5,
+      "observed": {
+        "calls": 3,
+        "tokens": {
+          "input": 0,
+          "output": 400,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 400
+        }
+      },
+      "unattributedPoints": 0,
+      "sessions": [
+        {
+          "session": "pane:w1",
+          "label": "~/work/api w1",
+          "calls": 3,
+          "tokens": {
+            "input": 0,
+            "output": 400,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 400
+          },
+          "trailingHourTokens": {
+            "input": 0,
+            "output": 400,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 400
+          },
+          "raw": {
+            "share": 1,
+            "contributionPoints": 60,
+            "pointsPerHour": 60
+          },
+          "priced": {
+            "share": 1,
+            "contributionPoints": 60,
+            "pointsPerHour": 60
+          },
+          "flagged": true
+        }
+      ]
+    },
+    {
+      "account": {
+        "provider": "opencode-go",
+        "accountKey": null,
+        "title": "opencode-go"
+      },
+      "id": "monthly",
+      "label": "Monthly",
+      "kind": "monthly",
+      "startsAt": "2026-10-01T00:00:00.000Z",
+      "resetsAt": "2026-10-31T00:00:00.000Z",
+      "usedPoints": 20,
+      "leftPoints": 80,
+      "pace": "behind",
+      "elapsedFraction": 0.5166666666666667,
+      "gate": {
+        "aheadOfPace": false,
+        "pastFirstTenth": true,
+        "open": false
+      },
+      "sustainablePointsPerHour": 0.22988505747126436,
+      "activeSessions": 0,
+      "fairPointsPerHour": 0.22988505747126436,
+      "observed": {
+        "calls": 2,
+        "tokens": {
+          "input": 400,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 400
+        }
+      },
+      "unattributedPoints": 0,
+      "sessions": [
+        {
+          "session": "file:/home/tester/.pi/agent/sessions/--home-tester-notes--/2026-10-15T08-00-00-000Z_eeeeeeee-0000-4000-8000-00000000e001.jsonl",
+          "label": "~/notes #00e001",
+          "calls": 2,
+          "tokens": {
+            "input": 400,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 400
+          },
+          "trailingHourTokens": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          },
+          "raw": {
+            "share": 1,
+            "contributionPoints": 20,
+            "pointsPerHour": 0
+          },
+          "priced": {
+            "share": 1,
+            "contributionPoints": 20,
+            "pointsPerHour": 0
+          },
+          "flagged": false
+        }
+      ]
+    }
+  ],
+  "sessions": [
+    {
+      "id": "pane:w1",
+      "kind": "pane",
+      "live": true,
+      "pane": "w1",
+      "paneStatus": "working",
+      "harness": "claude-code",
+      "cwd": "/home/tester/work/api",
+      "place": "~/work/api",
+      "label": "~/work/api w1",
+      "files": [
+        "/home/tester/.claude/projects/-home-tester-work-api/cccccccc-0000-4000-8000-00000000c001.jsonl"
+      ]
+    },
+    {
+      "id": "file:/home/tester/.pi/agent/sessions/--home-tester-notes--/2026-10-15T08-00-00-000Z_eeeeeeee-0000-4000-8000-00000000e001.jsonl",
+      "kind": "ended",
+      "live": false,
+      "harness": "pi",
+      "cwd": "/home/tester/notes",
+      "place": "~/notes",
+      "label": "~/notes #00e001",
+      "files": [
+        "/home/tester/.pi/agent/sessions/--home-tester-notes--/2026-10-15T08-00-00-000Z_eeeeeeee-0000-4000-8000-00000000e001.jsonl"
+      ]
+    }
+  ],
+  "unmatchedProcesses": [
+    {
+      "harness": "pi",
+      "cwd": "/home/tester/work/api",
+      "place": "~/work/api",
+      "pids": [
+        5150,
+        5151
+      ]
+    }
+  ],
+  "flags": [
+    {
+      "session": "pane:w1",
+      "label": "~/work/api w1",
+      "account": {
+        "provider": "claude",
+        "accountKey": "work",
+        "title": "claude work"
+      },
+      "window": "seven_day",
+      "windowLabel": "Weekly",
+      "pricedPointsPerHour": 60,
+      "fairPointsPerHour": 0.5,
+      "pricedShare": 1,
+      "rawShare": 1
+    }
+  ],
+  "unmetered": [
+    {
+      "route": "openai",
+      "calls": 2,
+      "tokens": {
+        "input": 20,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 20
+      }
+    }
+  ]
+}

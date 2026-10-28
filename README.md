@@ -4,7 +4,9 @@ Orc takes one task and turns it into one pull request.
 By default it runs the Pi agent in the nono sandbox, then the project checks, then no-mistakes.
 With `--sandbox none` it runs Pi and the checks directly on the host.
 This repository is a workspace with one package per area.
-Today it holds one package, the run package, which ships the orc command.
+The run package ships the orc command.
+The other packages make up tui-dash, the terminal dashboard of quota, machine, queue and task panels beside it.
+A panel package reaches another package only through the schema and ui packages, and `bun run lint` refuses any other import.
 
 ## Before you begin
 
@@ -43,7 +45,16 @@ In CI the `CHECKS_SECRETS_PACK` repository secret holds the list.
 | Path | What it holds |
 | --- | --- |
 | `packages/run` | The orc command and its checks, published as `@avi2dg/orc` |
+| `packages/schema` | The dashboard's shared decoders, machine sources and view models |
+| `packages/ui` | The dashboard's panel module interface, theme and screen runner |
+| `packages/alerts`, `packages/ledger`, `packages/queues`, `packages/quota`, `packages/resources`, `packages/schedules`, `packages/session-quota`, `packages/tasks` | One dashboard panel each |
+| `packages/dashboard` | The dashboard host, which lays out the panels it is given |
+| `packages/cli` | The `tui-dash` command, which composes the panels into the dashboard |
+| `docs/tui-dash.md` | The guide to the dashboard and its panels |
+| `dependency-cruiser.config.ts` | The panel border the lint holds every import to |
+| `docs/adr` | The dashboard's decision records |
 
 ## Related topics
 
 - [The orc command](packages/run/README.md)
+- [The tui-dash dashboard](docs/tui-dash.md)

@@ -1,0 +1,22 @@
+╭─ pueue north ────────────────────────────────────────────────────────────────────╮
+│ 2 running · 2 queued · 1 paused                                                  │
+│ history: 6 ended · 4 failed                                                      │
+│   project     started  took  command                                             │
+│ ▶ unknown     11m ago   11m  sleep 800                                           │
+│ ▶ website     11m ago   11m  sleep 1000                                          │
+│ ✓ website     11m ago    0s  echo queued work                                    │
+│ ✗ website     11m ago   17s  killed sleep 900                                    │
+│ ✗ ~           11m ago    0s  dep failed echo after the failure                   │
+│ ✗ shop        11m ago    0s  exit 1 bun run test                                 │
+│ ✓ ~           11m ago    0s  true                                                │
+│ ✗ my-example  11m ago    0s  exit 3 exit 3                                       │
+╰──────────────────────────────────────────────────────────────────────────────────╯
+╭─ pueue groups ───────────────────────────────────────────────────────────────────╮
+│ north default running, limit 1 · gpu paused, limit 1 · tests running, limit 2    │
+╰──────────────────────────────────────────────────────────────────────────────────╯
+╭─ actions · toolshed ─────────────────────────────────────────────────────────────╮
+│ 2 running · 1 waiting                                                            │
+│ ▷ ci · fix(website): keep the footer below the fold                              │
+│ ▶ ci · feat(shop): list the orders a customer placed this week                   │
+│ ▶ mutation · build(deps): take the newest test runner                            │
+╰──────────────────────────────────────────────────────────────────────────────────╯
