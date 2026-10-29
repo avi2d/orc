@@ -126,7 +126,7 @@ describe("runAgentStep refusals", () => {
     })
   })
 
-  test("a model orc cannot route is refused", async () => {
+  test("a model whose provider config.json does not configure is refused instead of run on a built-in provider", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const agentsDir = join(home, "agents")
@@ -135,8 +135,8 @@ describe("runAgentStep refusals", () => {
         git(dir, ["commit", "-qm", "task"])
         await mkdir(agentsDir, { recursive: true })
         await writeFile(join(agentsDir, "implementer.md"), "---\nmodel: example.com/other-model\nthinking: low\ntools: read\n---\nDo it.\n")
-        await writeFile(join(agentsDir, "fixer.md"), "---\nmodel: opencode-go/muse-spark\nthinking: high\ntools: read\n---\nFix it.\n")
-        expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test", agentsDir })).toContain("routes only opencode-go and anthropic models")
+        await writeFile(join(agentsDir, "fixer.md"), "---\nmodel: acme/coder\nthinking: high\ntools: read\n---\nFix it.\n")
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test", agentsDir })).toContain(join(home, "config.json") + " does not configure the provider for an agent model")
       })
     })
   })
@@ -153,8 +153,8 @@ describe("runAgentStep refusals", () => {
         git(dir, ["commit", "-qm", "task"])
         await mkdir(agentsDir, { recursive: true })
         await writeFile(join(agentsDir, "implementer.md"), "---\nmodel: example.com/other-model\nthinking: low\ntools: read\n---\nDo it.\n")
-        await writeFile(join(agentsDir, "fixer.md"), "---\nmodel: opencode-go/muse-spark\nthinking: high\ntools: read\n---\nFix it.\n")
-        expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test", agentsDir })).toContain("routes only opencode-go and anthropic models")
+        await writeFile(join(agentsDir, "fixer.md"), "---\nmodel: acme/coder\nthinking: high\ntools: read\n---\nFix it.\n")
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test", agentsDir })).toContain(join(home, "config.json") + " does not configure the provider for an agent model")
         expect(await exists(runDir)).toBe(false)
       })
     })

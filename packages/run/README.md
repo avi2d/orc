@@ -13,7 +13,7 @@ You read the PR and merge it, since orc never merges.
 - Git, tested on 2.56.0.
 - nono from https://nono.sh, tested on 0.80.0, for the default sandbox.
 - Node, tested on 24.22.1.
-- Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with an opencode-go login for opencode-go models or the token file for Claude models that [Running on a Claude model](#running-on-a-claude-model) describes.
+- Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with the login or token file each provider in [Configuring providers](#configuring-providers) takes.
 - no-mistakes v1.90.0 or later, tested on v1.100.2, installed as [Installing no-mistakes](#installing-no-mistakes) says.
 
 ## Install
@@ -95,10 +95,10 @@ An unset `ORC_REFUSE_MARKERS` names no marker and refuses no checkout for a mark
 The default sandbox run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
 With `--sandbox none` the run needs the same tools except `nono`.
 Orc runs `no-mistakes --version` before the sandbox starts and refuses a release older than v1.90.0.
-On an opencode-go model it also needs an opencode-go login in Pi, which `pi auth check --provider opencode-go` confirms.
+On a provider that takes a Pi login, the run also needs that login in Pi, which `pi auth check --provider <id>` confirms.
 With the default sandbox, orc reads that login through Pi on the host and hands it to the sandbox.
 nono reads it with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE` and `TERM` set, and orc's check runs the same way.
-So a key held only in the keychain or in an environment variable such as `OPENCODE_API_KEY` is refused, and a login Pi's `/login` stores in `~/.pi/agent/auth.json` works.
+So a key held only in the keychain or in an environment variable is refused, and a login Pi's `/login` stores in `~/.pi/agent/auth.json` works.
 This refusal applies to `--sandbox none` as well, so write a key held only in an environment variable to the Pi auth file first.
 With the default sandbox, if nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc's result names that error.
 
@@ -108,8 +108,10 @@ Orc takes the implementer agent file from the first of these that exists:
 1. `.orc/agents/implementer.md` in the project
 1. `agents/implementer.md` bundled with orc
 
-An agent file opens with a `---` header naming `model`, `thinking` and `tools`, and its body holds the instructions.
-Orc routes `opencode-go` and `anthropic` models and refuses any other model.
+An agent file opens with a `---` header naming `thinking`, `tools` and optionally `model`, and its body holds the instructions.
+The bundled agent files name no model.
+An agent file that names no model takes the one `models` in `config.json` names for its role, and orc refuses a run when neither names one.
+Orc runs only a model whose provider `config.json` names, and refuses any other model.
 Orc refuses an implementer and a fixer that name models from different providers.
 
 With the default sandbox, Pi in a run compacts its context once the context passes 150 thousand tokens, whatever the model's window.
@@ -118,8 +120,8 @@ With the default sandbox, orc writes the window minus 150000 as that model's res
 With the default sandbox, orc pins each agent model window in `models.json` as that provider model override `contextWindow`.
 Orc refuses a model the host's Pi does not list, or one whose window is 150 thousand tokens or less.
 That refusal applies to both sandboxes.
-With `--sandbox none` on an opencode-go model, Pi reads your Pi config, compaction included, so the fixed mark does not apply.
-On a Claude model Pi reads the run's own Pi folder, so the mark applies there too.
+With `--sandbox none` on a Pi login provider, Pi reads your Pi config, compaction included, so the fixed mark does not apply.
+On a token file provider Pi reads the run's own Pi folder, so the mark applies there too.
 
 Once the checks pass, orc runs `no-mistakes axi run` on the branch with the task as its intent.
 At each gate orc asks no-mistakes to fix the findings marked `auto-fix`, ignores those marked `no-op`, and accepts the fix review.
@@ -146,27 +148,50 @@ To run Pi and the checks directly on the host, add `--sandbox none` to `orc run`
 `--sandbox nono`, the default, keeps the nono sandbox.
 Without a sandbox the run still gets its own worktree on its own branch, and nono need not be on the PATH.
 Pi runs with your own environment, so it can read and write anything your user can.
-On an opencode-go model Pi also reads your Pi config.
-On a Claude model Pi reads the run's own Pi folder instead, as [Running on a Claude model](#running-on-a-claude-model) describes.
+On a Pi login provider Pi also reads your Pi config.
+On a token file provider Pi reads the run's own Pi folder instead, as [Configuring providers](#configuring-providers) describes.
 Orc points `GIT_CONFIG_GLOBAL` at a file in the run folder, so the commit identity Sandcastle sets never reaches your `~/.gitconfig`.
 Pi writes its session straight into the run's `sessions/host` folder.
 Resume takes the sandbox from the earlier run, so `orc run --branch <name>` resumes it without a sandbox.
 
-## Running on a Claude model
+## Configuring providers
 
-To run a task on a Claude model:
+Orc ships with no provider and no model, so a run needs `config.json` in `$ORC_HOME`, default `~/.orc/config.json`.
+It names each provider orc may run and, under `models`, the implementer and fixer models.
+This example names opencode-go through a Pi login and anthropic through a token file:
 
-1. Write the Claude token to a file that only your user can read.
-1. Set `ORC_CLAUDE_TOKEN_FILE` to that file's absolute path.
-1. Name an `anthropic/` model in both the implementer and the fixer agent files.
-1. Run the task with `--sandbox none`.
+```json
+{
+  "providers": [
+    { "id": "opencode-go", "credential": "pi-login", "nono": { "upstream": "https://opencode.ai/zen/go/v1" } },
+    { "id": "anthropic", "credential": "token-file", "tokenFile": { "env": "ANTHROPIC_TOKEN_FILE" } }
+  ],
+  "models": { "implementer": "opencode-go/muse-spark-1.3-contributor", "fixer": "opencode-go/muse-spark-1.3-contributor" }
+}
+```
 
-Orc refuses a Claude model in the default sandbox, because the sandbox carries only the opencode-go key.
+Each provider names its Pi provider `id`, the part of a model name before the `/`, and its `credential`:
+
+- `pi-login` checks the Pi login for that provider before the run, as [Running a task](#running-a-task) describes.
+  Its `nono` entry names the `upstream` URL the nono sandbox proxies with that login's key.
+  Its `nono` entry may name `injectHeader` and `credentialFormat`.
+  `injectHeader` names the HTTP header the proxy fills with the key and defaults to `Authorization`.
+  `credentialFormat` names the header value with `{}` where the key goes and defaults to `Bearer {}`.
+  A login provider without a `nono` entry runs only with `--sandbox none`.
+- `token-file` reads the token from a file, whose absolute path `tokenFile` takes from the variable `env` names or from `path`.
+  `orc run --token-file <path>` takes the path from the flag instead.
+  The nono sandbox carries only a Pi login, so a token file provider runs only with `--sandbox none`.
+
+Orc refuses a `config.json` key it does not know, so a misspelled key never drops a provider unnoticed.
+Orc refuses `--token-file` on a provider that takes a Pi login.
+`orc run --provider <id>` refuses a run whose implementer model is on another provider, so a token meant for one provider never reaches another.
 Orc refuses a token file that is unset, relative, missing, empty, not a regular file or readable by other users.
-Pi reads the run's own Pi folder instead of yours, so a Claude login stored in your Pi config never stands in for the token.
-The run's `models.json` names the token file only through `ORC_CLAUDE_TOKEN_FILE`.
-Pi reads the file when it calls Claude and holds the token only in memory, so no run file keeps it.
+On a token file provider, Pi reads the run's own Pi folder instead of yours.
+So a login stored in your Pi config never stands in for the token.
+The run's `models.json` names the token file only through `ORC_TOKEN_FILE`.
+Pi reads the file when it calls the provider and holds the token only in memory, so no run file keeps it.
 Orc never copies, moves or deletes the token file.
+A provider defined only in the operator's Pi models.json is not carried into a run directory, so use a provider Pi knows built in.
 
 ## Choosing the no-mistakes binary
 
@@ -251,7 +276,9 @@ Orc keeps one backlog of tasks in `~/.orc/backlog`, one Markdown file per task w
 `ORC_HOME` moves the backlog elsewhere when set.
 A task file sits in `new`, `taken` or `closed`, and the folder it sits in is its state.
 Two files beside the folders tell the beat where tasks may go.
-`dispatch.json` names each machine, its slots and its start command, and the Claude accounts with the floor of room each must keep:
+`dispatch.json` names each machine, its slots and its start command, and the quota.
+The quota names the provider its accounts belong to, the command that reads their room, and each account's token file.
+It also names the floor of room each account must keep:
 
 ```json
 {
@@ -259,9 +286,34 @@ Two files beside the folders tell the beat where tasks may go.
     { "name": "mac", "slots": 2, "start": ["orc", "runner", "start"] },
     { "name": "linux-box", "slots": 4, "start": ["orc", "runner", "start", "--", "ssh", "linux-box", "orc"] }
   ],
-  "quota": { "accounts": ["main", "second"], "floorPercent": 15 }
+  "quota": {
+    "provider": "anthropic",
+    "command": ["my-quota-reader", "--json"],
+    "accounts": [
+      { "name": "main", "tokenFile": "/Users/me/.secrets/main-token" },
+      { "name": "second", "tokenFile": "/Users/me/.secrets/second-token" }
+    ],
+    "floorPercent": 15
+  }
 }
 ```
+
+The provider is a token-file provider in `config.json` on each machine that runs the tasks, and each token file path holds on those machines.
+Orc runs the quota command with no input and reads its standard output as this document:
+
+```json
+{
+  "schema": "orc.quota.v1",
+  "accounts": [
+    { "name": "main", "remainingPercent": 40 },
+    { "name": "second", "unusable": "the login expired" }
+  ]
+}
+```
+
+Each entry gives the percent of room left, from 0 to 100, or the reason the account cannot run.
+An account the document does not name cannot run.
+A command that exits non-zero, runs past 15 seconds or prints any other document leaves the quota unread, and the beat starts nothing.
 
 `projects.json` names each project and its checkout on each machine:
 
@@ -275,17 +327,18 @@ To see the backlog, run `orc backlog`.
 It prints the new, taken and closed tasks side by side with the project list and each machine's busy slots beside them.
 To print the same facts as JSON, run `orc backlog --json`, whose document names its version first as `orc.backlog.v1`.
 To start what can start, run `orc beat`, from launchd or cron every few minutes.
-Each beat reads quota with `clauth status --json` and the room on each machine before it takes any task.
+Each beat runs the quota command and reads the room on each machine before it takes any task.
 A task starts only once three things hold:
 
 1. Every task it depends on closed done.
 2. Its project has a checkout on a machine with a free slot.
-3. A Claude account has room at or above the floor.
+3. An account has room at or above the floor, and the runs take the account with the most room.
 
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
 After the claim survives a recount, the beat writes the task started before it runs the start command.
 A task marked for a machine waits for a slot on that machine and never starts on another.
-The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE` and `ORC_TASK_ACCOUNT`.
+The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT` and `ORC_TASK_TOKEN_FILE`.
+`ORC_TASK_TOKEN_FILE` is the account's token file path, never the token.
 The beat starts it detached in its own session, never waits for it and never kills it.
 So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
@@ -300,6 +353,7 @@ When a started task ends, run `orc backlog close <task-id> <done|failed> [reason
 `orc runner start` is the start command that hands a task to pueue on its machine.
 The run then outlives the beat, the dispatcher and any SSH link to it.
 It reads the task from the beat's `ORC_TASK_*` variables and queues `orc run` in the checkout on branch `orc/<task-id>`, in the pueue group `orc`.
+The run takes `--sandbox none --provider <provider> --token-file <path>`, so it runs on the picked account and refuses an implementer on any other provider.
 The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
 The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
@@ -324,8 +378,10 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/bin.ts` | The orc entry point |
 | `src/args.ts` | The flag parsing for the orc command |
 | `src/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
-| `src/model-route.ts` | The choice between the opencode-go and Claude routes and the check of the Claude token file |
-| `src/sandbox-plan.ts` | The per-route preflight: the opencode-go login check, the model windows and the run's Pi folder |
+| `src/orc-config.ts` | The reading of `config.json`: the providers and the agent models |
+| `src/json-file.ts` | The JSON config file reading and its `ConfigError` |
+| `src/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
+| `src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
 | `src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
 | `src/history-write.ts` | The history checkpoints a run records as each step starts and ends |
 | `src/report.ts` | The `report.md` shape and the signal facts it carries |
@@ -346,7 +402,7 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/dispatch/backlog.ts` | The backlog folders, the id reservation and the atomic take of a task |
 | `src/dispatch/task-record.ts` | The task file and its frontmatter |
 | `src/dispatch/config.ts` | The reading of `dispatch.json` and `projects.json` |
-| `src/dispatch/quota.ts` | The quota reading from `clauth status --json` and the pick of an account |
+| `src/dispatch/quota.ts` | The quota reading from the configured command and the pick of an account |
 | `src/dispatch/beat.ts` | The beat: room, placement, take and start |
 | `src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
 | `src/dispatch/runner.ts` | The runner: the start through pueue and the reading of a task's result |

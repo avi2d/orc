@@ -148,6 +148,8 @@ export interface ModelCredential {
   readonly provider: string
   readonly name: string
   readonly upstream: string
+  readonly injectHeader: string
+  readonly credentialFormat: string
   readonly envVar: string
   readonly captureCommand: ReadonlyArray<string>
 }
@@ -158,42 +160,38 @@ export interface HostTools {
   readonly homeDir: string
 }
 
-export const canRouteModel = (model: string): boolean => {
-  const slash = model.indexOf("/")
-  return (slash === -1 ? model : model.slice(0, slash)) === "opencode-go"
+export interface NonoCarriedProvider {
+  readonly id: string
+  readonly upstream: string
+  readonly injectHeader?: string
+  readonly credentialFormat?: string
 }
 
-export const modelCredentialFor = (model: string, host: HostTools): ModelCredential | null => {
-  const slash = model.indexOf("/")
-  const provider = slash === -1 ? model : model.slice(0, slash)
-  if (!canRouteModel(model)) {
-    return null
-  }
-  return {
-    provider,
-    name: "opencode_go",
-    upstream: "https://opencode.ai/zen/go/v1",
-    envVar: "OPENCODE_GO_KEY",
-    // nono spawns capture under its own sandbox-shaped env, where PI_CODING_AGENT_DIR points at the run session instead of the operator login.
-    captureCommand: [
-      "/bin/sh",
-      "-c",
-      "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" unset PI_CODING_AGENT_DIR; exec \"$1\" auth print-api-key --provider opencode-go",
-      host.nodeBinary,
-      host.piBinary,
-      host.homeDir
-    ]
-  }
-}
+const keyName = (providerId: string): string => providerId.replace(/[^A-Za-z0-9]/g, "_").toLowerCase()
 
-export const loginCheckCommand = (host: HostTools, preserveAgentDir = false): ReadonlyArray<string> => [
+const piCommand = (host: HostTools, piArgs: string, providerId: string, preserveAgentDir: boolean): ReadonlyArray<string> => [
   "/bin/sh",
   "-c",
-  preserveAgentDir ? "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" exec \"$1\" auth check --provider opencode-go" : "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" unset PI_CODING_AGENT_DIR; exec \"$1\" auth check --provider opencode-go",
+  preserveAgentDir ? "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" exec \"$1\" " + piArgs + " \"$3\"" : "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" unset PI_CODING_AGENT_DIR; exec \"$1\" " + piArgs + " \"$3\"",
   host.nodeBinary,
   host.piBinary,
-  host.homeDir
+  host.homeDir,
+  providerId
 ]
+
+// nono spawns capture under its own sandbox-shaped env, where PI_CODING_AGENT_DIR points at the run session instead of the operator login.
+export const modelCredentialFor = (provider: NonoCarriedProvider, host: HostTools): ModelCredential => ({
+  provider: provider.id,
+  name: keyName(provider.id),
+  upstream: provider.upstream,
+  injectHeader: provider.injectHeader ?? "Authorization",
+  credentialFormat: provider.credentialFormat ?? "Bearer {}",
+  envVar: keyName(provider.id).toUpperCase() + "_KEY",
+  captureCommand: piCommand(host, "auth print-api-key --provider", provider.id, false)
+})
+
+export const loginCheckCommand = (host: HostTools, providerId: string, preserveAgentDir = false): ReadonlyArray<string> =>
+  piCommand(host, "auth check --provider", providerId, preserveAgentDir)
 
 export interface ProviderKey {
   readonly provider: string
@@ -257,8 +255,8 @@ export const buildAgentNonoProfile = (
         [credential.name]: {
           upstream: credential.upstream,
           credential_key: "cmd://" + credential.name,
-          inject_header: "Authorization",
-          credential_format: "Bearer {}",
+          inject_header: credential.injectHeader,
+          credential_format: credential.credentialFormat,
           env_var: credential.envVar
         }
       }

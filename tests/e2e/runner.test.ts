@@ -123,17 +123,19 @@ const resultJson = async (fixture: Fixture, task: string, through: ReadonlyArray
 
 const RunnerRun = Schema.Struct({ result: Schema.Struct({ run: Schema.Unknown }) })
 
+const mainToken = "/secrets/main-token"
+
 const writeMachine = async (fixture: Fixture, start: ReadonlyArray<string>): Promise<void> => {
   await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify({
     machines: [{ name: "linux", slots: 1, start }],
-    quota: { accounts: ["main"], floorPercent: 15 }
+    quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", tokenFile: mainToken }], floorPercent: 15 }
   }))
 }
 
-const fakeClauth = async (fixture: Fixture): Promise<void> => {
-  const status = { schema: 2, profiles: [{ name: "main", auth_status: "ok", fetch_status: "Fresh", stale: false, windows: [{ label: "5h", utilization_pct: 10 }, { label: "7d", utilization_pct: 20 }] }] }
-  await writeFile(join(fixture.dir, "bin", "clauth"), "#!/bin/sh\ncat <<'J'\n" + JSON.stringify(status) + "\nJ\n")
-  await chmod(join(fixture.dir, "bin", "clauth"), 0o755)
+const fakeQuota = async (fixture: Fixture): Promise<void> => {
+  const status = { schema: "orc.quota.v1", accounts: [{ name: "main", remainingPercent: 80 }] }
+  await writeFile(join(fixture.dir, "bin", "orc-quota"), "#!/bin/sh\ncat <<'J'\n" + JSON.stringify(status) + "\nJ\n")
+  await chmod(join(fixture.dir, "bin", "orc-quota"), 0o755)
 }
 
 const queuedArgs = async (fixture: Fixture): Promise<ReadonlyArray<string> | null> => {
@@ -161,7 +163,7 @@ const queuedEnv = async (fixture: Fixture): Promise<string | null> => {
 }
 
 const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>): Promise<ReadonlyArray<string> | null> => {
-  await fakeClauth(fixture)
+  await fakeQuota(fixture)
   await writeMachine(fixture, start)
   await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
   await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
@@ -171,7 +173,8 @@ const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>): Promi
 
 const pueueAddFor = (home: string, checkout: string): ReadonlyArray<string> => [
   "--group", "orc", "--label", "task-1", "--working-directory", checkout, "--print-task-id", "--escape", "--",
-  process.execPath, binPath, "run", join(home, "runner", "task-1.md"), "--branch", "orc/task-1"
+  process.execPath, binPath, "run", join(home, "runner", "task-1.md"), "--branch", "orc/task-1",
+  "--sandbox", "none", "--provider", "acme", "--token-file", mainToken
 ]
 
 const orcThere = (home: string): ReadonlyArray<string> => ["sh", "-c", "ORC_HOME='" + home + "' exec \"$0\" '" + binPath + "' \"$@\"", process.execPath]
@@ -198,7 +201,7 @@ describe("orc runner start", () => {
 
   test("a relative ORC_HOME reaches the child resolved instead of relative", async () => {
     await withFixture(async (fixture) => {
-      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" }, { ORC_HOME: "rel-home" })
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# x\n" }, { ORC_HOME: "rel-home" })
       expect(result.exitCode).toBe(0)
       expect(await queuedEnv(fixture)).toBe(join(fixture.dir, "rel-home"))
       expect(await readFile(join(fixture.dir, "rel-home", "runner", "task-9.md"), "utf8")).toBe("# x\n")
@@ -221,7 +224,7 @@ describe("orc runner start", () => {
       git(["-C", repo, "config", "user.name", "orc"])
       git(["-C", repo, "commit", "-q", "--allow-empty", "-m", "init"])
       const root = await realpath(repo)
-      const queued = await queueWith(fixture, { task: "task-9", checkout: sub, body: "# x\n" })
+      const queued = await queueWith(fixture, { task: "task-9", checkout: sub, provider: "acme", tokenFile: mainToken, body: "# x\n" })
       expect(queued.exitCode).toBe(0)
       const args = (await readFile(join(fixture.pueue, "add-args"), "utf8")).split("\n").slice(0, -1)
       expect(args[args.indexOf("--working-directory") + 1]).toBe(root)
@@ -248,7 +251,7 @@ describe("orc runner start", () => {
 
   test("a task pueue already holds in group orc is not queued twice", async () => {
     await withFixture(async (fixture) => {
-      const result = await queueWith(fixture, { task: "task-1", checkout: fixture.checkout, body: "# Again\n" })
+      const result = await queueWith(fixture, { task: "task-1", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# Again\n" })
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toBe("task-1 is already pueue task 655 in group orc\n")
       expect(await readFile(join(fixture.pueue, "add-args"), "utf8").catch(() => null)).toBeNull()
@@ -257,7 +260,7 @@ describe("orc runner start", () => {
 
   test("a checkout missing on the machine is refused before pueue is asked", async () => {
     await withFixture(async (fixture) => {
-      const result = await queueWith(fixture, { task: "task-9", checkout: join(fixture.dir, "nowhere"), body: "# x\n" })
+      const result = await queueWith(fixture, { task: "task-9", checkout: join(fixture.dir, "nowhere"), provider: "acme", tokenFile: mainToken, body: "# x\n" })
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toBe("orc: the checkout " + join(fixture.dir, "nowhere") + " is no folder on this machine\n")
       expect(await readFile(join(fixture.pueue, "add-args"), "utf8").catch(() => null)).toBeNull()
@@ -268,7 +271,7 @@ describe("orc runner start", () => {
     await withFixture(async (fixture) => {
       await writeFile(join(fixture.pueue, "groups.json"), JSON.stringify({ default: { status: "Running", parallel_tasks: 1 } }))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# x\n" })
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toBe("queued task-9 as pueue task 77 in group orc\n")
       expect((await readFile(join(fixture.pueue, "group-add-args"), "utf8")).split("\n").slice(0, -1)).toEqual(["group", "add", "orc"])
@@ -282,7 +285,7 @@ describe("orc runner start", () => {
         "orc-proof": { status: "Running", parallel_tasks: 1 }
       }))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# x\n" })
       expect(result.exitCode).toBe(0)
       expect((await readFile(join(fixture.pueue, "group-add-args"), "utf8")).split("\n").slice(0, -1)).toEqual(["group", "add", "orc"])
     })
@@ -290,7 +293,7 @@ describe("orc runner start", () => {
 
   test("an existing orc group is left alone instead of added again", async () => {
     await withFixture(async (fixture) => {
-      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# x\n" })
       expect(result.exitCode).toBe(0)
       expect(await readFile(join(fixture.pueue, "group-add-args"), "utf8").catch(() => null)).toBeNull()
     })
@@ -301,7 +304,7 @@ describe("orc runner start", () => {
       await writeFile(join(fixture.pueue, "groups.json"), JSON.stringify({ default: { status: "Running", parallel_tasks: 1 } }))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
       await writeFile(join(fixture.pueue, "race-add"), "")
-      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# x\n" })
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toBe("queued task-9 as pueue task 77 in group orc\n")
     })
@@ -313,8 +316,8 @@ describe("orc runner start", () => {
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
       await writeFile(join(fixture.pueue, "group-gate"), "")
       const queued = Promise.all([
-        queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" }),
-        queueWith(fixture, { task: "task-10", checkout: fixture.checkout, body: "# y\n" })
+        queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# x\n" }),
+        queueWith(fixture, { task: "task-10", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# y\n" })
       ])
       const deadline = Date.now() + startWaitMillis
       while (Date.now() < deadline) {
@@ -342,7 +345,7 @@ describe("orc runner start", () => {
       await writeFile(join(fixture.pueue, "groups.json"), JSON.stringify({ default: { status: "Running", parallel_tasks: 1 } }))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
       await writeFile(join(fixture.pueue, "fail-add"), "")
-      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, body: "# x\n" })
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# x\n" })
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toBe("orc: pueue group exited 1: fake pueue cannot add groups\n")
     })

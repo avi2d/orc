@@ -2,14 +2,26 @@ import { Effect, FileSystem, Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { SandboxKind } from "./args"
 import { checkedModelWindows, contextMarkJson, readModelWindows } from "./context-mark"
-import { claudeApiKey, claudeProvider, claudeTokenFileVar, type ModelRoute, requireClaudeTokenFile } from "./model-route"
+import { requireTokenFile, tokenFileApiKey, tokenFileSource, tokenFileVar } from "./model-route"
 import { inheritedEnv } from "./nono"
 import { type CheckedModelWindow, type HostTools, loginCheckCommand, type ModelCredential, modelCredentialFor, piAgentModels, type ProviderKey, providerKeyOf } from "./nono-profile"
+import type { LoginProvider, OrcConfig, Provider, TokenFileProvider } from "./orc-config"
 import { OrcRunError } from "./run-session"
+
+interface OwnAgentDir {
+  readonly piAgentDir: string
+  readonly env: Readonly<Record<string, string>>
+}
 
 export type SandboxPlan =
   | { readonly kind: "nono"; readonly credential: ModelCredential }
-  | { readonly kind: "none"; readonly piAgentDir: string | undefined }
+  | { readonly kind: "none"; readonly own: OwnAgentDir | null }
+
+export interface ProviderChoice<P extends Provider = Provider> {
+  readonly config: OrcConfig
+  readonly provider: P
+  readonly tokenFileFlag: string | undefined
+}
 
 interface PlanDirs {
   readonly projectDir: string
@@ -28,10 +40,11 @@ const runLoginCheck = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
   host: HostTools,
   cwd: string,
+  providerId: string,
   preserveAgentDir: boolean
 ): Effect.Effect<void, OrcRunError> =>
   Effect.scoped(Effect.gen(function*() {
-    const parts = loginCheckCommand(host, preserveAgentDir)
+    const parts = loginCheckCommand(host, providerId, preserveAgentDir)
     const agentDir = Bun.env.PI_CODING_AGENT_DIR === undefined ? {} : { PI_CODING_AGENT_DIR: Bun.env.PI_CODING_AGENT_DIR }
     const handle = yield* spawner.spawn(ChildProcess.make(parts[0], parts.slice(1), { cwd, env: preserveAgentDir ? { ...inheritedEnv(Bun.env), ...agentDir } : inheritedEnv(Bun.env), extendEnv: false }))
     const [, , exitCode] = yield* Effect.all([
@@ -40,7 +53,7 @@ const runLoginCheck = (
       handle.exitCode
     ], { concurrency: "unbounded" })
     if (exitCode !== 0) {
-      return yield* refuse("orc: pi auth check found no opencode-go login, so a key held only in the keychain or in an environment variable is refused; add an opencode-go login to pi on the host and rerun")
+      return yield* refuse("orc: pi auth check found no " + providerId + " login, so a key held only in the keychain or in an environment variable is refused; add a " + providerId + " login to pi on the host and rerun")
     }
   })).pipe(
     Effect.mapError((cause) => cause instanceof OrcRunError ? cause : new OrcRunError({ message: "orc: the login check failed to run: " + String(cause) }))
@@ -65,59 +78,70 @@ const checkedAgentWindows = (
   host: HostTools,
   runDir: string,
   models: AgentModels,
-  agentDir: string | undefined
+  agentDir: string | undefined,
+  extraEnv: Readonly<Record<string, string>> = {}
 ): Effect.Effect<ReadonlyArray<CheckedModelWindow>, OrcRunError> =>
-  readModelWindows(spawner, host, runDir, agentDir).pipe(
+  readModelWindows(spawner, host, runDir, agentDir, extraEnv).pipe(
     Effect.flatMap((windows) => Effect.fromResult(checkedModelWindows([models.agent, models.fixer], windows)).pipe(
       Effect.mapError((message) => new OrcRunError({ message }))
     ))
   )
 
-const planOpencodeGo = (
+const planLogin = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
   host: HostTools,
   dirs: PlanDirs,
   models: AgentModels,
+  choice: ProviderChoice<LoginProvider>,
   sandboxKind: SandboxKind
 ): Effect.Effect<SandboxPlan, OrcRunError> =>
   Effect.gen(function*() {
-    const credential = modelCredentialFor(models.agent, host)
-    if (credential === null) {
-      return yield* refuse("orc: the agent file names model " + models.agent + ", which names no opencode-go credential")
+    const provider = choice.provider
+    if (choice.tokenFileFlag !== undefined) {
+      return yield* refuse("orc: --token-file names a token file, and " + choice.config.file + " has the provider " + provider.id + " take a Pi login, so drop the flag or give the provider a token file")
     }
-    const preserveAgentDir = sandboxKind === "none"
-    yield* runLoginCheck(spawner, host, dirs.projectDir, preserveAgentDir)
-    const checked = yield* checkedAgentWindows(spawner, host, dirs.runDir, models, preserveAgentDir ? Bun.env.PI_CODING_AGENT_DIR : undefined)
     if (sandboxKind === "none") {
-      return { kind: "none", piAgentDir: undefined }
+      yield* runLoginCheck(spawner, host, dirs.projectDir, provider.id, true)
+      yield* checkedAgentWindows(spawner, host, dirs.runDir, models, Bun.env.PI_CODING_AGENT_DIR)
+      return { kind: "none", own: null }
     }
+    if (provider.nono === undefined) {
+      return yield* refuse("orc: " + choice.config.file + " gives the provider " + provider.id + " no nono entry, so the nono sandbox cannot carry its key; add one with its upstream or run with --sandbox none")
+    }
+    const credential = modelCredentialFor({ id: provider.id, ...provider.nono }, host)
+    yield* runLoginCheck(spawner, host, dirs.projectDir, provider.id, false)
+    const checked = yield* checkedAgentWindows(spawner, host, dirs.runDir, models, undefined)
     yield* writeAgentDir(fs, path, dirs.piAgentDir, providerKeyOf(credential), checked)
     return { kind: "nono", credential }
   })
 
-// Pi prefers a stored login over a configured key, so a Claude run reads its own agent folder and never the operator's.
-const planClaude = (
+// Pi prefers a stored login over a configured key, so a token-file run reads its own agent folder and never the operator's.
+const planTokenFile = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
   host: HostTools,
   dirs: PlanDirs,
   models: AgentModels,
+  choice: ProviderChoice<TokenFileProvider>,
   sandboxKind: SandboxKind
 ): Effect.Effect<SandboxPlan, OrcRunError> =>
   Effect.gen(function*() {
+    const provider = choice.provider
     if (sandboxKind === "nono") {
-      return yield* refuse("orc: the agent file names model " + models.agent + ", and the nono sandbox carries only the opencode-go key, so run a Claude model with --sandbox none")
+      return yield* refuse("orc: the implementer runs on model " + models.agent + ", whose provider " + provider.id + " takes its token from a file, and the nono sandbox carries only a Pi login, so run it with --sandbox none")
     }
-    yield* requireClaudeTokenFile(fs, models.agent, Bun.env[claudeTokenFileVar])
-    const key: ProviderKey = { provider: claudeProvider, apiKey: claudeApiKey }
+    const source = tokenFileSource(provider.tokenFile, choice.tokenFileFlag, Bun.env, choice.config.file)
+    const tokenFile = yield* requireTokenFile(fs, models.agent, source)
+    const env = { [tokenFileVar]: tokenFile }
+    const key: ProviderKey = { provider: provider.id, apiKey: tokenFileApiKey }
     // Pi lists no model of a provider that has no key, so the key goes in before the windows are read.
     yield* writeAgentDir(fs, path, dirs.piAgentDir, key, [])
-    const checked = yield* checkedAgentWindows(spawner, host, dirs.runDir, models, dirs.piAgentDir)
+    const checked = yield* checkedAgentWindows(spawner, host, dirs.runDir, models, dirs.piAgentDir, env)
     yield* writeAgentDir(fs, path, dirs.piAgentDir, key, checked)
-    return { kind: "none", piAgentDir: dirs.piAgentDir }
+    return { kind: "none", own: { piAgentDir: dirs.piAgentDir, env } }
   })
 
 export const planSandbox = (
@@ -127,9 +151,11 @@ export const planSandbox = (
   host: HostTools,
   dirs: PlanDirs,
   models: AgentModels,
-  route: ModelRoute,
+  choice: ProviderChoice,
   sandboxKind: SandboxKind
-): Effect.Effect<SandboxPlan, OrcRunError> =>
-  route === "claude"
-    ? planClaude(fs, path, spawner, host, dirs, models, sandboxKind)
-    : planOpencodeGo(fs, path, spawner, host, dirs, models, sandboxKind)
+): Effect.Effect<SandboxPlan, OrcRunError> => {
+  const { provider } = choice
+  return provider.credential === "pi-login"
+    ? planLogin(fs, path, spawner, host, dirs, models, { ...choice, provider }, sandboxKind)
+    : planTokenFile(fs, path, spawner, host, dirs, models, { ...choice, provider }, sandboxKind)
+}

@@ -1,5 +1,4 @@
 ---
-model: opencode-go/muse-spark-1.3-contributor
 thinking: high
 tools: read, bash, edit, write
 ---

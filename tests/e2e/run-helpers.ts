@@ -46,7 +46,7 @@ export const withHome = async (use: (home: string) => Promise<void>): Promise<vo
 
 const implementer: AgentFile = {
   kind: "implementer",
-  model: "opencode-go/muse-spark",
+  model: "acme/coder",
   thinking: "high",
   tools: ["read", "bash"],
   body: "Do the task.",
@@ -211,7 +211,7 @@ export const runStep = (dir: string, home: string, sandbox: SandboxOps["runAgent
 
 const fixer: AgentFile = {
   kind: "fixer",
-  model: "opencode-go/muse-spark",
+  model: "acme/coder",
   thinking: "high",
   tools: ["read", "bash"],
   body: "Fix the failure.",
