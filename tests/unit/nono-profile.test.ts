@@ -8,6 +8,8 @@ const credential = {
   provider: "acme-go",
   name: "acme_go",
   upstream: "https://llm.acme.test/v1",
+  injectHeader: "Authorization",
+  credentialFormat: "Bearer {}",
   envVar: "ACME_GO_KEY",
   captureCommand: ["/bin/sh", "-c", "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" unset PI_CODING_AGENT_DIR; exec \"$1\" auth print-api-key --provider \"$3\"", "/host/bin/node", "/host/bin/pi", "/host/home", "acme-go"]
 }
@@ -50,6 +52,25 @@ describe("loginCheckCommand", () => {
     const check = loginCheckCommand(tools, "acme-go").slice(0, 3).join(" ")
     const capture = ["/bin/sh", "-c", credential.captureCommand[2]].join(" ")
     expect(check.split(";")[0]).toBe(capture.split(";")[0])
+  })
+})
+
+describe("custom credential injection", () => {
+  test("a non-Bearer header and format travel from the placeholder to the proxy injection", async () => {
+    const custom = modelCredentialFor({ id: "acme-vault", upstream: "https://llm.acme.test/vault", injectHeader: "X-Api-Key", credentialFormat: "{}" }, tools)
+    expect(custom.envVar).toBe("ACME_VAULT_KEY")
+    const parsed: unknown = JSON.parse(piAgentModels(providerKeyOf(custom), []))
+    expect(parsed).toEqual({ providers: { "acme-vault": { apiKey: "$ACME_VAULT_KEY" } } })
+    const profile = await Effect.runPromise(buildAgentNonoProfile(roots, host, custom).pipe(Effect.provide(BunServices.layer)))
+    expect(profile.network.custom_credentials).toEqual({
+      acme_vault: {
+        upstream: "https://llm.acme.test/vault",
+        credential_key: "cmd://acme_vault",
+        inject_header: "X-Api-Key",
+        credential_format: "{}",
+        env_var: "ACME_VAULT_KEY"
+      }
+    })
   })
 })
 

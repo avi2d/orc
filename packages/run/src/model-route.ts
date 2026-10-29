@@ -17,17 +17,18 @@ export const routeOfAgents = (
   models: { readonly agent: string; readonly fixer: string },
   pinned: string | undefined
 ): Result.Result<Provider, string> => {
+  const agentProvider = config.providers.find((candidate) => candidate.id === providerOf(models.agent))
+  const fixerProvider = config.providers.find((candidate) => candidate.id === providerOf(models.fixer))
+  if (agentProvider === undefined || fixerProvider === undefined) {
+    return Result.fail("orc: " + config.file + " does not configure the provider for an agent model, so add it to the providers there")
+  }
   if (pinned !== undefined && providerOf(models.agent) !== pinned) {
     return Result.fail("orc: --provider names " + pinned + ", and the implementer runs on model " + models.agent + ", so the run would hand its credential to another provider; name a model from " + pinned + " or drop the flag")
   }
-  const provider = config.providers.find((candidate) => candidate.id === providerOf(models.agent))
-  if (provider === undefined) {
-    return Result.fail("orc: the implementer runs on model " + models.agent + ", whose provider " + config.file + " does not configure, so add it to the providers there")
-  }
-  if (providerOf(models.fixer) !== provider.id) {
+  if (providerOf(models.fixer) !== agentProvider.id) {
     return Result.fail("orc: the implementer runs on " + models.agent + " and the fixer on " + models.fixer + ", and orc runs both agents of a run on one provider, so name models from one provider")
   }
-  return Result.succeed(provider)
+  return Result.succeed(agentProvider)
 }
 
 export interface TokenFileSource {

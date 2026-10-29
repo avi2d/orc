@@ -148,6 +148,8 @@ export interface ModelCredential {
   readonly provider: string
   readonly name: string
   readonly upstream: string
+  readonly injectHeader: string
+  readonly credentialFormat: string
   readonly envVar: string
   readonly captureCommand: ReadonlyArray<string>
 }
@@ -161,6 +163,8 @@ export interface HostTools {
 export interface NonoCarriedProvider {
   readonly id: string
   readonly upstream: string
+  readonly injectHeader?: string
+  readonly credentialFormat?: string
 }
 
 const keyName = (providerId: string): string => providerId.replace(/[^A-Za-z0-9]/g, "_").toLowerCase()
@@ -180,6 +184,8 @@ export const modelCredentialFor = (provider: NonoCarriedProvider, host: HostTool
   provider: provider.id,
   name: keyName(provider.id),
   upstream: provider.upstream,
+  injectHeader: provider.injectHeader ?? "Authorization",
+  credentialFormat: provider.credentialFormat ?? "Bearer {}",
   envVar: keyName(provider.id).toUpperCase() + "_KEY",
   captureCommand: piCommand(host, "auth print-api-key --provider", provider.id, false)
 })
@@ -249,8 +255,8 @@ export const buildAgentNonoProfile = (
         [credential.name]: {
           upstream: credential.upstream,
           credential_key: "cmd://" + credential.name,
-          inject_header: "Authorization",
-          credential_format: "Bearer {}",
+          inject_header: credential.injectHeader,
+          credential_format: credential.credentialFormat,
           env_var: credential.envVar
         }
       }

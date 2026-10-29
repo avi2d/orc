@@ -110,7 +110,7 @@ const planLogin = (
     if (provider.nono === undefined) {
       return yield* refuse("orc: " + choice.config.file + " gives the provider " + provider.id + " no nono entry, so the nono sandbox cannot carry its key; add one with its upstream or run with --sandbox none")
     }
-    const credential = modelCredentialFor({ id: provider.id, upstream: provider.nono.upstream }, host)
+    const credential = modelCredentialFor({ id: provider.id, upstream: provider.nono.upstream, injectHeader: provider.nono.injectHeader, credentialFormat: provider.nono.credentialFormat }, host)
     yield* runLoginCheck(spawner, host, dirs.projectDir, provider.id, false)
     const checked = yield* checkedAgentWindows(spawner, host, dirs.runDir, models, undefined)
     yield* writeAgentDir(fs, path, dirs.piAgentDir, providerKeyOf(credential), checked)

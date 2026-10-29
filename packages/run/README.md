@@ -174,6 +174,9 @@ Each provider names its Pi provider `id`, the part of a model name before the `/
 
 - `pi-login` checks the Pi login for that provider before the run, as [Running a task](#running-a-task) describes.
   Its `nono` entry names the `upstream` URL the nono sandbox proxies with that login's key.
+  Its `nono` entry may name `injectHeader` and `credentialFormat`.
+  `injectHeader` names the HTTP header the proxy fills with the key and defaults to `Authorization`.
+  `credentialFormat` names the header value with `{}` where the key goes and defaults to `Bearer {}`.
   A login provider without a `nono` entry runs only with `--sandbox none`.
 - `token-file` reads the token from a file, whose absolute path `tokenFile` takes from the variable `env` names or from `path`.
   `orc run --token-file <path>` takes the path from the flag instead.
@@ -188,6 +191,7 @@ So a login stored in your Pi config never stands in for the token.
 The run's `models.json` names the token file only through `ORC_TOKEN_FILE`.
 Pi reads the file when it calls the provider and holds the token only in memory, so no run file keeps it.
 Orc never copies, moves or deletes the token file.
+A provider defined only in the operator's Pi models.json is not carried into a run directory, so use a provider Pi knows built in.
 
 ## Choosing the no-mistakes binary
 

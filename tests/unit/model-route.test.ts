@@ -62,6 +62,24 @@ describe("routeOfAgents", () => {
     expect(Result.isFailure(routeOfAgents({ file: config.file, providers: [] }, { agent: model, fixer: model }, undefined))).toBe(true)
   })
 
+  test("an implementer on a configured provider with a fixer elsewhere is refused with the config file only", () => {
+    const routed = routeOfAgents(config, { agent: model, fixer: "other/model" }, undefined)
+    const message = Result.isFailure(routed) ? routed.failure : ""
+    expect(message).toContain(config.file)
+    expect(message).not.toContain("other")
+    expect(message).not.toContain(model)
+    expect(message).not.toContain("other/model")
+  })
+
+  test("a pinned run with an unconfigured implementer is refused with the config file only", () => {
+    const routed = routeOfAgents(config, { agent: "other/model", fixer: model }, "acme")
+    const message = Result.isFailure(routed) ? routed.failure : ""
+    expect(message).toContain(config.file)
+    expect(message).not.toContain("other")
+    expect(message).not.toContain("other/model")
+    expect(message).not.toContain(model)
+  })
+
   test("an implementer and fixer on different providers is refused rather than run on one route", () => {
     const routed = routeOfAgents(config, { agent: model, fixer: "keyed/two" }, undefined)
     expect(Result.isFailure(routed) ? routed.failure : "").toContain("name models from one provider")
