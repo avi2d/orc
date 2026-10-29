@@ -7,9 +7,9 @@ const EnvVarName = Schema.String.check(Schema.isPattern(/^[A-Za-z_][A-Za-z0-9_]*
 
 const ModelRef = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*\/\S+$/))
 
-const HeaderToken = Schema.String.check((value) => /^[A-Za-z0-9!#$%&'*+\-.^_`|~]+$/.test(value))
+const HeaderToken = Schema.String.check(Schema.makeFilter((value) => /^[A-Za-z0-9!#$%&'*+\-.^_`|~]+$/.test(value)))
 
-const CredentialFormat = Schema.String.check((value) => value.length > 0 && value.indexOf("{}") !== -1 && value.indexOf("{}") === value.lastIndexOf("{}"))
+const CredentialFormat = Schema.String.check(Schema.makeFilter((value) => value.length > 0 && value.indexOf("{}") !== -1 && value.indexOf("{}") === value.lastIndexOf("{}")))
 
 const NonoEntry = Schema.Struct({
   upstream: Schema.String.check(Schema.isPattern(/^https:\/\/\S+$/)),
