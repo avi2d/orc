@@ -112,7 +112,7 @@ export const readShow = (
 ): Effect.Effect<ShowJsonDocument | null, Schema.SchemaError | SqliteFailure> =>
   sqlite(() => ({
     run: db.query(
-      "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason FROM runs WHERE id = ?"
+      "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox FROM runs WHERE id = ?"
     ).get(runId),
     steps: db.query(
       "SELECT id, run_id, name, attempt, status, started, ended, agent_file, pi_session_file FROM steps WHERE run_id = ? ORDER BY started ASC, id ASC"

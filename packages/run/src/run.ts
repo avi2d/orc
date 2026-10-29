@@ -7,7 +7,7 @@ import { resolveAgentFile, type AgentFile } from "./agents"
 import { hostGitShim, withHostGitSafety } from "./host"
 import { nonoSandboxProvider } from "./nono"
 import { noSandboxProvider } from "./no-sandbox"
-import { defaultSandbox, type SandboxKind } from "./args"
+import type { SandboxKind } from "./args"
 import { defaultToolchainResolver, type HostTools, type ToolchainResolver, withInstallFolders, within } from "./nono-profile"
 import { routeOfAgents } from "./model-route"
 import { planSandbox, type SandboxPlan } from "./sandbox-plan"
@@ -16,7 +16,7 @@ import { orcCompletionLine } from "./pi"
 import { OrcRunError, describeCause } from "./run-session"
 import { openDatabase, orcHomeDir, updateStep } from "./run-history"
 import { stepsForRun } from "./history-resume"
-import { buildResumePlan, resolveTaskFile } from "./run-resume"
+import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "./run-resume"
 import { finishRun, historyFailure, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordResumePublish } from "./history-write"
 import { failedReport, writeEvidence, writeReport, type HistoryRun, type OrcRunReport } from "./run-record"
 import { runFull, type RunCheckpoints, type SandboxOps } from "./run-loop"
@@ -216,15 +216,24 @@ const prepareAgents = (
 const requireNoMistakes = (options: NoMistakesHost, cwd: string): Effect.Effect<void, OrcRunError> =>
   noMistakesVersionProblem(options, cwd).pipe(Effect.flatMap((problem) => problem === null ? Effect.void : refuse(problem)))
 
-const readTaskFile = (
+interface RunStart {
+  readonly taskFile: string
+  readonly sandbox: SandboxKind
+}
+
+const readRunStart = (
   fs: FileSystem.FileSystem,
   home: string,
   checkout: Checkout,
-  supplied: string | null | undefined
-): Effect.Effect<string, OrcRunError, FileSystem.FileSystem | Path.Path> =>
+  request: OrcRunRequest
+): Effect.Effect<RunStart, OrcRunError, FileSystem.FileSystem | Path.Path> =>
   Effect.acquireUseRelease(
     openDatabase(home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
-    (db) => resolveTaskFile(db, fs, checkout.branch, checkout.projectDir, supplied),
+    (db) =>
+      Effect.all({
+        taskFile: resolveTaskFile(db, fs, checkout.branch, checkout.projectDir, request.taskFile),
+        sandbox: resolveSandboxKind(db, checkout.branch, checkout.projectDir, request.sandbox)
+      }),
     (db) => Effect.sync(() => db.close())
   )
 
@@ -263,9 +272,9 @@ export const runAgentStep = (
     const git = yield* openHostGit(fs, path)
     const checkout = yield* openCheckout(fs, path, spawner, git, request.cwd, request.branch, runId, parseRefuseMarkers(Bun.env.ORC_REFUSE_MARKERS))
     const runDir = path.join(home, "runs", runId)
-    const effectiveTaskFile = yield* readTaskFile(fs, home, checkout, request.taskFile)
+    const { taskFile: effectiveTaskFile, sandbox: sandboxKind } = yield* readRunStart(fs, home, checkout, request)
     const noMistakes = { spawner, binary: noMistakesBinary(Bun.env.ORC_NO_MISTAKES_BIN), pathEnv: hostPath ?? "", git: checkout.git }
-    const { folders, agent, fixer, plan } = yield* prepareAgents(fs, path, spawner, checkout, home, runDir, effectiveTaskFile, request.agentsDir, request.sandbox ?? defaultSandbox).pipe(
+    const { folders, agent, fixer, plan } = yield* prepareAgents(fs, path, spawner, checkout, home, runDir, effectiveTaskFile, request.agentsDir, sandboxKind).pipe(
       Effect.tap(() => requireNoMistakes(noMistakes, checkout.projectDir)),
       Effect.onError(() => fs.remove(runDir, { recursive: true }).pipe(Effect.result))
     )
@@ -286,7 +295,7 @@ export const runAgentStep = (
     const history: HistoryRun = {
       fs, path, spawner, git: checkout.git, projectDir: checkout.projectDir, runId,
       runDir: folders.runDir, piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir,
-      taskPath: folders.taskPath, agent, fixer, branch: checkout.branch, started,
+      taskPath: folders.taskPath, agent, fixer, branch: checkout.branch, sandbox: sandboxKind, started,
       worktreeDir: sandbox.worktreePath,
       noMistakes: subprocessNoMistakesRunner({ ...noMistakes, worktreeDir: sandbox.worktreePath }),
       allow: request.allow ?? [],

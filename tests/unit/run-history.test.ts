@@ -83,7 +83,8 @@ describe("openDatabase", () => {
         "started",
         "ended",
         "pr_link",
-        "end_reason"
+        "end_reason",
+        "sandbox"
       ])
       expect(columnNames(db, "steps")).toEqual([
         "id",
@@ -108,6 +109,31 @@ describe("openDatabase", () => {
         db.query("PRAGMA user_version").get()
       ).user_version
       expect(version).toBe(RUN_HISTORY_SCHEMA_VERSION)
+    })
+  })
+
+  test("a version 1 history gains the sandbox column with no kind for its runs instead of being refused as unsupported", async () => {
+    await withHome(async (home) => {
+      const v1 = new Database(join(home, "orc.sqlite"), { create: true })
+      v1.run("CREATE TABLE runs (id TEXT PRIMARY KEY, project TEXT NOT NULL, branch TEXT NOT NULL, task_file TEXT NOT NULL, status TEXT NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')), started TEXT NOT NULL, ended TEXT, pr_link TEXT, end_reason TEXT)")
+      v1.run("INSERT INTO runs (id, project, branch, task_file, status, started) VALUES ('old-run', 'orc', 'orc/x', 'task.md', 'failed', '2026-10-18T10:00:00.000Z')")
+      v1.run("PRAGMA user_version = 1")
+      v1.close()
+      const db = await openDb(home)
+      try {
+        expect((await readRuns(db)).map((run) => [run.id, run.sandbox])).toEqual([["old-run", null]])
+        expect(columnNames(db, "runs").at(-1)).toBe("sandbox")
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("refuses a sandbox kind orc does not know instead of storing it", async () => {
+    await openTemp(async (_home, db) => {
+      expect(() =>
+        db.run("INSERT INTO runs (id, project, branch, task_file, status, started, sandbox) VALUES ('r', 'orc', 'orc/x', 'task.md', 'running', '2026-10-18T10:00:00.000Z', 'docker')")
+      ).toThrow()
     })
   })
 
@@ -283,7 +309,8 @@ describe("runsJson", () => {
       started: "2026-10-18T10:00:00.000Z",
       ended: "2026-10-18T10:05:00.000Z",
       prLink: "https://github.com/avi2d/orc/pull/1",
-      endReason: null
+      endReason: null,
+      sandbox: "nono"
     }
   ]
 
@@ -332,7 +359,8 @@ describe("formatRunsTable", () => {
         started: "2026-10-18T10:00:00.000Z",
         ended: null,
         prLink: null,
-        endReason: null
+        endReason: null,
+        sandbox: "nono"
       }
     ])
     const [header, row] = table.split("\n")
@@ -355,7 +383,8 @@ describe("formatRunsTable", () => {
       started: "2026-10-18T10:00:00.000Z",
       ended: null,
       prLink: null,
-      endReason: null
+      endReason: null,
+      sandbox: "nono"
     }
     const table = formatRunsTable([run, { ...run, id: "run-2", prLink: "https://github.com/avi2d/orc/pull/1" }])
     expect(table.split("\n")).toEqual([

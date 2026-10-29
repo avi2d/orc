@@ -1,6 +1,6 @@
 import { type DispatchArgs, parseDispatchArgs } from "./dispatch/args"
 import { askUserWord, type QuestionAnswer } from "./no-mistakes"
-const sandboxKinds = ["nono", "none"] as const
+export const sandboxKinds = ["nono", "none"] as const
 export type SandboxKind = typeof sandboxKinds[number]
 export const defaultSandbox: SandboxKind = "nono"
 export type OrcArgs =
@@ -9,7 +9,7 @@ export type OrcArgs =
   | { readonly kind: "ListRuns"; readonly json: boolean }
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
   | { readonly kind: "ScoreStep"; readonly runId: string; readonly step: string; readonly score: number; readonly note: string }
-  | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly branch: string | undefined; readonly sandbox: SandboxKind; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
+  | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
   | { readonly kind: "Dispatch"; readonly args: Exclude<DispatchArgs, { readonly kind: "UsageError" }> }
   | { readonly kind: "UsageError"; readonly detail: string }
 const questionPrefix = "question-"
@@ -174,7 +174,7 @@ const parseRunArgs = (rest: readonly string[]): OrcArgs => {
     return { kind: "UsageError", detail: `unexpected argument: ${split.kept[1]}` }
   }
   const taskFile = split.kept.length === 1 ? split.kept[0] : null
-  return { kind: "RunAgent", taskFile, branch: split.branch, sandbox: split.sandbox ?? defaultSandbox, allow: split.allow, answers: split.answers }
+  return { kind: "RunAgent", taskFile, branch: split.branch, sandbox: split.sandbox, allow: split.allow, answers: split.answers }
 }
 const parseRunsArgs = (rest: readonly string[]): OrcArgs => {
   if (rest.length === 0) {
