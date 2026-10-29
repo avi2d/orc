@@ -13,7 +13,7 @@ You read the PR and merge it, since orc never merges.
 - Git, tested on 2.56.0.
 - nono from https://nono.sh, tested on 0.80.0, for the default sandbox.
 - Node, tested on 24.22.1.
-- Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with an opencode-go login for opencode-go models or the token file for Claude models that [Running on a Claude model](#running-on-a-claude-model) describes.
+- Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with the login or token file each provider in [Configuring providers](#configuring-providers) takes.
 - no-mistakes v1.90.0 or later, tested on v1.100.2, installed as [Installing no-mistakes](#installing-no-mistakes) says.
 
 ## Install
@@ -95,10 +95,10 @@ An unset `ORC_REFUSE_MARKERS` names no marker and refuses no checkout for a mark
 The default sandbox run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
 With `--sandbox none` the run needs the same tools except `nono`.
 Orc runs `no-mistakes --version` before the sandbox starts and refuses a release older than v1.90.0.
-On an opencode-go model it also needs an opencode-go login in Pi, which `pi auth check --provider opencode-go` confirms.
+On a provider that takes a Pi login, the run also needs that login in Pi, which `pi auth check --provider <id>` confirms.
 With the default sandbox, orc reads that login through Pi on the host and hands it to the sandbox.
 nono reads it with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE` and `TERM` set, and orc's check runs the same way.
-So a key held only in the keychain or in an environment variable such as `OPENCODE_API_KEY` is refused, and a login Pi's `/login` stores in `~/.pi/agent/auth.json` works.
+So a key held only in the keychain or in an environment variable is refused, and a login Pi's `/login` stores in `~/.pi/agent/auth.json` works.
 This refusal applies to `--sandbox none` as well, so write a key held only in an environment variable to the Pi auth file first.
 With the default sandbox, if nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc's result names that error.
 
@@ -108,8 +108,10 @@ Orc takes the implementer agent file from the first of these that exists:
 1. `.orc/agents/implementer.md` in the project
 1. `agents/implementer.md` bundled with orc
 
-An agent file opens with a `---` header naming `model`, `thinking` and `tools`, and its body holds the instructions.
-Orc routes `opencode-go` and `anthropic` models and refuses any other model.
+An agent file opens with a `---` header naming `thinking`, `tools` and optionally `model`, and its body holds the instructions.
+The bundled agent files name no model.
+An agent file that names no model takes the one `models` in `config.json` names for its role, and orc refuses a run when neither names one.
+Orc runs only a model whose provider `config.json` names, and refuses any other model.
 Orc refuses an implementer and a fixer that name models from different providers.
 
 With the default sandbox, Pi in a run compacts its context once the context passes 150 thousand tokens, whatever the model's window.
@@ -118,8 +120,8 @@ With the default sandbox, orc writes the window minus 150000 as that model's res
 With the default sandbox, orc pins each agent model window in `models.json` as that provider model override `contextWindow`.
 Orc refuses a model the host's Pi does not list, or one whose window is 150 thousand tokens or less.
 That refusal applies to both sandboxes.
-With `--sandbox none` on an opencode-go model, Pi reads your Pi config, compaction included, so the fixed mark does not apply.
-On a Claude model Pi reads the run's own Pi folder, so the mark applies there too.
+With `--sandbox none` on a Pi login provider, Pi reads your Pi config, compaction included, so the fixed mark does not apply.
+On a token file provider Pi reads the run's own Pi folder, so the mark applies there too.
 
 Once the checks pass, orc runs `no-mistakes axi run` on the branch with the task as its intent.
 At each gate orc asks no-mistakes to fix the findings marked `auto-fix`, ignores those marked `no-op`, and accepts the fix review.
@@ -146,26 +148,44 @@ To run Pi and the checks directly on the host, add `--sandbox none` to `orc run`
 `--sandbox nono`, the default, keeps the nono sandbox.
 Without a sandbox the run still gets its own worktree on its own branch, and nono need not be on the PATH.
 Pi runs with your own environment, so it can read and write anything your user can.
-On an opencode-go model Pi also reads your Pi config.
-On a Claude model Pi reads the run's own Pi folder instead, as [Running on a Claude model](#running-on-a-claude-model) describes.
+On a Pi login provider Pi also reads your Pi config.
+On a token file provider Pi reads the run's own Pi folder instead, as [Configuring providers](#configuring-providers) describes.
 Orc points `GIT_CONFIG_GLOBAL` at a file in the run folder, so the commit identity Sandcastle sets never reaches your `~/.gitconfig`.
 Pi writes its session straight into the run's `sessions/host` folder.
 Resume takes the sandbox from the earlier run, so `orc run --branch <name>` resumes it without a sandbox.
 
-## Running on a Claude model
+## Configuring providers
 
-To run a task on a Claude model:
+Orc ships with no provider and no model, so a run needs `config.json` in `$ORC_HOME`, default `~/.orc/config.json`.
+It names each provider orc may run and, under `models`, the implementer and fixer models.
+This example names opencode-go through a Pi login and anthropic through a token file:
 
-1. Write the Claude token to a file that only your user can read.
-1. Set `ORC_CLAUDE_TOKEN_FILE` to that file's absolute path.
-1. Name an `anthropic/` model in both the implementer and the fixer agent files.
-1. Run the task with `--sandbox none`.
+```json
+{
+  "providers": [
+    { "id": "opencode-go", "credential": "pi-login", "nono": { "upstream": "https://opencode.ai/zen/go/v1" } },
+    { "id": "anthropic", "credential": "token-file", "tokenFile": { "env": "ANTHROPIC_TOKEN_FILE" } }
+  ],
+  "models": { "implementer": "opencode-go/muse-spark-1.3-contributor", "fixer": "opencode-go/muse-spark-1.3-contributor" }
+}
+```
 
-Orc refuses a Claude model in the default sandbox, because the sandbox carries only the opencode-go key.
+Each provider names its Pi provider `id`, the part of a model name before the `/`, and its `credential`:
+
+- `pi-login` checks the Pi login for that provider before the run, as [Running a task](#running-a-task) describes.
+  Its `nono` entry names the `upstream` URL the nono sandbox proxies with that login's key.
+  A login provider without a `nono` entry runs only with `--sandbox none`.
+- `token-file` reads the token from a file, whose absolute path `tokenFile` takes from the variable `env` names or from `path`.
+  `orc run --token-file <path>` takes the path from the flag instead.
+  The nono sandbox carries only a Pi login, so a token file provider runs only with `--sandbox none`.
+
+Orc refuses a `config.json` key it does not know, so a misspelled key never drops a provider unnoticed.
+Orc refuses `--token-file` on a provider that takes a Pi login.
+`orc run --provider <id>` refuses a run whose implementer model is on another provider, so a token meant for one provider never reaches another.
 Orc refuses a token file that is unset, relative, missing, empty, not a regular file or readable by other users.
-Pi reads the run's own Pi folder instead of yours, so a Claude login stored in your Pi config never stands in for the token.
-The run's `models.json` names the token file only through `ORC_CLAUDE_TOKEN_FILE`.
-Pi reads the file when it calls Claude and holds the token only in memory, so no run file keeps it.
+On a token file provider, Pi reads the run's own Pi folder instead of yours, so a login stored in your Pi config never stands in for the token.
+The run's `models.json` names the token file only through `ORC_TOKEN_FILE`.
+Pi reads the file when it calls the provider and holds the token only in memory, so no run file keeps it.
 Orc never copies, moves or deletes the token file.
 
 ## Choosing the no-mistakes binary
@@ -324,8 +344,10 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/bin.ts` | The orc entry point |
 | `src/args.ts` | The flag parsing for the orc command |
 | `src/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
-| `src/model-route.ts` | The choice between the opencode-go and Claude routes and the check of the Claude token file |
-| `src/sandbox-plan.ts` | The per-route preflight: the opencode-go login check, the model windows and the run's Pi folder |
+| `src/orc-config.ts` | The reading of `config.json`: the providers and the agent models |
+| `src/json-file.ts` | The JSON config file reading and its `ConfigError` |
+| `src/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
+| `src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
 | `src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
 | `src/history-write.ts` | The history checkpoints a run records as each step starts and ends |
 | `src/report.ts` | The `report.md` shape and the signal facts it carries |

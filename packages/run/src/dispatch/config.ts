@@ -1,4 +1,5 @@
-import { Data, Effect, FileSystem, Schema } from "effect"
+import { Effect, type FileSystem, Schema } from "effect"
+import { AbsolutePath, ConfigError, duplicateOf, readJsonFile } from "../json-file"
 
 const namePattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 
@@ -22,7 +23,7 @@ export type DispatchConfig = typeof DispatchConfigFile.Type
 
 const Project = Schema.Struct({
   name: Name,
-  checkouts: Schema.Record(Name, Schema.String.check(Schema.isPattern(/^\//)))
+  checkouts: Schema.Record(Name, AbsolutePath)
 })
 export type Project = typeof Project.Type
 
@@ -30,33 +31,6 @@ export const checkoutOn = (project: Project, machine: string): string | null =>
   Object.hasOwn(project.checkouts, machine) ? (project.checkouts[machine] ?? null) : null
 
 const ProjectsFile = Schema.Struct({ projects: Schema.Array(Project) })
-
-export class ConfigError extends Data.TaggedError("ConfigError")<{
-  readonly file: string
-  readonly detail: string
-}> {}
-
-const duplicateOf = (names: ReadonlyArray<string>): string | null =>
-  names.find((name, index) => names.indexOf(name) !== index) ?? null
-
-const readJsonFile = <S extends Schema.Top>(
-  file: string,
-  schema: S
-): Effect.Effect<S["Type"], ConfigError, FileSystem.FileSystem | S["DecodingServices"]> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const text = yield* fs.readFileString(file).pipe(
-      Effect.catchReason("PlatformError", "NotFound", () => Effect.fail(new ConfigError({ file, detail: "the file is missing" }))),
-      Effect.mapError((error) => error instanceof ConfigError ? error : new ConfigError({ file, detail: error.message }))
-    )
-    const raw: unknown = yield* Effect.try({
-      try: (): unknown => JSON.parse(text),
-      catch: () => new ConfigError({ file, detail: "the file is no JSON" })
-    })
-    return yield* Schema.decodeUnknownEffect(schema)(raw).pipe(
-      Effect.mapError((error) => new ConfigError({ file, detail: error.message }))
-    )
-  })
 
 export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, ConfigError, FileSystem.FileSystem> =>
   readJsonFile(file, DispatchConfigFile).pipe(

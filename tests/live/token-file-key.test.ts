@@ -4,14 +4,16 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { Schema } from "effect"
-import { claudeApiKey, claudeProvider, claudeTokenFileVar } from "../../packages/run/src/model-route"
+import { tokenFileApiKey, tokenFileVar } from "../../packages/run/src/model-route"
 import { piAgentModels } from "../../packages/run/src/nono-profile"
 
 const noPi = Bun.which("pi") === null
 
+const provider = "anthropic"
+
 const token = "sk-ant-oat01-orc-live-fixture-token"
 
-const decodeClaudeModels = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct({ providers: Schema.Struct({ anthropic: Schema.Struct({ apiKey: Schema.String }) }) })))
+const decodeAgentModels = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct({ providers: Schema.Struct({ anthropic: Schema.Struct({ apiKey: Schema.String }) }) })))
 
 const runPiAgainst = async (agentDir: string, cwd: string, env: Record<string, string>): Promise<ReadonlyArray<string | null>> => {
   const authHeaders: Array<string | null> = []
@@ -23,10 +25,10 @@ const runPiAgainst = async (agentDir: string, cwd: string, env: Record<string, s
     }
   })
   try {
-    const written = decodeClaudeModels(piAgentModels({ provider: claudeProvider, apiKey: claudeApiKey }, []))
+    const written = decodeAgentModels(piAgentModels({ provider, apiKey: tokenFileApiKey }, []))
     const baseUrl = "http://127.0.0.1:" + server.port
     await writeFile(join(agentDir, "models.json"), JSON.stringify({ providers: { anthropic: { ...written.providers.anthropic, baseUrl } } }))
-    const pi = Bun.spawn(["pi", "--model", claudeProvider + "/claude-sonnet-4-5", "-p", "--no-session", "Say hi."], { cwd, env, stdout: "ignore", stderr: "ignore" })
+    const pi = Bun.spawn(["pi", "--model", provider + "/claude-sonnet-4-5", "-p", "--no-session", "Say hi."], { cwd, env, stdout: "ignore", stderr: "ignore" })
     await pi.exited
     return authHeaders
   } finally {
@@ -34,9 +36,9 @@ const runPiAgainst = async (agentDir: string, cwd: string, env: Record<string, s
   }
 }
 
-describe("Pi on the Claude agent folder orc writes", () => {
+describe("Pi on the token-file agent folder orc writes", () => {
   test.skipIf(noPi)(skipReason("needs pi on PATH", "sends the token file's text without its newline, not an operator ANTHROPIC variable"), async () => {
-    const root = await realpath(await mkdtemp(join(tmpdir(), "orc-claude-key-")))
+    const root = await realpath(await mkdtemp(join(tmpdir(), "orc-token-file-key-")))
     try {
       const agentDir = join(root, "agent")
       await mkdir(agentDir)
@@ -47,7 +49,7 @@ describe("Pi on the Claude agent folder orc writes", () => {
         PATH: process.env["PATH"] ?? "",
         HOME: root,
         PI_CODING_AGENT_DIR: agentDir,
-        [claudeTokenFileVar]: tokenFile,
+        [tokenFileVar]: tokenFile,
         ANTHROPIC_API_KEY: "sk-ant-api03-operator-variable",
         ANTHROPIC_AUTH_TOKEN: "operator-auth-token",
         ANTHROPIC_OAUTH_TOKEN: "sk-ant-oat01-operator-variable"

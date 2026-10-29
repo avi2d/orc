@@ -10,6 +10,7 @@ import { noSandboxProvider } from "./no-sandbox"
 import type { SandboxKind } from "./args"
 import { defaultToolchainResolver, type HostTools, type ToolchainResolver, withInstallFolders, within } from "./nono-profile"
 import { routeOfAgents } from "./model-route"
+import { readOrcConfig } from "./orc-config"
 import { planSandbox, type SandboxPlan } from "./sandbox-plan"
 import { runGit } from "./git-run"
 import { orcCompletionLine } from "./pi"
@@ -29,6 +30,8 @@ export interface OrcRunRequest {
   readonly taskFile: string | null | undefined
   readonly branch?: string | undefined
   readonly sandbox?: SandboxKind | undefined
+  readonly tokenFile?: string | undefined
+  readonly provider?: string | undefined
   readonly allow?: ReadonlyArray<AllowWord> | undefined
   readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
   readonly homeDir?: string | undefined
@@ -184,24 +187,30 @@ const prepareAgents = (
   runDir: string,
   effectiveTaskFile: string,
   agentsDir: string | undefined,
-  sandboxKind: SandboxKind
+  sandboxKind: SandboxKind,
+  pins: { readonly tokenFile: string | undefined; readonly provider: string | undefined }
 ): Effect.Effect<PreparedAgents, OrcRunError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
+    const config = yield* readOrcConfig(home).pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read " + cause.file + ": " + cause.detail }))
+    )
     const folders = yield* prepareRunFolders(fs, path, runDir, effectiveTaskFile)
     const agent: AgentFile = yield* resolveAgentFile("implementer", {
       projectDir: checkout.projectDir,
       orcHome: home,
-      agentsDir
+      agentsDir,
+      configModel: { file: config.file, model: config.models?.implementer }
     }).pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
     const fixer: AgentFile = yield* resolveAgentFile("fixer", {
       projectDir: checkout.projectDir,
       orcHome: home,
-      agentsDir
+      agentsDir,
+      configModel: { file: config.file, model: config.models?.fixer }
     }).pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
     const piBinary = Bun.which("pi")
     const nodeBinary = Bun.which("node")
     const models = { agent: agent.model, fixer: fixer.model }
-    const route = yield* Effect.fromResult(routeOfAgents(models)).pipe(Effect.mapError((message) => new OrcRunError({ message })))
+    const provider = yield* Effect.fromResult(routeOfAgents(config, models, pins.provider)).pipe(Effect.mapError((message) => new OrcRunError({ message })))
     if (piBinary === null) {
       return yield* refuse("orc: pi is not on the host PATH")
     }
@@ -209,7 +218,7 @@ const prepareAgents = (
       return yield* refuse("orc: node is not on the host PATH")
     }
     const host: HostTools = { piBinary, nodeBinary, homeDir: homedir() }
-    const plan = yield* planSandbox(fs, path, spawner, host, { projectDir: checkout.projectDir, runDir: folders.runDir, piAgentDir: folders.piAgentDir }, models, route, sandboxKind)
+    const plan = yield* planSandbox(fs, path, spawner, host, { projectDir: checkout.projectDir, runDir: folders.runDir, piAgentDir: folders.piAgentDir }, models, { config, provider, tokenFileFlag: pins.tokenFile }, sandboxKind)
     return { folders, agent, fixer, plan }
   })
 
@@ -250,7 +259,7 @@ const openSandboxForRun = (
     try: () => createSandbox({
       branch: checkout.branch,
       sandbox: plan.kind === "none"
-        ? noSandboxProvider({ piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir, piAgentDir: plan.piAgentDir }, operatorEnv)
+        ? noSandboxProvider({ piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir, piAgentDir: plan.own?.piAgentDir }, { ...operatorEnv, ...plan.own?.env })
         : nonoSandboxProvider({ piSessionDir: folders.piSessionDir, piAgentDir: folders.piAgentDir, modelCredential: plan.credential, hostPath, toolchain }),
       cwd: checkout.projectDir
     }),
@@ -274,7 +283,7 @@ export const runAgentStep = (
     const runDir = path.join(home, "runs", runId)
     const { taskFile: effectiveTaskFile, sandbox: sandboxKind } = yield* readRunStart(fs, home, checkout, request)
     const noMistakes = { spawner, binary: noMistakesBinary(Bun.env.ORC_NO_MISTAKES_BIN), pathEnv: hostPath ?? "", git: checkout.git }
-    const { folders, agent, fixer, plan } = yield* prepareAgents(fs, path, spawner, checkout, home, runDir, effectiveTaskFile, request.agentsDir, sandboxKind).pipe(
+    const { folders, agent, fixer, plan } = yield* prepareAgents(fs, path, spawner, checkout, home, runDir, effectiveTaskFile, request.agentsDir, sandboxKind, { tokenFile: request.tokenFile, provider: request.provider }).pipe(
       Effect.tap(() => requireNoMistakes(noMistakes, checkout.projectDir)),
       Effect.onError(() => fs.remove(runDir, { recursive: true }).pipe(Effect.result))
     )

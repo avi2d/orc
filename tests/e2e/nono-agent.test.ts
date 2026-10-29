@@ -124,10 +124,7 @@ describe("the model credential profile", () => {
       await mkdir(agentDir, { recursive: true })
       const stubPi = join(dir, "pi")
       await writeFile(stubPi, "#!/bin/sh\necho fixture-captured-token\n", { mode: 0o755 })
-      const credential = modelCredentialFor("opencode-go/muse-spark", { piBinary: stubPi, nodeBinary: "/bin/sh", homeDir: fixtureHome })
-      if (credential === null) {
-        throw new Error("the fixture model names no credential")
-      }
+      const credential = modelCredentialFor({ id: "acme-go", upstream: "https://llm.acme.test/v1" }, { piBinary: stubPi, nodeBinary: "/bin/sh", homeDir: fixtureHome })
       const handle = await nonoSandboxProvider({ piSessionDir: session, piAgentDir: agentDir, modelCredential: credential }).create({
         worktreePath: worktree,
         hostRepoPath: worktree,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { copyFile, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
@@ -15,8 +15,10 @@ const git = (dir: string, args: ReadonlyArray<string>): void => {
   }
 }
 
+const liveConfig = process.env["ORC_PI_E2E_CONFIG"] ?? ""
+
 describe("orc run through the agent step", () => {
-  test.skipIf(process.env["ORC_PI_E2E"] !== "1")(skipReason("needs ORC_PI_E2E=1 and an opencode-go Pi login on the host", "a live agent run commits on its branch"), async () => {
+  test.skipIf(process.env["ORC_PI_E2E"] !== "1" || liveConfig === "")(skipReason("needs ORC_PI_E2E=1 and ORC_PI_E2E_CONFIG naming an orc config.json whose models Pi can reach from the nono sandbox", "a live agent run commits on its branch"), async () => {
     const repo = await mkdtemp(join(tmpdir(), "orc-agent-repo-"))
     const home = await mkdtemp(join(tmpdir(), "orc-agent-home-"))
     try {
@@ -26,6 +28,7 @@ describe("orc run through the agent step", () => {
       await writeFile(join(repo, "task.md"), "Create greeting.txt in the repo root holding the single line hello from orc, then commit it.\n")
       git(repo, ["add", "task.md"])
       git(repo, ["commit", "-qm", "task"])
+      await copyFile(liveConfig, join(home, "config.json"))
       const report = await Effect.runPromise(
         runAgentStep({ cwd: repo, taskFile: join(repo, "task.md"), branch: "orc/e2e-agent", homeDir: home, runId: "e2e-agent-1" }).pipe(
           Effect.provide(BunServices.layer)
