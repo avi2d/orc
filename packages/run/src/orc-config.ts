@@ -13,8 +13,8 @@ const CredentialFormat = Schema.String.check(Schema.makeFilter((value) => value.
 
 const NonoEntry = Schema.Struct({
   upstream: Schema.String.check(Schema.isPattern(/^https:\/\/\S+$/)),
-  injectHeader: Schema.optional(HeaderToken),
-  credentialFormat: Schema.optional(CredentialFormat)
+  injectHeader: Schema.optionalKey(HeaderToken),
+  credentialFormat: Schema.optionalKey(CredentialFormat)
 })
 
 const LoginProvider = Schema.Struct({
