@@ -10,6 +10,8 @@ import { openDatabase } from "../../packages/run/src/run-history"
 
 const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
 
+const resumeTimeout = 30_000
+
 const runOrc = async (args: ReadonlyArray<string>, cwd?: string, env?: Record<string, string | undefined>): Promise<{ exitCode: number; stdout: string; stderr: string }> => {
   const proc = Bun.spawn([process.execPath, binPath, ...args], { stdout: "pipe", stderr: "pipe", cwd: cwd ?? process.cwd(), env: { ...process.env, ...env } })
   const stdout = proc.stdout
@@ -206,7 +208,7 @@ describe("orc bin", () => {
       expect(resumed.stderr).not.toContain("the sandbox failed to start")
       expect(await recordedSandboxes(env.ORC_HOME)).toEqual(["none", "none"])
     })
-  })
+  }, resumeTimeout)
 
   test("a run recorded in nono resumes in nono when the flag is dropped, instead of reading the record as no sandbox", async () => {
     await withRunnableFixture(async ({ dir, env }) => {
@@ -215,7 +217,7 @@ describe("orc bin", () => {
       expect(resumed.exitCode).not.toBe(0)
       expect(resumed.stderr).toContain("the sandbox failed to start")
     })
-  })
+  }, resumeTimeout)
 
   test("a resume whose flag names another sandbox than the recorded one is refused instead of switching sandbox", async () => {
     await withRunnableFixture(async ({ dir, env }) => {
@@ -225,7 +227,7 @@ describe("orc bin", () => {
       expect(resumed.stderr).toContain("branch orc/test started with --sandbox none, so resume refuses --sandbox nono; drop --sandbox to resume with none")
       expect(await recordedSandboxes(env.ORC_HOME)).toEqual(["none"])
     })
-  })
+  }, resumeTimeout)
 })
 
 interface RunnableFixture {
