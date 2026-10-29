@@ -183,7 +183,8 @@ Orc refuses a `config.json` key it does not know, so a misspelled key never drop
 Orc refuses `--token-file` on a provider that takes a Pi login.
 `orc run --provider <id>` refuses a run whose implementer model is on another provider, so a token meant for one provider never reaches another.
 Orc refuses a token file that is unset, relative, missing, empty, not a regular file or readable by other users.
-On a token file provider, Pi reads the run's own Pi folder instead of yours, so a login stored in your Pi config never stands in for the token.
+On a token file provider, Pi reads the run's own Pi folder instead of yours.
+So a login stored in your Pi config never stands in for the token.
 The run's `models.json` names the token file only through `ORC_TOKEN_FILE`.
 Pi reads the file when it calls the provider and holds the token only in memory, so no run file keeps it.
 Orc never copies, moves or deletes the token file.
@@ -271,7 +272,9 @@ Orc keeps one backlog of tasks in `~/.orc/backlog`, one Markdown file per task w
 `ORC_HOME` moves the backlog elsewhere when set.
 A task file sits in `new`, `taken` or `closed`, and the folder it sits in is its state.
 Two files beside the folders tell the beat where tasks may go.
-`dispatch.json` names each machine, its slots and its start command, and the Claude accounts with the floor of room each must keep:
+`dispatch.json` names each machine, its slots and its start command, and the quota.
+The quota names the provider its accounts belong to, the command that reads their room, and each account's token file.
+It also names the floor of room each account must keep:
 
 ```json
 {
@@ -279,9 +282,34 @@ Two files beside the folders tell the beat where tasks may go.
     { "name": "mac", "slots": 2, "start": ["orc", "runner", "start"] },
     { "name": "linux-box", "slots": 4, "start": ["orc", "runner", "start", "--", "ssh", "linux-box", "orc"] }
   ],
-  "quota": { "accounts": ["main", "second"], "floorPercent": 15 }
+  "quota": {
+    "provider": "anthropic",
+    "command": ["my-quota-reader", "--json"],
+    "accounts": [
+      { "name": "main", "tokenFile": "/Users/me/.secrets/main-token" },
+      { "name": "second", "tokenFile": "/Users/me/.secrets/second-token" }
+    ],
+    "floorPercent": 15
+  }
 }
 ```
+
+The provider is a token-file provider in `config.json` on each machine that runs the tasks, and each token file path holds on those machines.
+Orc runs the quota command with no input and reads its standard output as this document:
+
+```json
+{
+  "schema": "orc.quota.v1",
+  "accounts": [
+    { "name": "main", "remainingPercent": 40 },
+    { "name": "second", "unusable": "the login expired" }
+  ]
+}
+```
+
+Each entry gives the percent of room left, from 0 to 100, or the reason the account cannot run.
+An account the document does not name cannot run.
+A command that exits non-zero, runs past 15 seconds or prints any other document leaves the quota unread, and the beat starts nothing.
 
 `projects.json` names each project and its checkout on each machine:
 
@@ -295,17 +323,18 @@ To see the backlog, run `orc backlog`.
 It prints the new, taken and closed tasks side by side with the project list and each machine's busy slots beside them.
 To print the same facts as JSON, run `orc backlog --json`, whose document names its version first as `orc.backlog.v1`.
 To start what can start, run `orc beat`, from launchd or cron every few minutes.
-Each beat reads quota with `clauth status --json` and the room on each machine before it takes any task.
+Each beat runs the quota command and reads the room on each machine before it takes any task.
 A task starts only once three things hold:
 
 1. Every task it depends on closed done.
 2. Its project has a checkout on a machine with a free slot.
-3. A Claude account has room at or above the floor.
+3. An account has room at or above the floor, and the runs take the account with the most room.
 
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
 After the claim survives a recount, the beat writes the task started before it runs the start command.
 A task marked for a machine waits for a slot on that machine and never starts on another.
-The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE` and `ORC_TASK_ACCOUNT`.
+The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT` and `ORC_TASK_TOKEN_FILE`.
+`ORC_TASK_TOKEN_FILE` is the account's token file path, never the token.
 The beat starts it detached in its own session, never waits for it and never kills it.
 So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
@@ -320,6 +349,7 @@ When a started task ends, run `orc backlog close <task-id> <done|failed> [reason
 `orc runner start` is the start command that hands a task to pueue on its machine.
 The run then outlives the beat, the dispatcher and any SSH link to it.
 It reads the task from the beat's `ORC_TASK_*` variables and queues `orc run` in the checkout on branch `orc/<task-id>`, in the pueue group `orc`.
+The run takes `--sandbox none --provider <provider> --token-file <path>`, so it runs on the picked account and refuses an implementer on any other provider.
 The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
 The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
@@ -368,7 +398,7 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/dispatch/backlog.ts` | The backlog folders, the id reservation and the atomic take of a task |
 | `src/dispatch/task-record.ts` | The task file and its frontmatter |
 | `src/dispatch/config.ts` | The reading of `dispatch.json` and `projects.json` |
-| `src/dispatch/quota.ts` | The quota reading from `clauth status --json` and the pick of an account |
+| `src/dispatch/quota.ts` | The quota reading from the configured command and the pick of an account |
 | `src/dispatch/beat.ts` | The beat: room, placement, take and start |
 | `src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
 | `src/dispatch/runner.ts` | The runner: the start through pueue and the reading of a task's result |

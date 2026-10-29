@@ -1,7 +1,7 @@
 import { Effect, type FileSystem, Schema } from "effect"
 import { AbsolutePath, ConfigError, duplicateOf, readJsonFileIfPresent } from "./json-file"
 
-const ProviderId = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/))
+export const ProviderId = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/))
 
 const EnvVarName = Schema.String.check(Schema.isPattern(/^[A-Za-z_][A-Za-z0-9_]*$/))
 

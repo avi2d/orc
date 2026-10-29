@@ -9,8 +9,8 @@ import { parseDispatchArgs } from "../../packages/run/src/dispatch/args"
 import { addTask, claimTask, closeStartedTask, listTasks, releaseTask, writeTaken } from "../../packages/run/src/dispatch/backlog"
 import { placeTask, runBeat } from "../../packages/run/src/dispatch/beat"
 import { backlogJson, formatBoard } from "../../packages/run/src/dispatch/board"
-import type { DispatchConfig, Project } from "../../packages/run/src/dispatch/config"
-import { assessClauthStatus } from "../../packages/run/src/dispatch/quota"
+import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/dispatch/config"
+import { assessQuota } from "../../packages/run/src/dispatch/quota"
 import { parseTaskFile, renderTaskFile, TaskFileError, type TaskRecord } from "../../packages/run/src/dispatch/task-record"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
@@ -31,26 +31,23 @@ const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-
 
 const config: DispatchConfig = {
   machines: [{ name: "mac", slots: 1, start: ["true"] }, { name: "linux", slots: 4, start: ["true"] }],
-  quota: { accounts: ["main"], floorPercent: 15 }
+  quota: { provider: "keyed", command: ["orc-quota"], accounts: [{ name: "main", tokenFile: "/secrets/main-token" }], floorPercent: 15 }
 }
 
 const projects: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Users/a/orc", linux: "/home/a/orc" } }]
 
 const newTask = (machine: string | null): TaskRecord => ({ spec: { ...spec, id: "task-1", machine }, state: { kind: "new" } })
 
-const clauthReply = JSON.stringify({
-  schema: 2,
-  profiles: [{ name: "main", auth_status: "ok", fetch_status: "Fresh", stale: false, windows: [{ label: "5h", utilization_pct: 10 }, { label: "7d", utilization_pct: 20 }] }]
-})
+const quotaReply = JSON.stringify({ schema: "orc.quota.v1", accounts: [{ name: "main", remainingPercent: 80 }] })
 
-// Answers clauth itself and reads the task file at the moment the beat asks for the start command, before any process runs.
+// Answers the quota command itself and reads the task file at the moment the beat asks for the start command, before any process runs.
 const recordingSpawner = (taskFile: string, seen: Array<string>): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner, never, ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem> =>
   Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
     const real = yield* ChildProcessSpawner.ChildProcessSpawner
     const fs = yield* FileSystem.FileSystem
     return ChildProcessSpawner.make((command) =>
-      ChildProcess.isStandardCommand(command) && command.command === "clauth"
-        ? real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + clauthReply + "\nJ"]))
+      ChildProcess.isStandardCommand(command) && command.command === "orc-quota"
+        ? real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + quotaReply + "\nJ"]))
         : fs.readFileString(taskFile).pipe(
           Effect.tap((text) => Effect.sync(() => seen.push(text))),
           Effect.flatMap(() => real.spawn(command))
@@ -151,29 +148,89 @@ describe("task files", () => {
   })
 })
 
-describe("assessClauthStatus", () => {
-  const profile = (name: string, fiveHours: number, sevenDays: number) => ({
-    name,
-    auth_status: "ok",
-    fetch_status: "Fresh",
-    stale: false,
-    windows: [{ label: "5h", utilization_pct: fiveHours }, { label: "7d", utilization_pct: sevenDays }]
+const configProblem = async (root: string, quota: object): Promise<string | null> => {
+  const file = join(root, "dispatch.json")
+  await writeFile(file, JSON.stringify({ machines: config.machines, quota: { ...config.quota, ...quota } }))
+  return run(readDispatchConfig(file).pipe(
+    Effect.map(() => null),
+    Effect.catchTag("ConfigError", (error) => Effect.succeed(error.detail))
+  ))
+}
+
+describe("readDispatchConfig", () => {
+  test("keeps the provider, the quota command and each account's token file path", async () => {
+    await withBacklog(async (root) => {
+      const file = join(root, "dispatch.json")
+      await writeFile(file, JSON.stringify(config))
+      expect((await run(readDispatchConfig(file))).quota).toEqual(config.quota)
+    })
   })
-  test("room left is set by the fuller window, not the 5h window alone", () => {
-    const reading = assessClauthStatus({ profiles: [profile("main", 20, 70)] }, { accounts: ["main"], floorPercent: 15 })
-    expect(reading).toEqual({ kind: "read", floorPercent: 15, accounts: [{ account: "main", kind: "usable", remainingPercent: 30 }], pick: "main" })
+  test("refuses an account with no token file instead of starting its runs on none", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, { accounts: [{ name: "main" }] })).not.toBeNull()
+    })
   })
+  test("refuses a relative token file path instead of resolving it against the run's folder", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, { accounts: [{ name: "main", tokenFile: "secrets/main-token" }] })).not.toBeNull()
+    })
+  })
+  test("refuses an account named twice instead of keeping either token file", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, { accounts: [{ name: "main", tokenFile: "/a" }, { name: "main", tokenFile: "/b" }] })).toBe("the account main is named twice")
+    })
+  })
+  test("refuses a quota with no command instead of reading a built-in tool", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, { command: [] })).not.toBeNull()
+    })
+  })
+  test("refuses a quota with no provider instead of handing the accounts to any provider", async () => {
+    await withBacklog(async (root) => {
+      const file = join(root, "dispatch.json")
+      await writeFile(file, JSON.stringify({ machines: config.machines, quota: { command: config.quota.command, accounts: config.quota.accounts, floorPercent: 15 } }))
+      const read = await run(readDispatchConfig(file).pipe(Effect.as("read"), Effect.catchTag("ConfigError", () => Effect.succeed("refused"))))
+      expect(read).toBe("refused")
+    })
+  })
+})
+
+describe("assessQuota", () => {
+  const settings = (...names: ReadonlyArray<string>) => ({ command: ["orc-quota"] as const, accounts: names.map((name) => ({ name })), floorPercent: 15 })
+  const document = (accounts: ReadonlyArray<object>) => ({ schema: "orc.quota.v1", accounts })
   test("runs use the account with most room, not the first listed", () => {
-    const reading = assessClauthStatus({ profiles: [profile("main", 60, 60), profile("second", 10, 20)] }, { accounts: ["main", "second"], floorPercent: 15 })
-    expect(reading.kind === "read" ? reading.pick : "unread").toBe("second")
+    const reading = assessQuota(document([{ name: "main", remainingPercent: 40 }, { name: "second", remainingPercent: 80 }]), settings("main", "second"))
+    expect(reading).toEqual({
+      kind: "read",
+      floorPercent: 15,
+      accounts: [{ account: "main", kind: "usable", remainingPercent: 40 }, { account: "second", kind: "usable", remainingPercent: 80 }],
+      pick: "second"
+    })
   })
   test("an account below the floor is not picked", () => {
-    const reading = assessClauthStatus({ profiles: [profile("main", 90, 10)] }, { accounts: ["main"], floorPercent: 15 })
+    const reading = assessQuota(document([{ name: "main", remainingPercent: 10 }]), settings("main"))
     expect(reading.kind === "read" ? reading.pick : "unread").toBeNull()
   })
-  test("a stale reading is unusable instead of trusted", () => {
-    const reading = assessClauthStatus({ profiles: [{ ...profile("main", 0, 0), stale: true }] }, { accounts: ["main"], floorPercent: 15 })
-    expect(reading.kind === "read" ? reading.accounts[0]?.kind : "unread").toBe("unusable")
+  test("an account the command calls unusable keeps the command's reason instead of being picked", () => {
+    const reading = assessQuota(document([{ name: "main", unusable: "the login expired" }]), settings("main"))
+    expect(reading).toEqual({ kind: "read", floorPercent: 15, accounts: [{ account: "main", kind: "unusable", reason: "the login expired" }], pick: null })
+  })
+  test("an account the command does not name is unusable instead of assumed full", () => {
+    const reading = assessQuota(document([{ name: "other", remainingPercent: 90 }]), settings("main"))
+    expect(reading.kind === "read" ? reading.accounts : []).toEqual([{ account: "main", kind: "unusable", reason: "the quota command names no account main" }])
+  })
+  test("an entry naming both room and a reason is refused instead of read as usable", () => {
+    expect(assessQuota(document([{ name: "main", remainingPercent: 90, unusable: "spent" }]), settings("main")).kind).toBe("unread")
+  })
+  test("room above 100 percent is refused instead of read as room", () => {
+    expect(assessQuota(document([{ name: "main", remainingPercent: 140 }]), settings("main")).kind).toBe("unread")
+  })
+  test("a document without the orc.quota.v1 schema is refused instead of read", () => {
+    expect(assessQuota({ accounts: [{ name: "main", remainingPercent: 90 }] }, settings("main"))).toEqual({ kind: "unread", reason: "the quota command printed no orc.quota.v1 document" })
+  })
+  test("an account named twice is refused instead of taking either reading", () => {
+    const reading = assessQuota(document([{ name: "main", remainingPercent: 10 }, { name: "main", remainingPercent: 90 }]), settings("main"))
+    expect(reading).toEqual({ kind: "unread", reason: "the quota command names the account main twice" })
   })
 })
 

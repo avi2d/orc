@@ -1,5 +1,6 @@
 import { Duration, Effect, Option, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { duplicateOf } from "../json-file"
 
 type AccountReading =
   | { readonly account: string; readonly kind: "usable"; readonly remainingPercent: number }
@@ -15,61 +16,43 @@ export type QuotaReading =
   }
 
 export interface QuotaSettings {
-  readonly accounts: ReadonlyArray<string>
+  readonly command: readonly [string, ...Array<string>]
+  readonly accounts: ReadonlyArray<{ readonly name: string }>
   readonly floorPercent: number
 }
 
-const ClauthWindow = Schema.Struct({
-  label: Schema.String,
-  utilization_pct: Schema.optional(Schema.NullOr(Schema.Finite))
-})
+const QUOTA_JSON_SCHEMA = "orc.quota.v1" as const
 
-const ClauthProfile = Schema.Struct({
-  name: Schema.String,
-  auth_status: Schema.optional(Schema.NullOr(Schema.String)),
-  fetch_status: Schema.optional(Schema.NullOr(Schema.String)),
-  stale: Schema.optional(Schema.NullOr(Schema.Boolean)),
-  windows: Schema.optional(Schema.NullOr(Schema.Array(ClauthWindow)))
-})
-type ClauthProfile = typeof ClauthProfile.Type
+const QuotaAccount = Schema.Union([
+  Schema.Struct({ name: Schema.String, remainingPercent: Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 })) }),
+  Schema.Struct({ name: Schema.String, unusable: Schema.String })
+])
+type QuotaAccount = typeof QuotaAccount.Type
 
-const ClauthStatus = Schema.Struct({ profiles: Schema.Array(ClauthProfile) })
+const QuotaDocument = Schema.Struct({ schema: Schema.Literal(QUOTA_JSON_SCHEMA), accounts: Schema.Array(QuotaAccount) })
 
-const clauthSeconds = 15
+const quotaSeconds = 15
 
-const utilization = (profile: ClauthProfile, label: string): number | null =>
-  profile.windows?.find((window) => window.label === label)?.utilization_pct ?? null
-
-const readAccount = (profile: ClauthProfile | undefined, account: string): AccountReading => {
-  const unusable = (reason: string): AccountReading => ({ account, kind: "unusable", reason })
-  if (profile === undefined) {
-    return unusable("clauth has no profile " + account)
+const readAccount = (entry: QuotaAccount | undefined, account: string): AccountReading => {
+  if (entry === undefined) {
+    return { account, kind: "unusable", reason: "the quota command names no account " + account }
   }
-  if (profile.auth_status !== "ok") {
-    return unusable("clauth reports auth " + (profile.auth_status ?? "unknown"))
-  }
-  if (profile.fetch_status === "Failed") {
-    return unusable("clauth could not read its usage")
-  }
-  if (profile.stale !== false) {
-    return unusable("the clauth reading is stale")
-  }
-  const fiveHours = utilization(profile, "5h")
-  const sevenDays = utilization(profile, "7d")
-  if (fiveHours === null || sevenDays === null) {
-    return unusable("the clauth reading lacks its 5h and 7d windows")
-  }
-  return { account, kind: "usable", remainingPercent: Math.min(100, Math.max(0, 100 - Math.max(fiveHours, sevenDays))) }
+  return "unusable" in entry
+    ? { account, kind: "unusable", reason: entry.unusable }
+    : { account, kind: "usable", remainingPercent: entry.remainingPercent }
 }
 
-export const assessClauthStatus = (status: unknown, settings: QuotaSettings): QuotaReading => {
-  const decoded = Schema.decodeUnknownOption(ClauthStatus)(status)
+export const assessQuota = (document: unknown, settings: QuotaSettings): QuotaReading => {
+  // An entry naming both remainingPercent and unusable matches the first member unless excess keys fail it.
+  const decoded = Schema.decodeUnknownOption(QuotaDocument)(document, { onExcessProperty: "error" })
   if (Option.isNone(decoded)) {
-    return { kind: "unread", reason: "clauth status --json printed no profile list" }
+    return { kind: "unread", reason: "the quota command printed no " + QUOTA_JSON_SCHEMA + " document" }
   }
-  const accounts = settings.accounts.map((account) =>
-    readAccount(decoded.value.profiles.find((profile) => profile.name === account), account)
-  )
+  const duplicate = duplicateOf(decoded.value.accounts.map((entry) => entry.name))
+  if (duplicate !== null) {
+    return { kind: "unread", reason: "the quota command names the account " + duplicate + " twice" }
+  }
+  const accounts = settings.accounts.map(({ name }) => readAccount(decoded.value.accounts.find((entry) => entry.name === name), name))
   let pick: { readonly account: string; readonly remainingPercent: number } | null = null
   for (const reading of accounts) {
     if (reading.kind === "usable" && reading.remainingPercent >= settings.floorPercent && reading.remainingPercent > (pick?.remainingPercent ?? -1)) {
@@ -81,26 +64,28 @@ export const assessClauthStatus = (status: unknown, settings: QuotaSettings): Qu
 
 export const readQuota = (
   settings: QuotaSettings
-): Effect.Effect<QuotaReading, never, ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.gen(function*() {
+): Effect.Effect<QuotaReading, never, ChildProcessSpawner.ChildProcessSpawner> => {
+  const [program, ...args] = settings.command
+  return Effect.gen(function*() {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const handle = yield* spawner.spawn(ChildProcess.make("clauth", ["status", "--json"]))
+    const handle = yield* spawner.spawn(ChildProcess.make(program, args, { stdin: "ignore", stderr: "ignore" }))
     const [stdout, exitCode] = yield* Effect.all([handle.stdout.pipe(Stream.decodeText(), Stream.mkString), handle.exitCode], { concurrency: "unbounded" })
     if (exitCode !== 0) {
-      return { kind: "unread", reason: "clauth status --json exited " + exitCode } satisfies QuotaReading
+      return { kind: "unread", reason: "the quota command " + program + " exited " + exitCode } satisfies QuotaReading
     }
-    const parsed = yield* Effect.try({ try: (): unknown => JSON.parse(stdout), catch: () => "clauth status --json printed no JSON" })
-    return assessClauthStatus(parsed, settings)
+    const parsed = yield* Effect.try({ try: (): unknown => JSON.parse(stdout), catch: () => "the quota command " + program + " printed no JSON" })
+    return assessQuota(parsed, settings)
   }).pipe(
     Effect.scoped,
     Effect.timeoutOrElse({
-      duration: Duration.seconds(clauthSeconds),
-      orElse: () => Effect.fail("clauth status --json ran past " + clauthSeconds + " seconds")
+      duration: Duration.seconds(quotaSeconds),
+      orElse: () => Effect.fail("the quota command " + program + " ran past " + quotaSeconds + " seconds")
     }),
     Effect.catch((error) =>
-      Effect.succeed<QuotaReading>({ kind: "unread", reason: typeof error === "string" ? error : "clauth did not run: " + error.message })
+      Effect.succeed<QuotaReading>({ kind: "unread", reason: typeof error === "string" ? error : "the quota command " + program + " did not run: " + error.message })
     )
   )
+}
 
 export const describeQuota = (reading: QuotaReading): string => {
   if (reading.kind === "unread") {
