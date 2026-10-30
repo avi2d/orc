@@ -114,6 +114,18 @@ describe("the dispatch view", () => {
     });
   });
 
+  test("a task past the last free slot waits on room instead of the next beat", async () => {
+    await withBacklog(async (root) => {
+      const file = (id: string, title: string): string =>
+        ["---", 'id: "' + id + '"', 'title: "' + title + '"', 'project: "orc"', "machine: null", "depends_on: []", 'created: "2026-10-27T10:00:00.000Z"', "---", "# " + title, ""].join("\n");
+      await writeFile(join(root, "backlog", "new", "task-12.md"), file("task-12", "Second free task"));
+      await writeFile(join(root, "backlog", "new", "task-13.md"), file("task-13", "Third free task"));
+      const view = dispatchView(snapshotOf(await readBacklog(root)));
+      expect(view.waiting.find((row) => row.id === "task-12")?.reason).toBe("waits for the next beat");
+      expect(view.waiting.find((row) => row.id === "task-13")?.reason).toBe("no machine with a checkout of orc has room");
+    });
+  });
+
   test("an unknown project, machine or checkout waits on just that instead of room", async () => {
     await withBacklog(async (root) => {
       const view = dispatchView(snapshotOf(await readBacklog(root)));

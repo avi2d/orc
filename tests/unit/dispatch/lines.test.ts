@@ -86,6 +86,17 @@ describe("the dispatch panel, against the recorded backlog", () => {
     });
   });
 
+  test("the glance names unread files instead of looking healthy", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-dispatch-"));
+    try {
+      await writeDispatchBacklog(join(root, "backlog"));
+      await writeFile(join(root, "backlog", "new", "task-11.md"), "no frontmatter here" + String.fromCharCode(10));
+      expect(glance(await viewOf(root))).toContain("1 unread");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test("the glance counts the busy room, the runs and the waiting instead of one shared count", async () => {
     await withView((view) => {
       expect(glance(view)).toContain("1 of 3 busy");

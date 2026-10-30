@@ -1,14 +1,6 @@
 import type { CliRenderer } from "@opentui/core";
 import { DateTime, Effect, Option, type Scope } from "effect";
-import {
-  DispatchSource,
-  dispatchView,
-  type DispatchView,
-  type Freshness,
-  type BackgroundTuning,
-  polled,
-  readsCadence,
-} from "@tui-dash/schema";
+import { DispatchSource, dispatchView, type DispatchView, polled, readsCadence } from "@tui-dash/schema";
 import { type Block, frameRows, livePanel as liveUiPanel, type Panel, panel, panelChrome, panelWidth, printFrame, runPanel } from "@tui-dash/ui";
 import { dispatchLines } from "./panels";
 
@@ -17,7 +9,6 @@ export type DispatchSources = DispatchSource;
 export interface DispatchRead {
   readonly view: DispatchView;
   readonly at: number;
-  readonly freshness: ReadonlyArray<Freshness>;
 }
 
 const atOf = (capturedAt: DateTime.Utc): number => DateTime.toEpochMillis(capturedAt);
@@ -25,21 +16,22 @@ const atOf = (capturedAt: DateTime.Utc): number => DateTime.toEpochMillis(captur
 export const readDispatchRead: Effect.Effect<DispatchRead, never, DispatchSources> = Effect.gen(function* () {
   const reading = yield* (yield* DispatchSource).read;
   yield* Effect.yieldNow;
-  return { view: dispatchView(reading.snapshot), at: atOf(reading.capturedAt), freshness: [{ at: atOf(reading.capturedAt), kind: "live" }] };
+  return { view: dispatchView(reading.snapshot), at: atOf(reading.capturedAt) };
 });
 
 const pendingRead = (root: string): DispatchRead => ({
   view: { root, missing: false, pending: true, machines: { kind: "ok", value: [] }, runs: [], waiting: [], unread: [] },
   at: 0,
-  freshness: [],
 });
 
-export const backgroundDispatchRead = (
-  tuning?: BackgroundTuning,
-): Effect.Effect<{ readonly read: Effect.Effect<DispatchRead>; readonly refreshing: Effect.Effect<boolean> }, never, DispatchSources | Scope> =>
+export const backgroundDispatchRead = (): Effect.Effect<
+  { readonly read: Effect.Effect<DispatchRead>; readonly refreshing: Effect.Effect<boolean> },
+  never,
+  DispatchSources | Scope
+> =>
   Effect.gen(function* () {
     const source = yield* DispatchSource;
-    const poll = yield* polled(source.read, tuning?.revalidate ?? readsCadence);
+    const poll = yield* polled(source.read, readsCadence);
     return {
       read: Effect.map(
         poll.latest,
@@ -49,7 +41,6 @@ export const backgroundDispatchRead = (
             : {
               view: dispatchView(latest.value.value.snapshot),
               at: atOf(latest.value.value.capturedAt),
-              freshness: [{ at: latest.value.at, kind: "live" }],
             },
       ),
       refreshing: poll.refreshing,
