@@ -13,6 +13,7 @@ import { type DispatchConfig, type Project, readDispatchConfig } from "../../pac
 import { assessQuota } from "../../packages/run/src/dispatch/quota"
 import { heldTask, taskLabel } from "../../packages/run/src/dispatch/pueue-status"
 import { fileKeyOf, queueFromText, renewTask } from "../../packages/run/src/dispatch/runner"
+import { readStdinLabel } from "../../packages/run/src/dispatch/runner-result"
 import { parseTaskFile, renderTaskFile, TaskFileError, type TaskRecord } from "../../packages/run/src/dispatch/task-record"
 import { decodeTokenText, tokenLive } from "../../packages/run/src/dispatch/token"
 
@@ -403,7 +404,7 @@ describe("the beat", () => {
 const macProjects = [{ name: "orc", checkouts: { mac: "/checkout" } }]
 
 const beatAfterRun = async (root: string, result: unknown): Promise<{ readonly states: ReadonlyArray<string>; readonly actions: ReadonlyArray<string>; readonly reasons: ReadonlyArray<string> }> => {
-  await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["true"] }] }))
+  await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["orc", "runner", "start"] }] }))
   await writeFile(join(root, "projects.json"), JSON.stringify({ projects: macProjects }))
   await run(addTask(root, spec))
   await run(addTask(root, { ...spec, title: "Fix the other thing" }))
@@ -445,7 +446,7 @@ describe("the beat's closing sweep", () => {
   })
   test("a started task whose pueue run still runs stays started and keeps its slot instead of closing early", async () => {
     await withBacklog(async (root) => {
-      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["true"] }] }))
+      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["orc", "runner", "start"] }] }))
       await writeFile(join(root, "projects.json"), JSON.stringify({ projects: macProjects }))
       await run(addTask(root, spec))
       await run(addTask(root, { ...spec, title: "Fix the other thing" }))
@@ -482,7 +483,7 @@ describe("the beat's closing sweep", () => {
   })
   test("a task waiting on a just-finished task starts in the same beat instead of waiting one more beat", async () => {
     await withBacklog(async (root) => {
-      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["true"] }] }))
+      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["orc", "runner", "start"] }] }))
       await writeFile(join(root, "projects.json"), JSON.stringify({ projects: macProjects }))
       await run(addTask(root, spec))
       await run(addTask(root, { ...spec, title: "Fix the other thing", dependsOn: ["task-1"] }))
@@ -509,6 +510,58 @@ describe("the beat's closing sweep", () => {
       expect(report.actions.map((action) => action.kind + ":" + action.task)).toEqual(["closed:task-1", "started:task-2"])
     })
   })
+  test("a started task on a machine with a custom start is left alone instead of read and reported", async () => {
+    await withBacklog(async (root) => {
+      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["true"] }] }))
+      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: macProjects }))
+      await run(addTask(root, spec))
+      await run(claimTask(root, "task-1"))
+      const first = (await run(listTasks(root))).find((task) => task.spec.id === "task-1")
+      if (first === undefined) {
+        throw new Error("the backlog holds no task-1")
+      }
+      await run(writeTaken(root, { spec: first.spec, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
+      const unreadable = Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
+        const real = yield* ChildProcessSpawner.ChildProcessSpawner
+        return ChildProcessSpawner.make((command) =>
+          ChildProcess.isStandardCommand(command) && command.command === "pueue"
+            ? Effect.die("the sweep read pueue on a custom-start machine")
+            : ChildProcess.isStandardCommand(command) && command.command === "orc-quota"
+              ? real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + quotaReply + "\nJ"]))
+              : real.spawn(command)
+        )
+      })).pipe(Layer.provide(BunServices.layer))
+      const report = await Effect.runPromise(runBeat(root, root).pipe(Effect.provide(Layer.merge(BunServices.layer, unreadable))))
+      expect((await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["task-1:started"])
+      expect(report.actions).toEqual([])
+    })
+  })
+  test("a close read that never answers is reported after 30 seconds instead of stopping the beat", async () => {
+    await withBacklog(async (root) => {
+      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["orc", "runner", "start"] }] }))
+      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: macProjects }))
+      await run(addTask(root, spec))
+      await run(claimTask(root, "task-1"))
+      const first = (await run(listTasks(root))).find((task) => task.spec.id === "task-1")
+      if (first === undefined) {
+        throw new Error("the backlog holds no task-1")
+      }
+      await run(writeTaken(root, { spec: first.spec, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
+      const hanging = Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
+        const real = yield* ChildProcessSpawner.ChildProcessSpawner
+        return ChildProcessSpawner.make((command) =>
+          ChildProcess.isStandardCommand(command) && command.command === "pueue"
+            ? Effect.never
+            : ChildProcess.isStandardCommand(command) && command.command === "orc-quota"
+              ? real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + quotaReply + "\nJ"]))
+              : real.spawn(command)
+        )
+      })).pipe(Layer.provide(BunServices.layer))
+      const report = await Effect.runPromise(runBeat(root, root).pipe(Effect.provide(Layer.merge(BunServices.layer, hanging))))
+      expect((await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["task-1:started"])
+      expect(report.actions.flatMap((action) => action.kind === "close-failed" ? [action.reason] : [])).toEqual(["the close read timed out after 30 seconds"])
+    })
+  }, 120_000)
 })
 
 describe("the pueue label", () => {
@@ -565,6 +618,18 @@ describe("the pueue label", () => {
       await expect(Effect.runPromise(renewTask(stdin, { kind: "here" }, root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))).rejects.toThrow()
       expect(await readdir(join(root, "runner", "tokens", "task-1"))).toContain("token")
     })
+  })
+})
+
+describe("the result label on stdin", () => {
+  test("an empty pipe reads the home's own run instead of refusing", async () => {
+    expect(await run(readStdinLabel(Effect.succeed("")))).toBeNull()
+  })
+  test("a label document reads that home's run instead of the reader's", async () => {
+    expect(await run(readStdinLabel(Effect.succeed(JSON.stringify({ label: "/homes/a task-1" }))))).toBe("/homes/a task-1")
+  })
+  test("a pipe holding no document is refused instead of read as a label", async () => {
+    await expect(run(readStdinLabel(Effect.succeed("no json")))).rejects.toThrow()
   })
 })
 

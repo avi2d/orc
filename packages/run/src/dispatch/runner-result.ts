@@ -4,6 +4,7 @@ import { latestRunForBranch } from "../history-resume"
 import { formatHistoryError, openDatabase, RunStatusSchema } from "../run-history"
 import { TaskId } from "./backlog"
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
+import { LabelArg } from "./token"
 import { capture, type Command, decodeJson, readHeld, refuse, resolveProjectDir, RunnerError, type RunnerRequirements, taskBranch } from "./runner"
 
 const RUNNER_JSON_SCHEMA = "orc.runner.v1" as const
@@ -54,35 +55,28 @@ const failureReason = (result: typeof PueueResult.Type): string | null => {
 }
 
 export interface TaskClosing {
-  readonly task: string
-  readonly pueueTask: number
   readonly outcome: "done" | "failed"
   readonly reason: string
-  readonly started: string
-  readonly ended: string
 }
 
-const shellQuote = (word: string): string => /^[A-Za-z0-9_@%+=:,./-]+$/.test(word) ? word : "'" + word.replace(/'/g, "'\\''") + "'"
-
-export const closingFromResult = (task: string, result: RunnerResult): TaskClosing | null => {
+export const closingFromResult = (result: RunnerResult): TaskClosing | null => {
   if (result.status === "succeeded") {
-    return { task, pueueTask: result.pueueTask, outcome: "done", reason: "pueue task " + result.pueueTask + " succeeded", started: result.started, ended: result.ended }
+    return { outcome: "done", reason: "pueue task " + result.pueueTask + " succeeded" }
   }
   if (result.status === "failed") {
-    return { task, pueueTask: result.pueueTask, outcome: "failed", reason: result.reason, started: result.started, ended: result.ended }
+    return { outcome: "failed", reason: result.reason }
   }
   return null
 }
 
-const closingOf = (task: string, pueueTask: number, status: PueueStatus): TaskClosing | null => {
+const closingOf = (pueueTask: number, status: PueueStatus): TaskClosing | null => {
   if (!("Done" in status)) {
     return null
   }
-  const { start, end, result } = status.Done
-  const reason = failureReason(result)
+  const reason = failureReason(status.Done.result)
   return reason === null
-    ? { task, pueueTask, outcome: "done", reason: "pueue task " + pueueTask + " succeeded", started: start, ended: end }
-    : { task, pueueTask, outcome: "failed", reason, started: start, ended: end }
+    ? { outcome: "done", reason: "pueue task " + pueueTask + " succeeded" }
+    : { outcome: "failed", reason }
 }
 
 const assessHeld = (
@@ -92,11 +86,12 @@ const assessHeld = (
   run: RunSummary | null
 ): RunnerResult => {
   const held = { task, pueueTask, run }
-  const closing = closingOf(task, pueueTask, status)
-  if (closing !== null) {
-    return closing.outcome === "done"
-      ? { ...held, status: "succeeded", started: closing.started, ended: closing.ended }
-      : { ...held, status: "failed", started: closing.started, ended: closing.ended, reason: closing.reason }
+  if ("Done" in status) {
+    const { start, end, result } = status.Done
+    const reason = failureReason(result)
+    return reason === null
+      ? { ...held, status: "succeeded", started: start, ended: end }
+      : { ...held, status: "failed", started: start, ended: end, reason }
   }
   if ("Running" in status) {
     return { ...held, status: "running", started: status.Running.start }
@@ -130,7 +125,7 @@ export const readClosing = (task: string, home: string, label?: string | null): 
     const status = yield* Schema.decodeUnknownEffect(PueueStatus)(held.status).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "pueue reports a status orc cannot read for task " + held.id + ": " + error.message }))
     )
-    return closingOf(task, held.id, status)
+    return closingOf(held.id, status)
   })
 
 export const readResult = (task: string, home: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
@@ -146,8 +141,20 @@ export const readResult = (task: string, home: string, label?: string | null): E
     return assessHeld(task, held.id, status, run)
   })
 
+const ResultStdin = Schema.Struct({ label: LabelArg })
+
+// The label travels on stdin like a queue or renew request, so a reach that joins its argv for a remote shell cannot split it.
+export const readStdinLabel = (stdin: Effect.Effect<string, RunnerError>): Effect.Effect<string | null, RunnerError> =>
+  stdin.pipe(
+    Effect.flatMap((text) =>
+      text.trim() === ""
+        ? Effect.succeed(null)
+        : decodeJson(text, ResultStdin, "the result request on stdin").pipe(Effect.map(({ label }) => label))
+    )
+  )
+
 export const readResultThrough = (command: Command, task: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  capture([...command, ...["runner", "result", task, ...(label == null ? [] : ["--label", label]), "--json"].map(shellQuote)], null).pipe(
+  capture([...command, "runner", "result", task, "--json"], label == null ? null : JSON.stringify({ label })).pipe(
     Effect.flatMap((result) =>
       result.exitCode === 0
         ? decodeJson(result.stdout, RunnerDocument, command.join(" ") + " runner result")

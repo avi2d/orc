@@ -387,11 +387,14 @@ On a token command account it is empty, and the start command reads the token as
 The beat starts it detached in its own session, never waits for it and never kills it.
 So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
-From then on the task is the start command's to close, and one that fails leaves the task started until it is closed.
+From then on, each beat closes the finished runs on a machine whose start runs `orc runner start`.
+It reads `orc runner result` on that machine and closes the task done or failed, freeing its slot in the same beat.
+The beat prints `closed <task-id> <done|failed>` for each, or `close failed <task-id>` with the reason when the read fails or runs past 30 seconds.
+A machine whose start runs any other program keeps owning its tasks, which the beat never reads.
+To close one of those, run `orc backlog close <task-id> <done|failed> [reason]`.
 A missing start command exits 127 into its log and leaves the task started.
 Only a failure to spawn the log wrapper closes the task as `start-failed`.
-To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1`.
-When a started task ends, run `orc backlog close <task-id> <done|failed> [reason]`.
+To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1` and carries the closes as `closed` and `close-failed` actions.
 On a token command account, each beat first sends every started task its account's current token through its machine's `renew` command, as JSON on standard input.
 
 ## The runner
@@ -431,6 +434,8 @@ A renewal for a task pueue no longer runs is refused and removes that task's tok
 
 To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh linux-box orc` from another.
 The forwarded read defaults to that home's label, and `orc runner result <task-id> --label <label>` reads another home's run instead.
+The forwarded read carries the label as JSON on standard input, past any remote shell the reach uses.
+Piping that document into `orc runner result` yourself reads that home's run.
 It names pueue's state for the task and the orc run on `orc/<task-id>` with its PR.
 A task is queued, stashed, running, paused, succeeded or failed, or unknown when no pueue task in group `orc` holds it.
 To print the same facts as JSON, add `--json`, whose document names its version first as `orc.runner.v1`.

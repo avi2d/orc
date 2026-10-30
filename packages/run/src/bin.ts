@@ -38,6 +38,7 @@ const dispatch = (args: Extract<OrcArgs, { readonly kind: "Dispatch" }>["args"])
     cwd: process.cwd(),
     env: Bun.env,
     self: [process.execPath, Bun.main],
+    stdinIsTerminal: isatty(0),
     stdin: Effect.tryPromise({
       try: () => Bun.stdin.text(),
       catch: (cause) => new RunnerError({ detail: "cannot read stdin: " + String(cause) })

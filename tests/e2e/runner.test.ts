@@ -380,6 +380,38 @@ describe("orc runner result", () => {
     })
   }, runnerTimeout)
 
+  test("a result read through a splitting command still reads the far home's run instead of splitting its label", async () => {
+    await withFixture(async (fixture) => {
+      const far = join(fixture.dir, "far-home")
+      const statusFile = join(fixture.pueue, "status.json")
+      const status: unknown = JSON.parse(await readFile(statusFile, "utf8"))
+      if (!isRecord(status) || !isRecord(status.tasks) || !isRecord(status.tasks["656"])) {
+        throw new Error("the fixture holds no pueue task 656")
+      }
+      const near = status.tasks["656"]
+      status.tasks["777"] = { ...near, id: 777, label: far + " task-2" }
+      await writeFile(statusFile, JSON.stringify(status))
+      const db = await Effect.runPromise(openDatabase(far).pipe(Effect.provide(BunServices.layer)))
+      try {
+        Effect.runSync(recordRun(db, {
+          id: "run-far",
+          project: "/checkout",
+          branch: "orc/task-2",
+          taskFile: "task.md",
+          status: "succeeded",
+          started: "2026-10-28T02:36:39.200Z",
+          ended: "2026-10-28T02:36:39.400Z",
+          prLink: "https://github.com/avi2d/orc/pull/2"
+        }))
+      } finally {
+        db.close()
+      }
+      const splitting = ["sh", "-c", "joined=\"$*\"; ORC_HOME='" + far + "' eval \"exec \\\"$0\\\" '" + binPath + "' $joined\"", process.execPath]
+      const farResult = Schema.decodeUnknownSync(RunnerRun)(await resultJson(fixture, "task-2", ["--", ...splitting]))
+      expect(farResult.result.run).toEqual({ id: "run-far", status: "succeeded", prLink: "https://github.com/avi2d/orc/pull/2", endReason: null })
+    })
+  }, runnerTimeout)
+
   test("two homes sharing one far runner queue separately and read their own runs instead of seeing each other's", async () => {
     await withFixture(async (fixture) => {
       const homeA = fixture.home

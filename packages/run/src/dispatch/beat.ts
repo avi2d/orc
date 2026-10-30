@@ -289,6 +289,12 @@ const considerTask = (
 
 const renewSeconds = 30
 
+const closeSeconds = 30
+
+// The sweep closes only runs its own start command queued, so a custom start keeps owning its tasks.
+const ownedBySweep = (machine: Machine): boolean =>
+  machine.start.some((word, index) => word === "runner" && machine.start[index + 1] === "start")
+
 const throughOf = (values: ReadonlyArray<string>): Command | null => {
   const cut = values.indexOf("--")
   if (cut === -1) {
@@ -302,7 +308,7 @@ const throughOf = (values: ReadonlyArray<string>): Command | null => {
   return [first, ...others]
 }
 
-const throughFor = (machine: Machine): Command | null => throughOf(machine.start)
+const throughFor = (machine: Machine): Command | null => ownedBySweep(machine) ? throughOf(machine.start) : null
 
 const sendRenewal = (renew: Machine["renew"] & {}, stdin: string): Effect.Effect<string | null, never, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
@@ -355,11 +361,18 @@ const closeFinished = (
     const claim = task.state.claim
     const label = taskLabel(context.home, task.spec.id)
     const machine = context.config.machines.find((entry) => entry.name === claim.machine)
-    const through = machine === undefined ? null : throughFor(machine)
-    const read = through === null ? readClosing(task.spec.id, context.home, label) : readResultThrough(through, task.spec.id, label).pipe(Effect.map((result) => closingFromResult(task.spec.id, result)))
+    if (machine === undefined || !ownedBySweep(machine)) {
+      return Option.none()
+    }
+    const through = throughFor(machine)
+    const read = through === null ? readClosing(task.spec.id, context.home, label) : readResultThrough(through, task.spec.id, label).pipe(Effect.map(closingFromResult))
     const outcome = yield* read.pipe(
       Effect.map((closing) => ({ kind: "read" as const, closing })),
-      Effect.catchTag("RunnerError", (error) => Effect.succeed({ kind: "unread" as const, reason: error.detail }))
+      Effect.catchTag("RunnerError", (error) => Effect.succeed({ kind: "unread" as const, reason: error.detail })),
+      Effect.timeoutOrElse({
+        duration: Duration.seconds(closeSeconds),
+        orElse: () => Effect.succeed({ kind: "unread" as const, reason: "the close read timed out after " + closeSeconds + " seconds" })
+      })
     )
     if (outcome.kind === "unread") {
       return Option.some({ kind: "close-failed", task: task.spec.id, machine: claim.machine, reason: outcome.reason } satisfies BeatAction)
