@@ -107,6 +107,18 @@ const add = (args: Extract<CommandArgs, { readonly kind: "AddTask" }>, place: Di
     yield* Console.log("added " + record.spec.id + " for " + project.name + (args.machine === null ? "" : " on " + args.machine))
   })
 
+const reportResult = (args: Extract<CommandArgs, { readonly kind: "RunnerResult" }>, place: DispatchPlace) =>
+  Effect.gen(function*() {
+    let label = args.label ?? taskLabel(place.home, args.task)
+    if (args.reach.kind === "here" && args.label === undefined && !place.stdinIsTerminal) {
+      label = (yield* readStdinLabel(place.stdin)) ?? label
+    }
+    const result = args.reach.kind === "here"
+      ? yield* readResult(args.task, place.home, label)
+      : yield* readResultThrough(args.reach.command, args.task, label)
+    yield* Console.log(args.json ? JSON.stringify(runnerJson(result)) : formatResult(result))
+  })
+
 const execute = (args: CommandArgs, place: DispatchPlace) =>
   Effect.gen(function*() {
     switch (args.kind) {
@@ -157,14 +169,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         break
       }
       case "RunnerResult": {
-        let label = args.label ?? taskLabel(place.home, args.task)
-        if (args.reach.kind === "here" && args.label === undefined && !place.stdinIsTerminal) {
-          label = (yield* readStdinLabel(place.stdin)) ?? label
-        }
-        const result = args.reach.kind === "here"
-          ? yield* readResult(args.task, place.home, label)
-          : yield* readResultThrough(args.reach.command, args.task, label)
-        yield* Console.log(args.json ? JSON.stringify(runnerJson(result)) : formatResult(result))
+        yield* reportResult(args, place)
         break
       }
     }

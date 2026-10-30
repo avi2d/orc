@@ -2,7 +2,8 @@ import { DateTime, Duration, Effect, type FileSystem, Option, Stream } from "eff
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimTask, closeStartedTask, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken } from "./backlog"
 import type { ConfigError } from "../json-file"
-import { type Account, checkoutOn, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "./config"
+import { type Account, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "./config"
+import { dependencyOpen, type MachineRoom, placeTask, readRoom } from "./beat-place"
 import { type QuotaReading, readQuota } from "./quota"
 import type { Claim, TaskFileError, TaskRecord } from "./task-record"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
@@ -10,11 +11,8 @@ import { taskLabel } from "./pueue-status"
 import { closingFromResult, readClosing, readResultThrough } from "./runner-result"
 import type { Command } from "./runner"
 
-export interface MachineRoom {
-  readonly machine: string
-  readonly slots: number
-  readonly busy: number
-}
+export type { MachineRoom } from "./beat-place"
+export { dependencyOpen, placeTask, readRoom } from "./beat-place"
 
 export type BeatAction =
   | { readonly kind: "started"; readonly task: string; readonly machine: string; readonly account: string; readonly log: string }
@@ -39,20 +37,6 @@ type BeatRequirements = FileSystem.FileSystem | ChildProcessSpawner.ChildProcess
 
 const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
-export const readRoom = (machines: ReadonlyArray<Machine>, tasks: ReadonlyArray<TaskRecord>): ReadonlyArray<MachineRoom> =>
-  machines.map((machine) => ({
-    machine: machine.name,
-    slots: machine.slots,
-    busy: tasks.filter((task) =>
-      (task.state.kind === "taken" || task.state.kind === "started") && task.state.claim?.machine === machine.name
-    ).length
-  }))
-
-const freeRoom = (room: MachineRoom): number => Math.max(0, room.slots - room.busy)
-
-export const dependencyOpen = (dependency: TaskRecord | undefined): boolean =>
-  dependency === undefined || dependency.state.kind !== "closed" || dependency.state.closing.outcome !== "done"
-
 const dependencyWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>): string | null => {
   for (const id of task.spec.dependsOn) {
     const dependency = tasks.find((candidate) => candidate.spec.id === id)
@@ -64,45 +48,6 @@ const dependencyWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>): str
     }
   }
   return null
-}
-
-type Placement =
-  | { readonly kind: "place"; readonly machine: Machine; readonly checkout: string }
-  | { readonly kind: "waits"; readonly reason: string }
-
-// A task that names a machine is placed there or nowhere, whatever room the other machines have.
-export const placeTask = (
-  task: TaskRecord,
-  config: DispatchConfig,
-  projects: ReadonlyArray<Project>,
-  room: ReadonlyArray<MachineRoom>
-): Placement => {
-  const project = projects.find((candidate) => candidate.name === task.spec.project)
-  if (project === undefined) {
-    return { kind: "waits", reason: "the project " + task.spec.project + " is not in the project list" }
-  }
-  const pinned = task.spec.machine
-  if (pinned !== null && !config.machines.some((machine) => machine.name === pinned)) {
-    return { kind: "waits", reason: "the machine " + pinned + " is not in dispatch.json" }
-  }
-  const candidates = config.machines.flatMap((machine) => {
-    const checkout = checkoutOn(project, machine.name)
-    return (pinned === null || machine.name === pinned) && checkout !== null ? [{ machine, checkout }] : []
-  })
-  if (candidates.length === 0) {
-    return { kind: "waits", reason: "the project " + project.name + " has no checkout on " + (pinned ?? "any machine") }
-  }
-  let best: { readonly machine: Machine; readonly checkout: string; readonly free: number } | null = null
-  for (const candidate of candidates) {
-    const free = freeRoom(room.find((entry) => entry.machine === candidate.machine.name) ?? { machine: candidate.machine.name, slots: 0, busy: 0 })
-    if (free > (best?.free ?? 0)) {
-      best = { ...candidate, free }
-    }
-  }
-  if (best === null) {
-    return { kind: "waits", reason: pinned === null ? "no machine with a checkout of " + project.name + " has room" : pinned + " has no room" }
-  }
-  return { kind: "place", machine: best.machine, checkout: best.checkout }
 }
 
 type StartResult = { readonly kind: "started" } | { readonly kind: "failed"; readonly reason: string }

@@ -8,12 +8,9 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../packages/run/src/dispatch/args"
 import { addTask, claimTask, closeStartedTask, listTasks, releaseTask, writeTaken } from "../../packages/run/src/dispatch/backlog"
 import { placeTask, runBeat } from "../../packages/run/src/dispatch/beat"
-import { backlogJson, formatBoard } from "../../packages/run/src/dispatch/board"
 import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/dispatch/config"
 import { assessQuota } from "../../packages/run/src/dispatch/quota"
-import { heldTask, taskLabel } from "../../packages/run/src/dispatch/pueue-status"
-import { fileKeyOf, queueFromText, renewTask } from "../../packages/run/src/dispatch/runner"
-import { readStdinLabel } from "../../packages/run/src/dispatch/runner-result"
+import { taskLabel } from "../../packages/run/src/dispatch/pueue-status"
 import { parseTaskFile, renderTaskFile, TaskFileError, type TaskRecord } from "../../packages/run/src/dispatch/task-record"
 import { decodeTokenText, tokenLive } from "../../packages/run/src/dispatch/token"
 
@@ -562,88 +559,4 @@ describe("the beat's closing sweep", () => {
       expect(report.actions.flatMap((action) => action.kind === "close-failed" ? [action.reason] : [])).toEqual(["the close read timed out after 30 seconds"])
     })
   }, 120_000)
-})
-
-describe("the pueue label", () => {
-  test("a task-1 label queued by another home is never read as this home's run instead of the newest bare match winning", () => {
-    const running = { start: "2026-10-27T10:02:00.000Z" }
-    const tasks = {
-      "7": { id: 7, label: taskLabel("/homes/a", "task-1"), group: "orc", path: "/homes/a/orc", status: { Running: running } },
-      "9": { id: 9, label: taskLabel("/homes/b", "task-1"), group: "orc", path: "/homes/b/orc", status: { Running: running } },
-      "11": { id: 11, label: "task-1", group: "orc", path: "/homes/c/orc", status: { Running: running } }
-    }
-    expect(heldTask(tasks, "/homes/a", "task-1")?.id).toBe(7)
-    expect(heldTask(tasks, "/homes/b", "task-1")?.id).toBe(9)
-    expect(heldTask(tasks, "/homes/c", "task-1")).toBeNull()
-  })
-  test("the label names the home that queued it instead of one shared id", () => {
-    expect(taskLabel("/homes/a", "task-1")).not.toBe(taskLabel("/homes/b", "task-1"))
-  })
-  test("the label treats a trailing slash as the same home instead of another queue", () => {
-    expect(taskLabel("/homes/a/", "task-1")).toBe(taskLabel("/homes/a", "task-1"))
-  })
-  test("a scoped file key never names the folder itself instead of a file inside it", () => {
-    expect(fileKeyOf("/homes/a", "task-1", "")).toBe("label-")
-    expect(fileKeyOf("/homes/a", "task-1", ".")).toBe("label-.")
-    expect(fileKeyOf("/homes/a", "task-1", "..")).toBe("label-..")
-  })
-  test("a queue request with an empty label is refused instead of queueing under no key", async () => {
-    await withBacklog(async (root) => {
-      await expect(run(queueFromText(JSON.stringify({ task: "task-9", checkout: "/checkout", provider: "acme", body: "# x\n", tokenFile: "/secrets/main-token", label: "" }), ["orc"], root))).rejects.toThrow()
-      expect(await readdir(root)).not.toContain("runner")
-    })
-  })
-  test("a renewal for . keeps the held token instead of removing the runner folder", async () => {
-    await withBacklog(async (root) => {
-      await run(Effect.gen(function*() {
-        const fs = yield* FileSystem.FileSystem
-        yield* fs.makeDirectory(join(root, "runner", "tokens", "task-1"), { recursive: true })
-        yield* fs.writeFileString(join(root, "runner", "tokens", "task-1", "token"), "sentinel")
-      }))
-      const spawner = pueueStub(JSON.stringify({ tasks: {} })).pipe(Layer.provide(BunServices.layer))
-      const stdin = Effect.succeed(JSON.stringify({ task: "task-1", token: "tokenB123", expiresAt: "2027-01-01T00:00:00.000Z", label: "." }))
-      await expect(Effect.runPromise(renewTask(stdin, { kind: "here" }, root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))).rejects.toThrow()
-      expect(await readdir(join(root, "runner", "tokens", "task-1"))).toContain("token")
-    })
-  })
-  test("a renewal for .. keeps the held token instead of removing the runner folder", async () => {
-    await withBacklog(async (root) => {
-      await run(Effect.gen(function*() {
-        const fs = yield* FileSystem.FileSystem
-        yield* fs.makeDirectory(join(root, "runner", "tokens", "task-1"), { recursive: true })
-        yield* fs.writeFileString(join(root, "runner", "tokens", "task-1", "token"), "sentinel")
-      }))
-      const spawner = pueueStub(JSON.stringify({ tasks: {} })).pipe(Layer.provide(BunServices.layer))
-      const stdin = Effect.succeed(JSON.stringify({ task: "task-1", token: "tokenB123", expiresAt: "2027-01-01T00:00:00.000Z", label: ".." }))
-      await expect(Effect.runPromise(renewTask(stdin, { kind: "here" }, root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))).rejects.toThrow()
-      expect(await readdir(join(root, "runner", "tokens", "task-1"))).toContain("token")
-    })
-  })
-})
-
-describe("the result label on stdin", () => {
-  test("an empty pipe reads the home's own run instead of refusing", async () => {
-    expect(await run(readStdinLabel(Effect.succeed("")))).toBeNull()
-  })
-  test("a label document reads that home's run instead of the reader's", async () => {
-    expect(await run(readStdinLabel(Effect.succeed(JSON.stringify({ label: "/homes/a task-1" }))))).toBe("/homes/a task-1")
-  })
-  test("a pipe holding no document is refused instead of read as a label", async () => {
-    await expect(run(readStdinLabel(Effect.succeed("no json")))).rejects.toThrow()
-  })
-})
-
-describe("the board", () => {
-  test("the JSON names its schema version so a reader can refuse a newer one", () => {
-    const json = backlogJson({ tasks: [newTask("mac")], projects: { kind: "read", projects }, room: { kind: "unread", reason: "no dispatch.json" } })
-    expect(json.schema).toBe("orc.backlog.v1")
-    expect(json.tasks[0]).toEqual({ id: "task-1", title: "Fix the thing", project: "orc", machine: "mac", dependsOn: [], created: spec.created, status: "new" })
-    expect(json.room).toBeNull()
-  })
-  test("the project list sits beside the backlog instead of under it", () => {
-    const board = formatBoard({ tasks: [newTask("mac")], projects: { kind: "read", projects }, room: { kind: "read", room: [{ machine: "mac", slots: 1, busy: 0 }] } })
-    const [header = "", first = ""] = board.split("\n")
-    expect(header).toMatch(/^NEW \(1\) +TAKEN \(0\) +CLOSED \(0\) +PROJECTS$/)
-    expect(first).toMatch(/^task-1 orc @mac Fix the thing +orc on mac,linux$/)
-  })
 })

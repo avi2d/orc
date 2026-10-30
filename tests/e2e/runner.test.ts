@@ -41,6 +41,28 @@ const pueueAddFor = (home: string, checkout: string): ReadonlyArray<string> => [
   "--sandbox", "none", "--provider", "acme", "--token-file", mainToken
 ]
 
+const writeTwoHomeDispatches = async (homeA: string, homeB: string, machineThroughFar: ReadonlyArray<string>): Promise<void> => {
+  for (const home of [homeA, homeB]) {
+    await writeFile(join(home, "backlog", "dispatch.json"), JSON.stringify({
+      machines: [{ name: "linux", slots: 1, start: machineThroughFar }],
+      quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", tokenFile: mainToken }], floorPercent: 15 }
+    }))
+  }
+}
+
+const waitForAddedTasks = async (fixture: Fixture): Promise<ReadonlyArray<string>> => {
+  const deadline = Date.now() + startWaitMillis
+  let added: ReadonlyArray<string> = []
+  while (Date.now() < deadline) {
+    added = (await readFile(join(fixture.pueue, "added-tasks"), "utf8").catch(() => "")).split("\n").slice(0, -1)
+    if (added.length >= 2) {
+      break
+    }
+    await Bun.sleep(20)
+  }
+  return added
+}
+
 describe("orc runner start", () => {
   test("the beat's start hands the task to pueue in group orc instead of running orc itself", async () => {
     await withFixture(async (fixture) => {
@@ -422,12 +444,7 @@ describe("orc runner result", () => {
       await writeFile(join(homeB, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { linux: fixture.checkout } }] }))
       await fakeQuota(fixture)
       const machineThroughFar = [process.execPath, binPath, "runner", "start", "--", ...orcThere(far)]
-      for (const home of [homeA, homeB]) {
-        await writeFile(join(home, "backlog", "dispatch.json"), JSON.stringify({
-          machines: [{ name: "linux", slots: 1, start: machineThroughFar }],
-          quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", tokenFile: mainToken }], floorPercent: 15 }
-        }))
-      }
+      await writeTwoHomeDispatches(homeA, homeB, machineThroughFar)
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
       await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
       await orcOk(fixture, ["beat"])
@@ -441,15 +458,7 @@ describe("orc runner result", () => {
       }
       expect(beatB.stdout).toContain("started task-1")
       expect(beatB.stdout).not.toContain("already")
-      const deadline = Date.now() + startWaitMillis
-      let added: ReadonlyArray<string> = []
-      while (Date.now() < deadline) {
-        added = (await readFile(join(fixture.pueue, "added-tasks"), "utf8").catch(() => "")).split("\n").slice(0, -1)
-        if (added.length >= 2) {
-          break
-        }
-        await Bun.sleep(20)
-      }
+      const added = await waitForAddedTasks(fixture)
       const labelA = homeA + " task-1"
       const labelB = homeB + " task-1"
       expect(added.some((line) => line.startsWith(labelA + " orc "))).toBe(true)
