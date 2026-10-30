@@ -367,20 +367,8 @@ export {
 export { type CalendarPattern, cronPattern, everyValue, nextMatch } from "./views/calendar";
 export { type NamedOrchestrator, type NamedPueue, type NextKind, type NextReadings, type NextRow, type NextSource, type NextSourceState, type NextUp, nextUp, type OrchestratorRead } from "./views/next-up";
 export { machineQueue, type MachineQueueView, type QueueEntry, type QueueRow, type QueueRowState, queueWindow } from "./views/machine-queue";
-export {
-  type DispatchReading,
-  type DispatchSnapshot,
-  DispatchSource,
-  dispatchSourceLayer,
-  type DispatchTask,
-} from "./sources/dispatch";
-export {
-  type DispatchView,
-  dispatchView,
-  type RoomEntry,
-  type RunRow,
-  type WaitRow,
-} from "./views/dispatch";
+export { type DispatchReading, type DispatchSnapshot, DispatchSource, dispatchSourceLayer, type DispatchTask } from "./sources/dispatch";
+export { type DispatchView, dispatchView, type RoomEntry, type RunRow, type WaitRow } from "./views/dispatch";
 export { decodePueue, knownProjects, type PueueMachine, PueueMachines, pueueMachinesLayer, PueueStatus } from "./sources/pueue";
 export { type MachineProjects } from "./sources/project-names";
 export { type NoMistakesMachine, NoMistakesMachines, noMistakesMachinesLayer, type OrcMachine, OrcMachines, orcMachinesLayer } from "./sources/pipelines";
@@ -404,11 +392,5 @@ export {
   type RunOwners,
   type TestRun,
 } from "./views/queues";
-export {
-  quotaBlocks,
-  type QuotaBlock,
-  type QuotaBlockBody,
-  type SavedAge,
-  type SavedWindow,
-} from "./views/quotas";
+export { quotaBlocks, type QuotaBlock, type QuotaBlockBody, type SavedAge, type SavedWindow } from "./views/quotas";
 export * from "./feeds";
