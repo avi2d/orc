@@ -329,7 +329,7 @@ The session quota tool reads the same two machine names.
 ## Run the dispatch tool
 
 To run the live dispatch panel, run `tui-dash panel dispatch`.
-The panel reads `$ORC_HOME/backlog`, or `~/.orc/backlog` when `ORC_HOME` is unset, and paints again every 10 seconds.
+The panel reads `$ORC_HOME/backlog`, or `~/.orc/backlog` when `ORC_HOME` is unset or blank, and paints again every 10 seconds.
 It shows each machine with its busy room, the taken claims as runs and each new task with why it waits.
 A backlog that does not exist reads as missing.
 A folder or file the panel cannot read, including dispatch.json and projects.json, is named as unread.
@@ -543,7 +543,7 @@ A task row names its machine when the board holds more than one machine name.
 A screen 240 columns wide shows the machines and three levels, and a narrower one shows two boxes.
 
 The scheduled box gives what runs next, soonest first, from both machines’ delayed jobs and dated items alongside this machine’s timers and workflows.
-The queue box shares one title with the scheduled box, split on a bar, and each half opens on its hotkey.
+The queue box shares one title with the scheduled and dispatch boxes, split on bars, and each tab opens on its hotkey.
 It reads the systemd user timers on Linux and the user's own launch agents on macOS.
 Launch agents installed by third party software stay out of the box.
 It reads the scheduled GitHub workflows of every repository with a runner on this machine, in UTC as GitHub runs them.
