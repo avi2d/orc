@@ -7,6 +7,8 @@ export const longSessionCompactionLimit = 5
 
 export const handoverFileName = "handover.md"
 
+export const handoverLastReplyLimit = 2000
+
 const longSessionName = "long-session"
 
 export interface LongSessionCounts {
@@ -68,16 +70,54 @@ export const longSessionSignal = (counts: LongSessionCounts | null): ReadonlyArr
   return warning === null ? [] : [{ name: longSessionName, value: warning }]
 }
 
+const AssistantReplyLine = Schema.Struct({
+  type: Schema.Literal("message"),
+  message: Schema.Struct({
+    role: Schema.Literal("assistant"),
+    content: Schema.Array(Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String) }))
+  })
+})
+
+const decodeAssistantReplyLine = Schema.decodeUnknownOption(Schema.fromJsonString(AssistantReplyLine))
+
+export const lastAssistantReply = (jsonl: string | null): string | null => {
+  if (jsonl === null) {
+    return null
+  }
+  let found: string | null = null
+  for (const line of jsonl.split("\n")) {
+    if (line.trim() === "") {
+      continue
+    }
+    const parsed = decodeAssistantReplyLine(line)
+    if (Option.isNone(parsed)) {
+      continue
+    }
+    const text = parsed.value.message.content.filter((block) => block.type === "text" && (block.text ?? "") !== "").map((block) => block.text ?? "").join("\n")
+    if (text !== "") {
+      found = text
+    }
+  }
+  if (found === null) {
+    return null
+  }
+  return found.length > handoverLastReplyLimit ? found.slice(0, handoverLastReplyLimit) : found
+}
+
 export const handoverNote = (input: {
   readonly runId: string
   readonly branch: string
   readonly counts: LongSessionCounts
   readonly commits: ReadonlyArray<{ readonly sha: string; readonly subject: string }>
+  readonly taskText: string
+  readonly lastReply: string | null
   readonly endReason: string
 }): string => {
   const did = input.commits.length === 0
     ? "Made no commit."
     : input.commits.map((commit) => "- " + commit.sha + (commit.subject === "" ? "" : " " + commit.subject)).join("\n")
+  const task = input.taskText.trim() === "" ? "Task text unavailable." : input.taskText.trim()
+  const reply = input.lastReply === null || input.lastReply.trim() === "" ? "No assistant reply captured." : input.lastReply
   return [
     "# Handover " + input.runId,
     "",
@@ -90,7 +130,20 @@ export const handoverNote = (input: {
     "",
     "## What is left",
     "",
-    input.endReason,
+    "Task:",
+    "",
+    task,
+    "",
+    "Commits so far:",
+    "",
+    did,
+    "",
+    "Last reply:",
+    "",
+    reply,
+    "",
+    "Compare the task text above with the commits to find what is left.",
+    "Stop reason: " + input.endReason,
     "",
     "## Where it stopped",
     "",

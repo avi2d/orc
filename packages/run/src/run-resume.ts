@@ -223,18 +223,19 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       return empty
     }
     const progress = yield* readPriorProgress(db, run, prior)
-    const carriedImplement = yield* carrySessionFile(run, progress.implementSource, progress.implementSessionId)
+    const handover = yield* run.fs.readFileString(run.path.join(run.path.dirname(run.runDir), prior.id, handoverFileName)).pipe(
+      Effect.orElseSucceed(() => null)
+    )
+    const fresh = handover !== null
+    const carriedImplement = fresh ? null : yield* carrySessionFile(run, progress.implementSource, progress.implementSessionId)
     const carriedFix = yield* carrySessionFile(run, progress.fixSource, progress.fixSessionId)
     const skipImplement = progress.implementPassed
     const skipChecks = progress.implementPassed && progress.checksPassed
     const inherited = progress.implementPassed
       ? yield* inheritedCompletion(db, run, progress.priorId, progress.storedFixes)
       : { inheritedRounds: [], inheritedFixes: [] }
-    const handover = yield* run.fs.readFileString(run.path.join(run.path.dirname(run.runDir), prior.id, handoverFileName)).pipe(
-      Effect.orElseSucceed(() => null)
-    )
     return {
-      implementSessionId: progress.implementSessionId,
+      implementSessionId: fresh ? null : progress.implementSessionId,
       implementSessionFile: carriedImplement,
       skipImplement,
       skipChecks,

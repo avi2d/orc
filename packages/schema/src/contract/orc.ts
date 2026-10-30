@@ -38,6 +38,7 @@ const OrcShowJson = Schema.Struct({
       name: Schema.String,
       status: Schema.String,
       score: Schema.NullOr(Schema.Struct({ note: Schema.String })),
+      signals: Schema.optional(Schema.Array(Schema.Struct({ name: Schema.String, value: Schema.String }))),
     }),
   ),
 });
@@ -64,8 +65,7 @@ export const decodeOrcShow = (text: string): Decoded<OrcSnapshot> => {
           stages: parsed.value.steps.map((step) => ({
             name: step.name,
             status: step.status,
-            // The score note is the step's only human-written line.
-            detail: step.score?.note ?? undefined,
+            detail: step.signals?.find((signal) => signal.name === "long-session")?.value ?? step.score?.note ?? undefined,
           })),
         },
       ],

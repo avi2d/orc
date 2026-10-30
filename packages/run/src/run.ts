@@ -19,7 +19,8 @@ import { openDatabase, orcHomeDir, updateStep } from "./run-history"
 import { stepsForRun } from "./history-resume"
 import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "./run-resume"
 import { finishRun, historyFailure, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordResumePublish } from "./history-write"
-import { failedReport, writeEvidence, writeHandover, writeReport, type HistoryRun, type OrcRunReport } from "./run-record"
+import { failedReport, writeEvidence, writeHandover, writeReport, type HistoryRun, type OrcRunCommit, type OrcRunReport } from "./run-record"
+import { longSessionWarning, type LongSessionCounts } from "./long-session"
 import { runFull, type RunCheckpoints, type SandboxOps } from "./run-loop"
 import { noMistakesBinary, noMistakesVersionProblem, subprocessNoMistakesRunner, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "./no-mistakes"
 
@@ -324,9 +325,38 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
   Effect.gen(function*() {
     const resume = yield* buildResumePlan(db, run)
     yield* recordResumePublish(db, run, resume)
+    let implementLong: { readonly counts: LongSessionCounts; readonly commits: Array<OrcRunCommit>; readonly sessionFile: string | null } | null = null
     const checkpoints: RunCheckpoints = {
       implementStart: (started) => recordImplementStart(db, run, started, resume.implementSessionFile ?? undefined),
-      implementDone: (outcome, started, ended) => recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: outcome.sessionFile, tokens: outcome.tokens, commits: outcome.commits, sessionSize: outcome.sessionSize, implementPassed: outcome.completed }, started, ended),
+      implementDone: (outcome, started, ended) => Effect.gen(function*() {
+        yield* recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: outcome.sessionFile, tokens: outcome.tokens, commits: outcome.commits, sessionSize: outcome.sessionSize, implementPassed: outcome.completed }, started, ended)
+        if (outcome.sessionSize !== null && longSessionWarning(outcome.sessionSize) !== null) {
+          implementLong = { counts: outcome.sessionSize, commits: [...outcome.commits], sessionFile: outcome.sessionFile }
+          const provisional: OrcRunReport = {
+            runId: run.runId,
+            runDir: run.runDir,
+            branch: run.branch,
+            agentPath: run.agent.path,
+            agentSource: run.agent.source,
+            model: run.agent.model,
+            sessionId: outcome.sessionId,
+            sessionFile: outcome.sessionFile,
+            commits: [...outcome.commits],
+            tokens: outcome.tokens,
+            sessionSize: outcome.sessionSize,
+            completed: false,
+            markerVerified: outcome.markerVerified,
+            implementPassed: outcome.completed,
+            checksRounds: null,
+            fixes: [],
+            fixAttempts: 0,
+            prLink: null,
+            noMistakes: null,
+            endReason: outcome.endReason
+          }
+          yield* writeHandover(run, provisional).pipe(Effect.orElseSucceed(() => null))
+        }
+      }),
       checksRoundStart: (round, started) => recordChecksStart(db, run.runId, round, started),
       checksRoundDone: (round) => recordChecksDone(db, run.runId, round),
       fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer.path, started, attempt === 1 ? resume.fixSessionFile ?? undefined : undefined),
@@ -347,7 +377,8 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
           if (!existing.some((step) => step.name === "implement")) {
             yield* recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: null, tokens: null, commits: null, sessionSize: null, implementPassed: false }, run.started, now).pipe(Effect.orElseSucceed(() => undefined))
           }
-          const failed = failedReport(run, error.message)
+          const baseFailed = failedReport(run, error.message)
+          const failed = implementLong === null ? baseFailed : { ...baseFailed, sessionSize: implementLong.counts, commits: implementLong.commits, sessionFile: implementLong.sessionFile }
           yield* writeEvidence(run, failed).pipe(Effect.orElseSucceed(() => undefined))
           yield* writeReport(run, failed).pipe(Effect.orElseSucceed(() => undefined))
           yield* finishRun(db, run.runId, failed, new Date().toISOString()).pipe(Effect.orElseSucceed(() => undefined))

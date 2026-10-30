@@ -7,7 +7,7 @@ import type { AllowWord, NoMistakesRecord, NoMistakesRunner, QuestionAnswer } fr
 import { OrcRunError } from "./run-session"
 import { toFileUrl } from "./run-history"
 import { findingLine, reportFileName, reportMarkdown, runStatus, type OrcRunReport } from "./report"
-import { handoverFileName, handoverNote, longSessionWarning } from "./long-session"
+import { handoverFileName, handoverNote, lastAssistantReply, longSessionWarning } from "./long-session"
 
 export type { ChecksRoundSummary, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./report"
 
@@ -130,23 +130,30 @@ export const writeEvidence = (run: HistoryRun, report: OrcRunReport): Effect.Eff
   )
 }
 
-export const writeHandover = (run: HistoryRun, report: OrcRunReport): Effect.Effect<string | null, OrcRunError> => {
-  if (report.sessionSize === null || longSessionWarning(report.sessionSize) === null) {
-    return Effect.succeed(null)
-  }
-  const file = run.path.join(run.runDir, handoverFileName)
-  const note = handoverNote({
-    runId: report.runId,
-    branch: report.branch,
-    counts: report.sessionSize,
-    commits: report.commits ?? [],
-    endReason: report.endReason
+export const writeHandover = (run: HistoryRun, report: OrcRunReport): Effect.Effect<string | null, OrcRunError> =>
+  Effect.gen(function*() {
+    if (report.sessionSize === null || longSessionWarning(report.sessionSize) === null) {
+      return null
+    }
+    const taskText = yield* run.fs.readFileString(run.taskPath).pipe(Effect.orElseSucceed(() => ""))
+    const sessionJsonl = report.sessionFile === null
+      ? null
+      : yield* run.fs.readFileString(report.sessionFile).pipe(Effect.map((text) => text as string | null), Effect.orElseSucceed(() => null))
+    const file = run.path.join(run.runDir, handoverFileName)
+    const note = handoverNote({
+      runId: report.runId,
+      branch: report.branch,
+      counts: report.sessionSize,
+      commits: report.commits ?? [],
+      taskText,
+      lastReply: lastAssistantReply(sessionJsonl),
+      endReason: report.endReason
+    })
+    yield* run.fs.writeFileString(file, note).pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the handover note " + file + ": " + String(cause) }))
+    )
+    return file
   })
-  return run.fs.writeFileString(file, note).pipe(
-    Effect.as(file),
-    Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the handover note " + file + ": " + String(cause) }))
-  )
-}
 
 export const writeReport = (run: HistoryRun, report: OrcRunReport): Effect.Effect<void, OrcRunError> => {
   const file = run.path.join(run.runDir, reportFileName)

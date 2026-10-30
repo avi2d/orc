@@ -19,11 +19,12 @@ import {
   handoverFileName,
   handoverImplementPrompt,
   handoverNote,
-  longSessionCompactionLimit,
+  lastAssistantReply,
   longSessionSignal,
-  longSessionTurnLimit,
   longSessionWarning
 } from "../../packages/run/src/long-session"
+import { decodeOrcShow, orcPipelineOf, orcRunOf } from "@tui-dash/schema"
+import { valueOf } from "../lib/outcomes"
 import { fixture } from "../lib/fixtures"
 
 const message = (role: string, text?: string): string =>
@@ -63,33 +64,33 @@ describe("countSessionSize", () => {
 
 describe("longSessionWarning", () => {
   test("stays silent below both limits instead of warning early", () => {
-    expect(longSessionWarning({ turns: longSessionTurnLimit - 1, compactions: longSessionCompactionLimit - 1 })).toBeNull()
-    expect(longSessionWarning(countSessionSize(turns(longSessionTurnLimit - 1)))).toBeNull()
-    expect(longSessionWarning(countSessionSize(compactions(longSessionCompactionLimit - 1)))).toBeNull()
+    expect(longSessionWarning({ turns: 299, compactions: 4 })).toBeNull()
+    expect(longSessionWarning(countSessionSize(turns(299)))).toBeNull()
+    expect(longSessionWarning(countSessionSize(compactions(4)))).toBeNull()
   })
 
   test("warns at exactly 300 turns instead of waiting longer", () => {
-    const warning = longSessionWarning(countSessionSize(turns(longSessionTurnLimit)))
-    expect(warning).toContain(longSessionTurnLimit.toString() + " turns")
+    const warning = longSessionWarning(countSessionSize(turns(300)))
+    expect(warning).toContain("300 turns")
     expect(warning).toContain(handoverFileName)
   })
 
   test("warns at exactly 5 compactions instead of waiting longer", () => {
-    const warning = longSessionWarning(countSessionSize(compactions(longSessionCompactionLimit)))
-    expect(warning).toContain(longSessionCompactionLimit.toString() + " compactions")
+    const warning = longSessionWarning(countSessionSize(compactions(5)))
+    expect(warning).toContain("5 compactions")
     expect(warning).toContain(handoverFileName)
   })
 
   test("names both measures when both limits trip instead of only one", () => {
-    const warning = longSessionWarning({ turns: longSessionTurnLimit, compactions: longSessionCompactionLimit })
-    expect(warning).toContain(longSessionTurnLimit.toString() + " turns")
-    expect(warning).toContain(longSessionCompactionLimit.toString() + " compactions")
+    const warning = longSessionWarning({ turns: 300, compactions: 5 })
+    expect(warning).toContain("300 turns")
+    expect(warning).toContain("5 compactions")
   })
 
   test("trips on the recorded long session through its compactions instead of missing it", () => {
     const warning = longSessionWarning(countSessionSize(fixture("long-session.jsonl")))
-    expect(warning).toContain("reached " + longSessionCompactionLimit.toString() + " compactions")
-    expect(warning).not.toContain("reached " + longSessionTurnLimit.toString() + " turns")
+    expect(warning).toContain("reached 5 compactions")
+    expect(warning).not.toContain("reached 300 turns")
   })
 })
 
@@ -114,10 +115,15 @@ describe("handoverNote", () => {
       branch: "orc/sample",
       counts: { turns: 13, compactions: 5 },
       commits: [{ sha: "abc1234", subject: "Add the sample widget" }],
+      taskText: "Implement the endpoint and document it.",
+      lastReply: "Implemented the endpoint.",
       endReason: "The lint check still failed after 2 fix attempts."
     })
     expect(note).toContain("abc1234 Add the sample widget")
-    expect(note).toContain("The lint check still failed after 2 fix attempts.")
+    expect(note).toContain("Implement the endpoint and document it.")
+    expect(note).toContain("Implemented the endpoint.")
+    expect(note).toContain("Compare the task text above with the commits to find what is left.")
+    expect(note).toContain("Stop reason: The lint check still failed after 2 fix attempts.")
     expect(note).toContain("orc/sample")
     expect(note).toContain("run-1")
     expect(note).toContain("13 turns")
@@ -130,9 +136,26 @@ describe("handoverNote", () => {
       branch: "orc/sample",
       counts: { turns: 300, compactions: 0 },
       commits: [],
+      taskText: "Implement the endpoint and document it.",
+      lastReply: null,
       endReason: "Pi stopped without printing ORC_COMPLETE."
     })
     expect(note).toContain("Made no commit.")
+    expect(note).toContain("Implement the endpoint and document it.")
+  })
+
+  test("truncates a long last reply instead of pasting it whole", () => {
+    const note = handoverNote({
+      runId: "run-3",
+      branch: "orc/sample",
+      counts: { turns: 300, compactions: 0 },
+      commits: [],
+      taskText: "Do the thing.",
+      lastReply: "x".repeat(3000),
+      endReason: "Stopped."
+    })
+    expect(note.length).toBeLessThan(3000 + 1000)
+    expect(lastAssistantReply(null)).toBeNull()
   })
 })
 
@@ -254,15 +277,21 @@ describe("a replayed long session", () => {
         expect(implement?.signals.some((signal) => signal.name === "input-tokens")).toBe(true)
         expect(implement?.signals.some((signal) => signal.name === "long-session" && signal.value.includes("5 compactions"))).toBe(true)
         expect(implement?.evidence.some((item) => item.kind === "handover")).toBe(true)
+        expect(handover).toContain("Add a sample widget to the demo page.")
+        expect(handover).toContain("Compare the task text above with the commits to find what is left.")
         const next = await Effect.runPromise(historyFor("run-2", home, project, "2026-10-01T10:00:00.000Z", git))
         await mkdir(next.runDir, { recursive: true })
         await writeFile(next.taskPath, "Add a sample widget to the demo page.\n")
         const plan = await Effect.runPromise(buildResumePlan(db, next))
         expect(plan.handover).toBe(handover)
+        expect(plan.implementSessionId).toBeNull()
+        expect(plan.implementSessionFile).toBeNull()
         const prompts: Array<string> = []
+        const resumed: Array<string | undefined> = []
         const nextOps: SandboxOps = {
-          runAgent: async (_agent, prompt) => {
+          runAgent: async (_agent, prompt, _log, resumeSession) => {
             prompts.push(prompt)
+            resumed.push(resumeSession)
             return { iterations: [], stdout: "", commits: [] }
           },
           execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 })
@@ -271,6 +300,66 @@ describe("a replayed long session", () => {
         expect(prompts.length).toBe(1)
         expect(prompts[0]).toContain(handover)
         expect(prompts[0]).toContain("task.md")
+        expect(resumed).toEqual([undefined])
+      } finally {
+        db.close()
+      }
+    })
+  })
+})
+
+
+describe("a long session carries its warning to the dashboard", () => {
+  test("shows the long-session signal in the agent stage detail instead of dropping it", () => {
+    const warning = longSessionWarning({ turns: 13, compactions: 5 }) ?? ""
+    const snapshot = valueOf(decodeOrcShow(JSON.stringify({
+      schema: "orc.show.v1",
+      run: { id: "run-1", branch: "orc/sample" },
+      steps: [{ name: "implement", status: "failed", score: null, signals: [{ name: "long-session", value: warning }] }]
+    })))
+    const run = orcRunOf(snapshot, "run-1", [])
+    expect(run?.stages.find((stage) => stage.name === "implement")?.detail).toBe(warning)
+    const pipeline = orcPipelineOf(run, "working")
+    expect(pipeline.stages.find((stage) => stage.name === "agent")?.detail).toBe(warning)
+  })
+})
+
+describe("a long session survives a later failure", () => {
+  test("keeps the handover file when the checks step fails to start instead of pointing at nothing", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "project")
+        await mkdir(project, { recursive: true })
+        const git = await stubGit(home)
+        const run = await Effect.runPromise(historyFor("run-9", home, project, "2026-10-01T09:00:00.000Z", git))
+        await mkdir(run.runDir, { recursive: true })
+        await writeFile(run.taskPath, "Add a sample widget to the demo page.\\n")
+        const finalText = "work done\\nORC_COMPLETE"
+        const sessionJsonl = compactions(5) + "\\n" + JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: finalText }] } }) + "\\n"
+        const sessionDir = join(run.hostSessionsDir, "host")
+        await mkdir(sessionDir, { recursive: true })
+        await writeFile(join(sessionDir, "2026-10-01T09-00-00-000Z_long-ok.jsonl"), sessionJsonl)
+        const ops: SandboxOps = {
+          runAgent: async () => ({
+            iterations: [{ sessionId: "long-ok" }],
+            stdout: "",
+            completionSignal: "ORC_COMPLETE",
+            commits: [{ sha: "abc1234" }]
+          }),
+          execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 })
+        }
+        const report = await Effect.runPromise(runWithHistory(db, run, ops))
+        expect(report.sessionSize).toEqual({ turns: 1, compactions: 5 })
+        const handover = await Effect.runPromise(
+          Effect.gen(function*() {
+            const fs = yield* FileSystem.FileSystem
+            return yield* fs.readFileString(join(run.runDir, handoverFileName))
+          }).pipe(Effect.provide(BunServices.layer))
+        )
+        expect(handover).toContain("abc1234")
+        expect(handover).toContain("Add a sample widget to the demo page.")
+        expect(handover).toContain("work done")
       } finally {
         db.close()
       }

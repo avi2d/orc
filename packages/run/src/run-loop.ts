@@ -148,7 +148,7 @@ const implement = (run: HistoryRun, runAgent: SandboxOps["runAgent"], plan: Pick
     }).pipe(withHostGitSafety(run.git))
     const session = yield* sessionOf(run, agentProvider.sessionStorage, result)
     const verified = verifiedMarker(result, session.jsonl)
-    const prior = plan.implementSessionId === null ? [] : yield* resumedCommits(run)
+    const prior = plan.implementSessionId === null && plan.handover === null ? [] : yield* resumedCommits(run)
     const seen = new Set(session.commits.map((commit) => commit.sha))
     const commits = [...session.commits, ...prior.filter((commit) => !seen.has(commit.sha))]
     const completed = verified && commits.length > 0
