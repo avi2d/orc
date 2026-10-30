@@ -38,7 +38,7 @@ describe("the dispatcher source", () => {
     await withBacklog(async (root) => {
       const snapshot = snapshotOf(await readBacklog(root));
       expect(snapshot.missing).toBe(false);
-      expect(snapshot.machines).toEqual({ kind: "ok", value: [{ name: "mac", slots: 1 }, { name: "linux", slots: 2 }] });
+      expect(snapshot.machines).toEqual({ kind: "ok", value: [{ name: "mac", slots: 1, start: ["true"] }, { name: "linux", slots: 2, start: ["true"] }] });
       expect(snapshot.projects).toEqual({
         kind: "ok",
         value: [

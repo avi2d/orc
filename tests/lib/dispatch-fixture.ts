@@ -41,7 +41,13 @@ export const writeDispatchBacklog = async (root: string): Promise<void> => {
   await mkdir(join(root, "closed"), { recursive: true });
   await writeFile(
     join(root, "dispatch.json"),
-    JSON.stringify({ machines: [{ name: "mac", slots: 1 }, { name: "linux", slots: 2 }] }),
+    JSON.stringify({
+      machines: [
+        { name: "mac", slots: 1, start: ["true"] },
+        { name: "linux", slots: 2, start: ["true"] },
+      ],
+      quota: { provider: "keyed", command: ["orc-quota"], accounts: [{ name: "main", tokenFile: "/secrets/main-token" }], floorPercent: 15 },
+    }),
   );
   await writeFile(
     join(root, "projects.json"),

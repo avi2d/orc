@@ -32,9 +32,9 @@ export const mountDispatch: Effect.Effect<Mounted, never, DispatchSources | Scop
       yield* Effect.yieldNow;
       return { view: read.view, at: read.at, refreshing: yield* feed.refreshing };
     }),
-    pending: (reading) => reading.at === 0,
+    pending: (reading) => reading.view.pending,
     refreshing: (reading) => reading.refreshing,
-    freshness: (reading): ReadonlyArray<Freshness> => (reading.at === 0 ? [] : [{ at: reading.at, kind: "live" }]),
+    freshness: (reading): ReadonlyArray<Freshness> => (reading.view.pending ? [] : [{ at: reading.at, kind: "live" }]),
     placed: dispatchPlaced,
   });
 });

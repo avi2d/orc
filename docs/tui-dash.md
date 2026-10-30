@@ -326,6 +326,14 @@ With `TUI_DASH_REMOTE_PUEUE` unset or blank, the panel reads this machine's pueu
 The command runs through `sh -c` with a 20 second limit, beside this machine's own read.
 The session quota tool reads the same two machine names.
 
+## Run the dispatch tool
+
+To run the live dispatch panel, run `tui-dash panel dispatch`.
+The panel reads the backlog `ORC_HOME` names, or `~/.orc/backlog` when unset, and paints again every 10 seconds.
+It shows each machine with its busy room, the taken claims as runs and each new task with why it waits.
+A backlog the panel cannot list reads as missing, and a file it cannot read names itself as unread.
+To print one frame of plain text instead, run `tui-dash panel dispatch --print`.
+
 ## Run the tasks tool
 
 To run the live tasks screen, run `tui-dash panel tasks`.
@@ -649,18 +657,18 @@ The default layout is this one.
         "atLeast": { "columns": 240, "rows": 36 },
         "rows": [
           { "height": "auto", "atMost": 0.55, "least": 8, "cells": [{ "panel": "quota" }, { "tabs": ["session-quota", "alerts"] }] },
-          { "height": "fill", "cells": [{ "stack": [{ "panel": "resources" }, { "tabs": ["queues", "schedules"] }] }, { "panel": "tasks", "width": 2 }] }
+          { "height": "fill", "cells": [{ "stack": [{ "panel": "resources" }, { "tabs": ["queues", "schedules", "dispatch"] }] }, { "panel": "tasks", "width": 2 }] }
         ]
       },
       {
         "atLeast": { "columns": 120, "rows": 36 },
         "rows": [
           { "height": "auto", "atMost": 0.55, "least": 8, "cells": [{ "panel": "quota" }, { "tabs": ["session-quota", "alerts"] }] },
-          { "height": "fill", "cells": [{ "stack": [{ "panel": "resources" }, { "tabs": ["queues", "schedules"] }] }, { "panel": "tasks", "width": 1 }] }
+          { "height": "fill", "cells": [{ "stack": [{ "panel": "resources" }, { "tabs": ["queues", "schedules", "dispatch"] }] }, { "panel": "tasks", "width": 1 }] }
         ]
       }
     ],
-    "narrow": ["quota", "session-quota", "queues", "resources", "alerts", "tasks"],
+    "narrow": ["quota", "session-quota", "queues", "dispatch", "resources", "alerts", "tasks"],
     "narrowGivesWay": ["alerts", "quota", "session-quota"]
   }
 }
@@ -851,6 +859,7 @@ Run `bunx stryker run --mutate "packages/schema/src/sources/quota.ts"` to mutate
 | `packages/session-quota/` | The session quota panel module, its OpenTUI rendering, JSON report and alert stream |
 | `packages/resources/` | The resources panel module, its OpenTUI rendering and JSON report |
 | `packages/queues/` | The queues panel module and its OpenTUI rendering |
+| `packages/dispatch/` | The dispatch panel module and its OpenTUI rendering |
 | `packages/schedules/` | The scheduled panel module of what runs next |
 | `packages/ledger/` | The optional ledger panel module and the session-file reader that fills it |
 | `packages/dashboard/` | The dashboard host, which lays out the panel modules it is given from the layout setting |
