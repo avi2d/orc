@@ -509,7 +509,9 @@ describe("a long session survives a later failure", () => {
         const project = join(home, "project")
         await mkdir(project, { recursive: true })
         await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  test: bun test\n")
-        const git = await stubGit(home)
+        const logFile = join(home, "branch-log.txt")
+        await writeFile(logFile, "")
+        const git = await branchLogGit(home, logFile)
         const run = await Effect.runPromise(historyFor("run-9", home, project, "2026-10-01T09:00:00.000Z", git))
         await mkdir(run.runDir, { recursive: true })
         await writeFile(run.taskPath, "Add a sample widget to the demo page.\n")
@@ -525,6 +527,7 @@ describe("a long session survives a later failure", () => {
           runAgent: async () => {
             agentCalls += 1
             if (agentCalls === 1) {
+              await appendFile(logFile, "abc1234\x1fImplement A\n")
               return {
                 iterations: [{ sessionId: "long-ok" }],
                 stdout: "",
@@ -532,6 +535,7 @@ describe("a long session survives a later failure", () => {
                 commits: [{ sha: "abc1234" }]
               }
             }
+            await appendFile(logFile, "def5678\x1fFix B\n")
             return { iterations: [], stdout: "", commits: [{ sha: "def5678" }] }
           },
           execCheck: async () => {

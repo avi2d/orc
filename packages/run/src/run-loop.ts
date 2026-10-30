@@ -74,7 +74,6 @@ interface CapturedAgentRun {
   readonly tokens: PiTokenUse | null
   readonly jsonl: string | null
   readonly failure: string | null
-  readonly sessionSize: LongSessionCounts | null
 }
 
 const sessionOf = (
@@ -89,8 +88,7 @@ const sessionOf = (
       Effect.catchTag("OrcRunError", (error) => Effect.succeed({ session: noSession, failure: error.message }))
     )
     const commits = yield* collectCommits(run, result.commits)
-    const sessionSize = sessionRead.session.jsonl === null ? null : countSessionSize(sessionRead.session.jsonl)
-    return { sessionId, sessionFile: sessionRead.session.file, commits, tokens: sessionRead.session.usage, failure: sessionRead.failure, jsonl: sessionRead.session.jsonl, sessionSize }
+    return { sessionId, sessionFile: sessionRead.session.file, commits, tokens: sessionRead.session.usage, failure: sessionRead.failure, jsonl: sessionRead.session.jsonl }
   })
 
 const verifiedMarker = (result: SandboxRunResult, jsonl: string | null): boolean =>
@@ -136,6 +134,7 @@ const implement = (run: HistoryRun, runAgent: SandboxOps["runAgent"], plan: Pick
       catch: (cause) => new OrcRunError({ message: "orc: the agent run failed: " + describeCause(cause) })
     }).pipe(withHostGitSafety(run.git))
     const session = yield* sessionOf(run, agentProvider.sessionStorage, result)
+    const sessionSize = session.jsonl === null ? null : countSessionSize(session.jsonl)
     const verified = verifiedMarker(result, session.jsonl)
     const prior = plan.implementSessionId === null && plan.handover === null ? [] : yield* resumedCommits(run)
     const seen = new Set(session.commits.map((commit) => commit.sha))
@@ -151,7 +150,7 @@ const implement = (run: HistoryRun, runAgent: SandboxOps["runAgent"], plan: Pick
       sessionFile: session.sessionFile,
       commits,
       tokens: session.tokens,
-      sessionSize: session.sessionSize,
+      sessionSize,
       completed,
       markerVerified: verified,
       endReason
