@@ -14,7 +14,7 @@ import { runWithHistory } from "../../packages/run/src/run"
 import type { HistoryRun } from "../../packages/run/src/run-record"
 import type { SandboxOps } from "../../packages/run/src/run-loop"
 import { subprocessNoMistakesRunner, type NoMistakesRunner } from "../../packages/run/src/no-mistakes"
-import { ticketLines } from "@tui-dash/tasks"
+import { drawTasks, type TasksReadings } from "@tui-dash/tasks"
 import { plain } from "@tui-dash/ui"
 import {
   countSessionSize,
@@ -25,7 +25,8 @@ import {
   longSessionSignal,
   longSessionWarning
 } from "../../packages/run/src/long-session"
-import { anchorOf, decodeOrcShow, orcPipelineOf, orcRunOf, type TaskRow } from "@tui-dash/schema"
+import { anchorOf, decodeOrcShow, ok, orcPipelineOf, orcRunOf, taskLevels } from "@tui-dash/schema"
+import { pipelineTaskReadings } from "../lib/task-levels-fixture"
 import { valueOf } from "../lib/outcomes"
 import { fixture } from "../lib/fixtures"
 
@@ -381,6 +382,46 @@ describe("an inherited handover survives a failed restart", () => {
       }
     })
   })
+
+  test("fails the run instead of dropping the note when forwarding hits a storage error", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "project")
+        await mkdir(project, { recursive: true })
+        const logFile = join(home, "branch-log.txt")
+        await writeFile(logFile, "abc1234\x1fImplement A\n")
+        const git = await branchLogGit(home, logFile)
+        const taskText = "Add a sample widget to the demo page.\n"
+        const runA = await Effect.runPromise(historyFor("run-a", home, project, "2026-10-01T09:00:00.000Z", git))
+        await mkdir(runA.runDir, { recursive: true })
+        await writeFile(runA.taskPath, taskText)
+        const sessionDirA = join(runA.hostSessionsDir, "host")
+        await mkdir(sessionDirA, { recursive: true })
+        await writeFile(join(sessionDirA, "2026-10-01T09-00-00-000Z_long-a.jsonl"), compactions(5) + JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "work in progress" }] } }) + "\n")
+        await Effect.runPromise(runWithHistory(db, runA, {
+          runAgent: async () => ({ iterations: [{ sessionId: "long-a" }], stdout: "", commits: [{ sha: "abc1234" }] }),
+          execCheck: async () => { throw new Error("checks must not run for an unverified implement") }
+        }))
+        const handoverA = await readHandover(runA.runDir)
+        const runB = await Effect.runPromise(historyFor("run-b", home, project, "2026-10-01T10:00:00.000Z", git))
+        await mkdir(join(home, "runs"), { recursive: true })
+        await writeFile(runB.runDir, "not a directory\n")
+        const failure = await Effect.runPromise(Effect.flip(runWithHistory(db, runB, {
+          runAgent: async () => { throw new Error("the agent must not start when forwarding fails") },
+          execCheck: async () => { throw new Error("checks must not run when forwarding fails") }
+        })))
+        expect(failure.message).toContain("handover")
+        const runC = await Effect.runPromise(historyFor("run-c", home, project, "2026-10-01T11:00:00.000Z", git))
+        await mkdir(runC.runDir, { recursive: true })
+        await writeFile(runC.taskPath, taskText)
+        const planC = await Effect.runPromise(buildResumePlan(db, runC))
+        expect(planC.handover).toBe(handoverA)
+      } finally {
+        db.close()
+      }
+    })
+  })
 })
 
 describe("a handover written after no-mistakes", () => {
@@ -457,47 +498,24 @@ describe("a long session carries its warning to the run", () => {
     expect(anchorOf(pipeline.stages)?.detail).toContain("5 compactions")
   })
 
-  test("renders the warning beside the failed checks status instead of only carrying it in the mapping", () => {
+  test("shows the warning and the failed checks status on the dashboard frame instead of only carrying it in the mapping", () => {
     const warning = longSessionWarning({ turns: 13, compactions: 5 }) ?? ""
     const snapshot = valueOf(decodeOrcShow(JSON.stringify({
       schema: "orc.show.v1",
-      run: { id: "run-1", branch: "orc/sample" },
+      run: { id: "orc-step-7", branch: "fm/orc-step-7" },
       steps: [
         { name: "implement", status: "passed", score: null, signals: [{ name: "long-session", value: warning }] },
         { name: "checks", status: "failed", score: null }
       ]
     })))
-    const run = orcRunOf(snapshot, "run-1", [])
-    if (run === undefined) throw new Error("run-1 has no orc run")
-    const utc = DateTime.zoneMakeNamedUnsafe("UTC")
-    const row: TaskRow = {
-      id: "run-1",
-      machine: "north",
-      source: "local",
-      listed: true,
-      usageRead: false,
-      title: "Sample widget",
-      project: "demo",
-      state: "working",
-      detail: "",
-      firstStartedAt: DateTime.makeUnsafe("2026-10-01T09:00:00.000Z"),
-      endedAt: undefined,
-      seconds: 60,
-      cpuSeconds: undefined,
-      peakBytes: undefined,
-      live: undefined,
-      idled: false,
-      tests: [],
-      testSeconds: undefined,
-      episodes: [],
-      spend: undefined,
-      kind: "orc run",
-      pipeline: orcPipelineOf(run, "working"),
-      lastActiveAt: undefined
+    const readings: TasksReadings = {
+      levels: taskLevels(pipelineTaskReadings({ orc: ok(snapshot) })),
+      zone: DateTime.zoneMakeNamedUnsafe("UTC")
     }
-    const text = ticketLines(row, { machine: "north", source: "local", listed: true, usageRead: false }, DateTime.makeUnsafe("2026-10-01T10:00:00.000Z"), utc, 200).map(plain).join("\n")
+    const text = drawTasks(readings, { focus: "task", project: "harbor", task: "north orc-step-7", detail: 0 }, 120, 40)
+      .block.map((line) => plain(line).trimEnd()).join("\n")
+    expect(text).toContain("5 compactions")
     expect(text).toContain("[✕ checks]")
-    expect(text.split("\n").find((line) => line.includes("5 compactions")) ?? "").toContain("checks")
   })
 })
 

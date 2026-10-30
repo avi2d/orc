@@ -224,10 +224,13 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
     }
     const progress = yield* readPriorProgress(db, run, prior)
     const handover = yield* run.fs.readFileString(run.path.join(run.path.dirname(run.runDir), prior.id, handoverFileName)).pipe(
-      Effect.orElseSucceed(() => null)
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed<string | null>(null)),
+      Effect.mapError((cause) => historyFailure("read", cause))
     )
     if (handover !== null) {
-      yield* run.fs.writeFileString(run.path.join(run.runDir, handoverFileName), handover).pipe(Effect.orElseSucceed(() => undefined))
+      yield* run.fs.writeFileString(run.path.join(run.runDir, handoverFileName), handover).pipe(
+        Effect.mapError((cause) => historyFailure("forward the handover note in", cause))
+      )
     }
     const fresh = handover !== null
     const carriedImplement = fresh ? null : yield* carrySessionFile(run, progress.implementSource, progress.implementSessionId)
