@@ -162,7 +162,7 @@ const requireFolder = (checkout: string): Effect.Effect<void, RunnerError, FileS
     }
   })
 
-const queuedGuardScript = "pueue wait \"$1\"; rm -rf -- \"$2\""
+const queuedGuardScript = "pueue wait \"$1\" && rm -rf -- \"$2\""
 
 const guardQueued = (home: string, id: string, dir: string): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {

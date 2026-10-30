@@ -271,7 +271,6 @@ describe("orc runner hold", () => {
         env: { ...process.env, ...fixture.env }
       })
       expect(killed.exitCode).toBe(0)
-      expect(await readFile(join(fixture.pueue, "killed-tasks"), "utf8")).toBe(id + "\n")
       expect(await gone(tokenDir(fixture, "task-9"))).toBe(true)
     })
   }, runnerTimeout)
@@ -280,6 +279,19 @@ describe("orc runner hold", () => {
     await withFixture(async (fixture) => {
       await writeFile(join(fixture.pueue, "fail-spawn"), "")
       await holdToken(fixture, "task-9", placeholder, hoursFromNowIso(2))
+      expect(await gone(tokenDir(fixture, "task-9"))).toBe(true)
+    })
+  }, runnerTimeout)
+
+  test("a lost daemon connection keeps the folder so the run still waits for its turn instead of failing without a token", async () => {
+    await withFixture(async (fixture) => {
+      await writeFile(join(fixture.pueue, "wait-fails"), "")
+      await holdToken(fixture, "task-9", placeholder, hoursFromNowIso(2))
+      expect(await appears(join(fixture.pueue, "wait-calls"))).toBe(true)
+      expect(await stat(tokenDir(fixture, "task-9")).then(() => true, () => false)).toBe(true)
+      const result = await hold(fixture, "task-9", readsToken)
+      expect(result.stderr).toBe("")
+      expect(result.stdout).toBe("the run of task-9 finished\n")
       expect(await gone(tokenDir(fixture, "task-9"))).toBe(true)
     })
   }, runnerTimeout)

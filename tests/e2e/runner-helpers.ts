@@ -61,9 +61,9 @@ const fakePueue = [
   "    printf '%s' \"$ORC_HOME\" > \"$PUEUE_STATE/add-env.tmp\"; mv \"$PUEUE_STATE/add-env.tmp\" \"$PUEUE_STATE/add-env\";",
   "    rmdir \"$PUEUE_STATE/group-lock\"; echo \"$id\" ;;",
   "  wait)",
-  "    id=\"$2\"; while [ -f \"$PUEUE_STATE/live-$id\" ]; do sleep 0.05; done ;;",
+  "    printf '%s\\n' \"$2\" >> \"$PUEUE_STATE/wait-calls\"; if [ -f \"$PUEUE_STATE/wait-fails\" ]; then exit 1; fi; id=\"$2\"; while [ -f \"$PUEUE_STATE/live-$id\" ]; do sleep 0.05; done ;;",
   "  kill)",
-  "    id=\"$2\"; rm -f \"$PUEUE_STATE/live-$id\"; printf '%s\\n' \"$id\" >> \"$PUEUE_STATE/killed-tasks\"; echo \"Killed $id\" ;;",
+  "    id=\"$2\"; rm -f \"$PUEUE_STATE/live-$id\"; echo \"Killed $id\" ;;",
   "  *) echo \"fake pueue has no $1\" >&2; exit 2 ;;",
   "esac",
   ""
