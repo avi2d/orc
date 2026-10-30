@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
@@ -124,6 +124,32 @@ describe("the dispatch view", () => {
       expect(view.waiting.find((row) => row.id === "task-12")?.reason).toBe("waits for the next beat");
       expect(view.waiting.find((row) => row.id === "task-13")?.reason).toBe("no machine with a checkout of orc has room");
     });
+  });
+
+  test("an inherited property is not a checkout", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-dispatch-"));
+    try {
+      const backlog = join(root, "backlog");
+      await mkdir(join(backlog, "new"), { recursive: true });
+      await mkdir(join(backlog, "taken"), { recursive: true });
+      await mkdir(join(backlog, "closed"), { recursive: true });
+      await writeFile(
+        join(backlog, "dispatch.json"),
+        JSON.stringify({
+          machines: [{ name: "constructor", slots: 1, start: ["true"] }],
+          quota: { provider: "keyed", command: ["orc-quota"], accounts: [{ name: "main", tokenFile: "/secrets/main-token" }], floorPercent: 15 },
+        }),
+      );
+      await writeFile(join(backlog, "projects.json"), JSON.stringify({ projects: [{ name: "proj", checkouts: {} }] }));
+      await writeFile(
+        join(backlog, "new", "task-1.md"),
+        ["---", 'id: "task-1"', 'title: "First task"', 'project: "proj"', "machine: null", "depends_on: []", 'created: "2026-10-27T10:00:00.000Z"', "---", "# First task", ""].join("\n"),
+      );
+      const view = dispatchView(snapshotOf(await readBacklog(root)));
+      expect(view.waiting.find((row) => row.id === "task-1")?.reason).toBe("the project proj has no checkout on any machine");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   test("an unknown project, machine or checkout waits on just that instead of room", async () => {
