@@ -45,7 +45,7 @@ In CI the `CHECKS_SECRETS_PACK` repository secret holds the list.
 
 | Path | What it holds |
 | --- | --- |
-| `packages/run` | The orc command and its checks, published as `@avi2dg/orc` |
+| `packages/run` | The orc command and its checks |
 | `packages/schema` | The dashboard's shared decoders, machine sources and view models |
 | `packages/ui` | The dashboard's panel module interface, theme and screen runner |
 | `packages/alerts`, `packages/dispatch`, `packages/ledger`, `packages/queues`, `packages/quota`, `packages/resources`, `packages/schedules`, `packages/session-quota`, `packages/tasks` | One dashboard panel each |
