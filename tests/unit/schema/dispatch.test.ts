@@ -99,10 +99,10 @@ describe("the dispatch view", () => {
     });
   });
 
-  test("a task pinned to a full machine waits on room, not on the machine with room", async () => {
+  test("a pinned task on a full machine reads as unclaimed instead of forecasting room", async () => {
     await withBacklog(async (root) => {
       const view = dispatchView(snapshotOf(await readBacklog(root)));
-      expect(view.waiting.find((row) => row.id === "task-7")).toEqual({ id: "task-7", title: "Full machine", project: "orc", reason: "mac has no room" });
+      expect(view.waiting.find((row) => row.id === "task-7")).toEqual({ id: "task-7", title: "Full machine", project: "orc", reason: "unclaimed" });
     });
   });
 
@@ -110,20 +110,60 @@ describe("the dispatch view", () => {
     await withBacklog(async (root) => {
       const view = dispatchView(snapshotOf(await readBacklog(root)));
       expect(view.waiting.find((row) => row.id === "task-2")?.reason).toBe("waits on task-9, which the backlog does not hold");
-      expect(view.waiting.find((row) => row.id === "task-1")?.reason).toBe("waits for the next beat");
+      expect(view.waiting.find((row) => row.id === "task-1")?.reason).toBe("unclaimed");
     });
   });
 
-  test("a task past the last free slot waits on room instead of the next beat", async () => {
+  test("eligible tasks read as unclaimed instead of forecasting the beat", async () => {
     await withBacklog(async (root) => {
       const file = (id: string, title: string): string =>
         ["---", 'id: "' + id + '"', 'title: "' + title + '"', 'project: "orc"', "machine: null", "depends_on: []", 'created: "2026-10-27T10:00:00.000Z"', "---", "# " + title, ""].join("\n");
       await writeFile(join(root, "backlog", "new", "task-12.md"), file("task-12", "Second free task"));
       await writeFile(join(root, "backlog", "new", "task-13.md"), file("task-13", "Third free task"));
       const view = dispatchView(snapshotOf(await readBacklog(root)));
-      expect(view.waiting.find((row) => row.id === "task-12")?.reason).toBe("waits for the next beat");
-      expect(view.waiting.find((row) => row.id === "task-13")?.reason).toBe("no machine with a checkout of orc has room");
+      expect(view.waiting.find((row) => row.id === "task-12")?.reason).toBe("unclaimed");
+      expect(view.waiting.find((row) => row.id === "task-13")?.reason).toBe("unclaimed");
     });
+  });
+
+  test("an extensionless task file is ignored instead of listed", async () => {
+    await withBacklog(async (root) => {
+      await writeFile(
+        join(root, "backlog", "new", "task-12"),
+        ["---", 'id: "task-12"', 'title: "Extensionless task"', 'project: "orc"', "machine: null", "depends_on: []", 'created: "2026-10-27T10:00:00.000Z"', "---", "# Extensionless task", ""].join("\n"),
+      );
+      const view = dispatchView(snapshotOf(await readBacklog(root)));
+      expect(view.waiting.some((row) => row.id === "task-12")).toBe(false);
+      expect(view.unread.some((missed) => missed.includes("task-12"))).toBe(false);
+    });
+  });
+
+  test("an unreadable project file is named as unread even with no new tasks", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-dispatch-"));
+    try {
+      const backlog = join(root, "backlog");
+      await mkdir(join(backlog, "new"), { recursive: true });
+      await mkdir(join(backlog, "taken"), { recursive: true });
+      await mkdir(join(backlog, "closed"), { recursive: true });
+      await writeFile(
+        join(backlog, "dispatch.json"),
+        JSON.stringify({
+          machines: [{ name: "mac", slots: 1, start: ["true"] }],
+          quota: { provider: "keyed", command: ["orc-quota"], accounts: [{ name: "main", tokenFile: "/secrets/main-token" }], floorPercent: 15 },
+        }),
+      );
+      await writeFile(join(backlog, "projects.json"), "not json");
+      await writeFile(
+        join(backlog, "taken", "task-6.md"),
+        ["---", 'id: "task-6"', 'title: "Running task"', 'project: "orc"', "machine: null", "depends_on: []", 'beat: "beat-1"', 'taken_for: "mac"', 'account: "main"', 'taken_at: "2026-10-27T10:01:00.000Z"', 'created: "2026-10-27T10:00:00.000Z"', "---", "# Running task", ""].join("\n"),
+      );
+      const view = dispatchView(snapshotOf(await readBacklog(root)));
+      expect(view.runs).toHaveLength(1);
+      expect(view.waiting).toEqual([]);
+      expect(view.unread.some((missed) => missed.includes("projects.json"))).toBe(true);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   test("an inherited property is not a checkout", async () => {

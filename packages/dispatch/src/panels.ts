@@ -1,15 +1,5 @@
 import type { DispatchView, RoomEntry, RunRow, WaitRow } from "@tui-dash/schema";
-import {
-  type Block,
-  ellipsize,
-  type Line,
-  padEnd,
-  sentence,
-  sourceNotes,
-  span,
-  widthOf,
-  withinRoom,
-} from "@tui-dash/ui";
+import { type Block, ellipsize, type Line, padEnd, sentence, span, widthOf, withinRoom } from "@tui-dash/ui";
 
 const counted = (count: number, what: string): ReadonlyArray<string> => (count > 0 ? [count + " " + what] : []);
 
@@ -44,13 +34,11 @@ const waitLine = (wait: WaitRow, width: number): Line => {
 };
 
 export const dispatchLines = (view: DispatchView, width: number, rows: number): Block => {
-  if (view.pending) return sentence("reading the backlog\u2026", "muted", width);
   if (view.missing) return sentence("no backlog at " + view.root, "muted", width);
   const counts = headParts(view);
   const countHead: Block = counts.length === 0 ? [] : [[span(counts.join(" \u00b7 "), "foreground")]];
-  const machineNotes: Block = view.machines.kind === "ok" ? [] : sourceNotes("dispatch", view.machines, width);
   const unreadNotes: Block = view.unread.map((missed): Line => [span("! " + ellipsize(missed, width - 2), "warning")]);
-  const head: Block = [...countHead, ...machineNotes, ...unreadNotes];
+  const head: Block = [...countHead, ...unreadNotes];
   const machines = view.machines.kind === "ok" ? view.machines.value.map((entry) => machineLine(entry, width)) : [];
   const runs = view.runs.map((run) => runLine(run, width));
   const waits = view.waiting.map((wait) => waitLine(wait, width));

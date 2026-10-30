@@ -60,12 +60,12 @@ describe("the dispatch panel, against the recorded backlog", () => {
   test("shows why each new task waits instead of only its name", async () => {
     await withView((view) => {
       const lines = printed(view);
-      expect(lines.some((row) => row.includes("task-1 Free task \u00b7 waits for the next beat"))).toBe(true);
+      expect(lines.some((row) => row.includes("task-1 Free task \u00b7 unclaimed"))).toBe(true);
       expect(lines.some((row) => row.includes("task-2 Blocked task \u00b7 waits on task-9, which the backlog does not hold"))).toBe(true);
       expect(lines.some((row) => row.includes("task-3 Unknown project \u00b7 the project site is not in the project list"))).toBe(true);
       expect(lines.some((row) => row.includes("task-4 Unknown machine \u00b7 the machine feld is not in dispatch.json"))).toBe(true);
       expect(lines.some((row) => row.includes("task-5 No checkout \u00b7 the project docs has no checkout on linux"))).toBe(true);
-      expect(lines.some((row) => row.includes("task-7 Full machine \u00b7 mac has no room"))).toBe(true);
+      expect(lines.some((row) => row.includes("task-7 Full machine \u00b7 unclaimed"))).toBe(true);
     });
   });
 

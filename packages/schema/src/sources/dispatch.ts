@@ -212,8 +212,9 @@ const readTasks = (
         continue;
       }
       for (const name of listed.toSorted(byName)) {
-        const stem = name.replace(/\.md$/u, "");
-        if (!/^task-\d+$/u.test(stem)) continue;
+        const stemmed = /^task-(\d+)\.md$/u.exec(name);
+        if (stemmed === null) continue;
+        const stem = "task-" + stemmed[1];
         const file = root + "/" + folder + "/" + name;
         const text = yield* readText(fs, file);
         if (text === null) continue;
@@ -295,7 +296,12 @@ const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<Di
       }
       return decodedProjects;
     })();
-    return { root, missing: false, machines, projects, tasks, unread };
+    const diagnostic = (file: string, outcome: Outcome<unknown>): string | undefined => {
+      if (outcome.kind === "ok") return undefined;
+      return outcome.kind === "unreachable" ? outcome.reason : file + ": " + outcome.issue;
+    };
+    const failed = [diagnostic(machinesFile, machines), diagnostic(projectsFile, projects)].filter((reason) => reason !== undefined);
+    return { root, missing: false, machines, projects, tasks, unread: [...unread, ...failed] };
   });
 
 export interface DispatchReader {

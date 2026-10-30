@@ -332,7 +332,7 @@ To run the live dispatch panel, run `tui-dash panel dispatch`.
 The panel reads `$ORC_HOME/backlog`, or `~/.orc/backlog` when `ORC_HOME` is unset, and paints again every 10 seconds.
 It shows each machine with its busy room, the taken claims as runs and each new task with why it waits.
 A backlog that does not exist reads as missing.
-A folder or file the panel cannot read is named as unread.
+A folder or file the panel cannot read, including dispatch.json and projects.json, is named as unread.
 To print one frame of plain text instead, run `tui-dash panel dispatch --print`.
 
 ## Run the tasks tool
