@@ -13,18 +13,18 @@ import {
 } from "@tui-dash/schema";
 import { writeDispatchBacklog } from "../../lib/dispatch-fixture";
 
-const readBacklog = (root: string): Promise<DispatchReading> =>
+const readBacklog = (home: string): Promise<DispatchReading> =>
   Effect.runPromise(
     Effect.flatMap(DispatchSource, (source) => source.read).pipe(
       Effect.provide(dispatchSourceLayer.pipe(Layer.provide(BunFileSystem.layer))),
-      Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: root, ORC_BACKLOG: root }))),
+      Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: home, ORC_HOME: home }))),
     ),
   );
 
 const withBacklog = async (body: (root: string) => Promise<void>): Promise<void> => {
   const root = await mkdtemp(join(tmpdir(), "orc-dispatch-"));
   try {
-    await writeDispatchBacklog(root);
+    await writeDispatchBacklog(join(root, "backlog"));
     await body(root);
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -114,12 +114,11 @@ describe("the dispatch view", () => {
     });
   });
 
-  test("counts closed tasks by outcome instead of listing them as waiting", async () => {
+  test("leaves closed tasks out of the runs and the waiting instead of listing them", async () => {
     await withBacklog(async (root) => {
       const view = dispatchView(snapshotOf(await readBacklog(root)));
-      expect(view.closedDone).toBe(1);
-      expect(view.closedFailed).toBe(1);
       expect(view.waiting.some((row) => row.id === "task-8" || row.id === "task-10")).toBe(false);
+      expect(view.runs.some((row) => row.id === "task-8" || row.id === "task-10")).toBe(false);
     });
   });
 });

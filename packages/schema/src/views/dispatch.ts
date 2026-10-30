@@ -29,8 +29,6 @@ export interface DispatchView {
   readonly machines: Outcome<ReadonlyArray<RoomEntry>>;
   readonly runs: ReadonlyArray<RunRow>;
   readonly waiting: ReadonlyArray<WaitRow>;
-  readonly closedDone: number;
-  readonly closedFailed: number;
   readonly unread: ReadonlyArray<string>;
 }
 
@@ -78,8 +76,6 @@ const waitOf = (task: DispatchTask, snapshot: DispatchSnapshot): WaitRow => {
 export const dispatchView = (snapshot: DispatchSnapshot): DispatchView => {
   const runs: Array<RunRow> = [];
   const waiting: Array<WaitRow> = [];
-  let closedDone = 0;
-  let closedFailed = 0;
   for (const task of snapshot.tasks) {
     const state = task.state;
     if (state.kind === "taken") {
@@ -94,8 +90,7 @@ export const dispatchView = (snapshot: DispatchSnapshot): DispatchView => {
     } else if (state.kind === "started") {
       runs.push({ id: task.id, title: task.title, project: task.project, machine: state.claim.machine, account: state.claim.account, started: true });
     } else if (state.kind === "closed") {
-      if (state.closing.outcome === "done") closedDone += 1;
-      else closedFailed += 1;
+      continue;
     } else {
       waiting.push(waitOf(task, snapshot));
     }
@@ -106,5 +101,5 @@ export const dispatchView = (snapshot: DispatchSnapshot): DispatchView => {
       value: snapshot.machines.value.map((machine) => ({ machine: machine.name, slots: machine.slots, busy: busyOf(machine.name, snapshot.tasks) })),
     }
     : snapshot.machines;
-  return { root: snapshot.root, missing: snapshot.missing, machines, runs, waiting, closedDone, closedFailed, unread: snapshot.unread };
+  return { root: snapshot.root, missing: snapshot.missing, machines, runs, waiting, unread: snapshot.unread };
 };

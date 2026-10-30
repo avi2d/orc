@@ -16,6 +16,7 @@
         "@tui-dash/alerts": "workspace:*",
         "@tui-dash/cli": "workspace:*",
         "@tui-dash/dashboard": "workspace:*",
+        "@tui-dash/dispatch": "workspace:*",
         "@tui-dash/ledger": "workspace:*",
         "@tui-dash/queues": "workspace:*",
         "@tui-dash/quota": "workspace:*",
@@ -85,6 +86,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@effect/platform-bun": "4.0.0",
+        "@opentui/core": "0.6.5",
         "@tui-dash/schema": "workspace:*",
         "@tui-dash/ui": "workspace:*",
         "effect": "4.0.0",
