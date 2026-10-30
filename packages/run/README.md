@@ -422,7 +422,7 @@ A task marked for a machine waits for a slot on that machine and never starts on
 The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT` and `ORC_TASK_TOKEN_FILE`.
 `ORC_TASK_TOKEN_FILE` is the account's token file path, never the token.
 On a token command account it is empty, and the start command reads the token as `orc.token.v1` on standard input instead.
-On a kind `none` account it is empty and nothing reads standard input.
+On a kind `none` account it is empty, and the beat sends nothing on standard input, so a custom start command must not feed it input.
 The beat starts it detached in its own session, never waits for it and never kills it.
 So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.

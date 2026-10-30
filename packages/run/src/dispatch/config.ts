@@ -61,13 +61,9 @@ const DispatchEnvelope = Schema.Struct({
   })
 })
 
-export interface DispatchConfig {
-  readonly machines: ReadonlyArray<Machine>
-  readonly quota: {
-    readonly provider: typeof ProviderId.Type
-    readonly command: Command
+export type DispatchConfig = Omit<typeof DispatchEnvelope.Type, "quota"> & {
+  readonly quota: Omit<typeof DispatchEnvelope.Type["quota"], "accounts"> & {
     readonly accounts: ReadonlyArray<Account>
-    readonly floorPercent: number
   }
 }
 
@@ -82,19 +78,16 @@ export const checkoutOn = (project: Project, machine: string): string | null =>
 
 const ProjectsFile = Schema.Struct({ projects: Schema.Array(Project) })
 
-const accountDetail = (entry: unknown): string => {
-  const name = typeof entry === "object" && entry !== null && "name" in entry && typeof entry.name === "string" && entry.name !== "" ? entry.name : null
-  return name === null
-    ? "an account with no name names a credential outside token-file, token-command and none"
-    : "the account " + name + " names a credential outside token-file, token-command and none"
-}
+const accountName = (entry: unknown): string | null =>
+  typeof entry === "object" && entry !== null && "name" in entry && typeof entry.name === "string" && entry.name !== "" ? entry.name : null
+
+const accountDetail = (name: string | null, reason: string): string =>
+  (name === null ? "an account with no name" : "the account " + name) + " names a credential the beat cannot take: " + reason
 
 const readAccount = (file: string, entry: unknown): Effect.Effect<Account, ConfigError> =>
   Schema.decodeUnknownEffect(AnyAccount)(entry, { onExcessProperty: "error" }).pipe(
-    Effect.mapBoth({
-      onFailure: () => new ConfigError({ file, detail: accountDetail(entry) }),
-      onSuccess: tagAccount
-    })
+    Effect.mapError((error) => new ConfigError({ file, detail: accountDetail(accountName(entry), error.message) })),
+    Effect.map(tagAccount)
   )
 
 export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, ConfigError, FileSystem.FileSystem> =>
@@ -108,9 +101,9 @@ export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, 
         if (config.quota.accounts.length === 0) {
           return yield* new ConfigError({ file, detail: "the quota names no account" })
         }
-        const names = config.quota.accounts.map((entry) => typeof entry === "object" && entry !== null && "name" in entry && typeof entry.name === "string" ? entry.name : "")
-        const duplicate = duplicateOf(names)
-        if (duplicate !== null && duplicate !== "") {
+        const names = config.quota.accounts.map(accountName)
+        const duplicate = duplicateOf(names.filter((name) => name !== null))
+        if (duplicate !== null) {
           return yield* new ConfigError({ file, detail: "the account " + duplicate + " is named twice" })
         }
         const accounts = yield* Effect.forEach(config.quota.accounts, (entry) => readAccount(file, entry))
@@ -122,7 +115,7 @@ export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, 
         const lone = accounts.find((entry) => entry.kind === "none")
         const renewed = config.machines.find((entry) => entry.renew !== undefined)
         if (lone !== undefined && renewed !== undefined) {
-          return yield* new ConfigError({ file, detail: "the account " + lone.name + " takes kind none and holds no token, so the machine " + renewed.name + " names a renew command no account here uses" })
+          return yield* new ConfigError({ file, detail: "the account " + lone.name + " takes kind none and holds no token, so the machine " + renewed.name + " names a renew command it never takes" })
         }
         return { machines: config.machines, quota: { ...config.quota, accounts } }
       })

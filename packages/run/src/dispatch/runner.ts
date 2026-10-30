@@ -94,7 +94,7 @@ const decodeSecret = <S extends Schema.Top & { readonly DecodingServices: never 
     Effect.mapError(() => new RunnerError({ detail: refusal }))
   )
 
-const queueRefusal = "the queue request on stdin is no task, checkout, provider and body with either a tokenFile or a token and an expiresAt"
+const queueRefusal = "the queue request on stdin is no task, checkout, provider and body with an optional tokenFile or an optional token and expiresAt"
 
 const renewRefusal = "the renew request on stdin is no task with a token and an expiresAt"
 

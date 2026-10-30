@@ -203,7 +203,9 @@ describe("readDispatchConfig", () => {
   })
   test("refuses a relative token file path instead of resolving it against the run's folder", async () => {
     await withBacklog(async (root) => {
-      expect(await configProblem(root, { accounts: [{ name: "main", tokenFile: "secrets/main-token" }] })).not.toBeNull()
+            const problem = await configProblem(root, { accounts: [{ name: "main", tokenFile: "secrets/main-token" }] })
+      expect(problem).toContain("the account main")
+      expect(problem).toContain("tokenFile")
     })
   })
   test("refuses an account named twice instead of keeping either token file", async () => {
@@ -255,44 +257,57 @@ describe("readDispatchConfig", () => {
   })
   test("refuses a token file kind with no token file instead of starting its runs on none", async () => {
     await withBacklog(async (root) => {
-      expect(await configProblem(root, { accounts: [{ name: "main", kind: "token-file" }] })).toBe(
-        "the account main names a credential outside token-file, token-command and none"
-      )
+            const problem = await configProblem(root, { accounts: [{ name: "main", kind: "token-file" }] })
+      expect(problem).toContain("the account main")
+      expect(problem).toContain("Missing key")
+      expect(problem).toContain("tokenFile")
     })
   })
   test("refuses a token command kind with no token command instead of starting its runs on none", async () => {
     await withBacklog(async (root) => {
-      expect(await configProblem(root, { accounts: [{ name: "main", kind: "token-command" }] })).toBe(
-        "the account main names a credential outside token-file, token-command and none"
-      )
+            const problem = await configProblem(root, { accounts: [{ name: "main", kind: "token-command" }] })
+      expect(problem).toContain("the account main")
+      expect(problem).toContain("Missing key")
+      expect(problem).toContain("tokenCommand")
     })
   })
   test("refuses a token file kind that also names a token command instead of picking one", async () => {
     await withBacklog(async (root) => {
-      expect(await configProblem(root, { accounts: [{ name: "main", kind: "token-file", tokenFile: "/a", tokenCommand: ["clauth-token", "main"] }] })).toBe(
-        "the account main names a credential outside token-file, token-command and none"
-      )
+            const problem = await configProblem(root, { accounts: [{ name: "main", kind: "token-file", tokenFile: "/a", tokenCommand: ["clauth-token", "main"] }] })
+      expect(problem).toContain("the account main")
+      expect(problem).toContain("no excess property")
+      expect(problem).toContain("tokenCommand")
     })
   })
   test("refuses a token command kind that also names a token file instead of picking one", async () => {
     await withBacklog(async (root) => {
-      expect(await configProblem(root, { accounts: [{ name: "main", kind: "token-command", tokenCommand: ["clauth-token", "main"], tokenFile: "/a" }] })).toBe(
-        "the account main names a credential outside token-file, token-command and none"
-      )
+            const problem = await configProblem(root, { accounts: [{ name: "main", kind: "token-command", tokenCommand: ["clauth-token", "main"], tokenFile: "/a" }] })
+      expect(problem).toContain("the account main")
+      expect(problem).toContain("no excess property")
+      expect(problem).toContain("tokenFile")
     })
   })
   test("refuses a kind none account that also names a token command instead of holding it", async () => {
     await withBacklog(async (root) => {
-      expect(await configProblem(root, { accounts: [{ name: "main", kind: "none", tokenCommand: ["clauth-token", "main"] }] })).toBe(
-        "the account main names a credential outside token-file, token-command and none"
-      )
+            const problem = await configProblem(root, { accounts: [{ name: "main", kind: "none", tokenCommand: ["clauth-token", "main"] }] })
+      expect(problem).toContain("the account main")
+      expect(problem).toContain("no excess property")
+      expect(problem).toContain("tokenCommand")
     })
   })
   test("refuses a kind none account that also names a token file instead of holding it", async () => {
     await withBacklog(async (root) => {
-      expect(await configProblem(root, { accounts: [{ name: "main", kind: "none", tokenFile: "/a" }] })).toBe(
-        "the account main names a credential outside token-file, token-command and none"
-      )
+            const problem = await configProblem(root, { accounts: [{ name: "main", kind: "none", tokenFile: "/a" }] })
+      expect(problem).toContain("the account main")
+      expect(problem).toContain("no excess property")
+      expect(problem).toContain("tokenFile")
+    })
+  })
+  test("refuses an account name the schema cannot take instead of keeping it", async () => {
+    await withBacklog(async (root) => {
+      const problem = await configProblem(root, { accounts: [{ name: "main!", tokenFile: "/a" }] })
+      expect(problem).toContain("the account main!")
+      expect(problem).toContain("RegExp")
     })
   })
   test("refuses a kind none account while a machine names a renew command instead of keeping dead renewal", async () => {
@@ -301,7 +316,7 @@ describe("readDispatchConfig", () => {
       const machines = config.machines.map((machine) => ({ ...machine, renew: ["true"] }))
       await writeFile(file, JSON.stringify({ machines, quota: { ...config.quota, accounts: [{ name: "main", kind: "none" }] } }))
       const read = await run(readDispatchConfig(file).pipe(Effect.as("read"), Effect.catchTag("ConfigError", (error) => Effect.succeed(error.detail))))
-      expect(read).toBe("the account main takes kind none and holds no token, so the machine mac names a renew command no account here uses")
+      expect(read).toBe("the account main takes kind none and holds no token, so the machine mac names a renew command it never takes")
     })
   })
   test("refuses a quota with no command instead of reading a built-in tool", async () => {
