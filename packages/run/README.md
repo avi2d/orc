@@ -276,8 +276,10 @@ Orc keeps one backlog of tasks in `~/.orc/backlog`, one Markdown file per task w
 `ORC_HOME` moves the backlog elsewhere when set.
 A task file sits in `new`, `taken` or `closed`, and the folder it sits in is its state.
 Two files beside the folders tell the beat where tasks may go.
-`dispatch.json` names each machine, its slots and its start command, and the quota.
-The quota names the provider its accounts belong to, the command that reads their room, and each account's token file.
+`dispatch.json` names each machine, its slots, its start command and its renew command, and the quota.
+The quota names the provider its accounts belong to, the command that reads their room, and each account's token file or token command.
+A token file account needs only a start command on each machine.
+A token command account names a renew command on each machine beside its start command.
 It also names the floor of room each account must keep:
 
 ```json
@@ -298,7 +300,9 @@ It also names the floor of room each account must keep:
 }
 ```
 
-The provider is a token-file provider in `config.json` on each machine that runs the tasks, and each token file path holds on those machines.
+The provider is a token-file provider in `config.json` on each machine that runs the tasks.
+Each token file path in `dispatch.json` holds on those machines.
+A token command account keeps its token in the runner token folder on each machine instead.
 Orc runs the quota command with no input and reads its standard output as this document:
 
 ```json
