@@ -66,7 +66,7 @@ const waitOf = (task: DispatchTask, snapshot: DispatchSnapshot, busy: Map<string
   if (task.machine !== null && !machines.some((machine) => machine.name === task.machine)) {
     return waiting("the machine " + task.machine + " is not in dispatch.json");
   }
-  const placed = machines.filter((machine) => (task.machine === null || machine.name === task.machine) && project.checkouts[machine.name] !== undefined);
+  const placed = machines.filter((machine) => (task.machine === null || machine.name === task.machine) && Object.hasOwn(project.checkouts, machine.name));
   if (placed.length === 0) return waiting("the project " + project.name + " has no checkout on " + (task.machine ?? "any machine"));
   const full = placed.every((machine) => (busy.get(machine.name) ?? 0) >= machine.slots);
   if (full) {
