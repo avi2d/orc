@@ -14,8 +14,7 @@ const width = 84;
 const viewOf = (home: string): Promise<DispatchView> =>
   Effect.runPromise(
     Effect.map(Effect.flatMap(DispatchSource, (source) => source.read), (reading) => dispatchView(reading.snapshot)).pipe(
-      Effect.provide(dispatchSourceLayer.pipe(Layer.provide(BunFileSystem.layer))),
-      Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: home, ORC_HOME: home }))),
+      Effect.provide(dispatchSourceLayer.pipe(Layer.provide(BunFileSystem.layer), Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: home, ORC_HOME: home }))))),
     ),
   );
 

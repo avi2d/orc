@@ -181,10 +181,10 @@ const byName = (left: string, right: string): number => (left < right ? -1 : lef
 const readText = (
   fs: FileSystem.FileSystem,
   file: string,
-): Effect.Effect<string | null | undefined> =>
+): Effect.Effect<string | null | void> =>
   fs.readFileString(file).pipe(
     Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)),
-    Effect.catchTag("PlatformError", () => Effect.succeed(undefined)),
+    Effect.catchTag("PlatformError", () => Effect.void),
   );
 
 const readJsonFile = (fs: FileSystem.FileSystem, file: string): Effect.Effect<Outcome<unknown>> =>
