@@ -17,27 +17,46 @@ const Machine = Schema.Struct({
 })
 export type Machine = typeof Machine.Type
 
-const CredentialKind = Schema.Literals(["token-file", "token-command", "none"])
-
-const RawAccount = Schema.Struct({
+const TokenFileAccount = Schema.Struct({
   name: Name,
-  kind: Schema.optional(CredentialKind),
-  tokenFile: Schema.optional(AbsolutePath),
-  tokenCommand: Schema.optional(Command)
+  kind: Schema.Literal("token-file"),
+  tokenFile: AbsolutePath
 })
-type RawAccount = typeof RawAccount.Type
+const TokenCommandAccount = Schema.Struct({
+  name: Name,
+  kind: Schema.Literal("token-command"),
+  tokenCommand: Command
+})
+const NoneAccount = Schema.Struct({
+  name: Name,
+  kind: Schema.Literal("none")
+})
+const LegacyTokenFileAccount = Schema.Struct({
+  name: Name,
+  tokenFile: AbsolutePath
+})
+const LegacyTokenCommandAccount = Schema.Struct({
+  name: Name,
+  tokenCommand: Command
+})
 
-export type Account =
-  | { readonly name: string; readonly kind: "token-file"; readonly tokenFile: string }
-  | { readonly name: string; readonly kind: "token-command"; readonly tokenCommand: Command }
-  | { readonly name: string; readonly kind: "none" }
+const AnyAccount = Schema.Union([TokenFileAccount, TokenCommandAccount, NoneAccount, LegacyTokenFileAccount, LegacyTokenCommandAccount])
+type RawAccount = typeof AnyAccount.Type
+export type Account = Extract<RawAccount, { readonly kind: "token-file" | "token-command" | "none" }>
 
-const DispatchConfigFile = Schema.Struct({
+const tagAccount = (account: RawAccount): Account =>
+  "kind" in account
+    ? account
+    : "tokenFile" in account
+      ? { ...account, kind: "token-file" as const }
+      : { ...account, kind: "token-command" as const }
+
+const DispatchEnvelope = Schema.Struct({
   machines: Schema.Array(Machine),
   quota: Schema.Struct({
     provider: ProviderId,
     command: Command,
-    accounts: Schema.NonEmptyArray(RawAccount),
+    accounts: Schema.Array(Schema.Unknown),
     floorPercent: Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 }))
   })
 })
@@ -63,58 +82,38 @@ export const checkoutOn = (project: Project, machine: string): string | null =>
 
 const ProjectsFile = Schema.Struct({ projects: Schema.Array(Project) })
 
-const accountOf = (file: string, raw: RawAccount): Effect.Effect<Account, ConfigError> => {
-  const refuse = (detail: string): Effect.Effect<never, ConfigError> => Effect.fail(new ConfigError({ file, detail }))
-  const both = raw.tokenFile !== undefined && raw.tokenCommand !== undefined
-  if (raw.kind === undefined) {
-    if (both) {
-      return refuse("the account " + raw.name + " names both a token file and a token command, so name one source")
-    }
-    if (raw.tokenFile !== undefined) {
-      return Effect.succeed({ name: raw.name, kind: "token-file", tokenFile: raw.tokenFile })
-    }
-    if (raw.tokenCommand !== undefined) {
-      return Effect.succeed({ name: raw.name, kind: "token-command", tokenCommand: raw.tokenCommand })
-    }
-    return refuse("the account " + raw.name + " names no token file, token command or kind, so its runs would start with no credential")
-  }
-  if (raw.kind === "token-file") {
-    if (raw.tokenFile === undefined) {
-      return refuse("the account " + raw.name + " takes kind token-file and names no token file, so its runs would start with no credential")
-    }
-    if (raw.tokenCommand !== undefined) {
-      return refuse("the account " + raw.name + " takes kind token-file and also names a token command, so name one source")
-    }
-    return Effect.succeed({ name: raw.name, kind: "token-file", tokenFile: raw.tokenFile })
-  }
-  if (raw.kind === "token-command") {
-    if (raw.tokenCommand === undefined) {
-      return refuse("the account " + raw.name + " takes kind token-command and names no token command, so its runs would start with no credential")
-    }
-    if (raw.tokenFile !== undefined) {
-      return refuse("the account " + raw.name + " takes kind token-command and also names a token file, so name one source")
-    }
-    return Effect.succeed({ name: raw.name, kind: "token-command", tokenCommand: raw.tokenCommand })
-  }
-  if (raw.tokenFile !== undefined || raw.tokenCommand !== undefined) {
-    return refuse("the account " + raw.name + " takes kind none and also names a token source, so name no token source for it")
-  }
-  return Effect.succeed({ name: raw.name, kind: "none" })
+const accountDetail = (entry: unknown): string => {
+  const name = typeof entry === "object" && entry !== null && "name" in entry && typeof entry.name === "string" && entry.name !== "" ? entry.name : null
+  return name === null
+    ? "an account with no name names a credential outside token-file, token-command and none"
+    : "the account " + name + " names a credential outside token-file, token-command and none"
 }
 
+const readAccount = (file: string, entry: unknown): Effect.Effect<Account, ConfigError> =>
+  Schema.decodeUnknownEffect(AnyAccount)(entry, { onExcessProperty: "error" }).pipe(
+    Effect.mapBoth({
+      onFailure: () => new ConfigError({ file, detail: accountDetail(entry) }),
+      onSuccess: tagAccount
+    })
+  )
+
 export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, ConfigError, FileSystem.FileSystem> =>
-  readJsonFile(file, DispatchConfigFile).pipe(
+  readJsonFile(file, DispatchEnvelope).pipe(
     Effect.flatMap((config) =>
       Effect.gen(function*() {
         const machine = duplicateOf(config.machines.map((entry) => entry.name))
         if (machine !== null) {
           return yield* new ConfigError({ file, detail: "the machine " + machine + " is named twice" })
         }
-        const duplicate = duplicateOf(config.quota.accounts.map((entry) => entry.name))
-        if (duplicate !== null) {
+        if (config.quota.accounts.length === 0) {
+          return yield* new ConfigError({ file, detail: "the quota names no account" })
+        }
+        const names = config.quota.accounts.map((entry) => typeof entry === "object" && entry !== null && "name" in entry && typeof entry.name === "string" ? entry.name : "")
+        const duplicate = duplicateOf(names)
+        if (duplicate !== null && duplicate !== "") {
           return yield* new ConfigError({ file, detail: "the account " + duplicate + " is named twice" })
         }
-        const accounts = yield* Effect.forEach(config.quota.accounts, (entry) => accountOf(file, entry))
+        const accounts = yield* Effect.forEach(config.quota.accounts, (entry) => readAccount(file, entry))
         const commandAccount = accounts.find((entry) => entry.kind === "token-command")
         const unrenewed = config.machines.find((entry) => entry.renew === undefined)
         if (commandAccount !== undefined && unrenewed !== undefined) {

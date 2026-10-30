@@ -279,6 +279,40 @@ describe("orc runner start", () => {
     })
   }, runnerTimeout)
 
+  test("a start with garbage on stdin is refused instead of queueing with no token", async () => {
+    await withFixture(async (fixture) => {
+      await mkdir(join(fixture.home, "backlog", "taken"), { recursive: true })
+      const taskFile = join(fixture.home, "backlog", "taken", "task-9.md")
+      await writeFile(taskFile, ["---", "id: 'task-9'", "title: 'Do the thing'", "project: 'orc'", "machine: null", "depends_on: []", "beat: 'beat-1'", "taken_for: 'linux'", "account: 'main'", "taken_at: '2026-10-27T10:01:00.000Z'", "created: '2026-10-27T10:00:00.000Z'", "---", "# Do the thing", ""].join("\n"))
+      const result = await runOrc(fixture, ["runner", "start"], {
+        ORC_TASK_ID: "task-9",
+        ORC_TASK_FILE: taskFile,
+        ORC_TASK_CHECKOUT: fixture.checkout,
+        ORC_TASK_PROVIDER: "acme"
+      }, "not a token document")
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain("reads ORC_TASK_TOKEN_FILE")
+      expect(await readFile(join(fixture.pueue, "add-args"), "utf8").then(() => true, () => false)).toBe(false)
+    })
+  }, runnerTimeout)
+
+  test("a start with a relative token file is refused instead of queueing with no token", async () => {
+    await withFixture(async (fixture) => {
+      await mkdir(join(fixture.home, "backlog", "taken"), { recursive: true })
+      const taskFile = join(fixture.home, "backlog", "taken", "task-9.md")
+      await writeFile(taskFile, ["---", "id: 'task-9'", "title: 'Do the thing'", "project: 'orc'", "machine: null", "depends_on: []", "beat: 'beat-1'", "taken_for: 'linux'", "account: 'main'", "taken_at: '2026-10-27T10:01:00.000Z'", "created: '2026-10-27T10:00:00.000Z'", "---", "# Do the thing", ""].join("\n"))
+      const result = await runOrc(fixture, ["runner", "start"], {
+        ORC_TASK_ID: "task-9",
+        ORC_TASK_FILE: taskFile,
+        ORC_TASK_CHECKOUT: fixture.checkout,
+        ORC_TASK_PROVIDER: "acme",
+        ORC_TASK_TOKEN_FILE: "rel/tokens/main-token"
+      })
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain("orc runner start cannot queue task-9")
+      expect(await readFile(join(fixture.pueue, "add-args"), "utf8").then(() => true, () => false)).toBe(false)
+    })
+  }, runnerTimeout)
   test("a start with no task in its environment is refused instead of queueing nothing", async () => {
     await withFixture(async (fixture) => {
       const result = await runOrc(fixture, ["runner", "start"], { ORC_TASK_ID: "" })
@@ -524,7 +558,7 @@ describe("orc runner queue for a kind none account", () => {
   test("refuses the queue while the orc config is invalid instead of starting the run", async () => {
     await withFixture(async (fixture) => {
       await writeFile(join(fixture.home, "config.json"), JSON.stringify({ providers: [{ id: "acme", credential: "bogus" }] }))
-      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# x\n" })
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "acme", token: "tokenA123", expiresAt: "2027-01-01T00:00:00.000Z", body: "# x\n" })
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toContain(join(fixture.home, "config.json"))
       expect(await Bun.file(join(fixture.home, "runner", "tokens", "task-9", "token")).exists()).toBe(false)

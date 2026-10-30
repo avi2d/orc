@@ -256,21 +256,42 @@ describe("readDispatchConfig", () => {
   test("refuses a token file kind with no token file instead of starting its runs on none", async () => {
     await withBacklog(async (root) => {
       expect(await configProblem(root, { accounts: [{ name: "main", kind: "token-file" }] })).toBe(
-        "the account main takes kind token-file and names no token file, so its runs would start with no credential"
+        "the account main names a credential outside token-file, token-command and none"
       )
     })
   })
   test("refuses a token command kind with no token command instead of starting its runs on none", async () => {
     await withBacklog(async (root) => {
       expect(await configProblem(root, { accounts: [{ name: "main", kind: "token-command" }] })).toBe(
-        "the account main takes kind token-command and names no token command, so its runs would start with no credential"
+        "the account main names a credential outside token-file, token-command and none"
+      )
+    })
+  })
+  test("refuses a token file kind that also names a token command instead of picking one", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, { accounts: [{ name: "main", kind: "token-file", tokenFile: "/a", tokenCommand: ["clauth-token", "main"] }] })).toBe(
+        "the account main names a credential outside token-file, token-command and none"
+      )
+    })
+  })
+  test("refuses a token command kind that also names a token file instead of picking one", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, { accounts: [{ name: "main", kind: "token-command", tokenCommand: ["clauth-token", "main"], tokenFile: "/a" }] })).toBe(
+        "the account main names a credential outside token-file, token-command and none"
+      )
+    })
+  })
+  test("refuses a kind none account that also names a token command instead of holding it", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, { accounts: [{ name: "main", kind: "none", tokenCommand: ["clauth-token", "main"] }] })).toBe(
+        "the account main names a credential outside token-file, token-command and none"
       )
     })
   })
   test("refuses a kind none account that also names a token file instead of holding it", async () => {
     await withBacklog(async (root) => {
       expect(await configProblem(root, { accounts: [{ name: "main", kind: "none", tokenFile: "/a" }] })).toBe(
-        "the account main takes kind none and also names a token source, so name no token source for it"
+        "the account main names a credential outside token-file, token-command and none"
       )
     })
   })

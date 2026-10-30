@@ -7,7 +7,7 @@ import { TaskId } from "./backlog"
 import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldToken } from "./held-token"
 import { heldTask, orcGroup, PueueState, PueueStatus, taskLabel, type PueueTask } from "./pueue-status"
 import { parseTaskFile } from "./task-record"
-import { decodeTokenText, encodeRenewal, encodeSecretJson, LabelArg, RenewRequest, type TokenEncodeError, tokenFields } from "./token"
+import { decodeTokenText, encodeRenewal, encodeSecretJson, LabelArg, RenewRequest, type TokenEncodeError, tokenDocumentNote, tokenFields } from "./token"
 
 export class RunnerError extends Data.TaggedError("RunnerError")<{
   readonly detail: string
@@ -22,11 +22,10 @@ const taskFields = {
   body: Schema.String
 }
 
-const QueueRequest = Schema.Union([
-  Schema.Struct({ ...taskFields, tokenFile: AbsolutePath, label: Schema.optional(LabelArg) }),
-  Schema.Struct({ ...taskFields, ...tokenFields, label: Schema.optional(LabelArg) }),
-  Schema.Struct({ ...taskFields, label: Schema.optional(LabelArg) })
-])
+const QueueFileRequest = Schema.Struct({ ...taskFields, tokenFile: AbsolutePath, label: Schema.optional(LabelArg) })
+const QueueTokenRequest = Schema.Struct({ ...taskFields, ...tokenFields, label: Schema.optional(LabelArg) })
+const QueueBareRequest = Schema.Struct({ ...taskFields, label: Schema.optional(LabelArg) })
+const QueueRequest = Schema.Union([QueueFileRequest, QueueTokenRequest, QueueBareRequest])
 type QueueRequest = typeof QueueRequest.Type
 
 export type RunnerRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
@@ -283,13 +282,17 @@ const readRequest = (
     )
     const tokenFile = env["ORC_TASK_TOKEN_FILE"] ?? ""
     if (tokenFile !== "") {
-      return yield* Schema.decodeEffect(QueueRequest)({ ...fields, tokenFile }).pipe(
+      return yield* Schema.decodeEffect(QueueFileRequest)({ ...fields, tokenFile }).pipe(
         Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
       )
     }
-    const token = decodeTokenText(yield* stdin)
-    if (Option.isNone(token)) {
+    const input = yield* stdin
+    if (input === "") {
       return { ...fields }
+    }
+    const token = decodeTokenText(input)
+    if (Option.isNone(token)) {
+      return yield* refuse("orc runner start reads ORC_TASK_TOKEN_FILE or " + tokenDocumentNote + " on stdin, one of which the beat sends")
     }
     return { ...fields, ...token.value }
   })
