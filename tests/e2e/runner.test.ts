@@ -490,7 +490,7 @@ describe("orc runner result", () => {
         },
         groups: {}
       }))
-      const RunnerStatus = Schema.Struct({ result: Schema.Struct({ status: Schema.String, pueueTask: Schema.Number }) })
+      const RunnerStatus = Schema.Struct({ result: Schema.Struct({ status: Schema.String, pueueTask: Schema.Finite }) })
       const resultA = Schema.decodeUnknownSync(RunnerStatus)(JSON.parse(await orcOk(fixture, ["runner", "result", "task-1", "--label", labelA, "--json", "--", ...orcThere(far)], { ORC_HOME: homeA })))
       const resultB = Schema.decodeUnknownSync(RunnerStatus)(JSON.parse(await orcOk(fixture, ["runner", "result", "task-1", "--label", labelB, "--json", "--", ...orcThere(far)], { ORC_HOME: homeB })))
       expect(resultA.result.status).toBe("succeeded")

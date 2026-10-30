@@ -6,14 +6,27 @@ import { OrcRunError } from "./run-session"
 
 const contextMarkTokens = 150_000
 
-export const modelListCommand = (host: HostTools, preserveAgentDir = false): ReadonlyArray<string> => [
-  "/bin/sh",
-  "-c",
-  preserveAgentDir ? "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" exec \"$1\" --mode rpc --no-session --no-extensions --no-skills --no-context-files --offline" : "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" unset PI_CODING_AGENT_DIR; exec \"$1\" --mode rpc --no-session --no-extensions --no-skills --no-context-files --offline",
-  host.nodeBinary,
-  host.piBinary,
-  host.homeDir
-]
+export type ModelProbe =
+  | { readonly kind: "operator" }
+  | { readonly kind: "agent-dir"; readonly agentDir: string; readonly packages: boolean }
+
+const probeFlags = "--mode rpc --no-session --no-skills --no-context-files"
+
+// Pi lists a package's models only with its extensions loaded, and installs a missing package only online.
+const sealedProbeFlags = probeFlags + " --no-extensions --offline"
+
+export const modelListCommand = (host: HostTools, probe: ModelProbe = { kind: "operator" }): ReadonlyArray<string> => {
+  const flags = probe.kind === "agent-dir" && probe.packages ? probeFlags : sealedProbeFlags
+  const prefix = "HOME=\"$2\" PATH=\"$(dirname \"$0\"):$PATH\" "
+  return [
+    "/bin/sh",
+    "-c",
+    probe.kind === "operator" ? prefix + "unset PI_CODING_AGENT_DIR; exec \"$1\" " + flags : prefix + "exec \"$1\" " + flags,
+    host.nodeBinary,
+    host.piBinary,
+    host.homeDir
+  ]
+}
 
 export const modelListRequest = JSON.stringify({ id: "orc-models", type: "get_available_models" }) + "\n"
 
@@ -40,14 +53,14 @@ export const readModelWindows = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
   host: HostTools,
   cwd: string,
-  agentDir: string | undefined,
+  probe: ModelProbe,
   extraEnv: Readonly<Record<string, string>> = {}
 ): Effect.Effect<ModelWindows, OrcRunError> =>
   Effect.scoped(Effect.gen(function*() {
-    const parts = modelListCommand(host, agentDir !== undefined)
+    const parts = modelListCommand(host, probe)
     const handle = yield* spawner.spawn(ChildProcess.make(parts[0], parts.slice(1), {
       cwd,
-      env: agentDir === undefined ? { ...inheritedEnv(Bun.env), ...extraEnv } : { ...inheritedEnv(Bun.env), ...extraEnv, PI_CODING_AGENT_DIR: agentDir },
+      env: probe.kind === "operator" ? { ...inheritedEnv(Bun.env), ...extraEnv } : { ...inheritedEnv(Bun.env), ...extraEnv, PI_CODING_AGENT_DIR: probe.agentDir },
       extendEnv: false,
       stdin: Stream.fromIterable([new TextEncoder().encode(modelListRequest)])
     }))
@@ -85,10 +98,10 @@ export const checkedModelWindows = (
 }
 
 // Pi takes no absolute compaction point, only a reserve below each model's window.
-export const contextMarkJson = (checked: ReadonlyArray<CheckedModelWindow>): string => {
+export const contextMarkJson = (checked: ReadonlyArray<CheckedModelWindow>, packages: ReadonlyArray<string> = []): string => {
   const modelOverrides: Record<string, { readonly reserveTokens: number }> = {}
   for (const entry of checked) {
     modelOverrides[entry.ref] = { reserveTokens: entry.window - contextMarkTokens }
   }
-  return JSON.stringify({ compaction: { modelOverrides } }, null, 2) + "\n"
+  return JSON.stringify({ ...(packages.length === 0 ? {} : { packages }), compaction: { modelOverrides } }, null, 2) + "\n"
 }

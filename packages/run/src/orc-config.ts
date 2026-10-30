@@ -38,7 +38,18 @@ const TokenFileProvider = Schema.Struct({
 })
 export type TokenFileProvider = typeof TokenFileProvider.Type
 
-const Provider = Schema.Union([LoginProvider, TokenFileProvider])
+// Pi resolves a relative local path against the settings file, which here sits in the run's own Pi folder.
+const PiPackageSource = Schema.String.check(Schema.isPattern(/^(npm:|git:|https?:\/\/|ssh:\/\/|\/)\S+$/))
+
+const PackageProvider = Schema.Struct({
+  id: ProviderId,
+  credential: Schema.Literal("package"),
+  packages: Schema.NonEmptyArray(PiPackageSource),
+  env: Schema.optionalKey(Schema.Record(EnvVarName, Schema.String))
+})
+export type PackageProvider = typeof PackageProvider.Type
+
+const Provider = Schema.Union([LoginProvider, TokenFileProvider, PackageProvider])
 export type Provider = typeof Provider.Type
 
 const OrcConfigFile = Schema.Struct({
