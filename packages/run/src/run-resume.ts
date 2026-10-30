@@ -7,6 +7,7 @@ import { latestRunForBranch, stepsForRun } from "./history-resume"
 import { historyFailure } from "./history-write"
 import type { HistoryRun } from "./run-record"
 import type { ResumePlan } from "./run-loop"
+import { handoverFileName } from "./long-session"
 import { OrcRunError } from "./run-session"
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
@@ -214,7 +215,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
   Effect.gen(function*() {
     const allow = run.allow ?? []
     const answers = run.answers ?? []
-    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow, answers, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false }
+    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow, answers, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null }
     const prior = yield* latestRunForBranch(db, run.projectDir, run.branch).pipe(
       Effect.mapError((cause) => historyFailure("read", cause))
     )
@@ -229,6 +230,9 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
     const inherited = progress.implementPassed
       ? yield* inheritedCompletion(db, run, progress.priorId, progress.storedFixes)
       : { inheritedRounds: [], inheritedFixes: [] }
+    const handover = yield* run.fs.readFileString(run.path.join(run.path.dirname(run.runDir), prior.id, handoverFileName)).pipe(
+      Effect.orElseSucceed(() => null)
+    )
     return {
       implementSessionId: progress.implementSessionId,
       implementSessionFile: carriedImplement,
@@ -240,6 +244,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       inheritedFixes: inherited.inheritedFixes,
       fixSessionId: progress.fixSessionId,
       fixSessionFile: carriedFix,
-      fixRunning: progress.fixRunning
+      fixRunning: progress.fixRunning,
+      handover
     }
   })

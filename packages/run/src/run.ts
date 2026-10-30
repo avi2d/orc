@@ -18,8 +18,8 @@ import { OrcRunError, describeCause } from "./run-session"
 import { openDatabase, orcHomeDir, updateStep } from "./run-history"
 import { stepsForRun } from "./history-resume"
 import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "./run-resume"
-import { finishRun, historyFailure, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordResumePublish } from "./history-write"
-import { failedReport, writeEvidence, writeReport, type HistoryRun, type OrcRunReport } from "./run-record"
+import { finishRun, historyFailure, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordResumePublish } from "./history-write"
+import { failedReport, writeEvidence, writeHandover, writeReport, type HistoryRun, type OrcRunReport } from "./run-record"
 import { runFull, type RunCheckpoints, type SandboxOps } from "./run-loop"
 import { noMistakesBinary, noMistakesVersionProblem, subprocessNoMistakesRunner, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "./no-mistakes"
 
@@ -326,7 +326,7 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
     yield* recordResumePublish(db, run, resume)
     const checkpoints: RunCheckpoints = {
       implementStart: (started) => recordImplementStart(db, run, started, resume.implementSessionFile ?? undefined),
-      implementDone: (outcome, started, ended) => recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: outcome.sessionFile, tokens: outcome.tokens, commits: outcome.commits, implementPassed: outcome.completed }, started, ended),
+      implementDone: (outcome, started, ended) => recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: outcome.sessionFile, tokens: outcome.tokens, commits: outcome.commits, sessionSize: outcome.sessionSize, implementPassed: outcome.completed }, started, ended),
       checksRoundStart: (round, started) => recordChecksStart(db, run.runId, round, started),
       checksRoundDone: (round) => recordChecksDone(db, run.runId, round),
       fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer.path, started, attempt === 1 ? resume.fixSessionFile ?? undefined : undefined),
@@ -345,7 +345,7 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
             }
           }
           if (!existing.some((step) => step.name === "implement")) {
-            yield* recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: null, tokens: null, commits: null, implementPassed: false }, run.started, now).pipe(Effect.orElseSucceed(() => undefined))
+            yield* recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: null, tokens: null, commits: null, sessionSize: null, implementPassed: false }, run.started, now).pipe(Effect.orElseSucceed(() => undefined))
           }
           const failed = failedReport(run, error.message)
           yield* writeEvidence(run, failed).pipe(Effect.orElseSucceed(() => undefined))
@@ -357,6 +357,10 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
     )
     yield* writeEvidence(run, report)
     yield* writeReport(run, report)
+    const handover = yield* writeHandover(run, report)
+    if (handover !== null) {
+      yield* recordHandoverEvidence(db, run.runId, handover).pipe(Effect.orElseSucceed(() => undefined))
+    }
     yield* finishRun(db, run.runId, report, new Date().toISOString())
     return report
   })

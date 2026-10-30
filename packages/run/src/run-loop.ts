@@ -6,6 +6,7 @@ import { runGit } from "./git-run"
 import { buildImplementPrompt, finalReplyError, orcCompletionLine, piWithTools, sessionPrintedSignal, type PiTokenUse } from "./pi"
 import { OrcRunError, describeCause, noSession, readSession } from "./run-session"
 import { driveNoMistakes, type AllowWord, type QuestionAnswer } from "./no-mistakes"
+import { countSessionSize, handoverImplementPrompt, type LongSessionCounts } from "./long-session"
 import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
 
 export interface SandboxOps {
@@ -25,6 +26,7 @@ export interface ResumePlan {
   readonly fixSessionId: string | null
   readonly fixSessionFile: string | null
   readonly fixRunning: boolean
+  readonly handover: string | null
 }
 
 interface AgentOutcome {
@@ -32,6 +34,7 @@ interface AgentOutcome {
   readonly sessionFile: string | null
   readonly commits: Array<OrcRunCommit>
   readonly tokens: PiTokenUse | null
+  readonly sessionSize: LongSessionCounts | null
   readonly completed: boolean
   readonly markerVerified: boolean
   readonly endReason: string
@@ -71,6 +74,7 @@ interface CapturedAgentRun {
   readonly tokens: PiTokenUse | null
   readonly jsonl: string | null
   readonly failure: string | null
+  readonly sessionSize: LongSessionCounts | null
 }
 
 const sessionOf = (
@@ -85,7 +89,8 @@ const sessionOf = (
       Effect.catchTag("OrcRunError", (error) => Effect.succeed({ session: noSession, failure: error.message }))
     )
     const commits = yield* collectCommits(run, result.commits)
-    return { sessionId, sessionFile: sessionRead.session.file, commits, tokens: sessionRead.session.usage, failure: sessionRead.failure, jsonl: sessionRead.session.jsonl }
+    const sessionSize = sessionRead.session.jsonl === null ? null : countSessionSize(sessionRead.session.jsonl)
+    return { sessionId, sessionFile: sessionRead.session.file, commits, tokens: sessionRead.session.usage, failure: sessionRead.failure, jsonl: sessionRead.session.jsonl, sessionSize }
   })
 
 const verifiedMarker = (result: SandboxRunResult, jsonl: string | null): boolean =>
@@ -114,30 +119,36 @@ const resumedOutcome = (run: HistoryRun, sessionId: string | null, sessionFile: 
       sessionFile,
       commits,
       tokens: null,
+      sessionSize: null,
       completed: done,
       markerVerified: done,
       endReason: "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + "."
     }
   })
 
+const implementPrompt = (run: HistoryRun, plan: Pick<ResumePlan, "handover">): string => {
+  const taskFile = run.path.join(run.piSessionDir, "task.md")
+  return plan.handover === null ? buildImplementPrompt(run.agent, taskFile) : handoverImplementPrompt(run.agent, taskFile, plan.handover)
+}
+
 const replyErrorNote = (jsonl: string | null): string => {
   const error = jsonl === null ? null : finalReplyError(jsonl)
   return error === null ? "" : " It ended in an error: " + error
 }
 
-const implement = (run: HistoryRun, runAgent: SandboxOps["runAgent"], resumeSession: string | null): Effect.Effect<AgentOutcome, OrcRunError> =>
+const implement = (run: HistoryRun, runAgent: SandboxOps["runAgent"], plan: Pick<ResumePlan, "implementSessionId" | "handover">): Effect.Effect<AgentOutcome, OrcRunError> =>
   Effect.gen(function*() {
     const agentProvider = piWithTools(run.agent, {
       hostSessionsDir: run.hostSessionsDir,
       sandboxSessionsDir: run.path.join(run.piSessionDir, "agent", "sessions")
     })
     const result: SandboxRunResult = yield* Effect.tryPromise({
-      try: () => runAgent(agentProvider, buildImplementPrompt(run.agent, run.path.join(run.piSessionDir, "task.md")), "agent.log", resumeSession ?? undefined),
+      try: () => runAgent(agentProvider, implementPrompt(run, plan), "agent.log", plan.implementSessionId ?? undefined),
       catch: (cause) => new OrcRunError({ message: "orc: the agent run failed: " + describeCause(cause) })
     }).pipe(withHostGitSafety(run.git))
     const session = yield* sessionOf(run, agentProvider.sessionStorage, result)
     const verified = verifiedMarker(result, session.jsonl)
-    const prior = resumeSession === null ? [] : yield* resumedCommits(run)
+    const prior = plan.implementSessionId === null ? [] : yield* resumedCommits(run)
     const seen = new Set(session.commits.map((commit) => commit.sha))
     const commits = [...session.commits, ...prior.filter((commit) => !seen.has(commit.sha))]
     const completed = verified && commits.length > 0
@@ -151,6 +162,7 @@ const implement = (run: HistoryRun, runAgent: SandboxOps["runAgent"], resumeSess
       sessionFile: session.sessionFile,
       commits,
       tokens: session.tokens,
+      sessionSize: session.sessionSize,
       completed,
       markerVerified: verified,
       endReason
@@ -203,7 +215,7 @@ const readProjectChecks = (run: HistoryRun): Effect.Effect<ReadonlyArray<ChecksC
     )
   )
 
-const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError> =>
+const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
     yield* checkpoints.noMistakesStart(new Date().toISOString())
     const noMistakes = yield* driveNoMistakes({ runner: run.noMistakes, taskFile: run.taskPath, allow, answers })
@@ -286,7 +298,7 @@ export const runFull = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, ch
       ? yield* resumedOutcome(run, plan.implementSessionId, plan.implementSessionFile)
       : yield* Effect.gen(function*() {
         yield* checkpoints.implementStart(implementStarted)
-        const outcome = yield* implement(run, ops.runAgent, plan.implementSessionId)
+        const outcome = yield* implement(run, ops.runAgent, plan)
         yield* checkpoints.implementDone(outcome, implementStarted, new Date().toISOString())
         return outcome
       })
@@ -300,6 +312,7 @@ export const runFull = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, ch
       sessionId: done.sessionId,
       sessionFile: done.sessionFile,
       tokens: done.tokens,
+      sessionSize: done.sessionSize,
       markerVerified: done.markerVerified,
       implementPassed: done.completed,
       prLink: null,

@@ -1,4 +1,5 @@
 import type { PiTokenUse } from "./pi"
+import { longSessionSignal, type LongSessionCounts } from "./long-session"
 import type { NoMistakesFinding, NoMistakesRecord } from "./no-mistakes"
 import { toFileUrl } from "./run-history"
 
@@ -42,6 +43,7 @@ export interface OrcRunReport {
   readonly sessionFile: string | null
   readonly commits: ReadonlyArray<OrcRunCommit> | null
   readonly tokens: PiTokenUse | null
+  readonly sessionSize: LongSessionCounts | null
   readonly completed: boolean
   readonly markerVerified: boolean
   readonly implementPassed: boolean
@@ -56,7 +58,8 @@ export interface OrcRunReport {
 export const findingLine = (finding: NoMistakesFinding): string =>
   [finding.id, finding.severity, finding.file + (finding.line === "" ? "" : ":" + finding.line), finding.action, finding.description].filter((part) => part !== "").join(" ")
 
-export const measuredSignals = (report: Pick<OrcRunReport, "tokens" | "commits">): ReadonlyArray<{ readonly name: string; readonly value: string }> => [
+export const measuredSignals = (report: Pick<OrcRunReport, "tokens" | "commits" | "sessionSize">): ReadonlyArray<{ readonly name: string; readonly value: string }> => [
+  ...longSessionSignal(report.sessionSize),
   ...(report.tokens === null ? [] : [
     { name: "input-tokens", value: report.tokens.input.toString() },
     { name: "output-tokens", value: report.tokens.output.toString() }
