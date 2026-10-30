@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { Schema } from "effect"
 import { orcCompletionLine } from "../../packages/run/src/pi"
 
 const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
@@ -19,7 +20,17 @@ const piStream = [
   JSON.stringify({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "Committed.\n" + orcCompletionLine } })
 ].join("\n") + "\n"
 
-const modelListReply = JSON.stringify({ id: "orc-models", type: "response", command: "get_available_models", success: true, data: { models: [{ provider: "opencode-go", id: "muse-spark-1.3-contributor", contextWindow: 262144 }] } })
+const keyedModel = "keyed/coder-2"
+
+const modelListReply = JSON.stringify({ id: "orc-models", type: "response", command: "get_available_models", success: true, data: { models: [{ provider: "acme-go", id: "coder-1", contextWindow: 262144 }, { provider: "keyed", id: "coder-2", contextWindow: 200000 }] } })
+
+const fixtureToken = "sk-orc-e2e-fixture-token"
+
+const loginProvider = { id: "acme-go", credential: "pi-login", nono: { upstream: "https://llm.acme.test/v1" } }
+
+const keyedProvider = { id: "keyed", credential: "token-file", tokenFile: { env: "KEYED_TOKEN_FILE" } }
+
+const decodeKeyedModels = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct({ providers: Schema.Struct({ keyed: Schema.Struct({ apiKey: Schema.String }) }) })))
 
 const noMistakesReplies = [
   ["run:", "  id: \"01STUB\"", "  branch: orc/test", "  status: completed", "  head: abc1234", "  pr: \"" + prUrl + "\"", "  findings: none", "outcome: passed"],
@@ -62,6 +73,9 @@ const withNoSandboxFixture = async (body: (fixture: NoSandboxFixture) => Promise
       "if [ \"$1\" = --mode ]; then cat > /dev/null; echo '" + modelListReply + "'; exit 0; fi",
       "if [ \"$1\" != -p ]; then exit 2; fi",
       "cat > /dev/null",
+      "echo \"$PI_CODING_AGENT_DIR\" > \"" + fakeBin + "/pi-agent-dir\"",
+      "if [ -f \"$PI_CODING_AGENT_DIR/models.json\" ]; then cp \"$PI_CODING_AGENT_DIR/models.json\" \"" + fakeBin + "/pi-models\"; fi",
+      "echo \"$ORC_TOKEN_FILE\" > \"" + fakeBin + "/pi-token-file\"",
       "pwd > \"" + fakeBin + "/pi-cwd\"",
       "git rev-parse --show-toplevel --path-format=absolute --git-common-dir --abbrev-ref HEAD > \"" + fakeBin + "/pi-git\"",
       "echo \"$GIT_CONFIG_GLOBAL\" > \"" + fakeBin + "/pi-gitconfig\"",
@@ -98,10 +112,48 @@ const withNoSandboxFixture = async (body: (fixture: NoSandboxFixture) => Promise
     await writeFile(join(repo, ".no-mistakes.yaml"), "commands:\n  greeting: test -f greeting.txt\n")
     git(repo, ["add", "task.md", ".no-mistakes.yaml"], env)
     git(repo, ["commit", "-qm", "task"], env)
+    await writeConfig(env, { providers: [loginProvider, keyedProvider], models: { implementer: "acme-go/coder-1", fixer: "acme-go/coder-1" } })
     await body({ repo, home, fakeBin, env })
   } finally {
     await rm(root, { recursive: true, force: true })
   }
+}
+
+const writeConfig = async (env: Record<string, string>, config: unknown): Promise<void> => {
+  const orcHome = env["ORC_HOME"] ?? ""
+  await mkdir(orcHome, { recursive: true })
+  await writeFile(join(orcHome, "config.json"), JSON.stringify(config))
+}
+
+const writeToken = async (fixture: NoSandboxFixture, name: string, tokenMode: number): Promise<string> => {
+  const secretDir = join(fixture.home, "..", "secret")
+  await mkdir(secretDir, { recursive: true, mode: 0o700 })
+  const tokenFile = join(secretDir, name)
+  await writeFile(tokenFile, fixtureToken)
+  await chmod(tokenFile, tokenMode)
+  return tokenFile
+}
+
+const asTokenFileRun = async (fixture: NoSandboxFixture, tokenMode: number): Promise<Record<string, string> & { readonly KEYED_TOKEN_FILE: string }> => {
+  await writeConfig(fixture.env, { providers: [loginProvider, keyedProvider], models: { implementer: keyedModel, fixer: keyedModel } })
+  return { ...fixture.env, KEYED_TOKEN_FILE: await writeToken(fixture, "keyed-token", tokenMode) }
+}
+
+const filesUnder = async (dir: string): Promise<ReadonlyArray<string>> => {
+  const entries = await readdir(dir, { recursive: true, withFileTypes: true })
+  return entries.filter((entry) => entry.isFile()).map((entry) => join(entry.parentPath, entry.name))
+}
+
+const filesHolding = async (dirs: ReadonlyArray<string>, needle: string): Promise<ReadonlyArray<string>> => {
+  const holding: Array<string> = []
+  for (const dir of dirs) {
+    for (const file of await filesUnder(dir)) {
+      if ((await readFile(file)).includes(needle)) {
+        holding.push(file)
+      }
+    }
+  }
+  return holding
 }
 
 const runOrc = async (args: ReadonlyArray<string>, cwd: string, env: Record<string, string>): Promise<{ exitCode: number; stdout: string; stderr: string }> => {
@@ -135,6 +187,90 @@ describe("orc run --sandbox none", () => {
       const result = await runOrc(["run", "task.md", "--branch", "orc/test"], repo, env)
       expect(result.exitCode).not.toBe(0)
       expect(await Bun.file(join(fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+})
+
+describe("orc run on a token-file provider", () => {
+  test("hands Pi a run-owned agent folder whose key reads the token file, ends in one PR and leaves the token in no run, repo or home file", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const env = await asTokenFileRun(fixture, 0o600)
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, env)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect(result.stdout).toContain(prUrl)
+      const nmCalls = (await readFile(join(fixture.fakeBin, "nm-calls"), "utf8")).split("\n").filter((line) => line !== "")
+      expect(nmCalls.filter((line) => line.startsWith("axi run")).length).toBe(1)
+      const agentDir = (await readFile(join(fixture.fakeBin, "pi-agent-dir"), "utf8")).trim()
+      expect(agentDir).toStartWith((env["ORC_HOME"] ?? "") + "/")
+      const apiKey = decodeKeyedModels(await readFile(join(fixture.fakeBin, "pi-models"), "utf8")).providers.keyed.apiKey
+      expect(apiKey).toStartWith("!")
+      const handed = (await readFile(join(fixture.fakeBin, "pi-token-file"), "utf8")).trim()
+      expect(handed).toBe(env.KEYED_TOKEN_FILE)
+      const resolved = Bun.spawnSync(["sh", "-c", apiKey.slice(1)], { env: { ORC_TOKEN_FILE: handed } })
+      expect(resolved.stdout.toString()).toBe(fixtureToken)
+      expect(await filesHolding([env["ORC_HOME"] ?? "", fixture.repo, fixture.home], fixtureToken)).toEqual([])
+      expect(git(fixture.repo, ["log", "--all", "-p"], env)).not.toContain(fixtureToken)
+      expect(await Bun.file(join(fixture.fakeBin, "nono-calls")).exists()).toBe(false)
+    })
+  }, 60_000)
+
+  test("hands Pi the token file config.json names by path when the provider names no variable", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const tokenFile = await writeToken(fixture, "path-token", 0o600)
+      await writeConfig(fixture.env, { providers: [{ id: "keyed", credential: "token-file", tokenFile: { path: tokenFile } }], models: { implementer: keyedModel, fixer: keyedModel } })
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, fixture.env)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect((await readFile(join(fixture.fakeBin, "pi-token-file"), "utf8")).trim()).toBe(tokenFile)
+    })
+  }, 60_000)
+
+  test("hands Pi the --token-file path instead of the one the provider's variable names", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const env = await asTokenFileRun(fixture, 0o600)
+      const second = await writeToken(fixture, "second-token", 0o600)
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none", "--token-file", second], fixture.repo, env)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect((await readFile(join(fixture.fakeBin, "pi-token-file"), "utf8")).trim()).toBe(second)
+    })
+  }, 60_000)
+
+  test("with --provider naming another provider is refused before Pi runs instead of handing the token across", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const env = await asTokenFileRun(fixture, 0o600)
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none", "--provider", "acme-go"], fixture.repo, env)
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain("--provider names acme-go")
+      expect(await Bun.file(join(fixture.fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+
+  test("with the provider's variable unset is refused before Pi runs, naming the variable", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const { KEYED_TOKEN_FILE: _unset, ...env } = await asTokenFileRun(fixture, 0o600)
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, env)
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain("the variable KEYED_TOKEN_FILE names, which is unset")
+      expect(await Bun.file(join(fixture.fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+
+  test("in the nono sandbox is refused before Pi runs, naming --sandbox none", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const env = await asTokenFileRun(fixture, 0o600)
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test"], fixture.repo, env)
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain("--sandbox none")
+      expect(await Bun.file(join(fixture.fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+
+  test("with a token file other users can read is refused before Pi runs", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const env = await asTokenFileRun(fixture, 0o644)
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, env)
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain("has mode 644")
+      expect(await Bun.file(join(fixture.fakeBin, "pi-cwd")).exists()).toBe(false)
     })
   }, 60_000)
 })

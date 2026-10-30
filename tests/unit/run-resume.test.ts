@@ -4,11 +4,12 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { Database } from "bun:sqlite"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, FileSystem, Path } from "effect"
+import { Effect, FileSystem, Path, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../packages/run/src/agents"
 import { openDatabase, recordRun, recordStep } from "../../packages/run/src/run-history"
-import { buildResumePlan, resolveTaskFile } from "../../packages/run/src/run-resume"
+import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "../../packages/run/src/run-resume"
+import type { SandboxKind } from "../../packages/run/src/args"
 import { recordResumePublish } from "../../packages/run/src/history-write"
 import { subprocessNoMistakesRunner } from "../../packages/run/src/no-mistakes"
 import { noSandboxEnv } from "../../packages/run/src/no-sandbox"
@@ -57,7 +58,7 @@ const historyFor = (runId: string, home: string, projectDir: string, started: st
       piSessionDir: path.join(runDir, "session"),
       hostSessionsDir: path.join(runDir, "sessions"),
       taskPath: path.join(runDir, "task.md"),
-      agent: implementer, fixer, branch: "orc/test", started,
+      agent: implementer, fixer, branch: "orc/test", sandbox: "nono", started,
       worktreeDir: projectDir,
       noMistakes: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git: "git", worktreeDir: projectDir }),
       allow: [], answers: []
@@ -67,6 +68,21 @@ const historyFor = (runId: string, home: string, projectDir: string, started: st
 
 const seedRun = (db: Database, id: string, project: string, taskFile: string, status: "running" | "failed", started: string): Promise<void> =>
   Effect.runPromise(recordRun(db, { id, project, branch: "orc/test", taskFile, status, started }).pipe(Effect.asVoid))
+
+const seedSandboxRun = (db: Database, id: string, project: string, sandbox: SandboxKind | null): Promise<void> =>
+  Effect.runPromise(recordRun(db, { id, project, branch: "orc/test", taskFile: "task.md", status: "failed", started: "2026-10-19T09:00:00.000Z", sandbox }).pipe(Effect.asVoid))
+
+const sandboxOutcome = (db: Database, project: string, flag: SandboxKind | undefined): Promise<string> =>
+  Effect.runPromise(
+    resolveSandboxKind(db, "orc/test", project, flag).pipe(
+      Effect.catchTag("OrcRunError", (cause) => Effect.succeed(cause.message))
+    )
+  )
+
+const RecordedSandboxRow = Schema.Struct({ sandbox: Schema.NullOr(Schema.String) })
+
+const recordedSandbox = (db: Database, runId: string): string | null =>
+  Schema.decodeUnknownSync(RecordedSandboxRow)(db.query("SELECT sandbox FROM runs WHERE id = ?").get(runId)).sandbox
 
 const seedStep = (db: Database, runId: string, name: string, status: "running" | "passed" | "failed", started: string, piSessionFile: string | null): Promise<void> =>
   Effect.runPromise(recordStep(db, { runId, name, attempt: 1, status, started, agentFile: implementer.path, piSessionFile }).pipe(Effect.asVoid))
@@ -342,6 +358,107 @@ describe("reinterrupted continuations survive every handover", () => {
         const supplied = join(home, "supplied.md")
         await writeFile(supplied, "Do the thing.\n")
         expect(await taskOutcome(db, project, supplied)).toContain("refuses")
+      } finally {
+        db.close()
+      }
+    })
+  })
+})
+
+describe("resume reads the sandbox kind from the run history", () => {
+  test("a run start records its sandbox kind instead of leaving it to the next flag", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "repo")
+        for (const [runId, sandbox] of [["start-none", "none"], ["start-nono", "nono"]] as const) {
+          const run = { ...(await Effect.runPromise(historyFor(runId, home, project, "2026-10-19T10:00:00.000Z"))), branch: "orc/" + runId, sandbox }
+          await Effect.runPromise(recordResumePublish(db, run, await Effect.runPromise(buildResumePlan(db, run))))
+        }
+        expect([recordedSandbox(db, "start-none"), recordedSandbox(db, "start-nono")]).toEqual(["none", "nono"])
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a resume without the flag after a no-sandbox start takes none instead of the nono default", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await seedSandboxRun(db, "prior-1", join(home, "repo"), "none")
+        expect(await sandboxOutcome(db, join(home, "repo"), undefined)).toBe("none")
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a resume without the flag after a nono start takes nono instead of running on the host", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await seedSandboxRun(db, "prior-1", join(home, "repo"), "nono")
+        expect(await sandboxOutcome(db, join(home, "repo"), undefined)).toBe("nono")
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a resume whose flag names the recorded kind proceeds instead of being refused", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await seedSandboxRun(db, "prior-1", join(home, "repo"), "none")
+        expect(await sandboxOutcome(db, join(home, "repo"), "none")).toBe("none")
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a resume flagged none after a nono start is refused instead of leaving the sandbox", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await seedSandboxRun(db, "prior-1", join(home, "repo"), "nono")
+        expect(await sandboxOutcome(db, join(home, "repo"), "none")).toBe("orc: branch orc/test started with --sandbox nono, so resume refuses --sandbox none; drop --sandbox to resume with nono")
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a resume flagged nono after a no-sandbox start is refused instead of entering a sandbox", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await seedSandboxRun(db, "prior-1", join(home, "repo"), "none")
+        expect(await sandboxOutcome(db, join(home, "repo"), "nono")).toBe("orc: branch orc/test started with --sandbox none, so resume refuses --sandbox nono; drop --sandbox to resume with none")
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a branch with no prior run takes the flag, and nono without one, instead of refusing for want of a record", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        expect([await sandboxOutcome(db, join(home, "repo"), "none"), await sandboxOutcome(db, join(home, "repo"), undefined)]).toEqual(["none", "nono"])
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a run recorded with no kind takes the flag instead of refusing every flag", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await seedSandboxRun(db, "prior-1", join(home, "repo"), null)
+        expect([await sandboxOutcome(db, join(home, "repo"), "none"), await sandboxOutcome(db, join(home, "repo"), undefined)]).toEqual(["none", "nono"])
       } finally {
         db.close()
       }

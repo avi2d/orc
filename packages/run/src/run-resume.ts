@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite"
 import { Effect, FileSystem, Option, Schema } from "effect"
+import { defaultSandbox, type SandboxKind } from "./args"
 import { checksRoundsForRun, fixesForRun, type StoredFix } from "./history-resume"
 import { sessionIdFromFile, type RunRecord } from "./run-history"
 import { latestRunForBranch, stepsForRun } from "./history-resume"
@@ -29,6 +30,24 @@ export const resolveTaskFile = (
       yield* refuseOnChangedIntent(db, fs, branch, prior, supplied)
     }
     return supplied
+  })
+
+export const resolveSandboxKind = (
+  db: Database,
+  branch: string,
+  projectDir: string,
+  flag: SandboxKind | undefined
+): Effect.Effect<SandboxKind, OrcRunError> =>
+  Effect.gen(function*() {
+    const prior = yield* latestRunForBranch(db, projectDir, branch).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
+    const recorded = prior?.sandbox ?? null
+    if (recorded === null) {
+      return flag ?? defaultSandbox
+    }
+    if (flag !== undefined && flag !== recorded) {
+      return yield* refuse("orc: branch " + branch + " started with --sandbox " + recorded + ", so resume refuses --sandbox " + flag + "; drop --sandbox to resume with " + recorded)
+    }
+    return recorded
   })
 
 const refuseOnChangedIntent = (

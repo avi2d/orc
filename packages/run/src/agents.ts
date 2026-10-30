@@ -33,6 +33,12 @@ const headerKeys = ["model", "thinking", "tools"] as const
 
 type HeaderKey = typeof headerKeys[number]
 
+const requiredHeaderKeys: ReadonlyArray<HeaderKey> = ["thinking", "tools"]
+
+export interface ParsedAgentFile extends Omit<AgentFile, "model"> {
+  readonly model: string | null
+}
+
 const isHeaderKey = (key: string): key is HeaderKey => (headerKeys as ReadonlyArray<string>).includes(key)
 
 const isThinkingLevel = (value: string): value is PiThinkingLevel =>
@@ -66,7 +72,7 @@ const parseHeader = (
       }
       seen.set(key, value)
     }
-    for (const key of headerKeys) {
+    for (const key of requiredHeaderKeys) {
       if (!seen.has(key)) {
         return yield* fail(path, "misses the header key " + key)
       }
@@ -77,10 +83,10 @@ const parseHeader = (
 const checkFields = (
   seen: ReadonlyMap<string, string>,
   path: string
-): Effect.Effect<{ readonly model: string; readonly thinking: PiThinkingLevel; readonly tools: ReadonlyArray<string> }, AgentFileError> =>
+): Effect.Effect<{ readonly model: string | null; readonly thinking: PiThinkingLevel; readonly tools: ReadonlyArray<string> }, AgentFileError> =>
   Effect.gen(function*() {
-    const model = seen.get("model") ?? ""
-    if (model === "" || /\s/.test(model)) {
+    const model = seen.get("model") ?? null
+    if (model !== null && (model === "" || /\s/.test(model))) {
       return yield* fail(path, "names no usable model")
     }
     const thinking = seen.get("thinking") ?? ""
@@ -97,7 +103,7 @@ const checkFields = (
 export const parseAgentFile = (
   text: string,
   location: AgentFileLocation
-): Effect.Effect<AgentFile, AgentFileError> =>
+): Effect.Effect<ParsedAgentFile, AgentFileError> =>
   Effect.gen(function*() {
     const lines = text.split("\n")
     if (lines[0] !== "---") {
@@ -142,7 +148,12 @@ export const agentFileCandidates = (
 
 export const resolveAgentFile = (
   kind: AgentKind,
-  options: { readonly projectDir: string; readonly orcHome: string; readonly agentsDir?: string | undefined }
+  options: {
+    readonly projectDir: string
+    readonly orcHome: string
+    readonly agentsDir?: string | undefined
+    readonly configModel: { readonly file: string; readonly model: string | undefined }
+  }
 ): Effect.Effect<AgentFile, AgentFileError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
@@ -151,7 +162,12 @@ export const resolveAgentFile = (
     for (const location of candidates) {
       const text = yield* readIfPresent(fs, location.path)
       if (text !== null) {
-        return yield* parseAgentFile(text, location)
+        const parsed = yield* parseAgentFile(text, location)
+        const model = parsed.model ?? options.configModel.model
+        if (model === undefined) {
+          return yield* fail(location.path, "names no model and " + options.configModel.file + " names no " + kind + " model, so name one in either")
+        }
+        return { ...parsed, model }
       }
     }
     return yield* new AgentFileError({ message: "orc: no " + kind + ".md agent file found beside the bundled ones" })

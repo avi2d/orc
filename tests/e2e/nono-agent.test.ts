@@ -115,6 +115,52 @@ describe("the agent directory", () => {
   }, sandboxTimeout)
 })
 
+describe("the nono credential proxy", () => {
+  test.skipIf(noNono || insideSandbox)(skipReason("needs nono on PATH to create a sandbox", "sends a placeholder or Bearer value instead of the captured key under X-Api-Key"), async () => {
+    const dir = await mkdtemp(join(process.cwd(), ".orc-nono-proxy-"))
+    let server: ReturnType<typeof Bun.serve> | null = null
+    try {
+      const { worktree, session } = await checkoutWithSession(dir)
+      const agentDir = join(await realpath(session), "agent")
+      await mkdir(agentDir, { recursive: true })
+      const fixtureKey = "<fixture-key>"
+      const seen: Record<string, string | null> = {}
+      server = Bun.serve({
+        hostname: "127.0.0.1",
+        port: 0,
+        fetch: async (request) => {
+          seen["x-api-key"] = request.headers.get("x-api-key")
+          seen["authorization"] = request.headers.get("authorization")
+          return new Response("proxy-ok\n")
+        }
+      })
+      const upstream = "http://127.0.0.1:" + server.port + "/v1"
+      const stubPi = join(dir, "pi")
+      await writeFile(stubPi, "#!/bin/sh\nif [ \"$1\" = auth ]; then echo \"" + fixtureKey + "\"; exit 0; fi\nexit 2\n", { mode: 0o755 })
+      const credential = modelCredentialFor({ id: "acme-vault", upstream, injectHeader: "X-Api-Key", credentialFormat: "{}" }, { piBinary: stubPi, nodeBinary: "/bin/sh", homeDir: fixtureHome })
+      const handle = await nonoSandboxProvider({ piSessionDir: session, piAgentDir: agentDir, modelCredential: credential }).create({
+        worktreePath: worktree,
+        hostRepoPath: worktree,
+        mounts: [],
+        env: { HOME: fixtureHome }
+      })
+      try {
+        const result = await handle.exec("curl -s --max-time 10 '" + upstream + "/probe'")
+        expect(result.exitCode).toBe(0)
+        expect(result.stdout).toContain("proxy-ok")
+        expect(seen["x-api-key"]).toBe(fixtureKey)
+        expect(seen["x-api-key"]).not.toBe("$ACME_VAULT_KEY")
+        expect(seen["authorization"]).toBeNull()
+      } finally {
+        await handle.close()
+      }
+    } finally {
+      await server?.stop(true)
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, sandboxTimeout)
+})
+
 describe("the model credential profile", () => {
   test.skipIf(noNono || insideSandbox)(skipReason("needs nono on PATH to create a sandbox", "validates the credential profile and runs the sandbox"), async () => {
     const dir = await mkdtemp(join(process.cwd(), ".orc-nono-agent-"))
@@ -124,10 +170,7 @@ describe("the model credential profile", () => {
       await mkdir(agentDir, { recursive: true })
       const stubPi = join(dir, "pi")
       await writeFile(stubPi, "#!/bin/sh\necho fixture-captured-token\n", { mode: 0o755 })
-      const credential = modelCredentialFor("opencode-go/muse-spark", { piBinary: stubPi, nodeBinary: "/bin/sh", homeDir: fixtureHome })
-      if (credential === null) {
-        throw new Error("the fixture model names no credential")
-      }
+      const credential = modelCredentialFor({ id: "acme-go", upstream: "https://llm.acme.test/v1" }, { piBinary: stubPi, nodeBinary: "/bin/sh", homeDir: fixtureHome })
       const handle = await nonoSandboxProvider({ piSessionDir: session, piAgentDir: agentDir, modelCredential: credential }).create({
         worktreePath: worktree,
         hostRepoPath: worktree,

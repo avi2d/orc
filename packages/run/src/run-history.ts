@@ -3,8 +3,9 @@ import { Data, Effect, FileSystem, Path, Schema } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { homedir } from "node:os"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { sandboxKinds, type SandboxKind } from "./args"
 
-export const RUN_HISTORY_SCHEMA_VERSION = 1
+export const RUN_HISTORY_SCHEMA_VERSION = 2
 export const RUNS_JSON_SCHEMA = "orc.runs.v1" as const
 export const SHOW_JSON_SCHEMA = "orc.show.v1" as const
 
@@ -39,6 +40,7 @@ export interface RunInput {
   readonly ended?: string | null | undefined
   readonly prLink?: string | null | undefined
   readonly endReason?: string | null | undefined
+  readonly sandbox?: SandboxKind | null | undefined
 }
 
 export interface RunRecord {
@@ -51,6 +53,7 @@ export interface RunRecord {
   readonly ended: string | null
   readonly prLink: string | null
   readonly endReason: string | null
+  readonly sandbox: SandboxKind | null
 }
 
 export interface StepInput {
@@ -115,6 +118,8 @@ export const formatHistoryError = (error: unknown): string => {
 export const orcHomeDir = (override?: string): string =>
   override === undefined || override === "" ? `${homedir()}/.orc` : fileURLToPath(new URL(override, pathToFileURL(process.cwd() + "/")))
 
+const sandboxColumn = "sandbox TEXT CHECK (sandbox IN (" + sandboxKinds.map((kind) => "'" + kind + "'").join(", ") + "))"
+
 const schemaStatements: ReadonlyArray<string> = [
   "CREATE TABLE IF NOT EXISTS runs (" +
     "id TEXT PRIMARY KEY, " +
@@ -125,8 +130,8 @@ const schemaStatements: ReadonlyArray<string> = [
     "started TEXT NOT NULL, " +
     "ended TEXT, " +
     "pr_link TEXT, " +
-    "end_reason TEXT" +
-    ")",
+    "end_reason TEXT, " +
+    sandboxColumn + ")",
   "CREATE TABLE IF NOT EXISTS steps (" +
     "id INTEGER PRIMARY KEY, " +
     "run_id TEXT NOT NULL REFERENCES runs (id), " +
@@ -168,22 +173,35 @@ const SchemaVersionRow = Schema.Struct({ user_version: Schema.Finite })
 
 const busyTimeoutMillis = 5000
 
+const upgrades: ReadonlyMap<number, ReadonlyArray<string>> = new Map([[0, schemaStatements], [1, ["ALTER TABLE runs ADD COLUMN " + sandboxColumn]]])
+
+const readSchemaVersion = (db: Database): Effect.Effect<number, HistoryError> =>
+  sqlite(() => db.query("PRAGMA user_version").get()).pipe(Effect.flatMap(Schema.decodeUnknownEffect(SchemaVersionRow)), Effect.map((row) => row.user_version))
+
 const migrate = (db: Database): Effect.Effect<void, HistoryError> =>
   Effect.gen(function*() {
-    const versionRow = yield* sqlite(() => db.query("PRAGMA user_version").get())
-    const current = (yield* Schema.decodeUnknownEffect(SchemaVersionRow)(versionRow)).user_version
+    const current = yield* readSchemaVersion(db)
     if (current === RUN_HISTORY_SCHEMA_VERSION) {
       return
     }
-    if (current !== 0) {
+    if (!upgrades.has(current)) {
       return yield* new UnsupportedSchemaVersion({ found: current, expected: RUN_HISTORY_SCHEMA_VERSION })
     }
-    yield* sqlite(() => {
-      for (const statement of schemaStatements) {
-        db.run(statement)
-      }
-      db.run(`PRAGMA user_version = ${RUN_HISTORY_SCHEMA_VERSION}`)
-    })
+    // Another orc can upgrade the same file between the read above and the write, and ADD COLUMN fails when run twice.
+    yield* sqlite(() => db.run("BEGIN IMMEDIATE"))
+    yield* readSchemaVersion(db).pipe(
+      Effect.flatMap((locked) =>
+        sqlite(() => {
+          const statements = upgrades.get(locked)
+          if (statements !== undefined) {
+            statements.forEach((statement) => db.run(statement))
+            db.run(`PRAGMA user_version = ${RUN_HISTORY_SCHEMA_VERSION}`)
+          }
+          db.run("COMMIT")
+        })
+      ),
+      Effect.onError(() => sqlite(() => db.run("ROLLBACK")).pipe(Effect.result))
+    )
   })
 
 export const openDatabase = (
@@ -203,7 +221,7 @@ export const openDatabase = (
 
 export const insertRun = (db: Database, input: RunInput): void => {
   db.query(
-    "INSERT INTO runs (id, project, branch, task_file, status, started, ended, pr_link, end_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO runs (id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   ).run(
       input.id,
       input.project,
@@ -213,7 +231,8 @@ export const insertRun = (db: Database, input: RunInput): void => {
       input.started,
       input.ended ?? null,
       input.prLink ?? null,
-      input.endReason ?? null
+      input.endReason ?? null,
+      input.sandbox ?? null
     )
 }
 
@@ -277,7 +296,8 @@ export const RunSqlRowSchema = Schema.Struct({
   started: Schema.String,
   ended: Schema.NullOr(Schema.String),
   pr_link: Schema.NullOr(Schema.String),
-  end_reason: Schema.NullOr(Schema.String)
+  end_reason: Schema.NullOr(Schema.String),
+  sandbox: Schema.NullOr(Schema.Literals(sandboxKinds))
 })
 
 const runRecordOf = (row: typeof RunSqlRowSchema.Type): RunRecord => ({
@@ -289,10 +309,11 @@ const runRecordOf = (row: typeof RunSqlRowSchema.Type): RunRecord => ({
   started: row.started,
   ended: row.ended,
   prLink: row.pr_link,
-  endReason: row.end_reason
+  endReason: row.end_reason,
+  sandbox: row.sandbox
 })
 
-const runColumns = "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason FROM runs"
+const runColumns = "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox FROM runs"
 
 export const listRuns = (
   db: Database,

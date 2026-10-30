@@ -3,6 +3,8 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { formatHistoryError, openDatabase, RunStatusSchema } from "../run-history"
 import { latestRunForBranch } from "../history-resume"
 import type { Reach } from "./args"
+import { AbsolutePath } from "../json-file"
+import { ProviderId } from "../orc-config"
 import { TaskId } from "./backlog"
 import { heldTask, orcGroup, PueueResult, PueueState, PueueStatus, type PueueTask } from "./pueue-status"
 import { parseTaskFile } from "./task-record"
@@ -17,7 +19,9 @@ export type Command = readonly [string, ...Array<string>]
 
 const QueueRequest = Schema.Struct({
   task: TaskId,
-  checkout: Schema.String.check(Schema.isPattern(/^\//)),
+  checkout: AbsolutePath,
+  provider: ProviderId,
+  tokenFile: AbsolutePath,
   body: Schema.String
 })
 type QueueRequest = typeof QueueRequest.Type
@@ -184,7 +188,7 @@ const queueTask = (
     )
     const id = yield* pueue([
       "add", "--group", orcGroup, "--label", request.task, "--working-directory", project, "--print-task-id", "--escape", "--",
-      ...self, "run", taskFile, "--branch", taskBranch(request.task)
+      ...self, "run", taskFile, "--branch", taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, "--token-file", request.tokenFile
     ], { ORC_HOME: home })
     return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
   })
@@ -203,13 +207,15 @@ const readRequest = (env: Readonly<Record<string, string | undefined>>): Effect.
     const task = yield* requiredEnv(env, "ORC_TASK_ID")
     const file = yield* requiredEnv(env, "ORC_TASK_FILE")
     const checkout = yield* requiredEnv(env, "ORC_TASK_CHECKOUT")
+    const provider = yield* requiredEnv(env, "ORC_TASK_PROVIDER")
+    const tokenFile = yield* requiredEnv(env, "ORC_TASK_TOKEN_FILE")
     const text = yield* fs.readFileString(file).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "cannot read the task file " + file + ": " + error.message }))
     )
     const record = yield* parseTaskFile(file, "taken", text).pipe(
       Effect.mapError((error) => new RunnerError({ detail: error.file + ": " + error.detail }))
     )
-    return yield* Schema.decodeEffect(QueueRequest)({ task, checkout, body: record.spec.body }).pipe(
+    return yield* Schema.decodeEffect(QueueRequest)({ task, checkout, provider, tokenFile, body: record.spec.body }).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
     )
   })

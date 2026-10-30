@@ -10,16 +10,14 @@ const raceRounds = 4
 
 const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
 
-const clauthStatus = {
-  schema: 2,
-  profiles: [{
-    name: "main",
-    auth_status: "ok",
-    fetch_status: "Fresh",
-    stale: false,
-    windows: [{ label: "5h", utilization_pct: 10 }, { label: "7d", utilization_pct: 20 }]
-  }]
+const quotaStatus = {
+  schema: "orc.quota.v1",
+  accounts: [{ name: "main", remainingPercent: 40 }, { name: "second", remainingPercent: 80 }]
 }
+
+const accounts = [{ name: "main", tokenFile: "/secrets/main-token" }, { name: "second", tokenFile: "/secrets/second-token" }]
+
+const quotaConfig = (floorPercent: number) => ({ provider: "acme", command: ["orc-quota", "--json"], accounts, floorPercent })
 
 interface Fixture {
   readonly dir: string
@@ -71,13 +69,14 @@ const orcOk = async (fixture: Fixture, args: ReadonlyArray<string>, env: Record<
   return result.stdout
 }
 
-const fakeClauth = (arrivals: string): string =>
+const fakeQuota = (arrivals: string): string =>
   [
     "#!/bin/sh",
+    "[ \"$1\" = --json ] || exit 3",
     "touch '" + arrivals + "'/$$",
-    "while [ \"$(ls '" + arrivals + "' | wc -l)\" -lt \"${CLAUTH_AWAITS:-0}\" ]; do sleep 0.01; done",
+    "while [ \"$(ls '" + arrivals + "' | wc -l)\" -lt \"${QUOTA_AWAITS:-0}\" ]; do sleep 0.01; done",
     "cat <<'J'",
-    JSON.stringify(clauthStatus),
+    JSON.stringify(quotaStatus),
     "J",
     ""
   ].join("\n")
@@ -94,16 +93,16 @@ const withFixture = async (shape: FixtureShape, body: (fixture: Fixture) => Prom
     const bin = join(dir, "bin")
     const backlog = join(dir, "home", "backlog")
     const startLog = join(dir, "starts.log")
-    const arrivals = join(dir, "clauth-arrivals")
+    const arrivals = join(dir, "quota-arrivals")
     await mkdir(bin, { recursive: true })
     await mkdir(backlog, { recursive: true })
     await mkdir(arrivals)
-    await writeFile(join(bin, "clauth"), fakeClauth(arrivals))
-    await chmod(join(bin, "clauth"), 0o755)
+    await writeFile(join(bin, "orc-quota"), fakeQuota(arrivals))
+    await chmod(join(bin, "orc-quota"), 0o755)
     const start = ["sh", "-c", "sleep 0.1; echo \"$ORC_TASK_ID $ORC_TASK_MACHINE\" >> '" + startLog + "'"]
     await writeFile(join(backlog, "dispatch.json"), JSON.stringify({
       machines: [{ name: "mac", slots: shape.mac, start }, { name: "linux", slots: shape.linux, start }],
-      quota: { accounts: ["main"], floorPercent: shape.floorPercent }
+      quota: quotaConfig(shape.floorPercent)
     }))
     await writeFile(join(backlog, "projects.json"), JSON.stringify({
       projects: [{ name: "orc", checkouts: { mac: join(dir, "mac-orc"), linux: join(dir, "linux-orc") } }]
@@ -146,11 +145,11 @@ const addTasks = async (fixture: Fixture, count: number, machine: (index: number
   }
 }
 
-// Both beats read the backlog only after both have asked clauth for quota, so they reach the first task together.
+// Both beats read the backlog only after both have run the quota command, so they reach the first task together.
 const raceTwoBeats = async (fixture: Fixture): Promise<void> => {
   await rm(fixture.arrivals, { recursive: true, force: true })
   await mkdir(fixture.arrivals)
-  await Promise.all([orcOk(fixture, ["beat"], { CLAUTH_AWAITS: "2" }), orcOk(fixture, ["beat"], { CLAUTH_AWAITS: "2" })])
+  await Promise.all([orcOk(fixture, ["beat"], { QUOTA_AWAITS: "2" }), orcOk(fixture, ["beat"], { QUOTA_AWAITS: "2" })])
 }
 
 const backlogTasks = async (fixture: Fixture): Promise<ReadonlyArray<TaskJson>> =>
@@ -171,7 +170,7 @@ const backlogTask = async (fixture: Fixture, id: string): Promise<Record<string,
 const writeMachines = async (fixture: Fixture, start: ReadonlyArray<string>): Promise<void> => {
   await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({
     machines: [{ name: "mac", slots: 1, start }, { name: "linux", slots: 0, start: ["true"] }],
-    quota: { accounts: ["main"], floorPercent: 15 }
+    quota: quotaConfig(15)
   }))
 }
 
@@ -261,16 +260,37 @@ describe("orc beat", () => {
       await addTasks(fixture, 1)
       const log = join(fixture.dir, "home", "backlog", "logs", "task-1.log")
       const output = await orcOk(fixture, ["beat"])
-      expect(output).toContain("started task-1 on mac with main, output to " + log)
+      expect(output).toContain("started task-1 on mac with second, output to " + log)
       expect(output).not.toContain("out task-1")
       expect(await eventually(() => readFile(log, "utf8").catch(() => ""), (text) => text.includes("err"))).toBe("out task-1\nerr task-1\n")
     })
   }, beatTimeout)
 
-  test("a beat with no Claude account above the floor starts nothing", async () => {
+  test("the start command gets the roomiest account's token file path instead of the first account's", async () => {
+    await withFixture({ mac: 1, linux: 0, floorPercent: 15 }, async (fixture) => {
+      const seen = join(fixture.dir, "credential")
+      await writeMachines(fixture, ["sh", "-c", "echo \"$ORC_TASK_PROVIDER $ORC_TASK_ACCOUNT $ORC_TASK_TOKEN_FILE\" > '" + seen + "'"])
+      await addTasks(fixture, 1)
+      await orcOk(fixture, ["beat"])
+      expect(await eventually(() => readFile(seen, "utf8").catch(() => ""), (text) => text !== "")).toBe("acme second /secrets/second-token\n")
+    })
+  }, beatTimeout)
+
+  test("a quota command that fails starts nothing instead of running on an unread account", async () => {
+    await withFixture({ mac: 4, linux: 4, floorPercent: 15 }, async (fixture) => {
+      await writeFile(join(fixture.dir, "bin", "orc-quota"), "#!/bin/sh\nexit 4\n")
+      await addTasks(fixture, 1)
+      const output = await orcOk(fixture, ["beat"])
+      expect(output).toContain("quota unread: the quota command orc-quota exited 4")
+      expect(output).not.toContain("started task-1")
+      expect((await backlogTasks(fixture)).map((task) => task.status)).toEqual(["new"])
+    })
+  }, beatTimeout)
+
+  test("a beat with no account above the floor starts nothing", async () => {
     await withFixture({ mac: 4, linux: 4, floorPercent: 90 }, async (fixture) => {
       await addTasks(fixture, 1)
-      expect(await orcOk(fixture, ["beat"])).toContain("waits task-1: no Claude account has room")
+      expect(await orcOk(fixture, ["beat"])).toContain("waits task-1: no acme account has room")
       expect(await startedLines(fixture)).toEqual([])
     })
   }, beatTimeout)

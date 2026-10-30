@@ -13,13 +13,21 @@ import {
 
 const good = [
   "---",
-  "model: opencode-go/muse-spark",
+  "model: acme/coder",
   "thinking: high",
   "tools: read, bash, edit",
   "---",
   "Do the task.",
   "",
 ].join("\n")
+
+const noConfigModel = { file: "/orc-home/config.json", model: undefined }
+
+const resolved = (kind: "implementer" | "fixer", options: Parameters<typeof resolveAgentFile>[1]) =>
+  Effect.runPromise(resolveAgentFile(kind, options).pipe(
+    Effect.provide(BunServices.layer),
+    Effect.catchTag("AgentFileError", (cause) => Effect.succeed("refused: " + cause.message))
+  ))
 
 const location = { kind: "implementer" as const, path: "bundled/implementer.md", source: "bundled" as const }
 
@@ -50,7 +58,7 @@ describe("parseAgentFile", () => {
   test("reads the model, the thinking level, the tools and the body", () => {
     expect(parsed(good)).toMatchObject({
       kind: "implementer",
-      model: "opencode-go/muse-spark",
+      model: "acme/coder",
       thinking: "high",
       tools: ["read", "bash", "edit"],
       body: "Do the task.",
@@ -75,7 +83,12 @@ describe("parseAgentFile", () => {
     expect(failure(["---", "model m", "thinking: high", "tools: read", "---", "Go."].join("\n"))).toContain("without a colon")
   })
 
+  test("leaves the model unnamed when the header omits it instead of refusing the file", () => {
+    expect(parsed(["---", "thinking: high", "tools: read", "---", "Go."].join("\n")).model).toBeNull()
+  })
+
   test("refuses an unusable model, an unknown thinking level and no tools", () => {
+    expect(failure(["---", "model:", "thinking: high", "tools: read", "---", "Go."].join("\n"))).toContain("no usable model")
     expect(failure(["---", "model: two words", "thinking: high", "tools: read", "---", "Go."].join("\n"))).toContain("no usable model")
     expect(failure(["---", "model: m", "thinking: extreme", "tools: read", "---", "Go."].join("\n"))).toContain("unknown thinking level: extreme")
     expect(failure(["---", "model: m", "thinking: high", "tools:  , ", "---", "Go."].join("\n"))).toContain("names no tools")
@@ -88,16 +101,16 @@ describe("resolveAgentFile", () => {
       const home = join(root, "orc-home")
       const project = join(root, "project")
       const bundled = join(root, "bundled")
-      await writeAgent(join(home, "agents"), "implementer.md", good.replace("muse-spark", "personal-model"))
-      await writeAgent(join(project, ".orc", "agents"), "implementer.md", good.replace("muse-spark", "project-model"))
+      await writeAgent(join(home, "agents"), "implementer.md", good.replace("coder", "personal-model"))
+      await writeAgent(join(project, ".orc", "agents"), "implementer.md", good.replace("coder", "project-model"))
       await writeAgent(bundled, "implementer.md")
       const found = await Effect.runPromise(
-        resolveAgentFile("implementer", { projectDir: project, orcHome: home, agentsDir: bundled }).pipe(
+        resolveAgentFile("implementer", { projectDir: project, orcHome: home, agentsDir: bundled, configModel: noConfigModel }).pipe(
           Effect.provide(BunServices.layer)
         )
       )
       expect(found.source).toBe("personal")
-      expect(found.model).toBe("opencode-go/personal-model")
+      expect(found.model).toBe("acme/personal-model")
     })
   })
 
@@ -107,9 +120,9 @@ describe("resolveAgentFile", () => {
       const project = join(root, "project")
       const bundled = join(root, "bundled")
       await writeAgent(join(project, ".orc", "agents"), "implementer.md")
-      await writeAgent(bundled, "implementer.md", good.replace("muse-spark", "bundled-model"))
+      await writeAgent(bundled, "implementer.md", good.replace("coder", "bundled-model"))
       const found = await Effect.runPromise(
-        resolveAgentFile("implementer", { projectDir: project, orcHome: home, agentsDir: bundled }).pipe(
+        resolveAgentFile("implementer", { projectDir: project, orcHome: home, agentsDir: bundled, configModel: noConfigModel }).pipe(
           Effect.provide(BunServices.layer)
         )
       )
@@ -125,7 +138,7 @@ describe("resolveAgentFile", () => {
       await writeAgent(join(project, ".orc", "agents"), "implementer.md", "no header here\n")
       await writeAgent(bundled, "implementer.md")
       const result = await Effect.runPromise(
-        resolveAgentFile("implementer", { projectDir: project, orcHome: root, agentsDir: bundled }).pipe(
+        resolveAgentFile("implementer", { projectDir: project, orcHome: root, agentsDir: bundled, configModel: noConfigModel }).pipe(
           Effect.provide(BunServices.layer),
           Effect.catchTag("AgentFileError", (cause) => Effect.succeed("refused: " + cause.message))
         )
@@ -134,17 +147,35 @@ describe("resolveAgentFile", () => {
     })
   })
 
-  test("the bundled implementer and fixer files parse with the expected header", async () => {
+  test("the bundled implementer and fixer files name no model and take the one config.json names", async () => {
     for (const kind of ["implementer", "fixer"] as const) {
-      const found = await Effect.runPromise(
-        resolveAgentFile(kind, { projectDir: tmpdir(), orcHome: tmpdir() }).pipe(Effect.provide(BunServices.layer))
-      )
+      const found = await resolved(kind, { projectDir: tmpdir(), orcHome: tmpdir(), configModel: { file: "/orc-home/config.json", model: "acme/configured" } })
+      if (typeof found === "string") {
+        throw new Error(found)
+      }
       expect(found.source).toBe("bundled")
       expect(found.path).toBe(join(bundledAgentsDir(), kind + ".md"))
       expect(found.thinking).toBe("high")
       expect(found.tools).toEqual(["read", "bash", "edit", "write"])
-      expect(found.model.length).toBeGreaterThan(0)
+      expect(found.model).toBe("acme/configured")
     }
+  })
+
+  test("the bundled files with no configured model are refused instead of running on a built-in model", async () => {
+    for (const kind of ["implementer", "fixer"] as const) {
+      expect(await resolved(kind, { projectDir: tmpdir(), orcHome: tmpdir(), configModel: noConfigModel })).toBe(
+        "refused: orc: the agent file " + join(bundledAgentsDir(), kind + ".md") + " names no model and /orc-home/config.json names no " + kind + " model, so name one in either"
+      )
+    }
+  })
+
+  test("a model the agent file names wins over the configured one instead of being overridden by it", async () => {
+    await withDirs(async (root) => {
+      const project = join(root, "project")
+      await writeAgent(join(project, ".orc", "agents"), "implementer.md")
+      const found = await resolved("implementer", { projectDir: project, orcHome: root, agentsDir: join(root, "none"), configModel: { file: "/orc-home/config.json", model: "acme/configured" } })
+      expect(typeof found === "string" ? found : found.model).toBe("acme/coder")
+    })
   })
 
   test("candidates list personal, project then bundled in that order", async () => {

@@ -31,11 +31,14 @@ const expectedFiles = [
   "src/history-resume.ts",
   "src/history-write.ts",
   "src/host.ts",
+  "src/json-file.ts",
+  "src/model-route.ts",
   "src/no-mistakes-gate.ts",
   "src/no-mistakes.ts",
   "src/no-sandbox.ts",
   "src/nono-profile.ts",
   "src/nono.ts",
+  "src/orc-config.ts",
   "src/pi.ts",
   "src/report.ts",
   "src/run-history.ts",
@@ -45,6 +48,7 @@ const expectedFiles = [
   "src/run-scores.ts",
   "src/run-session.ts",
   "src/run.ts",
+  "src/sandbox-plan.ts",
   "src/show.ts",
   "src/toon.ts"
 ]

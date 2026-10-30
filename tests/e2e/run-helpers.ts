@@ -46,7 +46,7 @@ export const withHome = async (use: (home: string) => Promise<void>): Promise<vo
 
 const implementer: AgentFile = {
   kind: "implementer",
-  model: "opencode-go/muse-spark",
+  model: "acme/coder",
   thinking: "high",
   tools: ["read", "bash"],
   body: "Do the task.",
@@ -192,7 +192,7 @@ export const runStep = (dir: string, home: string, sandbox: SandboxOps["runAgent
             const report = yield* runWithHistory(db, {
               fs, path, spawner, git: hostGit, projectDir: dir, runId: "step-run-1", runDir,
               piSessionDir: path.join(runDir, "session"), hostSessionsDir: path.join(runDir, "sessions"),
-              taskPath: path.join(runDir, "task.md"), agent: implementer, fixer, branch: "orc/test", started: "2026-10-19T10:00:00.000Z",
+              taskPath: path.join(runDir, "task.md"), agent: implementer, fixer, branch: "orc/test", sandbox: "nono", started: "2026-10-19T10:00:00.000Z",
               worktreeDir: dir,
               noMistakes: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: stub.dir + ":" + (process.env.PATH ?? ""), git: hostGit, worktreeDir: dir }),
               answers
@@ -211,7 +211,7 @@ export const runStep = (dir: string, home: string, sandbox: SandboxOps["runAgent
 
 const fixer: AgentFile = {
   kind: "fixer",
-  model: "opencode-go/muse-spark",
+  model: "acme/coder",
   thinking: "high",
   tools: ["read", "bash"],
   body: "Fix the failure.",

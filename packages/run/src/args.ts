@@ -1,6 +1,6 @@
 import { type DispatchArgs, parseDispatchArgs } from "./dispatch/args"
 import { askUserWord, type QuestionAnswer } from "./no-mistakes"
-const sandboxKinds = ["nono", "none"] as const
+export const sandboxKinds = ["nono", "none"] as const
 export type SandboxKind = typeof sandboxKinds[number]
 export const defaultSandbox: SandboxKind = "nono"
 export type OrcArgs =
@@ -9,7 +9,7 @@ export type OrcArgs =
   | { readonly kind: "ListRuns"; readonly json: boolean }
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
   | { readonly kind: "ScoreStep"; readonly runId: string; readonly step: string; readonly score: number; readonly note: string }
-  | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly branch: string | undefined; readonly sandbox: SandboxKind; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
+  | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
   | { readonly kind: "Dispatch"; readonly args: Exclude<DispatchArgs, { readonly kind: "UsageError" }> }
   | { readonly kind: "UsageError"; readonly detail: string }
 const questionPrefix = "question-"
@@ -48,7 +48,7 @@ const parseScoreArgs = (rest: readonly string[]): OrcArgs => {
 }
 
 type RunSplit =
-  | { readonly kind: "ok"; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer>; readonly kept: ReadonlyArray<string> }
+  | { readonly kind: "ok"; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer>; readonly kept: ReadonlyArray<string> }
   | { readonly kind: "error"; readonly detail: string }
 type AnswerParse =
   | { readonly kind: "ok"; readonly value: QuestionAnswer }
@@ -96,7 +96,7 @@ const takeAnswerValue = (rest: readonly string[], index: number, seen: Set<strin
   seen.add(parsed.value.question)
   return parsed
 }
-const takeBranchName = (rest: readonly string[], index: number, taken: string | undefined): string | null => {
+const takeFlagValue = (rest: readonly string[], index: number, taken: string | undefined): string | null => {
   const name = rest[index + 1] ?? ""
   return taken !== undefined || name === "" || name.startsWith("--") ? null : name
 }
@@ -107,19 +107,28 @@ const takeSandboxKind = (rest: readonly string[], index: number, taken: SandboxK
 interface RunFlags {
   branch: string | undefined
   sandbox: SandboxKind | undefined
+  tokenFile: string | undefined
+  provider: string | undefined
   readonly allow: Array<typeof askUserWord>
   readonly answers: Array<QuestionAnswer>
   readonly seen: Set<string>
 }
 type FlagTake = { readonly kind: "taken" } | { readonly kind: "error"; readonly detail: string }
-const valueFlags = new Set(["--branch", "--sandbox", "--allow", "--answer"])
+type StringFlag = "branch" | "tokenFile" | "provider"
+const stringFlags: ReadonlyArray<{ readonly flag: string; readonly key: StringFlag; readonly detail: string }> = [
+  { flag: "--branch", key: "branch", detail: "unexpected argument: --branch" },
+  { flag: "--token-file", key: "tokenFile", detail: "orc run takes --token-file once, with a path" },
+  { flag: "--provider", key: "provider", detail: "orc run takes --provider once, with a provider id" }
+]
+const valueFlags = new Set(["--sandbox", "--allow", "--answer", ...stringFlags.map((entry) => entry.flag)])
 const takeValueFlag = (rest: readonly string[], index: number, flags: RunFlags): FlagTake => {
-  if (rest[index] === "--branch") {
-    const name = takeBranchName(rest, index, flags.branch)
-    if (name === null) {
-      return { kind: "error", detail: "unexpected argument: --branch" }
+  const named = stringFlags.find((entry) => entry.flag === rest[index])
+  if (named !== undefined) {
+    const value = takeFlagValue(rest, index, flags[named.key])
+    if (value === null) {
+      return { kind: "error", detail: named.detail }
     }
-    flags.branch = name
+    flags[named.key] = value
     return { kind: "taken" }
   }
   if (rest[index] === "--sandbox") {
@@ -146,7 +155,7 @@ const takeValueFlag = (rest: readonly string[], index: number, flags: RunFlags):
   return { kind: "taken" }
 }
 const splitRunArgs = (rest: readonly string[]): RunSplit => {
-  const flags: RunFlags = { branch: undefined, sandbox: undefined, allow: [], answers: [], seen: new Set() }
+  const flags: RunFlags = { branch: undefined, sandbox: undefined, tokenFile: undefined, provider: undefined, allow: [], answers: [], seen: new Set() }
   const kept: Array<string> = []
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index] ?? ""
@@ -160,7 +169,7 @@ const splitRunArgs = (rest: readonly string[]): RunSplit => {
     }
     index += 1
   }
-  return { kind: "ok", branch: flags.branch, sandbox: flags.sandbox, allow: flags.allow, answers: flags.answers, kept }
+  return { kind: "ok", branch: flags.branch, sandbox: flags.sandbox, tokenFile: flags.tokenFile, provider: flags.provider, allow: flags.allow, answers: flags.answers, kept }
 }
 const parseRunArgs = (rest: readonly string[]): OrcArgs => {
   const split = splitRunArgs(rest)
@@ -174,7 +183,7 @@ const parseRunArgs = (rest: readonly string[]): OrcArgs => {
     return { kind: "UsageError", detail: `unexpected argument: ${split.kept[1]}` }
   }
   const taskFile = split.kept.length === 1 ? split.kept[0] : null
-  return { kind: "RunAgent", taskFile, branch: split.branch, sandbox: split.sandbox ?? defaultSandbox, allow: split.allow, answers: split.answers }
+  return { kind: "RunAgent", taskFile, branch: split.branch, sandbox: split.sandbox, tokenFile: split.tokenFile, provider: split.provider, allow: split.allow, answers: split.answers }
 }
 const parseRunsArgs = (rest: readonly string[]): OrcArgs => {
   if (rest.length === 0) {

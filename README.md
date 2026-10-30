@@ -3,6 +3,7 @@
 Orc takes one task and turns it into one pull request.
 By default it runs the Pi agent in the nono sandbox, then the project checks, then no-mistakes.
 With `--sandbox none` it runs Pi and the checks directly on the host.
+Orc runs only the providers and models its `config.json` names, as the run package README describes.
 This repository is a workspace with one package per area.
 The run package ships the orc command.
 The other packages make up tui-dash, the terminal dashboard of quota, machine, queue and task panels beside it.
