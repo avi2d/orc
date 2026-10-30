@@ -7,6 +7,8 @@ export const longSessionCompactionLimit = 5
 
 export const handoverFileName = "handover.md"
 
+export const inheritedHandoverFileName = "inherited-handover.md"
+
 export const handoverLastReplyLimit = 2000
 
 const longSessionName = "long-session"

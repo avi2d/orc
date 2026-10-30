@@ -21,6 +21,7 @@ import {
   handoverFileName,
   handoverImplementPrompt,
   handoverNote,
+  inheritedHandoverFileName,
   lastAssistantReply,
   longSessionSignal,
   longSessionWarning
@@ -222,11 +223,11 @@ const branchLogGit = async (dir: string, logFile: string): Promise<string> => {
   return git
 }
 
-const readHandover = (runDir: string): Promise<string> =>
+const readHandover = (runDir: string, file: string = handoverFileName): Promise<string> =>
   Effect.runPromise(
     Effect.gen(function*() {
       const fs = yield* FileSystem.FileSystem
-      return yield* fs.readFileString(join(runDir, handoverFileName))
+      return yield* fs.readFileString(join(runDir, file))
     }).pipe(Effect.provide(BunServices.layer))
   )
 
@@ -355,7 +356,7 @@ describe("an inherited handover survives a failed restart", () => {
           execCheck: async () => { throw new Error("checks must not run when the agent never starts") }
         }))
         expect(reportB.completed).toBe(false)
-        const forwarded = await readHandover(runB.runDir)
+        const forwarded = await readHandover(runB.runDir, inheritedHandoverFileName)
         expect(forwarded).toBe(handoverA)
         const runC = await Effect.runPromise(historyFor("run-c", home, project, "2026-10-01T11:00:00.000Z", git))
         await mkdir(runC.runDir, { recursive: true })
@@ -417,6 +418,128 @@ describe("an inherited handover survives a failed restart", () => {
         await writeFile(runC.taskPath, taskText)
         const planC = await Effect.runPromise(buildResumePlan(db, runC))
         expect(planC.handover).toBe(handoverA)
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("resumes the interrupted implement session instead of restarting from the inherited note", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "project")
+        await mkdir(project, { recursive: true })
+        const logFile = join(home, "branch-log.txt")
+        await writeFile(logFile, "abc1234\x1fImplement A\n")
+        const git = await branchLogGit(home, logFile)
+        const taskText = "Add a sample widget to the demo page.\n"
+        const runA = await Effect.runPromise(historyFor("run-a", home, project, "2026-10-01T09:00:00.000Z", git))
+        await mkdir(runA.runDir, { recursive: true })
+        await writeFile(runA.taskPath, taskText)
+        const sessionDirA = join(runA.hostSessionsDir, "host")
+        await mkdir(sessionDirA, { recursive: true })
+        await writeFile(join(sessionDirA, "2026-10-01T09-00-00-000Z_long-a.jsonl"), compactions(5) + JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "work in progress" }] } }) + "\n")
+        await Effect.runPromise(runWithHistory(db, runA, {
+          runAgent: async () => ({ iterations: [{ sessionId: "long-a" }], stdout: "", commits: [{ sha: "abc1234" }] }),
+          execCheck: async () => { throw new Error("checks must not run for an unverified implement") }
+        }))
+        const handoverA = await readHandover(runA.runDir)
+        const runB = await Effect.runPromise(historyFor("run-b", home, project, "2026-10-01T10:00:00.000Z", git))
+        await mkdir(runB.runDir, { recursive: true })
+        await writeFile(runB.taskPath, taskText)
+        const reportB = await Effect.runPromise(runWithHistory(db, runB, {
+          runAgent: async () => {
+            const liveDir = join(runB.hostSessionsDir, "host")
+            await mkdir(liveDir, { recursive: true })
+            await writeFile(join(liveDir, "2026-10-01T10-00-00-000Z_live-b.jsonl"), message("assistant", "halfway there") + "\n")
+            throw new Error("killed mid-implement")
+          },
+          execCheck: async () => { throw new Error("checks must not run when implement never finishes") }
+        }))
+        expect(reportB.completed).toBe(false)
+        expect(await readHandover(runB.runDir, inheritedHandoverFileName)).toBe(handoverA)
+        const runC = await Effect.runPromise(historyFor("run-c", home, project, "2026-10-01T11:00:00.000Z", git))
+        await mkdir(runC.runDir, { recursive: true })
+        await writeFile(runC.taskPath, taskText)
+        const planC = await Effect.runPromise(buildResumePlan(db, runC))
+        expect(planC.handover).toBe(handoverA)
+        expect(planC.implementSessionId).toBe("live-b")
+        const prompts: Array<string> = []
+        const resumed: Array<string | undefined> = []
+        const reportC = await Effect.runPromise(runWithHistory(db, runC, {
+          runAgent: async (_agent, prompt, _log, resumeSession) => {
+            prompts.push(prompt)
+            resumed.push(resumeSession)
+            return { iterations: [{ sessionId: "live-b" }], stdout: "", commits: [] }
+          },
+          execCheck: async () => { throw new Error("checks must not run for an unverified implement") }
+        }))
+        expect(prompts.length).toBe(1)
+        expect(prompts[0]).toContain("abc1234")
+        expect(resumed).toEqual(["live-b"])
+        expect(reportC.commits?.some((commit) => commit.sha === "abc1234")).toBe(true)
+      } finally {
+        db.close()
+      }
+    })
+  })
+})
+
+describe("a handover after a passed implement", () => {
+  test("resumes the passed implement session instead of starting fresh when the handover follows a passed implement", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "project")
+        await mkdir(project, { recursive: true })
+        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  test: bun test\n")
+        const logFile = join(home, "branch-log.txt")
+        await writeFile(logFile, "")
+        const git = await branchLogGit(home, logFile)
+        const taskText = "Add a sample widget to the demo page.\n"
+        const runA = await Effect.runPromise(historyFor("run-a", home, project, "2026-10-01T09:00:00.000Z", git))
+        await mkdir(runA.runDir, { recursive: true })
+        await writeFile(runA.taskPath, taskText)
+        const sessionDirA = join(runA.hostSessionsDir, "host")
+        await mkdir(sessionDirA, { recursive: true })
+        await writeFile(join(sessionDirA, "2026-10-01T09-00-00-000Z_long-pass.jsonl"), compactions(5) + JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "work done\nORC_COMPLETE" }] } }) + "\n")
+        let agentCalls = 0
+        let checkCalls = 0
+        await Effect.runPromise(runWithHistory(db, runA, {
+          runAgent: async () => {
+            agentCalls += 1
+            if (agentCalls === 1) {
+              await appendFile(logFile, "abc1234\x1fImplement A\n")
+              return {
+                iterations: [{ sessionId: "long-pass" }],
+                stdout: "",
+                completionSignal: "ORC_COMPLETE",
+                commits: [{ sha: "abc1234" }]
+              }
+            }
+            await appendFile(logFile, "def5678\x1fFix B\n")
+            return { iterations: [], stdout: "", commits: [{ sha: "def5678" }] }
+          },
+          execCheck: async () => {
+            checkCalls += 1
+            if (checkCalls === 1) {
+              return { stdout: "", stderr: "failing", exitCode: 1 }
+            }
+            throw new Error("spawn bun ENOENT")
+          }
+        }))
+        expect(checkCalls).toBe(2)
+        const handoverA = await readHandover(runA.runDir)
+        expect(handoverA).toContain("abc1234")
+        const runB = await Effect.runPromise(historyFor("run-b", home, project, "2026-10-01T10:00:00.000Z", git))
+        await mkdir(runB.runDir, { recursive: true })
+        await writeFile(runB.taskPath, taskText)
+        const planB = await Effect.runPromise(buildResumePlan(db, runB))
+        expect(planB.handover).toBe(handoverA)
+        expect(planB.skipImplement).toBe(true)
+        expect(planB.implementSessionId).toBe("long-pass")
+        expect(planB.implementSessionFile).toContain("long-pass")
       } finally {
         db.close()
       }
