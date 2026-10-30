@@ -44,6 +44,7 @@ const waitLine = (wait: WaitRow, width: number): Line => {
 };
 
 export const dispatchLines = (view: DispatchView, width: number, rows: number): Block => {
+  if (view.pending) return sentence("reading the backlog\u2026", "muted", width);
   if (view.missing) return sentence("no backlog at " + view.root, "muted", width);
   const counts = headParts(view);
   const countHead: Block = counts.length === 0 ? [] : [[span(counts.join(" \u00b7 "), "foreground")]];

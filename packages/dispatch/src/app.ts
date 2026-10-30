@@ -8,7 +8,6 @@ import {
   type BackgroundTuning,
   polled,
   readsCadence,
-  unreachable,
 } from "@tui-dash/schema";
 import { type Block, frameRows, livePanel as liveUiPanel, type Panel, panel, panelChrome, panelWidth, printFrame, runPanel } from "@tui-dash/ui";
 import { dispatchLines } from "./panels";
@@ -30,14 +29,7 @@ export const readDispatchRead: Effect.Effect<DispatchRead, never, DispatchSource
 });
 
 const pendingRead = (root: string): DispatchRead => ({
-  view: dispatchView({
-    root,
-    missing: false,
-    machines: unreachable("reading the backlog\u2026"),
-    projects: unreachable("reading the backlog\u2026"),
-    tasks: [],
-    unread: [],
-  }),
+  view: { root, missing: false, pending: true, machines: { kind: "ok", value: [] }, runs: [], waiting: [], unread: [] },
   at: 0,
   freshness: [],
 });
@@ -47,7 +39,7 @@ export const backgroundDispatchRead = (
 ): Effect.Effect<{ readonly read: Effect.Effect<DispatchRead>; readonly refreshing: Effect.Effect<boolean> }, never, DispatchSources | Scope> =>
   Effect.gen(function* () {
     const source = yield* DispatchSource;
-    const poll = yield* polled(Effect.map(source.read, (reading) => reading), tuning?.revalidate ?? readsCadence);
+    const poll = yield* polled(source.read, tuning?.revalidate ?? readsCadence);
     return {
       read: Effect.map(
         poll.latest,
@@ -79,7 +71,7 @@ const panelLines = (readings: Readings, columns: number, rows: number): Block =>
 export const dispatchPanel = <R>(read: Effect.Effect<DispatchRead, never, R>): Panel<Readings, R> => ({
   read: Effect.map(read, (resolved) => ({ view: resolved.view, at: resolved.at })),
   lines: panelLines,
-  pending: (readings) => readings.at === 0,
+  pending: (readings) => readings.view.pending,
 });
 
 export const livePanel = (renderer: CliRenderer): Effect.Effect<void, never, DispatchSources> =>

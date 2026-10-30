@@ -57,11 +57,31 @@ export interface DispatchReading {
   readonly capturedAt: DateTime.Utc;
 }
 
-const MachinesFile = Schema.Struct({ machines: Schema.Array(Schema.Struct({ name: Schema.String, slots: Schema.Number })) });
+const namePattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
-const ProjectsFile = Schema.Struct({
-  projects: Schema.Array(Schema.Struct({ name: Schema.String, checkouts: Schema.Record(Schema.String, Schema.String) })),
+const Name = Schema.String.check(Schema.isPattern(namePattern));
+
+const Machine = Schema.Struct({
+  name: Name,
+  slots: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  start: Schema.NonEmptyArray(Schema.String.check(Schema.isNonEmpty())),
 });
+
+const MachinesFile = Schema.Struct({
+  machines: Schema.Array(Machine),
+  quota: Schema.Struct({
+    provider: Schema.String.check(Schema.isPattern(namePattern)),
+    command: Schema.NonEmptyArray(Schema.String.check(Schema.isNonEmpty())),
+    accounts: Schema.NonEmptyArray(Schema.Struct({ name: Name, tokenFile: Schema.String.check(Schema.isPattern(/^\//)) })),
+    floorPercent: Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 })),
+  }),
+});
+
+const Project = Schema.Struct({ name: Name, checkouts: Schema.Record(Name, Schema.String.check(Schema.isPattern(/^\//))) });
+
+const ProjectsFile = Schema.Struct({ projects: Schema.Array(Project) });
+
+const duplicateOf = (names: ReadonlyArray<string>): string | null => names.find((name, index) => names.indexOf(name) !== index) ?? null;
 
 const TaskFields = Schema.Struct({
   id: Schema.String,
@@ -242,16 +262,35 @@ const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<Di
     const machinesRead = yield* readJsonFile(fs, root + "/dispatch.json");
     const projectsRead = yield* readJsonFile(fs, root + "/projects.json");
     const { tasks, unread } = yield* readTasks(fs, root);
-    const machines: Outcome<ReadonlyArray<DispatchMachine>> =
+    const decodedMachines: Outcome<ReadonlyArray<DispatchMachine>> =
       machinesRead.kind === "ok"
         ? mapOutcome(decodeValue(MachinesFile)(machinesRead.value), (file) => file.machines)
         : machinesRead;
-    const projects: Outcome<ReadonlyArray<DispatchProject>> =
+    const machinesFile = root + "/dispatch.json";
+    const machines: Outcome<ReadonlyArray<DispatchMachine>> =
+      decodedMachines.kind === "ok"
+        ? ((duplicate) => (duplicate === null ? decodedMachines : unreachable(machinesFile + ": the machine " + duplicate + " is named twice")))(duplicateOf(decodedMachines.value.map((machine) => machine.name)))
+        : decodedMachines;
+    const decodedProjects: Outcome<ReadonlyArray<DispatchProject>> =
       projectsRead.kind === "ok"
         ? mapOutcome(decodeValue(ProjectsFile)(projectsRead.value), (file) =>
           file.projects.map((project) => ({ name: project.name, checkouts: { ...project.checkouts } })),
         )
         : projectsRead;
+    const projectsFile = root + "/projects.json";
+    const projects: Outcome<ReadonlyArray<DispatchProject>> = (() => {
+      if (decodedProjects.kind !== "ok") return decodedProjects;
+      const duplicate = duplicateOf(decodedProjects.value.map((project) => project.name));
+      if (duplicate !== null) return unreachable(projectsFile + ": the project " + duplicate + " is named twice");
+      if (machines.kind === "ok") {
+        const known = new Set(machines.value.map((machine) => machine.name));
+        for (const project of decodedProjects.value) {
+          const unknown = Object.keys(project.checkouts).find((machine) => !known.has(machine));
+          if (unknown !== undefined) return unreachable(projectsFile + ": the project " + project.name + " names the unknown machine " + unknown);
+        }
+      }
+      return decodedProjects;
+    })();
     return { root, missing: false, machines, projects, tasks, unread };
   });
 

@@ -26,6 +26,7 @@ export interface WaitRow {
 export interface DispatchView {
   readonly root: string;
   readonly missing: boolean;
+  readonly pending: boolean;
   readonly machines: Outcome<ReadonlyArray<RoomEntry>>;
   readonly runs: ReadonlyArray<RunRow>;
   readonly waiting: ReadonlyArray<WaitRow>;
@@ -101,5 +102,5 @@ export const dispatchView = (snapshot: DispatchSnapshot): DispatchView => {
       value: snapshot.machines.value.map((machine) => ({ machine: machine.name, slots: machine.slots, busy: busyOf(machine.name, snapshot.tasks) })),
     }
     : snapshot.machines;
-  return { root: snapshot.root, missing: snapshot.missing, machines, runs, waiting, unread: snapshot.unread };
+  return { root: snapshot.root, missing: snapshot.missing, pending: false, machines, runs, waiting, unread: snapshot.unread };
 };
