@@ -80,7 +80,7 @@ const runningTask = (id: number, label: string) => ({
 })
 
 const runsInPueue = (fixture: Fixture, task: string): Promise<void> =>
-  writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: { "77": runningTask(77, task) }, groups: {} }))
+  writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: { "77": runningTask(77, fixture.home + " " + task) }, groups: {} }))
 
 const filesUnder = async (dir: string): Promise<ReadonlyArray<string>> =>
   (await readdir(dir, { recursive: true, withFileTypes: true })).filter((entry) => entry.isFile()).map((entry) => join(entry.parentPath, entry.name))
@@ -199,7 +199,7 @@ describe("a beat with a token command", () => {
       await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
       await orcOk(fixture, ["beat"])
       await queuedArgs(fixture)
-      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: { "77": runningTask(77, "task-1") }, groups: {} }))
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: { "77": runningTask(77, fixture.home + " task-1") }, groups: {} }))
       const nextAt = hoursFromNowMillis(4)
       await writeSession(session, nextAt)
       const nextIso = new Date(nextAt).toISOString()

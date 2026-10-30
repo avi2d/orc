@@ -7,8 +7,9 @@ import { backlogJson, type BacklogView, beatJson, formatBeat, formatBoard, type 
 import type { ConfigError } from "../json-file"
 import { checkoutOn, type DispatchConfig, readDispatchConfig, readProjects } from "./config"
 import { holdRun } from "./hold"
+import { taskLabel } from "./pueue-status"
 import { type Command, queueFromText, renewTask, RunnerError, startTask } from "./runner"
-import { formatResult, readResult, readResultThrough, runnerJson } from "./runner-result"
+import { formatResult, readResult, readResultThrough, readStdinLabel, runnerJson } from "./runner-result"
 import type { TaskFileError, TaskRecord } from "./task-record"
 import { encodeToken, sessionToken } from "./token"
 
@@ -20,6 +21,7 @@ export interface DispatchPlace {
   readonly env: Readonly<Record<string, string | undefined>>
   readonly self: Command
   readonly stdin: Effect.Effect<string, RunnerError>
+  readonly stdinIsTerminal: boolean
   readonly stdoutIsTerminal: boolean
 }
 
@@ -105,6 +107,18 @@ const add = (args: Extract<CommandArgs, { readonly kind: "AddTask" }>, place: Di
     yield* Console.log("added " + record.spec.id + " for " + project.name + (args.machine === null ? "" : " on " + args.machine))
   })
 
+const reportResult = (args: Extract<CommandArgs, { readonly kind: "RunnerResult" }>, place: DispatchPlace) =>
+  Effect.gen(function*() {
+    let label = args.label ?? taskLabel(place.home, args.task)
+    if (args.reach.kind === "here" && args.label === undefined && !place.stdinIsTerminal) {
+      label = (yield* readStdinLabel(place.stdin)) ?? label
+    }
+    const result = args.reach.kind === "here"
+      ? yield* readResult(args.task, place.home, label)
+      : yield* readResultThrough(args.reach.command, args.task, label)
+    yield* Console.log(args.json ? JSON.stringify(runnerJson(result)) : formatResult(result))
+  })
+
 const execute = (args: CommandArgs, place: DispatchPlace) =>
   Effect.gen(function*() {
     switch (args.kind) {
@@ -124,7 +138,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         break
       }
       case "Beat": {
-        const report = yield* runBeat(backlogRoot(place))
+        const report = yield* runBeat(backlogRoot(place), place.home)
         yield* Console.log(args.json ? JSON.stringify(beatJson(report)) : formatBeat(report))
         break
       }
@@ -143,7 +157,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         break
       }
       case "RunnerHold": {
-        yield* Console.log(yield* holdRun(args.task, args.run, place.home))
+        yield* Console.log(yield* holdRun(args.task, args.run, place.home, args.label))
         break
       }
       case "RunnerToken": {
@@ -155,10 +169,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         break
       }
       case "RunnerResult": {
-        const result = args.reach.kind === "here"
-          ? yield* readResult(args.task, place.home)
-          : yield* readResultThrough(args.reach.command, args.task)
-        yield* Console.log(args.json ? JSON.stringify(runnerJson(result)) : formatResult(result))
+        yield* reportResult(args, place)
         break
       }
     }

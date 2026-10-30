@@ -69,6 +69,24 @@ const fakePueue = [
   ""
 ].join("\n")
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null
+
+// The copied fixture holds bare task labels, so each test home takes them as its own queueing.
+const scopeFixtureLabels = async (statusFile: string, home: string): Promise<void> => {
+  const status: unknown = JSON.parse(await readFile(statusFile, "utf8"))
+  if (!isRecord(status) || !isRecord(status.tasks)) {
+    throw new Error("the pueue fixture holds no task list")
+  }
+  const scoped: Record<string, unknown> = {}
+  for (const [id, task] of Object.entries(status.tasks)) {
+    scoped[id] = isRecord(task) && task.group === "orc" && typeof task.label === "string" && /^task-\d+$/.test(task.label)
+      ? { ...task, label: home + " " + task.label }
+      : task
+  }
+  await writeFile(statusFile, JSON.stringify({ ...status, tasks: scoped }))
+}
+
 export const withFixture = async (body: (fixture: Fixture) => Promise<void>): Promise<void> => {
   const dir = await mkdtemp(join(tmpdir(), "orc-runner-e2e-"))
   try {
@@ -80,6 +98,7 @@ export const withFixture = async (body: (fixture: Fixture) => Promise<void>): Pr
     await mkdir(join(home, "backlog"), { recursive: true })
     await mkdir(checkout)
     await cp(pueueFixtures, pueue, { recursive: true })
+    await scopeFixtureLabels(join(pueue, "status.json"), home)
     await writeFile(join(bin, "pueue"), fakePueue)
     await chmod(join(bin, "pueue"), 0o755)
     await writeFile(join(dir, "task.md"), "# Do the thing\n\nWith a body that holds 'quotes' and $dollars.\n")

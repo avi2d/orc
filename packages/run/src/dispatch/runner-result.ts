@@ -4,6 +4,7 @@ import { latestRunForBranch } from "../history-resume"
 import { formatHistoryError, openDatabase, RunStatusSchema } from "../run-history"
 import { TaskId } from "./backlog"
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
+import { LabelArg } from "./token"
 import { capture, type Command, decodeJson, readHeld, refuse, resolveProjectDir, RunnerError, type RunnerRequirements, taskBranch } from "./runner"
 
 const RUNNER_JSON_SCHEMA = "orc.runner.v1" as const
@@ -53,6 +54,31 @@ const failureReason = (result: typeof PueueResult.Type): string | null => {
   }
 }
 
+export interface TaskClosing {
+  readonly outcome: "done" | "failed"
+  readonly reason: string
+}
+
+export const closingFromResult = (result: RunnerResult): TaskClosing | null => {
+  if (result.status === "succeeded") {
+    return { outcome: "done", reason: "pueue task " + result.pueueTask + " succeeded" }
+  }
+  if (result.status === "failed") {
+    return { outcome: "failed", reason: result.reason }
+  }
+  return null
+}
+
+const closingOf = (pueueTask: number, status: PueueStatus): TaskClosing | null => {
+  if (!("Done" in status)) {
+    return null
+  }
+  const reason = failureReason(status.Done.result)
+  return reason === null
+    ? { outcome: "done", reason: "pueue task " + pueueTask + " succeeded" }
+    : { outcome: "failed", reason }
+}
+
 const assessHeld = (
   task: string,
   pueueTask: number,
@@ -89,9 +115,22 @@ const readRun = (home: string, checkout: string, task: string): Effect.Effect<Ru
     Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
   )
 
-export const readResult = (task: string, home: string): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
+// The beat closes a started task from this, so its done and failed match what runner result reports.
+export const readClosing = (task: string, home: string, label?: string | null): Effect.Effect<TaskClosing | null, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    const held = yield* readHeld(task)
+    const held = yield* readHeld(home, task, label)
+    if (held === null) {
+      return null
+    }
+    const status = yield* Schema.decodeUnknownEffect(PueueStatus)(held.status).pipe(
+      Effect.mapError((error) => new RunnerError({ detail: "pueue reports a status orc cannot read for task " + held.id + ": " + error.message }))
+    )
+    return closingOf(held.id, status)
+  })
+
+export const readResult = (task: string, home: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
+  Effect.gen(function*() {
+    const held = yield* readHeld(home, task, label)
     if (held === null) {
       return { task, status: "unknown" } satisfies RunnerResult
     }
@@ -102,8 +141,20 @@ export const readResult = (task: string, home: string): Effect.Effect<RunnerResu
     return assessHeld(task, held.id, status, run)
   })
 
-export const readResultThrough = (command: Command, task: string): Effect.Effect<RunnerResult, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  capture([...command, "runner", "result", task, "--json"], null).pipe(
+const ResultStdin = Schema.Struct({ label: LabelArg })
+
+// The label travels on stdin like a queue or renew request, so a reach that joins its argv for a remote shell cannot split it.
+export const readStdinLabel = (stdin: Effect.Effect<string, RunnerError>): Effect.Effect<string | null, RunnerError> =>
+  stdin.pipe(
+    Effect.flatMap((text) =>
+      text.trim() === ""
+        ? Effect.succeed(null)
+        : decodeJson(text, ResultStdin, "the result request on stdin").pipe(Effect.map(({ label }) => label))
+    )
+  )
+
+export const readResultThrough = (command: Command, task: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  capture([...command, "runner", "result", task, "--json"], label == null ? null : JSON.stringify({ label })).pipe(
     Effect.flatMap((result) =>
       result.exitCode === 0
         ? decodeJson(result.stdout, RunnerDocument, command.join(" ") + " runner result")
