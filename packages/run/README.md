@@ -389,7 +389,7 @@ So the start command and what it leaves running outlive the beat, even when laun
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
 From then on, each beat closes the finished runs on a machine whose start runs `orc runner start`.
 It reads `orc runner result` on that machine and closes the task done or failed, freeing its slot in the same beat.
-The beat prints `closed <task-id> <done|failed>` for each, or `close failed <task-id>` with the reason when the read fails or runs past 30 seconds.
+The beat prints `closed <task-id> <done|failed> on <machine>` with the reason for each, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds.
 A machine whose start runs any other program keeps owning its tasks, which the beat never reads.
 To close one of those, run `orc backlog close <task-id> <done|failed> [reason]`.
 A missing start command exits 127 into its log and leaves the task started.
@@ -407,7 +407,7 @@ The group's parallel limit caps the orc runs on that machine, and they never wai
 The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
 A task queued for another home keeps a scoped file instead, so two homes holding the same task id never share one file.
-A task pueue already holds in group `orc` is not queued again.
+A task this home already holds in group `orc` is not queued again.
 
 To start on another machine, put the command that runs orc there after `--`, as in `orc runner start -- ssh linux-box orc`.
 That runs `orc runner queue` on the far side and sends it the task as JSON on stdin, so the task text never passes through a remote shell.
@@ -430,14 +430,14 @@ A `pueue kill` gives the hold no time to clean up, so the guard removes the fold
 
 `orc runner renew` reads a task and its fresh token as JSON on standard input and replaces the token the task holds.
 Add `--` and the command that runs orc on another machine to send it there, as with `orc runner start`.
-A renewal for a task pueue no longer runs is refused and removes that task's token folder.
+A renewal for a task pueue no longer runs for that home is refused and removes that task's token folder.
 
 To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh linux-box orc` from another.
 The forwarded read defaults to that home's label, and `orc runner result <task-id> --label <label>` reads another home's run instead.
 The forwarded read carries the label as JSON on standard input, past any remote shell the reach uses.
 Piping that document into `orc runner result` yourself reads that home's run.
 It names pueue's state for the task and the orc run on `orc/<task-id>` with its PR.
-A task is queued, stashed, running, paused, succeeded or failed, or unknown when no pueue task in group `orc` holds it.
+A task is queued, stashed, running, paused, succeeded or failed, or unknown when no pueue task in group `orc` carries that home's label.
 To print the same facts as JSON, add `--json`, whose document names its version first as `orc.runner.v1`.
 
 ## Where things are
