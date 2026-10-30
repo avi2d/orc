@@ -15,7 +15,7 @@ review:
         It reaches another package only through @tui-dash/schema and @tui-dash/ui, as dependency-cruiser.config.ts holds.
     - path: "packages/dashboard/**"
       instructions: |
-        dashboard is a dashboard panel package.
+        dashboard is the dashboard host that lays out the panels the cli hands it.
         It reaches another package only through @tui-dash/schema and @tui-dash/ui, as dependency-cruiser.config.ts holds.
     - path: "packages/ledger/**"
       instructions: |
