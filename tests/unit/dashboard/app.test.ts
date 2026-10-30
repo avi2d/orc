@@ -89,7 +89,7 @@ describe("the live dashboard", () => {
       expect(standard.some((row) => row.startsWith("\u25cf claude second")) || standard.includes("+1 more claude profiles")).toBe(true);
       expect(standard).toContain("queue    local \u00b7 2 running \u00b7 2 queued \u00b7 1 paused \u00b7 gpu group paused");
       expect(standard).toContain("actions  toolshed \u00b7 2 running \u00b7 1 waiting");
-      expect(standard).toContain("+2 more rows");
+      expect(standard).toContain("+3 more rows");
       expect(standard[0]).toStartWith("\u25cf claude main");
       const alerts = standard.indexOf("alerts");
       expect(alerts).toBeGreaterThan(standard.findIndex((row) => row.startsWith("actions")));

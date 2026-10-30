@@ -3,7 +3,7 @@ kind: how-to
 ---
 # tui-dash
 Tui-dash is a set of OpenTUI terminal panels and a dashboard composed from them, held in the orc workspace.
-It holds the quota, session quota, resources, queues, schedules, tasks, alerts and ledger panels.
+It holds the quota, session quota, resources, queues, schedules, dispatch, tasks, alerts and ledger panels.
 It is built in Bun and Effect with one package per panel plus shared packages.
 Each panel opens on its own in the terminal, and the dashboard lays out the panels a config file names.
 The quota panel shows each account's quota windows, with health coloured bars, pace markers, verdicts and reset countdowns.
@@ -14,6 +14,7 @@ With a second machine configured, it merges that machine's session report, so an
 It flags each session spending over its fair share of a window that runs ahead of pace and runs out before its reset.
 The queues panel shows the pueue queues of this machine and a second one.
 It also lists the GitHub Actions runs of one repository that wait or run.
+The dispatch panel shows the orc dispatcher's machines, the room on each, the taken and started claims as runs and the tasks still waiting with why.
 The tasks tool walks from the registered projects to one project's tasks and to one task.
 It keeps a history of what each task used.
 The `tui-dash` command runs the dashboard, opens one panel, and prints every source's readings as one JSON snapshot for a script to read.
@@ -325,6 +326,15 @@ With `TUI_DASH_REMOTE_PUEUE` unset or blank, the panel reads this machine's pueu
 The command runs through `sh -c` with a 20 second limit, beside this machine's own read.
 The session quota tool reads the same two machine names.
 
+## Run the dispatch tool
+
+To run the live dispatch panel, run `tui-dash panel dispatch`.
+The panel reads `$ORC_HOME/backlog`, or `~/.orc/backlog` when `ORC_HOME` is unset or blank, and paints again every 10 seconds.
+It shows each machine with its busy room, the taken and started claims as runs and each new task with why it waits.
+A backlog that does not exist reads as missing.
+A folder or file the panel cannot read, including dispatch.json and projects.json, is named as unread.
+To print one frame of plain text instead, run `tui-dash panel dispatch --print`.
+
 ## Run the tasks tool
 
 To run the live tasks screen, run `tui-dash panel tasks`.
@@ -533,7 +543,7 @@ A task row names its machine when the board holds more than one machine name.
 A screen 240 columns wide shows the machines and three levels, and a narrower one shows two boxes.
 
 The scheduled box gives what runs next, soonest first, from both machines’ delayed jobs and dated items alongside this machine’s timers and workflows.
-The queue box shares one title with the scheduled box, split on a bar, and each half opens on its hotkey.
+The queue box shares one title with the scheduled and dispatch boxes, split on bars, and each tab opens on its hotkey.
 It reads the systemd user timers on Linux and the user's own launch agents on macOS.
 Launch agents installed by third party software stay out of the box.
 It reads the scheduled GitHub workflows of every repository with a runner on this machine, in UTC as GitHub runs them.
@@ -648,18 +658,18 @@ The default layout is this one.
         "atLeast": { "columns": 240, "rows": 36 },
         "rows": [
           { "height": "auto", "atMost": 0.55, "least": 8, "cells": [{ "panel": "quota" }, { "tabs": ["session-quota", "alerts"] }] },
-          { "height": "fill", "cells": [{ "stack": [{ "panel": "resources" }, { "tabs": ["queues", "schedules"] }] }, { "panel": "tasks", "width": 2 }] }
+          { "height": "fill", "cells": [{ "stack": [{ "panel": "resources" }, { "tabs": ["queues", "schedules", "dispatch"] }] }, { "panel": "tasks", "width": 2 }] }
         ]
       },
       {
         "atLeast": { "columns": 120, "rows": 36 },
         "rows": [
           { "height": "auto", "atMost": 0.55, "least": 8, "cells": [{ "panel": "quota" }, { "tabs": ["session-quota", "alerts"] }] },
-          { "height": "fill", "cells": [{ "stack": [{ "panel": "resources" }, { "tabs": ["queues", "schedules"] }] }, { "panel": "tasks", "width": 1 }] }
+          { "height": "fill", "cells": [{ "stack": [{ "panel": "resources" }, { "tabs": ["queues", "schedules", "dispatch"] }] }, { "panel": "tasks", "width": 1 }] }
         ]
       }
     ],
-    "narrow": ["quota", "session-quota", "queues", "resources", "alerts", "tasks"],
+    "narrow": ["quota", "session-quota", "queues", "dispatch", "resources", "alerts", "tasks"],
     "narrowGivesWay": ["alerts", "quota", "session-quota"]
   }
 }
@@ -850,6 +860,7 @@ Run `bunx stryker run --mutate "packages/schema/src/sources/quota.ts"` to mutate
 | `packages/session-quota/` | The session quota panel module, its OpenTUI rendering, JSON report and alert stream |
 | `packages/resources/` | The resources panel module, its OpenTUI rendering and JSON report |
 | `packages/queues/` | The queues panel module and its OpenTUI rendering |
+| `packages/dispatch/` | The dispatch panel module and its OpenTUI rendering |
 | `packages/schedules/` | The scheduled panel module of what runs next |
 | `packages/ledger/` | The optional ledger panel module and the session-file reader that fills it |
 | `packages/dashboard/` | The dashboard host, which lays out the panel modules it is given from the layout setting |
