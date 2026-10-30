@@ -93,6 +93,18 @@ const Project = Schema.Struct({ name: Name, checkouts: Schema.Record(Name, Schem
 
 const ProjectsFile = Schema.Struct({ projects: Schema.Array(Project) });
 
+const strictAccount = (entry: unknown): string | undefined => {
+  const result = Schema.decodeUnknownResult(Account)(entry, { errors: "all", onExcessProperty: "error" });
+  return Result.isSuccess(result) ? undefined : result.failure.message;
+};
+
+const AccountsEnvelope = Schema.Struct({ quota: Schema.Struct({ accounts: Schema.Array(Schema.Unknown) }) });
+
+const rawAccounts = (value: unknown): ReadonlyArray<unknown> => {
+  const decoded = Schema.decodeUnknownResult(AccountsEnvelope)(value);
+  return Result.isSuccess(decoded) ? decoded.success.quota.accounts : [];
+};
+
 const duplicateOf = (names: ReadonlyArray<string>): string | null => names.find((name, index) => names.indexOf(name) !== index) ?? null;
 
 const TaskFields = Schema.Struct({
@@ -320,6 +332,11 @@ const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<Di
     const machinesFile = root + "/dispatch.json";
     const machines: Outcome<ReadonlyArray<DispatchMachine>> = (() => {
       if (decodedMachines.kind !== "ok") return decodedMachines;
+      const raw = machinesRead.kind === "ok" ? machinesRead.value : undefined;
+      const strict = rawAccounts(raw)
+        .map((entry) => strictAccount(entry))
+        .find((issue) => issue !== undefined);
+      if (strict !== undefined) return unreachable(machinesFile + ": " + strict);
       const machine = duplicateOf(decodedMachines.value.machines.map((entry) => entry.name));
       if (machine !== null) return unreachable(machinesFile + ": the machine " + machine + " is named twice");
       const account = duplicateOf(decodedMachines.value.quota.accounts.map((entry) => entry.name));

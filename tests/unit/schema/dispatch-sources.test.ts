@@ -64,4 +64,18 @@ describe("the dispatch panel reader", () => {
       expect(machines.reason).toContain("names a renew command it never takes");
     }
   });
+  test("refuses a kind none account with a misspelt key instead of reporting the machines as healthy", async () => {
+    const machines = await machinesAt(
+      backlogWith({ machines: [machine], quota: { ...quota, accounts: [{ name: "main", kind: "none", tokenfile: "/secrets/main-token" }] } }),
+    );
+    expect(machines.kind).toBe("unreachable");
+    if (machines.kind === "unreachable") expect(machines.reason).toContain("tokenfile");
+  });
+  test("refuses a legacy account with an unknown key instead of reporting the machines as healthy", async () => {
+    const machines = await machinesAt(
+      backlogWith({ machines: [machine], quota: { ...quota, accounts: [{ name: "main", tokenFile: "/a", note: "x" }] } }),
+    );
+    expect(machines.kind).toBe("unreachable");
+    if (machines.kind === "unreachable") expect(machines.reason).toContain("note");
+  });
 });
