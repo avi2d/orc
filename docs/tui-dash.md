@@ -14,7 +14,7 @@ With a second machine configured, it merges that machine's session report, so an
 It flags each session spending over its fair share of a window that runs ahead of pace and runs out before its reset.
 The queues panel shows the pueue queues of this machine and a second one.
 It also lists the GitHub Actions runs of one repository that wait or run.
-The dispatch panel shows the orc dispatcher's machines, the room on each, the runs it started and the tasks still waiting with why.
+The dispatch panel shows the orc dispatcher's machines, the room on each, the taken and started claims as runs and the tasks still waiting with why.
 The tasks tool walks from the registered projects to one project's tasks and to one task.
 It keeps a history of what each task used.
 The `tui-dash` command runs the dashboard, opens one panel, and prints every source's readings as one JSON snapshot for a script to read.
@@ -330,7 +330,7 @@ The session quota tool reads the same two machine names.
 
 To run the live dispatch panel, run `tui-dash panel dispatch`.
 The panel reads `$ORC_HOME/backlog`, or `~/.orc/backlog` when `ORC_HOME` is unset or blank, and paints again every 10 seconds.
-It shows each machine with its busy room, the taken claims as runs and each new task with why it waits.
+It shows each machine with its busy room, the taken and started claims as runs and each new task with why it waits.
 A backlog that does not exist reads as missing.
 A folder or file the panel cannot read, including dispatch.json and projects.json, is named as unread.
 To print one frame of plain text instead, run `tui-dash panel dispatch --print`.
