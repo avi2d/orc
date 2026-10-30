@@ -6,24 +6,6 @@ import { tokenLive } from "./token"
 
 const pollSeconds = 5
 
-// pueue kill sends SIGKILL to the task's process group, which no finalizer outlives, so a process in its own session removes the folder once the holder is gone.
-const guardScript = "while kill -0 \"$1\" 2>/dev/null; do sleep 1; done; rm -rf -- \"$2\""
-
-const guardFolder = (holder: number, dir: string): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.gen(function*() {
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const handle = yield* spawner.spawn(ChildProcess.make("sh", ["-c", guardScript, "orc-token-guard", String(holder), dir], {
-      detached: true,
-      stdin: "ignore",
-      stdout: "ignore",
-      stderr: "ignore"
-    }))
-    yield* Effect.asVoid(handle.unref)
-  }).pipe(
-    Effect.scoped,
-    Effect.mapError((error) => new RunnerError({ detail: "the token guard did not start: " + error.message }))
-  )
-
 const waitForLiveToken = (home: string, task: string): Effect.Effect<DateTime.Utc, RunnerError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     let told = false
@@ -62,7 +44,6 @@ export const holdRun = (
   home: string
 ): Effect.Effect<string, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    yield* guardFolder(process.pid, heldTokenDir(home, task))
     while (true) {
       const startedWith = yield* waitForLiveToken(home, task)
       const exitCode = yield* runOnce(run)

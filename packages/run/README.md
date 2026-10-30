@@ -413,9 +413,10 @@ Pueue then runs `orc runner hold <task-id> -- orc run ... --token-file <that fil
 The hold starts the run only while the token is live, and otherwise waits for a fresh one.
 Pi reads the token once per process.
 So a run that fails after its token ran out starts again on the fresh token instead of failing the task.
-The hold removes the token folder when the run succeeds, fails or is killed.
-A `pueue kill` gives the hold no time to clean up.
-So a process the hold leaves in its own session removes the folder once the hold is gone.
+The queue starts a detached guard that waits for the pueue task and then removes the token folder.
+The guard covers the whole queued life of the task.
+It removes the folder when the run succeeds, fails, is killed, or never starts.
+A `pueue kill` gives the hold no time to clean up, so the guard removes the folder after pueue reports the task done.
 
 `orc runner renew` reads a task and its fresh token as JSON on standard input and replaces the token the task holds.
 Add `--` and the command that runs orc on another machine to send it there, as with `orc runner start`.

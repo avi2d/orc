@@ -28,7 +28,13 @@ const acquireLock = (fs: FileSystem.FileSystem, lock: string) =>
   Effect.gen(function*() {
     let waits = 0
     while (true) {
-      const taken = yield* fs.makeDirectory(lock).pipe(Effect.as(true), Effect.orElseSucceed(() => false as const))
+      const taken = yield* fs.makeDirectory(lock).pipe(
+        Effect.as(true),
+        Effect.catchTag("PlatformError", (error) =>
+          error.reason._tag === "AlreadyExists"
+            ? Effect.succeed(false as const)
+            : Effect.fail(error))
+      )
       if (taken) {
         return
       }
@@ -74,6 +80,9 @@ export const replaceHeldToken = (home: string, task: string, token: RunToken): E
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const dir = heldTokenDir(home, task)
+    if (!(yield* fs.exists(dir))) {
+      return false
+    }
     return yield* withTaskLock(fs, dir, Effect.gen(function*() {
       if (!(yield* fs.exists(dir))) {
         return false

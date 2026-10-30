@@ -1,7 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { spawn } from "node:child_process"
-import { once } from "node:events"
-import { readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
+import { readdir, readFile, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { binPath, fakeQuota, type Fixture, type OrcResult, orcOk, queuedArgs, runnerTimeout, runOrc, startWaitMillis, withFixture } from "./runner-helpers"
 
@@ -264,19 +262,24 @@ describe("orc runner hold", () => {
     })
   }, runnerTimeout)
 
-  test("a killed holder still leaves no folder behind instead of a token on disk", async () => {
+  test("a pueue kill before its holder starts loses its folder without another beat instead of a token on disk", async () => {
     await withFixture(async (fixture) => {
       await holdToken(fixture, "task-9", placeholder, hoursFromNowIso(2))
-      const started = join(fixture.dir, "started")
-      const holder = spawn(process.execPath, [binPath, "runner", "hold", "task-9", "--", "sh", "-c", "touch '" + started + "'; exec sleep 60"], {
-        stdio: "ignore",
-        detached: true,
+      const added = await readFile(join(fixture.pueue, "added-tasks"), "utf8")
+      const id = added.trim().split("\n").pop()?.split(" ").pop() ?? ""
+      const killed = Bun.spawnSync(["pueue", "kill", id], {
         env: { ...process.env, ...fixture.env }
       })
-      const exited = once(holder, "exit")
-      expect(await appears(started)).toBe(true)
-      process.kill(-(holder.pid ?? 0), "SIGKILL")
-      await exited
+      expect(killed.exitCode).toBe(0)
+      expect(await readFile(join(fixture.pueue, "killed-tasks"), "utf8")).toBe(id + "\n")
+      expect(await gone(tokenDir(fixture, "task-9"))).toBe(true)
+    })
+  }, runnerTimeout)
+
+  test("a task pueue cannot spawn loses its folder without another beat instead of a token on disk", async () => {
+    await withFixture(async (fixture) => {
+      await writeFile(join(fixture.pueue, "fail-spawn"), "")
+      await holdToken(fixture, "task-9", placeholder, hoursFromNowIso(2))
       expect(await gone(tokenDir(fixture, "task-9"))).toBe(true)
     })
   }, runnerTimeout)
@@ -326,29 +329,6 @@ describe("orc runner hold", () => {
       const result = await hold(fixture, "task-9", "exit 0")
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toBe("orc: no token is held for task-9 in " + tokenDir(fixture, "task-9") + "\n")
-    })
-  }, runnerTimeout)
-})
-
-describe("a queued task whose holder never runs", () => {
-  test("a task killed before its holder starts loses its folder without another beat instead of a token on disk", async () => {
-    await withFixture(async (fixture) => {
-      await holdToken(fixture, "task-9", placeholder, hoursFromNowIso(2))
-      await Bun.sleep(500)
-      const added = await readFile(join(fixture.pueue, "added-tasks"), "utf8")
-      const id = added.trim().split("\n").pop()?.split(" ").pop() ?? ""
-      await rm(join(fixture.pueue, "live-" + id))
-      expect(await gone(tokenDir(fixture, "task-9"))).toBe(true)
-    })
-  }, runnerTimeout)
-
-  test("a task whose holder never launches loses its folder without another beat instead of a token on disk", async () => {
-    await withFixture(async (fixture) => {
-      await holdToken(fixture, "task-9", placeholder, hoursFromNowIso(2))
-      const added = await readFile(join(fixture.pueue, "added-tasks"), "utf8")
-      const id = added.trim().split("\n").pop()?.split(" ").pop() ?? ""
-      await rm(join(fixture.pueue, "live-" + id))
-      expect(await gone(tokenDir(fixture, "task-9"))).toBe(true)
     })
   }, runnerTimeout)
 })
