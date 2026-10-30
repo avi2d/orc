@@ -1,6 +1,6 @@
 {
   "name": "@avi2dg/orc",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "One task to one pull request: Pi in a nono sandbox, the project's checks, then no-mistakes",
   "license": "MIT",
   "repository": "https://github.com/avi2d/orc.git",
