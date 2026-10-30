@@ -55,6 +55,7 @@ const dependencyWait = (task: DispatchTask, tasks: ReadonlyArray<DispatchTask>):
 
 const waitOf = (task: DispatchTask, snapshot: DispatchSnapshot): WaitRow => {
   const waiting = (reason: string): WaitRow => ({ id: task.id, title: task.title, project: task.project, reason });
+  if (snapshot.unread.length > 0) return waiting("the beat cannot read the backlog");
   const blocked = dependencyWait(task, snapshot.tasks);
   if (blocked !== undefined) return waiting(blocked);
   if (snapshot.projects.kind !== "ok") return waiting("the project list is unread");

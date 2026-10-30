@@ -331,7 +331,8 @@ The session quota tool reads the same two machine names.
 To run the live dispatch panel, run `tui-dash panel dispatch`.
 The panel reads the backlog `ORC_HOME` names, or `~/.orc/backlog` when unset, and paints again every 10 seconds.
 It shows each machine with its busy room, the taken claims as runs and each new task with why it waits.
-A backlog the panel cannot list reads as missing, and a file it cannot read names itself as unread.
+A backlog that does not exist reads as missing.
+A folder or file the panel cannot read is named as unread.
 To print one frame of plain text instead, run `tui-dash panel dispatch --print`.
 
 ## Run the tasks tool

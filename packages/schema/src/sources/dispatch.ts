@@ -1,6 +1,6 @@
 import { Config, Context, DateTime, Effect, FileSystem, Layer, Result, Schema } from "effect";
 import { decodeJson, decodeValue } from "../decode";
-import { mapOutcome, type Outcome, unreachable } from "../reading";
+import { mapOutcome, ok, type Outcome, unreachable } from "../reading";
 import { selector } from "./environment";
 
 export type DispatchMachine = typeof MachinesFile.Type["machines"][number];
@@ -262,15 +262,22 @@ const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<Di
     const machinesRead = yield* readJsonFile(fs, root + "/dispatch.json");
     const projectsRead = yield* readJsonFile(fs, root + "/projects.json");
     const { tasks, unread } = yield* readTasks(fs, root);
-    const decodedMachines: Outcome<ReadonlyArray<DispatchMachine>> =
+    const decodedMachines: Outcome<{ readonly machines: ReadonlyArray<DispatchMachine>; readonly accounts: ReadonlyArray<string> }> =
       machinesRead.kind === "ok"
-        ? mapOutcome(decodeValue(MachinesFile)(machinesRead.value), (file) => file.machines)
+        ? mapOutcome(decodeValue(MachinesFile)(machinesRead.value), (file) => ({
+          machines: file.machines,
+          accounts: file.quota.accounts.map((account) => account.name),
+        }))
         : machinesRead;
     const machinesFile = root + "/dispatch.json";
-    const machines: Outcome<ReadonlyArray<DispatchMachine>> =
-      decodedMachines.kind === "ok"
-        ? ((duplicate) => (duplicate === null ? decodedMachines : unreachable(machinesFile + ": the machine " + duplicate + " is named twice")))(duplicateOf(decodedMachines.value.map((machine) => machine.name)))
-        : decodedMachines;
+    const machines: Outcome<ReadonlyArray<DispatchMachine>> = (() => {
+      if (decodedMachines.kind !== "ok") return decodedMachines;
+      const machine = duplicateOf(decodedMachines.value.machines.map((entry) => entry.name));
+      if (machine !== null) return unreachable(machinesFile + ": the machine " + machine + " is named twice");
+      const account = duplicateOf(decodedMachines.value.accounts);
+      if (account !== null) return unreachable(machinesFile + ": the account " + account + " is named twice");
+      return ok(decodedMachines.value.machines);
+    })();
     const decodedProjects: Outcome<ReadonlyArray<DispatchProject>> =
       projectsRead.kind === "ok"
         ? mapOutcome(decodeValue(ProjectsFile)(projectsRead.value), (file) =>
