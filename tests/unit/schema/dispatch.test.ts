@@ -16,8 +16,7 @@ import { writeDispatchBacklog } from "../../lib/dispatch-fixture";
 const readBacklog = (home: string): Promise<DispatchReading> =>
   Effect.runPromise(
     Effect.flatMap(DispatchSource, (source) => source.read).pipe(
-      Effect.provide(dispatchSourceLayer.pipe(Layer.provide(BunFileSystem.layer))),
-      Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: home, ORC_HOME: home }))),
+      Effect.provide(dispatchSourceLayer.pipe(Layer.provide(BunFileSystem.layer), Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: home, ORC_HOME: home }))))),
     ),
   );
 
