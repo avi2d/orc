@@ -6,8 +6,9 @@ import { orcCompletionLine } from "./pi"
 import type { AllowWord, NoMistakesRecord, NoMistakesRunner, QuestionAnswer } from "./no-mistakes"
 import { OrcRunError } from "./run-session"
 import { toFileUrl } from "./run-history"
-import { findingLine, reportFileName, reportMarkdown, runStatus, type OrcRunReport } from "./report"
+import { findingLine, reportFileName, reportMarkdown, runStatus, type OrcRunCommit, type OrcRunReport } from "./report"
 import { handoverFileName, handoverNote, lastAssistantReply, longSessionWarning } from "./long-session"
+import { branchCommits } from "./git-run"
 
 export type { ChecksRoundSummary, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./report"
 
@@ -139,12 +140,15 @@ export const writeHandover = (run: HistoryRun, report: OrcRunReport): Effect.Eff
     const sessionJsonl = report.sessionFile === null
       ? null
       : yield* run.fs.readFileString(report.sessionFile).pipe(Effect.map((text) => text as string | null), Effect.orElseSucceed(() => null))
+    const branch = yield* branchCommits(run.spawner, run.git, run.branch, run.projectDir).pipe(Effect.orElseSucceed(() => [] as Array<OrcRunCommit>))
+    const seen = new Set((report.commits ?? []).map((commit) => commit.sha))
+    const commits = [...(report.commits ?? []), ...branch.filter((commit) => !seen.has(commit.sha))]
     const file = run.path.join(run.runDir, handoverFileName)
     const note = handoverNote({
       runId: report.runId,
       branch: report.branch,
       counts: report.sessionSize,
-      commits: report.commits ?? [],
+      commits,
       taskText,
       lastReply: lastAssistantReply(sessionJsonl),
       endReason: report.endReason

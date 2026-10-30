@@ -2,7 +2,7 @@ import type { AgentProvider, ExecResult, SandboxRunResult } from "@ai-hero/sandc
 import { Effect } from "effect"
 import { withHostGitSafety } from "./host"
 import { buildFixPrompt, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
-import { runGit } from "./git-run"
+import { branchCommits, runGit } from "./git-run"
 import { buildImplementPrompt, finalReplyError, orcCompletionLine, piWithTools, sessionPrintedSignal, type PiTokenUse } from "./pi"
 import { OrcRunError, describeCause, noSession, readSession } from "./run-session"
 import { driveNoMistakes, type AllowWord, type QuestionAnswer } from "./no-mistakes"
@@ -46,7 +46,7 @@ export interface RunCheckpoints {
   readonly checksRoundStart: (round: number, started: string) => Effect.Effect<void, OrcRunError>
   readonly checksRoundDone: (round: ChecksRoundSummary) => Effect.Effect<void, OrcRunError>
   readonly fixStart: (attempt: number, started: string) => Effect.Effect<void, OrcRunError>
-  readonly fixDone: (fix: RecordedFixAttempt, commits: Array<OrcRunCommit>) => Effect.Effect<void, OrcRunError>
+  readonly fixDone: (fix: RecordedFixAttempt) => Effect.Effect<void, OrcRunError>
   readonly noMistakesStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly noMistakesDone: (record: import("./no-mistakes").NoMistakesRecord) => Effect.Effect<void, OrcRunError>
 }
@@ -97,18 +97,7 @@ const verifiedMarker = (result: SandboxRunResult, jsonl: string | null): boolean
   result.completionSignal === orcCompletionLine && jsonl !== null && sessionPrintedSignal(jsonl, orcCompletionLine)
 
 const resumedCommits = (run: HistoryRun): Effect.Effect<Array<OrcRunCommit>, OrcRunError> =>
-  runGit(run.spawner, run.git, ["log", run.branch, "--not", "HEAD", "--format=%H%x1f%s"], run.projectDir).pipe(
-    Effect.map((logged) => {
-      if (logged.exitCode !== 0) {
-        return []
-      }
-      return logged.stdout.split("\n").filter((line) => line.trim() !== "").map((line) => {
-        const cut = line.indexOf("\x1f")
-        return cut === -1 ? { sha: line.trim(), subject: "" } : { sha: line.slice(0, cut).trim(), subject: line.slice(cut + 1).trim() }
-      })
-    }),
-    Effect.orElseSucceed(() => [] as Array<OrcRunCommit>)
-  )
+  branchCommits(run.spawner, run.git, run.branch, run.projectDir)
 
 const resumedOutcome = (run: HistoryRun, sessionId: string | null, sessionFile: string | null): Effect.Effect<AgentOutcome, OrcRunError> =>
   Effect.gen(function*() {
@@ -284,7 +273,7 @@ const runChecksFixLoop = (
       yield* checkpoints.fixStart(attempt, new Date().toISOString())
       const fixed = yield* fixOnce(run, ops.runAgent, outcome.file, attempt, attempt === 1 ? plan.fixSessionId : null)
       fixes.push(fixed.fix)
-      yield* checkpoints.fixDone(fixed.fix, fixed.commits)
+      yield* checkpoints.fixDone(fixed.fix)
       commits.push(...fixed.commits)
     }
     return yield* new OrcRunError({ message: "orc: the checks loop ended without a result" })

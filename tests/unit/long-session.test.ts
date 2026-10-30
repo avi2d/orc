@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { appendFile, chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Database } from "bun:sqlite"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, FileSystem, Path } from "effect"
+import { DateTime, Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../packages/run/src/agents"
 import { buildResumePlan } from "../../packages/run/src/run-resume"
@@ -13,7 +13,9 @@ import { openDatabase } from "../../packages/run/src/run-history"
 import { runWithHistory } from "../../packages/run/src/run"
 import type { HistoryRun } from "../../packages/run/src/run-record"
 import type { SandboxOps } from "../../packages/run/src/run-loop"
-import { subprocessNoMistakesRunner } from "../../packages/run/src/no-mistakes"
+import { subprocessNoMistakesRunner, type NoMistakesRunner } from "../../packages/run/src/no-mistakes"
+import { ticketLines } from "@tui-dash/tasks"
+import { plain } from "@tui-dash/ui"
 import {
   countSessionSize,
   handoverFileName,
@@ -23,7 +25,7 @@ import {
   longSessionSignal,
   longSessionWarning
 } from "../../packages/run/src/long-session"
-import { anchorOf, decodeOrcShow, orcPipelineOf, orcRunOf } from "@tui-dash/schema"
+import { anchorOf, decodeOrcShow, orcPipelineOf, orcRunOf, type TaskRow } from "@tui-dash/schema"
 import { valueOf } from "../lib/outcomes"
 import { fixture } from "../lib/fixtures"
 
@@ -210,6 +212,23 @@ const stubGit = async (dir: string): Promise<string> => {
   return git
 }
 
+const branchLogGit = async (dir: string, logFile: string): Promise<string> => {
+  const bin = join(dir, "git-bin")
+  await mkdir(bin, { recursive: true })
+  const git = join(bin, "git")
+  await writeFile(git, ["#!/bin/sh", "if [ \"$1\" = \"log\" ]; then", "  cat \"" + logFile + "\" 2>/dev/null || true", "fi", "exit 0"].join("\n") + "\n")
+  await chmod(git, 0o755)
+  return git
+}
+
+const readHandover = (runDir: string): Promise<string> =>
+  Effect.runPromise(
+    Effect.gen(function*() {
+      const fs = yield* FileSystem.FileSystem
+      return yield* fs.readFileString(join(runDir, handoverFileName))
+    }).pipe(Effect.provide(BunServices.layer))
+  )
+
 const openDb = (home: string): Promise<Database> =>
   Effect.runPromise(openDatabase(home).pipe(Effect.provide(BunServices.layer)))
 
@@ -302,6 +321,123 @@ describe("a replayed long session", () => {
 })
 
 
+describe("an inherited handover survives a failed restart", () => {
+  test("forwards the loaded note so the run after a failed start still resumes from it instead of the bare task", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "project")
+        await mkdir(project, { recursive: true })
+        const logFile = join(home, "branch-log.txt")
+        await writeFile(logFile, "abc1234\x1fImplement A\n")
+        const git = await branchLogGit(home, logFile)
+        const taskText = "Add a sample widget to the demo page.\n"
+        const runA = await Effect.runPromise(historyFor("run-a", home, project, "2026-10-01T09:00:00.000Z", git))
+        await mkdir(runA.runDir, { recursive: true })
+        await writeFile(runA.taskPath, taskText)
+        const sessionDirA = join(runA.hostSessionsDir, "host")
+        await mkdir(sessionDirA, { recursive: true })
+        await writeFile(join(sessionDirA, "2026-10-01T09-00-00-000Z_long-a.jsonl"), compactions(5) + JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "work in progress" }] } }) + "\n")
+        const reportA = await Effect.runPromise(runWithHistory(db, runA, {
+          runAgent: async () => ({ iterations: [{ sessionId: "long-a" }], stdout: "", commits: [{ sha: "abc1234" }] }),
+          execCheck: async () => { throw new Error("checks must not run for an unverified implement") }
+        }))
+        expect(reportA.completed).toBe(false)
+        expect(reportA.sessionSize).toEqual({ turns: 1, compactions: 5 })
+        const handoverA = await readHandover(runA.runDir)
+        expect(handoverA).toContain("abc1234")
+        const runB = await Effect.runPromise(historyFor("run-b", home, project, "2026-10-01T10:00:00.000Z", git))
+        await mkdir(runB.runDir, { recursive: true })
+        await writeFile(runB.taskPath, taskText)
+        const reportB = await Effect.runPromise(runWithHistory(db, runB, {
+          runAgent: async () => { throw new Error("pi exploded") },
+          execCheck: async () => { throw new Error("checks must not run when the agent never starts") }
+        }))
+        expect(reportB.completed).toBe(false)
+        const forwarded = await readHandover(runB.runDir)
+        expect(forwarded).toBe(handoverA)
+        const runC = await Effect.runPromise(historyFor("run-c", home, project, "2026-10-01T11:00:00.000Z", git))
+        await mkdir(runC.runDir, { recursive: true })
+        await writeFile(runC.taskPath, taskText)
+        const planC = await Effect.runPromise(buildResumePlan(db, runC))
+        expect(planC.handover).toBe(forwarded)
+        expect(planC.implementSessionId).toBeNull()
+        const prompts: Array<string> = []
+        const resumed: Array<string | undefined> = []
+        const reportC = await Effect.runPromise(runWithHistory(db, runC, {
+          runAgent: async (_agent, prompt, _log, resumeSession) => {
+            prompts.push(prompt)
+            resumed.push(resumeSession)
+            return { iterations: [], stdout: "", commits: [] }
+          },
+          execCheck: async () => { throw new Error("checks must not run for an unverified implement") }
+        }))
+        expect(prompts.length).toBe(1)
+        expect(prompts[0]).toContain("abc1234")
+        expect(resumed).toEqual([undefined])
+        expect(reportC.commits?.some((commit) => commit.sha === "abc1234")).toBe(true)
+      } finally {
+        db.close()
+      }
+    })
+  })
+})
+
+describe("a handover written after no-mistakes", () => {
+  test("lists a commit that landed during no-mistakes instead of only the checkpoint and loop commits", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "project")
+        await mkdir(project, { recursive: true })
+        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  test: bun test\n")
+        const logFile = join(home, "branch-log.txt")
+        await writeFile(logFile, "abc1234\x1fImplement A\n")
+        const git = await branchLogGit(home, logFile)
+        const run = await Effect.runPromise(historyFor("run-nm", home, project, "2026-10-01T09:00:00.000Z", git))
+        await mkdir(run.runDir, { recursive: true })
+        await writeFile(run.taskPath, "Add a sample widget to the demo page.\n")
+        const finalText = "work done\nORC_COMPLETE"
+        const sessionJsonl = compactions(5) + JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: finalText }] } }) + "\n"
+        const sessionDir = join(run.hostSessionsDir, "host")
+        await mkdir(sessionDir, { recursive: true })
+        await writeFile(join(sessionDir, "2026-10-01T09-00-00-000Z_long-nm.jsonl"), sessionJsonl)
+        const fixedAfterLoop: NoMistakesRunner = {
+          start: () => Effect.promise(() =>
+            appendFile(logFile, "def5678\x1fFix B\n").then(() => ({
+              stdout: "outcome: passed\npr: https://example.com/pr/1\n",
+              stderr: "",
+              exitCode: 0
+            }))
+          ),
+          reattach: Effect.die("no reattach in this test"),
+          respond: () => Effect.die("no gate in this test"),
+          answer: () => Effect.die("no question in this test"),
+          status: () => Effect.die("no status check in this test"),
+          logs: () => Effect.die("no logs in this test")
+        }
+        const report = await Effect.runPromise(runWithHistory(db, { ...run, noMistakes: fixedAfterLoop }, {
+          runAgent: async () => ({
+            iterations: [{ sessionId: "long-nm" }],
+            stdout: "",
+            completionSignal: "ORC_COMPLETE",
+            commits: [{ sha: "abc1234" }]
+          }),
+          execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 })
+        }))
+        expect(report.completed).toBe(true)
+        expect(report.commits?.some((commit) => commit.sha === "abc1234")).toBe(true)
+        expect(report.commits?.some((commit) => commit.sha === "def5678")).toBe(false)
+        const handover = await readHandover(run.runDir)
+        expect(handover).toContain("abc1234")
+        expect(handover).toContain("def5678")
+      } finally {
+        db.close()
+      }
+    })
+  })
+})
+
 describe("a long session carries its warning to the run", () => {
   test("shows the long-session warning on the failed checks anchor instead of hiding it with the passed agent stage", () => {
     const warning = longSessionWarning({ turns: 13, compactions: 5 }) ?? ""
@@ -319,6 +455,49 @@ describe("a long session carries its warning to the run", () => {
     const pipeline = orcPipelineOf(run, "working")
     expect(anchorOf(pipeline.stages)?.name).toBe("checks")
     expect(anchorOf(pipeline.stages)?.detail).toContain("5 compactions")
+  })
+
+  test("renders the warning beside the failed checks status instead of only carrying it in the mapping", () => {
+    const warning = longSessionWarning({ turns: 13, compactions: 5 }) ?? ""
+    const snapshot = valueOf(decodeOrcShow(JSON.stringify({
+      schema: "orc.show.v1",
+      run: { id: "run-1", branch: "orc/sample" },
+      steps: [
+        { name: "implement", status: "passed", score: null, signals: [{ name: "long-session", value: warning }] },
+        { name: "checks", status: "failed", score: null }
+      ]
+    })))
+    const run = orcRunOf(snapshot, "run-1", [])
+    if (run === undefined) throw new Error("run-1 has no orc run")
+    const utc = DateTime.zoneMakeNamedUnsafe("UTC")
+    const row: TaskRow = {
+      id: "run-1",
+      machine: "north",
+      source: "local",
+      listed: true,
+      usageRead: false,
+      title: "Sample widget",
+      project: "demo",
+      state: "working",
+      detail: "",
+      firstStartedAt: DateTime.makeUnsafe("2026-10-01T09:00:00.000Z"),
+      endedAt: undefined,
+      seconds: 60,
+      cpuSeconds: undefined,
+      peakBytes: undefined,
+      live: undefined,
+      idled: false,
+      tests: [],
+      testSeconds: undefined,
+      episodes: [],
+      spend: undefined,
+      kind: "orc run",
+      pipeline: orcPipelineOf(run, "working"),
+      lastActiveAt: undefined
+    }
+    const text = ticketLines(row, { machine: "north", source: "local", listed: true, usageRead: false }, DateTime.makeUnsafe("2026-10-01T10:00:00.000Z"), utc, 200).map(plain).join("\n")
+    expect(text).toContain("[✕ checks]")
+    expect(text.split("\n").find((line) => line.includes("5 compactions")) ?? "").toContain("checks")
   })
 })
 

@@ -226,6 +226,9 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
     const handover = yield* run.fs.readFileString(run.path.join(run.path.dirname(run.runDir), prior.id, handoverFileName)).pipe(
       Effect.orElseSucceed(() => null)
     )
+    if (handover !== null) {
+      yield* run.fs.writeFileString(run.path.join(run.runDir, handoverFileName), handover).pipe(Effect.orElseSucceed(() => undefined))
+    }
     const fresh = handover !== null
     const carriedImplement = fresh ? null : yield* carrySessionFile(run, progress.implementSource, progress.implementSessionId)
     const carriedFix = yield* carrySessionFile(run, progress.fixSource, progress.fixSessionId)

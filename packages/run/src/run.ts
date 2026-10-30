@@ -360,16 +360,7 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       checksRoundStart: (round, started) => recordChecksStart(db, run.runId, round, started),
       checksRoundDone: (round) => recordChecksDone(db, run.runId, round),
       fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer.path, started, attempt === 1 ? resume.fixSessionFile ?? undefined : undefined),
-      fixDone: (fix, commits) => Effect.gen(function*() {
-        yield* recordFixDone(db, run.runId, fix)
-        if (implementLong !== null) {
-          for (const commit of commits) {
-            if (!implementLong.commits.some((kept) => kept.sha === commit.sha)) {
-              implementLong.commits.push(commit)
-            }
-          }
-        }
-      }),
+      fixDone: (fix) => recordFixDone(db, run.runId, fix),
       noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
       noMistakesDone: (record) => recordNoMistakesDone(db, run, record)
     }
