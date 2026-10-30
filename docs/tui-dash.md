@@ -3,7 +3,7 @@ kind: how-to
 ---
 # tui-dash
 Tui-dash is a set of OpenTUI terminal panels and a dashboard composed from them, held in the orc workspace.
-It holds the quota, session quota, resources, queues, schedules, tasks, alerts and ledger panels.
+It holds the quota, session quota, resources, queues, schedules, dispatch, tasks, alerts and ledger panels.
 It is built in Bun and Effect with one package per panel plus shared packages.
 Each panel opens on its own in the terminal, and the dashboard lays out the panels a config file names.
 The quota panel shows each account's quota windows, with health coloured bars, pace markers, verdicts and reset countdowns.
@@ -14,6 +14,7 @@ With a second machine configured, it merges that machine's session report, so an
 It flags each session spending over its fair share of a window that runs ahead of pace and runs out before its reset.
 The queues panel shows the pueue queues of this machine and a second one.
 It also lists the GitHub Actions runs of one repository that wait or run.
+The dispatch panel shows the orc dispatcher's machines, the room on each, the runs it started and the tasks still waiting with why.
 The tasks tool walks from the registered projects to one project's tasks and to one task.
 It keeps a history of what each task used.
 The `tui-dash` command runs the dashboard, opens one panel, and prints every source's readings as one JSON snapshot for a script to read.

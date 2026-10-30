@@ -12,6 +12,7 @@ import {
   CommandRunner,
   type CommandUnreachable,
   type ConfigRefused,
+  dispatchSourceLayer,
   gpuSourceLayer,
   herdrSourceLayer,
   linuxDiskSourceLayer,
@@ -143,6 +144,7 @@ const recordedSources = (
       Layer.mergeAll(ciRunsLayer, machineSchedulesLayer("linux")).pipe(Layer.provideMerge(repos)),
     ).pipe(Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ TUI_DASH_ACTIONS_REPO: fixtureActionsRepo, ...env })))),
     Layer.succeed(TaskSamplesSource, samples),
+    dispatchSourceLayer.pipe(Layer.provide(BunFileSystem.layer)),
     saved,
     conversation === undefined ? conversationSourceLive : Layer.succeed(ConversationSource, conversation),
   ).pipe(
