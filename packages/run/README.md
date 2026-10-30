@@ -395,7 +395,7 @@ A Pi package that logs in on its own takes this kind, as in a `claude-bridge` pa
 ```
 
 Its `config.json` provider names the package with `credential` `package`, and its `env` points at the login the runs take, such as the `CLAUDE_CONFIG_DIR` of the account above.
-A file that names a token source or a `renew` command beside a kind `none` account is refused.
+A quota that names more than one account when any of them is kind `none` is refused, and so is a kind `none` account beside a machine `renew` command.
 
 `projects.json` names each project and its checkout on each machine:
 

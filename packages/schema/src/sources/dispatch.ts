@@ -348,6 +348,12 @@ const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<Di
           machinesFile + ": the machine " + unrenewed.name + " has no renew command, which the account " + commandAccount.name + " needs to carry its token past its expiry"
         );
       }
+      const single = decodedMachines.value.quota.accounts.find((entry) => "kind" in entry && entry.kind === "none");
+      if (single !== undefined && decodedMachines.value.quota.accounts.length > 1) {
+        return unreachable(
+          machinesFile + ": the account " + single.name + " takes kind none and names no login, so the quota names no other account beside it"
+        );
+      }
       const lone = decodedMachines.value.quota.accounts.find((entry) => "kind" in entry && entry.kind === "none");
       const renewed = decodedMachines.value.machines.find((entry) => entry.renew !== undefined);
       if (lone !== undefined && renewed !== undefined) {

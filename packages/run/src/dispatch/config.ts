@@ -107,6 +107,10 @@ export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, 
           return yield* new ConfigError({ file, detail: "the account " + duplicate + " is named twice" })
         }
         const accounts = yield* Effect.forEach(config.quota.accounts, (entry) => readAccount(file, entry))
+        const single = accounts.find((entry) => entry.kind === "none")
+        if (single !== undefined && accounts.length > 1) {
+          return yield* new ConfigError({ file, detail: "the account " + single.name + " takes kind none and names no login, so the quota names no other account beside it" })
+        }
         const commandAccount = accounts.find((entry) => entry.kind === "token-command")
         const unrenewed = config.machines.find((entry) => entry.renew === undefined)
         if (commandAccount !== undefined && unrenewed !== undefined) {

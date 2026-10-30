@@ -319,6 +319,28 @@ describe("readDispatchConfig", () => {
       expect(read).toBe("the account main takes kind none and holds no token, so the machine mac names a renew command it never takes")
     })
   })
+  test("refuses a second account beside a kind none account instead of spending the wrong login", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, { accounts: [{ name: "main", kind: "none" }, { name: "alt", kind: "none" }] })).toBe(
+        "the account main takes kind none and names no login, so the quota names no other account beside it"
+      )
+    })
+  })
+  test("refuses a token account beside a kind none account instead of spending the wrong login", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, { accounts: [{ name: "main", tokenFile: "/a" }, { name: "alt", kind: "none" }] })).toBe(
+        "the account alt takes kind none and names no login, so the quota names no other account beside it"
+      )
+    })
+  })
+  test("keeps several token accounts when no account is kind none", async () => {
+    await withBacklog(async (root) => {
+      const file = join(root, "dispatch.json")
+      const machines = config.machines.map((machine) => ({ ...machine, renew: ["true"] }))
+      await writeFile(file, JSON.stringify({ machines, quota: { ...config.quota, accounts: [{ name: "main", tokenFile: "/a" }, { name: "alt", tokenCommand: ["clauth-token", "alt"] }] } }))
+      expect((await run(readDispatchConfig(file))).quota.accounts).toEqual([{ name: "main", kind: "token-file", tokenFile: "/a" }, { name: "alt", kind: "token-command", tokenCommand: ["clauth-token", "alt"] }])
+    })
+  })
   test("refuses a quota with no command instead of reading a built-in tool", async () => {
     await withBacklog(async (root) => {
       expect(await configProblem(root, { command: [] })).not.toBeNull()

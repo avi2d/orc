@@ -78,4 +78,27 @@ describe("the dispatch panel reader", () => {
     expect(machines.kind).toBe("unreachable");
     if (machines.kind === "unreachable") expect(machines.reason).toContain("note");
   });
+  test("refuses a second account beside a kind none account instead of spending the wrong login", async () => {
+    const machines = await machinesAt(
+      backlogWith({ machines: [machine], quota: { ...quota, accounts: [{ name: "main", kind: "none" }, { name: "alt", kind: "none" }] } }),
+    );
+    expect(machines.kind).toBe("unreachable");
+    if (machines.kind === "unreachable") {
+      expect(machines.reason).toContain("the account main takes kind none and names no login");
+      expect(machines.reason).toContain("names no other account beside it");
+    }
+  });
+  test("refuses a token account beside a kind none account instead of spending the wrong login", async () => {
+    const machines = await machinesAt(
+      backlogWith({ machines: [machine], quota: { ...quota, accounts: [{ name: "main", tokenFile: "/a" }, { name: "alt", kind: "none" }] } }),
+    );
+    expect(machines.kind).toBe("unreachable");
+    if (machines.kind === "unreachable") expect(machines.reason).toContain("the account alt takes kind none and names no login");
+  });
+  test("keeps several token accounts when no account is kind none", async () => {
+    const machines = await machinesAt(
+      backlogWith({ machines: [machine], quota: { ...quota, accounts: [{ name: "main", tokenFile: "/a" }, { name: "alt", tokenFile: "/b" }] } }),
+    );
+    expect(machines.kind).toBe("ok");
+  });
 });
