@@ -7,7 +7,7 @@ review:
   path_instructions:
     - path: "packages/run/**"
       instructions: |
-        The run package ships the orc command, published as @avi2dg/orc.
+        The run package ships the orc command.
         dependency-cruiser.config.ts holds it to the panel border, so it reaches another package only through @tui-dash/schema and @tui-dash/ui.
     - path: "packages/alerts/**"
       instructions: |
