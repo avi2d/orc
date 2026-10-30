@@ -6,8 +6,11 @@ import { readRoom, runBeat } from "./beat"
 import { backlogJson, type BacklogView, beatJson, formatBeat, formatBoard, type ProjectList, type RoomList } from "./board"
 import type { ConfigError } from "../json-file"
 import { checkoutOn, type DispatchConfig, readDispatchConfig, readProjects } from "./config"
-import { type Command, formatResult, queueFromText, readResult, readResultThrough, RunnerError, runnerJson, startTask } from "./runner"
+import { holdRun } from "./hold"
+import { type Command, queueFromText, renewTask, RunnerError, startTask } from "./runner"
+import { formatResult, readResult, readResultThrough, runnerJson } from "./runner-result"
 import type { TaskFileError, TaskRecord } from "./task-record"
+import { encodeToken, sessionToken } from "./token"
 
 type CommandArgs = Exclude<DispatchArgs, { readonly kind: "UsageError" }>
 
@@ -17,6 +20,7 @@ export interface DispatchPlace {
   readonly env: Readonly<Record<string, string | undefined>>
   readonly self: Command
   readonly stdin: Effect.Effect<string, RunnerError>
+  readonly stdoutIsTerminal: boolean
 }
 
 const backlogRoot = (place: DispatchPlace): string => place.home + "/backlog"
@@ -51,6 +55,22 @@ const titleOf = (body: string): string =>
   body.split("\n").map((line) => line.replace(/^#+\s*/, "").trim()).find((line) => line !== "") ?? ""
 
 const refuse = (detail: string) => Effect.fail(new BacklogError({ detail }))
+
+const readSessionToken = (session: string, stdoutIsTerminal: boolean) =>
+  Effect.gen(function*() {
+    if (stdoutIsTerminal) {
+      return yield* refuse("orc runner token prints a token, so it writes only into a pipe and never onto a terminal")
+    }
+    const fs = yield* FileSystem.FileSystem
+    const text = yield* fs.readFileString(session).pipe(
+      Effect.mapError((error) => new BacklogError({ detail: "cannot read " + session + ": " + error.message }))
+    )
+    const reading = sessionToken(text)
+    if (reading.kind === "unread") {
+      return yield* refuse(session + " " + reading.reason)
+    }
+    return yield* encodeToken(reading.token).pipe(Effect.mapError((error) => new BacklogError({ detail: "the " + error.what + " would not encode" })))
+  })
 
 const refusedDependency = (dependsOn: ReadonlyArray<string>, tasks: ReadonlyArray<TaskRecord>): string | null =>
   dependsOn.find((id) => !isTaskId(id) || !tasks.some((task) => task.spec.id === id)) ?? null
@@ -109,10 +129,25 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         break
       }
       case "RunnerStart": {
-        const line = yield* startTask(place.env, args.reach, place.self, place.home)
+        const line = yield* startTask(place.env, place.stdin, args.reach, place.self, place.home)
         if (line !== null) {
           yield* Console.log(line)
         }
+        break
+      }
+      case "RunnerRenew": {
+        const line = yield* renewTask(place.stdin, args.reach, place.home)
+        if (line !== null) {
+          yield* Console.log(line)
+        }
+        break
+      }
+      case "RunnerHold": {
+        yield* Console.log(yield* holdRun(args.task, args.run, place.home))
+        break
+      }
+      case "RunnerToken": {
+        yield* Console.log(yield* readSessionToken(args.session, place.stdoutIsTerminal))
         break
       }
       case "RunnerQueue": {

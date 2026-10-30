@@ -160,13 +160,22 @@ const actionLine = (action: BeatAction): string => {
     case "waits": {
       return "waits " + action.task + ": " + action.reason
     }
+    case "renewed": {
+      return "renewed the token of " + action.task + " on " + action.machine
+    }
+    case "renew-failed": {
+      return "renew failed " + action.task + " on " + action.machine + ": " + action.reason
+    }
   }
 }
+
+const renewal = (action: BeatAction): boolean => action.kind === "renewed" || action.kind === "renew-failed"
 
 export const formatBeat = (report: BeatReport): string =>
   [
     report.beat + " at " + report.at,
     describeQuota(report.quota),
     "room: " + (report.room.map((entry) => entry.machine + " " + entry.busy + " of " + entry.slots + " busy").join(", ") || "no machine"),
-    ...(report.actions.length === 0 ? ["no new task"] : report.actions.map(actionLine))
+    ...report.actions.map(actionLine),
+    ...(report.actions.every(renewal) ? ["no new task"] : [])
   ].join("\n")

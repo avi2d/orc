@@ -276,8 +276,10 @@ Orc keeps one backlog of tasks in `~/.orc/backlog`, one Markdown file per task w
 `ORC_HOME` moves the backlog elsewhere when set.
 A task file sits in `new`, `taken` or `closed`, and the folder it sits in is its state.
 Two files beside the folders tell the beat where tasks may go.
-`dispatch.json` names each machine, its slots and its start command, and the quota.
-The quota names the provider its accounts belong to, the command that reads their room, and each account's token file.
+`dispatch.json` names each machine, its slots, its start command and its renew command, and the quota.
+The quota names the provider its accounts belong to, the command that reads their room, and each account's token file or token command.
+A token file account needs only a start command on each machine.
+A token command account names a renew command on each machine beside its start command.
 It also names the floor of room each account must keep:
 
 ```json
@@ -298,7 +300,9 @@ It also names the floor of room each account must keep:
 }
 ```
 
-The provider is a token-file provider in `config.json` on each machine that runs the tasks, and each token file path holds on those machines.
+The provider is a token-file provider in `config.json` on each machine that runs the tasks.
+Each token file path in `dispatch.json` holds on those machines.
+A token command account keeps its token in the runner token folder on each machine instead.
 Orc runs the quota command with no input and reads its standard output as this document:
 
 ```json
@@ -314,6 +318,46 @@ Orc runs the quota command with no input and reads its standard output as this d
 Each entry gives the percent of room left, from 0 to 100, or the reason the account cannot run.
 An account the document does not name cannot run.
 A command that exits non-zero, runs past 15 seconds or prints any other document leaves the quota unread, and the beat starts nothing.
+
+An account can name a `tokenCommand` instead of a `tokenFile`, for a token that lives on the dispatching machine and rolls over.
+Then every machine names a `renew` command beside its `start` command:
+
+```json
+{
+  "machines": [
+    {
+      "name": "linux-box",
+      "slots": 4,
+      "start": ["orc", "runner", "start", "--", "ssh", "linux-box", "orc"],
+      "renew": ["orc", "runner", "renew", "--", "ssh", "linux-box", "orc"]
+    }
+  ],
+  "quota": {
+    "provider": "anthropic",
+    "command": ["my-quota-reader", "--json"],
+    "accounts": [{ "name": "main", "tokenCommand": ["orc", "runner", "token", "/Users/me/profiles/main/session-token.json"] }],
+    "floorPercent": 15
+  }
+}
+```
+
+Orc runs the token command with no input and reads its standard output as this document:
+
+```json
+{ "schema": "orc.token.v1", "token": "<the token>", "expiresAt": "2027-01-01T00:00:00.000Z" }
+```
+
+The token is printable ASCII with no space, since Pi reads it with `cat` and trims it.
+A token running out within five minutes counts as lapsed.
+A command that exits non-zero, runs past 15 seconds or prints any other document or a lapsed token leaves the account waiting.
+The beat then starts nothing on it.
+A later beat that reads a live token starts the task.
+A refusal names only the command and what it missed, never the token.
+
+`orc runner token <session-token.json>` is a token command for a clauth profile.
+It prints the profile's access token and expiry as `orc.token.v1`, and writes only into a pipe, never onto a terminal.
+It refuses a session that still holds a refresh token, since that login would then leave the machine.
+Run `clauth rolling-token` on the profile first.
 
 `projects.json` names each project and its checkout on each machine:
 
@@ -339,6 +383,7 @@ After the claim survives a recount, the beat writes the task started before it r
 A task marked for a machine waits for a slot on that machine and never starts on another.
 The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT` and `ORC_TASK_TOKEN_FILE`.
 `ORC_TASK_TOKEN_FILE` is the account's token file path, never the token.
+On a token command account it is empty, and the start command reads the token as `orc.token.v1` on standard input instead.
 The beat starts it detached in its own session, never waits for it and never kills it.
 So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
@@ -347,6 +392,7 @@ A missing start command exits 127 into its log and leaves the task started.
 Only a failure to spawn the log wrapper closes the task as `start-failed`.
 To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1`.
 When a started task ends, run `orc backlog close <task-id> <done|failed> [reason]`.
+On a token command account, each beat first sends every started task its account's current token through its machine's `renew` command, as JSON on standard input.
 
 ## The runner
 
@@ -365,6 +411,21 @@ SSH can drop once pueue holds the run, since pueue on that machine owns it.
 Pueue runs the task with the environment of the command that queued it.
 So the command after `--` must give orc the `PATH` its runs need on that machine.
 The queue records the resolved absolute `ORC_HOME` with the task.
+
+A task that comes with a token instead of a token file keeps it in `~/.orc/runner/tokens/<task-id>/token`, readable only by its owner, beside the expiry in `expires-at`.
+Pueue then runs `orc runner hold <task-id> -- orc run ... --token-file <that file>`, and the hold runs the run.
+The hold starts the run only while the token is live, and otherwise waits for a fresh one.
+Pi reads the token once per process.
+So a run that fails after its token ran out starts again on the fresh token instead of failing the task.
+The queue starts a detached guard that waits for the pueue task to finish and then removes the token folder.
+The guard covers the whole queued life of the task.
+It removes the folder when the run succeeds, fails, is killed, or never starts.
+It leaves the folder when pueue itself is unreachable, so the run still has its token after a daemon restart.
+A `pueue kill` gives the hold no time to clean up, so the guard removes the folder after pueue reports the task done.
+
+`orc runner renew` reads a task and its fresh token as JSON on standard input and replaces the token the task holds.
+Add `--` and the command that runs orc on another machine to send it there, as with `orc runner start`.
+A renewal for a task pueue no longer runs is refused and removes that task's token folder.
 
 To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh linux-box orc` from another.
 It names pueue's state for the task and the orc run on `orc/<task-id>` with its PR.
@@ -405,7 +466,11 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/dispatch/quota.ts` | The quota reading from the configured command and the pick of an account |
 | `src/dispatch/beat.ts` | The beat: room, placement, take and start |
 | `src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
-| `src/dispatch/runner.ts` | The runner: the start through pueue and the reading of a task's result |
+| `src/dispatch/runner.ts` | The runner: the start and the token renewal through pueue |
+| `src/dispatch/runner-result.ts` | The reading of a task's result and the `orc.runner.v1` JSON |
+| `src/dispatch/token.ts` | The `orc.token.v1` document, the token command and the clauth session reading |
+| `src/dispatch/held-token.ts` | The owner-only token folder a run on another machine reads |
+| `src/dispatch/hold.ts` | `orc runner hold`: the wait for a live token, the rerun and the folder removal |
 | `src/dispatch/pueue-status.ts` | The pueue status shapes and the held-task lookup the runner reads |
 | `src/dispatch/args.ts` | The flag parsing for `orc backlog`, `orc beat` and `orc runner` |
 | `src/dispatch/cli.ts` | The `orc backlog`, `orc beat` and `orc runner` commands |

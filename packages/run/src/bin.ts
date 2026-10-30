@@ -2,6 +2,7 @@
 import type { Database } from "bun:sqlite"
 import { runMain } from "@effect/platform-bun/BunRuntime"
 import { BunServices } from "@effect/platform-bun"
+import { isatty } from "node:tty"
 import { Console, Effect } from "effect"
 import packageJson from "../package.json" with { type: "json" }
 import { type OrcArgs, parseArgs } from "./args"
@@ -40,7 +41,8 @@ const dispatch = (args: Extract<OrcArgs, { readonly kind: "Dispatch" }>["args"])
     stdin: Effect.tryPromise({
       try: () => Bun.stdin.text(),
       catch: (cause) => new RunnerError({ detail: "cannot read stdin: " + String(cause) })
-    })
+    }),
+    stdoutIsTerminal: isatty(1)
   }).pipe(
     Effect.provide(BunServices.layer),
     Effect.catch((detail) => Console.error("orc: " + detail).pipe(Effect.andThen(Effect.fail(detail))))
