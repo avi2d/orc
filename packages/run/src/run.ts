@@ -381,10 +381,6 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
           const failed = implementLong === null ? baseFailed : { ...baseFailed, sessionSize: implementLong.counts, commits: implementLong.commits, sessionFile: implementLong.sessionFile }
           yield* writeEvidence(run, failed).pipe(Effect.orElseSucceed(() => undefined))
           yield* writeReport(run, failed).pipe(Effect.orElseSucceed(() => undefined))
-          const failedHandover = yield* writeHandover(run, failed).pipe(Effect.orElseSucceed(() => null))
-          if (failedHandover !== null) {
-            yield* recordHandoverEvidence(db, run.runId, failedHandover).pipe(Effect.orElseSucceed(() => undefined))
-          }
           yield* finishRun(db, run.runId, failed, new Date().toISOString()).pipe(Effect.orElseSucceed(() => undefined))
           return failed
         })

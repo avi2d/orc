@@ -709,6 +709,9 @@ describe("a long session survives a later failure", () => {
         expect(handover).toContain("Add a sample widget to the demo page.")
         expect(handover).toContain("work done")
         expect(handover).toContain("spawn bun ENOENT")
+        const shown = await Effect.runPromise(readShow(db, "run-9"))
+        const implement = shown?.steps.find((step) => step.name === "implement")
+        expect(implement?.evidence.filter((item) => item.kind === "handover").length).toBe(1)
       } finally {
         db.close()
       }
