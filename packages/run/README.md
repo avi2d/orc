@@ -294,9 +294,11 @@ Orc keeps one backlog of tasks in `~/.orc/backlog`, one Markdown file per task w
 A task file sits in `new`, `taken` or `closed`, and the folder it sits in is its state.
 Two files beside the folders tell the beat where tasks may go.
 `dispatch.json` names each machine, its slots, its start command and its renew command, and the quota.
-The quota names the provider its accounts belong to, the command that reads their room, and each account's token file or token command.
-A token file account needs only a start command on each machine.
-A token command account names a renew command on each machine beside its start command.
+The quota names the provider its accounts belong to, the command that reads their room, and each account's credential kind.
+An account of kind `token-file` names a `tokenFile` and needs only a start command on each machine.
+An account of kind `token-command` names a `tokenCommand`, for a token that lives on the dispatching machine and rolls over, and every machine names a `renew` command beside its start command.
+An account of kind `none` names no token source, for a provider or Pi package that logs in on its own.
+An account written with only a `tokenFile` or only a `tokenCommand` keeps working, and reads as the matching kind.
 It also names the floor of room each account must keep:
 
 ```json
@@ -317,7 +319,7 @@ It also names the floor of room each account must keep:
 }
 ```
 
-The provider is a token-file provider, or a package provider whose run takes no token file, in `config.json` on each machine that runs the tasks.
+The provider named here is one `config.json` on each machine that runs the tasks defines.
 Each token file path in `dispatch.json` holds on those machines.
 A token command account keeps its token in the runner token folder on each machine instead.
 Orc runs the quota command with no input and reads its standard output as this document:
@@ -336,8 +338,7 @@ Each entry gives the percent of room left, from 0 to 100, or the reason the acco
 An account the document does not name cannot run.
 A command that exits non-zero, runs past 15 seconds or prints any other document leaves the quota unread, and the beat starts nothing.
 
-An account can name a `tokenCommand` instead of a `tokenFile`, for a token that lives on the dispatching machine and rolls over.
-Then every machine names a `renew` command beside its `start` command:
+A quota with a token command account then looks like this:
 
 ```json
 {
@@ -376,6 +377,26 @@ It prints the profile's access token and expiry as `orc.token.v1`, and writes on
 It refuses a session that still holds a refresh token, since that login would then leave the machine.
 Run `clauth rolling-token` on the profile first.
 
+An account of kind `none` holds no token: the beat mints nothing, sends nothing, renews nothing and never waits on a token for it.
+A Pi package that logs in on its own takes this kind, as in a `claude-bridge` package that drives the Claude Code SDK while the dispatched run still goes through the `main` account named here:
+
+```json
+{
+  "machines": [
+    { "name": "mac", "slots": 2, "start": ["orc", "runner", "start"] }
+  ],
+  "quota": {
+    "provider": "claude-bridge",
+    "command": ["my-quota-reader", "--json"],
+    "accounts": [{ "name": "main", "kind": "none" }],
+    "floorPercent": 15
+  }
+}
+```
+
+Its `config.json` provider names the package with `credential` `package`, and its `env` points at the login the runs take, such as the `CLAUDE_CONFIG_DIR` of the account above.
+A file that names a token source or a `renew` command beside a kind `none` account is refused.
+
 `projects.json` names each project and its checkout on each machine:
 
 ```json
@@ -401,6 +422,7 @@ A task marked for a machine waits for a slot on that machine and never starts on
 The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT` and `ORC_TASK_TOKEN_FILE`.
 `ORC_TASK_TOKEN_FILE` is the account's token file path, never the token.
 On a token command account it is empty, and the start command reads the token as `orc.token.v1` on standard input instead.
+On a kind `none` account it is empty and nothing reads standard input.
 The beat starts it detached in its own session, never waits for it and never kills it.
 So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
@@ -419,7 +441,7 @@ On a token command account, each beat first sends every started task its account
 `orc runner start` is the start command that hands a task to pueue on its machine.
 The run then outlives the beat, the dispatcher and any SSH link to it.
 It reads the task from the beat's `ORC_TASK_*` variables and queues `orc run` in the checkout on branch `orc/<task-id>`, in the pueue group `orc`.
-The run takes `--sandbox none --provider <provider> --token-file <path>` on a token file provider, and `--sandbox none --provider <provider>` with no token file on a package provider, so it runs on the picked account and refuses an implementer on any other provider.
+The run takes `--sandbox none --provider <provider> --token-file <path>` when the account holds a token file or token, and `--sandbox none --provider <provider>` with no token file when the account is kind `none`, so it runs on the picked account and refuses an implementer on any other provider.
 The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
 The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.

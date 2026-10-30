@@ -32,7 +32,7 @@ const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-
 
 const config: DispatchConfig = {
   machines: [{ name: "mac", slots: 1, start: ["true"] }, { name: "linux", slots: 4, start: ["true"] }],
-  quota: { provider: "keyed", command: ["orc-quota"], accounts: [{ name: "main", tokenFile: "/secrets/main-token" }], floorPercent: 15 }
+  quota: { provider: "keyed", command: ["orc-quota"], accounts: [{ name: "main", kind: "token-file", tokenFile: "/secrets/main-token" }], floorPercent: 15 }
 }
 
 const projects: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Users/a/orc", linux: "/home/a/orc" } }]
@@ -229,7 +229,58 @@ describe("readDispatchConfig", () => {
       const machines = config.machines.map((machine) => ({ ...machine, renew: ["true"] }))
       const accounts = [{ name: "main", tokenCommand: ["clauth-token", "main"] }] as const
       await writeFile(file, JSON.stringify({ machines, quota: { ...config.quota, accounts } }))
-      expect((await run(readDispatchConfig(file))).quota.accounts).toEqual(accounts)
+      expect((await run(readDispatchConfig(file))).quota.accounts).toEqual([{ name: "main", kind: "token-command", tokenCommand: ["clauth-token", "main"] }])
+    })
+  })
+  test("reads a legacy token file account as kind token-file instead of refusing it", async () => {
+    await withBacklog(async (root) => {
+      const file = join(root, "dispatch.json")
+      await writeFile(file, JSON.stringify({ machines: config.machines, quota: { ...config.quota, accounts: [{ name: "main", tokenFile: "/secrets/main-token" }] } }))
+      expect((await run(readDispatchConfig(file))).quota.accounts).toEqual([{ name: "main", kind: "token-file", tokenFile: "/secrets/main-token" }])
+    })
+  })
+  test("keeps an explicit token file kind on the account that names it", async () => {
+    await withBacklog(async (root) => {
+      const file = join(root, "dispatch.json")
+      await writeFile(file, JSON.stringify({ machines: config.machines, quota: { ...config.quota, accounts: [{ name: "main", kind: "token-file", tokenFile: "/a" }] } }))
+      expect((await run(readDispatchConfig(file))).quota.accounts).toEqual([{ name: "main", kind: "token-file", tokenFile: "/a" }])
+    })
+  })
+  test("keeps a kind none account once no machine names a renew command", async () => {
+    await withBacklog(async (root) => {
+      const file = join(root, "dispatch.json")
+      await writeFile(file, JSON.stringify({ machines: config.machines, quota: { ...config.quota, accounts: [{ name: "main", kind: "none" }] } }))
+      expect((await run(readDispatchConfig(file))).quota.accounts).toEqual([{ name: "main", kind: "none" }])
+    })
+  })
+  test("refuses a token file kind with no token file instead of starting its runs on none", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, { accounts: [{ name: "main", kind: "token-file" }] })).toBe(
+        "the account main takes kind token-file and names no token file, so its runs would start with no credential"
+      )
+    })
+  })
+  test("refuses a token command kind with no token command instead of starting its runs on none", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, { accounts: [{ name: "main", kind: "token-command" }] })).toBe(
+        "the account main takes kind token-command and names no token command, so its runs would start with no credential"
+      )
+    })
+  })
+  test("refuses a kind none account that also names a token file instead of holding it", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, { accounts: [{ name: "main", kind: "none", tokenFile: "/a" }] })).toBe(
+        "the account main takes kind none and also names a token source, so name no token source for it"
+      )
+    })
+  })
+  test("refuses a kind none account while a machine names a renew command instead of keeping dead renewal", async () => {
+    await withBacklog(async (root) => {
+      const file = join(root, "dispatch.json")
+      const machines = config.machines.map((machine) => ({ ...machine, renew: ["true"] }))
+      await writeFile(file, JSON.stringify({ machines, quota: { ...config.quota, accounts: [{ name: "main", kind: "none" }] } }))
+      const read = await run(readDispatchConfig(file).pipe(Effect.as("read"), Effect.catchTag("ConfigError", (error) => Effect.succeed(error.detail))))
+      expect(read).toBe("the account main takes kind none and holds no token, so the machine mac names a renew command no account here uses")
     })
   })
   test("refuses a quota with no command instead of reading a built-in tool", async () => {

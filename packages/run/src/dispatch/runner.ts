@@ -7,7 +7,7 @@ import { TaskId } from "./backlog"
 import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldToken } from "./held-token"
 import { heldTask, orcGroup, PueueState, PueueStatus, taskLabel, type PueueTask } from "./pueue-status"
 import { parseTaskFile } from "./task-record"
-import { decodeTokenText, encodeRenewal, encodeSecretJson, LabelArg, RenewRequest, type TokenEncodeError, tokenDocumentNote, tokenFields } from "./token"
+import { decodeTokenText, encodeRenewal, encodeSecretJson, LabelArg, RenewRequest, type TokenEncodeError, tokenFields } from "./token"
 
 export class RunnerError extends Data.TaggedError("RunnerError")<{
   readonly detail: string
@@ -24,7 +24,8 @@ const taskFields = {
 
 const QueueRequest = Schema.Union([
   Schema.Struct({ ...taskFields, tokenFile: AbsolutePath, label: Schema.optional(LabelArg) }),
-  Schema.Struct({ ...taskFields, ...tokenFields, label: Schema.optional(LabelArg) })
+  Schema.Struct({ ...taskFields, ...tokenFields, label: Schema.optional(LabelArg) }),
+  Schema.Struct({ ...taskFields, label: Schema.optional(LabelArg) })
 ])
 type QueueRequest = typeof QueueRequest.Type
 
@@ -193,6 +194,9 @@ const queueTask = (
 ): Effect.Effect<string, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
+    yield* readOrcConfig(home).pipe(
+      Effect.mapError((error) => new RunnerError({ detail: error.file + ": " + error.detail }))
+    )
     yield* requireFolder(request.checkout)
     const project = yield* resolveProjectDir(request.checkout)
     yield* ensureOrcGroup()
@@ -211,17 +215,13 @@ const queueTask = (
     const run = [...self, "run", taskFile, "--branch", taskBranch(request.task), "--sandbox", "none", "--provider", request.provider]
     const add = (command: ReadonlyArray<string>) =>
       pueue(["add", "--group", orcGroup, "--label", label, "--working-directory", project, "--print-task-id", "--escape", "--", ...command], { ORC_HOME: home })
-    const packageRun = yield* readOrcConfig(home).pipe(
-      Effect.map((config) => config.providers.some((candidate) => candidate.id === request.provider && candidate.credential === "package")),
-      Effect.orElseSucceed(() => false as const)
-    )
-    if (packageRun) {
-      const id = yield* add([...run])
-      return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
-    }
     const holdArgs: ReadonlyArray<string> = label === taskLabel(home, request.task) ? [request.task] : [request.task, "--label", label]
     if ("tokenFile" in request) {
       const id = yield* add([...run, "--token-file", request.tokenFile])
+      return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
+    }
+    if (!("token" in request)) {
+      const id = yield* add([...run])
       return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
     }
     const dir = yield* holdToken(home, key, request).pipe(
@@ -289,7 +289,7 @@ const readRequest = (
     }
     const token = decodeTokenText(yield* stdin)
     if (Option.isNone(token)) {
-      return yield* refuse("orc runner start reads ORC_TASK_TOKEN_FILE or " + tokenDocumentNote + " on stdin, one of which the beat sends")
+      return { ...fields }
     }
     return { ...fields, ...token.value }
   })

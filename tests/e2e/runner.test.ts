@@ -501,33 +501,32 @@ describe("orc runner result", () => {
   }, runnerTimeout)
 })
 
-describe("orc runner queue for a package provider", () => {
-  const packageConfig = {
-    providers: [{ id: "bridged", credential: "package", packages: ["git:example.test/acme/pi-bridged@v1.2.0"], env: { ACME_ACCOUNT_DIR: "/accounts/main" } }],
-    models: { implementer: "bridged/coder-3", fixer: "bridged/coder-3" }
-  }
-
-  const packageRunArgs = (fixture: Fixture, provider: string): Array<string> => [
-    "--group", "orc", "--label", fixture.home + " task-9", "--working-directory", fixture.checkout, "--print-task-id", "--escape", "--",
-    process.execPath, binPath, "run", join(fixture.home, "runner", "task-9.md"), "--branch", "orc/task-9",
+describe("orc runner queue for a kind none account", () => {
+  const bareRunArgs = (fixture: Fixture, task: string, provider: string): Array<string> => [
+    "--group", "orc", "--label", fixture.home + " " + task, "--working-directory", fixture.checkout, "--print-task-id", "--escape", "--",
+    process.execPath, binPath, "run", join(fixture.home, "runner", task + ".md"), "--branch", "orc/" + task,
     "--sandbox", "none", "--provider", provider
   ]
 
-  test("queues the run with no --token-file instead of forwarding the account token file", async () => {
+  test("queues a request with no token and no --token-file instead of holding a token", async () => {
     await withFixture(async (fixture) => {
-      await writeFile(join(fixture.home, "config.json"), JSON.stringify(packageConfig))
-      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "bridged", tokenFile: mainToken, body: "# x\n" })
+      await writeFile(join(fixture.home, "config.json"), JSON.stringify({
+        providers: [{ id: "acme", credential: "package", packages: ["git:example.test/acme/tools@v1.2.0"], env: { ACME_ACCOUNT_DIR: "/accounts/main" } }],
+        models: { implementer: "acme/coder-3", fixer: "acme/coder-3" }
+      }))
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "acme", body: "# x\n" })
       expect(result.exitCode).toBe(0)
-      expect((await readFile(join(fixture.pueue, "add-args"), "utf8")).split("\n").slice(0, -1)).toEqual(packageRunArgs(fixture, "bridged"))
+      expect((await readFile(join(fixture.pueue, "add-args"), "utf8")).split("\n").slice(0, -1)).toEqual(bareRunArgs(fixture, "task-9", "acme"))
+      expect(await Bun.file(join(fixture.home, "runner", "tokens", "task-9", "token")).exists()).toBe(false)
     })
   }, runnerTimeout)
 
-  test("queues a token task with no --token-file and holds no token instead of queueing through the token hold", async () => {
+  test("refuses the queue while the orc config is invalid instead of starting the run", async () => {
     await withFixture(async (fixture) => {
-      await writeFile(join(fixture.home, "config.json"), JSON.stringify(packageConfig))
-      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "bridged", token: "package-unused-token", expiresAt: "2027-01-01T00:00:00.000Z", body: "# x\n" })
-      expect(result.exitCode).toBe(0)
-      expect((await readFile(join(fixture.pueue, "add-args"), "utf8")).split("\n").slice(0, -1)).toEqual(packageRunArgs(fixture, "bridged"))
+      await writeFile(join(fixture.home, "config.json"), JSON.stringify({ providers: [{ id: "acme", credential: "bogus" }] }))
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# x\n" })
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain(join(fixture.home, "config.json"))
       expect(await Bun.file(join(fixture.home, "runner", "tokens", "task-9", "token")).exists()).toBe(false)
     })
   }, runnerTimeout)
@@ -539,7 +538,36 @@ describe("orc runner queue for a package provider", () => {
       }))
       const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# x\n" })
       expect(result.exitCode).toBe(0)
-      expect((await readFile(join(fixture.pueue, "add-args"), "utf8")).split("\n").slice(0, -1)).toEqual([...packageRunArgs(fixture, "acme"), "--token-file", mainToken])
+      expect((await readFile(join(fixture.pueue, "add-args"), "utf8")).split("\n").slice(0, -1)).toEqual([...bareRunArgs(fixture, "task-9", "acme"), "--token-file", mainToken])
+    })
+  }, runnerTimeout)
+
+  test("a beat start for a kind none account queues with no --token-file and renews nothing", async () => {
+    await withFixture(async (fixture) => {
+      await fakeQuota(fixture)
+      await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify({
+        machines: [{ name: "linux", slots: 1, start: [process.execPath, binPath, "runner", "start"] }],
+        quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", kind: "none" }], floorPercent: 15 }
+      }))
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+      await orcOk(fixture, ["beat"])
+      expect(await queuedArgs(fixture)).toEqual(bareRunArgs(fixture, "task-1", "acme"))
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({
+        tasks: {
+          "77": {
+            id: 77,
+            label: fixture.home + " task-1",
+            group: "orc",
+            path: fixture.checkout,
+            status: { Running: { start: "2026-10-28T02:36:39.176448491+03:00" } }
+          }
+        },
+        groups: {}
+      }))
+      const second = await orcOk(fixture, ["beat"])
+      expect(second).not.toContain("renew")
+      expect(await Bun.file(join(fixture.home, "runner", "tokens", "task-1", "token")).exists()).toBe(false)
     })
   }, runnerTimeout)
 })
