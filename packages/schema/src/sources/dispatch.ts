@@ -60,18 +60,28 @@ const namePattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 const Name = Schema.String.check(Schema.isPattern(namePattern));
 
+const Command = Schema.NonEmptyArray(Schema.String.check(Schema.isNonEmpty()));
+
+const AbsolutePath = Schema.String.check(Schema.isPattern(/^\//));
+
 const Machine = Schema.Struct({
   name: Name,
   slots: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  start: Schema.NonEmptyArray(Schema.String.check(Schema.isNonEmpty())),
+  start: Command,
+  renew: Schema.optionalKey(Command),
 });
+
+const Account = Schema.Union([
+  Schema.Struct({ name: Name, tokenFile: AbsolutePath, tokenCommand: Schema.optionalKey(Schema.Never) }),
+  Schema.Struct({ name: Name, tokenCommand: Command, tokenFile: Schema.optionalKey(Schema.Never) }),
+]);
 
 const MachinesFile = Schema.Struct({
   machines: Schema.Array(Machine),
   quota: Schema.Struct({
     provider: Schema.String.check(Schema.isPattern(namePattern)),
-    command: Schema.NonEmptyArray(Schema.String.check(Schema.isNonEmpty())),
-    accounts: Schema.NonEmptyArray(Schema.Struct({ name: Name, tokenFile: Schema.String.check(Schema.isPattern(/^\//)) })),
+    command: Command,
+    accounts: Schema.NonEmptyArray(Account),
     floorPercent: Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 })),
   }),
 });
@@ -302,20 +312,22 @@ const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<Di
     const machinesRead = yield* readJsonFile(fs, root + "/dispatch.json");
     const projectsRead = yield* readJsonFile(fs, root + "/projects.json");
     const { tasks, unread } = yield* readTasks(fs, root);
-    const decodedMachines: Outcome<{ readonly machines: ReadonlyArray<DispatchMachine>; readonly accounts: ReadonlyArray<string> }> =
-      machinesRead.kind === "ok"
-        ? mapOutcome(decodeValue(MachinesFile)(machinesRead.value), (file) => ({
-          machines: file.machines,
-          accounts: file.quota.accounts.map((account) => account.name),
-        }))
-        : machinesRead;
+    const decodedMachines: Outcome<typeof MachinesFile.Type> =
+      machinesRead.kind === "ok" ? decodeValue(MachinesFile)(machinesRead.value) : machinesRead;
     const machinesFile = root + "/dispatch.json";
     const machines: Outcome<ReadonlyArray<DispatchMachine>> = (() => {
       if (decodedMachines.kind !== "ok") return decodedMachines;
       const machine = duplicateOf(decodedMachines.value.machines.map((entry) => entry.name));
       if (machine !== null) return unreachable(machinesFile + ": the machine " + machine + " is named twice");
-      const account = duplicateOf(decodedMachines.value.accounts);
+      const account = duplicateOf(decodedMachines.value.quota.accounts.map((entry) => entry.name));
       if (account !== null) return unreachable(machinesFile + ": the account " + account + " is named twice");
+      const commandAccount = decodedMachines.value.quota.accounts.find((entry) => "tokenCommand" in entry && entry.tokenCommand !== undefined);
+      const unrenewed = decodedMachines.value.machines.find((entry) => entry.renew === undefined);
+      if (commandAccount !== undefined && unrenewed !== undefined) {
+        return unreachable(
+          machinesFile + ": the machine " + unrenewed.name + " has no renew command, which the account " + commandAccount.name + " needs to carry its token past its expiry"
+        );
+      }
       return ok(decodedMachines.value.machines);
     })();
     const decodedProjects: Outcome<ReadonlyArray<DispatchProject>> =
