@@ -7,6 +7,7 @@ import { latestRunForBranch, stepsForRun } from "./history-resume"
 import { historyFailure } from "./history-write"
 import type { HistoryRun } from "./run-record"
 import type { ResumePlan } from "./run-loop"
+import { handoverFileName, inheritedHandoverFileName } from "./long-session"
 import { OrcRunError } from "./run-session"
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
@@ -214,7 +215,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
   Effect.gen(function*() {
     const allow = run.allow ?? []
     const answers = run.answers ?? []
-    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow, answers, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false }
+    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow, answers, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null }
     const prior = yield* latestRunForBranch(db, run.projectDir, run.branch).pipe(
       Effect.mapError((cause) => historyFailure("read", cause))
     )
@@ -222,7 +223,22 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       return empty
     }
     const progress = yield* readPriorProgress(db, run, prior)
-    const carriedImplement = yield* carrySessionFile(run, progress.implementSource, progress.implementSessionId)
+    const readNote = (file: string): Effect.Effect<string | null, OrcRunError> =>
+      run.fs.readFileString(file).pipe(
+        Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed<string | null>(null)),
+        Effect.mapError((cause) => historyFailure("read", cause))
+      )
+    const priorDir = run.path.join(run.path.dirname(run.runDir), prior.id)
+    const own = yield* readNote(run.path.join(priorDir, handoverFileName))
+    const forwarded = own === null ? yield* readNote(run.path.join(priorDir, inheritedHandoverFileName)) : null
+    const handover = own ?? forwarded
+    if (handover !== null) {
+      yield* run.fs.writeFileString(run.path.join(run.runDir, inheritedHandoverFileName), handover).pipe(
+        Effect.mapError((cause) => historyFailure("forward the handover note in", cause))
+      )
+    }
+    const fresh = !progress.implementPassed && (own !== null || (forwarded !== null && progress.implementSessionId === null))
+    const carriedImplement = fresh ? null : yield* carrySessionFile(run, progress.implementSource, progress.implementSessionId)
     const carriedFix = yield* carrySessionFile(run, progress.fixSource, progress.fixSessionId)
     const skipImplement = progress.implementPassed
     const skipChecks = progress.implementPassed && progress.checksPassed
@@ -230,7 +246,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       ? yield* inheritedCompletion(db, run, progress.priorId, progress.storedFixes)
       : { inheritedRounds: [], inheritedFixes: [] }
     return {
-      implementSessionId: progress.implementSessionId,
+      implementSessionId: fresh ? null : progress.implementSessionId,
       implementSessionFile: carriedImplement,
       skipImplement,
       skipChecks,
@@ -240,6 +256,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       inheritedFixes: inherited.inheritedFixes,
       fixSessionId: progress.fixSessionId,
       fixSessionFile: carriedFix,
-      fixRunning: progress.fixRunning
+      fixRunning: progress.fixRunning,
+      handover
     }
   })

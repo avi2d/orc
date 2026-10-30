@@ -1,0 +1,28 @@
+{"type":"session","version":3,"id":"sample-session-1","timestamp":"2026-10-01T09:00:00.000Z","cwd":"/work/demo"}
+{"type":"session_info","id":"a1","parentId":"a0","timestamp":"2026-10-01T09:00:01.000Z","name":"sample-widget"}
+{"type":"message","message":{"role":"system","content":[{"type":"text","text":"You are a coding assistant."}]}}
+{"type":"message","message":{"role":"user","content":[{"type":"text","text":"Add a sample widget to the demo page."}]}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"I will add the sample widget."}]}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"toolCall","id":"call_1","name":"read","arguments":{"path":"demo/page.txt"}}]}}
+{"type":"message","message":{"role":"toolResult","content":[{"type":"text","text":"page contents"}]}}
+{"type":"model_change","id":"m1","parentId":"a1","timestamp":"2026-10-01T09:01:00.000Z"}
+{"type":"message","message":{"role":"user","content":[{"type":"text","text":"Use the green style for the widget."}]}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"Green style applied."}]}}
+{"type":"message","message":{"role":"toolResult","content":[{"type":"text","text":"edit ok"}]}}
+{"type":"message","message":{"role":"user","content":[{"type":"text","text":"Now add a caption under it."}]}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"Caption added."}]}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"Checking the build."}]}}
+{"type":"context_edit","id":"c1","parentId":"b9","timestamp":"2026-10-01T09:02:00.000Z","targetId":"b9","replacement":null}
+not json
+
+[1,2]
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"Continuing after compaction 1."}]}}
+{"type":"compaction","id":"k1","parentId":"p1","timestamp":"2026-10-01T09:03:00.000Z","summary":"Work so far: the sample widget is on the demo page."}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"Continuing after compaction 2."}]}}
+{"type":"compaction","id":"k2","parentId":"p2","timestamp":"2026-10-01T09:04:00.000Z","summary":"Work so far: the sample widget is on the demo page."}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"Continuing after compaction 3."}]}}
+{"type":"compaction","id":"k3","parentId":"p3","timestamp":"2026-10-01T09:05:00.000Z","summary":"Work so far: the sample widget is on the demo page."}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"Continuing after compaction 4."}]}}
+{"type":"compaction","id":"k4","parentId":"p4","timestamp":"2026-10-01T09:06:00.000Z","summary":"Work so far: the sample widget is on the demo page."}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"Continuing after compaction 5."}]}}
+{"type":"compaction","id":"k5","parentId":"p5","timestamp":"2026-10-01T09:07:00.000Z","summary":"Work so far: the sample widget is on the demo page."}

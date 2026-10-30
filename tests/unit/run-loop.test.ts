@@ -122,6 +122,7 @@ const runLoopCheckpoints = (db: Database, run: HistoryRun): RunCheckpoints => ({
       sessionFile: outcome.sessionFile,
       tokens: outcome.tokens,
       commits: outcome.commits,
+      sessionSize: outcome.sessionSize,
       implementPassed: outcome.completed
     }, started, ended),
   checksRoundStart: (round, started) => recordChecksStart(db, run.runId, round, started),
@@ -254,7 +255,7 @@ describe("runFull has no checkpoint-free mode", () => {
         await mkdir(project, { recursive: true })
         const git = await stubGit(home)
         const run = await Effect.runPromise(historyFor("next-x", home, project, "2026-10-19T10:00:00.000Z", git, ""))
-        const plan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow: [], answers: [], inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false }
+        const plan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow: [], answers: [], inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null }
         let agentCalls = 0
         let checkCalls = 0
         const ops: SandboxOps = {

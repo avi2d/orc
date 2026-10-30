@@ -6,7 +6,9 @@ import { orcCompletionLine } from "./pi"
 import type { AllowWord, NoMistakesRecord, NoMistakesRunner, QuestionAnswer } from "./no-mistakes"
 import { OrcRunError } from "./run-session"
 import { toFileUrl } from "./run-history"
-import { findingLine, reportFileName, reportMarkdown, runStatus, type OrcRunReport } from "./report"
+import { findingLine, reportFileName, reportMarkdown, runStatus, type OrcRunCommit, type OrcRunReport } from "./report"
+import { handoverFileName, handoverNote, lastAssistantReply, longSessionWarning } from "./long-session"
+import { branchCommits } from "./git-run"
 
 export type { ChecksRoundSummary, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./report"
 
@@ -45,6 +47,9 @@ export const formatReport = (report: OrcRunReport): string =>
     "commits: " + (report.commits === null ? "unknown" : report.commits.length.toString() + report.commits.map((commit) => " " + commit.sha).join(",")),
     "input tokens: " + (report.tokens === null ? "unknown" : report.tokens.input.toString()),
     "output tokens: " + (report.tokens === null ? "unknown" : report.tokens.output.toString()),
+    "session size: " + (report.sessionSize === null ? "unknown" : report.sessionSize.turns.toString() + " turns, " + report.sessionSize.compactions.toString() + " compactions"),
+    "long session: " + (report.sessionSize === null ? "unknown" : (longSessionWarning(report.sessionSize) ?? "no")),
+    "handover: " + (report.sessionSize !== null && longSessionWarning(report.sessionSize) !== null ? toFileUrl(report.runDir + "/" + handoverFileName) : "none"),
     "checks: " + (report.checksRounds === null
       ? "never ran"
       : report.checksRounds.length.toString() + (report.checksRounds.length === 1 ? " round" : " rounds") + ", " + report.fixAttempts.toString() + (report.fixAttempts === 1 ? " fix attempt" : " fix attempts")),
@@ -83,6 +88,7 @@ export const failedReport = (run: HistoryRun, reason: string): OrcRunReport => (
   sessionFile: null,
   commits: null,
   tokens: null,
+  sessionSize: null,
   completed: false,
   markerVerified: false,
   implementPassed: false,
@@ -124,6 +130,34 @@ export const writeEvidence = (run: HistoryRun, report: OrcRunReport): Effect.Eff
     Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the evidence file: " + String(cause) }))
   )
 }
+
+export const writeHandover = (run: HistoryRun, report: OrcRunReport): Effect.Effect<string | null, OrcRunError> =>
+  Effect.gen(function*() {
+    if (report.sessionSize === null || longSessionWarning(report.sessionSize) === null) {
+      return null
+    }
+    const taskText = yield* run.fs.readFileString(run.taskPath).pipe(Effect.orElseSucceed(() => ""))
+    const sessionJsonl = report.sessionFile === null
+      ? null
+      : yield* run.fs.readFileString(report.sessionFile).pipe(Effect.map((text) => text as string | null), Effect.orElseSucceed(() => null))
+    const branch = yield* branchCommits(run.spawner, run.git, run.branch, run.projectDir).pipe(Effect.orElseSucceed(() => [] as Array<OrcRunCommit>))
+    const seen = new Set((report.commits ?? []).map((commit) => commit.sha))
+    const commits = [...(report.commits ?? []), ...branch.filter((commit) => !seen.has(commit.sha))]
+    const file = run.path.join(run.runDir, handoverFileName)
+    const note = handoverNote({
+      runId: report.runId,
+      branch: report.branch,
+      counts: report.sessionSize,
+      commits,
+      taskText,
+      lastReply: lastAssistantReply(sessionJsonl),
+      endReason: report.endReason
+    })
+    yield* run.fs.writeFileString(file, note).pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the handover note " + file + ": " + String(cause) }))
+    )
+    return file
+  })
 
 export const writeReport = (run: HistoryRun, report: OrcRunReport): Effect.Effect<void, OrcRunError> => {
   const file = run.path.join(run.runDir, reportFileName)

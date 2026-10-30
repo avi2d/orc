@@ -3,6 +3,11 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { hostGitRefusalExit, hostGitSafetyEnv } from "./host"
 import { OrcRunError } from "./run-session"
 
+export interface OrcRunCommit {
+  readonly sha: string
+  readonly subject: string
+}
+
 const gitEnv = (): Record<string, string> => ({
   PATH: Bun.env.PATH ?? "",
   HOME: Bun.env.HOME ?? "",
@@ -19,6 +24,25 @@ export const collectOutput = (
     stderr: handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
     exitCode: handle.exitCode
   }, { concurrency: "unbounded" })
+
+export const branchCommits = (
+  spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
+  git: string,
+  branch: string,
+  projectDir: string
+): Effect.Effect<Array<OrcRunCommit>, OrcRunError> =>
+  runGit(spawner, git, ["log", branch, "--not", "HEAD", "--format=%H%x1f%s"], projectDir).pipe(
+    Effect.map((logged) => {
+      if (logged.exitCode !== 0) {
+        return []
+      }
+      return logged.stdout.split("\n").filter((line) => line.trim() !== "").map((line) => {
+        const cut = line.indexOf("\x1f")
+        return cut === -1 ? { sha: line.trim(), subject: "" } : { sha: line.slice(0, cut).trim(), subject: line.slice(cut + 1).trim() }
+      })
+    }),
+    Effect.orElseSucceed(() => [] as Array<OrcRunCommit>)
+  )
 
 export const runGit = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],

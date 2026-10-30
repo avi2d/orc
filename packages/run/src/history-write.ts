@@ -37,7 +37,7 @@ interface PlannedFix {
 
 const planImplementDone = (
   run: HistoryRun,
-  report: Pick<OrcRunReport, "agentPath" | "sessionFile" | "tokens" | "commits" | "implementPassed">,
+  report: Pick<OrcRunReport, "agentPath" | "sessionFile" | "tokens" | "commits" | "sessionSize" | "implementPassed">,
   started: string,
   ended: string
 ): PlannedImplement => ({
@@ -107,7 +107,7 @@ export const recordResumePublish = (db: Database, run: HistoryRun, resume: Resum
           const planned = planImplementDone(run, {
             agentPath: run.agent.path,
             sessionFile: resume.implementSessionFile,
-            tokens: null, commits: null, implementPassed: true
+            tokens: null, commits: null, sessionSize: null, implementPassed: true
           }, run.started, run.started)
           insertPlannedStep(db, planned.step, [
             planned.taskEvidence,
@@ -152,6 +152,17 @@ export const recordImplementStart = (db: Database, run: HistoryRun, started: str
     yield* recordStep(db, { runId: run.runId, name: "implement", attempt: 1, status: "running", started, agentFile: run.agent.path, piSessionFile: piSessionFile ?? null }).pipe(Effect.asVoid, Effect.mapError((cause) => historyFailure("record the step in", cause)))
   })
 
+export const recordHandoverEvidence = (db: Database, runId: string, path: string): Effect.Effect<void, OrcRunError> =>
+  Effect.gen(function*() {
+    const stepId = yield* stepIdFor(db, runId, "implement", 1).pipe(Effect.mapError((cause) => historyFailure("read the step in", cause)))
+    if (stepId === null) {
+      return
+    }
+    yield* recordEvidence(db, { stepId, direction: "out", path, kind: "handover" }).pipe(
+      Effect.mapError((cause) => historyFailure("record the handover evidence in", cause))
+    )
+  })
+
 export const recordChecksStart = (db: Database, runId: string, round: number, started: string): Effect.Effect<void, OrcRunError> =>
   recordStep(db, { runId, name: "checks", attempt: round, status: "running", started, agentFile: null, piSessionFile: null }).pipe(
     Effect.asVoid,
@@ -174,7 +185,7 @@ export const recordNoMistakesStart = (db: Database, runId: string, started: stri
     Effect.mapError((cause) => historyFailure("record the no-mistakes step in", cause))
   )
 
-export const recordImplementDone = (db: Database, run: HistoryRun, report: Pick<OrcRunReport, "agentPath" | "sessionFile" | "tokens" | "commits" | "implementPassed">, started: string, ended: string): Effect.Effect<void, OrcRunError> =>
+export const recordImplementDone = (db: Database, run: HistoryRun, report: Pick<OrcRunReport, "agentPath" | "sessionFile" | "tokens" | "commits" | "sessionSize" | "implementPassed">, started: string, ended: string): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
     const failed = (action: string) => (cause: unknown) => historyFailure(action, cause)
     const planned = planImplementDone(run, report, started, ended)

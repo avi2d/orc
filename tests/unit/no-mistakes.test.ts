@@ -307,6 +307,7 @@ const report = (overrides: Partial<OrcRunReport>): OrcRunReport => ({
   sessionFile: null,
   commits: [{ sha: "abc1234", subject: "work" }],
   tokens: null,
+  sessionSize: null,
   completed: false,
   markerVerified: true,
   implementPassed: true,

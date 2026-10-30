@@ -141,6 +141,10 @@ Its `no-mistakes.txt` and the run history hold the no-mistakes findings, their c
 They also name the reviewer that served the review, as `axi status` gives it in `reviewer_agent`, or say no-mistakes named none.
 Its `report.md` carries the task, the branch, the status, the PR, the steps, the evidence, the signals, the findings and the result.
 The terminal report names the run folder, the agent file, the session file and the report as full links, beside the PR link.
+A run whose Pi session reaches 300 turns or 5 compactions records a `long-session` warning beside its token signals and writes `handover.md` into the run folder.
+The count covers the implementation session only.
+The handover names the commits the run made and the reason the run stopped, so the next run on the branch starts from the note instead of the bare task.
+A run that loads a handover forwards the copy as `inherited-handover.md`, so a later run still starts fresh only from a run's own note or when no implement session survived.
 
 ## Running without a sandbox
 

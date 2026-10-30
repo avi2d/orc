@@ -37,6 +37,7 @@ const expectedFiles = [
   "src/history-write.ts",
   "src/host.ts",
   "src/json-file.ts",
+  "src/long-session.ts",
   "src/model-route.ts",
   "src/no-mistakes-gate.ts",
   "src/no-mistakes.ts",

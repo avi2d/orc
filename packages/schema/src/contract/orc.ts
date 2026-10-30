@@ -10,6 +10,7 @@ export interface OrcStage {
 export interface OrcRun {
   readonly id: string;
   readonly branch: string | undefined;
+  readonly notice: string | undefined;
   readonly stages: ReadonlyArray<OrcStage>;
 }
 
@@ -38,6 +39,7 @@ const OrcShowJson = Schema.Struct({
       name: Schema.String,
       status: Schema.String,
       score: Schema.NullOr(Schema.Struct({ note: Schema.String })),
+      signals: Schema.optional(Schema.Array(Schema.Struct({ name: Schema.String, value: Schema.String }))),
     }),
   ),
 });
@@ -47,7 +49,7 @@ export const decodeOrcRuns = (text: string): Decoded<OrcSnapshot> => {
   if (parsed.kind !== "ok") return parsed;
   return {
     kind: "ok",
-    value: { runs: parsed.value.runs.map((run) => ({ id: run.id, branch: run.branch ?? undefined, stages: [] })) },
+    value: { runs: parsed.value.runs.map((run) => ({ id: run.id, branch: run.branch ?? undefined, notice: undefined, stages: [] })) },
   };
 };
 
@@ -61,10 +63,10 @@ export const decodeOrcShow = (text: string): Decoded<OrcSnapshot> => {
         {
           id: parsed.value.run.id,
           branch: parsed.value.run.branch ?? undefined,
+          notice: parsed.value.steps.flatMap((step) => step.signals ?? []).find((signal) => signal.name === "long-session")?.value,
           stages: parsed.value.steps.map((step) => ({
             name: step.name,
             status: step.status,
-            // The score note is the step's only human-written line.
             detail: step.score?.note ?? undefined,
           })),
         },
