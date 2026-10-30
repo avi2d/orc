@@ -368,17 +368,11 @@ export { type CalendarPattern, cronPattern, everyValue, nextMatch } from "./view
 export { type NamedOrchestrator, type NamedPueue, type NextKind, type NextReadings, type NextRow, type NextSource, type NextSourceState, type NextUp, nextUp, type OrchestratorRead } from "./views/next-up";
 export { machineQueue, type MachineQueueView, type QueueEntry, type QueueRow, type QueueRowState, queueWindow } from "./views/machine-queue";
 export {
-  backlogRoot,
-  type DispatchClaim,
-  type DispatchMachine,
-  type DispatchProject,
   type DispatchReading,
   type DispatchSnapshot,
   DispatchSource,
   dispatchSourceLayer,
-  type DispatchStarted,
   type DispatchTask,
-  type DispatchTaskState,
 } from "./sources/dispatch";
 export {
   type DispatchView,

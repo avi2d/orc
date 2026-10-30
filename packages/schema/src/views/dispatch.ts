@@ -53,7 +53,7 @@ const dependencyWait = (task: DispatchTask, tasks: ReadonlyArray<DispatchTask>):
   return undefined;
 };
 
-const waitOf = (task: DispatchTask, snapshot: DispatchSnapshot): WaitRow => {
+const waitOf = (task: DispatchTask, snapshot: DispatchSnapshot, busy: Map<string, number>): WaitRow => {
   const waiting = (reason: string): WaitRow => ({ id: task.id, title: task.title, project: task.project, reason });
   if (snapshot.unread.length > 0) return waiting("the beat cannot read the backlog");
   const blocked = dependencyWait(task, snapshot.tasks);
@@ -68,16 +68,26 @@ const waitOf = (task: DispatchTask, snapshot: DispatchSnapshot): WaitRow => {
   }
   const placed = machines.filter((machine) => (task.machine === null || machine.name === task.machine) && project.checkouts[machine.name] !== undefined);
   if (placed.length === 0) return waiting("the project " + project.name + " has no checkout on " + (task.machine ?? "any machine"));
-  const full = placed.every((machine) => busyOf(machine.name, snapshot.tasks) >= machine.slots);
+  const full = placed.every((machine) => (busy.get(machine.name) ?? 0) >= machine.slots);
   if (full) {
     return waiting(task.machine === null ? "no machine with a checkout of " + project.name + " has room" : task.machine + " has no room");
   }
+  let best: { readonly name: string; readonly free: number } | null = null;
+  for (const machine of placed) {
+    const free = Math.max(0, machine.slots - (busy.get(machine.name) ?? 0));
+    if (free > (best?.free ?? 0)) best = { name: machine.name, free };
+  }
+  if (best !== null) busy.set(best.name, (busy.get(best.name) ?? 0) + 1);
   return waiting("waits for the next beat");
 };
 
 export const dispatchView = (snapshot: DispatchSnapshot): DispatchView => {
   const runs: Array<RunRow> = [];
   const waiting: Array<WaitRow> = [];
+  const busy = new Map<string, number>();
+  if (snapshot.machines.kind === "ok") {
+    for (const machine of snapshot.machines.value) busy.set(machine.name, busyOf(machine.name, snapshot.tasks));
+  }
   for (const task of snapshot.tasks) {
     const state = task.state;
     if (state.kind === "taken") {
@@ -94,7 +104,7 @@ export const dispatchView = (snapshot: DispatchSnapshot): DispatchView => {
     } else if (state.kind === "closed") {
       continue;
     } else {
-      waiting.push(waitOf(task, snapshot));
+      waiting.push(waitOf(task, snapshot, busy));
     }
   }
   const machines: DispatchView["machines"] = snapshot.machines.kind === "ok"

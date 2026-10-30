@@ -39,7 +39,6 @@ export interface DispatchTask {
   readonly machine: string | null;
   readonly dependsOn: ReadonlyArray<string>;
   readonly created: string;
-  readonly folder: TaskFolder;
   readonly state: DispatchTaskState;
 }
 
@@ -112,7 +111,6 @@ const backlogRoot: Config.Config<string> = Config.all({
   home: Config.String("HOME"),
 }).pipe(Config.map(({ explicit, home }) => (explicit ?? home + "/.orc") + "/backlog"));
 
-export { backlogRoot };
 
 const feed = String.fromCharCode(10);
 const fence = "---";
@@ -174,7 +172,6 @@ const taskOf = (folder: TaskFolder, file: string, stem: string, text: string): D
     machine: front.machine,
     dependsOn: front.depends_on,
     created: front.created,
-    folder,
     state,
   };
 };
