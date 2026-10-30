@@ -1,0 +1,21 @@
+run:
+  id: "01M5CXGP3C0WRHQ6XN7NAX7HQ5"
+  branch: fm/tui-dash-task-pipeline
+  status: running
+  head: b5e8e168
+  head_sha: b5e8e168581b91e089de3c0feb3e2fb8aae30ea6
+  verification_plan: none
+  findings: "6 awaiting, 6 auto-fix"
+  steps[9]{step,status,findings,duration_ms}:
+    intent,completed,0,81
+    rebase,completed,0,2934
+    review,fixing,12,263150
+    test,pending,0,0
+    document,pending,0,0
+    lint,pending,0,0
+    push,pending,0,0
+    pr,pending,0,0
+    ci,pending,0,0
+  reviewer_agent: pi/claude-bridge/claude-opus-5-5
+  active_steps[1]{step,status,active_for,round_active_for,last_activity,agent_pid,round}:
+    review,fixing,8m18s,1m57s,"1s ago: pi producing output","9006",fix 1

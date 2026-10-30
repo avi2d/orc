@@ -1,0 +1,72 @@
+{
+  "schema": 2,
+  "generated_at": "2026-10-13T20:18:16+00:00",
+  "active_profile": "main",
+  "pending_switch": null,
+  "wrap_off": false,
+  "active_codex_profile": null,
+  "codex_fallback_chain": [],
+  "codex_wrap_off": false,
+  "refresh_interval_ms": 90000,
+  "profiles": [
+    {
+      "name": "main",
+      "active": true,
+      "rolling_token": false,
+      "provider": "anthropic",
+      "base_url": null,
+      "tier": "Max 20x",
+      "harness": "claude",
+      "has_live_session": false,
+      "auth_status": "expired",
+      "fetch_status": "Cached",
+      "stale": true,
+      "fetched_at": "2026-10-13T10:07:23+00:00",
+      "next_refresh_at": null,
+      "auto_start": false,
+      "auto_start_queue": null,
+      "bell_threshold": null,
+      "fallback": null,
+      "windows": [
+        {
+          "label": "7d",
+          "utilization_pct": 66.0,
+          "resets_at": "2026-10-16T17:00:00.007525+00:00"
+        },
+        {
+          "label": "7d fable",
+          "utilization_pct": 0.0,
+          "resets_at": "2026-10-16T17:00:00+00:00"
+        }
+      ],
+      "third_party": null
+    },
+    {
+      "name": "second",
+      "active": false,
+      "rolling_token": false,
+      "provider": "anthropic",
+      "base_url": null,
+      "tier": "Pro",
+      "harness": "claude",
+      "has_live_session": false,
+      "auth_status": "expired",
+      "fetch_status": "Cached",
+      "stale": true,
+      "fetched_at": "2026-10-13T10:08:36+00:00",
+      "next_refresh_at": null,
+      "auto_start": false,
+      "auto_start_queue": null,
+      "bell_threshold": null,
+      "fallback": null,
+      "windows": [
+        {
+          "label": "7d",
+          "utilization_pct": 1.0,
+          "resets_at": "2026-10-20T04:00:00.025710+00:00"
+        }
+      ],
+      "third_party": null
+    }
+  ]
+}

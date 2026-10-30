@@ -1,0 +1,24 @@
+● claude main · max     quota, gluttons, queue, machines every 10s · alerts every 2s
+  5 hours    ━━━━━┃━━━━━━━━━━━━━━╸  98% left                        resets in 1h 11m
+  week       ━━━━━━╸──┃───────────  31% left  runs out in 1d 20h    resets in 2d 20h
+  fable week ━━━━━━━━━┃━━━━━━━━━━━ 100% left                        resets in 2d 20h
++1 more claude profiles
+● codex · plus
+  5 hours    ━━━━━━━━━━━━━━━━━━━━┃ 100% left                        resets in 4h 59m
+  week       ━━━━━━━━━━━━━━━━━──┃─  82% left  may run out in 2d 7h  resets in 6d 11h
+● opencode-go
+  5 hours    ━━━━━━━━━━━━━━━━━━━━┃ 100% left                        resets in 4h 59m
+  week       ━━━━━━━━━━━━━━━┃━━━╸─  93% left                        resets in 5d 3h
+  month      ━━━━━━━━━━━━━━━━━┃───  81% left  runs out in 22d       resets in 25d
++4 more flags
+queue    north · 2 running · 2 queued · 1 paused · gpu group paused
+         south · 1 running
+actions  shop · none queued
+north    cpu 11% · memory 5.5G of 31.3G
+gpu      NVIDIA GeForce RTX 3080 Laptop GPU · 9% · memory 1.8G of 16.0G
++2 more rows
+alerts
+quota-pace none recorded
+heavy-load just now · expected, a nightly baseline runs on south
+long-task  just now · no verdict on this fire
+nightly    none recorded

@@ -1,0 +1,3 @@
+{"type":"session","version":3,"id":"s","timestamp":"2026-10-10T08:00:00.000Z","cwd":"/home/tester/.treehouse/shop-a1b2c3/2/shop"}
+{"type":"message","id":"m","parentId":"p","timestamp":"2026-10-10T09:00:00.000Z","message":{"role":"assistant","content":[],"api":"x","provider":"opencode-go","model":"glm-5","usage":{"input":30000,"output":2000,"cacheRead":100000,"cacheWrite":0,"totalTokens":132000}}}
+{"type":"message","id":"m","parentId":"p","timestamp":"2026-10-10T09:30:00.000Z","message":{"role":"assistant","content":[],"api":"x","provider":"opencode-go","model":"glm-5","usage":{"input":20000,"output":1500,"cacheRead":80000,"cacheWrite":0,"totalTokens":101500}}}

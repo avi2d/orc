@@ -1,0 +1,40 @@
+ projects › harbor                                                                                                08:02
+┏━ harbor · tasks ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓╭─ orc-step-7 ─────────────────────────────────────────────╮
+┃   task                  state   model pipe          time ┃│ orc-step-7 · orc run                                     │
+┃   orc-step-7            working –     ✓✓●○○○○        17m ┃│ Step seven run                                           │
+┃   tasks-pipe-build      working –                  1h 2m ┃│ writing the run report command                           │
+┃   tasks-pipe-full       working –     ✓✓✓✓✓✓✓✓✓✓○  2h 2m ┃│ ● working                                                │
+┃   tasks-pipe-quick      working –     ✓✓●○           32m ┃│ started 07:45 · running for 17m · north                  │
+┃   tasks-pipe-scout      waiting –     ✓✓◆○         1h 2m ┃│ no model recorded                                        │
+┃   tasks-pipe-local      done    –     ✓✓✓✓        1h 30m ┃│ kept   cpu – · peak memory –                             │
+┃                                                          ┃│ [✓ take task] [✓ isolated copy] [● agent] [○ checks]     │
+┃                                                          ┃│ [○ fix, up to 3] [○ no-mistakes PR] [○ report]           │
+┃                                                          ┃│ agent                                                    │
+┃                                                          ┃│ no live process on this machine                          │
+┃                                                          ┃│ no pueue run in its folders                              │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┃                                                          ┃│                                                          │
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰──────────────────────────────────────────────────────────╯
+ ↑↓ pick   ⏎/→ in   esc/← back   click to open   q quit

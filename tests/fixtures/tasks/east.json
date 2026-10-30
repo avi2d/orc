@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-19T08:02:11.000Z",
+  "orchestrator": {
+    "name": "harbor",
+    "version": "0.9.0"
+  },
+  "tasks": [
+    {
+      "id": "tasks-bridge-plot",
+      "title": "Plot the bridge migration",
+      "project": "harbor",
+      "kind": "build",
+      "state": "working",
+      "detail": "Moving the bridge queue to the new runner",
+      "startedAt": "2026-10-19T07:41:00.000Z",
+      "firstStartedAt": "2026-10-18T22:15:00.000Z",
+      "endedAt": null,
+      "folders": [
+        "/home/example/work/harbor",
+        "/home/example/.no-mistakes/worktrees/a1b2c3/run-7"
+      ],
+      "branches": [
+        "feature/bridge-runner",
+        "feature/bridge-runner-ci"
+      ]
+    },
+    {
+      "id": "tasks-inbox-sweep",
+      "title": "Sweep the inbox",
+      "project": "harbor",
+      "kind": "review",
+      "state": "waiting",
+      "detail": "Waiting on the nightly digest",
+      "startedAt": "2026-10-19T06:00:00.000Z",
+      "firstStartedAt": "2026-10-19T06:00:00.000Z",
+      "endedAt": null,
+      "folders": [
+        "/home/example/work/harbor"
+      ],
+      "branches": []
+    },
+    {
+      "id": "tasks-release-notes",
+      "title": "Draft the release notes",
+      "project": "notes",
+      "kind": "docs",
+      "state": "done",
+      "detail": "Notes for the 0.9.0 release",
+      "startedAt": "2026-10-18T09:00:00.000Z",
+      "firstStartedAt": "2026-10-18T09:00:00.000Z",
+      "endedAt": "2026-10-18T15:30:00.000Z",
+      "folders": [
+        "/home/example/work/notes"
+      ],
+      "branches": [
+        "release/0.9.0"
+      ]
+    }
+  ],
+  "overhead": [
+    {
+      "name": "supervisor",
+      "folders": [
+        "/home/example/harbor"
+      ]
+    }
+  ],
+  "schedules": [
+    {
+      "name": "inbox sweep returns",
+      "at": "2026-10-20T06:00:00.000Z",
+      "detail": "The sweep returns to the queue at dawn"
+    }
+  ]
+}

@@ -4,3 +4,4 @@ dist/
 reports/
 .stryker-tmp/
 .orc-home/
+repos/*

@@ -1,0 +1,1 @@
+{"longTask":{"quietMinutes":42,"repeatMinutes":7},"heavyLoad":{"sustainedMinutes":9,"machines":[{"name":"mac","loadAtLeast":25,"memory":{"usedAtLeastPercent":95}}]}}

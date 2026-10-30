@@ -1,0 +1,13 @@
+current_branch: fm/tui-dash-task-pipeline
+runs_on_current_branch: 0
+count: 8 of 8 total
+runs[8]{id,branch,status,head,pr}:
+  "01M5CSJ295YDZNJ7FDQXB0RN1M",fm/tui-dash-projects-hide-done,completed,31a14225,"https://github.com/avi2d/tui-dash/pull/41"
+  "01M5CRTKB9KS7MPBNCZA1EFWFH",fm/tui-dash-projects-hide-done,failed,bc5213ee,""
+  "01M5CRDD20V1JNHF735607T4FB",fm/tui-dash-machines-disk,completed,c53c8eeb,"https://github.com/avi2d/tui-dash/pull/40"
+  "01M5CGBBSA7GYF9FHKFC6D3HJA",fm/tui-dash-tasks-history-detail,completed,9e2407e3,"https://github.com/avi2d/tui-dash/pull/37"
+  "01M5CFR1F0AA7A1FF8AM4DYM9V",fm/tui-dash-fast-start,completed,6d180687,"https://github.com/avi2d/tui-dash/pull/39"
+  "01M5CEH1FN855DW8RDS5BK1FRD",fm/tui-dash-tasks-history-detail,failed,9e2407e3,""
+  "01M5CE782KB4YGBYQ5ETDEA4F4",fm/tui-dash-mac-child-cpu,completed,f5ee1493,"https://github.com/avi2d/tui-dash/pull/38"
+  "01M5C8FHGASK3Y1G6BAR61ED5N",fm/tui-dash-remote-levels,completed,85b8ed72,"https://github.com/avi2d/tui-dash/pull/36"
+help[2]: "Run no-mistakes axi run --intent \"the user's goal\" --yes to validate the current branch",No run exists for this branch; every run listed above is on another branch - inspect one deliberately with `no-mistakes axi status --run <id>`

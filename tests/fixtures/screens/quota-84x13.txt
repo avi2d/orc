@@ -1,0 +1,13 @@
+● claude main · max
+session ━━━━━━━━━┃━━━━━━━━━━━━━━━━━━━━━━━━━━━━─  98%  behind pace             1h 11m
+week    ━━━━━━━━━━━━────┃──────────────────────  31%  empty in 1d 20h         2d 20h
+fable   ━━━━━━━━━━━━━━━━┃━━━━━━━━━━━━━━━━━━━━━━ 100%  behind pace             2d 20h
+● claude second · pro
+7d      read 10h 9m ago
+● codex · plus
+session ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┃ 100%  on pace                 4h 59m
+week    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━────┃──  82%  empty in 2d 7h · early  6d 11h
+● opencode-go
+rolling ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┃ 100%  on pace                 4h 59m
+weekly  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┃━━━━━━╸──  93%  behind pace             5d 3h
+monthly ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╸┃──────  81%  empty in 22d            25d

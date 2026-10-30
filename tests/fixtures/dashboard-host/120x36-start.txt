@@ -1,0 +1,36 @@
+╭─ quota ────────────────────────────────────────── ↻ 10s ─╮╭─ ledger · today ───────────────────────────────── ↻ 10s ─╮
+│ ● claude main · max · runs out in 1d 20h                 ││ ○ Ship the ledger board today. · 5h                      │
+│   5 hours    ━━━━┃━━━━━━━━━━━╸  98%  +74 spare    1h 11m ││ ● The compact box keeps one line per message. · 4h       │
+│   week       ━━━━━╸─┃─────────  31%  10 over      2d 20h ││ ○ Does l open the full screen? · 2h                      │
+│   fable week ━━━━━━━┃━━━━━━━━━ 100%  +59 spare    2d 20h ││ ● Yes. l takes the full screen, and the cursor op… · 25m │
+│ +1 more claude profiles                                  ││                                                          │
+│ ● codex · plus · may run out in 2d 7h                    ││                                                          │
+│   5 hours    ━━━━━━━━━━━━━━━━┃ 100%  on pace      4h 59m ││                                                          │
+│   week       ━━━━━━━━━━━━━━──┃  82%  11 over      6d 11h ││                                                          │
+│ ● opencode-go · runs out in 22d                          ││                                                          │
+│ +3 more rows                                             ││                                                          │
+╰──────────────────────────────────────────────────────────╯│                                                          │
+╭─ gluttons | alerts ─────────────────────────────── ↻ 2s ─╮│                                                          │
+│ ⚑ shop is spending over its share of claude main's week  ││                                                          │
+│ ⚑ my-home is spending over its share of claude main's    ││                                                          │
+│   week                                                   ││                                                          │
+│ +2 more flags                                            ││                                                          │
+│                                                          ││                                                          │
+╰──────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯
+╭─ machines ─────────────────────────────────────── ↻ 10s ─╮╭─ projects · today ─────────────────────────────── ↻ 10s ─╮
+│ north  cpu 11%  mem 5.5G/31.3G  gpu 9%  disk 19%         ││   project                 work wait park block done plan │
+│   ✓ no task over its share                               ││   total                      2    2    –     –    –    – │
+│                                                          ││   harbor                     1    1    –     –    –    – │
+│ south  cpu 42%  mem 12.0G/64.0G  gpu 63%  disk 19%       ││   kelp                       1    1    –     –    –    – │
+│   task usage not read: TUI_DASH_REMOTE_TASK_LIVE is      ││                                                          │
+│   unset                                                  ││                                                          │
+╰──────────────────────────────────────────────────────────╯│                                                          │
+╭─ queue | scheduled ────────────────────────────── ↻ 10s ─╮│                                                          │
+│ 4 running · 1 waiting · 2 queued in pueue                ││                                                          │
+│ ! CI runs of blog not read                               ││                                                          │
+│ ▶ pueue north unknown sleep 800            25m       now ││                                                          │
+│ ▶ pueue north website sleep 1000           24m       now ││                                                          │
+│ ▶ pueue south kelp bun test                 0s       now ││                                                          │
+│ ▶ CI          shop ci                       3m       now ││                                                          │
+│ +8 more runs                                             ││                                                          │
+╰──────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯

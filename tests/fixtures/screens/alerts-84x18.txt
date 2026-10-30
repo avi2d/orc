@@ -1,0 +1,21 @@
+alerts
+alert    quota-pace
+limits   a window runs ahead of pace past its first tenth and runs out before its
+         reset
+         read every 1m
+fired    none recorded
+alert    heavy-load
+limits   north load ≥ 10 or memory used ≥ 90% · south load ≥ 16 or memory free < 15%
+         over for 5m · read every 30s
+fired    40m ago · south over memory · north over load
+verdict  expected, a nightly baseline runs on south
+alert    long-task
+limits   quiet 20m, then every 10m · past 3h in total
+         watches working, waiting and blocked · read every 30s
+fired    10m ago · Plot the bridge migration on north, quiet 30m
+verdict  none on this fire
+earlier  25m ago · Plot the bridge migration on north, quiet 15m
+         still moving the queue, let it run
+alert    nightly
+limits   no repository mapped to an owner home · read every 5m
+fired    none recorded
