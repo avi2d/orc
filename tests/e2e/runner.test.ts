@@ -55,9 +55,53 @@ describe("orc runner start", () => {
     await withFixture(async (fixture) => {
       const far = join(fixture.dir, "far-home")
       const added = await beatStarts(fixture, [process.execPath, binPath, "runner", "start", "--", ...orcThere(far)])
-      expect(added).toEqual(pueueAddFor(far, fixture.checkout))
+      const label = fixture.home + " task-1"
+      expect(added).toEqual([
+        "--group", "orc", "--label", label, "--working-directory", fixture.checkout, "--print-task-id", "--escape", "--",
+        process.execPath, binPath, "run", join(far, "runner", encodeURIComponent(label) + ".md"), "--branch", "orc/task-1",
+        "--sandbox", "none", "--provider", "acme", "--token-file", mainToken
+      ])
       expect(await queuedEnv(fixture)).toBe(far)
-      expect(await readFile(join(far, "runner", "task-1.md"), "utf8")).toBe(await readFile(join(fixture.dir, "task.md"), "utf8"))
+      expect(await readFile(join(far, "runner", encodeURIComponent(label) + ".md"), "utf8")).toBe(await readFile(join(fixture.dir, "task.md"), "utf8"))
+    })
+  }, runnerTimeout)
+
+  test("a beat closes a far-home run through its machine instead of leaving it started", async () => {
+    await withFixture(async (fixture) => {
+      const far = join(fixture.dir, "far-home")
+      const farPueue = join(fixture.dir, "far-pueue")
+      await mkdir(far, { recursive: true })
+      await mkdir(farPueue, { recursive: true })
+      await writeFile(join(farPueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
+      const through = ["sh", "-c", "ORC_HOME='" + far + "' PUEUE_STATE='" + farPueue + "' exec \"$0\" '" + binPath + "' \"$@\"", process.execPath]
+      await fakeQuota(fixture)
+      await writeMachine(fixture, [process.execPath, binPath, "runner", "start", "--", ...through])
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+      await orcOk(fixture, ["beat"])
+      const deadline = Date.now() + startWaitMillis
+      while (Date.now() < deadline) {
+        if (await readFile(join(farPueue, "add-args"), "utf8").then(() => true, () => false)) {
+          break
+        }
+        await Bun.sleep(20)
+      }
+      expect(await readFile(join(farPueue, "add-args"), "utf8").then(() => true, () => false)).toBe(true)
+      await writeFile(join(farPueue, "status.json"), JSON.stringify({
+        tasks: {
+          "77": {
+            id: 77,
+            label: fixture.home + " task-1",
+            group: "orc",
+            path: fixture.checkout,
+            status: { Done: { start: "2026-10-28T02:36:39.176448491+03:00", end: "2026-10-28T02:36:39.489650573+03:00", result: "Success" } }
+          }
+        },
+        groups: {}
+      }))
+      const second = await orcOk(fixture, ["beat"])
+      expect(second).toContain("closed task-1 done")
+      expect(await orcOk(fixture, ["backlog", "--json"])).toContain("\"status\":\"closed\"")
     })
   }, runnerTimeout)
 
@@ -333,6 +377,85 @@ describe("orc runner result", () => {
       const nearResult = Schema.decodeUnknownSync(RunnerRun)(await resultJson(fixture, "task-2"))
       expect(farResult.result.run).toEqual({ id: "run-far", status: "succeeded", prLink: "https://github.com/avi2d/orc/pull/2", endReason: null })
       expect(nearResult.result.run).toBeNull()
+    })
+  }, runnerTimeout)
+
+  test("two homes sharing one far runner queue separately and read their own runs instead of seeing each other's", async () => {
+    await withFixture(async (fixture) => {
+      const homeA = fixture.home
+      const homeB = join(fixture.dir, "home-b")
+      const far = join(fixture.dir, "far-home")
+      await mkdir(join(homeB, "backlog"), { recursive: true })
+      await mkdir(far, { recursive: true })
+      await writeFile(join(homeB, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { linux: fixture.checkout } }] }))
+      await fakeQuota(fixture)
+      const machineThroughFar = [process.execPath, binPath, "runner", "start", "--", ...orcThere(far)]
+      for (const home of [homeA, homeB]) {
+        await writeFile(join(home, "backlog", "dispatch.json"), JSON.stringify({
+          machines: [{ name: "linux", slots: 1, start: machineThroughFar }],
+          quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", tokenFile: mainToken }], floorPercent: 15 }
+        }))
+      }
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+      await orcOk(fixture, ["beat"])
+      const addB = await runOrc(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"], { ORC_HOME: homeB })
+      if (addB.exitCode !== 0) {
+        throw new Error("home-b add exited " + addB.exitCode + ": " + addB.stderr)
+      }
+      const beatB = await runOrc(fixture, ["beat"], { ORC_HOME: homeB })
+      if (beatB.exitCode !== 0) {
+        throw new Error("home-b beat exited " + beatB.exitCode + ": " + beatB.stderr)
+      }
+      expect(beatB.stdout).toContain("started task-1")
+      expect(beatB.stdout).not.toContain("already")
+      const deadline = Date.now() + startWaitMillis
+      let added: ReadonlyArray<string> = []
+      while (Date.now() < deadline) {
+        added = (await readFile(join(fixture.pueue, "added-tasks"), "utf8").catch(() => "")).split("\n").slice(0, -1)
+        if (added.length >= 2) {
+          break
+        }
+        await Bun.sleep(20)
+      }
+      const labelA = homeA + " task-1"
+      const labelB = homeB + " task-1"
+      expect(added.some((line) => line.startsWith(labelA + " orc "))).toBe(true)
+      expect(added.some((line) => line.startsWith(labelB + " orc "))).toBe(true)
+      const queueA = await runOrc(fixture, ["runner", "queue"], { ORC_HOME: far }, JSON.stringify({ task: "task-1", checkout: fixture.checkout, provider: "acme", body: "# x\n", token: "tokenA123", expiresAt: "2027-01-01T00:00:00.000Z", label: labelA }))
+      expect(queueA.exitCode).toBe(0)
+      const queueB = await runOrc(fixture, ["runner", "queue"], { ORC_HOME: far }, JSON.stringify({ task: "task-1", checkout: fixture.checkout, provider: "acme", body: "# x\n", token: "tokenB123", expiresAt: "2027-01-01T00:00:00.000Z", label: labelB }))
+      expect(queueB.exitCode).toBe(0)
+      expect(queueB.stdout).toContain("queued task-1")
+      const tokenFileA = join(far, "runner", "tokens", encodeURIComponent(labelA), "token")
+      const tokenFileB = join(far, "runner", "tokens", encodeURIComponent(labelB), "token")
+      expect(await readFile(tokenFileA, "utf8")).toBe("tokenA123")
+      expect(await readFile(tokenFileB, "utf8")).toBe("tokenB123")
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({
+        tasks: {
+          "77": { id: 77, label: labelA, group: "orc", path: fixture.checkout, status: { Running: { start: "2026-10-28T02:36:41.331824562+03:00" } } },
+          "78": { id: 78, label: labelB, group: "orc", path: fixture.checkout, status: { Running: { start: "2026-10-28T02:36:41.331824562+03:00" } } }
+        },
+        groups: {}
+      }))
+      const renewB = await runOrc(fixture, ["runner", "renew", "--", ...orcThere(far)], { ORC_HOME: homeB }, JSON.stringify({ task: "task-1", token: "tokenB456", expiresAt: "2027-01-01T00:00:00.000Z", label: labelB }))
+      expect(renewB.exitCode).toBe(0)
+      expect(await readFile(tokenFileA, "utf8")).toBe("tokenA123")
+      expect(await readFile(tokenFileB, "utf8")).toBe("tokenB456")
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({
+        tasks: {
+          "77": { id: 77, label: labelA, group: "orc", path: fixture.checkout, status: { Done: { start: "2026-10-28T02:36:39.176448491+03:00", end: "2026-10-28T02:36:39.489650573+03:00", result: "Success" } } },
+          "78": { id: 78, label: labelB, group: "orc", path: fixture.checkout, status: { Done: { start: "2026-10-28T02:36:39.500714478+03:00", end: "2026-10-28T02:36:39.813536573+03:00", result: { Failed: 3 } } } }
+        },
+        groups: {}
+      }))
+      const RunnerStatus = Schema.Struct({ result: Schema.Struct({ status: Schema.String, pueueTask: Schema.Number }) })
+      const resultA = Schema.decodeUnknownSync(RunnerStatus)(JSON.parse(await orcOk(fixture, ["runner", "result", "task-1", "--label", labelA, "--json", "--", ...orcThere(far)], { ORC_HOME: homeA })))
+      const resultB = Schema.decodeUnknownSync(RunnerStatus)(JSON.parse(await orcOk(fixture, ["runner", "result", "task-1", "--label", labelB, "--json", "--", ...orcThere(far)], { ORC_HOME: homeB })))
+      expect(resultA.result.status).toBe("succeeded")
+      expect(resultA.result.pueueTask).toBe(77)
+      expect(resultB.result.status).toBe("failed")
+      expect(resultB.result.pueueTask).toBe(78)
     })
   }, runnerTimeout)
 })

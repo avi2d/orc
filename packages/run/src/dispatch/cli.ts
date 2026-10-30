@@ -143,7 +143,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         break
       }
       case "RunnerHold": {
-        yield* Console.log(yield* holdRun(args.task, args.run, place.home))
+        yield* Console.log(yield* holdRun(args.task, args.run, place.home, args.label))
         break
       }
       case "RunnerToken": {
@@ -156,8 +156,8 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       }
       case "RunnerResult": {
         const result = args.reach.kind === "here"
-          ? yield* readResult(args.task, place.home)
-          : yield* readResultThrough(args.reach.command, args.task)
+          ? yield* readResult(args.task, place.home, args.label)
+          : yield* readResultThrough(args.reach.command, args.task, args.label)
         yield* Console.log(args.json ? JSON.stringify(runnerJson(result)) : formatResult(result))
         break
       }

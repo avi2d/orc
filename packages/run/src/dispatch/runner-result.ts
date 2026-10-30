@@ -109,9 +109,9 @@ const readRun = (home: string, checkout: string, task: string): Effect.Effect<Ru
   )
 
 // The beat closes a started task from this, so its done and failed match what runner result reports.
-export const readClosing = (task: string, home: string): Effect.Effect<TaskClosing | null, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+export const readClosing = (task: string, home: string, label?: string | null): Effect.Effect<TaskClosing | null, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    const held = yield* readHeld(home, task)
+    const held = yield* readHeld(home, task, label)
     if (held === null) {
       return null
     }
@@ -121,9 +121,9 @@ export const readClosing = (task: string, home: string): Effect.Effect<TaskClosi
     return closingOf(task, held.id, status)
   })
 
-export const readResult = (task: string, home: string): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
+export const readResult = (task: string, home: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
-    const held = yield* readHeld(home, task)
+    const held = yield* readHeld(home, task, label)
     if (held === null) {
       return { task, status: "unknown" } satisfies RunnerResult
     }
@@ -134,8 +134,8 @@ export const readResult = (task: string, home: string): Effect.Effect<RunnerResu
     return assessHeld(task, held.id, status, run)
   })
 
-export const readResultThrough = (command: Command, task: string): Effect.Effect<RunnerResult, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  capture([...command, "runner", "result", task, "--json"], null).pipe(
+export const readResultThrough = (command: Command, task: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  capture(label == null ? [...command, "runner", "result", task, "--json"] : [...command, "runner", "result", task, "--label", label, "--json"], null).pipe(
     Effect.flatMap((result) =>
       result.exitCode === 0
         ? decodeJson(result.stdout, RunnerDocument, command.join(" ") + " runner result")

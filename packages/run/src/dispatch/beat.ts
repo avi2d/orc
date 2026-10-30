@@ -6,7 +6,9 @@ import { type Account, checkoutOn, type DispatchConfig, type Machine, type Proje
 import { type QuotaReading, readQuota } from "./quota"
 import type { Claim, TaskFileError, TaskRecord } from "./task-record"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
-import { readClosing } from "./runner-result"
+import { taskLabel } from "./pueue-status"
+import { readClosing, readResultThrough } from "./runner-result"
+import type { Command } from "./runner"
 
 export interface MachineRoom {
   readonly machine: string
@@ -286,6 +288,21 @@ const considerTask = (
 
 const renewSeconds = 30
 
+const throughOf = (values: ReadonlyArray<string>): Command | null => {
+  const cut = values.indexOf("--")
+  if (cut === -1) {
+    return null
+  }
+  const rest = values.slice(cut + 1)
+  const [first = "", ...others] = rest
+  if (first === "") {
+    return null
+  }
+  return [first, ...others]
+}
+
+const throughFor = (machine: Machine): Command | null => throughOf(machine.start) ?? (machine.renew === undefined ? null : throughOf(machine.renew))
+
 const sendRenewal = (renew: Machine["renew"] & {}, stdin: string): Effect.Effect<string | null, never, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
@@ -318,7 +335,7 @@ const renewTask = (context: BeatContext, task: TaskRecord): Effect.Effect<Option
       return Option.some(failed(check.reason))
     }
     const renew = machine.renew
-    const refused = yield* encodeRenewal({ task: task.spec.id, ...check.token }).pipe(
+    const refused = yield* encodeRenewal({ task: task.spec.id, ...check.token, label: taskLabel(context.home, task.spec.id) }).pipe(
       Effect.flatMap((renewal) => sendRenewal(renew, renewal)),
       Effect.catchTag("TokenEncodeError", (error) => Effect.succeed("the " + error.what + " would not encode"))
     )
@@ -334,7 +351,11 @@ const closeFinished = (
     if (task.state.kind !== "started") {
       return Option.none()
     }
-    const closing = yield* readClosing(task.spec.id, context.home).pipe(
+    const claim = task.state.claim
+    const label = taskLabel(context.home, task.spec.id)
+    const machine = context.config.machines.find((entry) => entry.name === claim.machine)
+    const through = machine === undefined ? null : throughFor(machine)
+    const closing = yield* (through === null ? readClosing(task.spec.id, context.home, label) : readResultThrough(through, task.spec.id, label).pipe(Effect.map((result) => result.status === "succeeded" ? { task: task.spec.id, pueueTask: result.pueueTask, outcome: "done" as const, reason: "pueue task " + result.pueueTask + " succeeded", started: result.started, ended: result.ended } : result.status === "failed" ? { task: task.spec.id, pueueTask: result.pueueTask, outcome: "failed" as const, reason: result.reason, started: result.started, ended: result.ended } : null))).pipe(
       Effect.catchTag("RunnerError", () => Effect.succeed(null))
     )
     if (closing === null) {
@@ -391,7 +412,9 @@ export const runBeat = (
       }
     }
     const closedIds = new Set(closed.map((action) => action.task))
-    const renewals = yield* Effect.forEach(tasks.filter((task) => !closedIds.has(task.spec.id)), (task) => renewTask(context, task))
-    const actions = yield* Effect.forEach(tasks.filter((task) => task.state.kind === "new"), (task) => considerTask(context, task))
+    const current = yield* listTasks(root)
+    const fresh: BeatContext = { ...context, tasks: current }
+    const renewals = yield* Effect.forEach(current.filter((task) => !closedIds.has(task.spec.id)), (task) => renewTask(fresh, task))
+    const actions = yield* Effect.forEach(current.filter((task) => task.state.kind === "new"), (task) => considerTask(fresh, task))
     return { beat, at, quota, room, actions: [...closed, ...renewals.flatMap(Option.toArray), ...actions] }
   })

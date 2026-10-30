@@ -52,7 +52,7 @@ export const encodeSecretJson = <S extends Schema.Top & { readonly EncodingServi
 export const encodeToken = (token: RunToken): Effect.Effect<string, TokenEncodeError> =>
   encodeSecretJson(TokenDocument, "token document")({ schema: TOKEN_JSON_SCHEMA, ...token })
 
-export const RenewRequest = Schema.Struct({ task: TaskId, ...tokenFields })
+export const RenewRequest = Schema.Struct({ task: TaskId, ...tokenFields, label: Schema.optional(Schema.String) })
 export type RenewRequest = typeof RenewRequest.Type
 
 export const encodeRenewal = encodeSecretJson(RenewRequest, "renewal")

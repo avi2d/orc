@@ -23,8 +23,8 @@ const taskFields = {
 }
 
 const QueueRequest = Schema.Union([
-  Schema.Struct({ ...taskFields, tokenFile: AbsolutePath }),
-  Schema.Struct({ ...taskFields, ...tokenFields })
+  Schema.Struct({ ...taskFields, tokenFile: AbsolutePath, label: Schema.optional(Schema.String) }),
+  Schema.Struct({ ...taskFields, ...tokenFields, label: Schema.optional(Schema.String) })
 ])
 type QueueRequest = typeof QueueRequest.Type
 
@@ -103,11 +103,15 @@ const encodeRefusal = (error: TokenEncodeError): RunnerError => new RunnerError(
 const encodeQueueRequest = (request: QueueRequest): Effect.Effect<string, RunnerError> =>
   encodeSecretJson(QueueRequest, "queue request")(request).pipe(Effect.mapError(encodeRefusal))
 
-export const readHeld = (home: string, task: string): Effect.Effect<PueueTask | null, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+export const readHeld = (home: string, task: string, label?: string | null): Effect.Effect<PueueTask | null, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   pueue(["status", "--json"]).pipe(
     Effect.flatMap((text) => decodeJson(text, PueueState, "pueue status --json")),
-    Effect.map((state) => heldTask(state.tasks, home, task))
+    Effect.map((state) => heldTask(state.tasks, home, task, label))
   )
+
+export const labelOf = (home: string, task: string, label?: string | null): string => label ?? taskLabel(home, task)
+
+export const fileKeyOf = (home: string, task: string, label: string): string => label === taskLabel(home, task) ? task : encodeURIComponent(label)
 
 const PueueGroups = Schema.Record(Schema.String, Schema.Unknown)
 
@@ -192,31 +196,34 @@ const queueTask = (
     yield* requireFolder(request.checkout)
     const project = yield* resolveProjectDir(request.checkout)
     yield* ensureOrcGroup()
-    const held = yield* readHeld(home, request.task)
+    const label = labelOf(home, request.task, request.label)
+    const key = fileKeyOf(home, request.task, label)
+    const held = yield* readHeld(home, request.task, label)
     if (held !== null) {
       return request.task + " is already pueue task " + held.id + " in group " + orcGroup
     }
     const folder = home + "/runner"
-    const taskFile = folder + "/" + request.task + ".md"
+    const taskFile = folder + "/" + key + ".md"
     yield* fs.makeDirectory(folder, { recursive: true }).pipe(
       Effect.andThen(fs.writeFileString(taskFile, request.body)),
       Effect.mapError((error) => new RunnerError({ detail: "cannot write " + taskFile + ": " + error.message }))
     )
     const run = [...self, "run", taskFile, "--branch", taskBranch(request.task), "--sandbox", "none", "--provider", request.provider]
     const add = (command: ReadonlyArray<string>) =>
-      pueue(["add", "--group", orcGroup, "--label", taskLabel(home, request.task), "--working-directory", project, "--print-task-id", "--escape", "--", ...command], { ORC_HOME: home })
+      pueue(["add", "--group", orcGroup, "--label", label, "--working-directory", project, "--print-task-id", "--escape", "--", ...command], { ORC_HOME: home })
+    const holdArgs: ReadonlyArray<string> = label === taskLabel(home, request.task) ? [request.task] : [request.task, "--label", label]
     if ("tokenFile" in request) {
       const id = yield* add([...run, "--token-file", request.tokenFile])
       return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
     }
-    const dir = yield* holdToken(home, request.task, request).pipe(
+    const dir = yield* holdToken(home, key, request).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "cannot hold the token for " + request.task + ": " + error.message })),
-      Effect.tapError(() => releaseHeldToken(home, request.task))
+      Effect.tapError(() => releaseHeldToken(home, key))
     )
-    const id = yield* add([...self, "runner", "hold", request.task, "--", ...run, "--token-file", heldTokenFile(dir)]).pipe(
-      Effect.tapError(() => releaseHeldToken(home, request.task))
+    const id = yield* add([...self, "runner", "hold", ...holdArgs, "--", ...run, "--token-file", heldTokenFile(dir)]).pipe(
+      Effect.tapError(() => releaseHeldToken(home, key))
     )
-    yield* guardQueued(home, id.trim(), dir).pipe(Effect.tapError(() => releaseHeldToken(home, request.task)))
+    yield* guardQueued(home, id.trim(), dir).pipe(Effect.tapError(() => releaseHeldToken(home, key)))
     return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
   })
 
@@ -228,13 +235,15 @@ const pueueDone = (task: PueueTask): boolean =>
 
 const renewHere = (request: RenewRequest, home: string): Effect.Effect<string, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
-    const held = yield* readHeld(home, request.task)
+    const label = labelOf(home, request.task, request.label)
+    const key = fileKeyOf(home, request.task, label)
+    const held = yield* readHeld(home, request.task, label)
     const fail = (error: { readonly message: string }) => new RunnerError({ detail: "cannot renew the token for " + request.task + ": " + error.message })
     if (held === null || pueueDone(held)) {
-      yield* dropHeldToken(home, request.task).pipe(Effect.mapError(fail))
+      yield* dropHeldToken(home, key).pipe(Effect.mapError(fail))
       return yield* refuse(request.task + " has no queued or running pueue task here, so no token is kept for it")
     }
-    if (!(yield* replaceHeldToken(home, request.task, request).pipe(Effect.mapError(fail)))) {
+    if (!(yield* replaceHeldToken(home, key, request).pipe(Effect.mapError(fail)))) {
       return yield* refuse(request.task + " holds no token here, so the renewal is dropped")
     }
     return "renewed the token for " + request.task + " until " + DateTime.formatIso(request.expiresAt)
@@ -313,7 +322,8 @@ export const startTask = (
     if (reach.kind === "here") {
       return yield* queueTask(request, self, home)
     }
-    yield* handThrough(reach.command, "queue", yield* encodeQueueRequest(request))
+    const label = taskLabel(home, request.task)
+    yield* handThrough(reach.command, "queue", yield* encodeQueueRequest({ ...request, label }))
     return null
   })
 

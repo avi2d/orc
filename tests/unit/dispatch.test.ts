@@ -479,6 +479,35 @@ describe("the beat's closing sweep", () => {
       expect(beat.actions).toEqual(["closed:task-1", "started:task-2"])
     })
   })
+  test("a task waiting on a just-finished task starts in the same beat instead of waiting one more beat", async () => {
+    await withBacklog(async (root) => {
+      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["true"] }] }))
+      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: macProjects }))
+      await run(addTask(root, spec))
+      await run(addTask(root, { ...spec, title: "Fix the other thing", dependsOn: ["task-1"] }))
+      await run(claimTask(root, "task-1"))
+      const first = (await run(listTasks(root))).find((task) => task.spec.id === "task-1")
+      if (first === undefined) {
+        throw new Error("the backlog holds no task-1")
+      }
+      await run(writeTaken(root, { spec: first.spec, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
+      const status = JSON.stringify({
+        tasks: {
+          "11": {
+            id: 11,
+            label: taskLabel(root, "task-1"),
+            group: "orc",
+            path: "/checkout",
+            status: { Done: { start: "2026-10-27T10:02:00.000Z", end: "2026-10-27T10:05:00.000Z", result: "Success" } }
+          }
+        }
+      })
+      const spawner = pueueStub(status).pipe(Layer.provide(BunServices.layer))
+      const report = await Effect.runPromise(runBeat(root, root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+      expect((await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["task-1:closed", "task-2:started"])
+      expect(report.actions.map((action) => action.kind + ":" + action.task)).toEqual(["closed:task-1", "started:task-2"])
+    })
+  })
 })
 
 describe("the pueue label", () => {
