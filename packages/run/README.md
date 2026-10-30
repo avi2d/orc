@@ -317,7 +317,7 @@ It also names the floor of room each account must keep:
 }
 ```
 
-The provider is a token-file provider in `config.json` on each machine that runs the tasks.
+The provider is a token-file provider, or a package provider whose run takes no token file, in `config.json` on each machine that runs the tasks.
 Each token file path in `dispatch.json` holds on those machines.
 A token command account keeps its token in the runner token folder on each machine instead.
 Orc runs the quota command with no input and reads its standard output as this document:
@@ -419,7 +419,7 @@ On a token command account, each beat first sends every started task its account
 `orc runner start` is the start command that hands a task to pueue on its machine.
 The run then outlives the beat, the dispatcher and any SSH link to it.
 It reads the task from the beat's `ORC_TASK_*` variables and queues `orc run` in the checkout on branch `orc/<task-id>`, in the pueue group `orc`.
-The run takes `--sandbox none --provider <provider> --token-file <path>`, so it runs on the picked account and refuses an implementer on any other provider.
+The run takes `--sandbox none --provider <provider> --token-file <path>` on a token file provider, and `--sandbox none --provider <provider>` with no token file on a package provider, so it runs on the picked account and refuses an implementer on any other provider.
 The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
 The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.

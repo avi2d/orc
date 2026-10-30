@@ -500,3 +500,46 @@ describe("orc runner result", () => {
     })
   }, runnerTimeout)
 })
+
+describe("orc runner queue for a package provider", () => {
+  const packageConfig = {
+    providers: [{ id: "bridged", credential: "package", packages: ["git:example.test/acme/pi-bridged@v1.2.0"], env: { ACME_ACCOUNT_DIR: "/accounts/main" } }],
+    models: { implementer: "bridged/coder-3", fixer: "bridged/coder-3" }
+  }
+
+  const packageRunArgs = (fixture: Fixture, provider: string): Array<string> => [
+    "--group", "orc", "--label", fixture.home + " task-9", "--working-directory", fixture.checkout, "--print-task-id", "--escape", "--",
+    process.execPath, binPath, "run", join(fixture.home, "runner", "task-9.md"), "--branch", "orc/task-9",
+    "--sandbox", "none", "--provider", provider
+  ]
+
+  test("queues the run with no --token-file instead of forwarding the account token file", async () => {
+    await withFixture(async (fixture) => {
+      await writeFile(join(fixture.home, "config.json"), JSON.stringify(packageConfig))
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "bridged", tokenFile: mainToken, body: "# x\n" })
+      expect(result.exitCode).toBe(0)
+      expect((await readFile(join(fixture.pueue, "add-args"), "utf8")).split("\n").slice(0, -1)).toEqual(packageRunArgs(fixture, "bridged"))
+    })
+  }, runnerTimeout)
+
+  test("queues a token task with no --token-file and holds no token instead of queueing through the token hold", async () => {
+    await withFixture(async (fixture) => {
+      await writeFile(join(fixture.home, "config.json"), JSON.stringify(packageConfig))
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "bridged", token: "package-unused-token", expiresAt: "2027-01-01T00:00:00.000Z", body: "# x\n" })
+      expect(result.exitCode).toBe(0)
+      expect((await readFile(join(fixture.pueue, "add-args"), "utf8")).split("\n").slice(0, -1)).toEqual(packageRunArgs(fixture, "bridged"))
+      expect(await Bun.file(join(fixture.home, "runner", "tokens", "task-9", "token")).exists()).toBe(false)
+    })
+  }, runnerTimeout)
+
+  test("queues the run with --token-file instead of dropping the account token file", async () => {
+    await withFixture(async (fixture) => {
+      await writeFile(join(fixture.home, "config.json"), JSON.stringify({
+        providers: [{ id: "acme", credential: "token-file", tokenFile: { env: "ACME_TOKEN_FILE" } }]
+      }))
+      const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# x\n" })
+      expect(result.exitCode).toBe(0)
+      expect((await readFile(join(fixture.pueue, "add-args"), "utf8")).split("\n").slice(0, -1)).toEqual([...packageRunArgs(fixture, "acme"), "--token-file", mainToken])
+    })
+  }, runnerTimeout)
+})

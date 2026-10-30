@@ -2,7 +2,7 @@ import { Data, DateTime, Duration, Effect, FileSystem, Option, Path, Schema, Str
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { Reach } from "./args"
 import { AbsolutePath } from "../json-file"
-import { ProviderId } from "../orc-config"
+import { ProviderId, readOrcConfig } from "../orc-config"
 import { TaskId } from "./backlog"
 import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldToken } from "./held-token"
 import { heldTask, orcGroup, PueueState, PueueStatus, taskLabel, type PueueTask } from "./pueue-status"
@@ -211,6 +211,14 @@ const queueTask = (
     const run = [...self, "run", taskFile, "--branch", taskBranch(request.task), "--sandbox", "none", "--provider", request.provider]
     const add = (command: ReadonlyArray<string>) =>
       pueue(["add", "--group", orcGroup, "--label", label, "--working-directory", project, "--print-task-id", "--escape", "--", ...command], { ORC_HOME: home })
+    const packageRun = yield* readOrcConfig(home).pipe(
+      Effect.map((config) => config.providers.some((candidate) => candidate.id === request.provider && candidate.credential === "package")),
+      Effect.orElseSucceed(() => false as const)
+    )
+    if (packageRun) {
+      const id = yield* add([...run])
+      return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
+    }
     const holdArgs: ReadonlyArray<string> = label === taskLabel(home, request.task) ? [request.task] : [request.task, "--label", label]
     if ("tokenFile" in request) {
       const id = yield* add([...run, "--token-file", request.tokenFile])

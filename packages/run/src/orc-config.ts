@@ -39,7 +39,7 @@ const TokenFileProvider = Schema.Struct({
 export type TokenFileProvider = typeof TokenFileProvider.Type
 
 // Pi resolves a relative local path against the settings file, which here sits in the run's own Pi folder.
-const PiPackageSource = Schema.String.check(Schema.isPattern(/^(npm:|git:|https?:\/\/|ssh:\/\/|\/)\S+$/))
+const PiPackageSource = Schema.String.check(Schema.isPattern(/^(?:\/\S(?:.*\S)?|(?:npm:|git:|https?:\/\/|ssh:\/\/)\S+)$/))
 
 const PackageProvider = Schema.Struct({
   id: ProviderId,
