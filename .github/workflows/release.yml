@@ -5,9 +5,8 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-  id-token: write
 jobs:
-  publish:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -34,14 +33,8 @@ jobs:
       - run: bun run test
       - name: tag matches package version
         run: test "v$(bun -p "require('./packages/run/package.json').version")" = "$GITHUB_REF_NAME"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-      - run: npm publish
-        working-directory: packages/run
   github-release:
-    needs: publish
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: write
