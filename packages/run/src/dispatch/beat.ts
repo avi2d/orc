@@ -1,10 +1,11 @@
-import { DateTime, Effect, type FileSystem } from "effect"
+import { DateTime, Effect, type FileSystem, Option, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimTask, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken } from "./backlog"
 import type { ConfigError } from "../json-file"
 import { type Account, checkoutOn, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "./config"
 import { type QuotaReading, readQuota } from "./quota"
 import type { Claim, TaskFileError, TaskRecord } from "./task-record"
+import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
 
 export interface MachineRoom {
   readonly machine: string
@@ -18,6 +19,8 @@ export type BeatAction =
   | { readonly kind: "lost"; readonly task: string }
   | { readonly kind: "given-back"; readonly task: string; readonly machine: string }
   | { readonly kind: "waits"; readonly task: string; readonly reason: string }
+  | { readonly kind: "renewed"; readonly task: string; readonly machine: string }
+  | { readonly kind: "renew-failed"; readonly task: string; readonly machine: string; readonly reason: string }
 
 export interface BeatReport {
   readonly beat: string
@@ -99,13 +102,21 @@ export const placeTask = (
 
 type StartResult = { readonly kind: "started" } | { readonly kind: "failed"; readonly reason: string }
 
+type Credential =
+  | { readonly kind: "file"; readonly provider: string; readonly tokenFile: string }
+  | { readonly kind: "token"; readonly provider: string; readonly token: RunToken }
+
 // Effect's spawner takes no file for stdio, so a shell sends the start command's output to the task's log.
 const logToTaskLog = ["sh", "-c", "exec \"$@\" >> \"$ORC_TASK_LOG\" 2>&1", "orc-start"] as const
 
+const bytesOf = (text: string) => Stream.make(new TextEncoder().encode(text))
+
 // The start command leads its own session and is unreferenced before the scope closes, so the spawner leaves it running and the beat exits without it.
+// The token is written whole before the scope closes, because closing the scope stops the fiber that writes it.
 const handOn = (
   machine: Machine,
-  env: Record<string, string>
+  env: Record<string, string>,
+  stdin: string | null
 ): Effect.Effect<StartResult, never, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
@@ -114,10 +125,13 @@ const handOn = (
       env,
       extendEnv: true,
       detached: true,
-      stdin: "ignore",
+      stdin: stdin === null ? "ignore" : "pipe",
       stdout: "ignore",
       stderr: "ignore"
     }))
+    if (stdin !== null) {
+      yield* Stream.run(bytesOf(stdin), handle.stdin)
+    }
     yield* Effect.asVoid(handle.unref)
     return { kind: "started" } satisfies StartResult
   }).pipe(
@@ -140,7 +154,7 @@ const startTask = (
   claim: Claim,
   checkout: string,
   machine: Machine,
-  credential: { readonly provider: string; readonly tokenFile: string }
+  credential: Credential
 ): Effect.Effect<BeatAction, BacklogError | TaskFileError, BeatRequirements> =>
   Effect.gen(function*() {
     const taken: TaskRecord = { spec: task.spec, state: { kind: "taken", claim } }
@@ -151,7 +165,7 @@ const startTask = (
     }
     const log = backlogPaths(root).logFile(task.spec.id)
     yield* writeTaken(root, { spec: task.spec, state: { kind: "started", claim, started: { at: yield* nowIso, log } } })
-    const result = yield* handOn(machine, {
+    const env = {
       ORC_TASK_LOG: log,
       ORC_TASK_ID: task.spec.id,
       ORC_TASK_FILE: backlogPaths(root).taskFile("taken", task.spec.id),
@@ -160,8 +174,14 @@ const startTask = (
       ORC_TASK_MACHINE: machine.name,
       ORC_TASK_PROVIDER: credential.provider,
       ORC_TASK_ACCOUNT: claim.account,
-      ORC_TASK_TOKEN_FILE: credential.tokenFile
-    })
+      ORC_TASK_TOKEN_FILE: credential.kind === "file" ? credential.tokenFile : ""
+    }
+    const result = credential.kind === "file"
+      ? yield* handOn(machine, env, null)
+      : yield* encodeToken(credential.token).pipe(
+        Effect.flatMap((stdin) => handOn(machine, env, stdin)),
+        Effect.catchTag("TokenEncodeError", (error) => Effect.succeed<StartResult>({ kind: "failed", reason: "the " + error.what + " would not encode" }))
+      )
     if (result.kind === "started") {
       return { kind: "started", task: task.spec.id, machine: machine.name, account: claim.account, log } satisfies BeatAction
     }
@@ -180,7 +200,46 @@ interface BeatContext {
   readonly tasks: ReadonlyArray<TaskRecord>
   readonly account: Account | null
   readonly live: Array<{ readonly machine: string; readonly slots: number; busy: number }>
+  readonly tokens: TokenCache
 }
+
+type TokenCheck = { readonly kind: "live"; readonly token: RunToken } | { readonly kind: "waits"; readonly reason: string }
+
+// One beat reads each account's token once, so every start and renewal in it carries the same token.
+type TokenCache = Map<string, TokenCheck>
+
+const checkToken = (
+  tokens: TokenCache,
+  account: Extract<Account, { readonly tokenCommand: unknown }>
+): Effect.Effect<TokenCheck, never, ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    const cached = tokens.get(account.name)
+    if (cached !== undefined) {
+      return cached
+    }
+    const reading = yield* readToken(account.tokenCommand)
+    const now = yield* DateTime.now
+    const check: TokenCheck = reading.kind === "unread"
+      ? { kind: "waits", reason: "the token for " + account.name + " is unread: " + reading.reason }
+      : tokenLive(reading.token.expiresAt, now)
+      ? { kind: "live", token: reading.token }
+      : { kind: "waits", reason: "the token for " + account.name + " runs out at " + DateTime.formatIso(reading.token.expiresAt) }
+    tokens.set(account.name, check)
+    return check
+  })
+
+const credentialFor = (
+  context: BeatContext,
+  account: Account
+): Effect.Effect<Credential | { readonly kind: "waits"; readonly reason: string }, never, ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    const provider = context.config.quota.provider
+    if (account.tokenCommand === undefined) {
+      return { kind: "file", provider, tokenFile: account.tokenFile }
+    }
+    const check = yield* checkToken(context.tokens, account)
+    return check.kind === "waits" ? check : { kind: "token", provider, token: check.token }
+  })
 
 const considerTask = (
   context: BeatContext,
@@ -199,6 +258,10 @@ const considerTask = (
     if (context.account === null) {
       return waits("no " + context.config.quota.provider + " account has room")
     }
+    const credential = yield* credentialFor(context, context.account)
+    if (credential.kind === "waits") {
+      return waits(credential.reason)
+    }
     if (!(yield* claimTask(context.root, task.spec.id))) {
       return { kind: "lost", task: task.spec.id } satisfies BeatAction
     }
@@ -207,7 +270,6 @@ const considerTask = (
       slot.busy += 1
     }
     const claim: Claim = { beat: context.beat, machine: placement.machine.name, account: context.account.name, takenAt: yield* nowIso }
-    const credential = { provider: context.config.quota.provider, tokenFile: context.account.tokenFile }
     const action = yield* startTask(context.root, task, claim, placement.checkout, placement.machine, credential)
     if (slot !== undefined) {
       if (action.kind === "given-back") {
@@ -217,6 +279,44 @@ const considerTask = (
       }
     }
     return action
+  })
+
+const sendRenewal = (renew: Machine["renew"] & {}, stdin: string): Effect.Effect<string | null, never, ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+    const [program, ...args] = renew
+    const handle = yield* spawner.spawn(ChildProcess.make(program, args, { stdin: "pipe", stdout: "ignore", stderr: "ignore" }))
+    yield* Stream.run(bytesOf(stdin), handle.stdin)
+    const exitCode = yield* handle.exitCode
+    return exitCode === 0 ? null : "the renew command exited " + exitCode
+  }).pipe(
+    Effect.scoped,
+    Effect.catch((error) => Effect.succeed("the renew command did not run: " + error.message))
+  )
+
+// A started run holds only the token it was handed, so each beat hands it the account's current one before that runs out.
+const renewTask = (context: BeatContext, task: TaskRecord): Effect.Effect<Option.Option<BeatAction>, never, ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    if (task.state.kind !== "started") {
+      return Option.none()
+    }
+    const claim = task.state.claim
+    const machine = context.config.machines.find((entry) => entry.name === claim.machine)
+    const account = context.config.quota.accounts.find((entry) => entry.name === claim.account)
+    if (machine?.renew === undefined || account?.tokenCommand === undefined) {
+      return Option.none()
+    }
+    const failed = (reason: string): BeatAction => ({ kind: "renew-failed", task: task.spec.id, machine: machine.name, reason })
+    const check = yield* checkToken(context.tokens, account)
+    if (check.kind === "waits") {
+      return Option.some(failed(check.reason))
+    }
+    const renew = machine.renew
+    const refused = yield* encodeRenewal({ task: task.spec.id, ...check.token }).pipe(
+      Effect.flatMap((renewal) => sendRenewal(renew, renewal)),
+      Effect.catchTag("TokenEncodeError", (error) => Effect.succeed("the " + error.what + " would not encode"))
+    )
+    return Option.some(refused === null ? { kind: "renewed", task: task.spec.id, machine: machine.name } : failed(refused))
   })
 
 export const runBeat = (
@@ -239,8 +339,10 @@ export const runBeat = (
       projects,
       tasks,
       account: quota.kind === "read" ? (config.quota.accounts.find((account) => account.name === quota.pick) ?? null) : null,
-      live: room.map((entry) => ({ ...entry }))
+      live: room.map((entry) => ({ ...entry })),
+      tokens: new Map()
     }
+    const renewals = yield* Effect.forEach(tasks, (task) => renewTask(context, task))
     const actions = yield* Effect.forEach(tasks.filter((task) => task.state.kind === "new"), (task) => considerTask(context, task))
-    return { beat, at, quota, room, actions }
+    return { beat, at, quota, room, actions: [...renewals.flatMap(Option.toArray), ...actions] }
   })

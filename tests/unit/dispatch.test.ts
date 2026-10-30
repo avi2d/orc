@@ -3,7 +3,7 @@ import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, FileSystem, Layer, Result } from "effect"
+import { DateTime, Effect, FileSystem, Layer, Option, Redacted, Result } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../packages/run/src/dispatch/args"
 import { addTask, claimTask, closeStartedTask, listTasks, releaseTask, writeTaken } from "../../packages/run/src/dispatch/backlog"
@@ -12,6 +12,7 @@ import { backlogJson, formatBoard } from "../../packages/run/src/dispatch/board"
 import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/dispatch/config"
 import { assessQuota } from "../../packages/run/src/dispatch/quota"
 import { parseTaskFile, renderTaskFile, TaskFileError, type TaskRecord } from "../../packages/run/src/dispatch/task-record"
+import { decodeTokenText, tokenLive } from "../../packages/run/src/dispatch/token"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -115,6 +116,23 @@ describe("parseDispatchArgs", () => {
     expect(parseDispatchArgs("runner", ["stop", "task-1"]).kind).toBe("UsageError")
     expect(parseDispatchArgs("runner", []).kind).toBe("UsageError")
   })
+  test("runner renew reaches through the command after -- instead of renewing here", () => {
+    expect(parseDispatchArgs("runner", ["renew", "--", "ssh", "linux", "orc"])).toEqual({
+      kind: "RunnerRenew",
+      reach: { kind: "through", command: ["ssh", "linux", "orc"] }
+    })
+  })
+  test("runner hold hands every word after -- to the run instead of reading them as its own", () => {
+    expect(parseDispatchArgs("runner", ["hold", "task-1", "--", "orc", "run", "--json"])).toEqual({
+      kind: "RunnerHold",
+      task: "task-1",
+      run: ["orc", "run", "--json"]
+    })
+  })
+  test("runner hold with no run command is refused instead of holding a token for nothing", () => {
+    expect(parseDispatchArgs("runner", ["hold", "task-1"]).kind).toBe("UsageError")
+    expect(parseDispatchArgs("runner", ["hold", "../task-1", "--", "orc"]).kind).toBe("UsageError")
+  })
 })
 
 describe("task files", () => {
@@ -180,6 +198,27 @@ describe("readDispatchConfig", () => {
       expect(await configProblem(root, { accounts: [{ name: "main", tokenFile: "/a" }, { name: "main", tokenFile: "/b" }] })).toBe("the account main is named twice")
     })
   })
+  test("refuses an account with both a token file and a token command instead of picking one", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, { accounts: [{ name: "main", tokenFile: "/a", tokenCommand: ["clauth-token", "main"] }] })).not.toBeNull()
+    })
+  })
+  test("refuses a token command account while a machine has no renew command instead of letting its runs lapse", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, { accounts: [{ name: "main", tokenCommand: ["clauth-token", "main"] }] })).toBe(
+        "the machine mac has no renew command, which the account main needs to carry its token past its expiry"
+      )
+    })
+  })
+  test("keeps a token command account once every machine has a renew command", async () => {
+    await withBacklog(async (root) => {
+      const file = join(root, "dispatch.json")
+      const machines = config.machines.map((machine) => ({ ...machine, renew: ["true"] }))
+      const accounts = [{ name: "main", tokenCommand: ["clauth-token", "main"] }] as const
+      await writeFile(file, JSON.stringify({ machines, quota: { ...config.quota, accounts } }))
+      expect((await run(readDispatchConfig(file))).quota.accounts).toEqual(accounts)
+    })
+  })
   test("refuses a quota with no command instead of reading a built-in tool", async () => {
     await withBacklog(async (root) => {
       expect(await configProblem(root, { command: [] })).not.toBeNull()
@@ -192,6 +231,35 @@ describe("readDispatchConfig", () => {
       const read = await run(readDispatchConfig(file).pipe(Effect.as("read"), Effect.catchTag("ConfigError", () => Effect.succeed("refused"))))
       expect(read).toBe("refused")
     })
+  })
+})
+
+describe("the token document", () => {
+  const placeholder = "orc-test-placeholder-not-a-token"
+  const document = (fields: object) => JSON.stringify({ schema: "orc.token.v1", token: placeholder, expiresAt: "2026-10-30T12:00:00.000Z", ...fields })
+  test("reads the token and its expiry", () => {
+    const token = Option.getOrThrow(decodeTokenText(document({})))
+    expect(Redacted.value(token.token)).toBe(placeholder)
+    expect(DateTime.formatIso(token.expiresAt)).toBe("2026-10-30T12:00:00.000Z")
+  })
+  test("a token holding a space is refused instead of reaching the provider cut at it", () => {
+    expect(Option.isNone(decodeTokenText(document({ token: "two words" })))).toBe(true)
+  })
+  test("an unknown key is refused instead of ignored", () => {
+    expect(Option.isNone(decodeTokenText(document({ refreshToken: placeholder })))).toBe(true)
+  })
+  test("another schema is refused instead of read as a token", () => {
+    expect(Option.isNone(decodeTokenText(document({ schema: "orc.token.v2" })))).toBe(true)
+  })
+  test("a token printed as a redacted value never shows its text", () => {
+    const token = Option.getOrThrow(decodeTokenText(document({})))
+    expect(Bun.inspect(token)).not.toContain(placeholder)
+    expect(JSON.stringify(token)).not.toContain(placeholder)
+  })
+  test("a token running out within five minutes is lapsed instead of live", () => {
+    const now = DateTime.makeUnsafe("2026-10-30T12:00:00.000Z")
+    expect(tokenLive(DateTime.makeUnsafe("2026-10-30T12:05:00.000Z"), now)).toBe(false)
+    expect(tokenLive(DateTime.makeUnsafe("2026-10-30T12:05:01.000Z"), now)).toBe(true)
   })
 })
 
