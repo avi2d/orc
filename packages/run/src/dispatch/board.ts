@@ -166,6 +166,9 @@ const actionLine = (action: BeatAction): string => {
     case "renew-failed": {
       return "renew failed " + action.task + " on " + action.machine + ": " + action.reason
     }
+    case "closed": {
+      return "closed " + action.task + " " + action.outcome + " on " + action.machine + ": " + action.reason
+    }
   }
 }
 

@@ -11,6 +11,7 @@ import { placeTask, runBeat } from "../../packages/run/src/dispatch/beat"
 import { backlogJson, formatBoard } from "../../packages/run/src/dispatch/board"
 import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/dispatch/config"
 import { assessQuota } from "../../packages/run/src/dispatch/quota"
+import { heldTask, taskLabel } from "../../packages/run/src/dispatch/pueue-status"
 import { parseTaskFile, renderTaskFile, TaskFileError, type TaskRecord } from "../../packages/run/src/dispatch/task-record"
 import { decodeTokenText, tokenLive } from "../../packages/run/src/dispatch/token"
 
@@ -40,6 +41,19 @@ const projects: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Use
 const newTask = (machine: string | null): TaskRecord => ({ spec: { ...spec, id: "task-1", machine }, state: { kind: "new" } })
 
 const quotaReply = JSON.stringify({ schema: "orc.quota.v1", accounts: [{ name: "main", remainingPercent: 80 }] })
+
+// Answers pueue status and the quota command itself, and runs every other command for real.
+const pueueStub = (statusJson: string): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner, never, ChildProcessSpawner.ChildProcessSpawner> =>
+  Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
+    const real = yield* ChildProcessSpawner.ChildProcessSpawner
+    return ChildProcessSpawner.make((command) =>
+      ChildProcess.isStandardCommand(command) && command.command === "pueue"
+        ? real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + statusJson + "\nJ"]))
+        : ChildProcess.isStandardCommand(command) && command.command === "orc-quota"
+          ? real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + quotaReply + "\nJ"]))
+          : real.spawn(command)
+    )
+  }))
 
 // Answers the quota command itself and reads the task file at the moment the beat asks for the start command, before any process runs.
 const recordingSpawner = (taskFile: string, seen: Array<string>): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner, never, ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem> =>
@@ -377,11 +391,110 @@ describe("the beat", () => {
       await run(addTask(root, spec))
       const seen: Array<string> = []
       const spawner = recordingSpawner(join(root, "taken", "task-1.md"), seen).pipe(Layer.provide(BunServices.layer))
-      const report = await Effect.runPromise(runBeat(root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+      const report = await Effect.runPromise(runBeat(root, root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
       expect(report.actions.map((action) => action.kind)).toEqual(["started"])
       expect(seen).toHaveLength(1)
       expect(seen[0]).toContain("started_at: ")
     })
+  })
+})
+
+const macProjects = [{ name: "orc", checkouts: { mac: "/checkout" } }]
+
+const beatAfterRun = async (root: string, result: unknown): Promise<{ readonly states: ReadonlyArray<string>; readonly actions: ReadonlyArray<string>; readonly reasons: ReadonlyArray<string> }> => {
+  await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["true"] }] }))
+  await writeFile(join(root, "projects.json"), JSON.stringify({ projects: macProjects }))
+  await run(addTask(root, spec))
+  await run(addTask(root, { ...spec, title: "Fix the other thing" }))
+  await run(claimTask(root, "task-1"))
+  const first = (await run(listTasks(root))).find((task) => task.spec.id === "task-1")
+  if (first === undefined) {
+    throw new Error("the backlog holds no task-1")
+  }
+  await run(writeTaken(root, { spec: first.spec, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
+  const status = JSON.stringify({
+    tasks: {
+      "11": {
+        id: 11,
+        label: taskLabel(root, "task-1"),
+        group: "orc",
+        path: "/checkout",
+        status: { Done: { start: "2026-10-27T10:02:00.000Z", end: "2026-10-27T10:05:00.000Z", result } }
+      }
+    }
+  })
+  const spawner = pueueStub(status).pipe(Layer.provide(BunServices.layer))
+  const report = await Effect.runPromise(runBeat(root, root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+  const tasks = await run(listTasks(root))
+  return {
+    states: tasks.map((task) => task.spec.id + ":" + task.state.kind),
+    actions: report.actions.map((action) => action.kind + ":" + action.task),
+    reasons: tasks.flatMap((task) => task.state.kind === "closed" ? [task.state.closing.outcome + ":" + task.state.closing.reason] : [])
+  }
+}
+
+describe("the beat's closing sweep", () => {
+  test("a started task whose pueue run succeeded is closed done and its slot starts the next task instead of staying started", async () => {
+    await withBacklog(async (root) => {
+      const beat = await beatAfterRun(root, "Success")
+      expect(beat.states).toEqual(["task-1:closed", "task-2:started"])
+      expect(beat.reasons).toEqual(["done:pueue task 11 succeeded"])
+      expect(beat.actions).toEqual(["closed:task-1", "started:task-2"])
+    })
+  })
+  test("a started task whose pueue run still runs stays started and keeps its slot instead of closing early", async () => {
+    await withBacklog(async (root) => {
+      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["true"] }] }))
+      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: macProjects }))
+      await run(addTask(root, spec))
+      await run(addTask(root, { ...spec, title: "Fix the other thing" }))
+      await run(claimTask(root, "task-1"))
+      const first = (await run(listTasks(root))).find((task) => task.spec.id === "task-1")
+      if (first === undefined) {
+        throw new Error("the backlog holds no task-1")
+      }
+      await run(writeTaken(root, { spec: first.spec, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
+      const status = JSON.stringify({
+        tasks: {
+          "11": {
+            id: 11,
+            label: taskLabel(root, "task-1"),
+            group: "orc",
+            path: "/checkout",
+            status: { Running: { start: "2026-10-27T10:02:00.000Z" } }
+          }
+        }
+      })
+      const spawner = pueueStub(status).pipe(Layer.provide(BunServices.layer))
+      const report = await Effect.runPromise(runBeat(root, root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+      expect((await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["task-1:started", "task-2:new"])
+      expect(report.actions.map((action) => action.kind + ":" + action.task)).toEqual(["waits:task-2"])
+    })
+  })
+  test("a started task whose pueue run failed is closed failed with the run's reason instead of staying started", async () => {
+    await withBacklog(async (root) => {
+      const beat = await beatAfterRun(root, { Failed: 3 })
+      expect(beat.states).toEqual(["task-1:closed", "task-2:started"])
+      expect(beat.reasons).toEqual(["failed:orc exited 3"])
+      expect(beat.actions).toEqual(["closed:task-1", "started:task-2"])
+    })
+  })
+})
+
+describe("the pueue label", () => {
+  test("a task-1 label queued by another home is never read as this home's run instead of the newest bare match winning", () => {
+    const running = { start: "2026-10-27T10:02:00.000Z" }
+    const tasks = {
+      "7": { id: 7, label: taskLabel("/homes/a", "task-1"), group: "orc", path: "/homes/a/orc", status: { Running: running } },
+      "9": { id: 9, label: taskLabel("/homes/b", "task-1"), group: "orc", path: "/homes/b/orc", status: { Running: running } },
+      "11": { id: 11, label: "task-1", group: "orc", path: "/homes/c/orc", status: { Running: running } }
+    }
+    expect(heldTask(tasks, "/homes/a", "task-1")?.id).toBe(7)
+    expect(heldTask(tasks, "/homes/b", "task-1")?.id).toBe(9)
+    expect(heldTask(tasks, "/homes/c", "task-1")).toBeNull()
+  })
+  test("the label carries its home and task instead of an opaque id", () => {
+    expect(taskLabel("/homes/a", "task-1")).toBe("/homes/a task-1")
   })
 })
 

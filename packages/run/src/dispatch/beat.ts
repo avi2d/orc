@@ -1,11 +1,12 @@
 import { DateTime, Duration, Effect, type FileSystem, Option, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { backlogPaths, type BacklogError, claimTask, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken } from "./backlog"
+import { backlogPaths, type BacklogError, claimTask, closeStartedTask, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken } from "./backlog"
 import type { ConfigError } from "../json-file"
 import { type Account, checkoutOn, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "./config"
 import { type QuotaReading, readQuota } from "./quota"
 import type { Claim, TaskFileError, TaskRecord } from "./task-record"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
+import { readClosing } from "./runner-result"
 
 export interface MachineRoom {
   readonly machine: string
@@ -21,6 +22,7 @@ export type BeatAction =
   | { readonly kind: "waits"; readonly task: string; readonly reason: string }
   | { readonly kind: "renewed"; readonly task: string; readonly machine: string }
   | { readonly kind: "renew-failed"; readonly task: string; readonly machine: string; readonly reason: string }
+  | { readonly kind: "closed"; readonly task: string; readonly machine: string; readonly outcome: "done" | "failed"; readonly reason: string }
 
 export interface BeatReport {
   readonly beat: string
@@ -194,6 +196,7 @@ const startTask = (
 
 interface BeatContext {
   readonly root: string
+  readonly home: string
   readonly beat: string
   readonly config: DispatchConfig
   readonly projects: ReadonlyArray<Project>
@@ -322,8 +325,39 @@ const renewTask = (context: BeatContext, task: TaskRecord): Effect.Effect<Option
     return Option.some(refused === null ? { kind: "renewed", task: task.spec.id, machine: machine.name } : failed(refused))
   })
 
+// A finished run closes its task here, because no other beat step reads a started task after its run ends.
+const closeFinished = (
+  context: BeatContext,
+  task: TaskRecord
+): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    if (task.state.kind !== "started") {
+      return Option.none()
+    }
+    const closing = yield* readClosing(task.spec.id, context.home).pipe(
+      Effect.catchTag("RunnerError", () => Effect.succeed(null))
+    )
+    if (closing === null) {
+      return Option.none()
+    }
+    const closed = yield* closeStartedTask(context.root, task.spec.id, closing.outcome, closing.reason, yield* nowIso).pipe(
+      Effect.catchTag("BacklogError", () => Effect.succeed(null))
+    )
+    if (closed === null) {
+      return Option.none()
+    }
+    return Option.some({
+      kind: "closed",
+      task: task.spec.id,
+      machine: task.state.claim.machine,
+      outcome: closing.outcome,
+      reason: closing.reason
+    } satisfies BeatAction)
+  })
+
 export const runBeat = (
-  root: string
+  root: string,
+  home: string
 ): Effect.Effect<BeatReport, BacklogError | ConfigError | TaskFileError, BeatRequirements> =>
   Effect.gen(function*() {
     const paths = backlogPaths(root)
@@ -337,6 +371,7 @@ export const runBeat = (
     const room = readRoom(config.machines, tasks)
     const context: BeatContext = {
       root,
+      home,
       beat,
       config,
       projects,
@@ -345,7 +380,18 @@ export const runBeat = (
       live: room.map((entry) => ({ ...entry })),
       tokens: new Map()
     }
-    const renewals = yield* Effect.forEach(tasks, (task) => renewTask(context, task))
+    const closings = yield* Effect.forEach(tasks.filter((task) => task.state.kind === "started"), (task) => closeFinished(context, task))
+    const closed = closings.flatMap(Option.toArray)
+    for (const action of closed) {
+      if (action.kind === "closed") {
+        const slot = context.live.find((entry) => entry.machine === action.machine)
+        if (slot !== undefined) {
+          slot.busy -= 1
+        }
+      }
+    }
+    const closedIds = new Set(closed.map((action) => action.task))
+    const renewals = yield* Effect.forEach(tasks.filter((task) => !closedIds.has(task.spec.id)), (task) => renewTask(context, task))
     const actions = yield* Effect.forEach(tasks.filter((task) => task.state.kind === "new"), (task) => considerTask(context, task))
-    return { beat, at, quota, room, actions: [...renewals.flatMap(Option.toArray), ...actions] }
+    return { beat, at, quota, room, actions: [...closed, ...renewals.flatMap(Option.toArray), ...actions] }
   })

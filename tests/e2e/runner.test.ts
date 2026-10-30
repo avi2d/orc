@@ -6,6 +6,9 @@ import { Effect, Schema } from "effect"
 import { openDatabase, recordRun } from "../../packages/run/src/run-history"
 import { binPath, fakeQuota, type Fixture, type OrcResult, orcOk, orcThere, queuedArgs, queuedEnv, runnerTimeout, runOrc, startWaitMillis, withFixture } from "./runner-helpers"
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null
+
 const queueWith = (fixture: Fixture, request: object, env: Record<string, string> = {}): Promise<OrcResult> =>
   runOrc(fixture, ["runner", "queue"], env, JSON.stringify(request))
 
@@ -33,7 +36,7 @@ const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>): Promi
 }
 
 const pueueAddFor = (home: string, checkout: string): ReadonlyArray<string> => [
-  "--group", "orc", "--label", "task-1", "--working-directory", checkout, "--print-task-id", "--escape", "--",
+  "--group", "orc", "--label", home + " task-1", "--working-directory", checkout, "--print-task-id", "--escape", "--",
   process.execPath, binPath, "run", join(home, "runner", "task-1.md"), "--branch", "orc/task-1",
   "--sandbox", "none", "--provider", "acme", "--token-file", mainToken
 ]
@@ -87,7 +90,7 @@ describe("orc runner start", () => {
       expect(queued.exitCode).toBe(0)
       const args = (await readFile(join(fixture.pueue, "add-args"), "utf8")).split("\n").slice(0, -1)
       expect(args[args.indexOf("--working-directory") + 1]).toBe(root)
-      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: { "77": { id: 77, label: "task-9", group: "orc", path: sub, status: { Queued: {} } } }, groups: {} }))
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: { "77": { id: 77, label: fixture.home + " task-9", group: "orc", path: sub, status: { Queued: {} } } }, groups: {} }))
       const db = await Effect.runPromise(openDatabase(fixture.home).pipe(Effect.provide(BunServices.layer)))
       try {
         Effect.runSync(recordRun(db, {
@@ -194,8 +197,8 @@ describe("orc runner start", () => {
       expect(second.stdout).toMatch(/^queued task-10 as pueue task 7[78] in group orc\n$/)
       const added = (await readFile(join(fixture.pueue, "added-tasks"), "utf8")).split("\n").slice(0, -1)
       expect(added).toHaveLength(2)
-      expect(added.some((line) => /^task-9 orc 7[78]$/.test(line))).toBe(true)
-      expect(added.some((line) => /^task-10 orc 7[78]$/.test(line))).toBe(true)
+      expect(added.some((line) => line.endsWith(" task-9 orc 77") || line.endsWith(" task-9 orc 78"))).toBe(true)
+      expect(added.some((line) => line.endsWith(" task-10 orc 77") || line.endsWith(" task-10 orc 78"))).toBe(true)
     })
   }, runnerTimeout)
 
@@ -232,6 +235,24 @@ describe("orc runner result", () => {
         { schema: "orc.runner.v1", result: { task: "task-6", status: "running", pueueTask: 660, run: null, started: "2026-10-28T02:36:41.331824562+03:00" } },
         { schema: "orc.runner.v1", result: { task: "task-7", status: "unknown" } }
       ])
+    })
+  }, runnerTimeout)
+
+  test("a task-1 queued by another home reads unknown instead of that home's run", async () => {
+    await withFixture(async (fixture) => {
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({
+        tasks: {
+          "77": {
+            id: 77,
+            label: join(fixture.dir, "other-home") + " task-1",
+            group: "orc",
+            path: "/checkout",
+            status: { Done: { start: "2026-10-28T02:36:39.176448491+03:00", end: "2026-10-28T02:36:39.489650573+03:00", result: "Success" } }
+          }
+        },
+        groups: {}
+      }))
+      expect(await resultJson(fixture, "task-1")).toEqual({ schema: "orc.runner.v1", result: { task: "task-1", status: "unknown" } })
     })
   }, runnerTimeout)
 
@@ -285,6 +306,14 @@ describe("orc runner result", () => {
   test("a result read through a command is the far side's result, not the reader's", async () => {
     await withFixture(async (fixture) => {
       const far = join(fixture.dir, "far-home")
+      const statusFile = join(fixture.pueue, "status.json")
+      const status: unknown = JSON.parse(await readFile(statusFile, "utf8"))
+      if (!isRecord(status) || !isRecord(status.tasks) || !isRecord(status.tasks["656"])) {
+        throw new Error("the fixture holds no pueue task 656")
+      }
+      const near = status.tasks["656"]
+      status.tasks["777"] = { ...near, id: 777, label: far + " task-2" }
+      await writeFile(statusFile, JSON.stringify(status))
       const db = await Effect.runPromise(openDatabase(far).pipe(Effect.provide(BunServices.layer)))
       try {
         Effect.runSync(recordRun(db, {

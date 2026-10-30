@@ -29,10 +29,14 @@ export const PueueStatus = Schema.Union([
 ])
 export type PueueStatus = typeof PueueStatus.Type
 
-export const heldTask = (tasks: Readonly<Record<string, PueueTask>>, task: string): PueueTask | null => {
+// One pueue group serves every ORC_HOME on the machine, so the label names the home that queued the task.
+export const taskLabel = (home: string, task: string): string => home.replace(/\/+$/, "") + " " + task
+
+export const heldTask = (tasks: Readonly<Record<string, PueueTask>>, home: string, task: string): PueueTask | null => {
+  const label = taskLabel(home, task)
   let latest: PueueTask | null = null
   for (const candidate of Object.values(tasks)) {
-    if (candidate.group === orcGroup && candidate.label === task && candidate.id > (latest?.id ?? -1)) {
+    if (candidate.group === orcGroup && candidate.label === label && candidate.id > (latest?.id ?? -1)) {
       latest = candidate
     }
   }

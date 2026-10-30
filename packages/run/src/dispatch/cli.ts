@@ -124,7 +124,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         break
       }
       case "Beat": {
-        const report = yield* runBeat(backlogRoot(place))
+        const report = yield* runBeat(backlogRoot(place), place.home)
         yield* Console.log(args.json ? JSON.stringify(beatJson(report)) : formatBeat(report))
         break
       }
