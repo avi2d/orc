@@ -1,0 +1,8 @@
+{
+  "layout": {
+    "wide": [
+      { "atLeast": { "columns": 120, "rows": 36 }, "rows": [{ "height": "fill", "cells": [{ "panel": "tasks" }] }] }
+    ],
+    "narrow": ["tasks"]
+  }
+}

@@ -1,5 +1,6 @@
 {
   "extends": "@avi2dg/checks/tsconfig.effect.json",
+  "exclude": ["node_modules", "repos"],
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "noEmit": true,

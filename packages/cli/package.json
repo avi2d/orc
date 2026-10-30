@@ -1,0 +1,34 @@
+{
+  "name": "@tui-dash/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The tui-dash command, composing the panel modules into the dashboard, opening one panel alone, printing reports and snapshots, or streaming alert events",
+  "repository": "https://github.com/avi2d/orc.git",
+  "author": "avi2d <avi2dg@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "bin": {
+    "tui-dash": "src/bin.ts"
+  },
+  "scripts": {
+    "build": "bun build src/bin.ts --outdir dist --target bun --external @opentui/core --external effect --external @effect/platform-bun",
+    "start": "bun src/bin.ts"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "4.0.0",
+    "@opentui/core": "0.6.5",
+    "@tui-dash/alerts": "workspace:*",
+    "@tui-dash/dashboard": "workspace:*",
+    "@tui-dash/ledger": "workspace:*",
+    "@tui-dash/queues": "workspace:*",
+    "@tui-dash/quota": "workspace:*",
+    "@tui-dash/resources": "workspace:*",
+    "@tui-dash/schedules": "workspace:*",
+    "@tui-dash/schema": "workspace:*",
+    "@tui-dash/session-quota": "workspace:*",
+    "@tui-dash/tasks": "workspace:*",
+    "@tui-dash/ui": "workspace:*",
+    "effect": "4.0.0"
+  }
+}

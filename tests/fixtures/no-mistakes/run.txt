@@ -1,0 +1,24 @@
+current_branch: fm/tui-dash-task-pipeline
+other_branch_run:
+  id: "01M5CFR1F0AA7A1FF8AM4DYM9V"
+  branch: fm/tui-dash-fast-start
+  status: completed
+  head: 6d180687
+  head_sha: 6d1806878ef13f2748bc6cc44341105aa4422667
+  verification_plan: none
+  pr: "https://github.com/avi2d/tui-dash/pull/39"
+  findings: "7 awaiting, 1 auto-fix"
+  steps[9]{step,status,findings,duration_ms}:
+    intent,completed,0,49
+    rebase,completed,0,2163
+    review,completed,8,4501436
+    test,completed,0,2464098
+    document,completed,0,91640
+    lint,completed,0,1350
+    push,completed,0,5567
+    pr,completed,0,28756
+    ci,completed,0,611003
+  reviewer_agent: pi/openai/gpt-6.1-sol
+  shared_work[1]{attributed_to,scope,duration_ms}:
+    document,document+lint housekeeping,91640
+outcome: passed

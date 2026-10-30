@@ -1,0 +1,7 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bun /path/to/orc/packages/session-quota/dist/capture-bin.js claude-statusline",
+    "refreshInterval": 30
+  }
+}

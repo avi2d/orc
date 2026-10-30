@@ -1,0 +1,23 @@
+{
+  "sessionId": "aaaaaaaa-0000-4000-8000-00000000a0c1",
+  "sessionFile": "/home/tester/.pi/agent/sessions/--home-tester-shop--/2026-10-17T10-00-00-000Z_aaaaaaaa-0000-4000-8000-00000000a0c1.jsonl",
+  "cwd": "/home/tester/shop",
+  "role": "assistant",
+  "content": [{ "type": "text", "text": "a reply the ledger must never hold" }],
+  "api": "anthropic-messages",
+  "provider": "claude-bridge",
+  "model": "claude-opus-5-5",
+  "thinkingLevel": "high",
+  "durationMs": 8000,
+  "usage": {
+    "input": 3,
+    "output": 120,
+    "cacheRead": 40000,
+    "cacheWrite": 500,
+    "reasoning": 0,
+    "totalTokens": 40623,
+    "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0 }
+  },
+  "stopReason": "stop",
+  "timestamp": 1792231208000
+}

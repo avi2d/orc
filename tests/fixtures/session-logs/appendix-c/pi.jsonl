@@ -1,0 +1,3 @@
+{"type":"session","cwd":"/work/alpha","id":"s1","timestamp":"2026-10-16T10:00:00.000Z"}
+{"type":"message","timestamp":"2026-10-16T10:01:00.000Z","message":{"role":"assistant","provider":"claude-bridge","model":"claude-opus-5-5","usage":{"input":2,"output":100,"cacheRead":5000,"cacheWrite":300}}}
+{"type":"message","timestamp":"2026-10-16T10:02:00.000Z","message":{"role":"assistant","provider":"claude-bridge","model":"claude-opus-5-5","usage":{"input":1,"output":50,"cacheRead":7000,"cacheWrite":0}}}

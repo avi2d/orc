@@ -1,0 +1,3 @@
+  PID %CPU    RSS COMM
+    1   2.4  13328 /sbin/launchd
+  759   1.0  11968 /Library/Objective-See/BlockBlock/BlockBlock.app/Contents/MacOS/BlockBlock

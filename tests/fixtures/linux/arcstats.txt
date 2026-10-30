@@ -1,0 +1,8 @@
+name                            type data
+hits                            4    123456789
+misses                          4    1234567
+c_min                           4    33554432
+c_max                           4    17179869184
+size                            4    1073741824
+compressed_size                 4    536870912
+uncompressed_size               4    1073741824

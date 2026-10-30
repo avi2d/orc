@@ -1,0 +1,36 @@
+╭─ quota ────────────────────────────────────────── ↻ 10s ─╮╭─ ledger · today ───────────────────────────────── ↻ 10s ─╮
+│ ● claude main · max · runs out in 1d 20h                 ││ ○ Ship the ledger board today. · 5h                      │
+│   5 hours    ━━━━┃━━━━━━━━━━━╸  98%  +74 spare    1h 11m ││ ● The compact box keeps one line per message. · 4h       │
+│   week       ━━━━━╸─┃─────────  31%  10 over      2d 20h ││ ○ Does l open the full screen? · 2h                      │
+│   fable week ━━━━━━━┃━━━━━━━━━ 100%  +59 spare    2d 20h ││ ● Yes. l takes the full screen, and the cursor op… · 25m │
+│ +1 more claude profiles                                  ││                                                          │
+│ ● codex · plus · may run out in 2d 7h                    ││                                                          │
+│   5 hours    ━━━━━━━━━━━━━━━━┃ 100%  on pace      4h 59m ││                                                          │
+│   week       ━━━━━━━━━━━━━━──┃  82%  11 over      6d 11h ││                                                          │
+│ ● opencode-go · runs out in 22d                          ││                                                          │
+│ +3 more rows                                             ││                                                          │
+╰──────────────────────────────────────────────────────────╯│                                                          │
+╭─ gluttons | alerts ─────────────────────────────── ↻ 2s ─╮│                                                          │
+│ ⚑ shop is spending over its share of claude main's week  ││                                                          │
+│ ⚑ my-home is spending over its share of claude main's    ││                                                          │
+│   week                                                   ││                                                          │
+│ +2 more flags                                            ││                                                          │
+│                                                          ││                                                          │
+╰──────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯
+╭─ kelp · tasks ─────────────────────────────────── ↻ 10s ─╮╭─ tasks-kelp-tend ──────────────────────────────── ↻ 10s ─╮
+│   task               state   machine model  tests   time ││ tasks-kelp-tend · build                                  │
+│   tasks-kelp-tend    working south   –          –    10h ││ Tend the kelp lines                                      │
+│   tasks-kelp-sort    waiting south   –          – 1h 57m ││ Reseeding the north line                                 │
+│                                                          ││ ● working                                                │
+│                                                          ││ started Sun 21:40 · running for 10h · south              │
+│                                                          ││ no model recorded                                        │
+│                                                          ││ kept   cpu – · peak memory –                             │
+│                                                          ││ no live process on south is read here                    │
+│                                                          ││ no pueue run in its folders                              │
+│                                                          ││                                                          │
+│                                                          ││                                                          │
+│                                                          ││                                                          │
+│                                                          ││                                                          │
+│                                                          ││                                                          │
+│                                                          ││                                                          │
+╰──────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯

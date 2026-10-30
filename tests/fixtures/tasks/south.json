@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-19T08:02:11.000Z",
+  "orchestrator": {
+    "name": "kelp-farmer",
+    "version": "0.9.0"
+  },
+  "tasks": [
+    {
+      "id": "tasks-kelp-tend",
+      "title": "Tend the kelp lines",
+      "project": "kelp",
+      "kind": "build",
+      "state": "working",
+      "detail": "Reseeding the north line",
+      "startedAt": "2026-10-19T07:12:00.000Z",
+      "firstStartedAt": "2026-10-18T21:40:00.000Z",
+      "endedAt": null,
+      "folders": [
+        "/home/example/work/kelp"
+      ],
+      "branches": [
+        "feature/kelp-tend"
+      ]
+    },
+    {
+      "id": "tasks-kelp-sort",
+      "title": "Sort the harvest",
+      "project": "kelp",
+      "kind": "review",
+      "state": "waiting",
+      "detail": "Waiting on the morning boat",
+      "startedAt": "2026-10-19T06:05:00.000Z",
+      "firstStartedAt": "2026-10-19T06:05:00.000Z",
+      "endedAt": null,
+      "folders": [
+        "/home/example/work/kelp"
+      ],
+      "branches": []
+    }
+  ],
+  "overhead": [],
+  "schedules": []
+}

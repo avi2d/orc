@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-13T20:18:10.000Z",
+  "machine": {
+    "cpu": {
+      "kind": "ok",
+      "value": {
+        "percent": 42.4,
+        "cores": 16
+      }
+    },
+    "memory": {
+      "kind": "ok",
+      "value": {
+        "usedBytes": 12884901888,
+        "totalBytes": 68719476736
+      }
+    },
+    "disk": {
+      "kind": "ok",
+      "value": {
+        "usedBytes": 207120975424,
+        "totalBytes": 1081101178432
+      }
+    },
+    "load": {
+      "kind": "ok",
+      "value": [
+        3.5,
+        2.25,
+        1.75
+      ]
+    },
+    "processes": {
+      "kind": "ok",
+      "value": [
+        {
+          "pid": 4242,
+          "program": "trainer",
+          "cpuPercent": 37.5,
+          "residentBytes": 2147483648
+        },
+        {
+          "pid": 515,
+          "program": "postgres",
+          "cpuPercent": 3.25,
+          "residentBytes": 536870912
+        },
+        {
+          "pid": 77,
+          "program": "kworker/0:1-events",
+          "cpuPercent": 0,
+          "residentBytes": 0
+        }
+      ]
+    }
+  },
+  "gpu": {
+    "kind": "ok",
+    "value": {
+      "gpus": [
+        {
+          "name": "NVIDIA GeForce RTX 4090",
+          "utilizationPercent": {
+            "kind": "value",
+            "value": 63
+          },
+          "memoryUsedMiB": {
+            "kind": "value",
+            "value": 8192
+          },
+          "memoryTotalMiB": {
+            "kind": "value",
+            "value": 24576
+          },
+          "temperatureC": {
+            "kind": "value",
+            "value": 61
+          }
+        }
+      ],
+      "apps": {
+        "kind": "ok",
+        "value": [
+          {
+            "pid": 4242,
+            "program": "trainer",
+            "memoryUsedMiB": {
+              "kind": "value",
+              "value": 8000
+            }
+          },
+          {
+            "pid": 9001,
+            "program": null,
+            "memoryUsedMiB": {
+              "kind": "not-reported"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

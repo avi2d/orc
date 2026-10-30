@@ -1,0 +1,31 @@
+estimates from local logs, upper bounds
+never quota
+  session           price  raw  ≤pp pp/h
+● claude main · assumed the only login
+5h window 2pp used · fair 27.3pp/h each
+behind pace
+● shop-a1b…/1 w1A:p2  55%  52% ≤1.2 0.96
+● ~/my-home w2B:p2    37%  38% ≤0.8 0.07
+● no-mista… pid 4242   8%   9% ≤0.2 0.15
+7d window 69pp used · fair 0.15pp/h each
+ahead of pace, over fair share flagged
+⚑ shop-a1b…/1 w1A:p2  51%  50%  ≤36 30.8
+⚑ ~/my-home w2B:p2    34%  36%  ≤24 2.38
+○ ~/notes #00d001      7%   5% ≤5.0 0.00
+⚑ no-mista… pid 4242   7%   9% ≤4.9 4.89
+● codex · joined by credential key
+5h window 0pp used · none logged here
+7d window 18pp used · fair 0.53pp/h each
+ahead but early, no flag
+○ ~/api #00f001      100% 100%  ≤18 0.00
+● opencode-go · assumed the only login
+5h window 0pp used · none logged here
+7d window 7pp used · fair 0.75pp/h each
+behind pace
+● ~/my-home w2B:p2   100% 100% ≤7.0 7.00
+31d window 19pp used
+fair 0.13pp/h each
+ahead of pace, over fair share flagged
+○ shop-a1…/2 #00e001  68%  69%  ≤13 0.00
+⚑ ~/my-home w2B:p2    32%  31% ≤6.1 6.06
+off subscription · openai 1 call

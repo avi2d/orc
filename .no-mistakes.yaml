@@ -3,3 +3,55 @@ commands:
   lint: bun run lint
   typecheck: bun run typecheck
   test: bun run test
+review:
+  path_instructions:
+    - path: "packages/run/**"
+      instructions: |
+        The run package ships the orc command, published as @avi2dg/orc.
+        dependency-cruiser.config.ts holds it to the panel border, so it reaches another package only through @tui-dash/schema and @tui-dash/ui.
+    - path: "packages/alerts/**"
+      instructions: |
+        alerts is a dashboard panel package.
+        It reaches another package only through @tui-dash/schema and @tui-dash/ui, as dependency-cruiser.config.ts holds.
+    - path: "packages/dashboard/**"
+      instructions: |
+        dashboard is the dashboard host that lays out the panels the cli hands it.
+        It reaches another package only through @tui-dash/schema and @tui-dash/ui, as dependency-cruiser.config.ts holds.
+    - path: "packages/ledger/**"
+      instructions: |
+        ledger is a dashboard panel package.
+        It reaches another package only through @tui-dash/schema and @tui-dash/ui, as dependency-cruiser.config.ts holds.
+    - path: "packages/queues/**"
+      instructions: |
+        queues is a dashboard panel package.
+        It reaches another package only through @tui-dash/schema and @tui-dash/ui, as dependency-cruiser.config.ts holds.
+    - path: "packages/quota/**"
+      instructions: |
+        quota is a dashboard panel package.
+        It reaches another package only through @tui-dash/schema and @tui-dash/ui, as dependency-cruiser.config.ts holds.
+    - path: "packages/resources/**"
+      instructions: |
+        resources is a dashboard panel package.
+        It reaches another package only through @tui-dash/schema and @tui-dash/ui, as dependency-cruiser.config.ts holds.
+    - path: "packages/schedules/**"
+      instructions: |
+        schedules is a dashboard panel package.
+        It reaches another package only through @tui-dash/schema and @tui-dash/ui, as dependency-cruiser.config.ts holds.
+    - path: "packages/session-quota/**"
+      instructions: |
+        session-quota is a dashboard panel package.
+        It reaches another package only through @tui-dash/schema and @tui-dash/ui, as dependency-cruiser.config.ts holds.
+    - path: "packages/tasks/**"
+      instructions: |
+        tasks is a dashboard panel package.
+        It reaches another package only through @tui-dash/schema and @tui-dash/ui, as dependency-cruiser.config.ts holds.
+    - path: "packages/schema/**"
+      instructions: |
+        Every dashboard package reads its data through the schema package, so it imports no other package.
+    - path: "packages/ui/**"
+      instructions: |
+        The ui package draws for every panel, so it imports no package but @tui-dash/schema.
+    - path: "packages/cli/**"
+      instructions: |
+        The cli package composes the panel modules into the dashboard and hands them to it.
+        It is the one dashboard package that may import the panels.

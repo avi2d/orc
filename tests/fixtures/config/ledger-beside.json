@@ -1,0 +1,29 @@
+{
+  "layout": {
+    "wide": [
+      {
+        "atLeast": {
+          "columns": 80,
+          "rows": 20
+        },
+        "rows": [
+          {
+            "height": "fill",
+            "cells": [
+              {
+                "panel": "resources"
+              },
+              {
+                "panel": "ledger"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "narrow": [
+      "resources",
+      "ledger"
+    ]
+  }
+}

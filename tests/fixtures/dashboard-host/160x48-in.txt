@@ -1,0 +1,48 @@
+╭─ quota ────────────────────────────────────────────────────────────── ↻ 10s ─╮╭─ ledger · today ───────────────────────────────────────────────────── ↻ 10s ─╮
+│ ● claude main · max · runs out in 1d 20h                                     ││ ○ Ship the ledger board today. · 5h                                          │
+│   5 hours    ━━━━━━━━━┃━━━━━━━━━━━━━━━━━━━━━━━━━━╸  98%  +74 spare    1h 11m ││ ● The compact box keeps one line per message. · 4h                           │
+│   week       ━━━━━━━━━━━╸───┃─────────────────────  31%  10 over      2d 20h ││ ○ Does l open the full screen? · 2h                                          │
+│   fable week ━━━━━━━━━━━━━━━┃━━━━━━━━━━━━━━━━━━━━━ 100%  +59 spare    2d 20h ││ ● Yes. l takes the full screen, and the cursor opens a message for th… · 25m │
+│ ● claude second · pro                                                        ││                                                                              │
+│   week                                             read 10h 9m ago           ││                                                                              │
+│ ● codex · plus · may run out in 2d 7h                                        ││                                                                              │
+│   5 hours    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┃ 100%  on pace      4h 59m ││                                                                              │
+│   week       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╸───┃──  82%  11 over      6d 11h ││                                                                              │
+│ ● opencode-go · runs out in 22d                                              ││                                                                              │
+│   5 hours    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┃ 100%  on pace      4h 59m ││                                                                              │
+│   week       ━━━━━━━━━━━━━━━━━━━━━━━━━━━┃━━━━━━╸──  93%  +19 spare     5d 3h ││                                                                              │
+│   month      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━─┃─────  81%  2 over          25d ││                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯│                                                                              │
+╭─ gluttons | alerts ─────────────────────────────────────────────────── ↻ 2s ─╮│                                                                              │
+│ ⚑ shop is spending over its share of claude main's week                      ││                                                                              │
+│ ⚑ my-home is spending over its share of claude main's week                   ││                                                                              │
+│ ⚑ a no-mistakes run is spending over its share of claude main's week         ││                                                                              │
+│ ⚑ my-home is spending over its share of opencode-go's month                  ││                                                                              │
+│                                                                              ││                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ projects · today ─────────────────────────────────────────────────── ↻ 10s ─╮╭─ harbor · tasks ───────────────────────────────────────────────────── ↻ 10s ─╮
+│   project                                     work wait park block done plan ││   task                                   state   machine model  tests   time │
+│   total                                          2    2    –     –    –    – ││ ▶ tasks-bridge-plot                      working north   –         1m 9h 47m │
+│   harbor                                         1    1    –     –    –    – ││ ▶ tasks-inbox-sweep                      waiting north   –         2m  2h 2m │
+│   kelp                                           1    1    –     –    –    – ││   harbor-gone                            unknown north   –          –  1h 0m │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────╯

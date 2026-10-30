@@ -1,0 +1,4 @@
+1001 900 pi /home/tester/.treehouse/shop-a1b2c3/1/shop
+1002 900 pi /home/tester/my-home
+4242 669 pi /home/tester/.no-mistakes/worktrees/abc123/01JRUNULID0000000000RUN42
+4243 4242 claude /home/tester/.no-mistakes/worktrees/abc123/01JRUNULID0000000000RUN42

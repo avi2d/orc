@@ -1,0 +1,16 @@
+{
+  "name": "@tui-dash/ledger",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Optional ledger box for tui-dash, listing today's conversation with one agent",
+  "repository": "https://github.com/avi2d/orc.git",
+  "author": "avi2d <avi2dg@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@tui-dash/schema": "workspace:*",
+    "@tui-dash/ui": "workspace:*",
+    "effect": "4.0.0"
+  }
+}
