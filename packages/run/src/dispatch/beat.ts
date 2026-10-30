@@ -1,4 +1,4 @@
-import { DateTime, Effect, type FileSystem, Option, Stream } from "effect"
+import { DateTime, Duration, Effect, type FileSystem, Option, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimTask, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken } from "./backlog"
 import type { ConfigError } from "../json-file"
@@ -281,6 +281,8 @@ const considerTask = (
     return action
   })
 
+const renewSeconds = 30
+
 const sendRenewal = (renew: Machine["renew"] & {}, stdin: string): Effect.Effect<string | null, never, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
@@ -291,6 +293,7 @@ const sendRenewal = (renew: Machine["renew"] & {}, stdin: string): Effect.Effect
     return exitCode === 0 ? null : "the renew command exited " + exitCode
   }).pipe(
     Effect.scoped,
+    Effect.timeoutOrElse({ duration: Duration.seconds(renewSeconds), orElse: () => Effect.succeed("the renew command timed out") }),
     Effect.catch((error) => Effect.succeed("the renew command did not run: " + error.message))
   )
 

@@ -1,4 +1,4 @@
-import { Data, DateTime, Effect, FileSystem, Option, Path, Schema, Stream } from "effect"
+import { Data, DateTime, Duration, Effect, FileSystem, Option, Path, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { Reach } from "./args"
 import { AbsolutePath } from "../json-file"
@@ -162,6 +162,25 @@ const requireFolder = (checkout: string): Effect.Effect<void, RunnerError, FileS
     }
   })
 
+const queuedGuardScript = "pueue wait \"$1\"; rm -rf -- \"$2\""
+
+const guardQueued = (home: string, id: string, dir: string): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+    const handle = yield* spawner.spawn(ChildProcess.make("sh", ["-c", queuedGuardScript, "orc-token-guard", id, dir], {
+      detached: true,
+      stdin: "ignore",
+      stdout: "ignore",
+      stderr: "ignore",
+      env: { ORC_HOME: home },
+      extendEnv: true
+    }))
+    yield* Effect.asVoid(handle.unref)
+  }).pipe(
+    Effect.scoped,
+    Effect.mapError((error) => new RunnerError({ detail: "the token guard did not start: " + error.message }))
+  )
+
 // The beat starts each task once, so this check keeps a rerun start from queueing a second run, not two starts racing.
 const queueTask = (
   request: QueueRequest,
@@ -186,13 +205,18 @@ const queueTask = (
     const run = [...self, "run", taskFile, "--branch", taskBranch(request.task), "--sandbox", "none", "--provider", request.provider]
     const add = (command: ReadonlyArray<string>) =>
       pueue(["add", "--group", orcGroup, "--label", request.task, "--working-directory", project, "--print-task-id", "--escape", "--", ...command], { ORC_HOME: home })
-    const id = "tokenFile" in request
-      ? yield* add([...run, "--token-file", request.tokenFile])
-      : yield* holdToken(home, request.task, request).pipe(
-        Effect.mapError((error) => new RunnerError({ detail: "cannot hold the token for " + request.task + ": " + error.message })),
-        Effect.flatMap((dir) => add([...self, "runner", "hold", request.task, "--", ...run, "--token-file", heldTokenFile(dir)])),
-        Effect.tapError(() => releaseHeldToken(home, request.task))
-      )
+    if ("tokenFile" in request) {
+      const id = yield* add([...run, "--token-file", request.tokenFile])
+      return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
+    }
+    const dir = yield* holdToken(home, request.task, request).pipe(
+      Effect.mapError((error) => new RunnerError({ detail: "cannot hold the token for " + request.task + ": " + error.message })),
+      Effect.tapError(() => releaseHeldToken(home, request.task))
+    )
+    const id = yield* add([...self, "runner", "hold", request.task, "--", ...run, "--token-file", heldTokenFile(dir)]).pipe(
+      Effect.tapError(() => releaseHeldToken(home, request.task))
+    )
+    yield* guardQueued(home, id.trim(), dir).pipe(Effect.tapError(() => releaseHeldToken(home, request.task)))
     return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
   })
 
@@ -253,6 +277,8 @@ const readRequest = (
     return { ...fields, ...token.value }
   })
 
+const forwardSeconds = 30
+
 const handThrough = (command: Command, verb: "queue" | "renew", input: string): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
@@ -268,6 +294,10 @@ const handThrough = (command: Command, verb: "queue" | "renew", input: string): 
     }
   }).pipe(
     Effect.scoped,
+    Effect.timeoutOrElse({
+      duration: Duration.seconds(forwardSeconds),
+      orElse: () => Effect.fail(new RunnerError({ detail: command.join(" ") + " runner " + verb + " timed out" }))
+    }),
     Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: command[0] + " did not run: " + error.message }))
   )
 

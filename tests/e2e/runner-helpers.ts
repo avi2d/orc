@@ -56,10 +56,12 @@ const fakePueue = [
   "    case \"$groups\" in *\"\\\"$group\\\"\":*) ;; *) echo \"fake pueue has no group $group\" >&2; exit 2 ;; esac;",
   "    while ! mkdir \"$PUEUE_STATE/group-lock\" 2>/dev/null; do sleep 0.05; done;",
   "    if [ -f \"$PUEUE_STATE/added-tasks\" ]; then n=$(wc -l < \"$PUEUE_STATE/added-tasks\"); else n=0; fi;",
-  "    id=$((77 + n)); printf '%s %s %s\\n' \"$label\" \"$group\" \"$id\" >> \"$PUEUE_STATE/added-tasks\";",
+  "    id=$((77 + n)); printf '%s %s %s\\n' \"$label\" \"$group\" \"$id\" >> \"$PUEUE_STATE/added-tasks\"; : > \"$PUEUE_STATE/live-$id\";",
   "    mv \"$PUEUE_STATE/add-args.tmp\" \"$PUEUE_STATE/add-args\";",
   "    printf '%s' \"$ORC_HOME\" > \"$PUEUE_STATE/add-env.tmp\"; mv \"$PUEUE_STATE/add-env.tmp\" \"$PUEUE_STATE/add-env\";",
   "    rmdir \"$PUEUE_STATE/group-lock\"; echo \"$id\" ;;",
+  "  wait)",
+  "    id=\"$2\"; while [ -f \"$PUEUE_STATE/live-$id\" ]; do sleep 0.05; done ;;",
   "  *) echo \"fake pueue has no $1\" >&2; exit 2 ;;",
   "esac",
   ""
