@@ -1,18 +1,19 @@
 import { Console, DateTime, Duration, Effect, FileSystem, Option } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { heldExpiry, heldTokenDir, releaseHeldToken } from "./held-token"
-import { type Command, RunnerError } from "./runner"
+import { fileKeyOf, labelOf, type Command, RunnerError } from "./runner"
 import { tokenLive } from "./token"
 
 const pollSeconds = 5
 
-const waitForLiveToken = (home: string, task: string): Effect.Effect<DateTime.Utc, RunnerError, FileSystem.FileSystem> =>
+const waitForLiveToken = (home: string, task: string, label?: string | null): Effect.Effect<DateTime.Utc, RunnerError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
+    const key = fileKeyOf(home, task, labelOf(home, task, label))
     let told = false
     while (true) {
-      const expiry = yield* heldExpiry(home, task)
+      const expiry = yield* heldExpiry(home, key)
       if (Option.isNone(expiry)) {
-        return yield* new RunnerError({ detail: "no token is held for " + task + " in " + heldTokenDir(home, task) })
+        return yield* new RunnerError({ detail: "no token is held for " + task + " in " + heldTokenDir(home, key) })
       }
       if (tokenLive(expiry.value, yield* DateTime.now)) {
         return expiry.value
@@ -41,11 +42,13 @@ const runOnce = (run: Command): Effect.Effect<number, RunnerError, ChildProcessS
 export const holdRun = (
   task: string,
   run: Command,
-  home: string
-): Effect.Effect<string, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.gen(function*() {
+  home: string,
+  label?: string | null
+): Effect.Effect<string, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> => {
+  const key = fileKeyOf(home, task, labelOf(home, task, label))
+  return Effect.gen(function*() {
     while (true) {
-      const startedWith = yield* waitForLiveToken(home, task)
+      const startedWith = yield* waitForLiveToken(home, task, label)
       const exitCode = yield* runOnce(run)
       if (exitCode === 0) {
         return "the run of " + task + " finished"
@@ -55,4 +58,5 @@ export const holdRun = (
       }
       yield* Console.log("the run of " + task + " exited " + exitCode + " as its token ran out at " + DateTime.formatIso(startedWith) + ", so it resumes on a fresh one")
     }
-  }).pipe(Effect.ensuring(releaseHeldToken(home, task)))
+  }).pipe(Effect.ensuring(releaseHeldToken(home, key)))
+}

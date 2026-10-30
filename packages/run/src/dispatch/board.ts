@@ -166,10 +166,16 @@ const actionLine = (action: BeatAction): string => {
     case "renew-failed": {
       return "renew failed " + action.task + " on " + action.machine + ": " + action.reason
     }
+    case "closed": {
+      return "closed " + action.task + " " + action.outcome + " on " + action.machine + ": " + action.reason
+    }
+    case "close-failed": {
+      return "close failed " + action.task + " on " + action.machine + ": " + action.reason
+    }
   }
 }
 
-const renewal = (action: BeatAction): boolean => action.kind === "renewed" || action.kind === "renew-failed"
+const renewal = (action: BeatAction): boolean => action.kind === "renewed" || action.kind === "renew-failed" || action.kind === "closed" || action.kind === "close-failed"
 
 export const formatBeat = (report: BeatReport): string =>
   [
