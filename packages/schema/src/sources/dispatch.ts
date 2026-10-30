@@ -321,7 +321,7 @@ const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<Di
       if (machine !== null) return unreachable(machinesFile + ": the machine " + machine + " is named twice");
       const account = duplicateOf(decodedMachines.value.quota.accounts.map((entry) => entry.name));
       if (account !== null) return unreachable(machinesFile + ": the account " + account + " is named twice");
-      const commandAccount = decodedMachines.value.quota.accounts.find((entry) => "tokenCommand" in entry && entry.tokenCommand !== undefined);
+      const commandAccount = decodedMachines.value.quota.accounts.find((entry) => "tokenCommand" in entry);
       const unrenewed = decodedMachines.value.machines.find((entry) => entry.renew === undefined);
       if (commandAccount !== undefined && unrenewed !== undefined) {
         return unreachable(
