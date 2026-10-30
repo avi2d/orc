@@ -1,5 +1,6 @@
 import type { OrcRun } from "../contract/orc";
 import {
+  anchorOf,
   type OpenTaskState,
   runMarkOf,
   stageNamesOf,
@@ -30,5 +31,9 @@ export const orcPipelineOf = (run: OrcRun | undefined, state: OpenTaskState): Ta
     const moved = mark === "failed" && run.stages.slice(at + 1).some((later) => runMarkOf(later.status) === "active");
     return stageOf(name, moved ? "next" : mark, found.detail);
   });
-  return { kind: "orc run", stages: stoppedAt(stages, state), validating: false, parkedSeconds: undefined };
+  const anchor = anchorOf(stages);
+  const noticed = run.notice === undefined ? stages : stages.map((stage) => stage === anchor
+    ? stageOf(stage.name, stage.mark, [stage.detail, run.notice].filter((part) => part !== undefined && part !== "").join(" \u00B7 "), stage.seconds)
+    : stage);
+  return { kind: "orc run", stages: stoppedAt(noticed, state), validating: false, parkedSeconds: undefined };
 };

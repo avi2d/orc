@@ -360,7 +360,16 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       checksRoundStart: (round, started) => recordChecksStart(db, run.runId, round, started),
       checksRoundDone: (round) => recordChecksDone(db, run.runId, round),
       fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer.path, started, attempt === 1 ? resume.fixSessionFile ?? undefined : undefined),
-      fixDone: (fix) => recordFixDone(db, run.runId, fix),
+      fixDone: (fix, commits) => Effect.gen(function*() {
+        yield* recordFixDone(db, run.runId, fix)
+        if (implementLong !== null) {
+          for (const commit of commits) {
+            if (!implementLong.commits.some((kept) => kept.sha === commit.sha)) {
+              implementLong.commits.push(commit)
+            }
+          }
+        }
+      }),
       noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
       noMistakesDone: (record) => recordNoMistakesDone(db, run, record)
     }
@@ -381,6 +390,10 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
           const failed = implementLong === null ? baseFailed : { ...baseFailed, sessionSize: implementLong.counts, commits: implementLong.commits, sessionFile: implementLong.sessionFile }
           yield* writeEvidence(run, failed).pipe(Effect.orElseSucceed(() => undefined))
           yield* writeReport(run, failed).pipe(Effect.orElseSucceed(() => undefined))
+          const failedHandover = yield* writeHandover(run, failed).pipe(Effect.orElseSucceed(() => null))
+          if (failedHandover !== null) {
+            yield* recordHandoverEvidence(db, run.runId, failedHandover).pipe(Effect.orElseSucceed(() => undefined))
+          }
           yield* finishRun(db, run.runId, failed, new Date().toISOString()).pipe(Effect.orElseSucceed(() => undefined))
           return failed
         })

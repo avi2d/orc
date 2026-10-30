@@ -10,6 +10,7 @@ export interface OrcStage {
 export interface OrcRun {
   readonly id: string;
   readonly branch: string | undefined;
+  readonly notice: string | undefined;
   readonly stages: ReadonlyArray<OrcStage>;
 }
 
@@ -48,7 +49,7 @@ export const decodeOrcRuns = (text: string): Decoded<OrcSnapshot> => {
   if (parsed.kind !== "ok") return parsed;
   return {
     kind: "ok",
-    value: { runs: parsed.value.runs.map((run) => ({ id: run.id, branch: run.branch ?? undefined, stages: [] })) },
+    value: { runs: parsed.value.runs.map((run) => ({ id: run.id, branch: run.branch ?? undefined, notice: undefined, stages: [] })) },
   };
 };
 
@@ -62,10 +63,11 @@ export const decodeOrcShow = (text: string): Decoded<OrcSnapshot> => {
         {
           id: parsed.value.run.id,
           branch: parsed.value.run.branch ?? undefined,
+          notice: parsed.value.steps.flatMap((step) => step.signals ?? []).find((signal) => signal.name === "long-session")?.value,
           stages: parsed.value.steps.map((step) => ({
             name: step.name,
             status: step.status,
-            detail: step.signals?.find((signal) => signal.name === "long-session")?.value ?? step.score?.note ?? undefined,
+            detail: step.score?.note ?? undefined,
           })),
         },
       ],

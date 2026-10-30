@@ -46,7 +46,7 @@ export interface RunCheckpoints {
   readonly checksRoundStart: (round: number, started: string) => Effect.Effect<void, OrcRunError>
   readonly checksRoundDone: (round: ChecksRoundSummary) => Effect.Effect<void, OrcRunError>
   readonly fixStart: (attempt: number, started: string) => Effect.Effect<void, OrcRunError>
-  readonly fixDone: (fix: RecordedFixAttempt) => Effect.Effect<void, OrcRunError>
+  readonly fixDone: (fix: RecordedFixAttempt, commits: Array<OrcRunCommit>) => Effect.Effect<void, OrcRunError>
   readonly noMistakesStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly noMistakesDone: (record: import("./no-mistakes").NoMistakesRecord) => Effect.Effect<void, OrcRunError>
 }
@@ -284,7 +284,7 @@ const runChecksFixLoop = (
       yield* checkpoints.fixStart(attempt, new Date().toISOString())
       const fixed = yield* fixOnce(run, ops.runAgent, outcome.file, attempt, attempt === 1 ? plan.fixSessionId : null)
       fixes.push(fixed.fix)
-      yield* checkpoints.fixDone(fixed.fix)
+      yield* checkpoints.fixDone(fixed.fix, fixed.commits)
       commits.push(...fixed.commits)
     }
     return yield* new OrcRunError({ message: "orc: the checks loop ended without a result" })
