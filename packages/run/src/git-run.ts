@@ -1,8 +1,12 @@
 import { Effect, type PlatformError, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { hostGitRefusalExit, hostGitSafetyEnv } from "./host"
-import type { OrcRunCommit } from "./report"
 import { OrcRunError } from "./run-session"
+
+export interface OrcRunCommit {
+  readonly sha: string
+  readonly subject: string
+}
 
 const gitEnv = (): Record<string, string> => ({
   PATH: Bun.env.PATH ?? "",

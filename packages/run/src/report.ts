@@ -1,3 +1,4 @@
+import type { OrcRunCommit } from "./git-run"
 import type { PiTokenUse } from "./pi"
 import { longSessionSignal, type LongSessionCounts } from "./long-session"
 import type { NoMistakesFinding, NoMistakesRecord } from "./no-mistakes"
@@ -5,10 +6,7 @@ import { toFileUrl } from "./run-history"
 
 export const reportFileName = "report.md"
 
-export interface OrcRunCommit {
-  readonly sha: string
-  readonly subject: string
-}
+export type { OrcRunCommit } from "./git-run"
 
 export interface ChecksRoundSummary {
   readonly round: number

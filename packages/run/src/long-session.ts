@@ -2,14 +2,14 @@ import { Option, Schema } from "effect"
 import type { AgentFile } from "./agents"
 import { orcCompletionLine } from "./pi"
 
-export const longSessionTurnLimit = 300
-export const longSessionCompactionLimit = 5
+const longSessionTurnLimit = 300
+const longSessionCompactionLimit = 5
 
 export const handoverFileName = "handover.md"
 
 export const inheritedHandoverFileName = "inherited-handover.md"
 
-export const handoverLastReplyLimit = 2000
+const handoverLastReplyLimit = 2000
 
 const longSessionName = "long-session"
 
