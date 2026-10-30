@@ -1,6 +1,7 @@
 import { BunFileSystem } from "@effect/platform-bun";
 import { type Config, Duration, Effect, Layer } from "effect";
 import { alertSourcesLive } from "@tui-dash/alerts";
+import { dispatchSourcesLive } from "@tui-dash/dispatch";
 import { conversationSourceLive } from "@tui-dash/ledger";
 import { queueFeedLayer, queueSourcesLive } from "@tui-dash/queues";
 import {
@@ -63,6 +64,7 @@ const sources = Layer.mergeAll(
   conversationSourceLive,
   queueSourcesLive,
   alertSourcesLive,
+  dispatchSourcesLive,
 );
 
 export const moduleFeeds = Layer.mergeAll(taskBoardFeedLayer, queueFeedLayer).pipe(Layer.provideMerge(sessionsFeedLayer), Layer.provideMerge(quotaFeedLayer));

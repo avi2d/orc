@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Effect } from "effect";
 import { decodeLayout, defaultLayout, layoutPanels } from "@tui-dash/dashboard";
 
-const known = ["quota", "session-quota", "alerts", "resources", "queues", "schedules", "tasks", "ledger"];
+const known = ["quota", "session-quota", "alerts", "resources", "queues", "schedules", "dispatch", "tasks", "ledger"];
 
 const refusalOf = (raw: unknown): Promise<string> =>
   Effect.runPromise(Effect.match(decodeLayout(raw, known), { onFailure: (error) => error.reason, onSuccess: () => "decoded" }));
