@@ -203,7 +203,7 @@ describe("readDispatchConfig", () => {
   })
   test("refuses a relative token file path instead of resolving it against the run's folder", async () => {
     await withBacklog(async (root) => {
-            const problem = await configProblem(root, { accounts: [{ name: "main", tokenFile: "secrets/main-token" }] })
+      const problem = await configProblem(root, { accounts: [{ name: "main", tokenFile: "secrets/main-token" }] })
       expect(problem).toContain("the account main")
       expect(problem).toContain("tokenFile")
     })
