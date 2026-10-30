@@ -354,11 +354,10 @@ const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<Di
           machinesFile + ": the account " + single.name + " takes kind none and names no login, so the quota names no other account beside it"
         );
       }
-      const lone = decodedMachines.value.quota.accounts.find((entry) => "kind" in entry && entry.kind === "none");
       const renewed = decodedMachines.value.machines.find((entry) => entry.renew !== undefined);
-      if (lone !== undefined && renewed !== undefined) {
+      if (single !== undefined && renewed !== undefined) {
         return unreachable(
-          machinesFile + ": the account " + lone.name + " takes kind none and holds no token, so the machine " + renewed.name + " names a renew command it never takes"
+          machinesFile + ": the account " + single.name + " takes kind none and holds no token, so the machine " + renewed.name + " names a renew command it never takes"
         );
       }
       return ok(decodedMachines.value.machines);
