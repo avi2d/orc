@@ -164,4 +164,4 @@ export const queuedEnv = async (fixture: Fixture): Promise<string | null> => {
   return null
 }
 
-export const orcThere = (home: string): ReadonlyArray<string> => ["sh", "-c", "ORC_HOME='" + home + "' exec \"$0\" '" + binPath + "' \"$@\"", process.execPath]
+export const orcThere = (home: string): ReadonlyArray<string> => ["sh", "-c", "joined=\"$*\"; ORC_HOME='" + home + "' eval \"exec \\\"$0\\\" '" + binPath + "' $joined\"", process.execPath]

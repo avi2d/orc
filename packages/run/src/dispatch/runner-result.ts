@@ -62,6 +62,18 @@ export interface TaskClosing {
   readonly ended: string
 }
 
+const shellQuote = (word: string): string => /^[A-Za-z0-9_@%+=:,./-]+$/.test(word) ? word : "'" + word.replace(/'/g, "'\\''") + "'"
+
+export const closingFromResult = (task: string, result: RunnerResult): TaskClosing | null => {
+  if (result.status === "succeeded") {
+    return { task, pueueTask: result.pueueTask, outcome: "done", reason: "pueue task " + result.pueueTask + " succeeded", started: result.started, ended: result.ended }
+  }
+  if (result.status === "failed") {
+    return { task, pueueTask: result.pueueTask, outcome: "failed", reason: result.reason, started: result.started, ended: result.ended }
+  }
+  return null
+}
+
 const closingOf = (task: string, pueueTask: number, status: PueueStatus): TaskClosing | null => {
   if (!("Done" in status)) {
     return null
@@ -135,7 +147,7 @@ export const readResult = (task: string, home: string, label?: string | null): E
   })
 
 export const readResultThrough = (command: Command, task: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  capture(label == null ? [...command, "runner", "result", task, "--json"] : [...command, "runner", "result", task, "--label", label, "--json"], null).pipe(
+  capture([...command, ...["runner", "result", task, ...(label == null ? [] : ["--label", label]), "--json"].map(shellQuote)], null).pipe(
     Effect.flatMap((result) =>
       result.exitCode === 0
         ? decodeJson(result.stdout, RunnerDocument, command.join(" ") + " runner result")

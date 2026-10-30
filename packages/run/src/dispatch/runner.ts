@@ -7,7 +7,7 @@ import { TaskId } from "./backlog"
 import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldToken } from "./held-token"
 import { heldTask, orcGroup, PueueState, PueueStatus, taskLabel, type PueueTask } from "./pueue-status"
 import { parseTaskFile } from "./task-record"
-import { decodeTokenText, encodeRenewal, encodeSecretJson, RenewRequest, type TokenEncodeError, tokenDocumentNote, tokenFields } from "./token"
+import { decodeTokenText, encodeRenewal, encodeSecretJson, LabelArg, RenewRequest, type TokenEncodeError, tokenDocumentNote, tokenFields } from "./token"
 
 export class RunnerError extends Data.TaggedError("RunnerError")<{
   readonly detail: string
@@ -23,8 +23,8 @@ const taskFields = {
 }
 
 const QueueRequest = Schema.Union([
-  Schema.Struct({ ...taskFields, tokenFile: AbsolutePath, label: Schema.optional(Schema.String) }),
-  Schema.Struct({ ...taskFields, ...tokenFields, label: Schema.optional(Schema.String) })
+  Schema.Struct({ ...taskFields, tokenFile: AbsolutePath, label: Schema.optional(LabelArg) }),
+  Schema.Struct({ ...taskFields, ...tokenFields, label: Schema.optional(LabelArg) })
 ])
 type QueueRequest = typeof QueueRequest.Type
 
@@ -111,7 +111,7 @@ export const readHeld = (home: string, task: string, label?: string | null): Eff
 
 export const labelOf = (home: string, task: string, label?: string | null): string => label ?? taskLabel(home, task)
 
-export const fileKeyOf = (home: string, task: string, label: string): string => label === taskLabel(home, task) ? task : encodeURIComponent(label)
+export const fileKeyOf = (home: string, task: string, label: string): string => label === taskLabel(home, task) ? task : "label-" + encodeURIComponent(label)
 
 const PueueGroups = Schema.Record(Schema.String, Schema.Unknown)
 
@@ -337,6 +337,7 @@ export const renewTask = (
     if (reach.kind === "here") {
       return yield* renewHere(request, home)
     }
-    yield* handThrough(reach.command, "renew", yield* encodeRenewal(request).pipe(Effect.mapError(encodeRefusal)))
+    const label = request.label ?? taskLabel(home, request.task)
+    yield* handThrough(reach.command, "renew", yield* encodeRenewal({ ...request, label }).pipe(Effect.mapError(encodeRefusal)))
     return null
   })

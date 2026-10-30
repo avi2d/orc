@@ -7,6 +7,7 @@ import { backlogJson, type BacklogView, beatJson, formatBeat, formatBoard, type 
 import type { ConfigError } from "../json-file"
 import { checkoutOn, type DispatchConfig, readDispatchConfig, readProjects } from "./config"
 import { holdRun } from "./hold"
+import { taskLabel } from "./pueue-status"
 import { type Command, queueFromText, renewTask, RunnerError, startTask } from "./runner"
 import { formatResult, readResult, readResultThrough, runnerJson } from "./runner-result"
 import type { TaskFileError, TaskRecord } from "./task-record"
@@ -155,9 +156,10 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         break
       }
       case "RunnerResult": {
+        const label = args.reach.kind === "here" ? args.label : (args.label ?? taskLabel(place.home, args.task))
         const result = args.reach.kind === "here"
           ? yield* readResult(args.task, place.home, args.label)
-          : yield* readResultThrough(args.reach.command, args.task, args.label)
+          : yield* readResultThrough(args.reach.command, args.task, label)
         yield* Console.log(args.json ? JSON.stringify(runnerJson(result)) : formatResult(result))
         break
       }

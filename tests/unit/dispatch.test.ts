@@ -12,6 +12,7 @@ import { backlogJson, formatBoard } from "../../packages/run/src/dispatch/board"
 import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/dispatch/config"
 import { assessQuota } from "../../packages/run/src/dispatch/quota"
 import { heldTask, taskLabel } from "../../packages/run/src/dispatch/pueue-status"
+import { fileKeyOf, queueFromText, renewTask } from "../../packages/run/src/dispatch/runner"
 import { parseTaskFile, renderTaskFile, TaskFileError, type TaskRecord } from "../../packages/run/src/dispatch/task-record"
 import { decodeTokenText, tokenLive } from "../../packages/run/src/dispatch/token"
 
@@ -522,8 +523,48 @@ describe("the pueue label", () => {
     expect(heldTask(tasks, "/homes/b", "task-1")?.id).toBe(9)
     expect(heldTask(tasks, "/homes/c", "task-1")).toBeNull()
   })
-  test("the label carries its home and task instead of an opaque id", () => {
-    expect(taskLabel("/homes/a", "task-1")).toBe("/homes/a task-1")
+  test("the label names the home that queued it instead of one shared id", () => {
+    expect(taskLabel("/homes/a", "task-1")).not.toBe(taskLabel("/homes/b", "task-1"))
+  })
+  test("the label treats a trailing slash as the same home instead of another queue", () => {
+    expect(taskLabel("/homes/a/", "task-1")).toBe(taskLabel("/homes/a", "task-1"))
+  })
+  test("a scoped file key never names the folder itself instead of a file inside it", () => {
+    expect(fileKeyOf("/homes/a", "task-1", "")).toBe("label-")
+    expect(fileKeyOf("/homes/a", "task-1", ".")).toBe("label-.")
+    expect(fileKeyOf("/homes/a", "task-1", "..")).toBe("label-..")
+  })
+  test("a queue request with an empty label is refused instead of queueing under no key", async () => {
+    await withBacklog(async (root) => {
+      await expect(run(queueFromText(JSON.stringify({ task: "task-9", checkout: "/checkout", provider: "acme", body: "# x\n", tokenFile: "/secrets/main-token", label: "" }), ["orc"], root))).rejects.toThrow()
+      expect(await readdir(root)).not.toContain("runner")
+    })
+  })
+  test("a renewal for . keeps the held token instead of removing the runner folder", async () => {
+    await withBacklog(async (root) => {
+      await run(Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        yield* fs.makeDirectory(join(root, "runner", "tokens", "task-1"), { recursive: true })
+        yield* fs.writeFileString(join(root, "runner", "tokens", "task-1", "token"), "sentinel")
+      }))
+      const spawner = pueueStub(JSON.stringify({ tasks: {} })).pipe(Layer.provide(BunServices.layer))
+      const stdin = Effect.succeed(JSON.stringify({ task: "task-1", token: "tokenB123", expiresAt: "2027-01-01T00:00:00.000Z", label: "." }))
+      await expect(Effect.runPromise(renewTask(stdin, { kind: "here" }, root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))).rejects.toThrow()
+      expect(await readdir(join(root, "runner", "tokens", "task-1"))).toContain("token")
+    })
+  })
+  test("a renewal for .. keeps the held token instead of removing the runner folder", async () => {
+    await withBacklog(async (root) => {
+      await run(Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        yield* fs.makeDirectory(join(root, "runner", "tokens", "task-1"), { recursive: true })
+        yield* fs.writeFileString(join(root, "runner", "tokens", "task-1", "token"), "sentinel")
+      }))
+      const spawner = pueueStub(JSON.stringify({ tasks: {} })).pipe(Layer.provide(BunServices.layer))
+      const stdin = Effect.succeed(JSON.stringify({ task: "task-1", token: "tokenB123", expiresAt: "2027-01-01T00:00:00.000Z", label: ".." }))
+      await expect(Effect.runPromise(renewTask(stdin, { kind: "here" }, root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))).rejects.toThrow()
+      expect(await readdir(join(root, "runner", "tokens", "task-1"))).toContain("token")
+    })
   })
 })
 

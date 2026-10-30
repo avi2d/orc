@@ -58,11 +58,11 @@ describe("orc runner start", () => {
       const label = fixture.home + " task-1"
       expect(added).toEqual([
         "--group", "orc", "--label", label, "--working-directory", fixture.checkout, "--print-task-id", "--escape", "--",
-        process.execPath, binPath, "run", join(far, "runner", encodeURIComponent(label) + ".md"), "--branch", "orc/task-1",
+        process.execPath, binPath, "run", join(far, "runner", "label-" + encodeURIComponent(label) + ".md"), "--branch", "orc/task-1",
         "--sandbox", "none", "--provider", "acme", "--token-file", mainToken
       ])
       expect(await queuedEnv(fixture)).toBe(far)
-      expect(await readFile(join(far, "runner", encodeURIComponent(label) + ".md"), "utf8")).toBe(await readFile(join(fixture.dir, "task.md"), "utf8"))
+      expect(await readFile(join(far, "runner", "label-" + encodeURIComponent(label) + ".md"), "utf8")).toBe(await readFile(join(fixture.dir, "task.md"), "utf8"))
     })
   }, runnerTimeout)
 
@@ -73,7 +73,7 @@ describe("orc runner start", () => {
       await mkdir(far, { recursive: true })
       await mkdir(farPueue, { recursive: true })
       await writeFile(join(farPueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      const through = ["sh", "-c", "ORC_HOME='" + far + "' PUEUE_STATE='" + farPueue + "' exec \"$0\" '" + binPath + "' \"$@\"", process.execPath]
+      const through = ["sh", "-c", "joined=\"$*\"; ORC_HOME='" + far + "' PUEUE_STATE='" + farPueue + "' eval \"exec \\\"$0\\\" '" + binPath + "' $joined\"", process.execPath]
       await fakeQuota(fixture)
       await writeMachine(fixture, [process.execPath, binPath, "runner", "start", "--", ...through])
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
@@ -427,8 +427,8 @@ describe("orc runner result", () => {
       const queueB = await runOrc(fixture, ["runner", "queue"], { ORC_HOME: far }, JSON.stringify({ task: "task-1", checkout: fixture.checkout, provider: "acme", body: "# x\n", token: "tokenB123", expiresAt: "2027-01-01T00:00:00.000Z", label: labelB }))
       expect(queueB.exitCode).toBe(0)
       expect(queueB.stdout).toContain("queued task-1")
-      const tokenFileA = join(far, "runner", "tokens", encodeURIComponent(labelA), "token")
-      const tokenFileB = join(far, "runner", "tokens", encodeURIComponent(labelB), "token")
+      const tokenFileA = join(far, "runner", "tokens", "label-" + encodeURIComponent(labelA), "token")
+      const tokenFileB = join(far, "runner", "tokens", "label-" + encodeURIComponent(labelB), "token")
       expect(await readFile(tokenFileA, "utf8")).toBe("tokenA123")
       expect(await readFile(tokenFileB, "utf8")).toBe("tokenB123")
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({

@@ -403,6 +403,7 @@ The run takes `--sandbox none --provider <provider> --token-file <path>`, so it 
 The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
 The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
+A task queued for another home keeps a scoped file instead, so two homes holding the same task id never share one file.
 A task pueue already holds in group `orc` is not queued again.
 
 To start on another machine, put the command that runs orc there after `--`, as in `orc runner start -- ssh linux-box orc`.
@@ -413,6 +414,7 @@ So the command after `--` must give orc the `PATH` its runs need on that machine
 The queue records the resolved absolute `ORC_HOME` with the task.
 
 A task that comes with a token instead of a token file keeps it in `~/.orc/runner/tokens/<task-id>/token`, readable only by its owner, beside the expiry in `expires-at`.
+A task queued for another home keeps its token under a scoped folder instead, so two homes holding the same task id never share one token.
 Pueue then runs `orc runner hold <task-id> -- orc run ... --token-file <that file>`, and the hold runs the run.
 The hold starts the run only while the token is live, and otherwise waits for a fresh one.
 Pi reads the token once per process.
@@ -428,6 +430,7 @@ Add `--` and the command that runs orc on another machine to send it there, as w
 A renewal for a task pueue no longer runs is refused and removes that task's token folder.
 
 To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh linux-box orc` from another.
+The forwarded read defaults to that home's label, and `orc runner result <task-id> --label <label>` reads another home's run instead.
 It names pueue's state for the task and the orc run on `orc/<task-id>` with its PR.
 A task is queued, stashed, running, paused, succeeded or failed, or unknown when no pueue task in group `orc` holds it.
 To print the same facts as JSON, add `--json`, whose document names its version first as `orc.runner.v1`.
