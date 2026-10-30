@@ -3,30 +3,30 @@ import { decodeJson, decodeValue } from "../decode";
 import { mapOutcome, ok, type Outcome, unreachable } from "../reading";
 import { selector } from "./environment";
 
-export type DispatchMachine = typeof MachinesFile.Type["machines"][number];
+type DispatchMachine = typeof MachinesFile.Type["machines"][number];
 
-export interface DispatchProject {
+interface DispatchProject {
   readonly name: string;
   readonly checkouts: Readonly<Partial<Record<string, string>>>;
 }
 
-export interface DispatchClaim {
+interface DispatchClaim {
   readonly beat: string;
   readonly machine: string;
   readonly account: string;
   readonly takenAt: string;
 }
 
-export interface DispatchStarted {
+interface DispatchStarted {
   readonly at: string;
   readonly log: string;
 }
 
-export type DispatchClosing =
+type DispatchClosing =
   | { readonly outcome: "start-failed"; readonly reason: string }
   | { readonly outcome: "done" | "failed"; readonly started: DispatchStarted; readonly reason: string };
 
-export type DispatchTaskState =
+type DispatchTaskState =
   | { readonly kind: "new" }
   | { readonly kind: "taken"; readonly claim: DispatchClaim | null }
   | { readonly kind: "started"; readonly claim: DispatchClaim; readonly started: DispatchStarted }
@@ -194,6 +194,73 @@ const readJsonFile = (fs: FileSystem.FileSystem, file: string): Effect.Effect<Ou
     return decodeJson(Schema.Unknown)(text);
   });
 
+const stemOf = (name: string): string | null => {
+  const stemmed = /^task-(\d+)\.md$/u.exec(name);
+  return stemmed === null ? null : "task-" + stemmed[1];
+};
+
+const takeTask = (
+  folder: TaskFolder,
+  file: string,
+  stem: string,
+  text: string,
+  tasks: Array<DispatchTask>,
+  unread: Array<string>,
+): void => {
+  const task = taskOf(folder, file, stem, text);
+  if (typeof task === "string") unread.push(task);
+  else tasks.push(task);
+};
+
+const readTaskFile = (
+  fs: FileSystem.FileSystem,
+  folder: TaskFolder,
+  root: string,
+  name: string,
+  tasks: Array<DispatchTask>,
+  unread: Array<string>,
+): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    const stem = stemOf(name);
+    if (stem === null) return;
+    const file = root + "/" + folder + "/" + name;
+    const text = yield* readText(fs, file);
+    if (text === null) return;
+    if (text === undefined) {
+      unread.push(file + ": the task file cannot be read");
+      return;
+    }
+    takeTask(folder, file, stem, text, tasks, unread);
+  });
+
+const readFolder = (
+  fs: FileSystem.FileSystem,
+  root: string,
+  folder: TaskFolder,
+  tasks: Array<DispatchTask>,
+  unread: Array<string>,
+): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    const listed = yield* fs.readDirectory(root + "/" + folder).pipe(
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed<ReadonlyArray<string> | null>([])),
+      Effect.catchTag("PlatformError", () => Effect.succeed<ReadonlyArray<string> | null>(null)),
+    );
+    if (listed === null) {
+      unread.push(root + "/" + folder + ": cannot be listed");
+      return;
+    }
+    for (const name of listed.toSorted(byName)) {
+      yield* readTaskFile(fs, folder, root, name, tasks, unread);
+    }
+  });
+
+const orderedTasks = (tasks: ReadonlyArray<DispatchTask>): ReadonlyArray<DispatchTask> => {
+  const seen = new Map<string, DispatchTask>();
+  for (const task of tasks) seen.set(task.id, task);
+  const numbered = (id: string): number => Number(id.slice(5));
+  return [...seen.values()].toSorted((left, right) => numbered(left.id) - numbered(right.id));
+};
+
 const readTasks = (
   fs: FileSystem.FileSystem,
   root: string,
@@ -203,34 +270,9 @@ const readTasks = (
     const unread: Array<string> = [];
     const folders: ReadonlyArray<TaskFolder> = ["new", "taken", "closed"];
     for (const folder of folders) {
-      const listed = yield* fs.readDirectory(root + "/" + folder).pipe(
-        Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed<ReadonlyArray<string> | null>([])),
-        Effect.catchTag("PlatformError", () => Effect.succeed<ReadonlyArray<string> | null>(null)),
-      );
-      if (listed === null) {
-        unread.push(root + "/" + folder + ": cannot be listed");
-        continue;
-      }
-      for (const name of listed.toSorted(byName)) {
-        const stemmed = /^task-(\d+)\.md$/u.exec(name);
-        if (stemmed === null) continue;
-        const stem = "task-" + stemmed[1];
-        const file = root + "/" + folder + "/" + name;
-        const text = yield* readText(fs, file);
-        if (text === null) continue;
-        if (text === undefined) {
-          unread.push(file + ": the task file cannot be read");
-          continue;
-        }
-        const task = taskOf(folder, file, stem, text);
-        if (typeof task === "string") unread.push(task);
-        else tasks.push(task);
-      }
+      yield* readFolder(fs, root, folder, tasks, unread);
     }
-    const seen = new Map<string, DispatchTask>();
-    for (const task of tasks) seen.set(task.id, task);
-    const numbered = (id: string): number => Number(id.slice(5));
-    return { tasks: [...seen.values()].toSorted((left, right) => numbered(left.id) - numbered(right.id)), unread };
+    return { tasks: orderedTasks(tasks), unread };
   });
 
 const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<DispatchSnapshot> =>

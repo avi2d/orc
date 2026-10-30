@@ -21,7 +21,7 @@ import {
   type PanelModule,
   type Placed,
   printSolo,
-  reading,
+  reading as makeReading,
   runSolo,
   sentence,
   type Block,
@@ -44,7 +44,7 @@ const pendingLines = (inner: number): Block => sentence("reading the backlog\u20
 
 const pendingGlance = (width: number): Block => {
   const label: Label = { text: "dispatch", width: leastLabelWidth };
-  return labelledReadings(label, [reading("muted", "reading\u2026")], width);
+  return labelledReadings(label, [makeReading("muted", "reading\u2026")], width);
 };
 
 export const dispatchPlaced = (reading: () => DispatchReading): Placed =>
@@ -62,7 +62,7 @@ export const dispatchPlaced = (reading: () => DispatchReading): Placed =>
     },
   });
 
-export const mountDispatch: Effect.Effect<Mounted, never, DispatchSources | Scope> = Effect.gen(function* () {
+export const mountDispatch: Effect.Effect<Mounted, never, DispatchSources | Scope.Scope> = Effect.gen(function* () {
   const poll = yield* polled((yield* DispatchSource).read, readsCadence);
   return yield* mountedOf({
     name: "dispatch",
