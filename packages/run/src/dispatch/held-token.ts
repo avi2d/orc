@@ -30,10 +30,7 @@ const acquireLock = (fs: FileSystem.FileSystem, lock: string) =>
     while (true) {
       const taken = yield* fs.makeDirectory(lock).pipe(
         Effect.as(true),
-        Effect.catchTag("PlatformError", (error) =>
-          error.reason._tag === "AlreadyExists"
-            ? Effect.succeed(false as const)
-            : Effect.fail(error))
+        Effect.catchReason("PlatformError", "AlreadyExists", () => Effect.succeed(false as const))
       )
       if (taken) {
         return
@@ -46,7 +43,7 @@ const acquireLock = (fs: FileSystem.FileSystem, lock: string) =>
     }
   })
 
-const withTaskLock = <A, E>(fs: FileSystem.FileSystem, dir: string, use: Effect.Effect<A, E, never>): Effect.Effect<A, E | PlatformError.PlatformError, FileSystem.FileSystem> =>
+const withTaskLock = <A, E>(fs: FileSystem.FileSystem, dir: string, use: Effect.Effect<A, E>): Effect.Effect<A, E | PlatformError.PlatformError, FileSystem.FileSystem> =>
   Effect.acquireUseRelease(
     acquireLock(fs, lockFor(dir)),
     () => use,
