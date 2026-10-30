@@ -6,11 +6,11 @@ import {
   type DispatchView,
   type Freshness,
   type BackgroundTuning,
-  refreshingOf,
-  stampedInBackground,
+  polled,
+  readsCadence,
   unreachable,
 } from "@tui-dash/schema";
-import { type Block, livePanel as liveUiPanel, type Panel, panelWidth, printFrame, runPanel } from "@tui-dash/ui";
+import { type Block, frameRows, livePanel as liveUiPanel, type Panel, panel, panelChrome, panelWidth, printFrame, runPanel } from "@tui-dash/ui";
 import { dispatchLines } from "./panels";
 
 export type DispatchSources = DispatchSource;
@@ -32,7 +32,7 @@ export const readDispatchRead: Effect.Effect<DispatchRead, never, DispatchSource
 const pendingRead = (root: string): DispatchRead => ({
   view: dispatchView({
     root,
-    missing: true,
+    missing: false,
     machines: unreachable("reading the backlog\u2026"),
     projects: unreachable("reading the backlog\u2026"),
     tasks: [],
@@ -44,44 +44,50 @@ const pendingRead = (root: string): DispatchRead => ({
 
 export const backgroundDispatchRead = (
   tuning?: BackgroundTuning,
-): Effect.Effect<{ readonly read: Effect.Effect<DispatchRead>; readonly refreshing: Effect.Effect<boolean> }, never, DispatchSources | Scope.Scope> =>
+): Effect.Effect<{ readonly read: Effect.Effect<DispatchRead>; readonly refreshing: Effect.Effect<boolean> }, never, DispatchSources | Scope> =>
   Effect.gen(function* () {
     const source = yield* DispatchSource;
-    const poll = yield* stampedInBackground(() => source.read, tuning?.patience ?? "2 seconds", { revalidate: tuning?.revalidate });
+    const poll = yield* polled(Effect.map(source.read, (reading) => reading), tuning?.revalidate ?? readsCadence);
     return {
       read: Effect.map(
-        poll.read(undefined),
-        (stamped): DispatchRead =>
-          Option.isNone(stamped)
+        poll.latest,
+        (latest): DispatchRead =>
+          Option.isNone(latest)
             ? pendingRead(source.root)
             : {
-              view: dispatchView(stamped.value.value.snapshot),
-              at: atOf(stamped.value.value.capturedAt),
-              freshness: [{ at: stamped.value.at, kind: "live" }],
+              view: dispatchView(latest.value.value.snapshot),
+              at: atOf(latest.value.value.capturedAt),
+              freshness: [{ at: latest.value.at, kind: "live" }],
             },
       ),
-      refreshing: refreshingOf([poll]),
+      refreshing: poll.refreshing,
     };
   });
 
 interface Readings {
   readonly view: DispatchView;
+  readonly at: number;
 }
 
-const panelLines = (readings: Readings, columns: number, rows: number): Block => dispatchLines(readings.view, panelWidth(columns), rows);
+const panelLines = (readings: Readings, columns: number, rows: number): Block => {
+  const width = panelWidth(columns);
+  const inner = Math.max(0, width - panelChrome);
+  const room = Number.isFinite(rows) ? Math.max(0, rows - frameRows) : rows;
+  return panel("dispatch", dispatchLines(readings.view, inner, room), width);
+};
 
-export const dispatchPanel = <R>(read: Effect.Effect<DispatchView, never, R>): Panel<Readings, R> => ({
-  read: Effect.map(read, (view) => ({ view })),
+export const dispatchPanel = <R>(read: Effect.Effect<DispatchRead, never, R>): Panel<Readings, R> => ({
+  read: Effect.map(read, (resolved) => ({ view: resolved.view, at: resolved.at })),
   lines: panelLines,
-  pending: () => false,
+  pending: (readings) => readings.at === 0,
 });
 
 export const livePanel = (renderer: CliRenderer): Effect.Effect<void, never, DispatchSources> =>
-  Effect.scoped(Effect.flatMap(backgroundDispatchRead(), (feed) => liveUiPanel(renderer, dispatchPanel(Effect.map(feed.read, (read) => read.view)), "10 seconds")));
+  Effect.scoped(Effect.flatMap(backgroundDispatchRead(), (feed) => liveUiPanel(renderer, dispatchPanel(feed.read), "10 seconds")));
 
 export const runDispatchPanel: Effect.Effect<void, never, DispatchSources> = Effect.scoped(
-  Effect.flatMap(backgroundDispatchRead(), (feed) => runPanel(dispatchPanel(Effect.map(feed.read, (read) => read.view)), "10 seconds")),
+  Effect.flatMap(backgroundDispatchRead(), (feed) => runPanel(dispatchPanel(feed.read), "10 seconds")),
 );
 
 export const printDispatchFrame = (width: number, height: number = Number.POSITIVE_INFINITY, color = false): Effect.Effect<void, never, DispatchSources> =>
-  printFrame(dispatchPanel(Effect.map(readDispatchRead, (read) => read.view)), width, height, color);
+  printFrame(dispatchPanel(readDispatchRead), width, height, color);

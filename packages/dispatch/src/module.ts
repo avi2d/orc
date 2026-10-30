@@ -20,7 +20,7 @@ export const dispatchPlaced = (reading: () => DispatchReading): Placed =>
     glance: (width) => [dispatchSection(reading().view, width)],
   });
 
-export const mountDispatch: Effect.Effect<Mounted, never, DispatchSources | Scope.Scope> = Effect.gen(function* () {
+export const mountDispatch: Effect.Effect<Mounted, never, DispatchSources | Scope> = Effect.gen(function* () {
   const feed = yield* backgroundDispatchRead();
   return yield* mountedOf({
     name: "dispatch",
@@ -32,7 +32,7 @@ export const mountDispatch: Effect.Effect<Mounted, never, DispatchSources | Scop
       yield* Effect.yieldNow;
       return { view: read.view, at: read.at, refreshing: yield* feed.refreshing };
     }),
-    pending: () => false,
+    pending: (reading) => reading.at === 0,
     refreshing: (reading) => reading.refreshing,
     freshness: (reading): ReadonlyArray<Freshness> => (reading.at === 0 ? [] : [{ at: reading.at, kind: "live" }]),
     placed: dispatchPlaced,

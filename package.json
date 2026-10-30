@@ -41,6 +41,7 @@
     "@tui-dash/alerts": "workspace:*",
     "@tui-dash/cli": "workspace:*",
     "@tui-dash/dashboard": "workspace:*",
+    "@tui-dash/dispatch": "workspace:*",
     "@tui-dash/ledger": "workspace:*",
     "@tui-dash/queues": "workspace:*",
     "@tui-dash/quota": "workspace:*",

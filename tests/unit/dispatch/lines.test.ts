@@ -11,18 +11,18 @@ import { writeDispatchBacklog } from "../../lib/dispatch-fixture";
 
 const width = 84;
 
-const viewOf = (root: string): Promise<DispatchView> =>
+const viewOf = (home: string): Promise<DispatchView> =>
   Effect.runPromise(
     Effect.map(Effect.flatMap(DispatchSource, (source) => source.read), (reading) => dispatchView(reading.snapshot)).pipe(
       Effect.provide(dispatchSourceLayer.pipe(Layer.provide(BunFileSystem.layer))),
-      Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: root, ORC_BACKLOG: root }))),
+      Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: home, ORC_HOME: home }))),
     ),
   );
 
 const withView = async (body: (view: DispatchView) => void): Promise<void> => {
   const root = await mkdtemp(join(tmpdir(), "orc-dispatch-"));
   try {
-    await writeDispatchBacklog(root);
+    await writeDispatchBacklog(join(root, "backlog"));
     body(await viewOf(root));
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -37,7 +37,7 @@ const glance = (view: DispatchView): string => dispatchSection(view, width).map(
 describe("the dispatch panel, against the recorded backlog", () => {
   test("counts the machines, the run and the waiting tasks instead of only the room", async () => {
     await withView((view) => {
-      expect(printed(view)[1]).toContain("2 machines \u00b7 1 run \u00b7 6 waiting");
+      expect(printed(view)[0]).toContain("2 machines \u00b7 1 run \u00b7 6 waiting");
     });
   });
 
@@ -75,9 +75,9 @@ describe("the dispatch panel, against the recorded backlog", () => {
     });
   });
 
-  test("counts the closed tasks by outcome instead of listing them as waiting", async () => {
+  test("leaves closed tasks out of the panel instead of listing them", async () => {
     await withView((view) => {
-      expect(printed(view).some((line) => line.includes("closed: 1 done \u00b7 1 failed"))).toBe(true);
+      expect(printed(view).some((line) => line.includes("task-8") || line.includes("task-10"))).toBe(false);
     });
   });
 

@@ -4,7 +4,6 @@ import {
   ellipsize,
   type Line,
   padEnd,
-  panel,
   sentence,
   sourceNotes,
   span,
@@ -44,13 +43,8 @@ const waitLine = (wait: WaitRow, width: number): Line => {
   return [span("\u00b7 ", "warning"), span(ellipsize(head, width - 2), "foreground")];
 };
 
-const closedParts = (view: DispatchView): ReadonlyArray<string> => [
-  ...counted(view.closedDone, "done"),
-  ...counted(view.closedFailed, "failed"),
-];
-
 export const dispatchLines = (view: DispatchView, width: number, rows: number): Block => {
-  if (view.missing) return panel("dispatch", sentence("no backlog at " + view.root, "muted", width), width);
+  if (view.missing) return sentence("no backlog at " + view.root, "muted", width);
   const counts = headParts(view);
   const countHead: Block = counts.length === 0 ? [] : [[span(counts.join(" \u00b7 "), "foreground")]];
   const machineNotes: Block = view.machines.kind === "ok" ? [] : sourceNotes("dispatch", view.machines, width);
@@ -59,7 +53,5 @@ export const dispatchLines = (view: DispatchView, width: number, rows: number): 
   const machines = view.machines.kind === "ok" ? view.machines.value.map((entry) => machineLine(entry, width)) : [];
   const runs = view.runs.map((run) => runLine(run, width));
   const waits = view.waiting.map((wait) => waitLine(wait, width));
-  const closed = closedParts(view);
-  const tail: Block = closed.length === 0 ? [] : [[span("closed: " + closed.join(" \u00b7 "), "muted")]];
-  return panel("dispatch", withinRoom(head, [...machines, ...runs, ...waits, ...tail], rows, "rows"), width);
+  return withinRoom(head, [...machines, ...runs, ...waits], rows, "rows");
 };

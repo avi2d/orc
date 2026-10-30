@@ -85,12 +85,12 @@ type TaskFields = typeof TaskFields.Type;
 
 type TaskFolder = "new" | "taken" | "closed";
 
-const backlogVariable = "ORC_BACKLOG";
+const backlogVariable = "ORC_HOME";
 
 const backlogRoot: Config.Config<string> = Config.all({
   explicit: selector(backlogVariable),
   home: Config.String("HOME"),
-}).pipe(Config.map(({ explicit, home }) => explicit ?? home + "/.orc/backlog"));
+}).pipe(Config.map(({ explicit, home }) => (explicit ?? home + "/.orc") + "/backlog"));
 
 export { backlogRoot };
 
@@ -164,13 +164,16 @@ const byName = (left: string, right: string): number => (left < right ? -1 : lef
 const readText = (
   fs: FileSystem.FileSystem,
   file: string,
-): Effect.Effect<string | undefined> =>
-  fs.readFileString(file).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(undefined)));
+): Effect.Effect<string | null | undefined> =>
+  fs.readFileString(file).pipe(
+    Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)),
+    Effect.catchTag("PlatformError", () => Effect.succeed(undefined)),
+  );
 
 const readJsonFile = (fs: FileSystem.FileSystem, file: string): Effect.Effect<Outcome<unknown>> =>
   Effect.gen(function* () {
     const text = yield* readText(fs, file);
-    if (text === undefined) return unreachable(file + " cannot be read");
+    if (text === null || text === undefined) return unreachable(file + " cannot be read");
     return decodeJson(Schema.Unknown)(text);
   });
 
@@ -183,14 +186,20 @@ const readTasks = (
     const unread: Array<string> = [];
     const folders: ReadonlyArray<TaskFolder> = ["new", "taken", "closed"];
     for (const folder of folders) {
-      const names = yield* fs.readDirectory(root + "/" + folder).pipe(
-        Effect.catchTag("PlatformError", () => Effect.succeed<ReadonlyArray<string>>([])),
+      const listed = yield* fs.readDirectory(root + "/" + folder).pipe(
+        Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed<ReadonlyArray<string> | null>([])),
+        Effect.catchTag("PlatformError", () => Effect.succeed<ReadonlyArray<string> | null>(null)),
       );
-      for (const name of names.toSorted(byName)) {
+      if (listed === null) {
+        unread.push(root + "/" + folder + ": cannot be listed");
+        continue;
+      }
+      for (const name of listed.toSorted(byName)) {
         const stem = name.replace(/\.md$/u, "");
         if (!/^task-\d+$/u.test(stem)) continue;
         const file = root + "/" + folder + "/" + name;
         const text = yield* readText(fs, file);
+        if (text === null) continue;
         if (text === undefined) {
           unread.push(file + ": the task file cannot be read");
           continue;
@@ -200,12 +209,26 @@ const readTasks = (
         else tasks.push(task);
       }
     }
-    return { tasks, unread };
+    const seen = new Map<string, DispatchTask>();
+    for (const task of tasks) seen.set(task.id, task);
+    const numbered = (id: string): number => Number(id.slice(5));
+    return { tasks: [...seen.values()].toSorted((left, right) => numbered(left.id) - numbered(right.id)), unread };
   });
 
 const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<DispatchSnapshot> =>
   Effect.gen(function* () {
-    const present = yield* fs.exists(root).pipe(Effect.catchTag("PlatformError", () => Effect.succeed(false)));
+    const present = yield* fs.exists(root).pipe(Effect.catchTag("PlatformError", () => Effect.succeed<boolean | null>(null)));
+    if (present === null) {
+      const reason = root + ": cannot be read";
+      return {
+        root,
+        missing: false,
+        machines: unreachable(reason),
+        projects: unreachable(reason),
+        tasks: [],
+        unread: [reason],
+      };
+    }
     if (!present) {
       return {
         root,
