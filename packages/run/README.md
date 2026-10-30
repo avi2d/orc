@@ -172,7 +172,7 @@ This example names opencode-go through a Pi login, anthropic through a token fil
     {
       "id": "claude-bridge",
       "credential": "package",
-      "packages": ["git:github.com/avi2d/pi-claude-bridge@v0.9.3+avi2d.6"],
+      "packages": ["git:github.com/avi2d/pi-claude-bridge@v0.9.3+avi2d.8"],
       "env": { "CLAUDE_CONFIG_DIR": "/Users/me/.claude-accounts/main" }
     }
   ],

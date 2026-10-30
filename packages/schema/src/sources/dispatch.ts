@@ -72,8 +72,11 @@ const Machine = Schema.Struct({
 });
 
 const Account = Schema.Union([
-  Schema.Struct({ name: Name, tokenFile: AbsolutePath, tokenCommand: Schema.optionalKey(Schema.Never) }),
-  Schema.Struct({ name: Name, tokenCommand: Command, tokenFile: Schema.optionalKey(Schema.Never) }),
+  Schema.Struct({ name: Name, kind: Schema.Literal("token-file"), tokenFile: AbsolutePath, tokenCommand: Schema.optionalKey(Schema.Never) }),
+  Schema.Struct({ name: Name, kind: Schema.Literal("token-command"), tokenCommand: Command, tokenFile: Schema.optionalKey(Schema.Never) }),
+  Schema.Struct({ name: Name, kind: Schema.Literal("none"), tokenFile: Schema.optionalKey(Schema.Never), tokenCommand: Schema.optionalKey(Schema.Never) }),
+  Schema.Struct({ name: Name, tokenFile: AbsolutePath, tokenCommand: Schema.optionalKey(Schema.Never), kind: Schema.optionalKey(Schema.Never) }),
+  Schema.Struct({ name: Name, tokenCommand: Command, tokenFile: Schema.optionalKey(Schema.Never), kind: Schema.optionalKey(Schema.Never) }),
 ]);
 
 const MachinesFile = Schema.Struct({
@@ -326,6 +329,13 @@ const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<Di
       if (commandAccount !== undefined && unrenewed !== undefined) {
         return unreachable(
           machinesFile + ": the machine " + unrenewed.name + " has no renew command, which the account " + commandAccount.name + " needs to carry its token past its expiry"
+        );
+      }
+      const lone = decodedMachines.value.quota.accounts.find((entry) => "kind" in entry && entry.kind === "none");
+      const renewed = decodedMachines.value.machines.find((entry) => entry.renew !== undefined);
+      if (lone !== undefined && renewed !== undefined) {
+        return unreachable(
+          machinesFile + ": the account " + lone.name + " takes kind none and holds no token, so the machine " + renewed.name + " names a renew command it never takes"
         );
       }
       return ok(decodedMachines.value.machines);
