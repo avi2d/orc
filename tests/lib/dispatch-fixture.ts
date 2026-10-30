@@ -64,7 +64,6 @@ export const writeDispatchBacklog = async (root: string): Promise<void> => {
   await writeFile(join(root, "new", "task-4.md"), task("task-4", "Unknown machine", "orc", "feld", []));
   await writeFile(join(root, "new", "task-5.md"), task("task-5", "No checkout", "docs", "linux", []));
   await writeFile(join(root, "new", "task-7.md"), task("task-7", "Full machine", "orc", "mac", []));
-  await writeFile(join(root, "new", "task-11.md"), "no frontmatter here" + String.fromCharCode(10));
   await writeFile(join(root, "taken", "task-6.md"), task("task-6", "Running task", "orc", null, [], claim));
   await writeFile(
     join(root, "closed", "task-8.md"),

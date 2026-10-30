@@ -20,5 +20,5 @@ export const dispatchSection = (view: DispatchView, width: number): Block => {
     ...counted(view.runs.length, view.runs.length === 1 ? "run" : "runs").map((part) => reading("foreground", part)),
     ...counted(view.waiting.length, "waiting").map((part) => reading("warning", part)),
   ];
-  return labelledReadings(label, parts.length === 0 ? [reading("muted", "idle")] : parts, width);
+  return labelledReadings(label, parts, width);
 };

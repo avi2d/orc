@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
@@ -70,9 +70,14 @@ describe("the dispatch panel, against the recorded backlog", () => {
   });
 
   test("names the broken file instead of dropping it", async () => {
-    await withView((view) => {
-      expect(printed(view).some((line) => line.includes("task-11.md"))).toBe(true);
-    });
+    const root = await mkdtemp(join(tmpdir(), "orc-dispatch-"));
+    try {
+      await writeDispatchBacklog(join(root, "backlog"));
+      await writeFile(join(root, "backlog", "new", "task-11.md"), "no frontmatter here" + String.fromCharCode(10));
+      expect(printed(await viewOf(root)).some((line) => line.includes("task-11.md"))).toBe(true);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   test("leaves closed tasks out of the panel instead of listing them", async () => {

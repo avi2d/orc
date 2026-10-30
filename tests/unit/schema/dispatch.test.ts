@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
@@ -54,9 +54,19 @@ describe("the dispatcher source", () => {
 
   test("lists a broken task file as unread instead of failing the read", async () => {
     await withBacklog(async (root) => {
+      await writeFile(join(root, "backlog", "new", "task-11.md"), "no frontmatter here" + String.fromCharCode(10));
       const snapshot = snapshotOf(await readBacklog(root));
       expect(snapshot.unread).toHaveLength(1);
       expect(snapshot.unread[0]).toContain("task-11.md");
+    });
+  });
+
+  test("says the beat cannot place a task while a file is unread instead of naming the next beat", async () => {
+    await withBacklog(async (root) => {
+      await writeFile(join(root, "backlog", "new", "task-11.md"), "no frontmatter here" + String.fromCharCode(10));
+      const view = dispatchView(snapshotOf(await readBacklog(root)));
+      expect(view.waiting.find((row) => row.id === "task-1")?.reason).toBe("the beat cannot read the backlog");
+      expect(view.waiting.find((row) => row.id === "task-2")?.reason).toBe("the beat cannot read the backlog");
     });
   });
 
