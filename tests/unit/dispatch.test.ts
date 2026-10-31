@@ -105,7 +105,8 @@ describe("parseDispatchArgs", () => {
       kind: "RunnerResult",
       task: "task-1",
       json: false,
-      reach: { kind: "through", command: ["ssh", "linux", "orc", "--json"] }
+      reach: { kind: "through", command: ["ssh", "linux", "orc", "--json"] },
+      stdinLabel: false
     })
   })
   test("runner result reads --json before -- as its own", () => {
@@ -113,8 +114,30 @@ describe("parseDispatchArgs", () => {
       kind: "RunnerResult",
       task: "task-1",
       json: true,
-      reach: { kind: "through", command: ["ssh", "linux", "orc"] }
+      reach: { kind: "through", command: ["ssh", "linux", "orc"] },
+      stdinLabel: false
     })
+  })
+  test("a label-less result reads no stdin marker instead of waiting on a pipe", () => {
+    expect(parseDispatchArgs("runner", ["result", "task-1"])).toEqual({
+      kind: "RunnerResult",
+      task: "task-1",
+      json: false,
+      reach: { kind: "here" },
+      stdinLabel: false
+    })
+  })
+  test("a forwarded result marks its stdin label instead of leaving the far side to guess", () => {
+    expect(parseDispatchArgs("runner", ["result", "task-1", "--json", "--stdin-label"])).toEqual({
+      kind: "RunnerResult",
+      task: "task-1",
+      json: true,
+      reach: { kind: "here" },
+      stdinLabel: true
+    })
+  })
+  test("a result with a repeated stdin marker is refused instead of read twice", () => {
+    expect(parseDispatchArgs("runner", ["result", "task-1", "--stdin-label", "--stdin-label"]).kind).toBe("UsageError")
   })
   test("runner -- with no command is refused instead of reading here", () => {
     expect(parseDispatchArgs("runner", ["start", "--"]).kind).toBe("UsageError")

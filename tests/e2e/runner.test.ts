@@ -323,6 +323,31 @@ describe("orc runner start", () => {
 })
 
 describe("orc runner result", () => {
+  test("a label-less result returns without stdin closing instead of waiting on stdin to EOF", async () => {
+    await withFixture(async (fixture) => {
+      const proc = Bun.spawn([process.execPath, binPath, "runner", "result", "task-7", "--json"], {
+        stdin: "pipe",
+        stdout: "pipe",
+        stderr: "pipe",
+        cwd: fixture.dir,
+        env: { ...process.env, ...fixture.env }
+      })
+      try {
+        const exitCode = await Promise.race([proc.exited, Bun.sleep(8000).then(() => "timed-out" as const)])
+        if (exitCode === "timed-out") {
+          throw new Error("orc runner result task-7 never returned with its stdin pipe left open")
+        }
+        expect(exitCode).toBe(0)
+        expect(JSON.parse(await new Response(proc.stdout).text())).toEqual({
+          schema: "orc.runner.v1",
+          result: { task: "task-7", status: "unknown" }
+        })
+      } finally {
+        proc.kill()
+      }
+    })
+  }, runnerTimeout)
+
   test("reads each pueue state as its own result instead of one running bucket", async () => {
     await withFixture(async (fixture) => {
       const statuses = await Promise.all(["task-1", "task-2", "task-3", "task-4", "task-5", "task-6", "task-7"].map(async (task) => resultJson(fixture, task)))

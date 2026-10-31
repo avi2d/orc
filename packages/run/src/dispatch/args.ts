@@ -18,7 +18,7 @@ export type DispatchArgs =
   | { readonly kind: "RunnerRenew"; readonly reach: Reach }
   | { readonly kind: "RunnerHold"; readonly task: string; readonly label?: string; readonly run: readonly [string, ...Array<string>] }
   | { readonly kind: "RunnerToken"; readonly session: string }
-  | { readonly kind: "RunnerResult"; readonly task: string; readonly label?: string; readonly json: boolean; readonly reach: Reach }
+  | { readonly kind: "RunnerResult"; readonly task: string; readonly label?: string; readonly json: boolean; readonly reach: Reach; readonly stdinLabel: boolean }
   | { readonly kind: "UsageError"; readonly detail: string }
 
 export const dispatchUsage =
@@ -100,36 +100,62 @@ const parseRunnerToken = (after: ReadonlyArray<string>): DispatchArgs => {
   return extra.length === 0 ? { kind: "RunnerToken", session } : unexpected(extra[0])
 }
 
+type StdinMarker = { readonly words: ReadonlyArray<string>; readonly stdinLabel: boolean } | { readonly error: string }
+
+const stripStdinMarker = (verb: "hold" | "result", words: ReadonlyArray<string>): StdinMarker => {
+  if (verb !== "result" || !words.includes("--stdin-label")) {
+    return { words, stdinLabel: false }
+  }
+  const kept = words.filter((word) => word !== "--stdin-label")
+  return kept.length === words.length - 1
+    ? { words: kept, stdinLabel: true }
+    : { error: "orc runner result takes one --stdin-label" }
+}
+
+type TaskLabel = { readonly label: string | undefined; readonly kept: Array<string> } | { readonly error: string }
+
+const takeTaskLabel = (verb: "hold" | "result", words: ReadonlyArray<string>): TaskLabel => {
+  let label: string | undefined
+  const kept: Array<string> = []
+  for (let index = 0; index < words.length; index += 1) {
+    const flag = words[index] ?? ""
+    if (flag !== "--label") {
+      kept.push(flag)
+      continue
+    }
+    const value = words[index + 1] ?? ""
+    if (value === "" || value.startsWith("--")) {
+      return { error: "orc runner " + verb + " takes a value after --label" }
+    }
+    if (label !== undefined) {
+      return { error: "orc runner " + verb + " takes one --label" }
+    }
+    label = value
+    index += 1
+  }
+  return { label, kept }
+}
+
 const parseRunnerTask = (verb: "hold" | "result", split: Extract<ReachSplit, { readonly kind: "split" }>): DispatchArgs => {
   const [task = "", ...flags] = split.words
   if (!isTaskId(task)) {
     return { kind: "UsageError", detail: "orc runner " + verb + " takes a task id, got \"" + task + "\"" }
   }
-  let label: string | undefined
-  const kept: Array<string> = []
-  for (let index = 0; index < flags.length; index += 1) {
-    const flag = flags[index] ?? ""
-    if (flag === "--label") {
-      const value = flags[index + 1] ?? ""
-      if (value === "" || value.startsWith("--")) {
-        return { kind: "UsageError", detail: "orc runner " + verb + " takes a value after --label" }
-      }
-      if (label !== undefined) {
-        return { kind: "UsageError", detail: "orc runner " + verb + " takes one --label" }
-      }
-      label = value
-      index += 1
-      continue
-    }
-    kept.push(flag)
+  const marked = stripStdinMarker(verb, flags)
+  if ("error" in marked) {
+    return { kind: "UsageError", detail: marked.error }
+  }
+  const taken = takeTaskLabel(verb, marked.words)
+  if ("error" in taken) {
+    return { kind: "UsageError", detail: taken.error }
   }
   if (verb === "result") {
-    return parseJsonFlag(kept, (json) => ({ kind: "RunnerResult", task, ...(label === undefined ? {} : { label }), json, reach: split.reach }))
+    return parseJsonFlag(taken.kept, (json) => ({ kind: "RunnerResult", task, ...(taken.label === undefined ? {} : { label: taken.label }), json, reach: split.reach, stdinLabel: marked.stdinLabel }))
   }
-  if (split.reach.kind === "here" || kept.length > 0) {
+  if (split.reach.kind === "here" || taken.kept.length > 0) {
     return { kind: "UsageError", detail: "orc runner hold takes a task id, then -- and the run command" }
   }
-  return { kind: "RunnerHold", task, ...(label === undefined ? {} : { label }), run: split.reach.command }
+  return { kind: "RunnerHold", task, ...(taken.label === undefined ? {} : { label: taken.label }), run: split.reach.command }
 }
 
 const parseRunner = (rest: ReadonlyArray<string>): DispatchArgs => {

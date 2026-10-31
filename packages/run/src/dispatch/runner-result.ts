@@ -153,8 +153,9 @@ export const readStdinLabel = (stdin: Effect.Effect<string, RunnerError>): Effec
     )
   )
 
-export const readResultThrough = (command: Command, task: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  capture([...command, "runner", "result", task, "--json"], label == null ? null : JSON.stringify({ label })).pipe(
+export const readResultThrough = (command: Command, task: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, ChildProcessSpawner.ChildProcessSpawner> => {
+  const stdin = label == null ? null : JSON.stringify({ label })
+  return capture([...command, "runner", "result", task, "--json", ...(stdin === null ? [] : ["--stdin-label"])], stdin).pipe(
     Effect.flatMap((result) =>
       result.exitCode === 0
         ? decodeJson(result.stdout, RunnerDocument, command.join(" ") + " runner result")
@@ -162,6 +163,7 @@ export const readResultThrough = (command: Command, task: string, label?: string
     ),
     Effect.map((document) => document.result)
   )
+}
 
 export const runnerJson = (result: RunnerResult): typeof RunnerDocument.Type => ({ schema: RUNNER_JSON_SCHEMA, result })
 
