@@ -16,7 +16,7 @@
     "postinstall": "bun packages/run/scripts/patch-knip-jiti.ts && cp CHANGELOG.md packages/run/CHANGELOG.md",
     "prepare": "checks-vendor --library effect --package effect --repository https://github.com/Effect-TS/effect.git --tag 'effect@{version}' --path packages/effect/package.json",
     "typecheck": "tsc --noEmit && effect-tsgo diagnostics --project tsconfig.json --format text --strict",
-    "test": "checks-test",
+    "test": "checks-test --parallel=3",
     "test:fast": "bun scripts/test-fast.ts",
     "test:live": "checks-test --tier=live",
     "dashboard": "bun packages/cli/src/bin.ts",

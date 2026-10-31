@@ -70,10 +70,18 @@ describe("the composed session panel, against its pinned screens of two invented
 
 describe("the composed session panel at every width from 30 to 120 columns", () => {
   const widths = Array.from({ length: 91 }, (_, index) => 30 + index);
-  const views = { composed, failed, stale, unreadable, localQuotaFailed, samePanes: () => samePanes(), longPrefixes };
+  const views = {
+    composed: composed(),
+    failed: failed(),
+    stale: stale(),
+    unreadable: unreadable(),
+    localQuotaFailed: localQuotaFailed(),
+    samePanes: samePanes(),
+    longPrefixes: longPrefixes(),
+  };
 
   test("keeps every row inside the width", () => {
-    for (const view of Object.values(views).map((make) => make())) {
+    for (const view of Object.values(views)) {
       for (const width of widths) {
         for (const line of sessionLines(view, width)) expect(lineWidth(line)).toBeLessThanOrEqual(width);
       }
@@ -82,15 +90,15 @@ describe("the composed session panel at every width from 30 to 120 columns", () 
 
   test("says which machines' logs the estimates come from, and that they stay upper bounds and never quota", () => {
     for (const width of widths) {
-      const together = textOf(composed(), width).replaceAll("\n", " ");
+      const together = textOf(views.composed, width).replaceAll("\n", " ");
       for (const phrase of ["estimates from north and south logs", "upper bounds", "never quota"]) expect(together).toContain(phrase);
-      expect(textOf(failed(), width).replaceAll("\n", " ")).toContain("estimates from north logs");
+      expect(textOf(views.failed, width).replaceAll("\n", " ")).toContain("estimates from north logs");
     }
   });
 
   test("names each session row's machine wherever the row has room, since both machines name a pane w1", () => {
     for (const width of widths.filter((columns) => columns >= 36)) {
-      const rows = textOf(composed(), width)
+      const rows = textOf(views.composed, width)
         .split("\n")
         .filter((row) => /^[●○⚑] .*%/u.test(row));
       expect(rows.length).toBe(5);
@@ -102,11 +110,11 @@ describe("the composed session panel at every width from 30 to 120 columns", () 
     const machineOf = (row: string): string | undefined =>
       ["local", "remote"].find((name) => name.startsWith(row.slice(2).split(" ")[0] ?? "-"));
     for (const width of widths) {
-      const rows = textOf(samePanes(), width)
+      const rows = textOf(views.samePanes, width)
         .split("\n")
         .filter((row) => /^[●○⚑] /u.test(row) && row.includes("w1A:p2"));
       expect(new Set(rows.map(machineOf))).toEqual(new Set(["local", "remote"]));
-      const flag = flagLines(samePanes(), width, 40).map(plain).find((line) => line.startsWith("⚑"));
+      const flag = flagLines(views.samePanes, width, 40).map(plain).find((line) => line.startsWith("⚑"));
       expect([flag?.includes("w1A:p2"), flag === undefined ? undefined : machineOf(flag)]).toEqual([true, "remote"]);
     }
   });
@@ -114,7 +122,7 @@ describe("the composed session panel at every width from 30 to 120 columns", () 
   test("cuts an east- machine tag sharing a long prefix to keep the pane id whole inside the width-minus-22 label column", () => {
     for (const width of widths) {
       const label = width - 22;
-      const rows = textOf(longPrefixes(), width)
+      const rows = textOf(views.longPrefixes, width)
         .split("\n")
         .filter((row) => /^[●○⚑] /u.test(row) && row.includes("w1A:p2"));
       expect(rows).toHaveLength(2);
@@ -127,7 +135,7 @@ describe("the composed session panel at every width from 30 to 120 columns", () 
   });
 
   test("names the whole session-quota-composed-json command for the flags that do not fit, within the rows it has", () => {
-    const view = composed();
+    const view = views.composed;
     const tripled = { ...view, accounts: [...view.accounts, ...view.accounts, ...view.accounts] };
     for (const width of widths) {
       const caption = flagLines(tripled, width, 40).map(plain).findIndex((line) => line.startsWith("⚑"));

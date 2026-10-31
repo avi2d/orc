@@ -33,11 +33,13 @@ const waitLine = (wait: WaitRow, width: number): Line => {
   return [span("\u00b7 ", "warning"), span(ellipsize(head, width - 2), "foreground")];
 };
 
+const withinBacklog = (root: string, missed: string): string => (missed.startsWith(root + "/") ? missed.slice(root.length + 1) : missed);
+
 export const dispatchLines = (view: DispatchView, width: number, rows: number): Block => {
   if (view.missing) return sentence("no backlog at " + view.root, "muted", width);
   const counts = headParts(view);
   const countHead: Block = counts.length === 0 ? [] : [[span(counts.join(" \u00b7 "), "foreground")]];
-  const unreadNotes: Block = view.unread.map((missed): Line => [span("! " + ellipsize(missed, width - 2), "warning")]);
+  const unreadNotes: Block = view.unread.map((missed): Line => [span("! " + ellipsize(withinBacklog(view.root, missed), width - 2), "warning")]);
   const head: Block = [...countHead, ...unreadNotes];
   const machines = view.machines.kind === "ok" ? view.machines.value.map((entry) => machineLine(entry, width)) : [];
   const runs = view.runs.map((run) => runLine(run, width));

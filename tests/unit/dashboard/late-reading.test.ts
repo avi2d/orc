@@ -87,11 +87,13 @@ const cachedCiFrame = () =>
       }
       yield* TestClock.adjust("1 second");
       yield* screen.read;
-      // The ticks wake each round on the test clock, and this hands the forked reads real time to land it.
-      yield* Effect.promise(() => Bun.sleep(50));
-      yield* screen.read;
       const now = yield* Clock.currentTimeMillis;
       const draw = (columns: number, rows: number): string => screen.draw(now, screen.initial, columns, rows).block.map(plain).join("\n");
+      // The ticks wake each round on the test clock, but the forked reads land it in real time, which no fixed wait bounds on a loaded machine.
+      for (let attempt = 0; attempt < 200 && bottomEdge(boxText(draw(240, 60), "queue | scheduled")).includes("reading\u2026"); attempt += 1) {
+        yield* Effect.promise(() => Bun.sleep(25));
+        yield* screen.read;
+      }
       return { wide: draw(240, 60), glance: draw(84, 40) };
     }),
   ).pipe(

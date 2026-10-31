@@ -82,8 +82,9 @@ describe("the live dashboard's first paint", () => {
 
   test(
     "paints this machine's cpu within a second while the other machine's resources are still in flight",
+    // The quota can land before this machine's cpu, and in 24 rows its accounts leave the machines box no row for south.
     () =>
-      withLivePanel({ width: 84, height: 24 }, slowSouthSources, async (setup) => {
+      withLivePanel({ width: 84, height: 40 }, slowSouthSources, async (setup) => {
         const started = performance.now();
         const frame = await frameWhere(setup, (text) => /north +cpu/u.test(text));
         expect(performance.now() - started).toBeLessThan(1_000);
