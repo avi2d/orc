@@ -154,6 +154,8 @@ describe("the live dashboard's saved readings", () => {
   );
 });
 
+const localCpu = process.platform === "darwin" ? "cpu 14%" : "cpu 11%";
+
 const answeringOnce = () => {
   const asked = new Set<string>();
   return dashboardSources({
@@ -173,13 +175,13 @@ describe("the live dashboard's hanging readings", () => {
     "keep the machines' last reading on show and say its growing age while the next read hangs",
     () =>
       withLivePanel({ width: 240, height: 60 }, answeringOnce(), async (setup) => {
-        const fresh = boxText(await frameWhere(setup, (frame) => boxText(frame, "machines").includes("cpu 11%")), "machines");
+        const fresh = boxText(await frameWhere(setup, (frame) => boxText(frame, "machines").includes(localCpu)), "machines");
         const answered = performance.now();
         expect(fresh).toMatch(/read 0s ago/u);
         await Bun.sleep(20_000);
         const late = boxText(await frameWhere(setup, (frame) => /read 2\ds ago \u00b7 reading\u2026/u.test(boxText(frame, "machines"))), "machines");
         expect(performance.now() - answered).toBeLessThan(30_000);
-        expect(late).toContain("cpu 11%");
+        expect(late).toContain(localCpu);
       }),
     40_000,
   );
