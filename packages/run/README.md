@@ -473,8 +473,9 @@ A renewal for a task pueue no longer runs for that home is refused and removes t
 
 To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh linux-box orc` from another.
 The forwarded read defaults to that home's label, and `orc runner result <task-id> --label <label>` reads another home's run instead.
-The forwarded read carries the label as JSON on standard input, past any remote shell the reach uses.
-Piping that document into `orc runner result` yourself reads that home's run.
+The forwarded read carries the label as JSON on standard input, past any remote shell the reach uses, and marks the far command with `--stdin-label` so only a marked read waits on standard input.
+A plain `orc runner result <task-id>` never reads standard input, so a pipe that never closes cannot hang it.
+Piping that document into `orc runner result <task-id> --stdin-label` yourself reads that home's run.
 It names pueue's state for the task and the orc run on `orc/<task-id>` with its PR.
 A task is queued, stashed, running, paused, succeeded or failed, or unknown when no pueue task in group `orc` carries that home's label.
 To print the same facts as JSON, add `--json`, whose document names its version first as `orc.runner.v1`.

@@ -110,7 +110,8 @@ const add = (args: Extract<CommandArgs, { readonly kind: "AddTask" }>, place: Di
 const reportResult = (args: Extract<CommandArgs, { readonly kind: "RunnerResult" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
     let label = args.label ?? taskLabel(place.home, args.task)
-    if (args.reach.kind === "here" && args.label === undefined && !place.stdinIsTerminal) {
+    // An open pipe that never closes would hang a stdin read, so only a forwarded read marked on argv reads the piped label.
+    if (args.reach.kind === "here" && args.label === undefined && args.stdinLabel && !place.stdinIsTerminal) {
       label = (yield* readStdinLabel(place.stdin)) ?? label
     }
     const result = args.reach.kind === "here"
