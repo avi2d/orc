@@ -38,23 +38,24 @@ describe("the session quota panel, against its pinned screens of the fixture hom
 
 describe("the session quota panel at every width from 30 to 120 columns", () => {
   const widths = Array.from({ length: 91 }, (_, index) => 30 + index);
+  const view = fixtureSessionView();
 
   test("keeps every row inside the width", () => {
     for (const width of widths) {
-      for (const line of sessionLines(fixtureSessionView(), width)) expect(lineWidth(line)).toBeLessThanOrEqual(width);
+      for (const line of sessionLines(view, width)) expect(lineWidth(line)).toBeLessThanOrEqual(width);
     }
   });
 
   test("always says the numbers are estimates, upper bounds and never quota, whole", () => {
     for (const width of widths) {
-      const text = sessionLines(fixtureSessionView(), width).map(plain).join(" ");
+      const text = sessionLines(view, width).map(plain).join(" ");
       for (const phrase of caption.split(", ")) expect(text).toContain(phrase);
     }
   });
 
   test("tells every session row apart by its pane, pid or log id", () => {
     for (const width of widths) {
-      const rows = sessionLines(fixtureSessionView(), width).map(plain).filter((row) => /^[●○⚑] .*%/u.test(row));
+      const rows = sessionLines(view, width).map(plain).filter((row) => /^[●○⚑] .*%/u.test(row));
       for (const row of rows) expect(row).toMatch(/(w\dA:p2|w\dB:p2|pid 4242|#00[a-f0-9]{4}) /u);
     }
   });
