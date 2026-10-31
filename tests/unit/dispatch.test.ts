@@ -32,7 +32,7 @@ const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-
 
 const config: DispatchConfig = {
   machines: [{ name: "mac", slots: 1, start: ["true"] }, { name: "linux", slots: 4, start: ["true"] }],
-  quota: { provider: "keyed", command: ["orc-quota"], accounts: [{ name: "main", tokenFile: "/secrets/main-token" }], floorPercent: 15 }
+  quota: { provider: "keyed", command: ["orc-quota"], accounts: [{ name: "main", kind: "token-file", tokenFile: "/secrets/main-token" }], floorPercent: 15 }
 }
 
 const projects: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Users/a/orc", linux: "/home/a/orc" } }]
@@ -203,7 +203,9 @@ describe("readDispatchConfig", () => {
   })
   test("refuses a relative token file path instead of resolving it against the run's folder", async () => {
     await withBacklog(async (root) => {
-      expect(await configProblem(root, { accounts: [{ name: "main", tokenFile: "secrets/main-token" }] })).not.toBeNull()
+      const problem = await configProblem(root, { accounts: [{ name: "main", tokenFile: "secrets/main-token" }] })
+      expect(problem).toContain("the account main")
+      expect(problem).toContain("tokenFile")
     })
   })
   test("refuses an account named twice instead of keeping either token file", async () => {
@@ -229,7 +231,7 @@ describe("readDispatchConfig", () => {
       const machines = config.machines.map((machine) => ({ ...machine, renew: ["true"] }))
       const accounts = [{ name: "main", tokenCommand: ["clauth-token", "main"] }] as const
       await writeFile(file, JSON.stringify({ machines, quota: { ...config.quota, accounts } }))
-      expect((await run(readDispatchConfig(file))).quota.accounts).toEqual(accounts)
+      expect((await run(readDispatchConfig(file))).quota.accounts).toEqual([{ name: "main", kind: "token-command", tokenCommand: ["clauth-token", "main"] }])
     })
   })
   test("refuses a quota with no command instead of reading a built-in tool", async () => {

@@ -22,13 +22,19 @@ const piStream = [
 
 const keyedModel = "keyed/coder-2"
 
-const modelListReply = JSON.stringify({ id: "orc-models", type: "response", command: "get_available_models", success: true, data: { models: [{ provider: "acme-go", id: "coder-1", contextWindow: 262144 }, { provider: "keyed", id: "coder-2", contextWindow: 200000 }] } })
+const packagedModel = "bridged/coder-3"
+
+const modelListReply = JSON.stringify({ id: "orc-models", type: "response", command: "get_available_models", success: true, data: { models: [{ provider: "acme-go", id: "coder-1", contextWindow: 262144 }, { provider: "keyed", id: "coder-2", contextWindow: 200000 }, { provider: "bridged", id: "coder-3", contextWindow: 400000 }] } })
 
 const fixtureToken = "sk-orc-e2e-fixture-token"
 
 const loginProvider = { id: "acme-go", credential: "pi-login", nono: { upstream: "https://llm.acme.test/v1" } }
 
 const keyedProvider = { id: "keyed", credential: "token-file", tokenFile: { env: "KEYED_TOKEN_FILE" } }
+
+const bridgedPackages = ["git:example.test/acme/pi-bridged@v1.2.0", "/opt/pi-packages/acme-tools"]
+
+const packageProvider = { id: "bridged", credential: "package", packages: bridgedPackages, env: { ACME_ACCOUNT_DIR: "/accounts/main" } }
 
 const decodeKeyedModels = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct({ providers: Schema.Struct({ keyed: Schema.Struct({ apiKey: Schema.String }) }) })))
 
@@ -70,11 +76,13 @@ const withNoSandboxFixture = async (body: (fixture: NoSandboxFixture) => Promise
     await writeFile(join(fakeBin, "stream.jsonl"), piStream)
     await writeScript(join(fakeBin, "pi"), [
       "if [ \"$1\" = auth ]; then exit 0; fi",
-      "if [ \"$1\" = --mode ]; then cat > /dev/null; echo '" + modelListReply + "'; exit 0; fi",
+      "if [ \"$1\" = --mode ]; then echo \"$*\" >> \"" + fakeBin + "/probe-argv\"; cat > /dev/null; echo '" + modelListReply + "'; exit 0; fi",
       "if [ \"$1\" != -p ]; then exit 2; fi",
       "cat > /dev/null",
       "echo \"$PI_CODING_AGENT_DIR\" > \"" + fakeBin + "/pi-agent-dir\"",
       "if [ -f \"$PI_CODING_AGENT_DIR/models.json\" ]; then cp \"$PI_CODING_AGENT_DIR/models.json\" \"" + fakeBin + "/pi-models\"; fi",
+      "if [ -f \"$PI_CODING_AGENT_DIR/settings.json\" ]; then cp \"$PI_CODING_AGENT_DIR/settings.json\" \"" + fakeBin + "/pi-settings\"; fi",
+      "echo \"$ACME_ACCOUNT_DIR\" > \"" + fakeBin + "/pi-account-dir\"",
       "echo \"$ORC_TOKEN_FILE\" > \"" + fakeBin + "/pi-token-file\"",
       "pwd > \"" + fakeBin + "/pi-cwd\"",
       "git rev-parse --show-toplevel --path-format=absolute --git-common-dir --abbrev-ref HEAD > \"" + fakeBin + "/pi-git\"",
@@ -270,6 +278,76 @@ describe("orc run on a token-file provider", () => {
       const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, env)
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toContain("has mode 644")
+      expect(await Bun.file(join(fixture.fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+})
+
+describe("orc run on a package provider", () => {
+  const asPackageRun = (fixture: NoSandboxFixture, provider: unknown = packageProvider): Promise<void> =>
+    writeConfig(fixture.env, { providers: [loginProvider, provider], models: { implementer: packagedModel, fixer: packagedModel } })
+
+  test("writes the configured packages into the run's Pi settings, hands Pi the configured env and no key, and ends in one PR", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      await asPackageRun(fixture)
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, fixture.env)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect(result.stdout).toContain(prUrl)
+      expect((await readFile(join(fixture.fakeBin, "pi-agent-dir"), "utf8")).trim()).toStartWith((fixture.env["ORC_HOME"] ?? "") + "/")
+      expect(JSON.parse(await readFile(join(fixture.fakeBin, "pi-settings"), "utf8"))).toEqual({
+        packages: bridgedPackages,
+        compaction: { modelOverrides: { [packagedModel]: { reserveTokens: 250000 } } }
+      })
+      expect(JSON.parse(await readFile(join(fixture.fakeBin, "pi-models"), "utf8"))).toEqual({
+        providers: { bridged: { modelOverrides: { "coder-3": { contextWindow: 400000 } } } }
+      })
+      expect((await readFile(join(fixture.fakeBin, "pi-account-dir"), "utf8")).trim()).toBe("/accounts/main")
+      expect(await Bun.file(join(fixture.fakeBin, "nono-calls")).exists()).toBe(false)
+    })
+  }, 60_000)
+
+  test("probes the model windows with the packages loaded and allowed to install instead of offline without extensions", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      await asPackageRun(fixture)
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, fixture.env)
+      expect(result.exitCode).toBe(0)
+      const probes = (await readFile(join(fixture.fakeBin, "probe-argv"), "utf8")).split("\n").filter((line) => line !== "")
+      expect(probes.length).toBeGreaterThan(0)
+      for (const probe of probes) {
+        const argv = probe.split(" ")
+        expect(argv).not.toContain("--no-extensions")
+        expect(argv).not.toContain("--offline")
+      }
+    })
+  }, 60_000)
+
+  test("with a relative package path is refused before Pi runs instead of resolving it against the run folder", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      await asPackageRun(fixture, { ...packageProvider, packages: ["./pi-bridged"] })
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, fixture.env)
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain(join(fixture.env["ORC_HOME"] ?? "", "config.json"))
+      expect(await Bun.file(join(fixture.fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+
+  test("with --token-file is refused before Pi runs instead of dropping the token", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      await asPackageRun(fixture)
+      const tokenFile = await writeToken(fixture, "stray-token", 0o600)
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none", "--token-file", tokenFile], fixture.repo, fixture.env)
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain("--token-file")
+      expect(await Bun.file(join(fixture.fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+
+  test("in the nono sandbox is refused before Pi runs, naming --sandbox none", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      await asPackageRun(fixture)
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test"], fixture.repo, fixture.env)
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain("--sandbox none")
       expect(await Bun.file(join(fixture.fakeBin, "pi-cwd")).exists()).toBe(false)
     })
   }, 60_000)

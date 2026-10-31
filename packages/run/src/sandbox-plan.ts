@@ -1,11 +1,11 @@
 import { Effect, FileSystem, Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { SandboxKind } from "./args"
-import { checkedModelWindows, contextMarkJson, readModelWindows } from "./context-mark"
+import { checkedModelWindows, contextMarkJson, type ModelProbe, readModelWindows } from "./context-mark"
 import { requireTokenFile, tokenFileApiKey, tokenFileSource, tokenFileVar } from "./model-route"
 import { inheritedEnv } from "./nono"
 import { type CheckedModelWindow, type HostTools, loginCheckCommand, type ModelCredential, modelCredentialFor, piAgentModels, type ProviderKey, providerKeyOf } from "./nono-profile"
-import type { LoginProvider, OrcConfig, Provider, TokenFileProvider } from "./orc-config"
+import type { LoginProvider, OrcConfig, PackageProvider, Provider, TokenFileProvider } from "./orc-config"
 import { OrcRunError } from "./run-session"
 
 interface OwnAgentDir {
@@ -63,12 +63,13 @@ const writeAgentDir = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
   piAgentDir: string,
-  key: ProviderKey,
-  checked: ReadonlyArray<CheckedModelWindow>
+  key: ProviderKey | null,
+  checked: ReadonlyArray<CheckedModelWindow>,
+  packages: ReadonlyArray<string> = []
 ): Effect.Effect<void, OrcRunError> =>
   fs.writeFileString(path.join(piAgentDir, "models.json"), piAgentModels(key, checked)).pipe(
     Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the agent models file: " + String(cause) })),
-    Effect.andThen(() => fs.writeFileString(path.join(piAgentDir, "settings.json"), contextMarkJson(checked)).pipe(
+    Effect.andThen(() => fs.writeFileString(path.join(piAgentDir, "settings.json"), contextMarkJson(checked, packages)).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the agent settings file: " + String(cause) }))
     ))
   )
@@ -78,10 +79,10 @@ const checkedAgentWindows = (
   host: HostTools,
   runDir: string,
   models: AgentModels,
-  agentDir: string | undefined,
+  probe: ModelProbe,
   extraEnv: Readonly<Record<string, string>> = {}
 ): Effect.Effect<ReadonlyArray<CheckedModelWindow>, OrcRunError> =>
-  readModelWindows(spawner, host, runDir, agentDir, extraEnv).pipe(
+  readModelWindows(spawner, host, runDir, probe, extraEnv).pipe(
     Effect.flatMap((windows) => Effect.fromResult(checkedModelWindows([models.agent, models.fixer], windows)).pipe(
       Effect.mapError((message) => new OrcRunError({ message }))
     ))
@@ -104,7 +105,8 @@ const planLogin = (
     }
     if (sandboxKind === "none") {
       yield* runLoginCheck(spawner, host, dirs.projectDir, provider.id, true)
-      yield* checkedAgentWindows(spawner, host, dirs.runDir, models, Bun.env.PI_CODING_AGENT_DIR)
+      const operatorAgentDir = Bun.env.PI_CODING_AGENT_DIR
+      yield* checkedAgentWindows(spawner, host, dirs.runDir, models, operatorAgentDir === undefined ? { kind: "operator" } : { kind: "agent-dir", agentDir: operatorAgentDir, packages: false })
       return { kind: "none", own: null }
     }
     if (provider.nono === undefined) {
@@ -112,7 +114,7 @@ const planLogin = (
     }
     const credential = modelCredentialFor({ id: provider.id, ...provider.nono }, host)
     yield* runLoginCheck(spawner, host, dirs.projectDir, provider.id, false)
-    const checked = yield* checkedAgentWindows(spawner, host, dirs.runDir, models, undefined)
+    const checked = yield* checkedAgentWindows(spawner, host, dirs.runDir, models, { kind: "operator" })
     yield* writeAgentDir(fs, path, dirs.piAgentDir, providerKeyOf(credential), checked)
     return { kind: "nono", credential }
   })
@@ -139,8 +141,35 @@ const planTokenFile = (
     const key: ProviderKey = { provider: provider.id, apiKey: tokenFileApiKey }
     // Pi lists no model of a provider that has no key, so the key goes in before the windows are read.
     yield* writeAgentDir(fs, path, dirs.piAgentDir, key, [])
-    const checked = yield* checkedAgentWindows(spawner, host, dirs.runDir, models, dirs.piAgentDir, env)
+    const checked = yield* checkedAgentWindows(spawner, host, dirs.runDir, models, { kind: "agent-dir", agentDir: dirs.piAgentDir, packages: false }, env)
     yield* writeAgentDir(fs, path, dirs.piAgentDir, key, checked)
+    return { kind: "none", own: { piAgentDir: dirs.piAgentDir, env } }
+  })
+
+// The provider's own Pi package reaches its service, so the run's Pi folder names packages and holds no key.
+const planPackage = (
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
+  host: HostTools,
+  dirs: PlanDirs,
+  models: AgentModels,
+  choice: ProviderChoice<PackageProvider>,
+  sandboxKind: SandboxKind
+): Effect.Effect<SandboxPlan, OrcRunError> =>
+  Effect.gen(function*() {
+    const provider = choice.provider
+    if (choice.tokenFileFlag !== undefined) {
+      return yield* refuse("orc: --token-file names a token file, and " + choice.config.file + " has the provider " + provider.id + " reach its service through its Pi packages, so drop the flag")
+    }
+    if (sandboxKind === "nono") {
+      return yield* refuse("orc: the implementer runs on model " + models.agent + ", whose provider " + provider.id + " reaches its service through its Pi packages, and the nono sandbox carries only a Pi login, so run it with --sandbox none")
+    }
+    const env = provider.env ?? {}
+    // Pi installs the packages into the folder it reads and lists their models only after, so they go in before the windows are read.
+    yield* writeAgentDir(fs, path, dirs.piAgentDir, null, [], provider.packages)
+    const checked = yield* checkedAgentWindows(spawner, host, dirs.runDir, models, { kind: "agent-dir", agentDir: dirs.piAgentDir, packages: true }, env)
+    yield* writeAgentDir(fs, path, dirs.piAgentDir, null, checked, provider.packages)
     return { kind: "none", own: { piAgentDir: dirs.piAgentDir, env } }
   })
 
@@ -155,7 +184,12 @@ export const planSandbox = (
   sandboxKind: SandboxKind
 ): Effect.Effect<SandboxPlan, OrcRunError> => {
   const { provider } = choice
-  return provider.credential === "pi-login"
-    ? planLogin(fs, path, spawner, host, dirs, models, { ...choice, provider }, sandboxKind)
-    : planTokenFile(fs, path, spawner, host, dirs, models, { ...choice, provider }, sandboxKind)
+  switch (provider.credential) {
+    case "pi-login":
+      return planLogin(fs, path, spawner, host, dirs, models, { ...choice, provider }, sandboxKind)
+    case "token-file":
+      return planTokenFile(fs, path, spawner, host, dirs, models, { ...choice, provider }, sandboxKind)
+    case "package":
+      return planPackage(fs, path, spawner, host, dirs, models, { ...choice, provider }, sandboxKind)
+  }
 }

@@ -13,7 +13,7 @@ You read the PR and merge it, since orc never merges.
 - Git, tested on 2.56.0.
 - nono from https://nono.sh, tested on 0.80.0, for the default sandbox.
 - Node, tested on 24.22.1.
-- Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with the login or token file each provider in [Configuring providers](#configuring-providers) takes.
+- Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with the login, token file or Pi packages each provider in [Configuring providers](#configuring-providers) takes.
 - no-mistakes v1.90.0 or later, tested on v1.100.2, installed as [Installing no-mistakes](#installing-no-mistakes) says.
 
 ## Install
@@ -121,7 +121,7 @@ With the default sandbox, orc pins each agent model window in `models.json` as t
 Orc refuses a model the host's Pi does not list, or one whose window is 150 thousand tokens or less.
 That refusal applies to both sandboxes.
 With `--sandbox none` on a Pi login provider, Pi reads your Pi config, compaction included, so the fixed mark does not apply.
-On a token file provider Pi reads the run's own Pi folder, so the mark applies there too.
+On a token file or package provider Pi reads the run's own Pi folder, so the mark applies there too.
 
 Once the checks pass, orc runs `no-mistakes axi run` on the branch with the task as its intent.
 At each gate orc asks no-mistakes to fix the findings marked `auto-fix`, ignores those marked `no-op`, and accepts the fix review.
@@ -153,7 +153,7 @@ To run Pi and the checks directly on the host, add `--sandbox none` to `orc run`
 Without a sandbox the run still gets its own worktree on its own branch, and nono need not be on the PATH.
 Pi runs with your own environment, so it can read and write anything your user can.
 On a Pi login provider Pi also reads your Pi config.
-On a token file provider Pi reads the run's own Pi folder instead, as [Configuring providers](#configuring-providers) describes.
+On a token file or package provider Pi reads the run's own Pi folder instead, as [Configuring providers](#configuring-providers) describes.
 Orc points `GIT_CONFIG_GLOBAL` at a file in the run folder, so the commit identity Sandcastle sets never reaches your `~/.gitconfig`.
 Pi writes its session straight into the run's `sessions/host` folder.
 Resume takes the sandbox from the earlier run, so `orc run --branch <name>` resumes it without a sandbox.
@@ -162,15 +162,21 @@ Resume takes the sandbox from the earlier run, so `orc run --branch <name>` resu
 
 Orc ships with no provider and no model, so a run needs `config.json` in `$ORC_HOME`, default `~/.orc/config.json`.
 It names each provider orc may run and, under `models`, the implementer and fixer models.
-This example names opencode-go through a Pi login and anthropic through a token file:
+This example names opencode-go through a Pi login, anthropic through a token file and claude-bridge through its Pi package:
 
 ```json
 {
   "providers": [
     { "id": "opencode-go", "credential": "pi-login", "nono": { "upstream": "https://opencode.ai/zen/go/v1" } },
-    { "id": "anthropic", "credential": "token-file", "tokenFile": { "env": "ANTHROPIC_TOKEN_FILE" } }
+    { "id": "anthropic", "credential": "token-file", "tokenFile": { "env": "ANTHROPIC_TOKEN_FILE" } },
+    {
+      "id": "claude-bridge",
+      "credential": "package",
+      "packages": ["git:github.com/avi2d/pi-claude-bridge@v0.9.3+avi2d.8"],
+      "env": { "CLAUDE_CONFIG_DIR": "/Users/me/.claude-accounts/main" }
+    }
   ],
-  "models": { "implementer": "opencode-go/muse-spark-1.3-contributor", "fixer": "opencode-go/muse-spark-1.3-contributor" }
+  "models": { "implementer": "claude-bridge/claude-opus-5-5", "fixer": "claude-bridge/claude-opus-5-5" }
 }
 ```
 
@@ -185,9 +191,16 @@ Each provider names its Pi provider `id`, the part of a model name before the `/
 - `token-file` reads the token from a file, whose absolute path `tokenFile` takes from the variable `env` names or from `path`.
   `orc run --token-file <path>` takes the path from the flag instead.
   The nono sandbox carries only a Pi login, so a token file provider runs only with `--sandbox none`.
+- `package` hands the run no key, since the provider's own Pi package reaches its service.
+  `packages` lists the Pi package sources, in the form Pi's `settings.json` takes: `npm:`, `git:`, a git URL or an absolute path.
+  Orc writes them into the run's Pi folder, `session/agent/settings.json`, so the run's Pi loads the package your Pi loads.
+  Pi installs an `npm:` or `git:` source into the run's folder on the first model list, so each run fetches it again.
+  An absolute path to a package already on the machine, such as one under `~/.pi/agent/git`, loads without the fetch.
+  `env` names variables orc sets for the run's Pi over your environment, such as the `CLAUDE_CONFIG_DIR` of the account a Claude Code package runs on.
+  The nono sandbox carries only a Pi login, so a package provider runs only with `--sandbox none`.
 
 Orc refuses a `config.json` key it does not know, so a misspelled key never drops a provider unnoticed.
-Orc refuses `--token-file` on a provider that takes a Pi login.
+Orc refuses `--token-file` on a provider that takes a Pi login or Pi packages.
 `orc run --provider <id>` refuses a run whose implementer model is on another provider, so a token meant for one provider never reaches another.
 Orc refuses a token file that is unset, relative, missing, empty, not a regular file or readable by other users.
 On a token file provider, Pi reads the run's own Pi folder instead of yours.
@@ -195,7 +208,7 @@ So a login stored in your Pi config never stands in for the token.
 The run's `models.json` names the token file only through `ORC_TOKEN_FILE`.
 Pi reads the file when it calls the provider and holds the token only in memory, so no run file keeps it.
 Orc never copies, moves or deletes the token file.
-A provider defined only in the operator's Pi models.json is not carried into a run directory, so use a provider Pi knows built in.
+A provider defined only in the operator's Pi models.json is not carried into a run directory, so use a provider Pi knows built in or one a configured package adds.
 
 ## Choosing the no-mistakes binary
 
@@ -281,9 +294,11 @@ Orc keeps one backlog of tasks in `~/.orc/backlog`, one Markdown file per task w
 A task file sits in `new`, `taken` or `closed`, and the folder it sits in is its state.
 Two files beside the folders tell the beat where tasks may go.
 `dispatch.json` names each machine, its slots, its start command and its renew command, and the quota.
-The quota names the provider its accounts belong to, the command that reads their room, and each account's token file or token command.
-A token file account needs only a start command on each machine.
-A token command account names a renew command on each machine beside its start command.
+The quota names the provider its accounts belong to, the command that reads their room, and each account's credential kind.
+An account of kind `token-file` names a `tokenFile` and needs only a start command on each machine.
+An account of kind `token-command` names a `tokenCommand`, for a token that lives on the dispatching machine and rolls over, and every machine names a `renew` command beside its start command.
+An account of kind `none` names no token source, for a provider or Pi package that logs in on its own.
+An account written with only a `tokenFile` or only a `tokenCommand` keeps working, and reads as the matching kind.
 It also names the floor of room each account must keep:
 
 ```json
@@ -304,7 +319,7 @@ It also names the floor of room each account must keep:
 }
 ```
 
-The provider is a token-file provider in `config.json` on each machine that runs the tasks.
+The provider named here is one `config.json` on each machine that runs the tasks defines.
 Each token file path in `dispatch.json` holds on those machines.
 A token command account keeps its token in the runner token folder on each machine instead.
 Orc runs the quota command with no input and reads its standard output as this document:
@@ -323,8 +338,7 @@ Each entry gives the percent of room left, from 0 to 100, or the reason the acco
 An account the document does not name cannot run.
 A command that exits non-zero, runs past 15 seconds or prints any other document leaves the quota unread, and the beat starts nothing.
 
-An account can name a `tokenCommand` instead of a `tokenFile`, for a token that lives on the dispatching machine and rolls over.
-Then every machine names a `renew` command beside its `start` command:
+A quota with a token command account then looks like this:
 
 ```json
 {
@@ -363,6 +377,26 @@ It prints the profile's access token and expiry as `orc.token.v1`, and writes on
 It refuses a session that still holds a refresh token, since that login would then leave the machine.
 Run `clauth rolling-token` on the profile first.
 
+An account of kind `none` holds no token: the beat mints nothing, sends nothing, renews nothing and never waits on a token for it.
+A Pi package that logs in on its own takes this kind, as in a `claude-bridge` package that drives the Claude Code SDK while the dispatched run still goes through the `main` account named here:
+
+```json
+{
+  "machines": [
+    { "name": "mac", "slots": 2, "start": ["orc", "runner", "start"] }
+  ],
+  "quota": {
+    "provider": "claude-bridge",
+    "command": ["my-quota-reader", "--json"],
+    "accounts": [{ "name": "main", "kind": "none" }],
+    "floorPercent": 15
+  }
+}
+```
+
+Its `config.json` provider names the package with `credential` `package`, and its `env` points at the login the runs take, such as the `CLAUDE_CONFIG_DIR` of the account above.
+A quota that names more than one account when any of them is kind `none` is refused, and so is a kind `none` account beside a machine `renew` command.
+
 `projects.json` names each project and its checkout on each machine:
 
 ```json
@@ -388,6 +422,7 @@ A task marked for a machine waits for a slot on that machine and never starts on
 The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT` and `ORC_TASK_TOKEN_FILE`.
 `ORC_TASK_TOKEN_FILE` is the account's token file path, never the token.
 On a token command account it is empty, and the start command reads the token as `orc.token.v1` on standard input instead.
+On a kind `none` account it is empty, and the beat sends nothing on standard input, so a custom start command must not feed it input.
 The beat starts it detached in its own session, never waits for it and never kills it.
 So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
@@ -406,7 +441,7 @@ On a token command account, each beat first sends every started task its account
 `orc runner start` is the start command that hands a task to pueue on its machine.
 The run then outlives the beat, the dispatcher and any SSH link to it.
 It reads the task from the beat's `ORC_TASK_*` variables and queues `orc run` in the checkout on branch `orc/<task-id>`, in the pueue group `orc`.
-The run takes `--sandbox none --provider <provider> --token-file <path>`, so it runs on the picked account and refuses an implementer on any other provider.
+The run takes `--sandbox none --provider <provider> --token-file <path>` when the account holds a token file or token, and `--sandbox none --provider <provider>` with no token file when the account is kind `none`, so it runs on the picked account and refuses an implementer on any other provider.
 The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
 The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.

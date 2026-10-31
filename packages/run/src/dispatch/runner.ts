@@ -2,7 +2,7 @@ import { Data, DateTime, Duration, Effect, FileSystem, Option, Path, Schema, Str
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { Reach } from "./args"
 import { AbsolutePath } from "../json-file"
-import { ProviderId } from "../orc-config"
+import { ProviderId, readOrcConfig } from "../orc-config"
 import { TaskId } from "./backlog"
 import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldToken } from "./held-token"
 import { heldTask, orcGroup, PueueState, PueueStatus, taskLabel, type PueueTask } from "./pueue-status"
@@ -22,10 +22,10 @@ const taskFields = {
   body: Schema.String
 }
 
-const QueueRequest = Schema.Union([
-  Schema.Struct({ ...taskFields, tokenFile: AbsolutePath, label: Schema.optional(LabelArg) }),
-  Schema.Struct({ ...taskFields, ...tokenFields, label: Schema.optional(LabelArg) })
-])
+const QueueFileRequest = Schema.Struct({ ...taskFields, tokenFile: AbsolutePath, label: Schema.optional(LabelArg) })
+const QueueTokenRequest = Schema.Struct({ ...taskFields, ...tokenFields, label: Schema.optional(LabelArg) })
+const QueueBareRequest = Schema.Struct({ ...taskFields, label: Schema.optional(LabelArg) })
+const QueueRequest = Schema.Union([QueueFileRequest, QueueTokenRequest, QueueBareRequest])
 type QueueRequest = typeof QueueRequest.Type
 
 export type RunnerRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
@@ -94,7 +94,7 @@ const decodeSecret = <S extends Schema.Top & { readonly DecodingServices: never 
     Effect.mapError(() => new RunnerError({ detail: refusal }))
   )
 
-const queueRefusal = "the queue request on stdin is no task, checkout, provider and body with either a tokenFile or a token and an expiresAt"
+const queueRefusal = "the queue request on stdin is no task, checkout, provider and body with an optional tokenFile or an optional token and expiresAt"
 
 const renewRefusal = "the renew request on stdin is no task with a token and an expiresAt"
 
@@ -193,6 +193,9 @@ const queueTask = (
 ): Effect.Effect<string, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
+    yield* readOrcConfig(home).pipe(
+      Effect.mapError((error) => new RunnerError({ detail: error.file + ": " + error.detail }))
+    )
     yield* requireFolder(request.checkout)
     const project = yield* resolveProjectDir(request.checkout)
     yield* ensureOrcGroup()
@@ -214,6 +217,10 @@ const queueTask = (
     const holdArgs: ReadonlyArray<string> = label === taskLabel(home, request.task) ? [request.task] : [request.task, "--label", label]
     if ("tokenFile" in request) {
       const id = yield* add([...run, "--token-file", request.tokenFile])
+      return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
+    }
+    if (!("token" in request)) {
+      const id = yield* add([...run])
       return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
     }
     const dir = yield* holdToken(home, key, request).pipe(
@@ -275,11 +282,15 @@ const readRequest = (
     )
     const tokenFile = env["ORC_TASK_TOKEN_FILE"] ?? ""
     if (tokenFile !== "") {
-      return yield* Schema.decodeEffect(QueueRequest)({ ...fields, tokenFile }).pipe(
+      return yield* Schema.decodeEffect(QueueFileRequest)({ ...fields, tokenFile }).pipe(
         Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
       )
     }
-    const token = decodeTokenText(yield* stdin)
+    const input = yield* stdin
+    if (input === "") {
+      return { ...fields }
+    }
+    const token = decodeTokenText(input)
     if (Option.isNone(token)) {
       return yield* refuse("orc runner start reads ORC_TASK_TOKEN_FILE or " + tokenDocumentNote + " on stdin, one of which the beat sends")
     }

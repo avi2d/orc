@@ -55,6 +55,7 @@ type StartResult = { readonly kind: "started" } | { readonly kind: "failed"; rea
 type Credential =
   | { readonly kind: "file"; readonly provider: string; readonly tokenFile: string }
   | { readonly kind: "token"; readonly provider: string; readonly token: RunToken }
+  | { readonly kind: "none"; readonly provider: string }
 
 // Effect's spawner takes no file for stdio, so a shell sends the start command's output to the task's log.
 const logToTaskLog = ["sh", "-c", "exec \"$@\" >> \"$ORC_TASK_LOG\" 2>&1", "orc-start"] as const
@@ -126,12 +127,12 @@ const startTask = (
       ORC_TASK_ACCOUNT: claim.account,
       ORC_TASK_TOKEN_FILE: credential.kind === "file" ? credential.tokenFile : ""
     }
-    const result = credential.kind === "file"
-      ? yield* handOn(machine, env, null)
-      : yield* encodeToken(credential.token).pipe(
+    const result = credential.kind === "token"
+      ? yield* encodeToken(credential.token).pipe(
         Effect.flatMap((stdin) => handOn(machine, env, stdin)),
         Effect.catchTag("TokenEncodeError", (error) => Effect.succeed<StartResult>({ kind: "failed", reason: "the " + error.what + " would not encode" }))
       )
+      : yield* handOn(machine, env, null)
     if (result.kind === "started") {
       return { kind: "started", task: task.spec.id, machine: machine.name, account: claim.account, log } satisfies BeatAction
     }
@@ -161,7 +162,7 @@ type TokenCache = Map<string, TokenCheck>
 
 const checkToken = (
   tokens: TokenCache,
-  account: Extract<Account, { readonly tokenCommand: unknown }>
+  account: Extract<Account, { readonly kind: "token-command" }>
 ): Effect.Effect<TokenCheck, never, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const cached = tokens.get(account.name)
@@ -185,11 +186,18 @@ const credentialFor = (
 ): Effect.Effect<Credential | { readonly kind: "waits"; readonly reason: string }, never, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const provider = context.config.quota.provider
-    if (account.tokenCommand === undefined) {
-      return { kind: "file", provider, tokenFile: account.tokenFile }
+    switch (account.kind) {
+      case "token-file": {
+        return { kind: "file", provider, tokenFile: account.tokenFile }
+      }
+      case "none": {
+        return { kind: "none", provider }
+      }
+      case "token-command": {
+        const check = yield* checkToken(context.tokens, account)
+        return check.kind === "waits" ? check : { kind: "token", provider, token: check.token }
+      }
     }
-    const check = yield* checkToken(context.tokens, account)
-    return check.kind === "waits" ? check : { kind: "token", provider, token: check.token }
   })
 
 const considerTask = (
@@ -278,7 +286,7 @@ const renewTask = (context: BeatContext, task: TaskRecord): Effect.Effect<Option
     const claim = task.state.claim
     const machine = context.config.machines.find((entry) => entry.name === claim.machine)
     const account = context.config.quota.accounts.find((entry) => entry.name === claim.account)
-    if (machine?.renew === undefined || account?.tokenCommand === undefined) {
+    if (machine?.renew === undefined || account === undefined || account.kind !== "token-command") {
       return Option.none()
     }
     const failed = (reason: string): BeatAction => ({ kind: "renew-failed", task: task.spec.id, machine: machine.name, reason })

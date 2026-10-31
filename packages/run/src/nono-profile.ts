@@ -200,16 +200,15 @@ export interface ProviderKey {
 
 export const providerKeyOf = (credential: ModelCredential): ProviderKey => ({ provider: credential.provider, apiKey: "$" + credential.envVar })
 
-export const piAgentModels = (key: ProviderKey, checked: ReadonlyArray<CheckedModelWindow>): string => {
+export const piAgentModels = (key: ProviderKey | null, checked: ReadonlyArray<CheckedModelWindow>): string => {
   const overridesByProvider = new Map<string, Record<string, { readonly contextWindow: number }>>()
   for (const entry of checked) {
     const overrides = overridesByProvider.get(entry.provider) ?? {}
     overrides[entry.id] = { contextWindow: entry.window }
     overridesByProvider.set(entry.provider, overrides)
   }
-  const providers: Record<string, { readonly apiKey?: string; readonly modelOverrides?: Record<string, { readonly contextWindow: number }> }> = {
-    [key.provider]: { apiKey: key.apiKey }
-  }
+  const providers: Record<string, { readonly apiKey?: string; readonly modelOverrides?: Record<string, { readonly contextWindow: number }> }> =
+    key === null ? {} : { [key.provider]: { apiKey: key.apiKey } }
   for (const [provider, modelOverrides] of overridesByProvider) {
     providers[provider] = { ...providers[provider], modelOverrides }
   }
