@@ -357,7 +357,7 @@ export const finishedRemoteTaskPolls: Effect.Effect<RemotePolls | undefined, Con
   function* () {
     const pieces = yield* remotePieces;
     if (pieces === undefined) return undefined;
-    const { machine, remote, pueue, history, live: liveMachine } = pieces;
+    const { machine, remote, pueue, mistakes, orcs, history, live: liveMachine } = pieces;
     const stamp = <A>(read: Effect.Effect<A>): Effect.Effect<Option.Option<Stamped<A>>> => Effect.asSome(stampedNow(read));
     const stampedSamples: Effect.Effect<Option.Option<Stamped<ReadonlyArray<TaskSampleRecord>>>> = Option.isSome(history)
       ? stamp(Effect.map(history.value.read, historySamples))
@@ -368,8 +368,8 @@ export const finishedRemoteTaskPolls: Effect.Effect<RemotePolls | undefined, Con
       live: Option.isSome(liveMachine) ? stamp(liveMachine.value.read) : Effect.succeedNone,
       liveConfigured: Option.isSome(liveMachine),
       pueue: pueue === undefined ? Effect.succeedNone : stamp(pueue.read),
-      noMistakes: () => Effect.succeedNone,
-      orc: () => Effect.succeedNone,
+      noMistakes: (folders) => (mistakes === undefined ? Effect.succeedNone : stamp(mistakes.read(folders))),
+      orc: (folders) => (orcs === undefined ? Effect.succeedNone : stamp(orcs.read(folders))),
       samples: stampedSamples,
       refreshing: Effect.succeed(false),
       listingsRefreshing: Effect.succeed(false),

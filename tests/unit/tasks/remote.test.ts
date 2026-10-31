@@ -218,6 +218,40 @@ describe("the remote machine's levels", () => {
     expect(task?.pipeline?.stages.some((stage) => stage.mark === "unknown")).toBe(false);
   });
 
+  test("a printed remote task whose no-mistakes run waits on a gate prints as waiting, not working", async () => {
+    const typed = Schema.decodeUnknownSync(TasksReport)(JSON.parse(fixture("tasks/south.json")));
+    const report = JSON.stringify({
+      ...typed,
+      tasks: typed.tasks.map((task, index) => (index === 0 ? { ...task, kind: "full review fix", branches: ["fm/tui-dash-fast-start"] } : task)),
+    });
+    const gated = fixture("no-mistakes/run.txt")
+      .replace("status: completed", "status: running")
+      .replace("review,completed,8,4501436", "review,awaiting_approval,8,4501436");
+    const config = ConfigProvider.layer(
+      ConfigProvider.fromEnvRecord({
+        TUI_DASH_MACHINE: "north",
+        TUI_DASH_REMOTE_MACHINE: "south",
+        TUI_DASH_REMOTE_TASKS: "ssh south.example.com tasks-report --json",
+      }),
+    );
+    const layers = Layer.mergeAll(tasksMachinesLayer, pueueMachinesLayer, noMistakesMachinesLayer, orcMachinesLayer, remoteTaskHistoryLayer, remoteTaskLiveLayer).pipe(
+      Layer.provide(
+        Layer.succeed(CommandRunner, {
+          run: (command) => {
+            const line = command.argv.join(" ");
+            return Effect.succeed(line.includes("no-mistakes axi status") ? gated : line.includes("tasks-report --json") ? report : "");
+          },
+        }),
+      ),
+      Layer.provide(config),
+    );
+    const polls = await Effect.runPromise(Effect.provide(finishedRemoteTaskPolls, Layer.merge(layers, config)));
+    if (polls === undefined) throw new Error("the remote machine is configured, so its polls exist");
+    const { readings } = await readRemote(polls);
+    const task = readings.levels.projects.flatMap((project) => project.tasks).find((row) => row.id === "tasks-kelp-tend");
+    expect(task?.state).toBe("waiting");
+  });
+
   test("polls the other machine's live usage in the background", async () => {
     const reading = await Effect.runPromise(
       Effect.scoped(
