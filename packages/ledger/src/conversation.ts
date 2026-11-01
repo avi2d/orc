@@ -49,14 +49,12 @@ const readTail = (fs: FileSystem.FileSystem, path: string, offset: number): Effe
     }),
   );
 
-const classifyScript = 'printf "%s" "$2" | eval "$1"';
-
 // The classifier reads the message on stdin, prints something when it is operational and nothing otherwise, and exits zero or one.
 // A classifier that cannot run keeps the turn: a noisy row beats a question nobody sees.
 const isOperational = (runner: Runner, command: string, text: string): Effect.Effect<boolean> =>
   Effect.map(
     Effect.orElseSucceed(
-      runner.run({ argv: ["sh", "-c", classifyScript, "ledger-classify", command, text], timeout: Duration.seconds(10), exitCodes: [0, 1] }),
+      runner.run({ argv: ["sh", "-c", command], stdin: text, timeout: Duration.seconds(10), exitCodes: [0, 1] }),
       () => "",
     ),
     (out) => out !== "",

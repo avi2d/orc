@@ -32,11 +32,17 @@ const signalGroup = (leader: number, signal: "SIGTERM" | "SIGKILL"): Effect.Effe
 const killGrace = Duration.seconds(1);
 
 // Each command runs detached in its own group, so a group still in this set outlives the process unless it is killed.
-const spawn = ({ argv, cwd }: Command, groups: Set<number>) =>
+const spawn = ({ argv, cwd, stdin }: Command, groups: Set<number>) =>
   Effect.tryPromise({
     try: (signal) => {
       // sh forks the command rather than exec'ing it, so a signal to sh alone leaves the command running.
-      const child = Bun.spawn([...argv], { ...(cwd === undefined ? {} : { cwd }), stdin: "ignore", stdout: "pipe", stderr: "pipe", detached: true });
+      const child = Bun.spawn([...argv], {
+        ...(cwd === undefined ? {} : { cwd }),
+        stdin: stdin === undefined ? "ignore" : new TextEncoder().encode(stdin),
+        stdout: "pipe",
+        stderr: "pipe",
+        detached: true,
+      });
       groups.add(child.pid);
       const stop = signalGroup(child.pid, "SIGTERM").pipe(
         Effect.andThen(Effect.sleep(killGrace)),
