@@ -15,8 +15,8 @@ const operational = "OPERATIONAL watcher wake: branch done";
 const classifier = "operational-input classify";
 
 const run = (command: Command): Effect.Effect<string, CommandUnreachable> =>
-  command.argv[0] === "sh" && command.argv[4] === classifier
-    ? Effect.succeed(command.argv[5].includes("OPERATIONAL") ? "operational\n" : "")
+  command.argv[0] === "sh" && command.argv.at(-1) === classifier && command.stdin !== undefined && !command.argv.some((arg) => arg.includes(command.stdin ?? ""))
+    ? Effect.succeed(command.stdin.includes("OPERATIONAL") ? "operational\n" : "")
     : Effect.fail(new CommandUnreachable({ reason: `unexpected ${command.argv.join(" ")}` }));
 
 const recorded = Layer.succeed(ConversationSource, makeConversationReader({ run }));
@@ -87,5 +87,25 @@ describe("the live ledger's operational filter", () => {
       [{ role: "you" }, ordinary],
       [{ role: "agent", name: "helper" }, "shipped."],
     ]);
+  });
+});
+
+// Oracle: ps lists the arguments of every process to any local user.
+// Rejects a classifier run that puts the message in the shell's arguments, where the process list shows it.
+describe("the live ledger's classifier", () => {
+  test("never sees the message in its own shell's arguments", async () => {
+    const stamp = new Date().toISOString();
+    const secret = "Is private-marker-7f3a still on?";
+    const { dir, sessions } = await sessionsWith([sessionLine(stamp, "user", secret)]);
+    const said = await readWith(
+      conversationSourceLive,
+      {
+        HOME: dir,
+        TUI_DASH_LEDGER_SESSIONS: sessions,
+        TUI_DASH_LEDGER_CLASSIFY: "ps -o args= -p $$ | grep -q 'private-[m]arker' && echo leaked",
+      },
+      at(stamp),
+    );
+    expect(saidOf(said).map((message) => [message.who.role, message.text])).toEqual([["you", secret]]);
   });
 });

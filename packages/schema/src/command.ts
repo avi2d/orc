@@ -4,6 +4,7 @@ export interface Command {
   readonly argv: readonly [string, ...string[]];
   readonly cwd?: string;
   readonly exitCodes?: ReadonlyArray<number>;
+  readonly stdin?: string;
   readonly timeout: Duration.Duration;
 }
 

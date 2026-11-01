@@ -56,6 +56,24 @@ describe("the live command runner", () => {
     }
   });
 
+  // Oracle: POSIX cat copies its standard input to its standard output and stops at end of file.
+  // Rejects a runner that drops the stdin text, or leaves the input open so cat waits for the timeout.
+  test("a command's stdin reaches the child and ends there", async () => {
+    const printed = await Effect.runPromise(
+      CommandRunner.use((runner) => runner.run({ argv: ["cat"], stdin: "the message\n", timeout: Duration.seconds(5) })).pipe(Effect.provide(liveCommandRunner)),
+    );
+    expect(printed).toBe("the message\n");
+  });
+
+  // Oracle: POSIX cat stops at end of file, which a closed input gives at once.
+  // Rejects a runner that leaves a command without stdin reading an open input until its timeout.
+  test("a command without stdin runs with its input closed", async () => {
+    const printed = await Effect.runPromise(
+      CommandRunner.use((runner) => runner.run({ argv: ["sh", "-c", "cat; echo done"], timeout: Duration.seconds(5) })).pipe(Effect.provide(liveCommandRunner)),
+    );
+    expect(printed).toBe("done\n");
+  });
+
   test("a command cut off at its timeout takes the processes it started with it", async () => {
     const scratch = mkdtempSync(join(tmpdir(), "runner-"));
     const pidFile = join(scratch, "pid");
