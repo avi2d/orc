@@ -2,6 +2,20 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.5.0
+
+Released 2026-10-31.
+
+### Features
+
+- **run:** run Pi on a provider its configured Pi packages bring [#43](https://github.com/avi2d/orc/pull/43)
+
+### Fixes
+
+- **tasks:** read the remote machine's pipelines in printed views [#46](https://github.com/avi2d/orc/pull/46)
+- make lint and test checks pass on Mac [#45](https://github.com/avi2d/orc/pull/45)
+- **run:** skip stdin read on runner result without a label [#44](https://github.com/avi2d/orc/pull/44)
+
 ## 0.4.0
 
 Released 2026-10-30.
