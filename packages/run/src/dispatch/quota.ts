@@ -1,4 +1,4 @@
-import { Duration, Effect, Option, Schema, Stream } from "effect"
+import { Duration, Effect, Result, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { duplicateOf } from "../json-file"
 
@@ -44,15 +44,15 @@ const readAccount = (entry: QuotaAccount | undefined, account: string): AccountR
 
 export const assessQuota = (document: unknown, settings: QuotaSettings): QuotaReading => {
   // An entry naming both remainingPercent and unusable matches the first member unless excess keys fail it.
-  const decoded = Schema.decodeUnknownOption(QuotaDocument)(document, { onExcessProperty: "error" })
-  if (Option.isNone(decoded)) {
-    return { kind: "unread", reason: "the quota command printed no " + QUOTA_JSON_SCHEMA + " document" }
+  const decoded = Schema.decodeUnknownResult(QuotaDocument)(document, { onExcessProperty: "error", errors: "all" })
+  if (Result.isFailure(decoded)) {
+    return { kind: "unread", reason: "the quota command printed no " + QUOTA_JSON_SCHEMA + " document: " + decoded.failure.message }
   }
-  const duplicate = duplicateOf(decoded.value.accounts.map((entry) => entry.name))
+  const duplicate = duplicateOf(decoded.success.accounts.map((entry) => entry.name))
   if (duplicate !== null) {
     return { kind: "unread", reason: "the quota command names the account " + duplicate + " twice" }
   }
-  const accounts = settings.accounts.map(({ name }) => readAccount(decoded.value.accounts.find((entry) => entry.name === name), name))
+  const accounts = settings.accounts.map(({ name }) => readAccount(decoded.success.accounts.find((entry) => entry.name === name), name))
   let pick: { readonly account: string; readonly remainingPercent: number } | null = null
   for (const reading of accounts) {
     if (reading.kind === "usable" && reading.remainingPercent >= settings.floorPercent && reading.remainingPercent > (pick?.remainingPercent ?? -1)) {

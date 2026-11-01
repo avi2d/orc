@@ -331,8 +331,20 @@ describe("assessQuota", () => {
   test("room above 100 percent is refused instead of read as room", () => {
     expect(assessQuota(document([{ name: "main", remainingPercent: 140 }]), settings("main")).kind).toBe("unread")
   })
-  test("a document without the orc.quota.v1 schema is refused instead of read", () => {
-    expect(assessQuota({ accounts: [{ name: "main", remainingPercent: 90 }] }, settings("main"))).toEqual({ kind: "unread", reason: "the quota command printed no orc.quota.v1 document" })
+  test("a document without the orc.quota.v1 schema is refused with the missing key instead of a bare refusal", () => {
+    expect(assessQuota({ accounts: [{ name: "main", remainingPercent: 90 }] }, settings("main"))).toEqual({ kind: "unread", reason: "the quota command printed no orc.quota.v1 document: Missing key\n  at [\"schema\"]" })
+  })
+  test("room above 100 percent names the out of range percent instead of a bare refusal", () => {
+    const reading = assessQuota(document([{ name: "main", remainingPercent: 120 }]), settings("main"))
+    expect(reading.kind === "unread" ? reading.reason : "read").toContain("Expected a value between 0 and 100\n  at [\"accounts\"][0][\"remainingPercent\"]")
+  })
+  test("a misspelled remainingPercent names the missing key instead of a bare refusal", () => {
+    const reading = assessQuota(document([{ name: "main", remaining: 90 }]), settings("main"))
+    expect(reading.kind === "unread" ? reading.reason : "read").toContain("Missing key\n  at [\"accounts\"][0][\"remainingPercent\"]")
+  })
+  test("a wrong schema name names the expected literal instead of a bare refusal", () => {
+    const reading = assessQuota({ schema: "orc.quota.v2", accounts: [{ name: "main", remainingPercent: 90 }] }, settings("main"))
+    expect(reading).toEqual({ kind: "unread", reason: "the quota command printed no orc.quota.v1 document: Expected \"orc.quota.v1\"\n  at [\"schema\"]" })
   })
   test("an account named twice is refused instead of taking either reading", () => {
     const reading = assessQuota(document([{ name: "main", remainingPercent: 10 }, { name: "main", remainingPercent: 90 }]), settings("main"))
