@@ -1,7 +1,5 @@
-name: daily-release
+name: release-pr
 on:
-  schedule:
-    - cron: "29 3 * * *"
   workflow_dispatch:
   push:
     branches: [main]
