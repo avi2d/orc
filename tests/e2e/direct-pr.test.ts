@@ -57,7 +57,7 @@ describe("a direct-PR run opens its own PR after the checks", () => {
   test("opens a new PR when the branch has no open PR instead of reusing a closed one", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
-        await withOrigin(dir, async (origin) => {
+        await withOrigin(dir, async () => {
           const sha = await readyToCheck(dir, home)
           const outcome = await runDirectPrStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses)
           expect(callLines(outcome.ghCalls)[0]).toBe("pr list --head orc/test --state open --json url --jq .[0].url // empty")
