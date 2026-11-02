@@ -229,4 +229,29 @@ describe("parseArgs run flags", () => {
   test("run rejects a second token-file flag instead of keeping the last", () => {
     expect(parseArgs(["run", "task.md", "--token-file", "/a", "--token-file", "/b"])).toEqual({ kind: "UsageError", detail: "orc run takes --token-file once, with a path" })
   })
+  test("an answer of --help is recorded instead of printing usage", () => {
+    expect(parseArgs(["backlog", "answer", "task-1", "--help"])).toEqual({
+      kind: "Dispatch",
+      args: { kind: "AnswerTask", id: "task-1", words: "--help" }
+    })
+    expect(parseArgs(["backlog", "answer", "task-1", "-h"])).toEqual({
+      kind: "Dispatch",
+      args: { kind: "AnswerTask", id: "task-1", words: "-h" }
+    })
+  })
+  test("a hold reason of --help is recorded instead of printing usage", () => {
+    expect(parseArgs(["backlog", "hold", "task-1", "--reason", "--help"])).toEqual({
+      kind: "Dispatch",
+      args: { kind: "HoldTask", id: "task-1", reason: "--help", until: null }
+    })
+    expect(parseArgs(["backlog", "hold", "task-1", "--reason", "-h", "--until", "2026-12-01"])).toEqual({
+      kind: "Dispatch",
+      args: { kind: "HoldTask", id: "task-1", reason: "-h", until: "2026-12-01" }
+    })
+  })
+  test("an explicit help flag still prints usage instead of becoming hold data", () => {
+    expect(parseArgs(["backlog", "answer", "--help"])).toEqual({ kind: "PrintHelp" })
+    expect(parseArgs(["backlog", "hold", "--help"])).toEqual({ kind: "PrintHelp" })
+    expect(parseArgs(["backlog", "--help"])).toEqual({ kind: "PrintHelp" })
+  })
 })

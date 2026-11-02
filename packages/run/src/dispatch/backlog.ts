@@ -322,7 +322,7 @@ const rewriteNew = <A>(
         return { result: rewrite.result, published: false } as const
       }
       const replacement = scratchName(paths.folder("new"), id)
-      const discardReplacement = Effect.ignore(fs.remove(replacement))
+      const discardReplacement = fs.remove(replacement).pipe(Effect.orElseSucceed(() => undefined))
       yield* fs.writeFileString(replacement, renderTaskFile(rewrite.record)).pipe(
         Effect.mapError(platformFailure("write " + replacement)),
         Effect.catch((error) => discardReplacement.pipe(Effect.andThen(Effect.fail(error))))

@@ -200,10 +200,21 @@ const parseRunsArgs = (rest: readonly string[]): OrcArgs => {
   return { kind: "ListRuns", json: true }
 }
 const helpFlags = new Set(["--help", "-h"])
+const holdValueFlags = new Set(["--reason", "--until"])
+const scanWords = (rest: readonly string[]): readonly string[] => {
+  if (rest[0] === "backlog" && rest[1] === "hold") {
+    return rest.filter((_word, index) => index < 2 || !holdValueFlags.has(rest[index - 1] ?? ""))
+  }
+  if (rest[0] === "backlog" && rest[1] === "answer") {
+    return rest.slice(0, 3)
+  }
+  return rest
+}
 // Words after "--" are a command orc passes on, so a --help there is that command's.
 const asksForHelp = (rest: readonly string[]): boolean => {
-  const end = rest.indexOf("--")
-  return (end === -1 ? rest : rest.slice(0, end)).some((word) => helpFlags.has(word))
+  const words = scanWords(rest)
+  const end = words.indexOf("--")
+  return (end === -1 ? words : words.slice(0, end)).some((word) => helpFlags.has(word))
 }
 const subcommands = new Set(["runs", "show", "score", "run", "chat", "backlog", "beat", "runner"])
 const parseWords = (args: readonly string[]): OrcArgs => {

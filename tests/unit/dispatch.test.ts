@@ -1,13 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { DateTime, Effect, FileSystem, Layer, Option, Redacted, Result } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../packages/run/src/dispatch/args"
-import { addTask, claimTask, closeStartedTask, listTasks, releaseTask, writeTaken } from "../../packages/run/src/dispatch/backlog"
+import { addTask, answerTask, claimTask, closeStartedTask, holdTask, listTasks, releaseTask, writeTaken } from "../../packages/run/src/dispatch/backlog"
 import { placeTask, runBeat } from "../../packages/run/src/dispatch/beat"
+import { startTask } from "../../packages/run/src/dispatch/runner"
 import { formatBeat } from "../../packages/run/src/dispatch/board"
 import { insertRun, openDatabase } from "../../packages/run/src/run-history"
 import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/dispatch/config"
@@ -592,4 +593,66 @@ describe("the beat's closing sweep", () => {
       expect(report.actions.flatMap((action) => action.kind === "close-failed" ? [action.reason] : [])).toEqual(["the close read timed out after 30 seconds"])
     })
   }, 120_000)
+})
+
+// Answers pueue group, status and add, and runs every other command for real.
+const runnerPueue: BeatSpawner =
+  Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
+    const real = yield* ChildProcessSpawner.ChildProcessSpawner
+    return ChildProcessSpawner.make((command) => {
+      if (ChildProcess.isStandardCommand(command) && command.command === "pueue") {
+        const verb = command.args[0] ?? ""
+        return real.spawn(ChildProcess.make("sh", ["-c", verb === "group" ? "echo '{\"orc\":{}}'" : verb === "status" ? "echo '{\"tasks\":{}}'" : "echo 77"]))
+      }
+      return real.spawn(command)
+    })
+  })).pipe(Layer.provide(BunServices.layer))
+
+describe("a released run's input", () => {
+  const answeredTaken = async (root: string): Promise<void> => {
+    await run(addTask(root, { ...spec, title: "Pick the API", body: "# Pick the API\nChoose.\n" }))
+    await run(holdTask(root, "task-1", { reason: "REST or gRPC", until: null }))
+    await run(answerTask(root, "task-1", "REST", "2026-11-02T12:00:00.000Z"))
+    await run(claimTask(root, "task-1"))
+  }
+  const startEnv = (root: string, checkout: string): Record<string, string> => ({
+    ORC_TASK_ID: "task-1",
+    ORC_TASK_FILE: join(root, "taken", "task-1.md"),
+    ORC_TASK_CHECKOUT: checkout,
+    ORC_TASK_PROVIDER: "test"
+  })
+  const answeredBody = (body: string): void => {
+    expect(body.indexOf("# Pick the API")).toBeLessThan(body.indexOf("REST or gRPC"))
+    expect(body).toContain("The captain answered: REST")
+  }
+  test("a released run gets the task body with the captain's answer instead of the body alone", async () => {
+    await withBacklog(async (root) => {
+      const checkout = join(root, "checkout")
+      await mkdir(checkout, { recursive: true })
+      await answeredTaken(root)
+      const queued = await Effect.runPromise(
+        startTask(startEnv(root, checkout), Effect.succeed(""), { kind: "here" }, ["orc"] as const, root).pipe(
+          Effect.provide(Layer.merge(BunServices.layer, runnerPueue))
+        )
+      )
+      expect(queued ?? "").toContain("queued task-1 as pueue task 77")
+      const names = await readdir(join(root, "runner"))
+      expect(names).toHaveLength(1)
+      answeredBody(await readFile(join(root, "runner", names[0] ?? ""), "utf8"))
+    })
+  })
+  test("a forwarded run gets the task body with the captain's answer instead of the body alone", async () => {
+    await withBacklog(async (root) => {
+      const checkout = join(root, "checkout")
+      await mkdir(checkout, { recursive: true })
+      await answeredTaken(root)
+      const captured = join(root, "forwarded.json")
+      const forwarded = await run(
+        startTask(startEnv(root, checkout), Effect.succeed(""), { kind: "through", command: ["sh", "-c", "cat > " + captured] as const }, ["orc"] as const, root)
+      )
+      expect(forwarded).toBeNull()
+      const body = (JSON.parse(await readFile(captured, "utf8")) as { readonly body: string }).body
+      answeredBody(body)
+    })
+  })
 })
