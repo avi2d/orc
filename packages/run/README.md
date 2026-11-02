@@ -462,6 +462,8 @@ On a token command account, each beat first sends every started task its account
 
 To say tasks in a chat instead of writing task files, run `orc chat`.
 It starts Pi on the model `models.orchestrator` names in `config.json`, and refuses to start when it names none.
+When `<ORC_HOME>/orchestrator.md` exists, the chat adds it to Pi's system prompt as the orchestrator's rules.
+Its first line of output names the rules file it loaded, or says it found none.
 The chat's Pi has four tools and no others:
 
 - `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project, the task's Markdown, an optional machine and the ids it depends on.
