@@ -2,6 +2,24 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.6.0
+
+Released 2026-11-02.
+
+### Features
+
+- **run:** post closed chat tasks back into orc chat with outcome and PR [#55](https://github.com/avi2d/orc/pull/55)
+- **run:** add orc chat on the orchestrator model with backlog tools [#54](https://github.com/avi2d/orc/pull/54)
+- **dispatch:** read the task for orc backlog add from stdin on - [#53](https://github.com/avi2d/orc/pull/53)
+- **run:** keep the run PR link on the closed task [#52](https://github.com/avi2d/orc/pull/52)
+
+### Fixes
+
+- **quota:** show message when no provider is set up [#57](https://github.com/avi2d/orc/pull/57)
+- **ledger:** pass each message to the classifier on stdin, not in argv [#51](https://github.com/avi2d/orc/pull/51)
+- **lint:** put the real bun and node ahead of mise shims on the lint PATH [#50](https://github.com/avi2d/orc/pull/50)
+- **run:** name the fault in an unread quota document [#48](https://github.com/avi2d/orc/pull/48)
+
 ## 0.5.0
 
 Released 2026-10-31.
