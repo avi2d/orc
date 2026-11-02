@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { readdir, readFile, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { binPath, fakeQuota, type Fixture, type OrcResult, orcOk, queuedArgs, runnerTimeout, runOrc, startWaitMillis, withFixture } from "./runner-helpers"
+import { binPath, fakeQuota, type Fixture, type OrcResult, orcOk, queuedArgs, queuedEnv, runnerTimeout, runOrc, startWaitMillis, withFixture } from "./runner-helpers"
 
 const placeholder = "orc-test-placeholder-not-a-token"
 const renewedPlaceholder = "orc-test-renewed-placeholder"
@@ -88,8 +88,7 @@ const filesUnder = async (dir: string): Promise<ReadonlyArray<string>> =>
 const filesHolding = async (dir: string, text: string, except: ReadonlyArray<string>): Promise<ReadonlyArray<string>> => {
   const holding: Array<string> = []
   for (const file of await filesUnder(dir)) {
-    const body = await readFile(file, "utf8").catch(() => null)
-    if (body !== null && !except.includes(file) && body.includes(text)) {
+    if (!except.includes(file) && (await readFile(file, "utf8")).includes(text)) {
       holding.push(file)
     }
   }
@@ -173,6 +172,7 @@ describe("a beat with a token command", () => {
       expect(await modeOf(join(dir, "token"))).toBe(0o600)
       expect(await readFile(join(dir, "token"), "utf8")).toBe(placeholder)
       expect(await readFile(join(dir, "expires-at"), "utf8")).toBe(liveIso)
+      expect(await queuedEnv(fixture)).toBe(fixture.home)
       expect(await filesHolding(fixture.dir, placeholder, [session, join(dir, "token")])).toEqual([])
     })
   }, runnerTimeout)
