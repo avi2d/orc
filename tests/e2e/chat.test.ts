@@ -138,6 +138,24 @@ const closeTask = async (fixture: Fixture, id: string, fields: ReadonlyArray<str
   await rename(from, to)
 }
 
+const startTask = async (fixture: Fixture, id: string): Promise<void> => {
+  const from = join(fixture.home, "backlog", "new", id + ".md")
+  const to = join(fixture.home, "backlog", "taken", id + ".md")
+  const text = await readFile(from, "utf8")
+  await mkdir(join(fixture.home, "backlog", "taken"), { recursive: true })
+  await writeFile(from, text.replace("\n---\n", "\n" + ranClosing("done", "", null).slice(0, 6).join("\n") + "\n---\n"))
+  await rename(from, to)
+}
+
+const finishTask = async (fixture: Fixture, id: string, pr: string): Promise<void> => {
+  const from = join(fixture.home, "backlog", "taken", id + ".md")
+  const to = join(fixture.home, "backlog", "closed", id + ".md")
+  const text = await readFile(from, "utf8")
+  await mkdir(join(fixture.home, "backlog", "closed"), { recursive: true })
+  await writeFile(from, text.replace("\n---\n", "\n" + ranClosing("done", "", pr).slice(6).join("\n") + "\n---\n"))
+  await rename(from, to)
+}
+
 const rejection = (pending: Promise<string>): Promise<string> =>
   pending.then((text) => "resolved with " + text, (error: unknown) => error instanceof Error ? error.message : String(error))
 
@@ -271,15 +289,61 @@ describe("orc chat tools", () => {
     })
   }, 60_000)
 
-  test("posts nothing for a task another chat or the command line added", async () => {
+  test("posts a task the command line added, not only the tasks this chat added", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       const chat = sessionFor(fixture)
-      await chat.call("orc_backlog_add", { project: "orc", task: "# Fix the typo\n" })
       await writeFile(join(fixture.dir, "task.md"), "# Elsewhere\n")
       expect((await runOrc(fixture, ["backlog", "add", "orc", join(fixture.dir, "task.md")])).exitCode).toBe(0)
-      await closeTask(fixture, "task-2", ranClosing("done", "", "https://github.com/acme/orc/pull/8"))
+      await closeTask(fixture, "task-1", ranClosing("done", "", "https://github.com/acme/orc/pull/8"))
       await chat.postClosed()
-      expect(chat.posted).toEqual([])
+      expect(chat.posted).toEqual(["task-1 Elsewhere closed done, PR https://github.com/acme/orc/pull/8"])
+    })
+  }, 60_000)
+
+  test("closing and reopening the chat while a task runs posts its close exactly once, not never and not on every start", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const first = piFor(fixture, 50)
+      await first.add({ project: "orc", task: "# Fix the typo\n" })
+      await startTask(fixture, "task-1")
+      first.fire("session_start")
+      await Bun.sleep(300)
+      first.fire("session_shutdown")
+      await finishTask(fixture, "task-1", "https://github.com/acme/orc/pull/7")
+      const reopened = piFor(fixture, 50)
+      reopened.fire("session_start")
+      await until(() => reopened.sent.length > 0, 10_000)
+      await Bun.sleep(500)
+      reopened.fire("session_shutdown")
+      const again = piFor(fixture, 50)
+      again.fire("session_start")
+      await Bun.sleep(1_000)
+      again.fire("session_shutdown")
+      expect([first.sent, reopened.sent.map((sent) => sent.message), again.sent]).toEqual([
+        [],
+        [{ customType: "orc-task-closed", content: "task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7", display: true }],
+        []
+      ])
+    })
+  }, 60_000)
+
+  test("closing and reopening the chat posts the close exactly once when the task closes while the reopened chat runs", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const first = piFor(fixture, 50)
+      await first.add({ project: "orc", task: "# Fix the typo\n" })
+      await startTask(fixture, "task-1")
+      first.fire("session_start")
+      first.fire("session_shutdown")
+      const reopened = piFor(fixture, 50)
+      reopened.fire("session_start")
+      await Bun.sleep(300)
+      await finishTask(fixture, "task-1", "https://github.com/acme/orc/pull/7")
+      await until(() => reopened.sent.length > 0, 10_000)
+      await Bun.sleep(500)
+      reopened.fire("session_shutdown")
+      expect([first.sent, reopened.sent.map((sent) => sent.message)]).toEqual([
+        [],
+        [{ customType: "orc-task-closed", content: "task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7", display: true }]
+      ])
     })
   }, 60_000)
 
