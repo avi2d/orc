@@ -28,7 +28,7 @@ const withBacklog = async (body: (root: string) => Promise<void>): Promise<void>
   }
 }
 
-const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, machine: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
+const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
 
 const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-10-27T10:01:00.000Z" }
 
@@ -84,6 +84,7 @@ describe("parseDispatchArgs", () => {
       project: "orc",
       task: { kind: "file", path: "t.md" },
       taskKind: "ship",
+      internal: false,
       machine: "mac",
       dependsOn: ["task-1", "task-2"]
     })
@@ -94,9 +95,16 @@ describe("parseDispatchArgs", () => {
       project: "orc",
       task: { kind: "stdin" },
       taskKind: "ship",
+      internal: false,
       machine: "mac",
       dependsOn: []
     })
+  })
+  test("add records --internal on a ship task instead of dropping it", () => {
+    expect(parseDispatchArgs("backlog", ["add", "orc", "t.md", "--internal"])).toMatchObject({ kind: "AddTask", taskKind: "ship", internal: true })
+  })
+  test("add refuses --internal on a scout instead of marking a task with no PR", () => {
+    expect(parseDispatchArgs("backlog", ["add", "orc", "t.md", "--kind", "scout", "--internal"]).kind).toBe("UsageError")
   })
   test("add refuses a second --machine instead of keeping either", () => {
     expect(parseDispatchArgs("backlog", ["add", "orc", "t.md", "--machine", "mac", "--machine", "linux"]).kind).toBe("UsageError")

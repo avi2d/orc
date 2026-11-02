@@ -64,6 +64,9 @@ const AddTaskInput = Schema.Struct({
   kind: Schema.optionalKey(Schema.Literals(taskKinds).annotate({
     description: "ship ends in a PR and is the default; scout and task end in a report file in the run folder instead"
   })),
+  internal: Schema.optionalKey(Schema.Boolean.annotate({
+    description: "Marks a ship task internal-only, so a no-mistakes-prod-only project opens its PR after checks without no-mistakes"
+  })),
   machine: Schema.optionalKey(Schema.String.annotate({ description: "The one machine the task may run on" })),
   dependsOn: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: "The ids of the tasks that must close done before this one starts" }))
 })
@@ -279,6 +282,7 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
                 input.project,
                 "-",
                 ...(input.kind === undefined ? [] : ["--kind", input.kind]),
+                ...(input.internal === true ? ["--internal"] : []),
                 ...(input.machine === undefined ? [] : ["--machine", input.machine]),
                 ...(input.dependsOn ?? []).flatMap((id) => ["--depends-on", id])
               ], input.task)

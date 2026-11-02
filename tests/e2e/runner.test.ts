@@ -16,6 +16,9 @@ const writeMachine = async (fixture: Fixture, start: ReadonlyArray<string>): Pro
   }))
 }
 
+const writeMode = (fixture: Fixture, mode: string): Promise<void> =>
+  writeFile(join(fixture.home, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { linux: fixture.checkout }, mode }] }))
+
 const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>, kind: ReadonlyArray<string> = []): Promise<ReadonlyArray<string> | null> => {
   await fakeQuota(fixture)
   await writeMachine(fixture, start)
@@ -46,6 +49,48 @@ describe("orc runner start", () => {
       const added = await beatStarts(fixture, [process.execPath, binPath, "runner", "start"], ["--kind", "scout"])
       const ship = pueueAddFor(fixture.home, fixture.checkout)
       expect(added).toEqual([...ship.slice(0, -2), "--kind", "scout", ...ship.slice(-2)])
+    })
+  }, runnerTimeout)
+
+  test("a direct-PR project's ship task queues orc run with --delivery direct-PR instead of a no-mistakes run", async () => {
+    await withFixture(async (fixture) => {
+      await writeMode(fixture, "direct-PR")
+      const added = await beatStarts(fixture, [process.execPath, binPath, "runner", "start"])
+      const ship = pueueAddFor(fixture.home, fixture.checkout)
+      expect(added).toEqual([...ship.slice(0, -2), "--delivery", "direct-PR", ...ship.slice(-2)])
+    })
+  }, runnerTimeout)
+
+  test("a prod-only project's unmarked ship task queues a no-mistakes run instead of a direct PR", async () => {
+    await withFixture(async (fixture) => {
+      await writeMode(fixture, "no-mistakes-prod-only")
+      expect(await beatStarts(fixture, [process.execPath, binPath, "runner", "start"])).toEqual(pueueAddFor(fixture.home, fixture.checkout))
+    })
+  }, runnerTimeout)
+
+  test("a prod-only project's internal ship task queues --delivery direct-PR instead of a no-mistakes run", async () => {
+    await withFixture(async (fixture) => {
+      await writeMode(fixture, "no-mistakes-prod-only")
+      const added = await beatStarts(fixture, [process.execPath, binPath, "runner", "start"], ["--internal"])
+      const ship = pueueAddFor(fixture.home, fixture.checkout)
+      expect(added).toEqual([...ship.slice(0, -2), "--delivery", "direct-PR", ...ship.slice(-2)])
+    })
+  }, runnerTimeout)
+
+  test("an internal mark on a no-mistakes project's task still queues a no-mistakes run instead of a direct PR", async () => {
+    await withFixture(async (fixture) => {
+      await writeMode(fixture, "no-mistakes")
+      expect(await beatStarts(fixture, [process.execPath, binPath, "runner", "start"], ["--internal"])).toEqual(pueueAddFor(fixture.home, fixture.checkout))
+    })
+  }, runnerTimeout)
+
+  test("an unknown mode is refused naming the project instead of starting the task", async () => {
+    await withFixture(async (fixture) => {
+      await writeMachine(fixture, ["true"])
+      await writeMode(fixture, "yolo")
+      const added = await runOrc(fixture, ["backlog", "add", "orc", "task.md"])
+      expect(added.exitCode).not.toBe(0)
+      expect(added.stderr).toContain("the project orc names the mode yolo, which is not no-mistakes, direct-PR or no-mistakes-prod-only")
     })
   }, runnerTimeout)
 

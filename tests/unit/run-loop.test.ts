@@ -18,6 +18,8 @@ import {
   recordImplementStart,
   recordNoMistakesDone,
   recordNoMistakesStart,
+  recordPullRequestDone,
+  recordPullRequestStart,
   recordResumePublish
 } from "../../packages/run/src/history-write"
 import { buildResumePlan } from "../../packages/run/src/run-resume"
@@ -85,7 +87,7 @@ const historyFor = (runId: string, home: string, projectDir: string, started: st
       taskPath: path.join(runDir, "task.md"),
       agent: implementer, fixer, branch: "orc/test", sandbox: "nono", started,
       worktreeDir: projectDir,
-      noMistakes: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: noMistakesPath, git, worktreeDir: projectDir }),
+      delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: noMistakesPath, git, worktreeDir: projectDir }) },
       allow: [], answers: []
     }
     return run
@@ -130,7 +132,9 @@ const runLoopCheckpoints = (db: Database, run: HistoryRun): RunCheckpoints => ({
   fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer.path, started),
   fixDone: (fix) => recordFixDone(db, run.runId, fix),
   noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
-  noMistakesDone: (record) => recordNoMistakesDone(db, run, record)
+  noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
+  pullRequestStart: (started) => recordPullRequestStart(db, run.runId, started),
+  pullRequestDone: (record) => recordPullRequestDone(db, run, record)
 })
 
 const seedRefusedPrior = async (db: Database, priorDir: string, project: string): Promise<void> => {

@@ -414,11 +414,14 @@ A quota that names more than one account when any of them is kind `none` is refu
 { "projects": [{ "name": "orc", "checkouts": { "mac": "/Users/me/code/orc", "linux-box": "/home/me/code/orc" } }] }
 ```
 
+A project may add `"mode"`, as [Delivery modes](#delivery-modes) shows.
+
 To add a task, run `orc backlog add <project> <task-file>`.
 To pipe the task in instead, give `-` as the task file, as in `printf '# Fix the login page\n' | orc backlog add orc -`.
 It reads stdin to its end and refuses a terminal.
 Add `--machine <name>` to run the task on that machine only, and `--depends-on <task-id>` once per task it waits for.
 Add `--kind scout` or `--kind task` for a task that ends in a report instead of a PR, as [Task kinds](#task-kinds) shows.
+Add `--internal` to mark a ship task internal-only, which only a `no-mistakes-prod-only` project reads.
 To see the backlog, run `orc backlog`.
 It prints the new, taken and closed tasks side by side with the project list and each machine's busy slots beside them.
 To print the same facts as JSON, run `orc backlog --json`, whose document names its version first as `orc.backlog.v1`.
@@ -444,7 +447,7 @@ Holding a held task again keeps the first reason.
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
 After the claim survives a recount, the beat writes the task started before it runs the start command.
 A task marked for a machine waits for a slot on that machine and never starts on another.
-The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT` and `ORC_TASK_TOKEN_FILE`.
+The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_DELIVERY`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT` and `ORC_TASK_TOKEN_FILE`.
 `ORC_TASK_TOKEN_FILE` is the account's token file path, never the token.
 On a token command account it is empty, and the start command reads the token as `orc.token.v1` on standard input instead.
 On a kind `none` account it is empty, and the beat sends nothing on standard input, so a custom start command must not feed it input.
@@ -496,6 +499,24 @@ The beat prints the report path in its `closed` line.
 The chat posts it where a shipped task posts its PR, as in `task-1 Map the parser closed done: the run wrote its report, report /home/me/.orc/runs/<run-id>/agent-report.md`.
 A scout or task marked for a machine waits for room there as any task does.
 
+## Delivery modes
+
+A project's `mode` in `projects.json` is `no-mistakes`, `direct-PR` or `no-mistakes-prod-only`, and a project with no `mode` reads as `no-mistakes`.
+Orc refuses any other mode with `the project <name> names the mode <word>, which is not no-mistakes, direct-PR or no-mistakes-prod-only`.
+The mode decides only how a ship task ends, and a scout or task ignores it.
+
+The beat turns the mode and the task's `internal` mark into the run's delivery and sets `ORC_TASK_DELIVERY` to `no-mistakes` or `direct-PR`.
+A `no-mistakes-prod-only` project gives `direct-PR` to a task marked `internal: true` and `no-mistakes` to the rest.
+`orc runner start` reads a missing `ORC_TASK_DELIVERY` as `no-mistakes` and queues a `direct-PR` ship run as `orc run <task-file> --delivery direct-PR`.
+
+A `direct-PR` run never starts no-mistakes and does not need it installed.
+Once the checks pass, it runs `git push --set-upstream origin <branch>` from the run's worktree.
+It reuses the open PR for the branch when `gh pr view` finds one, and otherwise runs `gh pr create`.
+The PR's title is the task's first line, and its body is the task with the checks that passed.
+Orc keeps that body as `pr-body.md` in the run folder and records the step as `pr`.
+The run succeeds with the PR link, so the task closes done with it as `pr` and the chat posts it as it posts any PR.
+A failed check, a failed push or a failed `gh pr create` ends the run failed with no PR, and the task closes failed.
+
 ## Adding tasks from a chat
 
 To say tasks in a chat instead of writing task files, run `orc chat`.
@@ -504,7 +525,8 @@ When `<ORC_HOME>/orchestrator.md` exists, the chat adds it to Pi's system prompt
 Its first line of output names the rules file it loaded, or says it found none.
 The chat's Pi has four tools and no others:
 
-- `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project, the task's Markdown, an optional kind, an optional machine and the ids it depends on.
+- `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project and the task's Markdown.
+  It may add a kind, an internal mark, a machine and the ids the task depends on.
 - `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
 - `orc_backlog_hold` holds one new task through `orc backlog hold`, with the reason and an optional date.
 - `orc_backlog_answer` answers a held task through `orc backlog answer`, with your words as you said them, or one parked question when it names the question's id.

@@ -9,6 +9,7 @@ export interface TaskSpec {
   readonly title: string
   readonly project: string
   readonly kind: TaskKind
+  readonly internal: boolean
   readonly machine: string | null
   readonly dependsOn: ReadonlyArray<string>
   readonly created: string
@@ -100,6 +101,7 @@ const Frontmatter = Schema.Struct({
   title: Schema.String,
   project: Schema.String,
   kind: Schema.optional(Schema.String),
+  internal: Schema.optional(Schema.Boolean),
   machine: Schema.NullOr(Schema.String),
   depends_on: Schema.Array(Schema.String),
   created: Schema.String,
@@ -267,6 +269,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
         title: front.title,
         project: front.project,
         kind,
+        internal: front.internal ?? false,
         machine: front.machine,
         dependsOn: front.depends_on,
         created: front.created,
@@ -349,6 +352,7 @@ export const renderTaskFile = (record: TaskRecord): string =>
     field("title", record.spec.title),
     field("project", record.spec.project),
     field("kind", record.spec.kind),
+    ...(record.spec.internal ? [field("internal", true)] : []),
     field("machine", record.spec.machine),
     field("depends_on", record.spec.dependsOn),
     field("created", record.spec.created),

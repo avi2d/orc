@@ -9,8 +9,15 @@ import { toFileUrl } from "./run-history"
 import { findingLine, reportFileName, reportMarkdown, runStatus, type OrcRunCommit, type OrcRunReport } from "./report"
 import { handoverFileName, handoverNote, lastAssistantReply, longSessionWarning } from "./long-session"
 import { branchCommits } from "./git-run"
+import type { PullRequestOpener } from "./direct-pr"
 
 export type { ChecksRoundSummary, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./report"
+
+export type RunDeliverer =
+  | { readonly kind: "no-mistakes"; readonly runner: NoMistakesRunner }
+  | { readonly kind: "direct-PR"; readonly opener: PullRequestOpener }
+
+export const prBodyFileName = "pr-body.md"
 
 export interface HistoryRun {
   readonly fs: FileSystem.FileSystem
@@ -29,7 +36,7 @@ export interface HistoryRun {
   readonly sandbox: SandboxKind
   readonly started: string
   readonly worktreeDir: string
-  readonly noMistakes: NoMistakesRunner
+  readonly delivery: RunDeliverer
   readonly allow?: ReadonlyArray<AllowWord> | undefined
   readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
 }

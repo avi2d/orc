@@ -1,4 +1,5 @@
-import { checkoutOn, type DispatchConfig, type Machine, type Project } from "./config"
+import { deliveryFor, type RunDelivery } from "../delivery"
+import { checkoutOn, type DispatchConfig, type Machine, modeOf, type Project } from "./config"
 import { captainWait, type TaskRecord } from "./task-record"
 
 export interface MachineRoom {
@@ -39,7 +40,7 @@ export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>): st
 }
 
 type Placement =
-  | { readonly kind: "place"; readonly machine: Machine; readonly checkout: string }
+  | { readonly kind: "place"; readonly machine: Machine; readonly checkout: string; readonly delivery: RunDelivery }
   | { readonly kind: "waits"; readonly reason: string }
 
 // A task that names a machine is placed there or nowhere, whatever room the other machines have.
@@ -74,5 +75,5 @@ export const placeTask = (
   if (best === null) {
     return { kind: "waits", reason: pinned === null ? "no machine with a checkout of " + project.name + " has room" : pinned + " has no room" }
   }
-  return { kind: "place", machine: best.machine, checkout: best.checkout }
+  return { kind: "place", machine: best.machine, checkout: best.checkout, delivery: deliveryFor(modeOf(project), task.spec.internal) }
 }

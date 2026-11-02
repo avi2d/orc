@@ -18,19 +18,22 @@ import { OrcRunError, describeCause } from "./run-session"
 import { openDatabase, orcHomeDir, updateStep } from "./run-history"
 import { stepsForRun } from "./history-resume"
 import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "./run-resume"
-import { finishRun, historyFailure, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordResumePublish } from "./history-write"
+import { finishRun, historyFailure, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordPullRequestDone, recordPullRequestStart, recordResumePublish } from "./history-write"
 import { failedReport, writeEvidence, writeHandover, writeReport, type HistoryRun, type OrcRunCommit, type OrcRunReport } from "./run-record"
 import { longSessionWarning, type LongSessionCounts } from "./long-session"
 import { runFull, type RunCheckpoints, type SandboxOps } from "./run-loop"
 import { type ReportOutcome, type ReportRun, runReport } from "./report-run"
 import { runDirFor, type ReportKind } from "./task-kind"
-import { noMistakesBinary, noMistakesVersionProblem, subprocessNoMistakesRunner, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "./no-mistakes"
+import { noMistakesBinary, noMistakesVersionProblem, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "./no-mistakes"
+import { subprocessDeliverer } from "./run-deliverer"
+import type { RunDelivery } from "./delivery"
 
 export type { SandboxOps }
 
 export interface OrcRunRequest {
   readonly cwd: string
   readonly taskFile: string | null | undefined
+  readonly delivery?: RunDelivery | undefined
   readonly branch?: string | undefined
   readonly sandbox?: SandboxKind | undefined
   readonly tokenFile?: string | undefined
@@ -282,7 +285,7 @@ export const runAgentStep = (
     const { fs, path, spawner, home, runId, git, checkout, sandboxKind } = opened
     const noMistakes = { spawner, binary: noMistakesBinary(Bun.env.ORC_NO_MISTAKES_BIN), pathEnv: hostPath ?? "", git: checkout.git }
     const { folders, agent, fixer, plan } = yield* prepareRunAgents(opened, request).pipe(
-      Effect.tap(() => requireNoMistakes(noMistakes, checkout.projectDir)),
+      Effect.tap(() => request.delivery === "direct-PR" ? Effect.void : requireNoMistakes(noMistakes, checkout.projectDir)),
       Effect.onError(() => removeRunDir(opened))
     )
     const started = new Date().toISOString()
@@ -304,7 +307,7 @@ export const runAgentStep = (
       runDir: folders.runDir, piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir,
       taskPath: folders.taskPath, agent, fixer, branch: checkout.branch, sandbox: sandboxKind, started,
       worktreeDir: sandbox.worktreePath,
-      noMistakes: subprocessNoMistakesRunner({ ...noMistakes, worktreeDir: sandbox.worktreePath }),
+      delivery: subprocessDeliverer(request.delivery ?? "no-mistakes", { ...noMistakes, worktreeDir: sandbox.worktreePath, branch: checkout.branch }),
       allow: request.allow ?? [],
       answers: request.answers ?? []
     }
@@ -359,7 +362,9 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer.path, started, attempt === 1 ? resume.fixSessionFile ?? undefined : undefined),
       fixDone: (fix) => recordFixDone(db, run.runId, fix),
       noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
-      noMistakesDone: (record) => recordNoMistakesDone(db, run, record)
+      noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
+      pullRequestStart: (started) => recordPullRequestStart(db, run.runId, started),
+      pullRequestDone: (record) => recordPullRequestDone(db, run, record)
     }
     const report = yield* runFull(run, ops, resume, checkpoints).pipe(
       Effect.catchTag("OrcRunError", (error) =>
