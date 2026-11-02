@@ -88,7 +88,7 @@ describe("orc runner start", () => {
     })
   }, runnerTimeout)
 
-  test("a beat closes a far-home run through its machine instead of leaving it started", async () => {
+  test("a beat closes a far-home run through its machine with the far run's PR instead of leaving it started", async () => {
     await withFixture(async (fixture) => {
       const far = join(fixture.dir, "far-home")
       const farPueue = join(fixture.dir, "far-pueue")
@@ -121,9 +121,25 @@ describe("orc runner start", () => {
         },
         groups: {}
       }))
+      const db = await Effect.runPromise(openDatabase(far).pipe(Effect.provide(BunServices.layer)))
+      try {
+        Effect.runSync(recordRun(db, {
+          id: "run-1",
+          project: fixture.checkout,
+          branch: "orc/task-1",
+          taskFile: "task.md",
+          status: "succeeded",
+          started: "2026-10-28T02:36:39.200Z",
+          ended: "2026-10-28T02:36:39.400Z",
+          prLink: "https://github.com/example/orc/pull/3"
+        }))
+      } finally {
+        db.close()
+      }
       const second = await orcOk(fixture, ["beat"])
-      expect(second).toContain("closed task-1 done")
-      expect(await orcOk(fixture, ["backlog", "--json"])).toContain("\"status\":\"closed\"")
+      expect(second).toContain("closed task-1 done on linux: pueue task 77 succeeded, PR https://github.com/example/orc/pull/3")
+      const backlog: unknown = JSON.parse(await orcOk(fixture, ["backlog", "--json"]))
+      expect(backlog).toMatchObject({ tasks: [{ id: "task-1", status: "closed", outcome: "done", pr: "https://github.com/example/orc/pull/3" }] })
     })
   }, runnerTimeout)
 

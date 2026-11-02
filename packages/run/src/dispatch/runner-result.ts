@@ -57,26 +57,18 @@ const failureReason = (result: typeof PueueResult.Type): string | null => {
 export interface TaskClosing {
   readonly outcome: "done" | "failed"
   readonly reason: string
+  readonly pr: string | null
 }
 
+// The beat closes a started task from this, so its done and failed match what runner result reports.
 export const closingFromResult = (result: RunnerResult): TaskClosing | null => {
   if (result.status === "succeeded") {
-    return { outcome: "done", reason: "pueue task " + result.pueueTask + " succeeded" }
+    return { outcome: "done", reason: "pueue task " + result.pueueTask + " succeeded", pr: result.run?.prLink ?? null }
   }
   if (result.status === "failed") {
-    return { outcome: "failed", reason: result.reason }
+    return { outcome: "failed", reason: result.reason, pr: result.run?.prLink ?? null }
   }
   return null
-}
-
-const closingOf = (pueueTask: number, status: PueueStatus): TaskClosing | null => {
-  if (!("Done" in status)) {
-    return null
-  }
-  const reason = failureReason(status.Done.result)
-  return reason === null
-    ? { outcome: "done", reason: "pueue task " + pueueTask + " succeeded" }
-    : { outcome: "failed", reason }
 }
 
 const assessHeld = (
@@ -114,19 +106,6 @@ const readRun = (home: string, checkout: string, task: string): Effect.Effect<Ru
   }).pipe(
     Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
   )
-
-// The beat closes a started task from this, so its done and failed match what runner result reports.
-export const readClosing = (task: string, home: string, label?: string | null): Effect.Effect<TaskClosing | null, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.gen(function*() {
-    const held = yield* readHeld(home, task, label)
-    if (held === null) {
-      return null
-    }
-    const status = yield* Schema.decodeUnknownEffect(PueueStatus)(held.status).pipe(
-      Effect.mapError((error) => new RunnerError({ detail: "pueue reports a status orc cannot read for task " + held.id + ": " + error.message }))
-    )
-    return closingOf(held.id, status)
-  })
 
 export const readResult = (task: string, home: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
