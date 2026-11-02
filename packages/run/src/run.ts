@@ -23,7 +23,7 @@ import { failedReport, writeEvidence, writeHandover, writeReport, type HistoryRu
 import { longSessionWarning, type LongSessionCounts } from "./long-session"
 import { runFull, type RunCheckpoints, type SandboxOps } from "./run-loop"
 import { type ReportOutcome, type ReportRun, runReport } from "./report-run"
-import type { ReportKind } from "./task-kind"
+import { runDirFor, type ReportKind } from "./task-kind"
 import { noMistakesBinary, noMistakesVersionProblem, subprocessNoMistakesRunner, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "./no-mistakes"
 
 export type { SandboxOps }
@@ -234,7 +234,7 @@ const openRun = (
     const runId = request.runId ?? newRunId()
     const git = yield* openHostGit(fs, path)
     const checkout = yield* openCheckout(fs, path, spawner, git, request.cwd, request.branch, runId, parseRefuseMarkers(Bun.env.ORC_REFUSE_MARKERS))
-    const runDir = path.join(home, "runs", runId)
+    const runDir = runDirFor(home, runId)
     const { taskFile: effectiveTaskFile, sandbox: sandboxKind } = yield* readRunStart(fs, home, checkout, request)
     return { fs, path, spawner, home, runId, git, checkout, runDir, effectiveTaskFile, sandboxKind }
   })

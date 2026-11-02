@@ -39,8 +39,6 @@ const kindAsk = (run: ReportRun): string =>
 
 const buildReportPrompt = (run: ReportRun): string =>
   [
-    run.agent.body,
-    "",
     "The task sits in " + run.taskPath + ". The project's checkout sits at " + run.projectDir + ". " + kindAsk(run),
     "This run ends in a report, not a commit or a PR. Write the report as markdown to " + reportPathOf(run.runDir) +
     ". When the report is written, print " + orcCompletionLine + " on its own line and stop."

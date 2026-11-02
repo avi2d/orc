@@ -8,3 +8,5 @@ export const isTaskKind = (word: string): word is TaskKind => taskKinds.some((ki
 export const unknownKind = (word: string): string => "the kind " + word + " is not ship, scout or task"
 
 export const agentReportFileName = "agent-report.md"
+
+export const runDirFor = (home: string, runId: string): string => home + "/runs/" + runId

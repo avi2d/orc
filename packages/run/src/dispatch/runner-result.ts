@@ -4,7 +4,7 @@ import { openQuestionsForRun, runsForBranch } from "../history-resume"
 import type { OpenQuestion } from "../no-mistakes-gate"
 import { formatHistoryError, openDatabase, type RunRecord, RunStatusSchema } from "../run-history"
 import { writtenReport } from "../report-run"
-import type { TaskKind } from "../task-kind"
+import { runDirFor, type TaskKind } from "../task-kind"
 import { TaskId } from "./backlog"
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
 import { LabelArg } from "./token"
@@ -169,7 +169,7 @@ const readRun = (home: string, checkout: string, task: string, interval: PueueIn
         Effect.gen(function*() {
           const runs = yield* runsForBranch(db, project, taskBranch(task))
           const run = runs.find((candidate) => interval === null || startsWithin(candidate.started, interval)) ?? null
-          return run === null ? null : toSummary(run, yield* openQuestionsForRun(db, run.id), yield* writtenReport(home + "/runs/" + run.id))
+          return run === null ? null : toSummary(run, yield* openQuestionsForRun(db, run.id), yield* writtenReport(runDirFor(home, run.id)))
         }),
       (db) => Effect.sync(() => db.close())
     )

@@ -78,6 +78,8 @@ const runOrc = async (args: ReadonlyArray<string>, cwd: string, env: Record<stri
 
 const scoutRun = ["run", "task.md", "--kind", "scout", "--branch", "orc/task-1", "--sandbox", "none"]
 
+const taskRun = ["run", "task.md", "--kind", "task", "--branch", "orc/task-1", "--sandbox", "none"]
+
 describe("orc run --kind scout", () => {
   test("runs Pi in the run folder and ends on its report, with no no-mistakes call, no PR and no branch", async () => {
     await withReportFixture(true, async ({ repo, orcHome, fakeBin, env }) => {
@@ -108,6 +110,16 @@ describe("orc run --kind scout", () => {
     })
   }, 60_000)
 
+  test("does not hand Pi the commit-the-result instruction in a scout run", async () => {
+    await withReportFixture(true, async ({ repo, fakeBin, env }) => {
+      const result = await runOrc(scoutRun, repo, env)
+      expect(result.exitCode).toBe(0)
+      const prompt = await readFile(join(fakeBin, "pi-prompt"), "utf8")
+      expect(prompt).not.toContain("Commit the result")
+      expect(prompt).not.toContain("You implement one task")
+    })
+  }, 60_000)
+
   test("a scout run without --sandbox none is refused before Pi starts instead of running unsandboxed", async () => {
     await withReportFixture(true, async ({ repo, fakeBin, env }) => {
       const result = await runOrc(["run", "task.md", "--kind", "scout", "--branch", "orc/task-1"], repo, env)
@@ -116,6 +128,18 @@ describe("orc run --kind scout", () => {
         stderr: "orc: a scout run starts Pi on the host in its run folder, so it takes --sandbox none and refuses --sandbox nono"
       })
       expect(await Bun.file(join(fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+})
+
+describe("orc run --kind task", () => {
+  test("does not hand Pi the commit-the-result instruction in a task run", async () => {
+    await withReportFixture(true, async ({ repo, fakeBin, env }) => {
+      const result = await runOrc(taskRun, repo, env)
+      expect(result.exitCode).toBe(0)
+      const prompt = await readFile(join(fakeBin, "pi-prompt"), "utf8")
+      expect(prompt).not.toContain("Commit the result")
+      expect(prompt).not.toContain("You implement one task")
     })
   }, 60_000)
 })
