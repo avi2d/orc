@@ -35,8 +35,8 @@ describe("a direct-PR run opens its own PR after the checks", () => {
           expect(outcome.nmCalls).toBe("")
           expect(branchOn(origin)).toBe(sha)
           expect(callLines(outcome.ghCalls)).toEqual([
-            "pr view orc/test --json url --jq .url",
-            "pr create --head orc/test --title Do the thing. --body-file " + bodyFile
+            "pr list --head orc/test --state open --json url --jq .[0].url // empty",
+            "pr create --head orc/test --title work --body-file " + bodyFile
           ])
           expect(outcome.report.completed).toBe(true)
           expect(outcome.report.noMistakes).toBeNull()
@@ -46,8 +46,24 @@ describe("a direct-PR run opens its own PR after the checks", () => {
           expect(outcome.steps).toContainEqual({ name: "pr", status: "passed" })
           expect(outcome.steps).not.toContainEqual(expect.objectContaining({ name: "no-mistakes" }))
           const body = await readFile(bodyFile, "utf8")
-          expect(body).toContain("Do the thing.")
+          expect(body).toContain("work")
           expect(body).toContain("after lint passed, without no-mistakes")
+          expect(body).not.toContain("Do the thing.")
+        })
+      })
+    })
+  })
+
+  test("opens a new PR when the branch has no open PR instead of reusing a closed one", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        await withOrigin(dir, async (origin) => {
+          const sha = await readyToCheck(dir, home)
+          const outcome = await runDirectPrStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses)
+          expect(callLines(outcome.ghCalls)[0]).toBe("pr list --head orc/test --state open --json url --jq .[0].url // empty")
+          expect(callLines(outcome.ghCalls).some((line) => line.startsWith("pr create --head orc/test"))).toBe(true)
+          expect(outcome.report.prLink).toBe(ghPrLink)
+          expect(outcome.report.completed).toBe(true)
         })
       })
     })

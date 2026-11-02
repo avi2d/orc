@@ -220,12 +220,10 @@ const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; read
     return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
   })
 
-const taskTitle = (task: string): string =>
-  task.split("\n").map((line) => line.replace(/^#+\s*/, "").trim()).find((line) => line !== "") ?? ""
-
-const prBody = (task: string, rounds: ReadonlyArray<ChecksRoundSummary>): string => {
+const prBody = (subjects: ReadonlyArray<string>, rounds: ReadonlyArray<ChecksRoundSummary>): string => {
   const passed = rounds.at(-1)?.checks.map((check) => check.name) ?? []
-  return task.trimEnd() + "\n\n---\n\norc opened this PR after " + (passed.length === 0 ? "the checks" : passed.join(", ")) + " passed, without no-mistakes.\n"
+  const closing = "orc opened this PR after " + (passed.length === 0 ? "the checks" : passed.join(", ")) + " passed, without no-mistakes.\n"
+  return subjects.length === 0 ? closing : subjects.map((subject) => "- " + subject).join("\n") + "\n\n---\n\n" + closing
 }
 
 const openPullRequest = (
@@ -236,15 +234,18 @@ const openPullRequest = (
 ): Effect.Effect<DirectPrRecord, OrcRunError> =>
   Effect.gen(function*() {
     yield* checkpoints.pullRequestStart(new Date().toISOString())
-    const task = yield* run.fs.readFileString(run.taskPath).pipe(
-      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the task file " + run.taskPath + ": " + String(cause) }))
+    const head = yield* runGit(run.spawner, run.git, ["log", "-1", "--format=%s", run.branch], run.worktreeDir).pipe(
+      Effect.map((logged) => logged.stdout.trim()),
+      Effect.orElseSucceed(() => "")
     )
+    const listed = yield* branchCommits(run.spawner, run.git, run.branch, run.projectDir).pipe(Effect.orElseSucceed(() => [] as Array<OrcRunCommit>))
+    const subjects = listed.map((commit) => commit.subject.trim()).filter((subject) => subject !== "")
+    const bodySubjects = subjects.length > 0 ? subjects : (head !== "" ? [head] : [])
     const bodyFile = run.path.join(run.runDir, prBodyFileName)
-    yield* run.fs.writeFileString(bodyFile, prBody(task, rounds)).pipe(
+    yield* run.fs.writeFileString(bodyFile, prBody(bodySubjects, rounds)).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + bodyFile + ": " + String(cause) }))
     )
-    const title = taskTitle(task)
-    const pr = yield* openDirectPr(opener, run.branch, title === "" ? run.branch : title, bodyFile)
+    const pr = yield* openDirectPr(opener, run.branch, head !== "" ? head : run.branch, bodyFile)
     yield* checkpoints.pullRequestDone(pr)
     return pr
   })

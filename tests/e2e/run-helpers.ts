@@ -181,7 +181,7 @@ const stubGh = async (): Promise<{ readonly dir: string; readonly calls: string 
   const calls = join(dir, "calls")
   await writeFile(calls, "")
   const script = ["#!/bin/sh", "echo \"$@\" >> \"" + calls + "\"",
-    "if [ \"$1 $2\" = \"pr view\" ]; then echo 'no pull requests found for branch' >&2; exit 1; fi",
+    "if [ \"$1 $2\" = \"pr list\" ]; then exit 0; fi",
     "if [ \"$1 $2\" = \"pr create\" ]; then echo '" + ghPrLink + "'; exit 0; fi",
     "echo 'unexpected gh call' >&2", "exit 1"].join("\n") + "\n"
   await writeFile(join(dir, "gh"), script)

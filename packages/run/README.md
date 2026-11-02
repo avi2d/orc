@@ -87,6 +87,7 @@ Orc refuses a checkout with uncommitted changes.
 Orc commits to a new branch named `orc/<run-id>`, or to the name you pass with `--branch <name>`.
 A branch name may hold only letters, digits, `.`, `_`, `-` and `/`.
 To resume the branch after a stop, enter the same target checkout and run `orc run --branch <name>` and orc skips the steps the run history marks passed.
+To resume a direct-PR run, add `--delivery direct-PR` to that resume command, and a resume without it runs no-mistakes.
 Resume takes the sandbox the earlier run recorded, so a no-sandbox run resumes without a sandbox with no flag.
 Orc refuses a resume whose `--sandbox` names another kind than the one recorded.
 A run recorded before orc stored the sandbox takes it from the flag, with nono as the default.
@@ -511,8 +512,9 @@ A `no-mistakes-prod-only` project gives `direct-PR` to a task marked `internal: 
 
 A `direct-PR` run never starts no-mistakes and does not need it installed.
 Once the checks pass, it runs `git push --set-upstream origin <branch>` from the run's worktree.
-It reuses the open PR for the branch when `gh pr view` finds one, and otherwise runs `gh pr create`.
-The PR's title is the task's first line, and its body is the task with the checks that passed.
+It reuses the open PR for the branch when `gh pr list --head <branch> --state open` finds one, and otherwise runs `gh pr create`.
+The PR's title is the head commit's subject, and its body lists the branch's commits and the checks that passed.
+To resume a direct-PR run, add `--delivery direct-PR` to the resume command, and a resume without it runs no-mistakes.
 Orc keeps that body as `pr-body.md` in the run folder and records the step as `pr`.
 The run succeeds with the PR link, so the task closes done with it as `pr` and the chat posts it as it posts any PR.
 A failed check, a failed push or a failed `gh pr create` ends the run failed with no PR, and the task closes failed.

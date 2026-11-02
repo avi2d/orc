@@ -198,7 +198,7 @@ describe("orc run --sandbox none", () => {
       const directPrUrl = "https://github.com/o/r/pull/11"
       await writeScript(join(fakeBin, "gh"), [
         "echo \"$* @ $(pwd)\" >> \"" + fakeBin + "/gh-calls\"",
-        "if [ \"$1 $2\" = 'pr view' ]; then echo 'no pull requests found' >&2; exit 1; fi",
+        "if [ \"$1 $2\" = 'pr list' ]; then exit 0; fi",
         "echo " + directPrUrl
       ])
       const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none", "--delivery", "direct-PR"], repo, env)
@@ -207,7 +207,7 @@ describe("orc run --sandbox none", () => {
       const piCwd = (await readFile(join(fakeBin, "pi-cwd"), "utf8")).trim()
       expect(git(origin, ["log", "orc/test", "--format=%s"], env).split("\n")).toEqual(["add greeting", "task"])
       const ghCalls = (await readFile(join(fakeBin, "gh-calls"), "utf8")).split("\n").filter((line) => line !== "")
-      expect(ghCalls.map((line) => line.split(" ").slice(0, 2).join(" "))).toEqual(["pr view", "pr create"])
+      expect(ghCalls.map((line) => line.split(" ").slice(0, 2).join(" "))).toEqual(["pr list", "pr create"])
       expect(ghCalls.every((line) => line.endsWith(" @ " + piCwd))).toBe(true)
       const nmCalls = await readFile(join(fakeBin, "nm-calls"), "utf8").catch(() => "")
       expect(nmCalls).not.toContain("axi run")
