@@ -141,7 +141,7 @@ The branch holds at least one new commit.
 The project's checks pass.
 no-mistakes opened the PR and reported CI green.
 Otherwise orc records the run as failed with the reason and exits 1.
-A task that changes no code ends failed with made no commit.
+A task that changes no code ends failed, because Pi made no commit.
 Each run keeps its task, evidence, agent log and Pi session in `$ORC_HOME/runs/<run-id>`, default `~/.orc/runs/<run-id>` when `ORC_HOME` is unset or empty.
 Its `no-mistakes.txt` and the run history hold the no-mistakes findings, their count, the gates orc answered, the final result and the PR link.
 They also name the reviewer that served the review, as `axi status` gives it in `reviewer_agent`, or say no-mistakes named none.

@@ -53,7 +53,7 @@ commands:
 Once nono is installed, drop the flag to run inside the sandbox.
 Orc prints the branch, the commits, the checks, the review and the PR link when no-mistakes opens one.
 A run counts as done only when the agent commits, the checks pass, and no-mistakes opens a PR and reports CI green.
-A task that changes no code ends failed with made no commit.
+A task that changes no code ends failed, because Pi made no commit.
 `orc runs` lists past runs, and `orc show <run-id>` walks one step by step.
 
 ## Queue tasks across machines
