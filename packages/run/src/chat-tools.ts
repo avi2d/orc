@@ -131,7 +131,7 @@ const deliverOnce = (state: PostState, deliver: Deliver, task: ClosedTask): void
 
 const markOne = (env: Env, taskId: string): Effect.Effect<true | string> =>
   runOrc(env, ["backlog", "posted", taskId], null).pipe(
-    Effect.as(true),
+    Effect.as<true>(true),
     Effect.catchTag("ChatToolError", (error) => Effect.succeed(error.message))
   )
 
