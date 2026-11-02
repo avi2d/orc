@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
+import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, Result } from "effect"
+import { Array as Arr, Effect, Result } from "effect"
+import { addTask, claimTask, holdTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
+import { parkStartedTask } from "../../../packages/run/src/dispatch/parked"
 import { parseTaskFile, renderTaskFile, type TaskRecord } from "../../../packages/run/src/dispatch/task-record"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
@@ -32,6 +37,24 @@ describe("held task files", () => {
     expect(await holdRefusal("new", ["hold_reason: \"why\"", "answer: \"yes\""])).toBe("an answer names no words or no time")
     expect(await holdRefusal("new", ["hold_reason: \"why\"", "answered_at: \"2026-11-02T12:00:00.000Z\""])).toBe("an answer names no words or no time")
     expect(await holdRefusal("new", ["answer: \"yes\"", "answered_at: \"2026-11-02T12:00:00.000Z\""])).toBe("a hold names no reason")
+  })
+  test("a hold on a parked task is refused instead of written", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-hold-parked-"))
+    try {
+      const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-10-27T10:01:00.000Z" }
+      await run(addTask(root, spec))
+      await run(claimTask(root, "task-1"))
+      await run(writeTaken(root, { spec: { ...spec, id: "task-1", body: "# Fix the thing\n" }, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
+      await run(parkStartedTask(root, "task-1", "orc/task-1", Arr.make({ id: "question-4", text: "Which retries are allowed?" })))
+      const file = join(root, "new", "task-1.md")
+      const before = await readFile(file, "utf8")
+      const failure = await run(Effect.flip(holdTask(root, "task-1", { reason: "wait for budget", until: null })))
+      expect(failure.detail).toBe("task-1 is parked for the captain's answer, so it cannot be held")
+      expect(await readFile(file, "utf8")).toBe(before)
+      expect((await run(listTasks(root)))[0]?.hold).toBeNull()
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
   test("a started or closed task with an unanswered hold is refused instead of read as running", async () => {
     const claimLines = ["beat: beat-1", "taken_for: mac", "account: main", "taken_at: 2026-10-27T10:01:00.000Z", "started_at: 2026-10-27T10:02:00.000Z", "start_log: /tmp/l"]

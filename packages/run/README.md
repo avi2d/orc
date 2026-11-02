@@ -434,7 +434,7 @@ The date says when you mean to answer, and a past date releases nothing: the tas
 To answer, run `orc backlog answer <task-id> <words>`.
 The task file keeps your words as `answer` and the time as `answered_at`, and the next beat may start the task.
 The released run reads the task body with the reason and your words added after it.
-Orc refuses to hold a task that is taken, started or closed, and to answer a task that is not held.
+Orc refuses to hold a task that is taken, started, closed or parked, and to answer a task that is not held.
 Holding a held task again keeps the first reason.
 `orc backlog` shows a held task as `held (<reason>)`, and `orc backlog --json` gives every task a `hold`, either `null` or the reason, the date and the answer.
 

@@ -324,6 +324,9 @@ const holdOn = (id: string, hold: Omit<Hold, "answer">) => (fresh: TaskRecord): 
   if (fresh.state.kind !== "new") {
     return Effect.fail(new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a new task is held" }))
   }
+  if (fresh.parked !== null) {
+    return Effect.fail(new BacklogError({ detail: id + " is parked for the captain's answer, so it cannot be held" }))
+  }
   if (fresh.hold?.answer != null) {
     return Effect.fail(new BacklogError({ detail: id + " was held and answered: " + fresh.hold.answer.words }))
   }
