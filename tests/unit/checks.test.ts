@@ -104,17 +104,22 @@ describe("runChecksRound", () => {
   })
 
   test("a command that throws ends the round with its check named", async () => {
-    const failed = await provide(Effect.gen(function*() {
-      const fs = yield* FileSystem.FileSystem
-      const path = yield* Path.Path
-      return yield* runChecksRound(async () => {
-        throw new Error("sandbox blew up")
-      }, fs, path, "/nowhere", 1, [{ name: "lint", command: "bun run lint" }]).pipe(
-        Effect.map(() => "ran"),
-        Effect.catchTag("ChecksError", (cause) => Effect.succeed(cause.message)))
-    }))
-    expect(failed).toContain("lint")
-    expect(failed).toContain("sandbox blew up")
+    const dir = await mkdtemp(join(tmpdir(), "orc-checks-"))
+    try {
+      const failed = await provide(Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        return yield* runChecksRound(async () => {
+          throw new Error("sandbox blew up")
+        }, fs, path, dir, 1, [{ name: "lint", command: "bun run lint" }]).pipe(
+          Effect.map(() => "ran"),
+          Effect.catchTag("ChecksError", (cause) => Effect.succeed(cause.message)))
+      }))
+      expect(failed).toContain("lint")
+      expect(failed).toContain("sandbox blew up")
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })
 

@@ -1,5 +1,5 @@
 import type { AgentProvider, ExecResult, SandboxRunResult } from "@ai-hero/sandcastle"
-import { Effect } from "effect"
+import { Effect, FileSystem } from "effect"
 import { withHostGitSafety } from "./host"
 import { buildFixPrompt, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
 import { branchCommits, runGit } from "./git-run"
@@ -215,7 +215,9 @@ const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; read
       return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: checked + pr.result }
     }
     yield* checkpoints.noMistakesStart(new Date().toISOString())
-    const noMistakes = yield* driveNoMistakes({ runner: run.delivery.runner, taskFile: run.taskPath, allow, answers })
+    const noMistakes = yield* driveNoMistakes({ runner: run.delivery.runner, taskFile: run.taskPath, runDir: run.runDir, allow, answers }).pipe(
+      Effect.provideService(FileSystem.FileSystem, run.fs)
+    )
     yield* checkpoints.noMistakesDone(noMistakes)
     return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
   })
