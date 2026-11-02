@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Schema } from "effect"
-import { chatTools } from "../../packages/run/src/chat-tools"
+import { chatSession } from "../../packages/run/src/chat-tools"
 
 const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
 const chatToolsPath = new URL("../../packages/run/src/chat-tools.ts", import.meta.url).pathname
@@ -75,16 +75,43 @@ const decodeBacklog = Schema.decodeUnknownSync(BacklogJson)
 
 const orchestratorConfig = { providers: [], models: { orchestrator: "acme/orchestrator-1" } }
 
-const toolsFor = (fixture: Fixture) => {
+const sessionFor = (fixture: Fixture) => {
   const env = { ...process.env, ...fixture.env, ORC_CHAT_ORC: JSON.stringify([process.execPath, binPath]) }
-  const byName = new Map(chatTools(env).map((tool) => [tool.name, tool]))
-  return (name: string, params: unknown) => {
+  const posted: Array<string> = []
+  const session = chatSession(env, (text) => posted.push(text))
+  const byName = new Map(session.tools.map((tool) => [tool.name, tool]))
+  const call = (name: string, params: unknown) => {
     const tool = byName.get(name)
     if (tool === undefined) {
       throw new Error("orc chat has no tool " + name)
     }
     return tool.execute("call-1", params).then((result) => result.content.map((block) => block.text).join(""))
   }
+  return { call, posted, postClosed: session.postClosed }
+}
+
+const toolsFor = (fixture: Fixture) => sessionFor(fixture).call
+
+const ranClosing = (outcome: "done" | "failed", reason: string, pr: string | null): ReadonlyArray<string> => [
+  "beat: \"beat-1\"",
+  "taken_for: \"mac\"",
+  "account: \"main\"",
+  "taken_at: \"2026-11-02T10:01:00.000Z\"",
+  "started_at: \"2026-11-02T10:02:00.000Z\"",
+  "start_log: \"/tmp/task.log\"",
+  "outcome: " + JSON.stringify(outcome),
+  "closed_at: \"2026-11-02T11:00:00.000Z\"",
+  "reason: " + JSON.stringify(reason),
+  ...(pr === null ? [] : ["pr: " + JSON.stringify(pr)])
+]
+
+const closeTask = async (fixture: Fixture, id: string, fields: ReadonlyArray<string>): Promise<void> => {
+  const from = join(fixture.home, "backlog", "new", id + ".md")
+  const to = join(fixture.home, "backlog", "closed", id + ".md")
+  const text = await readFile(from, "utf8")
+  await mkdir(join(fixture.home, "backlog", "closed"), { recursive: true })
+  await writeFile(from, text.replace("\n---\n", "\n" + fields.join("\n") + "\n---\n"))
+  await rename(from, to)
 }
 
 const rejection = (pending: Promise<string>): Promise<string> =>
@@ -151,6 +178,57 @@ describe("orc chat tools", () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       const call = toolsFor(fixture)
       expect(await rejection(call("orc_backlog_add", { project: "nowhere", task: "# Lost\n" }))).toBe("orc: the project nowhere is not in " + join(fixture.home, "backlog", "projects.json"))
+    })
+  })
+
+  test("posts a task the chat added once when it closes, PR and all, not while it is open and not twice", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const chat = sessionFor(fixture)
+      await chat.call("orc_backlog_add", { project: "orc", task: "# Fix the typo\n" })
+      await chat.postClosed()
+      expect(chat.posted).toEqual([])
+      await closeTask(fixture, "task-1", ranClosing("done", "", "https://github.com/acme/orc/pull/7"))
+      await chat.postClosed()
+      await chat.postClosed()
+      expect(chat.posted).toEqual(["task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7"])
+    })
+  })
+
+  test("posts a failed task's reason and that it has no PR instead of a blank PR", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const chat = sessionFor(fixture)
+      await chat.call("orc_backlog_add", { project: "orc", task: "# Fix the typo\n" })
+      await closeTask(fixture, "task-1", ranClosing("failed", "the run failed", null))
+      await chat.postClosed()
+      expect(chat.posted).toEqual(["task-1 Fix the typo closed failed: the run failed, with no PR"])
+    })
+  })
+
+  test("posts once that the backlog cannot be read instead of following in silence or on every poll", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const chat = sessionFor(fixture)
+      await chat.call("orc_backlog_add", { project: "orc", task: "# Fix the typo\n" })
+      const broken = join(fixture.home, "backlog", "new", "task-9.md")
+      await writeFile(broken, "no frontmatter\n")
+      await chat.postClosed()
+      await chat.postClosed()
+      expect(chat.posted).toEqual(["orc chat cannot read the backlog to follow task-1: orc: " + broken + ": the task file opens with no --- frontmatter"])
+      await rm(broken)
+      await closeTask(fixture, "task-1", ranClosing("done", "", "https://github.com/acme/orc/pull/7"))
+      await chat.postClosed()
+      expect(chat.posted.at(-1)).toBe("task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7")
+    })
+  })
+
+  test("posts nothing for a task another chat or the command line added", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const chat = sessionFor(fixture)
+      await chat.call("orc_backlog_add", { project: "orc", task: "# Fix the typo\n" })
+      await writeFile(join(fixture.dir, "task.md"), "# Elsewhere\n")
+      expect((await runOrc(fixture, ["backlog", "add", "orc", join(fixture.dir, "task.md")])).exitCode).toBe(0)
+      await closeTask(fixture, "task-2", ranClosing("done", "", "https://github.com/acme/orc/pull/8"))
+      await chat.postClosed()
+      expect(chat.posted).toEqual([])
     })
   })
 

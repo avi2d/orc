@@ -23,8 +23,15 @@ export interface ChatTool {
   readonly execute: (toolCallId: string, params: unknown) => Promise<TextResult>
 }
 
-interface ChatToolHost {
+export interface ChatSession {
+  readonly tools: ReadonlyArray<ChatTool>
+  readonly postClosed: () => Promise<void>
+}
+
+interface ChatHost {
   readonly registerTool: (tool: ChatTool) => void
+  readonly on: (event: "session_start" | "session_shutdown", handler: () => void) => void
+  readonly sendMessage: (message: { readonly customType: string; readonly content: string; readonly display: boolean }) => void
 }
 
 type Env = Readonly<Record<string, string | undefined>>
@@ -46,6 +53,24 @@ const AddTaskInput = Schema.Struct({
 
 // Effect writes an empty struct as {"not":{"type":"null"}}, and Pi takes only an object schema.
 const noParameters = { type: "object", properties: {}, additionalProperties: false } as const
+
+const ClosedTask = Schema.Struct({
+  id: Schema.String,
+  title: Schema.String,
+  status: Schema.Literal("closed"),
+  outcome: Schema.Literals(["done", "failed", "start-failed"]),
+  reason: Schema.String,
+  pr: Schema.NullOr(Schema.String)
+})
+type ClosedTask = typeof ClosedTask.Type
+
+const OpenTask = Schema.Struct({ id: Schema.String, status: Schema.Literals(["new", "taken", "started"]) })
+
+const BacklogTasks = Schema.fromJsonString(Schema.Struct({ tasks: Schema.Array(Schema.Union([ClosedTask, OpenTask])) }))
+
+const closedPollMillis = 15_000
+
+const addedTask = /^added (\S+) for /
 
 const runOrc = (env: Env, args: ReadonlyArray<string>, stdin: string | null): Effect.Effect<string, ChatToolError> =>
   Effect.gen(function*() {
@@ -69,42 +94,99 @@ const decodeInput = <A>(schema: Schema.Decoder<A>, tool: string, params: unknown
     Effect.mapError((error) => new ChatToolError({ message: tool + " takes " + error.message }))
   )
 
-export const chatTools = (env: Env): ReadonlyArray<ChatTool> => [
-  {
-    name: "orc_backlog_add",
-    label: "Add to the orc backlog",
-    description: "Adds one task to the orc backlog through orc backlog add, and returns the line orc prints, which names the new task's id.",
-    parameters: Schema.toJsonSchemaDocument(AddTaskInput).schema,
-    execute: (_toolCallId, params) =>
-      Effect.runPromise(
-        decodeInput(AddTaskInput, "orc_backlog_add", params).pipe(
-          Effect.flatMap((input) =>
-            runOrc(env, [
-              "backlog",
-              "add",
-              input.project,
-              "-",
-              ...(input.machine === undefined ? [] : ["--machine", input.machine]),
-              ...(input.dependsOn ?? []).flatMap((id) => ["--depends-on", id])
-            ], input.task)
-          ),
-          Effect.map(textResult)
+const closedLine = (task: ClosedTask): string =>
+  task.id + " " + task.title + " closed " + task.outcome + (task.reason === "" ? "" : ": " + task.reason) +
+  (task.pr === null ? ", with no PR" : ", PR " + task.pr)
+
+const followAdded = (followed: Set<string>, line: string): string => {
+  const id = addedTask.exec(line)?.[1]
+  if (id === undefined) {
+    return line + "\norc chat cannot follow this task to its close, as orc named no task id"
+  }
+  followed.add(id)
+  return line
+}
+
+export const chatSession = (env: Env, post: (text: string) => void): ChatSession => {
+  const followed = new Set<string>()
+  let unreadBecause: string | null = null
+  const tools: ReadonlyArray<ChatTool> = [
+    {
+      name: "orc_backlog_add",
+      label: "Add to the orc backlog",
+      description:
+        "Adds one task to the orc backlog through orc backlog add, and returns the line orc prints, which names the new task's id. When the task closes, orc chat posts its outcome and PR here.",
+      parameters: Schema.toJsonSchemaDocument(AddTaskInput).schema,
+      execute: (_toolCallId, params) =>
+        Effect.runPromise(
+          decodeInput(AddTaskInput, "orc_backlog_add", params).pipe(
+            Effect.flatMap((input) =>
+              runOrc(env, [
+                "backlog",
+                "add",
+                input.project,
+                "-",
+                ...(input.machine === undefined ? [] : ["--machine", input.machine]),
+                ...(input.dependsOn ?? []).flatMap((id) => ["--depends-on", id])
+              ], input.task)
+            ),
+            Effect.map((line) => textResult(followAdded(followed, line)))
+          )
+        )
+    },
+    {
+      name: "orc_backlog",
+      label: "Read the orc backlog",
+      description: "Returns orc backlog --json: every new, taken and closed task with its project, machine, outcome and PR, the project list, and the room on each machine.",
+      parameters: noParameters,
+      execute: () => Effect.runPromise(runOrc(env, ["backlog", "--json"], null).pipe(Effect.map(textResult)))
+    }
+  ]
+  const postClosed = Effect.gen(function*() {
+    if (followed.size === 0) {
+      return
+    }
+    const backlog = yield* runOrc(env, ["backlog", "--json"], null).pipe(
+      Effect.flatMap((text) =>
+        Schema.decodeEffect(BacklogTasks)(text).pipe(
+          Effect.mapError((error) => new ChatToolError({ message: "orc backlog --json printed no backlog orc chat reads: " + error.message }))
         )
       )
-  },
-  {
-    name: "orc_backlog",
-    label: "Read the orc backlog",
-    description: "Returns orc backlog --json: every new, taken and closed task with its project, machine, outcome and PR, the project list, and the room on each machine.",
-    parameters: noParameters,
-    execute: () => Effect.runPromise(runOrc(env, ["backlog", "--json"], null).pipe(Effect.map(textResult)))
-  }
-]
+    )
+    unreadBecause = null
+    for (const task of backlog.tasks) {
+      // Two polls can overlap, so only the one that still follows the task posts it.
+      if (task.status === "closed" && followed.delete(task.id)) {
+        post(closedLine(task))
+      }
+    }
+  }).pipe(
+    Effect.catchTag("ChatToolError", (error) =>
+      Effect.sync(() => {
+        if (error.message !== unreadBecause) {
+          unreadBecause = error.message
+          post("orc chat cannot read the backlog to follow " + [...followed].join(", ") + ": " + error.message)
+        }
+      })
+    )
+  )
+  return { tools, postClosed: () => Effect.runPromise(postClosed) }
+}
 
-export const chatToolNames: ReadonlyArray<string> = chatTools({}).map((tool) => tool.name)
+export const chatToolNames: ReadonlyArray<string> = chatSession({}, () => undefined).tools.map((tool) => tool.name)
 
-export default function registerChatTools(pi: ChatToolHost): void {
-  for (const tool of chatTools(process.env)) {
+export default function registerChatTools(pi: ChatHost): void {
+  const session = chatSession(process.env, (text) => pi.sendMessage({ customType: "orc-task-closed", content: text, display: true }))
+  for (const tool of session.tools) {
     pi.registerTool(tool)
   }
+  let poll: ReturnType<typeof setInterval> | undefined
+  pi.on("session_start", () => {
+    // An unreferenced timer never keeps Pi running after its session ends.
+    poll ??= setInterval(() => void session.postClosed(), closedPollMillis).unref()
+  })
+  pi.on("session_shutdown", () => {
+    clearInterval(poll)
+    poll = undefined
+  })
 }
