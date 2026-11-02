@@ -8,7 +8,8 @@ A run takes one task from `orc run` and a task file.
 It makes an isolated copy of the project on a new branch.
 By default it runs the Pi agent inside a nono sandbox, then runs the project's checks.
 With `--sandbox none` it runs Pi and the checks directly on the host.
-It hands the branch to no-mistakes, which reviews it, pushes it and opens a PR on a provider it supports, such as GitHub.
+A `no-mistakes` run hands the branch to no-mistakes, which reviews it, pushes it and opens a PR on a provider it supports, such as GitHub.
+A `direct-PR` run pushes the branch and opens the PR itself, as [Delivery modes](#delivery-modes) shows.
 You read the PR and merge it, since orc never merges.
 [The backlog and the beat](#the-backlog-and-the-beat), [Adding tasks from a chat](#adding-tasks-from-a-chat) and [The runner](#the-runner) describe the path a task takes to its run.
 
@@ -19,7 +20,7 @@ You read the PR and merge it, since orc never merges.
 - nono from https://nono.sh, tested on 0.80.0, for the default sandbox.
 - Node, tested on 24.22.1.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with the login, token file or Pi packages each provider in [Configuring providers](#configuring-providers) takes.
-- no-mistakes v1.90.0 or later, tested on v1.100.2, installed as [Installing no-mistakes](#installing-no-mistakes) says.
+- no-mistakes v1.90.0 or later, tested on v1.100.2, installed as [Installing no-mistakes](#installing-no-mistakes) says, for every run except `direct-PR`.
 
 ## Install
 
@@ -73,6 +74,7 @@ An unknown flag prints the usage text and exits 1.
 ## Running a task
 
 A `ship` run is the default kind.
+To open its pull request without no-mistakes, add `--delivery direct-PR`, as [Delivery modes](#delivery-modes) shows.
 To run one, enter a clean git checkout of the target project and run `orc run <task-file>`.
 For a `scout` or `task` report instead, add `--kind scout` or `--kind task` with `--sandbox none`, as [Task kinds](#task-kinds) shows.
 Before the first ship task, add a `.no-mistakes.yaml` file to the target project root with at least one named check under `commands`.
@@ -91,7 +93,7 @@ To resume a direct-PR run, add `--delivery direct-PR` to that resume command, an
 Resume takes the sandbox the earlier run recorded, so a no-sandbox run resumes without a sandbox with no flag.
 Orc refuses a resume whose `--sandbox` names another kind than the one recorded.
 A run recorded before orc stored the sandbox takes it from the flag, with nono as the default.
-On resume Sandcastle reuses the branch worktree, Pi resumes its prior session, and orc reattaches to no-mistakes with the same intent.
+On resume Sandcastle reuses the branch worktree and Pi resumes its prior session, and a `no-mistakes` run reattaches to no-mistakes with the same intent.
 After a refusal, run the same resume command with `--allow` and the name from the report, or with `--answer` and your answer for a question.
 No-mistakes takes the word for that `--allow` kind, and the answer for that question.
 Orc also refuses a checkout whose own git config sets any key outside a short list known to run no program.
@@ -100,9 +102,9 @@ Orc trims padding around each name and drops blank entries.
 Orc checks each marker in the project directory and its parent and refuses a checkout carrying one.
 An unset `ORC_REFUSE_MARKERS` names no marker and refuses no checkout for a marker.
 
-The default sandbox run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
+The default sandbox run needs `git`, `nono`, `pi` and `node` on the host PATH, and a run except `direct-PR` needs `no-mistakes` there too.
 With `--sandbox none` the run needs the same tools except `nono`.
-Orc runs `no-mistakes --version` before the sandbox starts and refuses a release older than v1.90.0.
+For every run except `direct-PR`, orc runs `no-mistakes --version` before the sandbox starts and refuses a release older than v1.90.0.
 On a provider that takes a Pi login, the run also needs that login in Pi, which `pi auth check --provider <id>` confirms.
 With the default sandbox, orc reads that login through Pi on the host and hands it to the sandbox.
 nono reads it with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE` and `TERM` set, and orc's check runs the same way.
@@ -131,21 +133,23 @@ That refusal applies to both sandboxes.
 With `--sandbox none` on a Pi login provider, Pi reads your Pi config, compaction included, so the fixed mark does not apply.
 On a token file or package provider Pi reads the run's own Pi folder, so the mark applies there too.
 
-Once the checks pass, orc runs `no-mistakes axi run` on the branch with the task as its intent.
+Once the checks pass, a `no-mistakes` run runs `no-mistakes axi run` on the branch with the task as its intent.
+A `direct-PR` run pushes the branch and opens the PR instead, as [Delivery modes](#delivery-modes) shows.
 At each gate orc asks no-mistakes to fix the findings marked `auto-fix`, ignores those marked `no-op`, and accepts the fix review.
 Orc refuses a no-mistakes gate holding an open review question without an `--answer` for that question.
 Rerun with `--answer question-<id>="<text>"` and orc answers every open question before any gate response.
 Orc refuses a no-mistakes gate holding an `ask-user` finding without `--allow ask-user`.
 Orc leaves that no-mistakes gate parked for you to answer.
 
-Orc records the run as succeeded only when four facts hold.
+Orc records a `no-mistakes` run as succeeded only when four facts hold.
 Pi's final reply in its captured session stopped cleanly with `ORC_COMPLETE` on its own line.
 The branch holds at least one new commit.
 The project's checks pass.
 no-mistakes opened the PR and reported CI green.
+A `direct-PR` run succeeds once the first three facts hold and its pull request opens, as [Delivery modes](#delivery-modes) shows.
 Otherwise orc records the run as failed with the reason and exits 1.
 Each run keeps its task, evidence, agent log and Pi session in `$ORC_HOME/runs/<run-id>`, default `~/.orc/runs/<run-id>` when `ORC_HOME` is unset or empty.
-Its `no-mistakes.txt` and the run history hold the no-mistakes findings, their count, the gates orc answered, the final result and the PR link.
+On a `no-mistakes` run, its `no-mistakes.txt` and the run history hold the no-mistakes findings, their count, the gates orc answered, the final result and the PR link.
 They also name the reviewer that served the review, as `axi status` gives it in `reviewer_agent`, or say no-mistakes named none.
 Its `report.md` carries the task, the branch, the status, the PR, the steps, the evidence, the signals, the findings and the result.
 The terminal report names the run folder, the agent file, the session file and the report as full links, beside the PR link.

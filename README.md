@@ -10,7 +10,7 @@ A terminal dashboard shows every machine, queue and account at a glance.
 - **Every kind of task.** Code changes, investigations, reports and chores on a named machine, each ending in what it needs.
 - **Runs where there is room.** `orc beat` places each task on a machine with a free slot and an account with quota left.
 - **Asks only when it must.** A task that needs your call waits with its question, and your answer starts it again.
-- **Reviewed before you see it.** A code change passes your checks and a no-mistakes review, and lands as a pull request on a provider no-mistakes supports.
+- **Reviewed before you see it.** A code change passes your checks and lands as a pull request after the review [Pick a delivery mode](#pick-a-delivery-mode) names.
 - **Never loses work.** The backlog, the run history and the queues live on disk, so a restart picks up where it stopped.
 - **See it all.** `tui-dash` shows quota, machines, queues, tasks and alerts in one terminal screen.
 
@@ -20,7 +20,7 @@ A terminal dashboard shows every machine, queue and account at a glance.
 - Git.
 - Node, which the agent runs on.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, logged in to a model provider.
-- no-mistakes, installed as [Installing no-mistakes](packages/run/README.md#installing-no-mistakes) says.
+- no-mistakes, installed as [Installing no-mistakes](packages/run/README.md#installing-no-mistakes) says, for every run except `direct-PR`.
 - pueue, to queue runs on each machine.
 
 ## Install
@@ -55,7 +55,7 @@ commands:
   test: bun test
 ```
 
-Orc prints the branch, its commits, the checks, the review and the PR link when its run opened one.
+Orc prints the branch, its commits, the checks, the PR link when its run opened one, and the review on a `no-mistakes` run.
 `--sandbox none` runs the agent on the host as your user.
 With nono from https://nono.sh installed, drop the flag and the run works inside the nono sandbox.
 
@@ -77,7 +77,7 @@ The post carries the PR, or the report for a scout or task.
 
 Each task has a kind, and the kind decides how its run ends:
 
-- `ship`, the default, changes code and ends in a pull request through the checks and no-mistakes.
+- `ship`, the default, changes code and ends in a pull request through the checks and the delivery [Pick a delivery mode](#pick-a-delivery-mode) names.
 - `scout` reads the checkout, changes nothing and ends in a report.
 - `task` does the work it describes and ends in a report with its evidence.
 
@@ -114,7 +114,7 @@ Orc grows toward the full orchestrator one step at a time.
 | --- | --- |
 | Chat and backlog as the front door | Ships today |
 | Runs placed by free slot and account quota, across machines | Ships today |
-| Code changes through checks and no-mistakes review into a pull request | Ships today |
+| Code changes through checks and review into a pull request | Ships today |
 | Terminal dashboard with quota, machines, queues, tasks and alerts | Ships today |
 | Orchestrator rules the chat follows | Next |
 | The chat posts every close, after a restart too | Next |

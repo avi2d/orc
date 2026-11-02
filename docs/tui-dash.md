@@ -414,7 +414,7 @@ A task whose `kind` is one of these walks a row of stages.
 | `quick fix` | build, PR, CI, merge, and your rebuild when its detail or a branch says rebuild |
 | `local only` | build, ready branch, your approval, land locally |
 | `scout` | investigate, report, your calls, follow-ups filed |
-| `orc run` | take task, isolated copy, agent, checks, fix up to 3 times, no-mistakes PR, report |
+| `orc run` | take task, isolated copy, agent, checks, fix up to 3 times, PR, report |
 
 The row of such a task gains a pipe column with a mark for each stage.
 
