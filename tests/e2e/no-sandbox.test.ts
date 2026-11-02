@@ -156,7 +156,8 @@ const filesHolding = async (dirs: ReadonlyArray<string>, needle: string): Promis
   const holding: Array<string> = []
   for (const dir of dirs) {
     for (const file of await filesUnder(dir)) {
-      if ((await readFile(file)).includes(needle)) {
+      const body = await readFile(file).catch(() => null)
+      if (body !== null && body.includes(needle)) {
         holding.push(file)
       }
     }
