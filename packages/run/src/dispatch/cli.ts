@@ -4,6 +4,7 @@ import type { DispatchArgs, TaskSource } from "./args"
 import { addTask, backlogPaths, BacklogError, closeStartedTask, holdTask, isTaskId, listTasks, markPosted } from "./backlog"
 import { answerTask } from "./parked"
 import { readRoom, runBeat } from "./beat"
+import { fiveMinuteLoad } from "./load"
 import { backlogJson, type BacklogView, beatJson, formatBeat, formatBoard, type ProjectList, type RoomList } from "./board"
 import type { ConfigError } from "../json-file"
 import { checkoutOn, type DispatchConfig, readDispatchConfig, readProjects } from "./config"
@@ -258,6 +259,10 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       }
       case "RunnerResult": {
         yield* reportResult(args, place)
+        break
+      }
+      case "RunnerLoad": {
+        yield* Console.log(String(fiveMinuteLoad()))
         break
       }
     }

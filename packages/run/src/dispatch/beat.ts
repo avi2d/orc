@@ -11,7 +11,9 @@ import type { Claim, TaskFileError, TaskRecord } from "./task-record"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
 import { taskLabel } from "./pueue-status"
 import { endingFromResult, type RunEnding, readResult, readResultThrough } from "./runner-result"
-import { type Command, taskBranch } from "./runner"
+import { taskBranch } from "./runner"
+import { loadWait, readMachineLoad, type ReadLoad } from "./load"
+import { ownedBySweep, throughFor } from "./machine-reach"
 
 export type { MachineRoom } from "./beat-place"
 export { dependencyOpen, placeTask, readRoom } from "./beat-place"
@@ -152,6 +154,7 @@ interface BeatContext {
   readonly tasks: ReadonlyArray<TaskRecord>
   readonly account: Account | null
   readonly live: Array<{ readonly machine: string; readonly slots: number; busy: number }>
+  readonly overloaded: ReadonlyMap<string, string>
   readonly tokens: TokenCache
 }
 
@@ -210,7 +213,7 @@ const considerTask = (
     if (waiting !== null) {
       return waits(waiting)
     }
-    const placement = placeTask(task, context.config, context.projects, context.live)
+    const placement = placeTask(task, context.config, context.projects, context.live, context.overloaded)
     if (placement.kind === "waits") {
       return waits(placement.reason)
     }
@@ -244,25 +247,6 @@ const considerTask = (
 const renewSeconds = 30
 
 const closeSeconds = 30
-
-// The sweep closes only runs its own start command queued, so a custom start keeps owning its tasks.
-const ownedBySweep = (machine: Machine): boolean =>
-  machine.start.some((word, index) => word === "runner" && machine.start[index + 1] === "start")
-
-const throughOf = (values: ReadonlyArray<string>): Command | null => {
-  const cut = values.indexOf("--")
-  if (cut === -1) {
-    return null
-  }
-  const rest = values.slice(cut + 1)
-  const [first = "", ...others] = rest
-  if (first === "") {
-    return null
-  }
-  return [first, ...others]
-}
-
-const throughFor = (machine: Machine): Command | null => ownedBySweep(machine) ? throughOf(machine.start) : null
 
 const sendRenewal = (renew: Machine["renew"] & {}, stdin: string): Effect.Effect<string | null, never, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
@@ -357,9 +341,21 @@ const closeFinished = (
     return outcome.ending === null ? Option.none() : yield* endTask(context.root, task, claim.machine, outcome.ending)
   })
 
+const readOverloaded = (machines: ReadonlyArray<Machine>, readLoad: ReadLoad): Effect.Effect<ReadonlyMap<string, string>, never, ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.forEach(machines, (machine) => {
+    const limit = machine.loadLimit
+    return limit === undefined
+      ? Effect.succeed([])
+      : readLoad(machine).pipe(Effect.map((reading) => {
+        const wait = loadWait(machine, limit, reading)
+        return wait === null ? [] : [[machine.name, wait] as const]
+      }))
+  }).pipe(Effect.map((entries) => new Map(entries.flat())))
+
 export const runBeat = (
   root: string,
-  home: string
+  home: string,
+  readLoad: ReadLoad = readMachineLoad
 ): Effect.Effect<BeatReport, BacklogError | ConfigError | TaskFileError, BeatRequirements> =>
   Effect.gen(function*() {
     const paths = backlogPaths(root)
@@ -380,6 +376,7 @@ export const runBeat = (
       tasks,
       account: quota.kind === "read" ? (config.quota.accounts.find((account) => account.name === quota.pick) ?? null) : null,
       live: room.map((entry) => ({ ...entry })),
+      overloaded: new Map(),
       tokens: new Map()
     }
     const closings = yield* Effect.forEach(tasks.filter((task) => task.state.kind === "started"), (task) => closeFinished(context, task))
@@ -393,8 +390,10 @@ export const runBeat = (
       }
     }
     const current = yield* listTasks(root)
-    const fresh: BeatContext = { ...context, tasks: current }
+    const queued = current.filter((task) => task.state.kind === "new")
+    const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, readLoad)
+    const fresh: BeatContext = { ...context, tasks: current, overloaded }
     const renewals = yield* Effect.forEach(current, (task) => renewTask(fresh, task))
-    const actions = yield* Effect.forEach(current.filter((task) => task.state.kind === "new"), (task) => considerTask(fresh, task))
+    const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, task))
     return { beat, at, quota, room: readRoom(config.machines, current), actions: [...closed, ...renewals.flatMap(Option.toArray), ...actions] }
   })

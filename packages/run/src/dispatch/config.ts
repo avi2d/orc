@@ -2,6 +2,7 @@ import { Effect, type FileSystem, Schema } from "effect"
 import { AbsolutePath, ConfigError, duplicateOf, readJsonFile } from "../json-file"
 import { ProviderId } from "../orc-config"
 import { type DeliveryMode, isDeliveryMode, unknownMode } from "../delivery"
+import { ownedBySweep } from "./machine-reach"
 
 const namePattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 
@@ -10,13 +11,28 @@ const Name = Schema.String.check(Schema.isPattern(namePattern))
 const Command = Schema.NonEmptyArray(Schema.String.check(Schema.isNonEmpty()))
 export type Command = typeof Command.Type
 
-const Machine = Schema.Struct({
+const RawMachine = Schema.Struct({
   name: Name,
   slots: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   start: Command,
-  renew: Schema.optionalKey(Command)
+  renew: Schema.optionalKey(Command),
+  loadLimit: Schema.optionalKey(Schema.Unknown)
 })
-export type Machine = typeof Machine.Type
+type RawMachine = typeof RawMachine.Type
+export type Machine = Omit<RawMachine, "loadLimit"> & { readonly loadLimit?: number }
+
+const checkedMachine = (machine: RawMachine): Machine | string => {
+  const { loadLimit, ...rest } = machine
+  if (loadLimit === undefined) {
+    return rest
+  }
+  if (typeof loadLimit !== "number" || loadLimit <= 0) {
+    return "the machine " + machine.name + " names the load limit " + JSON.stringify(loadLimit) + ", which is not a number above 0"
+  }
+  return ownedBySweep(rest)
+    ? { ...rest, loadLimit }
+    : "the machine " + machine.name + " names a load limit, but its start does not run orc runner start, which the beat reads its load through"
+}
 
 const TokenFileAccount = Schema.Struct({
   name: Name,
@@ -53,7 +69,7 @@ const tagAccount = (account: RawAccount): Account =>
       : { ...account, kind: "token-command" as const }
 
 const DispatchEnvelope = Schema.Struct({
-  machines: Schema.Array(Machine),
+  machines: Schema.Array(RawMachine),
   quota: Schema.Struct({
     provider: ProviderId,
     command: Command,
@@ -62,7 +78,8 @@ const DispatchEnvelope = Schema.Struct({
   })
 })
 
-export type DispatchConfig = Omit<typeof DispatchEnvelope.Type, "quota"> & {
+export type DispatchConfig = Omit<typeof DispatchEnvelope.Type, "machines" | "quota"> & {
+  readonly machines: ReadonlyArray<Machine>
   readonly quota: Omit<typeof DispatchEnvelope.Type["quota"], "accounts"> & {
     readonly accounts: ReadonlyArray<Account>
   }
@@ -117,6 +134,14 @@ export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, 
         if (machine !== null) {
           return yield* new ConfigError({ file, detail: "the machine " + machine + " is named twice" })
         }
+        const machines: Array<Machine> = []
+        for (const entry of config.machines) {
+          const checked = checkedMachine(entry)
+          if (typeof checked === "string") {
+            return yield* new ConfigError({ file, detail: checked })
+          }
+          machines.push(checked)
+        }
         if (config.quota.accounts.length === 0) {
           return yield* new ConfigError({ file, detail: "the quota names no account" })
         }
@@ -139,7 +164,7 @@ export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, 
         if (single !== undefined && renewed !== undefined) {
           return yield* new ConfigError({ file, detail: "the account " + single.name + " takes kind none and holds no token, so the machine " + renewed.name + " names a renew command it never takes" })
         }
-        return { machines: config.machines, quota: { ...config.quota, accounts } }
+        return { machines, quota: { ...config.quota, accounts } }
       })
     )
   )

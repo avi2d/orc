@@ -335,6 +335,8 @@ It also names the floor of room each account must keep:
 }
 ```
 
+A machine may add `"loadLimit"`, a number above 0, and the beat starts nothing there while `orc runner load` reads its five-minute load above it.
+
 The provider named here is one `config.json` on each machine that runs the tasks defines.
 Each token file path in `dispatch.json` holds on those machines.
 A token command account keeps its token in the runner token folder on each machine instead.
@@ -541,7 +543,8 @@ A project in `projects.json` may add `"yolo": true`, and a project with no `yolo
 Orc refuses any `yolo` other than `true` or `false` with `the project <name> names yolo <value>, which is not true or false`.
 `orc merge` takes `--basis captain-word`, the default, or `--basis yolo-green`.
 The chat merges with `captain-word` only when you said to merge that PR.
-It merges with `yolo-green` when you ask it to merge a yolo project's PR and the PR is green, and orc refuses `yolo-green` for a project without `yolo` true.
+It merges with `yolo-green` when you ask it to merge a yolo project's PR and the PR is green.
+Orc refuses `yolo-green` for a project without `yolo` true.
 Either basis meets every refusal above.
 
 ## Adding tasks from a chat

@@ -43,12 +43,37 @@ type Placement =
   | { readonly kind: "place"; readonly machine: Machine; readonly checkout: string; readonly delivery: RunDelivery }
   | { readonly kind: "waits"; readonly reason: string }
 
+interface Candidate {
+  readonly machine: Machine
+  readonly checkout: string
+}
+
+const roomiest = (
+  candidates: ReadonlyArray<Candidate>,
+  room: ReadonlyArray<MachineRoom>,
+  overloaded: ReadonlyMap<string, string>
+): { readonly best: Candidate | null; readonly loaded: ReadonlyArray<string> } => {
+  let best: (Candidate & { readonly free: number }) | null = null
+  const loaded: Array<string> = []
+  for (const candidate of candidates) {
+    const free = freeRoom(room.find((entry) => entry.machine === candidate.machine.name) ?? { machine: candidate.machine.name, slots: 0, busy: 0 })
+    const load = overloaded.get(candidate.machine.name)
+    if (load === undefined && free > (best?.free ?? 0)) {
+      best = { ...candidate, free }
+    } else if (load !== undefined && free > 0) {
+      loaded.push(load)
+    }
+  }
+  return { best, loaded }
+}
+
 // A task that names a machine is placed there or nowhere, whatever room the other machines have.
 export const placeTask = (
   task: TaskRecord,
   config: DispatchConfig,
   projects: ReadonlyArray<Project>,
-  room: ReadonlyArray<MachineRoom>
+  room: ReadonlyArray<MachineRoom>,
+  overloaded: ReadonlyMap<string, string> = new Map()
 ): Placement => {
   const project = projects.find((candidate) => candidate.name === task.spec.project)
   if (project === undefined) {
@@ -65,12 +90,9 @@ export const placeTask = (
   if (candidates.length === 0) {
     return { kind: "waits", reason: "the project " + project.name + " has no checkout on " + (pinned ?? "any machine") }
   }
-  let best: { readonly machine: Machine; readonly checkout: string; readonly free: number } | null = null
-  for (const candidate of candidates) {
-    const free = freeRoom(room.find((entry) => entry.machine === candidate.machine.name) ?? { machine: candidate.machine.name, slots: 0, busy: 0 })
-    if (free > (best?.free ?? 0)) {
-      best = { ...candidate, free }
-    }
+  const { best, loaded } = roomiest(candidates, room, overloaded)
+  if (best === null && loaded.length > 0) {
+    return { kind: "waits", reason: loaded.join("; ") }
   }
   if (best === null) {
     return { kind: "waits", reason: pinned === null ? "no machine with a checkout of " + project.name + " has room" : pinned + " has no room" }
