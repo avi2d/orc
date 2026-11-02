@@ -1,7 +1,7 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs, TaskSource } from "./args"
-import { addTask, backlogPaths, BacklogError, closeStartedTask, isTaskId, listTasks } from "./backlog"
+import { addTask, backlogPaths, BacklogError, closeStartedTask, isTaskId, listTasks, markPosted } from "./backlog"
 import { readRoom, runBeat } from "./beat"
 import { backlogJson, type BacklogView, beatJson, formatBeat, formatBoard, type ProjectList, type RoomList } from "./board"
 import type { ConfigError } from "../json-file"
@@ -138,6 +138,18 @@ const reportResult = (args: Extract<CommandArgs, { readonly kind: "RunnerResult"
     yield* Console.log(args.json ? JSON.stringify(runnerJson(result)) : formatResult(result))
   })
 
+const closeNow = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, place: DispatchPlace) =>
+  Effect.gen(function*() {
+    yield* closeStartedTask(backlogRoot(place), args.id, args.outcome, args.reason, null, DateTime.formatIso(yield* DateTime.now))
+    return "closed " + args.id + " " + args.outcome
+  })
+
+const markPostedNow = (id: string, place: DispatchPlace) =>
+  Effect.gen(function*() {
+    const marked = yield* markPosted(backlogRoot(place), id, DateTime.formatIso(yield* DateTime.now))
+    return (marked ? "posted " : "already posted ") + id
+  })
+
 const execute = (args: CommandArgs, place: DispatchPlace) =>
   Effect.gen(function*() {
     switch (args.kind) {
@@ -151,9 +163,11 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         break
       }
       case "CloseTask": {
-        const closedAt = DateTime.formatIso(yield* DateTime.now)
-        yield* closeStartedTask(backlogRoot(place), args.id, args.outcome, args.reason, null, closedAt)
-        yield* Console.log("closed " + args.id + " " + args.outcome)
+        yield* Console.log(yield* closeNow(args, place))
+        break
+      }
+      case "MarkPosted": {
+        yield* Console.log(yield* markPostedNow(args.id, place))
         break
       }
       case "Beat": {

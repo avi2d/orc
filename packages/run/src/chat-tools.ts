@@ -28,9 +28,13 @@ export interface ChatSession {
   readonly postClosed: () => Promise<void>
 }
 
+interface SessionStartContext {
+  readonly isIdle: () => boolean
+}
+
 interface ChatHost {
   readonly registerTool: (tool: ChatTool) => void
-  readonly on: (event: "session_start" | "session_shutdown", handler: () => void) => void
+  readonly on: (event: "session_start" | "session_shutdown", handler: (event: string, ctx?: SessionStartContext) => void) => void
   readonly sendMessage: (message: { readonly customType: string; readonly content: string; readonly display: boolean }, options?: { readonly triggerTurn?: boolean }) => void
 }
 
@@ -60,17 +64,18 @@ const ClosedTask = Schema.Struct({
   status: Schema.Literal("closed"),
   outcome: Schema.Literals(["done", "failed", "start-failed"]),
   reason: Schema.String,
-  pr: Schema.NullOr(Schema.String)
+  pr: Schema.NullOr(Schema.String),
+  postedAt: Schema.NullOr(Schema.String)
 })
 type ClosedTask = typeof ClosedTask.Type
 
 const OpenTask = Schema.Struct({ id: Schema.String, status: Schema.Literals(["new", "taken", "started"]) })
+type OpenTask = typeof OpenTask.Type
+type BacklogTask = ClosedTask | OpenTask
 
 const BacklogTasks = Schema.fromJsonString(Schema.Struct({ tasks: Schema.Array(Schema.Union([ClosedTask, OpenTask])) }))
 
 const closedPollMillis = 15_000
-
-const addedTask = /^added (\S+) for /
 
 const runOrc = (env: Env, args: ReadonlyArray<string>, stdin: string | null): Effect.Effect<string, ChatToolError> =>
   Effect.gen(function*() {
@@ -98,18 +103,96 @@ const closedLine = (task: ClosedTask): string =>
   task.id + " " + task.title + " closed " + task.outcome + (task.reason === "" ? "" : ": " + task.reason) +
   (task.pr === null ? ", with no PR" : ", PR " + task.pr)
 
-const followAdded = (followed: Set<string>, line: string): string => {
-  const id = addedTask.exec(line)?.[1]
-  if (id === undefined) {
-    return line + "\norc chat cannot follow this task to its close, as orc named no task id"
-  }
-  followed.add(id)
-  return line
+interface PostState {
+  unreadBecause: string | null
+  readonly delivered: Set<string>
 }
 
-export const chatSession = (env: Env, post: (text: string) => void): ChatSession => {
-  const followed = new Set<string>()
-  let unreadBecause: string | null = null
+type Deliver = (text: string) => boolean
+
+const readBacklog = (env: Env): Effect.Effect<{ readonly tasks: ReadonlyArray<BacklogTask> }, ChatToolError> =>
+  runOrc(env, ["backlog", "--json"], null).pipe(
+    Effect.flatMap((text) =>
+      Schema.decodeEffect(BacklogTasks)(text).pipe(
+        Effect.mapError((error) => new ChatToolError({ message: "orc backlog --json printed no backlog orc chat reads: " + error.message }))
+      )
+    )
+  )
+
+const isUnpostedClosed = (task: BacklogTask, isOpen: () => boolean): task is ClosedTask =>
+  task.status === "closed" && task.postedAt === null && isOpen()
+
+const deliverOnce = (state: PostState, deliver: Deliver, task: ClosedTask): void => {
+  if (!state.delivered.has(task.id)) {
+    deliver(closedLine(task))
+    state.delivered.add(task.id)
+  }
+}
+
+const markOne = (env: Env, taskId: string): Effect.Effect<true | string> =>
+  runOrc(env, ["backlog", "posted", taskId], null).pipe(
+    Effect.as<true>(true),
+    Effect.catchTag("ChatToolError", (error) => Effect.succeed(error.message))
+  )
+
+const postTask = (env: Env, state: PostState, deliver: Deliver, task: ClosedTask): Effect.Effect<string | null> =>
+  Effect.gen(function*() {
+    deliverOnce(state, deliver, task)
+    const marked = yield* markOne(env, task.id)
+    if (typeof marked === "string") {
+      return marked
+    }
+    state.delivered.delete(task.id)
+    return null
+  })
+
+const reportMarks = (state: PostState, deliver: Deliver, markProblem: string | null): Effect.Effect<void> =>
+  Effect.sync(() => {
+    if (markProblem === null) {
+      state.unreadBecause = null
+      return
+    }
+    if (state.unreadBecause !== null) {
+      state.unreadBecause = markProblem
+      return
+    }
+    if (deliver("orc chat cannot post the closed tasks: " + markProblem)) {
+      state.unreadBecause = markProblem
+    }
+  })
+
+const reportReadError = (state: PostState, deliver: Deliver, error: ChatToolError): Effect.Effect<void> =>
+  Effect.sync(() => {
+    if (error.message !== state.unreadBecause) {
+      if (deliver("orc chat cannot post the closed tasks: " + error.message)) {
+        state.unreadBecause = error.message
+      }
+    }
+  })
+
+const postUnposted = (env: Env, isOpen: () => boolean, deliver: Deliver, state: PostState): Effect.Effect<void> =>
+  Effect.gen(function*() {
+    const backlog = yield* readBacklog(env)
+    let markProblem: string | null = null
+    for (const task of backlog.tasks) {
+      if (!isUnpostedClosed(task, isOpen)) {
+        continue
+      }
+      const problem = yield* postTask(env, state, deliver, task)
+      markProblem ??= problem
+    }
+    yield* reportMarks(state, deliver, markProblem)
+  }).pipe(Effect.catchTag("ChatToolError", (error) => reportReadError(state, deliver, error)))
+
+export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string) => void): ChatSession => {
+  const state: PostState = { unreadBecause: null, delivered: new Set<string>() }
+  const deliver = (text: string): boolean => {
+    if (isOpen()) {
+      post(text)
+      return true
+    }
+    return false
+  }
   const tools: ReadonlyArray<ChatTool> = [
     {
       name: "orc_backlog_add",
@@ -130,7 +213,7 @@ export const chatSession = (env: Env, post: (text: string) => void): ChatSession
                 ...(input.dependsOn ?? []).flatMap((id) => ["--depends-on", id])
               ], input.task)
             ),
-            Effect.map((line) => textResult(followAdded(followed, line)))
+            Effect.map(textResult)
           )
         )
     },
@@ -142,61 +225,55 @@ export const chatSession = (env: Env, post: (text: string) => void): ChatSession
       execute: () => Effect.runPromise(runOrc(env, ["backlog", "--json"], null).pipe(Effect.map(textResult)))
     }
   ]
-  const postClosed = Effect.gen(function*() {
-    if (followed.size === 0) {
-      return
-    }
-    const backlog = yield* runOrc(env, ["backlog", "--json"], null).pipe(
-      Effect.flatMap((text) =>
-        Schema.decodeEffect(BacklogTasks)(text).pipe(
-          Effect.mapError((error) => new ChatToolError({ message: "orc backlog --json printed no backlog orc chat reads: " + error.message }))
-        )
-      )
-    )
-    unreadBecause = null
-    for (const task of backlog.tasks) {
-      // Two polls can overlap, so only the one that still follows the task posts it.
-      if (task.status === "closed" && followed.delete(task.id)) {
-        post(closedLine(task))
-      }
-    }
-  }).pipe(
-    Effect.catchTag("ChatToolError", (error) =>
-      Effect.sync(() => {
-        if (error.message !== unreadBecause) {
-          unreadBecause = error.message
-          post("orc chat cannot read the backlog to follow " + [...followed].join(", ") + ": " + error.message)
-        }
-      })
-    )
-  )
+  const postClosed = postUnposted(env, isOpen, deliver, state)
   return { tools, postClosed: () => Effect.runPromise(postClosed) }
 }
 
-export const chatToolNames: ReadonlyArray<string> = chatSession({}, () => undefined).tools.map((tool) => tool.name)
+export const chatToolNames: ReadonlyArray<string> = chatSession({}, () => false, () => undefined).tools.map((tool) => tool.name)
 
 export const chatExtension = (env: Env, pollMillis: number) => (pi: ChatHost): void => {
-  let stopped = false
-  const session = chatSession(env, (text) => {
-    if (!stopped) {
-      pi.sendMessage({ customType: "orc-task-closed", content: text, display: true }, { triggerTurn: false })
-    }
+  let stopped = true
+  let idle: (() => boolean) | null = null
+  const session = chatSession(env, () => !stopped && (idle?.() ?? false), (text) => {
+    pi.sendMessage({ customType: "orc-task-closed", content: text, display: true }, { triggerTurn: false })
   })
   for (const tool of session.tools) {
     pi.registerTool(tool)
   }
   let poll: ReturnType<typeof setInterval> | undefined
-  pi.on("session_start", () => {
+  let current: Promise<void> | null = null
+  pi.on("session_start", (_event, ctx) => {
     stopped = false
+    idle = ctx?.isIdle ?? null
+    const postClosed = () => {
+      if (current !== null) {
+        return
+      }
+      const run = session.postClosed()
+      current = run
+      run.then(() => {
+        if (current === run) {
+          current = null
+        }
+      }, () => {
+        if (current === run) {
+          current = null
+        }
+      })
+    }
+    postClosed()
     // An unreferenced timer never keeps Pi running after its session ends.
-    poll ??= setInterval(() => {
-      session.postClosed().catch(() => undefined)
-    }, pollMillis).unref()
+    poll ??= setInterval(postClosed, pollMillis).unref()
   })
   pi.on("session_shutdown", () => {
     stopped = true
+    idle = null
     clearInterval(poll)
     poll = undefined
+    const running = current
+    if (running !== null) {
+      void running.catch(() => undefined)
+    }
   })
 }
 
