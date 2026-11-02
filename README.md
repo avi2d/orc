@@ -69,8 +69,22 @@ To hand orc a stream of work:
 1. Run `orc beat` from cron or launchd every few minutes.
 1. Run `orc backlog` to see each task new, taken or closed.
 
-The chat posts each task it added since it started once the task closes, with its outcome, its reason and its PR when its run opened one.
+The chat posts each task it added since it started once the task closes, with its outcome, its reason and its PR, or its report for a scout or task.
 [The backlog and the beat](packages/run/README.md#the-backlog-and-the-beat) shows both files and every option.
+
+## Pick a task kind
+
+Each task has a kind, and the kind decides how its run ends:
+
+- `ship`, the default, changes code and ends in a pull request through the checks and no-mistakes.
+- `scout` reads the checkout, changes nothing and ends in a report.
+- `task` does the work it describes and ends in a report with its evidence.
+
+To pick one, add `--kind scout` or `--kind task` to `orc backlog add` or `orc run`, or say it in the chat.
+A scout or task run skips no-mistakes and the pull request.
+Pi works in the run folder and writes `agent-report.md` there.
+The task closes done with the report's path, or closes failed when no report exists.
+To keep a task on one machine, add `--machine <name>`, and it waits for room there instead of starting elsewhere.
 
 ## Open the dashboard
 
@@ -91,7 +105,7 @@ Orc grows toward the full orchestrator one step at a time.
 | The chat posts every close, after a restart too | Next |
 | Decisions held for you with a reason, answered from the chat | Ships today |
 | Runs parked on a question resume on your answer | Ships today |
-| Reports, investigations and machine tasks that end without a pull request | Next |
+| Reports, investigations and machine tasks that end without a pull request | Ships today |
 | Per-project delivery: direct pull request or full review | Next |
 | Merge on your word, refusing red checks | Next |
 | Stalled runs and machine load flagged in the chat | Next |
@@ -100,8 +114,9 @@ Orc grows toward the full orchestrator one step at a time.
 | Per-project instructions the run and the chat both read | Next |
 | A fresh checkout before every run, and follow-ups on upstream changes | Next |
 
-Today a run counts as done once Pi stops cleanly with `ORC_COMPLETE`, the branch holds a new commit, the checks pass and no-mistakes opens a pull request with green CI.
-A task that changes no code closes failed.
+Today a ship run counts as done once Pi stops cleanly with `ORC_COMPLETE`, the branch holds a new commit, the checks pass and no-mistakes opens a pull request with green CI.
+A ship task that changes no code closes failed.
+A scout or task run counts as done once its report exists.
 A queued run from the backlog runs without the nono sandbox.
 
 ## Contribute

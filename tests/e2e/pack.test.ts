@@ -14,10 +14,12 @@ const expectedFiles = [
   "src/agents.ts",
   "src/args.ts",
   "src/bin.ts",
+  "src/chat-closed.ts",
   "src/chat-parked.ts",
   "src/chat-tools.ts",
   "src/chat.ts",
   "src/checks.ts",
+  "src/checkout.ts",
   "src/context-mark.ts",
   "src/dispatch/args.ts",
   "src/dispatch/backlog-write.ts",
@@ -51,6 +53,7 @@ const expectedFiles = [
   "src/nono.ts",
   "src/orc-config.ts",
   "src/pi.ts",
+  "src/report-run.ts",
   "src/report.ts",
   "src/run-history.ts",
   "src/run-loop.ts",
@@ -61,6 +64,7 @@ const expectedFiles = [
   "src/run.ts",
   "src/sandbox-plan.ts",
   "src/show.ts",
+  "src/task-kind.ts",
   "src/toon.ts"
 ]
 

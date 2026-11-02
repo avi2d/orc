@@ -30,6 +30,7 @@ export type BeatAction =
     readonly outcome: "done" | "failed"
     readonly reason: string
     readonly pr: string | null
+    readonly report: string | null
   }
   | { readonly kind: "close-failed"; readonly task: string; readonly machine: string; readonly reason: string }
   | { readonly kind: "parked"; readonly task: string; readonly machine: string; readonly branch: string; readonly questions: ReadonlyArray<string> }
@@ -314,12 +315,12 @@ const endTask = (
         ? Option.none()
         : Option.some({ kind: "parked", task: id, machine, branch, questions: ending.questions.map((question) => question.id) } satisfies BeatAction)
     }
-    const closed = yield* closeStartedTask(root, id, ending.outcome, ending.reason, ending.pr, yield* nowIso).pipe(
+    const closed = yield* closeStartedTask(root, id, ending.outcome, ending.reason, { pr: ending.pr, report: ending.report }, yield* nowIso).pipe(
       Effect.catchTag("BacklogError", () => Effect.succeed(null))
     )
     return closed === null
       ? Option.none()
-      : Option.some({ kind: "closed", task: id, machine, outcome: ending.outcome, reason: ending.reason, pr: ending.pr } satisfies BeatAction)
+      : Option.some({ kind: "closed", task: id, machine, outcome: ending.outcome, reason: ending.reason, pr: ending.pr, report: ending.report } satisfies BeatAction)
   })
 
 // A finished run ends its task here, because no other beat step reads a started task after its run ends.
@@ -338,7 +339,7 @@ const closeFinished = (
       return Option.none()
     }
     const through = throughFor(machine)
-    const read = (through === null ? readResult(task.spec.id, context.home, label) : readResultThrough(through, task.spec.id, label)).pipe(Effect.map(endingFromResult))
+    const read = (through === null ? readResult(task.spec.id, context.home, label) : readResultThrough(through, task.spec.id, label)).pipe(Effect.map((result) => endingFromResult(result, task.spec.kind)))
     const outcome = yield* read.pipe(
       Effect.map((ending) => ({ kind: "read" as const, ending })),
       Effect.catchTag("RunnerError", (error) => Effect.succeed({ kind: "unread" as const, reason: error.detail })),

@@ -201,7 +201,7 @@ export const closeStartedTask = (
   id: string,
   outcome: "done" | "failed",
   reason: string,
-  pr: string | null,
+  delivered: { readonly pr: string | null; readonly report: string | null },
   closedAt: string
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
@@ -214,7 +214,7 @@ export const closeStartedTask = (
     }
     const closed: TaskRecord = {
       ...record,
-      state: { kind: "closed", claim: record.state.claim, closing: { outcome, started: record.state.started, reason, pr }, closedAt, postedAt: null }
+      state: { kind: "closed", claim: record.state.claim, closing: { outcome, started: record.state.started, reason, ...delivered }, closedAt, postedAt: null }
     }
     if (!(yield* publishClosed(root, closed))) {
       return yield* new BacklogError({ detail: id + " was closed by another command" })

@@ -1,4 +1,5 @@
 import { Array as Arr, Data, Effect, Schema } from "effect"
+import { isTaskKind, type TaskKind, unknownKind } from "../task-kind"
 
 export const taskFolders = ["new", "taken", "closed"] as const
 export type TaskFolder = typeof taskFolders[number]
@@ -7,6 +8,7 @@ export interface TaskSpec {
   readonly id: string
   readonly title: string
   readonly project: string
+  readonly kind: TaskKind
   readonly machine: string | null
   readonly dependsOn: ReadonlyArray<string>
   readonly created: string
@@ -49,7 +51,7 @@ export interface Parked {
 
 type Closing =
   | { readonly outcome: "start-failed"; readonly reason: string }
-  | { readonly outcome: "done" | "failed"; readonly started: Started; readonly reason: string; readonly pr: string | null }
+  | { readonly outcome: "done" | "failed"; readonly started: Started; readonly reason: string; readonly pr: string | null; readonly report: string | null }
 
 type TaskState =
   | { readonly kind: "new" }
@@ -97,6 +99,7 @@ const Frontmatter = Schema.Struct({
   id: Schema.String,
   title: Schema.String,
   project: Schema.String,
+  kind: Schema.optional(Schema.String),
   machine: Schema.NullOr(Schema.String),
   depends_on: Schema.Array(Schema.String),
   created: Schema.String,
@@ -121,6 +124,7 @@ const Frontmatter = Schema.Struct({
   closed_at: Schema.optional(Schema.String),
   reason: Schema.optional(Schema.String),
   pr: Schema.optional(Schema.String),
+  report: Schema.optional(Schema.String),
   posted_at: Schema.optional(Schema.String)
 })
 type Frontmatter = typeof Frontmatter.Type
@@ -140,7 +144,7 @@ const closingOf = (front: Frontmatter, started: Started | null): Closing | null 
   if (front.outcome === "start-failed") {
     return { outcome: "start-failed", reason }
   }
-  return front.outcome === undefined || started === null ? null : { outcome: front.outcome, started, reason, pr: front.pr ?? null }
+  return front.outcome === undefined || started === null ? null : { outcome: front.outcome, started, reason, pr: front.pr ?? null, report: front.report ?? null }
 }
 
 const answerOf = (front: { readonly answer?: string | undefined; readonly answered_at?: string | undefined }): Answer | null | string => {
@@ -231,6 +235,10 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     const front = yield* Schema.decodeUnknownEffect(Frontmatter)(raw).pipe(
       Effect.mapError((error) => new TaskFileError({ file, detail: error.message }))
     )
+    const kind = front.kind ?? "ship"
+    if (!isTaskKind(kind)) {
+      return yield* new TaskFileError({ file, detail: unknownKind(kind) })
+    }
     const stem = file.split("/").at(-1)?.replace(/\.md$/, "")
     if (front.id !== stem) {
       return yield* new TaskFileError({ file, detail: "the frontmatter id " + front.id + " is not the file " + (stem ?? file) })
@@ -258,6 +266,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
         id: front.id,
         title: front.title,
         project: front.project,
+        kind,
         machine: front.machine,
         dependsOn: front.depends_on,
         created: front.created,
@@ -313,7 +322,13 @@ const stateFields = (state: TaskState): ReadonlyArray<string> => {
     case "closed": {
       const ran = state.closing.outcome === "start-failed"
         ? { started: [], pr: [] }
-        : { started: startedFields(state.closing.started), pr: state.closing.pr === null ? [] : [field("pr", state.closing.pr)] }
+        : {
+          started: startedFields(state.closing.started),
+          pr: [
+            ...(state.closing.pr === null ? [] : [field("pr", state.closing.pr)]),
+            ...(state.closing.report === null ? [] : [field("report", state.closing.report)])
+          ]
+        }
       return [
         ...claimFields(state.claim),
         ...ran.started,
@@ -333,6 +348,7 @@ export const renderTaskFile = (record: TaskRecord): string =>
     field("id", record.spec.id),
     field("title", record.spec.title),
     field("project", record.spec.project),
+    field("kind", record.spec.kind),
     field("machine", record.spec.machine),
     field("depends_on", record.spec.dependsOn),
     field("created", record.spec.created),

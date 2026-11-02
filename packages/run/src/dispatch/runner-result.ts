@@ -3,6 +3,8 @@ import type { ChildProcessSpawner } from "effect/process"
 import { openQuestionsForRun, runsForBranch } from "../history-resume"
 import type { OpenQuestion } from "../no-mistakes-gate"
 import { formatHistoryError, openDatabase, type RunRecord, RunStatusSchema } from "../run-history"
+import { writtenReport } from "../report-run"
+import { runDirFor, type TaskKind } from "../task-kind"
 import { TaskId } from "./backlog"
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
 import { LabelArg } from "./token"
@@ -15,7 +17,8 @@ const RunSummary = Schema.Struct({
   status: RunStatusSchema,
   prLink: Schema.NullOr(Schema.String),
   endReason: Schema.NullOr(Schema.String),
-  openQuestions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String }))
+  openQuestions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String })),
+  report: Schema.optional(Schema.String)
 })
 type RunSummary = typeof RunSummary.Type
 
@@ -57,13 +60,27 @@ const failureReason = (result: typeof PueueResult.Type): string | null => {
 }
 
 export type RunEnding =
-  | { readonly kind: "close"; readonly outcome: "done" | "failed"; readonly reason: string; readonly pr: string | null }
+  | { readonly kind: "close"; readonly outcome: "done" | "failed"; readonly reason: string; readonly pr: string | null; readonly report: string | null }
   | { readonly kind: "park"; readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion> }
 
+type FinishedResult = Extract<RunnerResult, { readonly status: "succeeded" | "failed" }>
+
+const reportEnding = (result: FinishedResult): RunEnding => {
+  const report = result.run?.report ?? null
+  if (report !== null) {
+    return { kind: "close", outcome: "done", reason: "the run wrote its report", pr: null, report }
+  }
+  const why = result.status === "failed" ? result.reason : result.run?.endReason ?? "pueue task " + result.pueueTask + " succeeded"
+  return { kind: "close", outcome: "failed", reason: "the run wrote no report: " + why, pr: null, report: null }
+}
+
 // The beat ends a started task from this, so its done and failed match what runner result reports.
-export const endingFromResult = (result: RunnerResult): RunEnding | null => {
+export const endingFromResult = (result: RunnerResult, kind: TaskKind): RunEnding | null => {
+  if (kind !== "ship" && (result.status === "succeeded" || result.status === "failed")) {
+    return reportEnding(result)
+  }
   if (result.status === "succeeded") {
-    return { kind: "close", outcome: "done", reason: "pueue task " + result.pueueTask + " succeeded", pr: result.run?.prLink ?? null }
+    return { kind: "close", outcome: "done", reason: "pueue task " + result.pueueTask + " succeeded", pr: result.run?.prLink ?? null, report: null }
   }
   if (result.status !== "failed") {
     return null
@@ -71,7 +88,7 @@ export const endingFromResult = (result: RunnerResult): RunEnding | null => {
   const questions = result.run?.openQuestions ?? []
   return Arr.isReadonlyArrayNonEmpty(questions)
     ? { kind: "park", questions }
-    : { kind: "close", outcome: "failed", reason: result.reason, pr: result.run?.prLink ?? null }
+    : { kind: "close", outcome: "failed", reason: result.reason, pr: result.run?.prLink ?? null, report: null }
 }
 
 interface PueueInterval {
@@ -134,7 +151,14 @@ const assessHeld = (
   return { ...held, status: "Stashed" in status ? "stashed" : "queued" }
 }
 
-const toSummary = (run: RunRecord, openQuestions: ReadonlyArray<OpenQuestion>): RunSummary => ({ id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason, openQuestions })
+const toSummary = (run: RunRecord, openQuestions: ReadonlyArray<OpenQuestion>, report: string | null): RunSummary => ({
+  id: run.id,
+  status: run.status,
+  prLink: run.prLink,
+  endReason: run.endReason,
+  openQuestions,
+  ...(report === null ? {} : { report })
+})
 
 const readRun = (home: string, checkout: string, task: string, interval: PueueInterval | null): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
@@ -145,7 +169,7 @@ const readRun = (home: string, checkout: string, task: string, interval: PueueIn
         Effect.gen(function*() {
           const runs = yield* runsForBranch(db, project, taskBranch(task))
           const run = runs.find((candidate) => interval === null || startsWithin(candidate.started, interval)) ?? null
-          return run === null ? null : toSummary(run, yield* openQuestionsForRun(db, run.id))
+          return run === null ? null : toSummary(run, yield* openQuestionsForRun(db, run.id), yield* writtenReport(runDirFor(home, run.id)))
         }),
       (db) => Effect.sync(() => db.close())
     )
@@ -217,7 +241,8 @@ const headLine = (result: RunnerResult): string => {
 const runLine = (task: string, run: RunSummary | null): string =>
   run === null
     ? "orc holds no run on " + taskBranch(task)
-    : "orc run " + run.id + " " + run.status + (run.prLink === null ? "" : ", PR " + run.prLink) + (run.endReason === null ? "" : ": " + run.endReason)
+    : "orc run " + run.id + " " + run.status + (run.prLink === null ? "" : ", PR " + run.prLink) + (run.report === undefined ? "" : ", report " + run.report) +
+      (run.endReason === null ? "" : ": " + run.endReason)
 
 export const formatResult = (result: RunnerResult): string => {
   if (result.status === "unknown") {
