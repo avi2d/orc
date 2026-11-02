@@ -70,6 +70,7 @@ The panel reads `quota-axi` on the machine it runs on and paints again every 30 
 Two Claude accounts share the Claude brand clay, and Codex and OpenCode Go keep their own colours.
 Each account gets its own block, titled with its account key.
 A provider `quota-axi` reports as not set up gets no block, so the panel shows only the Claude, Codex and OpenCode Go accounts you use.
+When no provider is set up, the panel shows `no provider is set up in quota-axi`.
 An exhaustion projection made early in a window reads muted and marked `early` instead of as a warning.
 Press `q` or Control C to quit.
 

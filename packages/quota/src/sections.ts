@@ -339,7 +339,11 @@ const hiddenLine = (block: QuotaBlock, hidden: ReadonlyArray<QuotaBlock>): Block
   return hidden.includes(block) ? [] : undefined;
 };
 
+// quota-axi drops every provider the user has not set up, so an empty report is a real reading, not a pending one.
+export const noProviderLines: Block = [[span("no provider is set up in quota-axi", "muted")]];
+
 export const reserveQuotaSection = (blocks: ReadonlyArray<QuotaBlock>, width: number, now: DateTime.Utc, savedShown: number): Block => {
+  if (blocks.length === 0) return noProviderLines;
   const { hidden, shown } = splitShown(blocks, savedShown);
   const rows = shown.flatMap((block) => rowsOf(block.body, now));
   const name = widest(rows.map((row) => widthOf(row.name)));
@@ -371,6 +375,7 @@ export const reserveQuotaSection = (blocks: ReadonlyArray<QuotaBlock>, width: nu
 };
 
 export const quotaSection = (blocks: ReadonlyArray<QuotaBlock>, width: number, now: DateTime.Utc, savedShown: number): Block => {
+  if (blocks.length === 0) return noProviderLines;
   const { hidden, shown } = splitShown(blocks, savedShown);
   const shape = rowShape(
     shown.flatMap((block) => rowsOf(block.body, now)),
