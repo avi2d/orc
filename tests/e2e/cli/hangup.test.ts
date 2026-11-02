@@ -17,70 +17,70 @@ const isRunning = (pid: number): boolean => {
   }
 };
 
-const dashboardPids = async (): Promise<ReadonlySet<number>> => {
-  const listing = Bun.spawn(["pgrep", "-xf", `bun ${command}`], { stdout: "pipe", stderr: "ignore" });
-  const out = await new Response(listing.stdout).text();
-  await listing.exited;
-  return new Set(out.split("\n").filter((line) => line !== "").map(Number));
-};
+const settleMs = 30_000;
 
-const dashboardUnder = async (before: ReadonlySet<number>): Promise<number> => {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    for (const pid of await dashboardPids()) {
-      if (!before.has(pid)) return pid;
-    }
+const eventually = async <T>(probe: () => Promise<T | undefined>): Promise<T | undefined> => {
+  const deadline = Date.now() + settleMs;
+  while (Date.now() < deadline) {
+    const found = await probe();
+    if (found !== undefined) return found;
     await Bun.sleep(100);
-  }
-  throw new Error("the dashboard never appeared under its pseudo terminal");
-};
-
-const waitsGone = async (pid: number): Promise<boolean> => {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    if (!isRunning(pid)) return true;
-    await Bun.sleep(100);
-  }
-  return false;
-};
-
-const recordedCode = async (codeFile: string): Promise<string | undefined> => {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
-    try {
-      return await Bun.file(codeFile).text();
-    } catch {
-      await Bun.sleep(100);
-    }
   }
   return undefined;
 };
+
+const readOr = async (path: string, fallback: string): Promise<string> => {
+  try {
+    return await Bun.file(path).text();
+  } catch {
+    return fallback;
+  }
+};
+
+const childrenOf = async (pid: number): Promise<ReadonlyArray<number>> =>
+  (await readOr(`/proc/${pid}/task/${pid}/children`, "")).split(" ").filter((field) => field !== "").map(Number);
+
+// Matching the command line machine-wide picks up dashboards that parallel tests started, so only this terminal's descendants count.
+const dashboardUnder = async (terminal: number): Promise<number | undefined> => {
+  const pending = [...(await childrenOf(terminal))];
+  for (let pid = pending.shift(); pid !== undefined; pid = pending.shift()) {
+    if ((await readOr(`/proc/${pid}/cmdline`, "")) === `bun\0${command}\0`) return pid;
+    pending.push(...(await childrenOf(pid)));
+  }
+  return undefined;
+};
+
+// The renderer writes its setup sequences before the screen watches stdin, so only a painted panel shows the dashboard is up.
+const painted = async (screenFile: string): Promise<true | undefined> =>
+  (await readOr(screenFile, "")).includes("reading the quota") ? true : undefined;
 
 type HangUp = (terminal: Bun.Subprocess, dashboard: number) => Promise<void>;
 
 const exitCodeAfter = async (hangUp: HangUp): Promise<{ readonly gone: boolean; readonly code: string | undefined }> => {
   const home = mkdtempSync(join(tmpdir(), "tui-dash-hangup-e2e-"));
   const codeFile = join(home, "exit-code");
+  const screenFile = join(home, "screen");
+  const terminal = Bun.spawn(
+    ["script", "-qfec", `trap '' HUP; bun '${command}'; echo -n $? > '${codeFile}'`, screenFile],
+    {
+      env: { PATH: process.env["PATH"] ?? "", HOME: home, TERM: process.env["TERM"] ?? "xterm-256color" },
+      stdin: "ignore",
+      stdout: "ignore",
+      stderr: "ignore",
+    },
+  );
+  let dashboard: number | undefined;
   try {
-    const before = await dashboardPids();
-    const terminal = Bun.spawn(
-      ["script", "-qec", `trap '' HUP; bun '${command}'; echo -n $? > '${codeFile}'`, "/dev/null"],
-      {
-        env: { PATH: process.env["PATH"] ?? "", HOME: home, TERM: process.env["TERM"] ?? "xterm-256color" },
-        stdin: "ignore",
-        stdout: "ignore",
-        stderr: "ignore",
-      },
-    );
-    let dashboard: number | undefined;
-    try {
-      dashboard = await dashboardUnder(before);
-      await Bun.sleep(4000);
-      await hangUp(terminal, dashboard);
-      const gone = await waitsGone(dashboard);
-      return { gone, code: await recordedCode(codeFile) };
-    } finally {
-      if (dashboard !== undefined && isRunning(dashboard)) process.kill(dashboard, "SIGKILL");
-      terminal.kill("SIGKILL");
-    }
+    dashboard = await eventually(() => dashboardUnder(terminal.pid));
+    if (dashboard === undefined) throw new Error("the dashboard never appeared under its pseudo terminal");
+    if ((await eventually(() => painted(screenFile))) === undefined) throw new Error("the dashboard never drew to its pseudo terminal");
+    await hangUp(terminal, dashboard);
+    const running = dashboard;
+    const gone = (await eventually(async () => (isRunning(running) ? undefined : true))) === true;
+    return { gone, code: await eventually(async () => readOr(codeFile, "").then((code) => (code === "" ? undefined : code))) };
   } finally {
+    if (dashboard !== undefined && isRunning(dashboard)) process.kill(dashboard, "SIGKILL");
+    terminal.kill("SIGKILL");
     rmSync(home, { recursive: true, force: true });
   }
 };
