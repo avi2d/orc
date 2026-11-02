@@ -434,7 +434,7 @@ The date says when you mean to answer, and a past date releases nothing: the tas
 To answer, run `orc backlog answer <task-id> <words>`.
 The task file keeps your words as `answer` and the time as `answered_at`, and the next beat may start the task.
 The released run reads the task body with the reason and your words added after it.
-Orc refuses to hold a task that is taken, started, closed or parked, and to answer a task that is not held.
+Orc refuses to hold a task that is taken, started, closed or parked, and to answer a task that is neither held nor parked.
 Holding a held task again keeps the first reason.
 `orc backlog` shows a held task as `held (<reason>)`, and `orc backlog --json` gives every task a `hold`, either `null` or the reason, the date and the answer.
 
@@ -448,15 +448,15 @@ On a kind `none` account it is empty, and the beat sends nothing on standard inp
 The beat starts it detached in its own session, never waits for it and never kills it.
 So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
-From then on, each beat closes the finished runs on a machine whose start runs `orc runner start`.
-It reads `orc runner result` on that machine and closes the task done or failed, freeing its slot in the same beat.
+From then on, each beat ends the finished runs on a machine whose start runs `orc runner start`.
+It reads `orc runner result` on that machine and closes the task done or failed, or parks it on your open questions, freeing its slot in the same beat.
 The closed task file keeps the PR link of the orc run on `orc/<task-id>` as `pr`, and `orc backlog --json` carries it as `pr`, or `null` when the run opened none.
 The beat prints `closed <task-id> <done|failed> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds.
 A machine whose start runs any other program keeps owning its tasks, which the beat never reads.
 To close one of those, run `orc backlog close <task-id> <done|failed> [reason]`.
 A missing start command exits 127 into its log and leaves the task started.
 Only a failure to spawn the log wrapper closes the task as `start-failed`.
-To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1` and carries the closes as `closed` and `close-failed` actions.
+To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1` and carries the endings as `closed`, `close-failed` and `parked` actions.
 On a token command account, each beat first sends every started task its account's current token through its machine's `renew` command, as JSON on standard input.
 
 ## Parked runs
