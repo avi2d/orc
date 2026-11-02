@@ -30,6 +30,6 @@ export const AnswerInput = Schema.Struct({
 export const MergeInput = Schema.Struct({
   id: Schema.String.annotate({ description: "The id of the closed task whose PR lands" }),
   basis: Schema.Literals(mergeBases).annotate({
-    description: "captain-word when the captain explicitly said to merge this PR; yolo-green when the task's project has yolo true and the PR is green"
+    description: "captain-word when the captain explicitly said to merge this PR. yolo-green when asked to merge a yolo project's PR and the PR is green"
   })
 })

@@ -64,23 +64,6 @@ describe("task files", () => {
   test("a task file with no internal line reads as unmarked instead of being refused", async () => {
     expect((await run(parseTaskFile("task-1.md", "new", frontmatter("")))).spec.internal).toBe(false)
   })
-  test("a merged task keeps its merge time through a write and a read instead of reading as unmerged", async () => {
-    const record: TaskRecord = {
-      spec: { ...spec, id: "task-4" },
-      hold: null,
-      parked: null,
-      state: {
-        kind: "closed",
-        claim,
-        closing: { outcome: "done", started, reason: "", pr: "https://github.com/acme/orc/pull/8", report: null, mergedAt: "2026-10-27T12:00:00.000Z" },
-        closedAt: "2026-10-27T11:00:00.000Z",
-        postedAt: null
-      }
-    }
-    const text = renderTaskFile(record)
-    expect(text).toContain("merged_at: \"2026-10-27T12:00:00.000Z\"\n")
-    expect(await run(parseTaskFile("task-4.md", "closed", text))).toEqual(record)
-  })
   test("a closed scout keeps its kind and report through a write and a read instead of dropping them", async () => {
     const record: TaskRecord = {
       spec: { ...spec, id: "task-2", kind: "scout" },
@@ -89,7 +72,7 @@ describe("task files", () => {
       state: {
         kind: "closed",
         claim,
-        closing: { outcome: "done", started, reason: "the run wrote its report", pr: null, report: "/runs/run-1/agent-report.md", mergedAt: null },
+        closing: { outcome: "done", started, reason: "the run wrote its report", pr: null, report: "/runs/run-1/agent-report.md" },
         closedAt: "2026-10-27T11:00:00.000Z",
         postedAt: null
       }

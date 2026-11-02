@@ -214,7 +214,7 @@ export const closeStartedTask = (
     }
     const closed: TaskRecord = {
       ...record,
-      state: { kind: "closed", claim: record.state.claim, closing: { outcome, started: record.state.started, reason, ...delivered, mergedAt: null }, closedAt, postedAt: null }
+      state: { kind: "closed", claim: record.state.claim, closing: { outcome, started: record.state.started, reason, ...delivered }, closedAt, postedAt: null }
     }
     if (!(yield* publishClosed(root, closed))) {
       return yield* new BacklogError({ detail: id + " was closed by another command" })
@@ -242,24 +242,18 @@ const readClosed = (root: string, id: string): Effect.Effect<TaskRecord, Backlog
     Effect.filterOrFail((record) => record !== null, () => new BacklogError({ detail: "the backlog holds no closed " + id }))
   )
 
-type ClosedRecord = TaskRecord & { readonly state: Extract<TaskRecord["state"], { readonly kind: "closed" }> }
-
-const rewriteClosed = (
-  root: string,
-  id: string,
-  change: (record: ClosedRecord) => TaskRecord | null
-): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+const writePosted = (root: string, id: string, postedAt: string): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const paths = backlogPaths(root)
     const record = yield* readClosed(root, id)
-    const changed = record.state.kind === "closed" ? change({ ...record, state: record.state }) : null
-    if (changed === null) {
+    if (record.state.kind !== "closed" || record.state.postedAt !== null) {
       return false
     }
+    const posted: TaskRecord = { ...record, state: { ...record.state, postedAt } }
     const file = paths.taskFile("closed", id)
     const scratch = scratchName(paths.folder("closed"), id)
-    yield* fs.writeFileString(scratch, renderTaskFile(changed)).pipe(Effect.mapError(platformFailure("write " + scratch)))
+    yield* fs.writeFileString(scratch, renderTaskFile(posted)).pipe(Effect.mapError(platformFailure("write " + scratch)))
     yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
     return true
   })
@@ -268,20 +262,7 @@ export const markPosted = (
   root: string,
   id: string,
   postedAt: string
-): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  rewriteClosed(root, id, (record) => record.state.postedAt === null ? { ...record, state: { ...record.state, postedAt } } : null)
-
-export const markMerged = (
-  root: string,
-  id: string,
-  mergedAt: string
-): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  rewriteClosed(root, id, (record) => {
-    const closing = record.state.closing
-    return closing.outcome === "start-failed" || closing.mergedAt !== null
-      ? null
-      : { ...record, state: { ...record.state, closing: { ...closing, mergedAt } } }
-  })
+): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> => writePosted(root, id, postedAt)
 
 export type Rewrite<A> = { readonly kind: "write"; readonly record: TaskRecord; readonly result: A } | { readonly kind: "keep"; readonly result: A }
 

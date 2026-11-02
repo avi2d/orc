@@ -92,14 +92,14 @@ describe("the beat closing a scout", () => {
       await mkdir(join(root, "runs", "run-1"), { recursive: true })
       await writeFile(report, "# Findings\n")
       const beat = await beatClosing(root)
-      expect(beat.closing).toEqual({ outcome: "done", started, reason: "the run wrote its report", pr: null, report, mergedAt: null })
+      expect(beat.closing).toEqual({ outcome: "done", started, reason: "the run wrote its report", pr: null, report })
       expect(beat.lines).toEqual(["closed task-1 done on mac: the run wrote its report, report " + report])
     })
   })
   test("a scout whose run wrote no report closes failed even when pueue says it succeeded", async () => {
     await withBacklog(async (root) => {
       await startScout(root)
-      expect((await beatClosing(root)).closing).toEqual({ outcome: "failed", started, reason: "the run wrote no report: pueue task 11 succeeded", pr: null, report: null, mergedAt: null })
+      expect((await beatClosing(root)).closing).toEqual({ outcome: "failed", started, reason: "the run wrote no report: pueue task 11 succeeded", pr: null, report: null })
     })
   })
 })

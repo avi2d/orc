@@ -1,6 +1,6 @@
-import { DateTime, Effect, type FileSystem, Schema } from "effect"
+import { Effect, type FileSystem, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { BacklogError, backlogPaths, findTask, markMerged } from "./backlog"
+import { BacklogError, backlogPaths, findTask } from "./backlog"
 import { isYolo, readDispatchConfig, readProjects } from "./config"
 import type { ConfigError } from "../json-file"
 import { capture, type RunnerError } from "./runner"
@@ -8,6 +8,7 @@ import type { TaskFileError } from "./task-record"
 import type { MergeBasis } from "./merge-basis"
 
 const CheckRun = Schema.Struct({
+  workflowName: Schema.optional(Schema.String),
   name: Schema.String,
   status: Schema.String,
   conclusion: Schema.String,
@@ -39,13 +40,14 @@ const runVerdict = (run: CheckRun): CheckVerdict => {
   return greenConclusions.has(run.conclusion) ? "green" : "red"
 }
 
-// GitHub keeps a cancelled run beside its re-run under one name, so only the newest run of each name speaks for the check.
+// GitHub keeps a cancelled run beside its re-run under one workflow and name, so only the newest run of each workflow and name speaks for the check.
 const newestRuns = (runs: ReadonlyArray<CheckRun>): ReadonlyArray<CheckRun> => {
   const newest = new Map<string, CheckRun>()
   for (const run of runs) {
-    const seen = newest.get(run.name)
+    const key = (run.workflowName ?? "") + "\0" + run.name
+    const seen = newest.get(key)
     if (seen === undefined || run.startedAt > seen.startedAt) {
-      newest.set(run.name, run)
+      newest.set(key, run)
     }
   }
   return [...newest.values()]
@@ -55,7 +57,7 @@ const checkVerdicts = (view: PullRequestView): ReadonlyArray<NamedVerdict> => {
   const runs = view.statusCheckRollup.filter((entry) => "status" in entry)
   const contexts = view.statusCheckRollup.filter((entry) => "context" in entry)
   return [
-    ...newestRuns(runs).map((run) => ({ name: run.name, verdict: runVerdict(run) })),
+    ...newestRuns(runs).map((run) => ({ name: run.workflowName === undefined || run.workflowName === "" ? run.name : run.workflowName + "/" + run.name, verdict: runVerdict(run) })),
     ...contexts.map((context): NamedVerdict => ({
       name: context.context,
       verdict: context.state === "SUCCESS" ? "green" : unreportedStates.has(context.state) ? "unreported" : "red"
@@ -136,9 +138,6 @@ export const mergeTask = (
     if (closing === null || url === null) {
       return yield* refuse(id + " names no PR to merge")
     }
-    if (closing.mergedAt !== null) {
-      return yield* refuse(id + " shows its PR " + url + " merged at " + closing.mergedAt)
-    }
     if (!prPattern.test(url)) {
       return yield* refuse(id + " names the PR " + url + ", which is no GitHub pull request link")
     }
@@ -164,9 +163,5 @@ export const mergeTask = (
     if (merged.exitCode !== 0) {
       return yield* refuse("gh pr merge refused " + url + ": " + merged.said)
     }
-    const at = DateTime.formatIso(yield* DateTime.now)
-    yield* markMerged(root, id, at).pipe(
-      Effect.mapError((error) => new BacklogError({ detail: "merged " + url + " but could not record it on " + id + ": " + (error instanceof BacklogError ? error.detail : error.file + ": " + error.detail) }))
-    )
     return "merged " + id + " " + url
   })

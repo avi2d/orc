@@ -76,15 +76,19 @@ describe("orc merge refuses a PR the guard would not land", () => {
   }, 60_000)
 
   test("a red check is refused instead of merged", async () => {
-    await refusedMerge({ checks: [passed("lint"), { __typename: "CheckRun", name: "test", status: "COMPLETED", conclusion: "FAILURE", startedAt: "2026-11-02T10:00:00Z" }] }, "the check test is red")
+    await refusedMerge({ checks: [passed("lint"), { __typename: "CheckRun", workflowName: "ci", name: "test", status: "COMPLETED", conclusion: "FAILURE", startedAt: "2026-11-02T10:00:00Z" }] }, "the check ci/test is red")
+  }, 60_000)
+
+  test("the same job name in two workflows with one red is refused instead of merged", async () => {
+    await refusedMerge({ checks: [{ __typename: "CheckRun", workflowName: "ci", name: "build", status: "COMPLETED", conclusion: "FAILURE", startedAt: "2026-11-02T10:00:10Z" }, { __typename: "CheckRun", workflowName: "release", name: "build", status: "COMPLETED", conclusion: "SUCCESS", startedAt: "2026-11-02T10:00:12Z" }] }, "the check ci/build is red")
   }, 60_000)
 
   test("a failed status context is refused instead of merged", async () => {
-    await refusedMerge({ checks: [passed("lint"), { __typename: "StatusContext", context: "ci/deploy", state: "FAILURE" }] }, "the check ci/deploy is red")
+    await refusedMerge({ checks: [{ __typename: "CheckRun", workflowName: "ci", name: "lint", status: "COMPLETED", conclusion: "SUCCESS", startedAt: "2026-11-02T10:00:00Z" }, { __typename: "StatusContext", context: "ci/deploy", state: "FAILURE" }] }, "the check ci/deploy is red")
   }, 60_000)
 
   test("a check still running is refused instead of read as green", async () => {
-    await refusedMerge({ checks: [passed("lint"), { __typename: "CheckRun", name: "test", status: "IN_PROGRESS", conclusion: "", startedAt: "2026-11-02T10:00:00Z" }] }, "the check test has not reported")
+    await refusedMerge({ checks: [{ __typename: "CheckRun", workflowName: "ci", name: "lint", status: "COMPLETED", conclusion: "SUCCESS", startedAt: "2026-11-02T10:00:00Z" }, { __typename: "CheckRun", workflowName: "ci", name: "test", status: "IN_PROGRESS", conclusion: "", startedAt: "2026-11-02T10:00:00Z" }] }, "the check ci/test has not reported")
   }, 60_000)
 
   test("a PR with no check reported is refused instead of read as green", async () => {
@@ -97,7 +101,7 @@ describe("orc merge refuses a PR the guard would not land", () => {
 })
 
 describe("orc merge lands a green PR", () => {
-  test("squash-merges the open green PR at its checked head and records it on the task file instead of leaving it open", async () => {
+  test("squash-merges the open green PR at its checked head instead of leaving it open", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, {})
@@ -106,21 +110,21 @@ describe("orc merge lands a green PR", () => {
       expect(merged.stdout.trim()).toBe("merged task-1 " + prUrl)
       expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + head])
       expect(await readFile(ghCalls(fixture), "utf8")).toContain("api --hostname github.com repos/acme/orc/compare/main..." + head + " --jq .behind_by")
-      expect(await taskFile(fixture)).toMatch(/^merged_at: "[^"]+"$/m)
+      expect(await taskFile(fixture)).toContain(prUrl)
+      expect(await taskFile(fixture)).not.toContain("merged_at")
       const board = await runOrc(fixture, ["backlog"])
-      expect(board.stdout).toContain("task-1 orc done merged")
+      expect(board.stdout).toContain("task-1 orc done")
+      expect(board.stdout).not.toContain("done merged")
       const json: unknown = JSON.parse((await runOrc(fixture, ["backlog", "--json"])).stdout)
-      expect(json).toMatchObject({ tasks: [{ id: "task-1", status: "closed", pr: prUrl, mergedAt: expect.any(String) }] })
-      const again = await runOrc(fixture, ["merge", "task-1"])
-      expect(again.exitCode).not.toBe(0)
-      expect(again.stderr).toContain("task-1 shows its PR " + prUrl + " merged at ")
+      expect(json).toMatchObject({ tasks: [{ id: "task-1", status: "closed", pr: prUrl }] })
+      expect(JSON.stringify(json)).not.toContain("mergedAt")
     })
   }, 60_000)
 
   test("a cancelled check re-run green reads green instead of red", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await closedWithPr(fixture)
-      await stubGh(fixture, { checks: [{ __typename: "CheckRun", name: "test", status: "COMPLETED", conclusion: "CANCELLED", startedAt: "2026-11-02T10:00:00Z" }, passed("test", "2026-11-02T10:05:00Z")] })
+      await stubGh(fixture, { checks: [{ __typename: "CheckRun", workflowName: "ci", name: "test", status: "COMPLETED", conclusion: "CANCELLED", startedAt: "2026-11-02T10:00:00Z" }, { __typename: "CheckRun", workflowName: "ci", name: "test", status: "COMPLETED", conclusion: "SUCCESS", startedAt: "2026-11-02T10:05:00Z" }] })
       expect((await runOrc(fixture, ["merge", "task-1"])).stdout.trim()).toBe("merged task-1 " + prUrl)
     })
   }, 60_000)
@@ -183,8 +187,8 @@ describe("the merge_task chat tool", () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await writeProject(fixture, { yolo: true })
       await closedWithPr(fixture)
-      await stubGh(fixture, { checks: [{ __typename: "CheckRun", name: "test", status: "COMPLETED", conclusion: "FAILURE", startedAt: "2026-11-02T10:00:00Z" }] })
-      expect(await rejection(sessionFor(fixture).call("merge_task", { id: "task-1", basis: "yolo-green" }))).toContain("the check test is red")
+      await stubGh(fixture, { checks: [{ __typename: "CheckRun", workflowName: "ci", name: "test", status: "COMPLETED", conclusion: "FAILURE", startedAt: "2026-11-02T10:00:00Z" }] })
+      expect(await rejection(sessionFor(fixture).call("merge_task", { id: "task-1", basis: "yolo-green" }))).toContain("the check ci/test is red")
       expect(await mergeCalls(fixture)).toEqual([])
     })
   }, 60_000)

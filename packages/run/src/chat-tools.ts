@@ -303,7 +303,7 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
       name: "merge_task",
       label: "Merge an orc task's PR",
       description:
-        "Squash-merges a closed task's PR through orc merge, which merges nothing and says why when the PR is not open, a check is red or has not reported, or the branch is behind its base. Call it only on the captain's explicit word to merge that PR, with basis captain-word, or for a project with yolo true once its PR is green, with basis yolo-green. orc refuses yolo-green for a project without yolo true.",
+        "Squash-merges a closed task's PR through orc merge, which merges nothing and says why when the PR is not open, a check is red or has not reported, or the branch is behind its base. Call it only when asked to merge that PR, with basis captain-word on the captain's explicit word, or with basis yolo-green when asked about a yolo project's PR and the PR is green. orc refuses yolo-green for a project without yolo true.",
       parameters: Schema.toJsonSchemaDocument(MergeInput).schema,
       execute: (_toolCallId, params) =>
         runTool(MergeInput, "merge_task", params, env, (input) => ["merge", input.id, "--basis", input.basis])
