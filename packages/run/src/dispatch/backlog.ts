@@ -319,13 +319,25 @@ const rewriteNew = <A>(
       const rewrite = yield* decide(yield* parseTaskFile(file, "new", text))
       if (rewrite.kind === "keep") {
         yield* putBack
-        return rewrite.result
+        return { result: rewrite.result, published: false } as const
       }
-      yield* fs.writeFileString(grabbed, renderTaskFile(rewrite.record)).pipe(Effect.mapError(platformFailure("write " + grabbed)))
-      yield* fs.rename(grabbed, file).pipe(Effect.mapError(platformFailure("write " + file)))
-      return rewrite.result
+      const replacement = scratchName(paths.folder("new"), id)
+      const discardReplacement = Effect.ignore(fs.remove(replacement))
+      yield* fs.writeFileString(replacement, renderTaskFile(rewrite.record)).pipe(
+        Effect.mapError(platformFailure("write " + replacement)),
+        Effect.catch((error) => discardReplacement.pipe(Effect.andThen(Effect.fail(error))))
+      )
+      yield* fs.rename(replacement, file).pipe(
+        Effect.mapError(platformFailure("write " + file)),
+        Effect.catch((error) => discardReplacement.pipe(Effect.andThen(Effect.fail(error))))
+      )
+      return { result: rewrite.result, published: true } as const
     })
-    return yield* settle.pipe(Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error)))))
+    const settled = yield* settle.pipe(Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error)))))
+    if (settled.published) {
+      yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
+    }
+    return settled.result
   })
 
 const findTask = (root: string, id: string): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>

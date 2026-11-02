@@ -217,7 +217,6 @@ const heldLine = (task: OpenHeld): string =>
 const postOpenHeld = (env: Env, deliver: Deliver): Effect.Effect<boolean> =>
   readBacklog(env).pipe(
     Effect.map((backlog) => backlog.tasks.filter(isOpenHeld).map(heldLine)),
-    Effect.catchTag("ChatToolError", (error) => Effect.succeed(["orc chat cannot list the held decisions: " + error.message])),
     Effect.map((lines) => {
       if (lines.length === 0) {
         return true
@@ -230,7 +229,13 @@ const postOpenHeld = (env: Env, deliver: Deliver): Effect.Effect<boolean> =>
         deliver(line)
       }
       return true
-    })
+    }),
+    Effect.catchTag("ChatToolError", (error) =>
+      Effect.sync(() => {
+        deliver("orc chat cannot list the held decisions: " + error.message)
+        return false
+      })
+    )
   )
 
 const runTool = <A>(schema: Schema.Decoder<A>, name: string, params: unknown, env: Env, args: (input: A) => ReadonlyArray<string>): Promise<TextResult> =>
