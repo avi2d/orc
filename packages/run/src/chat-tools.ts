@@ -70,6 +70,8 @@ const ClosedTask = Schema.Struct({
 type ClosedTask = typeof ClosedTask.Type
 
 const OpenTask = Schema.Struct({ id: Schema.String, status: Schema.Literals(["new", "taken", "started"]) })
+type OpenTask = typeof OpenTask.Type
+type BacklogTask = ClosedTask | OpenTask
 
 const BacklogTasks = Schema.fromJsonString(Schema.Struct({ tasks: Schema.Array(Schema.Union([ClosedTask, OpenTask])) }))
 
@@ -101,9 +103,89 @@ const closedLine = (task: ClosedTask): string =>
   task.id + " " + task.title + " closed " + task.outcome + (task.reason === "" ? "" : ": " + task.reason) +
   (task.pr === null ? ", with no PR" : ", PR " + task.pr)
 
+interface PostState {
+  unreadBecause: string | null
+  readonly delivered: Set<string>
+}
+
+type Deliver = (text: string) => boolean
+
+const readBacklog = (env: Env): Effect.Effect<{ readonly tasks: ReadonlyArray<BacklogTask> }, ChatToolError> =>
+  runOrc(env, ["backlog", "--json"], null).pipe(
+    Effect.flatMap((text) =>
+      Schema.decodeEffect(BacklogTasks)(text).pipe(
+        Effect.mapError((error) => new ChatToolError({ message: "orc backlog --json printed no backlog orc chat reads: " + error.message }))
+      )
+    )
+  )
+
+const isUnpostedClosed = (task: BacklogTask, isOpen: () => boolean): task is ClosedTask =>
+  task.status === "closed" && task.postedAt === null && isOpen()
+
+const deliverOnce = (state: PostState, deliver: Deliver, task: ClosedTask): void => {
+  if (!state.delivered.has(task.id)) {
+    deliver(closedLine(task))
+    state.delivered.add(task.id)
+  }
+}
+
+const markOne = (env: Env, taskId: string): Effect.Effect<true | string> =>
+  runOrc(env, ["backlog", "posted", taskId], null).pipe(
+    Effect.as(true),
+    Effect.catchTag("ChatToolError", (error) => Effect.succeed(error.message))
+  )
+
+const postTask = (env: Env, state: PostState, deliver: Deliver, task: ClosedTask): Effect.Effect<string | null> =>
+  Effect.gen(function*() {
+    deliverOnce(state, deliver, task)
+    const marked = yield* markOne(env, task.id)
+    if (typeof marked === "string") {
+      return marked
+    }
+    state.delivered.delete(task.id)
+    return null
+  })
+
+const reportMarks = (state: PostState, deliver: Deliver, markProblem: string | null): Effect.Effect<void> =>
+  Effect.sync(() => {
+    if (markProblem === null) {
+      state.unreadBecause = null
+      return
+    }
+    if (state.unreadBecause !== null) {
+      state.unreadBecause = markProblem
+      return
+    }
+    if (deliver("orc chat cannot post the closed tasks: " + markProblem)) {
+      state.unreadBecause = markProblem
+    }
+  })
+
+const reportReadError = (state: PostState, deliver: Deliver, error: ChatToolError): Effect.Effect<void> =>
+  Effect.sync(() => {
+    if (error.message !== state.unreadBecause) {
+      if (deliver("orc chat cannot post the closed tasks: " + error.message)) {
+        state.unreadBecause = error.message
+      }
+    }
+  })
+
+const postUnposted = (env: Env, isOpen: () => boolean, deliver: Deliver, state: PostState): Effect.Effect<void> =>
+  Effect.gen(function*() {
+    const backlog = yield* readBacklog(env)
+    let markProblem: string | null = null
+    for (const task of backlog.tasks) {
+      if (!isUnpostedClosed(task, isOpen)) {
+        continue
+      }
+      const problem = yield* postTask(env, state, deliver, task)
+      markProblem ??= problem
+    }
+    yield* reportMarks(state, deliver, markProblem)
+  }).pipe(Effect.catchTag("ChatToolError", (error) => reportReadError(state, deliver, error)))
+
 export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string) => void): ChatSession => {
-  let unreadBecause: string | null = null
-  const delivered = new Set<string>()
+  const state: PostState = { unreadBecause: null, delivered: new Set<string>() }
   const deliver = (text: string): boolean => {
     if (isOpen()) {
       post(text)
@@ -143,57 +225,7 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
       execute: () => Effect.runPromise(runOrc(env, ["backlog", "--json"], null).pipe(Effect.map(textResult)))
     }
   ]
-  const postClosed = Effect.gen(function*() {
-    const backlog = yield* runOrc(env, ["backlog", "--json"], null).pipe(
-      Effect.flatMap((text) =>
-        Schema.decodeEffect(BacklogTasks)(text).pipe(
-          Effect.mapError((error) => new ChatToolError({ message: "orc backlog --json printed no backlog orc chat reads: " + error.message }))
-        )
-      )
-    )
-    let markProblem: string | null = null
-    for (const task of backlog.tasks) {
-      if (task.status !== "closed" || task.postedAt !== null || !isOpen()) {
-        continue
-      }
-      if (!delivered.has(task.id)) {
-        deliver(closedLine(task))
-        delivered.add(task.id)
-      }
-      const marked = yield* runOrc(env, ["backlog", "posted", task.id], null).pipe(
-        Effect.as(true),
-        Effect.catchTag("ChatToolError", (error) => Effect.succeed(error.message))
-      )
-      if (typeof marked === "string") {
-        if (markProblem === null) {
-          markProblem = marked
-        }
-        continue
-      }
-      delivered.delete(task.id)
-    }
-    if (markProblem !== null) {
-      if (unreadBecause === null) {
-        if (deliver("orc chat cannot post the closed tasks: " + markProblem)) {
-          unreadBecause = markProblem
-        }
-      } else {
-        unreadBecause = markProblem
-      }
-      return
-    }
-    unreadBecause = null
-  }).pipe(
-    Effect.catchTag("ChatToolError", (error) =>
-      Effect.sync(() => {
-        if (error.message !== unreadBecause) {
-          if (deliver("orc chat cannot post the closed tasks: " + error.message)) {
-            unreadBecause = error.message
-          }
-        }
-      })
-    )
-  )
+  const postClosed = postUnposted(env, isOpen, deliver, state)
   return { tools, postClosed: () => Effect.runPromise(postClosed) }
 }
 
@@ -240,7 +272,7 @@ export const chatExtension = (env: Env, pollMillis: number) => (pi: ChatHost): v
     poll = undefined
     const running = current
     if (running !== null) {
-      return running.catch(() => undefined) as unknown as void
+      void running.catch(() => undefined)
     }
   })
 }
