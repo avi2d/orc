@@ -458,10 +458,10 @@ The chat's Pi has two tools and no others:
 - `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
 
 So a task from the chat enters the backlog the way any other does, and the beat starts it.
-When it starts and every 15 seconds after, the chat reads `orc backlog --json` and posts each closed task that has no `postedAt`, with its outcome, its reason and its PR, as in `task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
+When it starts and every 15 seconds after, the chat reads `orc backlog --json` and, while Pi is idle, posts each closed task that has no `postedAt`, with its outcome, its reason and its PR, as in `task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
 It posts a task whoever added it: this chat, an earlier chat or the command line.
 It posts each close then runs `orc backlog posted <task-id>`, which writes `posted_at` into the closed task file, so a task closed while no chat ran is posted by the next chat to start, and every close is posted, with a close repeated at most when the chat stops between its post and its mark, or when two chats post the same close in the same moment.
-When it cannot read the backlog, it posts orc's error once and keeps polling.
+When it cannot read or mark the backlog, it posts orc's error once Pi is idle and keeps polling.
 The chat's Pi loads your Pi settings and packages, so a provider a package adds works as it does in your Pi.
 `ORC_HOME` reaches the tools from the shell that runs `orc chat`.
 
