@@ -17,12 +17,15 @@ const chatToolsFile = import.meta.dir + "/chat-tools.ts"
 
 type ChatRules = { readonly kind: "loaded"; readonly file: string } | { readonly kind: "none"; readonly file: string }
 
-const chatRules = (orcHome: string): Effect.Effect<ChatRules, never, FileSystem.FileSystem> =>
+const chatRules = (orcHome: string): Effect.Effect<ChatRules, ChatError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const file = orcHome + "/orchestrator.md"
     const fs = yield* FileSystem.FileSystem
-    const type = yield* fs.stat(file).pipe(Effect.map((info) => info.type), Effect.orElseSucceed(() => null))
-    return type === "File" ? { kind: "loaded", file } : { kind: "none", file }
+    const info = yield* fs.stat(file).pipe(
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)),
+      Effect.mapError((error) => new ChatError({ message: "orc chat: " + file + ": " + error.message }))
+    )
+    return info !== null && info.type === "File" ? { kind: "loaded", file } : { kind: "none", file }
   })
 
 const rulesLine = (rules: ChatRules): string =>
