@@ -41,7 +41,7 @@ describe("orc runner result", () => {
         { schema: "orc.runner.v1", result: { task: "task-3", status: "failed", pueueTask: 657, run: null, started: "2026-10-28T02:36:41.331824562+03:00", ended: "2026-10-28T02:36:42.246702792+03:00", reason: "the run was killed" } },
         { schema: "orc.runner.v1", result: { task: "task-4", status: "queued", pueueTask: 658, run: null } },
         { schema: "orc.runner.v1", result: { task: "task-5", status: "stashed", pueueTask: 659, run: null } },
-        { schema: "orc.runner.v1", result: { task: "task-6", status: "running", pueueTask: 660, run: null, started: "2026-10-28T02:36:41.331824562+03:00" } },
+        { schema: "orc.runner.v1", result: { task: "task-6", status: "running", pueueTask: 660, run: null, started: "2026-10-28T02:36:41.331824562+03:00", outputAt: "2026-10-28T02:36:41.331824562+03:00" } },
         { schema: "orc.runner.v1", result: { task: "task-7", status: "unknown" } }
       ])
     })
