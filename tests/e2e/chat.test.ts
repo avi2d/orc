@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Schema } from "effect"
-import { chatSession } from "../../packages/run/src/chat-tools"
+import { chatExtension, chatSession, type ChatTool } from "../../packages/run/src/chat-tools"
 
 const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
 const chatToolsPath = new URL("../../packages/run/src/chat-tools.ts", import.meta.url).pathname
@@ -75,10 +75,11 @@ const decodeBacklog = Schema.decodeUnknownSync(BacklogJson)
 
 const orchestratorConfig = { providers: [], models: { orchestrator: "acme/orchestrator-1" } }
 
+const chatEnv = (fixture: Fixture) => ({ ...process.env, ...fixture.env, ORC_CHAT_ORC: JSON.stringify([process.execPath, binPath]) })
+
 const sessionFor = (fixture: Fixture) => {
-  const env = { ...process.env, ...fixture.env, ORC_CHAT_ORC: JSON.stringify([process.execPath, binPath]) }
   const posted: Array<string> = []
-  const session = chatSession(env, (text) => posted.push(text))
+  const session = chatSession(chatEnv(fixture), (text) => posted.push(text))
   const byName = new Map(session.tools.map((tool) => [tool.name, tool]))
   const call = (name: string, params: unknown) => {
     const tool = byName.get(name)
@@ -104,6 +105,29 @@ const ranClosing = (outcome: "done" | "failed", reason: string, pr: string | nul
   "reason: " + JSON.stringify(reason),
   ...(pr === null ? [] : ["pr: " + JSON.stringify(pr)])
 ]
+
+type ChatHost = Parameters<ReturnType<typeof chatExtension>>[0]
+
+const piFor = (fixture: Fixture, pollMillis: number) => {
+  const tools = new Map<string, ChatTool>()
+  const handlers = new Map<string, () => void>()
+  const sent: Array<{ readonly message: unknown; readonly options: unknown }> = []
+  const host: ChatHost = {
+    registerTool: (tool) => tools.set(tool.name, tool),
+    on: (event, handler) => handlers.set(event, handler),
+    sendMessage: (message, options) => sent.push({ message, options })
+  }
+  chatExtension(chatEnv(fixture), pollMillis)(host)
+  const add = (params: unknown) => tools.get("orc_backlog_add")?.execute("call-1", params)
+  return { add, sent, fire: (event: string) => handlers.get(event)?.() }
+}
+
+const until = async (done: () => boolean, millis: number): Promise<void> => {
+  const end = Date.now() + millis
+  while (!done() && Date.now() < end) {
+    await Bun.sleep(20)
+  }
+}
 
 const closeTask = async (fixture: Fixture, id: string, fields: ReadonlyArray<string>): Promise<void> => {
   const from = join(fixture.home, "backlog", "new", id + ".md")
@@ -217,6 +241,33 @@ describe("orc chat tools", () => {
       await closeTask(fixture, "task-1", ranClosing("done", "", "https://github.com/acme/orc/pull/7"))
       await chat.postClosed()
       expect(chat.posted.at(-1)).toBe("task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7")
+    })
+  })
+
+  test("Pi gets the closed task as a shown message that starts no model turn, not one steered into a running turn", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const pi = piFor(fixture, 50)
+      await pi.add({ project: "orc", task: "# Fix the typo\n" })
+      await closeTask(fixture, "task-1", ranClosing("done", "", "https://github.com/acme/orc/pull/7"))
+      pi.fire("session_start")
+      await until(() => pi.sent.length > 0, 10_000)
+      pi.fire("session_shutdown")
+      expect(pi.sent).toEqual([{
+        message: { customType: "orc-task-closed", content: "task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7", display: true },
+        options: { triggerTurn: false }
+      }])
+    })
+  })
+
+  test("Pi gets nothing once its session shuts down, instead of a post into a stale session", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const pi = piFor(fixture, 50)
+      await pi.add({ project: "orc", task: "# Fix the typo\n" })
+      pi.fire("session_start")
+      pi.fire("session_shutdown")
+      await closeTask(fixture, "task-1", ranClosing("done", "", "https://github.com/acme/orc/pull/7"))
+      await Bun.sleep(1_000)
+      expect(pi.sent).toEqual([])
     })
   })
 

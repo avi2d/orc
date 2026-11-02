@@ -175,9 +175,9 @@ export const chatSession = (env: Env, post: (text: string) => void): ChatSession
 
 export const chatToolNames: ReadonlyArray<string> = chatSession({}, () => undefined).tools.map((tool) => tool.name)
 
-export default function registerChatTools(pi: ChatHost): void {
+export const chatExtension = (env: Env, pollMillis: number) => (pi: ChatHost): void => {
   let stopped = false
-  const session = chatSession(process.env, (text) => {
+  const session = chatSession(env, (text) => {
     if (!stopped) {
       pi.sendMessage({ customType: "orc-task-closed", content: text, display: true }, { triggerTurn: false })
     }
@@ -191,7 +191,7 @@ export default function registerChatTools(pi: ChatHost): void {
     // An unreferenced timer never keeps Pi running after its session ends.
     poll ??= setInterval(() => {
       session.postClosed().catch(() => undefined)
-    }, closedPollMillis).unref()
+    }, pollMillis).unref()
   })
   pi.on("session_shutdown", () => {
     stopped = true
@@ -199,3 +199,5 @@ export default function registerChatTools(pi: ChatHost): void {
     poll = undefined
   })
 }
+
+export default chatExtension(process.env, closedPollMillis)
