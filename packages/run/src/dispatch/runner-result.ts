@@ -1,4 +1,4 @@
-import { Array as Arr, Effect, Schema } from "effect"
+import { Array as Arr, Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { openQuestionsForRun, runsForBranch } from "../history-resume"
 import type { OpenQuestion } from "../no-mistakes-gate"
@@ -178,6 +178,35 @@ const readRun = (home: string, checkout: string, task: string, interval: PueueIn
     Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
   )
 
+const runLogAt = (home: string, runId: string): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const dir = runDirFor(home, runId)
+    const names = yield* fs.readDirectory(dir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
+    let latest: string | null = null
+    for (const name of names) {
+      if (name !== "agent.log" && !/^fix-.*\.log$/.test(name)) {
+        continue
+      }
+      const info = yield* fs.stat(dir + "/" + name).pipe(Effect.orElseSucceed(() => null))
+      const at = info === null ? null : Option.match(info.mtime, { onNone: () => null, onSome: (mtime) => mtime.toISOString() })
+      if (at !== null && (latest === null || Date.parse(at) > Date.parse(latest))) {
+        latest = at
+      }
+    }
+    return latest
+  })
+
+const latestAt = (first: string | null, second: string | null): string | null => {
+  if (first === null) {
+    return second
+  }
+  if (second === null) {
+    return first
+  }
+  return Date.parse(second) > Date.parse(first) ? second : first
+}
+
 export const readResult = (task: string, home: string, env: Env, label?: string | null): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const held = yield* readHeld(home, task, label)
@@ -192,7 +221,9 @@ export const readResult = (task: string, home: string, env: Env, label?: string 
     if (result.status !== "running" && result.status !== "paused") {
       return result
     }
-    const outputAt = yield* pueueOutputAt(held.id, env, process.platform)
+    const pueueAt = yield* pueueOutputAt(held.id, env, process.platform)
+    const runAt = run === null ? null : yield* runLogAt(home, run.id)
+    const outputAt = latestAt(pueueAt, runAt)
     return outputAt === null ? result : { ...result, outputAt }
   })
 

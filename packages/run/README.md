@@ -336,6 +336,7 @@ It also names the floor of room each account must keep:
 ```
 
 A machine may add `"loadLimit"`, a number above 0, and the beat starts nothing there while `orc runner load` reads its five-minute load above it.
+An unread load holds starts there too.
 
 The provider named here is one `config.json` on each machine that runs the tasks defines.
 Each token file path in `dispatch.json` holds on those machines.

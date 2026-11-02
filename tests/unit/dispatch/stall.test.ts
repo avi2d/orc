@@ -3,10 +3,12 @@ import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Option } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { TestClock } from "effect/testing"
-import { addTask, claimTask, writeTaken } from "../../../packages/run/src/dispatch/backlog"
+import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
+import { flagStall } from "../../../packages/run/src/dispatch/stall"
+import { openDatabase, recordRun } from "../../../packages/run/src/run-history"
 import { runBeat } from "../../../packages/run/src/dispatch/beat"
 import { formatBeat } from "../../../packages/run/src/dispatch/board"
 import type { LoadReading } from "../../../packages/run/src/dispatch/load"
@@ -124,6 +126,22 @@ describe("a pueue run's stall", () => {
       expect(await beatAt(root, minutesAfterWrite(65), env)).toEqual(["stalled task-1 on mac: no output since 2026-10-27T11:35:00.000Z"])
     })
   })
+  test("a fresh agent log with a stale pueue log stays silent instead of flagging a healthy run", async () => {
+    await withBacklog(async (root) => {
+      const env = await pueueConfig(root)
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await touch(pueueLog(root), writtenAt)
+      const db = await Effect.runPromise(openDatabase(root).pipe(Effect.provide(BunServices.layer)))
+      try {
+        Effect.runSync(recordRun(db, { id: "run-1", project: "/checkout", branch: "orc/task-1", taskFile: "task.md", status: "running", started: "2026-10-27T10:02:00.000Z" }))
+      } finally {
+        db.close()
+      }
+      await mkdir(join(root, "runs", "run-1"), { recursive: true })
+      await touch(join(root, "runs", "run-1", "agent.log"), minutesAfterWrite(29))
+      expect(await beatAt(root, minutesAfterWrite(30), env)).toEqual([])
+    })
+  })
   test("a finished run is closed instead of flagged however old its output", async () => {
     await withBacklog(async (root) => {
       const env = await pueueConfig(root)
@@ -152,6 +170,29 @@ describe("a custom start's stall", () => {
       await startTask(root, ["true"], log)
       await touch(log, writtenAt)
       expect(await beatAt(root, minutesAfterWrite(29), {})).toEqual([])
+    })
+  })
+})
+
+describe("a failed close read", () => {
+  test("keeps the stall flag instead of flagging the same stall again", async () => {
+    await withBacklog(async (root) => {
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      const task = (await run(listTasks(root))).find((entry) => entry.spec.id === "task-1") ?? null
+      expect(task?.state.kind).toBe("started")
+      if (task === null || task.state.kind !== "started") {
+        throw new Error("task-1 is not started")
+      }
+      const running = { kind: "running", outputAt: "2026-10-27T11:00:00.000Z" } as const
+      const failed = { kind: "ended", action: { kind: "close-failed", task: "task-1", machine: "mac", reason: "the close read timed out" } } as const
+      const flagAt = (progress: typeof running | typeof failed, now: number) =>
+        Effect.runPromise(Effect.gen(function*() {
+          yield* TestClock.setTime(now)
+          return yield* flagStall(root, task, progress)
+        }).pipe(Effect.provide(Layer.mergeAll(BunServices.layer, TestClock.layer()))))
+      expect(Option.isSome(await flagAt(running, minutesAfterWrite(30)))).toBe(true)
+      expect(Option.isNone(await flagAt(failed, minutesAfterWrite(31)))).toBe(true)
+      expect(Option.isNone(await flagAt(running, minutesAfterWrite(32)))).toBe(true)
     })
   })
 })

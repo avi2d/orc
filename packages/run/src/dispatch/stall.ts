@@ -30,6 +30,9 @@ export const flagStall = (root: string, task: TaskRecord, progress: Progress): E
     const fs = yield* FileSystem.FileSystem
     const file = backlogPaths(root).stallFile(task.spec.id)
     if (progress.kind === "ended") {
+      if (progress.action.kind === "close-failed") {
+        return Option.none()
+      }
       yield* fs.remove(file, { force: true }).pipe(Effect.mapError(platformFailure("remove " + file)))
       return Option.none()
     }
