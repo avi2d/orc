@@ -16,6 +16,7 @@ import {
   type GateAnswer,
   type GateResponse,
   type NoMistakesFinding,
+  type OpenQuestion,
   type ParkedGate,
   type ParsedRun,
   type QuestionAnswer
@@ -30,6 +31,7 @@ export interface NoMistakesRecord {
   readonly gate: string | null
   readonly findings: ReadonlyArray<NoMistakesFinding>
   readonly gatesAnswered: number
+  readonly openQuestions: ReadonlyArray<OpenQuestion>
   readonly prLink: string | null
   readonly reviewer: string | null
   readonly result: string
@@ -75,6 +77,7 @@ interface Ending {
   readonly status: NoMistakesStatus
   readonly gate: ParkedGate | null
   readonly result: string
+  readonly openQuestions: ReadonlyArray<OpenQuestion>
 }
 
 type Sent =
@@ -180,6 +183,7 @@ interface DriveLog {
   readonly gatesAnswered: () => number
   readonly countGate: () => void
   readonly refuse: (gate: ParkedGate | null, reason: string) => Ending
+  readonly awaitAnswers: (gate: ParkedGate, missing: ReadonlyArray<NoMistakesFinding>) => Ending
   readonly fail: (reason: string) => Ending
   readonly finish: (parsed: ParsedRun) => Ending
   readonly close: (ending: Ending) => NoMistakesRecord
@@ -200,7 +204,13 @@ const openDriveLog = (started: string): DriveLog => {
       }
     }
   }
-  const fail = (reason: string): Ending => ({ status: "failed", gate: null, result: reason + ". " + prNote(prLink) })
+  const fail = (reason: string): Ending => ({ status: "failed", gate: null, result: reason + ". " + prNote(prLink), openQuestions: [] })
+  const refuse = (gate: ParkedGate | null, reason: string): Ending => ({
+    status: "refused",
+    gate,
+    result: "no-mistakes stopped" + (gate === null ? "." : " at the " + gate.step + " gate.") + " " + reason + ". " + prNote(prLink),
+    openQuestions: []
+  })
   return {
     read: (output) => {
       const parsed = parseRun(output)
@@ -219,21 +229,22 @@ const openDriveLog = (started: string): DriveLog => {
     countGate: () => {
       gatesAnswered += 1
     },
-    refuse: (gate, reason) => ({
-      status: "refused",
-      gate,
-      result: "no-mistakes stopped" + (gate === null ? "." : " at the " + gate.step + " gate.") + " " + reason + ". " + prNote(prLink)
+    refuse,
+    awaitAnswers: (gate, missing) => ({
+      ...refuse(gate, missingReason(missing)),
+      openQuestions: missing.map((finding) => ({ id: finding.id, text: finding.description }))
     }),
     fail,
     finish: (parsed) =>
       greenOutcomes.has(parsed.outcome) && prLink !== null
-        ? { status: "passed", gate: null, result: "no-mistakes opened " + prLink + " and CI is green." }
+        ? { status: "passed", gate: null, result: "no-mistakes opened " + prLink + " and CI is green.", openQuestions: [] }
         : fail(endedReason(parsed)),
     close: (ending) => ({
       status: ending.status,
       gate: ending.gate === null ? null : ending.gate.step,
       findings,
       gatesAnswered,
+      openQuestions: ending.openQuestions,
       prLink,
       reviewer,
       result: ending.result,
@@ -296,7 +307,7 @@ const serveOpenQuestions = (input: NoMistakesInput, log: DriveLog, gate: ParkedG
     const supplied = new Map((input.answers ?? []).map((entry) => [entry.question, entry.answer] as const))
     const missing = open.filter((finding) => !supplied.has(finding.id))
     if (missing.length > 0) {
-      return { kind: "ending", ending: log.refuse(gate, missingReason(missing)) }
+      return { kind: "ending", ending: log.awaitAnswers(gate, missing) }
     }
     for (let index = 0; index < open.length - 1; index += 1) {
       const pending = open[index] ?? { id: "", description: "" }
@@ -376,7 +387,8 @@ const collectRecordedFindings = (input: NoMistakesInput, log: DriveLog, runId: s
 const withUnreadFindings = (ending: Ending, failure: string): Ending => ({
   status: ending.status === "passed" ? "failed" : ending.status,
   gate: ending.gate,
-  result: ending.result + " orc could not read the findings no-mistakes recorded: " + failure + "."
+  result: ending.result + " orc could not read the findings no-mistakes recorded: " + failure + ".",
+  openQuestions: ending.openQuestions
 })
 
 export const driveNoMistakes = (input: NoMistakesInput): Effect.Effect<NoMistakesRecord> =>

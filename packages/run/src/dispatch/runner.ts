@@ -19,7 +19,12 @@ const taskFields = {
   task: TaskId,
   checkout: AbsolutePath,
   provider: ProviderId,
-  body: Schema.String
+  body: Schema.String,
+  branch: Schema.optional(Schema.String.check(Schema.isPattern(/^[A-Za-z0-9._/-]+$/))),
+  answers: Schema.optional(Schema.Array(Schema.Struct({
+    question: Schema.String.check(Schema.isPattern(/^question-\S+$/)),
+    answer: Schema.String.check(Schema.isNonEmpty())
+  })))
 }
 
 const QueueFileRequest = Schema.Struct({ ...taskFields, tokenFile: AbsolutePath, label: Schema.optional(LabelArg) })
@@ -185,7 +190,7 @@ const guardQueued = (home: string, id: string, dir: string): Effect.Effect<void,
     Effect.mapError((error) => new RunnerError({ detail: "the token guard did not start: " + error.message }))
   )
 
-// The beat starts each task once, so this check keeps a rerun start from queueing a second run, not two starts racing.
+// A start again after a done run resumes a parked task, so only a queued or running task stops a second run; two starts racing are not stopped here.
 const queueTask = (
   request: QueueRequest,
   self: Command,
@@ -202,7 +207,7 @@ const queueTask = (
     const label = labelOf(home, request.task, request.label)
     const key = fileKeyOf(home, request.task, label)
     const held = yield* readHeld(home, request.task, label)
-    if (held !== null) {
+    if (held !== null && !pueueDone(held)) {
       return request.task + " is already pueue task " + held.id + " in group " + orcGroup
     }
     const folder = home + "/runner"
@@ -211,7 +216,8 @@ const queueTask = (
       Effect.andThen(fs.writeFileString(taskFile, request.body)),
       Effect.mapError((error) => new RunnerError({ detail: "cannot write " + taskFile + ": " + error.message }))
     )
-    const run = [...self, "run", taskFile, "--branch", taskBranch(request.task), "--sandbox", "none", "--provider", request.provider]
+    const answers = (request.answers ?? []).flatMap((entry) => ["--answer", entry.question + "=" + entry.answer])
+    const run = [...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...answers]
     const add = (command: ReadonlyArray<string>) =>
       pueue(["add", "--group", orcGroup, "--label", label, "--working-directory", project, "--print-task-id", "--escape", "--", ...command], { ORC_HOME: home })
     const holdArgs: ReadonlyArray<string> = label === taskLabel(home, request.task) ? [request.task] : [request.task, "--label", label]
@@ -281,7 +287,13 @@ const readRequest = (
     const body = hold !== null && hold.answer !== null
       ? record.spec.body + "\n\nHeld for the captain: " + hold.reason + "\nThe captain answered: " + hold.answer.words
       : record.spec.body
-    const fields = yield* Schema.decodeEffect(Schema.Struct(taskFields))({ task, checkout, provider, body }).pipe(
+    const resume = record.parked === null
+      ? {}
+      : {
+        branch: record.parked.branch,
+        answers: record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ question: question.id, answer: question.answer.words }])
+      }
+    const fields = yield* Schema.decodeEffect(Schema.Struct(taskFields))({ task, checkout, provider, body, ...resume }).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
     )
     const tokenFile = env["ORC_TASK_TOKEN_FILE"] ?? ""

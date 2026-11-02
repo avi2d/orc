@@ -7,6 +7,11 @@ export interface QuestionAnswer {
   readonly answer: string
 }
 
+export interface OpenQuestion {
+  readonly id: string
+  readonly text: string
+}
+
 export interface NoMistakesFinding {
   readonly id: string
   readonly severity: string

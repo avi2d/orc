@@ -90,7 +90,7 @@ Orc grows toward the full orchestrator one step at a time.
 | Orchestrator rules the chat follows | Next |
 | The chat posts every close, after a restart too | Next |
 | Decisions held for you with a reason, answered from the chat | Ships today |
-| Runs parked on a question resume on your answer | Next |
+| Runs parked on a question resume on your answer | Ships today |
 | Reports, investigations and machine tasks that end without a pull request | Next |
 | Per-project delivery: direct pull request or full review | Next |
 | Merge on your word, refusing red checks | Next |

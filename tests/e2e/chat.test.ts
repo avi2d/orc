@@ -130,6 +130,15 @@ const until = async (done: () => boolean, millis: number): Promise<void> => {
   }
 }
 
+const parkTask = async (fixture: Fixture, id: string, questions: ReadonlyArray<{ readonly id: string; readonly text: string }>): Promise<void> => {
+  const file = join(fixture.home, "backlog", "new", id + ".md")
+  const text = await readFile(file, "utf8")
+  const end = text.indexOf("\n---\n", 4)
+  const parked = "\nparked_branch: \"orc/" + id + "\"\nparked_questions: " + JSON.stringify(questions)
+  await writeFile(file + ".tmp", text.slice(0, end) + parked + text.slice(end))
+  await rename(file + ".tmp", file)
+}
+
 const closeTask = async (fixture: Fixture, id: string, fields: ReadonlyArray<string>): Promise<void> => {
   const from = join(fixture.home, "backlog", "new", id + ".md")
   const to = join(fixture.home, "backlog", "closed", id + ".md")
@@ -490,6 +499,45 @@ describe("orc chat tools", () => {
       const beat = await runOrc(fixture, ["beat"])
       expect(beat.stdout).toContain("waits task-1: held for the captain: REST or gRPC, until 2026-12-01")
       expect(await Bun.file(join(fixture.home, "backlog", "new", "task-1.md")).exists()).toBe(true)
+    })
+  }, 60_000)
+
+  test("a parked question is listed once per chat start, again after a restart, and the answer tool resumes it instead of leaving it parked", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const first = piFor(fixture, 50)
+      await first.add({ project: "orc", task: "# Pick the API\n" })
+      await parkTask(fixture, "task-1", [{ id: "question-4", text: "REST or gRPC?" }])
+      const parkedPost = { customType: "orc-parked-question", content: "task-1 Pick the API is parked on orc/task-1 for the captain's answer to question-4: REST or gRPC?", display: true }
+      first.fire("session_start", { isIdle: () => true })
+      await until(() => first.sent.length > 0, 10_000)
+      await Bun.sleep(500)
+      first.fire("session_shutdown")
+      const reopened = piFor(fixture, 50)
+      reopened.fire("session_start", { isIdle: () => true })
+      await until(() => reopened.sent.length > 0, 10_000)
+      await Bun.sleep(500)
+      reopened.fire("session_shutdown")
+      expect([first.sent, reopened.sent]).toEqual([[{ message: parkedPost, options: { triggerTurn: false } }], [{ message: parkedPost, options: { triggerTurn: false } }]])
+      expect(await reopened.call("orc_backlog_answer", { id: "task-1", question: "question-4", words: "REST, and keep v1" })).toBe("answered question-4 on task-1, so the beat resumes it on orc/task-1")
+      expect(await readFile(join(fixture.home, "backlog", "new", "task-1.md"), "utf8")).toContain("\"answer\":\"REST, and keep v1\"")
+    })
+  }, 60_000)
+
+  test("a task that parks while the chat runs is listed once on the next poll instead of waiting for a restart", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const pi = piFor(fixture, 50)
+      await pi.add({ project: "orc", task: "# Pick the API\n" })
+      pi.fire("session_start", { isIdle: () => true })
+      await Bun.sleep(300)
+      expect(pi.sent).toEqual([])
+      await parkTask(fixture, "task-1", [{ id: "question-4", text: "REST or gRPC?" }, { id: "question-5", text: "" }])
+      await until(() => pi.sent.length > 1, 10_000)
+      await Bun.sleep(500)
+      pi.fire("session_shutdown")
+      expect(pi.sent.map((sent) => sent.message)).toEqual([
+        { customType: "orc-parked-question", content: "task-1 Pick the API is parked on orc/task-1 for the captain's answer to question-4: REST or gRPC?", display: true },
+        { customType: "orc-parked-question", content: "task-1 Pick the API is parked on orc/task-1 for the captain's answer to question-5", display: true }
+      ])
     })
   }, 60_000)
 

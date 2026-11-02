@@ -1,7 +1,7 @@
 import { dependencyOpen, type BeatAction, type BeatReport, type MachineRoom } from "./beat"
 import type { Project } from "./config"
 import { describeQuota } from "./quota"
-import { type Claim, type Hold, isHeld, type Started, type TaskRecord } from "./task-record"
+import { type Claim, type Hold, isHeld, openQuestions, type Parked, type Started, type TaskRecord } from "./task-record"
 
 const BACKLOG_JSON_SCHEMA = "orc.backlog.v1" as const
 const BEAT_JSON_SCHEMA = "orc.beat.v1" as const
@@ -38,6 +38,7 @@ type TaskJson = {
   readonly dependsOn: ReadonlyArray<string>
   readonly created: string
   readonly hold: Hold | null
+  readonly parked: Parked | null
 } & TaskStatusJson
 
 interface BacklogJson {
@@ -88,6 +89,7 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     dependsOn: record.spec.dependsOn,
     created: record.spec.created,
     hold: record.hold,
+    parked: record.parked,
     ...claimJson(record)
   })),
   projects: view.projects.kind === "read" ? view.projects.projects : null,
@@ -115,7 +117,9 @@ const newCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>): string => 
   const open = record.spec.dependsOn.filter((id) => dependencyOpen(all.find((candidate) => candidate.spec.id === id)))
   const waits = open.length === 0 ? "" : " waits " + open.join(",")
   const held = isHeld(record) ? " held (" + record.hold.reason + ")" : ""
-  return record.spec.id + " " + record.spec.project + pinOf(record) + waits + held + " " + record.spec.title
+  const asked = openQuestions(record)
+  const parked = asked.length === 0 ? "" : " parked (" + asked.map((question) => question.id).join(",") + ")"
+  return record.spec.id + " " + record.spec.project + pinOf(record) + waits + held + parked + " " + record.spec.title
 }
 
 const takenCell = (record: TaskRecord): string => {
@@ -179,10 +183,13 @@ const actionLine = (action: BeatAction): string => {
     case "close-failed": {
       return "close failed " + action.task + " on " + action.machine + ": " + action.reason
     }
+    case "parked": {
+      return "parked " + action.task + " on " + action.branch + " for the captain's answer to " + action.questions.join(", ")
+    }
   }
 }
 
-const renewal = (action: BeatAction): boolean => action.kind === "renewed" || action.kind === "renew-failed" || action.kind === "closed" || action.kind === "close-failed"
+const renewal = (action: BeatAction): boolean => action.kind === "renewed" || action.kind === "renew-failed" || action.kind === "closed" || action.kind === "close-failed" || action.kind === "parked"
 
 export const formatBeat = (report: BeatReport): string =>
   [

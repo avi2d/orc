@@ -210,7 +210,7 @@ describe("orc runner result", () => {
       }
       const farResult = Schema.decodeUnknownSync(RunnerRun)(await resultJson(fixture, "task-2", ["--", ...orcThere(far)]))
       const nearResult = Schema.decodeUnknownSync(RunnerRun)(await resultJson(fixture, "task-2"))
-      expect(farResult.result.run).toEqual({ id: "run-far", status: "succeeded", prLink: "https://github.com/avi2d/orc/pull/2", endReason: null })
+      expect(farResult.result.run).toEqual({ id: "run-far", status: "succeeded", prLink: "https://github.com/avi2d/orc/pull/2", endReason: null, openQuestions: [] })
       expect(nearResult.result.run).toBeNull()
     })
   }, runnerTimeout)
@@ -243,7 +243,7 @@ describe("orc runner result", () => {
       }
       const splitting = ["sh", "-c", "joined=\"$*\"; ORC_HOME='" + far + "' eval \"exec \\\"$0\\\" '" + binPath + "' $joined\"", process.execPath]
       const farResult = Schema.decodeUnknownSync(RunnerRun)(await resultJson(fixture, "task-2", ["--", ...splitting]))
-      expect(farResult.result.run).toEqual({ id: "run-far", status: "succeeded", prLink: "https://github.com/avi2d/orc/pull/2", endReason: null })
+      expect(farResult.result.run).toEqual({ id: "run-far", status: "succeeded", prLink: "https://github.com/avi2d/orc/pull/2", endReason: null, openQuestions: [] })
     })
   }, runnerTimeout)
 

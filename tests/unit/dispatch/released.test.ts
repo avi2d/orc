@@ -5,7 +5,8 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Layer, Schema } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { addTask, answerTask, claimTask, holdTask } from "../../../packages/run/src/dispatch/backlog"
+import { addTask, claimTask, holdTask } from "../../../packages/run/src/dispatch/backlog"
+import { answerTask } from "../../../packages/run/src/dispatch/parked"
 import { startTask } from "../../../packages/run/src/dispatch/runner"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>

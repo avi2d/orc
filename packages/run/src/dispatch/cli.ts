@@ -1,7 +1,8 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs, TaskSource } from "./args"
-import { addTask, answerTask, backlogPaths, BacklogError, closeStartedTask, holdTask, isTaskId, listTasks, markPosted } from "./backlog"
+import { addTask, backlogPaths, BacklogError, closeStartedTask, holdTask, isTaskId, listTasks, markPosted } from "./backlog"
+import { answerTask } from "./parked"
 import { readRoom, runBeat } from "./beat"
 import { backlogJson, type BacklogView, beatJson, formatBeat, formatBoard, type ProjectList, type RoomList } from "./board"
 import type { ConfigError } from "../json-file"
@@ -160,8 +161,13 @@ const holdNow = (args: Extract<CommandArgs, { readonly kind: "HoldTask" }>, plac
 
 const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
-    yield* answerTask(backlogRoot(place), args.id, args.words, DateTime.formatIso(yield* DateTime.now))
-    return "answered " + args.id + ", so the beat may start it"
+    const answered = yield* answerTask(backlogRoot(place), args.id, args.words, DateTime.formatIso(yield* DateTime.now))
+    if (answered.kind === "hold") {
+      return "answered " + args.id + ", so the beat may start it"
+    }
+    return answered.open.length === 0
+      ? "answered " + answered.question + " on " + args.id + ", so the beat resumes it on " + answered.branch
+      : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
 type TaskVerb = Extract<CommandArgs, { readonly kind: "CloseTask" | "MarkPosted" | "HoldTask" | "AnswerTask" }>

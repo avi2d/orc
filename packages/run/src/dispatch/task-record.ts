@@ -1,4 +1,4 @@
-import { Data, Effect, Schema } from "effect"
+import { Array as Arr, Data, Effect, Schema } from "effect"
 
 export const taskFolders = ["new", "taken", "closed"] as const
 export type TaskFolder = typeof taskFolders[number]
@@ -36,6 +36,17 @@ export interface Hold {
   readonly answer: Answer | null
 }
 
+export interface ParkedQuestion {
+  readonly id: string
+  readonly text: string
+  readonly answer: Answer | null
+}
+
+export interface Parked {
+  readonly branch: string
+  readonly questions: Arr.NonEmptyReadonlyArray<ParkedQuestion>
+}
+
 type Closing =
   | { readonly outcome: "start-failed"; readonly reason: string }
   | { readonly outcome: "done" | "failed"; readonly started: Started; readonly reason: string; readonly pr: string | null }
@@ -49,6 +60,7 @@ type TaskState =
 export interface TaskRecord {
   readonly spec: TaskSpec
   readonly hold: Hold | null
+  readonly parked: Parked | null
   readonly state: TaskState
 }
 
@@ -56,8 +68,20 @@ type HeldRecord = TaskRecord & { readonly hold: Hold & { readonly answer: null }
 
 export const isHeld = (record: TaskRecord): record is HeldRecord => record.hold !== null && record.hold.answer === null
 
-export const heldReason = (task: TaskRecord): string | null =>
+const heldReason = (task: TaskRecord): string | null =>
   isHeld(task) ? "held for the captain: " + task.hold.reason + (task.hold.until === null ? "" : ", until " + task.hold.until) : null
+
+export const openQuestions = (task: TaskRecord): ReadonlyArray<ParkedQuestion> =>
+  task.parked?.questions.filter((question) => question.answer === null) ?? []
+
+const parkedReason = (task: TaskRecord): string | null => {
+  const open = openQuestions(task)
+  return task.parked === null || open.length === 0
+    ? null
+    : "parked on " + task.parked.branch + " for the captain's answer to " + open.map((question) => question.id).join(", ")
+}
+
+export const captainWait = (task: TaskRecord): string | null => heldReason(task) ?? parkedReason(task)
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/
 
@@ -80,6 +104,13 @@ const Frontmatter = Schema.Struct({
   hold_until: Schema.optional(Schema.String),
   answer: Schema.optional(Schema.String),
   answered_at: Schema.optional(Schema.String),
+  parked_branch: Schema.optional(Schema.String),
+  parked_questions: Schema.optional(Schema.Array(Schema.Struct({
+    id: Schema.String,
+    text: Schema.String,
+    answer: Schema.optional(Schema.String),
+    answered_at: Schema.optional(Schema.String)
+  }))),
   beat: Schema.optional(Schema.String),
   taken_for: Schema.optional(Schema.String),
   account: Schema.optional(Schema.String),
@@ -112,7 +143,7 @@ const closingOf = (front: Frontmatter, started: Started | null): Closing | null 
   return front.outcome === undefined || started === null ? null : { outcome: front.outcome, started, reason, pr: front.pr ?? null }
 }
 
-const answerOf = (front: Frontmatter): Answer | null | string => {
+const answerOf = (front: { readonly answer?: string | undefined; readonly answered_at?: string | undefined }): Answer | null | string => {
   if (front.answer === undefined && front.answered_at === undefined) {
     return null
   }
@@ -120,6 +151,24 @@ const answerOf = (front: Frontmatter): Answer | null | string => {
     return "an answer names no words or no time"
   }
   return { words: front.answer, at: front.answered_at }
+}
+
+const parkedOf = (front: Frontmatter): Parked | null | string => {
+  if (front.parked_branch === undefined && front.parked_questions === undefined) {
+    return null
+  }
+  if (front.parked_branch === undefined || front.parked_branch === "") {
+    return "a parked task names no branch"
+  }
+  const questions: Array<ParkedQuestion> = []
+  for (const question of front.parked_questions ?? []) {
+    const answer = answerOf(question)
+    if (typeof answer === "string") {
+      return "the parked question " + question.id + " names its answer with no words or no time"
+    }
+    questions.push({ id: question.id, text: question.text, answer })
+  }
+  return Arr.isReadonlyArrayNonEmpty(questions) ? { branch: front.parked_branch, questions } : "a parked task names no question"
 }
 
 const holdOf = (front: Frontmatter): Hold | null | string => {
@@ -197,6 +246,13 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     if (hold !== null && hold.answer === null && (state.kind === "started" || state.kind === "closed")) {
       return yield* new TaskFileError({ file, detail: "a " + state.kind + " task carries an unanswered hold" })
     }
+    const parked = parkedOf(front)
+    if (typeof parked === "string") {
+      return yield* new TaskFileError({ file, detail: parked })
+    }
+    if (parked?.questions.some((question) => question.answer === null) === true && (state.kind === "started" || state.kind === "closed")) {
+      return yield* new TaskFileError({ file, detail: "a " + state.kind + " task carries an unanswered parked question" })
+    }
     return {
       spec: {
         id: front.id,
@@ -208,6 +264,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
         body: parts.body
       },
       hold,
+      parked,
       state
     }
   })
@@ -228,6 +285,18 @@ const holdFields = (hold: Hold | null): ReadonlyArray<string> =>
       field("hold_reason", hold.reason),
       ...(hold.until === null ? [] : [field("hold_until", hold.until)]),
       ...(hold.answer === null ? [] : [field("answer", hold.answer.words), field("answered_at", hold.answer.at)])
+    ]
+
+const parkedFields = (parked: Parked | null): ReadonlyArray<string> =>
+  parked === null
+    ? []
+    : [
+      field("parked_branch", parked.branch),
+      field("parked_questions", parked.questions.map((question) => ({
+        id: question.id,
+        text: question.text,
+        ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at })
+      })))
     ]
 
 const stateFields = (state: TaskState): ReadonlyArray<string> => {
@@ -268,6 +337,7 @@ export const renderTaskFile = (record: TaskRecord): string =>
     field("depends_on", record.spec.dependsOn),
     field("created", record.spec.created),
     ...holdFields(record.hold),
+    ...parkedFields(record.parked),
     ...stateFields(record.state),
     fence,
     record.spec.body

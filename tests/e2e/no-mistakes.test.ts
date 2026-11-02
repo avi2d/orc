@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { access, readFile, realpath, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import { isRecord } from "./runner-helpers"
 import { checksPassedWhileMonitoring, cleanFinish, git, passedWithPr, readyToCheck, recordedNothing, runStep, sandboxResult, withHome, withRepo, type NoMistakesReply } from "./run-helpers"
 
 const fixableGate: NoMistakesReply = {
@@ -241,6 +242,37 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(reason).toContain("Which retries are allowed?")
         expect(reason).toContain("--answer question-3=")
         expect(reason).toContain("--answer question-5=")
+      })
+    })
+  })
+  test("only the unanswered review questions are recorded as open, with their text, instead of every question or none", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const sha = await readyToCheck(dir, home)
+        const questionGate: NoMistakesReply = {
+          stdout: [
+            "run:",
+            "  id: \"01STUB\"",
+            "  branch: orc/test",
+            "  status: awaiting_approval",
+            "  awaiting_agent: parked 2m10s",
+            "  head: abc1234",
+            "  pr: \"\"",
+            "  findings[2]{id,severity,file,line,action,description}:",
+            "    question-3,info,,,ask-user,Which scope should the report cover?",
+            "    question-4,info,,,ask-user,Which retries are allowed?",
+            "review-questions-omitted: 1 further review question(s) are open and have no row of their own. This gate releases only once EVERY open question is answered, so answer these by id as well, with: no-mistakes axi answer --question <id> --answer \"<your answer>\". Omitted question ids: question-5",
+            "gate: review"
+          ].join("\n") + "\n"
+        }
+        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [questionGate, recordedNothing], [{ question: "question-3", answer: "Use the wide scope" }])
+        expect(outcome.report.noMistakes?.status).toBe("refused")
+        const signals: ReadonlyArray<unknown> = Array.isArray(outcome.signals) ? outcome.signals : []
+        const open = signals.flatMap((signal) => isRecord(signal) && signal.name === "open-question" ? [String(signal.value)] : [])
+        expect(open.toSorted()).toEqual([
+          JSON.stringify({ id: "question-4", text: "Which retries are allowed?" }),
+          JSON.stringify({ id: "question-5", text: "" })
+        ])
       })
     })
   })

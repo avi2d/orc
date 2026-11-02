@@ -423,7 +423,7 @@ To start what can start, run `orc beat`, from launchd or cron every few minutes.
 Each beat runs the quota command and reads the room on each machine before it takes any task.
 A task starts only once four things hold:
 
-1. No hold for the captain waits on it unanswered.
+1. No hold or parked question for the captain waits on it unanswered.
 2. Every task it depends on closed done.
 3. Its project has a checkout on a machine with a free slot.
 4. An account has room at or above the floor, and the runs take the account with the most room.
@@ -434,7 +434,7 @@ The date says when you mean to answer, and a past date releases nothing: the tas
 To answer, run `orc backlog answer <task-id> <words>`.
 The task file keeps your words as `answer` and the time as `answered_at`, and the next beat may start the task.
 The released run reads the task body with the reason and your words added after it.
-Orc refuses to hold a task that is taken, started or closed, and to answer a task that is not held.
+Orc refuses to hold a task that is taken, started, closed or parked, and to answer a task that is neither held nor parked.
 Holding a held task again keeps the first reason.
 `orc backlog` shows a held task as `held (<reason>)`, and `orc backlog --json` gives every task a `hold`, either `null` or the reason, the date and the answer.
 
@@ -448,16 +448,29 @@ On a kind `none` account it is empty, and the beat sends nothing on standard inp
 The beat starts it detached in its own session, never waits for it and never kills it.
 So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
-From then on, each beat closes the finished runs on a machine whose start runs `orc runner start`.
-It reads `orc runner result` on that machine and closes the task done or failed, freeing its slot in the same beat.
+From then on, each beat ends the finished runs on a machine whose start runs `orc runner start`.
+It reads `orc runner result` on that machine and closes the task done or failed, or parks it on your open questions, freeing its slot in the same beat.
 The closed task file keeps the PR link of the orc run on `orc/<task-id>` as `pr`, and `orc backlog --json` carries it as `pr`, or `null` when the run opened none.
 The beat prints `closed <task-id> <done|failed> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds.
 A machine whose start runs any other program keeps owning its tasks, which the beat never reads.
 To close one of those, run `orc backlog close <task-id> <done|failed> [reason]`.
 A missing start command exits 127 into its log and leaves the task started.
 Only a failure to spawn the log wrapper closes the task as `start-failed`.
-To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1` and carries the closes as `closed` and `close-failed` actions.
+To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1` and carries the endings as `closed`, `close-failed` and `parked` actions.
 On a token command account, each beat first sends every started task its account's current token through its machine's `renew` command, as JSON on standard input.
+
+## Parked runs
+
+A run that no-mistakes stops on review questions you have not answered parks its task instead of closing it failed.
+The beat moves the task back to `new` with `parked_branch` and `parked_questions` in its file, each question with its id and text.
+It prints `parked <task-id> on <branch> for the captain's answer to <question-ids>`.
+Each later beat prints `waits <task-id>: parked on <branch> for the captain's answer to <question-ids>` and never starts it.
+To answer one question, run `orc backlog answer <task-id> <question-id>=<text>`.
+The task file keeps your text and its time on that question, and the other questions stay parked.
+Once every question has an answer, the next beat starts the task again on the same branch with `--answer <question-id>=<text>` for each one.
+The run resumes there and hands your answers to no-mistakes, so no new branch and no fresh run starts.
+If the resumed run stops on new questions, the task parks again with those, and it keeps the answers it already has.
+`orc backlog` shows a parked task as `parked (<question-ids>)`, and `orc backlog --json` gives every task a `parked`, either `null` or the branch and the questions with their answers.
 
 ## Adding tasks from a chat
 
@@ -470,7 +483,7 @@ The chat's Pi has four tools and no others:
 - `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project, the task's Markdown, an optional machine and the ids it depends on.
 - `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
 - `orc_backlog_hold` holds one new task through `orc backlog hold`, with the reason and an optional date.
-- `orc_backlog_answer` answers a held task through `orc backlog answer`, with your words as you said them.
+- `orc_backlog_answer` answers a held task through `orc backlog answer`, with your words as you said them, or one parked question when it names the question's id.
 
 So a task from the chat enters the backlog the way any other does, and the beat starts it.
 When it starts and every 15 seconds after, the chat reads `orc backlog --json` and, while Pi is idle, posts each closed task that has no `postedAt`, with its outcome, its reason and its PR, as in `task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
@@ -478,6 +491,8 @@ It posts a task whoever added it: this chat, an earlier chat or the command line
 It posts each close then runs `orc backlog posted <task-id>`, which writes `posted_at` into the closed task file, so a task closed while no chat ran is posted by the next chat to start, and every close is posted, with a close repeated at most when the chat stops between its post and its mark, or when two chats post the same close in the same moment.
 When it cannot read or mark the backlog, it posts orc's error once Pi is idle and keeps polling.
 Each time the chat starts, it posts one line per held task you have not answered, once Pi is idle, as in `task-2 Pick the API is held for the captain: REST or gRPC, until 2026-12-01`.
+It posts one line per parked question you have not answered each time it starts, and once more when a task parks while it runs, as in `task-3 Fix the retries is parked on orc/task-3 for the captain's answer to question-4: Which retries are allowed?`.
+A question whose line a failed read or a busy Pi kept back is posted on a later poll.
 The chat's Pi loads your Pi settings and packages, so a provider a package adds works as it does in your Pi.
 `ORC_HOME` reaches the tools from the shell that runs `orc chat`.
 
@@ -491,7 +506,7 @@ The group's parallel limit caps the orc runs on that machine, and they never wai
 The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
 A task queued for another home keeps a scoped file instead, so two homes holding the same task id never share one file.
-A task this home already holds in group `orc` is not queued again.
+A task this home already holds queued or running in group `orc` is not queued again, and a task whose earlier run is done there is queued again, as a parked task is once answered.
 
 To start on another machine, put the command that runs orc there after `--`, as in `orc runner start -- ssh linux-box orc`.
 That runs `orc runner queue` on the far side and sends it the task as JSON on stdin, so the task text never passes through a remote shell.
@@ -535,6 +550,7 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/orc-config.ts` | The reading of `config.json`: the providers and the implementer, fixer and orchestrator models |
 | `src/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
 | `src/chat-tools.ts` | The chat tools and the poll that posts each closed task into the chat once |
+| `src/chat-parked.ts` | The chat's listing of parked questions, once per start and once per park |
 | `src/json-file.ts` | The JSON config file reading and its `ConfigError` |
 | `src/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
@@ -557,6 +573,7 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/git-config.ts` | The git config parsing that finds the credentials, includes and submodules a checkout carries |
 | `src/dispatch/backlog.ts` | The backlog folders, the id reservation and the atomic take of a task |
 | `src/dispatch/task-record.ts` | The task file and its frontmatter |
+| `src/dispatch/parked.ts` | Parking a run's task on its questions, and the answer to a hold or a question |
 | `src/dispatch/config.ts` | The reading of `dispatch.json` and `projects.json` |
 | `src/dispatch/quota.ts` | The quota reading from the configured command and the pick of an account |
 | `src/dispatch/beat.ts` | The beat: room, placement, take and start |

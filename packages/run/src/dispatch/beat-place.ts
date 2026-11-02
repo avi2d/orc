@@ -1,5 +1,5 @@
 import { checkoutOn, type DispatchConfig, type Machine, type Project } from "./config"
-import { heldReason, type TaskRecord } from "./task-record"
+import { captainWait, type TaskRecord } from "./task-record"
 
 export interface MachineRoom {
   readonly machine: string
@@ -22,7 +22,7 @@ export const dependencyOpen = (dependency: TaskRecord | undefined): boolean =>
   dependency === undefined || dependency.state.kind !== "closed" || dependency.state.closing.outcome !== "done"
 
 export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>): string | null => {
-  const held = heldReason(task)
+  const held = captainWait(task)
   if (held !== null) {
     return held
   }
