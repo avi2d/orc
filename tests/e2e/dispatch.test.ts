@@ -49,9 +49,11 @@ const parseBacklogTasks = (text: string): ReadonlyArray<TaskJson> => {
 const runOrc = async (
   fixture: Fixture,
   args: ReadonlyArray<string>,
-  env: Record<string, string> = {}
+  env: Record<string, string> = {},
+  stdin: string | null = null
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> => {
   const proc = Bun.spawn([process.execPath, binPath, ...args], {
+    stdin: stdin === null ? "ignore" : new TextEncoder().encode(stdin),
     stdout: "pipe",
     stderr: "pipe",
     cwd: fixture.dir,
@@ -292,6 +294,26 @@ describe("orc beat", () => {
       await addTasks(fixture, 1)
       expect(await orcOk(fixture, ["beat"])).toContain("waits task-1: no acme account has room")
       expect(await startedLines(fixture)).toEqual([])
+    })
+  }, beatTimeout)
+
+  test("a task piped to backlog add - lands with its whole body instead of reading a file named -", async () => {
+    await withFixture({ mac: 1, linux: 1, floorPercent: 15 }, async (fixture) => {
+      const said = "# Fix the login page\n\nThe button does nothing on a narrow screen.\n"
+      const result = await runOrc(fixture, ["backlog", "add", "orc", "-"], {}, said)
+      expect(result.stderr).toBe("")
+      expect(result.stdout).toBe("added task-1 for orc\n")
+      expect(await backlogTask(fixture, "task-1")).toMatchObject({ title: "Fix the login page", status: "new" })
+      expect(await readFile(join(fixture.dir, "home", "backlog", "new", "task-1.md"), "utf8")).toEndWith(said)
+    })
+  }, beatTimeout)
+
+  test("an empty pipe to backlog add - is refused instead of adding an untitled task", async () => {
+    await withFixture({ mac: 1, linux: 1, floorPercent: 15 }, async (fixture) => {
+      const result = await runOrc(fixture, ["backlog", "add", "orc", "-"], {}, "\n")
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain("the task on stdin holds no text")
+      expect(await backlogTasks(fixture)).toEqual([])
     })
   }, beatTimeout)
 
