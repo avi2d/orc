@@ -7,10 +7,10 @@ You talk to it in a chat, it keeps the backlog, and it sends each task to a mach
 A terminal dashboard shows every machine, queue and account at a glance.
 
 - **One front door.** Tell `orc chat` the work in plain words, or add a task file with `orc backlog add`.
-- **Every kind of task.** Code changes, investigations, reports and chores on a named machine, each ending in what it needs.
+- **Every kind of task.** Code changes land as pull requests today, and investigations and reports follow in the roadmap below.
 - **Runs where there is room.** `orc beat` places each task on a machine with a free slot and an account with quota left.
-- **Asks only when it must.** A task that needs your call waits with its question, and your answer starts it again.
-- **Reviewed before you see it.** A code change passes your checks and a no-mistakes review, and lands as a pull request.
+- **Asks only when it must.** A task that needs your call waits with its question, and your answer starts it again with `orc run`.
+- **Reviewed before you see it.** A code change passes your checks and a no-mistakes review, and lands as a pull request on a provider no-mistakes supports.
 - **Never loses work.** The backlog, the run history and the queues live on disk, so a restart picks up where it stopped.
 - **See it all.** `tui-dash` shows quota, machines, queues, tasks and alerts in one terminal screen.
 
@@ -55,7 +55,7 @@ commands:
   test: bun test
 ```
 
-Orc prints the branch, its commits, the checks, the review and the PR link.
+Orc prints the branch, its commits, the checks, the review and the PR link when its run opened one.
 `--sandbox none` runs the agent on the host as your user.
 With nono from https://nono.sh installed, drop the flag and the run works inside the nono sandbox.
 
@@ -69,7 +69,7 @@ To hand orc a stream of work:
 1. Run `orc beat` from cron or launchd every few minutes.
 1. Run `orc backlog` to see each task new, taken or closed.
 
-The chat posts each task it added once the task closes, with its outcome and PR.
+The chat posts each task it added since it started once the task closes, with its outcome, its reason and its PR when its run opened one.
 [The backlog and the beat](packages/run/README.md#the-backlog-and-the-beat) shows both files and every option.
 
 ## Open the dashboard
@@ -100,7 +100,7 @@ Orc grows toward the full orchestrator one step at a time.
 | Per-project instructions the run and the chat both read | Next |
 | A fresh checkout before every run, and follow-ups on upstream changes | Next |
 
-Today a run counts as done once the agent commits, the checks pass and no-mistakes opens a pull request with green CI.
+Today a run counts as done once Pi stops cleanly with `ORC_COMPLETE`, the branch holds a new commit, the checks pass and no-mistakes opens a pull request with green CI.
 A task that changes no code closes failed.
 A queued run from the backlog runs without the nono sandbox.
 
