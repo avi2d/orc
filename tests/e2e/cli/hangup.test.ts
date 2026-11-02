@@ -52,7 +52,7 @@ const dashboardUnder = async (terminal: number): Promise<number | undefined> => 
 
 // The renderer writes its setup sequences before the screen watches stdin, so only a painted panel shows the dashboard is up.
 const painted = async (screenFile: string): Promise<true | undefined> =>
-  (await readOr(screenFile, "")).includes("reading the quota") ? true : undefined;
+  (await readOr(screenFile, "")).includes("quota") ? true : undefined;
 
 type HangUp = (terminal: Bun.Subprocess, dashboard: number) => Promise<void>;
 
