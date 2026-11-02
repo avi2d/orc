@@ -531,7 +531,7 @@ Orc reads the PR with `gh pr view` and merges nothing when any of these holds:
 - The task names no PR.
 - The PR is closed or merged, not open.
 - A check is red, a check has not reported, or no check has reported at all.
-  Only the newest run of each workflow and check counts, so a cancelled run that re-ran green reads green.
+  Only the newest attempt of each run and check counts, so a cancelled run that re-ran green reads green.
 - The branch is behind its base by the compare API's `behind_by`, so update the branch and let its checks run again.
 
 Each refusal starts `orc merge refused <task-id> and merged nothing` and names every reason.

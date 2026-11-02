@@ -9,6 +9,7 @@ import type { MergeBasis } from "./merge-basis"
 
 const CheckRun = Schema.Struct({
   workflowName: Schema.optional(Schema.String),
+  detailsUrl: Schema.optional(Schema.String),
   name: Schema.String,
   status: Schema.String,
   conclusion: Schema.String,
@@ -40,11 +41,12 @@ const runVerdict = (run: CheckRun): CheckVerdict => {
   return greenConclusions.has(run.conclusion) ? "green" : "red"
 }
 
-// GitHub keeps a cancelled run beside its re-run under one workflow and name, so only the newest run of each workflow and name speaks for the check.
+// GitHub keeps a cancelled run beside its re-run under one run and name, so only the newest run of each run and name speaks for the check.
+const runScope = (run: CheckRun): string => run.detailsUrl?.match(/\/actions\/runs\/(\d+)(?:\/|$)/)?.[1] ?? run.workflowName ?? ""
 const newestRuns = (runs: ReadonlyArray<CheckRun>): ReadonlyArray<CheckRun> => {
   const newest = new Map<string, CheckRun>()
   for (const run of runs) {
-    const key = (run.workflowName ?? "") + "\0" + run.name
+    const key = runScope(run) + "\0" + run.name
     const seen = newest.get(key)
     if (seen === undefined || run.startedAt > seen.startedAt) {
       newest.set(key, run)
