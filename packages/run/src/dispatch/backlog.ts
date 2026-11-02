@@ -221,10 +221,64 @@ export const closeStartedTask = (
     }
     const closed: TaskRecord = {
       spec: record.spec,
-      state: { kind: "closed", claim: record.state.claim, closing: { outcome, started: record.state.started, reason, pr }, closedAt }
+      state: { kind: "closed", claim: record.state.claim, closing: { outcome, started: record.state.started, reason, pr }, closedAt, postedAt: null }
     }
     if (!(yield* publishClosed(root, closed))) {
       return yield* new BacklogError({ detail: id + " was closed by another command" })
     }
     return closed
+  })
+
+const readClosed = (root: string, id: string): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const file = backlogPaths(root).taskFile("closed", id)
+    const text = yield* fs.readFileString(file).pipe(
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.fail(new BacklogError({ detail: "the backlog holds no closed " + id }))),
+      Effect.mapError((error) => error instanceof BacklogError ? error : platformFailure("read " + file)(error))
+    )
+    return yield* parseTaskFile(file, "closed", text)
+  })
+
+const unposted = (record: TaskRecord): boolean => record.state.kind === "closed" && record.state.postedAt === null
+
+const writePosted = (root: string, id: string, postedAt: string): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const paths = backlogPaths(root)
+    const record = yield* readClosed(root, id)
+    if (record.state.kind !== "closed" || record.state.postedAt !== null) {
+      return false
+    }
+    const posted: TaskRecord = { spec: record.spec, state: { ...record.state, postedAt } }
+    const file = paths.taskFile("closed", id)
+    const scratch = scratchName(paths.folder("closed"), id)
+    yield* fs.writeFileString(scratch, renderTaskFile(posted)).pipe(Effect.mapError(platformFailure("write " + scratch)))
+    yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
+    return true
+  })
+
+// Two chats may post one close at once, so only the command that creates the mark and then still finds no posted_at writes it and gets true.
+export const markPosted = (
+  root: string,
+  id: string,
+  postedAt: string
+): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    if (!unposted(yield* readClosed(root, id))) {
+      return false
+    }
+    const mark = backlogPaths(root).folder("closed") + "/." + id + ".posting"
+    const marked = yield* fs.writeFileString(mark, "", { flag: "wx" }).pipe(
+      Effect.as(true),
+      Effect.catchReason("PlatformError", "AlreadyExists", () => Effect.succeed(false)),
+      Effect.mapError(platformFailure("write " + mark))
+    )
+    if (!marked) {
+      return false
+    }
+    const written = yield* Effect.exit(writePosted(root, id, postedAt))
+    yield* fs.remove(mark).pipe(Effect.mapError(platformFailure("remove " + mark)))
+    return yield* written
   })

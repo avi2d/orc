@@ -27,6 +27,7 @@ type TaskStatusJson =
     readonly reason: string
     readonly pr: string | null
     readonly closedAt: string
+    readonly postedAt: string | null
   }
 
 type TaskJson = {
@@ -69,7 +70,8 @@ const claimJson = (record: TaskRecord): TaskStatusJson => {
         outcome: state.closing.outcome,
         reason: state.closing.reason,
         pr: state.closing.outcome === "start-failed" ? null : state.closing.pr,
-        closedAt: state.closedAt
+        closedAt: state.closedAt,
+        postedAt: state.postedAt
       }
     }
   }

@@ -14,6 +14,7 @@ export type DispatchArgs =
     readonly dependsOn: ReadonlyArray<string>
   }
   | { readonly kind: "CloseTask"; readonly id: string; readonly outcome: "done" | "failed"; readonly reason: string }
+  | { readonly kind: "MarkPosted"; readonly id: string }
   | { readonly kind: "Beat"; readonly json: boolean }
   | { readonly kind: "RunnerStart"; readonly reach: Reach }
   | { readonly kind: "RunnerQueue" }
@@ -24,7 +25,7 @@ export type DispatchArgs =
   | { readonly kind: "UsageError"; readonly detail: string }
 
 export const dispatchUsage =
-  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>]"
+  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog posted <task-id> | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>]"
 
 const parseJsonFlag = (rest: ReadonlyArray<string>, json: (json: boolean) => DispatchArgs): DispatchArgs => {
   if (rest.length === 0) {
@@ -94,6 +95,14 @@ const splitReach = (rest: ReadonlyArray<string>): ReachSplit => {
 }
 
 const unexpected = (word: string | undefined): DispatchArgs => ({ kind: "UsageError", detail: "unexpected argument: " + (word ?? "") })
+
+const parsePosted = (rest: ReadonlyArray<string>): DispatchArgs => {
+  const [id = "", ...extra] = rest
+  if (!isTaskId(id)) {
+    return { kind: "UsageError", detail: "orc backlog posted takes a task id, got \"" + id + "\"" }
+  }
+  return extra.length === 0 ? { kind: "MarkPosted", id } : unexpected(extra[0])
+}
 
 const parseRunnerToken = (after: ReadonlyArray<string>): DispatchArgs => {
   const [session = "", ...extra] = after
@@ -197,6 +206,9 @@ export const parseDispatchArgs = (command: "backlog" | "beat" | "runner", rest: 
   }
   if (rest[0] === "close") {
     return parseClose(rest.slice(1))
+  }
+  if (rest[0] === "posted") {
+    return parsePosted(rest.slice(1))
   }
   return parseJsonFlag(rest, (json) => ({ kind: "ShowBacklog", json }))
 }

@@ -79,7 +79,7 @@ const chatEnv = (fixture: Fixture) => ({ ...process.env, ...fixture.env, ORC_CHA
 
 const sessionFor = (fixture: Fixture) => {
   const posted: Array<string> = []
-  const session = chatSession(chatEnv(fixture), (text) => posted.push(text))
+  const session = chatSession(chatEnv(fixture), () => true, (text) => posted.push(text))
   const byName = new Map(session.tools.map((tool) => [tool.name, tool]))
   const call = (name: string, params: unknown) => {
     const tool = byName.get(name)
@@ -254,7 +254,7 @@ describe("orc chat tools", () => {
       await writeFile(broken, "no frontmatter\n")
       await chat.postClosed()
       await chat.postClosed()
-      expect(chat.posted).toEqual(["orc chat cannot read the backlog to follow task-1: orc: " + broken + ": the task file opens with no --- frontmatter"])
+      expect(chat.posted).toEqual(["orc chat cannot post the closed tasks: orc: " + broken + ": the task file opens with no --- frontmatter"])
       await rm(broken)
       await closeTask(fixture, "task-1", ranClosing("done", "", "https://github.com/acme/orc/pull/7"))
       await chat.postClosed()
@@ -286,6 +286,7 @@ describe("orc chat tools", () => {
       await closeTask(fixture, "task-1", ranClosing("done", "", "https://github.com/acme/orc/pull/7"))
       await Bun.sleep(1_000)
       expect(pi.sent).toEqual([])
+      expect(await readFile(join(fixture.home, "backlog", "closed", "task-1.md"), "utf8")).not.toContain("posted_at")
     })
   }, 60_000)
 
@@ -297,6 +298,32 @@ describe("orc chat tools", () => {
       await closeTask(fixture, "task-1", ranClosing("done", "", "https://github.com/acme/orc/pull/8"))
       await chat.postClosed()
       expect(chat.posted).toEqual(["task-1 Elsewhere closed done, PR https://github.com/acme/orc/pull/8"])
+    })
+  }, 60_000)
+
+  test("a posted close carries posted_at in its task file and postedAt in orc backlog --json, so no later chat posts it again", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const chat = sessionFor(fixture)
+      await chat.call("orc_backlog_add", { project: "orc", task: "# Fix the typo\n" })
+      await closeTask(fixture, "task-1", ranClosing("done", "", "https://github.com/acme/orc/pull/7"))
+      const before = Date.now()
+      await chat.postClosed()
+      const file = await readFile(join(fixture.home, "backlog", "closed", "task-1.md"), "utf8")
+      const postedAt = /^posted_at: "([^"]+)"$/m.exec(file)?.[1] ?? ""
+      expect(Date.parse(postedAt)).toBeGreaterThanOrEqual(before - 1_000)
+      const json: unknown = JSON.parse((await runOrc(fixture, ["backlog", "--json"])).stdout)
+      expect(json).toMatchObject({ tasks: [{ id: "task-1", status: "closed", postedAt }] })
+      const later = sessionFor(fixture)
+      await later.postClosed()
+      expect(later.posted).toEqual([])
+    })
+  }, 60_000)
+
+  test("orc backlog posted refuses an open task instead of marking a close that has not happened", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Fix the typo\n" })
+      const result = await runOrc(fixture, ["backlog", "posted", "task-1"])
+      expect([result.exitCode, result.stderr.trim()]).toEqual([1, "orc: the backlog holds no closed task-1"])
     })
   }, 60_000)
 

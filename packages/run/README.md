@@ -458,10 +458,10 @@ The chat's Pi has two tools and no others:
 - `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
 
 So a task from the chat enters the backlog the way any other does, and the beat starts it.
-Every 15 seconds the chat reads `orc backlog --json` and posts each task it added that has since closed, with its outcome, its reason and its PR, as in `task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
-It posts each task once, and posts nothing for a task another chat or the command line added.
-When it cannot read the backlog, it posts orc's error once and keeps following the open tasks.
-The chat follows only the tasks added since it started, so a task added in an earlier chat closes without a post.
+When it starts and every 15 seconds after, the chat reads `orc backlog --json` and posts each closed task that has no `postedAt`, with its outcome, its reason and its PR, as in `task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
+It posts a task whoever added it: this chat, an earlier chat or the command line.
+Before it posts a task it runs `orc backlog posted <task-id>`, which writes `posted_at` into the closed task file and prints `posted <task-id>` only to the one command that wrote it, so a task closed while no chat ran is posted by the next chat to start, and each task is posted once however often the chat closes and reopens.
+When it cannot read the backlog, it posts orc's error once and keeps polling.
 The chat's Pi loads your Pi settings and packages, so a provider a package adds works as it does in your Pi.
 `ORC_HOME` reaches the tools from the shell that runs `orc chat`.
 
@@ -518,7 +518,7 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
 | `src/orc-config.ts` | The reading of `config.json`: the providers and the implementer, fixer and orchestrator models |
 | `src/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
-| `src/chat-tools.ts` | The chat tools and the closed-task follow that posts each added task back into the chat |
+| `src/chat-tools.ts` | The chat tools and the poll that posts each closed task into the chat once |
 | `src/json-file.ts` | The JSON config file reading and its `ConfigError` |
 | `src/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
