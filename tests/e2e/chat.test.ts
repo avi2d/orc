@@ -110,7 +110,7 @@ type ChatHost = Parameters<ReturnType<typeof chatExtension>>[0]
 
 const piFor = (fixture: Fixture, pollMillis: number) => {
   const tools = new Map<string, ChatTool>()
-  const handlers = new Map<string, () => void>()
+  const handlers = new Map<string, (ctx?: { isIdle: () => boolean }) => void>()
   const sent: Array<{ readonly message: unknown; readonly options: unknown }> = []
   const host: ChatHost = {
     registerTool: (tool) => tools.set(tool.name, tool),
@@ -119,7 +119,7 @@ const piFor = (fixture: Fixture, pollMillis: number) => {
   }
   chatExtension(chatEnv(fixture), pollMillis)(host)
   const add = (params: unknown) => tools.get("orc_backlog_add")?.execute("call-1", params)
-  return { add, sent, fire: (event: string) => handlers.get(event)?.() }
+  return { add, sent, fire: (event: string, ctx?: { isIdle: () => boolean }) => handlers.get(event)?.(ctx) }
 }
 
 const until = async (done: () => boolean, millis: number): Promise<void> => {
@@ -304,6 +304,62 @@ describe("orc chat tools", () => {
       await Bun.sleep(1_000)
       expect(pi.sent).toEqual([])
       expect(await readFile(join(fixture.home, "backlog", "closed", "task-1.md"), "utf8")).not.toContain("posted_at")
+    })
+  }, 60_000)
+
+  test("while Pi streams a turn the close waits unmarked until idle instead of being lost", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const pi = piFor(fixture, 50)
+      await pi.add({ project: "orc", task: "# Fix the typo\n" })
+      await closeTask(fixture, "task-1", ranClosing("done", "", "https://github.com/acme/orc/pull/7"))
+      let idle = false
+      pi.fire("session_start", { isIdle: () => idle })
+      await Bun.sleep(500)
+      expect(pi.sent).toEqual([])
+      expect(await readFile(join(fixture.home, "backlog", "closed", "task-1.md"), "utf8")).not.toContain("posted_at")
+      idle = true
+      await until(() => pi.sent.length > 0, 10_000)
+      const postedFile = join(fixture.home, "backlog", "closed", "task-1.md")
+      await until(() => Bun.file(postedFile).size > 0, 1_000).catch(() => undefined)
+      for (let attempt = 0; attempt < 200; attempt += 1) {
+        if ((await readFile(postedFile, "utf8")).includes("posted_at")) {
+          break
+        }
+        await Bun.sleep(20)
+      }
+      pi.fire("session_shutdown")
+      expect(pi.sent.map((entry) => entry.message)).toEqual([
+        { customType: "orc-task-closed", content: "task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7", display: true }
+      ])
+      expect(await readFile(join(fixture.home, "backlog", "closed", "task-1.md"), "utf8")).toContain("posted_at")
+    })
+  }, 60_000)
+
+  test("a failed mark retries without reposting the close and still posts later closes", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const chat = sessionFor(fixture)
+      await chat.call("orc_backlog_add", { project: "orc", task: "# First\n" })
+      await chat.call("orc_backlog_add", { project: "orc", task: "# Second\n" })
+      await closeTask(fixture, "task-1", ranClosing("done", "", null))
+      await closeTask(fixture, "task-2", ranClosing("done", "", null))
+      const closedDir = join(fixture.home, "backlog", "closed")
+      await chmod(closedDir, 0o555)
+      try {
+        await chat.postClosed()
+        expect(chat.posted.slice(0, 2)).toEqual([
+          "task-1 First closed done, with no PR",
+          "task-2 Second closed done, with no PR"
+        ])
+        expect(chat.posted[2]).toStartWith("orc chat cannot post the closed tasks: ")
+        await chat.postClosed()
+        expect(chat.posted.length).toBe(3)
+      } finally {
+        await chmod(closedDir, 0o755)
+      }
+      await chat.postClosed()
+      expect(chat.posted.length).toBe(3)
+      expect(await readFile(join(closedDir, "task-1.md"), "utf8")).toContain("posted_at")
+      expect(await readFile(join(closedDir, "task-2.md"), "utf8")).toContain("posted_at")
     })
   }, 60_000)
 

@@ -28,9 +28,13 @@ export interface ChatSession {
   readonly postClosed: () => Promise<void>
 }
 
+interface SessionStartContext {
+  readonly isIdle: () => boolean
+}
+
 interface ChatHost {
   readonly registerTool: (tool: ChatTool) => void
-  readonly on: (event: "session_start" | "session_shutdown", handler: () => void) => void
+  readonly on: (event: "session_start" | "session_shutdown", handler: (ctx?: SessionStartContext) => void) => void
   readonly sendMessage: (message: { readonly customType: string; readonly content: string; readonly display: boolean }, options?: { readonly triggerTurn?: boolean }) => void
 }
 
@@ -99,6 +103,12 @@ const closedLine = (task: ClosedTask): string =>
 
 export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string) => void): ChatSession => {
   let unreadBecause: string | null = null
+  const delivered = new Set<string>()
+  const deliver = (text: string): void => {
+    if (isOpen()) {
+      post(text)
+    }
+  }
   const tools: ReadonlyArray<ChatTool> = [
     {
       name: "orc_backlog_add",
@@ -139,12 +149,35 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
         )
       )
     )
+    let markProblem: string | null = null
     for (const task of backlog.tasks) {
       if (task.status !== "closed" || task.postedAt !== null || !isOpen()) {
         continue
       }
-      post(closedLine(task))
-      yield* runOrc(env, ["backlog", "posted", task.id], null)
+      if (!delivered.has(task.id)) {
+        deliver(closedLine(task))
+        delivered.add(task.id)
+      }
+      const marked = yield* runOrc(env, ["backlog", "posted", task.id], null).pipe(
+        Effect.as(true),
+        Effect.catchTag("ChatToolError", (error) => Effect.succeed(error.message))
+      )
+      if (typeof marked === "string") {
+        if (markProblem === null) {
+          markProblem = marked
+        }
+        continue
+      }
+      delivered.delete(task.id)
+    }
+    if (markProblem !== null) {
+      if (unreadBecause === null) {
+        unreadBecause = markProblem
+        deliver("orc chat cannot post the closed tasks: " + markProblem)
+      } else {
+        unreadBecause = markProblem
+      }
+      return
     }
     unreadBecause = null
   }).pipe(
@@ -152,7 +185,7 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
       Effect.sync(() => {
         if (error.message !== unreadBecause) {
           unreadBecause = error.message
-          post("orc chat cannot post the closed tasks: " + error.message)
+          deliver("orc chat cannot post the closed tasks: " + error.message)
         }
       })
     )
@@ -164,7 +197,8 @@ export const chatToolNames: ReadonlyArray<string> = chatSession({}, () => false,
 
 export const chatExtension = (env: Env, pollMillis: number) => (pi: ChatHost): void => {
   let stopped = true
-  const session = chatSession(env, () => !stopped, (text) => {
+  let idle: (() => boolean) | null = null
+  const session = chatSession(env, () => !stopped && (idle?.() ?? true), (text) => {
     pi.sendMessage({ customType: "orc-task-closed", content: text, display: true }, { triggerTurn: false })
   })
   for (const tool of session.tools) {
@@ -172,8 +206,9 @@ export const chatExtension = (env: Env, pollMillis: number) => (pi: ChatHost): v
   }
   let poll: ReturnType<typeof setInterval> | undefined
   let current: Promise<void> | null = null
-  pi.on("session_start", () => {
+  pi.on("session_start", (ctx) => {
     stopped = false
+    idle = ctx?.isIdle ?? null
     const postClosed = () => {
       if (current !== null) {
         return
@@ -196,6 +231,7 @@ export const chatExtension = (env: Env, pollMillis: number) => (pi: ChatHost): v
   })
   pi.on("session_shutdown", () => {
     stopped = true
+    idle = null
     clearInterval(poll)
     poll = undefined
     const running = current
