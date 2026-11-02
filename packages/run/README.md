@@ -10,7 +10,7 @@ By default it runs the Pi agent inside a nono sandbox, then runs the project's c
 With `--sandbox none` it runs Pi and the checks directly on the host.
 A `no-mistakes` run hands the branch to no-mistakes, which reviews it, pushes it and opens a PR on a provider it supports, such as GitHub.
 A `direct-PR` run pushes the branch and opens the PR itself, as [Delivery modes](#delivery-modes) shows.
-You read the PR and merge it, since orc never merges.
+You read the PR and land it with `orc merge <task-id>`, as [Merging a task's PR](#merging-a-tasks-pr) shows.
 [The backlog and the beat](#the-backlog-and-the-beat), [Adding tasks from a chat](#adding-tasks-from-a-chat) and [The runner](#the-runner) describe the path a task takes to its run.
 
 ## Before you begin
@@ -659,8 +659,10 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/dispatch/held-token.ts` | The owner-only token folder a run on another machine reads |
 | `src/dispatch/hold.ts` | `orc runner hold`: the wait for a live token, the rerun and the folder removal |
 | `src/dispatch/pueue-status.ts` | The pueue status shapes and the held-task lookup the runner reads |
-| `src/dispatch/args.ts` | The flag parsing for `orc backlog`, `orc beat` and `orc runner` |
-| `src/dispatch/cli.ts` | The `orc backlog`, `orc beat` and `orc runner` commands |
+| `src/dispatch/args.ts` | The flag parsing for `orc backlog`, `orc beat`, `orc runner` and `orc merge` |
+| `src/dispatch/cli.ts` | The `orc backlog`, `orc beat`, `orc runner` and `orc merge` commands |
+| `src/dispatch/merge.ts` | The `orc merge` guard and squash-merge |
+| `src/dispatch/merge-basis.ts` | The `captain-word` and `yolo-green` bases `orc merge` takes |
 | `../../tests/unit` | The in-process unit tests at the workspace root |
 | `../../tests/e2e` | The tests that run `src/bin.ts`, git or nono as a process, with a live Pi run through `ORC_PI_E2E=1`, at the workspace root |
 | `../../tests/fixtures/runner/pueue` | The pueue 4 status JSON the runner tests read |
