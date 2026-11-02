@@ -1,4 +1,4 @@
-import { Data, Effect, FileSystem } from "effect"
+import { Console, Data, Effect, FileSystem } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { chatToolNames, orcCommandVar } from "./chat-tools"
 import type { Command } from "./dispatch/runner"
@@ -15,8 +15,30 @@ interface ChatLaunch {
 
 const chatToolsFile = import.meta.dir + "/chat-tools.ts"
 
-const chatLaunch = (model: string, self: Command): ChatLaunch => ({
-  command: ["pi", "--model", model, "--extension", chatToolsFile, "--tools", chatToolNames.join(",")],
+type ChatRules = { readonly kind: "loaded"; readonly file: string } | { readonly kind: "none"; readonly file: string }
+
+const chatRules = (orcHome: string): Effect.Effect<ChatRules, never, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const file = orcHome + "/orchestrator.md"
+    const fs = yield* FileSystem.FileSystem
+    const type = yield* fs.stat(file).pipe(Effect.map((info) => info.type), Effect.orElseSucceed(() => null))
+    return type === "File" ? { kind: "loaded", file } : { kind: "none", file }
+  })
+
+const rulesLine = (rules: ChatRules): string =>
+  rules.kind === "loaded" ? "orc chat loaded the rules in " + rules.file : "orc chat found no rules at " + rules.file
+
+const chatLaunch = (model: string, rules: ChatRules, self: Command): ChatLaunch => ({
+  command: [
+    "pi",
+    "--model",
+    model,
+    "--extension",
+    chatToolsFile,
+    "--tools",
+    chatToolNames.join(","),
+    ...(rules.kind === "loaded" ? ["--append-system-prompt", rules.file] : [])
+  ],
   env: { [orcCommandVar]: JSON.stringify(self) }
 })
 
@@ -29,7 +51,9 @@ export const runChat = (orcHome: string, self: Command): Effect.Effect<number, C
     if (model === undefined) {
       return yield* new ChatError({ message: "orc chat needs models.orchestrator in " + config.file + ", the provider/model the chat runs on" })
     }
-    const launch = chatLaunch(model, self)
+    const rules = yield* chatRules(orcHome)
+    yield* Console.log(rulesLine(rules))
+    const launch = chatLaunch(model, rules, self)
     const [program, ...args] = launch.command
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const handle = yield* spawner.spawn(ChildProcess.make(program, args, { env: launch.env, extendEnv: true, stdin: "inherit", stdout: "inherit", stderr: "inherit" }))
