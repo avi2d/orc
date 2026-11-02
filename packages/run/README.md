@@ -428,7 +428,8 @@ So the start command and what it leaves running outlive the beat, even when laun
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
 From then on, each beat closes the finished runs on a machine whose start runs `orc runner start`.
 It reads `orc runner result` on that machine and closes the task done or failed, freeing its slot in the same beat.
-The beat prints `closed <task-id> <done|failed> on <machine>` with the reason for each, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds.
+The closed task file keeps the PR link of the orc run on `orc/<task-id>` as `pr`, and `orc backlog --json` carries it as `pr`, or `null` when the run opened none.
+The beat prints `closed <task-id> <done|failed> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds.
 A machine whose start runs any other program keeps owning its tasks, which the beat never reads.
 To close one of those, run `orc backlog close <task-id> <done|failed> [reason]`.
 A missing start command exits 127 into its log and leaves the task started.

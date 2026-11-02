@@ -27,7 +27,7 @@ export interface Started {
 
 type Closing =
   | { readonly outcome: "start-failed"; readonly reason: string }
-  | { readonly outcome: "done" | "failed"; readonly started: Started; readonly reason: string }
+  | { readonly outcome: "done" | "failed"; readonly started: Started; readonly reason: string; readonly pr: string | null }
 
 type TaskState =
   | { readonly kind: "new" }
@@ -60,7 +60,8 @@ const Frontmatter = Schema.Struct({
   start_log: Schema.optional(Schema.String),
   outcome: Schema.optional(Schema.Literals(["done", "failed", "start-failed"])),
   closed_at: Schema.optional(Schema.String),
-  reason: Schema.optional(Schema.String)
+  reason: Schema.optional(Schema.String),
+  pr: Schema.optional(Schema.String)
 })
 type Frontmatter = typeof Frontmatter.Type
 
@@ -79,7 +80,7 @@ const closingOf = (front: Frontmatter, started: Started | null): Closing | null 
   if (front.outcome === "start-failed") {
     return { outcome: "start-failed", reason }
   }
-  return front.outcome === undefined || started === null ? null : { outcome: front.outcome, started, reason }
+  return front.outcome === undefined || started === null ? null : { outcome: front.outcome, started, reason, pr: front.pr ?? null }
 }
 
 const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => {
@@ -168,13 +169,16 @@ const stateFields = (state: TaskState): ReadonlyArray<string> => {
       return [...claimFields(state.claim), ...startedFields(state.started)]
     }
     case "closed": {
-      const started = state.closing.outcome === "start-failed" ? [] : startedFields(state.closing.started)
+      const ran = state.closing.outcome === "start-failed"
+        ? { started: [], pr: [] }
+        : { started: startedFields(state.closing.started), pr: state.closing.pr === null ? [] : [field("pr", state.closing.pr)] }
       return [
         ...claimFields(state.claim),
-        ...started,
+        ...ran.started,
         field("outcome", state.closing.outcome),
         field("closed_at", state.closedAt),
-        field("reason", state.closing.reason)
+        field("reason", state.closing.reason),
+        ...ran.pr
       ]
     }
   }

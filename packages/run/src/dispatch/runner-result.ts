@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { latestRunForBranch } from "../history-resume"
-import { formatHistoryError, openDatabase, RunStatusSchema } from "../run-history"
+import { runsForBranch } from "../history-resume"
+import { formatHistoryError, openDatabase, type RunRecord, RunStatusSchema } from "../run-history"
 import { TaskId } from "./backlog"
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
 import { LabelArg } from "./token"
@@ -57,26 +57,55 @@ const failureReason = (result: typeof PueueResult.Type): string | null => {
 export interface TaskClosing {
   readonly outcome: "done" | "failed"
   readonly reason: string
+  readonly pr: string | null
 }
 
+// The beat closes a started task from this, so its done and failed match what runner result reports.
 export const closingFromResult = (result: RunnerResult): TaskClosing | null => {
   if (result.status === "succeeded") {
-    return { outcome: "done", reason: "pueue task " + result.pueueTask + " succeeded" }
+    return { outcome: "done", reason: "pueue task " + result.pueueTask + " succeeded", pr: result.run?.prLink ?? null }
   }
   if (result.status === "failed") {
-    return { outcome: "failed", reason: result.reason }
+    return { outcome: "failed", reason: result.reason, pr: result.run?.prLink ?? null }
   }
   return null
 }
 
-const closingOf = (pueueTask: number, status: PueueStatus): TaskClosing | null => {
-  if (!("Done" in status)) {
-    return null
+interface PueueInterval {
+  readonly start: string
+  readonly end: string | null
+}
+
+const pueueIntervalOf = (status: PueueStatus): PueueInterval | null => {
+  if ("Done" in status) {
+    return { start: status.Done.start, end: status.Done.end }
   }
-  const reason = failureReason(status.Done.result)
-  return reason === null
-    ? { outcome: "done", reason: "pueue task " + pueueTask + " succeeded" }
-    : { outcome: "failed", reason }
+  if ("Running" in status) {
+    return { start: status.Running.start, end: null }
+  }
+  if ("Paused" in status) {
+    return { start: status.Paused.start, end: null }
+  }
+  return null
+}
+
+const startsWithin = (runStarted: string, interval: PueueInterval): boolean => {
+  const runMs = Date.parse(runStarted)
+  const startMs = Date.parse(interval.start)
+  if (Number.isNaN(runMs) || Number.isNaN(startMs)) {
+    return false
+  }
+  if (runMs < startMs) {
+    return false
+  }
+  if (interval.end === null) {
+    return true
+  }
+  const endMs = Date.parse(interval.end)
+  if (Number.isNaN(endMs)) {
+    return false
+  }
+  return runMs <= endMs
 }
 
 const assessHeld = (
@@ -102,31 +131,21 @@ const assessHeld = (
   return { ...held, status: "Stashed" in status ? "stashed" : "queued" }
 }
 
-const readRun = (home: string, checkout: string, task: string): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
+const toSummary = (run: RunRecord): RunSummary => ({ id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason })
+
+const readRun = (home: string, checkout: string, task: string, interval: PueueInterval | null): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const project = yield* resolveProjectDir(checkout)
-    const run = yield* Effect.acquireUseRelease(
+    const runs = yield* Effect.acquireUseRelease(
       openDatabase(home),
-      (db) => latestRunForBranch(db, project, taskBranch(task)),
+      (db) => runsForBranch(db, project, taskBranch(task)),
       (db) => Effect.sync(() => db.close())
     )
-    return run === null ? null : { id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason }
+    const run = runs.find((candidate) => interval === null || startsWithin(candidate.started, interval)) ?? null
+    return run === null ? null : toSummary(run)
   }).pipe(
     Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
   )
-
-// The beat closes a started task from this, so its done and failed match what runner result reports.
-export const readClosing = (task: string, home: string, label?: string | null): Effect.Effect<TaskClosing | null, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.gen(function*() {
-    const held = yield* readHeld(home, task, label)
-    if (held === null) {
-      return null
-    }
-    const status = yield* Schema.decodeUnknownEffect(PueueStatus)(held.status).pipe(
-      Effect.mapError((error) => new RunnerError({ detail: "pueue reports a status orc cannot read for task " + held.id + ": " + error.message }))
-    )
-    return closingOf(held.id, status)
-  })
 
 export const readResult = (task: string, home: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
@@ -137,7 +156,7 @@ export const readResult = (task: string, home: string, label?: string | null): E
     const status = yield* Schema.decodeUnknownEffect(PueueStatus)(held.status).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "pueue reports a status orc cannot read for task " + held.id + ": " + error.message }))
     )
-    const run = yield* readRun(home, held.path, task)
+    const run = yield* readRun(home, held.path, task, pueueIntervalOf(status))
     return assessHeld(task, held.id, status, run)
   })
 

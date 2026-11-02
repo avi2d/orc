@@ -8,6 +8,8 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../packages/run/src/dispatch/args"
 import { addTask, claimTask, closeStartedTask, listTasks, releaseTask, writeTaken } from "../../packages/run/src/dispatch/backlog"
 import { placeTask, runBeat } from "../../packages/run/src/dispatch/beat"
+import { formatBeat } from "../../packages/run/src/dispatch/board"
+import { insertRun, openDatabase } from "../../packages/run/src/run-history"
 import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/dispatch/config"
 import { assessQuota } from "../../packages/run/src/dispatch/quota"
 import { taskLabel } from "../../packages/run/src/dispatch/pueue-status"
@@ -402,7 +404,7 @@ describe("the backlog folders", () => {
     await withBacklog(async (root) => {
       const record = await run(addTask(root, spec))
       await run(claimTask(root, record.spec.id))
-      const result = await run(Effect.result(closeStartedTask(root, record.spec.id, "done", "", "2026-10-27T11:00:00.000Z")))
+      const result = await run(Effect.result(closeStartedTask(root, record.spec.id, "done", "", null, "2026-10-27T11:00:00.000Z")))
       expect(Result.isFailure(result)).toBe(true)
     })
   })
@@ -411,7 +413,7 @@ describe("the backlog folders", () => {
       const record = await run(addTask(root, spec))
       await run(claimTask(root, record.spec.id))
       await run(writeTaken(root, { spec: record.spec, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
-      await run(closeStartedTask(root, record.spec.id, "done", "merged", "2026-10-27T11:00:00.000Z"))
+      await run(closeStartedTask(root, record.spec.id, "done", "merged", null, "2026-10-27T11:00:00.000Z"))
       const tasks = await run(listTasks(root))
       expect(tasks.map((task) => task.state.kind)).toEqual(["closed"])
       expect(await readdir(join(root, "taken"))).toEqual([])
@@ -437,35 +439,74 @@ describe("the beat", () => {
 
 const macProjects = [{ name: "orc", checkouts: { mac: "/checkout" } }]
 
-const beatAfterRun = async (root: string, result: unknown): Promise<{ readonly states: ReadonlyArray<string>; readonly actions: ReadonlyArray<string>; readonly reasons: ReadonlyArray<string> }> => {
-  await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["orc", "runner", "start"] }] }))
+const orcStart = ["orc", "runner", "start"]
+
+type BeatSpawner = Layer.Layer<ChildProcessSpawner.ChildProcessSpawner>
+
+const startTaskOne = async (root: string, start: ReadonlyArray<string>, next: { readonly dependsOn: ReadonlyArray<string> } | null): Promise<void> => {
+  await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start }] }))
   await writeFile(join(root, "projects.json"), JSON.stringify({ projects: macProjects }))
   await run(addTask(root, spec))
-  await run(addTask(root, { ...spec, title: "Fix the other thing" }))
+  if (next !== null) {
+    await run(addTask(root, { ...spec, title: "Fix the other thing", dependsOn: next.dependsOn }))
+  }
   await run(claimTask(root, "task-1"))
   const first = (await run(listTasks(root))).find((task) => task.spec.id === "task-1")
   if (first === undefined) {
     throw new Error("the backlog holds no task-1")
   }
   await run(writeTaken(root, { spec: first.spec, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
-  const status = JSON.stringify({
-    tasks: {
-      "11": {
-        id: 11,
-        label: taskLabel(root, "task-1"),
-        group: "orc",
-        path: "/checkout",
-        status: { Done: { start: "2026-10-27T10:02:00.000Z", end: "2026-10-27T10:05:00.000Z", result } }
-      }
-    }
-  })
-  const spawner = pueueStub(status).pipe(Layer.provide(BunServices.layer))
-  const report = await Effect.runPromise(runBeat(root, root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+}
+
+const pueueAnswering = (root: string, status: unknown): BeatSpawner =>
+  pueueStub(JSON.stringify({ tasks: { "11": { id: 11, label: taskLabel(root, "task-1"), group: "orc", path: "/checkout", status } } })).pipe(Layer.provide(BunServices.layer))
+
+const pueueDone = (root: string, result: unknown): BeatSpawner =>
+  pueueAnswering(root, { Done: { start: "2026-10-27T10:02:00.000Z", end: "2026-10-27T10:05:00.000Z", result } })
+
+const pueueInstead = (onPueue: ReturnType<typeof ChildProcessSpawner.ChildProcessSpawner.of>["spawn"]): BeatSpawner =>
+  Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
+    const real = yield* ChildProcessSpawner.ChildProcessSpawner
+    return ChildProcessSpawner.make((command) =>
+      ChildProcess.isStandardCommand(command) && command.command === "pueue"
+        ? onPueue(command)
+        : ChildProcess.isStandardCommand(command) && command.command === "orc-quota"
+          ? real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + quotaReply + "\nJ"]))
+          : real.spawn(command)
+    )
+  })).pipe(Layer.provide(BunServices.layer))
+
+const beatWith = (root: string, spawner: BeatSpawner) =>
+  Effect.runPromise(runBeat(root, root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+
+const backlogStates = async (root: string): Promise<ReadonlyArray<string>> =>
+  (await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)
+
+interface BeatAfterRun {
+  readonly states: ReadonlyArray<string>
+  readonly actions: ReadonlyArray<string>
+  readonly reasons: ReadonlyArray<string>
+  readonly prs: ReadonlyArray<string | null>
+  readonly lines: ReadonlyArray<string>
+}
+
+const recordRun = (home: string, prLink: string): Promise<void> =>
+  run(Effect.acquireUseRelease(
+    openDatabase(home),
+    (db) => Effect.sync(() => insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/task-1", taskFile: "task-1.md", status: "succeeded", started: "2026-10-27T10:02:00.000Z", prLink })),
+    (db) => Effect.sync(() => db.close())
+  ))
+
+const beatAfterRun = async (root: string, result: unknown): Promise<BeatAfterRun> => {
+  await startTaskOne(root, orcStart, { dependsOn: [] })
+  const report = await beatWith(root, pueueDone(root, result))
   const tasks = await run(listTasks(root))
   return {
     states: tasks.map((task) => task.spec.id + ":" + task.state.kind),
     actions: report.actions.map((action) => action.kind + ":" + action.task),
-    reasons: tasks.flatMap((task) => task.state.kind === "closed" ? [task.state.closing.outcome + ":" + task.state.closing.reason] : [])
+    reasons: tasks.flatMap((task) => task.state.kind === "closed" ? [task.state.closing.outcome + ":" + task.state.closing.reason] : []),
+    prs: tasks.flatMap((task) => task.state.kind === "closed" && task.state.closing.outcome !== "start-failed" ? [task.state.closing.pr] : []),
+    lines: formatBeat(report).split("\n").filter((line) => line.startsWith("closed "))
   }
 }
 
@@ -478,32 +519,28 @@ describe("the beat's closing sweep", () => {
       expect(beat.actions).toEqual(["closed:task-1", "started:task-2"])
     })
   })
+  test("a closed task keeps the PR its run opened instead of only the pueue reason", async () => {
+    await withBacklog(async (root) => {
+      await recordRun(root, "https://github.com/example/orc/pull/7")
+      const beat = await beatAfterRun(root, "Success")
+      expect(beat.prs).toEqual(["https://github.com/example/orc/pull/7"])
+      expect(beat.lines).toEqual(["closed task-1 done on mac: pueue task 11 succeeded, PR https://github.com/example/orc/pull/7"])
+      const closed = (await run(listTasks(root))).find((task) => task.spec.id === "task-1")
+      expect(closed === undefined ? "" : renderTaskFile(closed)).toContain('pr: "https://github.com/example/orc/pull/7"')
+    })
+  })
+  test("a failed run with no PR closes with none instead of an empty link", async () => {
+    await withBacklog(async (root) => {
+      const beat = await beatAfterRun(root, { Failed: 3 })
+      expect(beat.prs).toEqual([null])
+      expect(beat.lines).toEqual(["closed task-1 failed on mac: orc exited 3"])
+    })
+  })
   test("a started task whose pueue run still runs stays started and keeps its slot instead of closing early", async () => {
     await withBacklog(async (root) => {
-      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["orc", "runner", "start"] }] }))
-      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: macProjects }))
-      await run(addTask(root, spec))
-      await run(addTask(root, { ...spec, title: "Fix the other thing" }))
-      await run(claimTask(root, "task-1"))
-      const first = (await run(listTasks(root))).find((task) => task.spec.id === "task-1")
-      if (first === undefined) {
-        throw new Error("the backlog holds no task-1")
-      }
-      await run(writeTaken(root, { spec: first.spec, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
-      const status = JSON.stringify({
-        tasks: {
-          "11": {
-            id: 11,
-            label: taskLabel(root, "task-1"),
-            group: "orc",
-            path: "/checkout",
-            status: { Running: { start: "2026-10-27T10:02:00.000Z" } }
-          }
-        }
-      })
-      const spawner = pueueStub(status).pipe(Layer.provide(BunServices.layer))
-      const report = await Effect.runPromise(runBeat(root, root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
-      expect((await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["task-1:started", "task-2:new"])
+      await startTaskOne(root, orcStart, { dependsOn: [] })
+      const report = await beatWith(root, pueueAnswering(root, { Running: { start: "2026-10-27T10:02:00.000Z" } }))
+      expect(await backlogStates(root)).toEqual(["task-1:started", "task-2:new"])
       expect(report.actions.map((action) => action.kind + ":" + action.task)).toEqual(["waits:task-2"])
     })
   })
@@ -517,82 +554,25 @@ describe("the beat's closing sweep", () => {
   })
   test("a task waiting on a just-finished task starts in the same beat instead of waiting one more beat", async () => {
     await withBacklog(async (root) => {
-      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["orc", "runner", "start"] }] }))
-      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: macProjects }))
-      await run(addTask(root, spec))
-      await run(addTask(root, { ...spec, title: "Fix the other thing", dependsOn: ["task-1"] }))
-      await run(claimTask(root, "task-1"))
-      const first = (await run(listTasks(root))).find((task) => task.spec.id === "task-1")
-      if (first === undefined) {
-        throw new Error("the backlog holds no task-1")
-      }
-      await run(writeTaken(root, { spec: first.spec, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
-      const status = JSON.stringify({
-        tasks: {
-          "11": {
-            id: 11,
-            label: taskLabel(root, "task-1"),
-            group: "orc",
-            path: "/checkout",
-            status: { Done: { start: "2026-10-27T10:02:00.000Z", end: "2026-10-27T10:05:00.000Z", result: "Success" } }
-          }
-        }
-      })
-      const spawner = pueueStub(status).pipe(Layer.provide(BunServices.layer))
-      const report = await Effect.runPromise(runBeat(root, root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
-      expect((await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["task-1:closed", "task-2:started"])
+      await startTaskOne(root, orcStart, { dependsOn: ["task-1"] })
+      const report = await beatWith(root, pueueDone(root, "Success"))
+      expect(await backlogStates(root)).toEqual(["task-1:closed", "task-2:started"])
       expect(report.actions.map((action) => action.kind + ":" + action.task)).toEqual(["closed:task-1", "started:task-2"])
     })
   })
   test("a started task on a machine with a custom start is left alone instead of read and reported", async () => {
     await withBacklog(async (root) => {
-      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["true"] }] }))
-      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: macProjects }))
-      await run(addTask(root, spec))
-      await run(claimTask(root, "task-1"))
-      const first = (await run(listTasks(root))).find((task) => task.spec.id === "task-1")
-      if (first === undefined) {
-        throw new Error("the backlog holds no task-1")
-      }
-      await run(writeTaken(root, { spec: first.spec, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
-      const unreadable = Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
-        const real = yield* ChildProcessSpawner.ChildProcessSpawner
-        return ChildProcessSpawner.make((command) =>
-          ChildProcess.isStandardCommand(command) && command.command === "pueue"
-            ? Effect.die("the sweep read pueue on a custom-start machine")
-            : ChildProcess.isStandardCommand(command) && command.command === "orc-quota"
-              ? real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + quotaReply + "\nJ"]))
-              : real.spawn(command)
-        )
-      })).pipe(Layer.provide(BunServices.layer))
-      const report = await Effect.runPromise(runBeat(root, root).pipe(Effect.provide(Layer.merge(BunServices.layer, unreadable))))
-      expect((await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["task-1:started"])
+      await startTaskOne(root, ["true"], null)
+      const report = await beatWith(root, pueueInstead(() => Effect.die("the sweep read pueue on a custom-start machine")))
+      expect(await backlogStates(root)).toEqual(["task-1:started"])
       expect(report.actions).toEqual([])
     })
   })
   test("a close read that never answers is reported after 30 seconds instead of stopping the beat", async () => {
     await withBacklog(async (root) => {
-      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["orc", "runner", "start"] }] }))
-      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: macProjects }))
-      await run(addTask(root, spec))
-      await run(claimTask(root, "task-1"))
-      const first = (await run(listTasks(root))).find((task) => task.spec.id === "task-1")
-      if (first === undefined) {
-        throw new Error("the backlog holds no task-1")
-      }
-      await run(writeTaken(root, { spec: first.spec, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
-      const hanging = Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
-        const real = yield* ChildProcessSpawner.ChildProcessSpawner
-        return ChildProcessSpawner.make((command) =>
-          ChildProcess.isStandardCommand(command) && command.command === "pueue"
-            ? Effect.never
-            : ChildProcess.isStandardCommand(command) && command.command === "orc-quota"
-              ? real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + quotaReply + "\nJ"]))
-              : real.spawn(command)
-        )
-      })).pipe(Layer.provide(BunServices.layer))
-      const report = await Effect.runPromise(runBeat(root, root).pipe(Effect.provide(Layer.merge(BunServices.layer, hanging))))
-      expect((await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["task-1:started"])
+      await startTaskOne(root, orcStart, null)
+      const report = await beatWith(root, pueueInstead(() => Effect.never))
+      expect(await backlogStates(root)).toEqual(["task-1:started"])
       expect(report.actions.flatMap((action) => action.kind === "close-failed" ? [action.reason] : [])).toEqual(["the close read timed out after 30 seconds"])
     })
   }, 120_000)

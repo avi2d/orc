@@ -25,6 +25,7 @@ type TaskStatusJson =
     readonly started: Started | null
     readonly outcome: "done" | "failed" | "start-failed"
     readonly reason: string
+    readonly pr: string | null
     readonly closedAt: string
   }
 
@@ -67,6 +68,7 @@ const claimJson = (record: TaskRecord): TaskStatusJson => {
         started: state.closing.outcome === "start-failed" ? null : state.closing.started,
         outcome: state.closing.outcome,
         reason: state.closing.reason,
+        pr: state.closing.outcome === "start-failed" ? null : state.closing.pr,
         closedAt: state.closedAt
       }
     }
@@ -167,7 +169,7 @@ const actionLine = (action: BeatAction): string => {
       return "renew failed " + action.task + " on " + action.machine + ": " + action.reason
     }
     case "closed": {
-      return "closed " + action.task + " " + action.outcome + " on " + action.machine + ": " + action.reason
+      return "closed " + action.task + " " + action.outcome + " on " + action.machine + ": " + action.reason + (action.pr === null ? "" : ", PR " + action.pr)
     }
     case "close-failed": {
       return "close failed " + action.task + " on " + action.machine + ": " + action.reason

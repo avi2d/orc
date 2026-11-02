@@ -134,7 +134,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       }
       case "CloseTask": {
         const closedAt = DateTime.formatIso(yield* DateTime.now)
-        yield* closeStartedTask(backlogRoot(place), args.id, args.outcome, args.reason, closedAt)
+        yield* closeStartedTask(backlogRoot(place), args.id, args.outcome, args.reason, null, closedAt)
         yield* Console.log("closed " + args.id + " " + args.outcome)
         break
       }

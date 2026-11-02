@@ -1,4 +1,4 @@
-import { DateTime, Duration, Effect, type FileSystem, Option, Stream } from "effect"
+import { DateTime, Duration, Effect, type FileSystem, Option, type Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimTask, closeStartedTask, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken } from "./backlog"
 import type { ConfigError } from "../json-file"
@@ -8,7 +8,7 @@ import { type QuotaReading, readQuota } from "./quota"
 import type { Claim, TaskFileError, TaskRecord } from "./task-record"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
 import { taskLabel } from "./pueue-status"
-import { closingFromResult, readClosing, readResultThrough } from "./runner-result"
+import { closingFromResult, readResult, readResultThrough } from "./runner-result"
 import type { Command } from "./runner"
 
 export type { MachineRoom } from "./beat-place"
@@ -22,7 +22,14 @@ export type BeatAction =
   | { readonly kind: "waits"; readonly task: string; readonly reason: string }
   | { readonly kind: "renewed"; readonly task: string; readonly machine: string }
   | { readonly kind: "renew-failed"; readonly task: string; readonly machine: string; readonly reason: string }
-  | { readonly kind: "closed"; readonly task: string; readonly machine: string; readonly outcome: "done" | "failed"; readonly reason: string }
+  | {
+    readonly kind: "closed"
+    readonly task: string
+    readonly machine: string
+    readonly outcome: "done" | "failed"
+    readonly reason: string
+    readonly pr: string | null
+  }
   | { readonly kind: "close-failed"; readonly task: string; readonly machine: string; readonly reason: string }
 
 export interface BeatReport {
@@ -33,7 +40,7 @@ export interface BeatReport {
   readonly actions: ReadonlyArray<BeatAction>
 }
 
-type BeatRequirements = FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
+type BeatRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
 
 const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
@@ -306,7 +313,7 @@ const renewTask = (context: BeatContext, task: TaskRecord): Effect.Effect<Option
 const closeFinished = (
   context: BeatContext,
   task: TaskRecord
-): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+): Effect.Effect<Option.Option<BeatAction>, TaskFileError, BeatRequirements> =>
   Effect.gen(function*() {
     if (task.state.kind !== "started") {
       return Option.none()
@@ -318,7 +325,7 @@ const closeFinished = (
       return Option.none()
     }
     const through = throughFor(machine)
-    const read = through === null ? readClosing(task.spec.id, context.home, label) : readResultThrough(through, task.spec.id, label).pipe(Effect.map(closingFromResult))
+    const read = (through === null ? readResult(task.spec.id, context.home, label) : readResultThrough(through, task.spec.id, label)).pipe(Effect.map(closingFromResult))
     const outcome = yield* read.pipe(
       Effect.map((closing) => ({ kind: "read" as const, closing })),
       Effect.catchTag("RunnerError", (error) => Effect.succeed({ kind: "unread" as const, reason: error.detail })),
@@ -334,7 +341,7 @@ const closeFinished = (
     if (closing === null) {
       return Option.none()
     }
-    const closed = yield* closeStartedTask(context.root, task.spec.id, closing.outcome, closing.reason, yield* nowIso).pipe(
+    const closed = yield* closeStartedTask(context.root, task.spec.id, closing.outcome, closing.reason, closing.pr, yield* nowIso).pipe(
       Effect.catchTag("BacklogError", () => Effect.succeed(null))
     )
     if (closed === null) {
@@ -345,7 +352,8 @@ const closeFinished = (
       task: task.spec.id,
       machine: task.state.claim.machine,
       outcome: closing.outcome,
-      reason: closing.reason
+      reason: closing.reason,
+      pr: closing.pr
     } satisfies BeatAction)
   })
 
