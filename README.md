@@ -101,6 +101,18 @@ A failed check closes a `direct-PR` task failed with no push and no pull request
 The chat posts a `direct-PR` task's pull request the same way as any other.
 Orc refuses any other mode with a message that names the project.
 
+## Merge a PR and turn on yolo
+
+To land a closed task's PR, run `orc merge <task-id>`, or tell the chat to merge it.
+Orc squash-merges the PR only when it is open, every check is green and the branch is not behind its base.
+Otherwise it merges nothing and says why.
+The task file then records the merge, and `orc backlog` shows the task as merged.
+
+The chat merges on your word.
+To let it merge a project's green PRs without asking, add `"yolo": true` to that project in `projects.json`.
+Orc refuses a `yolo` that is not `true` or `false`, and a project with no `yolo` waits for your word.
+[Merging a task's PR](packages/run/README.md#merging-a-tasks-pr) names every refusal.
+
 ## Open the dashboard
 
 To open the dashboard, run `bun run dashboard` from the repository root.
@@ -122,7 +134,7 @@ Orc grows toward the full orchestrator one step at a time.
 | Runs parked on a question resume on your answer | Ships today |
 | Reports, investigations and machine tasks that end without a pull request | Ships today |
 | Per-project delivery: direct pull request or full review | Ships today |
-| Merge on your word, refusing red checks | Next |
+| Merge on your word, refusing red checks | Ships today |
 | Stalled runs and machine load flagged in the chat | Next |
 | Alerts and pull request events posted in the chat | Next |
 | Decision boards you answer once | Next |

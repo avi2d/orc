@@ -28,6 +28,7 @@ type TaskStatusJson =
     readonly reason: string
     readonly pr: string | null
     readonly report: string | null
+    readonly mergedAt: string | null
     readonly closedAt: string
     readonly postedAt: string | null
   }
@@ -76,6 +77,7 @@ const claimJson = (record: TaskRecord): TaskStatusJson => {
         reason: state.closing.reason,
         pr: state.closing.outcome === "start-failed" ? null : state.closing.pr,
         report: state.closing.outcome === "start-failed" ? null : state.closing.report,
+        mergedAt: state.closing.outcome === "start-failed" ? null : state.closing.mergedAt,
         closedAt: state.closedAt,
         postedAt: state.postedAt
       }
@@ -138,8 +140,13 @@ const takenCell = (record: TaskRecord): string => {
   return named(record) + machine + " taken"
 }
 
-const closedCell = (record: TaskRecord): string =>
-  record.state.kind === "closed" ? named(record) + " " + record.state.closing.outcome : record.spec.id
+const closedCell = (record: TaskRecord): string => {
+  if (record.state.kind !== "closed") {
+    return record.spec.id
+  }
+  const closing = record.state.closing
+  return named(record) + " " + closing.outcome + (closing.outcome !== "start-failed" && closing.mergedAt !== null ? " merged" : "")
+}
 
 const projectCells = (projects: ProjectList): ReadonlyArray<string> =>
   projects.kind === "unread"

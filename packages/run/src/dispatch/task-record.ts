@@ -52,7 +52,7 @@ export interface Parked {
 
 type Closing =
   | { readonly outcome: "start-failed"; readonly reason: string }
-  | { readonly outcome: "done" | "failed"; readonly started: Started; readonly reason: string; readonly pr: string | null; readonly report: string | null }
+  | { readonly outcome: "done" | "failed"; readonly started: Started; readonly reason: string; readonly pr: string | null; readonly report: string | null; readonly mergedAt: string | null }
 
 type TaskState =
   | { readonly kind: "new" }
@@ -127,6 +127,7 @@ const Frontmatter = Schema.Struct({
   reason: Schema.optional(Schema.String),
   pr: Schema.optional(Schema.String),
   report: Schema.optional(Schema.String),
+  merged_at: Schema.optional(Schema.String),
   posted_at: Schema.optional(Schema.String)
 })
 type Frontmatter = typeof Frontmatter.Type
@@ -146,7 +147,7 @@ const closingOf = (front: Frontmatter, started: Started | null): Closing | null 
   if (front.outcome === "start-failed") {
     return { outcome: "start-failed", reason }
   }
-  return front.outcome === undefined || started === null ? null : { outcome: front.outcome, started, reason, pr: front.pr ?? null, report: front.report ?? null }
+  return front.outcome === undefined || started === null ? null : { outcome: front.outcome, started, reason, pr: front.pr ?? null, report: front.report ?? null, mergedAt: front.merged_at ?? null }
 }
 
 const answerOf = (front: { readonly answer?: string | undefined; readonly answered_at?: string | undefined }): Answer | null | string => {
@@ -329,7 +330,8 @@ const stateFields = (state: TaskState): ReadonlyArray<string> => {
           started: startedFields(state.closing.started),
           pr: [
             ...(state.closing.pr === null ? [] : [field("pr", state.closing.pr)]),
-            ...(state.closing.report === null ? [] : [field("report", state.closing.report)])
+            ...(state.closing.report === null ? [] : [field("report", state.closing.report)]),
+            ...(state.closing.mergedAt === null ? [] : [field("merged_at", state.closing.mergedAt)])
           ]
         }
       return [

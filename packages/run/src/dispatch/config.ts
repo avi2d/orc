@@ -71,19 +71,25 @@ export type DispatchConfig = Omit<typeof DispatchEnvelope.Type, "quota"> & {
 const RawProject = Schema.Struct({
   name: Name,
   checkouts: Schema.Record(Name, AbsolutePath),
-  mode: Schema.optionalKey(Schema.String)
+  mode: Schema.optionalKey(Schema.String),
+  yolo: Schema.optionalKey(Schema.Unknown)
 })
 type RawProject = typeof RawProject.Type
-export type Project = Omit<RawProject, "mode"> & { readonly mode?: DeliveryMode }
+export type Project = Omit<RawProject, "mode" | "yolo"> & { readonly mode?: DeliveryMode; readonly yolo?: boolean }
 
 export const modeOf = (project: Project): DeliveryMode => project.mode ?? "no-mistakes"
 
-const checkedMode = (project: RawProject): Project | null => {
-  const { mode, ...rest } = project
-  if (mode === undefined) {
-    return rest
+export const isYolo = (project: Project): boolean => project.yolo === true
+
+const checkedProject = (project: RawProject): Project | string => {
+  const { mode, yolo, ...rest } = project
+  if (mode !== undefined && !isDeliveryMode(mode)) {
+    return unknownMode(project.name, mode)
   }
-  return isDeliveryMode(mode) ? { ...rest, mode } : null
+  if (yolo !== undefined && typeof yolo !== "boolean") {
+    return "the project " + project.name + " names yolo " + JSON.stringify(yolo) + ", which is not true or false"
+  }
+  return { ...rest, ...(mode === undefined ? {} : { mode }), ...(yolo === undefined ? {} : { yolo }) }
 }
 
 export const checkoutOn = (project: Project, machine: string): string | null =>
@@ -155,11 +161,11 @@ export const readProjects = (
         if (unknown !== undefined) {
           return Effect.fail(new ConfigError({ file, detail: "the project " + project.name + " names the unknown machine " + unknown }))
         }
-        const moded = checkedMode(project)
-        if (moded === null) {
-          return Effect.fail(new ConfigError({ file, detail: unknownMode(project.name, project.mode ?? "") }))
+        const read = checkedProject(project)
+        if (typeof read === "string") {
+          return Effect.fail(new ConfigError({ file, detail: read }))
         }
-        checked.push(moded)
+        checked.push(read)
       }
       return Effect.succeed(checked)
     })

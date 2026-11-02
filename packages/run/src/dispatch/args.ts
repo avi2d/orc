@@ -1,6 +1,7 @@
 import { isTaskId } from "./backlog"
 import { isCalendarDate } from "./task-record"
 import { isTaskKind, type TaskKind, unknownKind } from "../task-kind"
+import { isMergeBasis, type MergeBasis, mergeBases } from "./merge-basis"
 
 export type TaskSource = { readonly kind: "file"; readonly path: string } | { readonly kind: "stdin" }
 
@@ -21,6 +22,7 @@ export type DispatchArgs =
   | { readonly kind: "MarkPosted"; readonly id: string }
   | { readonly kind: "HoldTask"; readonly id: string; readonly reason: string; readonly until: string | null }
   | { readonly kind: "AnswerTask"; readonly id: string; readonly words: string }
+  | { readonly kind: "MergeTask"; readonly id: string; readonly basis: MergeBasis }
   | { readonly kind: "Beat"; readonly json: boolean }
   | { readonly kind: "RunnerStart"; readonly reach: Reach }
   | { readonly kind: "RunnerQueue" }
@@ -31,7 +33,7 @@ export type DispatchArgs =
   | { readonly kind: "UsageError"; readonly detail: string }
 
 export const dispatchUsage =
-  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task>] [--internal] [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog posted <task-id> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] | orc backlog answer <task-id> <words|question-id=text> | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>]"
+  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task>] [--internal] [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog posted <task-id> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] | orc backlog answer <task-id> <words|question-id=text> | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>]"
 
 const parseJsonFlag = (rest: ReadonlyArray<string>, json: (json: boolean) => DispatchArgs): DispatchArgs => {
   if (rest.length === 0) {
@@ -285,9 +287,30 @@ const parseRunner = (rest: ReadonlyArray<string>): DispatchArgs => {
   return { kind: verb === "start" ? "RunnerStart" : "RunnerRenew", reach: split.reach }
 }
 
-export const parseDispatchArgs = (command: "backlog" | "beat" | "runner", rest: ReadonlyArray<string>): DispatchArgs => {
+const parseMerge = (rest: ReadonlyArray<string>): DispatchArgs => {
+  const [id = "", ...flags] = rest
+  if (id === "") {
+    return { kind: "UsageError", detail: "orc merge takes a task id" }
+  }
+  if (!isTaskId(id)) {
+    return { kind: "UsageError", detail: "orc merge takes a task id, got \"" + id + "\"" }
+  }
+  if (flags.length === 0) {
+    return { kind: "MergeTask", id, basis: "captain-word" }
+  }
+  const [flag, basis = "", ...extra] = flags
+  if (flag !== "--basis" || !isMergeBasis(basis)) {
+    return { kind: "UsageError", detail: "orc merge takes --basis once, with " + mergeBases.join(" or ") }
+  }
+  return extra.length === 0 ? { kind: "MergeTask", id, basis } : unexpected(extra[0])
+}
+
+export const parseDispatchArgs = (command: "backlog" | "beat" | "runner" | "merge", rest: ReadonlyArray<string>): DispatchArgs => {
   if (command === "runner") {
     return parseRunner(rest)
+  }
+  if (command === "merge") {
+    return parseMerge(rest)
   }
   if (command === "beat") {
     return parseJsonFlag(rest, (json) => ({ kind: "Beat", json }))

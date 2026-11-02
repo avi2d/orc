@@ -4,8 +4,8 @@ import * as BunPath from "@effect/platform-bun/BunPath"
 import { Data, Effect, Layer, Schema } from "effect"
 import { ParkedJson, parkedListing } from "./chat-parked"
 import { capture } from "./dispatch/runner"
-import { taskKinds } from "./task-kind"
 import { ClosedTask, closedLine } from "./chat-closed"
+import { AddTaskInput, AnswerInput, HoldInput, MergeInput } from "./chat-inputs"
 
 export const orcCommandVar = "ORC_CHAT_ORC"
 
@@ -57,31 +57,6 @@ const definedEnv = (env: Env): Record<string, string> =>
   Object.fromEntries(Object.entries(env).flatMap(([name, value]) => value === undefined ? [] : [[name, value]]))
 
 const OrcCommand = Schema.fromJsonString(Schema.NonEmptyArray(Schema.String))
-
-const AddTaskInput = Schema.Struct({
-  project: Schema.String.annotate({ description: "The project the task is for, as the backlog's project list names it" }),
-  task: Schema.String.annotate({ description: "The task as markdown, whose first line is its title" }),
-  kind: Schema.optionalKey(Schema.Literals(taskKinds).annotate({
-    description: "ship ends in a PR and is the default; scout and task end in a report file in the run folder instead"
-  })),
-  internal: Schema.optionalKey(Schema.Boolean.annotate({
-    description: "Marks a ship task internal-only, so a no-mistakes-prod-only project opens its PR after checks without no-mistakes"
-  })),
-  machine: Schema.optionalKey(Schema.String.annotate({ description: "The one machine the task may run on" })),
-  dependsOn: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: "The ids of the tasks that must close done before this one starts" }))
-})
-
-const HoldInput = Schema.Struct({
-  id: Schema.String.annotate({ description: "The id of the new task that waits for the captain" }),
-  reason: Schema.String.annotate({ description: "The decision the captain must make before the task may start" }),
-  until: Schema.optionalKey(Schema.String.annotate({ description: "The YYYY-MM-DD date the captain should answer by; it releases nothing by itself" }))
-})
-
-const AnswerInput = Schema.Struct({
-  id: Schema.String.annotate({ description: "The id of the held or parked task" }),
-  question: Schema.optionalKey(Schema.String.annotate({ description: "The id of the parked question the captain answers, such as question-4; leave it out for a held task" })),
-  words: Schema.String.annotate({ description: "The captain's answer, word for word" })
-})
 
 // Effect writes an empty struct as {"not":{"type":"null"}}, and Pi takes only an object schema.
 const noParameters = { type: "object", properties: {}, additionalProperties: false } as const
@@ -323,6 +298,15 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
       execute: (_toolCallId, params) =>
         runTool(AnswerInput, "orc_backlog_answer", params, env, (input) =>
           ["backlog", "answer", input.id, input.question === undefined ? input.words : input.question + "=" + input.words])
+    },
+    {
+      name: "merge_task",
+      label: "Merge an orc task's PR",
+      description:
+        "Squash-merges a closed task's PR through orc merge, which merges nothing and says why when the PR is not open, a check is red or has not reported, or the branch is behind its base. Call it only on the captain's explicit word to merge that PR, with basis captain-word, or for a project with yolo true once its PR is green, with basis yolo-green. orc refuses yolo-green for a project without yolo true.",
+      parameters: Schema.toJsonSchemaDocument(MergeInput).schema,
+      execute: (_toolCallId, params) =>
+        runTool(MergeInput, "merge_task", params, env, (input) => ["merge", input.id, "--basis", input.basis])
     }
   ]
   const postClosed = postUnposted(env, isOpen, deliver, state)

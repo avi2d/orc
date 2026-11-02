@@ -251,7 +251,7 @@ const asksForHelp = (rest: readonly string[]): boolean => {
   const end = words.indexOf("--")
   return (end === -1 ? words : words.slice(0, end)).some((word) => helpFlags.has(word))
 }
-const subcommands = new Set(["runs", "show", "score", "run", "chat", "backlog", "beat", "runner"])
+const subcommands = new Set(["runs", "show", "score", "run", "chat", "backlog", "beat", "runner", "merge"])
 const parseWords = (args: readonly string[]): OrcArgs => {
   if (args.length === 0) {
     return { kind: "UsageError", detail: "orc takes one flag" }
@@ -272,7 +272,7 @@ const parseWords = (args: readonly string[]): OrcArgs => {
   if (first === "chat") {
     return rest.length === 0 ? { kind: "Chat" } : { kind: "UsageError", detail: `orc chat takes no argument: ${rest[0]}` }
   }
-  if (first === "backlog" || first === "beat" || first === "runner") {
+  if (first === "backlog" || first === "beat" || first === "runner" || first === "merge") {
     const dispatch = parseDispatchArgs(first, rest)
     return dispatch.kind === "UsageError" ? dispatch : { kind: "Dispatch", args: dispatch }
   }
