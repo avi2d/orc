@@ -62,7 +62,7 @@ const runPi = (run: ReportRun): Effect.Effect<number, OrcRunError, FileSystem.Fi
     }))
     const logPath = run.runDir + "/agent.log"
     yield* fs.writeFileString(logPath, "").pipe(Effect.orElseSucceed(() => undefined))
-    const append = (chunk: string): Effect.Effect<void, never, never> =>
+    const append = (chunk: string): Effect.Effect<void> =>
       chunk === "" ? Effect.void : fs.writeFileString(logPath, chunk, { flag: "a" }).pipe(Effect.orElseSucceed(() => undefined))
     const [, , exitCode] = yield* Effect.all([
       handle.stdout.pipe(Stream.decodeText(), Stream.runForEach(append)),

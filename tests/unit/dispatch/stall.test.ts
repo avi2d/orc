@@ -198,16 +198,16 @@ describe("a failed close read", () => {
       if (task === null || task.state.kind !== "started") {
         throw new Error("task-1 is not started")
       }
-      const running = { kind: "running", outputAt: "2026-10-27T11:00:00.000Z" } as const
+      const active = { kind: "running", outputAt: "2026-10-27T11:00:00.000Z" } as const
       const failed = { kind: "ended", action: { kind: "close-failed", task: "task-1", machine: "mac", reason: "the close read timed out" } } as const
-      const flagAt = (progress: typeof running | typeof failed, now: number) =>
+      const flagAt = (progress: typeof active | typeof failed, now: number) =>
         Effect.runPromise(Effect.gen(function*() {
           yield* TestClock.setTime(now)
           return yield* flagStall(root, task, progress)
         }).pipe(Effect.provide(Layer.mergeAll(BunServices.layer, TestClock.layer()))))
-      expect(Option.isSome(await flagAt(running, minutesAfterWrite(30)))).toBe(true)
+      expect(Option.isSome(await flagAt(active, minutesAfterWrite(30)))).toBe(true)
       expect(Option.isNone(await flagAt(failed, minutesAfterWrite(31)))).toBe(true)
-      expect(Option.isNone(await flagAt(running, minutesAfterWrite(32)))).toBe(true)
+      expect(Option.isNone(await flagAt(active, minutesAfterWrite(32)))).toBe(true)
     })
   })
 })
