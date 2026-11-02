@@ -1,11 +1,16 @@
 # orc
-Orc takes one task and turns it into one pull request.
-It starts from a command in the terminal that takes the task as text or as a file.
+Orc keeps a backlog of agent tasks, starts each on a machine with room, and ends each run in a pull request.
+You add a task with `orc backlog add`, or say it in `orc chat` to Pi on the orchestrator model.
+Each `orc beat` starts the tasks that can start, and `orc runner start` queues each run in pueue on its machine.
+The beat later closes the task done or failed, with the PR link of its run.
+
+A run takes one task from `orc run` and a task file.
 It makes an isolated copy of the project on a new branch.
 By default it runs the Pi agent inside a nono sandbox, then runs the project's checks.
 With `--sandbox none` it runs Pi and the checks directly on the host.
 It hands the branch to no-mistakes, which reviews it, pushes it and opens the PR.
 You read the PR and merge it, since orc never merges.
+[The backlog and the beat](#the-backlog-and-the-beat), [Adding tasks from a chat](#adding-tasks-from-a-chat) and [The runner](#the-runner) describe the path a task takes to its run.
 
 ## Before you begin
 
