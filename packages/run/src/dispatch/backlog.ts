@@ -258,7 +258,15 @@ const writePosted = (root: string, id: string, postedAt: string): Effect.Effect<
     return true
   })
 
-// Two chats may post one close at once, so only the command that creates the mark and then still finds no posted_at writes it and gets true.
+const alive = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return (error as { readonly code?: string }).code !== "ESRCH"
+  }
+}
+
 export const markPosted = (
   root: string,
   id: string,
@@ -266,19 +274,37 @@ export const markPosted = (
 ): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
-    if (!unposted(yield* readClosed(root, id))) {
-      return false
+    const folder = backlogPaths(root).folder("closed")
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      if (!unposted(yield* readClosed(root, id))) {
+        return false
+      }
+      const mark = folder + "/." + id + ".posting"
+      const created = yield* fs.writeFileString(mark, String(process.pid), { flag: "wx" }).pipe(
+        Effect.as(true),
+        Effect.catchReason("PlatformError", "AlreadyExists", () => Effect.succeed(false)),
+        Effect.mapError(platformFailure("write " + mark))
+      )
+      if (created) {
+        const written = yield* Effect.exit(writePosted(root, id, postedAt))
+        yield* fs.remove(mark).pipe(Effect.mapError(platformFailure("remove " + mark)))
+        return yield* written
+      }
+      const owner = yield* fs.readFileString(mark).pipe(
+        Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)),
+        Effect.mapError(platformFailure("read " + mark))
+      )
+      if (owner === null) {
+        continue
+      }
+      const ownerPid = Number(owner.trim())
+      if (owner.trim() !== "" && Number.isInteger(ownerPid) && ownerPid > 0 && alive(ownerPid)) {
+        return false
+      }
+      yield* fs.remove(mark).pipe(
+        Effect.catchReason("PlatformError", "NotFound", () => Effect.void),
+        Effect.mapError(platformFailure("remove " + mark))
+      )
     }
-    const mark = backlogPaths(root).folder("closed") + "/." + id + ".posting"
-    const marked = yield* fs.writeFileString(mark, "", { flag: "wx" }).pipe(
-      Effect.as(true),
-      Effect.catchReason("PlatformError", "AlreadyExists", () => Effect.succeed(false)),
-      Effect.mapError(platformFailure("write " + mark))
-    )
-    if (!marked) {
-      return false
-    }
-    const written = yield* Effect.exit(writePosted(root, id, postedAt))
-    yield* fs.remove(mark).pipe(Effect.mapError(platformFailure("remove " + mark)))
-    return yield* written
+    return false
   })

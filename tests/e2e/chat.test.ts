@@ -236,6 +236,23 @@ describe("orc chat tools", () => {
     })
   }, 60_000)
 
+  test("a close whose post fails stays unposted so the next chat posts it instead of losing it", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Fix the typo\n" })
+      await closeTask(fixture, "task-1", ranClosing("done", "", "https://github.com/acme/orc/pull/7"))
+      const failing = chatSession(chatEnv(fixture), () => true, () => {
+        throw new Error("post failed")
+      })
+      await failing.postClosed().then(() => {
+        throw new Error("expected postClosed to fail")
+      }, () => undefined)
+      expect(await readFile(join(fixture.home, "backlog", "closed", "task-1.md"), "utf8")).not.toContain("posted_at")
+      const next = sessionFor(fixture)
+      await next.postClosed()
+      expect(next.posted).toEqual(["task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7"])
+    })
+  }, 60_000)
+
   test("posts a failed task's reason and that it has no PR instead of a blank PR", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       const chat = sessionFor(fixture)

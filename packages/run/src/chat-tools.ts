@@ -139,17 +139,14 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
         )
       )
     )
-    unreadBecause = null
     for (const task of backlog.tasks) {
-      // A closed chat never shows a post, so it must not mark one either.
       if (task.status !== "closed" || task.postedAt !== null || !isOpen()) {
         continue
       }
-      // Two polls or two chats can overlap, so only the one orc reports posting it posts it.
-      if ((yield* runOrc(env, ["backlog", "posted", task.id], null)) === "posted " + task.id) {
-        post(closedLine(task))
-      }
+      post(closedLine(task))
+      yield* runOrc(env, ["backlog", "posted", task.id], null)
     }
+    unreadBecause = null
   }).pipe(
     Effect.catchTag("ChatToolError", (error) =>
       Effect.sync(() => {
@@ -174,10 +171,24 @@ export const chatExtension = (env: Env, pollMillis: number) => (pi: ChatHost): v
     pi.registerTool(tool)
   }
   let poll: ReturnType<typeof setInterval> | undefined
+  let current: Promise<void> | null = null
   pi.on("session_start", () => {
     stopped = false
     const postClosed = () => {
-      session.postClosed().catch(() => undefined)
+      if (current !== null) {
+        return
+      }
+      const run = session.postClosed()
+      current = run
+      run.then(() => {
+        if (current === run) {
+          current = null
+        }
+      }, () => {
+        if (current === run) {
+          current = null
+        }
+      })
     }
     postClosed()
     // An unreferenced timer never keeps Pi running after its session ends.
@@ -187,6 +198,10 @@ export const chatExtension = (env: Env, pollMillis: number) => (pi: ChatHost): v
     stopped = true
     clearInterval(poll)
     poll = undefined
+    const running = current
+    if (running !== null) {
+      return running.catch(() => undefined) as unknown as void
+    }
   })
 }
 
