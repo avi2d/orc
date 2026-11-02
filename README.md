@@ -34,8 +34,8 @@ To run one task in a project:
 
 1. Save `~/.orc/config.json` with the provider and models orc may run, as below.
 1. Add a `.no-mistakes.yaml` naming the project's checks, and commit it.
-1. Write the task in Markdown, such as `task.md`.
-1. In a clean checkout of the project, run `orc run task.md --sandbox none`.
+1. Write the task in Markdown outside the project checkout, such as `~/task.md`.
+1. In a clean checkout of the project, run `orc run ~/task.md --sandbox none`.
 
 ```json
 {
@@ -52,6 +52,8 @@ commands:
 `--sandbox none` runs the agent on the host as your user.
 Once nono is installed, drop the flag to run inside the sandbox.
 Orc prints the branch, the commits, the checks, the review and the PR link when no-mistakes opens one.
+A run counts as done today when its branch holds a new commit.
+A task that changes no code ends as no commit.
 `orc runs` lists past runs, and `orc show <run-id>` walks one step by step.
 
 ## Queue tasks across machines
@@ -59,7 +61,7 @@ Orc prints the branch, the commits, the checks, the review and the PR link when 
 To keep a backlog that starts itself:
 
 1. Name your machines and accounts in `~/.orc/backlog/dispatch.json`, and your projects in `~/.orc/backlog/projects.json`.
-1. Run `orc chat` and say the tasks, or run `orc backlog add <project> task.md`.
+1. Run `orc chat` and say the tasks, or run `orc backlog add <project> ~/task.md`.
 1. Run `orc beat` from cron or launchd every few minutes.
 1. Run `orc backlog` to see each task new, taken or closed.
 
