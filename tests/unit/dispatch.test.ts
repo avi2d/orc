@@ -622,8 +622,11 @@ describe("a released run's input", () => {
     ORC_TASK_PROVIDER: "test"
   })
   const answeredBody = (body: string): void => {
-    expect(body.indexOf("# Pick the API")).toBeLessThan(body.indexOf("REST or gRPC"))
-    expect(body).toContain("The captain answered: REST")
+    const asked = body.indexOf("REST or gRPC")
+    const answered = body.indexOf("The captain answered: REST")
+    expect(body).toContain("# Pick the API\nChoose.\n")
+    expect(body.indexOf("# Pick the API\nChoose.\n")).toBeLessThan(asked)
+    expect(asked).toBeLessThan(answered)
   }
   test("a released run gets the task body with the captain's answer instead of the body alone", async () => {
     await withBacklog(async (root) => {
