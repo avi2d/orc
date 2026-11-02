@@ -25,6 +25,17 @@ export interface Started {
   readonly log: string
 }
 
+interface Answer {
+  readonly words: string
+  readonly at: string
+}
+
+export interface Hold {
+  readonly reason: string
+  readonly until: string | null
+  readonly answer: Answer | null
+}
+
 type Closing =
   | { readonly outcome: "start-failed"; readonly reason: string }
   | { readonly outcome: "done" | "failed"; readonly started: Started; readonly reason: string; readonly pr: string | null }
@@ -37,8 +48,21 @@ type TaskState =
 
 export interface TaskRecord {
   readonly spec: TaskSpec
+  readonly hold: Hold | null
   readonly state: TaskState
 }
+
+type HeldRecord = TaskRecord & { readonly hold: Hold & { readonly answer: null } }
+
+export const isHeld = (record: TaskRecord): record is HeldRecord => record.hold !== null && record.hold.answer === null
+
+export const heldReason = (task: TaskRecord): string | null =>
+  isHeld(task) ? "held for the captain: " + task.hold.reason + (task.hold.until === null ? "" : ", until " + task.hold.until) : null
+
+const datePattern = /^\d{4}-\d{2}-\d{2}$/
+
+export const isCalendarDate = (text: string): boolean =>
+  datePattern.test(text) && !Number.isNaN(Date.parse(text)) && new Date(text).toISOString().slice(0, 10) === text
 
 export class TaskFileError extends Data.TaggedError("TaskFileError")<{
   readonly file: string
@@ -52,6 +76,10 @@ const Frontmatter = Schema.Struct({
   machine: Schema.NullOr(Schema.String),
   depends_on: Schema.Array(Schema.String),
   created: Schema.String,
+  hold_reason: Schema.optional(Schema.String),
+  hold_until: Schema.optional(Schema.String),
+  answer: Schema.optional(Schema.String),
+  answered_at: Schema.optional(Schema.String),
   beat: Schema.optional(Schema.String),
   taken_for: Schema.optional(Schema.String),
   account: Schema.optional(Schema.String),
@@ -82,6 +110,33 @@ const closingOf = (front: Frontmatter, started: Started | null): Closing | null 
     return { outcome: "start-failed", reason }
   }
   return front.outcome === undefined || started === null ? null : { outcome: front.outcome, started, reason, pr: front.pr ?? null }
+}
+
+const answerOf = (front: Frontmatter): Answer | null | string => {
+  if (front.answer === undefined && front.answered_at === undefined) {
+    return null
+  }
+  if (front.answer === undefined || front.answered_at === undefined || Number.isNaN(Date.parse(front.answered_at))) {
+    return "an answer names no words or no time"
+  }
+  return { words: front.answer, at: front.answered_at }
+}
+
+const holdOf = (front: Frontmatter): Hold | null | string => {
+  const answer = answerOf(front)
+  if (typeof answer === "string") {
+    return answer
+  }
+  if (front.hold_reason === undefined) {
+    return front.hold_until === undefined && answer === null ? null : "a hold names no reason"
+  }
+  if (front.hold_reason.trim() === "") {
+    return "a hold names no reason"
+  }
+  if (front.hold_until !== undefined && !isCalendarDate(front.hold_until)) {
+    return "the hold_until " + front.hold_until + " is no YYYY-MM-DD date"
+  }
+  return { reason: front.hold_reason, until: front.hold_until ?? null, answer }
 }
 
 const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => {
@@ -135,6 +190,13 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     if (typeof state === "string") {
       return yield* new TaskFileError({ file, detail: state })
     }
+    const hold = holdOf(front)
+    if (typeof hold === "string") {
+      return yield* new TaskFileError({ file, detail: hold })
+    }
+    if (hold !== null && hold.answer === null && (state.kind === "started" || state.kind === "closed")) {
+      return yield* new TaskFileError({ file, detail: "a " + state.kind + " task carries an unanswered hold" })
+    }
     return {
       spec: {
         id: front.id,
@@ -145,6 +207,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
         created: front.created,
         body: parts.body
       },
+      hold,
       state
     }
   })
@@ -157,6 +220,15 @@ const claimFields = (claim: Claim | null): ReadonlyArray<string> =>
     : [field("beat", claim.beat), field("taken_for", claim.machine), field("account", claim.account), field("taken_at", claim.takenAt)]
 
 const startedFields = (started: Started): ReadonlyArray<string> => [field("started_at", started.at), field("start_log", started.log)]
+
+const holdFields = (hold: Hold | null): ReadonlyArray<string> =>
+  hold === null
+    ? []
+    : [
+      field("hold_reason", hold.reason),
+      ...(hold.until === null ? [] : [field("hold_until", hold.until)]),
+      ...(hold.answer === null ? [] : [field("answer", hold.answer.words), field("answered_at", hold.answer.at)])
+    ]
 
 const stateFields = (state: TaskState): ReadonlyArray<string> => {
   switch (state.kind) {
@@ -195,6 +267,7 @@ export const renderTaskFile = (record: TaskRecord): string =>
     field("machine", record.spec.machine),
     field("depends_on", record.spec.dependsOn),
     field("created", record.spec.created),
+    ...holdFields(record.hold),
     ...stateFields(record.state),
     fence,
     record.spec.body

@@ -1,7 +1,7 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs, TaskSource } from "./args"
-import { addTask, backlogPaths, BacklogError, closeStartedTask, isTaskId, listTasks, markPosted } from "./backlog"
+import { addTask, answerTask, backlogPaths, BacklogError, closeStartedTask, holdTask, isTaskId, listTasks, markPosted } from "./backlog"
 import { readRoom, runBeat } from "./beat"
 import { backlogJson, type BacklogView, beatJson, formatBeat, formatBoard, type ProjectList, type RoomList } from "./board"
 import type { ConfigError } from "../json-file"
@@ -150,6 +150,39 @@ const markPostedNow = (id: string, place: DispatchPlace) =>
     return (marked ? "posted " : "already posted ") + id
   })
 
+const holdNow = (args: Extract<CommandArgs, { readonly kind: "HoldTask" }>, place: DispatchPlace) =>
+  holdTask(backlogRoot(place), args.id, { reason: args.reason, until: args.until }).pipe(
+    Effect.map((outcome) =>
+      (outcome.kind === "held" ? "held " + args.id : args.id + " is already held") + ": " + outcome.hold.reason +
+      (outcome.hold.until === null ? "" : ", until " + outcome.hold.until)
+    )
+  )
+
+const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, place: DispatchPlace) =>
+  Effect.gen(function*() {
+    yield* answerTask(backlogRoot(place), args.id, args.words, DateTime.formatIso(yield* DateTime.now))
+    return "answered " + args.id + ", so the beat may start it"
+  })
+
+type TaskVerb = Extract<CommandArgs, { readonly kind: "CloseTask" | "MarkPosted" | "HoldTask" | "AnswerTask" }>
+
+const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
+  switch (args.kind) {
+    case "CloseTask": {
+      return closeNow(args, place)
+    }
+    case "MarkPosted": {
+      return markPostedNow(args.id, place)
+    }
+    case "HoldTask": {
+      return holdNow(args, place)
+    }
+    case "AnswerTask": {
+      return answerNow(args, place)
+    }
+  }
+}
+
 const execute = (args: CommandArgs, place: DispatchPlace) =>
   Effect.gen(function*() {
     switch (args.kind) {
@@ -162,12 +195,11 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         yield* add(args, place)
         break
       }
-      case "CloseTask": {
-        yield* Console.log(yield* closeNow(args, place))
-        break
-      }
-      case "MarkPosted": {
-        yield* Console.log(yield* markPostedNow(args.id, place))
+      case "CloseTask":
+      case "MarkPosted":
+      case "HoldTask":
+      case "AnswerTask": {
+        yield* Console.log(yield* taskVerbLine(args, place))
         break
       }
       case "Beat": {

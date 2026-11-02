@@ -19,7 +19,7 @@ describe("marking a close posted", () => {
     try {
       const record = await run(addTask(root, spec))
       await run(claimTask(root, record.spec.id))
-      await run(writeTaken(root, { spec: record.spec, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
+      await run(writeTaken(root, { spec: record.spec, hold: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
       await run(closeStartedTask(root, record.spec.id, "done", "", null, "2026-10-27T11:00:00.000Z"))
       const marks = await run(Effect.all(Array.from({ length: 8 }, () => markPosted(root, "task-1", "2026-10-27T11:01:00.000Z")), { concurrency: "unbounded" }))
       expect(marks).toHaveLength(8)

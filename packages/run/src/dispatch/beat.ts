@@ -1,9 +1,9 @@
 import { DateTime, Duration, Effect, type FileSystem, Option, type Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { backlogPaths, type BacklogError, claimTask, closeStartedTask, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken } from "./backlog"
+import { backlogPaths, type BacklogError, claimUnheld, closeStartedTask, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken } from "./backlog"
 import type { ConfigError } from "../json-file"
 import { type Account, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "./config"
-import { dependencyOpen, type MachineRoom, placeTask, readRoom } from "./beat-place"
+import { type MachineRoom, placeTask, readRoom, taskWait } from "./beat-place"
 import { type QuotaReading, readQuota } from "./quota"
 import type { Claim, TaskFileError, TaskRecord } from "./task-record"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
@@ -43,19 +43,6 @@ export interface BeatReport {
 type BeatRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
 
 const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
-
-const dependencyWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>): string | null => {
-  for (const id of task.spec.dependsOn) {
-    const dependency = tasks.find((candidate) => candidate.spec.id === id)
-    if (dependency === undefined) {
-      return "waits on " + id + ", which the backlog does not hold"
-    }
-    if (dependencyOpen(dependency)) {
-      return "waits on " + id
-    }
-  }
-  return null
-}
 
 type StartResult = { readonly kind: "started" } | { readonly kind: "failed"; readonly reason: string }
 
@@ -115,14 +102,14 @@ const startTask = (
   credential: Credential
 ): Effect.Effect<BeatAction, BacklogError | TaskFileError, BeatRequirements> =>
   Effect.gen(function*() {
-    const taken: TaskRecord = { spec: task.spec, state: { kind: "taken", claim } }
+    const taken: TaskRecord = { spec: task.spec, hold: task.hold, state: { kind: "taken", claim } }
     yield* writeTaken(root, taken)
     if (yield* machineOverfull(root, machine)) {
       yield* releaseTask(root, taken)
       return { kind: "given-back", task: task.spec.id, machine: machine.name } satisfies BeatAction
     }
     const log = backlogPaths(root).logFile(task.spec.id)
-    yield* writeTaken(root, { spec: task.spec, state: { kind: "started", claim, started: { at: yield* nowIso, log } } })
+    yield* writeTaken(root, { spec: task.spec, hold: task.hold, state: { kind: "started", claim, started: { at: yield* nowIso, log } } })
     const env = {
       ORC_TASK_LOG: log,
       ORC_TASK_ID: task.spec.id,
@@ -145,6 +132,7 @@ const startTask = (
     }
     yield* publishClosed(root, {
       spec: task.spec,
+      hold: task.hold,
       state: { kind: "closed", claim, closing: { outcome: "start-failed", reason: result.reason }, closedAt: yield* nowIso, postedAt: null }
     })
     return { kind: "start-failed", task: task.spec.id, machine: machine.name, reason: result.reason } satisfies BeatAction
@@ -213,7 +201,7 @@ const considerTask = (
 ): Effect.Effect<BeatAction, BacklogError | TaskFileError, BeatRequirements> =>
   Effect.gen(function*() {
     const waits = (reason: string): BeatAction => ({ kind: "waits", task: task.spec.id, reason })
-    const waiting = dependencyWait(task, context.tasks)
+    const waiting = taskWait(task, context.tasks)
     if (waiting !== null) {
       return waits(waiting)
     }
@@ -228,15 +216,16 @@ const considerTask = (
     if (credential.kind === "waits") {
       return waits(credential.reason)
     }
-    if (!(yield* claimTask(context.root, task.spec.id))) {
-      return { kind: "lost", task: task.spec.id } satisfies BeatAction
+    const claimed = yield* claimUnheld(context.root, task.spec.id)
+    if (claimed.kind !== "claimed") {
+      return claimed.kind === "lost" ? { kind: "lost", task: task.spec.id } satisfies BeatAction : waits(claimed.reason)
     }
     const slot = context.live.find((entry) => entry.machine === placement.machine.name)
     if (slot !== undefined) {
       slot.busy += 1
     }
     const claim: Claim = { beat: context.beat, machine: placement.machine.name, account: context.account.name, takenAt: yield* nowIso }
-    const action = yield* startTask(context.root, task, claim, placement.checkout, placement.machine, credential)
+    const action = yield* startTask(context.root, claimed.record, claim, placement.checkout, placement.machine, credential)
     if (slot !== undefined) {
       if (action.kind === "given-back") {
         slot.busy = slot.slots
