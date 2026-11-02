@@ -2,6 +2,21 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.7.0
+
+Released 2026-11-02.
+
+### Features
+
+- **run:** park a run on open questions and resume it on the answer [#66](https://github.com/avi2d/orc/pull/66)
+- **run:** hold backlog tasks for captain decision until answered [#65](https://github.com/avi2d/orc/pull/65)
+- **run:** load orchestrator rules in orc chat [#64](https://github.com/avi2d/orc/pull/64)
+
+### Fixes
+
+- **run:** post every unposted closed task once across chat restarts [#62](https://github.com/avi2d/orc/pull/62)
+- **run:** print usage for --help after any subcommand [#59](https://github.com/avi2d/orc/pull/59)
+
 ## 0.6.0
 
 Released 2026-11-02.
