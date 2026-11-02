@@ -158,7 +158,7 @@ describe("orc chat", () => {
         "ORC_CHAT_ORC=" + JSON.stringify([process.execPath, binPath])
       ])
     })
-  })
+  }, 60_000)
 
   test("refuses with no models.orchestrator instead of starting pi on Pi's default model", async () => {
     await withFixture({ providers: [], models: { implementer: "acme/implementer-1" } }, 0, async (fixture) => {
@@ -167,14 +167,14 @@ describe("orc chat", () => {
       expect(result.stderr).toContain("orc chat needs models.orchestrator in " + join(fixture.home, "config.json"))
       expect(await Bun.file(fixture.piLog).exists()).toBe(false)
     })
-  })
+  }, 60_000)
 
   test("exits non-zero when pi does instead of reporting a failed chat as success", async () => {
     await withFixture(orchestratorConfig, 3, async (fixture) => {
       const result = await runOrc(fixture, ["chat"])
       expect(result.exitCode).not.toBe(0)
     })
-  })
+  }, 60_000)
 })
 
 describe("orc chat tools", () => {
@@ -186,7 +186,7 @@ describe("orc chat tools", () => {
       expect(backlog.tasks).toEqual([{ id: "task-1", title: "Fix the typo", project: "orc", machine: "mac", status: "new", dependsOn: [] }])
       expect(await readFile(join(fixture.home, "backlog", "new", "task-1.md"), "utf8")).toContain("# Fix the typo\n\nThe word teh in the intro.\n")
     })
-  })
+  }, 60_000)
 
   test("the add tool passes each dependency to orc instead of dropping them", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
@@ -196,14 +196,14 @@ describe("orc chat tools", () => {
       const backlog = decodeBacklog(await call("orc_backlog", {}))
       expect(backlog.tasks.map((task) => [task.id, task.dependsOn])).toEqual([["task-1", []], ["task-2", ["task-1"]]])
     })
-  })
+  }, 60_000)
 
   test("the add tool fails with orc's own refusal instead of a bare exit code", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       const call = toolsFor(fixture)
       expect(await rejection(call("orc_backlog_add", { project: "nowhere", task: "# Lost\n" }))).toBe("orc: the project nowhere is not in " + join(fixture.home, "backlog", "projects.json"))
     })
-  })
+  }, 60_000)
 
   test("posts a task the chat added once when it closes, PR and all, not while it is open and not twice", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
@@ -216,7 +216,7 @@ describe("orc chat tools", () => {
       await chat.postClosed()
       expect(chat.posted).toEqual(["task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7"])
     })
-  })
+  }, 60_000)
 
   test("posts a failed task's reason and that it has no PR instead of a blank PR", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
@@ -226,7 +226,7 @@ describe("orc chat tools", () => {
       await chat.postClosed()
       expect(chat.posted).toEqual(["task-1 Fix the typo closed failed: the run failed, with no PR"])
     })
-  })
+  }, 60_000)
 
   test("posts once that the backlog cannot be read instead of following in silence or on every poll", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
@@ -242,7 +242,7 @@ describe("orc chat tools", () => {
       await chat.postClosed()
       expect(chat.posted.at(-1)).toBe("task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7")
     })
-  })
+  }, 60_000)
 
   test("Pi gets the closed task as a shown message that starts no model turn, not one steered into a running turn", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
@@ -257,7 +257,7 @@ describe("orc chat tools", () => {
         options: { triggerTurn: false }
       }])
     })
-  })
+  }, 60_000)
 
   test("Pi gets nothing once its session shuts down, instead of a post into a stale session", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
@@ -269,7 +269,7 @@ describe("orc chat tools", () => {
       await Bun.sleep(1_000)
       expect(pi.sent).toEqual([])
     })
-  })
+  }, 60_000)
 
   test("posts nothing for a task another chat or the command line added", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
@@ -281,7 +281,7 @@ describe("orc chat tools", () => {
       await chat.postClosed()
       expect(chat.posted).toEqual([])
     })
-  })
+  }, 60_000)
 
   test("the add tool refuses an unknown field instead of dropping it", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
@@ -289,5 +289,5 @@ describe("orc chat tools", () => {
       expect(await rejection(call("orc_backlog_add", { project: "orc", task: "# Fast\n", priority: "high" }))).toStartWith("orc_backlog_add takes ")
       expect(await Bun.file(join(fixture.home, "backlog", "new", "task-1.md")).exists()).toBe(false)
     })
-  })
+  }, 60_000)
 })

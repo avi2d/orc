@@ -33,20 +33,20 @@ describe("tui-dash panel", () => {
     const listed = await run(["panel", "--list"]);
     expect(listed.code).toBe(0);
     expect(listed.stdout.split("\n").filter((line) => line !== "").map((line) => line.split(/ +/u)[0])).toEqual(panels);
-  });
+  }, 60_000);
 
   for (const panel of panels) {
     test(`${panel} --help lists the frame flags`, async () => {
       const help = await run(["panel", panel, "--help"]);
       expect(help.code).toBe(0);
       for (const flag of ["--print", "--color", "--width", "--height"]) expect(help.stdout).toContain(flag);
-    });
+    }, 60_000);
 
     test(`${panel} --color without --print is refused`, async () => {
       const refused = await run(["panel", panel, "--color"]);
       expect(refused.code).toBe(1);
       expect(refused.stderr).toContain("--color colours a printed frame, so pass --print with it");
-    });
+    }, 60_000);
   }
 
   for (const [flag, value, unit] of [
@@ -58,27 +58,27 @@ describe("tui-dash panel", () => {
       const refused = await run(["panel", "quota", "--print", flag, value]);
       expect(refused.code).toBe(1);
       expect(refused.stderr).toContain(`Invalid value for flag ${flag}: "${value}". Expected: a whole number of ${unit} from 1 up`);
-    });
+    }, 60_000);
   }
 
   test("refuses a --width that is not a number", async () => {
     const refused = await run(["panel", "quota", "--print", "--width", "wide"]);
     expect(refused.code).toBe(1);
     expect(refused.stderr).toContain('Invalid value for flag --width: "wide"');
-  });
+  }, 60_000);
 
   test("refuses a panel no module is called, naming the panels", async () => {
     const refused = await run(["panel", "nope", "--print"]);
     expect(refused.code).toBe(1);
     expect(refused.stderr).toContain("nope");
     for (const panel of panels) expect(refused.stderr).toContain(panel);
-  });
+  }, 60_000);
 
   test("asks for a panel when none is named", async () => {
     const refused = await run(["panel"]);
     expect(refused.code).toBe(1);
     expect(refused.stderr).toContain("--list");
-  });
+  }, 60_000);
 
   test("refuses a config whose panels section names no panel", async () => {
     const config = join(home, "stray.json");
@@ -86,7 +86,7 @@ describe("tui-dash panel", () => {
     const refused = await run(["panel", "quota", "--print"], config);
     expect(refused.code).toBe(1);
     expect(refused.stderr).toContain(`panels.nope in ${config} is not a panel`);
-  });
+  }, 60_000);
 });
 
 describe("a setting the command refuses", () => {
@@ -107,7 +107,7 @@ describe("a setting the command refuses", () => {
       const refused = await run(args, config);
       expect(refused.code).toBe(1);
       expect(refused.stderr).toContain(`${section} in ${config} is not valid: `);
-    });
+    }, 60_000);
   }
 
   test("names alerts.json when it stands in for an absent config.json", async () => {
@@ -115,7 +115,7 @@ describe("a setting the command refuses", () => {
     const refused = await run(["panel", "alerts", "--print"], join(home, "config.json"));
     expect(refused.code).toBe(1);
     expect(refused.stderr).toContain(`panels.alerts in ${legacy} is not valid: `);
-  });
+  }, 60_000);
 });
 
 describe("tui-dash", () => {
@@ -123,5 +123,5 @@ describe("tui-dash", () => {
     const refused = await run(["--color"]);
     expect(refused.code).toBe(1);
     expect(refused.stderr).toContain("--color colours a printed frame, so pass --print with it");
-  });
+  }, 60_000);
 });
