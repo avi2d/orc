@@ -33,7 +33,7 @@ type TaskState =
   | { readonly kind: "new" }
   | { readonly kind: "taken"; readonly claim: Claim | null }
   | { readonly kind: "started"; readonly claim: Claim; readonly started: Started }
-  | { readonly kind: "closed"; readonly claim: Claim; readonly closing: Closing; readonly closedAt: string }
+  | { readonly kind: "closed"; readonly claim: Claim; readonly closing: Closing; readonly closedAt: string; readonly postedAt: string | null }
 
 export interface TaskRecord {
   readonly spec: TaskSpec
@@ -61,7 +61,8 @@ const Frontmatter = Schema.Struct({
   outcome: Schema.optional(Schema.Literals(["done", "failed", "start-failed"])),
   closed_at: Schema.optional(Schema.String),
   reason: Schema.optional(Schema.String),
-  pr: Schema.optional(Schema.String)
+  pr: Schema.optional(Schema.String),
+  posted_at: Schema.optional(Schema.String)
 })
 type Frontmatter = typeof Frontmatter.Type
 
@@ -99,7 +100,7 @@ const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => 
   if (claim === null || closing === null || front.closed_at === undefined) {
     return "a closed task names no claim, outcome or close time"
   }
-  return { kind: "closed", claim, closing, closedAt: front.closed_at }
+  return { kind: "closed", claim, closing, closedAt: front.closed_at, postedAt: front.posted_at ?? null }
 }
 
 const splitFrontmatter = (text: string): { readonly head: string; readonly body: string } | null => {
@@ -178,7 +179,8 @@ const stateFields = (state: TaskState): ReadonlyArray<string> => {
         field("outcome", state.closing.outcome),
         field("closed_at", state.closedAt),
         field("reason", state.closing.reason),
-        ...ran.pr
+        ...ran.pr,
+        ...(state.postedAt === null ? [] : [field("posted_at", state.postedAt)])
       ]
     }
   }

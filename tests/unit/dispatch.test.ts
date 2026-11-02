@@ -105,6 +105,11 @@ describe("parseDispatchArgs", () => {
   test("close refuses an outcome other than done or failed", () => {
     expect(parseDispatchArgs("backlog", ["close", "task-1", "merged"]).kind).toBe("UsageError")
   })
+  test("posted takes one task id and refuses a second instead of marking only the first", () => {
+    expect(parseDispatchArgs("backlog", ["posted", "task-1"])).toEqual({ kind: "MarkPosted", id: "task-1" })
+    expect(parseDispatchArgs("backlog", ["posted", "task-1", "task-2"])).toEqual({ kind: "UsageError", detail: "unexpected argument: task-2" })
+    expect(parseDispatchArgs("backlog", ["posted", "../task-1"]).kind).toBe("UsageError")
+  })
   test("beat refuses an unknown argument instead of ignoring it", () => {
     expect(parseDispatchArgs("beat", ["--dry-run"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --dry-run" })
   })
