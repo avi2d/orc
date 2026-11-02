@@ -72,8 +72,10 @@ An unknown flag prints the usage text and exits 1.
 
 ## Running a task
 
-To run a task, enter a clean git checkout of the target project and run `orc run <task-file>`.
-Before the first task, add a `.no-mistakes.yaml` file to the target project root with at least one named check under `commands`.
+A `ship` run is the default kind.
+To run one, enter a clean git checkout of the target project and run `orc run <task-file>`.
+For a `scout` or `task` report instead, add `--kind scout` or `--kind task` with `--sandbox none`, as [Task kinds](#task-kinds) shows.
+Before the first ship task, add a `.no-mistakes.yaml` file to the target project root with at least one named check under `commands`.
 Commit that file before running orc.
 For example, a project checked by `bun test` keeps this `.no-mistakes.yaml` file.
 ```yaml
@@ -483,6 +485,7 @@ Orc refuses any other kind, from `orc backlog add --kind` or in a task file, wit
 A `ship` task runs as [Running a task](#running-a-task) shows and ends in a PR.
 A `scout` reads the checkout and changes nothing, and a `task` does what it asks and puts its evidence in the report.
 The runner queues either as `orc run <task-file> --kind <scout|task> --sandbox none`.
+To run one directly, enter a clean checkout of the target project and run the same command.
 That run skips no-mistakes and the PR and creates no branch.
 It starts Pi on the host in `~/.orc/runs/<run-id>`, tells it where the task and the checkout are, and asks it to write `agent-report.md` there.
 Orc refuses a scout or task run without `--sandbox none`, and refuses `--allow` and `--answer` on one.
