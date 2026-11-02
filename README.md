@@ -15,6 +15,7 @@ Tell orc what needs doing, and it runs each task with an AI agent on a machine t
 
 - Bun, at the version `.bun-version` pins.
 - Git.
+- Node.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, logged in to a model provider.
 - no-mistakes, installed as [Installing no-mistakes](packages/run/README.md#installing-no-mistakes) says.
 - nono from https://nono.sh, for the default sandbox, or `--sandbox none` to run without it.
