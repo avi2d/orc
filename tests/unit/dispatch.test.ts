@@ -422,7 +422,7 @@ describe("the beat", () => {
       await run(addTask(root, spec))
       const seen: Array<string> = []
       const spawner = recordingSpawner(join(root, "taken", "task-1.md"), seen).pipe(Layer.provide(BunServices.layer))
-      const report = await Effect.runPromise(runBeat(root, root, liveSources({})).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+      const report = await Effect.runPromise(runBeat(root, root, liveSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
       expect(report.actions.map((action) => action.kind)).toEqual(["started"])
       expect(seen).toHaveLength(1)
       expect(seen[0]).toContain("started_at: ")
@@ -470,7 +470,7 @@ const pueueInstead = (onPueue: ReturnType<typeof ChildProcessSpawner.ChildProces
   })).pipe(Layer.provide(BunServices.layer))
 
 const beatWith = (root: string, spawner: BeatSpawner) =>
-  Effect.runPromise(runBeat(root, root, liveSources({})).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+  Effect.runPromise(runBeat(root, root, liveSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
 
 const backlogStates = async (root: string): Promise<ReadonlyArray<string>> =>
   (await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)
@@ -534,7 +534,7 @@ describe("the beat's closing sweep", () => {
       await startTaskOne(root, orcStart, { dependsOn: [] })
       const report = await beatWith(root, pueueAnswering(root, { Running: { start: "2026-10-27T10:02:00.000Z" } }))
       expect(await backlogStates(root)).toEqual(["task-1:started", "task-2:new"])
-      expect(report.actions.map((action) => action.kind + ":" + action.task)).toEqual(["waits:task-2"])
+      expect(report.actions.map((action) => action.kind + ":" + action.task)).toEqual(["stalled:task-1", "waits:task-2"])
     })
   })
   test("a started task whose pueue run failed is closed failed with the run's reason instead of staying started", async () => {

@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, FileSystem } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { collectOutput } from "./git-run"
 import { hostGitSafetyEnv } from "./host"
@@ -55,9 +55,12 @@ export interface NoMistakesRunner {
   readonly logs: (runId: string, step: string) => Effect.Effect<NoMistakesReply>
 }
 
+export const gateLogFileName = "gate.log"
+
 export interface NoMistakesInput {
   readonly runner: NoMistakesRunner
   readonly taskFile: string
+  readonly runDir: string
   readonly allow?: ReadonlyArray<AllowWord> | undefined
   readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
 }
@@ -322,9 +325,19 @@ const serveOpenQuestions = (input: NoMistakesInput, log: DriveLog, gate: ParkedG
     return { kind: "answered", command }
   })
 
-const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending> =>
+const appendGate = (runDir: string, step: string): Effect.Effect<void, never, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    yield* fs.writeFileString(runDir + "/" + gateLogFileName, new Date().toISOString() + " " + step + "\n", { flag: "a" }).pipe(
+      Effect.orElseSucceed(() => undefined)
+    )
+  })
+
+const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     let sent: Sent = { kind: "start" }
+    yield* appendGate(input.runDir, "start")
+    let lastStep = "start"
     let current = yield* input.runner.start(input.taskFile)
     for (;;) {
       const step: CurrentStep = yield* stepCurrent(input, log, sent, current)
@@ -335,6 +348,10 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending> =>
         current = step.command
         sent = { kind: "reattach" }
         continue
+      }
+      if (step.gate.step !== lastStep) {
+        lastStep = step.gate.step
+        yield* appendGate(input.runDir, step.gate.step)
       }
       const open = openQuestionsIn(step.parsed.findings, omittedQuestionIds(current.stdout))
       if (open.length > 0) {

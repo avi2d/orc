@@ -4,10 +4,10 @@ import { openQuestionsForRun, runsForBranch } from "../history-resume"
 import type { OpenQuestion } from "../no-mistakes-gate"
 import { formatHistoryError, openDatabase, type RunRecord, RunStatusSchema } from "../run-history"
 import { writtenReport } from "../report-run"
+import { gateLogFileName } from "../no-mistakes"
 import { runDirFor, type TaskKind } from "../task-kind"
 import { TaskId } from "./backlog"
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
-import { type Env, pueueOutputAt } from "./pueue-log"
 import { LabelArg } from "./token"
 import { capture, type Command, decodeJson, readHeld, refuse, resolveProjectDir, RunnerError, type RunnerRequirements, taskBranch } from "./runner"
 
@@ -185,7 +185,7 @@ const runLogAt = (home: string, runId: string): Effect.Effect<string | null, nev
     const names = yield* fs.readDirectory(dir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
     let latest: string | null = null
     for (const name of names) {
-      if (name !== "agent.log" && !/^fix-.*\.log$/.test(name)) {
+      if (name !== "agent.log" && name !== gateLogFileName && !/^fix-.*\.log$/.test(name) && !/^checks-.*\.txt$/.test(name)) {
         continue
       }
       const info = yield* fs.stat(dir + "/" + name).pipe(Effect.orElseSucceed(() => null))
@@ -197,17 +197,7 @@ const runLogAt = (home: string, runId: string): Effect.Effect<string | null, nev
     return latest
   })
 
-const latestAt = (first: string | null, second: string | null): string | null => {
-  if (first === null) {
-    return second
-  }
-  if (second === null) {
-    return first
-  }
-  return Date.parse(second) > Date.parse(first) ? second : first
-}
-
-export const readResult = (task: string, home: string, env: Env, label?: string | null): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
+export const readResult = (task: string, home: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const held = yield* readHeld(home, task, label)
     if (held === null) {
@@ -221,10 +211,8 @@ export const readResult = (task: string, home: string, env: Env, label?: string 
     if (result.status !== "running" && result.status !== "paused") {
       return result
     }
-    const pueueAt = yield* pueueOutputAt(held.id, env, process.platform)
     const runAt = run === null ? null : yield* runLogAt(home, run.id)
-    const outputAt = latestAt(pueueAt, runAt)
-    return outputAt === null ? result : { ...result, outputAt }
+    return { ...result, outputAt: runAt ?? result.started }
   })
 
 const ResultStdin = Schema.Struct({ label: LabelArg })

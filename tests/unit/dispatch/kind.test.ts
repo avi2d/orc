@@ -76,7 +76,7 @@ const startScout = async (root: string): Promise<void> => {
 }
 
 const beatClosing = async (root: string) => {
-  const report = await Effect.runPromise(runBeat(root, root, liveSources({})).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueDone(root)))))
+  const report = await Effect.runPromise(runBeat(root, root, liveSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueDone(root)))))
   const task = (await run(listTasks(root))).find((candidate) => candidate.spec.id === "task-1")
   return {
     closing: task?.state.kind === "closed" ? task.state.closing : null,

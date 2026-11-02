@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test"
+import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { answerArgsFor, answerForGate, driveNoMistakes, noMistakesBinary, omittedQuestionIds, parseRun, type NoMistakesFinding, type NoMistakesRunner } from "../../packages/run/src/no-mistakes"
+import { answerArgsFor, answerForGate, driveNoMistakes, noMistakesBinary, omittedQuestionIds, parseRun, type NoMistakesFinding, type NoMistakesRecord, type NoMistakesRunner } from "../../packages/run/src/no-mistakes"
 import { formatReport, type OrcRunReport } from "../../packages/run/src/run-record"
 
 const approvalGate = { step: "review", stage: "approval" } as const
@@ -408,19 +412,35 @@ const endedSkippingPr: NoMistakesRunner = {
 }
 
 describe("driveNoMistakes", () => {
+  const driveIn = async (runner: NoMistakesRunner): Promise<{ readonly record: NoMistakesRecord; readonly gate: string }> => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-gate-"))
+    try {
+      const record = await Effect.runPromise(driveNoMistakes({ runner, taskFile: "/task.md", runDir: dir }).pipe(Effect.provide(BunServices.layer)))
+      return { record, gate: await readFile(join(dir, "gate.log"), "utf8") }
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }
+
   test("a run that skips the pr step carries the reason no-mistakes gave", async () => {
-    const record = await Effect.runPromise(driveNoMistakes({ runner: endedSkippingPr, taskFile: "/task.md" }))
+    const { record } = await driveIn(endedSkippingPr)
     expect(record.result).toBe("no-mistakes ended with outcome passed-with-skips, and it skipped the pr step: provider unknown is not supported yet. No PR opens.")
   })
 
   test("a run that ends failed carries the error no-mistakes gave for it", async () => {
-    const record = await Effect.runPromise(driveNoMistakes({ runner: endedFailed, taskFile: "/task.md" }))
+    const { record } = await driveIn(endedFailed)
     expect(record.status).toBe("failed")
     expect(record.result).toBe("no-mistakes ended with outcome failed: step lint failed: agent lint: pi output parse: invalid character '.' looking for beginning of object key string. No PR opens.")
   })
 
   test("the error of a failed run beside its steps table still lets orc read the recorded findings", async () => {
-    const record = await Effect.runPromise(driveNoMistakes({ runner: endedFailed, taskFile: "/task.md" }))
+    const { record } = await driveIn(endedFailed)
     expect(record.findings.map((finding) => finding.id)).toEqual(["lint-1"])
+  })
+
+  test("a parked gate leaves its step in the run folder instead of only in memory", async () => {
+    const parkedRunner: NoMistakesRunner = { ...endedFailed, start: () => Effect.succeed({ stdout: parked, stderr: "", exitCode: 0 }) }
+    const { gate } = await driveIn(parkedRunner)
+    expect(gate.trim().split("\n").map((line) => line.split(" ").at(-1))).toEqual(["start", "review"])
   })
 })

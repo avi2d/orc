@@ -70,18 +70,20 @@ const touch = async (file: string, at: number): Promise<void> => {
   await utimes(file, at / 1000, at / 1000)
 }
 
-const pueueConfig = async (root: string): Promise<Record<string, string>> => {
-  await mkdir(join(root, "pueue", "task_logs"), { recursive: true })
-  await writeFile(join(root, "pueue.yml"), "shared:\n  pueue_directory: " + join(root, "pueue") + "\n")
-  return { PUEUE_CONFIG_PATH: join(root, "pueue.yml") }
+const seedRun = async (root: string): Promise<void> => {
+  const db = await Effect.runPromise(openDatabase(root).pipe(Effect.provide(BunServices.layer)))
+  try {
+    Effect.runSync(recordRun(db, { id: "run-1", project: "/checkout", branch: "orc/task-1", taskFile: "task.md", status: "running", started: "2026-10-27T10:02:00.000Z" }))
+  } finally {
+    db.close()
+  }
+  await mkdir(join(root, "runs", "run-1"), { recursive: true })
 }
 
-const pueueLog = (root: string): string => join(root, "pueue", "task_logs", "11.log")
-
-const beatAt = async (root: string, now: number, env: Record<string, string>, state: PueueState = running): Promise<ReadonlyArray<string>> => {
+const beatAt = async (root: string, now: number, state: PueueState = running): Promise<ReadonlyArray<string>> => {
   const beat = Effect.gen(function*() {
     yield* TestClock.setTime(now)
-    return yield* runBeat(root, root, { env, readLoad: unreadLoad })
+    return yield* runBeat(root, root, { readLoad: unreadLoad })
   })
   const report = await Effect.runPromise(beat.pipe(Effect.provide(Layer.mergeAll(BunServices.layer, pueueWith(root, state), TestClock.layer()))))
   return formatBeat(report).split("\n").filter((line) => line.startsWith("stalled ") || line.startsWith("closed "))
@@ -92,63 +94,76 @@ const stalledLine = "stalled task-1 on mac: no output since 2026-10-27T11:00:00.
 describe("a pueue run's stall", () => {
   test("output 30 minutes old flags the run instead of waiting longer", async () => {
     await withBacklog(async (root) => {
-      const env = await pueueConfig(root)
       await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
-      await touch(pueueLog(root), writtenAt)
-      expect(await beatAt(root, minutesAfterWrite(30), env)).toEqual([stalledLine])
+      await seedRun(root)
+      await touch(join(root, "runs", "run-1", "agent.log"), writtenAt)
+      expect(await beatAt(root, minutesAfterWrite(30))).toEqual([stalledLine])
     })
   })
   test("output 29 minutes old is not flagged instead of flagging early", async () => {
     await withBacklog(async (root) => {
-      const env = await pueueConfig(root)
       await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
-      await touch(pueueLog(root), writtenAt)
-      expect(await beatAt(root, minutesAfterWrite(29), env)).toEqual([])
+      await seedRun(root)
+      await touch(join(root, "runs", "run-1", "agent.log"), writtenAt)
+      expect(await beatAt(root, minutesAfterWrite(29))).toEqual([])
     })
   })
   test("one stall is flagged once instead of on every beat", async () => {
     await withBacklog(async (root) => {
-      const env = await pueueConfig(root)
       await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
-      await touch(pueueLog(root), writtenAt)
-      expect(await beatAt(root, minutesAfterWrite(30), env)).toEqual([stalledLine])
-      expect(await beatAt(root, minutesAfterWrite(40), env)).toEqual([])
+      await seedRun(root)
+      await touch(join(root, "runs", "run-1", "agent.log"), writtenAt)
+      expect(await beatAt(root, minutesAfterWrite(30))).toEqual([stalledLine])
+      expect(await beatAt(root, minutesAfterWrite(40))).toEqual([])
     })
   })
   test("new output clears the flag and a second stall flags again instead of staying silent", async () => {
     await withBacklog(async (root) => {
-      const env = await pueueConfig(root)
       await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
-      await touch(pueueLog(root), writtenAt)
-      expect(await beatAt(root, minutesAfterWrite(30), env)).toEqual([stalledLine])
-      await touch(pueueLog(root), minutesAfterWrite(35))
-      expect(await beatAt(root, minutesAfterWrite(50), env)).toEqual([])
-      expect(await beatAt(root, minutesAfterWrite(65), env)).toEqual(["stalled task-1 on mac: no output since 2026-10-27T11:35:00.000Z"])
+      await seedRun(root)
+      await touch(join(root, "runs", "run-1", "agent.log"), writtenAt)
+      expect(await beatAt(root, minutesAfterWrite(30))).toEqual([stalledLine])
+      await touch(join(root, "runs", "run-1", "agent.log"), minutesAfterWrite(35))
+      expect(await beatAt(root, minutesAfterWrite(50))).toEqual([])
+      expect(await beatAt(root, minutesAfterWrite(65))).toEqual(["stalled task-1 on mac: no output since 2026-10-27T11:35:00.000Z"])
     })
   })
-  test("a fresh agent log with a stale pueue log stays silent instead of flagging a healthy run", async () => {
+  test("a fresh agent log stays silent instead of flagging a healthy run", async () => {
     await withBacklog(async (root) => {
-      const env = await pueueConfig(root)
       await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
-      await touch(pueueLog(root), writtenAt)
-      const db = await Effect.runPromise(openDatabase(root).pipe(Effect.provide(BunServices.layer)))
-      try {
-        Effect.runSync(recordRun(db, { id: "run-1", project: "/checkout", branch: "orc/task-1", taskFile: "task.md", status: "running", started: "2026-10-27T10:02:00.000Z" }))
-      } finally {
-        db.close()
-      }
-      await mkdir(join(root, "runs", "run-1"), { recursive: true })
+      await seedRun(root)
       await touch(join(root, "runs", "run-1", "agent.log"), minutesAfterWrite(29))
-      expect(await beatAt(root, minutesAfterWrite(30), env)).toEqual([])
+      expect(await beatAt(root, minutesAfterWrite(30))).toEqual([])
+    })
+  })
+  test("a run with no run-folder log falls back to its start instead of staying silent", async () => {
+    await withBacklog(async (root) => {
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await seedRun(root)
+      expect(await beatAt(root, minutesAfterWrite(30))).toEqual(["stalled task-1 on mac: no output since 2026-10-27T10:02:00.000Z"])
+    })
+  })
+  test("a fresh gate log stays silent instead of flagging a run in review", async () => {
+    await withBacklog(async (root) => {
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await seedRun(root)
+      await touch(join(root, "runs", "run-1", "gate.log"), minutesAfterWrite(29))
+      expect(await beatAt(root, minutesAfterWrite(30))).toEqual([])
+    })
+  })
+  test("a fresh checks file stays silent instead of flagging a run in checks", async () => {
+    await withBacklog(async (root) => {
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await seedRun(root)
+      await touch(join(root, "runs", "run-1", "checks-1.txt"), minutesAfterWrite(29))
+      expect(await beatAt(root, minutesAfterWrite(30))).toEqual([])
     })
   })
   test("a finished run is closed instead of flagged however old its output", async () => {
     await withBacklog(async (root) => {
-      const env = await pueueConfig(root)
       await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
-      await touch(pueueLog(root), writtenAt)
       const done: PueueState = { Done: { start: "2026-10-27T10:02:00.000Z", end: "2026-10-27T11:00:00.000Z", result: "Success" } }
-      const lines = await beatAt(root, minutesAfterWrite(90), env, done)
+      const lines = await beatAt(root, minutesAfterWrite(90), done)
       expect(lines.filter((line) => line.startsWith("stalled "))).toEqual([])
       expect(lines.filter((line) => line.startsWith("closed "))).toHaveLength(1)
     })
@@ -161,7 +176,7 @@ describe("a custom start's stall", () => {
       const log = join(root, "logs", "task-1.log")
       await startTask(root, ["true"], log)
       await touch(log, writtenAt)
-      expect(await beatAt(root, minutesAfterWrite(30), {})).toEqual([stalledLine])
+      expect(await beatAt(root, minutesAfterWrite(30))).toEqual([stalledLine])
     })
   })
   test("a backlog log 29 minutes old is not flagged instead of flagging early", async () => {
@@ -169,7 +184,7 @@ describe("a custom start's stall", () => {
       const log = join(root, "logs", "task-1.log")
       await startTask(root, ["true"], log)
       await touch(log, writtenAt)
-      expect(await beatAt(root, minutesAfterWrite(29), {})).toEqual([])
+      expect(await beatAt(root, minutesAfterWrite(29))).toEqual([])
     })
   })
 })
@@ -203,7 +218,7 @@ describe("a task that has not started", () => {
       await writeFile(join(root, "dispatch.json"), JSON.stringify({ machines: [{ name: "mac", slots: 0, start: ["true"] }], quota }))
       await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: "/checkout" } }] }))
       await run(addTask(root, spec))
-      expect(await beatAt(root, minutesAfterWrite(600), {})).toEqual([])
+      expect(await beatAt(root, minutesAfterWrite(600))).toEqual([])
     })
   })
 })

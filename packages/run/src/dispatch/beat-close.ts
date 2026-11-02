@@ -5,7 +5,6 @@ import type { BeatAction } from "./beat-action"
 import type { DispatchConfig } from "./config"
 import { ownedBySweep, throughFor } from "./machine-reach"
 import { parkStartedTask } from "./parked"
-import type { Env } from "./pueue-log"
 import { taskLabel } from "./pueue-status"
 import { taskBranch } from "./runner"
 import { endingFromResult, type RunEnding, readResult, readResultThrough, type RunnerResult } from "./runner-result"
@@ -14,7 +13,6 @@ import type { TaskFileError, TaskRecord } from "./task-record"
 export interface CloseContext {
   readonly root: string
   readonly home: string
-  readonly env: Env
   readonly config: DispatchConfig
 }
 
@@ -73,7 +71,7 @@ export const closeFinished = (
       return { kind: "own-log" } satisfies Progress
     }
     const through = throughFor(machine)
-    const read = through === null ? readResult(task.spec.id, context.home, context.env, label) : readResultThrough(through, task.spec.id, label)
+    const read = through === null ? readResult(task.spec.id, context.home, label) : readResultThrough(through, task.spec.id, label)
     const outcome = yield* read.pipe(
       Effect.map((result) => ({ kind: "read" as const, ending: endingFromResult(result, task.spec.kind), outputAt: outputAtOf(result) })),
       Effect.catchTag("RunnerError", (error) => Effect.succeed({ kind: "unread" as const, reason: error.detail })),

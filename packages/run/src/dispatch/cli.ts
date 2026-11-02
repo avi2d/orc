@@ -148,7 +148,7 @@ const reportResult = (args: Extract<CommandArgs, { readonly kind: "RunnerResult"
       label = (yield* readStdinLabel(place.stdin)) ?? label
     }
     const result = args.reach.kind === "here"
-      ? yield* readResult(args.task, place.home, place.env, label)
+      ? yield* readResult(args.task, place.home, label)
       : yield* readResultThrough(args.reach.command, args.task, label)
     yield* Console.log(args.json ? JSON.stringify(runnerJson(result)) : formatResult(result))
   })
@@ -227,7 +227,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         break
       }
       case "Beat": {
-        const report = yield* runBeat(backlogRoot(place), place.home, liveSources(place.env))
+        const report = yield* runBeat(backlogRoot(place), place.home, liveSources())
         yield* Console.log(args.json ? JSON.stringify(beatJson(report)) : formatBeat(report))
         break
       }

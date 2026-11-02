@@ -60,12 +60,15 @@ const runPi = (run: ReportRun): Effect.Effect<number, OrcRunError, FileSystem.Fi
       extendEnv: false,
       stdin: print.stdin === undefined ? "ignore" : Stream.fromIterable([new TextEncoder().encode(print.stdin)])
     }))
-    const [log, errors, exitCode] = yield* Effect.all([
-      handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
-      handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
+    const logPath = run.runDir + "/agent.log"
+    yield* fs.writeFileString(logPath, "").pipe(Effect.orElseSucceed(() => undefined))
+    const append = (chunk: string): Effect.Effect<void, never, never> =>
+      chunk === "" ? Effect.void : fs.writeFileString(logPath, chunk, { flag: "a" }).pipe(Effect.orElseSucceed(() => undefined))
+    const [, , exitCode] = yield* Effect.all([
+      handle.stdout.pipe(Stream.decodeText(), Stream.tap(append), Stream.mkString),
+      handle.stderr.pipe(Stream.decodeText(), Stream.tap(append), Stream.mkString),
       handle.exitCode
     ], { concurrency: "unbounded" })
-    yield* fs.writeFileString(run.runDir + "/agent.log", log + errors).pipe(Effect.orElseSucceed(() => undefined))
     return exitCode
   }).pipe(
     Effect.scoped,

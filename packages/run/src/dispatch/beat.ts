@@ -10,7 +10,6 @@ import type { Claim, TaskFileError, TaskRecord } from "./task-record"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
 import type { BeatAction } from "./beat-action"
 import { closeFinished } from "./beat-close"
-import type { Env } from "./pueue-log"
 import { taskLabel } from "./pueue-status"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
 import { flagStall } from "./stall"
@@ -129,7 +128,6 @@ const startTask = (
 interface BeatContext {
   readonly root: string
   readonly home: string
-  readonly env: Env
   readonly beat: string
   readonly config: DispatchConfig
   readonly projects: ReadonlyArray<Project>
@@ -268,11 +266,10 @@ const renewTask = (context: BeatContext, task: TaskRecord): Effect.Effect<Option
   })
 
 export interface BeatSources {
-  readonly env: Env
   readonly readLoad: ReadLoad
 }
 
-export const liveSources = (env: Env): BeatSources => ({ env, readLoad: readMachineLoad })
+export const liveSources = (): BeatSources => ({ readLoad: readMachineLoad })
 
 export const runBeat = (
   root: string,
@@ -292,7 +289,6 @@ export const runBeat = (
     const context: BeatContext = {
       root,
       home,
-      env: sources.env,
       beat,
       config,
       projects,

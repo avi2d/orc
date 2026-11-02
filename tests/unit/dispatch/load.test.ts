@@ -50,7 +50,7 @@ const loadOf = (fiveMinute: number) => (): Effect.Effect<LoadReading> => Effect.
 
 const beatAt = async (root: string, machine: Record<string, unknown>, readLoad: () => Effect.Effect<LoadReading>) => {
   await writeBacklog(root, machine)
-  const report = await Effect.runPromise(runBeat(root, root, { env: {}, readLoad }).pipe(Effect.provide(Layer.merge(BunServices.layer, quotaStub))))
+  const report = await Effect.runPromise(runBeat(root, root, { readLoad }).pipe(Effect.provide(Layer.merge(BunServices.layer, quotaStub))))
   const states = (await run(listTasks(root))).map((task) => task.state.kind)
   return { actions: report.actions.map((action) => action.kind === "waits" ? "waits: " + action.reason : action.kind), states }
 }
@@ -97,7 +97,7 @@ describe("a machine's five-minute load limit", () => {
       }))
       await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { winbox: "/home/a/orc", mac: "/Users/a/orc" } }] }))
       await run(addTask(root, spec))
-      const report = await Effect.runPromise(runBeat(root, root, { env: {}, readLoad: loadOf(20) }).pipe(Effect.provide(Layer.merge(BunServices.layer, quotaStub))))
+      const report = await Effect.runPromise(runBeat(root, root, { readLoad: loadOf(20) }).pipe(Effect.provide(Layer.merge(BunServices.layer, quotaStub))))
       expect(report.actions.map((action) => action.kind === "started" ? action.machine : action.kind)).toEqual(["mac"])
     })
   })
