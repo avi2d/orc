@@ -292,7 +292,7 @@ const withUnreadFindings = (ending: Ending, failure: string): Ending => ({
   openQuestions: ending.openQuestions
 })
 
-export const driveNoMistakes = (input: NoMistakesInput): Effect.Effect<NoMistakesRecord> =>
+export const driveNoMistakes = (input: NoMistakesInput): Effect.Effect<NoMistakesRecord, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const log = openDriveLog(new Date().toISOString())
     const ending = yield* drive(input, log)
