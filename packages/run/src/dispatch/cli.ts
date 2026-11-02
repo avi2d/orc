@@ -122,8 +122,19 @@ const add = (args: Extract<CommandArgs, { readonly kind: "AddTask" }>, place: Di
       return yield* refuse(from + " holds no text")
     }
     const created = DateTime.formatIso(yield* DateTime.now)
-    const record = yield* addTask(backlogRoot(place), { title, project: project.name, machine: args.machine, dependsOn: args.dependsOn, created, body })
-    yield* Console.log("added " + record.spec.id + " for " + project.name + (args.machine === null ? "" : " on " + args.machine))
+    const record = yield* addTask(backlogRoot(place), {
+      title,
+      project: project.name,
+      kind: args.taskKind,
+      machine: args.machine,
+      dependsOn: args.dependsOn,
+      created,
+      body
+    })
+    yield* Console.log(
+      "added " + record.spec.id + " for " + project.name + (args.machine === null ? "" : " on " + args.machine) +
+        (record.spec.kind === "ship" ? "" : " as a " + record.spec.kind)
+    )
   })
 
 const reportResult = (args: Extract<CommandArgs, { readonly kind: "RunnerResult" }>, place: DispatchPlace) =>
@@ -141,7 +152,7 @@ const reportResult = (args: Extract<CommandArgs, { readonly kind: "RunnerResult"
 
 const closeNow = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
-    yield* closeStartedTask(backlogRoot(place), args.id, args.outcome, args.reason, null, DateTime.formatIso(yield* DateTime.now))
+    yield* closeStartedTask(backlogRoot(place), args.id, args.outcome, args.reason, { pr: null, report: null }, DateTime.formatIso(yield* DateTime.now))
     return "closed " + args.id + " " + args.outcome
   })
 

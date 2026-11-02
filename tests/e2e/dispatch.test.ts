@@ -330,6 +330,17 @@ describe("orc beat", () => {
     })
   }, beatTimeout)
 
+  test("a scout added with --kind shows its kind in backlog and --json, and an unknown kind is refused instead of added as ship", async () => {
+    await withFixture({ mac: 1, linux: 1, floorPercent: 15 }, async (fixture) => {
+      expect(await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--kind", "scout"])).toBe("added task-1 for orc as a scout\n")
+      expect(await orcOk(fixture, ["backlog"])).toContain("task-1 scout orc Do the thing")
+      expect(await backlogTask(fixture, "task-1")).toMatchObject({ kind: "scout" })
+      const refused = await runOrc(fixture, ["backlog", "add", "orc", "task.md", "--kind", "deploy"])
+      expect({ exitCode: refused.exitCode, stderr: refused.stderr }).toEqual({ exitCode: 1, stderr: expect.stringContaining("the kind deploy is not ship, scout or task") })
+      expect((await backlogTasks(fixture)).map((task) => task.id)).toEqual(["task-1"])
+    })
+  }, beatTimeout)
+
   test("adding a task for a project not in the list is refused instead of queued", async () => {
     await withFixture({ mac: 1, linux: 1, floorPercent: 15 }, async (fixture) => {
       const result = await runOrc(fixture, ["backlog", "add", "web", "task.md"])

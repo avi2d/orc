@@ -12,7 +12,7 @@ import { defaultToolchainResolver, type HostTools, type ToolchainResolver, withI
 import { routeOfAgents } from "./model-route"
 import { readOrcConfig } from "./orc-config"
 import { planSandbox, type SandboxPlan } from "./sandbox-plan"
-import { runGit } from "./git-run"
+import { type Checkout, openCheckout, parseRefuseMarkers } from "./checkout"
 import { orcCompletionLine } from "./pi"
 import { OrcRunError, describeCause } from "./run-session"
 import { openDatabase, orcHomeDir, updateStep } from "./run-history"
@@ -22,6 +22,8 @@ import { finishRun, historyFailure, recordChecksDone, recordChecksStart, recordF
 import { failedReport, writeEvidence, writeHandover, writeReport, type HistoryRun, type OrcRunCommit, type OrcRunReport } from "./run-record"
 import { longSessionWarning, type LongSessionCounts } from "./long-session"
 import { runFull, type RunCheckpoints, type SandboxOps } from "./run-loop"
+import { type ReportOutcome, type ReportRun, runReport } from "./report-run"
+import type { ReportKind } from "./task-kind"
 import { noMistakesBinary, noMistakesVersionProblem, subprocessNoMistakesRunner, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "./no-mistakes"
 
 export type { SandboxOps }
@@ -48,23 +50,6 @@ const newRunId = (): string => {
   return stamp + "-" + random
 }
 
-const exists = (fs: FileSystem.FileSystem, path: string): Effect.Effect<boolean, OrcRunError> =>
-  fs.exists(path).pipe(
-    Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot stat " + path + ": " + String(cause) }))
-  )
-
-interface Checkout {
-  readonly git: string
-  readonly projectDir: string
-  readonly branch: string
-}
-
-// Sandcastle interpolates the branch into host shell commands, so any other character can be expanded or run.
-const shellSafeBranch = /^[A-Za-z0-9._/-]+$/
-
-export const parseRefuseMarkers = (value: string | undefined): ReadonlyArray<string> =>
-  value === undefined ? [] : value.split(",").map((entry) => entry.trim()).filter((entry) => entry !== "")
-
 // The sandbox reads each folder whole, so a folder holding HOME would hand it the operator's credentials.
 export const toolchainFromEnv = (value: string | undefined, home: string): Effect.Effect<ToolchainResolver, OrcRunError> =>
   Effect.gen(function*() {
@@ -83,48 +68,6 @@ export const toolchainFromEnv = (value: string | undefined, home: string): Effec
     return withInstallFolders(defaultToolchainResolver(home), folders)
   })
 
-export const openCheckout = (
-  fs: FileSystem.FileSystem,
-  path: Path.Path,
-  spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
-  git: string,
-  cwd: string,
-  branchName: string | undefined,
-  runId: string,
-  refuseMarkers: ReadonlyArray<string>
-): Effect.Effect<Checkout, OrcRunError> =>
-  Effect.gen(function*() {
-    const top = yield* runGit(spawner, git, ["rev-parse", "--show-toplevel"], cwd)
-    if (top.exitCode !== 0) {
-      return yield* refuse("orc: " + cwd + " sits in no git checkout")
-    }
-    const projectDir = yield* fs.realPath(top.stdout.trim()).pipe(
-      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot resolve the checkout: " + String(cause) }))
-    )
-    const candidates = refuseMarkers.flatMap((marker) => [path.join(projectDir, marker), path.join(path.dirname(projectDir), marker)])
-    for (const candidate of candidates) {
-      if (yield* exists(fs, candidate)) {
-        return yield* refuse("orc: " + candidate + " marks this checkout as refused, so orc refuses to run in it")
-      }
-    }
-    const status = yield* runGit(spawner, git, ["status", "--porcelain", "--", ".", ":(exclude).sandcastle/worktrees"], projectDir)
-    if (status.exitCode !== 0) {
-      return yield* refuse("orc: git status failed in " + projectDir)
-    }
-    const dirty = status.stdout.split("\n").filter((line) => line.trim() !== "").length
-    if (dirty > 0) {
-      return yield* refuse("orc: the checkout at " + projectDir + " holds " + dirty.toString() + " uncommitted changes, so commit or stash them before orc runs")
-    }
-    const branch = branchName ?? ("orc/" + runId)
-    if (!shellSafeBranch.test(branch)) {
-      return yield* refuse("orc: Sandcastle interpolates " + branch + " into host shell commands, so a branch holding a shell metacharacter is refused and orc takes only letters, digits, '.', '_', '-' and '/' in a branch name")
-    }
-    const named = yield* runGit(spawner, git, ["check-ref-format", "--branch", branch], projectDir)
-    if (named.exitCode !== 0) {
-      return yield* refuse("orc: " + branch + " is no usable branch name")
-    }
-    return { git, projectDir, branch }
-  })
 
 interface RunFolders {
   readonly runDir: string
@@ -267,26 +210,80 @@ const openSandboxForRun = (
     catch: (cause) => new OrcRunError({ message: "orc: the sandbox failed to start: " + describeCause(cause) })
   }).pipe(withHostGitSafety(git))
 
-export const runAgentStep = (
+interface OpenedRun {
+  readonly fs: FileSystem.FileSystem
+  readonly path: Path.Path
+  readonly spawner: ChildProcessSpawner.ChildProcessSpawner["Service"]
+  readonly home: string
+  readonly runId: string
+  readonly git: string
+  readonly checkout: Checkout
+  readonly runDir: string
+  readonly effectiveTaskFile: string
+  readonly sandboxKind: SandboxKind
+}
+
+const openRun = (
   request: OrcRunRequest
-): Effect.Effect<OrcRunReport, OrcRunError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.scoped(Effect.gen(function*() {
+): Effect.Effect<OpenedRun, OrcRunError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner | Scope.Scope> =>
+  Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const home = orcHomeDir(request.homeDir ?? Bun.env.ORC_HOME)
     const runId = request.runId ?? newRunId()
-    const operatorEnv = { ...Bun.env }
-    const hostPath = Bun.env.PATH
-    const toolchain = yield* toolchainFromEnv(Bun.env.ORC_TOOLCHAIN_DIRS, homedir())
     const git = yield* openHostGit(fs, path)
     const checkout = yield* openCheckout(fs, path, spawner, git, request.cwd, request.branch, runId, parseRefuseMarkers(Bun.env.ORC_REFUSE_MARKERS))
     const runDir = path.join(home, "runs", runId)
     const { taskFile: effectiveTaskFile, sandbox: sandboxKind } = yield* readRunStart(fs, home, checkout, request)
+    return { fs, path, spawner, home, runId, git, checkout, runDir, effectiveTaskFile, sandboxKind }
+  })
+
+const prepareRunAgents = (opened: OpenedRun, request: OrcRunRequest) =>
+  prepareAgents(
+    opened.fs, opened.path, opened.spawner, opened.checkout, opened.home, opened.runDir, opened.effectiveTaskFile, request.agentsDir, opened.sandboxKind,
+    { tokenFile: request.tokenFile, provider: request.provider }
+  )
+
+const removeRunDir = (opened: OpenedRun) => opened.fs.remove(opened.runDir, { recursive: true }).pipe(Effect.result)
+
+// A report run starts Pi on the host in its run folder, outside Sandcastle, so a nono run would go unsandboxed without saying so.
+export const runReportStep = (
+  request: OrcRunRequest,
+  kind: ReportKind
+): Effect.Effect<ReportOutcome, OrcRunError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.scoped(Effect.gen(function*() {
+    const opened = yield* openRun(request)
+    if (opened.sandboxKind !== "none") {
+      return yield* refuse("orc: a " + kind + " run starts Pi on the host in its run folder, so it takes --sandbox none and refuses --sandbox " + opened.sandboxKind)
+    }
+    const { folders, agent, plan } = yield* prepareRunAgents(opened, request).pipe(Effect.onError(() => removeRunDir(opened)))
+    const run: ReportRun = {
+      kind, runId: opened.runId, runDir: folders.runDir, projectDir: opened.checkout.projectDir, branch: opened.checkout.branch, sandbox: opened.sandboxKind,
+      taskPath: folders.taskPath, piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir,
+      piAgentDir: plan.kind === "none" ? plan.own?.piAgentDir : undefined, agent, started: new Date().toISOString(),
+      env: { ...Bun.env, ...(plan.kind === "none" ? plan.own?.env : undefined) }
+    }
+    return yield* Effect.acquireUseRelease(
+      openDatabase(opened.home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
+      (db) => runReport(db, run),
+      (db) => Effect.sync(() => db.close())
+    )
+  }))
+
+export const runAgentStep = (
+  request: OrcRunRequest
+): Effect.Effect<OrcRunReport, OrcRunError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.scoped(Effect.gen(function*() {
+    const operatorEnv = { ...Bun.env }
+    const hostPath = Bun.env.PATH
+    const toolchain = yield* toolchainFromEnv(Bun.env.ORC_TOOLCHAIN_DIRS, homedir())
+    const opened = yield* openRun(request)
+    const { fs, path, spawner, home, runId, git, checkout, sandboxKind } = opened
     const noMistakes = { spawner, binary: noMistakesBinary(Bun.env.ORC_NO_MISTAKES_BIN), pathEnv: hostPath ?? "", git: checkout.git }
-    const { folders, agent, fixer, plan } = yield* prepareAgents(fs, path, spawner, checkout, home, runDir, effectiveTaskFile, request.agentsDir, sandboxKind, { tokenFile: request.tokenFile, provider: request.provider }).pipe(
+    const { folders, agent, fixer, plan } = yield* prepareRunAgents(opened, request).pipe(
       Effect.tap(() => requireNoMistakes(noMistakes, checkout.projectDir)),
-      Effect.onError(() => fs.remove(runDir, { recursive: true }).pipe(Effect.result))
+      Effect.onError(() => removeRunDir(opened))
     )
     const started = new Date().toISOString()
     const sandbox: Sandbox = yield* openSandboxForRun(plan, git, checkout, folders, hostPath, toolchain, operatorEnv)

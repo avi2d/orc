@@ -1,6 +1,7 @@
 import { dependencyOpen, type BeatAction, type BeatReport, type MachineRoom } from "./beat"
 import type { Project } from "./config"
 import { describeQuota } from "./quota"
+import type { TaskKind } from "../task-kind"
 import { type Claim, type Hold, isHeld, openQuestions, type Parked, type Started, type TaskRecord } from "./task-record"
 
 const BACKLOG_JSON_SCHEMA = "orc.backlog.v1" as const
@@ -26,6 +27,7 @@ type TaskStatusJson =
     readonly outcome: "done" | "failed" | "start-failed"
     readonly reason: string
     readonly pr: string | null
+    readonly report: string | null
     readonly closedAt: string
     readonly postedAt: string | null
   }
@@ -34,6 +36,7 @@ type TaskJson = {
   readonly id: string
   readonly title: string
   readonly project: string
+  readonly kind: TaskKind
   readonly machine: string | null
   readonly dependsOn: ReadonlyArray<string>
   readonly created: string
@@ -72,6 +75,7 @@ const claimJson = (record: TaskRecord): TaskStatusJson => {
         outcome: state.closing.outcome,
         reason: state.closing.reason,
         pr: state.closing.outcome === "start-failed" ? null : state.closing.pr,
+        report: state.closing.outcome === "start-failed" ? null : state.closing.report,
         closedAt: state.closedAt,
         postedAt: state.postedAt
       }
@@ -85,6 +89,7 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     id: record.spec.id,
     title: record.spec.title,
     project: record.spec.project,
+    kind: record.spec.kind,
     machine: record.spec.machine,
     dependsOn: record.spec.dependsOn,
     created: record.spec.created,
@@ -113,26 +118,28 @@ const sideBySide = (columns: ReadonlyArray<ReadonlyArray<string>>): string => {
 
 const pinOf = (record: TaskRecord): string => record.spec.machine === null ? "" : " @" + record.spec.machine
 
+const named = (record: TaskRecord): string => record.spec.id + (record.spec.kind === "ship" ? "" : " " + record.spec.kind) + " " + record.spec.project
+
 const newCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>): string => {
   const open = record.spec.dependsOn.filter((id) => dependencyOpen(all.find((candidate) => candidate.spec.id === id)))
   const waits = open.length === 0 ? "" : " waits " + open.join(",")
   const held = isHeld(record) ? " held (" + record.hold.reason + ")" : ""
   const asked = openQuestions(record)
   const parked = asked.length === 0 ? "" : " parked (" + asked.map((question) => question.id).join(",") + ")"
-  return record.spec.id + " " + record.spec.project + pinOf(record) + waits + held + parked + " " + record.spec.title
+  return named(record) + pinOf(record) + waits + held + parked + " " + record.spec.title
 }
 
 const takenCell = (record: TaskRecord): string => {
   const state = record.state
   if (state.kind === "started") {
-    return record.spec.id + " " + record.spec.project + " on " + state.claim.machine + " started"
+    return named(record) + " on " + state.claim.machine + " started"
   }
   const machine = state.kind === "taken" && state.claim !== null ? " on " + state.claim.machine : ""
-  return record.spec.id + " " + record.spec.project + machine + " taken"
+  return named(record) + machine + " taken"
 }
 
 const closedCell = (record: TaskRecord): string =>
-  record.state.kind === "closed" ? record.spec.id + " " + record.spec.project + " " + record.state.closing.outcome : record.spec.id
+  record.state.kind === "closed" ? named(record) + " " + record.state.closing.outcome : record.spec.id
 
 const projectCells = (projects: ProjectList): ReadonlyArray<string> =>
   projects.kind === "unread"
@@ -178,7 +185,8 @@ const actionLine = (action: BeatAction): string => {
       return "renew failed " + action.task + " on " + action.machine + ": " + action.reason
     }
     case "closed": {
-      return "closed " + action.task + " " + action.outcome + " on " + action.machine + ": " + action.reason + (action.pr === null ? "" : ", PR " + action.pr)
+      return "closed " + action.task + " " + action.outcome + " on " + action.machine + ": " + action.reason + (action.pr === null ? "" : ", PR " + action.pr) +
+        (action.report === null ? "" : ", report " + action.report)
     }
     case "close-failed": {
       return "close failed " + action.task + " on " + action.machine + ": " + action.reason

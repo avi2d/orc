@@ -4,6 +4,8 @@ import * as BunPath from "@effect/platform-bun/BunPath"
 import { Data, Effect, Layer, Schema } from "effect"
 import { ParkedJson, parkedListing } from "./chat-parked"
 import { capture } from "./dispatch/runner"
+import { taskKinds } from "./task-kind"
+import { ClosedTask, closedLine } from "./chat-closed"
 
 export const orcCommandVar = "ORC_CHAT_ORC"
 
@@ -59,6 +61,9 @@ const OrcCommand = Schema.fromJsonString(Schema.NonEmptyArray(Schema.String))
 const AddTaskInput = Schema.Struct({
   project: Schema.String.annotate({ description: "The project the task is for, as the backlog's project list names it" }),
   task: Schema.String.annotate({ description: "The task as markdown, whose first line is its title" }),
+  kind: Schema.optionalKey(Schema.Literals(taskKinds).annotate({
+    description: "ship ends in a PR and is the default; scout and task end in a report file in the run folder instead"
+  })),
   machine: Schema.optionalKey(Schema.String.annotate({ description: "The one machine the task may run on" })),
   dependsOn: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: "The ids of the tasks that must close done before this one starts" }))
 })
@@ -77,17 +82,6 @@ const AnswerInput = Schema.Struct({
 
 // Effect writes an empty struct as {"not":{"type":"null"}}, and Pi takes only an object schema.
 const noParameters = { type: "object", properties: {}, additionalProperties: false } as const
-
-const ClosedTask = Schema.Struct({
-  id: Schema.String,
-  title: Schema.String,
-  status: Schema.Literal("closed"),
-  outcome: Schema.Literals(["done", "failed", "start-failed"]),
-  reason: Schema.String,
-  pr: Schema.NullOr(Schema.String),
-  postedAt: Schema.NullOr(Schema.String)
-})
-type ClosedTask = typeof ClosedTask.Type
 
 const HoldJson = Schema.Struct({
   reason: Schema.String,
@@ -130,10 +124,6 @@ const decodeInput = <A>(schema: Schema.Decoder<A>, tool: string, params: unknown
   Schema.decodeUnknownEffect(schema)(params, { onExcessProperty: "error" }).pipe(
     Effect.mapError((error) => new ChatToolError({ message: tool + " takes " + error.message }))
   )
-
-const closedLine = (task: ClosedTask): string =>
-  task.id + " " + task.title + " closed " + task.outcome + (task.reason === "" ? "" : ": " + task.reason) +
-  (task.pr === null ? ", with no PR" : ", PR " + task.pr)
 
 interface PostState {
   unreadBecause: string | null
@@ -277,7 +267,7 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
       name: "orc_backlog_add",
       label: "Add to the orc backlog",
       description:
-        "Adds one task to the orc backlog through orc backlog add, and returns the line orc prints, which names the new task's id. When the task closes, orc chat posts its outcome and PR here.",
+        "Adds one task to the orc backlog through orc backlog add, and returns the line orc prints, which names the new task's id. When the task closes, orc chat posts its outcome and its PR, or its report for a scout or task.",
       parameters: Schema.toJsonSchemaDocument(AddTaskInput).schema,
       execute: (_toolCallId, params) =>
         Effect.runPromise(
@@ -288,6 +278,7 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
                 "add",
                 input.project,
                 "-",
+                ...(input.kind === undefined ? [] : ["--kind", input.kind]),
                 ...(input.machine === undefined ? [] : ["--machine", input.machine]),
                 ...(input.dependsOn ?? []).flatMap((id) => ["--depends-on", id])
               ], input.task)
@@ -299,7 +290,7 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
     {
       name: "orc_backlog",
       label: "Read the orc backlog",
-      description: "Returns orc backlog --json: every new, taken and closed task with its project, machine, outcome and PR, the project list, and the room on each machine.",
+      description: "Returns orc backlog --json: every new, taken and closed task with its project, kind, machine, outcome, PR and report, the project list, and the room on each machine.",
       parameters: noParameters,
       execute: () => Effect.runPromise(runOrc(env, ["backlog", "--json"], null).pipe(Effect.map(textResult)))
     },

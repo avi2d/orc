@@ -16,11 +16,11 @@ const writeMachine = async (fixture: Fixture, start: ReadonlyArray<string>): Pro
   }))
 }
 
-const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>): Promise<ReadonlyArray<string> | null> => {
+const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>, kind: ReadonlyArray<string> = []): Promise<ReadonlyArray<string> | null> => {
   await fakeQuota(fixture)
   await writeMachine(fixture, start)
   await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux", ...kind])
   await orcOk(fixture, ["beat"])
   return queuedArgs(fixture)
 }
@@ -38,6 +38,14 @@ describe("orc runner start", () => {
       expect(added).toEqual(pueueAddFor(fixture.home, fixture.checkout))
       expect(await queuedEnv(fixture)).toBe(fixture.home)
       expect(await readFile(join(fixture.home, "runner", "task-1.md"), "utf8")).toBe(await readFile(join(fixture.dir, "task.md"), "utf8"))
+    })
+  }, runnerTimeout)
+
+  test("a scout's start queues orc run with --kind scout instead of a ship run", async () => {
+    await withFixture(async (fixture) => {
+      const added = await beatStarts(fixture, [process.execPath, binPath, "runner", "start"], ["--kind", "scout"])
+      const ship = pueueAddFor(fixture.home, fixture.checkout)
+      expect(added).toEqual([...ship.slice(0, -2), "--kind", "scout", ...ship.slice(-2)])
     })
   }, runnerTimeout)
 

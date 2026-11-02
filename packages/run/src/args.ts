@@ -1,5 +1,6 @@
 import { type DispatchArgs, parseDispatchArgs } from "./dispatch/args"
 import { askUserWord, type QuestionAnswer } from "./no-mistakes"
+import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
 export const sandboxKinds = ["nono", "none"] as const
 export type SandboxKind = typeof sandboxKinds[number]
 export const defaultSandbox: SandboxKind = "nono"
@@ -9,7 +10,7 @@ export type OrcArgs =
   | { readonly kind: "ListRuns"; readonly json: boolean }
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
   | { readonly kind: "ScoreStep"; readonly runId: string; readonly step: string; readonly score: number; readonly note: string }
-  | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
+  | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly taskKind: TaskKind; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
   | { readonly kind: "Dispatch"; readonly args: Exclude<DispatchArgs, { readonly kind: "UsageError" }> }
   | { readonly kind: "Chat" }
   | { readonly kind: "UsageError"; readonly detail: string }
@@ -49,7 +50,7 @@ const parseScoreArgs = (rest: readonly string[]): OrcArgs => {
 }
 
 type RunSplit =
-  | { readonly kind: "ok"; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer>; readonly kept: ReadonlyArray<string> }
+  | { readonly kind: "ok"; readonly taskKind: TaskKind; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer>; readonly kept: ReadonlyArray<string> }
   | { readonly kind: "error"; readonly detail: string }
 type AnswerParse =
   | { readonly kind: "ok"; readonly value: QuestionAnswer }
@@ -106,6 +107,7 @@ const takeSandboxKind = (rest: readonly string[], index: number, taken: SandboxK
   return taken === undefined ? sandboxKinds.find((kind) => kind === name) ?? null : null
 }
 interface RunFlags {
+  taskKind: TaskKind | undefined
   branch: string | undefined
   sandbox: SandboxKind | undefined
   tokenFile: string | undefined
@@ -121,7 +123,18 @@ const stringFlags: ReadonlyArray<{ readonly flag: string; readonly key: StringFl
   { flag: "--token-file", key: "tokenFile", detail: "orc run takes --token-file once, with a path" },
   { flag: "--provider", key: "provider", detail: "orc run takes --provider once, with a provider id" }
 ]
-const valueFlags = new Set(["--sandbox", "--allow", "--answer", ...stringFlags.map((entry) => entry.flag)])
+const valueFlags = new Set(["--kind", "--sandbox", "--allow", "--answer", ...stringFlags.map((entry) => entry.flag)])
+const takeTaskKind = (rest: readonly string[], index: number, flags: RunFlags): FlagTake => {
+  const word = rest[index + 1] ?? ""
+  if (flags.taskKind !== undefined || word === "" || word.startsWith("--")) {
+    return { kind: "error", detail: "orc run takes --kind once, with ship, scout or task" }
+  }
+  if (!isTaskKind(word)) {
+    return { kind: "error", detail: unknownKind(word) }
+  }
+  flags.taskKind = word
+  return { kind: "taken" }
+}
 const takeValueFlag = (rest: readonly string[], index: number, flags: RunFlags): FlagTake => {
   const named = stringFlags.find((entry) => entry.flag === rest[index])
   if (named !== undefined) {
@@ -131,6 +144,9 @@ const takeValueFlag = (rest: readonly string[], index: number, flags: RunFlags):
     }
     flags[named.key] = value
     return { kind: "taken" }
+  }
+  if (rest[index] === "--kind") {
+    return takeTaskKind(rest, index, flags)
   }
   if (rest[index] === "--sandbox") {
     const kind = takeSandboxKind(rest, index, flags.sandbox)
@@ -156,7 +172,7 @@ const takeValueFlag = (rest: readonly string[], index: number, flags: RunFlags):
   return { kind: "taken" }
 }
 const splitRunArgs = (rest: readonly string[]): RunSplit => {
-  const flags: RunFlags = { branch: undefined, sandbox: undefined, tokenFile: undefined, provider: undefined, allow: [], answers: [], seen: new Set() }
+  const flags: RunFlags = { taskKind: undefined, branch: undefined, sandbox: undefined, tokenFile: undefined, provider: undefined, allow: [], answers: [], seen: new Set() }
   const kept: Array<string> = []
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index] ?? ""
@@ -170,7 +186,7 @@ const splitRunArgs = (rest: readonly string[]): RunSplit => {
     }
     index += 1
   }
-  return { kind: "ok", branch: flags.branch, sandbox: flags.sandbox, tokenFile: flags.tokenFile, provider: flags.provider, allow: flags.allow, answers: flags.answers, kept }
+  return { kind: "ok", taskKind: flags.taskKind ?? "ship", branch: flags.branch, sandbox: flags.sandbox, tokenFile: flags.tokenFile, provider: flags.provider, allow: flags.allow, answers: flags.answers, kept }
 }
 const parseRunArgs = (rest: readonly string[]): OrcArgs => {
   const split = splitRunArgs(rest)
@@ -183,8 +199,11 @@ const parseRunArgs = (rest: readonly string[]): OrcArgs => {
   if (split.kept.length > 1) {
     return { kind: "UsageError", detail: `unexpected argument: ${split.kept[1]}` }
   }
+  if (split.taskKind !== "ship" && (split.allow.length > 0 || split.answers.length > 0)) {
+    return { kind: "UsageError", detail: "orc run --kind " + split.taskKind + " ends in a report, so it takes no --allow or --answer" }
+  }
   const taskFile = split.kept.length === 1 ? split.kept[0] : null
-  return { kind: "RunAgent", taskFile, branch: split.branch, sandbox: split.sandbox, tokenFile: split.tokenFile, provider: split.provider, allow: split.allow, answers: split.answers }
+  return { kind: "RunAgent", taskFile, taskKind: split.taskKind, branch: split.branch, sandbox: split.sandbox, tokenFile: split.tokenFile, provider: split.provider, allow: split.allow, answers: split.answers }
 }
 const parseRunsArgs = (rest: readonly string[]): OrcArgs => {
   if (rest.length === 0) {

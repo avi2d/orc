@@ -13,7 +13,7 @@ import { insertRun, openDatabase } from "../../packages/run/src/run-history"
 import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/dispatch/config"
 import { assessQuota } from "../../packages/run/src/dispatch/quota"
 import { taskLabel } from "../../packages/run/src/dispatch/pueue-status"
-import { parseTaskFile, renderTaskFile, TaskFileError, type TaskRecord } from "../../packages/run/src/dispatch/task-record"
+import { renderTaskFile, type TaskRecord } from "../../packages/run/src/dispatch/task-record"
 import { decodeTokenText, tokenLive } from "../../packages/run/src/dispatch/token"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
@@ -28,7 +28,7 @@ const withBacklog = async (body: (root: string) => Promise<void>): Promise<void>
   }
 }
 
-const spec = { title: "Fix the thing", project: "orc", machine: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
+const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, machine: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
 
 const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-10-27T10:01:00.000Z" }
 
@@ -83,6 +83,7 @@ describe("parseDispatchArgs", () => {
       kind: "AddTask",
       project: "orc",
       task: { kind: "file", path: "t.md" },
+      taskKind: "ship",
       machine: "mac",
       dependsOn: ["task-1", "task-2"]
     })
@@ -92,6 +93,7 @@ describe("parseDispatchArgs", () => {
       kind: "AddTask",
       project: "orc",
       task: { kind: "stdin" },
+      taskKind: "ship",
       machine: "mac",
       dependsOn: []
     })
@@ -184,41 +186,6 @@ describe("parseDispatchArgs", () => {
   test("runner hold with no run command is refused instead of holding a token for nothing", () => {
     expect(parseDispatchArgs("runner", ["hold", "task-1"]).kind).toBe("UsageError")
     expect(parseDispatchArgs("runner", ["hold", "../task-1", "--", "orc"]).kind).toBe("UsageError")
-  })
-})
-
-describe("task files", () => {
-  test("a hand-written task file reads as a new task with its body intact", async () => {
-    const text = "---\nid: task-7\ntitle: Fix the thing\nproject: orc\nmachine: mac\ndepends_on: [task-3]\ncreated: 2026-10-27T10:00:00.000Z\n---\n# Fix the thing\n\nDo it.\n"
-    const record = await run(parseTaskFile("task-7.md", "new", text))
-    expect(record).toEqual({
-      spec: { id: "task-7", title: "Fix the thing", project: "orc", machine: "mac", dependsOn: ["task-3"], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n\nDo it.\n" },
-      hold: null,
-      parked: null,
-      state: { kind: "new" }
-    })
-  })
-  test("a body holding a --- line survives a write and a read instead of being cut there", async () => {
-    const record: TaskRecord = {
-      spec: { ...spec, id: "task-2", body: "Before\n---\nAfter\n" },
-      hold: null,
-      parked: null,
-      state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: "/home/captain/.orc/backlog/logs/task-2.log" } }
-    }
-    expect(await run(parseTaskFile("task-2.md", "taken", renderTaskFile(record)))).toEqual(record)
-  })
-  test("a copied file whose frontmatter id is not its own stem is refused instead of read as that task", async () => {
-    const text = "---\nid: task-3\ntitle: Fix the thing\nproject: orc\nmachine: null\ndepends_on: []\ncreated: 2026-10-27T10:00:00.000Z\n---\n# Fix the thing\n"
-    const result = await run(Effect.result(parseTaskFile("new/task-9.md", "new", text)))
-    expect(Result.isFailure(result)).toBe(true)
-    if (Result.isFailure(result)) {
-      expect(result.failure).toBeInstanceOf(TaskFileError)
-      expect(result.failure.file).toContain("task-9.md")
-    }
-  })
-  test("a file with no frontmatter is refused instead of read as an empty task", async () => {
-    const result = await run(Effect.result(parseTaskFile("task-1.md", "new", "# Just a title\n")))
-    expect(Result.isFailure(result)).toBe(true)
   })
 })
 
@@ -422,7 +389,7 @@ describe("the backlog folders", () => {
     await withBacklog(async (root) => {
       const record = await run(addTask(root, spec))
       await run(claimTask(root, record.spec.id))
-      const result = await run(Effect.result(closeStartedTask(root, record.spec.id, "done", "", null, "2026-10-27T11:00:00.000Z")))
+      const result = await run(Effect.result(closeStartedTask(root, record.spec.id, "done", "", { pr: null, report: null }, "2026-10-27T11:00:00.000Z")))
       expect(Result.isFailure(result)).toBe(true)
     })
   })
@@ -431,7 +398,7 @@ describe("the backlog folders", () => {
       const record = await run(addTask(root, spec))
       await run(claimTask(root, record.spec.id))
       await run(writeTaken(root, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
-      await run(closeStartedTask(root, record.spec.id, "done", "merged", null, "2026-10-27T11:00:00.000Z"))
+      await run(closeStartedTask(root, record.spec.id, "done", "merged", { pr: null, report: null }, "2026-10-27T11:00:00.000Z"))
       const tasks = await run(listTasks(root))
       expect(tasks.map((task) => task.state.kind)).toEqual(["closed"])
       expect(await readdir(join(root, "taken"))).toEqual([])

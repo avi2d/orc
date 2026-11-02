@@ -416,6 +416,7 @@ To add a task, run `orc backlog add <project> <task-file>`.
 To pipe the task in instead, give `-` as the task file, as in `printf '# Fix the login page\n' | orc backlog add orc -`.
 It reads stdin to its end and refuses a terminal.
 Add `--machine <name>` to run the task on that machine only, and `--depends-on <task-id>` once per task it waits for.
+Add `--kind scout` or `--kind task` for a task that ends in a report instead of a PR, as [Task kinds](#task-kinds) shows.
 To see the backlog, run `orc backlog`.
 It prints the new, taken and closed tasks side by side with the project list and each machine's busy slots beside them.
 To print the same facts as JSON, run `orc backlog --json`, whose document names its version first as `orc.backlog.v1`.
@@ -449,7 +450,8 @@ The beat starts it detached in its own session, never waits for it and never kil
 So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
 From then on, each beat ends the finished runs on a machine whose start runs `orc runner start`.
-It reads `orc runner result` on that machine and closes the task done or failed, or parks it on your open questions, freeing its slot in the same beat.
+It reads `orc runner result` on that machine and closes the task done or failed, or parks it on your open questions.
+Either way the task frees its slot in the same beat.
 The closed task file keeps the PR link of the orc run on `orc/<task-id>` as `pr`, and `orc backlog --json` carries it as `pr`, or `null` when the run opened none.
 The beat prints `closed <task-id> <done|failed> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds.
 A machine whose start runs any other program keeps owning its tasks, which the beat never reads.
@@ -472,6 +474,25 @@ The run resumes there and hands your answers to no-mistakes, so no new branch an
 If the resumed run stops on new questions, the task parks again with those, and it keeps the answers it already has.
 `orc backlog` shows a parked task as `parked (<question-ids>)`, and `orc backlog --json` gives every task a `parked`, either `null` or the branch and the questions with their answers.
 
+## Task kinds
+
+A task file's `kind` is `ship`, `scout` or `task`, and a file with no `kind` reads as `ship`.
+Orc refuses any other kind, from `orc backlog add --kind` or in a task file, with `the kind <word> is not ship, scout or task`.
+`orc backlog` names a scout or task beside its id, as in `task-1 scout orc`, and `orc backlog --json` gives every task a `kind`.
+
+A `ship` task runs as [Running a task](#running-a-task) shows and ends in a PR.
+A `scout` reads the checkout and changes nothing, and a `task` does what it asks and puts its evidence in the report.
+The runner queues either as `orc run <task-file> --kind <scout|task> --sandbox none`.
+That run skips no-mistakes and the PR and creates no branch.
+It starts Pi on the host in `~/.orc/runs/<run-id>`, tells it where the task and the checkout are, and asks it to write `agent-report.md` there.
+Orc refuses a scout or task run without `--sandbox none`, and refuses `--allow` and `--answer` on one.
+It prints `orc: <kind> run <run-id> wrote its report to <path>` and records the run succeeded, or prints why it wrote none, records the run failed and exits non-zero.
+The beat closes the task done with the reason `the run wrote its report` and keeps the path as `report` in the task file and in `orc backlog --json`.
+When no report exists, it closes the task failed with `the run wrote no report` and the run's reason, even when pueue says the run succeeded.
+The beat prints the report path in its `closed` line.
+The chat posts it where a shipped task posts its PR, as in `task-1 Map the parser closed done: the run wrote its report, report /home/me/.orc/runs/<run-id>/agent-report.md`.
+A scout or task marked for a machine waits for room there as any task does.
+
 ## Adding tasks from a chat
 
 To say tasks in a chat instead of writing task files, run `orc chat`.
@@ -480,13 +501,14 @@ When `<ORC_HOME>/orchestrator.md` exists, the chat adds it to Pi's system prompt
 Its first line of output names the rules file it loaded, or says it found none.
 The chat's Pi has four tools and no others:
 
-- `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project, the task's Markdown, an optional machine and the ids it depends on.
+- `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project, the task's Markdown, an optional kind, an optional machine and the ids it depends on.
 - `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
 - `orc_backlog_hold` holds one new task through `orc backlog hold`, with the reason and an optional date.
 - `orc_backlog_answer` answers a held task through `orc backlog answer`, with your words as you said them, or one parked question when it names the question's id.
 
 So a task from the chat enters the backlog the way any other does, and the beat starts it.
-When it starts and every 15 seconds after, the chat reads `orc backlog --json` and, while Pi is idle, posts each closed task that has no `postedAt`, with its outcome, its reason and its PR, as in `task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
+When it starts and every 15 seconds after, the chat reads `orc backlog --json`.
+While Pi is idle, it posts each closed task that has no `postedAt`, with its outcome, its reason and its PR or report, as in `task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
 It posts a task whoever added it: this chat, an earlier chat or the command line.
 It posts each close then runs `orc backlog posted <task-id>`, which writes `posted_at` into the closed task file, so a task closed while no chat ran is posted by the next chat to start, and every close is posted, with a close repeated at most when the chat stops between its post and its mark, or when two chats post the same close in the same moment.
 When it cannot read or mark the backlog, it posts orc's error once Pi is idle and keeps polling.

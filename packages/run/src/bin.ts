@@ -10,13 +10,15 @@ import { runChat } from "./chat"
 import { dispatchUsage } from "./dispatch/args"
 import { runDispatch } from "./dispatch/cli"
 import { RunnerError } from "./dispatch/runner"
-import { runAgentStep } from "./run"
+import { formatReportOutcome } from "./report-run"
+import { runAgentStep, runReportStep } from "./run"
+import type { ReportKind } from "./task-kind"
 import { formatReport } from "./run-record"
 import { encodeRunsJson, formatHistoryError, formatRunsTable, listRuns, openDatabase, orcHomeDir } from "./run-history"
 import { recordStepScore } from "./run-scores"
 import { encodeShowJson, formatShow, readShow } from "./show"
 
-const usage = "Usage: orc [--version] [--help] | orc chat | orc runs [--json] | orc show <run> [--json] | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--branch <name>] [--sandbox nono|none] [--token-file <path>] [--provider <id>] [--allow ask-user] [--answer question-<id>=\"<text>\"] | " + dispatchUsage
+const usage = "Usage: orc [--version] [--help] | orc chat | orc runs [--json] | orc show <run> [--json] | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--kind ship|scout|task] [--branch <name>] [--sandbox nono|none] [--token-file <path>] [--provider <id>] [--allow ask-user] [--answer question-<id>=\"<text>\"] | " + dispatchUsage
 
 const readFailure = (error: unknown): string =>
   typeof error === "string" ? error : "orc: cannot read the run history: " + formatHistoryError(error)
@@ -90,6 +92,32 @@ const chat = runChat(orcHomeDir(Bun.env.ORC_HOME), [process.execPath, Bun.main])
   Effect.flatMap((exitCode) => exitCode === 0 ? Effect.void : Effect.fail("pi exited " + String(exitCode)))
 )
 
+const shipStep = (args: Extract<OrcArgs, { readonly kind: "RunAgent" }>) =>
+  Effect.gen(function*() {
+    const report = yield* runAgentStep({ cwd: process.cwd(), taskFile: args.taskFile, branch: args.branch, sandbox: args.sandbox, tokenFile: args.tokenFile, provider: args.provider, allow: args.allow, answers: args.answers }).pipe(
+      Effect.provide(BunServices.layer),
+      Effect.catchTag("OrcRunError", (error) =>
+        Console.error(error.message).pipe(Effect.andThen(Effect.fail("agent step refused")))
+      )
+    )
+    yield* Console.log(formatReport(report))
+    if (!report.completed) {
+      return yield* Effect.fail("agent step failed")
+    }
+  })
+
+const reportStep = (args: Extract<OrcArgs, { readonly kind: "RunAgent" }>, kind: ReportKind) =>
+  Effect.gen(function*() {
+    const outcome = yield* runReportStep({ cwd: process.cwd(), taskFile: args.taskFile, branch: args.branch, sandbox: args.sandbox, tokenFile: args.tokenFile, provider: args.provider }, kind).pipe(
+      Effect.provide(BunServices.layer),
+      Effect.catchTag("OrcRunError", (error) => Console.error(error.message).pipe(Effect.andThen(Effect.fail("report step refused"))))
+    )
+    yield* Console.log(formatReportOutcome(kind, outcome))
+    if (outcome.kind === "unreported") {
+      return yield* Effect.fail("report step failed")
+    }
+  })
+
 const program = Effect.gen(function*() {
   const args = parseArgs(Bun.argv.slice(2))
   switch (args.kind) {
@@ -127,17 +155,7 @@ const program = Effect.gen(function*() {
       return yield* scoreStep(args)
     }
     case "RunAgent": {
-      const report = yield* runAgentStep({ cwd: process.cwd(), taskFile: args.taskFile, branch: args.branch, sandbox: args.sandbox, tokenFile: args.tokenFile, provider: args.provider, allow: args.allow, answers: args.answers }).pipe(
-        Effect.provide(BunServices.layer),
-        Effect.catchTag("OrcRunError", (error) =>
-          Console.error(error.message).pipe(Effect.andThen(Effect.fail("agent step refused")))
-        )
-      )
-      yield* Console.log(formatReport(report))
-      if (!report.completed) {
-        return yield* Effect.fail("agent step failed")
-      }
-      break
+      return yield* args.taskKind === "ship" ? shipStep(args) : reportStep(args, args.taskKind)
     }
     case "Dispatch": {
       return yield* dispatch(args.args)
