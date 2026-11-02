@@ -71,6 +71,28 @@ export const closingFromResult = (result: RunnerResult): TaskClosing | null => {
   return null
 }
 
+const pueueStartOf = (status: PueueStatus): string | null => {
+  if ("Done" in status) {
+    return status.Done.start
+  }
+  if ("Running" in status) {
+    return status.Running.start
+  }
+  if ("Paused" in status) {
+    return status.Paused.start
+  }
+  return null
+}
+
+const runStartsWith = (runStarted: string, pueueStart: string): boolean => {
+  const runMs = Date.parse(runStarted)
+  const pueueMs = Date.parse(pueueStart)
+  if (Number.isNaN(runMs) || Number.isNaN(pueueMs)) {
+    return false
+  }
+  return runMs >= pueueMs
+}
+
 const assessHeld = (
   task: string,
   pueueTask: number,
@@ -94,7 +116,7 @@ const assessHeld = (
   return { ...held, status: "Stashed" in status ? "stashed" : "queued" }
 }
 
-const readRun = (home: string, checkout: string, task: string): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
+const readRun = (home: string, checkout: string, task: string, pueueStart: string | null): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const project = yield* resolveProjectDir(checkout)
     const run = yield* Effect.acquireUseRelease(
@@ -102,7 +124,13 @@ const readRun = (home: string, checkout: string, task: string): Effect.Effect<Ru
       (db) => latestRunForBranch(db, project, taskBranch(task)),
       (db) => Effect.sync(() => db.close())
     )
-    return run === null ? null : { id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason }
+    if (run === null) {
+      return null
+    }
+    if (pueueStart !== null && !runStartsWith(run.started, pueueStart)) {
+      return null
+    }
+    return { id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason }
   }).pipe(
     Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
   )
@@ -116,7 +144,7 @@ export const readResult = (task: string, home: string, label?: string | null): E
     const status = yield* Schema.decodeUnknownEffect(PueueStatus)(held.status).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "pueue reports a status orc cannot read for task " + held.id + ": " + error.message }))
     )
-    const run = yield* readRun(home, held.path, task)
+    const run = yield* readRun(home, held.path, task, pueueStartOf(status))
     return assessHeld(task, held.id, status, run)
   })
 
