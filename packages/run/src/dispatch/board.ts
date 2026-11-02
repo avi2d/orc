@@ -194,10 +194,15 @@ const actionLine = (action: BeatAction): string => {
     case "parked": {
       return "parked " + action.task + " on " + action.branch + " for the captain's answer to " + action.questions.join(", ")
     }
+    case "stalled": {
+      return "stalled " + action.task + " on " + action.machine + ": no output since " + action.since
+    }
   }
 }
 
-const renewal = (action: BeatAction): boolean => action.kind === "renewed" || action.kind === "renew-failed" || action.kind === "closed" || action.kind === "close-failed" || action.kind === "parked"
+const renewal = (action: BeatAction): boolean =>
+  action.kind === "renewed" || action.kind === "renew-failed" || action.kind === "closed" || action.kind === "close-failed" || action.kind === "parked" ||
+  action.kind === "stalled"
 
 export const formatBeat = (report: BeatReport): string =>
   [

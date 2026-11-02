@@ -88,8 +88,13 @@ export const runChecksRound = (
   commands: ReadonlyArray<ChecksCommand>
 ): Effect.Effect<ChecksRound, ChecksError> =>
   Effect.gen(function*() {
+    const file = path.join(runDir, checksFileName(round))
+    yield* fs.makeDirectory(path.dirname(file), { recursive: true }).pipe(
+      Effect.andThen(() => fs.writeFileString(file, "")),
+      Effect.mapError((cause) => new ChecksError({ message: "orc: cannot write the checks evidence file: " + String(cause) }))
+    )
     const outcomes: Array<CheckOutcome> = []
-    const sections: Array<string> = []
+    let first = true
     for (const check of commands) {
       const result = yield* Effect.tryPromise({
         try: () => runCommand(check.command),
@@ -97,11 +102,12 @@ export const runChecksRound = (
       })
       const outcome: CheckOutcome = { name: check.name, command: check.command, exitCode: result.exitCode, passed: result.exitCode === 0 }
       outcomes.push(outcome)
-      sections.push(sectionOf(outcome, result.stdout, result.stderr))
+      yield* fs.writeFileString(file, (first ? "" : "\n\n") + sectionOf(outcome, result.stdout, result.stderr), first ? undefined : { flag: "a" }).pipe(
+        Effect.mapError((cause) => new ChecksError({ message: "orc: cannot write the checks evidence file: " + String(cause) }))
+      )
+      first = false
     }
-    const file = path.join(runDir, checksFileName(round))
-    yield* fs.makeDirectory(path.dirname(file), { recursive: true }).pipe(
-      Effect.andThen(() => fs.writeFileString(file, sections.join("\n\n") + "\n")),
+    yield* fs.writeFileString(file, "\n", { flag: "a" }).pipe(
       Effect.mapError((cause) => new ChecksError({ message: "orc: cannot write the checks evidence file: " + String(cause) }))
     )
     return { round, file, outcomes }

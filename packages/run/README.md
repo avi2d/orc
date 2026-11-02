@@ -335,6 +335,11 @@ It also names the floor of room each account must keep:
 }
 ```
 
+A machine may add `"loadLimit"`, a number above 0, and the beat starts nothing there while `orc runner load` reads its five-minute load above it.
+An unread load holds starts there too.
+Orc refuses a load limit that is not a number above 0.
+Orc refuses a load limit on a machine whose start command does not run `orc runner start`, because the beat reads the load through that command.
+
 The provider named here is one `config.json` on each machine that runs the tasks defines.
 Each token file path in `dispatch.json` holds on those machines.
 A token command account keeps its token in the runner token folder on each machine instead.
@@ -466,9 +471,10 @@ The closed task file keeps the PR link of the orc run on `orc/<task-id>` as `pr`
 The beat prints `closed <task-id> <done|failed> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds.
 A machine whose start runs any other program keeps owning its tasks, which the beat never reads.
 To close one of those, run `orc backlog close <task-id> <done|failed> [reason]`.
+A started run whose output has not grown for 30 minutes prints `stalled <task-id> on <machine>: no output since <time>` once, and again after new output stalls anew.
 A missing start command exits 127 into its log and leaves the task started.
 Only a failure to spawn the log wrapper closes the task as `start-failed`.
-To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1` and carries the endings as `closed`, `close-failed` and `parked` actions.
+To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1` and carries the endings as `closed`, `close-failed` and `parked` actions and a stall as `stalled`.
 On a token command account, each beat first sends every started task its account's current token through its machine's `renew` command, as JSON on standard input.
 
 ## Parked runs
@@ -541,7 +547,8 @@ A project in `projects.json` may add `"yolo": true`, and a project with no `yolo
 Orc refuses any `yolo` other than `true` or `false` with `the project <name> names yolo <value>, which is not true or false`.
 `orc merge` takes `--basis captain-word`, the default, or `--basis yolo-green`.
 The chat merges with `captain-word` only when you said to merge that PR.
-It merges with `yolo-green` when you ask it to merge a yolo project's PR and the PR is green, and orc refuses `yolo-green` for a project without `yolo` true.
+It merges with `yolo-green` when you ask it to merge a yolo project's PR and the PR is green.
+Orc refuses `yolo-green` for a project without `yolo` true.
 Either basis meets every refusal above.
 
 ## Adding tasks from a chat
@@ -614,6 +621,7 @@ Piping that document into `orc runner result <task-id> --stdin-label` yourself r
 It names pueue's state for the task and the orc run on `orc/<task-id>` with its PR.
 A task is queued, stashed, running, paused, succeeded or failed, or unknown when no pueue task in group `orc` carries that home's label.
 To print the same facts as JSON, add `--json`, whose document names its version first as `orc.runner.v1`.
+To print the five minute load average the beat compares against a load limit, run `orc runner load` on that machine.
 
 ## Where things are
 
@@ -652,6 +660,12 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/dispatch/config.ts` | The reading of `dispatch.json` and `projects.json` |
 | `src/dispatch/quota.ts` | The quota reading from the configured command and the pick of an account |
 | `src/dispatch/beat.ts` | The beat: room, placement, take and start |
+| `src/dispatch/beat-action.ts` | The beat actions each beat step reports |
+| `src/dispatch/beat-close.ts` | The closing of finished runs and the running output time |
+| `src/dispatch/beat-place.ts` | The room reading and the placement of each new task |
+| `src/dispatch/load.ts` | The five minute load reading and the overloaded machines |
+| `src/dispatch/machine-reach.ts` | The sweep ownership check and the remote command prefix |
+| `src/dispatch/stall.ts` | The stalled run flag kept in the backlog logs |
 | `src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
 | `src/dispatch/runner.ts` | The runner: the start and the token renewal through pueue |
 | `src/dispatch/runner-result.ts` | The reading of a task's result and the `orc.runner.v1` JSON |

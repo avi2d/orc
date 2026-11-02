@@ -26,6 +26,7 @@ export type DispatchArgs =
   | { readonly kind: "Beat"; readonly json: boolean }
   | { readonly kind: "RunnerStart"; readonly reach: Reach }
   | { readonly kind: "RunnerQueue" }
+  | { readonly kind: "RunnerLoad" }
   | { readonly kind: "RunnerRenew"; readonly reach: Reach }
   | { readonly kind: "RunnerHold"; readonly task: string; readonly label?: string; readonly run: readonly [string, ...Array<string>] }
   | { readonly kind: "RunnerToken"; readonly session: string }
@@ -33,7 +34,7 @@ export type DispatchArgs =
   | { readonly kind: "UsageError"; readonly detail: string }
 
 export const dispatchUsage =
-  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task>] [--internal] [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog posted <task-id> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] | orc backlog answer <task-id> <words|question-id=text> | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>]"
+  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task>] [--internal] [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog posted <task-id> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] | orc backlog answer <task-id> <words|question-id=text> | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner load"
 
 const parseJsonFlag = (rest: ReadonlyArray<string>, json: (json: boolean) => DispatchArgs): DispatchArgs => {
   if (rest.length === 0) {
@@ -268,11 +269,14 @@ const parseRunner = (rest: ReadonlyArray<string>): DispatchArgs => {
   if (verb === "queue") {
     return after.length === 0 ? { kind: "RunnerQueue" } : unexpected(after[0])
   }
+  if (verb === "load") {
+    return after.length === 0 ? { kind: "RunnerLoad" } : unexpected(after[0])
+  }
   if (verb === "token") {
     return parseRunnerToken(after)
   }
   if (verb !== "start" && verb !== "renew" && verb !== "hold" && verb !== "result") {
-    return { kind: "UsageError", detail: "orc runner takes start, queue, renew, hold, token or result" }
+    return { kind: "UsageError", detail: "orc runner takes start, queue, renew, hold, token, result or load" }
   }
   const split = splitReach(after)
   if (split.kind === "UsageError") {

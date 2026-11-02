@@ -1,9 +1,10 @@
-import { Array as Arr, Effect, Schema } from "effect"
+import { Array as Arr, Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { openQuestionsForRun, runsForBranch } from "../history-resume"
 import type { OpenQuestion } from "../no-mistakes-gate"
 import { formatHistoryError, openDatabase, type RunRecord, RunStatusSchema } from "../run-history"
 import { writtenReport } from "../report-run"
+import { gateLogFileName } from "../no-mistakes"
 import { runDirFor, type TaskKind } from "../task-kind"
 import { TaskId } from "./backlog"
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
@@ -31,7 +32,7 @@ const heldFields = {
 const RunnerResult = Schema.Union([
   Schema.Struct({ task: TaskId, status: Schema.Literal("unknown") }),
   Schema.Struct({ ...heldFields, status: Schema.Literals(["queued", "stashed"]) }),
-  Schema.Struct({ ...heldFields, status: Schema.Literals(["running", "paused"]), started: Schema.String }),
+  Schema.Struct({ ...heldFields, status: Schema.Literals(["running", "paused"]), started: Schema.String, outputAt: Schema.optional(Schema.String) }),
   Schema.Struct({ ...heldFields, status: Schema.Literal("succeeded"), started: Schema.String, ended: Schema.String }),
   Schema.Struct({ ...heldFields, status: Schema.Literal("failed"), started: Schema.String, ended: Schema.String, reason: Schema.String })
 ])
@@ -177,6 +178,25 @@ const readRun = (home: string, checkout: string, task: string, interval: PueueIn
     Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
   )
 
+const runLogAt = (home: string, runId: string): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const dir = runDirFor(home, runId)
+    const names = yield* fs.readDirectory(dir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
+    let latest: string | null = null
+    for (const name of names) {
+      if (name !== "agent.log" && name !== gateLogFileName && !/^fix-.*\.log$/.test(name) && !/^checks-.*\.txt$/.test(name)) {
+        continue
+      }
+      const info = yield* fs.stat(dir + "/" + name).pipe(Effect.orElseSucceed(() => null))
+      const at = info === null ? null : Option.match(info.mtime, { onNone: () => null, onSome: (mtime) => mtime.toISOString() })
+      if (at !== null && (latest === null || Date.parse(at) > Date.parse(latest))) {
+        latest = at
+      }
+    }
+    return latest
+  })
+
 export const readResult = (task: string, home: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const held = yield* readHeld(home, task, label)
@@ -187,7 +207,12 @@ export const readResult = (task: string, home: string, label?: string | null): E
       Effect.mapError((error) => new RunnerError({ detail: "pueue reports a status orc cannot read for task " + held.id + ": " + error.message }))
     )
     const run = yield* readRun(home, held.path, task, pueueIntervalOf(status))
-    return assessHeld(task, held.id, status, run)
+    const result = assessHeld(task, held.id, status, run)
+    if (result.status !== "running" && result.status !== "paused") {
+      return result
+    }
+    const runAt = run === null ? null : yield* runLogAt(home, run.id)
+    return { ...result, outputAt: runAt ?? result.started }
   })
 
 const ResultStdin = Schema.Struct({ label: LabelArg })
@@ -227,7 +252,8 @@ const headLine = (result: RunnerResult): string => {
     }
     case "running":
     case "paused": {
-      return result.task + ": " + result.status + " as pueue task " + result.pueueTask + " since " + result.started
+      return result.task + ": " + result.status + " as pueue task " + result.pueueTask + " since " + result.started +
+        (result.outputAt === undefined ? "" : ", output last written " + result.outputAt)
     }
     case "succeeded": {
       return result.task + ": succeeded as pueue task " + result.pueueTask + ", " + result.started + " to " + result.ended

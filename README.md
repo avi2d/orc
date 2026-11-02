@@ -134,7 +134,7 @@ Orc grows toward the full orchestrator one step at a time.
 | Reports, investigations and machine tasks that end without a pull request | Ships today |
 | Per-project delivery: direct pull request or full review | Ships today |
 | Merge on your word, refusing red checks | Ships today |
-| Stalled runs and machine load flagged in the chat | Next |
+| Stalled runs and machine load flagged in the chat | Ships today |
 | Alerts and pull request events posted in the chat | Next |
 | Decision boards you answer once | Next |
 | Per-project instructions the run and the chat both read | Next |
