@@ -1,10 +1,8 @@
-import { Data, Effect, FileSystem, Schema } from "effect"
-import type { PlatformError } from "effect/PlatformError"
+import { Effect, FileSystem, Schema } from "effect"
 import { heldReason, type Hold, isHeld, parseTaskFile, renderTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
+import { BacklogError, platformFailure, publishOnce, scratchName } from "./backlog-write"
 
-export class BacklogError extends Data.TaggedError("BacklogError")<{
-  readonly detail: string
-}> {}
+export { BacklogError }
 
 const taskFilePattern = /^task-(\d+)\.md$/
 const idPattern = /^task-(\d+)$/
@@ -36,9 +34,6 @@ export const backlogPaths = (root: string): BacklogPaths => ({
   folder: (folder: TaskFolder): string => root + "/" + folder,
   taskFile: (folder: TaskFolder, id: string): string => root + "/" + folder + "/" + id + ".md"
 })
-
-const platformFailure = (action: string) => (error: PlatformError): BacklogError =>
-  new BacklogError({ detail: "cannot " + action + ": " + error.message })
 
 export const ensureBacklog = (root: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
@@ -96,28 +91,6 @@ export const listTasks = (
       return all.filter((record) => record.state.kind === "closed" || !closed.has(record.spec.id)).sort(byTaskNumber)
     })
   )
-
-const scratchName = (folder: string, id: string): string => folder + "/." + id + "." + crypto.randomUUID() + ".tmp"
-
-// link(2) refuses an existing name, so the file appears whole and at most once.
-const publishOnce = (
-  folder: string,
-  id: string,
-  text: string
-): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const scratch = scratchName(folder, id)
-    const file = folder + "/" + id + ".md"
-    yield* fs.writeFileString(scratch, text).pipe(Effect.mapError(platformFailure("write " + scratch)))
-    const published = yield* fs.link(scratch, file).pipe(
-      Effect.as(true),
-      Effect.catchReason("PlatformError", "AlreadyExists", () => Effect.succeed(false)),
-      Effect.mapError(platformFailure("write " + file))
-    )
-    yield* fs.remove(scratch).pipe(Effect.mapError(platformFailure("remove " + scratch)))
-    return published
-  })
 
 const reserveId = (root: string): Effect.Effect<string, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
