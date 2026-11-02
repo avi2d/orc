@@ -29,7 +29,7 @@ const spec = { title: "Fix the thing", project: "orc", machine: null, dependsOn:
 
 const projects: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Users/a/orc", linux: "/home/a/orc" } }]
 
-const newTask = (machine: string | null): TaskRecord => ({ spec: { ...spec, id: "task-1", machine }, state: { kind: "new" } })
+const newTask = (machine: string | null): TaskRecord => ({ spec: { ...spec, id: "task-1", machine }, hold: null, state: { kind: "new" } })
 
 const quotaReply = JSON.stringify({ schema: "orc.quota.v1", accounts: [{ name: "main", remainingPercent: 80 }] })
 
@@ -119,7 +119,7 @@ describe("the board", () => {
   test("the JSON names its schema version so a reader can refuse a newer one", () => {
     const json = backlogJson({ tasks: [newTask("mac")], projects: { kind: "read", projects }, room: { kind: "unread", reason: "no dispatch.json" } })
     expect(json.schema).toBe("orc.backlog.v1")
-    expect(json.tasks[0]).toEqual({ id: "task-1", title: "Fix the thing", project: "orc", machine: "mac", dependsOn: [], created: spec.created, status: "new" })
+    expect(json.tasks[0]).toEqual({ id: "task-1", title: "Fix the thing", project: "orc", machine: "mac", dependsOn: [], created: spec.created, hold: null, status: "new" })
     expect(json.room).toBeNull()
   })
   test("the project list sits beside the backlog instead of under it", () => {

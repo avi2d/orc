@@ -1,7 +1,7 @@
 import { dependencyOpen, type BeatAction, type BeatReport, type MachineRoom } from "./beat"
 import type { Project } from "./config"
 import { describeQuota } from "./quota"
-import type { Claim, Started, TaskRecord } from "./task-record"
+import { type Claim, type Hold, isHeld, type Started, type TaskRecord } from "./task-record"
 
 const BACKLOG_JSON_SCHEMA = "orc.backlog.v1" as const
 const BEAT_JSON_SCHEMA = "orc.beat.v1" as const
@@ -37,6 +37,7 @@ type TaskJson = {
   readonly machine: string | null
   readonly dependsOn: ReadonlyArray<string>
   readonly created: string
+  readonly hold: Hold | null
 } & TaskStatusJson
 
 interface BacklogJson {
@@ -86,6 +87,7 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     machine: record.spec.machine,
     dependsOn: record.spec.dependsOn,
     created: record.spec.created,
+    hold: record.hold,
     ...claimJson(record)
   })),
   projects: view.projects.kind === "read" ? view.projects.projects : null,
@@ -112,7 +114,8 @@ const pinOf = (record: TaskRecord): string => record.spec.machine === null ? "" 
 const newCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>): string => {
   const open = record.spec.dependsOn.filter((id) => dependencyOpen(all.find((candidate) => candidate.spec.id === id)))
   const waits = open.length === 0 ? "" : " waits " + open.join(",")
-  return record.spec.id + " " + record.spec.project + pinOf(record) + waits + " " + record.spec.title
+  const held = isHeld(record) ? " held (" + record.hold.reason + ")" : ""
+  return record.spec.id + " " + record.spec.project + pinOf(record) + waits + held + " " + record.spec.title
 }
 
 const takenCell = (record: TaskRecord): string => {

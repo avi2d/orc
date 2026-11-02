@@ -1,4 +1,5 @@
 import { isTaskId } from "./backlog"
+import { isCalendarDate } from "./task-record"
 
 export type TaskSource = { readonly kind: "file"; readonly path: string } | { readonly kind: "stdin" }
 
@@ -15,6 +16,8 @@ export type DispatchArgs =
   }
   | { readonly kind: "CloseTask"; readonly id: string; readonly outcome: "done" | "failed"; readonly reason: string }
   | { readonly kind: "MarkPosted"; readonly id: string }
+  | { readonly kind: "HoldTask"; readonly id: string; readonly reason: string; readonly until: string | null }
+  | { readonly kind: "AnswerTask"; readonly id: string; readonly words: string }
   | { readonly kind: "Beat"; readonly json: boolean }
   | { readonly kind: "RunnerStart"; readonly reach: Reach }
   | { readonly kind: "RunnerQueue" }
@@ -25,7 +28,7 @@ export type DispatchArgs =
   | { readonly kind: "UsageError"; readonly detail: string }
 
 export const dispatchUsage =
-  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog posted <task-id> | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>]"
+  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog posted <task-id> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] | orc backlog answer <task-id> <words> | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>]"
 
 const parseJsonFlag = (rest: ReadonlyArray<string>, json: (json: boolean) => DispatchArgs): DispatchArgs => {
   if (rest.length === 0) {
@@ -102,6 +105,53 @@ const parsePosted = (rest: ReadonlyArray<string>): DispatchArgs => {
     return { kind: "UsageError", detail: "orc backlog posted takes a task id, got \"" + id + "\"" }
   }
   return extra.length === 0 ? { kind: "MarkPosted", id } : unexpected(extra[0])
+}
+
+const takeHoldFlags = (words: ReadonlyArray<string>): { readonly reason: string | null; readonly until: string | null } | { readonly error: string } => {
+  const values: { reason: string | null; until: string | null } = { reason: null, until: null }
+  for (let index = 0; index < words.length; index += 2) {
+    const flag = words[index] ?? ""
+    if (flag !== "--reason" && flag !== "--until") {
+      return { error: "unexpected argument: " + flag }
+    }
+    if (index + 1 >= words.length) {
+      return { error: "orc backlog hold takes a value after " + flag }
+    }
+    const value = words[index + 1] ?? ""
+    const key = flag === "--reason" ? "reason" : "until"
+    if (values[key] !== null) {
+      return { error: "orc backlog hold takes one " + flag }
+    }
+    values[key] = value
+  }
+  return values
+}
+
+const parseHold = (rest: ReadonlyArray<string>): DispatchArgs => {
+  const [id = "", ...flags] = rest
+  if (!isTaskId(id)) {
+    return { kind: "UsageError", detail: "orc backlog hold takes a task id, got \"" + id + "\"" }
+  }
+  const taken = takeHoldFlags(flags)
+  if ("error" in taken) {
+    return { kind: "UsageError", detail: taken.error }
+  }
+  if (taken.reason === null || taken.reason.trim() === "") {
+    return { kind: "UsageError", detail: "orc backlog hold takes --reason and why the task waits for the captain" }
+  }
+  if (taken.until !== null && !isCalendarDate(taken.until)) {
+    return { kind: "UsageError", detail: "orc backlog hold takes a YYYY-MM-DD date after --until, got \"" + taken.until + "\"" }
+  }
+  return { kind: "HoldTask", id, reason: taken.reason, until: taken.until }
+}
+
+const parseAnswer = (rest: ReadonlyArray<string>): DispatchArgs => {
+  const [id = "", ...words] = rest
+  if (!isTaskId(id)) {
+    return { kind: "UsageError", detail: "orc backlog answer takes a task id, got \"" + id + "\"" }
+  }
+  const said = words.join(" ")
+  return said.trim() === "" ? { kind: "UsageError", detail: "orc backlog answer takes a task id and the captain's words" } : { kind: "AnswerTask", id, words: said }
 }
 
 const parseRunnerToken = (after: ReadonlyArray<string>): DispatchArgs => {
@@ -209,6 +259,12 @@ export const parseDispatchArgs = (command: "backlog" | "beat" | "runner", rest: 
   }
   if (rest[0] === "posted") {
     return parsePosted(rest.slice(1))
+  }
+  if (rest[0] === "hold") {
+    return parseHold(rest.slice(1))
+  }
+  if (rest[0] === "answer") {
+    return parseAnswer(rest.slice(1))
   }
   return parseJsonFlag(rest, (json) => ({ kind: "ShowBacklog", json }))
 }

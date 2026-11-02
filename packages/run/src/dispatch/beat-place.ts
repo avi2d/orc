@@ -1,5 +1,5 @@
 import { checkoutOn, type DispatchConfig, type Machine, type Project } from "./config"
-import type { TaskRecord } from "./task-record"
+import { heldReason, type TaskRecord } from "./task-record"
 
 export interface MachineRoom {
   readonly machine: string
@@ -20,6 +20,23 @@ const freeRoom = (room: MachineRoom): number => Math.max(0, room.slots - room.bu
 
 export const dependencyOpen = (dependency: TaskRecord | undefined): boolean =>
   dependency === undefined || dependency.state.kind !== "closed" || dependency.state.closing.outcome !== "done"
+
+export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>): string | null => {
+  const held = heldReason(task)
+  if (held !== null) {
+    return held
+  }
+  for (const id of task.spec.dependsOn) {
+    const dependency = tasks.find((candidate) => candidate.spec.id === id)
+    if (dependency === undefined) {
+      return "waits on " + id + ", which the backlog does not hold"
+    }
+    if (dependencyOpen(dependency)) {
+      return "waits on " + id
+    }
+  }
+  return null
+}
 
 type Placement =
   | { readonly kind: "place"; readonly machine: Machine; readonly checkout: string }

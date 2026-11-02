@@ -119,7 +119,8 @@ const piFor = (fixture: Fixture, pollMillis: number) => {
   }
   chatExtension(chatEnv(fixture), pollMillis)(host)
   const add = (params: unknown) => tools.get("orc_backlog_add")?.execute("call-1", params)
-  return { add, sent, fire: (event: string, ctx?: { isIdle: () => boolean }) => handlers.get(event)?.(event, ctx) }
+  const call = (name: string, params: unknown) => tools.get(name)?.execute("call-1", params).then((result) => result.content.map((block) => block.text).join(""))
+  return { add, call, sent, fire: (event: string, ctx?: { isIdle: () => boolean }) => handlers.get(event)?.(event, ctx) }
 }
 
 const until = async (done: () => boolean, millis: number): Promise<void> => {
@@ -172,7 +173,7 @@ describe("orc chat", () => {
         "--extension",
         chatToolsPath,
         "--tools",
-        "orc_backlog_add,orc_backlog",
+        "orc_backlog_add,orc_backlog,orc_backlog_hold,orc_backlog_answer",
         "ORC_CHAT_ORC=" + JSON.stringify([process.execPath, binPath])
       ])
     })
@@ -467,6 +468,73 @@ describe("orc chat tools", () => {
         [],
         [{ customType: "orc-task-closed", content: "task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7", display: true }]
       ])
+    })
+  }, 60_000)
+
+  test("an open held decision is listed again after the chat restarts, once per start, and the beat still refuses it", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const first = piFor(fixture, 50)
+      await first.add({ project: "orc", task: "# Pick the API\n" })
+      expect(await first.call("orc_backlog_hold", { id: "task-1", reason: "REST or gRPC", until: "2026-12-01" })).toBe("held task-1: REST or gRPC, until 2026-12-01")
+      const heldPost = { customType: "orc-held-decision", content: "task-1 Pick the API is held for the captain: REST or gRPC, until 2026-12-01", display: true }
+      first.fire("session_start", { isIdle: () => true })
+      await until(() => first.sent.length > 0, 10_000)
+      await Bun.sleep(500)
+      first.fire("session_shutdown")
+      const reopened = piFor(fixture, 50)
+      reopened.fire("session_start", { isIdle: () => true })
+      await until(() => reopened.sent.length > 0, 10_000)
+      await Bun.sleep(500)
+      reopened.fire("session_shutdown")
+      expect([first.sent, reopened.sent]).toEqual([[{ message: heldPost, options: { triggerTurn: false } }], [{ message: heldPost, options: { triggerTurn: false } }]])
+      const beat = await runOrc(fixture, ["beat"])
+      expect(beat.stdout).toContain("waits task-1: held for the captain: REST or gRPC, until 2026-12-01")
+      expect(await Bun.file(join(fixture.home, "backlog", "new", "task-1.md")).exists()).toBe(true)
+    })
+  }, 60_000)
+
+  test("a chat that starts mid-turn lists the held decision once Pi is idle instead of dropping it", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const pi = piFor(fixture, 50)
+      await pi.add({ project: "orc", task: "# Pick the API\n" })
+      await pi.call("orc_backlog_hold", { id: "task-1", reason: "REST or gRPC" })
+      let idle = false
+      pi.fire("session_start", { isIdle: () => idle })
+      await Bun.sleep(500)
+      expect(pi.sent).toEqual([])
+      idle = true
+      await until(() => pi.sent.length > 0, 10_000)
+      await Bun.sleep(500)
+      pi.fire("session_shutdown")
+      expect(pi.sent.map((sent) => sent.message)).toEqual([{ customType: "orc-held-decision", content: "task-1 Pick the API is held for the captain: REST or gRPC", display: true }])
+    })
+  }, 60_000)
+
+  test("an answered decision is not listed at chat start and the answer tool keeps the captain's words whole", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const pi = piFor(fixture, 50)
+      await pi.add({ project: "orc", task: "# Pick the API\n" })
+      await pi.add({ project: "orc", task: "# Pick the store\n" })
+      await pi.call("orc_backlog_hold", { id: "task-1", reason: "REST or gRPC" })
+      await pi.call("orc_backlog_hold", { id: "task-2", reason: "SQLite or Postgres" })
+      const words = "REST --until never, and keep  v1"
+      expect(await pi.call("orc_backlog_answer", { id: "task-1", words })).toBe("answered task-1, so the beat may start it")
+      pi.fire("session_start", { isIdle: () => true })
+      await until(() => pi.sent.length > 0, 10_000)
+      await Bun.sleep(500)
+      pi.fire("session_shutdown")
+      expect(pi.sent.map((sent) => sent.message)).toEqual([{ customType: "orc-held-decision", content: "task-2 Pick the store is held for the captain: SQLite or Postgres", display: true }])
+      expect(await readFile(join(fixture.home, "backlog", "new", "task-1.md"), "utf8")).toContain("answer: " + JSON.stringify(words))
+    })
+  }, 60_000)
+
+  test("the hold and answer tools fail with orc's own refusal and refuse an unknown field instead of dropping it", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const call = toolsFor(fixture)
+      expect(await rejection(call("orc_backlog_hold", { id: "task-9", reason: "why" }))).toBe("orc: the backlog holds no task-9")
+      expect(await rejection(call("orc_backlog_answer", { id: "task-9", words: "yes" }))).toBe("orc: the backlog holds no task-9")
+      expect(await rejection(call("orc_backlog_hold", { id: "task-1", reason: "why", priority: "high" }))).toStartWith("orc_backlog_hold takes ")
+      expect(await rejection(call("orc_backlog_answer", { id: "task-1" }))).toStartWith("orc_backlog_answer takes ")
     })
   }, 60_000)
 

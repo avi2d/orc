@@ -39,7 +39,7 @@ const config: DispatchConfig = {
 
 const projects: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Users/a/orc", linux: "/home/a/orc" } }]
 
-const newTask = (machine: string | null): TaskRecord => ({ spec: { ...spec, id: "task-1", machine }, state: { kind: "new" } })
+const newTask = (machine: string | null): TaskRecord => ({ spec: { ...spec, id: "task-1", machine }, hold: null, state: { kind: "new" } })
 
 const quotaReply = JSON.stringify({ schema: "orc.quota.v1", accounts: [{ name: "main", remainingPercent: 80 }] })
 
@@ -193,12 +193,14 @@ describe("task files", () => {
     const record = await run(parseTaskFile("task-7.md", "new", text))
     expect(record).toEqual({
       spec: { id: "task-7", title: "Fix the thing", project: "orc", machine: "mac", dependsOn: ["task-3"], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n\nDo it.\n" },
+      hold: null,
       state: { kind: "new" }
     })
   })
   test("a body holding a --- line survives a write and a read instead of being cut there", async () => {
     const record: TaskRecord = {
       spec: { ...spec, id: "task-2", body: "Before\n---\nAfter\n" },
+      hold: null,
       state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: "/home/captain/.orc/backlog/logs/task-2.log" } }
     }
     expect(await run(parseTaskFile("task-2.md", "taken", renderTaskFile(record)))).toEqual(record)
@@ -408,7 +410,7 @@ describe("the backlog folders", () => {
     await withBacklog(async (root) => {
       const record = await run(addTask(root, spec))
       await run(claimTask(root, record.spec.id))
-      const taken: TaskRecord = { spec: record.spec, state: { kind: "taken", claim } }
+      const taken: TaskRecord = { spec: record.spec, hold: null, state: { kind: "taken", claim } }
       await run(writeTaken(root, taken))
       await run(releaseTask(root, taken))
       expect((await run(listTasks(root))).map((task) => task.state)).toEqual([{ kind: "new" }])
@@ -426,7 +428,7 @@ describe("the backlog folders", () => {
     await withBacklog(async (root) => {
       const record = await run(addTask(root, spec))
       await run(claimTask(root, record.spec.id))
-      await run(writeTaken(root, { spec: record.spec, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
+      await run(writeTaken(root, { spec: record.spec, hold: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
       await run(closeStartedTask(root, record.spec.id, "done", "merged", null, "2026-10-27T11:00:00.000Z"))
       const tasks = await run(listTasks(root))
       expect(tasks.map((task) => task.state.kind)).toEqual(["closed"])
@@ -469,7 +471,7 @@ const startTaskOne = async (root: string, start: ReadonlyArray<string>, next: { 
   if (first === undefined) {
     throw new Error("the backlog holds no task-1")
   }
-  await run(writeTaken(root, { spec: first.spec, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
+  await run(writeTaken(root, { spec: first.spec, hold: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
 }
 
 const pueueAnswering = (root: string, status: unknown): BeatSpawner =>
@@ -591,3 +593,5 @@ describe("the beat's closing sweep", () => {
     })
   }, 120_000)
 })
+
+
