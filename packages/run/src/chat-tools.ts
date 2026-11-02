@@ -31,7 +31,7 @@ export interface ChatSession {
 interface ChatHost {
   readonly registerTool: (tool: ChatTool) => void
   readonly on: (event: "session_start" | "session_shutdown", handler: () => void) => void
-  readonly sendMessage: (message: { readonly customType: string; readonly content: string; readonly display: boolean }) => void
+  readonly sendMessage: (message: { readonly customType: string; readonly content: string; readonly display: boolean }, options?: { readonly triggerTurn?: boolean }) => void
 }
 
 type Env = Readonly<Record<string, string | undefined>>
@@ -176,16 +176,25 @@ export const chatSession = (env: Env, post: (text: string) => void): ChatSession
 export const chatToolNames: ReadonlyArray<string> = chatSession({}, () => undefined).tools.map((tool) => tool.name)
 
 export default function registerChatTools(pi: ChatHost): void {
-  const session = chatSession(process.env, (text) => pi.sendMessage({ customType: "orc-task-closed", content: text, display: true }))
+  let stopped = false
+  const session = chatSession(process.env, (text) => {
+    if (!stopped) {
+      pi.sendMessage({ customType: "orc-task-closed", content: text, display: true }, { triggerTurn: false })
+    }
+  })
   for (const tool of session.tools) {
     pi.registerTool(tool)
   }
   let poll: ReturnType<typeof setInterval> | undefined
   pi.on("session_start", () => {
+    stopped = false
     // An unreferenced timer never keeps Pi running after its session ends.
-    poll ??= setInterval(() => void session.postClosed(), closedPollMillis).unref()
+    poll ??= setInterval(() => {
+      session.postClosed().catch(() => undefined)
+    }, closedPollMillis).unref()
   })
   pi.on("session_shutdown", () => {
+    stopped = true
     clearInterval(poll)
     poll = undefined
   })
