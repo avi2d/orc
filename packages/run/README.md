@@ -513,7 +513,7 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
 | `src/orc-config.ts` | The reading of `config.json`: the providers and the implementer, fixer and orchestrator models |
 | `src/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
-| `src/chat-tools.ts` | The `orc_backlog_add` and `orc_backlog` tools the chat offers Pi |
+| `src/chat-tools.ts` | The chat tools and the closed-task follow that posts each added task back into the chat |
 | `src/json-file.ts` | The JSON config file reading and its `ConfigError` |
 | `src/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
