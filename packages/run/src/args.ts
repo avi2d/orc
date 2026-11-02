@@ -11,6 +11,7 @@ export type OrcArgs =
   | { readonly kind: "ScoreStep"; readonly runId: string; readonly step: string; readonly score: number; readonly note: string }
   | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
   | { readonly kind: "Dispatch"; readonly args: Exclude<DispatchArgs, { readonly kind: "UsageError" }> }
+  | { readonly kind: "Chat" }
   | { readonly kind: "UsageError"; readonly detail: string }
 const questionPrefix = "question-"
 const parseShowArgs = (rest: readonly string[]): OrcArgs => {
@@ -214,6 +215,9 @@ export const parseArgs = (args: readonly string[]): OrcArgs => {
   }
   if (first === "run") {
     return parseRunArgs(rest)
+  }
+  if (first === "chat") {
+    return rest.length === 0 ? { kind: "Chat" } : { kind: "UsageError", detail: `orc chat takes no argument: ${rest[0]}` }
   }
   if (first === "backlog" || first === "beat" || first === "runner") {
     const dispatch = parseDispatchArgs(first, rest)

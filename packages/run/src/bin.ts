@@ -6,6 +6,7 @@ import { isatty } from "node:tty"
 import { Console, Effect } from "effect"
 import packageJson from "../package.json" with { type: "json" }
 import { type OrcArgs, parseArgs } from "./args"
+import { runChat } from "./chat"
 import { dispatchUsage } from "./dispatch/args"
 import { runDispatch } from "./dispatch/cli"
 import { RunnerError } from "./dispatch/runner"
@@ -15,7 +16,7 @@ import { encodeRunsJson, formatHistoryError, formatRunsTable, listRuns, openData
 import { recordStepScore } from "./run-scores"
 import { encodeShowJson, formatShow, readShow } from "./show"
 
-const usage = "Usage: orc [--version] [--help] | orc runs [--json] | orc show <run> [--json] | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--branch <name>] [--sandbox nono|none] [--token-file <path>] [--provider <id>] [--allow ask-user] [--answer question-<id>=\"<text>\"] | " + dispatchUsage
+const usage = "Usage: orc [--version] [--help] | orc chat | orc runs [--json] | orc show <run> [--json] | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--branch <name>] [--sandbox nono|none] [--token-file <path>] [--provider <id>] [--allow ask-user] [--answer question-<id>=\"<text>\"] | " + dispatchUsage
 
 const readFailure = (error: unknown): string =>
   typeof error === "string" ? error : "orc: cannot read the run history: " + formatHistoryError(error)
@@ -48,6 +49,46 @@ const dispatch = (args: Extract<OrcArgs, { readonly kind: "Dispatch" }>["args"])
     Effect.provide(BunServices.layer),
     Effect.catch((detail) => Console.error("orc: " + detail).pipe(Effect.andThen(Effect.fail(detail))))
   )
+
+const scoreStep = (args: Extract<OrcArgs, { readonly kind: "ScoreStep" }>) =>
+  Effect.gen(function*() {
+    yield* Effect.acquireUseRelease(
+      openDatabase(orcHomeDir(Bun.env.ORC_HOME)),
+      (db) =>
+        recordStepScore(db, {
+          runId: args.runId,
+          step: args.step,
+          score: args.score,
+          note: args.note,
+          scoredAt: new Date().toISOString()
+        }),
+      (db) => Effect.sync(() => db.close())
+    ).pipe(
+      Effect.provide(BunServices.layer),
+      Effect.catchTags({
+        UnknownRun: (error) =>
+          Console.error("orc score: unknown run " + error.runId).pipe(Effect.andThen(Effect.fail("orc score refused"))),
+        UnknownStep: (error) =>
+          Console.error("orc score: unknown step " + error.step + " in run " + error.runId).pipe(
+            Effect.andThen(Effect.fail("orc score refused"))
+          ),
+        InvalidScore: (error) =>
+          Console.error(`orc score takes a score from 1 to 5, got "${error.score}"`).pipe(
+            Effect.andThen(Effect.fail("orc score refused"))
+          )
+      }),
+      Effect.catch((error) =>
+        Console.error(readFailure(error)).pipe(Effect.andThen(Effect.fail("run history unavailable")))
+      )
+    )
+    yield* Console.log(`orc score recorded ${args.score} for ${args.step} in ${args.runId}`)
+  })
+
+const chat = runChat(orcHomeDir(Bun.env.ORC_HOME), [process.execPath, Bun.main]).pipe(
+  Effect.provide(BunServices.layer),
+  Effect.catchTag("ChatError", (error) => Console.error(error.message).pipe(Effect.andThen(Effect.fail("orc chat refused")))),
+  Effect.flatMap((exitCode) => exitCode === 0 ? Effect.void : Effect.fail("pi exited " + String(exitCode)))
+)
 
 const program = Effect.gen(function*() {
   const args = parseArgs(Bun.argv.slice(2))
@@ -83,37 +124,7 @@ const program = Effect.gen(function*() {
       break
     }
     case "ScoreStep": {
-      yield* Effect.acquireUseRelease(
-        openDatabase(orcHomeDir(Bun.env.ORC_HOME)),
-        (db) =>
-          recordStepScore(db, {
-            runId: args.runId,
-            step: args.step,
-            score: args.score,
-            note: args.note,
-            scoredAt: new Date().toISOString()
-          }),
-        (db) => Effect.sync(() => db.close())
-      ).pipe(
-        Effect.provide(BunServices.layer),
-        Effect.catchTags({
-          UnknownRun: (error) =>
-            Console.error("orc score: unknown run " + error.runId).pipe(Effect.andThen(Effect.fail("orc score refused"))),
-          UnknownStep: (error) =>
-            Console.error("orc score: unknown step " + error.step + " in run " + error.runId).pipe(
-              Effect.andThen(Effect.fail("orc score refused"))
-            ),
-          InvalidScore: (error) =>
-            Console.error(`orc score takes a score from 1 to 5, got "${error.score}"`).pipe(
-              Effect.andThen(Effect.fail("orc score refused"))
-            )
-        }),
-        Effect.catch((error) =>
-          Console.error(readFailure(error)).pipe(Effect.andThen(Effect.fail("run history unavailable")))
-        )
-      )
-      yield* Console.log(`orc score recorded ${args.score} for ${args.step} in ${args.runId}`)
-      break
+      return yield* scoreStep(args)
     }
     case "RunAgent": {
       const report = yield* runAgentStep({ cwd: process.cwd(), taskFile: args.taskFile, branch: args.branch, sandbox: args.sandbox, tokenFile: args.tokenFile, provider: args.provider, allow: args.allow, answers: args.answers }).pipe(
@@ -130,6 +141,9 @@ const program = Effect.gen(function*() {
     }
     case "Dispatch": {
       return yield* dispatch(args.args)
+    }
+    case "Chat": {
+      return yield* chat
     }
     case "UsageError": {
       yield* Console.error(`${args.detail}\n${usage}`)

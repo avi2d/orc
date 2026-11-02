@@ -176,7 +176,11 @@ This example names opencode-go through a Pi login, anthropic through a token fil
       "env": { "CLAUDE_CONFIG_DIR": "/Users/me/.claude-accounts/main" }
     }
   ],
-  "models": { "implementer": "claude-bridge/claude-opus-5-5", "fixer": "claude-bridge/claude-opus-5-5" }
+  "models": {
+    "implementer": "claude-bridge/claude-opus-5-5",
+    "fixer": "claude-bridge/claude-opus-5-5",
+    "orchestrator": "claude-bridge/claude-sonnet-5-5"
+  }
 }
 ```
 
@@ -438,6 +442,19 @@ A missing start command exits 127 into its log and leaves the task started.
 Only a failure to spawn the log wrapper closes the task as `start-failed`.
 To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1` and carries the closes as `closed` and `close-failed` actions.
 On a token command account, each beat first sends every started task its account's current token through its machine's `renew` command, as JSON on standard input.
+
+## Adding tasks from a chat
+
+To say tasks in a chat instead of writing task files, run `orc chat`.
+It starts Pi on the model `models.orchestrator` names in `config.json`, and refuses to start when it names none.
+The chat's Pi has two tools and no others:
+
+- `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project, the task's Markdown, an optional machine and the ids it depends on.
+- `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
+
+So a task from the chat enters the backlog the way any other does, and the beat starts it.
+The chat's Pi loads your Pi settings and packages, so a provider a package adds works as it does in your Pi.
+`ORC_HOME` reaches the tools from the shell that runs `orc chat`.
 
 ## The runner
 
