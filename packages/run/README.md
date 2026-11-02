@@ -67,7 +67,7 @@ For another origin it pushes the branch and skips the `pr` and `ci` steps, and o
 To print the orc version, run `orc --version` from any folder.
 
 Orc prints `orc` and the version `package.json` names, and exits 0.
-`--help` or `-h` prints the usage text and exits 0.
+`--help` or `-h` prints the usage text and exits 0, after any subcommand too, such as `orc run --help`.
 An unknown flag prints the usage text and exits 1.
 
 ## Running a task

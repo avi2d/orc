@@ -10,6 +10,13 @@ describe("parseArgs", () => {
   test("--help prints the usage text", () => {
     expect(parseArgs(["--help"])).toEqual({ kind: "PrintHelp" })
   })
+  test("a subcommand's --help prints the usage text instead of naming a task file", () => {
+    expect(parseArgs(["run", "--help"])).toEqual({ kind: "PrintHelp" })
+    expect(parseArgs(["backlog", "add", "-h"])).toEqual({ kind: "PrintHelp" })
+  })
+  test("--help after -- belongs to the passed-on command, not to orc", () => {
+    expect(parseArgs(["runner", "hold", "task-1", "--", "orc", "--help"]).kind).toBe("Dispatch")
+  })
   test("chat starts the orchestrator", () => {
     expect(parseArgs(["chat"])).toEqual({ kind: "Chat" })
   })
