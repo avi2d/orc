@@ -1,5 +1,7 @@
 import { isTaskId } from "./backlog"
 
+export type TaskSource = { readonly kind: "file"; readonly path: string } | { readonly kind: "stdin" }
+
 export type Reach = { readonly kind: "here" } | { readonly kind: "through"; readonly command: readonly [string, ...Array<string>] }
 
 export type DispatchArgs =
@@ -7,7 +9,7 @@ export type DispatchArgs =
   | {
     readonly kind: "AddTask"
     readonly project: string
-    readonly taskFile: string
+    readonly task: TaskSource
     readonly machine: string | null
     readonly dependsOn: ReadonlyArray<string>
   }
@@ -22,7 +24,7 @@ export type DispatchArgs =
   | { readonly kind: "UsageError"; readonly detail: string }
 
 export const dispatchUsage =
-  "orc backlog [--json] | orc backlog add <project> <task-file> [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>]"
+  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>]"
 
 const parseJsonFlag = (rest: ReadonlyArray<string>, json: (json: boolean) => DispatchArgs): DispatchArgs => {
   if (rest.length === 0) {
@@ -62,7 +64,8 @@ const parseAdd = (rest: ReadonlyArray<string>): DispatchArgs => {
     return { kind: "UsageError", detail: "orc backlog add takes a project and a task file" }
   }
   const [project = "", taskFile = ""] = kept
-  return { kind: "AddTask", project, taskFile, machine, dependsOn }
+  const task: TaskSource = taskFile === "-" ? { kind: "stdin" } : { kind: "file", path: taskFile }
+  return { kind: "AddTask", project, task, machine, dependsOn }
 }
 
 const parseClose = (rest: ReadonlyArray<string>): DispatchArgs => {

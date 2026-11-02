@@ -404,6 +404,8 @@ A quota that names more than one account when any of them is kind `none` is refu
 ```
 
 To add a task, run `orc backlog add <project> <task-file>`.
+To pipe the task in instead, give `-` as the task file, as in `printf '# Fix the login page\n' | orc backlog add orc -`.
+It reads stdin to its end and refuses a terminal.
 Add `--machine <name>` to run the task on that machine only, and `--depends-on <task-id>` once per task it waits for.
 To see the backlog, run `orc backlog`.
 It prints the new, taken and closed tasks side by side with the project list and each machine's busy slots beside them.

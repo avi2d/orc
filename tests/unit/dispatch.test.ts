@@ -82,9 +82,18 @@ describe("parseDispatchArgs", () => {
     expect(parseDispatchArgs("backlog", ["add", "orc", "t.md", "--depends-on", "task-1", "--machine", "mac", "--depends-on", "task-2"])).toEqual({
       kind: "AddTask",
       project: "orc",
-      taskFile: "t.md",
+      task: { kind: "file", path: "t.md" },
       machine: "mac",
       dependsOn: ["task-1", "task-2"]
+    })
+  })
+  test("add reads the task from stdin on - instead of from a file named -", () => {
+    expect(parseDispatchArgs("backlog", ["add", "orc", "-", "--machine", "mac"])).toEqual({
+      kind: "AddTask",
+      project: "orc",
+      task: { kind: "stdin" },
+      machine: "mac",
+      dependsOn: []
     })
   })
   test("add refuses a second --machine instead of keeping either", () => {

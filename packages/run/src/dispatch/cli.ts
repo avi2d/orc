@@ -1,6 +1,6 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import type { DispatchArgs } from "./args"
+import type { DispatchArgs, TaskSource } from "./args"
 import { addTask, backlogPaths, BacklogError, closeStartedTask, isTaskId, listTasks } from "./backlog"
 import { readRoom, runBeat } from "./beat"
 import { backlogJson, type BacklogView, beatJson, formatBeat, formatBoard, type ProjectList, type RoomList } from "./board"
@@ -77,10 +77,31 @@ const readSessionToken = (session: string, stdoutIsTerminal: boolean) =>
 const refusedDependency = (dependsOn: ReadonlyArray<string>, tasks: ReadonlyArray<TaskRecord>): string | null =>
   dependsOn.find((id) => !isTaskId(id) || !tasks.some((task) => task.spec.id === id)) ?? null
 
-const add = (args: Extract<CommandArgs, { readonly kind: "AddTask" }>, place: DispatchPlace) =>
+interface TaskText {
+  readonly from: string
+  readonly body: string
+}
+
+const readTaskText = (source: TaskSource, place: DispatchPlace) =>
   Effect.gen(function*() {
+    if (source.kind === "stdin") {
+      if (place.stdinIsTerminal) {
+        return yield* refuse("orc backlog add - reads the task from a pipe, and stdin is a terminal")
+      }
+      const body = yield* place.stdin.pipe(Effect.mapError((error) => new BacklogError({ detail: error.detail })))
+      return { from: "the task on stdin", body } satisfies TaskText
+    }
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
+    const taskPath = path.resolve(place.cwd, source.path)
+    const body = yield* fs.readFileString(taskPath).pipe(
+      Effect.mapError((error) => new BacklogError({ detail: "cannot read the task file " + taskPath + ": " + error.message }))
+    )
+    return { from: "the task file " + taskPath, body } satisfies TaskText
+  })
+
+const add = (args: Extract<CommandArgs, { readonly kind: "AddTask" }>, place: DispatchPlace) =>
+  Effect.gen(function*() {
     const paths = backlogPaths(backlogRoot(place))
     const config = yield* readDispatchConfig(paths.dispatchConfig)
     const project = (yield* readProjects(paths.projects, config.machines)).find((candidate) => candidate.name === args.project)
@@ -94,13 +115,10 @@ const add = (args: Extract<CommandArgs, { readonly kind: "AddTask" }>, place: Di
     if (dependency !== null) {
       return yield* refuse("the backlog holds no task " + dependency)
     }
-    const taskPath = path.resolve(place.cwd, args.taskFile)
-    const body = yield* fs.readFileString(taskPath).pipe(
-      Effect.mapError((error) => new BacklogError({ detail: "cannot read the task file " + taskPath + ": " + error.message }))
-    )
+    const { from, body } = yield* readTaskText(args.task, place)
     const title = titleOf(body)
     if (title === "") {
-      return yield* refuse("the task file " + taskPath + " holds no text")
+      return yield* refuse(from + " holds no text")
     }
     const created = DateTime.formatIso(yield* DateTime.now)
     const record = yield* addTask(backlogRoot(place), { title, project: project.name, machine: args.machine, dependsOn: args.dependsOn, created, body })
