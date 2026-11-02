@@ -337,6 +337,8 @@ It also names the floor of room each account must keep:
 
 A machine may add `"loadLimit"`, a number above 0, and the beat starts nothing there while `orc runner load` reads its five-minute load above it.
 An unread load holds starts there too.
+Orc refuses a load limit that is not a number above 0.
+Orc refuses a load limit on a machine whose start command does not run `orc runner start`, because the beat reads the load through that command.
 
 The provider named here is one `config.json` on each machine that runs the tasks defines.
 Each token file path in `dispatch.json` holds on those machines.
@@ -619,6 +621,7 @@ Piping that document into `orc runner result <task-id> --stdin-label` yourself r
 It names pueue's state for the task and the orc run on `orc/<task-id>` with its PR.
 A task is queued, stashed, running, paused, succeeded or failed, or unknown when no pueue task in group `orc` carries that home's label.
 To print the same facts as JSON, add `--json`, whose document names its version first as `orc.runner.v1`.
+To print the five minute load average the beat compares against a load limit, run `orc runner load` on that machine.
 
 ## Where things are
 
@@ -657,6 +660,12 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/dispatch/config.ts` | The reading of `dispatch.json` and `projects.json` |
 | `src/dispatch/quota.ts` | The quota reading from the configured command and the pick of an account |
 | `src/dispatch/beat.ts` | The beat: room, placement, take and start |
+| `src/dispatch/beat-action.ts` | The beat actions each beat step reports |
+| `src/dispatch/beat-close.ts` | The closing of finished runs and the running output time |
+| `src/dispatch/beat-place.ts` | The room reading and the placement of each new task |
+| `src/dispatch/load.ts` | The five minute load reading and the overloaded machines |
+| `src/dispatch/machine-reach.ts` | The sweep ownership check and the remote command prefix |
+| `src/dispatch/stall.ts` | The stalled run flag kept in the backlog logs |
 | `src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
 | `src/dispatch/runner.ts` | The runner: the start and the token renewal through pueue |
 | `src/dispatch/runner-result.ts` | The reading of a task's result and the `orc.runner.v1` JSON |
