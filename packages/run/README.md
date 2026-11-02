@@ -1,14 +1,14 @@
 # orc
-Orc keeps a backlog of agent tasks, starts each on a machine with room, and ends each run in a pull request.
-You add a task with `orc backlog add`, or say it in `orc chat` to Pi on the orchestrator model.
+Orc keeps a backlog of agent tasks and starts each on a machine with room.
+You say a task in `orc chat` to Pi on the orchestrator model, or add one with `orc backlog add`.
 Each `orc beat` starts the tasks that can start, and `orc runner start` queues each run in pueue on its machine.
-The beat later closes the task done or failed, with the PR link of its run.
+The beat later closes the task done or failed, with the PR link when its run opened one.
 
 A run takes one task from `orc run` and a task file.
 It makes an isolated copy of the project on a new branch.
 By default it runs the Pi agent inside a nono sandbox, then runs the project's checks.
 With `--sandbox none` it runs Pi and the checks directly on the host.
-It hands the branch to no-mistakes, which reviews it, pushes it and opens the PR.
+It hands the branch to no-mistakes, which reviews it, pushes it and opens a PR on a provider it supports, such as GitHub.
 You read the PR and merge it, since orc never merges.
 [The backlog and the beat](#the-backlog-and-the-beat), [Adding tasks from a chat](#adding-tasks-from-a-chat) and [The runner](#the-runner) describe the path a task takes to its run.
 
@@ -36,7 +36,7 @@ To install orc:
 After the release that moves orc into the run package, relink the Mac launcher on the Mac itself.
 Enter packages/run and run `bun link` to point the launcher at the new entry point.
 Then run `orc --version` and confirm it prints the version `packages/run/package.json` names.
-The release performs no automated handoff, so the captain runs these steps when the release lands.
+The release performs no automated handoff, so you run these steps when the release lands.
 
 ## Installing no-mistakes
 
@@ -89,7 +89,7 @@ Resume takes the sandbox the earlier run recorded, so a no-sandbox run resumes w
 Orc refuses a resume whose `--sandbox` names another kind than the one recorded.
 A run recorded before orc stored the sandbox takes it from the flag, with nono as the default.
 On resume Sandcastle reuses the branch worktree, Pi resumes its prior session, and orc reattaches to no-mistakes with the same intent.
-After a refusal, run the same resume command with `--allow` and the name from the report, or with `--answer` and the captain's answer for a question.
+After a refusal, run the same resume command with `--allow` and the name from the report, or with `--answer` and your answer for a question.
 No-mistakes takes the word for that `--allow` kind, and the answer for that question.
 Orc also refuses a checkout whose own git config sets any key outside a short list known to run no program.
 To refuse checkouts carrying a marker file, set `ORC_REFUSE_MARKERS` to comma separated marker names.

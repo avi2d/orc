@@ -2,7 +2,7 @@
   "name": "orc",
   "version": "0.6.0",
   "private": true,
-  "description": "Backlog of agent tasks started on machines with room, each run ending in a pull request, and the terminal dashboard of panels beside it",
+  "description": "Queue tasks for AI agents and run them across your machines, with a terminal dashboard",
   "license": "MIT",
   "repository": "https://github.com/avi2d/orc.git",
   "author": "avi2d <avi2dg@gmail.com>",
