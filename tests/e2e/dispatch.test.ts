@@ -297,6 +297,19 @@ describe("orc beat", () => {
     })
   }, beatTimeout)
 
+  test("the beat leaves a task held for the captain new instead of starting it", async () => {
+    await withFixture({ mac: 1, linux: 1, floorPercent: 15 }, async (fixture) => {
+      await addTasks(fixture, 1)
+      const file = join(fixture.dir, "home", "backlog", "new", "task-1.md")
+      const text = await readFile(file, "utf8")
+      await writeFile(file, text.replace("\n---\n", "\nhold_reason: \"which API shape\"\n---\n"))
+      const output = await orcOk(fixture, ["beat"])
+      await Bun.sleep(startSettleMillis)
+      expect([output.includes("started task-1"), await startedLines(fixture)]).toEqual([false, []])
+      expect((await backlogTasks(fixture)).map((task) => task.status)).toEqual(["new"])
+    })
+  }, beatTimeout)
+
   test("a task piped to backlog add - lands with its whole body instead of reading a file named -", async () => {
     await withFixture({ mac: 1, linux: 1, floorPercent: 15 }, async (fixture) => {
       const said = "# Fix the login page\n\nThe button does nothing on a narrow screen.\n"
