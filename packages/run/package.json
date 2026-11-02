@@ -1,7 +1,7 @@
 {
   "name": "@avi2dg/orc",
   "version": "0.6.0",
-  "description": "Queue tasks for AI agents and run each on a machine with room: Pi in a nono sandbox, your checks, then no-mistakes review",
+  "description": "Queue tasks for AI agents and run each on a machine with room: Pi with your checks then no-mistakes review, nono sandbox for direct runs and without a sandbox for runner queued runs",
   "license": "MIT",
   "repository": "https://github.com/avi2d/orc.git",
   "author": "avi2d <avi2dg@gmail.com>",

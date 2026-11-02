@@ -5,7 +5,9 @@ Tell orc what needs doing, and it runs each task with an AI agent on a machine t
 - **Say it or file it.** Tell `orc chat` what you need, or add a task file with `orc backlog add`.
 - **Runs where there is room.** `orc beat` starts each task on a machine with a free slot and an account with quota left.
 - **Waits its turn.** A task that depends on others starts once they close done.
-- **Safe by default.** Each run works on its own branch in its own copy, inside the nono sandbox, and runs your checks.
+- **Safe by default.** Direct runs use the nono sandbox by default.
+  Runner queued tasks run without a sandbox.
+  Each run works on its own branch in its own copy and runs your checks.
 - **Reviewed before you see it.** no-mistakes reviews the branch and opens a pull request for a code change, and orc never merges.
 - **Watch it all.** The `tui-dash` dashboard shows quota, machines, queues and tasks in the terminal.
 
