@@ -199,7 +199,14 @@ const parseRunsArgs = (rest: readonly string[]): OrcArgs => {
   }
   return { kind: "ListRuns", json: true }
 }
-export const parseArgs = (args: readonly string[]): OrcArgs => {
+const helpFlags = new Set(["--help", "-h"])
+// Words after "--" are a command orc passes on, so a --help there is that command's.
+const asksForHelp = (rest: readonly string[]): boolean => {
+  const end = rest.indexOf("--")
+  return (end === -1 ? rest : rest.slice(0, end)).some((word) => helpFlags.has(word))
+}
+const subcommands = new Set(["runs", "show", "score", "run", "chat", "backlog", "beat", "runner"])
+const parseWords = (args: readonly string[]): OrcArgs => {
   if (args.length === 0) {
     return { kind: "UsageError", detail: "orc takes one flag" }
   }
@@ -239,3 +246,5 @@ export const parseArgs = (args: readonly string[]): OrcArgs => {
     }
   }
 }
+export const parseArgs = (args: readonly string[]): OrcArgs =>
+  subcommands.has(args[0] ?? "") && asksForHelp(args.slice(1)) ? { kind: "PrintHelp" } : parseWords(args)

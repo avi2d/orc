@@ -36,6 +36,18 @@ describe("orc bin", () => {
     expect(result.stdout).toContain("Usage: orc")
   })
 
+  test("every subcommand in the usage text prints that usage for --help instead of reading --help as an argument", async () => {
+    const top = await runOrc(["--help"])
+    const subcommands = [...new Set([...top.stdout.matchAll(/(?:^Usage: |\| )orc (\w+)/g)].map((match) => match[1]))]
+    expect(subcommands).toContain("run")
+    const asked = subcommands.flatMap((subcommand) => ["--help", "-h"].map((flag) => [subcommand, flag]))
+    const results = await Promise.all(asked.map(async (words) => {
+      const result = await runOrc(words)
+      return { words, exitCode: result.exitCode, stdout: result.stdout }
+    }))
+    expect(results).toEqual(asked.map((words) => ({ words, exitCode: 0, stdout: top.stdout })))
+  }, 30_000)
+
   test("an unknown flag prints usage and exits non-zero", async () => {
     const result = await runOrc(["--frobnicate"])
     expect(result.exitCode).not.toBe(0)
