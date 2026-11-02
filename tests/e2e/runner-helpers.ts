@@ -1,6 +1,7 @@
 import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { Schema } from "effect"
 
 export const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
 const pueueFixtures = new URL("../fixtures/runner/pueue", import.meta.url).pathname
@@ -69,8 +70,12 @@ const fakePueue = [
   ""
 ].join("\n")
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null
+
+export const mainToken = "/secrets/main-token"
+
+export const RunnerRun = Schema.Struct({ result: Schema.Struct({ run: Schema.Unknown }) })
 
 // The copied fixture holds bare task labels, so each test home takes them as its own queueing.
 const scopeFixtureLabels = async (statusFile: string, home: string): Promise<void> => {
@@ -165,3 +170,28 @@ export const queuedEnv = async (fixture: Fixture): Promise<string | null> => {
 }
 
 export const orcThere = (home: string): ReadonlyArray<string> => ["sh", "-c", "ORC_HOME='" + home + "' exec \"$0\" '" + binPath + "' \"$@\"", process.execPath]
+
+export const resultJson = async (fixture: Fixture, task: string, through: ReadonlyArray<string> = []): Promise<unknown> =>
+  JSON.parse(await orcOk(fixture, ["runner", "result", task, "--json", ...through]))
+
+export const writeTwoHomeDispatches = async (homeA: string, homeB: string, machineThroughFar: ReadonlyArray<string>): Promise<void> => {
+  for (const home of [homeA, homeB]) {
+    await writeFile(join(home, "backlog", "dispatch.json"), JSON.stringify({
+      machines: [{ name: "linux", slots: 1, start: machineThroughFar }],
+      quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", tokenFile: mainToken }], floorPercent: 15 }
+    }))
+  }
+}
+
+export const waitForAddedTasks = async (fixture: Fixture): Promise<ReadonlyArray<string>> => {
+  const deadline = Date.now() + startWaitMillis
+  let added: ReadonlyArray<string> = []
+  while (Date.now() < deadline) {
+    added = (await readFile(join(fixture.pueue, "added-tasks"), "utf8").catch(() => "")).split("\n").slice(0, -1)
+    if (added.length >= 2) {
+      break
+    }
+    await Bun.sleep(20)
+  }
+  return added
+}

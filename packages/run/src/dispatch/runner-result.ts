@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { runsForBranch } from "../history-resume"
-import { formatHistoryError, openDatabase, RunStatusSchema } from "../run-history"
+import { formatHistoryError, openDatabase, type RunRecord, RunStatusSchema } from "../run-history"
 import { TaskId } from "./backlog"
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
 import { LabelArg } from "./token"
@@ -131,6 +131,8 @@ const assessHeld = (
   return { ...held, status: "Stashed" in status ? "stashed" : "queued" }
 }
 
+const toSummary = (run: RunRecord): RunSummary => ({ id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason })
+
 const readRun = (home: string, checkout: string, task: string, interval: PueueInterval | null): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const project = yield* resolveProjectDir(checkout)
@@ -139,12 +141,8 @@ const readRun = (home: string, checkout: string, task: string, interval: PueueIn
       (db) => runsForBranch(db, project, taskBranch(task)),
       (db) => Effect.sync(() => db.close())
     )
-    if (interval === null) {
-      const run = runs[0] ?? null
-      return run === null ? null : { id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason }
-    }
-    const run = runs.find((candidate) => startsWithin(candidate.started, interval)) ?? null
-    return run === null ? null : { id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason }
+    const run = runs.find((candidate) => interval === null || startsWithin(candidate.started, interval)) ?? null
+    return run === null ? null : toSummary(run)
   }).pipe(
     Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
   )
