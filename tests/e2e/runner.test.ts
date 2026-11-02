@@ -129,8 +129,8 @@ describe("orc runner start", () => {
           branch: "orc/task-1",
           taskFile: "task.md",
           status: "succeeded",
-          started: "2026-10-28T02:36:39.200Z",
-          ended: "2026-10-28T02:36:39.400Z",
+          started: "2026-10-27T23:36:39.200Z",
+          ended: "2026-10-27T23:36:39.400Z",
           prLink: "https://github.com/example/orc/pull/3"
         }))
       } finally {
@@ -407,8 +407,8 @@ describe("orc runner result", () => {
           branch: "orc/task-1",
           taskFile: "task.md",
           status: "succeeded",
-          started: "2026-10-28T02:36:39.200Z",
-          ended: "2026-10-28T02:36:39.400Z",
+          started: "2026-10-27T23:36:39.200Z",
+          ended: "2026-10-27T23:36:39.400Z",
           prLink: "https://github.com/avi2d/orc/pull/1"
         }))
       } finally {
@@ -479,6 +479,41 @@ describe("orc runner result", () => {
     })
   }, runnerTimeout)
 
+  test("a task does not close with a later run's PR", async () => {
+    await withFixture(async (fixture) => {
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({
+        tasks: {
+          "77": {
+            id: 77,
+            label: fixture.home + " task-1",
+            group: "orc",
+            path: "/checkout",
+            status: { Done: { start: "2026-10-28T02:36:39.100Z", end: "2026-10-28T02:36:39.200Z", result: { Failed: 3 } } }
+          }
+        },
+        groups: {}
+      }))
+      const db = await Effect.runPromise(openDatabase(fixture.home).pipe(Effect.provide(BunServices.layer)))
+      try {
+        Effect.runSync(recordRun(db, {
+          id: "run-later",
+          project: "/checkout",
+          branch: "orc/task-1",
+          taskFile: "task.md",
+          status: "succeeded",
+          started: "2026-10-28T02:36:39.500Z",
+          ended: "2026-10-28T02:36:39.600Z",
+          prLink: "https://github.com/avi2d/orc/pull/9"
+        }))
+      } finally {
+        db.close()
+      }
+      const document = Schema.decodeUnknownSync(RunnerRun)(await resultJson(fixture, "task-1"))
+      expect(document.result.run).toBeNull()
+      expect(await orcOk(fixture, ["runner", "result", "task-1"])).toContain("orc holds no run on orc/task-1")
+    })
+  }, runnerTimeout)
+
   test("a result read through a command is the far side's result, not the reader's", async () => {
     await withFixture(async (fixture) => {
       const far = join(fixture.dir, "far-home")
@@ -498,8 +533,8 @@ describe("orc runner result", () => {
           branch: "orc/task-2",
           taskFile: "task.md",
           status: "succeeded",
-          started: "2026-10-28T02:36:39.200Z",
-          ended: "2026-10-28T02:36:39.400Z",
+          started: "2026-10-27T23:36:39.600Z",
+          ended: "2026-10-27T23:36:39.700Z",
           prLink: "https://github.com/avi2d/orc/pull/2"
         }))
       } finally {
@@ -531,8 +566,8 @@ describe("orc runner result", () => {
           branch: "orc/task-2",
           taskFile: "task.md",
           status: "succeeded",
-          started: "2026-10-28T02:36:39.200Z",
-          ended: "2026-10-28T02:36:39.400Z",
+          started: "2026-10-27T23:36:39.600Z",
+          ended: "2026-10-27T23:36:39.700Z",
           prLink: "https://github.com/avi2d/orc/pull/2"
         }))
       } finally {

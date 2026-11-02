@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { latestRunForBranch } from "../history-resume"
+import { runsForBranch } from "../history-resume"
 import { formatHistoryError, openDatabase, RunStatusSchema } from "../run-history"
 import { TaskId } from "./backlog"
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
@@ -71,26 +71,41 @@ export const closingFromResult = (result: RunnerResult): TaskClosing | null => {
   return null
 }
 
-const pueueStartOf = (status: PueueStatus): string | null => {
+interface PueueInterval {
+  readonly start: string
+  readonly end: string | null
+}
+
+const pueueIntervalOf = (status: PueueStatus): PueueInterval | null => {
   if ("Done" in status) {
-    return status.Done.start
+    return { start: status.Done.start, end: status.Done.end }
   }
   if ("Running" in status) {
-    return status.Running.start
+    return { start: status.Running.start, end: null }
   }
   if ("Paused" in status) {
-    return status.Paused.start
+    return { start: status.Paused.start, end: null }
   }
   return null
 }
 
-const runStartsWith = (runStarted: string, pueueStart: string): boolean => {
+const startsWithin = (runStarted: string, interval: PueueInterval): boolean => {
   const runMs = Date.parse(runStarted)
-  const pueueMs = Date.parse(pueueStart)
-  if (Number.isNaN(runMs) || Number.isNaN(pueueMs)) {
+  const startMs = Date.parse(interval.start)
+  if (Number.isNaN(runMs) || Number.isNaN(startMs)) {
     return false
   }
-  return runMs >= pueueMs
+  if (runMs < startMs) {
+    return false
+  }
+  if (interval.end === null) {
+    return true
+  }
+  const endMs = Date.parse(interval.end)
+  if (Number.isNaN(endMs)) {
+    return false
+  }
+  return runMs <= endMs
 }
 
 const assessHeld = (
@@ -116,21 +131,20 @@ const assessHeld = (
   return { ...held, status: "Stashed" in status ? "stashed" : "queued" }
 }
 
-const readRun = (home: string, checkout: string, task: string, pueueStart: string | null): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
+const readRun = (home: string, checkout: string, task: string, interval: PueueInterval | null): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const project = yield* resolveProjectDir(checkout)
-    const run = yield* Effect.acquireUseRelease(
+    const runs = yield* Effect.acquireUseRelease(
       openDatabase(home),
-      (db) => latestRunForBranch(db, project, taskBranch(task)),
+      (db) => runsForBranch(db, project, taskBranch(task)),
       (db) => Effect.sync(() => db.close())
     )
-    if (run === null) {
-      return null
+    if (interval === null) {
+      const run = runs[0] ?? null
+      return run === null ? null : { id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason }
     }
-    if (pueueStart !== null && !runStartsWith(run.started, pueueStart)) {
-      return null
-    }
-    return { id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason }
+    const run = runs.find((candidate) => startsWithin(candidate.started, interval)) ?? null
+    return run === null ? null : { id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason }
   }).pipe(
     Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
   )
@@ -144,7 +158,7 @@ export const readResult = (task: string, home: string, label?: string | null): E
     const status = yield* Schema.decodeUnknownEffect(PueueStatus)(held.status).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "pueue reports a status orc cannot read for task " + held.id + ": " + error.message }))
     )
-    const run = yield* readRun(home, held.path, task, pueueStartOf(status))
+    const run = yield* readRun(home, held.path, task, pueueIntervalOf(status))
     return assessHeld(task, held.id, status, run)
   })
 
