@@ -161,7 +161,7 @@ Resume takes the sandbox from the earlier run, so `orc run --branch <name>` resu
 ## Configuring providers
 
 Orc ships with no provider and no model, so a run needs `config.json` in `$ORC_HOME`, default `~/.orc/config.json`.
-It names each provider orc may run and, under `models`, the implementer and fixer models.
+It names each provider orc may run and, under `models`, the implementer, fixer and orchestrator models.
 This example names opencode-go through a Pi login, anthropic through a token file and claude-bridge through its Pi package:
 
 ```json
@@ -176,7 +176,11 @@ This example names opencode-go through a Pi login, anthropic through a token fil
       "env": { "CLAUDE_CONFIG_DIR": "/Users/me/.claude-accounts/main" }
     }
   ],
-  "models": { "implementer": "claude-bridge/claude-opus-5-5", "fixer": "claude-bridge/claude-opus-5-5" }
+  "models": {
+    "implementer": "claude-bridge/claude-opus-5-5",
+    "fixer": "claude-bridge/claude-opus-5-5",
+    "orchestrator": "claude-bridge/claude-sonnet-5-5"
+  }
 }
 ```
 
@@ -439,6 +443,19 @@ Only a failure to spawn the log wrapper closes the task as `start-failed`.
 To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1` and carries the closes as `closed` and `close-failed` actions.
 On a token command account, each beat first sends every started task its account's current token through its machine's `renew` command, as JSON on standard input.
 
+## Adding tasks from a chat
+
+To say tasks in a chat instead of writing task files, run `orc chat`.
+It starts Pi on the model `models.orchestrator` names in `config.json`, and refuses to start when it names none.
+The chat's Pi has two tools and no others:
+
+- `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project, the task's Markdown, an optional machine and the ids it depends on.
+- `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
+
+So a task from the chat enters the backlog the way any other does, and the beat starts it.
+The chat's Pi loads your Pi settings and packages, so a provider a package adds works as it does in your Pi.
+`ORC_HOME` reaches the tools from the shell that runs `orc chat`.
+
 ## The runner
 
 `orc runner start` is the start command that hands a task to pueue on its machine.
@@ -490,7 +507,9 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/bin.ts` | The orc entry point |
 | `src/args.ts` | The flag parsing for the orc command |
 | `src/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
-| `src/orc-config.ts` | The reading of `config.json`: the providers and the agent models |
+| `src/orc-config.ts` | The reading of `config.json`: the providers and the implementer, fixer and orchestrator models |
+| `src/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
+| `src/chat-tools.ts` | The `orc_backlog_add` and `orc_backlog` tools the chat offers Pi |
 | `src/json-file.ts` | The JSON config file reading and its `ConfigError` |
 | `src/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |

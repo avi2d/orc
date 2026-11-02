@@ -10,6 +10,12 @@ describe("parseArgs", () => {
   test("--help prints the usage text", () => {
     expect(parseArgs(["--help"])).toEqual({ kind: "PrintHelp" })
   })
+  test("chat starts the orchestrator", () => {
+    expect(parseArgs(["chat"])).toEqual({ kind: "Chat" })
+  })
+  test("chat refuses an argument instead of dropping it", () => {
+    expect(parseArgs(["chat", "add a task"])).toEqual({ kind: "UsageError", detail: "orc chat takes no argument: add a task" })
+  })
   test("-h prints the usage text", () => {
     expect(parseArgs(["-h"])).toEqual({ kind: "PrintHelp" })
   })

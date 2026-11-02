@@ -14,6 +14,8 @@ const expectedFiles = [
   "src/agents.ts",
   "src/args.ts",
   "src/bin.ts",
+  "src/chat-tools.ts",
+  "src/chat.ts",
   "src/checks.ts",
   "src/context-mark.ts",
   "src/dispatch/args.ts",
