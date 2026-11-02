@@ -7,6 +7,7 @@ import { writtenReport } from "../report-run"
 import { runDirFor, type TaskKind } from "../task-kind"
 import { TaskId } from "./backlog"
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
+import { type Env, pueueOutputAt } from "./pueue-log"
 import { LabelArg } from "./token"
 import { capture, type Command, decodeJson, readHeld, refuse, resolveProjectDir, RunnerError, type RunnerRequirements, taskBranch } from "./runner"
 
@@ -31,7 +32,7 @@ const heldFields = {
 const RunnerResult = Schema.Union([
   Schema.Struct({ task: TaskId, status: Schema.Literal("unknown") }),
   Schema.Struct({ ...heldFields, status: Schema.Literals(["queued", "stashed"]) }),
-  Schema.Struct({ ...heldFields, status: Schema.Literals(["running", "paused"]), started: Schema.String }),
+  Schema.Struct({ ...heldFields, status: Schema.Literals(["running", "paused"]), started: Schema.String, outputAt: Schema.optional(Schema.String) }),
   Schema.Struct({ ...heldFields, status: Schema.Literal("succeeded"), started: Schema.String, ended: Schema.String }),
   Schema.Struct({ ...heldFields, status: Schema.Literal("failed"), started: Schema.String, ended: Schema.String, reason: Schema.String })
 ])
@@ -177,7 +178,7 @@ const readRun = (home: string, checkout: string, task: string, interval: PueueIn
     Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
   )
 
-export const readResult = (task: string, home: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
+export const readResult = (task: string, home: string, env: Env, label?: string | null): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const held = yield* readHeld(home, task, label)
     if (held === null) {
@@ -187,7 +188,12 @@ export const readResult = (task: string, home: string, label?: string | null): E
       Effect.mapError((error) => new RunnerError({ detail: "pueue reports a status orc cannot read for task " + held.id + ": " + error.message }))
     )
     const run = yield* readRun(home, held.path, task, pueueIntervalOf(status))
-    return assessHeld(task, held.id, status, run)
+    const result = assessHeld(task, held.id, status, run)
+    if (result.status !== "running" && result.status !== "paused") {
+      return result
+    }
+    const outputAt = yield* pueueOutputAt(held.id, env, process.platform)
+    return outputAt === null ? result : { ...result, outputAt }
   })
 
 const ResultStdin = Schema.Struct({ label: LabelArg })
@@ -227,7 +233,8 @@ const headLine = (result: RunnerResult): string => {
     }
     case "running":
     case "paused": {
-      return result.task + ": " + result.status + " as pueue task " + result.pueueTask + " since " + result.started
+      return result.task + ": " + result.status + " as pueue task " + result.pueueTask + " since " + result.started +
+        (result.outputAt === undefined ? "" : ", output last written " + result.outputAt)
     }
     case "succeeded": {
       return result.task + ": succeeded as pueue task " + result.pueueTask + ", " + result.started + " to " + result.ended

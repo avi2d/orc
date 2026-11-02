@@ -7,7 +7,7 @@ import { DateTime, Effect, FileSystem, Layer, Option, Redacted, Result } from "e
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../packages/run/src/dispatch/args"
 import { addTask, claimTask, closeStartedTask, listTasks, releaseTask, writeTaken } from "../../packages/run/src/dispatch/backlog"
-import { placeTask, runBeat } from "../../packages/run/src/dispatch/beat"
+import { liveSources, placeTask, runBeat } from "../../packages/run/src/dispatch/beat"
 import { formatBeat } from "../../packages/run/src/dispatch/board"
 import { insertRun, openDatabase } from "../../packages/run/src/run-history"
 import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/dispatch/config"
@@ -422,7 +422,7 @@ describe("the beat", () => {
       await run(addTask(root, spec))
       const seen: Array<string> = []
       const spawner = recordingSpawner(join(root, "taken", "task-1.md"), seen).pipe(Layer.provide(BunServices.layer))
-      const report = await Effect.runPromise(runBeat(root, root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+      const report = await Effect.runPromise(runBeat(root, root, liveSources({})).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
       expect(report.actions.map((action) => action.kind)).toEqual(["started"])
       expect(seen).toHaveLength(1)
       expect(seen[0]).toContain("started_at: ")
@@ -470,7 +470,7 @@ const pueueInstead = (onPueue: ReturnType<typeof ChildProcessSpawner.ChildProces
   })).pipe(Layer.provide(BunServices.layer))
 
 const beatWith = (root: string, spawner: BeatSpawner) =>
-  Effect.runPromise(runBeat(root, root).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+  Effect.runPromise(runBeat(root, root, liveSources({})).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
 
 const backlogStates = async (root: string): Promise<ReadonlyArray<string>> =>
   (await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)

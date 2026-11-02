@@ -104,11 +104,12 @@ export const withFixture = async (body: (fixture: Fixture) => Promise<void>): Pr
     await mkdir(checkout)
     await cp(pueueFixtures, pueue, { recursive: true })
     await scopeFixtureLabels(join(pueue, "status.json"), home)
+    await writeFile(join(dir, "pueue.yml"), "shared:\n  pueue_directory: " + pueue + "\n")
     await writeFile(join(bin, "pueue"), fakePueue)
     await chmod(join(bin, "pueue"), 0o755)
     await writeFile(join(dir, "task.md"), "# Do the thing\n\nWith a body that holds 'quotes' and $dollars.\n")
     await writeFile(join(home, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { linux: checkout } }] }))
-    await body({ dir, home, checkout, pueue, env: { ORC_HOME: home, PUEUE_STATE: pueue, PATH: bin + ":" + (process.env.PATH ?? "") } })
+    await body({ dir, home, checkout, pueue, env: { ORC_HOME: home, PUEUE_STATE: pueue, PUEUE_CONFIG_PATH: join(dir, "pueue.yml"), PATH: bin + ":" + (process.env.PATH ?? "") } })
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

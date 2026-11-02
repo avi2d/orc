@@ -32,9 +32,20 @@ export const readMachineLoad: ReadLoad = (machine) => {
   )
 }
 
-export const loadWait = (machine: Machine, limit: number, reading: LoadReading): string | null => {
+const loadWait = (machine: Machine, limit: number, reading: LoadReading): string | null => {
   if (reading.kind === "unread") {
     return "the load on " + machine.name + " is unread: " + reading.reason
   }
   return reading.fiveMinute > limit ? machine.name + "'s five-minute load is " + reading.fiveMinute + ", above its limit of " + limit : null
 }
+
+export const readOverloaded = (machines: ReadonlyArray<Machine>, readLoad: ReadLoad): Effect.Effect<ReadonlyMap<string, string>, never, ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.forEach(machines, (machine) => {
+    const limit = machine.loadLimit
+    return limit === undefined
+      ? Effect.succeed([])
+      : readLoad(machine).pipe(Effect.map((reading) => {
+        const wait = loadWait(machine, limit, reading)
+        return wait === null ? [] : [[machine.name, wait] as const]
+      }))
+  }).pipe(Effect.map((entries) => new Map(entries.flat())))

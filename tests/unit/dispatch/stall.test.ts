@@ -1,0 +1,168 @@
+import { describe, expect, test } from "bun:test"
+import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { BunServices } from "@effect/platform-bun"
+import { Effect, Layer } from "effect"
+import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { TestClock } from "effect/testing"
+import { addTask, claimTask, writeTaken } from "../../../packages/run/src/dispatch/backlog"
+import { runBeat } from "../../../packages/run/src/dispatch/beat"
+import { formatBeat } from "../../../packages/run/src/dispatch/board"
+import type { LoadReading } from "../../../packages/run/src/dispatch/load"
+import { taskLabel } from "../../../packages/run/src/dispatch/pueue-status"
+
+const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
+  Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
+
+const withBacklog = async (body: (root: string) => Promise<void>): Promise<void> => {
+  const root = await mkdtemp(join(tmpdir(), "orc-stall-"))
+  try {
+    await body(root)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+}
+
+const spec = { title: "Fix the login page", project: "orc", kind: "ship" as const, internal: false, machine: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the login page\n" }
+
+const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-10-27T10:01:00.000Z" }
+
+const quota = { provider: "keyed", command: ["orc-quota"], accounts: [{ name: "main", tokenFile: "/secrets/main-token" }], floorPercent: 15 }
+
+const quotaReply = JSON.stringify({ schema: "orc.quota.v1", accounts: [{ name: "main", remainingPercent: 80 }] })
+
+const writtenAt = Date.parse("2026-10-27T11:00:00.000Z")
+
+const minutesAfterWrite = (minutes: number): number => writtenAt + minutes * 60 * 1000
+
+type PueueState = { readonly Running: { readonly start: string } } | { readonly Done: { readonly start: string; readonly end: string; readonly result: "Success" } }
+
+const running: PueueState = { Running: { start: "2026-10-27T10:02:00.000Z" } }
+
+const pueueWith = (root: string, state: PueueState): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner> => {
+  const status = JSON.stringify({ tasks: { "11": { id: 11, label: taskLabel(root, "task-1"), group: "orc", path: "/checkout", status: state } } })
+  return Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
+    const real = yield* ChildProcessSpawner.ChildProcessSpawner
+    const reply = (text: string) => real.spawn(ChildProcess.make("sh", ["-c", "cat <<'J'\n" + text + "\nJ"]))
+    return ChildProcessSpawner.make((command) =>
+      ChildProcess.isStandardCommand(command) && command.command === "pueue"
+        ? reply(status)
+        : ChildProcess.isStandardCommand(command) && command.command === "orc-quota" ? reply(quotaReply) : real.spawn(command)
+    )
+  })).pipe(Layer.provide(BunServices.layer))
+}
+
+const unreadLoad = (): Effect.Effect<LoadReading> => Effect.succeed({ kind: "unread", reason: "no load read in a stall test" })
+
+const startTask = async (root: string, start: ReadonlyArray<string>, log: string): Promise<void> => {
+  await writeFile(join(root, "dispatch.json"), JSON.stringify({ machines: [{ name: "mac", slots: 1, start }], quota }))
+  await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: "/checkout" } }] }))
+  await run(addTask(root, spec))
+  await run(claimTask(root, "task-1"))
+  await run(writeTaken(root, { spec: { ...spec, id: "task-1" }, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log } } }))
+}
+
+const touch = async (file: string, at: number): Promise<void> => {
+  await writeFile(file, "output\n")
+  await utimes(file, at / 1000, at / 1000)
+}
+
+const pueueConfig = async (root: string): Promise<Record<string, string>> => {
+  await mkdir(join(root, "pueue", "task_logs"), { recursive: true })
+  await writeFile(join(root, "pueue.yml"), "shared:\n  pueue_directory: " + join(root, "pueue") + "\n")
+  return { PUEUE_CONFIG_PATH: join(root, "pueue.yml") }
+}
+
+const pueueLog = (root: string): string => join(root, "pueue", "task_logs", "11.log")
+
+const beatAt = async (root: string, now: number, env: Record<string, string>, state: PueueState = running): Promise<ReadonlyArray<string>> => {
+  const beat = Effect.gen(function*() {
+    yield* TestClock.setTime(now)
+    return yield* runBeat(root, root, { env, readLoad: unreadLoad })
+  })
+  const report = await Effect.runPromise(beat.pipe(Effect.provide(Layer.mergeAll(BunServices.layer, pueueWith(root, state), TestClock.layer()))))
+  return formatBeat(report).split("\n").filter((line) => line.startsWith("stalled ") || line.startsWith("closed "))
+}
+
+const stalledLine = "stalled task-1 on mac: no output since 2026-10-27T11:00:00.000Z"
+
+describe("a pueue run's stall", () => {
+  test("output 30 minutes old flags the run instead of waiting longer", async () => {
+    await withBacklog(async (root) => {
+      const env = await pueueConfig(root)
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await touch(pueueLog(root), writtenAt)
+      expect(await beatAt(root, minutesAfterWrite(30), env)).toEqual([stalledLine])
+    })
+  })
+  test("output 29 minutes old is not flagged instead of flagging early", async () => {
+    await withBacklog(async (root) => {
+      const env = await pueueConfig(root)
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await touch(pueueLog(root), writtenAt)
+      expect(await beatAt(root, minutesAfterWrite(29), env)).toEqual([])
+    })
+  })
+  test("one stall is flagged once instead of on every beat", async () => {
+    await withBacklog(async (root) => {
+      const env = await pueueConfig(root)
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await touch(pueueLog(root), writtenAt)
+      expect(await beatAt(root, minutesAfterWrite(30), env)).toEqual([stalledLine])
+      expect(await beatAt(root, minutesAfterWrite(40), env)).toEqual([])
+    })
+  })
+  test("new output clears the flag and a second stall flags again instead of staying silent", async () => {
+    await withBacklog(async (root) => {
+      const env = await pueueConfig(root)
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await touch(pueueLog(root), writtenAt)
+      expect(await beatAt(root, minutesAfterWrite(30), env)).toEqual([stalledLine])
+      await touch(pueueLog(root), minutesAfterWrite(35))
+      expect(await beatAt(root, minutesAfterWrite(50), env)).toEqual([])
+      expect(await beatAt(root, minutesAfterWrite(65), env)).toEqual(["stalled task-1 on mac: no output since 2026-10-27T11:35:00.000Z"])
+    })
+  })
+  test("a finished run is closed instead of flagged however old its output", async () => {
+    await withBacklog(async (root) => {
+      const env = await pueueConfig(root)
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await touch(pueueLog(root), writtenAt)
+      const done: PueueState = { Done: { start: "2026-10-27T10:02:00.000Z", end: "2026-10-27T11:00:00.000Z", result: "Success" } }
+      const lines = await beatAt(root, minutesAfterWrite(90), env, done)
+      expect(lines.filter((line) => line.startsWith("stalled "))).toEqual([])
+      expect(lines.filter((line) => line.startsWith("closed "))).toHaveLength(1)
+    })
+  })
+})
+
+describe("a custom start's stall", () => {
+  test("a backlog log 30 minutes old flags the run instead of waiting longer", async () => {
+    await withBacklog(async (root) => {
+      const log = join(root, "logs", "task-1.log")
+      await startTask(root, ["true"], log)
+      await touch(log, writtenAt)
+      expect(await beatAt(root, minutesAfterWrite(30), {})).toEqual([stalledLine])
+    })
+  })
+  test("a backlog log 29 minutes old is not flagged instead of flagging early", async () => {
+    await withBacklog(async (root) => {
+      const log = join(root, "logs", "task-1.log")
+      await startTask(root, ["true"], log)
+      await touch(log, writtenAt)
+      expect(await beatAt(root, minutesAfterWrite(29), {})).toEqual([])
+    })
+  })
+})
+
+describe("a task that has not started", () => {
+  test("is never flagged instead of being read as a silent run", async () => {
+    await withBacklog(async (root) => {
+      await writeFile(join(root, "dispatch.json"), JSON.stringify({ machines: [{ name: "mac", slots: 0, start: ["true"] }], quota }))
+      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: "/checkout" } }] }))
+      await run(addTask(root, spec))
+      expect(await beatAt(root, minutesAfterWrite(600), {})).toEqual([])
+    })
+  })
+})
