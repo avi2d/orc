@@ -65,8 +65,8 @@ const runPi = (run: ReportRun): Effect.Effect<number, OrcRunError, FileSystem.Fi
     const append = (chunk: string): Effect.Effect<void, never, never> =>
       chunk === "" ? Effect.void : fs.writeFileString(logPath, chunk, { flag: "a" }).pipe(Effect.orElseSucceed(() => undefined))
     const [, , exitCode] = yield* Effect.all([
-      handle.stdout.pipe(Stream.decodeText(), Stream.tap(append), Stream.mkString),
-      handle.stderr.pipe(Stream.decodeText(), Stream.tap(append), Stream.mkString),
+      handle.stdout.pipe(Stream.decodeText(), Stream.runForEach(append)),
+      handle.stderr.pipe(Stream.decodeText(), Stream.runForEach(append)),
       handle.exitCode
     ], { concurrency: "unbounded" })
     return exitCode

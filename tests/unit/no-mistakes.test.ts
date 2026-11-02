@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { answerArgsFor, answerForGate, driveNoMistakes, noMistakesBinary, omittedQuestionIds, parseRun, type NoMistakesFinding, type NoMistakesRecord, type NoMistakesRunner } from "../../packages/run/src/no-mistakes"
+import { answerArgsFor, answerForGate, askUserWord, driveNoMistakes, noMistakesBinary, omittedQuestionIds, parseRun, type AllowWord, type NoMistakesFinding, type NoMistakesRecord, type NoMistakesRunner } from "../../packages/run/src/no-mistakes"
 import { formatReport, type OrcRunReport } from "../../packages/run/src/run-record"
 
 const approvalGate = { step: "review", stage: "approval" } as const
@@ -412,15 +412,17 @@ const endedSkippingPr: NoMistakesRunner = {
 }
 
 describe("driveNoMistakes", () => {
-  const driveIn = async (runner: NoMistakesRunner): Promise<{ readonly record: NoMistakesRecord; readonly gate: string }> => {
+  const driveIn = async (runner: NoMistakesRunner, allow: ReadonlyArray<AllowWord> = []): Promise<{ readonly record: NoMistakesRecord; readonly gate: string }> => {
     const dir = await mkdtemp(join(tmpdir(), "orc-gate-"))
     try {
-      const record = await Effect.runPromise(driveNoMistakes({ runner, taskFile: "/task.md", runDir: dir }).pipe(Effect.provide(BunServices.layer)))
+      const record = await Effect.runPromise(driveNoMistakes({ runner, taskFile: "/task.md", runDir: dir, allow }).pipe(Effect.provide(BunServices.layer)))
       return { record, gate: await readFile(join(dir, "gate.log"), "utf8") }
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
   }
+
+  const gateSteps = (gate: string): ReadonlyArray<string | undefined> => gate.trim().split("\n").map((line) => line.split(" ").at(-1))
 
   test("a run that skips the pr step carries the reason no-mistakes gave", async () => {
     const { record } = await driveIn(endedSkippingPr)
@@ -441,6 +443,42 @@ describe("driveNoMistakes", () => {
   test("a parked gate leaves its step in the run folder instead of only in memory", async () => {
     const parkedRunner: NoMistakesRunner = { ...endedFailed, start: () => Effect.succeed({ stdout: parked, stderr: "", exitCode: 0 }) }
     const { gate } = await driveIn(parkedRunner)
-    expect(gate.trim().split("\n").map((line) => line.split(" ").at(-1))).toEqual(["start", "review"])
+    expect(gateSteps(gate)).toEqual(["start", "review"])
+  })
+
+  test("a gate that parks at the same step twice leaves two lines instead of one", async () => {
+    let answered = false
+    const repark: NoMistakesRunner = {
+      ...endedFailed,
+      start: () => Effect.succeed({ stdout: parked, stderr: "", exitCode: 0 }),
+      respond: () => {
+        if (answered) {
+          return Effect.succeed({ stdout: failedRun, stderr: "", exitCode: 0 })
+        }
+        answered = true
+        return Effect.succeed({ stdout: parked, stderr: "", exitCode: 0 })
+      }
+    }
+    const { gate } = await driveIn(repark, [askUserWord])
+    expect(gateSteps(gate)).toEqual(["start", "review", "review"])
+  })
+
+  test("a gate that answers without parking leaves a running line instead of silence", async () => {
+    const waiting = [
+      "run:",
+      "  id: \"01RUN\"",
+      "  branch: orc/test",
+      "  status: running",
+      "  head: abc1234",
+      "  pr: \"\"",
+      "  findings: none"
+    ].join("\n")
+    const waitingRunner: NoMistakesRunner = {
+      ...endedFailed,
+      start: () => Effect.succeed({ stdout: waiting, stderr: "", exitCode: 0 }),
+      reattach: Effect.succeed({ stdout: parked, stderr: "", exitCode: 0 })
+    }
+    const { gate } = await driveIn(waitingRunner)
+    expect(gateSteps(gate)).toEqual(["start", "running", "review"])
   })
 })

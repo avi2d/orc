@@ -337,7 +337,6 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending, nev
   Effect.gen(function*() {
     let sent: Sent = { kind: "start" }
     yield* appendGate(input.runDir, "start")
-    let lastStep = "start"
     let current = yield* input.runner.start(input.taskFile)
     for (;;) {
       const step: CurrentStep = yield* stepCurrent(input, log, sent, current)
@@ -347,12 +346,10 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending, nev
       if (step.kind === "reattach") {
         current = step.command
         sent = { kind: "reattach" }
+        yield* appendGate(input.runDir, "running")
         continue
       }
-      if (step.gate.step !== lastStep) {
-        lastStep = step.gate.step
-        yield* appendGate(input.runDir, step.gate.step)
-      }
+      yield* appendGate(input.runDir, step.gate.step)
       const open = openQuestionsIn(step.parsed.findings, omittedQuestionIds(current.stdout))
       if (open.length > 0) {
         const outcome: OpenOutcome = yield* serveOpenQuestions(input, log, step.gate, open)
