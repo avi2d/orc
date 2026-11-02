@@ -263,4 +263,13 @@ describe("parseArgs run flags", () => {
     expect(parseArgs(["backlog", "hold", "--help"])).toEqual({ kind: "PrintHelp" })
     expect(parseArgs(["backlog", "--help"])).toEqual({ kind: "PrintHelp" })
   })
+  test("merge takes the captain's word by default instead of yolo", () => {
+    expect(parseArgs(["merge", "task-4"])).toEqual({ kind: "Dispatch", args: { kind: "MergeTask", id: "task-4", basis: "captain-word" } })
+    expect(parseArgs(["merge", "task-4", "--basis", "yolo-green"])).toEqual({ kind: "Dispatch", args: { kind: "MergeTask", id: "task-4", basis: "yolo-green" } })
+  })
+  test("merge refuses an unknown basis or a missing task id instead of merging", () => {
+    expect(parseArgs(["merge", "task-4", "--basis", "green"])).toEqual({ kind: "UsageError", detail: "orc merge takes --basis once, with captain-word or yolo-green" })
+    expect(parseArgs(["merge"])).toEqual({ kind: "UsageError", detail: "orc merge takes a task id" })
+    expect(parseArgs(["merge", "https://github.com/acme/orc/pull/8"])).toEqual({ kind: "UsageError", detail: "orc merge takes a task id, got \"https://github.com/acme/orc/pull/8\"" })
+  })
 })

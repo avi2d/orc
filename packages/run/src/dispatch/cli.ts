@@ -8,6 +8,7 @@ import { backlogJson, type BacklogView, beatJson, formatBeat, formatBoard, type 
 import type { ConfigError } from "../json-file"
 import { checkoutOn, type DispatchConfig, readDispatchConfig, readProjects } from "./config"
 import { holdRun } from "./hold"
+import { mergeTask } from "./merge"
 import { taskLabel } from "./pueue-status"
 import { type Command, queueFromText, renewTask, RunnerError, startTask } from "./runner"
 import { formatResult, readResult, readResultThrough, readStdinLabel, runnerJson } from "./runner-result"
@@ -182,7 +183,7 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
-type TaskVerb = Extract<CommandArgs, { readonly kind: "CloseTask" | "MarkPosted" | "HoldTask" | "AnswerTask" }>
+type TaskVerb = Extract<CommandArgs, { readonly kind: "CloseTask" | "MarkPosted" | "HoldTask" | "AnswerTask" | "MergeTask" }>
 
 const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   switch (args.kind) {
@@ -197,6 +198,9 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
     }
     case "AnswerTask": {
       return answerNow(args, place)
+    }
+    case "MergeTask": {
+      return mergeTask(backlogRoot(place), args.id, args.basis)
     }
   }
 }
@@ -216,7 +220,8 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       case "CloseTask":
       case "MarkPosted":
       case "HoldTask":
-      case "AnswerTask": {
+      case "AnswerTask":
+      case "MergeTask": {
         yield* Console.log(yield* taskVerbLine(args, place))
         break
       }

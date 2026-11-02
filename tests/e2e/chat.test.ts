@@ -89,7 +89,7 @@ describe("orc chat", () => {
         "--extension",
         chatToolsPath,
         "--tools",
-        "orc_backlog_add,orc_backlog,orc_backlog_hold,orc_backlog_answer",
+        "orc_backlog_add,orc_backlog,orc_backlog_hold,orc_backlog_answer,merge_task",
         "ORC_CHAT_ORC=" + JSON.stringify([process.execPath, binPath])
       ])
     })

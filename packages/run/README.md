@@ -10,7 +10,7 @@ By default it runs the Pi agent inside a nono sandbox, then runs the project's c
 With `--sandbox none` it runs Pi and the checks directly on the host.
 A `no-mistakes` run hands the branch to no-mistakes, which reviews it, pushes it and opens a PR on a provider it supports, such as GitHub.
 A `direct-PR` run pushes the branch and opens the PR itself, as [Delivery modes](#delivery-modes) shows.
-You read the PR and merge it, since orc never merges.
+You read the PR and land it with `orc merge <task-id>`, as [Merging a task's PR](#merging-a-tasks-pr) shows.
 [The backlog and the beat](#the-backlog-and-the-beat), [Adding tasks from a chat](#adding-tasks-from-a-chat) and [The runner](#the-runner) describe the path a task takes to its run.
 
 ## Before you begin
@@ -419,7 +419,7 @@ A quota that names more than one account when any of them is kind `none` is refu
 { "projects": [{ "name": "orc", "checkouts": { "mac": "/Users/me/code/orc", "linux-box": "/home/me/code/orc" } }] }
 ```
 
-A project may add `"mode"`, as [Delivery modes](#delivery-modes) shows.
+A project may add `"mode"`, as [Delivery modes](#delivery-modes) shows, and `"yolo"`, as [Merging a task's PR](#merging-a-tasks-pr) shows.
 
 To add a task, run `orc backlog add <project> <task-file>`.
 To pipe the task in instead, give `-` as the task file, as in `printf '# Fix the login page\n' | orc backlog add orc -`.
@@ -523,19 +523,41 @@ Orc keeps that body as `pr-body.md` in the run folder and records the step as `p
 The run succeeds with the PR link, so the task closes done with it as `pr` and the chat posts it as it posts any PR.
 A failed check, a failed push or a failed `gh pr create` ends the run failed with no PR, and the task closes failed.
 
+## Merging a task's PR
+
+To land a closed task's PR, run `orc merge <task-id>`.
+Orc reads the PR with `gh pr view` and merges nothing when any of these holds:
+
+- The task names no PR.
+- The PR is closed or merged, not open.
+- A check is red, a check has not reported, or no check has reported at all.
+  Only the newest attempt of each run and check counts, so a cancelled run that re-ran green reads green.
+- The branch is behind its base by the compare API's `behind_by`, so update the branch and let its checks run again.
+
+Each refusal starts `orc merge refused <task-id> and merged nothing` and names every reason.
+Otherwise orc runs `gh pr merge <url> --squash --match-head-commit <sha>` at the head it checked, so a push after the check merges nothing.
+
+A project in `projects.json` may add `"yolo": true`, and a project with no `yolo` reads as `false`.
+Orc refuses any `yolo` other than `true` or `false` with `the project <name> names yolo <value>, which is not true or false`.
+`orc merge` takes `--basis captain-word`, the default, or `--basis yolo-green`.
+The chat merges with `captain-word` only when you said to merge that PR.
+It merges with `yolo-green` when you ask it to merge a yolo project's PR and the PR is green, and orc refuses `yolo-green` for a project without `yolo` true.
+Either basis meets every refusal above.
+
 ## Adding tasks from a chat
 
 To say tasks in a chat instead of writing task files, run `orc chat`.
 It starts Pi on the model `models.orchestrator` names in `config.json`, and refuses to start when it names none.
 When `<ORC_HOME>/orchestrator.md` exists, the chat adds it to Pi's system prompt as the orchestrator's rules.
 Its first line of output names the rules file it loaded, or says it found none.
-The chat's Pi has four tools and no others:
+The chat's Pi has five tools and no others:
 
 - `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project and the task's Markdown.
   It may add a kind, an internal mark, a machine and the ids the task depends on.
 - `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
 - `orc_backlog_hold` holds one new task through `orc backlog hold`, with the reason and an optional date.
 - `orc_backlog_answer` answers a held task through `orc backlog answer`, with your words as you said them, or one parked question when it names the question's id.
+- `merge_task` lands a closed task's PR through `orc merge <task-id> --basis <basis>`, as [Merging a task's PR](#merging-a-tasks-pr) shows.
 
 So a task from the chat enters the backlog the way any other does, and the beat starts it.
 When it starts and every 15 seconds after, the chat reads `orc backlog --json`.
@@ -637,8 +659,10 @@ To print the same facts as JSON, add `--json`, whose document names its version 
 | `src/dispatch/held-token.ts` | The owner-only token folder a run on another machine reads |
 | `src/dispatch/hold.ts` | `orc runner hold`: the wait for a live token, the rerun and the folder removal |
 | `src/dispatch/pueue-status.ts` | The pueue status shapes and the held-task lookup the runner reads |
-| `src/dispatch/args.ts` | The flag parsing for `orc backlog`, `orc beat` and `orc runner` |
-| `src/dispatch/cli.ts` | The `orc backlog`, `orc beat` and `orc runner` commands |
+| `src/dispatch/args.ts` | The flag parsing for `orc backlog`, `orc beat`, `orc runner` and `orc merge` |
+| `src/dispatch/cli.ts` | The `orc backlog`, `orc beat`, `orc runner` and `orc merge` commands |
+| `src/dispatch/merge.ts` | The `orc merge` guard and squash-merge |
+| `src/dispatch/merge-basis.ts` | The `captain-word` and `yolo-green` bases `orc merge` takes |
 | `../../tests/unit` | The in-process unit tests at the workspace root |
 | `../../tests/e2e` | The tests that run `src/bin.ts`, git or nono as a process, with a live Pi run through `ORC_PI_E2E=1`, at the workspace root |
 | `../../tests/fixtures/runner/pueue` | The pueue 4 status JSON the runner tests read |
