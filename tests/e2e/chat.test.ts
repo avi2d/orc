@@ -110,7 +110,7 @@ type ChatHost = Parameters<ReturnType<typeof chatExtension>>[0]
 
 const piFor = (fixture: Fixture, pollMillis: number) => {
   const tools = new Map<string, ChatTool>()
-  const handlers = new Map<string, (ctx?: { isIdle: () => boolean }) => void>()
+  const handlers = new Map<string, (event: string, ctx?: { isIdle: () => boolean }) => void>()
   const sent: Array<{ readonly message: unknown; readonly options: unknown }> = []
   const host: ChatHost = {
     registerTool: (tool) => tools.set(tool.name, tool),
@@ -119,7 +119,7 @@ const piFor = (fixture: Fixture, pollMillis: number) => {
   }
   chatExtension(chatEnv(fixture), pollMillis)(host)
   const add = (params: unknown) => tools.get("orc_backlog_add")?.execute("call-1", params)
-  return { add, sent, fire: (event: string, ctx?: { isIdle: () => boolean }) => handlers.get(event)?.(ctx) }
+  return { add, sent, fire: (event: string, ctx?: { isIdle: () => boolean }) => handlers.get(event)?.(event, ctx) }
 }
 
 const until = async (done: () => boolean, millis: number): Promise<void> => {
@@ -284,7 +284,7 @@ describe("orc chat tools", () => {
       const pi = piFor(fixture, 50)
       await pi.add({ project: "orc", task: "# Fix the typo\n" })
       await closeTask(fixture, "task-1", ranClosing("done", "", "https://github.com/acme/orc/pull/7"))
-      pi.fire("session_start")
+      pi.fire("session_start", { isIdle: () => true })
       await until(() => pi.sent.length > 0, 10_000)
       pi.fire("session_shutdown")
       expect(pi.sent).toEqual([{
@@ -298,7 +298,7 @@ describe("orc chat tools", () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       const pi = piFor(fixture, 50)
       await pi.add({ project: "orc", task: "# Fix the typo\n" })
-      pi.fire("session_start")
+      pi.fire("session_start", { isIdle: () => true })
       pi.fire("session_shutdown")
       await closeTask(fixture, "task-1", ranClosing("done", "", "https://github.com/acme/orc/pull/7"))
       await Bun.sleep(1_000)
@@ -405,17 +405,17 @@ describe("orc chat tools", () => {
       const first = piFor(fixture, 50)
       await first.add({ project: "orc", task: "# Fix the typo\n" })
       await startTask(fixture, "task-1")
-      first.fire("session_start")
+      first.fire("session_start", { isIdle: () => true })
       await Bun.sleep(300)
       first.fire("session_shutdown")
       await finishTask(fixture, "task-1", "https://github.com/acme/orc/pull/7")
       const reopened = piFor(fixture, 50)
-      reopened.fire("session_start")
+      reopened.fire("session_start", { isIdle: () => true })
       await until(() => reopened.sent.length > 0, 10_000)
       await Bun.sleep(500)
       reopened.fire("session_shutdown")
       const again = piFor(fixture, 50)
-      again.fire("session_start")
+      again.fire("session_start", { isIdle: () => true })
       await Bun.sleep(1_000)
       again.fire("session_shutdown")
       expect([first.sent, reopened.sent.map((sent) => sent.message), again.sent]).toEqual([
@@ -431,10 +431,10 @@ describe("orc chat tools", () => {
       const first = piFor(fixture, 50)
       await first.add({ project: "orc", task: "# Fix the typo\n" })
       await startTask(fixture, "task-1")
-      first.fire("session_start")
+      first.fire("session_start", { isIdle: () => true })
       first.fire("session_shutdown")
       const reopened = piFor(fixture, 50)
-      reopened.fire("session_start")
+      reopened.fire("session_start", { isIdle: () => true })
       await Bun.sleep(300)
       await finishTask(fixture, "task-1", "https://github.com/acme/orc/pull/7")
       await until(() => reopened.sent.length > 0, 10_000)

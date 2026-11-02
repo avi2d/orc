@@ -34,7 +34,7 @@ interface SessionStartContext {
 
 interface ChatHost {
   readonly registerTool: (tool: ChatTool) => void
-  readonly on: (event: "session_start" | "session_shutdown", handler: (ctx?: SessionStartContext) => void) => void
+  readonly on: (event: "session_start" | "session_shutdown", handler: (event: string, ctx?: SessionStartContext) => void) => void
   readonly sendMessage: (message: { readonly customType: string; readonly content: string; readonly display: boolean }, options?: { readonly triggerTurn?: boolean }) => void
 }
 
@@ -198,7 +198,7 @@ export const chatToolNames: ReadonlyArray<string> = chatSession({}, () => false,
 export const chatExtension = (env: Env, pollMillis: number) => (pi: ChatHost): void => {
   let stopped = true
   let idle: (() => boolean) | null = null
-  const session = chatSession(env, () => !stopped && (idle?.() ?? true), (text) => {
+  const session = chatSession(env, () => !stopped && (idle?.() ?? false), (text) => {
     pi.sendMessage({ customType: "orc-task-closed", content: text, display: true }, { triggerTurn: false })
   })
   for (const tool of session.tools) {
@@ -206,7 +206,7 @@ export const chatExtension = (env: Env, pollMillis: number) => (pi: ChatHost): v
   }
   let poll: ReturnType<typeof setInterval> | undefined
   let current: Promise<void> | null = null
-  pi.on("session_start", (ctx) => {
+  pi.on("session_start", (_event, ctx) => {
     stopped = false
     idle = ctx?.isIdle ?? null
     const postClosed = () => {

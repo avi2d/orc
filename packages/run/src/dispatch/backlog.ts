@@ -1,4 +1,4 @@
-import { Data, Effect, FileSystem, Option, Schema } from "effect"
+import { Data, Effect, FileSystem, Schema } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { parseTaskFile, renderTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 
@@ -240,8 +240,6 @@ const readClosed = (root: string, id: string): Effect.Effect<TaskRecord, Backlog
     return yield* parseTaskFile(file, "closed", text)
   })
 
-const unposted = (record: TaskRecord): boolean => record.state.kind === "closed" && record.state.postedAt === null
-
 const writePosted = (root: string, id: string, postedAt: string): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
@@ -258,85 +256,8 @@ const writePosted = (root: string, id: string, postedAt: string): Effect.Effect<
     return true
   })
 
-const staleMarkerMs = 5 * 60 * 1000
-
-const markerToken = (): string => String(process.pid) + ":" + crypto.randomUUID()
-
-const reclaimStaleMarker = (
-  fs: FileSystem.FileSystem,
-  mark: string
-): Effect.Effect<boolean, BacklogError> =>
-  Effect.gen(function*() {
-    const info = yield* fs.stat(mark).pipe(
-      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)),
-      Effect.mapError(platformFailure("read " + mark))
-    )
-    if (info === null) {
-      return true
-    }
-    const at = Option.match(info.mtime, { onNone: () => 0, onSome: (date) => date.getTime() })
-    if (Date.now() - at < staleMarkerMs) {
-      return false
-    }
-    const renamed = mark + ".stale." + crypto.randomUUID()
-    const moved = yield* fs.rename(mark, renamed).pipe(
-      Effect.as(true),
-      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(false)),
-      Effect.mapError(platformFailure("read " + mark))
-    )
-    if (!moved) {
-      return true
-    }
-    yield* fs.remove(renamed).pipe(
-      Effect.catchReason("PlatformError", "NotFound", () => Effect.void),
-      Effect.mapError(platformFailure("remove " + renamed))
-    )
-    return true
-  })
-
 export const markPosted = (
   root: string,
   id: string,
   postedAt: string
-): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const folder = backlogPaths(root).folder("closed")
-    const mark = folder + "/." + id + ".posting"
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      if (!unposted(yield* readClosed(root, id))) {
-        return false
-      }
-      const token = markerToken()
-      const scratch = scratchName(folder, id)
-      yield* fs.writeFileString(scratch, token).pipe(Effect.mapError(platformFailure("write " + scratch)))
-      const linked = yield* fs.link(scratch, mark).pipe(
-        Effect.as(true),
-        Effect.catchReason("PlatformError", "AlreadyExists", () => Effect.succeed(false)),
-        Effect.mapError(platformFailure("write " + mark))
-      )
-      yield* fs.remove(scratch).pipe(
-        Effect.catchReason("PlatformError", "NotFound", () => Effect.void),
-        Effect.mapError(platformFailure("remove " + scratch))
-      )
-      if (!linked) {
-        if (yield* reclaimStaleMarker(fs, mark)) {
-          continue
-        }
-        return false
-      }
-      const written = yield* Effect.exit(writePosted(root, id, postedAt))
-      const current = yield* fs.readFileString(mark).pipe(
-        Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)),
-        Effect.mapError(platformFailure("read " + mark))
-      )
-      if (current === token) {
-        yield* fs.remove(mark).pipe(
-          Effect.catchReason("PlatformError", "NotFound", () => Effect.void),
-          Effect.mapError(platformFailure("remove " + mark))
-        )
-      }
-      return yield* written
-    }
-    return false
-  })
+): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> => writePosted(root, id, postedAt)
