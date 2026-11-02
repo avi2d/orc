@@ -2,6 +2,17 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.8.0
+
+Released 2026-11-02.
+
+### Features
+
+- **run:** flag stalled runs and refuse starts on overloaded machines [#71](https://github.com/avi2d/orc/pull/71)
+- **run:** add orc merge for task PRs on captain word or yolo green [#70](https://github.com/avi2d/orc/pull/70)
+- **run:** per-project delivery modes with direct-PR [#69](https://github.com/avi2d/orc/pull/69)
+- **run:** add scout and task kinds that end in a report [#68](https://github.com/avi2d/orc/pull/68)
+
 ## 0.7.0
 
 Released 2026-11-02.
