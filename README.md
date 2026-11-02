@@ -1,12 +1,17 @@
 # orc
 
-Orc takes one task and turns it into one pull request.
-By default it runs the Pi agent in the nono sandbox, then the project checks, then no-mistakes.
+Orc keeps a backlog of agent tasks, starts each on a machine with room, and ends each run in a pull request.
+You add a task with `orc backlog add`, or say it in `orc chat`, which runs Pi on the orchestrator model `config.json` names.
+Each `orc beat` starts the tasks whose dependencies closed done, on a machine with a free slot and an account with room.
+The runner queues each run in pueue on its machine, over SSH for another machine, so the run outlives the beat.
+A run gives one task to the Pi agent, by default in the nono sandbox, then runs the project checks, then no-mistakes, which opens the PR.
 With `--sandbox none` it runs Pi and the checks directly on the host.
+The beat closes the task of each finished runner run done or failed, with its PR link.
 Orc runs only the providers and models its `config.json` names, as the run package README describes.
 This repository is a workspace with one package per area.
 The run package ships the orc command.
-The other packages make up tui-dash, the terminal dashboard of quota, machine, queue and task panels beside it.
+The other packages make up the terminal dashboard, moved in from tui-dash, and its `tui-dash` command.
+It holds the quota, session quota, resources, queues, schedules, dispatch, tasks, alerts and ledger panels.
 A panel package reaches another package only through the schema and ui packages, and `bun run lint` refuses any other import.
 
 ## Before you begin
