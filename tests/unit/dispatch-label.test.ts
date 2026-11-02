@@ -25,7 +25,7 @@ const withBacklog = async (body: (root: string) => Promise<void>): Promise<void>
   }
 }
 
-const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, machine: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
+const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
 
 const projects: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Users/a/orc", linux: "/home/a/orc" } }]
 

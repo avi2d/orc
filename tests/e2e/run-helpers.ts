@@ -6,10 +6,11 @@ import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../packages/run/src/agents"
 import { subprocessNoMistakesRunner, type QuestionAnswer } from "../../packages/run/src/no-mistakes"
+import { subprocessPullRequestOpener } from "../../packages/run/src/direct-pr"
 import { hostGitShim } from "../../packages/run/src/host"
 import { orcCompletionLine } from "../../packages/run/src/pi"
 import { runWithHistory, type SandboxOps } from "../../packages/run/src/run"
-import type { OrcRunReport } from "../../packages/run/src/run-record"
+import type { OrcRunReport, RunDeliverer } from "../../packages/run/src/run-record"
 import { listRuns, openDatabase, type RunRecord } from "../../packages/run/src/run-history"
 
 export const git = (dir: string, args: ReadonlyArray<string>): string => {
@@ -173,8 +174,43 @@ const stubNoMistakes = async (replies: ReadonlyArray<NoMistakesReply>): Promise<
   return { dir, calls }
 }
 
+export const ghPrLink = "https://github.com/o/r/pull/9"
+
+const stubGh = async (): Promise<{ readonly dir: string; readonly calls: string }> => {
+  const dir = await mkdtemp(join(tmpdir(), "orc-gh-stub-"))
+  const calls = join(dir, "calls")
+  await writeFile(calls, "")
+  const script = ["#!/bin/sh", "echo \"$@\" >> \"" + calls + "\"",
+    "if [ \"$1 $2\" = \"pr list\" ]; then exit 0; fi",
+    "if [ \"$1 $2\" = \"pr create\" ]; then echo '" + ghPrLink + "'; exit 0; fi",
+    "echo 'unexpected gh call' >&2", "exit 1"].join("\n") + "\n"
+  await writeFile(join(dir, "gh"), script)
+  await chmod(join(dir, "gh"), 0o755)
+  return { dir, calls }
+}
+
 const unexpectedNoMistakes: ReadonlyArray<NoMistakesReply> = [{ stdout: "", stderr: "unexpected no-mistakes call", exitCode: 1 }]
+
+type DelivererFor = (spawner: ChildProcessSpawner.ChildProcessSpawner["Service"], hostGit: string, pathEnv: string, dir: string) => RunDeliverer
+
+const noMistakesDelivery: DelivererFor = (spawner, hostGit, pathEnv, dir) =>
+  ({ kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv, git: hostGit, worktreeDir: dir }) })
+
 export const runStep = (dir: string, home: string, sandbox: SandboxOps["runAgent"], execCheck: SandboxOps["execCheck"] = unexpectedChecks, nmReplies: ReadonlyArray<NoMistakesReply> = unexpectedNoMistakes, answers: ReadonlyArray<QuestionAnswer> = []): Promise<StepOutcome & { readonly nmCalls: string }> =>
+  runStepWith(dir, home, sandbox, execCheck, nmReplies, answers, noMistakesDelivery, "")
+
+export const runDirectPrStep = async (dir: string, home: string, sandbox: SandboxOps["runAgent"], execCheck: SandboxOps["execCheck"]): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
+  const gh = await stubGh()
+  try {
+    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], (spawner, hostGit, pathEnv, worktreeDir) =>
+      ({ kind: "direct-PR", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }) }), gh.dir + ":")
+    return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
+  } finally {
+    await rm(gh.dir, { recursive: true, force: true })
+  }
+}
+
+const runStepWith = (dir: string, home: string, sandbox: SandboxOps["runAgent"], execCheck: SandboxOps["execCheck"], nmReplies: ReadonlyArray<NoMistakesReply>, answers: ReadonlyArray<QuestionAnswer>, deliver: DelivererFor, extraPath: string): Promise<StepOutcome & { readonly nmCalls: string }> =>
   Effect.runPromise(
     Effect.gen(function*() {
       const fs = yield* FileSystem.FileSystem
@@ -194,7 +230,7 @@ export const runStep = (dir: string, home: string, sandbox: SandboxOps["runAgent
               piSessionDir: path.join(runDir, "session"), hostSessionsDir: path.join(runDir, "sessions"),
               taskPath: path.join(runDir, "task.md"), agent: implementer, fixer, branch: "orc/test", sandbox: "nono", started: "2026-10-19T10:00:00.000Z",
               worktreeDir: dir,
-              noMistakes: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: stub.dir + ":" + (process.env.PATH ?? ""), git: hostGit, worktreeDir: dir }),
+              delivery: deliver(spawner, hostGit, extraPath + stub.dir + ":" + (process.env.PATH ?? ""), dir),
               answers
             }, { runAgent: sandbox, execCheck })
             const runs = yield* listRuns(db)

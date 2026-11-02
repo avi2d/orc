@@ -190,6 +190,30 @@ describe("orc run --sandbox none", () => {
     })
   }, 60_000)
 
+  test("with --delivery direct-PR pushes the branch and opens the PR through gh instead of starting no-mistakes", async () => {
+    await withNoSandboxFixture(async ({ repo, fakeBin, env }) => {
+      const origin = join(fakeBin, "..", "origin.git")
+      git(fakeBin, ["init", "-q", "--bare", origin], env)
+      git(repo, ["remote", "add", "origin", origin], env)
+      const directPrUrl = "https://github.com/o/r/pull/11"
+      await writeScript(join(fakeBin, "gh"), [
+        "echo \"$* @ $(pwd)\" >> \"" + fakeBin + "/gh-calls\"",
+        "if [ \"$1 $2\" = 'pr list' ]; then exit 0; fi",
+        "echo " + directPrUrl
+      ])
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none", "--delivery", "direct-PR"], repo, env)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect(result.stdout).toContain(directPrUrl)
+      const piCwd = (await readFile(join(fakeBin, "pi-cwd"), "utf8")).trim()
+      expect(git(origin, ["log", "orc/test", "--format=%s"], env).split("\n")).toEqual(["add greeting", "task"])
+      const ghCalls = (await readFile(join(fakeBin, "gh-calls"), "utf8")).split("\n").filter((line) => line !== "")
+      expect(ghCalls.map((line) => line.split(" ").slice(0, 2).join(" "))).toEqual(["pr list", "pr create"])
+      expect(ghCalls.every((line) => line.endsWith(" @ " + piCwd))).toBe(true)
+      const nmCalls = await readFile(join(fakeBin, "nm-calls"), "utf8").catch(() => "")
+      expect(nmCalls).not.toContain("axi run")
+    })
+  }, 60_000)
+
   test("without --sandbox the run still takes nono instead of running unsandboxed", async () => {
     await withNoSandboxFixture(async ({ repo, fakeBin, env }) => {
       const result = await runOrc(["run", "task.md", "--branch", "orc/test"], repo, env)

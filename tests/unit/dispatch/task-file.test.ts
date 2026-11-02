@@ -6,7 +6,7 @@ import { parseTaskFile, renderTaskFile, TaskFileError, type TaskRecord } from ".
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
 
-const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, machine: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
+const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
 
 const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-10-27T10:01:00.000Z" }
 
@@ -20,7 +20,7 @@ describe("task files", () => {
     const text = "---\nid: task-7\ntitle: Fix the thing\nproject: orc\nmachine: mac\ndepends_on: [task-3]\ncreated: 2026-10-27T10:00:00.000Z\n---\n# Fix the thing\n\nDo it.\n"
     const record = await run(parseTaskFile("task-7.md", "new", text))
     expect(record).toEqual({
-      spec: { id: "task-7", title: "Fix the thing", project: "orc", kind: "ship", machine: "mac", dependsOn: ["task-3"], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n\nDo it.\n" },
+      spec: { id: "task-7", title: "Fix the thing", project: "orc", kind: "ship", internal: false, machine: "mac", dependsOn: ["task-3"], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n\nDo it.\n" },
       hold: null,
       parked: null,
       state: { kind: "new" }
@@ -54,6 +54,15 @@ describe("task files", () => {
   test("a task file with an unknown kind is refused with the kinds it may take instead of read as ship", async () => {
     const result = await run(Effect.result(parseTaskFile("task-1.md", "new", frontmatter("kind: deploy\n"))))
     expect(Result.isFailure(result) ? result.failure.detail : null).toBe("the kind deploy is not ship, scout or task")
+  })
+  test("an internal ship task keeps its mark through a write and a read instead of reading as unmarked", async () => {
+    const record: TaskRecord = { spec: { ...spec, id: "task-3", internal: true }, hold: null, parked: null, state: { kind: "new" } }
+    const text = renderTaskFile(record)
+    expect(text).toContain("internal: true\n")
+    expect(await run(parseTaskFile("task-3.md", "new", text))).toEqual(record)
+  })
+  test("a task file with no internal line reads as unmarked instead of being refused", async () => {
+    expect((await run(parseTaskFile("task-1.md", "new", frontmatter("")))).spec.internal).toBe(false)
   })
   test("a closed scout keeps its kind and report through a write and a read instead of dropping them", async () => {
     const record: TaskRecord = {

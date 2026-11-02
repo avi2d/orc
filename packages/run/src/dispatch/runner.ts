@@ -8,6 +8,7 @@ import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldT
 import { heldTask, orcGroup, PueueState, PueueStatus, taskLabel, type PueueTask } from "./pueue-status"
 import { parseTaskFile } from "./task-record"
 import { reportKinds } from "../task-kind"
+import { isRunDelivery } from "../delivery"
 import { decodeTokenText, encodeRenewal, encodeSecretJson, LabelArg, RenewRequest, type TokenEncodeError, tokenDocumentNote, tokenFields } from "./token"
 
 export class RunnerError extends Data.TaggedError("RunnerError")<{
@@ -22,6 +23,7 @@ const taskFields = {
   provider: ProviderId,
   body: Schema.String,
   kind: Schema.optional(Schema.Literals(reportKinds)),
+  delivery: Schema.optional(Schema.Literal("direct-PR")),
   branch: Schema.optional(Schema.String.check(Schema.isPattern(/^[A-Za-z0-9._/-]+$/))),
   answers: Schema.optional(Schema.Array(Schema.Struct({
     question: Schema.String.check(Schema.isPattern(/^question-\S+$/)),
@@ -220,7 +222,8 @@ const queueTask = (
     )
     const answers = (request.answers ?? []).flatMap((entry) => ["--answer", entry.question + "=" + entry.answer])
     const kind = request.kind === undefined ? [] : ["--kind", request.kind]
-    const run = [...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...kind, ...answers]
+    const delivery = request.delivery === undefined ? [] : ["--delivery", request.delivery]
+    const run = [...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...kind, ...delivery, ...answers]
     const add = (command: ReadonlyArray<string>) =>
       pueue(["add", "--group", orcGroup, "--label", label, "--working-directory", project, "--print-task-id", "--escape", "--", ...command], { ORC_HOME: home })
     const holdArgs: ReadonlyArray<string> = label === taskLabel(home, request.task) ? [request.task] : [request.task, "--label", label]
@@ -296,8 +299,13 @@ const readRequest = (
         branch: record.parked.branch,
         answers: record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ question: question.id, answer: question.answer.words }])
       }
+    const deliveryWord = env["ORC_TASK_DELIVERY"] ?? "no-mistakes"
+    if (!isRunDelivery(deliveryWord)) {
+      return yield* refuse("orc runner start reads ORC_TASK_DELIVERY as no-mistakes or direct-PR, not " + deliveryWord)
+    }
     const kind = record.spec.kind === "ship" ? {} : { kind: record.spec.kind }
-    const fields = yield* Schema.decodeEffect(Schema.Struct(taskFields))({ task, checkout, provider, body, ...kind, ...resume }).pipe(
+    const delivery = record.spec.kind === "ship" && deliveryWord === "direct-PR" ? { delivery: deliveryWord } : {}
+    const fields = yield* Schema.decodeEffect(Schema.Struct(taskFields))({ task, checkout, provider, body, ...kind, ...delivery, ...resume }).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
     )
     const tokenFile = env["ORC_TASK_TOKEN_FILE"] ?? ""

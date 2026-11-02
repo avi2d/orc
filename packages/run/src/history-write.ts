@@ -1,7 +1,8 @@
 import { Effect } from "effect"
 import type { Database } from "bun:sqlite"
 import type { NoMistakesRecord } from "./no-mistakes"
-import { noMistakesFile, type HistoryRun } from "./run-record"
+import type { DirectPrRecord } from "./direct-pr"
+import { noMistakesFile, prBodyFileName, type HistoryRun } from "./run-record"
 import type { ChecksRoundSummary, OrcRunReport, RecordedFixAttempt } from "./report"
 import { OrcRunError } from "./run-session"
 import { formatHistoryError, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, stepIdFor, updateRun, updateStep } from "./run-history"
@@ -251,6 +252,27 @@ export const recordNoMistakesDone = (db: Database, run: HistoryRun, record: NoMi
     yield* recordEvidence(db, { stepId, direction: "out", path: noMistakesFile(run), kind: "no-mistakes" }).pipe(Effect.mapError(failed("record the no-mistakes evidence in")))
     for (const signal of noMistakesSignals(record)) {
       yield* recordSignal(db, { stepId, name: signal.name, value: signal.value }).pipe(Effect.mapError(failed("record the no-mistakes signals in")))
+    }
+  })
+
+export const recordPullRequestStart = (db: Database, runId: string, started: string): Effect.Effect<void, OrcRunError> =>
+  recordStep(db, { runId, name: "pr", attempt: 1, status: "running", started, agentFile: null, piSessionFile: null }).pipe(
+    Effect.asVoid,
+    Effect.mapError((cause) => historyFailure("record the pr step in", cause))
+  )
+
+export const recordPullRequestDone = (db: Database, run: HistoryRun, record: DirectPrRecord): Effect.Effect<void, OrcRunError> =>
+  Effect.gen(function*() {
+    const failed = (action: string) => (cause: unknown) => historyFailure(action, cause)
+    const status = record.status === "opened" ? "passed" : "failed"
+    const known = yield* stepIdFor(db, run.runId, "pr", 1).pipe(Effect.mapError(failed("read the pr step in")))
+    const stepId = known ?? (yield* recordStep(db, { runId: run.runId, name: "pr", attempt: 1, status, started: record.started, ended: record.ended, agentFile: null, piSessionFile: null }).pipe(Effect.mapError(failed("record the pr step in"))))
+    if (known !== null) {
+      yield* updateStep(db, run.runId, "pr", 1, { status, ended: record.ended }).pipe(Effect.mapError(failed("record the pr step in")))
+    }
+    yield* recordEvidence(db, { stepId, direction: "in", path: run.path.join(run.runDir, prBodyFileName), kind: "pr-body" }).pipe(Effect.mapError(failed("record the pr evidence in")))
+    if (record.prLink !== null) {
+      yield* recordSignal(db, { stepId, name: "pr-link", value: record.prLink }).pipe(Effect.mapError(failed("record the pr signals in")))
     }
   })
 

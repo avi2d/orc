@@ -126,6 +126,7 @@ const add = (args: Extract<CommandArgs, { readonly kind: "AddTask" }>, place: Di
       title,
       project: project.name,
       kind: args.taskKind,
+      internal: args.internal,
       machine: args.machine,
       dependsOn: args.dependsOn,
       created,
@@ -133,7 +134,7 @@ const add = (args: Extract<CommandArgs, { readonly kind: "AddTask" }>, place: Di
     })
     yield* Console.log(
       "added " + record.spec.id + " for " + project.name + (args.machine === null ? "" : " on " + args.machine) +
-        (record.spec.kind === "ship" ? "" : " as a " + record.spec.kind)
+        (record.spec.kind === "ship" ? "" : " as a " + record.spec.kind) + (record.spec.internal ? " marked internal" : "")
     )
   })
 

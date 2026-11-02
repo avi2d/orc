@@ -13,6 +13,7 @@ export type DispatchArgs =
     readonly project: string
     readonly task: TaskSource
     readonly taskKind: TaskKind
+    readonly internal: boolean
     readonly machine: string | null
     readonly dependsOn: ReadonlyArray<string>
   }
@@ -30,7 +31,7 @@ export type DispatchArgs =
   | { readonly kind: "UsageError"; readonly detail: string }
 
 export const dispatchUsage =
-  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task>] [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog posted <task-id> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] | orc backlog answer <task-id> <words|question-id=text> | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>]"
+  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task>] [--internal] [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog posted <task-id> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] | orc backlog answer <task-id> <words|question-id=text> | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>]"
 
 const parseJsonFlag = (rest: ReadonlyArray<string>, json: (json: boolean) => DispatchArgs): DispatchArgs => {
   if (rest.length === 0) {
@@ -48,14 +49,24 @@ type AddFlag = typeof addFlags[number]
 const isAddFlag = (token: string): token is AddFlag => addFlags.some((flag) => flag === token)
 
 type AddWords =
-  | { readonly kind: "words"; readonly kept: ReadonlyArray<string>; readonly values: Readonly<Record<AddFlag, ReadonlyArray<string>>> }
+  | {
+    readonly kind: "words"
+    readonly kept: ReadonlyArray<string>
+    readonly values: Readonly<Record<AddFlag, ReadonlyArray<string>>>
+    readonly internal: boolean
+  }
   | { readonly kind: "missing"; readonly flag: AddFlag }
 
 const splitAdd = (rest: ReadonlyArray<string>): AddWords => {
   const kept: Array<string> = []
   const values: Record<AddFlag, Array<string>> = { "--kind": [], "--machine": [], "--depends-on": [] }
+  let internal = false
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index] ?? ""
+    if (token === "--internal") {
+      internal = true
+      continue
+    }
     if (!isAddFlag(token)) {
       kept.push(token)
       continue
@@ -67,7 +78,7 @@ const splitAdd = (rest: ReadonlyArray<string>): AddWords => {
     values[token].push(value)
     index += 1
   }
-  return { kind: "words", kept, values }
+  return { kind: "words", kept, values, internal }
 }
 
 const addTaskKind = (words: ReadonlyArray<string>): { readonly kind: "kind"; readonly taskKind: TaskKind } | { readonly kind: "refused"; readonly detail: string } => {
@@ -87,6 +98,9 @@ const parseAdd = (rest: ReadonlyArray<string>): DispatchArgs => {
   if (taskKind.kind === "refused") {
     return { kind: "UsageError", detail: taskKind.detail }
   }
+  if (split.internal && taskKind.taskKind !== "ship") {
+    return { kind: "UsageError", detail: "orc backlog add takes --internal only for a ship task" }
+  }
   if (split.values["--machine"].length > 1) {
     return { kind: "UsageError", detail: "orc backlog add takes one --machine" }
   }
@@ -96,7 +110,7 @@ const parseAdd = (rest: ReadonlyArray<string>): DispatchArgs => {
   }
   const [project = "", taskFile = ""] = split.kept
   const task: TaskSource = taskFile === "-" ? { kind: "stdin" } : { kind: "file", path: taskFile }
-  return { kind: "AddTask", project, task, taskKind: taskKind.taskKind, machine, dependsOn: split.values["--depends-on"] }
+  return { kind: "AddTask", project, task, taskKind: taskKind.taskKind, internal: split.internal, machine, dependsOn: split.values["--depends-on"] }
 }
 
 const parseClose = (rest: ReadonlyArray<string>): DispatchArgs => {

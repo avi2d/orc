@@ -8,7 +8,8 @@ A run takes one task from `orc run` and a task file.
 It makes an isolated copy of the project on a new branch.
 By default it runs the Pi agent inside a nono sandbox, then runs the project's checks.
 With `--sandbox none` it runs Pi and the checks directly on the host.
-It hands the branch to no-mistakes, which reviews it, pushes it and opens a PR on a provider it supports, such as GitHub.
+A `no-mistakes` run hands the branch to no-mistakes, which reviews it, pushes it and opens a PR on a provider it supports, such as GitHub.
+A `direct-PR` run pushes the branch and opens the PR itself, as [Delivery modes](#delivery-modes) shows.
 You read the PR and merge it, since orc never merges.
 [The backlog and the beat](#the-backlog-and-the-beat), [Adding tasks from a chat](#adding-tasks-from-a-chat) and [The runner](#the-runner) describe the path a task takes to its run.
 
@@ -19,7 +20,7 @@ You read the PR and merge it, since orc never merges.
 - nono from https://nono.sh, tested on 0.80.0, for the default sandbox.
 - Node, tested on 24.22.1.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with the login, token file or Pi packages each provider in [Configuring providers](#configuring-providers) takes.
-- no-mistakes v1.90.0 or later, tested on v1.100.2, installed as [Installing no-mistakes](#installing-no-mistakes) says.
+- no-mistakes v1.90.0 or later, tested on v1.100.2, installed as [Installing no-mistakes](#installing-no-mistakes) says, for every run except `direct-PR`.
 
 ## Install
 
@@ -73,6 +74,7 @@ An unknown flag prints the usage text and exits 1.
 ## Running a task
 
 A `ship` run is the default kind.
+To open its pull request without no-mistakes, add `--delivery direct-PR`, as [Delivery modes](#delivery-modes) shows.
 To run one, enter a clean git checkout of the target project and run `orc run <task-file>`.
 For a `scout` or `task` report instead, add `--kind scout` or `--kind task` with `--sandbox none`, as [Task kinds](#task-kinds) shows.
 Before the first ship task, add a `.no-mistakes.yaml` file to the target project root with at least one named check under `commands`.
@@ -87,10 +89,11 @@ Orc refuses a checkout with uncommitted changes.
 Orc commits to a new branch named `orc/<run-id>`, or to the name you pass with `--branch <name>`.
 A branch name may hold only letters, digits, `.`, `_`, `-` and `/`.
 To resume the branch after a stop, enter the same target checkout and run `orc run --branch <name>` and orc skips the steps the run history marks passed.
+To resume a direct-PR run, add `--delivery direct-PR` to that resume command, and a resume without it runs no-mistakes.
 Resume takes the sandbox the earlier run recorded, so a no-sandbox run resumes without a sandbox with no flag.
 Orc refuses a resume whose `--sandbox` names another kind than the one recorded.
 A run recorded before orc stored the sandbox takes it from the flag, with nono as the default.
-On resume Sandcastle reuses the branch worktree, Pi resumes its prior session, and orc reattaches to no-mistakes with the same intent.
+On resume Sandcastle reuses the branch worktree and Pi resumes its prior session, and a `no-mistakes` run reattaches to no-mistakes with the same intent.
 After a refusal, run the same resume command with `--allow` and the name from the report, or with `--answer` and your answer for a question.
 No-mistakes takes the word for that `--allow` kind, and the answer for that question.
 Orc also refuses a checkout whose own git config sets any key outside a short list known to run no program.
@@ -99,9 +102,9 @@ Orc trims padding around each name and drops blank entries.
 Orc checks each marker in the project directory and its parent and refuses a checkout carrying one.
 An unset `ORC_REFUSE_MARKERS` names no marker and refuses no checkout for a marker.
 
-The default sandbox run needs `git`, `nono`, `pi`, `node` and `no-mistakes` on the host PATH.
+The default sandbox run needs `git`, `nono`, `pi` and `node` on the host PATH, and a run except `direct-PR` needs `no-mistakes` there too.
 With `--sandbox none` the run needs the same tools except `nono`.
-Orc runs `no-mistakes --version` before the sandbox starts and refuses a release older than v1.90.0.
+For every run except `direct-PR`, orc runs `no-mistakes --version` before the sandbox starts and refuses a release older than v1.90.0.
 On a provider that takes a Pi login, the run also needs that login in Pi, which `pi auth check --provider <id>` confirms.
 With the default sandbox, orc reads that login through Pi on the host and hands it to the sandbox.
 nono reads it with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE` and `TERM` set, and orc's check runs the same way.
@@ -130,21 +133,23 @@ That refusal applies to both sandboxes.
 With `--sandbox none` on a Pi login provider, Pi reads your Pi config, compaction included, so the fixed mark does not apply.
 On a token file or package provider Pi reads the run's own Pi folder, so the mark applies there too.
 
-Once the checks pass, orc runs `no-mistakes axi run` on the branch with the task as its intent.
+Once the checks pass, a `no-mistakes` run runs `no-mistakes axi run` on the branch with the task as its intent.
+A `direct-PR` run pushes the branch and opens the PR instead, as [Delivery modes](#delivery-modes) shows.
 At each gate orc asks no-mistakes to fix the findings marked `auto-fix`, ignores those marked `no-op`, and accepts the fix review.
 Orc refuses a no-mistakes gate holding an open review question without an `--answer` for that question.
 Rerun with `--answer question-<id>="<text>"` and orc answers every open question before any gate response.
 Orc refuses a no-mistakes gate holding an `ask-user` finding without `--allow ask-user`.
 Orc leaves that no-mistakes gate parked for you to answer.
 
-Orc records the run as succeeded only when four facts hold.
+Orc records a `no-mistakes` run as succeeded only when four facts hold.
 Pi's final reply in its captured session stopped cleanly with `ORC_COMPLETE` on its own line.
 The branch holds at least one new commit.
 The project's checks pass.
 no-mistakes opened the PR and reported CI green.
+A `direct-PR` run succeeds once the first three facts hold and its pull request opens, as [Delivery modes](#delivery-modes) shows.
 Otherwise orc records the run as failed with the reason and exits 1.
 Each run keeps its task, evidence, agent log and Pi session in `$ORC_HOME/runs/<run-id>`, default `~/.orc/runs/<run-id>` when `ORC_HOME` is unset or empty.
-Its `no-mistakes.txt` and the run history hold the no-mistakes findings, their count, the gates orc answered, the final result and the PR link.
+On a `no-mistakes` run, its `no-mistakes.txt` and the run history hold the no-mistakes findings, their count, the gates orc answered, the final result and the PR link.
 They also name the reviewer that served the review, as `axi status` gives it in `reviewer_agent`, or say no-mistakes named none.
 Its `report.md` carries the task, the branch, the status, the PR, the steps, the evidence, the signals, the findings and the result.
 The terminal report names the run folder, the agent file, the session file and the report as full links, beside the PR link.
@@ -414,11 +419,14 @@ A quota that names more than one account when any of them is kind `none` is refu
 { "projects": [{ "name": "orc", "checkouts": { "mac": "/Users/me/code/orc", "linux-box": "/home/me/code/orc" } }] }
 ```
 
+A project may add `"mode"`, as [Delivery modes](#delivery-modes) shows.
+
 To add a task, run `orc backlog add <project> <task-file>`.
 To pipe the task in instead, give `-` as the task file, as in `printf '# Fix the login page\n' | orc backlog add orc -`.
 It reads stdin to its end and refuses a terminal.
 Add `--machine <name>` to run the task on that machine only, and `--depends-on <task-id>` once per task it waits for.
 Add `--kind scout` or `--kind task` for a task that ends in a report instead of a PR, as [Task kinds](#task-kinds) shows.
+Add `--internal` to mark a ship task internal-only, which only a `no-mistakes-prod-only` project reads.
 To see the backlog, run `orc backlog`.
 It prints the new, taken and closed tasks side by side with the project list and each machine's busy slots beside them.
 To print the same facts as JSON, run `orc backlog --json`, whose document names its version first as `orc.backlog.v1`.
@@ -444,7 +452,7 @@ Holding a held task again keeps the first reason.
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
 After the claim survives a recount, the beat writes the task started before it runs the start command.
 A task marked for a machine waits for a slot on that machine and never starts on another.
-The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT` and `ORC_TASK_TOKEN_FILE`.
+The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_DELIVERY`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT` and `ORC_TASK_TOKEN_FILE`.
 `ORC_TASK_TOKEN_FILE` is the account's token file path, never the token.
 On a token command account it is empty, and the start command reads the token as `orc.token.v1` on standard input instead.
 On a kind `none` account it is empty, and the beat sends nothing on standard input, so a custom start command must not feed it input.
@@ -496,6 +504,25 @@ The beat prints the report path in its `closed` line.
 The chat posts it where a shipped task posts its PR, as in `task-1 Map the parser closed done: the run wrote its report, report /home/me/.orc/runs/<run-id>/agent-report.md`.
 A scout or task marked for a machine waits for room there as any task does.
 
+## Delivery modes
+
+A project's `mode` in `projects.json` is `no-mistakes`, `direct-PR` or `no-mistakes-prod-only`, and a project with no `mode` reads as `no-mistakes`.
+Orc refuses any other mode with `the project <name> names the mode <word>, which is not no-mistakes, direct-PR or no-mistakes-prod-only`.
+The mode decides only how a ship task ends, and a scout or task ignores it.
+
+The beat turns the mode and the task's `internal` mark into the run's delivery and sets `ORC_TASK_DELIVERY` to `no-mistakes` or `direct-PR`.
+A `no-mistakes-prod-only` project gives `direct-PR` to a task marked `internal: true` and `no-mistakes` to the rest.
+`orc runner start` reads a missing `ORC_TASK_DELIVERY` as `no-mistakes` and queues a `direct-PR` ship run as `orc run <task-file> --delivery direct-PR`.
+
+A `direct-PR` run never starts no-mistakes and does not need it installed.
+Once the checks pass, it runs `git push --set-upstream origin <branch>` from the run's worktree.
+It reuses the open PR for the branch when `gh pr list --head <branch> --state open` finds one, and otherwise runs `gh pr create`.
+The PR's title is the head commit's subject, and its body lists the branch's commits and the checks that passed.
+To resume a direct-PR run, add `--delivery direct-PR` to the resume command, and a resume without it runs no-mistakes.
+Orc keeps that body as `pr-body.md` in the run folder and records the step as `pr`.
+The run succeeds with the PR link, so the task closes done with it as `pr` and the chat posts it as it posts any PR.
+A failed check, a failed push or a failed `gh pr create` ends the run failed with no PR, and the task closes failed.
+
 ## Adding tasks from a chat
 
 To say tasks in a chat instead of writing task files, run `orc chat`.
@@ -504,7 +531,8 @@ When `<ORC_HOME>/orchestrator.md` exists, the chat adds it to Pi's system prompt
 Its first line of output names the rules file it loaded, or says it found none.
 The chat's Pi has four tools and no others:
 
-- `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project, the task's Markdown, an optional kind, an optional machine and the ids it depends on.
+- `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project and the task's Markdown.
+  It may add a kind, an internal mark, a machine and the ids the task depends on.
 - `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
 - `orc_backlog_hold` holds one new task through `orc backlog hold`, with the reason and an optional date.
 - `orc_backlog_answer` answers a held task through `orc backlog answer`, with your words as you said them, or one parked question when it names the question's id.

@@ -1,6 +1,7 @@
 import { Effect, type FileSystem, Schema } from "effect"
 import { AbsolutePath, ConfigError, duplicateOf, readJsonFile } from "../json-file"
 import { ProviderId } from "../orc-config"
+import { type DeliveryMode, isDeliveryMode, unknownMode } from "../delivery"
 
 const namePattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 
@@ -67,16 +68,28 @@ export type DispatchConfig = Omit<typeof DispatchEnvelope.Type, "quota"> & {
   }
 }
 
-const Project = Schema.Struct({
+const RawProject = Schema.Struct({
   name: Name,
-  checkouts: Schema.Record(Name, AbsolutePath)
+  checkouts: Schema.Record(Name, AbsolutePath),
+  mode: Schema.optionalKey(Schema.String)
 })
-export type Project = typeof Project.Type
+type RawProject = typeof RawProject.Type
+export type Project = Omit<RawProject, "mode"> & { readonly mode?: DeliveryMode }
+
+export const modeOf = (project: Project): DeliveryMode => project.mode ?? "no-mistakes"
+
+const checkedMode = (project: RawProject): Project | null => {
+  const { mode, ...rest } = project
+  if (mode === undefined) {
+    return rest
+  }
+  return isDeliveryMode(mode) ? { ...rest, mode } : null
+}
 
 export const checkoutOn = (project: Project, machine: string): string | null =>
   Object.hasOwn(project.checkouts, machine) ? (project.checkouts[machine] ?? null) : null
 
-const ProjectsFile = Schema.Struct({ projects: Schema.Array(Project) })
+const ProjectsFile = Schema.Struct({ projects: Schema.Array(RawProject) })
 
 const accountName = (entry: unknown): string | null =>
   typeof entry === "object" && entry !== null && "name" in entry && typeof entry.name === "string" && entry.name !== "" ? entry.name : null
@@ -136,12 +149,18 @@ export const readProjects = (
         return Effect.fail(new ConfigError({ file, detail: "the project " + duplicate + " is named twice" }))
       }
       const known = new Set(machines.map((machine) => machine.name))
+      const checked: Array<Project> = []
       for (const project of projects) {
         const unknown = Object.keys(project.checkouts).find((machine) => !known.has(machine))
         if (unknown !== undefined) {
           return Effect.fail(new ConfigError({ file, detail: "the project " + project.name + " names the unknown machine " + unknown }))
         }
+        const moded = checkedMode(project)
+        if (moded === null) {
+          return Effect.fail(new ConfigError({ file, detail: unknownMode(project.name, project.mode ?? "") }))
+        }
+        checked.push(moded)
       }
-      return Effect.succeed(projects)
+      return Effect.succeed(checked)
     })
   )

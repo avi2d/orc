@@ -88,7 +88,7 @@ const historyFor = (runId: string, home: string, projectDir: string, started: st
       taskPath: path.join(runDir, "task.md"),
       agent: implementer, fixer, branch: "orc/sample", sandbox: "none", started,
       worktreeDir: projectDir,
-      noMistakes: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git, worktreeDir: projectDir }),
+      delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git, worktreeDir: projectDir }) },
       allow: [], answers: []
     }
     return run
@@ -188,7 +188,7 @@ describe("a handover written after no-mistakes", () => {
           status: () => Effect.die("no status check in this test"),
           logs: () => Effect.die("no logs in this test")
         }
-        const report = await Effect.runPromise(runWithHistory(db, { ...run, noMistakes: fixedAfterLoop }, {
+        const report = await Effect.runPromise(runWithHistory(db, { ...run, delivery: { kind: "no-mistakes", runner: fixedAfterLoop } }, {
           runAgent: async () => ({
             iterations: [{ sessionId: "long-nm" }],
             stdout: "",

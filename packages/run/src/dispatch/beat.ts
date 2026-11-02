@@ -2,6 +2,7 @@ import { DateTime, Duration, Effect, type FileSystem, Option, type Path, Stream 
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimUnheld, closeStartedTask, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken } from "./backlog"
 import { parkStartedTask } from "./parked"
+import type { RunDelivery } from "../delivery"
 import type { ConfigError } from "../json-file"
 import { type Account, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "./config"
 import { type MachineRoom, placeTask, readRoom, taskWait } from "./beat-place"
@@ -101,6 +102,7 @@ const startTask = (
   task: TaskRecord,
   claim: Claim,
   checkout: string,
+  delivery: RunDelivery,
   machine: Machine,
   credential: Credential
 ): Effect.Effect<BeatAction, BacklogError | TaskFileError, BeatRequirements> =>
@@ -119,6 +121,7 @@ const startTask = (
       ORC_TASK_FILE: backlogPaths(root).taskFile("taken", task.spec.id),
       ORC_TASK_PROJECT: task.spec.project,
       ORC_TASK_CHECKOUT: checkout,
+      ORC_TASK_DELIVERY: delivery,
       ORC_TASK_MACHINE: machine.name,
       ORC_TASK_PROVIDER: credential.provider,
       ORC_TASK_ACCOUNT: claim.account,
@@ -227,7 +230,7 @@ const considerTask = (
       slot.busy += 1
     }
     const claim: Claim = { beat: context.beat, machine: placement.machine.name, account: context.account.name, takenAt: yield* nowIso }
-    const action = yield* startTask(context.root, claimed.record, claim, placement.checkout, placement.machine, credential)
+    const action = yield* startTask(context.root, claimed.record, claim, placement.checkout, placement.delivery, placement.machine, credential)
     if (slot !== undefined) {
       if (action.kind === "given-back") {
         slot.busy = slot.slots

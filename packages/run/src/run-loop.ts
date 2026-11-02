@@ -5,9 +5,10 @@ import { buildFixPrompt, maxFixAttempts, readChecksCommands, runChecksRound, typ
 import { branchCommits, runGit } from "./git-run"
 import { buildImplementPrompt, finalReplyError, orcCompletionLine, piWithTools, sessionPrintedSignal, type PiTokenUse } from "./pi"
 import { OrcRunError, describeCause, noSession, readSession } from "./run-session"
-import { driveNoMistakes, type AllowWord, type QuestionAnswer } from "./no-mistakes"
+import { driveNoMistakes, type AllowWord, type NoMistakesRecord, type QuestionAnswer } from "./no-mistakes"
+import { type DirectPrRecord, openDirectPr, type PullRequestOpener } from "./direct-pr"
 import { countSessionSize, handoverImplementPrompt, type LongSessionCounts } from "./long-session"
-import type { ChecksRoundSummary, HistoryRun, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./run-record"
+import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 
 export interface SandboxOps {
   readonly runAgent: (agent: AgentProvider, prompt: string, logFile: string, resumeSession?: string) => Promise<SandboxRunResult>
@@ -48,7 +49,9 @@ export interface RunCheckpoints {
   readonly fixStart: (attempt: number, started: string) => Effect.Effect<void, OrcRunError>
   readonly fixDone: (fix: RecordedFixAttempt) => Effect.Effect<void, OrcRunError>
   readonly noMistakesStart: (started: string) => Effect.Effect<void, OrcRunError>
-  readonly noMistakesDone: (record: import("./no-mistakes").NoMistakesRecord) => Effect.Effect<void, OrcRunError>
+  readonly noMistakesDone: (record: NoMistakesRecord) => Effect.Effect<void, OrcRunError>
+  readonly pullRequestStart: (started: string) => Effect.Effect<void, OrcRunError>
+  readonly pullRequestDone: (record: DirectPrRecord) => Effect.Effect<void, OrcRunError>
 }
 
 const collectCommits = (
@@ -205,20 +208,46 @@ const readProjectChecks = (run: HistoryRun): Effect.Effect<ReadonlyArray<ChecksC
 
 const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
-    yield* checkpoints.noMistakesStart(new Date().toISOString())
-    const noMistakes = yield* driveNoMistakes({ runner: run.noMistakes, taskFile: run.taskPath, allow, answers })
-    yield* checkpoints.noMistakesDone(noMistakes)
-    return {
-      ...base,
-      commits,
-      completed: noMistakes.status === "passed",
-      checksRounds: rounds,
-      fixes,
-      fixAttempts: fixes.length,
-      prLink: noMistakes.prLink,
-      noMistakes,
-      endReason: "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + ", and the checks passed. " + noMistakes.result
+    const checked = "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + ", and the checks passed. "
+    const settled = { ...base, commits, checksRounds: rounds, fixes, fixAttempts: fixes.length }
+    if (run.delivery.kind === "direct-PR") {
+      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints)
+      return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: checked + pr.result }
     }
+    yield* checkpoints.noMistakesStart(new Date().toISOString())
+    const noMistakes = yield* driveNoMistakes({ runner: run.delivery.runner, taskFile: run.taskPath, allow, answers })
+    yield* checkpoints.noMistakesDone(noMistakes)
+    return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
+  })
+
+const prBody = (subjects: ReadonlyArray<string>, rounds: ReadonlyArray<ChecksRoundSummary>): string => {
+  const passed = rounds.at(-1)?.checks.map((check) => check.name) ?? []
+  const closing = "orc opened this PR after " + (passed.length === 0 ? "the checks" : passed.join(", ")) + " passed, without no-mistakes.\n"
+  return subjects.length === 0 ? closing : subjects.map((subject) => "- " + subject).join("\n") + "\n\n---\n\n" + closing
+}
+
+const openPullRequest = (
+  run: HistoryRun,
+  opener: PullRequestOpener,
+  rounds: ReadonlyArray<ChecksRoundSummary>,
+  checkpoints: RunCheckpoints
+): Effect.Effect<DirectPrRecord, OrcRunError> =>
+  Effect.gen(function*() {
+    yield* checkpoints.pullRequestStart(new Date().toISOString())
+    const head = yield* runGit(run.spawner, run.git, ["log", "-1", "--format=%s", run.branch], run.worktreeDir).pipe(
+      Effect.map((logged) => logged.stdout.trim()),
+      Effect.orElseSucceed(() => "")
+    )
+    const listed = yield* branchCommits(run.spawner, run.git, run.branch, run.projectDir).pipe(Effect.orElseSucceed(() => [] as Array<OrcRunCommit>))
+    const subjects = listed.map((commit) => commit.subject.trim()).filter((subject) => subject !== "")
+    const bodySubjects = subjects.length > 0 ? subjects : (head !== "" ? [head] : [])
+    const bodyFile = run.path.join(run.runDir, prBodyFileName)
+    yield* run.fs.writeFileString(bodyFile, prBody(bodySubjects, rounds)).pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + bodyFile + ": " + String(cause) }))
+    )
+    const pr = yield* openDirectPr(opener, run.branch, head !== "" ? head : run.branch, bodyFile)
+    yield* checkpoints.pullRequestDone(pr)
+    return pr
   })
 
 type ImplementBase = Parameters<typeof finishAfterChecks>[1]

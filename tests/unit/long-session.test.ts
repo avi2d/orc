@@ -242,7 +242,7 @@ const historyFor = (runId: string, home: string, projectDir: string, started: st
       taskPath: path.join(runDir, "task.md"),
       agent: implementer, fixer, branch: "orc/sample", sandbox: "none", started,
       worktreeDir: projectDir,
-      noMistakes: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git, worktreeDir: projectDir }),
+      delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git, worktreeDir: projectDir }) },
       allow: [], answers: []
     }
     return run
