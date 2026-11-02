@@ -2,6 +2,7 @@ import * as BunChildProcessSpawner from "@effect/platform-bun/BunChildProcessSpa
 import * as BunFileSystem from "@effect/platform-bun/BunFileSystem"
 import * as BunPath from "@effect/platform-bun/BunPath"
 import { Data, Effect, Layer, Schema } from "effect"
+import { ParkedJson, parkedListing } from "./chat-parked"
 import { capture } from "./dispatch/runner"
 
 export const orcCommandVar = "ORC_CHAT_ORC"
@@ -27,11 +28,13 @@ export interface ChatSession {
   readonly tools: ReadonlyArray<ChatTool>
   readonly postClosed: () => Promise<void>
   readonly postHeld: () => Promise<boolean>
+  readonly postParked: () => Promise<void>
+  readonly listParkedAgain: () => void
 }
 
-type PostKind = "closed" | "held"
+type PostKind = "closed" | "held" | "parked"
 
-const postTypes = { closed: "orc-task-closed", held: "orc-held-decision" } as const satisfies Record<PostKind, string>
+const postTypes = { closed: "orc-task-closed", held: "orc-held-decision", parked: "orc-parked-question" } as const satisfies Record<PostKind, string>
 
 interface SessionStartContext {
   readonly isIdle: () => boolean
@@ -67,7 +70,8 @@ const HoldInput = Schema.Struct({
 })
 
 const AnswerInput = Schema.Struct({
-  id: Schema.String.annotate({ description: "The id of the held task" }),
+  id: Schema.String.annotate({ description: "The id of the held or parked task" }),
+  question: Schema.optionalKey(Schema.String.annotate({ description: "The id of the parked question the captain answers, such as question-4; leave it out for a held task" })),
   words: Schema.String.annotate({ description: "The captain's answer, word for word" })
 })
 
@@ -91,7 +95,13 @@ const HoldJson = Schema.Struct({
   answer: Schema.NullOr(Schema.Struct({ words: Schema.String, at: Schema.String }))
 })
 
-const OpenTask = Schema.Struct({ id: Schema.String, title: Schema.String, status: Schema.Literals(["new", "taken", "started"]), hold: Schema.NullOr(HoldJson) })
+const OpenTask = Schema.Struct({
+  id: Schema.String,
+  title: Schema.String,
+  status: Schema.Literals(["new", "taken", "started"]),
+  hold: Schema.NullOr(HoldJson),
+  parked: Schema.NullOr(ParkedJson)
+})
 type OpenTask = typeof OpenTask.Type
 type BacklogTask = ClosedTask | OpenTask
 
@@ -311,15 +321,20 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
     },
     {
       name: "orc_backlog_answer",
-      label: "Answer a held orc task",
-      description: "Records the captain's words on a held task through orc backlog answer, word for word, which releases it for the next beat.",
+      label: "Answer a held or parked orc task",
+      description:
+        "Records the captain's words through orc backlog answer, word for word. On a held task it releases the task for the next beat. On a parked task it answers the one question named, and the beat resumes the run on its branch once every question is answered.",
       parameters: Schema.toJsonSchemaDocument(AnswerInput).schema,
-      execute: (_toolCallId, params) => runTool(AnswerInput, "orc_backlog_answer", params, env, (input) => ["backlog", "answer", input.id, input.words])
+      execute: (_toolCallId, params) =>
+        runTool(AnswerInput, "orc_backlog_answer", params, env, (input) =>
+          ["backlog", "answer", input.id, input.question === undefined ? input.words : input.question + "=" + input.words])
     }
   ]
   const postClosed = postUnposted(env, isOpen, deliver, state)
   const postHeld = postOpenHeld(env, deliverAs("held"), state)
-  return { tools, postClosed: () => Effect.runPromise(postClosed), postHeld: () => Effect.runPromise(postHeld) }
+  const parked = parkedListing(readBacklog(env).pipe(Effect.map((backlog) => backlog.tasks)), deliverAs("parked"))
+  const postParked = () => Effect.runPromise(parked.post)
+  return { tools, postClosed: () => Effect.runPromise(postClosed), postHeld: () => Effect.runPromise(postHeld), postParked, listParkedAgain: parked.forget }
 }
 
 export const chatToolNames: ReadonlyArray<string> = chatSession({}, () => false, () => undefined).tools.map((tool) => tool.name)
@@ -346,11 +361,12 @@ export const chatExtension = (env: Env, pollMillis: number) => (pi: ChatHost): v
     stopped = false
     idle = ctx?.isIdle ?? null
     heldDue = true
+    session.listParkedAgain()
     const postClosed = () => {
       if (current !== null) {
         return
       }
-      const run = postHeldIfDue().then(() => session.postClosed())
+      const run = postHeldIfDue().then(() => session.postParked()).then(() => session.postClosed())
       current = run
       run.then(() => {
         if (current === run) {

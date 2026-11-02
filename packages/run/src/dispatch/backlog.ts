@@ -1,5 +1,5 @@
 import { Effect, FileSystem, Schema } from "effect"
-import { heldReason, type Hold, isHeld, parseTaskFile, renderTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
+import { captainWait, type Hold, parseTaskFile, renderTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 import { BacklogError, platformFailure, publishOnce, scratchName } from "./backlog-write"
 
 export { BacklogError }
@@ -119,7 +119,7 @@ export const addTask = (
   Effect.gen(function*() {
     yield* ensureBacklog(root)
     const id = yield* reserveId(root)
-    const record: TaskRecord = { spec: { ...spec, id }, hold: null, state: { kind: "new" } }
+    const record: TaskRecord = { spec: { ...spec, id }, hold: null, parked: null, state: { kind: "new" } }
     if (!(yield* publishOnce(backlogPaths(root).folder("new"), id, renderTaskFile(record)))) {
       return yield* new BacklogError({ detail: "the reserved id " + id + " already names a task" })
     }
@@ -143,14 +143,14 @@ type Claimed =
   | { readonly kind: "lost" }
   | { readonly kind: "held"; readonly reason: string }
 
-// A hold can land after a beat listed the task, so the file the claim took is read again and a held one goes back to new.
+// A hold can land after a beat listed the task, so the file the claim took is read again and a held or parked one goes back to new.
 export const claimUnheld = (root: string, id: string): Effect.Effect<Claimed, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const record = (yield* claimTask(root, id)) ? yield* readTask(root, "taken", id) : null
     if (record === null) {
       return { kind: "lost" } satisfies Claimed
     }
-    const reason = heldReason(record)
+    const reason = captainWait(record)
     if (reason === null) {
       return { kind: "claimed", record } satisfies Claimed
     }
@@ -163,7 +163,7 @@ export const releaseTask = (root: string, record: TaskRecord): Effect.Effect<voi
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const paths = backlogPaths(root)
-    const unclaimed: TaskRecord = { spec: record.spec, hold: record.hold, state: { kind: "new" } }
+    const unclaimed: TaskRecord = { ...record, state: { kind: "new" } }
     yield* writeTaken(root, unclaimed)
     yield* fs.rename(paths.taskFile("taken", record.spec.id), paths.taskFile("new", record.spec.id)).pipe(
       Effect.mapError(platformFailure("give back " + record.spec.id))
@@ -213,8 +213,7 @@ export const closeStartedTask = (
       return yield* new BacklogError({ detail: id + " is " + record.state.kind + ", and only a started task closes" })
     }
     const closed: TaskRecord = {
-      spec: record.spec,
-      hold: record.hold,
+      ...record,
       state: { kind: "closed", claim: record.state.claim, closing: { outcome, started: record.state.started, reason, pr }, closedAt, postedAt: null }
     }
     if (!(yield* publishClosed(root, closed))) {
@@ -251,7 +250,7 @@ const writePosted = (root: string, id: string, postedAt: string): Effect.Effect<
     if (record.state.kind !== "closed" || record.state.postedAt !== null) {
       return false
     }
-    const posted: TaskRecord = { spec: record.spec, hold: record.hold, state: { ...record.state, postedAt } }
+    const posted: TaskRecord = { ...record, state: { ...record.state, postedAt } }
     const file = paths.taskFile("closed", id)
     const scratch = scratchName(paths.folder("closed"), id)
     yield* fs.writeFileString(scratch, renderTaskFile(posted)).pipe(Effect.mapError(platformFailure("write " + scratch)))
@@ -265,10 +264,10 @@ export const markPosted = (
   postedAt: string
 ): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> => writePosted(root, id, postedAt)
 
-type Rewrite<A> = { readonly kind: "write"; readonly record: TaskRecord; readonly result: A } | { readonly kind: "keep"; readonly result: A }
+export type Rewrite<A> = { readonly kind: "write"; readonly record: TaskRecord; readonly result: A } | { readonly kind: "keep"; readonly result: A }
 
 // rename(2) takes the one task file at most once, so a hold, an answer and a beat's claim never hold the same file together.
-const rewriteNew = <A>(
+export const rewriteNew = <A>(
   root: string,
   id: string,
   decide: (fresh: TaskRecord) => Effect.Effect<Rewrite<A>, BacklogError>
@@ -313,7 +312,7 @@ const rewriteNew = <A>(
     return settled.result
   })
 
-const findTask = (root: string, id: string): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+export const findTask = (root: string, id: string): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   listTasks(root).pipe(
     Effect.map((tasks) => tasks.find((candidate) => candidate.spec.id === id)),
     Effect.filterOrFail((record) => record !== undefined, () => new BacklogError({ detail: "the backlog holds no " + id }))
@@ -350,31 +349,3 @@ export const holdTask = (
     }
     return yield* rewriteNew(root, id, decide)
   })
-
-const answerOn = (id: string, words: string, at: string) => (fresh: TaskRecord): Effect.Effect<Rewrite<Hold>, BacklogError> => {
-  if (!isHeld(fresh)) {
-    return Effect.fail(new BacklogError({ detail: id + " is not held" + (fresh.hold?.answer == null ? "" : ": its hold was answered") }))
-  }
-  if (fresh.state.kind !== "new") {
-    return Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" }))
-  }
-  const answered: Hold = { ...fresh.hold, answer: { words, at } }
-  return Effect.succeed({ kind: "write", record: { ...fresh, hold: answered }, result: answered })
-}
-
-export const answerTask = (
-  root: string,
-  id: string,
-  words: string,
-  at: string
-): Effect.Effect<Hold, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const record = yield* findTask(root, id)
-    const decide = answerOn(id, words, at)
-    if (record.state.kind !== "new") {
-      const refused = yield* decide(record)
-      return refused.result
-    }
-    return yield* rewriteNew(root, id, decide)
-  })
-

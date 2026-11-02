@@ -65,13 +65,16 @@ export const measuredSignals = (report: Pick<OrcRunReport, "tokens" | "commits" 
   ...(report.commits === null ? [] : [{ name: "commit-count", value: report.commits.length.toString() }])
 ]
 
+export const openQuestionSignal = "open-question"
+
 export const noMistakesSignals = (record: NoMistakesRecord): ReadonlyArray<{ readonly name: string; readonly value: string }> => [
   { name: "finding-count", value: record.findings.length.toString() },
   { name: "result", value: record.status },
   { name: "gates-answered", value: record.gatesAnswered.toString() },
   ...(record.gate === null ? [] : [{ name: "gate", value: record.gate }]),
   ...(record.prLink === null ? [] : [{ name: "pr-link", value: record.prLink }]),
-  ...(record.reviewer === null ? [] : [{ name: "reviewer", value: record.reviewer }])
+  ...(record.reviewer === null ? [] : [{ name: "reviewer", value: record.reviewer }]),
+  ...record.openQuestions.map((question) => ({ name: openQuestionSignal, value: JSON.stringify({ id: question.id, text: question.text }) }))
 ]
 
 type ChecksLoopStep =

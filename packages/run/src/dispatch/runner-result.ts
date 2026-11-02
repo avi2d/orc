@@ -1,6 +1,7 @@
-import { Effect, Schema } from "effect"
+import { Array as Arr, Effect, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { runsForBranch } from "../history-resume"
+import { openQuestionsForRun, runsForBranch } from "../history-resume"
+import type { OpenQuestion } from "../no-mistakes-gate"
 import { formatHistoryError, openDatabase, type RunRecord, RunStatusSchema } from "../run-history"
 import { TaskId } from "./backlog"
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
@@ -13,7 +14,8 @@ const RunSummary = Schema.Struct({
   id: Schema.String,
   status: RunStatusSchema,
   prLink: Schema.NullOr(Schema.String),
-  endReason: Schema.NullOr(Schema.String)
+  endReason: Schema.NullOr(Schema.String),
+  openQuestions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String }))
 })
 type RunSummary = typeof RunSummary.Type
 
@@ -54,21 +56,22 @@ const failureReason = (result: typeof PueueResult.Type): string | null => {
   }
 }
 
-export interface TaskClosing {
-  readonly outcome: "done" | "failed"
-  readonly reason: string
-  readonly pr: string | null
-}
+export type RunEnding =
+  | { readonly kind: "close"; readonly outcome: "done" | "failed"; readonly reason: string; readonly pr: string | null }
+  | { readonly kind: "park"; readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion> }
 
-// The beat closes a started task from this, so its done and failed match what runner result reports.
-export const closingFromResult = (result: RunnerResult): TaskClosing | null => {
+// The beat ends a started task from this, so its done and failed match what runner result reports.
+export const endingFromResult = (result: RunnerResult): RunEnding | null => {
   if (result.status === "succeeded") {
-    return { outcome: "done", reason: "pueue task " + result.pueueTask + " succeeded", pr: result.run?.prLink ?? null }
+    return { kind: "close", outcome: "done", reason: "pueue task " + result.pueueTask + " succeeded", pr: result.run?.prLink ?? null }
   }
-  if (result.status === "failed") {
-    return { outcome: "failed", reason: result.reason, pr: result.run?.prLink ?? null }
+  if (result.status !== "failed") {
+    return null
   }
-  return null
+  const questions = result.run?.openQuestions ?? []
+  return Arr.isReadonlyArrayNonEmpty(questions)
+    ? { kind: "park", questions }
+    : { kind: "close", outcome: "failed", reason: result.reason, pr: result.run?.prLink ?? null }
 }
 
 interface PueueInterval {
@@ -131,18 +134,21 @@ const assessHeld = (
   return { ...held, status: "Stashed" in status ? "stashed" : "queued" }
 }
 
-const toSummary = (run: RunRecord): RunSummary => ({ id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason })
+const toSummary = (run: RunRecord, openQuestions: ReadonlyArray<OpenQuestion>): RunSummary => ({ id: run.id, status: run.status, prLink: run.prLink, endReason: run.endReason, openQuestions })
 
 const readRun = (home: string, checkout: string, task: string, interval: PueueInterval | null): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const project = yield* resolveProjectDir(checkout)
-    const runs = yield* Effect.acquireUseRelease(
+    return yield* Effect.acquireUseRelease(
       openDatabase(home),
-      (db) => runsForBranch(db, project, taskBranch(task)),
+      (db) =>
+        Effect.gen(function*() {
+          const runs = yield* runsForBranch(db, project, taskBranch(task))
+          const run = runs.find((candidate) => interval === null || startsWithin(candidate.started, interval)) ?? null
+          return run === null ? null : toSummary(run, yield* openQuestionsForRun(db, run.id))
+        }),
       (db) => Effect.sync(() => db.close())
     )
-    const run = runs.find((candidate) => interval === null || startsWithin(candidate.started, interval)) ?? null
-    return run === null ? null : toSummary(run)
   }).pipe(
     Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
   )

@@ -157,15 +157,15 @@ describe("orc runner start", () => {
         db.close()
       }
       const document = Schema.decodeUnknownSync(RunnerRun)(await resultJson(fixture, "task-9"))
-      expect(document.result.run).toEqual({ id: "run-root", status: "succeeded", prLink: "https://github.com/avi2d/orc/pull/9", endReason: null })
+      expect(document.result.run).toEqual({ id: "run-root", status: "succeeded", prLink: "https://github.com/avi2d/orc/pull/9", endReason: null, openQuestions: [] })
     })
   }, runnerTimeout)
 
-  test("a task pueue already holds in group orc is not queued twice", async () => {
+  test("a task pueue still runs in group orc is not queued twice", async () => {
     await withFixture(async (fixture) => {
-      const result = await queueWith(fixture, { task: "task-1", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# Again\n" })
+      const result = await queueWith(fixture, { task: "task-6", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# Again\n" })
       expect(result.exitCode).toBe(0)
-      expect(result.stdout).toBe("task-1 is already pueue task 655 in group orc\n")
+      expect(result.stdout).toBe("task-6 is already pueue task 660 in group orc\n")
       expect(await readFile(join(fixture.pueue, "add-args"), "utf8").catch(() => null)).toBeNull()
     })
   }, runnerTimeout)

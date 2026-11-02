@@ -1,6 +1,7 @@
 import { DateTime, Duration, Effect, type FileSystem, Option, type Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimUnheld, closeStartedTask, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken } from "./backlog"
+import { parkStartedTask } from "./parked"
 import type { ConfigError } from "../json-file"
 import { type Account, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "./config"
 import { type MachineRoom, placeTask, readRoom, taskWait } from "./beat-place"
@@ -8,8 +9,8 @@ import { type QuotaReading, readQuota } from "./quota"
 import type { Claim, TaskFileError, TaskRecord } from "./task-record"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
 import { taskLabel } from "./pueue-status"
-import { closingFromResult, readResult, readResultThrough } from "./runner-result"
-import type { Command } from "./runner"
+import { endingFromResult, type RunEnding, readResult, readResultThrough } from "./runner-result"
+import { type Command, taskBranch } from "./runner"
 
 export type { MachineRoom } from "./beat-place"
 export { dependencyOpen, placeTask, readRoom } from "./beat-place"
@@ -31,6 +32,7 @@ export type BeatAction =
     readonly pr: string | null
   }
   | { readonly kind: "close-failed"; readonly task: string; readonly machine: string; readonly reason: string }
+  | { readonly kind: "parked"; readonly task: string; readonly machine: string; readonly branch: string; readonly questions: ReadonlyArray<string> }
 
 export interface BeatReport {
   readonly beat: string
@@ -102,14 +104,14 @@ const startTask = (
   credential: Credential
 ): Effect.Effect<BeatAction, BacklogError | TaskFileError, BeatRequirements> =>
   Effect.gen(function*() {
-    const taken: TaskRecord = { spec: task.spec, hold: task.hold, state: { kind: "taken", claim } }
+    const taken: TaskRecord = { ...task, state: { kind: "taken", claim } }
     yield* writeTaken(root, taken)
     if (yield* machineOverfull(root, machine)) {
       yield* releaseTask(root, taken)
       return { kind: "given-back", task: task.spec.id, machine: machine.name } satisfies BeatAction
     }
     const log = backlogPaths(root).logFile(task.spec.id)
-    yield* writeTaken(root, { spec: task.spec, hold: task.hold, state: { kind: "started", claim, started: { at: yield* nowIso, log } } })
+    yield* writeTaken(root, { ...task, state: { kind: "started", claim, started: { at: yield* nowIso, log } } })
     const env = {
       ORC_TASK_LOG: log,
       ORC_TASK_ID: task.spec.id,
@@ -131,8 +133,7 @@ const startTask = (
       return { kind: "started", task: task.spec.id, machine: machine.name, account: claim.account, log } satisfies BeatAction
     }
     yield* publishClosed(root, {
-      spec: task.spec,
-      hold: task.hold,
+      ...task,
       state: { kind: "closed", claim, closing: { outcome: "start-failed", reason: result.reason }, closedAt: yield* nowIso, postedAt: null }
     })
     return { kind: "start-failed", task: task.spec.id, machine: machine.name, reason: result.reason } satisfies BeatAction
@@ -298,7 +299,30 @@ const renewTask = (context: BeatContext, task: TaskRecord): Effect.Effect<Option
     return Option.some(refused === null ? { kind: "renewed", task: task.spec.id, machine: machine.name } : failed(refused))
   })
 
-// A finished run closes its task here, because no other beat step reads a started task after its run ends.
+const endTask = (
+  root: string,
+  task: TaskRecord,
+  machine: string,
+  ending: RunEnding
+): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const id = task.spec.id
+    if (ending.kind === "park") {
+      const branch = task.parked?.branch ?? taskBranch(id)
+      const parked = yield* parkStartedTask(root, id, branch, ending.questions).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
+      return parked === null
+        ? Option.none()
+        : Option.some({ kind: "parked", task: id, machine, branch, questions: ending.questions.map((question) => question.id) } satisfies BeatAction)
+    }
+    const closed = yield* closeStartedTask(root, id, ending.outcome, ending.reason, ending.pr, yield* nowIso).pipe(
+      Effect.catchTag("BacklogError", () => Effect.succeed(null))
+    )
+    return closed === null
+      ? Option.none()
+      : Option.some({ kind: "closed", task: id, machine, outcome: ending.outcome, reason: ending.reason, pr: ending.pr } satisfies BeatAction)
+  })
+
+// A finished run ends its task here, because no other beat step reads a started task after its run ends.
 const closeFinished = (
   context: BeatContext,
   task: TaskRecord
@@ -314,9 +338,9 @@ const closeFinished = (
       return Option.none()
     }
     const through = throughFor(machine)
-    const read = (through === null ? readResult(task.spec.id, context.home, label) : readResultThrough(through, task.spec.id, label)).pipe(Effect.map(closingFromResult))
+    const read = (through === null ? readResult(task.spec.id, context.home, label) : readResultThrough(through, task.spec.id, label)).pipe(Effect.map(endingFromResult))
     const outcome = yield* read.pipe(
-      Effect.map((closing) => ({ kind: "read" as const, closing })),
+      Effect.map((ending) => ({ kind: "read" as const, ending })),
       Effect.catchTag("RunnerError", (error) => Effect.succeed({ kind: "unread" as const, reason: error.detail })),
       Effect.timeoutOrElse({
         duration: Duration.seconds(closeSeconds),
@@ -326,24 +350,7 @@ const closeFinished = (
     if (outcome.kind === "unread") {
       return Option.some({ kind: "close-failed", task: task.spec.id, machine: claim.machine, reason: outcome.reason } satisfies BeatAction)
     }
-    const closing = outcome.closing
-    if (closing === null) {
-      return Option.none()
-    }
-    const closed = yield* closeStartedTask(context.root, task.spec.id, closing.outcome, closing.reason, closing.pr, yield* nowIso).pipe(
-      Effect.catchTag("BacklogError", () => Effect.succeed(null))
-    )
-    if (closed === null) {
-      return Option.none()
-    }
-    return Option.some({
-      kind: "closed",
-      task: task.spec.id,
-      machine: task.state.claim.machine,
-      outcome: closing.outcome,
-      reason: closing.reason,
-      pr: closing.pr
-    } satisfies BeatAction)
+    return outcome.ending === null ? Option.none() : yield* endTask(context.root, task, claim.machine, outcome.ending)
   })
 
 export const runBeat = (
@@ -374,7 +381,7 @@ export const runBeat = (
     const closings = yield* Effect.forEach(tasks.filter((task) => task.state.kind === "started"), (task) => closeFinished(context, task))
     const closed = closings.flatMap(Option.toArray)
     for (const action of closed) {
-      if (action.kind === "closed") {
+      if (action.kind === "closed" || action.kind === "parked") {
         const slot = context.live.find((entry) => entry.machine === action.machine)
         if (slot !== undefined) {
           slot.busy -= 1

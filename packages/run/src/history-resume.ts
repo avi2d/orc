@@ -1,5 +1,7 @@
 import type { Database } from "bun:sqlite"
 import { Effect, Schema } from "effect"
+import type { OpenQuestion } from "./no-mistakes-gate"
+import { openQuestionSignal } from "./report"
 import { RunSqlRowSchema, sqlite, type RunRecord, type SqliteFailure } from "./run-history"
 
 export interface BranchStep {
@@ -80,6 +82,19 @@ export const stepsForRun = (
   ).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(BranchStepRowSchema))),
     Effect.map((rows) => rows.map((row) => ({ name: row.name, status: row.status, attempt: row.attempt, piSessionFile: row.pi_session_file })))
+  )
+
+const SignalValues = Schema.Array(Schema.Struct({ value: Schema.fromJsonString(Schema.Struct({ id: Schema.String, text: Schema.String })) }))
+
+export const openQuestionsForRun = (
+  db: Database,
+  runId: string
+): Effect.Effect<ReadonlyArray<OpenQuestion>, Schema.SchemaError | SqliteFailure> =>
+  sqlite(() =>
+    db.query("SELECT signals.value AS value FROM signals JOIN steps ON signals.step_id = steps.id WHERE steps.run_id = ? AND signals.name = ? ORDER BY signals.id ASC").all(runId, openQuestionSignal)
+  ).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(SignalValues)),
+    Effect.map((rows) => rows.map((row) => row.value))
   )
 
 export interface StoredChecksRound {

@@ -13,6 +13,7 @@ describe("held task files", () => {
     const record: TaskRecord = {
       spec: { ...spec, id: "task-4", body: "# Fix the thing\n" },
       hold: { reason: "which API: REST or \"gRPC\"?", until: "2026-12-01", answer: { words: "REST,\n  and keep v1 — for now", at: "2026-11-02T12:00:00.000Z" } },
+      parked: null,
       state: { kind: "new" }
     }
     expect(await run(parseTaskFile("task-4.md", "new", renderTaskFile(record)))).toEqual(record)
