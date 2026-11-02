@@ -104,10 +104,12 @@ const closedLine = (task: ClosedTask): string =>
 export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string) => void): ChatSession => {
   let unreadBecause: string | null = null
   const delivered = new Set<string>()
-  const deliver = (text: string): void => {
+  const deliver = (text: string): boolean => {
     if (isOpen()) {
       post(text)
+      return true
     }
+    return false
   }
   const tools: ReadonlyArray<ChatTool> = [
     {
@@ -172,8 +174,9 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
     }
     if (markProblem !== null) {
       if (unreadBecause === null) {
-        unreadBecause = markProblem
-        deliver("orc chat cannot post the closed tasks: " + markProblem)
+        if (deliver("orc chat cannot post the closed tasks: " + markProblem)) {
+          unreadBecause = markProblem
+        }
       } else {
         unreadBecause = markProblem
       }
@@ -184,8 +187,9 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
     Effect.catchTag("ChatToolError", (error) =>
       Effect.sync(() => {
         if (error.message !== unreadBecause) {
-          unreadBecause = error.message
-          deliver("orc chat cannot post the closed tasks: " + error.message)
+          if (deliver("orc chat cannot post the closed tasks: " + error.message)) {
+            unreadBecause = error.message
+          }
         }
       })
     )
