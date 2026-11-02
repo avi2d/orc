@@ -89,7 +89,7 @@ Orc grows toward the full orchestrator one step at a time.
 | Terminal dashboard with quota, machines, queues, tasks and alerts | Ships today |
 | Orchestrator rules the chat follows | Next |
 | The chat posts every close, after a restart too | Next |
-| Decisions held for you with a reason, answered from the chat | Next |
+| Decisions held for you with a reason, answered from the chat | Ships today |
 | Runs parked on a question resume on your answer | Next |
 | Reports, investigations and machine tasks that end without a pull request | Next |
 | Per-project delivery: direct pull request or full review | Next |
