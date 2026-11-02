@@ -23,6 +23,7 @@ import {
   truncate,
   widthOf,
 } from "@tui-dash/ui";
+import { noProviderLines } from "./sections";
 
 const labelWidth = 8;
 const verdictMinimum = 16;
@@ -312,6 +313,7 @@ const tintOf = (provider: QuotaBlock["provider"]): QuotaTint => {
 };
 
 export const quotaLines = (blocks: ReadonlyArray<QuotaBlock>, width: number, showReset: boolean, now: DateTime.Utc): Block => {
+  if (blocks.length === 0) return noProviderLines;
   const shape = rowShape(width, showReset, blocks.flatMap((block) => verdictsOf(block.body, now)));
   return blocks
     .flatMap((block): Block => [header(block, tintOf(block.provider)), ...bodyLines(block.body, width, shape, now)])
