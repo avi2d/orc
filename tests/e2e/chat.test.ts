@@ -178,6 +178,29 @@ describe("orc chat", () => {
     })
   }, 60_000)
 
+  test("appends orchestrator.md to pi's system prompt and names it on the first line instead of starting without the rules", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const rules = join(fixture.home, "orchestrator.md")
+      await writeFile(rules, "# Rules\n")
+      const result = await runOrc(fixture, ["chat"])
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout.split("\n")[0]).toBe("orc chat loaded the rules in " + rules)
+      const lines = (await readFile(fixture.piLog, "utf8")).trimEnd().split("\n")
+      expect(lines.slice(lines.indexOf("--append-system-prompt"), lines.indexOf("--append-system-prompt") + 2)).toEqual(["--append-system-prompt", rules])
+    })
+  }, 60_000)
+
+  test("passes pi no rules flag for a missing orchestrator.md and says none were found, instead of a path pi cannot read", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const result = await runOrc(fixture, ["chat"])
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout.split("\n")[0]).toBe("orc chat found no rules at " + join(fixture.home, "orchestrator.md"))
+      const lines = (await readFile(fixture.piLog, "utf8")).trimEnd().split("\n")
+      expect(lines).not.toContain("--append-system-prompt")
+      expect(lines).not.toContain(join(fixture.home, "orchestrator.md"))
+    })
+  }, 60_000)
+
   test("refuses with no models.orchestrator instead of starting pi on Pi's default model", async () => {
     await withFixture({ providers: [], models: { implementer: "acme/implementer-1" } }, 0, async (fixture) => {
       const result = await runOrc(fixture, ["chat"])
