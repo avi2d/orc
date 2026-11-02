@@ -127,6 +127,7 @@ const closedLine = (task: ClosedTask): string =>
 
 interface PostState {
   unreadBecause: string | null
+  unreadHeldBecause: string | null
   readonly delivered: Set<string>
 }
 
@@ -214,10 +215,11 @@ const heldLine = (task: OpenHeld): string =>
   task.id + " " + task.title + " is held for the captain: " + task.hold.reason + (task.hold.until === null ? "" : ", until " + task.hold.until)
 
 // Delivered is false only when Pi took none of the lines, so the caller tries the whole list again.
-const postOpenHeld = (env: Env, deliver: Deliver): Effect.Effect<boolean> =>
+const postOpenHeld = (env: Env, deliver: Deliver, state: PostState): Effect.Effect<boolean> =>
   readBacklog(env).pipe(
     Effect.map((backlog) => backlog.tasks.filter(isOpenHeld).map(heldLine)),
     Effect.map((lines) => {
+      state.unreadHeldBecause = null
       if (lines.length === 0) {
         return true
       }
@@ -232,7 +234,11 @@ const postOpenHeld = (env: Env, deliver: Deliver): Effect.Effect<boolean> =>
     }),
     Effect.catchTag("ChatToolError", (error) =>
       Effect.sync(() => {
-        deliver("orc chat cannot list the held decisions: " + error.message)
+        if (error.message !== state.unreadHeldBecause) {
+          if (deliver("orc chat cannot list the held decisions: " + error.message)) {
+            state.unreadHeldBecause = error.message
+          }
+        }
         return false
       })
     )
@@ -247,7 +253,7 @@ const runTool = <A>(schema: Schema.Decoder<A>, name: string, params: unknown, en
   )
 
 export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string, kind: PostKind) => void): ChatSession => {
-  const state: PostState = { unreadBecause: null, delivered: new Set<string>() }
+  const state: PostState = { unreadBecause: null, unreadHeldBecause: null, delivered: new Set<string>() }
   const deliverAs = (kind: PostKind) => (text: string): boolean => {
     if (isOpen()) {
       post(text, kind)
@@ -312,7 +318,7 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
     }
   ]
   const postClosed = postUnposted(env, isOpen, deliver, state)
-  const postHeld = postOpenHeld(env, deliverAs("held"))
+  const postHeld = postOpenHeld(env, deliverAs("held"), state)
   return { tools, postClosed: () => Effect.runPromise(postClosed), postHeld: () => Effect.runPromise(postHeld) }
 }
 

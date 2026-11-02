@@ -277,7 +277,11 @@ const readRequest = (
     const record = yield* parseTaskFile(file, "taken", text).pipe(
       Effect.mapError((error) => new RunnerError({ detail: error.file + ": " + error.detail }))
     )
-    const fields = yield* Schema.decodeEffect(Schema.Struct(taskFields))({ task, checkout, provider, body: record.spec.body }).pipe(
+    const hold = record.hold
+    const body = hold !== null && hold.answer !== null
+      ? record.spec.body + "\n\nHeld for the captain: " + hold.reason + "\nThe captain answered: " + hold.answer.words
+      : record.spec.body
+    const fields = yield* Schema.decodeEffect(Schema.Struct(taskFields))({ task, checkout, provider, body }).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
     )
     const tokenFile = env["ORC_TASK_TOKEN_FILE"] ?? ""
