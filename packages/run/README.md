@@ -421,11 +421,21 @@ It prints the new, taken and closed tasks side by side with the project list and
 To print the same facts as JSON, run `orc backlog --json`, whose document names its version first as `orc.backlog.v1`.
 To start what can start, run `orc beat`, from launchd or cron every few minutes.
 Each beat runs the quota command and reads the room on each machine before it takes any task.
-A task starts only once three things hold:
+A task starts only once four things hold:
 
-1. Every task it depends on closed done.
-2. Its project has a checkout on a machine with a free slot.
-3. An account has room at or above the floor, and the runs take the account with the most room.
+1. No hold for the captain waits on it unanswered.
+2. Every task it depends on closed done.
+3. Its project has a checkout on a machine with a free slot.
+4. An account has room at or above the floor, and the runs take the account with the most room.
+
+To keep a new task back for a decision of yours, run `orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>]`.
+Each beat then prints `waits <task-id>: held for the captain: <reason>`, with the date when the hold names one, and never starts it.
+The date says when you mean to answer, and a past date releases nothing: the task stays held until you answer it.
+To answer, run `orc backlog answer <task-id> <words>`.
+The task file keeps your words as `answer` and the time as `answered_at`, and the next beat may start the task.
+Orc refuses to hold a task that is taken, started or closed, and to answer a task that is not held.
+Holding a held task again keeps the first reason.
+`orc backlog` shows a held task as `held (<reason>)`, and `orc backlog --json` gives every task a `hold`, either `null` or the reason, the date and the answer.
 
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
 After the claim survives a recount, the beat writes the task started before it runs the start command.
@@ -452,16 +462,19 @@ On a token command account, each beat first sends every started task its account
 
 To say tasks in a chat instead of writing task files, run `orc chat`.
 It starts Pi on the model `models.orchestrator` names in `config.json`, and refuses to start when it names none.
-The chat's Pi has two tools and no others:
+The chat's Pi has four tools and no others:
 
 - `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project, the task's Markdown, an optional machine and the ids it depends on.
 - `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
+- `orc_backlog_hold` holds one new task through `orc backlog hold`, with the reason and an optional date.
+- `orc_backlog_answer` answers a held task through `orc backlog answer`, with your words as you said them.
 
 So a task from the chat enters the backlog the way any other does, and the beat starts it.
 When it starts and every 15 seconds after, the chat reads `orc backlog --json` and, while Pi is idle, posts each closed task that has no `postedAt`, with its outcome, its reason and its PR, as in `task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
 It posts a task whoever added it: this chat, an earlier chat or the command line.
 It posts each close then runs `orc backlog posted <task-id>`, which writes `posted_at` into the closed task file, so a task closed while no chat ran is posted by the next chat to start, and every close is posted, with a close repeated at most when the chat stops between its post and its mark, or when two chats post the same close in the same moment.
 When it cannot read or mark the backlog, it posts orc's error once Pi is idle and keeps polling.
+Each time the chat starts, it posts one line per held task you have not answered, once Pi is idle, as in `task-2 Pick the API is held for the captain: REST or gRPC, until 2026-12-01`.
 The chat's Pi loads your Pi settings and packages, so a provider a package adds works as it does in your Pi.
 `ORC_HOME` reaches the tools from the shell that runs `orc chat`.
 

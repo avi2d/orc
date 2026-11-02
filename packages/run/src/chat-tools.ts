@@ -26,7 +26,12 @@ export interface ChatTool {
 export interface ChatSession {
   readonly tools: ReadonlyArray<ChatTool>
   readonly postClosed: () => Promise<void>
+  readonly postHeld: () => Promise<boolean>
 }
+
+type PostKind = "closed" | "held"
+
+const postTypes = { closed: "orc-task-closed", held: "orc-held-decision" } as const satisfies Record<PostKind, string>
 
 interface SessionStartContext {
   readonly isIdle: () => boolean
@@ -55,6 +60,17 @@ const AddTaskInput = Schema.Struct({
   dependsOn: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: "The ids of the tasks that must close done before this one starts" }))
 })
 
+const HoldInput = Schema.Struct({
+  id: Schema.String.annotate({ description: "The id of the new task that waits for the captain" }),
+  reason: Schema.String.annotate({ description: "The decision the captain must make before the task may start" }),
+  until: Schema.optionalKey(Schema.String.annotate({ description: "The YYYY-MM-DD date the captain should answer by; it releases nothing by itself" }))
+})
+
+const AnswerInput = Schema.Struct({
+  id: Schema.String.annotate({ description: "The id of the held task" }),
+  words: Schema.String.annotate({ description: "The captain's answer, word for word" })
+})
+
 // Effect writes an empty struct as {"not":{"type":"null"}}, and Pi takes only an object schema.
 const noParameters = { type: "object", properties: {}, additionalProperties: false } as const
 
@@ -69,7 +85,13 @@ const ClosedTask = Schema.Struct({
 })
 type ClosedTask = typeof ClosedTask.Type
 
-const OpenTask = Schema.Struct({ id: Schema.String, status: Schema.Literals(["new", "taken", "started"]) })
+const HoldJson = Schema.Struct({
+  reason: Schema.String,
+  until: Schema.NullOr(Schema.String),
+  answer: Schema.NullOr(Schema.Struct({ words: Schema.String, at: Schema.String }))
+})
+
+const OpenTask = Schema.Struct({ id: Schema.String, title: Schema.String, status: Schema.Literals(["new", "taken", "started"]), hold: Schema.NullOr(HoldJson) })
 type OpenTask = typeof OpenTask.Type
 type BacklogTask = ClosedTask | OpenTask
 
@@ -184,15 +206,51 @@ const postUnposted = (env: Env, isOpen: () => boolean, deliver: Deliver, state: 
     yield* reportMarks(state, deliver, markProblem)
   }).pipe(Effect.catchTag("ChatToolError", (error) => reportReadError(state, deliver, error)))
 
-export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string) => void): ChatSession => {
+type OpenHeld = OpenTask & { readonly hold: typeof HoldJson.Type & { readonly answer: null } }
+
+const isOpenHeld = (task: BacklogTask): task is OpenHeld => task.status !== "closed" && task.hold !== null && task.hold.answer === null
+
+const heldLine = (task: OpenHeld): string =>
+  task.id + " " + task.title + " is held for the captain: " + task.hold.reason + (task.hold.until === null ? "" : ", until " + task.hold.until)
+
+// Delivered is false only when Pi took none of the lines, so the caller tries the whole list again.
+const postOpenHeld = (env: Env, deliver: Deliver): Effect.Effect<boolean> =>
+  readBacklog(env).pipe(
+    Effect.map((backlog) => backlog.tasks.filter(isOpenHeld).map(heldLine)),
+    Effect.catchTag("ChatToolError", (error) => Effect.succeed(["orc chat cannot list the held decisions: " + error.message])),
+    Effect.map((lines) => {
+      if (lines.length === 0) {
+        return true
+      }
+      const [first, ...rest] = lines
+      if (!deliver(first)) {
+        return false
+      }
+      for (const line of rest) {
+        deliver(line)
+      }
+      return true
+    })
+  )
+
+const runTool = <A>(schema: Schema.Decoder<A>, name: string, params: unknown, env: Env, args: (input: A) => ReadonlyArray<string>): Promise<TextResult> =>
+  Effect.runPromise(
+    decodeInput(schema, name, params).pipe(
+      Effect.flatMap((input) => runOrc(env, args(input), null)),
+      Effect.map(textResult)
+    )
+  )
+
+export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string, kind: PostKind) => void): ChatSession => {
   const state: PostState = { unreadBecause: null, delivered: new Set<string>() }
-  const deliver = (text: string): boolean => {
+  const deliverAs = (kind: PostKind) => (text: string): boolean => {
     if (isOpen()) {
-      post(text)
+      post(text, kind)
       return true
     }
     return false
   }
+  const deliver = deliverAs("closed")
   const tools: ReadonlyArray<ChatTool> = [
     {
       name: "orc_backlog_add",
@@ -223,10 +281,34 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
       description: "Returns orc backlog --json: every new, taken and closed task with its project, machine, outcome and PR, the project list, and the room on each machine.",
       parameters: noParameters,
       execute: () => Effect.runPromise(runOrc(env, ["backlog", "--json"], null).pipe(Effect.map(textResult)))
+    },
+    {
+      name: "orc_backlog_hold",
+      label: "Hold an orc task for the captain",
+      description:
+        "Holds one new task through orc backlog hold, so no beat starts it until the captain answers. A passed until date does not release it; only orc_backlog_answer does. Holding a held task again keeps the first reason.",
+      parameters: Schema.toJsonSchemaDocument(HoldInput).schema,
+      execute: (_toolCallId, params) =>
+        runTool(HoldInput, "orc_backlog_hold", params, env, (input) => [
+          "backlog",
+          "hold",
+          input.id,
+          "--reason",
+          input.reason,
+          ...(input.until === undefined ? [] : ["--until", input.until])
+        ])
+    },
+    {
+      name: "orc_backlog_answer",
+      label: "Answer a held orc task",
+      description: "Records the captain's words on a held task through orc backlog answer, word for word, which releases it for the next beat.",
+      parameters: Schema.toJsonSchemaDocument(AnswerInput).schema,
+      execute: (_toolCallId, params) => runTool(AnswerInput, "orc_backlog_answer", params, env, (input) => ["backlog", "answer", input.id, input.words])
     }
   ]
   const postClosed = postUnposted(env, isOpen, deliver, state)
-  return { tools, postClosed: () => Effect.runPromise(postClosed) }
+  const postHeld = postOpenHeld(env, deliverAs("held"))
+  return { tools, postClosed: () => Effect.runPromise(postClosed), postHeld: () => Effect.runPromise(postHeld) }
 }
 
 export const chatToolNames: ReadonlyArray<string> = chatSession({}, () => false, () => undefined).tools.map((tool) => tool.name)
@@ -234,22 +316,30 @@ export const chatToolNames: ReadonlyArray<string> = chatSession({}, () => false,
 export const chatExtension = (env: Env, pollMillis: number) => (pi: ChatHost): void => {
   let stopped = true
   let idle: (() => boolean) | null = null
-  const session = chatSession(env, () => !stopped && (idle?.() ?? false), (text) => {
-    pi.sendMessage({ customType: "orc-task-closed", content: text, display: true }, { triggerTurn: false })
+  const session = chatSession(env, () => !stopped && (idle?.() ?? false), (text, kind) => {
+    pi.sendMessage({ customType: postTypes[kind], content: text, display: true }, { triggerTurn: false })
   })
   for (const tool of session.tools) {
     pi.registerTool(tool)
   }
   let poll: ReturnType<typeof setInterval> | undefined
   let current: Promise<void> | null = null
+  let heldDue = false
+  const postHeldIfDue = (): Promise<void> =>
+    heldDue
+      ? session.postHeld().then((delivered) => {
+        heldDue = heldDue && !delivered
+      })
+      : Promise.resolve()
   pi.on("session_start", (_event, ctx) => {
     stopped = false
     idle = ctx?.isIdle ?? null
+    heldDue = true
     const postClosed = () => {
       if (current !== null) {
         return
       }
-      const run = session.postClosed()
+      const run = postHeldIfDue().then(() => session.postClosed())
       current = run
       run.then(() => {
         if (current === run) {
