@@ -7,6 +7,11 @@ import { chatSession } from "../../packages/run/src/chat-tools"
 import type { BoardLauncher, BoardPoll } from "../../packages/run/src/chat-lavish"
 import { chatEnv, type Fixture, withFixture } from "./chat-helpers"
 
+const SavedBoard = Schema.fromJsonString(Schema.Struct({ board: Schema.String }))
+
+const savedBoardId = (boardsDir: string): string =>
+  Schema.decodeSync(SavedBoard)(readFileSync(join(boardsDir, "task-1", "board.json"), "utf8")).board
+
 const HeldJson = Schema.fromJsonString(Schema.Struct({
   tasks: Schema.Array(Schema.Struct({
     id: Schema.String,
@@ -62,7 +67,7 @@ const fakeLavish = (boardsDir: string) => {
     }
   }
   const answer = (card: string, option: string, words?: string): void => {
-    const board = (JSON.parse(readFileSync(join(boardsDir, "task-1", "board.json"), "utf8")) as { readonly board: string }).board
+    const board = savedBoardId(boardsDir)
     send({ kind: "feedback", prompts: [{ tag: "orc-board-answer", text: card + ": " + option, data: words === undefined ? { board, card, answer: option } : { board, card, answer: option, words } }] })
   }
   return { launcher, opened, ended, replies, send, answer, polls: () => polls }
@@ -354,7 +359,7 @@ describe("orc chat decision boards", () => {
       const chat = boardChat(fixture, lavish)
       await holdTwo(chat.call)
       await chat.call("orc_decision_board", twoCards)
-      const before = (JSON.parse(await readFile(join(fixture.home, "boards", "task-1", "board.json"), "utf8")) as { readonly board: string }).board
+      const before = savedBoardId(join(fixture.home, "boards"))
       await chat.call("orc_decision_board", twoCards)
       lavish.send({ kind: "feedback", prompts: [{ tag: "orc-board-answer", text: "REST or gRPC?: gRPC", data: { board: before, card: "question-1", answer: "gRPC" } }] })
       await until(() => chat.boardLines().some((line) => line.includes("no longer describes its current decision")))

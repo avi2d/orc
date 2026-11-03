@@ -1,5 +1,6 @@
 import { Effect, Fiber, FileSystem, Schema } from "effect"
-import { decisionFor, type BacklogTask, type Decision, openDecision, parkedReason } from "./chat-backlog"
+import { decisionFor, type BacklogTask, type Decision, openDecision } from "./chat-backlog"
+import { answeredAlready, completedWords, matchesRecord } from "./chat-board-bind"
 import { fileSystemLayer } from "./chat-command"
 import { ChatToolError } from "./chat-error"
 import type { BoardCard, BoardInput } from "./chat-inputs"
@@ -122,25 +123,6 @@ const waitingTask = (host: BoardHost, id: string): Effect.Effect<Decision | null
 const rawTask = (host: BoardHost, id: string): Effect.Effect<BacklogTask | null, ChatToolError> =>
   host.tasks.pipe(Effect.map((tasks) => tasks.find((task) => task.id === id) ?? null))
 
-const matchesRecord = (task: Decision, record: BoardRecord): boolean => {
-  if (task.waits !== record.waits || task.reason !== record.reason) {
-    return false
-  }
-  const covers = record.cards.every((card) => {
-    const target = card.target
-    if (target.kind === "reason") {
-      return task.questions.length === 0 && card.text === task.reason
-    }
-    const question = task.questions.find((candidate) => candidate.id === target.id)
-    return question !== undefined && question.text === card.text
-  })
-  return covers && task.questions.filter((question) => question.answer === null).every((question) =>
-    record.cards.some((card) => {
-      const target = card.target
-      return target.kind === "question" && target.id === question.id
-    }))
-}
-
 const boundDecision = (host: BoardHost, record: BoardRecord): Effect.Effect<Decision | null, ChatToolError> =>
   rawTask(host, record.task).pipe(
     Effect.map((task) => {
@@ -152,34 +134,35 @@ const boundDecision = (host: BoardHost, record: BoardRecord): Effect.Effect<Deci
     })
   )
 
-const completedWords = (record: BoardRecord, task: BacklogTask) => (card: BoardCardRecord): string | null => {
-  if (task.id !== record.task) {
-    return null
-  }
-  if (record.waits === "held") {
-    if (task.hold === null || task.hold.reason !== record.reason) {
-      return null
-    }
-    const target = card.target
-    if (target.kind === "reason") {
-      return task.hold.answer?.words ?? null
-    }
-    const question = task.hold.questions.find((candidate) => candidate.id === target.id)
-    return question !== undefined && question.text === card.text ? question.answer?.words ?? null : null
-  }
-  if (task.parked === null || parkedReason(task.parked.branch) !== record.reason) {
-    return null
-  }
-  const target = card.target
-  if (target.kind !== "question") {
-    return null
-  }
-  const question = task.parked.questions.find((candidate) => candidate.id === target.id)
-  return question !== undefined && question.text === card.text ? question.answer?.words ?? null : null
-}
-
 const staleLine = (record: BoardRecord, text: string): string =>
   record.task + "'s decision board no longer describes its current decision, so orc recorded nothing: " + text
+
+const unmatchedLine = (record: BoardRecord, text: string): string =>
+  record.task + "'s decision board sent an answer that matches none of its cards, so orc recorded nothing: " + text
+
+type MatchedAnswer =
+  | { readonly kind: "matched"; readonly card: BoardCardRecord; readonly answer: typeof BoardAnswer.Type }
+  | { readonly kind: "refused"; readonly line: string }
+
+const matchAnswer = (record: BoardRecord, prompt: BoardPrompt): Effect.Effect<MatchedAnswer> =>
+  decodeAnswer(prompt.data).pipe(
+    Effect.map((answer): MatchedAnswer => {
+      if (answer.board !== record.board) {
+        return { kind: "refused", line: staleLine(record, prompt.text) }
+      }
+      const card = record.cards.find((candidate) => cardKey(candidate.target) === answer.card)
+      return card === undefined || !card.options.includes(answer.answer)
+        ? { kind: "refused", line: unmatchedLine(record, prompt.text) }
+        : { kind: "matched", card, answer }
+    }),
+    Effect.orElseSucceed((): MatchedAnswer => ({ kind: "refused", line: unmatchedLine(record, prompt.text) }))
+  )
+
+const staleRefusal = (host: BoardHost, record: BoardRecord, card: BoardCardRecord, text: string): Effect.Effect<string | null> =>
+  boundDecision(host, record).pipe(
+    Effect.map((bound) => bound === null || answeredAlready(bound, card) ? staleLine(record, text) : null),
+    Effect.catchTag("ChatToolError", (error) => Effect.succeed("orc recorded nothing: " + error.message))
+  )
 
 const recordPrompt = (host: BoardHost, record: BoardRecord, prompt: BoardPrompt): Effect.Effect<string> =>
   Effect.gen(function*() {
@@ -187,35 +170,16 @@ const recordPrompt = (host: BoardHost, record: BoardRecord, prompt: BoardPrompt)
       host.say("On " + record.task + "'s decision board the captain wrote: " + prompt.text)
       return "orc passed this to the chat"
     }
-    const answer = yield* decodeAnswer(prompt.data).pipe(Effect.orElseSucceed(() => null))
-    if (answer === null) {
-      const line = record.task + "'s decision board sent an answer that matches none of its cards, so orc recorded nothing: " + prompt.text
-      host.say(line)
-      return line
+    const matched = yield* matchAnswer(record, prompt)
+    if (matched.kind === "refused") {
+      host.say(matched.line)
+      return matched.line
     }
-    if (answer.board !== record.board) {
-      const line = staleLine(record, prompt.text)
-      host.say(line)
-      return line
-    }
-    const card = record.cards.find((candidate) => cardKey(candidate.target) === answer.card)
-    if (card === undefined || !card.options.includes(answer.answer)) {
-      const line = record.task + "'s decision board sent an answer that matches none of its cards, so orc recorded nothing: " + prompt.text
-      host.say(line)
-      return line
-    }
-    const bound = yield* boundDecision(host, record)
-    if (bound === null) {
-      const line = staleLine(record, prompt.text)
-      host.say(line)
-      return line
-    }
-    const target = card.target
-    const current = target.kind === "question" ? bound.questions.find((question) => question.id === target.id)?.answer ?? null : null
-    if (target.kind === "question" && current !== null) {
-      const line = staleLine(record, prompt.text)
-      host.say(line)
-      return line
+    const { card, answer } = matched
+    const refusal = yield* staleRefusal(host, record, card, prompt.text)
+    if (refusal !== null) {
+      host.say(refusal)
+      return refusal
     }
     const words = answerWords(answer)
     const said = yield* host.orc(answerArgs(record.task, card.target, words)).pipe(

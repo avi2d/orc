@@ -28,8 +28,10 @@ describe("chat backlog decoding", () => {
         postedAt: null
       }]
     }))
-    const task = backlog.tasks[0]
-    expect(task?.status).toBe("closed")
-    expect(task !== undefined && task.status === "closed" ? task.hold?.questions[0]?.answer?.words : null).toBe("gRPC")
+    const task = backlog.tasks.find((candidate) => candidate.id === "task-1")
+    if (task === undefined || task.status !== "closed") {
+      throw new Error("expected one closed task, got " + JSON.stringify(backlog.tasks))
+    }
+    expect(task.hold?.questions[0]?.answer?.words).toBe("gRPC")
   })
 })

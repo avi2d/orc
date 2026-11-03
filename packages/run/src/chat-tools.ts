@@ -371,15 +371,12 @@ export const chatExtension = (env: Env, pollMillis: number) => (pi: ChatHost): v
       session.postBoardNews()
       const run = postHeldIfDue().then(listBoardsIfDue).then(() => session.reconcileBoards()).then(() => session.postParked()).then(() => session.postClosed())
       current = run
-      run.then(() => {
+      const clear = () => {
         if (current === run) {
           current = null
         }
-      }, () => {
-        if (current === run) {
-          current = null
-        }
-      })
+      }
+      run.then(clear, clear)
     }
     postClosed()
     // An unreferenced timer never keeps Pi running after its session ends.

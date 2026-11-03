@@ -15,6 +15,7 @@ const expectedFiles = [
   "src/args.ts",
   "src/bin.ts",
   "src/chat-backlog.ts",
+  "src/chat-board-bind.ts",
   "src/chat-board-page.ts",
   "src/chat-board.ts",
   "src/chat-closed.ts",
