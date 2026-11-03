@@ -6,6 +6,7 @@ import { decodeSavedProfiles, decodeQuota, quotaBlocks } from "@tui-dash/schema"
 import { blockDocument, type Block, frameText, quotaLines } from "@tui-dash/quota";
 import { fixture } from "../../lib/fixtures";
 import { quotaAxiRead } from "../../lib/quota-read";
+import { cellDiffs } from "../../lib/styled-screen";
 
 // The frame time the pinned screen was recorded at, one second after the report.
 const now = DateTime.makeUnsafe("2026-10-13T20:18:16Z");
@@ -58,6 +59,10 @@ describe("the quota panel, against an earlier dashboard's pinned quota output", 
     const lines = quotaLines(blocks(), width, true, now);
     const frame = await Effect.runPromise(frameText(blockDocument(lines), width, lines.length + 1));
     expect(frame).toBe(pinned());
+  });
+
+  test("keeps each cell's tone, rejecting a health bar painted in another health's colour", async () => {
+    expect(await cellDiffs(quotaLines(blocks(), width, true, now), width, "quota-84x13")).toEqual([]);
   });
 
   test("every provider header carries its brand colour, in bold", async () => {

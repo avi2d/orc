@@ -6,6 +6,7 @@ import { blockDocument, frameText, lineWidth, plain } from "@tui-dash/ui";
 import { fixture } from "../../lib/fixtures";
 import { claudeUnread, machineReport, machineView, southReading } from "../../lib/machines-fixture";
 import { valueOf } from "../../lib/outcomes";
+import { cellDiffs } from "../../lib/styled-screen";
 
 const refused = "sh exited 255: ssh: connect to host south.example.com port 22: Connection refused";
 
@@ -65,6 +66,18 @@ describe("the composed session panel, against its pinned screens of two invented
 
   test("renders the reviewed 40 column screen of a failed remote through OpenTUI", async () => {
     expect(await rendered(failed(), 40)).toBe(normalize(fixture("screens/session-quota-remote-failed-40x19.txt")));
+  });
+
+  test("keeps each cell's tone at 84 columns, rejecting a machine prefix painted in another machine's colour", async () => {
+    expect(await cellDiffs(sessionLines(composed(), 84, 8), 84, "session-quota-composed-84x17")).toEqual([]);
+  });
+
+  test("keeps each cell's tone at 40 columns, rejecting a machine prefix painted in another machine's colour", async () => {
+    expect(await cellDiffs(sessionLines(composed(), 40, 8), 40, "session-quota-composed-40x26")).toEqual([]);
+  });
+
+  test("keeps each cell's tone of a failed remote, rejecting a failure painted like a reading", async () => {
+    expect(await cellDiffs(sessionLines(failed(), 40, 8), 40, "session-quota-remote-failed-40x19")).toEqual([]);
   });
 });
 

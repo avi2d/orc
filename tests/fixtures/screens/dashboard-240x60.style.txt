@@ -1,0 +1,81 @@
+1  foreground on pick
+2  primary on pick
+3  warning on pick
+a  accent
+A  accent bold
+C  claude bold
+e  error
+E  error bold
+f  foreground
+F  foreground bold
+G  opencodeGo bold
+m  muted
+o  focus
+O  focus bold
+p  primary
+s  success
+u  subtle
+w  warning
+W  warning bold
+X  codex bold
+
+mm fffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mmmm AOOOOOOO m Ammmmm mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mm mmmm Afffff f fffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mm
+m C CCCCCC CCCC m mmm W WWWW WWW WW WW WWW                                     mm E FFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF FFFFFF FFFF                      mm w ffff fff ffffff fffff ffffff f ff                                          m
+m   f fffff    sssssssssasssssssssssssssssssssssssss  sss  sss sssss    mm mmm mm E FFFFFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF FFFFFF FFFF                   mm f fff fffffff fff fffff fff ffff fff ffffffff f ff                           m
+m   ffff       wwwwwwwwwwwwuuuauuuuuuuuuuuuuuuuuuuuu  www  WW WWWW      mm mmm mm E F FFFFFFFFFFF FFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF FFFFFF FFFF         mm w ffff f ffff fff ffff fffffff f ff                                          m
+m   fffff ffff sssssssssssssssasssssssssssssssssssss ssss  sss sssss    mm mmm mm E FFFFFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFFFFFFFFF FFFFF                  mm f ffff f fffff fff ffff fffffff fff fff ffffff fffff f fffffff fff fff f fff m
+m C CCCCCC CCCCCC m mmm                                                        mm                                                                              mm                                                                              m
+m   ffff                                             wwww www ww www           mm                                                                              mm                                                                              m
+m X XXXXX m mmmm m mmm mmm mmm mm mm mm                                        mm                                                                              mm                                                                              m
+m   f fffff    ssssssssssssssssssssssssssssssssssssa ssss  mm mmmm      mm mmm mm                                                                              mm                                                                              m
+m   ffff       sssssssssssssssssssssssssssssssuuuauu  sss  WW WWWW      mm mmm mm                                                                              mm                                                                              m
+m G GGGGGGGGGGG W WWWW WWW WW WWW                                              mm                                                                              mm                                                                              m
+m   f fffff    ssssssssssssssssssssssssssssssssssssa ssss  mm mmmm      mm mmm mm                                                                              mm                                                                              m
+m   ffff       sssssssssssssssssssssssssssasssssssuu  sss  sss sssss     mm mm mm                                                                              mm                                                                              m
+m   fffff      ssssssssssssssssssssssssssssssuauuuuu  sss  W WWWW          mmm mm                                                                              mm                                                                              m
+m                                                                              mm                                                                              mm                                                                              m
+m                                                                              mm                                                                              mm                                                                              m
+m                                                                              mm                                                                              mm                                                                              m
+m                                                                              mm                                                                              mm                                                                              m
+m                                                                              mm                                                                              mm                                                                              m
+m                                                                              mm                                                                              mm                                                                              m
+m                                                                              mm                                                                              mm                                                                              m
+m                                                                              mm                                                                              mm                                                                              m
+mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+mm ffffffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mmoo AOOOOOOO O OOOOO ooooooooooooooooooooooooooooooooooooooooooooooooooo m mmm oomm ffffff f fffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mm
+m FFFFF  mmm sss  mmm ssssssssss  mmm ss  mmmm sss                             mo   uuuuuuu                                     uuuu uuuu uuuu uuuuu uuuu uuuu om   uuuu                                   uuuuu   uuuuuuu uuuuu  uuuuu   uuuu m
+m   s ff ffff ffff fff fffff                                                   mo   uuuuu                                          p    w    f     f    f    f om p fffffffffffffffff                      ppppppp fffff   f         ff ff fff m
+m                                                                              mo 1111111111111111111111111111111111111111111112222233333111111111111111111111 om p fffffffffffffffff                      wwwwwww fffff   f         ff  ff ff m
+m FFFFF  mmm sss  mmm sssssssssss  mmm www  mmmm sss                           mo   ffff                                           p    w    f     f    f    f om   mmmmmmmmmmm                            mmmmmmm mmmmm   m          m  mm mm m
+m   mmmm mmmmm mmm mmmmm mmmmmmmmmmmmmmmmmmmmmmmmm mm mmmmm                    mo                                                                              om                                                                              m
+mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmo                                                                              om                                                                              m
+mm OAOOO m Ammmmmmmm mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mmo                                                                              om                                                                              m
+m f fffffff f f fffffff f f ffffff ff fffff                                    mo                                                                              om                                                                              m
+m w ww wwww ww wwww www wwww                                                   mo                                                                              om                                                                              m
+m p mmmmm fffff fffffff mmmmm mmm                                fff       mmm mo                                                                              om                                                                              m
+m p mmmmm fffff fffffff mmmmm mmmm                               fff       mmm mo                                                                              om                                                                              m
+m p mmmmm fffff ffff mmm mmmm                                     ff       mmm mo                                                                              om                                                                              m
+m p mm          ffff mm                                           ff       mmm mo                                                                              om                                                                              m
+m w mm          ffff mmmmmm                                        f   wwwwwww mo                                                                              om                                                                              m
+m s mmmmm fffff fffffffffffffffff mmmm mmmmmm mmmm                ff     mmmmm mo                                                                              om                                                                              m
+m m mmmmm mmmmm mmmmmmmmmmmmmmmmmmm mmmmm mmm                    fff     mmmmm mo                                                                              om                                                                              m
+m e mmmmm fffff f mmmm mmmmm mmm mmmmmmm                          ff     mmmmm mo                                                                              om                                                                              m
+m e mmmmm fffff fffffffffffffffff mmm mmm mmmm                    ff     mmmmm mo                                                                              om                                                                              m
+m s mmmmm fffff fffffffffffffffff mmmm                            ff     mmmmm mo                                                                              om                                                                              m
+m e mmmmm fffff ffffffffff mmmm m                                 ff     mmmmm mo                                                                              om                                                                              m
+m e mm          ffff mm                                           ff     mmmmm mo                                                                              om                                                                              m
+m                                                                              mo                                                                              om                                                                              m
+m                                                                              mo                                                                              om                                                                              m
+m                                                                              mo                                                                              om                                                                              m
+m                                                                              mo                                                                              om                                                                              m
+m                                                                              mo                                                                              om                                                                              m
+m                                                                              mo                                                                              om                                                                              m
+m                                                                              mo                                                                              om                                                                              m
+m                                                                              mo                                                                              om                                                                              m
+m                                                                              mo                                                                              om                                                                              m
+m                                                                              mo                                                                              om                                                                              m
+m                                                                              mo                                                                              om                                                                              m
+m                                                                              mo                                                                              om                                                                              m
+m                                                                              mo                                                                              om                                                                              m
+m                                                                              mo                                                                              om                                                                              m
+mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooommmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

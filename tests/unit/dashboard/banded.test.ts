@@ -6,6 +6,7 @@ import { type BandedReadings, bandedReadings } from "../../lib/banded-fixture";
 import { dashboardNow, recordedResources } from "../../lib/dashboard-fixture";
 import { fixture } from "../../lib/fixtures";
 import { bandedDrawn, bandedLines, bandedScreen, type Step } from "../../lib/host-fixture";
+import { cellDiffs } from "../../lib/styled-screen";
 import { at, gib, live, southTaskReadings, taskReadings } from "../../lib/task-levels-fixture";
 
 const texts = (columns: number, rows: number, steps: ReadonlyArray<Step> = []): ReadonlyArray<string> => bandedLines(columns, rows, steps);
@@ -526,6 +527,10 @@ describe("the banded dashboard, against its pinned recordings", () => {
   for (const [columns, rows] of [[240, 60], [120, 40]] as const) {
     test(`renders the pinned frame at ${columns}x${rows}`, () => {
       expect(`${texts(columns, rows).map((line) => line.trimEnd()).join("\n")}\n`).toBe(fixture(`screens/dashboard-${columns}x${rows}.txt`));
+    });
+
+    test(`keeps each cell's tone at ${columns}x${rows}, rejecting a focused box painted like an unfocused one`, async () => {
+      expect(await cellDiffs(bandedDrawn(columns, rows).block, columns, `dashboard-${columns}x${rows}`)).toEqual([]);
     });
   }
 });

@@ -1,0 +1,24 @@
+a  accent
+C  claude bold
+f  foreground
+G  opencodeGo bold
+m  muted
+s  success
+u  subtle
+w  warning
+W  warning bold
+X  codex bold
+
+C CCCCCC CCCC m mmm
+fffffff sssssssssassssssssssssssssssssssssssssu  sss  mmmmmm mmmm             mm mmm
+ffff    wwwwwwwwwwwwuuuuauuuuuuuuuuuuuuuuuuuuuu  www  WWWWW WW WW WWW         mm mmm
+fffff   ssssssssssssssssassssssssssssssssssssss ssss  mmmmmm mmmm             mm mmm
+C CCCCCC CCCCCC m mmm
+ff      wwww www ww www
+X XXXXX m mmmm
+fffffff ssssssssssssssssssssssssssssssssssssssa ssss  mm mmmm                 mm mmm
+ffff    ssssssssssssssssssssssssssssssssuuuuauu  sss  mmmmm mm mm mm m mmmmm  mm mmm
+G GGGGGGGGGGG
+fffffff ssssssssssssssssssssssssssssssssssssssa ssss  mm mmmm                 mm mmm
+ffffff  sssssssssssssssssssssssssssssasssssssuu  sss  mmmmmm mmmm             mm mm
+fffffff ssssssssssssssssssssssssssssssssauuuuuu  sss  WWWWW WW WWW            mmm
