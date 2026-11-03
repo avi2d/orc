@@ -65,6 +65,7 @@ const expectedFiles = [
   "src/dispatch/task-events.ts",
   "src/dispatch/task-record.ts",
   "src/dispatch/token.ts",
+  "src/dispatch/upstream.ts",
   "src/git-config.ts",
   "src/git-run.ts",
   "src/history-resume.ts",

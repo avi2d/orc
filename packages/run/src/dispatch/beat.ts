@@ -14,6 +14,7 @@ import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
 import { flagStall } from "./stall"
 import { readPullRequest } from "./pr-view"
 import { prEvents, type ReadPullRequest } from "./task-events"
+import { type ReadUpstream, readUpstream, watchUpstream } from "./upstream"
 
 export type { BeatAction } from "./beat-action"
 export type { MachineRoom } from "./beat-place"
@@ -269,9 +270,10 @@ const renewTask = (context: BeatContext, task: TaskRecord): Effect.Effect<Option
 export interface BeatSources {
   readonly readLoad: ReadLoad
   readonly readPullRequest: ReadPullRequest
+  readonly readUpstream: ReadUpstream
 }
 
-export const liveSources = (): BeatSources => ({ readLoad: readMachineLoad, readPullRequest })
+export const liveSources = (): BeatSources => ({ readLoad: readMachineLoad, readPullRequest, readUpstream })
 
 export const runBeat = (
   root: string,
@@ -312,6 +314,7 @@ export const runBeat = (
         }
       }
     }
+    const upstream = yield* watchUpstream(root, projects, sources.readUpstream, at)
     const current = yield* listTasks(root)
     const queued = current.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, sources.readLoad)
@@ -323,6 +326,7 @@ export const runBeat = (
         ...closed,
         ...stalls.flatMap(Option.toArray),
         ...prs.flatMap(Option.toArray),
+        ...upstream,
         ...renewals.flatMap(Option.toArray),
         ...actions
       ]

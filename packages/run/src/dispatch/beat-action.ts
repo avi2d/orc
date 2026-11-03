@@ -21,3 +21,6 @@ export type BeatAction =
   | { readonly kind: "parked"; readonly task: string; readonly machine: string; readonly branch: string; readonly questions: ReadonlyArray<string> }
   | StalledAction
   | { readonly kind: "pr-unread"; readonly task: string; readonly reason: string }
+  | { readonly kind: "upstream-seen"; readonly project: string; readonly url: string; readonly state: string }
+  | { readonly kind: "upstream-changed"; readonly project: string; readonly url: string; readonly changes: ReadonlyArray<string>; readonly task: string }
+  | { readonly kind: "upstream-unread"; readonly project: string; readonly url: string; readonly reason: string }
