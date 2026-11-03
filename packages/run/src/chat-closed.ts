@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { HoldJson, ParkedJson } from "./chat-parked"
 import { taskKinds } from "./task-kind"
 
 export const ClosedTask = Schema.Struct({
@@ -6,6 +7,8 @@ export const ClosedTask = Schema.Struct({
   title: Schema.String,
   kind: Schema.Literals(taskKinds),
   status: Schema.Literal("closed"),
+  hold: Schema.NullOr(HoldJson),
+  parked: Schema.NullOr(ParkedJson),
   outcome: Schema.Literals(["done", "failed", "start-failed"]),
   reason: Schema.String,
   pr: Schema.NullOr(Schema.String),

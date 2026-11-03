@@ -1,5 +1,6 @@
 import { Console, Data, Effect, FileSystem } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { boardsVar } from "./chat-board"
 import { chatToolNames, orcCommandVar } from "./chat-tools"
 import type { Command } from "./dispatch/runner"
 import { readOrcConfig } from "./orc-config"
@@ -31,7 +32,7 @@ const chatRules = (orcHome: string): Effect.Effect<ChatRules, ChatError, FileSys
 const rulesLine = (rules: ChatRules): string =>
   rules.kind === "loaded" ? "orc chat loaded the rules in " + rules.file : "orc chat found no rules at " + rules.file
 
-const chatLaunch = (model: string, rules: ChatRules, self: Command): ChatLaunch => ({
+const chatLaunch = (orcHome: string, model: string, rules: ChatRules, self: Command): ChatLaunch => ({
   command: [
     "pi",
     "--model",
@@ -42,7 +43,7 @@ const chatLaunch = (model: string, rules: ChatRules, self: Command): ChatLaunch 
     chatToolNames.join(","),
     ...(rules.kind === "loaded" ? ["--append-system-prompt", rules.file] : [])
   ],
-  env: { [orcCommandVar]: JSON.stringify(self) }
+  env: { [orcCommandVar]: JSON.stringify(self), [boardsVar]: orcHome + "/boards" }
 })
 
 export const runChat = (orcHome: string, self: Command): Effect.Effect<number, ChatError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
@@ -56,7 +57,7 @@ export const runChat = (orcHome: string, self: Command): Effect.Effect<number, C
     }
     const rules = yield* chatRules(orcHome)
     yield* Console.log(rulesLine(rules))
-    const launch = chatLaunch(model, rules, self)
+    const launch = chatLaunch(orcHome, model, rules, self)
     const [program, ...args] = launch.command
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const handle = yield* spawner.spawn(ChildProcess.make(program, args, { env: launch.env, extendEnv: true, stdin: "inherit", stdout: "inherit", stderr: "inherit" }))

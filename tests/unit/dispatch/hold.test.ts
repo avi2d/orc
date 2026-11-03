@@ -17,11 +17,60 @@ describe("held task files", () => {
   test("a held and answered task survives a write and a read with its words intact instead of losing the hold", async () => {
     const record: TaskRecord = {
       spec: { ...spec, id: "task-4", body: "# Fix the thing\n" },
-      hold: { reason: "which API: REST or \"gRPC\"?", until: "2026-12-01", answer: { words: "REST,\n  and keep v1 — for now", at: "2026-11-02T12:00:00.000Z" } },
+      hold: { reason: "which API: REST or \"gRPC\"?", until: "2026-12-01", questions: [], answer: { words: "REST,\n  and keep v1 — for now", at: "2026-11-02T12:00:00.000Z" } },
       parked: null,
       state: { kind: "new" }
     }
     expect(await run(parseTaskFile("task-4.md", "new", renderTaskFile(record)))).toEqual(record)
+  })
+  test("a hold with one of two questions answered survives a write and a read instead of dropping the open question", async () => {
+    const record: TaskRecord = {
+      spec: { ...spec, id: "task-4", body: "# Fix the thing\n" },
+      hold: {
+        reason: "two choices",
+        until: null,
+        questions: [
+          { id: "question-1", text: "REST or \"gRPC\"?", answer: { words: "gRPC, for now", at: "2026-11-02T12:00:00.000Z" } },
+          { id: "question-2", text: "Which region?", answer: null }
+        ],
+        answer: null
+      },
+      parked: null,
+      state: { kind: "new" }
+    }
+    expect(await run(parseTaskFile("task-4.md", "new", renderTaskFile(record)))).toEqual(record)
+  })
+  test("asking a held task the same questions again keeps it, and asking others is refused instead of replacing the open ones", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-hold-questions-"))
+    try {
+      await run(addTask(root, spec))
+      const ask = { reason: "two choices", until: null, questions: ["REST or gRPC?", "Which region?"] }
+      expect((await run(holdTask(root, "task-1", ask))).kind).toBe("held")
+      const file = join(root, "new", "task-1.md")
+      const before = await readFile(file, "utf8")
+      expect((await run(holdTask(root, "task-1", ask))).kind).toBe("already held")
+      const failure = await run(Effect.flip(holdTask(root, "task-1", { ...ask, questions: ["Which database?"] })))
+      expect(failure.detail).toBe("task-1 is already held on question-1, question-2, so answer those first")
+      expect(await readFile(file, "utf8")).toBe(before)
+      expect((await run(listTasks(root)))[0]?.hold?.questions.map((question) => question.id + " " + question.text)).toEqual(["question-1 REST or gRPC?", "question-2 Which region?"])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+  test("holding a reason-only held task again with questions is refused instead of attaching them", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-hold-reason-"))
+    try {
+      await run(addTask(root, spec))
+      await run(holdTask(root, "task-1", { reason: "wait for budget", until: null, questions: [] }))
+      const file = join(root, "new", "task-1.md")
+      const before = await readFile(file, "utf8")
+      const failure = await run(Effect.flip(holdTask(root, "task-1", { reason: "wait for budget", until: null, questions: ["Which API?"] })))
+      expect(failure.detail).toBe("task-1 is already held: wait for budget, so answer it first")
+      expect(await readFile(file, "utf8")).toBe(before)
+      expect((await run(holdTask(root, "task-1", { reason: "wait for budget", until: null, questions: [] }))).kind).toBe("already held")
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
   const holdRefusal = async (folder: "new" | "taken" | "closed", lines: ReadonlyArray<string>): Promise<string> => {
     const text = ["---", "id: task-5", "title: Fix the thing", "project: orc", "machine: null", "depends_on: []", "created: 2026-10-27T10:00:00.000Z", ...lines, "---", "# Fix the thing", ""].join("\n")
@@ -37,6 +86,10 @@ describe("held task files", () => {
     expect(await holdRefusal("new", ["hold_reason: \"why\"", "answer: \"yes\""])).toBe("an answer names no words or no time")
     expect(await holdRefusal("new", ["hold_reason: \"why\"", "answered_at: \"2026-11-02T12:00:00.000Z\""])).toBe("an answer names no words or no time")
     expect(await holdRefusal("new", ["answer: \"yes\"", "answered_at: \"2026-11-02T12:00:00.000Z\""])).toBe("a hold names no reason")
+    expect(await holdRefusal("new", ["hold_reason: \"why\"", "hold_questions: [{\"id\":\"question-1\",\"text\":\"REST?\",\"answer\":\"yes\",\"answered_at\":\"2026-11-02T12:00:00.000Z\"}]"]))
+      .toBe("a hold answers every question and names no answer")
+    expect(await holdRefusal("new", ["hold_reason: \"why\"", "hold_questions: [{\"id\":\"question-1\",\"text\":\"REST?\",\"answer\":\"yes\"}]"]))
+      .toBe("the held question question-1 names its answer with no words or no time")
   })
   test("a hold on a parked task is refused instead of written", async () => {
     const root = await mkdtemp(join(tmpdir(), "orc-hold-parked-"))
@@ -48,7 +101,7 @@ describe("held task files", () => {
       await run(parkStartedTask(root, "task-1", "orc/task-1", Arr.make({ id: "question-4", text: "Which retries are allowed?" })))
       const file = join(root, "new", "task-1.md")
       const before = await readFile(file, "utf8")
-      const failure = await run(Effect.flip(holdTask(root, "task-1", { reason: "wait for budget", until: null })))
+      const failure = await run(Effect.flip(holdTask(root, "task-1", { reason: "wait for budget", until: null, questions: [] })))
       expect(failure.detail).toBe("task-1 is parked for the captain's answer, so it cannot be held")
       expect(await readFile(file, "utf8")).toBe(before)
       expect((await run(listTasks(root)))[0]?.hold).toBeNull()

@@ -40,7 +40,7 @@ const runnerPueue: BeatSpawner =
 describe("a released run's input", () => {
   const answeredTaken = async (root: string): Promise<void> => {
     await run(addTask(root, { ...spec, title: "Pick the API", body: "# Pick the API\nChoose.\n" }))
-    await run(holdTask(root, "task-1", { reason: "REST or gRPC", until: null }))
+    await run(holdTask(root, "task-1", { reason: "REST or gRPC", until: null, questions: [] }))
     await run(answerTask(root, "task-1", "REST", "2026-11-02T12:00:00.000Z"))
     await run(claimTask(root, "task-1"))
   }
