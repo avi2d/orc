@@ -204,6 +204,15 @@ const actionLine = (action: BeatAction): string => {
     case "pr-unread": {
       return "cannot read the PR of " + action.task + " for the chat: " + action.reason
     }
+    case "upstream-seen": {
+      return "watching " + action.url + " for " + action.project + ": " + action.state
+    }
+    case "upstream-changed": {
+      return "added " + action.task + " for " + action.project + " as a scout: " + action.url + " changed: " + action.changes.join(", ")
+    }
+    case "upstream-unread": {
+      return "upstream of " + action.project + ": " + action.reason
+    }
   }
 }
 
