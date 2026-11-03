@@ -13,9 +13,7 @@ import { closeFinished } from "./beat-close"
 import { taskLabel } from "./pueue-status"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
 import { flagStall } from "./stall"
-import { alertEvents, watchAlerts } from "./alert-events"
 import { readPullRequest } from "./pr-view"
-import { type Command } from "./runner"
 import { prEvents, type ReadPullRequest, stallEvent } from "./task-events"
 
 export type { BeatAction } from "./beat-action"
@@ -272,27 +270,9 @@ const renewTask = (context: BeatContext, task: TaskRecord): Effect.Effect<Option
 export interface BeatSources {
   readonly readLoad: ReadLoad
   readonly readPullRequest: ReadPullRequest
-  readonly alerts: Command | null
 }
 
-export const liveSources = (): BeatSources => ({
-  readLoad: readMachineLoad,
-  readPullRequest,
-  alerts: Bun.which("tui-dash") === null ? null : ["tui-dash", "alerts", "--json"]
-})
-
-const recordChatEvents = (
-  root: string,
-  sources: BeatSources,
-  tasks: ReadonlyArray<TaskRecord>,
-  at: string
-): Effect.Effect<ReadonlyArray<BeatAction>, BacklogError, BeatRequirements> =>
-  Effect.gen(function*() {
-    const prs = yield* Effect.forEach(tasks, (task) => prEvents(root, task, sources.readPullRequest, at))
-    const watched = sources.alerts === null ? [] : yield* watchAlerts(root, sources.alerts)
-    const unread = yield* alertEvents(root)
-    return [...prs.flatMap(Option.toArray), ...watched, ...unread]
-  })
+export const liveSources = (): BeatSources => ({ readLoad: readMachineLoad, readPullRequest })
 
 export const runBeat = (
   root: string,
@@ -337,7 +317,7 @@ export const runBeat = (
       }
     }
     const current = yield* listTasks(root)
-    const events = yield* recordChatEvents(root, sources, current, at)
+    const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))
     const queued = current.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: current, overloaded }
@@ -346,7 +326,7 @@ export const runBeat = (
     return { beat, at, quota, room: readRoom(config.machines, current), actions: [
         ...closed,
         ...stalls.flatMap(Option.toArray),
-        ...events,
+        ...prs.flatMap(Option.toArray),
         ...renewals.flatMap(Option.toArray),
         ...actions
       ]

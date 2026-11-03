@@ -101,8 +101,6 @@ const withFixture = async (shape: FixtureShape, body: (fixture: Fixture) => Prom
     await mkdir(arrivals)
     await writeFile(join(bin, "orc-quota"), fakeQuota(arrivals))
     await chmod(join(bin, "orc-quota"), 0o755)
-    await writeFile(join(bin, "tui-dash"), "#!/bin/sh\nexit 0\n")
-    await chmod(join(bin, "tui-dash"), 0o755)
     const start = ["sh", "-c", "sleep 0.1; echo \"$ORC_TASK_ID $ORC_TASK_MACHINE\" >> '" + startLog + "'"]
     await writeFile(join(backlog, "dispatch.json"), JSON.stringify({
       machines: [{ name: "mac", slots: shape.mac, start }, { name: "linux", slots: shape.linux, start }],

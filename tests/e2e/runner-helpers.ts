@@ -25,6 +25,11 @@ export interface OrcResult {
 
 const fakePueue = [
   "#!/bin/sh",
+  "case \" $* \" in *\" orc-alerts-\"*)",
+  "  printf '%s\\n' \"$@\" > \"$PUEUE_STATE/alerts-$1-args\";",
+  "  if [ -f \"$PUEUE_STATE/fail-alerts\" ]; then echo \"fake pueue refuses the alert stream\" >&2; exit 1; fi;",
+  "  if [ \"$1\" = \"add\" ]; then echo 900; else echo \"Group $3 created\"; fi; exit 0 ;;",
+  "esac",
   "case \"$1\" in",
   "  status) cat \"$PUEUE_STATE/status.json\" ;;",
   "  group)",

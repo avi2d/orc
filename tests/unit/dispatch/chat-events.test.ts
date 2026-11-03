@@ -113,10 +113,10 @@ const fireTexts = [
 ]
 
 describe("an alert fire", () => {
-  test("each fire is posted once instead of once per beat", async () => {
+  test("each fire is listed once instead of once per read or per beat", async () => {
     await withBacklog(async (root) => {
       await writeFile(join(root, "alerts.jsonl"), [quotaFire, loadFire, longFire].join("\n") + "\n")
-      await beat(root)
+      expect(await unposted(root)).toEqual(fireTexts)
       await beat(root)
       expect(await unposted(root)).toEqual(fireTexts)
     })
@@ -124,20 +124,40 @@ describe("an alert fire", () => {
   test("a posted fire stays posted after a restart instead of posting again", async () => {
     await withBacklog(async (root) => {
       await writeFile(join(root, "alerts.jsonl"), quotaFire + "\n")
-      await beat(root)
       await postAll(root)
-      await beat(root)
-      expect(await unposted(root)).toEqual([])
+      await appendFile(join(root, "alerts.jsonl"), loadFire + "\n")
+      expect(await unposted(root)).toEqual([fireTexts[1]])
+    })
+  })
+  test("a line the stream wrote twice is listed once instead of posting twice", async () => {
+    await withBacklog(async (root) => {
+      await writeFile(join(root, "alerts.jsonl"), [quotaFire, quotaFire].join("\n") + "\n")
+      expect(await unposted(root)).toEqual([fireTexts[0]])
     })
   })
   test("a line the stream is still writing waits for its newline instead of failing to read", async () => {
     await withBacklog(async (root) => {
       await writeFile(join(root, "alerts.jsonl"), quotaFire + "\n" + loadFire.slice(0, 20))
-      expect(await beat(root)).not.toContain("cannot read alert line")
       expect(await unposted(root)).toEqual([fireTexts[0]])
       await appendFile(join(root, "alerts.jsonl"), loadFire.slice(20) + "\n")
-      await beat(root)
       expect(await unposted(root)).toEqual(fireTexts.slice(0, 2))
+    })
+  })
+  test("a line orc cannot read is posted once as its error instead of stopping every later fire", async () => {
+    await withBacklog(async (root) => {
+      await writeFile(join(root, "alerts.jsonl"), "{\"rule\":\"unknown\"}\n" + loadFire + "\n")
+      const [unread = "", ...rest] = await unposted(root)
+      expect(unread).toStartWith("orc cannot read alert line 1 of " + join(root, "alerts.jsonl") + ": ")
+      expect(rest).toEqual([fireTexts[1]])
+      await postAll(root)
+      expect(await unposted(root)).toEqual([])
+    })
+  })
+  test("a key no fire carries is refused instead of marked", async () => {
+    await withBacklog(async (root) => {
+      await writeFile(join(root, "alerts.jsonl"), quotaFire + "\n")
+      const refused = await Effect.runPromise(markEventPosted(root, "alert.quota-pace.0000000000000000").pipe(Effect.flip, Effect.provide(BunServices.layer)))
+      expect(refused.detail).toBe("the backlog holds no event alert.quota-pace.0000000000000000")
     })
   })
 })
@@ -147,7 +167,6 @@ describe("a long task fire", () => {
     await withBacklog(async (root) => {
       const total = JSON.stringify({ ...longTask, reason: "total", totalMinutes: 6095.8 })
       await writeFile(join(root, "alerts.jsonl"), total + "\n")
-      await beat(root)
       expect(await unposted(root)).toEqual(["alert: Port the parser (task-9) on mac running for 4d 5h"])
     })
   })

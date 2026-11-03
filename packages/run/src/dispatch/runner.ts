@@ -73,7 +73,7 @@ export const capture = (command: Command, stdin: string | null, env?: Record<str
     Effect.mapError((error) => new RunnerError({ detail: command[0] + " did not run: " + error.message }))
   )
 
-const pueue = (args: ReadonlyArray<string>, env?: Record<string, string>): Effect.Effect<string, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+export const pueue = (args: ReadonlyArray<string>, env?: Record<string, string>): Effect.Effect<string, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   capture(["pueue", ...args], null, env).pipe(
     Effect.flatMap((result) =>
       result.exitCode === 0
@@ -124,21 +124,21 @@ export const fileKeyOf = (home: string, task: string, label: string): string => 
 
 const PueueGroups = Schema.Record(Schema.String, Schema.Unknown)
 
-const readOrcGroup = (): Effect.Effect<boolean, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+const readGroup = (group: string): Effect.Effect<boolean, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   pueue(["group", "--json"]).pipe(
     Effect.flatMap((text) => decodeJson(text, PueueGroups, "pueue group --json")),
-    Effect.map((groups) => Object.hasOwn(groups, orcGroup))
+    Effect.map((groups) => Object.hasOwn(groups, group))
   )
 
-const ensureOrcGroup = (): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  readOrcGroup().pipe(
+export const ensureGroup = (group: string, options: ReadonlyArray<string> = []): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  readGroup(group).pipe(
     Effect.flatMap((present) =>
       present
         ? Effect.void
-        : pueue(["group", "add", orcGroup]).pipe(
+        : pueue(["group", "add", group, ...options]).pipe(
           Effect.asVoid,
           Effect.catch((error) =>
-            readOrcGroup().pipe(
+            readGroup(group).pipe(
               Effect.flatMap((now) => now ? Effect.void : Effect.fail(error))
             )
           )
@@ -207,7 +207,7 @@ const queueTask = (
     )
     yield* requireFolder(request.checkout)
     const project = yield* resolveProjectDir(request.checkout)
-    yield* ensureOrcGroup()
+    yield* ensureGroup(orcGroup)
     const label = labelOf(home, request.task, request.label)
     const key = fileKeyOf(home, request.task, label)
     const held = yield* readHeld(home, request.task, label)
@@ -249,7 +249,7 @@ const queueTask = (
 export const queueFromText = (text: string, self: Command, home: string): Effect.Effect<string, RunnerError, RunnerRequirements> =>
   decodeSecret(text, QueueRequest, queueRefusal).pipe(Effect.flatMap((request) => queueTask(request, self, home)))
 
-const pueueDone = (task: PueueTask): boolean =>
+export const pueueDone = (task: PueueTask): boolean =>
   Option.exists(Schema.decodeUnknownOption(PueueStatus)(task.status), (status) => "Done" in status)
 
 const renewHere = (request: RenewRequest, home: string): Effect.Effect<string, RunnerError, RunnerRequirements> =>

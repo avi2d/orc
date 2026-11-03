@@ -21,5 +21,3 @@ export type BeatAction =
   | { readonly kind: "parked"; readonly task: string; readonly machine: string; readonly branch: string; readonly questions: ReadonlyArray<string> }
   | StalledAction
   | { readonly kind: "pr-unread"; readonly task: string; readonly reason: string }
-  | { readonly kind: "alerts-started"; readonly command: string; readonly output: string }
-  | { readonly kind: "alert-unread"; readonly line: number; readonly reason: string }

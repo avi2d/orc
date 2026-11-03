@@ -387,18 +387,15 @@ describe("orc chat tools", () => {
     })
   }, 60_000)
 
-  test("an alert fire the beat records is posted once as its own message, not again on a later poll or after a restart", async () => {
+  test("an alert fire the stream writes is posted once as its own message with no beat, not again on a later poll or after a restart", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       const fire = { schemaVersion: 1, rule: "heavy-load", at: "2026-11-02T11:31:00.000Z", machine: "mac", since: "2026-11-02T11:25:00.000Z", crossed: ["cpu"] }
       await writeFile(join(fixture.home, "backlog", "alerts.jsonl"), JSON.stringify(fire) + "\n")
-      const beat = await runOrc(fixture, ["beat"])
-      expect(beat.stderr).toBe("")
       const first = piFor(fixture, 50)
       first.fire("session_start", { isIdle: () => true })
       await until(() => first.sent.length > 0, 10_000)
       await Bun.sleep(500)
       first.fire("session_shutdown")
-      await runOrc(fixture, ["beat"])
       const reopened = piFor(fixture, 50)
       reopened.fire("session_start", { isIdle: () => true })
       await Bun.sleep(1_000)

@@ -1,9 +1,5 @@
-import { Effect, FileSystem, Result, Schema } from "effect"
-import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { BacklogError, platformFailure } from "./backlog-write"
-import type { BeatAction } from "./beat-action"
-import { recordEvent } from "./events"
-import type { Command } from "./runner"
+import { Result, Schema } from "effect"
+import type { ChatEvent } from "./chat-event"
 
 const QuotaPace = Schema.Struct({
   rule: Schema.Literal("quota-pace"),
@@ -70,77 +66,23 @@ const alertText = (alert: AlertLine): string => {
 }
 
 // The stream writes each fire once, as one line holding its rule, subject and time, so the line names the fire.
-const fireKey = (rule: AlertLine["rule"], line: string): string =>
-  "alert." + rule + "." + new Bun.CryptoHasher("sha256").update(line).digest("hex").slice(0, 16)
-
-const alertsFile = (root: string): string => root + "/alerts.jsonl"
-const pidFile = (root: string): string => root + "/alerts.pid"
-const logFile = (root: string): string => root + "/logs/alerts.log"
+const lineKey = (kind: string, line: string): string =>
+  "alert." + kind + "." + new Bun.CryptoHasher("sha256").update(line).digest("hex").slice(0, 16)
 
 // A line the stream is still writing has no newline yet, so only finished lines are read.
 const finishedLines = (text: string): ReadonlyArray<string> => text.split("\n").slice(0, -1)
 
-export const alertEvents = (root: string): Effect.Effect<ReadonlyArray<BeatAction>, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const file = alertsFile(root)
-    const text = yield* fs.readFileString(file).pipe(
-      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed("")),
-      Effect.mapError(platformFailure("read " + file))
-    )
-    const unread: Array<BeatAction> = []
-    for (const [index, line] of finishedLines(text).entries()) {
-      if (line.trim() === "") {
-        continue
-      }
-      const alert = Schema.decodeResult(AlertLine)(line)
-      if (Result.isFailure(alert)) {
-        unread.push({ kind: "alert-unread", line: index + 1, reason: file + " holds no alert orc reads: " + alert.failure.message })
-        continue
-      }
-      yield* recordEvent(root, { key: fireKey(alert.success.rule, line), at: alert.success.at, text: alertText(alert.success) })
-    }
-    return unread
-  })
-
-const alive = (pid: number): Effect.Effect<boolean> =>
-  Effect.try({ try: () => process.kill(pid, 0), catch: () => new BacklogError({ detail: "no process " + String(pid) }) }).pipe(
-    Effect.as(true),
-    Effect.catchTag("BacklogError", () => Effect.succeed(false))
-  )
-
-// The stream leads its own session and is unreferenced, so it outlives the beat and keeps each rule's state between beats.
-const startStream = (root: string, command: Command): Effect.Effect<number, BacklogError, ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const handle = yield* spawner.spawn(ChildProcess.make("sh", ["-c", "exec \"$@\" >> \"$ORC_ALERTS\" 2>> \"$ORC_ALERTS_LOG\"", "orc-alerts", ...command], {
-      env: { ORC_ALERTS: alertsFile(root), ORC_ALERTS_LOG: logFile(root) },
-      extendEnv: true,
-      detached: true,
-      stdin: "ignore",
-      stdout: "ignore",
-      stderr: "ignore"
-    }))
-    yield* Effect.asVoid(handle.unref)
-    return Number(handle.pid)
-  }).pipe(Effect.scoped, Effect.mapError(platformFailure("start " + command.join(" "))))
-
-export const watchAlerts = (
-  root: string,
-  command: Command
-): Effect.Effect<ReadonlyArray<BeatAction>, BacklogError, ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const file = pidFile(root)
-    const written = yield* fs.readFileString(file).pipe(
-      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed("")),
-      Effect.mapError(platformFailure("read " + file))
-    )
-    const pid = Number(written.trim())
-    if (Number.isInteger(pid) && pid > 0 && (yield* alive(pid))) {
+const lineEvents = (file: string, text: string): ReadonlyArray<ChatEvent> =>
+  finishedLines(text).flatMap((line, index): ReadonlyArray<ChatEvent> => {
+    if (line.trim() === "") {
       return []
     }
-    const started = yield* startStream(root, command)
-    yield* fs.writeFileString(file, String(started)).pipe(Effect.mapError(platformFailure("write " + file)))
-    return [{ kind: "alerts-started", command: command.join(" "), output: alertsFile(root) }]
+    const alert = Schema.decodeResult(AlertLine)(line)
+    if (Result.isFailure(alert)) {
+      return [{ key: lineKey("unread", line), at: "", text: "orc cannot read alert line " + String(index + 1) + " of " + file + ": " + alert.failure.message }]
+    }
+    return [{ key: lineKey(alert.success.rule, line), at: alert.success.at, text: alertText(alert.success) }]
   })
+
+export const alertFires = (file: string, text: string): ReadonlyArray<ChatEvent> =>
+  [...new Map(lineEvents(file, text).map((event) => [event.key, event])).values()]

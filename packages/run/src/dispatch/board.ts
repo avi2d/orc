@@ -2,7 +2,7 @@ import { dependencyOpen, type BeatAction, type BeatReport, type MachineRoom } fr
 import type { Project } from "./config"
 import { describeQuota } from "./quota"
 import type { TaskKind } from "../task-kind"
-import type { ChatEvent } from "./events"
+import type { ChatEvent } from "./chat-event"
 import { type Claim, type Hold, isHeld, openQuestions, type Parked, type Started, type TaskRecord } from "./task-record"
 
 const BACKLOG_JSON_SCHEMA = "orc.backlog.v1" as const
@@ -203,12 +203,6 @@ const actionLine = (action: BeatAction): string => {
     }
     case "pr-unread": {
       return "cannot read the PR of " + action.task + " for the chat: " + action.reason
-    }
-    case "alerts-started": {
-      return "started " + action.command + ", its alerts to " + action.output
-    }
-    case "alert-unread": {
-      return "cannot read alert line " + String(action.line) + " for the chat: " + action.reason
     }
   }
 }

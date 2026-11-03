@@ -8,6 +8,5 @@ export const uncheckedOpen: PullRequestView = { state: "OPEN", headRefOid: "0".r
 
 export const quietSources = (readLoad: ReadLoad = readMachineLoad, readPullRequest: ReadPullRequest = () => Effect.succeed(uncheckedOpen)): BeatSources => ({
   readLoad,
-  readPullRequest,
-  alerts: null
+  readPullRequest
 })

@@ -571,10 +571,12 @@ When it starts and every 15 seconds after, the chat reads `orc backlog --json`.
 While Pi is idle, it posts each closed task that has no `postedAt`, with its outcome, its reason and its PR or report, as in `task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
 It posts a task whoever added it: this chat, an earlier chat or the command line.
 It posts each close then runs `orc backlog posted <task-id>`, which writes `posted_at` into the closed task file, so a task closed while no chat ran is posted by the next chat to start, and every close is posted, with a close repeated at most when the chat stops between its post and its mark, or when two chats post the same close in the same moment.
-It posts each event the beat records the same way, then runs `orc backlog posted <event-key>`.
-The beat records an event when a task's run stalls, when a closed task's PR turns green, merges or closes without merging, and for each alert fire.
-It reads the fires from `alerts.jsonl` in the backlog folder, which `tui-dash alerts --json` writes when `tui-dash` is on the beat's PATH, and the beat starts that stream when none runs.
-Each event file under `events/` is named for the event, so a beat records it at most once, and a second stall of one task is a new event.
+It posts each event the same way, then runs `orc backlog posted <event-key>`.
+The beat records an event when a task's run stalls, or when a closed task's PR turns green, merges or closes without merging.
+Each event file under `events/` is named for the event, so a beat records it once.
+A second stall of one task is a new event.
+`orc backlog --json` also lists each alert fire from `alerts.jsonl` in the backlog folder, and the chat posts each fire once.
+The alert stream that `orc runner start` queues writes that file, as [The runner](#the-runner) shows.
 When it cannot read or mark the backlog, it posts orc's error once Pi is idle and keeps polling.
 Each time the chat starts, it posts one line per held task you have not answered, once Pi is idle, as in `task-2 Pick the API is held for the captain: REST or gRPC, until 2026-12-01`.
 It posts one line per parked question you have not answered each time it starts, and once more when a task parks while it runs, as in `task-3 Fix the retries is parked on orc/task-3 for the captain's answer to question-4: Which retries are allowed?`.
@@ -593,6 +595,10 @@ The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
 A task queued for another home keeps a scoped file instead, so two homes holding the same task id never share one file.
 A task this home already holds queued or running in group `orc` is not queued again, and a task whose earlier run is done there is queued again, as a parked task is once answered.
+
+When `tui-dash` is on its PATH, `orc runner start` also queues `tui-dash alerts --json` in pueue on the machine it runs on, with its output appended to `~/.orc/backlog/alerts.jsonl`.
+It queues that stream once, in a group of its own home that runs one task at a time, so a stream already queued or running is not queued again, and one that ended is queued again at the next start.
+When pueue refuses the stream, the start prints why on standard error and still queues the task.
 
 To start on another machine, put the command that runs orc there after `--`, as in `orc runner start -- ssh linux-box orc`.
 That runs `orc runner queue` on the far side and sends it the task as JSON on stdin, so the task text never passes through a remote shell.
@@ -670,6 +676,11 @@ To print the five minute load average the beat compares against a load limit, ru
 | `src/dispatch/load.ts` | The five minute load reading and the overloaded machines |
 | `src/dispatch/machine-reach.ts` | The sweep ownership check and the remote command prefix |
 | `src/dispatch/stall.ts` | The stalled run flag kept in the backlog logs |
+| `src/dispatch/events.ts` | The chat events under `events/`, their posted marks and the alert fires the backlog lists |
+| `src/dispatch/task-events.ts` | The stall and PR events the beat records for every task |
+| `src/dispatch/alert-events.ts` | The reading of each `alerts.jsonl` line as one alert fire |
+| `src/dispatch/alert-stream.ts` | The one alert stream `orc runner start` queues in pueue |
+| `src/dispatch/pr-view.ts` | The `gh pr view` reading of a task's PR and its check verdicts |
 | `src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
 | `src/dispatch/runner.ts` | The runner: the start and the token renewal through pueue |
 | `src/dispatch/runner-result.ts` | The reading of a task's result and the `orc.runner.v1` JSON |

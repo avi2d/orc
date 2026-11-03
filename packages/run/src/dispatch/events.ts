@@ -1,11 +1,7 @@
 import { Effect, FileSystem, Schema } from "effect"
+import { alertFires } from "./alert-events"
 import { BacklogError, platformFailure, publishOnce } from "./backlog-write"
-
-export interface ChatEvent {
-  readonly key: string
-  readonly at: string
-  readonly text: string
-}
+import type { ChatEvent } from "./chat-event"
 
 const keyPattern = /^[a-z0-9][a-z0-9.-]*$/
 
@@ -17,6 +13,19 @@ const eventsFolder = (root: string): string => root + "/events"
 const postedFolder = (root: string): string => root + "/events/posted"
 
 const fileSuffix = ".json"
+
+export const alertsFile = (root: string): string => root + "/alerts.jsonl"
+
+const readAlertFires = (root: string): Effect.Effect<ReadonlyArray<ChatEvent>, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const file = alertsFile(root)
+    const text = yield* fs.readFileString(file).pipe(
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed("")),
+      Effect.mapError(platformFailure("read " + file))
+    )
+    return alertFires(file, text)
+  })
 
 // The key names the file, and link(2) refuses an existing name, so each event is recorded at most once however often a beat sees it.
 export const recordEvent = (root: string, event: ChatEvent): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
@@ -39,7 +48,8 @@ export const eventRecorded = (root: string, key: string): Effect.Effect<boolean,
 export const markEventPosted = (root: string, key: string): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
-    if (!(yield* eventRecorded(root, key))) {
+    const fired = key.startsWith("alert.") && (yield* readAlertFires(root)).some((fire) => fire.key === key)
+    if (!fired && !(yield* eventRecorded(root, key))) {
       return yield* new BacklogError({ detail: "the backlog holds no event " + key })
     }
     const folder = postedFolder(root)
@@ -74,6 +84,7 @@ export const unpostedEvents = (root: string): Effect.Effect<ReadonlyArray<ChatEv
       .filter((name) => name.endsWith(fileSuffix))
       .map((name) => name.slice(0, -fileSuffix.length))
       .filter((key) => isEventKey(key) && !posted.has(key))
-    const events = yield* Effect.forEach(keys, (key) => readEvent(root, key))
-    return events.toSorted((left, right) => left.at.localeCompare(right.at) || left.key.localeCompare(right.key))
+    const recorded = yield* Effect.forEach(keys, (key) => readEvent(root, key))
+    const fires = (yield* readAlertFires(root)).filter((fire) => !posted.has(fire.key))
+    return [...recorded, ...fires].toSorted((left, right) => left.at.localeCompare(right.at) || left.key.localeCompare(right.key))
   })

@@ -16,6 +16,7 @@ import { formatResult, readResult, readResultThrough, readStdinLabel, runnerJson
 import type { TaskFileError, TaskRecord } from "./task-record"
 import { encodeToken, sessionToken } from "./token"
 import { markEventPosted, unpostedEvents } from "./events"
+import { ensureAlertStream, liveAlertStream } from "./alert-stream"
 
 type CommandArgs = Exclude<DispatchArgs, { readonly kind: "UsageError" }>
 
@@ -214,6 +215,17 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   }
 }
 
+// The task is queued by now, so a stream that will not queue is told in the task's log and fails no task.
+const startAlertStream = (home: string) => {
+  const stream = liveAlertStream()
+  return stream === null
+    ? Effect.void
+    : ensureAlertStream(home, stream).pipe(
+      Effect.flatMap((line) => line === null ? Effect.void : Console.log(line)),
+      Effect.catchTag("RunnerError", (error) => Console.error("orc runner start queued no alert stream: " + error.detail))
+    )
+}
+
 const execute = (args: CommandArgs, place: DispatchPlace) =>
   Effect.gen(function*() {
     switch (args.kind) {
@@ -245,6 +257,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         if (line !== null) {
           yield* Console.log(line)
         }
+        yield* startAlertStream(place.home)
         break
       }
       case "RunnerRenew": {
