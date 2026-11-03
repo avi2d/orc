@@ -105,28 +105,3 @@ export const panelLine = (title: Line, lines: Block, width: number, frame: Frame
   ...lines.map((line) => sides(line, width, frame)),
   bottomEdge(width, frame),
 ];
-
-// The caller styles each name bright or dim; the edge only frames them.
-export const tabEdge = (tabs: ReadonlyArray<Line>, width: number, frame: Frame, top: boolean): Line => {
-  const edge = edges[frame.weight];
-  const open = top ? edge.topLeft : edge.bottomLeft;
-  const shut = top ? edge.topRight : edge.bottomRight;
-  const head: Array<Line[number]> = [span(`${open}${edge.across}`, frame.tone)];
-  for (const tab of tabs) head.push(span("\u2510", frame.tone), ...tab, span("\u250c", frame.tone));
-  return fit(
-    [...head, span(edge.across.repeat(Math.max(0, width - 1 - lineWidth(head))), frame.tone), span(shut, frame.tone)],
-    width,
-  );
-};
-
-export const tabbedPanel = (
-  tabs: ReadonlyArray<Line>,
-  lines: Block,
-  width: number,
-  frame: Frame = lightFrame,
-  bottomTabs: ReadonlyArray<Line> = [],
-): Block => [
-  tabEdge(tabs, width, frame, true),
-  ...lines.map((line) => sides(line, width, frame)),
-  bottomTabs.length === 0 ? bottomEdge(width, frame) : tabEdge(bottomTabs, width, frame, false),
-];
