@@ -8,6 +8,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../../packages/run/src/dispatch/args"
 import { addTask, listTasks } from "../../../packages/run/src/dispatch/backlog"
 import { runBeat } from "../../../packages/run/src/dispatch/beat"
+import { quietSources } from "../../lib/beat-sources"
 import { readDispatchConfig } from "../../../packages/run/src/dispatch/config"
 import { type LoadReading, readMachineLoad } from "../../../packages/run/src/dispatch/load"
 
@@ -50,7 +51,7 @@ const loadOf = (fiveMinute: number) => (): Effect.Effect<LoadReading> => Effect.
 
 const beatAt = async (root: string, machine: Record<string, unknown>, readLoad: () => Effect.Effect<LoadReading>) => {
   await writeBacklog(root, machine)
-  const report = await Effect.runPromise(runBeat(root, root, { readLoad }).pipe(Effect.provide(Layer.merge(BunServices.layer, quotaStub))))
+  const report = await Effect.runPromise(runBeat(root, root, quietSources(readLoad)).pipe(Effect.provide(Layer.merge(BunServices.layer, quotaStub))))
   const states = (await run(listTasks(root))).map((task) => task.state.kind)
   return { actions: report.actions.map((action) => action.kind === "waits" ? "waits: " + action.reason : action.kind), states }
 }
@@ -97,7 +98,7 @@ describe("a machine's five-minute load limit", () => {
       }))
       await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { winbox: "/home/a/orc", mac: "/Users/a/orc" } }] }))
       await run(addTask(root, spec))
-      const report = await Effect.runPromise(runBeat(root, root, { readLoad: loadOf(20) }).pipe(Effect.provide(Layer.merge(BunServices.layer, quotaStub))))
+      const report = await Effect.runPromise(runBeat(root, root, quietSources(loadOf(20))).pipe(Effect.provide(Layer.merge(BunServices.layer, quotaStub))))
       expect(report.actions.map((action) => action.kind === "started" ? action.machine : action.kind)).toEqual(["mac"])
     })
   })

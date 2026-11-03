@@ -1,4 +1,5 @@
 import { isTaskId } from "./backlog"
+import { isEventKey } from "./events"
 import { isCalendarDate } from "./task-record"
 import { isTaskKind, type TaskKind, unknownKind } from "../task-kind"
 import { isMergeBasis, type MergeBasis, mergeBases } from "./merge-basis"
@@ -20,6 +21,7 @@ export type DispatchArgs =
   }
   | { readonly kind: "CloseTask"; readonly id: string; readonly outcome: "done" | "failed"; readonly reason: string }
   | { readonly kind: "MarkPosted"; readonly id: string }
+  | { readonly kind: "MarkEventPosted"; readonly key: string }
   | { readonly kind: "HoldTask"; readonly id: string; readonly reason: string; readonly until: string | null; readonly questions: ReadonlyArray<string> }
   | { readonly kind: "AnswerTask"; readonly id: string; readonly words: string }
   | { readonly kind: "MergeTask"; readonly id: string; readonly basis: MergeBasis }
@@ -34,7 +36,7 @@ export type DispatchArgs =
   | { readonly kind: "UsageError"; readonly detail: string }
 
 export const dispatchUsage =
-  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task>] [--internal] [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog posted <task-id> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner load"
+  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task>] [--internal] [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner load"
 
 const parseJsonFlag = (rest: ReadonlyArray<string>, json: (json: boolean) => DispatchArgs): DispatchArgs => {
   if (rest.length === 0) {
@@ -145,10 +147,13 @@ const unexpected = (word: string | undefined): DispatchArgs => ({ kind: "UsageEr
 
 const parsePosted = (rest: ReadonlyArray<string>): DispatchArgs => {
   const [id = "", ...extra] = rest
-  if (!isTaskId(id)) {
-    return { kind: "UsageError", detail: "orc backlog posted takes a task id, got \"" + id + "\"" }
+  if (extra.length > 0) {
+    return unexpected(extra[0])
   }
-  return extra.length === 0 ? { kind: "MarkPosted", id } : unexpected(extra[0])
+  if (isEventKey(id)) {
+    return { kind: "MarkEventPosted", key: id }
+  }
+  return isTaskId(id) ? { kind: "MarkPosted", id } : { kind: "UsageError", detail: "orc backlog posted takes a task id or an event key, got \"" + id + "\"" }
 }
 
 interface HoldFlags {

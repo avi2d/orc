@@ -40,4 +40,6 @@ export const decisionFor = (task: BacklogTask, waits: "held" | "parked"): Decisi
 // Parked comes first because orc backlog answer answers a parked question before a hold.
 export const openDecision = (task: BacklogTask): Decision | null => decisionFor(task, "parked") ?? decisionFor(task, "held")
 
-export const BacklogTasks = Schema.fromJsonString(Schema.Struct({ tasks: Schema.Array(Schema.Union([ClosedTask, OpenTask])) }))
+const BacklogEvent = Schema.Struct({ key: Schema.String, text: Schema.String })
+
+export const BacklogTasks = Schema.fromJsonString(Schema.Struct({ tasks: Schema.Array(Schema.Union([ClosedTask, OpenTask])), events: Schema.Array(BacklogEvent) }))

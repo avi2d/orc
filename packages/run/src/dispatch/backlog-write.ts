@@ -13,13 +13,13 @@ export const scratchName = (folder: string, id: string): string => folder + "/."
 // link(2) refuses an existing name, so the file appears whole and at most once.
 export const publishOnce = (
   folder: string,
-  id: string,
+  name: string,
   text: string
 ): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
-    const scratch = scratchName(folder, id)
-    const file = folder + "/" + id + ".md"
+    const scratch = scratchName(folder, name)
+    const file = folder + "/" + name
     yield* fs.writeFileString(scratch, text).pipe(Effect.mapError(platformFailure("write " + scratch)))
     const published = yield* fs.link(scratch, file).pipe(
       Effect.as(true),

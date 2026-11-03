@@ -6,7 +6,8 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, Layer } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
-import { liveSources, placeTask, runBeat } from "../../../packages/run/src/dispatch/beat"
+import { placeTask, runBeat } from "../../../packages/run/src/dispatch/beat"
+import { quietSources } from "../../lib/beat-sources"
 import { formatBeat } from "../../../packages/run/src/dispatch/board"
 import type { DispatchConfig, Project } from "../../../packages/run/src/dispatch/config"
 import { taskLabel } from "../../../packages/run/src/dispatch/pueue-status"
@@ -76,7 +77,7 @@ const startScout = async (root: string): Promise<void> => {
 }
 
 const beatClosing = async (root: string) => {
-  const report = await Effect.runPromise(runBeat(root, root, liveSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueDone(root)))))
+  const report = await Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueDone(root)))))
   const task = (await run(listTasks(root))).find((candidate) => candidate.spec.id === "task-1")
   return {
     closing: task?.state.kind === "closed" ? task.state.closing : null,

@@ -13,6 +13,8 @@ import { closeFinished } from "./beat-close"
 import { taskLabel } from "./pueue-status"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
 import { flagStall } from "./stall"
+import { readPullRequest } from "./pr-view"
+import { prEvents, type ReadPullRequest } from "./task-events"
 
 export type { BeatAction } from "./beat-action"
 export type { MachineRoom } from "./beat-place"
@@ -267,9 +269,10 @@ const renewTask = (context: BeatContext, task: TaskRecord): Effect.Effect<Option
 
 export interface BeatSources {
   readonly readLoad: ReadLoad
+  readonly readPullRequest: ReadPullRequest
 }
 
-export const liveSources = (): BeatSources => ({ readLoad: readMachineLoad })
+export const liveSources = (): BeatSources => ({ readLoad: readMachineLoad, readPullRequest })
 
 export const runBeat = (
   root: string,
@@ -316,5 +319,13 @@ export const runBeat = (
     const fresh: BeatContext = { ...context, tasks: current, overloaded }
     const renewals = yield* Effect.forEach(current, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, task))
-    return { beat, at, quota, room: readRoom(config.machines, current), actions: [...closed, ...stalls.flatMap(Option.toArray), ...renewals.flatMap(Option.toArray), ...actions] }
+    const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))
+    return { beat, at, quota, room: readRoom(config.machines, current), actions: [
+        ...closed,
+        ...stalls.flatMap(Option.toArray),
+        ...prs.flatMap(Option.toArray),
+        ...renewals.flatMap(Option.toArray),
+        ...actions
+      ]
+    }
   })

@@ -476,9 +476,10 @@ The beat prints `closed <task-id> <done|failed> on <machine>` with the reason an
 A machine whose start runs any other program keeps owning its tasks, which the beat never reads.
 To close one of those, run `orc backlog close <task-id> <done|failed> [reason]`.
 A started run whose output has not grown for 30 minutes prints `stalled <task-id> on <machine>: no output since <time>` once, and again after new output stalls anew.
+A PR the beat cannot read for the chat prints `cannot read the PR of <task-id> for the chat: <reason>`.
 A missing start command exits 127 into its log and leaves the task started.
 Only a failure to spawn the log wrapper closes the task as `start-failed`.
-To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1` and carries the endings as `closed`, `close-failed` and `parked` actions and a stall as `stalled`.
+To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1` and carries the endings as `closed`, `close-failed` and `parked` actions, a stall as `stalled` and a PR the beat cannot read as `pr-unread`.
 On a token command account, each beat first sends every started task its account's current token through its machine's `renew` command, as JSON on standard input.
 
 ## Parked runs
@@ -576,6 +577,12 @@ When it starts and every 15 seconds after, the chat reads `orc backlog --json`.
 While Pi is idle, it posts each closed task that has no `postedAt`, with its outcome, its reason and its PR or report, as in `task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
 It posts a task whoever added it: this chat, an earlier chat or the command line.
 It posts each close then runs `orc backlog posted <task-id>`, which writes `posted_at` into the closed task file, so a task closed while no chat ran is posted by the next chat to start, and every close is posted, with a close repeated at most when the chat stops between its post and its mark, or when two chats post the same close in the same moment.
+It posts each event the same way, then runs `orc backlog posted <event-key>`.
+The beat records an event when a task's run stalls, or when a closed task's PR turns green, merges or closes without merging.
+Each event file under `events/` is named for the event, so a beat records it once.
+A second stall of one task is a new event.
+`orc backlog --json` also lists each alert fire from `alerts.jsonl` in the backlog folder, and the chat posts each fire once.
+The alert stream that `orc runner start` queues writes that file, as [The runner](#the-runner) shows.
 When it cannot read or mark the backlog, it posts orc's error once Pi is idle and keeps polling.
 Each time the chat starts, it posts one line per held task you have not answered, once Pi is idle, as in `task-2 Pick the API is held for the captain: REST or gRPC, until 2026-12-01`.
 It posts one line per parked question you have not answered each time it starts, and once more when a task parks while it runs, as in `task-3 Fix the retries is parked on orc/task-3 for the captain's answer to question-4: Which retries are allowed?`.
@@ -615,6 +622,10 @@ The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
 A task queued for another home keeps a scoped file instead, so two homes holding the same task id never share one file.
 A task this home already holds queued or running in group `orc` is not queued again, and a task whose earlier run is done there is queued again, as a parked task is once answered.
+
+When `tui-dash` is on its PATH, `orc runner start` also queues `tui-dash alerts --json` in pueue on the machine it runs on, with its output appended to `~/.orc/backlog/alerts.jsonl`.
+It queues that stream once, in a group of its own home that runs one task at a time, so a stream already queued or running is not queued again, and one that ended is queued again at the next start.
+When pueue refuses the stream, the start prints why on standard error and still queues the task.
 
 To start on another machine, put the command that runs orc there after `--`, as in `orc runner start -- ssh linux-box orc`.
 That runs `orc runner queue` on the far side and sends it the task as JSON on stdin, so the task text never passes through a remote shell.
@@ -658,7 +669,7 @@ To print the five minute load average the beat compares against a load limit, ru
 | `src/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
 | `src/orc-config.ts` | The reading of `config.json`: the providers and the implementer, fixer and orchestrator models |
 | `src/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
-| `src/chat-tools.ts` | The chat tools and the poll that posts each closed task into the chat once |
+| `src/chat-tools.ts` | The chat tools and the poll that posts each closed task and each event into the chat once |
 | `src/chat-parked.ts` | The chat's listing of parked questions, once per start and once per park |
 | `src/chat-board.ts` | The chat's decision boards: the cards, the answers they record and the listing at each start |
 | `src/chat-board-page.ts` | The decision board page and the record of its cards |
@@ -695,6 +706,11 @@ To print the five minute load average the beat compares against a load limit, ru
 | `src/dispatch/load.ts` | The five minute load reading and the overloaded machines |
 | `src/dispatch/machine-reach.ts` | The sweep ownership check and the remote command prefix |
 | `src/dispatch/stall.ts` | The stalled run flag kept in the backlog logs |
+| `src/dispatch/events.ts` | The chat events under `events/`, their posted marks and the alert fires the backlog lists |
+| `src/dispatch/task-events.ts` | The stall and PR events the beat records for every task |
+| `src/dispatch/alert-events.ts` | The reading of each `alerts.jsonl` line as one alert fire |
+| `src/dispatch/alert-stream.ts` | The one alert stream `orc runner start` queues in pueue |
+| `src/dispatch/pr-view.ts` | The `gh pr view` reading of a task's PR and its check verdicts |
 | `src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
 | `src/dispatch/runner.ts` | The runner: the start and the token renewal through pueue |
 | `src/dispatch/refresh.ts` | The fast-forward of the checkout's default branch when a run starts |

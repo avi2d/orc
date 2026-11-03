@@ -122,7 +122,7 @@ export const addTask = (
     yield* ensureBacklog(root)
     const id = yield* reserveId(root)
     const record: TaskRecord = { spec: { ...spec, id }, hold: null, parked: null, state: { kind: "new" } }
-    if (!(yield* publishOnce(backlogPaths(root).folder("new"), id, renderTaskFile(record)))) {
+    if (!(yield* publishOnce(backlogPaths(root).folder("new"), id + ".md", renderTaskFile(record)))) {
       return yield* new BacklogError({ detail: "the reserved id " + id + " already names a task" })
     }
     return record
@@ -187,7 +187,7 @@ export const publishClosed = (root: string, record: TaskRecord): Effect.Effect<b
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const paths = backlogPaths(root)
-    if (!(yield* publishOnce(paths.folder("closed"), record.spec.id, renderTaskFile(record)))) {
+    if (!(yield* publishOnce(paths.folder("closed"), record.spec.id + ".md", renderTaskFile(record)))) {
       return false
     }
     const taken = paths.taskFile("taken", record.spec.id)

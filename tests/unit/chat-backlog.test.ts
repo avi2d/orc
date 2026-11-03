@@ -26,7 +26,8 @@ describe("chat backlog decoding", () => {
         pr: null,
         report: null,
         postedAt: null
-      }]
+      }],
+      events: []
     }))
     const task = backlog.tasks.find((candidate) => candidate.id === "task-1")
     if (task === undefined || task.status !== "closed") {

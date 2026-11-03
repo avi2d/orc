@@ -37,7 +37,7 @@ export const parkStartedTask = (
         return yield* new BacklogError({ detail: id + " is " + record.state.kind + ", and only a started task parks" })
       }
       const parked: TaskRecord = { ...record, parked: { branch, questions: parkedQuestions(open, record) }, state: { kind: "new" } }
-      if (!(yield* publishOnce(paths.folder("new"), id, renderTaskFile(parked)))) {
+      if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(parked)))) {
         return yield* new BacklogError({ detail: "new/ already holds " + id })
       }
       return parked
