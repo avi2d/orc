@@ -452,7 +452,11 @@ The task file keeps your words as `answer` and the time as `answered_at`, and th
 The released run reads the task body with the reason and your words added after it.
 Orc refuses to hold a task that is taken, started, closed or parked, and to answer a task that is neither held nor parked.
 Holding a held task again keeps the first reason.
-`orc backlog` shows a held task as `held (<reason>)`, and `orc backlog --json` gives every task a `hold`, either `null` or the reason, the date and the answer.
+To hold a task on several decisions at once, add one `--question <text>` for each, and orc names them `question-1` onward.
+Answer each one with `orc backlog answer <task-id> <question-id>=<words>`, and the task stays held until every question has an answer.
+The last answer also writes each question with its answer into `answer`, which the released run reads.
+Holding the task again with the same questions keeps the hold, and orc refuses other questions until you answer the open ones.
+`orc backlog` shows a held task as `held (<reason>)`, and `orc backlog --json` gives every task a `hold`, either `null` or the reason, the date, the questions with their answers and the answer.
 
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
 After the claim survives a recount, the beat writes the task started before it runs the start command.

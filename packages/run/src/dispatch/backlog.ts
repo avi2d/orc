@@ -1,5 +1,5 @@
 import { Effect, FileSystem, Schema } from "effect"
-import { captainWait, type Hold, parseTaskFile, renderTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
+import { captainWait, type Hold, type ParkedQuestion, parseTaskFile, renderTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 import { BacklogError, platformFailure, publishOnce, scratchName } from "./backlog-write"
 
 export { BacklogError }
@@ -322,7 +322,30 @@ export const findTask = (root: string, id: string): Effect.Effect<TaskRecord, Ba
 
 export type HoldOutcome = { readonly kind: "held" | "already held"; readonly hold: Hold }
 
-const holdOn = (id: string, hold: Omit<Hold, "answer">) => (fresh: TaskRecord): Effect.Effect<Rewrite<HoldOutcome>, BacklogError> => {
+export interface HoldAsk {
+  readonly reason: string
+  readonly until: string | null
+  readonly questions: ReadonlyArray<string>
+}
+
+const askedQuestions = (texts: ReadonlyArray<string>): ReadonlyArray<ParkedQuestion> =>
+  texts.map((text, index) => ({ id: "question-" + String(index + 1), text, answer: null }))
+
+const asksTheSame = (held: ReadonlyArray<ParkedQuestion>, texts: ReadonlyArray<string>): boolean =>
+  held.length === texts.length && held.every((question, index) => question.text === texts[index])
+
+const holdAgain = (id: string, fresh: TaskRecord, held: Hold, ask: HoldAsk): Effect.Effect<Rewrite<HoldOutcome>, BacklogError> => {
+  if (ask.questions.length === 0 || asksTheSame(held.questions, ask.questions)) {
+    return Effect.succeed({ kind: "keep", result: { kind: "already held", hold: held } })
+  }
+  if (held.questions.length > 0) {
+    return Effect.fail(new BacklogError({ detail: id + " is already held on " + held.questions.map((question) => question.id).join(", ") + ", so answer those first" }))
+  }
+  const asked: Hold = { ...held, questions: askedQuestions(ask.questions) }
+  return Effect.succeed({ kind: "write", record: { ...fresh, hold: asked }, result: { kind: "already held", hold: asked } })
+}
+
+const holdOn = (id: string, ask: HoldAsk) => (fresh: TaskRecord): Effect.Effect<Rewrite<HoldOutcome>, BacklogError> => {
   if (fresh.state.kind !== "new") {
     return Effect.fail(new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a new task is held" }))
   }
@@ -333,9 +356,9 @@ const holdOn = (id: string, hold: Omit<Hold, "answer">) => (fresh: TaskRecord): 
     return Effect.fail(new BacklogError({ detail: id + " was held and answered: " + fresh.hold.answer.words }))
   }
   if (fresh.hold !== null) {
-    return Effect.succeed({ kind: "keep", result: { kind: "already held", hold: fresh.hold } })
+    return holdAgain(id, fresh, fresh.hold, ask)
   }
-  const held: Hold = { ...hold, answer: null }
+  const held: Hold = { reason: ask.reason, until: ask.until, questions: askedQuestions(ask.questions), answer: null }
   return Effect.succeed({ kind: "write", record: { ...fresh, hold: held }, result: { kind: "held", hold: held } })
 }
 
@@ -343,11 +366,11 @@ const holdOn = (id: string, hold: Omit<Hold, "answer">) => (fresh: TaskRecord): 
 export const holdTask = (
   root: string,
   id: string,
-  hold: Omit<Hold, "answer">
+  ask: HoldAsk
 ): Effect.Effect<HoldOutcome, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const record = yield* findTask(root, id)
-    const decide = holdOn(id, hold)
+    const decide = holdOn(id, ask)
     if (record.state.kind !== "new") {
       const refused = yield* decide(record)
       return refused.result

@@ -33,15 +33,16 @@ interface Answer {
   readonly at: string
 }
 
-export interface Hold {
-  readonly reason: string
-  readonly until: string | null
-  readonly answer: Answer | null
-}
-
 export interface ParkedQuestion {
   readonly id: string
   readonly text: string
+  readonly answer: Answer | null
+}
+
+export interface Hold {
+  readonly reason: string
+  readonly until: string | null
+  readonly questions: ReadonlyArray<ParkedQuestion>
   readonly answer: Answer | null
 }
 
@@ -96,6 +97,13 @@ export class TaskFileError extends Data.TaggedError("TaskFileError")<{
   readonly detail: string
 }> {}
 
+const QuestionFront = Schema.Struct({
+  id: Schema.String,
+  text: Schema.String,
+  answer: Schema.optional(Schema.String),
+  answered_at: Schema.optional(Schema.String)
+})
+
 const Frontmatter = Schema.Struct({
   id: Schema.String,
   title: Schema.String,
@@ -107,15 +115,11 @@ const Frontmatter = Schema.Struct({
   created: Schema.String,
   hold_reason: Schema.optional(Schema.String),
   hold_until: Schema.optional(Schema.String),
+  hold_questions: Schema.optional(Schema.Array(QuestionFront)),
   answer: Schema.optional(Schema.String),
   answered_at: Schema.optional(Schema.String),
   parked_branch: Schema.optional(Schema.String),
-  parked_questions: Schema.optional(Schema.Array(Schema.Struct({
-    id: Schema.String,
-    text: Schema.String,
-    answer: Schema.optional(Schema.String),
-    answered_at: Schema.optional(Schema.String)
-  }))),
+  parked_questions: Schema.optional(Schema.Array(QuestionFront)),
   beat: Schema.optional(Schema.String),
   taken_for: Schema.optional(Schema.String),
   account: Schema.optional(Schema.String),
@@ -159,6 +163,18 @@ const answerOf = (front: { readonly answer?: string | undefined; readonly answer
   return { words: front.answer, at: front.answered_at }
 }
 
+const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string): Array<ParkedQuestion> | string => {
+  const questions: Array<ParkedQuestion> = []
+  for (const question of fronts) {
+    const answer = answerOf(question)
+    if (typeof answer === "string") {
+      return "the " + what + " question " + question.id + " names its answer with no words or no time"
+    }
+    questions.push({ id: question.id, text: question.text, answer })
+  }
+  return questions
+}
+
 const parkedOf = (front: Frontmatter): Parked | null | string => {
   if (front.parked_branch === undefined && front.parked_questions === undefined) {
     return null
@@ -166,13 +182,9 @@ const parkedOf = (front: Frontmatter): Parked | null | string => {
   if (front.parked_branch === undefined || front.parked_branch === "") {
     return "a parked task names no branch"
   }
-  const questions: Array<ParkedQuestion> = []
-  for (const question of front.parked_questions ?? []) {
-    const answer = answerOf(question)
-    if (typeof answer === "string") {
-      return "the parked question " + question.id + " names its answer with no words or no time"
-    }
-    questions.push({ id: question.id, text: question.text, answer })
+  const questions = questionsOf(front.parked_questions ?? [], "parked")
+  if (typeof questions === "string") {
+    return questions
   }
   return Arr.isReadonlyArrayNonEmpty(questions) ? { branch: front.parked_branch, questions } : "a parked task names no question"
 }
@@ -183,7 +195,7 @@ const holdOf = (front: Frontmatter): Hold | null | string => {
     return answer
   }
   if (front.hold_reason === undefined) {
-    return front.hold_until === undefined && answer === null ? null : "a hold names no reason"
+    return front.hold_until === undefined && front.hold_questions === undefined && answer === null ? null : "a hold names no reason"
   }
   if (front.hold_reason.trim() === "") {
     return "a hold names no reason"
@@ -191,7 +203,14 @@ const holdOf = (front: Frontmatter): Hold | null | string => {
   if (front.hold_until !== undefined && !isCalendarDate(front.hold_until)) {
     return "the hold_until " + front.hold_until + " is no YYYY-MM-DD date"
   }
-  return { reason: front.hold_reason, until: front.hold_until ?? null, answer }
+  const questions = questionsOf(front.hold_questions ?? [], "held")
+  if (typeof questions === "string") {
+    return questions
+  }
+  if (answer === null && questions.length > 0 && questions.every((question) => question.answer !== null)) {
+    return "a hold answers every question and names no answer"
+  }
+  return { reason: front.hold_reason, until: front.hold_until ?? null, questions, answer }
 }
 
 const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => {
@@ -290,26 +309,27 @@ const claimFields = (claim: Claim | null): ReadonlyArray<string> =>
 
 const startedFields = (started: Started): ReadonlyArray<string> => [field("started_at", started.at), field("start_log", started.log)]
 
+const questionFronts = (questions: ReadonlyArray<ParkedQuestion>) =>
+  questions.map((question) => ({
+    id: question.id,
+    text: question.text,
+    ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at })
+  }))
+
 const holdFields = (hold: Hold | null): ReadonlyArray<string> =>
   hold === null
     ? []
     : [
       field("hold_reason", hold.reason),
       ...(hold.until === null ? [] : [field("hold_until", hold.until)]),
+      ...(hold.questions.length === 0 ? [] : [field("hold_questions", questionFronts(hold.questions))]),
       ...(hold.answer === null ? [] : [field("answer", hold.answer.words), field("answered_at", hold.answer.at)])
     ]
 
 const parkedFields = (parked: Parked | null): ReadonlyArray<string> =>
   parked === null
     ? []
-    : [
-      field("parked_branch", parked.branch),
-      field("parked_questions", parked.questions.map((question) => ({
-        id: question.id,
-        text: question.text,
-        ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at })
-      })))
-    ]
+    : [field("parked_branch", parked.branch), field("parked_questions", questionFronts(parked.questions))]
 
 const stateFields = (state: TaskState): ReadonlyArray<string> => {
   switch (state.kind) {

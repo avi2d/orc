@@ -49,19 +49,26 @@ export const parkStartedTask = (
 
 export type AnswerOutcome =
   | { readonly kind: "hold"; readonly hold: Hold }
+  | { readonly kind: "held question"; readonly question: string; readonly open: ReadonlyArray<ParkedQuestion> }
   | { readonly kind: "question"; readonly question: string; readonly branch: string; readonly open: ReadonlyArray<ParkedQuestion> }
 
-const answerQuestionOn = (id: string, words: string, at: string, fresh: TaskRecord & { readonly parked: Parked }): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
-  const open = openQuestions(fresh)
-  if (open.length === 0) {
-    return Effect.fail(new BacklogError({ detail: id + " is not parked: its questions were answered" }))
-  }
+const unanswered = (questions: ReadonlyArray<ParkedQuestion>): ReadonlyArray<ParkedQuestion> => questions.filter((question) => question.answer === null)
+
+const answerOneOf = (
+  id: string,
+  words: string,
+  at: string,
+  questions: ReadonlyArray<ParkedQuestion>,
+  waits: "parked" | "held",
+  fresh: TaskRecord
+): Effect.Effect<{ readonly asked: ParkedQuestion; readonly answered: ParkedQuestion }, BacklogError> => {
+  const open = unanswered(questions)
   const cut = words.indexOf("=")
   const question = cut === -1 ? "" : words.slice(0, cut)
   const text = cut === -1 ? "" : words.slice(cut + 1)
-  const asked = fresh.parked.questions.find((candidate) => candidate.id === question)
+  const asked = questions.find((candidate) => candidate.id === question)
   if (asked === undefined || text.trim() === "") {
-    return Effect.fail(new BacklogError({ detail: id + " is parked for the captain's answer to " + open.map((candidate) => candidate.id).join(", ") + ", so answer one as <question-id>=<text>" }))
+    return Effect.fail(new BacklogError({ detail: id + " is " + waits + " for the captain's answer to " + open.map((candidate) => candidate.id).join(", ") + ", so answer one as <question-id>=<text>" }))
   }
   if (asked.answer !== null) {
     return Effect.fail(new BacklogError({ detail: id + " already has an answer to " + question + ": " + asked.answer.words }))
@@ -69,10 +76,31 @@ const answerQuestionOn = (id: string, words: string, at: string, fresh: TaskReco
   if (fresh.state.kind !== "new") {
     return Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" }))
   }
-  const questions = Arr.map(fresh.parked.questions, (candidate) => candidate === asked ? { ...candidate, answer: { words: text, at } } : candidate)
-  const answered: TaskRecord = { ...fresh, parked: { ...fresh.parked, questions } }
-  return Effect.succeed({ kind: "write", record: answered, result: { kind: "question", question, branch: fresh.parked.branch, open: openQuestions(answered) } })
+  return Effect.succeed({ asked, answered: { ...asked, answer: { words: text, at } } })
 }
+
+const answerQuestionOn = (id: string, words: string, at: string, fresh: TaskRecord & { readonly parked: Parked }): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
+  if (openQuestions(fresh).length === 0) {
+    return Effect.fail(new BacklogError({ detail: id + " is not parked: its questions were answered" }))
+  }
+  return answerOneOf(id, words, at, fresh.parked.questions, "parked", fresh).pipe(Effect.map(({ asked, answered }) => {
+    const questions = Arr.map(fresh.parked.questions, (candidate) => candidate === asked ? answered : candidate)
+    const record: TaskRecord = { ...fresh, parked: { ...fresh.parked, questions } }
+    return { kind: "write", record, result: { kind: "question", question: asked.id, branch: fresh.parked.branch, open: openQuestions(record) } }
+  }))
+}
+
+// The released run reads only hold.answer, so the last answer writes every question's words into it.
+const releasedWords = (questions: ReadonlyArray<ParkedQuestion>): string =>
+  questions.map((question) => question.text + ": " + (question.answer?.words ?? "")).join("\n")
+
+const answerHeldQuestionOn = (id: string, words: string, at: string, fresh: TaskRecord & { readonly hold: Hold }): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> =>
+  answerOneOf(id, words, at, fresh.hold.questions, "held", fresh).pipe(Effect.map(({ asked, answered }) => {
+    const questions = fresh.hold.questions.map((candidate) => candidate === asked ? answered : candidate)
+    const open = unanswered(questions)
+    const hold: Hold = { ...fresh.hold, questions, answer: open.length === 0 ? { words: releasedWords(questions), at } : null }
+    return { kind: "write", record: { ...fresh, hold }, result: { kind: "held question", question: asked.id, open } }
+  }))
 
 const answerOn = (id: string, words: string, at: string) => (fresh: TaskRecord): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
   if (fresh.parked !== null) {
@@ -80,6 +108,9 @@ const answerOn = (id: string, words: string, at: string) => (fresh: TaskRecord):
   }
   if (!isHeld(fresh)) {
     return Effect.fail(new BacklogError({ detail: id + " is not held" + (fresh.hold?.answer == null ? "" : ": its hold was answered") }))
+  }
+  if (fresh.hold.questions.length > 0) {
+    return answerHeldQuestionOn(id, words, at, fresh)
   }
   if (fresh.state.kind !== "new") {
     return Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" }))

@@ -251,11 +251,21 @@ describe("parseArgs run flags", () => {
   test("a hold reason of --help is recorded instead of printing usage", () => {
     expect(parseArgs(["backlog", "hold", "task-1", "--reason", "--help"])).toEqual({
       kind: "Dispatch",
-      args: { kind: "HoldTask", id: "task-1", reason: "--help", until: null }
+      args: { kind: "HoldTask", id: "task-1", reason: "--help", until: null, questions: [] }
     })
     expect(parseArgs(["backlog", "hold", "task-1", "--reason", "-h", "--until", "2026-12-01"])).toEqual({
       kind: "Dispatch",
-      args: { kind: "HoldTask", id: "task-1", reason: "-h", until: "2026-12-01" }
+      args: { kind: "HoldTask", id: "task-1", reason: "-h", until: "2026-12-01", questions: [] }
+    })
+  })
+  test("each --question is kept in order instead of the last one winning", () => {
+    expect(parseArgs(["backlog", "hold", "task-1", "--reason", "two choices", "--question", "REST or gRPC?", "--question", "Which region?"])).toEqual({
+      kind: "Dispatch",
+      args: { kind: "HoldTask", id: "task-1", reason: "two choices", until: null, questions: ["REST or gRPC?", "Which region?"] }
+    })
+    expect(parseArgs(["backlog", "hold", "task-1", "--reason", "two choices", "--question", " "])).toEqual({
+      kind: "UsageError",
+      detail: "orc backlog hold takes the question's text after --question"
     })
   })
   test("an explicit help flag still prints usage instead of becoming hold data", () => {

@@ -166,10 +166,11 @@ const markPostedNow = (id: string, place: DispatchPlace) =>
   })
 
 const holdNow = (args: Extract<CommandArgs, { readonly kind: "HoldTask" }>, place: DispatchPlace) =>
-  holdTask(backlogRoot(place), args.id, { reason: args.reason, until: args.until }).pipe(
+  holdTask(backlogRoot(place), args.id, { reason: args.reason, until: args.until, questions: args.questions }).pipe(
     Effect.map((outcome) =>
       (outcome.kind === "held" ? "held " + args.id : args.id + " is already held") + ": " + outcome.hold.reason +
-      (outcome.hold.until === null ? "" : ", until " + outcome.hold.until)
+      (outcome.hold.until === null ? "" : ", until " + outcome.hold.until) +
+      (outcome.hold.questions.length === 0 ? "" : ", on " + outcome.hold.questions.map((question) => question.id).join(", "))
     )
   )
 
@@ -178,6 +179,11 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
     const answered = yield* answerTask(backlogRoot(place), args.id, args.words, DateTime.formatIso(yield* DateTime.now))
     if (answered.kind === "hold") {
       return "answered " + args.id + ", so the beat may start it"
+    }
+    if (answered.kind === "held question") {
+      return answered.open.length === 0
+        ? "answered " + answered.question + " on " + args.id + ", so the beat may start it"
+        : "answered " + answered.question + " on " + args.id + ", and it stays held for " + answered.open.map((question) => question.id).join(", ")
     }
     return answered.open.length === 0
       ? "answered " + answered.question + " on " + args.id + ", so the beat resumes it on " + answered.branch
