@@ -123,6 +123,10 @@ const parsedInstructions = (project: { readonly name: string; readonly instructi
   return instructions === undefined ? { name } : { name, instructions }
 }
 
+// GitHub ignores case in owner and repository names and numbers issues and pull requests from one sequence, and an owner holds no dot.
+export const contributionId = (contribution: Contribution): string =>
+  contribution.owner.toLowerCase() + "." + contribution.repo.toLowerCase() + "." + String(contribution.number)
+
 const contributionPattern = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)\/(?:issues|pull)\/([1-9]\d*)$/
 
 const notUpstream = (name: string, value: unknown): string =>
@@ -140,8 +144,9 @@ const parsedUpstream = (name: string, upstream: unknown): ReadonlyArray<Contribu
     }
     contributions.push({ url: match[0], owner: match[1], repo: match[2], number: Number(match[3]) })
   }
-  const twice = duplicateOf(contributions.map((contribution) => contribution.url))
-  return twice === null ? contributions : "the project " + name + " names the upstream URL " + twice + " twice"
+  const ids = contributions.map(contributionId)
+  const again = contributions.find((contribution, index) => ids.indexOf(contributionId(contribution)) !== index)
+  return again === undefined ? contributions : "the project " + name + " names the upstream URL " + again.url + " twice"
 }
 
 const checkedProject = (project: RawProject): Project | string => {

@@ -97,6 +97,14 @@ describe("readProjects", () => {
       expect(await readProjectList(root, [{ ...projects[0], upstream: [url, url] }])).toBe("the project orc names the upstream URL " + url + " twice")
     })
   })
+  test.each([
+    ["another case", "https://github.com/Acme/Orc/pull/7"],
+    ["its issue URL", "https://github.com/acme/orc/issues/7"]
+  ])("refuses a contribution named again in %s instead of watching it twice", async (_, again) => {
+    await withBacklog(async (root) => {
+      expect(await readProjectList(root, [{ ...projects[0], upstream: ["https://github.com/acme/orc/pull/7", again] }])).toBe("the project orc names the upstream URL " + again + " twice")
+    })
+  })
   test("reads a project without the key unchanged, with no instructions or upstream field", async () => {
     await withBacklog(async (root) => {
       expect(await readProjectList(root, projects)).toEqual(projects)

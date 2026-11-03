@@ -3,7 +3,7 @@ import type { ChildProcessSpawner } from "effect/process"
 import { addTask } from "./backlog"
 import { BacklogError, platformFailure, scratchName } from "./backlog-write"
 import type { BeatAction } from "./beat-action"
-import type { Contribution, Project } from "./config"
+import { type Contribution, contributionId, type Project } from "./config"
 import { recordEvent } from "./events"
 import { gh } from "./pr-view"
 import type { RunnerError } from "./runner-error"
@@ -80,9 +80,8 @@ type Seen = typeof Seen.Type
 
 const seenFolder = (root: string, project: string): string => root + "/upstream/" + project
 
-// A GitHub owner holds no dot, so the owner, repository and number name one contribution whichever URL form names it.
 const seenFile = (root: string, project: string, contribution: Contribution): string =>
-  seenFolder(root, project) + "/" + contribution.owner + "." + contribution.repo + "." + String(contribution.number) + ".json"
+  seenFolder(root, project) + "/" + contributionId(contribution) + ".json"
 
 const readSeen = (file: string): Effect.Effect<Seen | null, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
@@ -108,7 +107,7 @@ const writeSeen = (root: string, project: string, contribution: Contribution, se
     const text = yield* Schema.encodeEffect(Seen)(seen).pipe(
       Effect.mapError((error) => new BacklogError({ detail: "cannot write " + file + ": " + error.message }))
     )
-    const scratch = scratchName(folder, contribution.owner + "." + contribution.repo + "." + String(contribution.number))
+    const scratch = scratchName(folder, contributionId(contribution))
     yield* fs.writeFileString(scratch, text).pipe(Effect.mapError(platformFailure("write " + scratch)))
     yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
   })
@@ -130,10 +129,13 @@ const scoutBody = (project: string, contribution: Contribution, state: UpstreamS
   ].join("\n")
 
 // The key holds the change number and both states, so beats reading one change share one key, and a record removed and seen afresh meets no old key.
-const changeKey = (project: string, seen: Seen, state: UpstreamState): string =>
-  "upstream." + new Bun.CryptoHasher("sha256").update([project, seen.url, String(seen.changes), JSON.stringify(seen.state), JSON.stringify(state)].join("\0")).digest("hex").slice(0, 16)
+const changeKey = (project: string, contribution: Contribution, seen: Seen, state: UpstreamState): string =>
+  "upstream." + new Bun.CryptoHasher("sha256").update([project, contributionId(contribution), String(seen.changes), JSON.stringify(seen.state), JSON.stringify(state)].join("\0")).digest("hex").slice(0, 16)
 
 const upstreamSeconds = 30
+
+// Reads run side by side, so a GitHub that hangs holds the beat's starts for about one timeout rather than one per contribution.
+const upstreamReads = 4
 
 type Requirements = FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
 
@@ -175,7 +177,7 @@ const watchOne = (
     }
     const title = "Follow up on " + shortName(contribution) + ": " + changes.join(", ")
     // The event is claimed before the task is added, so of two beats reading one change only the one that claims it adds the task.
-    const claimed = yield* recordEvent(root, { key: changeKey(project, before, state), at, text: "upstream " + contribution.url + " of " + project + " changed: " + changes.join(", ") })
+    const claimed = yield* recordEvent(root, { key: changeKey(project, contribution, before, state), at, text: "upstream " + contribution.url + " of " + project + " changed: " + changes.join(", ") })
     const task = claimed
       ? yield* addTask(root, { title, project, kind: "scout", internal: false, machine: null, dependsOn: [], created: at, body: scoutBody(project, contribution, state, title, changes) })
       : null
@@ -191,5 +193,6 @@ export const watchUpstream = (
 ): Effect.Effect<ReadonlyArray<BeatAction>, BacklogError, Requirements> =>
   Effect.forEach(
     projects.flatMap((project) => (project.upstream ?? []).map((contribution) => ({ project: project.name, contribution }))),
-    (entry) => watchOne(root, entry.project, entry.contribution, read, at)
+    (entry) => watchOne(root, entry.project, entry.contribution, read, at),
+    { concurrency: upstreamReads }
   ).pipe(Effect.map((actions) => actions.flatMap(Option.toArray)))
