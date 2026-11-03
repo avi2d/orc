@@ -1,9 +1,9 @@
 import { Effect, Schema } from "effect"
-import { BacklogTasks, isOpenHeld, type OpenHeld } from "./chat-backlog"
+import { isOpenHeld, type OpenHeld } from "./chat-backlog"
 import { type BoardHost, type Boards, boardsVar, decisionBoards } from "./chat-board"
 import { type Env, runCommand } from "./chat-command"
 import { ChatToolError } from "./chat-error"
-import { type Deliver, postUnposted, type PostState } from "./chat-posts"
+import { type Deliver, postUnposted, type PostState, readBacklog } from "./chat-posts"
 import { AddTaskInput, AnswerInput, BoardInput, HoldInput, MergeInput } from "./chat-inputs"
 import { lavishLauncher } from "./chat-lavish"
 import { parkedListing } from "./chat-parked"
@@ -79,21 +79,12 @@ const decodeInput = <A>(schema: Schema.Decoder<A>, tool: string, params: unknown
     Effect.mapError((error) => new ChatToolError({ message: tool + " takes " + error.message }))
   )
 
-const readBacklog = (env: Env): Effect.Effect<typeof BacklogTasks.Type, ChatToolError> =>
-  runOrc(env, ["backlog", "--json"], null).pipe(
-    Effect.flatMap((text) =>
-      Schema.decodeEffect(BacklogTasks)(text).pipe(
-        Effect.mapError((error) => new ChatToolError({ message: "orc backlog --json printed no backlog orc chat reads: " + error.message }))
-      )
-    )
-  )
-
 const heldLine = (task: OpenHeld): string =>
   task.id + " " + task.title + " is held for the captain: " + task.hold.reason + (task.hold.until === null ? "" : ", until " + task.hold.until)
 
 // Delivered is false only when Pi took none of the lines, so the caller tries the whole list again.
 const postOpenHeld = (env: Env, deliver: Deliver, state: PostState): Effect.Effect<boolean> =>
-  readBacklog(env).pipe(
+  readBacklog((args, stdin) => runOrc(env, args, stdin)).pipe(
     Effect.map((backlog) => backlog.tasks.filter(isOpenHeld).map(heldLine)),
     Effect.map((lines) => {
       state.unreadHeldBecause = null
@@ -233,7 +224,7 @@ export const chatSession = (
     ...boardSetup,
     dir: env[boardsVar] ?? null,
     orc: (args) => runOrc(env, args, null),
-    tasks: readBacklog(env).pipe(Effect.map((backlog) => backlog.tasks)),
+    tasks: readBacklog((args, stdin) => runOrc(env, args, stdin)).pipe(Effect.map((backlog) => backlog.tasks)),
     say: (line) => {
       boardNews.push(line)
       postBoardNews()
@@ -242,7 +233,7 @@ export const chatSession = (
   const tools = chatTools(env, boards)
   const postClosed = postUnposted((args, stdin) => runOrc(env, args, stdin), isOpen, deliverAs, state)
   const postHeld = postOpenHeld(env, deliverAs("held"), state)
-  const parked = parkedListing(readBacklog(env).pipe(Effect.map((backlog) => backlog.tasks)), deliverAs("parked"))
+  const parked = parkedListing(readBacklog((args, stdin) => runOrc(env, args, stdin)).pipe(Effect.map((backlog) => backlog.tasks)), deliverAs("parked"))
   const postParked = () => Effect.runPromise(parked.post)
   return {
     tools,

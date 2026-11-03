@@ -13,7 +13,7 @@ export type Deliver = (text: string) => boolean
 
 type RunOrc = (args: ReadonlyArray<string>, stdin: string | null) => Effect.Effect<string, ChatToolError>
 
-const readBacklog = (runOrc: RunOrc): Effect.Effect<typeof BacklogTasks.Type, ChatToolError> =>
+export const readBacklog = (runOrc: RunOrc): Effect.Effect<typeof BacklogTasks.Type, ChatToolError> =>
   runOrc(["backlog", "--json"], null).pipe(
     Effect.flatMap((text) =>
       Schema.decodeEffect(BacklogTasks)(text).pipe(

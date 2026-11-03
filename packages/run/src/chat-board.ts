@@ -128,7 +128,7 @@ const writeBoard = (dir: string, record: BoardRecord, task: Decision): Effect.Ef
   })
 
 const openFrom = (tasks: ReadonlyArray<BacklogTask>, id: string): Decision | null => {
-  const task = tasks.find((candidate) => candidate.id === id) ?? null
+  const task = rawFrom(tasks, id)
   return task === null ? null : openDecision(task)
 }
 
@@ -282,7 +282,7 @@ const openedLine = (record: BoardRecord, cards: number, url: string, networkWarn
 
 type BoardFibers = Map<string, { readonly dir: string; readonly fiber: Fiber.Fiber<void>; readonly sem: Semaphore.Semaphore }>
 
-const stopWatching = (host: BoardHost, fibers: BoardFibers, task: string): Effect.Effect<void> =>
+const stopWatching = (fibers: BoardFibers, task: string): Effect.Effect<void> =>
   Effect.gen(function*() {
     const entry = fibers.get(task)
     if (entry === undefined) {
@@ -310,11 +310,11 @@ const reconcileOne = (host: BoardHost, fibers: BoardFibers, task: string, dir: s
       }
       yield* host.launcher.end(boardFile(dir, "board.html")).pipe(Effect.catchTag("ChatToolError", () => Effect.void))
       host.say(state === "closed" ? closedBoardLine(record) : staleBoardLine(record))
-      yield* stopWatching(host, fibers, task)
+      yield* stopWatching(fibers, task)
     }).pipe(
       Effect.catchTag("ChatToolError", (error) =>
         Effect.sync(() => host.say("orc stopped reading " + task + "'s decision board: " + error.message)).pipe(
-          Effect.andThen(stopWatching(host, fibers, task))
+          Effect.andThen(stopWatching(fibers, task))
         ))
     ))
   })
