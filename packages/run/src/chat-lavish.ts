@@ -37,11 +37,6 @@ interface BoardInterface {
   readonly internal: boolean
 }
 
-const tailnetAddress = (address: string): boolean => {
-  const parts = address.split(".").map(Number)
-  return parts.length === 4 && parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127
-}
-
 const rankAddress = (address: string): number | null => {
   if (address.startsWith("192.168.")) {
     return 0
@@ -58,7 +53,7 @@ const rankAddress = (address: string): number | null => {
 
 export const pickBoardHost = (ifaces: Record<string, ReadonlyArray<BoardInterface> | undefined>): string | null => {
   const candidates = Object.values(ifaces).flat().filter((info): info is BoardInterface =>
-    info !== undefined && !info.internal && (info.family === "IPv4" || info.family === 4) && !tailnetAddress(info.address) && rankAddress(info.address) !== null)
+    info !== undefined && !info.internal && (info.family === "IPv4" || info.family === 4) && rankAddress(info.address) !== null)
   for (const rank of [0, 1, 2]) {
     const found = candidates.find((info) => rankAddress(info.address) === rank)
     if (found !== undefined) {

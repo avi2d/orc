@@ -214,9 +214,8 @@ const staleBoardLine = (record: BoardRecord): string =>
 const refreshPage = (tasks: ReadonlyArray<BacklogTask>, dir: string, record: BoardRecord): Effect.Effect<"closed" | "stale" | "current", ChatToolError> =>
   Effect.gen(function*() {
     const page = boardFile(dir, "board.html")
-    const open = openFrom(tasks, record.task)
-    if (open === null) {
-      const raw = rawFrom(tasks, record.task)
+    const raw = rawFrom(tasks, record.task)
+    if (raw === null || decisionFor(raw, record.waits) === null) {
       if (raw !== null) {
         yield* writePageIfChanged(page, boardHtml(record, completedWords(record, raw)))
       }
@@ -377,7 +376,7 @@ export const decisionBoards = (host: BoardHost): Boards => {
         return
       }
       const raw = rawFrom(tasks, record.task)
-      if (raw === null || openDecision(raw) !== null) {
+      if (raw === null || decisionFor(raw, record.waits) !== null) {
         return
       }
       yield* writePageIfChanged(boardFile(dir, "board.html"), boardHtml(record, completedWords(record, raw)))

@@ -405,6 +405,34 @@ describe("orc chat decision boards", () => {
     })
   }, 60_000)
 
+  test("a held board whose hold is answered and whose task parks renders its completed page instead of asking to open it again", async () => {
+    await withFixture(null, 0, async (fixture) => {
+      const lavish = fakeLavish(join(fixture.home, "boards"))
+      const chat = boardChat(fixture, lavish)
+      await holdTwo(chat.call)
+      await chat.call("orc_decision_board", twoCards)
+      await chat.call("orc_backlog_answer", { id: "task-1", question: "question-1", words: "gRPC" })
+      await chat.call("orc_backlog_answer", { id: "task-1", question: "question-2", words: "us-east" })
+      const file = join(fixture.home, "backlog", "new", "task-1.md")
+      const text = await readFile(file, "utf8")
+      const end = text.indexOf("\n---\n", 4)
+      const questions = [{ id: "question-4", text: "Keep the retries?" }]
+      await writeFile(file + ".tmp", text.slice(0, end) + "\nparked_branch: \"orc/task-1\"\nparked_questions: " + JSON.stringify(questions) + text.slice(end))
+      await rename(file + ".tmp", file)
+      await chat.session.reconcileBoards()
+      const page = await readFile(join(fixture.home, "boards", "task-1", "board.html"), "utf8")
+      expect(page).toContain("Every card is answered.")
+      expect(page).toContain("Recorded: <strong>gRPC</strong>")
+      expect(chat.boardLines()).toEqual(["task-1 is no longer held, so orc closed its decision board"])
+      await chat.session.stopBoards()
+      const next = boardChat(fixture, fakeLavish(join(fixture.home, "boards")))
+      await next.session.listBoards()
+      expect(next.boardLines()).toEqual([])
+      expect(await readFile(join(fixture.home, "boards", "task-1", "board.html"), "utf8")).toContain("Every card is answered.")
+      await next.session.stopBoards()
+    })
+  }, 60_000)
+
   test("a refresh while cards are still open keeps the board watched and shows the outside answer instead of dropping later ones", async () => {
     await withFixture(null, 0, async (fixture) => {
       const lavish = fakeLavish(join(fixture.home, "boards"))
