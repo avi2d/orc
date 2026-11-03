@@ -99,21 +99,32 @@ export const modeOf = (project: Project): DeliveryMode => project.mode ?? "no-mi
 
 export const isYolo = (project: Project): boolean => project.yolo === true
 
+type ParsedInstructions = { readonly name: string; readonly instructions?: string }
+
+const parsedInstructions = (project: RawProject): ParsedInstructions | string => {
+  const { name, instructions } = project
+  if (instructions !== undefined && (typeof instructions !== "string" || instructions === "")) {
+    return "the project " + name + " names instructions " + JSON.stringify(instructions) + ", which is not a file path"
+  }
+  return instructions === undefined ? { name } : { name, instructions }
+}
+
 const checkedProject = (project: RawProject): Project | string => {
-  const { mode, yolo, instructions, ...rest } = project
+  const { mode, yolo } = project
   if (mode !== undefined && !isDeliveryMode(mode)) {
     return unknownMode(project.name, mode)
   }
   if (yolo !== undefined && typeof yolo !== "boolean") {
     return "the project " + project.name + " names yolo " + JSON.stringify(yolo) + ", which is not true or false"
   }
-  if (instructions !== undefined && (typeof instructions !== "string" || instructions === "")) {
-    return "the project " + project.name + " names instructions " + JSON.stringify(instructions) + ", which is not a file path"
+  const parsed = parsedInstructions(project)
+  if (typeof parsed === "string") {
+    return parsed
   }
-  return { ...rest, ...(mode === undefined ? {} : { mode }), ...(yolo === undefined ? {} : { yolo }), ...(instructions === undefined ? {} : { instructions }) }
+  return { name: project.name, checkouts: project.checkouts, ...(mode === undefined ? {} : { mode }), ...(yolo === undefined ? {} : { yolo }), ...(parsed.instructions === undefined ? {} : { instructions: parsed.instructions }) }
 }
 
-const instructionsFile = (file: string, project: Project): Effect.Effect<Project, ConfigError, FileSystem.FileSystem | Path.Path> =>
+const instructionsFile = <T extends ParsedInstructions>(file: string, project: T): Effect.Effect<T, ConfigError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
     if (project.instructions === undefined) {
       return project
@@ -229,19 +240,24 @@ export const readProjectInstructions = (file: string): Effect.Effect<ReadonlyArr
   readJsonFileIfPresent(file, ProjectsFile).pipe(
     Effect.catchTag("ConfigError", () => Effect.succeed(null)),
     Effect.flatMap((read) => {
-      const checked = (read?.projects ?? []).map((project) => checkedProject(project))
-      const invalid = checked.find((entry): entry is string => typeof entry === "string" && entry.includes(" names instructions "))
-      if (invalid !== undefined) {
-        return Effect.fail(new ConfigError({ file, detail: invalid }))
+      const list = read?.projects ?? []
+      const parsed: Array<ParsedInstructions> = []
+      for (const project of list) {
+        const entry = parsedInstructions(project)
+        if (typeof entry === "string") {
+          return Effect.fail(new ConfigError({ file, detail: entry }))
+        }
+        parsed.push(entry)
       }
-      if (checked.some((entry) => typeof entry === "string")) {
-        return Effect.succeed<ReadonlyArray<Project>>([])
-      }
-      return Effect.forEach(
-        checked.filter((entry): entry is Project => typeof entry !== "string"),
-        (project) => instructionsFile(file, project)
-      ).pipe(
-        Effect.map((projects) => projects.flatMap((project) => project.instructions === undefined ? [] : [{ project: project.name, file: project.instructions }]))
+      return Effect.forEach(parsed, (entry) => instructionsFile(file, entry)).pipe(
+        Effect.flatMap((resolved) => {
+          for (const project of list) {
+            if (typeof checkedProject(project) === "string") {
+              return Effect.succeed<ReadonlyArray<ProjectInstructions>>([])
+            }
+          }
+          return Effect.succeed(resolved.flatMap((entry) => entry.instructions === undefined ? [] : [{ project: entry.name, file: entry.instructions }]))
+        })
       )
     })
   )
