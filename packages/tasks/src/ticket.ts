@@ -192,7 +192,7 @@ const holdWords = (row: PlannedRow): string => {
 
 const sentence = (text: string, width: number, tone: Tone, limit: number): Block => {
   const room = Math.max(1, width - dotWidth);
-  const parts = wrapParts(text.split(" "), room, " ");
+  const parts = wrapParts(text.split(" "), room, " ", limit);
   const kept = parts.slice(0, limit);
   const cut = parts.length > limit;
   return kept.map((part, index): Line => {
@@ -218,7 +218,7 @@ const plannedStatusOf = (row: PlannedRow, width: number): Block => {
 export const plannedTicketLines = (row: PlannedRow, now: DateTime.Utc, width: number): Block => {
   const kindText = ellipsize(row.kind, Math.max(0, width - row.id.length - 3));
   const header = truncate([span(ellipsize(row.id, Math.max(0, width - kindText.length - 3)), "foreground", { bold: true }), span(` \u00B7 ${kindText}`, "subtle")], width);
-  const title = wrapParts(row.title.split(" "), width, " ").slice(0, 2).map((text): Line => [span(ellipsize(text, width), "foreground")]);
+  const title = wrapParts(row.title.split(" "), width, " ", 2).slice(0, 2).map((text): Line => [span(ellipsize(text, width), "foreground")]);
   const parts = [queuedWords(row.queuedOn, now), `${row.home} backlog`].filter((part): part is string => part !== undefined);
   const meta = wrapParts(parts, width).map((text): Line => [span(ellipsize(text, width), "muted")]);
   return [header, ...title, ...plannedStatusOf(row, width), ...meta];
@@ -226,7 +226,7 @@ export const plannedTicketLines = (row: PlannedRow, now: DateTime.Utc, width: nu
 
 export const ticketLines = (task: TaskRow, origin: TaskOrigin, now: DateTime.Utc, zone: DateTime.TimeZone, width: number): Block => {
   const meta = wrapParts(metaPartsOf(task, origin, now, zone), width).map((text): Line => [span(ellipsize(text, width), "muted")]);
-  const title = wrapParts(task.title.split(" "), width, " ").slice(0, 2).map((text): Line => [span(ellipsize(text, width), "foreground")]);
+  const title = wrapParts(task.title.split(" "), width, " ", 2).slice(0, 2).map((text): Line => [span(ellipsize(text, width), "foreground")]);
   const gate = gateHoldOf(task.pipeline);
   const workerDetail = task.state === "waiting" && task.detail !== undefined ? detailWithoutWaitsOf(task.detail) : task.detail;
   const rest = gate === undefined ? workerDetail : undefined;

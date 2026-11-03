@@ -16,14 +16,15 @@ const withoutLoneWord = (rows: ReadonlyArray<Row>, width: number, separator: str
   return widthOf(moved.join(separator)) <= width ? [...rows.slice(0, -2), above.slice(0, -1), moved] : rows;
 };
 
-export const wrapParts = (parts: ReadonlyArray<string>, width: number, separator = " \u00b7 "): ReadonlyArray<string> => {
+export const wrapParts = (parts: ReadonlyArray<string>, width: number, separator = " \u00b7 ", kept?: number): ReadonlyArray<string> => {
   const rows = parts.reduce<ReadonlyArray<Row>>((lines, part) => {
     const last = lines.at(-1);
     if (last === undefined) return [[part]];
     const joined = [...last, part];
     return widthOf(joined.join(separator)) <= width ? [...lines.slice(0, -1), joined] : [...lines, [part]];
   }, []);
-  return withoutLoneWord(rows, width, separator).map((row) => row.join(separator));
+  const balanced = kept !== undefined && rows.length > kept ? rows : withoutLoneWord(rows, width, separator);
+  return balanced.map((row) => row.join(separator));
 };
 
 export const withinRows = (block: Block, rows: number): Block => {
