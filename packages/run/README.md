@@ -16,7 +16,7 @@ You read the PR and land it with `orc merge <task-id>`, as [Merging a task's PR]
 ## Before you begin
 
 - Bun, at the version `.bun-version` pins.
-- Git, tested on 2.56.0.
+- Git 2.48 or later, tested on 2.56.0.
 - nono from https://nono.sh, tested on 0.80.0, for the default sandbox.
 - Node, tested on 24.22.1.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, tested on 1.4.0, with the login, token file or Pi packages each provider in [Configuring providers](#configuring-providers) takes.
