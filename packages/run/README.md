@@ -431,6 +431,12 @@ A quota that names more than one account when any of them is kind `none` is refu
 
 A project may add `"mode"`, as [Delivery modes](#delivery-modes) shows, and `"yolo"`, as [Merging a task's PR](#merging-a-tasks-pr) shows.
 
+A project may also add `"instructions"`, the path of a Markdown file with that project's own rules for its runs and the chat.
+The path is absolute, or relative to the folder that holds `projects.json`.
+Each run of the project's tasks gets the file through `orc run --instructions`, and `orc chat` reads it at start.
+Orc refuses a project list naming an instructions file that does not exist.
+A project with no `instructions` hands its runs and the chat no instructions.
+
 To add a task, run `orc backlog add <project> <task-file>`.
 To pipe the task in instead, give `-` as the task file, as in `printf '# Fix the login page\n' | orc backlog add orc -`.
 It reads stdin to its end and refuses a terminal.
@@ -566,7 +572,8 @@ Either basis meets every refusal above.
 To say tasks in a chat instead of writing task files, run `orc chat`.
 It starts Pi on the model `models.orchestrator` names in `config.json`, and refuses to start when it names none.
 When `<ORC_HOME>/orchestrator.md` exists, the chat adds it to Pi's system prompt as the orchestrator's rules.
-Its first line of output names the rules file it loaded, or says it found none.
+It also adds the instructions file of each project in `projects.json` that names one, labelled with the project's name.
+Its first line of output names the rules file it loaded, or says it found none, and then names each instructions file.
 The chat's Pi has six tools and no others:
 
 - `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project and the task's Markdown.
@@ -726,6 +733,8 @@ To print the five minute load average the beat compares against a load limit, ru
 | `src/dispatch/pr-view.ts` | The `gh pr view` reading of a task's PR and its check verdicts |
 | `src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
 | `src/dispatch/runner.ts` | The runner: the start and the token renewal through pueue |
+| `src/dispatch/runner-instructions.ts` | The project instructions a start carries to the machine that queues the run |
+| `src/dispatch/runner-error.ts` | The runner's error |
 | `src/dispatch/refresh.ts` | The fast-forward of the checkout's default branch when a run starts |
 | `src/dispatch/runner-result.ts` | The reading of a task's result and the `orc.runner.v1` JSON |
 | `src/dispatch/token.ts` | The `orc.token.v1` document, the token command and the clauth session reading |

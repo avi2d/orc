@@ -1,7 +1,9 @@
-import { Console, Data, Effect, FileSystem } from "effect"
+import { Console, Data, Effect, FileSystem, type Path } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { boardsVar } from "./chat-board"
 import { chatToolNames, orcCommandVar } from "./chat-tools"
+import { backlogPaths } from "./dispatch/backlog"
+import { type ProjectInstructions, readProjectInstructions } from "./dispatch/config"
 import type { Command } from "./dispatch/runner"
 import { readOrcConfig } from "./orc-config"
 
@@ -29,10 +31,35 @@ const chatRules = (orcHome: string): Effect.Effect<ChatRules, ChatError, FileSys
     return info !== null && info.type === "File" ? { kind: "loaded", file } : { kind: "none", file }
   })
 
-const rulesLine = (rules: ChatRules): string =>
+interface LoadedInstructions extends ProjectInstructions {
+  readonly text: string
+}
+
+const chatInstructions = (orcHome: string): Effect.Effect<ReadonlyArray<LoadedInstructions>, ChatError, FileSystem.FileSystem | Path.Path> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const named = yield* readProjectInstructions(backlogPaths(orcHome + "/backlog").projects).pipe(
+      Effect.mapError((error) => new ChatError({ message: "orc chat: " + error.file + ": " + error.detail }))
+    )
+    return yield* Effect.forEach(named, (entry) =>
+      fs.readFileString(entry.file).pipe(
+        Effect.map((text) => ({ ...entry, text })),
+        Effect.mapError((error) => new ChatError({ message: "orc chat: cannot read the instructions file " + entry.file + ": " + error.message }))
+      ))
+  })
+
+const rulesWords = (rules: ChatRules): string =>
   rules.kind === "loaded" ? "orc chat loaded the rules in " + rules.file : "orc chat found no rules at " + rules.file
 
-const chatLaunch = (orcHome: string, model: string, rules: ChatRules, self: Command): ChatLaunch => ({
+const instructionsWords = (rules: ChatRules, instructions: ReadonlyArray<ProjectInstructions>): string =>
+  instructions.length === 0
+    ? ""
+    : (rules.kind === "loaded" ? " and" : "; it loaded") + " the instructions for " + instructions.map((entry) => entry.project + " in " + entry.file).join(" and for ")
+
+const instructionsPrompt = (entry: LoadedInstructions): string =>
+  "The instructions file for the project " + entry.project + ", " + entry.file + ":\n\n" + entry.text
+
+const chatLaunch = (orcHome: string, model: string, rules: ChatRules, instructions: ReadonlyArray<LoadedInstructions>, self: Command): ChatLaunch => ({
   command: [
     "pi",
     "--model",
@@ -41,12 +68,16 @@ const chatLaunch = (orcHome: string, model: string, rules: ChatRules, self: Comm
     chatToolsFile,
     "--tools",
     chatToolNames.join(","),
-    ...(rules.kind === "loaded" ? ["--append-system-prompt", rules.file] : [])
+    ...(rules.kind === "loaded" ? ["--append-system-prompt", rules.file] : []),
+    ...instructions.flatMap((entry) => ["--append-system-prompt", instructionsPrompt(entry)])
   ],
   env: { [orcCommandVar]: JSON.stringify(self), [boardsVar]: orcHome + "/boards" }
 })
 
-export const runChat = (orcHome: string, self: Command): Effect.Effect<number, ChatError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+export const runChat = (
+  orcHome: string,
+  self: Command
+): Effect.Effect<number, ChatError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const config = yield* readOrcConfig(orcHome).pipe(
       Effect.mapError((error) => new ChatError({ message: "orc chat: " + error.file + ": " + error.detail }))
@@ -56,8 +87,9 @@ export const runChat = (orcHome: string, self: Command): Effect.Effect<number, C
       return yield* new ChatError({ message: "orc chat needs models.orchestrator in " + config.file + ", the provider/model the chat runs on" })
     }
     const rules = yield* chatRules(orcHome)
-    yield* Console.log(rulesLine(rules))
-    const launch = chatLaunch(orcHome, model, rules, self)
+    const instructions = yield* chatInstructions(orcHome)
+    yield* Console.log(rulesWords(rules) + instructionsWords(rules, instructions))
+    const launch = chatLaunch(orcHome, model, rules, instructions, self)
     const [program, ...args] = launch.command
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const handle = yield* spawner.spawn(ChildProcess.make(program, args, { env: launch.env, extendEnv: true, stdin: "inherit", stdout: "inherit", stderr: "inherit" }))

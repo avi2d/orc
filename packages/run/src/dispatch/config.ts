@@ -1,5 +1,5 @@
 import { Effect, FileSystem, Path, Schema } from "effect"
-import { AbsolutePath, ConfigError, duplicateOf, readJsonFile } from "../json-file"
+import { AbsolutePath, ConfigError, duplicateOf, readJsonFile, readJsonFileIfPresent } from "../json-file"
 import { ProviderId } from "../orc-config"
 import { type DeliveryMode, isDeliveryMode, unknownMode } from "../delivery"
 import { ownedBySweep } from "./machine-reach"
@@ -219,3 +219,19 @@ export const readProjects = (
   machines: ReadonlyArray<Machine>
 ): Effect.Effect<ReadonlyArray<Project>, ConfigError, FileSystem.FileSystem | Path.Path> =>
   readJsonFile(file, ProjectsFile).pipe(Effect.flatMap(({ projects }) => checkedProjects(file, projects, machines)))
+
+export interface ProjectInstructions {
+  readonly project: string
+  readonly file: string
+}
+
+export const readProjectInstructions = (file: string): Effect.Effect<ReadonlyArray<ProjectInstructions>, ConfigError, FileSystem.FileSystem | Path.Path> =>
+  readJsonFileIfPresent(file, ProjectsFile).pipe(
+    Effect.flatMap((read) =>
+      Effect.forEach(read?.projects ?? [], (project) => {
+        const checked = checkedProject(project)
+        return typeof checked === "string" ? Effect.fail(new ConfigError({ file, detail: checked })) : instructionsFile(file, checked)
+      })
+    ),
+    Effect.map((projects) => projects.flatMap((project) => project.instructions === undefined ? [] : [{ project: project.name, file: project.instructions }]))
+  )
