@@ -27,6 +27,7 @@ import { type ReportOutcome, type ReportRun, runReport } from "./report-run"
 import { runDirFor, type ReportKind } from "./task-kind"
 import { noMistakesBinary, noMistakesVersionProblem, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "./no-mistakes"
 import { newRunId } from "./run-id"
+import { prepareRunFolders, type RunFolders, runInstructions } from "./run-folders"
 import { subprocessDeliverer } from "./run-deliverer"
 import type { RunDelivery } from "./delivery"
 
@@ -40,6 +41,7 @@ export interface OrcRunRequest {
   readonly sandbox?: SandboxKind | undefined
   readonly tokenFile?: string | undefined
   readonly provider?: string | undefined
+  readonly instructions?: string | undefined
   readonly allow?: ReadonlyArray<AllowWord> | undefined
   readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
   readonly homeDir?: string | undefined
@@ -68,43 +70,6 @@ export const toolchainFromEnv = (value: string | undefined, home: string): Effec
   })
 
 
-interface RunFolders {
-  readonly runDir: string
-  readonly piSessionDir: string
-  readonly piAgentDir: string
-  readonly hostSessionsDir: string
-  readonly taskPath: string
-  readonly sandboxTaskPath: string
-}
-
-const prepareRunFolders = (
-  fs: FileSystem.FileSystem,
-  path: Path.Path,
-  runDir: string,
-  taskFile: string
-): Effect.Effect<RunFolders, OrcRunError> =>
-  Effect.gen(function*() {
-    const piSessionDir = path.join(runDir, "session")
-    const piAgentDir = path.join(piSessionDir, "agent")
-    const hostSessionsDir = path.join(runDir, "sessions")
-    yield* fs.makeDirectory(piAgentDir, { recursive: true }).pipe(
-      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot create the run folder " + runDir + ": " + String(cause) }))
-    )
-    yield* fs.makeDirectory(hostSessionsDir, { recursive: true }).pipe(
-      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot create the sessions folder: " + String(cause) }))
-    )
-    const taskText = yield* fs.readFileString(taskFile).pipe(
-      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the task file " + taskFile + ": " + String(cause) }))
-    )
-    const taskPath = path.join(runDir, "task.md")
-    const sandboxTaskPath = path.join(piSessionDir, "task.md")
-    yield* fs.writeFileString(taskPath, taskText).pipe(
-      Effect.andThen(() => fs.writeFileString(sandboxTaskPath, taskText)),
-      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the task file: " + String(cause) }))
-    )
-    return { runDir, piSessionDir, piAgentDir, hostSessionsDir, taskPath, sandboxTaskPath }
-  })
-
 const openHostGit = (fs: FileSystem.FileSystem, path: Path.Path): Effect.Effect<string, OrcRunError, Scope.Scope> => {
   const realGit = Bun.which("git")
   return realGit === null
@@ -129,6 +94,7 @@ const prepareAgents = (
   home: string,
   runDir: string,
   effectiveTaskFile: string,
+  instructionsFile: string | null,
   agentsDir: string | undefined,
   sandboxKind: SandboxKind,
   pins: { readonly tokenFile: string | undefined; readonly provider: string | undefined }
@@ -137,7 +103,7 @@ const prepareAgents = (
     const config = yield* readOrcConfig(home).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read " + cause.file + ": " + cause.detail }))
     )
-    const folders = yield* prepareRunFolders(fs, path, runDir, effectiveTaskFile)
+    const folders = yield* prepareRunFolders(fs, path, runDir, effectiveTaskFile, instructionsFile)
     const agent: AgentFile = yield* resolveAgentFile("implementer", {
       projectDir: checkout.projectDir,
       orcHome: home,
@@ -219,8 +185,10 @@ interface OpenedRun {
   readonly checkout: Checkout
   readonly runDir: string
   readonly effectiveTaskFile: string
+  readonly instructionsFile: string | null
   readonly sandboxKind: SandboxKind
 }
+
 
 const openRun = (
   request: OrcRunRequest
@@ -231,17 +199,18 @@ const openRun = (
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const home = orcHomeDir(request.homeDir ?? Bun.env.ORC_HOME)
     const runId = request.runId ?? newRunId()
+    const instructionsFile = yield* runInstructions(fs, path, request.cwd, request.instructions)
     const git = yield* openHostGit(fs, path)
     const checkout = yield* openCheckout(fs, path, spawner, git, request.cwd, request.branch, runId, parseRefuseMarkers(Bun.env.ORC_REFUSE_MARKERS))
     yield* Console.log(formatRefresh(checkout.projectDir, yield* refreshCheckout(checkout.projectDir)))
     const runDir = runDirFor(home, runId)
     const { taskFile: effectiveTaskFile, sandbox: sandboxKind } = yield* readRunStart(fs, home, checkout, request)
-    return { fs, path, spawner, home, runId, git, checkout, runDir, effectiveTaskFile, sandboxKind }
+    return { fs, path, spawner, home, runId, git, checkout, runDir, effectiveTaskFile, instructionsFile, sandboxKind }
   })
 
 const prepareRunAgents = (opened: OpenedRun, request: OrcRunRequest) =>
   prepareAgents(
-    opened.fs, opened.path, opened.spawner, opened.checkout, opened.home, opened.runDir, opened.effectiveTaskFile, request.agentsDir, opened.sandboxKind,
+    opened.fs, opened.path, opened.spawner, opened.checkout, opened.home, opened.runDir, opened.effectiveTaskFile, opened.instructionsFile, request.agentsDir, opened.sandboxKind,
     { tokenFile: request.tokenFile, provider: request.provider }
   )
 
@@ -260,7 +229,7 @@ export const runReportStep = (
     const { folders, agent, plan } = yield* prepareRunAgents(opened, request).pipe(Effect.onError(() => removeRunDir(opened)))
     const run: ReportRun = {
       kind, runId: opened.runId, runDir: folders.runDir, projectDir: opened.checkout.projectDir, branch: opened.checkout.branch, sandbox: opened.sandboxKind,
-      taskPath: folders.taskPath, piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir,
+      taskPath: folders.taskPath, instructions: folders.instructionsPath, piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir,
       piAgentDir: plan.kind === "none" ? plan.own?.piAgentDir : undefined, agent, started: new Date().toISOString(),
       env: { ...Bun.env, ...(plan.kind === "none" ? plan.own?.env : undefined) }
     }
@@ -302,7 +271,7 @@ export const runAgentStep = (
     const history: HistoryRun = {
       fs, path, spawner, git: checkout.git, projectDir: checkout.projectDir, runId,
       runDir: folders.runDir, piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir,
-      taskPath: folders.taskPath, agent, fixer, branch: checkout.branch, sandbox: sandboxKind, started,
+      taskPath: folders.taskPath, instructions: folders.instructionsPath, agent, fixer, branch: checkout.branch, sandbox: sandboxKind, started,
       worktreeDir: sandbox.worktreePath,
       delivery: subprocessDeliverer(request.delivery ?? "no-mistakes", { ...noMistakes, worktreeDir: sandbox.worktreePath, branch: checkout.branch }),
       allow: request.allow ?? [],

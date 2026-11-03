@@ -1,4 +1,4 @@
-import { Data, DateTime, Duration, Effect, FileSystem, Option, Path, Schema, Stream } from "effect"
+import { DateTime, Duration, Effect, FileSystem, Option, Path, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { Reach } from "./args"
 import { AbsolutePath } from "../json-file"
@@ -8,12 +8,13 @@ import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldT
 import { heldTask, orcGroup, PueueState, PueueStatus, taskLabel, type PueueTask } from "./pueue-status"
 import { parseTaskFile } from "./task-record"
 import { reportKinds } from "../task-kind"
+import { readInstructions, TaskInstructions, writeInstructions } from "./runner-instructions"
+import { RunnerError } from "./runner-error"
+
+export { RunnerError } from "./runner-error"
 import { isRunDelivery } from "../delivery"
 import { decodeTokenText, encodeRenewal, encodeSecretJson, LabelArg, RenewRequest, type TokenEncodeError, tokenDocumentNote, tokenFields } from "./token"
 
-export class RunnerError extends Data.TaggedError("RunnerError")<{
-  readonly detail: string
-}> {}
 
 export type Command = readonly [string, ...Array<string>]
 
@@ -28,7 +29,8 @@ const taskFields = {
   answers: Schema.optional(Schema.Array(Schema.Struct({
     question: Schema.String.check(Schema.isPattern(/^question-\S+$/)),
     answer: Schema.String.check(Schema.isNonEmpty())
-  })))
+  }))),
+  instructions: Schema.optional(TaskInstructions)
 }
 
 const QueueFileRequest = Schema.Struct({ ...taskFields, tokenFile: AbsolutePath, label: Schema.optional(LabelArg) })
@@ -223,7 +225,8 @@ const queueTask = (
     const answers = (request.answers ?? []).flatMap((entry) => ["--answer", entry.question + "=" + entry.answer])
     const kind = request.kind === undefined ? [] : ["--kind", request.kind]
     const delivery = request.delivery === undefined ? [] : ["--delivery", request.delivery]
-    const run = [...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...kind, ...delivery, ...answers]
+    const instructions = request.instructions === undefined ? [] : ["--instructions", yield* writeInstructions(folder + "/" + key + ".instructions", request.instructions)]
+    const run = [...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...kind, ...delivery, ...instructions, ...answers]
     const add = (command: ReadonlyArray<string>) =>
       pueue(["add", "--group", orcGroup, "--label", label, "--working-directory", project, "--print-task-id", "--escape", "--", ...command], { ORC_HOME: home })
     const holdArgs: ReadonlyArray<string> = label === taskLabel(home, request.task) ? [request.task] : [request.task, "--label", label]
@@ -276,7 +279,7 @@ const requiredEnv = (env: Readonly<Record<string, string | undefined>>, name: st
 const readRequest = (
   env: Readonly<Record<string, string | undefined>>,
   stdin: Effect.Effect<string, RunnerError>
-): Effect.Effect<QueueRequest, RunnerError, FileSystem.FileSystem> =>
+): Effect.Effect<QueueRequest, RunnerError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const task = yield* requiredEnv(env, "ORC_TASK_ID")
@@ -303,9 +306,10 @@ const readRequest = (
     if (!isRunDelivery(deliveryWord)) {
       return yield* refuse("orc runner start reads ORC_TASK_DELIVERY as no-mistakes or direct-PR, not " + deliveryWord)
     }
+    const instructions = yield* readInstructions(env["ORC_TASK_INSTRUCTIONS"] ?? "")
     const kind = record.spec.kind === "ship" ? {} : { kind: record.spec.kind }
     const delivery = record.spec.kind === "ship" && deliveryWord === "direct-PR" ? { delivery: deliveryWord } : {}
-    const fields = yield* Schema.decodeEffect(Schema.Struct(taskFields))({ task, checkout, provider, body, ...kind, ...delivery, ...resume }).pipe(
+    const fields = yield* Schema.decodeEffect(Schema.Struct(taskFields))({ task, checkout, provider, body, ...kind, ...delivery, ...instructions, ...resume }).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
     )
     const tokenFile = env["ORC_TASK_TOKEN_FILE"] ?? ""

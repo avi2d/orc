@@ -102,6 +102,11 @@ Orc trims padding around each name and drops blank entries.
 Orc checks each marker in the project directory and its parent and refuses a checkout carrying one.
 An unset `ORC_REFUSE_MARKERS` names no marker and refuses no checkout for a marker.
 
+To hand the run a project's instructions, add `--instructions <file>`, an absolute path or one relative to the folder you run orc in.
+Orc copies the file into the run's `session` folder and adds it to the system prompt of each Pi the run starts.
+The run's first line of output names the file, and orc refuses the run before Pi starts when the file is missing.
+A run without `--instructions` hands Pi no instructions.
+
 The default sandbox run needs `git`, `nono`, `pi` and `node` on the host PATH, and a run except `direct-PR` needs `no-mistakes` there too.
 With `--sandbox none` the run needs the same tools except `nono`.
 For every run except `direct-PR`, orc runs `no-mistakes --version` before the sandbox starts and refuses a release older than v1.90.0.
@@ -426,6 +431,13 @@ A quota that names more than one account when any of them is kind `none` is refu
 
 A project may add `"mode"`, as [Delivery modes](#delivery-modes) shows, and `"yolo"`, as [Merging a task's PR](#merging-a-tasks-pr) shows.
 
+A project may also add `"instructions"`, the path of a Markdown file with that project's own rules for its runs and the chat.
+The path is absolute, or relative to the folder that holds `projects.json`.
+Each run of the project's tasks gets the file through `orc run --instructions`, and `orc chat` reads it at start.
+A project instructions file replaces a discovered APPEND_SYSTEM.md.
+Orc refuses an instructions value that is not a file path, and a project list naming an instructions file that does not exist.
+A project with no `instructions` hands its runs and the chat no instructions.
+
 To add a task, run `orc backlog add <project> <task-file>`.
 To pipe the task in instead, give `-` as the task file, as in `printf '# Fix the login page\n' | orc backlog add orc -`.
 It reads stdin to its end and refuses a terminal.
@@ -461,7 +473,8 @@ Holding the task again with the same questions keeps the hold, and orc refuses o
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
 After the claim survives a recount, the beat writes the task started before it runs the start command.
 A task marked for a machine waits for a slot on that machine and never starts on another.
-The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_DELIVERY`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT` and `ORC_TASK_TOKEN_FILE`.
+The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_DELIVERY`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT`, `ORC_TASK_TOKEN_FILE` and `ORC_TASK_INSTRUCTIONS`.
+`ORC_TASK_INSTRUCTIONS` is empty when the project names no instructions file.
 `ORC_TASK_TOKEN_FILE` is the account's token file path, never the token.
 On a token command account it is empty, and the start command reads the token as `orc.token.v1` on standard input instead.
 On a kind `none` account it is empty, and the beat sends nothing on standard input, so a custom start command must not feed it input.
@@ -561,7 +574,8 @@ Either basis meets every refusal above.
 To say tasks in a chat instead of writing task files, run `orc chat`.
 It starts Pi on the model `models.orchestrator` names in `config.json`, and refuses to start when it names none.
 When `<ORC_HOME>/orchestrator.md` exists, the chat adds it to Pi's system prompt as the orchestrator's rules.
-Its first line of output names the rules file it loaded, or says it found none.
+It also adds the instructions file of each project in `projects.json` that names one, labelled with the project's name.
+Its first line of output names the rules file it loaded, or says it found none, and then names each instructions file.
 The chat's Pi has six tools and no others:
 
 - `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project and the task's Markdown.
@@ -627,6 +641,7 @@ The refresh needs Git 2.48 or later.
 The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
 The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
+When the task names instructions, the queued `orc run` gets `--instructions` pointing at a copy in `~/.orc/runner/<task-id>.instructions/<file name>` on that machine.
 A task queued for another home keeps a scoped file instead, so two homes holding the same task id never share one file.
 A task this home already holds queued or running in group `orc` is not queued again, and a task whose earlier run is done there is queued again, as a parked task is once answered.
 
@@ -685,6 +700,7 @@ To print the five minute load average the beat compares against a load limit, ru
 | `src/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
 | `src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
+| `src/run-folders.ts` | A run's folders, its task copies and the instructions file `--instructions` names |
 | `src/history-write.ts` | The history checkpoints a run records as each step starts and ends |
 | `src/report.ts` | The `report.md` shape and the signal facts it carries |
 | `src/show.ts` | The `orc show` reading of one run from the history |
@@ -720,6 +736,8 @@ To print the five minute load average the beat compares against a load limit, ru
 | `src/dispatch/pr-view.ts` | The `gh pr view` reading of a task's PR and its check verdicts |
 | `src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
 | `src/dispatch/runner.ts` | The runner: the start and the token renewal through pueue |
+| `src/dispatch/runner-instructions.ts` | The project instructions a start carries to the machine that queues the run |
+| `src/dispatch/runner-error.ts` | The runner's error |
 | `src/dispatch/refresh.ts` | The fast-forward of the checkout's default branch when a run starts |
 | `src/dispatch/runner-result.ts` | The reading of a task's result and the `orc.runner.v1` JSON |
 | `src/dispatch/token.ts` | The `orc.token.v1` document, the token command and the clauth session reading |

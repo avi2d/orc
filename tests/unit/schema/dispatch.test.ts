@@ -165,6 +165,13 @@ describe("the dispatch view", () => {
     }
   });
 
+  test("a project naming an instructions file reads as the same project instead of making the project list unread", async () => {
+    await withBacklog(async (root) => {
+      await writeFile(join(root, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: "/Users/a/orc" }, instructions: "orc.md" }] }));
+      expect(snapshotOf(await readBacklog(root)).projects).toEqual({ kind: "ok", value: [{ name: "orc", checkouts: { mac: "/Users/a/orc" } }] });
+    });
+  });
+
   test("an inherited property is not a checkout", async () => {
     const root = await mkdtemp(join(tmpdir(), "orc-dispatch-"));
     try {

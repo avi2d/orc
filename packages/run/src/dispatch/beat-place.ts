@@ -39,9 +39,15 @@ export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>): st
   return null
 }
 
-type Placement =
-  | { readonly kind: "place"; readonly machine: Machine; readonly checkout: string; readonly delivery: RunDelivery }
-  | { readonly kind: "waits"; readonly reason: string }
+export interface Placed {
+  readonly kind: "place"
+  readonly machine: Machine
+  readonly checkout: string
+  readonly delivery: RunDelivery
+  readonly instructions: string | null
+}
+
+type Placement = Placed | { readonly kind: "waits"; readonly reason: string }
 
 interface Candidate {
   readonly machine: Machine
@@ -97,5 +103,11 @@ export const placeTask = (
   if (best === null) {
     return { kind: "waits", reason: pinned === null ? "no machine with a checkout of " + project.name + " has room" : pinned + " has no room" }
   }
-  return { kind: "place", machine: best.machine, checkout: best.checkout, delivery: deliveryFor(modeOf(project), task.spec.internal) }
+  return {
+    kind: "place",
+    machine: best.machine,
+    checkout: best.checkout,
+    delivery: deliveryFor(modeOf(project), task.spec.internal),
+    instructions: project.instructions ?? null
+  }
 }

@@ -18,6 +18,7 @@ export interface ReportRun {
   readonly branch: string
   readonly sandbox: SandboxKind
   readonly taskPath: string
+  readonly instructions: string | null
   readonly piSessionDir: string
   readonly hostSessionsDir: string
   readonly piAgentDir: string | undefined
@@ -51,7 +52,7 @@ const runPi = (run: ReportRun): Effect.Effect<number, OrcRunError, FileSystem.Fi
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const print = piWithTools(run.agent, { hostSessionsDir: run.hostSessionsDir, sandboxSessionsDir: run.hostSessionsDir })
+    const print = piWithTools(run.agent, { hostSessionsDir: run.hostSessionsDir, sandboxSessionsDir: run.hostSessionsDir }, run.instructions)
       .buildPrintCommand({ prompt: buildReportPrompt(run), dangerouslySkipPermissions: true })
     const dirs = { piSessionDir: run.piSessionDir, hostSessionsDir: run.hostSessionsDir, piAgentDir: run.piAgentDir }
     const handle = yield* spawner.spawn(ChildProcess.make("sh", ["-c", print.command], {

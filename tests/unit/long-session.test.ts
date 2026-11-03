@@ -240,6 +240,7 @@ const historyFor = (runId: string, home: string, projectDir: string, started: st
       piSessionDir: path.join(runDir, "session"),
       hostSessionsDir: path.join(runDir, "sessions"),
       taskPath: path.join(runDir, "task.md"),
+      instructions: null,
       agent: implementer, fixer, branch: "orc/sample", sandbox: "none", started,
       worktreeDir: projectDir,
       delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git, worktreeDir: projectDir }) },

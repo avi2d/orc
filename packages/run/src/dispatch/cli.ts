@@ -39,7 +39,7 @@ const failure = (error: BacklogError | ConfigError | TaskFileError | RunnerError
 
 type ConfigReading = { readonly kind: "read"; readonly config: DispatchConfig } | { readonly kind: "unread"; readonly reason: string }
 
-const readView = (root: string): Effect.Effect<BacklogView, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+const readView = (root: string): Effect.Effect<BacklogView, BacklogError | TaskFileError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
     const paths = backlogPaths(root)
     const tasks = yield* listTasks(root)

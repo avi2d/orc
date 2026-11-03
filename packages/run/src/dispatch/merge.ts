@@ -1,4 +1,4 @@
-import { Effect, type FileSystem } from "effect"
+import { Effect, type FileSystem, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { BacklogError, backlogPaths, findTask } from "./backlog"
 import { isYolo, readDispatchConfig, readProjects } from "./config"
@@ -42,7 +42,7 @@ export const mergeTask = (
   root: string,
   id: string,
   basis: MergeBasis
-): Effect.Effect<string, BacklogError | ConfigError | TaskFileError | RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+): Effect.Effect<string, BacklogError | ConfigError | TaskFileError | RunnerError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const record = yield* findTask(root, id)
     const closing = record.state.kind === "closed" && record.state.closing.outcome !== "start-failed" ? record.state.closing : null

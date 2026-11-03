@@ -34,12 +34,26 @@ describe("piWithTools", () => {
       const provider = piWithTools(agent(["read", "bash"]), {
         hostSessionsDir: join(root, "host"),
         sandboxSessionsDir: join(root, "sandbox")
-      })
+      }, null)
       const command = provider.buildPrintCommand({ prompt: "hi", dangerouslySkipPermissions: true })
       expect(command.command).toContain("opencode-go/muse-spark")
       expect(command.command).toContain("--thinking high")
       expect(command.command).toContain("--tools " + q + "read,bash" + q)
       expect(command.command).not.toContain("edit")
+      expect(command.command).not.toContain("--append-system-prompt")
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+  test("appends the instructions file to Pi's system prompt, quoted, instead of leaving it out", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-pi-"))
+    try {
+      const provider = piWithTools(agent(["read"]), {
+        hostSessionsDir: join(root, "host"),
+        sandboxSessionsDir: join(root, "sandbox")
+      }, "/runs/r 1/session/instructions.md")
+      const command = provider.buildPrintCommand({ prompt: "hi", dangerouslySkipPermissions: true })
+      expect(command.command).toEndWith(" --append-system-prompt " + q + "/runs/r 1/session/instructions.md" + q)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
