@@ -568,7 +568,7 @@ The chat's Pi has six tools and no others:
   It may add a kind, an internal mark, a machine and the ids the task depends on.
 - `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
 - `orc_backlog_hold` holds one new task through `orc backlog hold`, with the reason, an optional date and optional questions.
-- `orc_backlog_answer` answers a held task through `orc backlog answer`, with your words as you said them, or one parked question when it names the question's id.
+- `orc_backlog_answer` answers a held or parked task through `orc backlog answer`, with your words as you said them, or one held or parked question when it names the question's id.
 - `merge_task` lands a closed task's PR through `orc merge <task-id> --basis <basis>`, as [Merging a task's PR](#merging-a-tasks-pr) shows.
 - `orc_decision_board` opens a decision board for one held or parked task, as [Decision boards](#decision-boards) shows.
 
