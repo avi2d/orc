@@ -20,11 +20,12 @@ export const BoardRecord = Schema.Struct({
   waits: Schema.Literals(["held", "parked"]),
   reason: Schema.String,
   openedAt: Schema.String,
+  board: Schema.String,
   cards: Schema.NonEmptyArray(BoardCardRecord)
 })
 export type BoardRecord = typeof BoardRecord.Type
 
-export const BoardAnswer = Schema.Struct({ card: Schema.String, answer: Schema.String, words: Schema.optional(Schema.String) })
+export const BoardAnswer = Schema.Struct({ board: Schema.String, card: Schema.String, answer: Schema.String, words: Schema.optional(Schema.String) })
 type BoardAnswer = typeof BoardAnswer.Type
 
 export const answerTag = "orc-board-answer"
@@ -53,15 +54,15 @@ const optionHtml = (card: BoardCardRecord, option: string): string => {
     "<span class=\"flex-1 min-w-0 break-words\">" + escapeHtml(option) + "</span>" + (recommended ? "<span class=\"badge badge-primary\">Recommended</span>" : "") + "</label>"
 }
 
-const formHtml = (card: BoardCardRecord, key: string): string =>
-  "<form data-card=\"" + key + "\" data-lavish-question=\"" + key + "\" class=\"grid gap-2\">" + card.options.map((option) => optionHtml(card, option)).join("") +
+const formHtml = (card: BoardCardRecord, key: string, board: string): string =>
+  "<form data-card=\"" + key + "\" data-board=\"" + board + "\" data-lavish-question=\"" + key + "\" class=\"grid gap-2\">" + card.options.map((option) => optionHtml(card, option)).join("") +
   "<label class=\"fieldset\"><span class=\"fieldset-legend\">Words to add (optional)</span><textarea class=\"textarea w-full\" name=\"words\" rows=\"2\"></textarea></label>" +
   "<div class=\"card-actions\"><button type=\"submit\" class=\"btn btn-primary\">Record this answer</button></div></form>"
 
-const cardHtml = (card: BoardCardRecord, answered: string | null): string => {
+const cardHtml = (card: BoardCardRecord, answered: string | null, board: string): string => {
   const key = escapeHtml(cardKey(card.target))
   const body = answered === null
-    ? formHtml(card, key)
+    ? formHtml(card, key, board)
     : "<p class=\"break-words\">Recorded: <strong>" + escapeHtml(answered) + "</strong></p>"
   const mark = answered === null ? "" : "<span class=\"badge badge-success badge-soft\">Recorded</span>"
   return "<section class=\"card card-border bg-base-100\"><div class=\"card-body gap-3\">" +
@@ -79,7 +80,7 @@ const script = [
   "  const words = String(values.get('words') ?? '')",
   "  const question = form.closest('section').querySelector('h2').textContent",
   "  const said = words.trim() === '' ? answer : answer + ' — ' + words",
-  "  window.lavish.queuePrompt(question + ': ' + said, { tag: '" + answerTag + "', text: question + ': ' + said, element: form, data: { card: form.dataset.card, answer, words } })",
+  "  window.lavish.queuePrompt(question + ': ' + said, { tag: '" + answerTag + "', text: question + ': ' + said, element: form, data: { board: form.dataset.board, card: form.dataset.card, answer, words } })",
   "  window.lavish.sendQueuedPrompts()",
   "  const button = form.querySelector('button')",
   "  button.disabled = true",
@@ -100,7 +101,7 @@ export const boardHtml = (record: BoardRecord, answered: (card: BoardCardRecord)
     "<p class=\"opacity-80 break-words\">" + escapeHtml(record.reason) + "</p>",
     "<p role=\"status\" class=\"alert " + (open === 0 ? "alert-success" : "alert-info") + " alert-soft\">" +
       (open === 0 ? "Every card is answered." : open + " of " + record.cards.length + " cards wait for your answer. The task stays " + record.waits + " until every card is answered.") + "</p>",
-    ...record.cards.map((card) => cardHtml(card, answered(card))),
+    ...record.cards.map((card) => cardHtml(card, answered(card), escapeHtml(record.board))),
     "</main><script>" + script + "</script></body></html>",
     ""
   ].join("\n")

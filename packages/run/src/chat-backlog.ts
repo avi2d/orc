@@ -1,14 +1,6 @@
 import { Schema } from "effect"
 import { ClosedTask } from "./chat-closed"
-import { ParkedJson, QuestionJson } from "./chat-parked"
-
-const HoldJson = Schema.Struct({
-  reason: Schema.String,
-  until: Schema.NullOr(Schema.String),
-  questions: Schema.Array(QuestionJson),
-  answer: Schema.NullOr(Schema.Struct({ words: Schema.String, at: Schema.String }))
-})
-type HoldJson = typeof HoldJson.Type
+import { HoldJson, ParkedJson, QuestionJson } from "./chat-parked"
 
 const OpenTask = Schema.Struct({
   id: Schema.String,
@@ -34,10 +26,12 @@ export interface Decision {
   readonly questions: ReadonlyArray<Question>
 }
 
+export const parkedReason = (branch: string): string => "Parked on " + branch + " for the captain's answers."
+
 export const decisionFor = (task: BacklogTask, waits: "held" | "parked"): Decision | null => {
   if (waits === "parked") {
     return task.status !== "closed" && task.parked !== null && task.parked.questions.some((question) => question.answer === null)
-      ? { id: task.id, title: task.title, waits: "parked", reason: "Parked on " + task.parked.branch + " for the captain's answers.", questions: task.parked.questions }
+      ? { id: task.id, title: task.title, waits: "parked", reason: parkedReason(task.parked.branch), questions: task.parked.questions }
       : null
   }
   return isOpenHeld(task) ? { id: task.id, title: task.title, waits: "held", reason: task.hold.reason, questions: task.hold.questions } : null

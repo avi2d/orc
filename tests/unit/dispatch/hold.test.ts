@@ -57,6 +57,21 @@ describe("held task files", () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+  test("holding a reason-only held task again with questions is refused instead of attaching them", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-hold-reason-"))
+    try {
+      await run(addTask(root, spec))
+      await run(holdTask(root, "task-1", { reason: "wait for budget", until: null, questions: [] }))
+      const file = join(root, "new", "task-1.md")
+      const before = await readFile(file, "utf8")
+      const failure = await run(Effect.flip(holdTask(root, "task-1", { reason: "wait for budget", until: null, questions: ["Which API?"] })))
+      expect(failure.detail).toBe("task-1 is already held: wait for budget, so answer it first")
+      expect(await readFile(file, "utf8")).toBe(before)
+      expect((await run(holdTask(root, "task-1", { reason: "wait for budget", until: null, questions: [] }))).kind).toBe("already held")
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
   const holdRefusal = async (folder: "new" | "taken" | "closed", lines: ReadonlyArray<string>): Promise<string> => {
     const text = ["---", "id: task-5", "title: Fix the thing", "project: orc", "machine: null", "depends_on: []", "created: 2026-10-27T10:00:00.000Z", ...lines, "---", "# Fix the thing", ""].join("\n")
     const result = await run(Effect.result(parseTaskFile("task-5.md", folder, text)))

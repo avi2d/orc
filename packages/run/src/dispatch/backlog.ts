@@ -341,8 +341,7 @@ const holdAgain = (id: string, fresh: TaskRecord, held: Hold, ask: HoldAsk): Eff
   if (held.questions.length > 0) {
     return Effect.fail(new BacklogError({ detail: id + " is already held on " + held.questions.map((question) => question.id).join(", ") + ", so answer those first" }))
   }
-  const asked: Hold = { ...held, questions: askedQuestions(ask.questions) }
-  return Effect.succeed({ kind: "write", record: { ...fresh, hold: asked }, result: { kind: "already held", hold: asked } })
+  return Effect.fail(new BacklogError({ detail: id + " is already held: " + held.reason + ", so answer it first" }))
 }
 
 const holdOn = (id: string, ask: HoldAsk) => (fresh: TaskRecord): Effect.Effect<Rewrite<HoldOutcome>, BacklogError> => {

@@ -7,6 +7,14 @@ export const ParkedJson = Schema.Struct({
   questions: Schema.Array(QuestionJson)
 })
 
+export const HoldJson = Schema.Struct({
+  reason: Schema.String,
+  until: Schema.NullOr(Schema.String),
+  questions: Schema.Array(QuestionJson),
+  answer: Schema.NullOr(Schema.Struct({ words: Schema.String, at: Schema.String }))
+})
+export type HoldJson = typeof HoldJson.Type
+
 interface ParkedTask {
   readonly id: string
   readonly title: string

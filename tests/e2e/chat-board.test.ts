@@ -24,7 +24,7 @@ const HeldJson = Schema.fromJsonString(Schema.Struct({
 
 const openedAt = new Date("2026-11-03T09:30:00.000Z")
 
-const fakeLavish = () => {
+const fakeLavish = (boardsDir: string) => {
   const waiting: Array<(poll: BoardPoll) => void> = []
   const queued: Array<BoardPoll> = []
   const opened: Array<string> = []
@@ -61,8 +61,10 @@ const fakeLavish = () => {
       resolve(poll)
     }
   }
-  const answer = (card: string, option: string, words?: string): void =>
-    send({ kind: "feedback", prompts: [{ tag: "orc-board-answer", text: card + ": " + option, data: words === undefined ? { card, answer: option } : { card, answer: option, words } }] })
+  const answer = (card: string, option: string, words?: string): void => {
+    const board = (JSON.parse(readFileSync(join(boardsDir, "task-1", "board.json"), "utf8")) as { readonly board: string }).board
+    send({ kind: "feedback", prompts: [{ tag: "orc-board-answer", text: card + ": " + option, data: words === undefined ? { board, card, answer: option } : { board, card, answer: option, words } }] })
+  }
   return { launcher, opened, ended, replies, send, answer, polls: () => polls }
 }
 
@@ -116,7 +118,7 @@ const twoCards = {
 describe("orc chat decision boards", () => {
   test("each card's answer is recorded word for word and the task stays held until the last card instead of releasing on the first", async () => {
     await withFixture(null, 0, async (fixture) => {
-      const lavish = fakeLavish()
+      const lavish = fakeLavish(join(fixture.home, "boards"))
       const chat = boardChat(fixture, lavish)
       await holdTwo(chat.call)
       const board = join(fixture.home, "boards", "task-1", "board.html")
@@ -158,7 +160,7 @@ describe("orc chat decision boards", () => {
 
   test("a parked run's cards answer its question ids word for word and close only once the last is answered instead of refusing a parked task", async () => {
     await withFixture(null, 0, async (fixture) => {
-      const lavish = fakeLavish()
+      const lavish = fakeLavish(join(fixture.home, "boards"))
       const chat = boardChat(fixture, lavish)
       await parkTwo(fixture, chat.call)
       const cards = [
@@ -187,7 +189,7 @@ describe("orc chat decision boards", () => {
 
   test("a session ended in Lavish stops the reading and leaves the task held instead of polling it again or ending it twice", async () => {
     await withFixture(null, 0, async (fixture) => {
-      const lavish = fakeLavish()
+      const lavish = fakeLavish(join(fixture.home, "boards"))
       const chat = boardChat(fixture, lavish)
       await holdTwo(chat.call)
       await chat.call("orc_decision_board", twoCards)
@@ -206,7 +208,7 @@ describe("orc chat decision boards", () => {
 
   test("the page marks the recorded card and keeps the open one answerable instead of showing every card open", async () => {
     await withFixture(null, 0, async (fixture) => {
-      const lavish = fakeLavish()
+      const lavish = fakeLavish(join(fixture.home, "boards"))
       const chat = boardChat(fixture, lavish)
       await holdTwo(chat.call)
       await chat.call("orc_decision_board", twoCards)
@@ -235,7 +237,7 @@ describe("orc chat decision boards", () => {
 
   test("words the captain adds to an option are recorded after it as written instead of dropped or trimmed", async () => {
     await withFixture(null, 0, async (fixture) => {
-      const lavish = fakeLavish()
+      const lavish = fakeLavish(join(fixture.home, "boards"))
       const chat = boardChat(fixture, lavish)
       await holdTwo(chat.call)
       await chat.call("orc_decision_board", twoCards)
@@ -250,7 +252,7 @@ describe("orc chat decision boards", () => {
 
   test("an answer that is none of the card's options records nothing instead of the sent words", async () => {
     await withFixture(null, 0, async (fixture) => {
-      const lavish = fakeLavish()
+      const lavish = fakeLavish(join(fixture.home, "boards"))
       const chat = boardChat(fixture, lavish)
       await holdTwo(chat.call)
       await chat.call("orc_decision_board", twoCards)
@@ -264,7 +266,7 @@ describe("orc chat decision boards", () => {
 
   test("a board that leaves out an open question is refused instead of opened partly", async () => {
     await withFixture(null, 0, async (fixture) => {
-      const lavish = fakeLavish()
+      const lavish = fakeLavish(join(fixture.home, "boards"))
       const chat = boardChat(fixture, lavish)
       await holdTwo(chat.call)
       const refused = await chat.call("orc_decision_board", { id: "task-1", cards: [twoCards.cards[0]] }).then(String, refusal)
@@ -275,7 +277,7 @@ describe("orc chat decision boards", () => {
 
   test("a recommendation outside a card's options is refused instead of shown as recommended", async () => {
     await withFixture(null, 0, async (fixture) => {
-      const lavish = fakeLavish()
+      const lavish = fakeLavish(join(fixture.home, "boards"))
       const chat = boardChat(fixture, lavish)
       await holdTwo(chat.call)
       const cards = [twoCards.cards[0], { question: "question-2", options: ["eu-west"], recommended: "mars" }]
@@ -286,7 +288,7 @@ describe("orc chat decision boards", () => {
 
   test("a hold with a reason and no questions takes one card whose answer releases it instead of needing a question id", async () => {
     await withFixture(null, 0, async (fixture) => {
-      const lavish = fakeLavish()
+      const lavish = fakeLavish(join(fixture.home, "boards"))
       const chat = boardChat(fixture, lavish)
       await chat.call("orc_backlog_add", { project: "orc", task: "# Pick the API\n" })
       await chat.call("orc_backlog_hold", { id: "task-1", reason: "REST or gRPC?" })
@@ -303,7 +305,7 @@ describe("orc chat decision boards", () => {
 
   test("a board answer for a question answered elsewhere records nothing instead of overwriting it", async () => {
     await withFixture(null, 0, async (fixture) => {
-      const lavish = fakeLavish()
+      const lavish = fakeLavish(join(fixture.home, "boards"))
       const chat = boardChat(fixture, lavish)
       await holdTwo(chat.call)
       await chat.call("orc_decision_board", twoCards)
@@ -319,7 +321,7 @@ describe("orc chat decision boards", () => {
 
   test("the chat start lists each board whose task is still held, with the time it opened, instead of none or a released one", async () => {
     await withFixture(null, 0, async (fixture) => {
-      const first = fakeLavish()
+      const first = fakeLavish(join(fixture.home, "boards"))
       const before = boardChat(fixture, first)
       await holdTwo(before.call)
       await before.call("orc_decision_board", twoCards)
@@ -328,9 +330,9 @@ describe("orc chat decision boards", () => {
       await before.session.stopBoards()
       await mkdir(join(fixture.home, "boards", "task-9"), { recursive: true })
       await writeFile(join(fixture.home, "boards", "task-9", "board.json"), JSON.stringify({
-        task: "task-9", title: "Gone", waits: "held", reason: "x", openedAt: openedAt.toISOString(), cards: [{ target: { kind: "reason" }, text: "x", options: ["a"], recommended: "a" }]
+        task: "task-9", title: "Gone", waits: "held", reason: "x", openedAt: openedAt.toISOString(), board: "board-gone", cards: [{ target: { kind: "reason" }, text: "x", options: ["a"], recommended: "a" }]
       }))
-      const second = fakeLavish()
+      const second = fakeLavish(join(fixture.home, "boards"))
       const after = boardChat(fixture, second)
       await after.session.listBoards()
       expect(after.boardLines()).toEqual([
@@ -343,6 +345,58 @@ describe("orc chat decision boards", () => {
       second.answer("question-2", "eu-west")
       await until(() => after.boardLines().length === 3)
       expect(after.boardLines()[1]).toBe("From task-1's decision board, Which region? eu-west: answered question-2 on task-1, so the beat may start it")
+    })
+  }, 60_000)
+
+  test("an answer queued from an earlier board records nothing instead of landing on the newer decision", async () => {
+    await withFixture(null, 0, async (fixture) => {
+      const lavish = fakeLavish(join(fixture.home, "boards"))
+      const chat = boardChat(fixture, lavish)
+      await holdTwo(chat.call)
+      await chat.call("orc_decision_board", twoCards)
+      const before = (JSON.parse(await readFile(join(fixture.home, "boards", "task-1", "board.json"), "utf8")) as { readonly board: string }).board
+      await chat.call("orc_decision_board", twoCards)
+      lavish.send({ kind: "feedback", prompts: [{ tag: "orc-board-answer", text: "REST or gRPC?: gRPC", data: { board: before, card: "question-1", answer: "gRPC" } }] })
+      await until(() => chat.boardLines().some((line) => line.includes("no longer describes its current decision")))
+      expect(chat.boardLines()).toEqual(["task-1's decision board no longer describes its current decision, so orc recorded nothing: REST or gRPC?: gRPC"])
+      expect((await chat.held())?.hold?.questions.map((question) => question.answer)).toEqual([null, null])
+      await chat.session.stopBoards()
+    })
+  }, 60_000)
+
+  test("answers recorded outside the board close its page and session on the next refresh instead of leaving it open", async () => {
+    await withFixture(null, 0, async (fixture) => {
+      const lavish = fakeLavish(join(fixture.home, "boards"))
+      const chat = boardChat(fixture, lavish)
+      await holdTwo(chat.call)
+      await chat.call("orc_decision_board", twoCards)
+      await chat.call("orc_backlog_answer", { id: "task-1", question: "question-1", words: "gRPC" })
+      await chat.call("orc_backlog_answer", { id: "task-1", question: "question-2", words: "us-east" })
+      await chat.session.reconcileBoards()
+      const page = await readFile(join(fixture.home, "boards", "task-1", "board.html"), "utf8")
+      expect(page).toContain("Every card is answered.")
+      expect(page).toContain("Recorded: <strong>gRPC</strong>")
+      expect(page).toContain("Recorded: <strong>us-east</strong>")
+      expect(lavish.ended).toEqual([join(fixture.home, "boards", "task-1", "board.html")])
+      expect(chat.boardLines()).toEqual(["task-1 is no longer held, so orc closed its decision board"])
+      await chat.session.stopBoards()
+    })
+  }, 60_000)
+
+  test("a board released while the chat was away gets its completed page at the next start instead of keeping open cards", async () => {
+    await withFixture(null, 0, async (fixture) => {
+      const lavish = fakeLavish(join(fixture.home, "boards"))
+      const chat = boardChat(fixture, lavish)
+      await holdTwo(chat.call)
+      await chat.call("orc_decision_board", twoCards)
+      await chat.call("orc_backlog_answer", { id: "task-1", question: "question-1", words: "gRPC" })
+      await chat.call("orc_backlog_answer", { id: "task-1", question: "question-2", words: "us-east" })
+      await chat.session.stopBoards()
+      const next = boardChat(fixture, fakeLavish(join(fixture.home, "boards")))
+      await next.session.listBoards()
+      expect(next.boardLines()).toEqual([])
+      expect(await readFile(join(fixture.home, "boards", "task-1", "board.html"), "utf8")).toContain("Every card is answered.")
+      await next.session.stopBoards()
     })
   }, 60_000)
 })

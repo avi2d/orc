@@ -595,6 +595,8 @@ Words you add on the card follow the option after ` — `, as you wrote them.
 The chat and the board's Conversation panel both show what orc recorded.
 The page then shows that card as recorded, and the task stays held or parked until every card has an answer.
 Once the task no longer waits on you, the chat writes the recorded answers into the page and ends the board's Lavish session.
+Answers recorded outside the board are picked up on the next refresh, which writes the page and ends the session the same way.
+An answer sent from an earlier board records nothing, since each board answers only its own cards.
 Each time the chat starts, it posts one line per board whose task still waits on you.
 The line names the time the board opened and the questions it waits on.
 Open the board again with `orc_decision_board` to answer the rest, which reads only a board opened that way.

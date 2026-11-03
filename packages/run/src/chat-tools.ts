@@ -30,6 +30,7 @@ export interface ChatSession {
   readonly postParked: () => Promise<void>
   readonly listParkedAgain: () => void
   readonly listBoards: () => Promise<void>
+  readonly reconcileBoards: () => Promise<void>
   readonly postBoardNews: () => void
   readonly stopBoards: () => Promise<void>
 }
@@ -323,6 +324,7 @@ export const chatSession = (
     postParked,
     listParkedAgain: parked.forget,
     listBoards: () => Effect.runPromise(boards.listOpen),
+    reconcileBoards: () => Effect.runPromise(boards.reconcileWatched),
     postBoardNews,
     stopBoards: () => Effect.runPromise(boards.stop)
   }
@@ -367,7 +369,7 @@ export const chatExtension = (env: Env, pollMillis: number) => (pi: ChatHost): v
         return
       }
       session.postBoardNews()
-      const run = postHeldIfDue().then(listBoardsIfDue).then(() => session.postParked()).then(() => session.postClosed())
+      const run = postHeldIfDue().then(listBoardsIfDue).then(() => session.reconcileBoards()).then(() => session.postParked()).then(() => session.postClosed())
       current = run
       run.then(() => {
         if (current === run) {
