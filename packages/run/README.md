@@ -585,6 +585,7 @@ The run then outlives the beat, the dispatcher and any SSH link to it.
 It reads the task from the beat's `ORC_TASK_*` variables and queues `orc run` in the checkout on branch `orc/<task-id>`, in the pueue group `orc`.
 The run takes `--sandbox none --provider <provider> --token-file <path>` when the account holds a token file or token, and `--sandbox none --provider <provider>` with no token file when the account is kind `none`, so it runs on the picked account and refuses an implementer on any other provider.
 When the run starts, it fast-forwards the checkout's default branch from its remote, or says in its output why not.
+The refresh needs Git 2.48 or later.
 The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
 The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.

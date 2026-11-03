@@ -17,7 +17,7 @@ A terminal dashboard shows every machine, queue and account at a glance.
 ## Before you begin
 
 - Bun, at the version `.bun-version` pins.
-- Git.
+- Git 2.48 or later.
 - Node, which the agent runs on.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, logged in to a model provider.
 - no-mistakes, installed as [Installing no-mistakes](packages/run/README.md#installing-no-mistakes) says, for every run except `direct-PR`.
