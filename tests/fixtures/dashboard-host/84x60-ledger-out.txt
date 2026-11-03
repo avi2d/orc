@@ -28,8 +28,8 @@ gpu      NVIDIA GeForce RTX 4090 · 63% · memory 8.0G of 24.0G
 
 alerts
 alert    quota-pace
-limits   a window runs ahead of pace past its first tenth and runs out before its
-         reset
+limits   a window runs ahead of pace past its first tenth and runs out before
+         its reset
          read every 1m
 fired    none recorded
 alert    heavy-load

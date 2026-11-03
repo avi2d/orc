@@ -12,8 +12,8 @@
 ╰──────────────────────────────────────────────────────────╯│                                                          │
 ╭─ gluttons | alerts ─────────────────────────────── ↻ 2s ─╮│                                                          │
 │ ⚑ shop is spending over its share of claude main's week  ││                                                          │
-│ ⚑ my-home is spending over its share of claude main's    ││                                                          │
-│   week                                                   ││                                                          │
+│ ⚑ my-home is spending over its share of claude           ││                                                          │
+│   main's week                                            ││                                                          │
 │ +2 more flags                                            ││                                                          │
 │                                                          ││                                                          │
 ╰──────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯

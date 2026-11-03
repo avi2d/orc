@@ -1,7 +1,7 @@
 alerts
 alert    quota-pace
-limits   a window runs ahead of pace past its first tenth and runs out before its
-         reset
+limits   a window runs ahead of pace past its first tenth and runs out before
+         its reset
          read every 1m
 fired    none recorded
 alert    heavy-load

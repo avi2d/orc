@@ -3,13 +3,28 @@ import { ellipsize, fit, type Line, lineWidth, plain, span, truncate, widthOf } 
 
 export type Block = ReadonlyArray<Line>;
 
-export const wrapParts = (parts: ReadonlyArray<string>, width: number, separator = " \u00b7 "): ReadonlyArray<string> =>
-  parts.reduce<ReadonlyArray<string>>((lines, part) => {
+type Row = ReadonlyArray<string>;
+
+const singleWord = (row: Row): boolean => row.length === 1 && !/\s/u.test(row[0] ?? "");
+
+// A last row holding one word takes the part before it, while the row above keeps two parts and the pair fits.
+const withoutLoneWord = (rows: ReadonlyArray<Row>, width: number, separator: string): ReadonlyArray<Row> => {
+  const last = rows.at(-1);
+  const above = rows.at(-2);
+  if (last === undefined || above === undefined || !singleWord(last) || above.length < 3) return rows;
+  const moved = [...above.slice(-1), ...last];
+  return widthOf(moved.join(separator)) <= width ? [...rows.slice(0, -2), above.slice(0, -1), moved] : rows;
+};
+
+export const wrapParts = (parts: ReadonlyArray<string>, width: number, separator = " \u00b7 "): ReadonlyArray<string> => {
+  const rows = parts.reduce<ReadonlyArray<Row>>((lines, part) => {
     const last = lines.at(-1);
-    if (last === undefined) return [part];
-    const joined = last + separator + part;
-    return widthOf(joined) <= width ? [...lines.slice(0, -1), joined] : [...lines, part];
+    if (last === undefined) return [[part]];
+    const joined = [...last, part];
+    return widthOf(joined.join(separator)) <= width ? [...lines.slice(0, -1), joined] : [...lines, [part]];
   }, []);
+  return withoutLoneWord(rows, width, separator).map((row) => row.join(separator));
+};
 
 export const withinRows = (block: Block, rows: number): Block => {
   if (block.length <= rows) return block;
