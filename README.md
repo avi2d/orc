@@ -17,7 +17,7 @@ A terminal dashboard shows every machine, queue and account at a glance.
 ## Before you begin
 
 - Bun, at the version `.bun-version` pins.
-- Git.
+- Git 2.48 or later.
 - Node, which the agent runs on.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, logged in to a model provider.
 - no-mistakes, installed as [Installing no-mistakes](packages/run/README.md#installing-no-mistakes) says, for every run except `direct-PR`.
@@ -138,7 +138,8 @@ Orc grows toward the full orchestrator one step at a time.
 | Alerts and pull request events posted in the chat | Next |
 | Decision boards you answer once | Next |
 | Per-project instructions the run and the chat both read | Next |
-| A fresh checkout before every run, and follow-ups on upstream changes | Next |
+| A fresh checkout before every run | Ships today |
+| Follow-ups on upstream changes | Next |
 
 Today a ship run counts as done once Pi stops cleanly with `ORC_COMPLETE` and the branch holds a new commit.
 The checks must pass too, and no-mistakes must open a pull request with green CI.

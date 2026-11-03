@@ -88,7 +88,7 @@ describe("orc run --kind scout", () => {
       const runDir = (await readFile(join(fakeBin, "pi-cwd"), "utf8")).trim()
       expect(runDir).toStartWith(join(orcHome, "runs") + "/")
       const report = join(runDir, "agent-report.md")
-      expect(result.stdout).toBe("orc: scout run " + runDir.split("/").at(-1) + " wrote its report to " + report + "\n")
+      expect(result.stdout).toBe("did not refresh " + repo + " because it has no remote, so the run starts from what it holds\norc: scout run " + runDir.split("/").at(-1) + " wrote its report to " + report + "\n")
       expect(await readFile(report, "utf8")).toContain("The checkout holds one task file.")
       expect(await readFile(join(fakeBin, "pi-prompt"), "utf8")).toContain(report)
       expect(await Bun.file(join(fakeBin, "nm-calls")).exists()).toBe(false)

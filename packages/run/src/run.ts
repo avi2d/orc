@@ -1,5 +1,5 @@
 import { createSandbox, type Sandbox } from "@ai-hero/sandcastle"
-import { Effect, FileSystem, Path, type Scope } from "effect"
+import { Console, Effect, FileSystem, Path, type Scope } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { Database } from "bun:sqlite"
 import { homedir } from "node:os"
@@ -13,6 +13,7 @@ import { routeOfAgents } from "./model-route"
 import { readOrcConfig } from "./orc-config"
 import { planSandbox, type SandboxPlan } from "./sandbox-plan"
 import { type Checkout, openCheckout, parseRefuseMarkers } from "./checkout"
+import { formatRefresh, refreshCheckout } from "./dispatch/refresh"
 import { orcCompletionLine } from "./pi"
 import { OrcRunError, describeCause } from "./run-session"
 import { openDatabase, orcHomeDir, updateStep } from "./run-history"
@@ -25,6 +26,7 @@ import { runFull, type RunCheckpoints, type SandboxOps } from "./run-loop"
 import { type ReportOutcome, type ReportRun, runReport } from "./report-run"
 import { runDirFor, type ReportKind } from "./task-kind"
 import { noMistakesBinary, noMistakesVersionProblem, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "./no-mistakes"
+import { newRunId } from "./run-id"
 import { subprocessDeliverer } from "./run-deliverer"
 import type { RunDelivery } from "./delivery"
 
@@ -46,12 +48,6 @@ export interface OrcRunRequest {
 }
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
-
-const newRunId = (): string => {
-  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15)
-  const random = Math.random().toString(16).slice(2, 8)
-  return stamp + "-" + random
-}
 
 // The sandbox reads each folder whole, so a folder holding HOME would hand it the operator's credentials.
 export const toolchainFromEnv = (value: string | undefined, home: string): Effect.Effect<ToolchainResolver, OrcRunError> =>
@@ -237,6 +233,7 @@ const openRun = (
     const runId = request.runId ?? newRunId()
     const git = yield* openHostGit(fs, path)
     const checkout = yield* openCheckout(fs, path, spawner, git, request.cwd, request.branch, runId, parseRefuseMarkers(Bun.env.ORC_REFUSE_MARKERS))
+    yield* Console.log(formatRefresh(checkout.projectDir, yield* refreshCheckout(checkout.projectDir)))
     const runDir = runDirFor(home, runId)
     const { taskFile: effectiveTaskFile, sandbox: sandboxKind } = yield* readRunStart(fs, home, checkout, request)
     return { fs, path, spawner, home, runId, git, checkout, runDir, effectiveTaskFile, sandboxKind }
