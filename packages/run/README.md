@@ -472,9 +472,10 @@ The beat prints `closed <task-id> <done|failed> on <machine>` with the reason an
 A machine whose start runs any other program keeps owning its tasks, which the beat never reads.
 To close one of those, run `orc backlog close <task-id> <done|failed> [reason]`.
 A started run whose output has not grown for 30 minutes prints `stalled <task-id> on <machine>: no output since <time>` once, and again after new output stalls anew.
+A PR the beat cannot read for the chat prints `cannot read the PR of <task-id> for the chat: <reason>`.
 A missing start command exits 127 into its log and leaves the task started.
 Only a failure to spawn the log wrapper closes the task as `start-failed`.
-To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1` and carries the endings as `closed`, `close-failed` and `parked` actions and a stall as `stalled`.
+To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1` and carries the endings as `closed`, `close-failed` and `parked` actions, a stall as `stalled` and a PR the beat cannot read as `pr-unread`.
 On a token command account, each beat first sends every started task its account's current token through its machine's `renew` command, as JSON on standard input.
 
 ## Parked runs
@@ -644,7 +645,7 @@ To print the five minute load average the beat compares against a load limit, ru
 | `src/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
 | `src/orc-config.ts` | The reading of `config.json`: the providers and the implementer, fixer and orchestrator models |
 | `src/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
-| `src/chat-tools.ts` | The chat tools and the poll that posts each closed task into the chat once |
+| `src/chat-tools.ts` | The chat tools and the poll that posts each closed task and each event into the chat once |
 | `src/chat-parked.ts` | The chat's listing of parked questions, once per start and once per park |
 | `src/json-file.ts` | The JSON config file reading and its `ConfigError` |
 | `src/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
