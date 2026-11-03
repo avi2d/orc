@@ -1,8 +1,10 @@
 import { Effect, Schema } from "effect"
 
+export const QuestionJson = Schema.Struct({ id: Schema.String, text: Schema.String, answer: Schema.NullOr(Schema.Struct({ words: Schema.String, at: Schema.String })) })
+
 export const ParkedJson = Schema.Struct({
   branch: Schema.String,
-  questions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String, answer: Schema.NullOr(Schema.Struct({ words: Schema.String, at: Schema.String })) }))
+  questions: Schema.Array(QuestionJson)
 })
 
 interface ParkedTask {

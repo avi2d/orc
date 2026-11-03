@@ -17,6 +17,7 @@ const fakePi = (log: string, exitCode: number): string =>
     "#!/bin/sh",
     "for arg in \"$@\"; do printf '%s\\n' \"$arg\" >> '" + log + "'; done",
     "printf 'ORC_CHAT_ORC=%s\\n' \"$ORC_CHAT_ORC\" >> '" + log + "'",
+    "printf 'ORC_CHAT_BOARDS=%s\\n' \"$ORC_CHAT_BOARDS\" >> '" + log + "'",
     "exit " + exitCode,
     ""
   ].join("\n")

@@ -58,7 +58,7 @@ describe("the startup held-decision listing", () => {
       expect(posted).toHaveLength(1)
       await writeFile(
         fixture,
-        JSON.stringify({ tasks: [{ id: "task-1", title: "Pick the API", status: "new", hold: { reason: "REST or gRPC", until: null, answer: null }, parked: null }] })
+        JSON.stringify({ tasks: [{ id: "task-1", title: "Pick the API", status: "new", hold: { reason: "REST or gRPC", until: null, questions: [], answer: null }, parked: null }] })
       )
       env[orcCommandVar] = JSON.stringify(["sh", "-c", "cat " + fixture])
       expect(await session.postHeld()).toBe(true)

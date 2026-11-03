@@ -561,14 +561,15 @@ To say tasks in a chat instead of writing task files, run `orc chat`.
 It starts Pi on the model `models.orchestrator` names in `config.json`, and refuses to start when it names none.
 When `<ORC_HOME>/orchestrator.md` exists, the chat adds it to Pi's system prompt as the orchestrator's rules.
 Its first line of output names the rules file it loaded, or says it found none.
-The chat's Pi has five tools and no others:
+The chat's Pi has six tools and no others:
 
 - `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project and the task's Markdown.
   It may add a kind, an internal mark, a machine and the ids the task depends on.
 - `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
-- `orc_backlog_hold` holds one new task through `orc backlog hold`, with the reason and an optional date.
+- `orc_backlog_hold` holds one new task through `orc backlog hold`, with the reason, an optional date and optional questions.
 - `orc_backlog_answer` answers a held task through `orc backlog answer`, with your words as you said them, or one parked question when it names the question's id.
 - `merge_task` lands a closed task's PR through `orc merge <task-id> --basis <basis>`, as [Merging a task's PR](#merging-a-tasks-pr) shows.
+- `orc_decision_board` opens a decision board for one held or parked task, as [Decision boards](#decision-boards) shows.
 
 So a task from the chat enters the backlog the way any other does, and the beat starts it.
 When it starts and every 15 seconds after, the chat reads `orc backlog --json`.
@@ -581,6 +582,22 @@ It posts one line per parked question you have not answered each time it starts,
 A question whose line a failed read or a busy Pi kept back is posted on a later poll.
 The chat's Pi loads your Pi settings and packages, so a provider a package adds works as it does in your Pi.
 `ORC_HOME` reaches the tools from the shell that runs `orc chat`.
+
+### Decision boards
+
+`orc_decision_board` writes one card per open question on a held or parked task into `<ORC_HOME>/boards/<task-id>/board.html`.
+Each card has its options and the option the chat recommends.
+A task held with a reason and no questions gets one card for the reason.
+The chat opens the page with `lavish-axi <board.html> --no-open` and posts the local URL, so the board stays on this machine and nothing is published.
+The page loads the Tailwind and DaisyUI styles Lavish recommends from the jsDelivr CDN.
+Each card you answer is recorded through `orc backlog answer`, word for word as the option reads.
+Words you add on the card follow the option after ` — `, as you wrote them.
+The chat and the board's Conversation panel both show what orc recorded.
+The page then shows that card as recorded, and the task stays held or parked until every card has an answer.
+Once the task no longer waits on you, the chat ends the board's Lavish session.
+Each time the chat starts, it posts one line per board whose task still waits on you, and goes back to reading it.
+The line names the time the board opened, its URL and the questions it waits on.
+The boards need `lavish-axi` on the PATH of the shell that runs `orc chat`.
 
 ## The runner
 
@@ -638,6 +655,9 @@ To print the five minute load average the beat compares against a load limit, ru
 | `src/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
 | `src/chat-tools.ts` | The chat tools and the poll that posts each closed task into the chat once |
 | `src/chat-parked.ts` | The chat's listing of parked questions, once per start and once per park |
+| `src/chat-board.ts` | The chat's decision boards: the cards, the answers they record and the listing at each start |
+| `src/chat-board-page.ts` | The decision board page and the record of its cards |
+| `src/chat-lavish.ts` | The `lavish-axi` launcher that opens, reads and ends a board's session |
 | `src/json-file.ts` | The JSON config file reading and its `ConfigError` |
 | `src/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
