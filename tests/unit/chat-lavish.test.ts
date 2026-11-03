@@ -126,7 +126,7 @@ describe("the board host choice", () => {
       await chmod(join(dir, "lavish-axi"), 0o755)
       const full = { PATH: dir + ":" + (process.env.PATH ?? ""), ...env }
       expect((await Effect.runPromise(lavishLauncher(full).open("/tmp/board.html"))).url).toBe("http://127.0.0.1:4387/session/f11db70733bf420a")
-      return Bun.file(seen).text()
+      return await Bun.file(seen).text()
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
