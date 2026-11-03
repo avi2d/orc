@@ -1,6 +1,7 @@
-import { Duration, Effect, Stream } from "effect"
+import { Duration, Effect, FileSystem, Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { hostGitSafetyEnv } from "../host"
+import { hostGitRefusalExit, hostGitSafetyEnv, hostGitShim } from "../host"
+import { parseRefuseMarkers } from "../checkout"
 
 export type Refresh =
   | { readonly kind: "fast-forwarded"; readonly branch: string; readonly remote: string; readonly from: string; readonly to: string }
@@ -9,7 +10,7 @@ export type Refresh =
 
 type Kept = Extract<Refresh, { readonly kind: "kept" }>
 
-type Requirements = ChildProcessSpawner.ChildProcessSpawner
+type Requirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
 
 interface GitResult {
   readonly exitCode: number
@@ -20,12 +21,12 @@ interface GitResult {
 // The far side of a forwarded start gets 30 seconds before the dispatcher gives up on it, so the fetch must end well inside that.
 const fetchSeconds = 20
 
-const gitEnv = { ...hostGitSafetyEnv, GIT_TERMINAL_PROMPT: "0" }
+const gitEnv = { ...hostGitSafetyEnv, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0" }
 
-const git = (projectDir: string, args: ReadonlyArray<string>): Effect.Effect<GitResult, never, Requirements> =>
+const git = (gitBin: string, projectDir: string, args: ReadonlyArray<string>): Effect.Effect<GitResult, never, Requirements> =>
   Effect.gen(function*() {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const handle = yield* spawner.spawn(ChildProcess.make("git", [...args], { cwd: projectDir, env: gitEnv, extendEnv: true, stdin: "ignore" }))
+    const handle = yield* spawner.spawn(ChildProcess.make(gitBin, [...args], { cwd: projectDir, env: gitEnv, extendEnv: true, stdin: "ignore" }))
     const [stdout, stderr, exitCode] = yield* Effect.all([
       handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
       handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
@@ -37,25 +38,54 @@ const git = (projectDir: string, args: ReadonlyArray<string>): Effect.Effect<Git
     Effect.catch((error) => Effect.succeed({ exitCode: -1, stdout: "", stderr: "git did not run: " + error.message }))
   )
 
-const firstLine = (text: string): string => text.split("\n")[0] ?? ""
+const firstLine = (text: string): string => text.split("
+")[0] ?? ""
 
 const short = (sha: string): string => sha.slice(0, 7)
 
 const kept = (reason: string): Kept => ({ kind: "kept", reason })
 
+const refused = (result: GitResult): Kept | null =>
+  result.exitCode === hostGitRefusalExit ? kept(firstLine(result.stderr)) : null
+
 const uncommittedChanges = (count: number): string => count.toString() + (count === 1 ? " uncommitted change" : " uncommitted changes")
 
-const cleanBranch = (projectDir: string): Effect.Effect<{ readonly branch: string } | Kept, never, Requirements> =>
+const refusedMarker = (
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  projectDir: string
+): Effect.Effect<Kept | null, never, never> =>
   Effect.gen(function*() {
-    const inside = yield* git(projectDir, ["rev-parse", "--is-inside-work-tree"])
+    for (const marker of parseRefuseMarkers(Bun.env.ORC_REFUSE_MARKERS)) {
+      for (const candidate of [path.join(projectDir, marker), path.join(path.dirname(projectDir), marker)]) {
+        const found = yield* fs.exists(candidate).pipe(Effect.orElseSucceed(() => false))
+        if (found) {
+          return kept(candidate + " marks this checkout as refused")
+        }
+      }
+    }
+    return null
+  })
+
+const cleanBranch = (gitBin: string, projectDir: string): Effect.Effect<{ readonly branch: string } | Kept, never, Requirements> =>
+  Effect.gen(function*() {
+    const inside = yield* git(gitBin, projectDir, ["rev-parse", "--is-inside-work-tree"])
+    const stopInside = refused(inside)
+    if (stopInside !== null) {
+      return stopInside
+    }
     if (inside.exitCode !== 0 || inside.stdout !== "true") {
       return kept("it is no git checkout")
     }
-    const head = yield* git(projectDir, ["symbolic-ref", "--quiet", "--short", "HEAD"])
+    const head = yield* git(gitBin, projectDir, ["symbolic-ref", "--quiet", "--short", "HEAD"])
+    const stopHead = refused(head)
+    if (stopHead !== null) {
+      return stopHead
+    }
     if (head.exitCode !== 0) {
       return kept("it is on no branch")
     }
-    const status = yield* git(projectDir, ["status", "--porcelain", "--", ".", ":(exclude).sandcastle/worktrees"])
+    const status = yield* git(gitBin, projectDir, ["status", "--porcelain", "--", ".", ":(exclude).sandcastle/worktrees"])
     if (status.exitCode !== 0) {
       return kept("git status failed: " + firstLine(status.stderr))
     }
@@ -74,8 +104,8 @@ const pickRemote = (listed: string): { readonly remote: string } | Kept => {
   return remotes.length === 1 ? { remote: remotes.join("") } : kept("it has several remotes and none named origin")
 }
 
-const fetchRemote = (projectDir: string, remote: string): Effect.Effect<Kept | null, never, Requirements> =>
-  git(projectDir, ["fetch", "--quiet", "--no-recurse-submodules", remote]).pipe(
+const fetchRemote = (gitBin: string, projectDir: string, remote: string): Effect.Effect<Kept | null, never, Requirements> =>
+  git(gitBin, projectDir, ["fetch", "--quiet", "--no-recurse-submodules", remote]).pipe(
     Effect.map((fetched) => fetched.exitCode === 0 ? null : kept("git fetch " + remote + " failed: " + firstLine(fetched.stderr))),
     Effect.timeoutOrElse({
       duration: Duration.seconds(fetchSeconds),
@@ -90,38 +120,57 @@ interface RemoteTip {
   readonly tip: string
 }
 
-const fetchedTip = (projectDir: string): Effect.Effect<RemoteTip | Kept, never, Requirements> =>
+const fetchedTip = (gitBin: string, projectDir: string): Effect.Effect<RemoteTip | Kept, never, Requirements> =>
   Effect.gen(function*() {
-    const picked = pickRemote((yield* git(projectDir, ["remote"])).stdout)
+    const listed = yield* git(gitBin, projectDir, ["remote"])
+    const stopListed = refused(listed)
+    if (stopListed !== null) {
+      return stopListed
+    }
+    const picked = pickRemote(listed.stdout)
     if ("kind" in picked) {
       return picked
     }
     const remote = picked.remote
-    const fetchFailure = yield* fetchRemote(projectDir, remote)
+    const fetchFailure = yield* fetchRemote(gitBin, projectDir, remote)
     if (fetchFailure !== null) {
       return fetchFailure
     }
-    const remoteHead = yield* git(projectDir, ["symbolic-ref", "--quiet", "--short", "refs/remotes/" + remote + "/HEAD"])
+    const remoteHead = yield* git(gitBin, projectDir, ["symbolic-ref", "--quiet", "--short", "refs/remotes/" + remote + "/HEAD"])
+    const stopHead = refused(remoteHead)
+    if (stopHead !== null) {
+      return stopHead
+    }
     if (remoteHead.exitCode !== 0) {
       return kept(remote + " names no default branch, which git remote set-head " + remote + " --auto records")
     }
     const tracking = remoteHead.stdout
-    const tip = (yield* git(projectDir, ["rev-parse", "--verify", "--quiet", tracking])).stdout
+    const resolved = yield* git(gitBin, projectDir, ["rev-parse", "--verify", "--quiet", tracking])
+    const stopResolved = refused(resolved)
+    if (stopResolved !== null) {
+      return stopResolved
+    }
+    const tip = resolved.stdout
     return tip === "" ? kept(tracking + " names no commit") : { remote, tracking, defaultBranch: tracking.slice(remote.length + 1), tip }
   })
 
-const fastForward = (projectDir: string, branch: string, remote: RemoteTip): Effect.Effect<Refresh, never, Requirements> =>
+const fastForward = (gitBin: string, projectDir: string, branch: string, remote: RemoteTip): Effect.Effect<Refresh, never, Requirements> =>
   Effect.gen(function*() {
-    const local = (yield* git(projectDir, ["rev-parse", "HEAD"])).stdout
+    const localResult = yield* git(gitBin, projectDir, ["rev-parse", "HEAD"])
+    const stopLocal = refused(localResult)
+    if (stopLocal !== null) {
+      return stopLocal
+    }
+    const local = localResult.stdout
     if (local === remote.tip) {
       return { kind: "current", branch, remote: remote.remote, at: short(local) } satisfies Refresh
     }
-    const behind = yield* git(projectDir, ["merge-base", "--is-ancestor", "HEAD", remote.tip])
+    const behind = yield* git(gitBin, projectDir, ["merge-base", "--is-ancestor", "HEAD", remote.tip])
     if (behind.exitCode !== 0) {
-      const ahead = yield* git(projectDir, ["merge-base", "--is-ancestor", remote.tip, "HEAD"])
+      const ahead = yield* git(gitBin, projectDir, ["merge-base", "--is-ancestor", remote.tip, "HEAD"])
       return kept(ahead.exitCode === 0 ? branch + " holds commits " + remote.tracking + " lacks" : branch + " has diverged from " + remote.tracking)
     }
-    const merged = yield* git(projectDir, ["merge", "--ff-only", "--quiet", remote.tip])
+    const merged = yield* git(gitBin, projectDir, ["merge", "--ff-only", "--quiet", "--no-overwrite-ignore", remote.tip])
     if (merged.exitCode !== 0) {
       return kept("git merge --ff-only " + remote.tracking + " failed: " + firstLine(merged.stderr))
     }
@@ -130,20 +179,30 @@ const fastForward = (projectDir: string, branch: string, remote: RemoteTip): Eff
 
 // Only a fast-forward of the checked-out default branch with a clean tree moves anything, so no local commit or change is ever lost.
 export const refreshCheckout = (projectDir: string): Effect.Effect<Refresh, never, Requirements> =>
-  Effect.gen(function*() {
-    const local = yield* cleanBranch(projectDir)
+  Effect.scoped(Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const marked = yield* refusedMarker(fs, path, projectDir)
+    if (marked !== null) {
+      return marked
+    }
+    const shim = yield* hostGitShim(fs, path, Bun.which("git") ?? "git").pipe(Effect.orElseSucceed(() => null))
+    if (shim === null) {
+      return kept("cannot write the host git shim")
+    }
+    const local = yield* cleanBranch(shim, projectDir)
     if ("kind" in local) {
       return local
     }
-    const remote = yield* fetchedTip(projectDir)
+    const remote = yield* fetchedTip(shim, projectDir)
     if ("kind" in remote) {
       return remote
     }
     if (local.branch !== remote.defaultBranch) {
       return kept("it is on " + local.branch + ", not the default branch " + remote.defaultBranch)
     }
-    return yield* fastForward(projectDir, local.branch, remote)
-  })
+    return yield* fastForward(shim, projectDir, local.branch, remote)
+  }))
 
 export const formatRefresh = (projectDir: string, refresh: Refresh): string => {
   switch (refresh.kind) {
