@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
 import { createTestRenderer, type TestRendererSetup } from "@opentui/core/testing";
-import { type Config, ConfigProvider, Effect, Fiber, Layer } from "effect";
+import { type Config, ConfigProvider, Effect, Fiber, type FileSystem, Layer } from "effect";
 import { type ModuleSources, moduleFeeds, modules } from "@tui-dash/cli";
 import type { CliRenderer } from "@opentui/core";
 import { dashboardScreen, printDashboard } from "@tui-dash/dashboard";
@@ -14,6 +14,7 @@ import {
   type ConfigRefused,
   dispatchSourceLayer,
   gpuSourceLayer,
+  harvestLogSourceLayer,
   herdrSourceLayer,
   linuxDiskSourceLayer,
   linuxHarnessProcessSourceLayer,
@@ -40,13 +41,14 @@ import {
   TaskSamplesSource,
   tasksMachinesLayer,
   noSavedReadings,
+  readClaudeAccounts,
   readConfig,
   ReadModeReference,
   type SavedReadings,
+  sessionLogSourceLayer,
 } from "@tui-dash/schema";
 import { liveScreen, type PanelError, type PanelModule, type PrintFrame } from "@tui-dash/ui";
 import { type ConversationReader, ConversationSource, conversationSourceLive } from "@tui-dash/ledger";
-import { harvestLogSourceLive, sessionLogSourceLive } from "@tui-dash/session-quota";
 import { fixture } from "./fixtures";
 import { fixtureActionsRepo, queueAnswers } from "./queues-fixture";
 import { fixtureHomeEnvironment } from "./session-fixture";
@@ -92,6 +94,7 @@ export interface DashboardSourcesOptions {
   readonly config?: string;
   readonly conversation?: ConversationReader;
   readonly repos?: Layer.Layer<RunnerRepos, Config.ConfigError, CommandRunner>;
+  readonly fileSystem?: Layer.Layer<FileSystem.FileSystem>;
 }
 
 const noSamples: TaskSamples = { read: () => Effect.succeed([]), append: () => Effect.void };
@@ -105,8 +108,9 @@ export const dashboardSources = ({
   config = join(alertFixtures, "..", "config", "config.json"),
   conversation,
   repos = runnerReposLayer,
+  fileSystem = BunFileSystem.layer,
 }: DashboardSourcesOptions): Layer.Layer<ModuleSources, Config.ConfigError | ConfigRefused> =>
-  moduleFeeds.pipe(Layer.provideMerge(recordedSources(run, env, saved, samples, config, conversation, repos)));
+  moduleFeeds.pipe(Layer.provideMerge(recordedSources(run, env, saved, samples, config, conversation, repos, fileSystem)));
 
 const recordedSources = (
   run: DashboardSourcesOptions["run"],
@@ -116,6 +120,7 @@ const recordedSources = (
   config: string,
   conversation: ConversationReader | undefined,
   repos: Layer.Layer<RunnerRepos, Config.ConfigError, CommandRunner>,
+  fileSystem: Layer.Layer<FileSystem.FileSystem>,
 ) =>
   Layer.mergeAll(
     quotaSourceLayer,
@@ -145,21 +150,21 @@ const recordedSources = (
     ).pipe(Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ TUI_DASH_ACTIONS_REPO: fixtureActionsRepo, ...env })))),
     Layer.succeed(TaskSamplesSource, samples),
     dispatchSourceLayer.pipe(
-      Layer.provide(BunFileSystem.layer),
+      Layer.provide(fileSystem),
       Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ ...env, HOME: "/home/tester" }))),
     ),
     saved,
     conversation === undefined ? conversationSourceLive : Layer.succeed(ConversationSource, conversation),
   ).pipe(
     Layer.merge(
-      Layer.mergeAll(sessionLogSourceLive, harvestLogSourceLive).pipe(
-        Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord(fixtureHomeEnvironment))),
+      Layer.mergeAll(sessionLogSourceLayer, harvestLogSourceLayer(readClaudeAccounts)).pipe(
+        Layer.provide(Layer.merge(fileSystem, ConfigProvider.layer(ConfigProvider.fromEnvRecord(fixtureHomeEnvironment)))),
       ),
     ),
     Layer.provide(Layer.succeed(CommandRunner, { run })),
     Layer.merge(
       Layer.merge(
-        BunFileSystem.layer,
+        fileSystem,
         ConfigProvider.layer(
           ConfigProvider.fromEnvRecord({
             ...env,
