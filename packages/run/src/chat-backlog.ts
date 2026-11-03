@@ -34,12 +34,16 @@ export interface Decision {
   readonly questions: ReadonlyArray<Question>
 }
 
-// Parked comes first because orc backlog answer answers a parked question before a hold.
-export const openDecision = (task: BacklogTask): Decision | null => {
-  if (task.status !== "closed" && task.parked !== null && task.parked.questions.some((question) => question.answer === null)) {
-    return { id: task.id, title: task.title, waits: "parked", reason: "Parked on " + task.parked.branch + " for the captain's answers.", questions: task.parked.questions }
+export const decisionFor = (task: BacklogTask, waits: "held" | "parked"): Decision | null => {
+  if (waits === "parked") {
+    return task.status !== "closed" && task.parked !== null && task.parked.questions.some((question) => question.answer === null)
+      ? { id: task.id, title: task.title, waits: "parked", reason: "Parked on " + task.parked.branch + " for the captain's answers.", questions: task.parked.questions }
+      : null
   }
   return isOpenHeld(task) ? { id: task.id, title: task.title, waits: "held", reason: task.hold.reason, questions: task.hold.questions } : null
 }
+
+// Parked comes first because orc backlog answer answers a parked question before a hold.
+export const openDecision = (task: BacklogTask): Decision | null => decisionFor(task, "parked") ?? decisionFor(task, "held")
 
 export const BacklogTasks = Schema.fromJsonString(Schema.Struct({ tasks: Schema.Array(Schema.Union([ClosedTask, OpenTask])) }))

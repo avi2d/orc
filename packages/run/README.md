@@ -588,15 +588,16 @@ The chat's Pi loads your Pi settings and packages, so a provider a package adds 
 `orc_decision_board` writes one card per open question on a held or parked task into `<ORC_HOME>/boards/<task-id>/board.html`.
 Each card has its options and the option the chat recommends.
 A task held with a reason and no questions gets one card for the reason.
-The chat opens the page with `lavish-axi <board.html> --no-open` and posts the local URL, so the board stays on this machine and nothing is published.
+The chat opens the page with `lavish-axi <board.html> --no-open --reopen` and posts the local URL, so the board stays on this machine and nothing is published.
 The page loads the Tailwind and DaisyUI styles Lavish recommends from the jsDelivr CDN.
 Each card you answer is recorded through `orc backlog answer`, word for word as the option reads.
 Words you add on the card follow the option after ` — `, as you wrote them.
 The chat and the board's Conversation panel both show what orc recorded.
 The page then shows that card as recorded, and the task stays held or parked until every card has an answer.
-Once the task no longer waits on you, the chat ends the board's Lavish session.
-Each time the chat starts, it posts one line per board whose task still waits on you, and goes back to reading it.
-The line names the time the board opened, its URL and the questions it waits on.
+Once the task no longer waits on you, the chat writes the recorded answers into the page and ends the board's Lavish session.
+Each time the chat starts, it posts one line per board whose task still waits on you.
+The line names the time the board opened and the questions it waits on.
+Open the board again with `orc_decision_board` to answer the rest, which reads only a board opened that way.
 The boards need `lavish-axi` on the PATH of the shell that runs `orc chat`.
 
 ## The runner

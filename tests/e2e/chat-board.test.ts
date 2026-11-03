@@ -148,6 +148,10 @@ describe("orc chat decision boards", () => {
         "end"
       ])
       expect((await chat.held())?.hold?.answer).toEqual({ words: "REST or gRPC?: gRPC\nWhich region?: us-east" })
+      await until(() => readFileSync(join(fixture.home, "boards", "task-1", "board.html"), "utf8").includes("Every card is answered."))
+      const doneHtml = await readFile(join(fixture.home, "boards", "task-1", "board.html"), "utf8")
+      expect(doneHtml).toContain("Recorded: <strong>gRPC</strong>")
+      expect(doneHtml).toContain("Recorded: <strong>us-east</strong>")
       await chat.session.stopBoards()
     })
   }, 60_000)
@@ -297,6 +301,22 @@ describe("orc chat decision boards", () => {
     })
   }, 60_000)
 
+  test("a board answer for a question answered elsewhere records nothing instead of overwriting it", async () => {
+    await withFixture(null, 0, async (fixture) => {
+      const lavish = fakeLavish()
+      const chat = boardChat(fixture, lavish)
+      await holdTwo(chat.call)
+      await chat.call("orc_decision_board", twoCards)
+      await chat.call("orc_backlog_answer", { id: "task-1", question: "question-1", words: "REST" })
+      lavish.answer("question-1", "gRPC")
+      await until(() => chat.boardLines().length === 1)
+      expect(chat.boardLines()).toEqual(["task-1's decision board no longer describes its current decision, so orc recorded nothing: question-1: gRPC"])
+      expect((await chat.held())?.hold?.questions.map((question) => question.answer)).toEqual([{ words: "REST" }, null])
+      await until(() => readFileSync(join(fixture.home, "boards", "task-1", "board.html"), "utf8").includes("Recorded: <strong>REST</strong>"))
+      await chat.session.stopBoards()
+    })
+  }, 60_000)
+
   test("the chat start lists each board whose task is still held, with the time it opened, instead of none or a released one", async () => {
     await withFixture(null, 0, async (fixture) => {
       const first = fakeLavish()
@@ -314,8 +334,12 @@ describe("orc chat decision boards", () => {
       const after = boardChat(fixture, second)
       await after.session.listBoards()
       expect(after.boardLines()).toEqual([
-        "task-1 Pick the API has a decision board open since 2026-11-03T09:30:00.000Z at http://127.0.0.1:4387/session/board-1, waiting on question-2"
+        "task-1 Pick the API has a decision board open since 2026-11-03T09:30:00.000Z, waiting on question-2"
       ])
+      expect(second.opened).toEqual([])
+      expect(second.polls()).toBe(0)
+      await after.call("orc_decision_board", { id: "task-1", cards: [twoCards.cards[1]] })
+      expect(second.opened).toEqual([join(fixture.home, "boards", "task-1", "board.html")])
       second.answer("question-2", "eu-west")
       await until(() => after.boardLines().length === 3)
       expect(after.boardLines()[1]).toBe("From task-1's decision board, Which region? eu-west: answered question-2 on task-1, so the beat may start it")

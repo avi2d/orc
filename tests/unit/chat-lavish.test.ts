@@ -46,7 +46,7 @@ describe("the lavish-axi launcher", () => {
           { tag: "prompt", text: "Ship it, but check the region", data: null }
         ]
       })
-      expect(await Bun.file(log).text()).toBe("poll\n/tmp/board.html\n--takeover\n")
+      expect(await Bun.file(log).text()).toBe("poll\n/tmp/board.html\n")
     })
   })
 
@@ -66,7 +66,7 @@ describe("the lavish-axi launcher", () => {
   test("opening reads the session URL and never asks lavish-axi to publish or open a browser", async () => {
     await withLavish(opened, async (env, log) => {
       expect(await Effect.runPromise(lavishLauncher(env).open("/tmp/board.html"))).toBe("http://127.0.0.1:4387/session/f11db70733bf420a")
-      expect(await Bun.file(log).text()).toBe("/tmp/board.html\n--no-open\n")
+      expect(await Bun.file(log).text()).toBe("/tmp/board.html\n--no-open\n--reopen\n")
     })
   })
 })

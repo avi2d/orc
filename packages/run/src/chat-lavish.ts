@@ -39,12 +39,12 @@ const lavish = (args: ReadonlyArray<string>, env: Env): Effect.Effect<string, Ch
 
 export const lavishLauncher = (env: Env): BoardLauncher => ({
   open: (file) =>
-    lavish([file, "--no-open"], env).pipe(
+    lavish([file, "--no-open", "--reopen"], env).pipe(
       Effect.filterOrFail((output) => scalar(output, "url") !== "", (output) => new ChatToolError({ message: "lavish-axi opened no session for " + file + ": " + output })),
       Effect.map((output) => scalar(output, "url"))
     ),
   poll: (file) =>
-    lavish(["poll", file, "--takeover"], env).pipe(
+    lavish(["poll", file], env).pipe(
       Effect.flatMap((output): Effect.Effect<BoardPoll> => {
         const status = scalar(output, "status")
         if (status === "feedback") {

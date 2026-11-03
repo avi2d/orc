@@ -1,5 +1,5 @@
 import { Effect, Fiber, FileSystem, Schema } from "effect"
-import { type BacklogTask, type Decision, openDecision } from "./chat-backlog"
+import { decisionFor, type BacklogTask, type Decision, openDecision } from "./chat-backlog"
 import { fileSystemLayer } from "./chat-command"
 import { ChatToolError } from "./chat-error"
 import type { BoardCard, BoardInput } from "./chat-inputs"
@@ -118,6 +118,58 @@ const writeBoard = (dir: string, record: BoardRecord, task: Decision): Effect.Ef
 const waitingTask = (host: BoardHost, id: string): Effect.Effect<Decision | null, ChatToolError> =>
   host.tasks.pipe(Effect.map((tasks) => tasks.find((task) => task.id === id) ?? null), Effect.map((task) => task === null ? null : openDecision(task)))
 
+const rawTask = (host: BoardHost, id: string): Effect.Effect<BacklogTask | null, ChatToolError> =>
+  host.tasks.pipe(Effect.map((tasks) => tasks.find((task) => task.id === id) ?? null))
+
+const matchesRecord = (task: Decision, record: BoardRecord): boolean => {
+  if (task.waits !== record.waits || task.reason !== record.reason) {
+    return false
+  }
+  return record.cards.every((card) => {
+    if (card.target.kind === "reason") {
+      return task.questions.length === 0 && card.text === task.reason
+    }
+    const id = card.target.id
+    const question = task.questions.find((candidate) => candidate.id === id)
+    return question !== undefined && question.text === card.text
+  })
+}
+
+const boundDecision = (host: BoardHost, record: BoardRecord): Effect.Effect<Decision | null, ChatToolError> =>
+  rawTask(host, record.task).pipe(
+    Effect.map((task) => {
+      if (task === null) {
+        return null
+      }
+      const bound = decisionFor(task, record.waits)
+      return bound !== null && matchesRecord(bound, record) ? bound : null
+    })
+  )
+
+const completedWords = (record: BoardRecord, task: BacklogTask) => (card: BoardCardRecord): string | null => {
+  if (task.status === "closed" || task.id !== record.task) {
+    return null
+  }
+  if (record.waits === "held") {
+    if (task.hold === null) {
+      return null
+    }
+    if (card.target.kind === "reason") {
+      return task.hold.answer?.words ?? null
+    }
+    const heldId = card.target.id
+    return task.hold.questions.find((question) => question.id === heldId)?.answer?.words ?? null
+  }
+  if (task.parked === null || card.target.kind !== "question") {
+    return null
+  }
+  const parkedId = card.target.id
+  return task.parked.questions.find((question) => question.id === parkedId)?.answer?.words ?? null
+}
+
+const staleLine = (record: BoardRecord, text: string): string =>
+  record.task + "'s decision board no longer describes its current decision, so orc recorded nothing: " + text
+
 const recordPrompt = (host: BoardHost, record: BoardRecord, prompt: BoardPrompt): Effect.Effect<string> =>
   Effect.gen(function*() {
     if (prompt.tag !== answerTag) {
@@ -128,6 +180,19 @@ const recordPrompt = (host: BoardHost, record: BoardRecord, prompt: BoardPrompt)
     const card = answer === null ? undefined : record.cards.find((candidate) => cardKey(candidate.target) === answer.card)
     if (answer === null || card === undefined || !card.options.includes(answer.answer)) {
       const line = record.task + "'s decision board sent an answer that matches none of its cards, so orc recorded nothing: " + prompt.text
+      host.say(line)
+      return line
+    }
+    const bound = yield* boundDecision(host, record)
+    if (bound === null) {
+      const line = staleLine(record, prompt.text)
+      host.say(line)
+      return line
+    }
+    const target = card.target
+    const current = target.kind === "question" ? bound.questions.find((question) => question.id === target.id)?.answer ?? null : null
+    if (target.kind === "question" && current !== null) {
+      const line = staleLine(record, prompt.text)
       host.say(line)
       return line
     }
@@ -143,15 +208,26 @@ type Reading = "read again" | "done"
 
 const refreshed = (host: BoardHost, dir: string, record: BoardRecord, reply: string): Effect.Effect<Reading, ChatToolError> =>
   Effect.gen(function*() {
-    const task = yield* waitingTask(host, record.task)
+    const open = yield* waitingTask(host, record.task)
     const page = boardFile(dir, "board.html")
     const replied = host.launcher.reply(page, reply).pipe(Effect.catchTag("ChatToolError", () => Effect.void))
-    if (task === null) {
-      yield* replied.pipe(Effect.andThen(host.launcher.end(page)), Effect.catchTag("ChatToolError", () => Effect.void))
+    const ended = replied.pipe(Effect.andThen(host.launcher.end(page)), Effect.catchTag("ChatToolError", () => Effect.void))
+    if (open === null) {
+      const raw = yield* rawTask(host, record.task)
+      if (raw !== null && raw.status !== "closed") {
+        yield* writeAtomic(page, boardHtml(record, completedWords(record, raw)))
+      }
+      yield* ended
       host.say(record.task + " is no longer " + record.waits + ", so orc closed its decision board")
       return "done"
     }
-    yield* writeAtomic(page, boardHtml(record, recordedWords(task)))
+    const bound = yield* boundDecision(host, record)
+    if (bound === null) {
+      yield* ended
+      host.say(record.task + "'s decision board no longer describes its current decision, so orc stopped reading it; open it again to answer the rest")
+      return "done"
+    }
+    yield* writeAtomic(page, boardHtml(record, recordedWords(bound)))
     yield* replied
     return "read again"
   })
@@ -214,13 +290,11 @@ export const decisionBoards = (host: BoardHost): Boards => {
   const listOne = (dir: string): Effect.Effect<void, ChatToolError> =>
     Effect.gen(function*() {
       const record = yield* readRecord(dir)
-      const task = yield* waitingTask(host, record.task)
-      if (task === null) {
+      const bound = yield* boundDecision(host, record)
+      if (bound === null) {
         return
       }
-      const url = yield* host.launcher.open(boardFile(dir, "board.html"))
-      host.say(task.id + " " + task.title + " has a decision board open since " + record.openedAt + " at " + url + ", waiting on " + waitingOn(record, task))
-      watch(task.id, dir)
+      host.say(bound.id + " " + bound.title + " has a decision board open since " + record.openedAt + ", waiting on " + waitingOn(record, bound))
     })
 
   const listOpen = (host.dir === null ? Effect.succeed([]) : boardDirs(host.dir)).pipe(
