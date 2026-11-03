@@ -34,7 +34,7 @@ export const AnswerInput = Schema.Struct({
 
 const BoardCard = Schema.Struct({
   question: Schema.optionalKey(Schema.String.annotate({
-    description: "The id of the held question this card answers, such as question-2; leave it out when the task was held with a reason and no questions"
+    description: "The id of the held or parked question this card answers, such as question-2; leave it out when the task was held with a reason and no questions"
   })),
   options: Schema.NonEmptyArray(Schema.String.check(Schema.isNonEmpty())).annotate({ description: "The options the captain picks one of, each recorded word for word when picked" }),
   recommended: Schema.String.annotate({ description: "The option you recommend, written exactly as it appears in options" })
@@ -42,8 +42,8 @@ const BoardCard = Schema.Struct({
 export type BoardCard = typeof BoardCard.Type
 
 export const BoardInput = Schema.Struct({
-  id: Schema.String.annotate({ description: "The id of the held task the board decides" }),
-  cards: Schema.NonEmptyArray(BoardCard).annotate({ description: "One card per open question on the hold" })
+  id: Schema.String.annotate({ description: "The id of the held or parked task the board decides" }),
+  cards: Schema.NonEmptyArray(BoardCard).annotate({ description: "One card per open question on the hold or park" })
 })
 export type BoardInput = typeof BoardInput.Type
 
