@@ -14,7 +14,7 @@ import { taskLabel } from "./pueue-status"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
 import { flagStall } from "./stall"
 import { readPullRequest } from "./pr-view"
-import { prEvents, type ReadPullRequest, stallEvent } from "./task-events"
+import { prEvents, type ReadPullRequest } from "./task-events"
 
 export type { BeatAction } from "./beat-action"
 export type { MachineRoom } from "./beat-place"
@@ -304,10 +304,7 @@ export const runBeat = (
     const started = tasks.filter((task) => task.state.kind === "started")
     const progress = yield* Effect.forEach(started, (task) => closeFinished(context, task))
     const closed = progress.flatMap((entry) => entry.kind === "ended" ? [entry.action] : [])
-    const stalls = yield* Effect.forEach(started, (task, index) =>
-      flagStall(root, task, progress[index] ?? { kind: "untracked" }).pipe(
-        Effect.tap((stall) => Option.isSome(stall) ? stallEvent(root, task, stall.value, at) : Effect.void)
-      ))
+    const stalls = yield* Effect.forEach(started, (task, index) => flagStall(root, task, progress[index] ?? { kind: "untracked" }))
     for (const action of closed) {
       if (action.kind === "closed" || action.kind === "parked") {
         const slot = context.live.find((entry) => entry.machine === action.machine)
