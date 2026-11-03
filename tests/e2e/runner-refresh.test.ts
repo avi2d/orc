@@ -59,6 +59,36 @@ describe("orc run refreshes the checkout", () => {
     })
   }, runTimeout)
 
+  test("a branch sharing its name with a tag is still fast-forwarded instead of misread as another branch", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const branch = branchOf(fixture)
+      const upstream = withUpstream(fixture, branch)
+      git(fixture.repo, ["tag", branch], fixture.env)
+      const old = git(fixture.repo, ["rev-parse", "refs/heads/" + branch], fixture.env)
+      const tip = await pushUpstream(fixture, upstream, branch, "upstream change")
+      const result = await runIt(fixture)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect(result.stdout).toStartWith("fast-forwarded " + branch + " in " + fixture.repo + " from " + old.slice(0, 7) + " to " + tip.slice(0, 7) + " on origin\n")
+      expect(git(fixture.repo, ["rev-parse", "refs/heads/" + branch], fixture.env)).toBe(tip)
+      expect(git(fixture.repo, ["log", "orc/test", "--format=%s"], fixture.env).split("\n")).toEqual(["add greeting", "upstream change", "task"])
+    })
+  }, runTimeout)
+
+  test("a local branch named like the remote tracking branch does not corrupt the tracked default", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const branch = branchOf(fixture)
+      const upstream = withUpstream(fixture, branch)
+      git(fixture.repo, ["branch", "origin/" + branch], fixture.env)
+      const old = git(fixture.repo, ["rev-parse", "HEAD"], fixture.env)
+      const tip = await pushUpstream(fixture, upstream, branch, "upstream change")
+      const result = await runIt(fixture)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect(result.stdout).toStartWith("fast-forwarded " + branch + " in " + fixture.repo + " from " + old.slice(0, 7) + " to " + tip.slice(0, 7) + " on origin\n")
+      expect(git(fixture.repo, ["rev-parse", branch], fixture.env)).toBe(tip)
+      expect(git(fixture.repo, ["log", "orc/test", "--format=%s"], fixture.env).split("\n")).toEqual(["add greeting", "upstream change", "task"])
+    })
+  }, runTimeout)
+
   test("a current checkout costs one fetch and no other network call, and is left as it was", async () => {
     await withNoSandboxFixture(async (fixture) => {
       const branch = branchOf(fixture)

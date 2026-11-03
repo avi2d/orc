@@ -76,7 +76,7 @@ const cleanBranch = (gitBin: string, projectDir: string): Effect.Effect<{ readon
     if (inside.exitCode !== 0 || inside.stdout !== "true") {
       return kept("it is no git checkout")
     }
-    const head = yield* git(gitBin, projectDir, ["symbolic-ref", "--quiet", "--short", "HEAD"])
+    const head = yield* git(gitBin, projectDir, ["symbolic-ref", "--quiet", "HEAD"])
     const stopHead = refused(head)
     if (stopHead !== null) {
       return stopHead
@@ -89,7 +89,9 @@ const cleanBranch = (gitBin: string, projectDir: string): Effect.Effect<{ readon
       return kept("git status failed: " + firstLine(status.stderr))
     }
     const changes = status.stdout.split("\n").filter((line) => line.trim() !== "").length
-    return changes > 0 ? kept("it holds " + uncommittedChanges(changes)) : { branch: head.stdout }
+    const fullRef = head.stdout
+    const headsPrefix = "refs/heads/"
+    return changes > 0 ? kept("it holds " + uncommittedChanges(changes)) : { branch: fullRef.startsWith(headsPrefix) ? fullRef.slice(headsPrefix.length) : fullRef }
   })
 
 const pickRemote = (listed: string): { readonly remote: string } | Kept => {
@@ -135,7 +137,7 @@ const fetchedTip = (gitBin: string, projectDir: string): Effect.Effect<RemoteTip
     if (fetchFailure !== null) {
       return fetchFailure
     }
-    const remoteHead = yield* git(gitBin, projectDir, ["symbolic-ref", "--quiet", "--short", "refs/remotes/" + remote + "/HEAD"])
+    const remoteHead = yield* git(gitBin, projectDir, ["symbolic-ref", "--quiet", "refs/remotes/" + remote + "/HEAD"])
     const stopHead = refused(remoteHead)
     if (stopHead !== null) {
       return stopHead
@@ -143,8 +145,13 @@ const fetchedTip = (gitBin: string, projectDir: string): Effect.Effect<RemoteTip
     if (remoteHead.exitCode !== 0) {
       return kept(remote + " names no default branch, which git remote set-head " + remote + " --auto records")
     }
-    const tracking = remoteHead.stdout
-    const resolved = yield* git(gitBin, projectDir, ["rev-parse", "--verify", "--quiet", tracking])
+    const target = remoteHead.stdout
+    const namespace = "refs/remotes/" + remote + "/"
+    if (!target.startsWith(namespace)) {
+      return kept(remote + " names no default branch, which git remote set-head " + remote + " --auto records")
+    }
+    const tracking = remote + "/" + target.slice(namespace.length)
+    const resolved = yield* git(gitBin, projectDir, ["rev-parse", "--verify", "--quiet", target])
     const stopResolved = refused(resolved)
     if (stopResolved !== null) {
       return stopResolved
