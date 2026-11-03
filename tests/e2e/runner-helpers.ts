@@ -25,6 +25,11 @@ export interface OrcResult {
 
 const fakePueue = [
   "#!/bin/sh",
+  "case \" $* \" in *\" orc-alerts-\"*)",
+  "  printf '%s\\n' \"$@\" > \"$PUEUE_STATE/alerts-$1-args\";",
+  "  if [ -f \"$PUEUE_STATE/fail-alerts\" ]; then echo \"fake pueue refuses the alert stream\" >&2; exit 1; fi;",
+  "  if [ \"$1\" = \"add\" ]; then echo 900; else echo \"Group $3 created\"; fi; exit 0 ;;",
+  "esac",
   "case \"$1\" in",
   "  status) cat \"$PUEUE_STATE/status.json\" ;;",
   "  group)",
@@ -106,6 +111,8 @@ export const withFixture = async (body: (fixture: Fixture) => Promise<void>): Pr
     await scopeFixtureLabels(join(pueue, "status.json"), home)
     await writeFile(join(bin, "pueue"), fakePueue)
     await chmod(join(bin, "pueue"), 0o755)
+    await writeFile(join(bin, "tui-dash"), "#!/bin/sh\nexit 0\n")
+    await chmod(join(bin, "tui-dash"), 0o755)
     await writeFile(join(dir, "task.md"), "# Do the thing\n\nWith a body that holds 'quotes' and $dollars.\n")
     await writeFile(join(home, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { linux: checkout } }] }))
     await body({ dir, home, checkout, pueue, env: { ORC_HOME: home, PUEUE_STATE: pueue, PATH: bin + ":" + (process.env.PATH ?? "") } })

@@ -15,6 +15,8 @@ import { type Command, queueFromText, renewTask, RunnerError, startTask } from "
 import { formatResult, readResult, readResultThrough, readStdinLabel, runnerJson } from "./runner-result"
 import type { TaskFileError, TaskRecord } from "./task-record"
 import { encodeToken, sessionToken } from "./token"
+import { markEventPosted, unpostedEvents } from "./events"
+import { ensureAlertStream, liveAlertStream } from "./alert-stream"
 
 type CommandArgs = Exclude<DispatchArgs, { readonly kind: "UsageError" }>
 
@@ -45,15 +47,16 @@ const readView = (root: string): Effect.Effect<BacklogView, BacklogError | TaskF
       Effect.map((config): ConfigReading => ({ kind: "read", config })),
       Effect.catchTag("ConfigError", (error) => Effect.succeed<ConfigReading>({ kind: "unread", reason: failure(error) }))
     )
+    const events = yield* unpostedEvents(root)
     if (reading.kind === "unread") {
-      return { tasks, projects: reading, room: reading }
+      return { tasks, events, projects: reading, room: reading }
     }
     const projects = yield* readProjects(paths.projects, reading.config.machines).pipe(
       Effect.map((list): ProjectList => ({ kind: "read", projects: list })),
       Effect.catchTag("ConfigError", (error) => Effect.succeed<ProjectList>({ kind: "unread", reason: failure(error) }))
     )
     const room: RoomList = { kind: "read", room: readRoom(reading.config.machines, tasks) }
-    return { tasks, projects, room }
+    return { tasks, events, projects, room }
   })
 
 const titleOf = (body: string): string =>
@@ -165,6 +168,9 @@ const markPostedNow = (id: string, place: DispatchPlace) =>
     return (marked ? "posted " : "already posted ") + id
   })
 
+const markEventPostedNow = (key: string, place: DispatchPlace) =>
+  markEventPosted(backlogRoot(place), key).pipe(Effect.map((marked) => (marked ? "posted " : "already posted ") + key))
+
 const holdNow = (args: Extract<CommandArgs, { readonly kind: "HoldTask" }>, place: DispatchPlace) =>
   holdTask(backlogRoot(place), args.id, { reason: args.reason, until: args.until }).pipe(
     Effect.map((outcome) =>
@@ -184,7 +190,7 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
-type TaskVerb = Extract<CommandArgs, { readonly kind: "CloseTask" | "MarkPosted" | "HoldTask" | "AnswerTask" | "MergeTask" }>
+type TaskVerb = Extract<CommandArgs, { readonly kind: "CloseTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "MergeTask" }>
 
 const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   switch (args.kind) {
@@ -193,6 +199,9 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
     }
     case "MarkPosted": {
       return markPostedNow(args.id, place)
+    }
+    case "MarkEventPosted": {
+      return markEventPostedNow(args.key, place)
     }
     case "HoldTask": {
       return holdNow(args, place)
@@ -204,6 +213,17 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
       return mergeTask(backlogRoot(place), args.id, args.basis)
     }
   }
+}
+
+// The task is queued by now, so a stream that will not queue is told in the task's log and fails no task.
+const startAlertStream = (home: string) => {
+  const stream = liveAlertStream()
+  return stream === null
+    ? Effect.void
+    : ensureAlertStream(home, stream).pipe(
+      Effect.flatMap((line) => line === null ? Effect.void : Console.log(line)),
+      Effect.catchTag("RunnerError", (error) => Console.error("orc runner start queued no alert stream: " + error.detail))
+    )
 }
 
 const execute = (args: CommandArgs, place: DispatchPlace) =>
@@ -220,6 +240,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       }
       case "CloseTask":
       case "MarkPosted":
+      case "MarkEventPosted":
       case "HoldTask":
       case "AnswerTask":
       case "MergeTask": {
@@ -236,6 +257,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         if (line !== null) {
           yield* Console.log(line)
         }
+        yield* startAlertStream(place.home)
         break
       }
       case "RunnerRenew": {

@@ -211,7 +211,7 @@ describe("orc chat tools", () => {
       await writeFile(broken, "no frontmatter\n")
       await chat.postClosed()
       await chat.postClosed()
-      expect(chat.posted).toEqual(["orc chat cannot post the closed tasks: orc: " + broken + ": the task file opens with no --- frontmatter"])
+      expect(chat.posted).toEqual(["orc chat cannot post the closed tasks and events: orc: " + broken + ": the task file opens with no --- frontmatter"])
       await rm(broken)
       await closeTask(fixture, "task-1", ranClosing("done", "", "https://github.com/acme/orc/pull/7"))
       await chat.postClosed()
@@ -290,7 +290,7 @@ describe("orc chat tools", () => {
           "task-1 First closed done, with no PR",
           "task-2 Second closed done, with no PR"
         ])
-        expect(chat.posted[2]).toStartWith("orc chat cannot post the closed tasks: ")
+        expect(chat.posted[2]).toStartWith("orc chat cannot post the closed tasks and events: ")
         await chat.postClosed()
         expect(chat.posted.length).toBe(3)
       } finally {
@@ -383,6 +383,26 @@ describe("orc chat tools", () => {
       expect([first.sent, reopened.sent.map((sent) => sent.message)]).toEqual([
         [],
         [{ customType: "orc-task-closed", content: "task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7", display: true }]
+      ])
+    })
+  }, 60_000)
+
+  test("an alert fire the stream writes is posted once as its own message with no beat, not again on a later poll or after a restart", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      const fire = { schemaVersion: 1, rule: "heavy-load", at: "2026-11-02T11:31:00.000Z", machine: "mac", since: "2026-11-02T11:25:00.000Z", crossed: ["cpu"] }
+      await writeFile(join(fixture.home, "backlog", "alerts.jsonl"), JSON.stringify(fire) + "\n")
+      const first = piFor(fixture, 50)
+      first.fire("session_start", { isIdle: () => true })
+      await until(() => first.sent.length > 0, 10_000)
+      await Bun.sleep(500)
+      first.fire("session_shutdown")
+      const reopened = piFor(fixture, 50)
+      reopened.fire("session_start", { isIdle: () => true })
+      await Bun.sleep(1_000)
+      reopened.fire("session_shutdown")
+      expect([first.sent.map((sent) => sent.message), reopened.sent]).toEqual([
+        [{ customType: "orc-event", content: "alert: mac over its cpu limit since 2026-11-02T11:25:00.000Z", display: true }],
+        []
       ])
     })
   }, 60_000)

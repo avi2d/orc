@@ -8,8 +8,10 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { TestClock } from "effect/testing"
 import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
 import { flagStall } from "../../../packages/run/src/dispatch/stall"
+import { markEventPosted, unpostedEvents } from "../../../packages/run/src/dispatch/events"
 import { openDatabase, recordRun } from "../../../packages/run/src/run-history"
 import { runBeat } from "../../../packages/run/src/dispatch/beat"
+import { quietSources } from "../../lib/beat-sources"
 import { formatBeat } from "../../../packages/run/src/dispatch/board"
 import type { LoadReading } from "../../../packages/run/src/dispatch/load"
 import { taskLabel } from "../../../packages/run/src/dispatch/pueue-status"
@@ -83,7 +85,7 @@ const seedRun = async (root: string): Promise<void> => {
 const beatAt = async (root: string, now: number, state: PueueState = running): Promise<ReadonlyArray<string>> => {
   const beat = Effect.gen(function*() {
     yield* TestClock.setTime(now)
-    return yield* runBeat(root, root, { readLoad: unreadLoad })
+    return yield* runBeat(root, root, quietSources(unreadLoad))
   })
   const report = await Effect.runPromise(beat.pipe(Effect.provide(Layer.mergeAll(BunServices.layer, pueueWith(root, state), TestClock.layer()))))
   return formatBeat(report).split("\n").filter((line) => line.startsWith("stalled ") || line.startsWith("closed "))
@@ -166,6 +168,42 @@ describe("a pueue run's stall", () => {
       const lines = await beatAt(root, minutesAfterWrite(90), done)
       expect(lines.filter((line) => line.startsWith("stalled "))).toEqual([])
       expect(lines.filter((line) => line.startsWith("closed "))).toHaveLength(1)
+    })
+  })
+})
+
+const chatPosts = async (root: string): Promise<ReadonlyArray<string>> => {
+  const events = await run(unpostedEvents(root))
+  for (const event of events) {
+    await run(markEventPosted(root, event.key))
+  }
+  return events.map((event) => event.text)
+}
+
+describe("a stall in the chat", () => {
+  test("one stall posts once instead of on every beat", async () => {
+    await withBacklog(async (root) => {
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await seedRun(root)
+      await touch(join(root, "runs", "run-1", "agent.log"), writtenAt)
+      await beatAt(root, minutesAfterWrite(30))
+      expect(await chatPosts(root)).toEqual(["task-1 Fix the login page stalled on mac: no output since 2026-10-27T11:00:00.000Z"])
+      await beatAt(root, minutesAfterWrite(40))
+      expect(await chatPosts(root)).toEqual([])
+    })
+  })
+  test("a second stall posts again instead of reading as the posted first", async () => {
+    await withBacklog(async (root) => {
+      await startTask(root, ["orc", "runner", "start"], join(root, "logs", "task-1.log"))
+      await seedRun(root)
+      await touch(join(root, "runs", "run-1", "agent.log"), writtenAt)
+      await beatAt(root, minutesAfterWrite(30))
+      expect(await chatPosts(root)).toHaveLength(1)
+      await touch(join(root, "runs", "run-1", "agent.log"), minutesAfterWrite(35))
+      await beatAt(root, minutesAfterWrite(50))
+      expect(await chatPosts(root)).toEqual([])
+      await beatAt(root, minutesAfterWrite(65))
+      expect(await chatPosts(root)).toEqual(["task-1 Fix the login page stalled on mac: no output since 2026-10-27T11:35:00.000Z"])
     })
   })
 })
