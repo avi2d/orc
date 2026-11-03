@@ -399,4 +399,21 @@ describe("orc chat decision boards", () => {
       await next.session.stopBoards()
     })
   }, 60_000)
+
+  test("a refresh while cards are still open keeps the board watched and shows the outside answer instead of dropping later ones", async () => {
+    await withFixture(null, 0, async (fixture) => {
+      const lavish = fakeLavish(join(fixture.home, "boards"))
+      const chat = boardChat(fixture, lavish)
+      await holdTwo(chat.call)
+      await chat.call("orc_decision_board", twoCards)
+      await chat.call("orc_backlog_answer", { id: "task-1", question: "question-1", words: "gRPC" })
+      await chat.session.reconcileBoards()
+      expect(await readFile(join(fixture.home, "boards", "task-1", "board.html"), "utf8")).toContain("Recorded: <strong>gRPC</strong>")
+      expect(chat.boardLines()).toEqual([])
+      lavish.answer("question-2", "us-east")
+      await until(() => chat.boardLines().some((line) => line.includes("answered question-2 on task-1")))
+      expect((await chat.held())?.hold?.questions.map((question) => question.answer)).toEqual([{ words: "gRPC" }, { words: "us-east" }])
+      await chat.session.stopBoards()
+    })
+  }, 60_000)
 })

@@ -227,28 +227,49 @@ const recordPrompt = (host: BoardHost, record: BoardRecord, prompt: BoardPrompt)
 
 type Reading = "read again" | "done"
 
-const refreshed = (host: BoardHost, dir: string, record: BoardRecord, reply: string): Effect.Effect<Reading, ChatToolError> =>
+type BoardRefresh = "closed" | "stale" | "current"
+
+const closedBoardLine = (record: BoardRecord): string =>
+  record.task + " is no longer " + record.waits + ", so orc closed its decision board"
+
+const staleBoardLine = (record: BoardRecord): string =>
+  record.task + "'s decision board no longer describes its current decision, so orc stopped reading it; open it again to answer the rest"
+
+const refreshPage = (host: BoardHost, dir: string, record: BoardRecord): Effect.Effect<BoardRefresh, ChatToolError> =>
   Effect.gen(function*() {
     const open = yield* waitingTask(host, record.task)
     const page = boardFile(dir, "board.html")
-    const replied = host.launcher.reply(page, reply).pipe(Effect.catchTag("ChatToolError", () => Effect.void))
-    const ended = replied.pipe(Effect.andThen(host.launcher.end(page)), Effect.catchTag("ChatToolError", () => Effect.void))
     if (open === null) {
       const raw = yield* rawTask(host, record.task)
       if (raw !== null) {
         yield* writeAtomic(page, boardHtml(record, completedWords(record, raw)))
       }
-      yield* ended
-      host.say(record.task + " is no longer " + record.waits + ", so orc closed its decision board")
-      return "done"
+      return "closed"
     }
     const bound = yield* boundDecision(host, record)
     if (bound === null) {
-      yield* ended
-      host.say(record.task + "'s decision board no longer describes its current decision, so orc stopped reading it; open it again to answer the rest")
-      return "done"
+      return "stale"
     }
     yield* writeAtomic(page, boardHtml(record, recordedWords(bound)))
+    return "current"
+  })
+
+const refreshed = (host: BoardHost, dir: string, record: BoardRecord, reply: string): Effect.Effect<Reading, ChatToolError> =>
+  Effect.gen(function*() {
+    const page = boardFile(dir, "board.html")
+    const replied = host.launcher.reply(page, reply).pipe(Effect.catchTag("ChatToolError", () => Effect.void))
+    const ended = replied.pipe(Effect.andThen(host.launcher.end(page)), Effect.catchTag("ChatToolError", () => Effect.void))
+    const state = yield* refreshPage(host, dir, record)
+    if (state === "closed") {
+      yield* ended
+      host.say(closedBoardLine(record))
+      return "done"
+    }
+    if (state === "stale") {
+      yield* ended
+      host.say(staleBoardLine(record))
+      return "done"
+    }
     yield* replied
     return "read again"
   })
@@ -306,16 +327,12 @@ export const decisionBoards = (host: BoardHost): Boards => {
   const reconcileOne = (task: string, dir: string): Effect.Effect<void, ChatToolError> =>
     Effect.gen(function*() {
       const record = yield* readRecord(dir)
-      const open = yield* waitingTask(host, record.task)
-      if (open !== null) {
+      const state = yield* refreshPage(host, dir, record)
+      if (state === "current") {
         return
       }
-      const raw = yield* rawTask(host, record.task)
-      if (raw !== null) {
-        yield* writeAtomic(boardFile(dir, "board.html"), boardHtml(record, completedWords(record, raw)))
-      }
       yield* host.launcher.end(boardFile(dir, "board.html")).pipe(Effect.catchTag("ChatToolError", () => Effect.void))
-      host.say(record.task + " is no longer " + record.waits + ", so orc closed its decision board")
+      host.say(state === "closed" ? closedBoardLine(record) : staleBoardLine(record))
       yield* stopWatching(task)
     })
 
@@ -326,8 +343,9 @@ export const decisionBoards = (host: BoardHost): Boards => {
         ? Effect.void
         : reconcileOne(task, entry.dir).pipe(
           Effect.catchTag("ChatToolError", (error) =>
-            Effect.sync(() => host.say("orc stopped reading " + task + "'s decision board: " + error.message))),
-          Effect.andThen(stopWatching(task))
+            Effect.sync(() => host.say("orc stopped reading " + task + "'s decision board: " + error.message)).pipe(
+              Effect.andThen(stopWatching(task))
+            ))
         )
     }, { discard: true })
   )
