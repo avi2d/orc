@@ -102,6 +102,11 @@ Orc trims padding around each name and drops blank entries.
 Orc checks each marker in the project directory and its parent and refuses a checkout carrying one.
 An unset `ORC_REFUSE_MARKERS` names no marker and refuses no checkout for a marker.
 
+To hand the run a project's instructions, add `--instructions <file>`, an absolute path or one relative to the folder you run orc in.
+Orc copies the file into the run's `session` folder and adds it to the system prompt of each Pi the run starts.
+The run's first line of output names the file, and orc refuses the run before Pi starts when the file is missing.
+A run without `--instructions` hands Pi no instructions.
+
 The default sandbox run needs `git`, `nono`, `pi` and `node` on the host PATH, and a run except `direct-PR` needs `no-mistakes` there too.
 With `--sandbox none` the run needs the same tools except `nono`.
 For every run except `direct-PR`, orc runs `no-mistakes --version` before the sandbox starts and refuses a release older than v1.90.0.
@@ -685,6 +690,7 @@ To print the five minute load average the beat compares against a load limit, ru
 | `src/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
 | `src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
+| `src/run-folders.ts` | A run's folders, its task copies and the instructions file `--instructions` names |
 | `src/history-write.ts` | The history checkpoints a run records as each step starts and ends |
 | `src/report.ts` | The `report.md` shape and the signal facts it carries |
 | `src/show.ts` | The `orc show` reading of one run from the history |

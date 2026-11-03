@@ -68,6 +68,7 @@ export const withNoSandboxFixture = async (body: (fixture: NoSandboxFixture) => 
       "if [ \"$1\" = --mode ]; then echo \"$*\" >> \"" + fakeBin + "/probe-argv\"; cat > /dev/null; echo '" + modelListReply + "'; exit 0; fi",
       "if [ \"$1\" != -p ]; then exit 2; fi",
       "cat > /dev/null",
+      "prev=''; for arg in \"$@\"; do if [ \"$prev\" = --append-system-prompt ]; then cp \"$arg\" \"" + fakeBin + "/pi-instructions\"; fi; prev=$arg; done",
       "echo \"$PI_CODING_AGENT_DIR\" > \"" + fakeBin + "/pi-agent-dir\"",
       "if [ -f \"$PI_CODING_AGENT_DIR/models.json\" ]; then cp \"$PI_CODING_AGENT_DIR/models.json\" \"" + fakeBin + "/pi-models\"; fi",
       "if [ -f \"$PI_CODING_AGENT_DIR/settings.json\" ]; then cp \"$PI_CODING_AGENT_DIR/settings.json\" \"" + fakeBin + "/pi-settings\"; fi",

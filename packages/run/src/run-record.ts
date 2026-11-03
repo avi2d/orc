@@ -30,6 +30,7 @@ export interface HistoryRun {
   readonly piSessionDir: string
   readonly hostSessionsDir: string
   readonly taskPath: string
+  readonly instructions: string | null
   readonly agent: AgentFile
   readonly fixer: AgentFile
   readonly branch: string

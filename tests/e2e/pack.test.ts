@@ -82,6 +82,7 @@ const expectedFiles = [
   "src/report-run.ts",
   "src/report.ts",
   "src/run-deliverer.ts",
+  "src/run-folders.ts",
   "src/run-history.ts",
   "src/run-id.ts",
   "src/run-loop.ts",

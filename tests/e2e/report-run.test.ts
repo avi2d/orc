@@ -41,6 +41,7 @@ const withReportFixture = async (writesReport: boolean, body: (fixture: ReportFi
       "if [ \"$1\" = --mode ]; then cat > /dev/null; echo '" + modelListReply + "'; exit 0; fi",
       "if [ \"$1\" != -p ]; then exit 2; fi",
       "cat > \"" + fakeBin + "/pi-prompt\"",
+      "prev=''; for arg in \"$@\"; do if [ \"$prev\" = --append-system-prompt ]; then cp \"$arg\" \"" + fakeBin + "/pi-instructions\"; fi; prev=$arg; done",
       "echo \"$*\" >> \"" + fakeBin + "/pi-argv\"",
       "pwd > \"" + fakeBin + "/pi-cwd\"",
       ...(writesReport ? ["printf '# Findings\\n\\nThe checkout holds one task file.\\n' > agent-report.md"] : []),
@@ -117,6 +118,17 @@ describe("orc run --kind scout", () => {
       const prompt = await readFile(join(fakeBin, "pi-prompt"), "utf8")
       expect(prompt).not.toContain("Commit the result")
       expect(prompt).not.toContain("You implement one task")
+    })
+  }, 60_000)
+
+  test("with --instructions names the file on the first output line and hands Pi its words instead of running without them", async () => {
+    await withReportFixture(true, async ({ repo, fakeBin, env }) => {
+      const instructions = join(repo, "..", "orc-instructions.md")
+      await writeFile(instructions, "Write the report in the voice of a PELICAN.\n")
+      const result = await runOrc([...scoutRun, "--instructions", instructions], repo, env)
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout.split("\n")[0]).toBe("orc run loaded the instructions in " + instructions)
+      expect(await readFile(join(fakeBin, "pi-instructions"), "utf8")).toBe("Write the report in the voice of a PELICAN.\n")
     })
   }, 60_000)
 

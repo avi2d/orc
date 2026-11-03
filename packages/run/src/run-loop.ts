@@ -131,7 +131,7 @@ const implement = (run: HistoryRun, runAgent: SandboxOps["runAgent"], plan: Pick
     const agentProvider = piWithTools(run.agent, {
       hostSessionsDir: run.hostSessionsDir,
       sandboxSessionsDir: run.path.join(run.piSessionDir, "agent", "sessions")
-    })
+    }, run.instructions)
     const result: SandboxRunResult = yield* Effect.tryPromise({
       try: () => runAgent(agentProvider, implementPrompt(run, plan), "agent.log", plan.implementSessionId ?? undefined),
       catch: (cause) => new OrcRunError({ message: "orc: the agent run failed: " + describeCause(cause) })
@@ -172,7 +172,7 @@ const fixOnce = (
     const fixerProvider = piWithTools(run.fixer, {
       hostSessionsDir: run.hostSessionsDir,
       sandboxSessionsDir: run.path.join(run.piSessionDir, "agent", "sessions")
-    })
+    }, run.instructions)
     const result: SandboxRunResult = yield* Effect.tryPromise({
       try: () => runAgent(fixerProvider, buildFixPrompt(run.fixer, evidenceFile), "fix-" + attempt + ".log", resumeSession ?? undefined),
       catch: (cause) => new OrcRunError({ message: "orc: the fix run failed: " + describeCause(cause) })

@@ -228,7 +228,7 @@ const runStepWith = (dir: string, home: string, sandbox: SandboxOps["runAgent"],
             const report = yield* runWithHistory(db, {
               fs, path, spawner, git: hostGit, projectDir: dir, runId: "step-run-1", runDir,
               piSessionDir: path.join(runDir, "session"), hostSessionsDir: path.join(runDir, "sessions"),
-              taskPath: path.join(runDir, "task.md"), agent: implementer, fixer, branch: "orc/test", sandbox: "nono", started: "2026-10-19T10:00:00.000Z",
+              taskPath: path.join(runDir, "task.md"), instructions: null, agent: implementer, fixer, branch: "orc/test", sandbox: "nono", started: "2026-10-19T10:00:00.000Z",
               worktreeDir: dir,
               delivery: deliver(spawner, hostGit, extraPath + stub.dir + ":" + (process.env.PATH ?? ""), dir),
               answers

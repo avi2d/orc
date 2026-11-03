@@ -13,7 +13,10 @@ const shellEscape = (arg: string): string => "'" + arg.replace(/'/g, "'\\''") + 
 
 export const toolFlag = (agent: AgentFile): string => " --tools " + shellEscape(agent.tools.join(","))
 
-export const piWithTools = (agent: AgentFile, sessions: PiSessionDirs): AgentProvider => {
+const instructionsFlag = (instructions: string | null): string =>
+  instructions === null ? "" : " --append-system-prompt " + shellEscape(instructions)
+
+export const piWithTools = (agent: AgentFile, sessions: PiSessionDirs, instructions: string | null): AgentProvider => {
   const base = pi(agent.model, {
     thinking: agent.thinking,
     sessionStorage: { hostSessionsDir: sessions.hostSessionsDir, sandboxSessionsDir: sessions.sandboxSessionsDir }
@@ -22,7 +25,7 @@ export const piWithTools = (agent: AgentFile, sessions: PiSessionDirs): AgentPro
     ...base,
     buildPrintCommand: (options: AgentCommandOptions) => {
       const command = base.buildPrintCommand(options)
-      return { ...command, command: command.command + toolFlag(agent) }
+      return { ...command, command: command.command + toolFlag(agent) + instructionsFlag(instructions) }
     }
   }
 }

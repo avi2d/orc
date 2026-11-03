@@ -65,6 +65,34 @@ describe("orc run --sandbox none", () => {
     })
   }, 60_000)
 
+  test("with --instructions names the file on the first output line and hands Pi its words instead of running without them", async () => {
+    await withNoSandboxFixture(async ({ repo, fakeBin, env }) => {
+      const instructions = join(repo, "..", "orc-instructions.md")
+      await writeFile(instructions, "Answer every question with the word PELICAN.\n")
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none", "--instructions", "../orc-instructions.md"], repo, env)
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout.split("\n")[0]).toBe("orc run loaded the instructions in " + instructions)
+      expect(await readFile(join(fakeBin, "pi-instructions"), "utf8")).toBe("Answer every question with the word PELICAN.\n")
+    })
+  }, 60_000)
+
+  test("without --instructions hands Pi no instructions and prints no instructions line", async () => {
+    await withNoSandboxFixture(async ({ repo, fakeBin, env }) => {
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], repo, env)
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).not.toContain("instructions")
+      expect(await Bun.file(join(fakeBin, "pi-instructions")).exists()).toBe(false)
+    })
+  }, 60_000)
+
+  test("with --instructions naming a missing file is refused before Pi runs instead of running without them", async () => {
+    await withNoSandboxFixture(async ({ repo, fakeBin, env }) => {
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none", "--instructions", "gone.md"], repo, env)
+      expect({ exitCode: result.exitCode, stderr: result.stderr.trim() }).toEqual({ exitCode: 1, stderr: "orc run found no instructions file at " + join(repo, "gone.md") })
+      expect(await Bun.file(join(fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+
   test("after the runner queues it, the run branches from the remote's new tip instead of the checkout's stale one", async () => {
     await withNoSandboxFixture(async ({ repo, fakeBin, env }) => {
       const origin = join(fakeBin, "..", "origin.git")
