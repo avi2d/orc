@@ -434,6 +434,7 @@ A project may add `"mode"`, as [Delivery modes](#delivery-modes) shows, and `"yo
 A project may also add `"instructions"`, the path of a Markdown file with that project's own rules for its runs and the chat.
 The path is absolute, or relative to the folder that holds `projects.json`.
 Each run of the project's tasks gets the file through `orc run --instructions`, and `orc chat` reads it at start.
+A project instructions file replaces a discovered APPEND_SYSTEM.md.
 Orc refuses a project list naming an instructions file that does not exist.
 A project with no `instructions` hands its runs and the chat no instructions.
 

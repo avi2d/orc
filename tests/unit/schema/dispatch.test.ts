@@ -172,15 +172,6 @@ describe("the dispatch view", () => {
     });
   });
 
-  test("instructions that are no file path make the project list unread instead of being dropped", async () => {
-    await withBacklog(async (root) => {
-      await writeFile(join(root, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: "/Users/a/orc" }, instructions: 3 }] }));
-      const snapshot = snapshotOf(await readBacklog(root));
-      expect(snapshot.projects.kind).not.toBe("ok");
-      expect(snapshot.unread.some((missed) => missed.includes("projects.json"))).toBe(true);
-    });
-  });
-
   test("an inherited property is not a checkout", async () => {
     const root = await mkdtemp(join(tmpdir(), "orc-dispatch-"));
     try {

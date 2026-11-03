@@ -41,6 +41,16 @@ describe("orc chat with a project's instructions file", () => {
     })
   }, 60_000)
 
+  test("starts with no instructions when the list names none even with a bad yolo instead of refusing to start", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await writeFile(join(fixture.home, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: fixture.dir }, yolo: "yes" }] }))
+      const result = await runOrc(fixture, ["chat"])
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout.split("\n")[0]).toBe("orc chat found no rules at " + join(fixture.home, "orchestrator.md"))
+      expect(await piArgs(fixture)).not.toBe("")
+    })
+  }, 60_000)
+
   test("refuses a project naming a missing instructions file before pi starts instead of chatting without it", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await writeProjects(fixture, "gone.md")

@@ -227,11 +227,21 @@ export interface ProjectInstructions {
 
 export const readProjectInstructions = (file: string): Effect.Effect<ReadonlyArray<ProjectInstructions>, ConfigError, FileSystem.FileSystem | Path.Path> =>
   readJsonFileIfPresent(file, ProjectsFile).pipe(
-    Effect.flatMap((read) =>
-      Effect.forEach(read?.projects ?? [], (project) => {
-        const checked = checkedProject(project)
-        return typeof checked === "string" ? Effect.fail(new ConfigError({ file, detail: checked })) : instructionsFile(file, checked)
-      })
-    ),
-    Effect.map((projects) => projects.flatMap((project) => project.instructions === undefined ? [] : [{ project: project.name, file: project.instructions }]))
+    Effect.catchTag("ConfigError", () => Effect.succeed(null)),
+    Effect.flatMap((read) => {
+      const checked = (read?.projects ?? []).map((project) => checkedProject(project))
+      const invalid = checked.find((entry): entry is string => typeof entry === "string" && entry.includes(" names instructions "))
+      if (invalid !== undefined) {
+        return Effect.fail(new ConfigError({ file, detail: invalid }))
+      }
+      if (checked.some((entry) => typeof entry === "string")) {
+        return Effect.succeed<ReadonlyArray<Project>>([])
+      }
+      return Effect.forEach(
+        checked.filter((entry): entry is Project => typeof entry !== "string"),
+        (project) => instructionsFile(file, project)
+      ).pipe(
+        Effect.map((projects) => projects.flatMap((project) => project.instructions === undefined ? [] : [{ project: project.name, file: project.instructions }]))
+      )
+    })
   )
