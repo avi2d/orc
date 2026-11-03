@@ -134,9 +134,6 @@ const changeKey = (project: string, contribution: Contribution, seen: Seen, stat
 
 const upstreamSeconds = 30
 
-// Reads run side by side, so a GitHub that hangs holds the beat's starts for about one timeout rather than one per contribution.
-const upstreamReads = 4
-
 type Requirements = FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
 
 const timedRead = (read: ReadUpstream, contribution: Contribution) =>
@@ -193,6 +190,5 @@ export const watchUpstream = (
 ): Effect.Effect<ReadonlyArray<BeatAction>, BacklogError, Requirements> =>
   Effect.forEach(
     projects.flatMap((project) => (project.upstream ?? []).map((contribution) => ({ project: project.name, contribution }))),
-    (entry) => watchOne(root, entry.project, entry.contribution, read, at),
-    { concurrency: upstreamReads }
+    (entry) => watchOne(root, entry.project, entry.contribution, read, at)
   ).pipe(Effect.map((actions) => actions.flatMap(Option.toArray)))
