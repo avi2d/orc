@@ -190,6 +190,39 @@ describe("orc run --sandbox none", () => {
     })
   }, 60_000)
 
+  test("after the runner queues it, the run branches from the remote's new tip instead of the checkout's stale one", async () => {
+    await withNoSandboxFixture(async ({ repo, fakeBin, env }) => {
+      const origin = join(fakeBin, "..", "origin.git")
+      const branch = git(repo, ["symbolic-ref", "--short", "HEAD"], env)
+      git(fakeBin, ["init", "-q", "--bare", "--initial-branch=" + branch, origin], env)
+      git(repo, ["remote", "add", "origin", origin], env)
+      git(repo, ["push", "-q", "origin", branch], env)
+      const upstream = join(fakeBin, "..", "upstream")
+      git(fakeBin, ["clone", "-q", origin, upstream], env)
+      git(upstream, ["config", "user.name", "orc test"], env)
+      git(upstream, ["config", "user.email", "orc@test.invalid"], env)
+      await writeFile(join(upstream, "upstream.txt"), "upstream\n")
+      git(upstream, ["add", "upstream.txt"], env)
+      git(upstream, ["commit", "-qm", "upstream change"], env)
+      git(upstream, ["push", "-q", "origin", branch], env)
+      await writeScript(join(fakeBin, "pueue"), [
+        "case \"$1\" in",
+        "  status) echo '{\"tasks\":{},\"groups\":{}}' ;;",
+        "  group) echo '{\"orc\":{}}' ;;",
+        "  add) echo 5 ;;",
+        "esac"
+      ])
+      const request = JSON.stringify({ task: "task-1", checkout: repo, provider: "acme-go", body: "Create greeting.txt.\n" })
+      const proc = Bun.spawn([process.execPath, binPath, "runner", "queue"], { stdin: new TextEncoder().encode(request), stdout: "pipe", stderr: "pipe", cwd: repo, env })
+      const [queued, queueErr, queueExit] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
+      expect({ exitCode: queueExit, stderr: queueErr }).toEqual({ exitCode: 0, stderr: "" })
+      expect(queued).toStartWith("fast-forwarded " + branch + " in " + repo + " from ")
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], repo, env)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect(git(repo, ["log", "orc/test", "--format=%s"], env).split("\n")).toEqual(["add greeting", "upstream change", "task"])
+    })
+  }, 60_000)
+
   test("with --delivery direct-PR pushes the branch and opens the PR through gh instead of starting no-mistakes", async () => {
     await withNoSandboxFixture(async ({ repo, fakeBin, env }) => {
       const origin = join(fakeBin, "..", "origin.git")
