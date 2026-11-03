@@ -1,4 +1,4 @@
-import { Effect, Fiber, FileSystem, Schema } from "effect"
+import { Effect, Fiber, FileSystem, Schema, Semaphore } from "effect"
 import { decisionFor, type BacklogTask, type Decision, openDecision } from "./chat-backlog"
 import { answeredAlready, completedWords, matchesRecord } from "./chat-board-bind"
 import { fileSystemLayer } from "./chat-command"
@@ -250,27 +250,23 @@ const refreshed = (host: BoardHost, tasks: ReadonlyArray<BacklogTask>, dir: stri
     return "read again"
   })
 
-const watchOnce = (host: BoardHost, dir: string, busy: Set<string>): Effect.Effect<Reading, ChatToolError> =>
+const watchOnce = (host: BoardHost, dir: string, sem: Semaphore.Semaphore): Effect.Effect<Reading, ChatToolError> =>
   Effect.gen(function*() {
     const poll = yield* host.launcher.poll(boardFile(dir, "board.html"))
     if (poll.kind === "waiting") {
       return "read again"
     }
-    const record = yield* readRecord(dir)
-    if (poll.kind === "closed") {
-      host.say(record.task + "'s decision board's Lavish session is " + poll.status + ", so orc stopped reading it; open it again to answer the rest")
-      return "done"
-    }
-    busy.add(record.task)
-    return yield* Effect.gen(function*() {
+    return yield* sem.withPermits(1)(Effect.gen(function*() {
+      const record = yield* readRecord(dir)
+      if (poll.kind === "closed") {
+        host.say(record.task + "'s decision board's Lavish session is " + poll.status + ", so orc stopped reading it; open it again to answer the rest")
+        return "done"
+      }
       const said = yield* Effect.forEach(poll.prompts, (prompt) => recordPrompt(host, record, prompt))
       const tasks = yield* host.tasks
       return yield* refreshed(host, tasks, dir, record, said.join("\n\n"))
-    }).pipe(Effect.ensuring(Effect.sync(() => busy.delete(record.task))))
+    }))
   })
-
-const hostOf = (url: string): string =>
-  url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "").split(/[/:?#]/)[0].replace(/^\[(.*)\]$/, "$1").toLowerCase()
 
 const openedLine = (record: BoardRecord, cards: number, url: string, networkWarning: string): string => {
   const base = "opened " + record.task + "'s decision board with " + cards + " cards at " + url +
@@ -278,14 +274,14 @@ const openedLine = (record: BoardRecord, cards: number, url: string, networkWarn
   if (networkWarning !== "") {
     return base + " " + networkWarning
   }
-  const host = hostOf(url)
+  const host = new URL(url).hostname.replace(/^\[(.*)\]$/, "$1").toLowerCase()
   if (host === "127.0.0.1" || host === "localhost" || host === "::1") {
     return base + " The board opens only on this machine."
   }
   return base + " Anyone on the same network who holds the link can open it and submit answers, which orc records as the captain's, because the page has no login."
 }
 
-type BoardFibers = Map<string, { readonly dir: string; readonly fiber: Fiber.Fiber<void> }>
+type BoardFibers = Map<string, { readonly dir: string; readonly fiber: Fiber.Fiber<void>; readonly sem: Semaphore.Semaphore }>
 
 const stopWatching = (host: BoardHost, fibers: BoardFibers, task: string): Effect.Effect<void> =>
   Effect.gen(function*() {
@@ -297,45 +293,44 @@ const stopWatching = (host: BoardHost, fibers: BoardFibers, task: string): Effec
     yield* Fiber.interrupt(entry.fiber)
   })
 
-const reconcileOne = (host: BoardHost, fibers: BoardFibers, busy: ReadonlySet<string>, task: string, dir: string): Effect.Effect<void, ChatToolError> =>
+const reconcileOne = (host: BoardHost, fibers: BoardFibers, task: string, dir: string): Effect.Effect<void, ChatToolError> =>
   Effect.gen(function*() {
-    if (fibers.get(task) === undefined || busy.has(task)) {
+    const entry = fibers.get(task)
+    if (entry === undefined) {
       return
     }
-    const record = yield* readRecord(dir)
-    const tasks = yield* host.tasks
-    const state = yield* refreshPage(tasks, dir, record)
-    if (state === "current") {
-      return
-    }
-    if (fibers.get(task) === undefined || busy.has(task)) {
-      return
-    }
-    yield* host.launcher.end(boardFile(dir, "board.html")).pipe(Effect.catchTag("ChatToolError", () => Effect.void))
-    host.say(state === "closed" ? closedBoardLine(record) : staleBoardLine(record))
-    yield* stopWatching(host, fibers, task)
+    yield* entry.sem.withPermits(1)(Effect.gen(function*() {
+      if (fibers.get(task) !== entry) {
+        return
+      }
+      const record = yield* readRecord(dir)
+      const tasks = yield* host.tasks
+      const state = yield* refreshPage(tasks, dir, record)
+      if (state === "current") {
+        return
+      }
+      yield* host.launcher.end(boardFile(dir, "board.html")).pipe(Effect.catchTag("ChatToolError", () => Effect.void))
+      host.say(state === "closed" ? closedBoardLine(record) : staleBoardLine(record))
+      yield* stopWatching(host, fibers, task)
+    }))
   })
 
 export const decisionBoards = (host: BoardHost): Boards => {
   const fibers: BoardFibers = new Map()
-  const busy = new Set<string>()
 
-  const boardDir = (task: string): Effect.Effect<string, ChatToolError> =>
-    host.dir === null ? refuse("orc chat names its decision board folder in " + boardsVar + ", so open a board from inside orc chat") : Effect.succeed(host.dir + "/" + task)
-
-  const watch = (task: string, dir: string): void => {
+  const watch = (task: string, dir: string, sem: Semaphore.Semaphore): void => {
     if (fibers.has(task)) {
       return
     }
     const loop = Effect.gen(function*() {
-      while ((yield* watchOnce(host, dir, busy)) === "read again") {
+      while ((yield* watchOnce(host, dir, sem)) === "read again") {
         yield* Effect.yieldNow
       }
     }).pipe(
       Effect.catchTag("ChatToolError", (error) => Effect.sync(() => host.say("orc stopped reading " + task + "'s decision board: " + error.message))),
       Effect.ensuring(Effect.sync(() => fibers.delete(task)))
     )
-    fibers.set(task, { dir, fiber: Effect.runFork(Effect.yieldNow.pipe(Effect.andThen(loop))) })
+    fibers.set(task, { dir, fiber: Effect.runFork(Effect.yieldNow.pipe(Effect.andThen(loop))), sem })
   }
 
   const reconcileWatched: Effect.Effect<void> = Effect.suspend(() =>
@@ -343,7 +338,7 @@ export const decisionBoards = (host: BoardHost): Boards => {
       const entry = fibers.get(task)
       return entry === undefined
         ? Effect.void
-        : reconcileOne(host, fibers, busy, task, entry.dir).pipe(
+        : reconcileOne(host, fibers, task, entry.dir).pipe(
           Effect.catchTag("ChatToolError", (error) =>
             Effect.sync(() => host.say("orc stopped reading " + task + "'s decision board: " + error.message)).pipe(
               Effect.andThen(stopWatching(host, fibers, task))
@@ -354,18 +349,23 @@ export const decisionBoards = (host: BoardHost): Boards => {
 
   const open = (input: BoardInput): Effect.Effect<string, ChatToolError> =>
     Effect.gen(function*() {
-      const dir = yield* boardDir(input.id)
+      const dir = host.dir === null
+        ? yield* refuse("orc chat names its decision board folder in " + boardsVar + ", so open a board from inside orc chat")
+        : host.dir + "/" + input.id
       const tasks = yield* host.tasks
       const task = openFrom(tasks, input.id)
       if (task === null) {
         return yield* refuse(input.id + " is neither held nor parked for the captain, so it takes no decision board")
       }
       const cards = yield* cardsFor(task, input.cards)
-      const board = yield* Effect.sync(() => crypto.randomUUID())
-      const record: BoardRecord = { task: task.id, title: task.title, waits: task.waits, reason: task.reason, openedAt: host.now().toISOString(), board, cards }
-      yield* writeBoard(dir, record, task)
-      const session = yield* host.launcher.open(boardFile(dir, "board.html"))
-      watch(task.id, dir)
+      const record: BoardRecord = { task: task.id, title: task.title, waits: task.waits, reason: task.reason, openedAt: host.now().toISOString(), board: crypto.randomUUID(), cards }
+      const sem = fibers.get(task.id)?.sem ?? Semaphore.makeUnsafe(1)
+      const session = yield* sem.withPermits(1)(Effect.gen(function*() {
+        yield* writeBoard(dir, record, task)
+        const opened = yield* host.launcher.open(boardFile(dir, "board.html"))
+        watch(task.id, dir, sem)
+        return opened
+      }))
       return openedLine(record, cards.length, session.url, session.networkWarning)
     })
 

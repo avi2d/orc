@@ -28,7 +28,7 @@ export interface BoardLauncher {
 }
 
 const boardHostVar = "ORC_BOARD_HOST"
-export const lavishHostVar = "LAVISH_AXI_HOST"
+const lavishHostVar = "LAVISH_AXI_HOST"
 const loopbackHost = "127.0.0.1"
 
 interface BoardInterface {
@@ -42,7 +42,7 @@ const tailnetAddress = (address: string): boolean => {
   return parts.length === 4 && parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127
 }
 
-const rankAddress = (address: string): number => {
+const rankAddress = (address: string): number | null => {
   if (address.startsWith("192.168.")) {
     return 0
   }
@@ -53,13 +53,13 @@ const rankAddress = (address: string): number => {
   if (address.startsWith("172.") && second >= 16 && second <= 31) {
     return 2
   }
-  return 3
+  return null
 }
 
 export const pickBoardHost = (ifaces: Record<string, ReadonlyArray<BoardInterface> | undefined>): string | null => {
   const candidates = Object.values(ifaces).flat().filter((info): info is BoardInterface =>
-    info !== undefined && !info.internal && (info.family === "IPv4" || info.family === 4) && !tailnetAddress(info.address))
-  for (const rank of [0, 1, 2, 3]) {
+    info !== undefined && !info.internal && (info.family === "IPv4" || info.family === 4) && !tailnetAddress(info.address) && rankAddress(info.address) !== null)
+  for (const rank of [0, 1, 2]) {
     const found = candidates.find((info) => rankAddress(info.address) === rank)
     if (found !== undefined) {
       return found.address
@@ -74,14 +74,6 @@ export const boardHostAddress = (env: Env, ifaces: Record<string, ReadonlyArray<
     return override
   }
   return pickBoardHost(ifaces) ?? loopbackHost
-}
-
-const withBoardHost = (env: Env): Env => {
-  const current = env[lavishHostVar]?.trim()
-  if (current !== undefined && current !== "") {
-    return env
-  }
-  return { ...env, [lavishHostVar]: boardHostAddress(env) }
 }
 
 const contextMarker = "\n\nContext data:\n"
@@ -101,7 +93,7 @@ const lavish = (args: ReadonlyArray<string>, env: Env): Effect.Effect<string, Ch
   runCommand(["lavish-axi", ...args], null, env)
 
 export const lavishLauncher = (env: Env): BoardLauncher => {
-  const full = withBoardHost(env)
+  const full = { ...env, [lavishHostVar]: boardHostAddress(env) }
   return {
     open: (file) =>
       lavish([file, "--no-open", "--reopen"], full).pipe(

@@ -1,7 +1,6 @@
 import { Console, Data, Effect, FileSystem } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { boardsVar } from "./chat-board"
-import { boardHostAddress, lavishHostVar } from "./chat-lavish"
 import { chatToolNames, orcCommandVar } from "./chat-tools"
 import type { Command } from "./dispatch/runner"
 import { readOrcConfig } from "./orc-config"
@@ -44,7 +43,7 @@ const chatLaunch = (orcHome: string, model: string, rules: ChatRules, self: Comm
     chatToolNames.join(","),
     ...(rules.kind === "loaded" ? ["--append-system-prompt", rules.file] : [])
   ],
-  env: { [orcCommandVar]: JSON.stringify(self), [boardsVar]: orcHome + "/boards", [lavishHostVar]: boardHostAddress(process.env) }
+  env: { [orcCommandVar]: JSON.stringify(self), [boardsVar]: orcHome + "/boards" }
 })
 
 export const runChat = (orcHome: string, self: Command): Effect.Effect<number, ChatError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
