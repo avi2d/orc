@@ -57,6 +57,8 @@ const expectedFiles = [
   "src/dispatch/pueue-status.ts",
   "src/dispatch/quota.ts",
   "src/dispatch/refresh.ts",
+  "src/dispatch/runner-error.ts",
+  "src/dispatch/runner-instructions.ts",
   "src/dispatch/runner-result.ts",
   "src/dispatch/runner.ts",
   "src/dispatch/stall.ts",
