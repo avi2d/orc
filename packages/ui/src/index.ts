@@ -20,7 +20,7 @@ export {
 export { drawAlone, printSolo, runSolo, soloScreen } from "./solo";
 export { leastPanelWidth, type Panel, livePanel, panelWidth, printFrame, printFrameOf, runPanel } from "./panel";
 export { binArgsExit, colorWithoutPrintExit, printBinArgsExit, printColor, printPanelKnown, printPanelUsage, usageText } from "./bin-args";
-export { type Block, bottomEdgeRow, type Frame, panel, panelChrome, panelLine, tabbedPanel, tabEdge, titleEdge, titleRoom, withinRows, wrapParts } from "./layout";
+export { type Block, bottomEdgeRow, type Frame, panel, panelChrome, panelLine, titleEdge, titleRoom, withinRows, wrapParts } from "./layout";
 export { type Drawn, liveScreen, type Move, printBlock, printScreen, runScreen, type Screen, type ScreenSize, type Target, targetAt } from "./screen";
 export { blockDocument, frameAnsi, frameText, hexOfTone } from "./opentui";
 export { agoWords, joinWords, sourceWords } from "./sources";

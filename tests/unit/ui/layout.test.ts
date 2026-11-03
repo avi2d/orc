@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { panel, plain } from "@tui-dash/ui";
+import { panel, plain, wrapParts } from "@tui-dash/ui";
+
+describe("wrapParts", () => {
+  test("a title kept to two rows shows queue to the new rather than dropping new", () => {
+    expect(wrapParts("Move the bridge queue to the new runner".split(" "), 16, " ", 2).slice(0, 2)).toEqual(["Move the bridge", "queue to the new"]);
+  });
+});
 
 // Oracle: a box 20 columns wide keeps both top corners in its 20 columns, so a 15 column title room takes "queue · north" and an
 // ellipsis, worked by hand. Rejects a long title that pushes the top right corner out of the box.

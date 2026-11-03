@@ -15,8 +15,8 @@
 ╰──────────────────────────────────────────────────────────╯│                                                          │
 ╭─ gluttons | alerts ─────────────────────────────── ↻ 2s ─╮│                                                          │
 │ ⚑ shop is spending over its share of claude main's week  ││                                                          │
-│ ⚑ my-home is spending over its share of claude main's    ││                                                          │
-│   week                                                   ││                                                          │
+│ ⚑ my-home is spending over its share of claude           ││                                                          │
+│   main's week                                            ││                                                          │
 │ +2 more flags                                            ││                                                          │
 │                                                          ││                                                          │
 ╰──────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯
@@ -25,8 +25,8 @@
 │   ✓ no task over its share                               ││   total                      2    2    –     –    –    – │
 │                                                          ││   harbor                     1    1    –     –    –    – │
 │ south  cpu 42%  mem 12.0G/64.0G  gpu 63%  disk 19%       ││   kelp                       1    1    –     –    –    – │
-│   task usage not read: TUI_DASH_REMOTE_TASK_LIVE is      ││                                                          │
-│   unset                                                  ││                                                          │
+│   task usage not read: TUI_DASH_REMOTE_TASK_LIVE         ││                                                          │
+│   is unset                                               ││                                                          │
 ╰──────────────────────────────────────────────────────────╯│                                                          │
 ╭─ queue | scheduled ────────────────────────────── ↻ 10s ─╮│                                                          │
 │ 4 running · 1 waiting · 2 queued in pueue                ││                                                          │

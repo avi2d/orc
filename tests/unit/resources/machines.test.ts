@@ -107,8 +107,8 @@ describe("the resources panel with a second machine configured", () => {
     const rows = printed({ kind: "unreachable", reason: "sh exited 255: ssh: connect to host south port 22: Connection refused" });
     expect(titles(rows)).toEqual(["north", "north gpu", "south"]);
     expect(rows.slice(-3, -1).map((row) => row.slice(2, -2).trimEnd())).toEqual([
-      "✗ unreachable: sh exited 255: ssh: connect to host south port 22: Connection",
-      "refused",
+      "✗ unreachable: sh exited 255: ssh: connect to host south port 22:",
+      "Connection refused",
     ]);
   });
 

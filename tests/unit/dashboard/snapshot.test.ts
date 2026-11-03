@@ -505,6 +505,6 @@ describe("the dashboard with a second machine configured", () => {
   test("leaves out a report older than a minute and says how old it is", () => {
     const stale = { ...southResources(), generatedAt: DateTime.makeUnsafe("2026-10-13T20:15:16Z") };
     expect(machineRows(withSouth(ok(stale))).at(-1)).toBe("south    ! answered 3m ago, so its readings are left out");
-    expect(machineRows(withSouth(ok(stale)), 30).slice(-3)).toEqual(["south    ! answered 3m ago, so", "         its readings are left", "         out"]);
+    expect(machineRows(withSouth(ok(stale)), 30).slice(-3)).toEqual(["south    ! answered 3m ago, so", "         its readings are", "         left out"]);
   });
 });

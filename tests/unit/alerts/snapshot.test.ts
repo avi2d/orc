@@ -40,8 +40,8 @@ describe("the alerts panel shows each rule's limits from the settings file", () 
     const lines = printed();
     expect(lines.filter((line) => line.startsWith("alert ")).map((line) => line.split(/ +/u)[1])).toEqual(["quota-pace", "heavy-load", "long-task", "nightly"]);
     expect(ruleOf(lines, "quota-pace").slice(0, 3)).toEqual([
-      "limits   a window runs ahead of pace past its first tenth and runs out before its",
-      "         reset",
+      "limits   a window runs ahead of pace past its first tenth and runs out before",
+      "         its reset",
       "         read every 1m",
     ]);
     expect(ruleOf(lines, "heavy-load").slice(0, 2)).toEqual([
