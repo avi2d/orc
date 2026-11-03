@@ -43,7 +43,7 @@ export const taskBranch = (task: string): string => "orc/" + task
 
 export const refuse = (detail: string): Effect.Effect<never, RunnerError> => Effect.fail(new RunnerError({ detail }))
 
-interface Captured {
+export interface Captured {
   readonly exitCode: number
   readonly stdout: string
   readonly stderr: string
