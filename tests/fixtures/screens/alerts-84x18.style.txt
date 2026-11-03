@@ -4,8 +4,8 @@ m  muted
 
 FFFFFF
 fffff    FFFFFFFFFF
-ffffff   f ffffff ffff fffff ff ffff ffff fff fffff fffff fff ffff fff ffffff fff
-         fffff
+ffffff   f ffffff ffff fffff ff ffff ffff fff fffff fffff fff ffff fff ffffff
+         fff fffff
          ffff fffff ff
 fffff    mmmm mmmmmmmm
 fffff    FFFFFFFFFF
