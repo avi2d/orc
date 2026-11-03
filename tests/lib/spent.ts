@@ -71,9 +71,19 @@ const countedFile = (file: FileSystem.File, flight: InFlight): FileSystem.File =
 // Finalizers run last-added first, so the close the open adds runs between the enter added after it and the leave added before it.
 const countedOpen = (fs: FileSystem.FileSystem, flight: InFlight): FileSystem.FileSystem["open"] => (path, options) =>
   Effect.gen(function* () {
-    yield* Effect.addFinalizer(() => Effect.sync(() => flight.leave()));
+    let closing = false;
+    yield* Effect.addFinalizer(() =>
+      Effect.sync(() => {
+        if (closing) flight.leave();
+      }),
+    );
     const file = yield* flight.around(fs.open(path, options));
-    yield* Effect.addFinalizer(() => Effect.sync(() => flight.enter()));
+    yield* Effect.addFinalizer(() =>
+      Effect.sync(() => {
+        closing = true;
+        flight.enter();
+      }),
+    );
     return countedFile(file, flight);
   });
 
