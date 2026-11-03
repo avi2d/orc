@@ -25,7 +25,7 @@ import {
 } from "@tui-dash/ui";
 import { noProviderLines } from "./sections";
 
-const labelWidth = 8;
+const minimumLabel = 8;
 const verdictMinimum = 16;
 const resetWidth = 6;
 const minimumBar = 6;
@@ -74,6 +74,7 @@ const ageWords = (age: SavedAge, now: DateTime.Utc): string => {
 const savedVerdict = (age: SavedAge, now: DateTime.Utc): Line => [span(ageWords(age, now), "muted")];
 
 interface RowShape {
+  readonly label: number;
   readonly bar: number;
   readonly verdict: number;
   readonly reset: boolean;
@@ -91,12 +92,16 @@ const holdsAWord = (verdict: Line, width: number): boolean => {
 };
 
 // Every row of the panel shares one verdict column, wide enough for its longest verdict while the bar keeps its minimum, and absent when it cannot hold a whole word of every verdict.
-const rowShape = (width: number, reset: boolean, verdicts: ReadonlyArray<Line>): RowShape => {
-  const others = labelWidth + 1 + 4 + (reset ? 1 + resetWidth : 0);
+// The label column holds the panel's longest label and one blank cell after it, while the bar keeps its minimum.
+const rowShape = (width: number, reset: boolean, verdicts: ReadonlyArray<Line>, labels: ReadonlyArray<string>): RowShape => {
+  const resetColumns = reset ? 1 + resetWidth : 0;
+  const longestLabel = Math.max(0, ...labels.map(widthOf));
+  const label = Math.max(minimumLabel, Math.min(longestLabel + 1, width - 1 - 4 - resetColumns - minimumBar));
+  const others = label + 1 + 4 + resetColumns;
   const longestVerdict = Math.max(0, ...verdicts.map(lineWidth));
   const fitted = Math.min(Math.max(verdictMinimum, longestVerdict + 1), width - others - minimumBar - verdictGap);
   const verdict = verdicts.every((line) => holdsAWord(line, fitted)) ? fitted : 0;
-  return { bar: Math.max(minimumBar, width - others - verdictColumn(verdict)), verdict, reset };
+  return { label, bar: Math.max(minimumBar, width - others - verdictColumn(verdict)), verdict, reset };
 };
 
 const verdictText = (verdict: Line, width: number): Line =>
@@ -117,25 +122,27 @@ const resetColumn = (shape: RowShape, text: string): Line => (shape.reset ? [spa
 const resetCell = (shape: RowShape, from: DateTime.Utc, resetsAt: DateTime.Utc | null | undefined): Line =>
   resetColumn(shape, resetsAt === null || resetsAt === undefined ? "" : countdown(secondsBetween(from, resetsAt)));
 
+const labelCell = (label: string, shape: RowShape): Line[number] => span(padEnd(ellipsize(label, shape.label - 1), shape.label), "foreground");
+
 const meteredRow = (
   label: string,
+  shape: RowShape,
   percentLeft: number,
   bar: Line,
   verdict: Line,
-  verdictWidth: number,
   reset: Line,
 ): Line => [
-  span(padEnd(label, labelWidth), "foreground"),
+  labelCell(label, shape),
   ...bar,
   span(" ", "muted"),
   span(padStart(`${Math.round(percentLeft)}%`, 4), leftHealth(percentLeft)),
-  ...verdictCell(verdict, verdictWidth),
+  ...verdictCell(verdict, shape.verdict),
   ...reset,
 ];
 
 // The window may have reset since a stale reading, so its row leaves the reset column blank.
 const staleCell = (label: string, text: string, shape: RowShape): Line => [
-  span(padEnd(label, labelWidth), "foreground"),
+  labelCell(label, shape),
   span(padEnd(ellipsize(text, shape.bar + 5 + verdictColumn(shape.verdict)), shape.bar + 5 + verdictColumn(shape.verdict)), "warning"),
   ...resetColumn(shape, ""),
 ];
@@ -157,32 +164,35 @@ const liveRow = (
     const parent = body.windows.find((candidate) => candidate.id === window.shareOf);
     const caption = `share of ${parent === undefined ? window.shareOf : shortLabel(parent)}`;
     return [
-      span(padEnd(shortLabel(window), labelWidth), "foreground"),
+      labelCell(shortLabel(window), shape),
       span(padEnd(ellipsize(caption, shape.bar + 5), shape.bar + 5 + verdictColumn(shape.verdict)), "muted"),
       ...reset,
     ];
   }
   return meteredRow(
     shortLabel(window),
+    shape,
     window.percentRemaining,
     quotaBar(window.percentRemaining, window.pace?.timeRemainingPercent, shape.bar),
     liveVerdict(window, body.exhaustion),
-    shape.verdict,
     reset,
   );
 };
 
+// The saved-profiles file names its windows, so a saved row keeps that name whole rather than quota-axi's seven-cell cut.
+const savedLabel = (window: SavedWindow): string => window.label.trim().toLowerCase();
+
 const savedRow = (window: SavedWindow, age: SavedAge, stale: boolean, shape: RowShape, now: DateTime.Utc): Line => {
   const staleAge = staleSavedAgeSeconds(age, stale, now);
   if (staleAge !== undefined) {
-    return staleCell(shortLabel({ label: window.label, id: "" }), `read ${countdown(staleAge)} ago`, shape);
+    return staleCell(savedLabel(window), `read ${countdown(staleAge)} ago`, shape);
   }
   return meteredRow(
-    shortLabel({ label: window.label, id: "" }),
+    savedLabel(window),
+    shape,
     window.percentLeft,
     quotaBar(window.percentLeft, undefined, shape.bar),
     savedVerdict(age, now),
-    shape.verdict,
     resetCell(shape, now, window.resetsAt),
   );
 };
@@ -294,6 +304,12 @@ const verdictsOf = (body: QuotaBlockBody, now: DateTime.Utc): ReadonlyArray<Line
   return [];
 };
 
+const labelsOf = (body: QuotaBlockBody): ReadonlyArray<string> => {
+  if (body.kind === "live") return body.windows.map(shortLabel);
+  if (body.kind === "saved") return body.windows.map(savedLabel);
+  return [];
+};
+
 const slug = (text: string) => text.toLowerCase().replaceAll(/[\s-]/g, "");
 
 const planOf = (block: QuotaBlock): string | undefined => {
@@ -314,7 +330,12 @@ const tintOf = (provider: QuotaBlock["provider"]): QuotaTint => {
 
 export const quotaLines = (blocks: ReadonlyArray<QuotaBlock>, width: number, showReset: boolean, now: DateTime.Utc): Block => {
   if (blocks.length === 0) return noProviderLines;
-  const shape = rowShape(width, showReset, blocks.flatMap((block) => verdictsOf(block.body, now)));
+  const shape = rowShape(
+    width,
+    showReset,
+    blocks.flatMap((block) => verdictsOf(block.body, now)),
+    blocks.flatMap((block) => labelsOf(block.body)),
+  );
   return blocks
     .flatMap((block): Block => [header(block, tintOf(block.provider)), ...bodyLines(block.body, width, shape, now)])
     .map((line) => truncate(line, width));
