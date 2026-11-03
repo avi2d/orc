@@ -7,6 +7,7 @@ import { queueLines } from "@tui-dash/queues";
 import { blockDocument, type Block, frameText, lineWidth, plain } from "@tui-dash/ui";
 import { fixture } from "../../lib/fixtures";
 import { fixtureQueues, queuesNow } from "../../lib/queues-fixture";
+import { cellDiffs } from "../../lib/styled-screen";
 
 const width = 84;
 
@@ -260,5 +261,9 @@ describe("the queues, against the pinned output", () => {
     const pinned = normalize(fixture("screens/queues-84x22.txt"));
     expect(await rendered(rows)).toBe(pinned);
     expect(await Effect.runPromise(frameText(blockDocument(rows), width, rows.length + 1))).toBe(pinned);
+  });
+
+  test("keeps each cell's tone, rejecting a job state painted in another state's colour", async () => {
+    expect(await cellDiffs(queueLines(fixtureQueues(), width, Number.POSITIVE_INFINITY, queuesNow), width, "queues-84x22")).toEqual([]);
   });
 });

@@ -1,0 +1,77 @@
+1  foreground on held
+2  primary on held
+3  warning on held
+4  success on held
+5  muted on held
+a  accent
+f  foreground
+F  foreground bold
+m  muted
+o  focus
+O  focus bold
+p  primary
+P  primary bold
+s  success
+u  subtle
+w  warning
+
+ ffffffff m aaaaaa m aaaaaaaaaaaaaaa                                                                                                                                                                                                      mmmmm
+mm ffffffff f fffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm ffffff f fffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmoo OOOOOOOOOOOOOOO ooooooooooooooooooooooooooooooooooooooooo
+m   uuuuuuu                 uuuu uuuu uuuu uuuuu uuuu uuuu mm   uuuu                  uuuuu   uuuuu uuuu          uuuu mo FFFFFFFFFFFFFFF u uuuu uuuuuu uuu                        o
+m 11111111111111111111111112222233333111111111114444411111 mm   ffffffffff            ppppppp f     sspuuuu        fff mo ffffffffff ffffff                                        o
+m                                                          mm   ffffffffffffffff      ppppppp f                  ff ff mo mm m m mm m mmmmmm mmmmmm m mmmmmmm mmm                  o
+m                                                          mm 11111111111111111111111222222221111111444444444451111111 mo P PPPPPPP                                                o
+m                                                          mm   ffffffffffffffff      ppppppp f     sspm           fff mo mmmmmmm mmmmm m mmmmmmm mmm mm mm m mmmmm                o
+m                                                          mm   ffffffffffffffff      wwwwwww f     ssam         ff ff mo mm mmmmm mmmmmmmm                                        o
+m                                                          mm   mmmmmmmmmmmmmmmm      mmmm    m     mmmm        mm mmm mo ffff   fff f f ffff ffffff f                             o
+m                                                          mm                                                          mo ss ssssss ss sssssss ss sssss ss ssss sssss ss sssssss   o
+m                                                          mm                                                          mo ss sssss ss sssss ss sssss ss sssss ss sss ss sss        o
+m                                                          mm                                                          mo mm mmmmmm                                                o
+m                                                          mm                                                          mo fffff                                                    o
+m                                                          mm                                                          mo mm mmmm mmmmmmm mm mmmm mmmmmmm                          o
+m                                                          mm                                                          mo mm mmmmm mmm mm mmm mmmmmmm                              o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+m                                                          mm                                                          mo                                                          o
+mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+ mm mmmm m mmm   m mm m mmmm mm   mmm mm m mmmm mmmm   mmmmm m mmm mm mmmm mm   mmmmm m mmmm mm mmm mmm mmmm mm mmmm mmmmm   m mmmm

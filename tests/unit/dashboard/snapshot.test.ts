@@ -22,6 +22,7 @@ import { machineView, southReading } from "../../lib/machines-fixture";
 import { glanceBlock } from "../../lib/host-fixture";
 import { fixtureQueueReadings, fixtureQueues } from "../../lib/queues-fixture";
 import { fixtureSessionView, fiveHourAheadSessionView } from "../../lib/session-fixture";
+import { cellDiffs } from "../../lib/styled-screen";
 
 const width = 84;
 
@@ -310,6 +311,11 @@ describe("the dashboard screen, against its pinned recording", () => {
   test("renders the pinned frame at 84x24", () => {
     const frame = printed(24, width).join("\n").concat("\n");
     expect(frame).toBe(fixture("screens/dashboard-84x24.txt"));
+  });
+
+  test("keeps each cell's tone at 84x24, rejecting a panel painted in another panel's colours with the same text", async () => {
+    const rows = glanceRows({ blocks: blocks(), sessions: sessions(), machines: alone(view()) }, width, 24);
+    expect(await cellDiffs(rows, width, "dashboard-84x24")).toEqual([]);
   });
 });
 

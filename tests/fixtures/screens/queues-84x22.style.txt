@@ -1,0 +1,30 @@
+e  error
+f  foreground
+m  muted
+p  primary
+s  success
+u  subtle
+w  warning
+
+mm mmmmm mmmmm mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+m f fffffff m f ffffff m f ffffff                                                  m
+m mmmmmmmm m mmmmm m m mmmmmm                                                      m
+m   uuuuuuu     uuuuuuu  uuuu  uuuuuuu                                             m
+m p fffffff     uuu uuu   fff  fffff fff                                           m
+m p fffffff     uuu uuu   fff  fffff ffff                                          m
+m s fffffff     uuu uuu    uu  mmmm mmmmmm mmmm                                    m
+m e fffffff     uuu uuu   uuu  eeeeee mmmmm mmm                                    m
+m e f           uuu uuu    uu  eee eeeeee mmmm mmmmm mmm mmmmmmm                   m
+m e ffff        uuu uuu    uu  eeee e mmm mmm mmmm                                 m
+m s f           uuu uuu    uu  mmmm                                                m
+m e ffffffffff  uuu uuu    uu  eeee e mmmm m                                       m
+mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+mm mmmmm mmmmmm mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+m fffff uuuuuuu uuuuuuuu uuuuu u m www wwwwwww wwwww w m uuuuu uuuuuuuu uuuuu u    m
+mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+mm mmmmmmm m mmmmmmmm mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+m f fffffff m f fffffff                                                            m
+m u uu u uuuuuuuuuuuuu uuuu uuu uuuuuu uuuuu uuu uuuu                              m
+m f ff f fffffffffff ffff fff ffffff f ffffffff ffffff ffff ffff                   m
+m f ffffffff f ffffffffffff ffff fff ffffff ffff ffffff                            m
+mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

@@ -6,6 +6,7 @@ import { TextRenderable } from "@opentui/core";
 import { type SessionQuotaView } from "@tui-dash/schema";
 import { blockDocument, failureLines, frameText, lineWidth, plain } from "@tui-dash/ui";
 import { fixture } from "../../lib/fixtures";
+import { cellDiffs } from "../../lib/styled-screen";
 import {
   fixtureSessionView,
   harvestedSessionView,
@@ -34,6 +35,12 @@ describe("the session quota panel, against its pinned screens of the fixture hom
   test("renders the reviewed 40 column screen through OpenTUI", async () => {
     expect(await rendered(40)).toBe(normalize(fixture("screens/session-quota-40x31.txt")));
   });
+
+  for (const [width, screen] of [[84, "session-quota-84x24"], [40, "session-quota-40x31"]] as const) {
+    test(`keeps each cell's tone at ${width} columns, rejecting a flagged session painted like an unflagged one`, async () => {
+      expect(await cellDiffs(sessionLines(fixtureSessionView(), width, 8), width, screen)).toEqual([]);
+    });
+  }
 });
 
 describe("the session quota panel at every width from 30 to 120 columns", () => {
