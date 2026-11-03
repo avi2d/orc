@@ -21,7 +21,7 @@ interface GitResult {
 // The far side of a forwarded start gets 30 seconds before the dispatcher gives up on it, so the fetch must end well inside that.
 const fetchSeconds = 20
 
-const gitEnv = { ...hostGitSafetyEnv, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0" }
+const gitEnv = { ...hostGitSafetyEnv, GIT_TERMINAL_PROMPT: "0" }
 
 const git = (gitBin: string, projectDir: string, args: ReadonlyArray<string>): Effect.Effect<GitResult, never, Requirements> =>
   Effect.gen(function*() {
@@ -105,8 +105,17 @@ const pickRemote = (listed: string): { readonly remote: string } | Kept => {
 }
 
 const fetchRemote = (gitBin: string, projectDir: string, remote: string): Effect.Effect<Kept | null, never, Requirements> =>
-  git(gitBin, projectDir, ["fetch", "--quiet", "--no-recurse-submodules", remote]).pipe(
-    Effect.map((fetched) => fetched.exitCode === 0 ? null : kept("git fetch " + remote + " failed: " + firstLine(fetched.stderr))),
+  Effect.gen(function*() {
+    const fetched = yield* git(gitBin, projectDir, ["fetch", "--quiet", "--no-recurse-submodules", remote])
+    if (fetched.exitCode !== 0) {
+      return kept("git fetch " + remote + " failed: " + firstLine(fetched.stderr))
+    }
+    const setHead = yield* git(gitBin, projectDir, ["remote", "set-head", remote, "--auto"])
+    if (setHead.exitCode !== 0) {
+      return kept("git remote set-head " + remote + " --auto failed: " + firstLine(setHead.stderr))
+    }
+    return null
+  }).pipe(
     Effect.timeoutOrElse({
       duration: Duration.seconds(fetchSeconds),
       orElse: () => Effect.succeed(kept("git fetch " + remote + " ran past " + fetchSeconds + " seconds"))
