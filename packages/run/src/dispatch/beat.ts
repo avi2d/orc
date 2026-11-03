@@ -317,12 +317,12 @@ export const runBeat = (
       }
     }
     const current = yield* listTasks(root)
-    const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))
     const queued = current.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: current, overloaded }
     const renewals = yield* Effect.forEach(current, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, task))
+    const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))
     return { beat, at, quota, room: readRoom(config.machines, current), actions: [
         ...closed,
         ...stalls.flatMap(Option.toArray),

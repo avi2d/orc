@@ -1,6 +1,7 @@
 import { DateTime, Effect, FileSystem, Option } from "effect"
 import { backlogPaths, type BacklogError } from "./backlog"
 import type { StalledAction } from "./beat-action"
+import { stallEvent } from "./task-events"
 import type { Progress } from "./beat-close"
 import { platformFailure } from "./backlog-write"
 import type { TaskRecord } from "./task-record"
@@ -48,6 +49,8 @@ export const flagStall = (root: string, task: TaskRecord, progress: Progress): E
     if (flagged === since) {
       return Option.none()
     }
+    const stall = { kind: "stalled", task: task.spec.id, machine: task.state.claim.machine, since } satisfies StalledAction
+    yield* stallEvent(root, task, stall, DateTime.formatIso(now))
     yield* fs.writeFileString(file, since).pipe(Effect.mapError(platformFailure("write " + file)))
-    return Option.some({ kind: "stalled", task: task.spec.id, machine: task.state.claim.machine, since } satisfies StalledAction)
+    return Option.some(stall)
   })

@@ -1,6 +1,6 @@
-import { Effect, type FileSystem, Option, Result } from "effect"
+import { Duration, Effect, type FileSystem, Option, Result } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import type { BacklogError } from "./backlog-write"
+import { BacklogError } from "./backlog-write"
 import type { BeatAction, StalledAction } from "./beat-action"
 import type { ChatEvent } from "./chat-event"
 import { eventRecorded, recordEvent } from "./events"
@@ -12,6 +12,8 @@ export type ReadPullRequest = (url: string) => Effect.Effect<PullRequestView, Ba
 
 type Requirements = FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
 
+const prSeconds = 30
+
 const named = (task: TaskRecord): string => task.spec.id + " " + task.spec.title
 
 export const stallEvent = (root: string, task: TaskRecord, stall: StalledAction, at: string): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
@@ -22,7 +24,7 @@ export const stallEvent = (root: string, task: TaskRecord, stall: StalledAction,
   })
 
 const openPr = (task: TaskRecord): string | null =>
-  task.state.kind === "closed" && task.state.closing.outcome === "done" && task.spec.kind === "ship" ? task.state.closing.pr : null
+  task.state.kind === "closed" && task.state.closing.outcome !== "start-failed" && task.spec.kind === "ship" ? task.state.closing.pr : null
 
 const prEvent = (task: TaskRecord, pr: string, view: PullRequestView, at: string, readyPosted: boolean): ChatEvent | null => {
   if (view.state === "MERGED") {
@@ -50,7 +52,7 @@ export const prEvents = (
     if (pr === null || (yield* eventRecorded(root, id + ".merged")) || (yield* eventRecorded(root, id + ".pr-closed"))) {
       return Option.none()
     }
-    const view = yield* read(pr).pipe(Effect.result)
+    const view = yield* read(pr).pipe(Effect.result, Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed(Result.fail(new BacklogError({ detail: "cannot read " + pr + ": the read timed out after " + prSeconds + " seconds" }))) }))
     if (Result.isFailure(view)) {
       return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: view.failure.detail })
     }
