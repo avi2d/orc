@@ -56,6 +56,12 @@ describe("the lavish-axi launcher", () => {
     })
   })
 
+  test("a disconnected browser reads as waiting instead of closed while its session stays open", async () => {
+    await withLavish("session:\n  file: /tmp/board.html\n  status: browser_disconnected\n", async (env) => {
+      expect(await Effect.runPromise(lavishLauncher(env).poll("/tmp/board.html"))).toEqual({ kind: "waiting" })
+    })
+  })
+
   test("what orc recorded goes back to the board through lavish-axi reply instead of leaving it unanswered", async () => {
     await withLavish("session:\n  file: /tmp/board.html\n  status: sent\n", async (env, log) => {
       await Effect.runPromise(lavishLauncher(env).reply("/tmp/board.html", "answered question-1 on task-1"))

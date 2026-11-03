@@ -106,7 +106,7 @@ export const lavishLauncher = (env: Env): BoardLauncher => {
           if (status === "feedback") {
             return promptsOf(output).pipe(Effect.map((prompts) => ({ kind: "feedback", prompts })))
           }
-          return Effect.succeed(status === "waiting" ? { kind: "waiting" } : { kind: "closed", status: status === "" ? "no status" : status })
+          return Effect.succeed(status === "waiting" || status === "browser_disconnected" ? { kind: "waiting" } : { kind: "closed", status: status === "" ? "no status" : status })
         })
       ),
     reply: (file, text) => lavish(["reply", file, "--agent-reply", text], full).pipe(Effect.asVoid),
