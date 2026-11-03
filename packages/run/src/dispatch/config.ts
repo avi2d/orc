@@ -1,4 +1,4 @@
-import { Effect, FileSystem, Path, Schema } from "effect"
+import { Effect, FileSystem, Path, Result, Schema } from "effect"
 import { AbsolutePath, ConfigError, duplicateOf, readJsonFile, readJsonFileIfPresent } from "../json-file"
 import { ProviderId } from "../orc-config"
 import { type DeliveryMode, isDeliveryMode, unknownMode } from "../delivery"
@@ -101,7 +101,7 @@ export const isYolo = (project: Project): boolean => project.yolo === true
 
 type ParsedInstructions = { readonly name: string; readonly instructions?: string }
 
-const parsedInstructions = (project: RawProject): ParsedInstructions | string => {
+const parsedInstructions = (project: { readonly name: string; readonly instructions?: unknown }): ParsedInstructions | string => {
   const { name, instructions } = project
   if (instructions !== undefined && (typeof instructions !== "string" || instructions === "")) {
     return "the project " + name + " names instructions " + JSON.stringify(instructions) + ", which is not a file path"
@@ -143,6 +143,19 @@ export const checkoutOn = (project: Project, machine: string): string | null =>
   Object.hasOwn(project.checkouts, machine) ? (project.checkouts[machine] ?? null) : null
 
 const ProjectsFile = Schema.Struct({ projects: Schema.Array(RawProject) })
+
+const LooseProjectsFile = Schema.Struct({ projects: Schema.Array(Schema.Unknown) })
+
+const looseInstructions = (entry: unknown): ParsedInstructions | string | null => {
+  if (typeof entry !== "object" || entry === null || !("instructions" in entry)) {
+    return null
+  }
+  const record = entry as { readonly name?: unknown; readonly instructions?: unknown }
+  if (typeof record.name !== "string" || record.name === "") {
+    return null
+  }
+  return parsedInstructions({ name: record.name, instructions: record.instructions })
+}
 
 const accountName = (entry: unknown): string | null =>
   typeof entry === "object" && entry !== null && "name" in entry && typeof entry.name === "string" && entry.name !== "" ? entry.name : null
@@ -237,21 +250,31 @@ export interface ProjectInstructions {
 }
 
 export const readProjectInstructions = (file: string): Effect.Effect<ReadonlyArray<ProjectInstructions>, ConfigError, FileSystem.FileSystem | Path.Path> =>
-  readJsonFileIfPresent(file, ProjectsFile).pipe(
+  readJsonFileIfPresent(file, LooseProjectsFile).pipe(
     Effect.catchTag("ConfigError", () => Effect.succeed(null)),
     Effect.flatMap((read) => {
       const list = read?.projects ?? []
       const parsed: Array<ParsedInstructions> = []
-      for (const project of list) {
-        const entry = parsedInstructions(project)
-        if (typeof entry === "string") {
-          return Effect.fail(new ConfigError({ file, detail: entry }))
+      for (const entry of list) {
+        const found = looseInstructions(entry)
+        if (found === null) {
+          continue
         }
-        parsed.push(entry)
+        if (typeof found === "string") {
+          return Effect.fail(new ConfigError({ file, detail: found }))
+        }
+        parsed.push(found)
       }
       return Effect.forEach(parsed, (entry) => instructionsFile(file, entry)).pipe(
         Effect.flatMap((resolved) => {
-          for (const project of list) {
+          const decoded = Schema.decodeUnknownResult(ProjectsFile)({ projects: list })
+          if (!Result.isSuccess(decoded)) {
+            return Effect.succeed<ReadonlyArray<ProjectInstructions>>([])
+          }
+          if (duplicateOf(decoded.success.projects.map((project) => project.name)) !== null) {
+            return Effect.succeed<ReadonlyArray<ProjectInstructions>>([])
+          }
+          for (const project of decoded.success.projects) {
             if (typeof checkedProject(project) === "string") {
               return Effect.succeed<ReadonlyArray<ProjectInstructions>>([])
             }
