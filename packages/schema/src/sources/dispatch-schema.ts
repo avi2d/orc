@@ -33,7 +33,11 @@ export const MachinesFile = Schema.Struct({
   }),
 });
 
-const Project = Schema.Struct({ name: Name, checkouts: Schema.Record(Name, Schema.String.check(Schema.isPattern(/^\//))) });
+const Project = Schema.Struct({
+  name: Name,
+  checkouts: Schema.Record(Name, Schema.String.check(Schema.isPattern(/^\//))),
+  instructions: Schema.optionalKey(Schema.String.check(Schema.isNonEmpty())),
+});
 
 export const ProjectsFile = Schema.Struct({ projects: Schema.Array(Project) });
 

@@ -1,4 +1,4 @@
-import { Effect, type FileSystem, Schema } from "effect"
+import { Effect, FileSystem, Path, Schema } from "effect"
 import { AbsolutePath, ConfigError, duplicateOf, readJsonFile } from "../json-file"
 import { ProviderId } from "../orc-config"
 import { type DeliveryMode, isDeliveryMode, unknownMode } from "../delivery"
@@ -89,25 +89,44 @@ const RawProject = Schema.Struct({
   name: Name,
   checkouts: Schema.Record(Name, AbsolutePath),
   mode: Schema.optionalKey(Schema.String),
-  yolo: Schema.optionalKey(Schema.Unknown)
+  yolo: Schema.optionalKey(Schema.Unknown),
+  instructions: Schema.optionalKey(Schema.Unknown)
 })
 type RawProject = typeof RawProject.Type
-export type Project = Omit<RawProject, "mode" | "yolo"> & { readonly mode?: DeliveryMode; readonly yolo?: boolean }
+export type Project = Omit<RawProject, "mode" | "yolo" | "instructions"> & { readonly mode?: DeliveryMode; readonly yolo?: boolean; readonly instructions?: string }
 
 export const modeOf = (project: Project): DeliveryMode => project.mode ?? "no-mistakes"
 
 export const isYolo = (project: Project): boolean => project.yolo === true
 
 const checkedProject = (project: RawProject): Project | string => {
-  const { mode, yolo, ...rest } = project
+  const { mode, yolo, instructions, ...rest } = project
   if (mode !== undefined && !isDeliveryMode(mode)) {
     return unknownMode(project.name, mode)
   }
   if (yolo !== undefined && typeof yolo !== "boolean") {
     return "the project " + project.name + " names yolo " + JSON.stringify(yolo) + ", which is not true or false"
   }
-  return { ...rest, ...(mode === undefined ? {} : { mode }), ...(yolo === undefined ? {} : { yolo }) }
+  if (instructions !== undefined && (typeof instructions !== "string" || instructions === "")) {
+    return "the project " + project.name + " names instructions " + JSON.stringify(instructions) + ", which is not a file path"
+  }
+  return { ...rest, ...(mode === undefined ? {} : { mode }), ...(yolo === undefined ? {} : { yolo }), ...(instructions === undefined ? {} : { instructions }) }
 }
+
+const instructionsFile = (file: string, project: Project): Effect.Effect<Project, ConfigError, FileSystem.FileSystem | Path.Path> =>
+  Effect.gen(function*() {
+    if (project.instructions === undefined) {
+      return project
+    }
+    const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const resolved = path.resolve(path.dirname(file), project.instructions)
+    const info = yield* fs.stat(resolved).pipe(Effect.orElseSucceed(() => null))
+    if (info?.type !== "File") {
+      return yield* new ConfigError({ file, detail: "the project " + project.name + " names the instructions file " + resolved + ", which is no file" })
+    }
+    return { ...project, instructions: resolved }
+  })
 
 export const checkoutOn = (project: Project, machine: string): string | null =>
   Object.hasOwn(project.checkouts, machine) ? (project.checkouts[machine] ?? null) : null
@@ -169,29 +188,34 @@ export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, 
     )
   )
 
+const checkedProjects = (
+  file: string,
+  projects: ReadonlyArray<RawProject>,
+  machines: ReadonlyArray<Machine>
+): Effect.Effect<ReadonlyArray<Project>, ConfigError, FileSystem.FileSystem | Path.Path> =>
+  Effect.gen(function*() {
+    const duplicate = duplicateOf(projects.map((project) => project.name))
+    if (duplicate !== null) {
+      return yield* new ConfigError({ file, detail: "the project " + duplicate + " is named twice" })
+    }
+    const known = new Set(machines.map((machine) => machine.name))
+    const checked: Array<Project> = []
+    for (const project of projects) {
+      const unknown = Object.keys(project.checkouts).find((machine) => !known.has(machine))
+      if (unknown !== undefined) {
+        return yield* new ConfigError({ file, detail: "the project " + project.name + " names the unknown machine " + unknown })
+      }
+      const read = checkedProject(project)
+      if (typeof read === "string") {
+        return yield* new ConfigError({ file, detail: read })
+      }
+      checked.push(yield* instructionsFile(file, read))
+    }
+    return checked
+  })
+
 export const readProjects = (
   file: string,
   machines: ReadonlyArray<Machine>
-): Effect.Effect<ReadonlyArray<Project>, ConfigError, FileSystem.FileSystem> =>
-  readJsonFile(file, ProjectsFile).pipe(
-    Effect.flatMap(({ projects }) => {
-      const duplicate = duplicateOf(projects.map((project) => project.name))
-      if (duplicate !== null) {
-        return Effect.fail(new ConfigError({ file, detail: "the project " + duplicate + " is named twice" }))
-      }
-      const known = new Set(machines.map((machine) => machine.name))
-      const checked: Array<Project> = []
-      for (const project of projects) {
-        const unknown = Object.keys(project.checkouts).find((machine) => !known.has(machine))
-        if (unknown !== undefined) {
-          return Effect.fail(new ConfigError({ file, detail: "the project " + project.name + " names the unknown machine " + unknown }))
-        }
-        const read = checkedProject(project)
-        if (typeof read === "string") {
-          return Effect.fail(new ConfigError({ file, detail: read }))
-        }
-        checked.push(read)
-      }
-      return Effect.succeed(checked)
-    })
-  )
+): Effect.Effect<ReadonlyArray<Project>, ConfigError, FileSystem.FileSystem | Path.Path> =>
+  readJsonFile(file, ProjectsFile).pipe(Effect.flatMap(({ projects }) => checkedProjects(file, projects, machines)))
