@@ -473,7 +473,8 @@ Holding the task again with the same questions keeps the hold, and orc refuses o
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
 After the claim survives a recount, the beat writes the task started before it runs the start command.
 A task marked for a machine waits for a slot on that machine and never starts on another.
-The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_DELIVERY`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT` and `ORC_TASK_TOKEN_FILE`.
+The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_DELIVERY`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT`, `ORC_TASK_TOKEN_FILE` and `ORC_TASK_INSTRUCTIONS`.
+`ORC_TASK_INSTRUCTIONS` is empty when the project names no instructions file.
 `ORC_TASK_TOKEN_FILE` is the account's token file path, never the token.
 On a token command account it is empty, and the start command reads the token as `orc.token.v1` on standard input instead.
 On a kind `none` account it is empty, and the beat sends nothing on standard input, so a custom start command must not feed it input.
@@ -640,6 +641,7 @@ The refresh needs Git 2.48 or later.
 The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
 The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
+When the task names instructions, the queued `orc run` gets `--instructions` pointing at a copy in `~/.orc/runner/<task-id>.instructions/<file name>` on that machine.
 A task queued for another home keeps a scoped file instead, so two homes holding the same task id never share one file.
 A task this home already holds queued or running in group `orc` is not queued again, and a task whose earlier run is done there is queued again, as a parked task is once answered.
 
