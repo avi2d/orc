@@ -438,6 +438,18 @@ A project instructions file replaces a discovered APPEND_SYSTEM.md.
 Orc refuses an instructions value that is not a file path, and a project list naming an instructions file that does not exist.
 A project with no `instructions` hands its runs and the chat no instructions.
 
+A project may also add `"upstream"`, a list of GitHub issue or pull request URLs on other people's repositories that the project's work filed.
+Only `orc beat` reads it, through `gh api graphql` under the `gh` login of the machine that runs the beat, and it only reads.
+Each beat reads each contribution's state: open, closed or merged, its comment count, and for a pull request its review count and head commit.
+It keeps the last state it read in `~/.orc/backlog/upstream/<project>/<owner>.<repo>.<number>.json`, never in `projects.json`.
+The first beat to read a contribution records it, prints `watching <url> for <project>: <state>` and adds no task.
+A later beat that reads another state adds one scout task for the project, titled `Follow up on <owner>/<repo>#<number>: <changes>`, records the change as a chat event and prints `added <task-id> for <project> as a scout: <url> changed: <changes>`.
+The event's key names the change, so of two beats reading one change only one adds the task, and a repeat beat on the same state adds none.
+A contribution gh cannot read within 30 seconds, through no network, no login or a deleted issue, prints `upstream of <project>: cannot read <url>: <reason>`, adds no task and keeps the recorded state.
+A recorded state orc cannot read prints `upstream of <project>:` with the file and adds no task until you remove the file, and the next beat then records the contribution afresh.
+Orc refuses an `upstream` that is not a list, an entry that is not a `https://github.com/<owner>/<repo>/issues/<number>` or `/pull/<number>` URL, and a URL named twice.
+A project with no `upstream` makes the beat read nothing upstream.
+
 To add a task, run `orc backlog add <project> <task-file>`.
 To pipe the task in instead, give `-` as the task file, as in `printf '# Fix the login page\n' | orc backlog add orc -`.
 It reads stdin to its end and refuses a terminal.
@@ -492,7 +504,7 @@ A started run whose output has not grown for 30 minutes prints `stalled <task-id
 A PR the beat cannot read for the chat prints `cannot read the PR of <task-id> for the chat: <reason>`.
 A missing start command exits 127 into its log and leaves the task started.
 Only a failure to spawn the log wrapper closes the task as `start-failed`.
-To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1` and carries the endings as `closed`, `close-failed` and `parked` actions, a stall as `stalled` and a PR the beat cannot read as `pr-unread`.
+To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1` and carries the endings as `closed`, `close-failed` and `parked` actions, a stall as `stalled`, a PR the beat cannot read as `pr-unread`, and an upstream contribution as `upstream-seen`, `upstream-changed` or `upstream-unread`.
 On a token command account, each beat first sends every started task its account's current token through its machine's `renew` command, as JSON on standard input.
 
 ## Parked runs
@@ -740,6 +752,7 @@ To print the five minute load average the beat compares against a load limit, ru
 | `src/dispatch/runner-error.ts` | The runner's error |
 | `src/dispatch/refresh.ts` | The fast-forward of the checkout's default branch when a run starts |
 | `src/dispatch/runner-result.ts` | The reading of a task's result and the `orc.runner.v1` JSON |
+| `src/dispatch/upstream.ts` | The beat's read of each project's upstream contributions and the scout task a change adds |
 | `src/dispatch/token.ts` | The `orc.token.v1` document, the token command and the clauth session reading |
 | `src/dispatch/held-token.ts` | The owner-only token folder a run on another machine reads |
 | `src/dispatch/hold.ts` | `orc runner hold`: the wait for a live token, the rerun and the folder removal |

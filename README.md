@@ -123,6 +123,17 @@ A project instructions file replaces a discovered APPEND_SYSTEM.md.
 Orc refuses an instructions value that is not a file path, and a list naming an instructions file that does not exist.
 A project with no `instructions` gets no extra rules.
 
+## Follow up on your upstream contributions
+
+To have orc follow the issues and pull requests you filed on other people's repositories, add `"upstream": ["<url>"]` to that project in `projects.json`.
+Each entry is a GitHub issue or pull request URL, such as `https://github.com/owner/repo/pull/12`.
+Only `orc beat` reads the list, through the `gh` login of the machine that runs it, so a private repository needs a login that can see it.
+The beat only reads upstream and never comments, pushes or opens anything there.
+The first beat to read a contribution records its state and adds no task.
+When a later beat finds it closed, merged, reopened, commented on, reviewed or pushed to, it adds one scout task for the project naming the URL and the change, and the chat posts the change.
+A contribution the beat cannot read prints `upstream of <project>: <reason>`, with the URL and why in the reason, and adds no task.
+Orc refuses an `upstream` that is not a list of such URLs, and a project with no `upstream` watches nothing.
+
 ## Open the dashboard
 
 To open the dashboard, run `bun run dashboard` from the repository root.
@@ -150,7 +161,7 @@ Orc grows toward the full orchestrator one step at a time.
 | Decision boards you answer once | Ships today |
 | Per-project instructions the run and the chat both read | Ships today |
 | A fresh checkout before every run | Ships today |
-| Follow-ups on upstream changes | Next |
+| Follow-ups on upstream changes | Ships today |
 
 Today a ship run counts as done once Pi stops cleanly with `ORC_COMPLETE` and the branch holds a new commit.
 The checks must pass too, and no-mistakes must open a pull request with green CI.
