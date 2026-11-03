@@ -41,15 +41,13 @@ const checkedCard = (task: string, card: BoardCard, target: BoardCardRecord["tar
   return Effect.succeed({ target, text, options: card.options, recommended: card.recommended })
 }
 
-type BoardCards = BoardRecord["cards"]
-
-const cardsFor = (task: Decision, cards: BoardInput["cards"]): Effect.Effect<BoardCards, ChatToolError> => {
+const cardsFor = (task: Decision, cards: BoardInput["cards"]): Effect.Effect<BoardRecord["cards"], ChatToolError> => {
   const [first, ...rest] = cards
   if (task.questions.length === 0) {
     if (rest.length > 0 || first.question !== undefined) {
       return refuse(task.id + " is held with a reason and no questions, so its board takes one card with no question")
     }
-    return checkedCard(task.id, first, { kind: "reason" }, task.reason).pipe(Effect.map((card): BoardCards => [card]))
+    return checkedCard(task.id, first, { kind: "reason" }, task.reason).pipe(Effect.map((card): BoardRecord["cards"] => [card]))
   }
   const open = task.questions.filter((question) => question.answer === null)
   const named = cards.map((card) => card.question ?? "")
@@ -64,7 +62,6 @@ const cardsFor = (task: Decision, cards: BoardInput["cards"]): Effect.Effect<Boa
   ])
 }
 
-// A reason card is answered exactly when its task stops being held, so on an open board it is never answered.
 const recordedWords = (task: Decision) => (card: BoardCardRecord): string | null =>
   card.target.kind === "reason" ? null : task.questions.find((question) => question.id === cardKey(card.target))?.answer?.words ?? null
 
@@ -78,9 +75,22 @@ const boardFile = (dir: string, name: "board.html" | "board.json"): string => di
 const writeAtomic = (file: string, text: string): Effect.Effect<void, ChatToolError> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
-    yield* fs.writeFileString(file + ".tmp", text)
-    yield* fs.rename(file + ".tmp", file)
+    const tmp = file + ".tmp." + crypto.randomUUID()
+    yield* fs.writeFileString(tmp, text)
+    yield* fs.rename(tmp, file)
   }).pipe(Effect.provide(fileSystemLayer), Effect.mapError(fileError))
+
+const writePageIfChanged = (file: string, text: string): Effect.Effect<void, ChatToolError> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const prior = yield* fs.readFileString(file).pipe(
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)),
+      Effect.mapError(fileError)
+    )
+    if (prior !== text) {
+      yield* writeAtomic(file, text)
+    }
+  }).pipe(Effect.provide(fileSystemLayer))
 
 const makeBoardDir = (dir: string): Effect.Effect<void, ChatToolError> =>
   Effect.gen(function*() {
@@ -117,22 +127,22 @@ const writeBoard = (dir: string, record: BoardRecord, task: Decision): Effect.Ef
     yield* writeAtomic(boardFile(dir, "board.html"), boardHtml(record, recordedWords(task)))
   })
 
-const waitingTask = (host: BoardHost, id: string): Effect.Effect<Decision | null, ChatToolError> =>
-  host.tasks.pipe(Effect.map((tasks) => tasks.find((task) => task.id === id) ?? null), Effect.map((task) => task === null ? null : openDecision(task)))
+const openFrom = (tasks: ReadonlyArray<BacklogTask>, id: string): Decision | null => {
+  const task = tasks.find((candidate) => candidate.id === id) ?? null
+  return task === null ? null : openDecision(task)
+}
 
-const rawTask = (host: BoardHost, id: string): Effect.Effect<BacklogTask | null, ChatToolError> =>
-  host.tasks.pipe(Effect.map((tasks) => tasks.find((task) => task.id === id) ?? null))
+const rawFrom = (tasks: ReadonlyArray<BacklogTask>, id: string): BacklogTask | null =>
+  tasks.find((candidate) => candidate.id === id) ?? null
 
-const boundDecision = (host: BoardHost, record: BoardRecord): Effect.Effect<Decision | null, ChatToolError> =>
-  rawTask(host, record.task).pipe(
-    Effect.map((task) => {
-      if (task === null) {
-        return null
-      }
-      const bound = decisionFor(task, record.waits)
-      return bound !== null && matchesRecord(bound, record) ? bound : null
-    })
-  )
+const boundFrom = (tasks: ReadonlyArray<BacklogTask>, record: BoardRecord): Decision | null => {
+  const task = rawFrom(tasks, record.task)
+  if (task === null) {
+    return null
+  }
+  const bound = decisionFor(task, record.waits)
+  return bound !== null && matchesRecord(bound, record) ? bound : null
+}
 
 const staleLine = (record: BoardRecord, text: string): string =>
   record.task + "'s decision board no longer describes its current decision, so orc recorded nothing: " + text
@@ -158,11 +168,10 @@ const matchAnswer = (record: BoardRecord, prompt: BoardPrompt): Effect.Effect<Ma
     Effect.orElseSucceed((): MatchedAnswer => ({ kind: "refused", line: unmatchedLine(record, prompt.text) }))
   )
 
-const staleRefusal = (host: BoardHost, record: BoardRecord, card: BoardCardRecord, text: string): Effect.Effect<string | null> =>
-  boundDecision(host, record).pipe(
-    Effect.map((bound) => bound === null || answeredAlready(bound, card) ? staleLine(record, text) : null),
-    Effect.catchTag("ChatToolError", (error) => Effect.succeed("orc recorded nothing: " + error.message))
-  )
+const staleRefusal = (tasks: ReadonlyArray<BacklogTask>, record: BoardRecord, card: BoardCardRecord, text: string): string | null => {
+  const bound = boundFrom(tasks, record)
+  return bound === null || answeredAlready(bound, card) ? staleLine(record, text) : null
+}
 
 const recordPrompt = (host: BoardHost, record: BoardRecord, prompt: BoardPrompt): Effect.Effect<string> =>
   Effect.gen(function*() {
@@ -176,7 +185,12 @@ const recordPrompt = (host: BoardHost, record: BoardRecord, prompt: BoardPrompt)
       return matched.line
     }
     const { card, answer } = matched
-    const refusal = yield* staleRefusal(host, record, card, prompt.text)
+    const tasks = yield* host.tasks.pipe(Effect.catchTag("ChatToolError", (error) => Effect.succeed("orc recorded nothing: " + error.message)))
+    if (typeof tasks === "string") {
+      host.say(tasks)
+      return tasks
+    }
+    const refusal = staleRefusal(tasks, record, card, prompt.text)
     if (refusal !== null) {
       host.say(refusal)
       return refusal
@@ -191,39 +205,37 @@ const recordPrompt = (host: BoardHost, record: BoardRecord, prompt: BoardPrompt)
 
 type Reading = "read again" | "done"
 
-type BoardRefresh = "closed" | "stale" | "current"
-
 const closedBoardLine = (record: BoardRecord): string =>
   record.task + " is no longer " + record.waits + ", so orc closed its decision board"
 
 const staleBoardLine = (record: BoardRecord): string =>
   record.task + "'s decision board no longer describes its current decision, so orc stopped reading it; open it again to answer the rest"
 
-const refreshPage = (host: BoardHost, dir: string, record: BoardRecord): Effect.Effect<BoardRefresh, ChatToolError> =>
+const refreshPage = (tasks: ReadonlyArray<BacklogTask>, dir: string, record: BoardRecord): Effect.Effect<"closed" | "stale" | "current", ChatToolError> =>
   Effect.gen(function*() {
-    const open = yield* waitingTask(host, record.task)
     const page = boardFile(dir, "board.html")
+    const open = openFrom(tasks, record.task)
     if (open === null) {
-      const raw = yield* rawTask(host, record.task)
+      const raw = rawFrom(tasks, record.task)
       if (raw !== null) {
-        yield* writeAtomic(page, boardHtml(record, completedWords(record, raw)))
+        yield* writePageIfChanged(page, boardHtml(record, completedWords(record, raw)))
       }
       return "closed"
     }
-    const bound = yield* boundDecision(host, record)
+    const bound = boundFrom(tasks, record)
     if (bound === null) {
       return "stale"
     }
-    yield* writeAtomic(page, boardHtml(record, recordedWords(bound)))
+    yield* writePageIfChanged(page, boardHtml(record, recordedWords(bound)))
     return "current"
   })
 
-const refreshed = (host: BoardHost, dir: string, record: BoardRecord, reply: string): Effect.Effect<Reading, ChatToolError> =>
+const refreshed = (host: BoardHost, tasks: ReadonlyArray<BacklogTask>, dir: string, record: BoardRecord, reply: string): Effect.Effect<Reading, ChatToolError> =>
   Effect.gen(function*() {
     const page = boardFile(dir, "board.html")
     const replied = host.launcher.reply(page, reply).pipe(Effect.catchTag("ChatToolError", () => Effect.void))
     const ended = replied.pipe(Effect.andThen(host.launcher.end(page)), Effect.catchTag("ChatToolError", () => Effect.void))
-    const state = yield* refreshPage(host, dir, record)
+    const state = yield* refreshPage(tasks, dir, record)
     if (state === "closed") {
       yield* ended
       host.say(closedBoardLine(record))
@@ -238,7 +250,7 @@ const refreshed = (host: BoardHost, dir: string, record: BoardRecord, reply: str
     return "read again"
   })
 
-const watchOnce = (host: BoardHost, dir: string): Effect.Effect<Reading, ChatToolError> =>
+const watchOnce = (host: BoardHost, dir: string, busy: Set<string>): Effect.Effect<Reading, ChatToolError> =>
   Effect.gen(function*() {
     const poll = yield* host.launcher.poll(boardFile(dir, "board.html"))
     if (poll.kind === "waiting") {
@@ -249,66 +261,92 @@ const watchOnce = (host: BoardHost, dir: string): Effect.Effect<Reading, ChatToo
       host.say(record.task + "'s decision board's Lavish session is " + poll.status + ", so orc stopped reading it; open it again to answer the rest")
       return "done"
     }
-    const said = yield* Effect.forEach(poll.prompts, (prompt) => recordPrompt(host, record, prompt))
-    return yield* refreshed(host, dir, record, said.join("\n\n"))
+    busy.add(record.task)
+    return yield* Effect.gen(function*() {
+      const said = yield* Effect.forEach(poll.prompts, (prompt) => recordPrompt(host, record, prompt))
+      const tasks = yield* host.tasks
+      return yield* refreshed(host, tasks, dir, record, said.join("\n\n"))
+    }).pipe(Effect.ensuring(Effect.sync(() => busy.delete(record.task))))
   })
 
-const openedLine = (record: BoardRecord, cards: number, url: string): string =>
-  "opened " + record.task + "'s decision board with " + cards + " cards at " + url +
-  ". orc records each answer the captain sends from it, word for word, and keeps the task " + record.waits + " until every card is answered."
+const hostOf = (url: string): string =>
+  url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "").split(/[/:?#]/)[0].replace(/^\[(.*)\]$/, "$1").toLowerCase()
+
+const openedLine = (record: BoardRecord, cards: number, url: string, networkWarning: string): string => {
+  const base = "opened " + record.task + "'s decision board with " + cards + " cards at " + url +
+    ". orc records each answer the captain sends from it, word for word, and keeps the task " + record.waits + " until every card is answered."
+  if (networkWarning !== "") {
+    return base + " " + networkWarning
+  }
+  const host = hostOf(url)
+  if (host === "127.0.0.1" || host === "localhost" || host === "::1") {
+    return base + " The board opens only on this machine."
+  }
+  return base + " Anyone on the same network who holds the link can open it and submit answers, which orc records as the captain's, because the page has no login."
+}
+
+type BoardFibers = Map<string, { readonly dir: string; readonly fiber: Fiber.Fiber<void> }>
+
+const stopWatching = (host: BoardHost, fibers: BoardFibers, task: string): Effect.Effect<void> =>
+  Effect.gen(function*() {
+    const entry = fibers.get(task)
+    if (entry === undefined) {
+      return
+    }
+    fibers.delete(task)
+    yield* Fiber.interrupt(entry.fiber)
+  })
+
+const reconcileOne = (host: BoardHost, fibers: BoardFibers, busy: ReadonlySet<string>, task: string, dir: string): Effect.Effect<void, ChatToolError> =>
+  Effect.gen(function*() {
+    if (fibers.get(task) === undefined || busy.has(task)) {
+      return
+    }
+    const record = yield* readRecord(dir)
+    const tasks = yield* host.tasks
+    const state = yield* refreshPage(tasks, dir, record)
+    if (state === "current") {
+      return
+    }
+    if (fibers.get(task) === undefined || busy.has(task)) {
+      return
+    }
+    yield* host.launcher.end(boardFile(dir, "board.html")).pipe(Effect.catchTag("ChatToolError", () => Effect.void))
+    host.say(state === "closed" ? closedBoardLine(record) : staleBoardLine(record))
+    yield* stopWatching(host, fibers, task)
+  })
 
 export const decisionBoards = (host: BoardHost): Boards => {
-  const watching = new Map<string, { readonly dir: string; readonly fiber: Fiber.Fiber<void> }>()
+  const fibers: BoardFibers = new Map()
+  const busy = new Set<string>()
 
-  const stopWatching = (task: string): Effect.Effect<void> =>
-    Effect.gen(function*() {
-      const entry = watching.get(task)
-      if (entry === undefined) {
-        return
-      }
-      watching.delete(task)
-      yield* Fiber.interrupt(entry.fiber)
-    })
   const boardDir = (task: string): Effect.Effect<string, ChatToolError> =>
     host.dir === null ? refuse("orc chat names its decision board folder in " + boardsVar + ", so open a board from inside orc chat") : Effect.succeed(host.dir + "/" + task)
 
   const watch = (task: string, dir: string): void => {
-    if (watching.has(task)) {
+    if (fibers.has(task)) {
       return
     }
     const loop = Effect.gen(function*() {
-      while ((yield* watchOnce(host, dir)) === "read again") {
+      while ((yield* watchOnce(host, dir, busy)) === "read again") {
         yield* Effect.yieldNow
       }
     }).pipe(
       Effect.catchTag("ChatToolError", (error) => Effect.sync(() => host.say("orc stopped reading " + task + "'s decision board: " + error.message))),
-      Effect.ensuring(Effect.sync(() => watching.delete(task)))
+      Effect.ensuring(Effect.sync(() => fibers.delete(task)))
     )
-    // The fiber yields before its first poll, so it is in the map before it can remove itself.
-    watching.set(task, { dir, fiber: Effect.runFork(Effect.yieldNow.pipe(Effect.andThen(loop))) })
+    fibers.set(task, { dir, fiber: Effect.runFork(Effect.yieldNow.pipe(Effect.andThen(loop))) })
   }
 
-  const reconcileOne = (task: string, dir: string): Effect.Effect<void, ChatToolError> =>
-    Effect.gen(function*() {
-      const record = yield* readRecord(dir)
-      const state = yield* refreshPage(host, dir, record)
-      if (state === "current") {
-        return
-      }
-      yield* host.launcher.end(boardFile(dir, "board.html")).pipe(Effect.catchTag("ChatToolError", () => Effect.void))
-      host.say(state === "closed" ? closedBoardLine(record) : staleBoardLine(record))
-      yield* stopWatching(task)
-    })
-
   const reconcileWatched: Effect.Effect<void> = Effect.suspend(() =>
-    Effect.forEach([...watching.keys()], (task) => {
-      const entry = watching.get(task)
+    Effect.forEach([...fibers.keys()], (task) => {
+      const entry = fibers.get(task)
       return entry === undefined
         ? Effect.void
-        : reconcileOne(task, entry.dir).pipe(
+        : reconcileOne(host, fibers, busy, task, entry.dir).pipe(
           Effect.catchTag("ChatToolError", (error) =>
             Effect.sync(() => host.say("orc stopped reading " + task + "'s decision board: " + error.message)).pipe(
-              Effect.andThen(stopWatching(task))
+              Effect.andThen(stopWatching(host, fibers, task))
             ))
         )
     }, { discard: true })
@@ -317,7 +355,8 @@ export const decisionBoards = (host: BoardHost): Boards => {
   const open = (input: BoardInput): Effect.Effect<string, ChatToolError> =>
     Effect.gen(function*() {
       const dir = yield* boardDir(input.id)
-      const task = yield* waitingTask(host, input.id)
+      const tasks = yield* host.tasks
+      const task = openFrom(tasks, input.id)
       if (task === null) {
         return yield* refuse(input.id + " is neither held nor parked for the captain, so it takes no decision board")
       }
@@ -325,24 +364,25 @@ export const decisionBoards = (host: BoardHost): Boards => {
       const board = yield* Effect.sync(() => crypto.randomUUID())
       const record: BoardRecord = { task: task.id, title: task.title, waits: task.waits, reason: task.reason, openedAt: host.now().toISOString(), board, cards }
       yield* writeBoard(dir, record, task)
-      const url = yield* host.launcher.open(boardFile(dir, "board.html"))
+      const session = yield* host.launcher.open(boardFile(dir, "board.html"))
       watch(task.id, dir)
-      return openedLine(record, cards.length, url)
+      return openedLine(record, cards.length, session.url, session.networkWarning)
     })
 
   const listOne = (dir: string): Effect.Effect<void, ChatToolError> =>
     Effect.gen(function*() {
       const record = yield* readRecord(dir)
-      const bound = yield* boundDecision(host, record)
+      const tasks = yield* host.tasks
+      const bound = boundFrom(tasks, record)
       if (bound !== null) {
         host.say(bound.id + " " + bound.title + " has a decision board open since " + record.openedAt + ", waiting on " + waitingOn(record, bound))
         return
       }
-      const raw = yield* rawTask(host, record.task)
+      const raw = rawFrom(tasks, record.task)
       if (raw === null || openDecision(raw) !== null) {
         return
       }
-      yield* writeAtomic(boardFile(dir, "board.html"), boardHtml(record, completedWords(record, raw)))
+      yield* writePageIfChanged(boardFile(dir, "board.html"), boardHtml(record, completedWords(record, raw)))
     })
 
   const listOpen = (host.dir === null ? Effect.succeed([]) : boardDirs(host.dir)).pipe(
@@ -353,7 +393,7 @@ export const decisionBoards = (host: BoardHost): Boards => {
     Effect.catchTag("ChatToolError", (error) => Effect.sync(() => host.say(error.message)))
   )
 
-  const stop = Effect.suspend(() => Effect.forEach([...watching.values()], (entry) => Fiber.interrupt(entry.fiber), { discard: true }))
+  const stop = Effect.suspend(() => Effect.forEach([...fibers.values()], (entry) => Fiber.interrupt(entry.fiber), { discard: true }))
 
   return { open, listOpen, reconcileWatched, stop }
 }

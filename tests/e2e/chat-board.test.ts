@@ -39,7 +39,7 @@ const fakeLavish = (boardsDir: string) => {
   const launcher: BoardLauncher = {
     open: (file) => Effect.sync(() => {
       opened.push(file)
-      return "http://127.0.0.1:4387/session/board-" + opened.length
+      return { url: "http://127.0.0.1:4387/session/board-" + opened.length, networkWarning: "" }
     }),
     poll: () => Effect.promise(() => new Promise<BoardPoll>((resolve) => {
       polls += 1
@@ -128,7 +128,7 @@ describe("orc chat decision boards", () => {
       await holdTwo(chat.call)
       const board = join(fixture.home, "boards", "task-1", "board.html")
       expect(await chat.call("orc_decision_board", twoCards)).toBe(
-        "opened task-1's decision board with 2 cards at http://127.0.0.1:4387/session/board-1. orc records each answer the captain sends from it, word for word, and keeps the task held until every card is answered."
+        "opened task-1's decision board with 2 cards at http://127.0.0.1:4387/session/board-1. orc records each answer the captain sends from it, word for word, and keeps the task held until every card is answered. The board opens only on this machine."
       )
       expect(lavish.opened).toEqual([board])
       lavish.answer("question-1", "gRPC")
@@ -172,7 +172,7 @@ describe("orc chat decision boards", () => {
         { question: "question-4", options: ["keep three", "drop them"], recommended: "keep three" },
         { question: "question-5", options: ["30s", "2m"], recommended: "30s" }
       ]
-      expect(await chat.call("orc_decision_board", { id: "task-1", cards })).toEndWith("keeps the task parked until every card is answered.")
+      expect(await chat.call("orc_decision_board", { id: "task-1", cards })).toBe("opened task-1's decision board with 2 cards at http://127.0.0.1:4387/session/board-1. orc records each answer the captain sends from it, word for word, and keeps the task parked until every card is answered. The board opens only on this machine.")
       lavish.answer("question-4", "drop them")
       await until(() => chat.boardLines().length === 1)
       expect(chat.boardLines()).toEqual(["From task-1's decision board, Keep the retries? drop them: answered question-4 on task-1, and it stays parked for question-5"])

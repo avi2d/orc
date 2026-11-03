@@ -3,7 +3,7 @@ import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect } from "effect"
-import { lavishLauncher } from "../../packages/run/src/chat-lavish"
+import { boardHostAddress, lavishLauncher, pickBoardHost } from "../../packages/run/src/chat-lavish"
 
 const feedback = [
   "session:",
@@ -65,8 +65,59 @@ describe("the lavish-axi launcher", () => {
 
   test("opening reads the session URL and never asks lavish-axi to publish or open a browser", async () => {
     await withLavish(opened, async (env, log) => {
-      expect(await Effect.runPromise(lavishLauncher(env).open("/tmp/board.html"))).toBe("http://127.0.0.1:4387/session/f11db70733bf420a")
+      expect(await Effect.runPromise(lavishLauncher(env).open("/tmp/board.html"))).toEqual({
+        url: "http://127.0.0.1:4387/session/f11db70733bf420a",
+        networkWarning: ""
+      })
       expect(await Bun.file(log).text()).toBe("/tmp/board.html\n--no-open\n--reopen\n")
     })
+  })
+
+  test("opening keeps a network warning lavish-axi reports instead of dropping it", async () => {
+    await withLavish(opened + "\nnetwork_warning: \"192.168.1.62 is unreachable from here\"", async (env) => {
+      expect(await Effect.runPromise(lavishLauncher(env).open("/tmp/board.html"))).toEqual({
+        url: "http://127.0.0.1:4387/session/f11db70733bf420a",
+        networkWarning: "192.168.1.62 is unreachable from here"
+      })
+    })
+  })
+})
+
+describe("the board host choice", () => {
+  const table = {
+    lo: [{ address: "127.0.0.1", family: "IPv4" as const, internal: true }],
+    tail: [{ address: "100.64.0.7", family: "IPv4" as const, internal: false }],
+    ten: [{ address: "10.0.2.15", family: "IPv4" as const, internal: false }],
+    lan: [{ address: "172.16.4.9", family: "IPv4" as const, internal: false }],
+    home: [{ address: "192.168.1.62", family: "IPv4" as const, internal: false }]
+  }
+
+  test("a home LAN address wins over a tailnet name, a 10 address and a 172.16 address, and loopback never binds", async () => {
+    expect(pickBoardHost(table)).toBe("192.168.1.62")
+    expect(pickBoardHost({ lo: table.lo, tail: table.tail, ten: table.ten, lan: table.lan })).toBe("10.0.2.15")
+    expect(pickBoardHost({ lo: table.lo, tail: table.tail, lan: table.lan })).toBe("172.16.4.9")
+    expect(pickBoardHost({ lo: table.lo, tail: table.tail })).toBeNull()
+  })
+
+  test("ORC_BOARD_HOST names the bound address as given instead of the picked LAN address", async () => {
+    expect(boardHostAddress({ ORC_BOARD_HOST: "captain.lan" }, table)).toBe("captain.lan")
+    expect(boardHostAddress({ ORC_BOARD_HOST: "127.0.0.1" }, table)).toBe("127.0.0.1")
+    expect(boardHostAddress({ ORC_BOARD_HOST: "  " }, table)).toBe("192.168.1.62")
+    expect(boardHostAddress({}, { lo: table.lo })).toBe("127.0.0.1")
+  })
+
+  test("the launcher hands its bound address to lavish-axi in LAVISH_AXI_HOST instead of leaving it unset", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-lavish-host-"))
+    try {
+      const seen = join(dir, "host.txt")
+      await writeFile(join(dir, "out.txt"), opened)
+      await writeFile(join(dir, "lavish-axi"), "#!/bin/sh\nprintf '%s' \"$LAVISH_AXI_HOST\" > '" + seen + "'\ncat '" + join(dir, "out.txt") + "'\n")
+      await chmod(join(dir, "lavish-axi"), 0o755)
+      const env = { PATH: dir + ":" + (process.env.PATH ?? ""), ORC_BOARD_HOST: "captain.lan" }
+      expect((await Effect.runPromise(lavishLauncher(env).open("/tmp/board.html"))).url).toBe("http://127.0.0.1:4387/session/f11db70733bf420a")
+      expect(await Bun.file(seen).text()).toBe("captain.lan")
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })

@@ -202,7 +202,7 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
     name: "orc_decision_board",
     label: "Open a decision board for a held orc task",
     description:
-      "Opens a Lavish decision board in the browser for one held task, with one card per open question on its hold, each with options and the option you recommend, and returns its local URL for the captain. orc records each card the captain answers there through orc backlog answer, word for word, posts what it recorded here, and releases the task only once every card is answered. The board stays on this machine and is never published.",
+      "Opens a Lavish decision board in the browser for one held task, with one card per open question on its hold, each with options and the option you recommend, and returns its URL for the captain. Anyone on the same network who holds the link can open it and submit answers, which orc records as the captain's through orc backlog answer, word for word, because the page has no login. orc posts what it recorded here, and releases the task only once every card is answered. The board is never published through lavish-axi share, a third-party host, or a public tunnel.",
     parameters: Schema.toJsonSchemaDocument(BoardInput).schema,
     execute: (_toolCallId, params) =>
       Effect.runPromise(decodeInput(BoardInput, "orc_decision_board", params).pipe(Effect.flatMap(boards.open), Effect.map(textResult)))

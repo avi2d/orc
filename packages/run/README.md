@@ -595,7 +595,14 @@ The chat's Pi loads your Pi settings and packages, so a provider a package adds 
 `orc_decision_board` writes one card per open question on a held or parked task into `<ORC_HOME>/boards/<task-id>/board.html`.
 Each card has its options and the option the chat recommends.
 A task held with a reason and no questions gets one card for the reason.
-The chat opens the page with `lavish-axi <board.html> --no-open --reopen` and posts the local URL, so the board stays on this machine and nothing is published.
+The chat opens the page with `lavish-axi <board.html> --no-open --reopen` and posts its URL on this machine's LAN address, so another device on the same Wi-Fi opens it from the link.
+Anyone on the same network who holds the link can open the board and submit answers, which orc records as the captain's, because the page has no login.
+The board is never published through `lavish-axi share`, a third-party host, or a public tunnel.
+To name the address the board binds, set `ORC_BOARD_HOST` to a hostname or IP address.
+Orc passes it to `lavish-axi` as `LAVISH_AXI_HOST`, which binds that address plus loopback and prints the session link on it.
+An unset `ORC_BOARD_HOST` binds this machine's private LAN IPv4 address, preferring 192.168.0.0/16, then 10.0.0.0/8, then 172.16.0.0/12, and never the 100.64.0.0/10 tailnet range, and `127.0.0.1` keeps boards on this machine.
+When no LAN address exists and the setting is unset, the board opens only on this machine.
+When `lavish-axi` reports the address could not be bound, the chat passes its warning on in the opened line.
 The page loads the Tailwind and DaisyUI styles Lavish recommends from the jsDelivr CDN.
 Each card you answer is recorded through `orc backlog answer`, word for word as the option reads.
 Words you add on the card follow the option after ` — `, as you wrote them.
