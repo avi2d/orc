@@ -293,7 +293,7 @@ const stopWatching = (host: BoardHost, fibers: BoardFibers, task: string): Effec
     yield* Fiber.interrupt(entry.fiber)
   })
 
-const reconcileOne = (host: BoardHost, fibers: BoardFibers, task: string, dir: string): Effect.Effect<void, ChatToolError> =>
+const reconcileOne = (host: BoardHost, fibers: BoardFibers, task: string, dir: string): Effect.Effect<void> =>
   Effect.gen(function*() {
     const entry = fibers.get(task)
     if (entry === undefined) {
@@ -312,7 +312,12 @@ const reconcileOne = (host: BoardHost, fibers: BoardFibers, task: string, dir: s
       yield* host.launcher.end(boardFile(dir, "board.html")).pipe(Effect.catchTag("ChatToolError", () => Effect.void))
       host.say(state === "closed" ? closedBoardLine(record) : staleBoardLine(record))
       yield* stopWatching(host, fibers, task)
-    }))
+    }).pipe(
+      Effect.catchTag("ChatToolError", (error) =>
+        Effect.sync(() => host.say("orc stopped reading " + task + "'s decision board: " + error.message)).pipe(
+          Effect.andThen(stopWatching(host, fibers, task))
+        ))
+    ))
   })
 
 export const decisionBoards = (host: BoardHost): Boards => {
@@ -336,14 +341,7 @@ export const decisionBoards = (host: BoardHost): Boards => {
   const reconcileWatched: Effect.Effect<void> = Effect.suspend(() =>
     Effect.forEach([...fibers.keys()], (task) => {
       const entry = fibers.get(task)
-      return entry === undefined
-        ? Effect.void
-        : reconcileOne(host, fibers, task, entry.dir).pipe(
-          Effect.catchTag("ChatToolError", (error) =>
-            Effect.sync(() => host.say("orc stopped reading " + task + "'s decision board: " + error.message)).pipe(
-              Effect.andThen(stopWatching(host, fibers, task))
-            ))
-        )
+      return entry === undefined ? Effect.void : reconcileOne(host, fibers, task, entry.dir)
     }, { discard: true })
   )
 
