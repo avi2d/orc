@@ -172,6 +172,13 @@ describe("the dispatch view", () => {
     });
   });
 
+  test("a project naming upstream URLs reads as the same project instead of making the project list unread", async () => {
+    await withBacklog(async (root) => {
+      await writeFile(join(root, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: "/Users/a/orc" }, upstream: ["https://github.com/acme/orc/pull/7"] }] }));
+      expect(snapshotOf(await readBacklog(root)).projects).toEqual({ kind: "ok", value: [{ name: "orc", checkouts: { mac: "/Users/a/orc" } }] });
+    });
+  });
+
   test("an inherited property is not a checkout", async () => {
     const root = await mkdtemp(join(tmpdir(), "orc-dispatch-"));
     try {

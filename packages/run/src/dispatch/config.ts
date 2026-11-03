@@ -90,10 +90,24 @@ const RawProject = Schema.Struct({
   checkouts: Schema.Record(Name, AbsolutePath),
   mode: Schema.optionalKey(Schema.String),
   yolo: Schema.optionalKey(Schema.Unknown),
-  instructions: Schema.optionalKey(Schema.Unknown)
+  instructions: Schema.optionalKey(Schema.Unknown),
+  upstream: Schema.optionalKey(Schema.Unknown)
 })
 type RawProject = typeof RawProject.Type
-export type Project = Omit<RawProject, "mode" | "yolo" | "instructions"> & { readonly mode?: DeliveryMode; readonly yolo?: boolean; readonly instructions?: string }
+
+export interface Contribution {
+  readonly url: string
+  readonly owner: string
+  readonly repo: string
+  readonly number: number
+}
+
+export type Project = Omit<RawProject, "mode" | "yolo" | "instructions" | "upstream"> & {
+  readonly mode?: DeliveryMode
+  readonly yolo?: boolean
+  readonly instructions?: string
+  readonly upstream?: ReadonlyArray<Contribution>
+}
 
 export const modeOf = (project: Project): DeliveryMode => project.mode ?? "no-mistakes"
 
@@ -109,6 +123,27 @@ const parsedInstructions = (project: { readonly name: string; readonly instructi
   return instructions === undefined ? { name } : { name, instructions }
 }
 
+const contributionPattern = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)\/(?:issues|pull)\/([1-9]\d*)$/
+
+const notUpstream = (name: string, value: unknown): string =>
+  "the project " + name + " names upstream " + JSON.stringify(value) + ", which is not a list of GitHub issue or pull request URLs"
+
+const parsedUpstream = (name: string, upstream: unknown): ReadonlyArray<Contribution> | string => {
+  if (!Array.isArray(upstream)) {
+    return notUpstream(name, upstream)
+  }
+  const contributions: Array<Contribution> = []
+  for (const entry of upstream) {
+    const match = typeof entry === "string" ? contributionPattern.exec(entry) : null
+    if (match === null) {
+      return "the project " + name + " names the upstream entry " + JSON.stringify(entry) + ", which is not a GitHub issue or pull request URL such as https://github.com/owner/repo/pull/12"
+    }
+    contributions.push({ url: match[0], owner: match[1], repo: match[2], number: Number(match[3]) })
+  }
+  const twice = duplicateOf(contributions.map((contribution) => contribution.url))
+  return twice === null ? contributions : "the project " + name + " names the upstream URL " + twice + " twice"
+}
+
 const checkedProject = (project: RawProject): Project | string => {
   const { mode, yolo } = project
   if (mode !== undefined && !isDeliveryMode(mode)) {
@@ -121,7 +156,18 @@ const checkedProject = (project: RawProject): Project | string => {
   if (typeof parsed === "string") {
     return parsed
   }
-  return { name: project.name, checkouts: project.checkouts, ...(mode === undefined ? {} : { mode }), ...(yolo === undefined ? {} : { yolo }), ...(parsed.instructions === undefined ? {} : { instructions: parsed.instructions }) }
+  const upstream = project.upstream === undefined ? undefined : parsedUpstream(project.name, project.upstream)
+  if (typeof upstream === "string") {
+    return upstream
+  }
+  return {
+    name: project.name,
+    checkouts: project.checkouts,
+    ...(mode === undefined ? {} : { mode }),
+    ...(yolo === undefined ? {} : { yolo }),
+    ...(parsed.instructions === undefined ? {} : { instructions: parsed.instructions }),
+    ...(upstream === undefined ? {} : { upstream })
+  }
 }
 
 const instructionsFile = <T extends ParsedInstructions>(file: string, project: T): Effect.Effect<T, ConfigError, FileSystem.FileSystem | Path.Path> =>
