@@ -28,8 +28,6 @@ const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>, kind: 
   return queuedArgs(fixture)
 }
 
-const keptNoGit = (fixture: Fixture): string => "did not refresh " + fixture.checkout + " because it is no git checkout, so the run starts from what it holds\n"
-
 const pueueAddFor = (home: string, checkout: string): ReadonlyArray<string> => [
   "--group", "orc", "--label", home + " task-1", "--working-directory", checkout, "--print-task-id", "--escape", "--",
   process.execPath, binPath, "run", join(home, "runner", "task-1.md"), "--branch", "orc/task-1",
@@ -240,7 +238,7 @@ describe("orc runner start", () => {
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
       const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# x\n" })
       expect(result.exitCode).toBe(0)
-      expect(result.stdout).toBe(keptNoGit(fixture) + "queued task-9 as pueue task 77 in group orc\n")
+      expect(result.stdout).toBe("queued task-9 as pueue task 77 in group orc\n")
       expect((await readFile(join(fixture.pueue, "group-add-args"), "utf8")).split("\n").slice(0, -1)).toEqual(["group", "add", "orc"])
     })
   }, runnerTimeout)
@@ -273,7 +271,7 @@ describe("orc runner start", () => {
       await writeFile(join(fixture.pueue, "race-add"), "")
       const result = await queueWith(fixture, { task: "task-9", checkout: fixture.checkout, provider: "acme", tokenFile: mainToken, body: "# x\n" })
       expect(result.exitCode).toBe(0)
-      expect(result.stdout).toBe(keptNoGit(fixture) + "queued task-9 as pueue task 77 in group orc\n")
+      expect(result.stdout).toBe("queued task-9 as pueue task 77 in group orc\n")
     })
   }, runnerTimeout)
 
@@ -298,8 +296,8 @@ describe("orc runner start", () => {
       const [first, second] = await queued
       expect(first.exitCode).toBe(0)
       expect(second.exitCode).toBe(0)
-      expect(first.stdout).toMatch(/^did not refresh .*\nqueued task-9 as pueue task 7[78] in group orc\n$/)
-      expect(second.stdout).toMatch(/^did not refresh .*\nqueued task-10 as pueue task 7[78] in group orc\n$/)
+      expect(first.stdout).toMatch(/^queued task-9 as pueue task 7[78] in group orc\n$/)
+      expect(second.stdout).toMatch(/^queued task-10 as pueue task 7[78] in group orc\n$/)
       const added = (await readFile(join(fixture.pueue, "added-tasks"), "utf8")).split("\n").slice(0, -1)
       expect(added).toHaveLength(2)
       expect(added.some((line) => line.endsWith(" task-9 orc 77") || line.endsWith(" task-9 orc 78"))).toBe(true)

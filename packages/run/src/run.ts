@@ -1,5 +1,5 @@
 import { createSandbox, type Sandbox } from "@ai-hero/sandcastle"
-import { Effect, FileSystem, Path, type Scope } from "effect"
+import { Console, Effect, FileSystem, Path, type Scope } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { Database } from "bun:sqlite"
 import { homedir } from "node:os"
@@ -13,7 +13,7 @@ import { routeOfAgents } from "./model-route"
 import { readOrcConfig } from "./orc-config"
 import { planSandbox, type SandboxPlan } from "./sandbox-plan"
 import { type Checkout, openCheckout, parseRefuseMarkers } from "./checkout"
-import { refreshCheckout } from "./dispatch/refresh"
+import { formatRefresh, refreshCheckout } from "./dispatch/refresh"
 import { orcCompletionLine } from "./pi"
 import { OrcRunError, describeCause } from "./run-session"
 import { openDatabase, orcHomeDir, updateStep } from "./run-history"
@@ -238,7 +238,7 @@ const openRun = (
     const runId = request.runId ?? newRunId()
     const git = yield* openHostGit(fs, path)
     const checkout = yield* openCheckout(fs, path, spawner, git, request.cwd, request.branch, runId, parseRefuseMarkers(Bun.env.ORC_REFUSE_MARKERS))
-    yield* refreshCheckout(checkout.projectDir)
+    yield* Console.log(formatRefresh(checkout.projectDir, yield* refreshCheckout(checkout.projectDir)))
     const runDir = runDirFor(home, runId)
     const { taskFile: effectiveTaskFile, sandbox: sandboxKind } = yield* readRunStart(fs, home, checkout, request)
     return { fs, path, spawner, home, runId, git, checkout, runDir, effectiveTaskFile, sandboxKind }

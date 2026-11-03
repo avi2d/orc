@@ -584,7 +584,7 @@ The chat's Pi loads your Pi settings and packages, so a provider a package adds 
 The run then outlives the beat, the dispatcher and any SSH link to it.
 It reads the task from the beat's `ORC_TASK_*` variables and queues `orc run` in the checkout on branch `orc/<task-id>`, in the pueue group `orc`.
 The run takes `--sandbox none --provider <provider> --token-file <path>` when the account holds a token file or token, and `--sandbox none --provider <provider>` with no token file when the account is kind `none`, so it runs on the picked account and refuses an implementer on any other provider.
-Before it queues the run, the runner fast-forwards the checkout's default branch from its remote, or says in the task log why not.
+When the run starts, it fast-forwards the checkout's default branch from its remote, or says in its output why not.
 The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
 The runner creates the `orc` group when the machine lacks it.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
@@ -669,7 +669,7 @@ To print the five minute load average the beat compares against a load limit, ru
 | `src/dispatch/stall.ts` | The stalled run flag kept in the backlog logs |
 | `src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
 | `src/dispatch/runner.ts` | The runner: the start and the token renewal through pueue |
-| `src/dispatch/refresh.ts` | The fast-forward of the checkout's default branch before a run is queued |
+| `src/dispatch/refresh.ts` | The fast-forward of the checkout's default branch when a run starts |
 | `src/dispatch/runner-result.ts` | The reading of a task's result and the `orc.runner.v1` JSON |
 | `src/dispatch/token.ts` | The `orc.token.v1` document, the token command and the clauth session reading |
 | `src/dispatch/held-token.ts` | The owner-only token folder a run on another machine reads |

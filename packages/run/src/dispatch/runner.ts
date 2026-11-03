@@ -6,7 +6,6 @@ import { ProviderId, readOrcConfig } from "../orc-config"
 import { TaskId } from "./backlog"
 import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldToken } from "./held-token"
 import { heldTask, orcGroup, PueueState, PueueStatus, taskLabel, type PueueTask } from "./pueue-status"
-import { formatRefresh, refreshCheckout } from "./refresh"
 import { parseTaskFile } from "./task-record"
 import { reportKinds } from "../task-kind"
 import { isRunDelivery } from "../delivery"
@@ -228,14 +227,13 @@ const queueTask = (
     const add = (command: ReadonlyArray<string>) =>
       pueue(["add", "--group", orcGroup, "--label", label, "--working-directory", project, "--print-task-id", "--escape", "--", ...command], { ORC_HOME: home })
     const holdArgs: ReadonlyArray<string> = label === taskLabel(home, request.task) ? [request.task] : [request.task, "--label", label]
-    const refreshed = formatRefresh(project, yield* refreshCheckout(project)) + "\n"
     if ("tokenFile" in request) {
       const id = yield* add([...run, "--token-file", request.tokenFile])
-      return refreshed + "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
+      return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
     }
     if (!("token" in request)) {
       const id = yield* add([...run])
-      return refreshed + "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
+      return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
     }
     const dir = yield* holdToken(home, key, request).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "cannot hold the token for " + request.task + ": " + error.message })),
@@ -245,7 +243,7 @@ const queueTask = (
       Effect.tapError(() => releaseHeldToken(home, key))
     )
     yield* guardQueued(home, id.trim(), dir).pipe(Effect.tapError(() => releaseHeldToken(home, key)))
-    return refreshed + "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
+    return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
   })
 
 export const queueFromText = (text: string, self: Command, home: string): Effect.Effect<string, RunnerError, RunnerRequirements> =>

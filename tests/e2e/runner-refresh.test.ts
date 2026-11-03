@@ -1,161 +1,137 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, realpath, writeFile } from "node:fs/promises"
+import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { type Fixture, mainToken, type OrcResult, runnerTimeout, runOrc, withFixture } from "./runner-helpers"
+import { git, runOrc, withNoSandboxFixture, type NoSandboxFixture, writeScript } from "./no-sandbox-fixture"
 
-const realGit = Bun.which("git") ?? "git"
+const runTimeout = 60_000
 
-const gitEnv = { GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" }
+const branchOf = (fixture: NoSandboxFixture): string =>
+  git(fixture.repo, ["symbolic-ref", "--short", "HEAD"], fixture.env)
 
-const git = (dir: string, args: ReadonlyArray<string>): string => {
-  const result = Bun.spawnSync([realGit, ...args], { cwd: dir, env: { ...process.env, ...gitEnv } })
-  if (result.exitCode !== 0) {
-    throw new Error("the git fixture failed: git " + args.join(" ") + ": " + result.stderr.toString())
-  }
-  return result.stdout.toString().trim()
+const withUpstream = (fixture: NoSandboxFixture, branch: string): string => {
+  const origin = join(fixture.fakeBin, "..", "origin.git")
+  git(fixture.fakeBin, ["init", "-q", "--bare", "--initial-branch=" + branch, origin], fixture.env)
+  git(fixture.repo, ["remote", "add", "origin", origin], fixture.env)
+  git(fixture.repo, ["push", "-q", "origin", branch], fixture.env)
+  const upstream = join(fixture.fakeBin, "..", "upstream")
+  git(fixture.fakeBin, ["clone", "-q", origin, upstream], fixture.env)
+  git(upstream, ["config", "user.name", "orc test"], fixture.env)
+  git(upstream, ["config", "user.email", "orc@test.invalid"], fixture.env)
+  return upstream
 }
 
-interface Remote {
-  readonly bare: string
-  readonly checkout: string
-  readonly upstream: string
+const pushUpstream = async (fixture: NoSandboxFixture, upstream: string, branch: string, subject: string): Promise<string> => {
+  await writeFile(join(upstream, subject.replace(/\s+/g, "-") + ".txt"), subject + "\n")
+  git(upstream, ["add", subject.replace(/\s+/g, "-") + ".txt"], fixture.env)
+  git(upstream, ["commit", "-qm", subject], fixture.env)
+  git(upstream, ["push", "-q", "origin", branch], fixture.env)
+  return git(upstream, ["rev-parse", "HEAD"], fixture.env)
 }
 
-const cloneAs = (fixture: Fixture, bare: string, name: string): string => {
-  git(fixture.dir, ["clone", "-q", bare, name])
-  const dir = join(fixture.dir, name)
-  git(dir, ["config", "user.name", "orc test"])
-  git(dir, ["config", "user.email", "orc@test.invalid"])
-  return dir
-}
+const runIt = (fixture: NoSandboxFixture): Promise<{ exitCode: number; stdout: string; stderr: string }> =>
+  runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, fixture.env)
 
-const commitIn = async (dir: string, file: string, subject: string): Promise<string> => {
-  await writeFile(join(dir, file), subject + "\n")
-  git(dir, ["add", file])
-  git(dir, ["commit", "-qm", subject])
-  return git(dir, ["rev-parse", "HEAD"])
-}
-
-const withRemote = async (fixture: Fixture): Promise<Remote> => {
-  const bare = join(fixture.dir, "remote.git")
-  const upstream = join(fixture.dir, "upstream")
-  git(fixture.dir, ["init", "-q", "--bare", "--initial-branch=main", bare])
-  cloneAs(fixture, bare, "upstream")
-  git(upstream, ["switch", "-q", "-c", "main"])
-  await commitIn(upstream, "seed.txt", "seed")
-  git(upstream, ["push", "-q", "origin", "main"])
-  return { bare, upstream, checkout: await realpath(cloneAs(fixture, bare, "work")) }
-}
-
-const pushUpstream = async (remote: Remote, subject: string): Promise<string> => {
-  const sha = await commitIn(remote.upstream, subject.replace(/\s+/g, "-") + ".txt", subject)
-  git(remote.upstream, ["push", "-q", "origin", "main"])
-  return sha
-}
-
-const logGitCalls = async (fixture: Fixture): Promise<string> => {
-  const calls = join(fixture.dir, "git-calls")
-  await writeFile(join(fixture.dir, "bin", "git"), "#!/bin/sh\nprintf '%s\\n' \"$*\" >> '" + calls + "'\nexec '" + realGit + "' \"$@\"\n")
-  await chmod(join(fixture.dir, "bin", "git"), 0o755)
+const logGitCalls = async (fixture: NoSandboxFixture): Promise<string> => {
+  const realGit = Bun.which("git") ?? "git"
+  const calls = join(fixture.fakeBin, "..", "git-calls")
+  await writeScript(join(fixture.fakeBin, "git"), [
+    "printf '%s\\n' \"$*\" >> '" + calls + "'",
+    "exec '" + realGit + "' \"$@\""
+  ])
   return calls
 }
 
-const networkCalls = async (calls: string): Promise<ReadonlyArray<string>> =>
-  (await Bun.file(calls).text()).split("\n").filter((line) => /^(fetch|pull|ls-remote|remote update)\b/.test(line))
+const fetchCalls = async (calls: string): Promise<ReadonlyArray<string>> =>
+  (await Bun.file(calls).text()).split("\n").filter((line) => line.includes("fetch --quiet"))
 
-interface Snapshot {
-  readonly branch: string
-  readonly head: string
-  readonly main: string
-  readonly status: string
-}
-
-const snapshot = (checkout: string): Snapshot => ({
-  branch: git(checkout, ["rev-parse", "--abbrev-ref", "HEAD"]),
-  head: git(checkout, ["rev-parse", "HEAD"]),
-  main: git(checkout, ["rev-parse", "refs/heads/main"]),
-  status: git(checkout, ["status", "--porcelain"])
-})
-
-const queueIn = (fixture: Fixture, checkout: string): Promise<OrcResult> =>
-  runOrc(fixture, ["runner", "queue"], {}, JSON.stringify({ task: "task-9", checkout, provider: "acme", tokenFile: mainToken, body: "# x\n" }))
-
-const queuedTo = (result: OrcResult): void => {
-  expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: "" })
-  expect(result.stdout).toEndWith("queued task-9 as pueue task 77 in group orc\n")
-}
-
-const expectKept = async (fixture: Fixture, checkout: string, reason: string): Promise<void> => {
-  const before = snapshot(checkout)
-  const result = await queueIn(fixture, checkout)
-  queuedTo(result)
-  expect(result.stdout).toBe("did not refresh " + checkout + " because " + reason + ", so the run starts from what it holds\nqueued task-9 as pueue task 77 in group orc\n")
-  expect(snapshot(checkout)).toEqual(before)
-}
-
-describe("orc runner queue refreshes the checkout", () => {
-  test("a checkout behind its remote is fast-forwarded to the remote tip before the run is queued, not left behind", async () => {
-    await withFixture(async (fixture) => {
-      const remote = await withRemote(fixture)
-      const old = git(remote.checkout, ["rev-parse", "HEAD"])
-      const tip = await pushUpstream(remote, "upstream change")
-      const result = await queueIn(fixture, remote.checkout)
-      queuedTo(result)
-      expect(result.stdout).toStartWith("fast-forwarded main in " + remote.checkout + " from " + old.slice(0, 7) + " to " + tip.slice(0, 7) + " on origin\n")
-      expect(snapshot(remote.checkout)).toEqual({ branch: "main", head: tip, main: tip, status: "" })
+describe("orc run refreshes the checkout", () => {
+  test("a checkout behind its remote is fast-forwarded to the remote tip, and the run branches from the new tip instead of the stale one", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const branch = branchOf(fixture)
+      const upstream = withUpstream(fixture, branch)
+      const old = git(fixture.repo, ["rev-parse", "HEAD"], fixture.env)
+      const tip = await pushUpstream(fixture, upstream, branch, "upstream change")
+      const result = await runIt(fixture)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect(result.stdout).toStartWith("fast-forwarded " + branch + " in " + fixture.repo + " from " + old.slice(0, 7) + " to " + tip.slice(0, 7) + " on origin\n")
+      expect(git(fixture.repo, ["rev-parse", branch], fixture.env)).toBe(tip)
+      expect(git(fixture.repo, ["log", "orc/test", "--format=%s"], fixture.env).split("\n")).toEqual(["add greeting", "upstream change", "task"])
     })
-  }, runnerTimeout)
+  }, runTimeout)
 
   test("a current checkout costs one fetch and no other network call, and is left as it was", async () => {
-    await withFixture(async (fixture) => {
-      const remote = await withRemote(fixture)
-      const before = snapshot(remote.checkout)
+    await withNoSandboxFixture(async (fixture) => {
+      const branch = branchOf(fixture)
+      withUpstream(fixture, branch)
       const calls = await logGitCalls(fixture)
-      const result = await queueIn(fixture, remote.checkout)
-      queuedTo(result)
-      expect(result.stdout).toStartWith("main in " + remote.checkout + " is current with origin at " + before.head.slice(0, 7) + "\n")
-      expect(await networkCalls(calls)).toEqual(["fetch --quiet --no-recurse-submodules origin"])
-      expect(snapshot(remote.checkout)).toEqual(before)
+      const before = git(fixture.repo, ["rev-parse", "HEAD"], fixture.env)
+      const result = await runIt(fixture)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect(result.stdout).toStartWith(branch + " in " + fixture.repo + " is current with origin at " + before.slice(0, 7) + "\n")
+      expect(await fetchCalls(calls)).toHaveLength(1)
+      expect(git(fixture.repo, ["rev-parse", "HEAD"], fixture.env)).toBe(before)
     })
-  }, runnerTimeout)
+  }, runTimeout)
 
-  test("a dirty checkout keeps its change and its commit instead of being reset to the remote", async () => {
-    await withFixture(async (fixture) => {
-      const remote = await withRemote(fixture)
-      await pushUpstream(remote, "upstream change")
-      await writeFile(join(remote.checkout, "seed.txt"), "local edit\n")
-      await expectKept(fixture, remote.checkout, "it holds 1 uncommitted change")
+  test("a dirty checkout is refused before the refresh instead of being reset to the remote", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const branch = branchOf(fixture)
+      const upstream = withUpstream(fixture, branch)
+      await pushUpstream(fixture, upstream, branch, "upstream change")
+      const before = git(fixture.repo, ["rev-parse", "HEAD"], fixture.env)
+      await writeFile(join(fixture.repo, "task.md"), "a local edit\n")
+      const result = await runIt(fixture)
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain("holds 1 uncommitted change")
+      expect(result.stdout).toBe("")
+      expect(git(fixture.repo, ["rev-parse", "HEAD"], fixture.env)).toBe(before)
+      expect(git(fixture.repo, ["status", "--porcelain"], fixture.env)).not.toBe("")
     })
-  }, runnerTimeout)
+  }, runTimeout)
 
-  test("a diverged checkout keeps its local commit instead of being rebased or reset", async () => {
-    await withFixture(async (fixture) => {
-      const remote = await withRemote(fixture)
-      await pushUpstream(remote, "upstream change")
-      await commitIn(remote.checkout, "local.txt", "local change")
-      await expectKept(fixture, remote.checkout, "main has diverged from origin/main")
+  test("a diverged checkout keeps its local commit and still runs from what it holds instead of being rebased", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const branch = branchOf(fixture)
+      const upstream = withUpstream(fixture, branch)
+      await pushUpstream(fixture, upstream, branch, "upstream change")
+      await writeFile(join(fixture.repo, "local.txt"), "local\n")
+      git(fixture.repo, ["add", "local.txt"], fixture.env)
+      git(fixture.repo, ["commit", "-qm", "local change"], fixture.env)
+      const local = git(fixture.repo, ["rev-parse", "HEAD"], fixture.env)
+      const result = await runIt(fixture)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect(result.stdout).toContain("did not refresh " + fixture.repo + " because " + branch + " has diverged from origin/" + branch + ", so the run starts from what it holds\n")
+      expect(git(fixture.repo, ["rev-parse", branch], fixture.env)).toBe(local)
+      expect(git(fixture.repo, ["log", "orc/test", "--format=%s"], fixture.env).split("\n")).toEqual(["add greeting", "local change", "task"])
     })
-  }, runnerTimeout)
+  }, runTimeout)
 
-  test("a checkout on another branch stays on it and leaves main where it was instead of switching", async () => {
-    await withFixture(async (fixture) => {
-      const remote = await withRemote(fixture)
-      await pushUpstream(remote, "upstream change")
-      git(remote.checkout, ["switch", "-q", "-c", "feature"])
-      await expectKept(fixture, remote.checkout, "it is on feature, not the default branch main")
+  test("a checkout on another branch stays on it and leaves the default branch where it was instead of switching", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const branch = branchOf(fixture)
+      const upstream = withUpstream(fixture, branch)
+      await pushUpstream(fixture, upstream, branch, "upstream change")
+      const main = git(fixture.repo, ["rev-parse", branch], fixture.env)
+      git(fixture.repo, ["switch", "-q", "-c", "feature"], fixture.env)
+      const result = await runIt(fixture)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect(result.stdout).toContain("did not refresh " + fixture.repo + " because it is on feature, not the default branch " + branch + ", so the run starts from what it holds\n")
+      expect(git(fixture.repo, ["rev-parse", branch], fixture.env)).toBe(main)
+      expect(git(fixture.repo, ["symbolic-ref", "--short", "HEAD"], fixture.env)).toBe("feature")
     })
-  }, runnerTimeout)
+  }, runTimeout)
 
-  test("a failed fetch still queues the run from what the checkout holds instead of refusing the start", async () => {
-    await withFixture(async (fixture) => {
-      const remote = await withRemote(fixture)
-      git(remote.checkout, ["remote", "set-url", "origin", join(fixture.dir, "gone.git")])
-      const before = snapshot(remote.checkout)
-      const result = await queueIn(fixture, remote.checkout)
-      queuedTo(result)
-      expect(result.stdout).toStartWith("did not refresh " + remote.checkout + " because git fetch origin failed: ")
-      expect(result.stdout).toContain(", so the run starts from what it holds\nqueued task-9")
-      expect(snapshot(remote.checkout)).toEqual(before)
+  test("a failed fetch still runs from what the checkout holds instead of refusing the start", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const branch = branchOf(fixture)
+      withUpstream(fixture, branch)
+      git(fixture.repo, ["remote", "set-url", "origin", join(fixture.fakeBin, "gone.git")], fixture.env)
+      const before = git(fixture.repo, ["rev-parse", "HEAD"], fixture.env)
+      const result = await runIt(fixture)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect(result.stdout).toStartWith("did not refresh " + fixture.repo + " because git fetch origin failed: ")
+      expect(result.stdout).toContain(", so the run starts from what it holds\n")
+      expect(git(fixture.repo, ["rev-parse", "HEAD"], fixture.env)).toBe(before)
     })
-  }, runnerTimeout)
+  }, runTimeout)
 })

@@ -38,8 +38,7 @@ const git = (gitBin: string, projectDir: string, args: ReadonlyArray<string>): E
     Effect.catch((error) => Effect.succeed({ exitCode: -1, stdout: "", stderr: "git did not run: " + error.message }))
   )
 
-const firstLine = (text: string): string => text.split("
-")[0] ?? ""
+const firstLine = (text: string): string => text.split("\n")[0] ?? ""
 
 const short = (sha: string): string => sha.slice(0, 7)
 
@@ -54,7 +53,7 @@ const refusedMarker = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
   projectDir: string
-): Effect.Effect<Kept | null, never, never> =>
+): Effect.Effect<Kept | null> =>
   Effect.gen(function*() {
     for (const marker of parseRefuseMarkers(Bun.env.ORC_REFUSE_MARKERS)) {
       for (const candidate of [path.join(projectDir, marker), path.join(path.dirname(projectDir), marker)]) {
@@ -105,17 +104,8 @@ const pickRemote = (listed: string): { readonly remote: string } | Kept => {
 }
 
 const fetchRemote = (gitBin: string, projectDir: string, remote: string): Effect.Effect<Kept | null, never, Requirements> =>
-  Effect.gen(function*() {
-    const fetched = yield* git(gitBin, projectDir, ["fetch", "--quiet", "--no-recurse-submodules", remote])
-    if (fetched.exitCode !== 0) {
-      return kept("git fetch " + remote + " failed: " + firstLine(fetched.stderr))
-    }
-    const setHead = yield* git(gitBin, projectDir, ["remote", "set-head", remote, "--auto"])
-    if (setHead.exitCode !== 0) {
-      return kept("git remote set-head " + remote + " --auto failed: " + firstLine(setHead.stderr))
-    }
-    return null
-  }).pipe(
+  git(gitBin, projectDir, ["-c", "remote." + remote + ".followRemoteHEAD=always", "fetch", "--quiet", "--no-recurse-submodules", remote]).pipe(
+    Effect.map((fetched) => fetched.exitCode === 0 ? null : kept("git fetch " + remote + " failed: " + firstLine(fetched.stderr))),
     Effect.timeoutOrElse({
       duration: Duration.seconds(fetchSeconds),
       orElse: () => Effect.succeed(kept("git fetch " + remote + " ran past " + fetchSeconds + " seconds"))
