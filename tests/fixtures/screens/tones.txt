@@ -1,0 +1,15 @@
+primary #60aaf3
+accent #66cfe1
+warning #e3b667
+error #ed7473
+success #68ca80
+foreground #d3d8e1
+muted #969aa3
+subtle #adb1ba
+faint #5c6370
+focus #8cc4ff
+pick #2d4f7c
+held #2c323d
+claude #d97757
+codex #60aaf3
+opencodeGo #66cfe1

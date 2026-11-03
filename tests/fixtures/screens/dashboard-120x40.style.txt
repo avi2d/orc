@@ -1,0 +1,60 @@
+1  foreground on pick
+2  primary on pick
+3  warning on pick
+a  accent
+A  accent bold
+C  claude bold
+E  error bold
+f  foreground
+F  foreground bold
+G  opencodeGo bold
+m  muted
+o  focus
+O  focus bold
+p  primary
+s  success
+u  subtle
+w  warning
+W  warning bold
+X  codex bold
+
+mm fffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mmmm Afffff f fffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mm
+m C CCCCCC CCCC m mmm W WWWW WWW WW WW WWW                 mm w ffff fff ffffff fffff ffffff f ff                      m
+m   f fffff    ssssassssssssssss  sss  sss sssss    mm mmm mm f fff fffffff fff fffff fff ffff fff ffffffff f ff       m
+m   ffff       wwwwwwuauuuuuuuuu  www  WW WWWW      mm mmm mm w ffff f ffff fff ffff fffffff f ff                      m
+m   fffff ffff sssssssasssssssss ssss  sss sssss    mm mmm mm f ffff f fffff fff ffff fffffff fff fff ffffff fff f fff m
+m C CCCCCC CCCCCC m mmm                                    mm                                                          m
+m   ffff                         wwww www ww www           mm                                                          m
+m X XXXXX m mmmm m mmm mmm mmm mm mm mm                    mm                                                          m
+m   f fffff    ssssssssssssssssa ssss  mm mmmm      mm mmm mm                                                          m
+m   ffff       ssssssssssssssuua  sss  WW WWWW      mm mmm mm                                                          m
+m G GGGGGGGGGGG W WWWW WWW WW WWW                          mm                                                          m
+m   f fffff    ssssssssssssssssa ssss  mm mmmm      mm mmm mm                                                          m
+m   ffff       sssssssssssssassu  sss  sss sssss     mm mm mm                                                          m
+m   fffff      ssssssssssssssauu  sss  W WWWW          mmm mm                                                          m
+mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm                                                          m
+mm AOOOOOOO m Ammmmm mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mm mmm                                                          m
+m E FFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF FFFFFF FFFF  mm                                                          m
+m E FFFFFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF FFFFFF    mm                                                          m
+m   FFFF                                                   mm                                                          m
+m ww wwww wwwww                                            mm                                                          m
+m                                                          mm                                                          m
+mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+mm ffffffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mmoo AOOOOOOO O OOOOO ooooooooooooooooooooooooooooooo m mmm oo
+m FFFFF  mmm sss  mmm ssssssssss  mmm ss  mmmm sss         mo   uuuuuuu                 uuuu uuuu uuuu uuuuu uuuu uuuu o
+m   s ff ffff ffff fff fffff                               mo   uuuuu                      p    w    f     f    f    f o
+m                                                          mo 11111111111111111111111112222233333111111111111111111111 o
+m FFFFF  mmm sss  mmm sssssssssss  mmm www  mmmm sss       mo   ffff                       p    w    f     f    f    f o
+m   mmmm mmmmm mmm mmmmm mmmmmmmmmmmmmmmmmmmmmmmmm mm      mo                                                          o
+m   mmmmm                                                  mo                                                          o
+mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmo                                                          o
+mm OAOOO m Ammmmmmmm mmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mmo                                                          o
+m f fffffff f f fffffff f f ffffff ff fffff                mo                                                          o
+m w ww wwww ww wwww www wwww                               mo                                                          o
+m p mmmmm fffff fffffff mmmmm mmm            fff       mmm mo                                                          o
+m p mmmmm fffff fffffff mmmmm mmmm           fff       mmm mo                                                          o
+m p mmmmm fffff ffff mmm mmmm                 ff       mmm mo                                                          o
+m p mm          ffff mm                       ff       mmm mo                                                          o
+m w mm          ffff mmmmmm                    f   wwwwwww mo                                                          o
+m mm mmmm mmmm                                             mo                                                          o
+mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo

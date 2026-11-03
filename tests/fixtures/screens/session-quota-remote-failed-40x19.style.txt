@@ -1,0 +1,29 @@
+C  claude bold
+E  error bold
+f  foreground
+F  foreground bold
+m  muted
+s  success
+u  subtle
+w  warning
+X  codex bold
+
+mmmmmmmmm mmmm mmmmm mmmmm mmmmm mmmmmm
+mmmmm mmmmm
+w wwwww wwwwwwwwwww
+  ww wwwwww wwwww wwwww wwwww
+  mm mmmmmm mmmm mmmm mmmmmmm mm mmmm
+  mmmmmmmmmmmmmmmmm mmmm mmm mmmmmmmmmmm
+  mmmmmmm           mmmmm  mmm  mmm mmmm
+C CCCCCC CCCC m mmmmmmm mmm mmmm mmmmm
+mm mmmmmm mmm mmmm
+mmmm mmmmmm mm mmmmm
+uu uuuuuu uuuu uuuu u uuuu uuuuuuuu uuuu
+wwwww ww wwwww wwww wwww wwwww wwwwwww
+E FFFFF FFFFFFFFF FF  fff  mmm  mmm wwww
+m mmmmm mmmm mmmmmmm  fff  mmm  mmm mmmm
+X XXXXX m mmmmmm mm mmmmmmmmmm mmm
+uu uuuuuu uuuu uuuu u uuuu uuuuuuuu uuuu
+mmmmmm mmmm
+s fffff fff fff ffff ffff mmmm  mmm mmmm
+mmm mmmmmmmmmmmm m mmmmmm m mmmm

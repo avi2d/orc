@@ -2,9 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
 import { decodeNoMistakes, decodeTasksReport, ok, type TaskLevelReadings, taskLevels } from "@tui-dash/schema";
 import { drawTasks, type Navigation, type TasksReadings } from "@tui-dash/tasks";
-import { plain } from "@tui-dash/ui";
+import { type Block, plain } from "@tui-dash/ui";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";
+import { cellDiffs } from "../../lib/styled-screen";
 import { pipelineTaskReadings } from "../../lib/task-levels-fixture";
 
 const readings = (overrides: Partial<TaskLevelReadings> = {}): TasksReadings => ({
@@ -12,10 +13,14 @@ const readings = (overrides: Partial<TaskLevelReadings> = {}): TasksReadings => 
   zone: DateTime.zoneMakeNamedUnsafe("UTC"),
 });
 
+const drawn = (navigation: Navigation, columns: number, rows: number, value = readings()): Block => drawTasks(value, navigation, columns, rows).block;
+
 const frame = (navigation: Navigation, columns: number, rows: number, value = readings()): string =>
-  `${drawTasks(value, navigation, columns, rows)
-    .block.map((line) => plain(line).trimEnd())
+  `${drawn(navigation, columns, rows, value)
+    .map((line) => plain(line).trimEnd())
     .join("\n")}\n`;
+
+const list: Navigation = { focus: "tasks", project: "harbor", task: undefined, detail: 0 };
 
 const ticket = (task: string): Navigation => ({ focus: "task", project: "harbor", task, detail: 0 });
 
@@ -28,7 +33,7 @@ const withStep = (step: string, status: string, run: string) =>
 
 describe("the tasks screen against its pinned frames", () => {
   test("the tasks list at 120 by 40", () => {
-    expect(frame({ focus: "tasks", project: "harbor", task: undefined, detail: 0 }, 120, 40)).toBe(
+    expect(frame(list, 120, 40)).toBe(
       fixture("screens/tasks-pipe-120x40.txt"),
     );
   });
@@ -37,6 +42,14 @@ describe("the tasks screen against its pinned frames", () => {
     expect(frame({ focus: "task", project: "harbor", task: "north tasks-pipe-full", detail: 0 }, 240, 60)).toBe(
       fixture("screens/tasks-pipe-240x60.txt"),
     );
+  });
+
+  test("the tasks list at 120 by 40 keeps each cell's tone, rejecting a retoned span with the same text", async () => {
+    expect(await cellDiffs(drawn(list, 120, 40), 120, "tasks-pipe-120x40")).toEqual([]);
+  });
+
+  test("the task pane at 240 by 60 keeps each cell's tone, rejecting a retoned span with the same text", async () => {
+    expect(await cellDiffs(drawn(ticket("north tasks-pipe-full"), 240, 60), 240, "tasks-pipe-240x60")).toEqual([]);
   });
 });
 
@@ -62,6 +75,24 @@ describe("each ticket state against its pinned frame", () => {
 
   test("done", () => {
     expect(frame(ticket("north tasks-pipe-local"), 120, 40)).toBe(fixture("screens/tasks-ticket-done-120x40.txt"));
+  });
+
+  test("waiting keeps each cell's tone, rejecting a status line painted in another state's colour", async () => {
+    expect(await cellDiffs(drawn(ticket("north tasks-pipe-scout"), 120, 40), 120, "tasks-ticket-waiting-120x40")).toEqual([]);
+  });
+
+  test("parked keeps each cell's tone, rejecting a status line painted in another state's colour", async () => {
+    const parked = readings({ tasks: parkedAs("tasks-pipe-quick") });
+    expect(await cellDiffs(drawn(ticket("north tasks-pipe-quick"), 120, 40, parked), 120, "tasks-ticket-parked-120x40")).toEqual([]);
+  });
+
+  test("blocked keeps each cell's tone, rejecting a status line painted in another state's colour", async () => {
+    const blocked = readings({ noMistakes: withStep("ci", "failed", "failed") });
+    expect(await cellDiffs(drawn(ticket("north tasks-pipe-full"), 120, 40, blocked), 120, "tasks-ticket-blocked-120x40")).toEqual([]);
+  });
+
+  test("done keeps each cell's tone, rejecting a status line painted in another state's colour", async () => {
+    expect(await cellDiffs(drawn(ticket("north tasks-pipe-local"), 120, 40), 120, "tasks-ticket-done-120x40")).toEqual([]);
   });
 });
 
@@ -103,5 +134,13 @@ describe("each review gate against its pinned frame", () => {
     expect(frame(ticket("north tasks-pipe-full"), 120, 40, gateParkedAs("parked", 8100))).toBe(
       fixture("screens/tasks-ticket-gate-parked-120x40.txt"),
     );
+  });
+
+  test("a review gate awaiting you keeps each cell's tone, rejecting a gate painted as parked with the same text", async () => {
+    expect(await cellDiffs(drawn(ticket("north tasks-pipe-full"), 120, 40, gateParkedAs("awaiting_approval", 7500)), 120, "tasks-ticket-gate-awaiting-120x40")).toEqual([]);
+  });
+
+  test("a parked review gate keeps each cell's tone, rejecting a gate painted as awaiting with the same text", async () => {
+    expect(await cellDiffs(drawn(ticket("north tasks-pipe-full"), 120, 40, gateParkedAs("parked", 8100)), 120, "tasks-ticket-gate-parked-120x40")).toEqual([]);
   });
 });
