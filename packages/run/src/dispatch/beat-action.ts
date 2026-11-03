@@ -1,3 +1,5 @@
+export type StalledAction = { readonly kind: "stalled"; readonly task: string; readonly machine: string; readonly since: string }
+
 export type BeatAction =
   | { readonly kind: "started"; readonly task: string; readonly machine: string; readonly account: string; readonly log: string }
   | { readonly kind: "start-failed"; readonly task: string; readonly machine: string; readonly reason: string }
@@ -17,4 +19,7 @@ export type BeatAction =
   }
   | { readonly kind: "close-failed"; readonly task: string; readonly machine: string; readonly reason: string }
   | { readonly kind: "parked"; readonly task: string; readonly machine: string; readonly branch: string; readonly questions: ReadonlyArray<string> }
-  | { readonly kind: "stalled"; readonly task: string; readonly machine: string; readonly since: string }
+  | StalledAction
+  | { readonly kind: "pr-unread"; readonly task: string; readonly reason: string }
+  | { readonly kind: "alerts-started"; readonly command: string; readonly output: string }
+  | { readonly kind: "alert-unread"; readonly line: number; readonly reason: string }

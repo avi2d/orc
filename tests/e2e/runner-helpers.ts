@@ -106,6 +106,8 @@ export const withFixture = async (body: (fixture: Fixture) => Promise<void>): Pr
     await scopeFixtureLabels(join(pueue, "status.json"), home)
     await writeFile(join(bin, "pueue"), fakePueue)
     await chmod(join(bin, "pueue"), 0o755)
+    await writeFile(join(bin, "tui-dash"), "#!/bin/sh\nexit 0\n")
+    await chmod(join(bin, "tui-dash"), 0o755)
     await writeFile(join(dir, "task.md"), "# Do the thing\n\nWith a body that holds 'quotes' and $dollars.\n")
     await writeFile(join(home, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { linux: checkout } }] }))
     await body({ dir, home, checkout, pueue, env: { ORC_HOME: home, PUEUE_STATE: pueue, PATH: bin + ":" + (process.env.PATH ?? "") } })

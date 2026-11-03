@@ -7,7 +7,8 @@ import { DateTime, Effect, FileSystem, Layer, Option, Redacted, Result } from "e
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../packages/run/src/dispatch/args"
 import { addTask, claimTask, closeStartedTask, listTasks, releaseTask, writeTaken } from "../../packages/run/src/dispatch/backlog"
-import { liveSources, placeTask, runBeat } from "../../packages/run/src/dispatch/beat"
+import { placeTask, runBeat } from "../../packages/run/src/dispatch/beat"
+import { quietSources } from "../lib/beat-sources"
 import { formatBeat } from "../../packages/run/src/dispatch/board"
 import { insertRun, openDatabase } from "../../packages/run/src/run-history"
 import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/dispatch/config"
@@ -422,7 +423,7 @@ describe("the beat", () => {
       await run(addTask(root, spec))
       const seen: Array<string> = []
       const spawner = recordingSpawner(join(root, "taken", "task-1.md"), seen).pipe(Layer.provide(BunServices.layer))
-      const report = await Effect.runPromise(runBeat(root, root, liveSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+      const report = await Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
       expect(report.actions.map((action) => action.kind)).toEqual(["started"])
       expect(seen).toHaveLength(1)
       expect(seen[0]).toContain("started_at: ")
@@ -470,7 +471,7 @@ const pueueInstead = (onPueue: ReturnType<typeof ChildProcessSpawner.ChildProces
   })).pipe(Layer.provide(BunServices.layer))
 
 const beatWith = (root: string, spawner: BeatSpawner) =>
-  Effect.runPromise(runBeat(root, root, liveSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+  Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
 
 const backlogStates = async (root: string): Promise<ReadonlyArray<string>> =>
   (await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)
@@ -496,7 +497,7 @@ const beatAfterRun = async (root: string, result: unknown): Promise<BeatAfterRun
   const tasks = await run(listTasks(root))
   return {
     states: tasks.map((task) => task.spec.id + ":" + task.state.kind),
-    actions: report.actions.map((action) => action.kind + ":" + action.task),
+    actions: report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : "")),
     reasons: tasks.flatMap((task) => task.state.kind === "closed" ? [task.state.closing.outcome + ":" + task.state.closing.reason] : []),
     prs: tasks.flatMap((task) => task.state.kind === "closed" && task.state.closing.outcome !== "start-failed" ? [task.state.closing.pr] : []),
     lines: formatBeat(report).split("\n").filter((line) => line.startsWith("closed "))
@@ -534,7 +535,7 @@ describe("the beat's closing sweep", () => {
       await startTaskOne(root, orcStart, { dependsOn: [] })
       const report = await beatWith(root, pueueAnswering(root, { Running: { start: "2026-10-27T10:02:00.000Z" } }))
       expect(await backlogStates(root)).toEqual(["task-1:started", "task-2:new"])
-      expect(report.actions.map((action) => action.kind + ":" + action.task)).toEqual(["stalled:task-1", "waits:task-2"])
+      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["stalled:task-1", "waits:task-2"])
     })
   })
   test("a started task whose pueue run failed is closed failed with the run's reason instead of staying started", async () => {
@@ -550,7 +551,7 @@ describe("the beat's closing sweep", () => {
       await startTaskOne(root, orcStart, { dependsOn: ["task-1"] })
       const report = await beatWith(root, pueueDone(root, "Success"))
       expect(await backlogStates(root)).toEqual(["task-1:closed", "task-2:started"])
-      expect(report.actions.map((action) => action.kind + ":" + action.task)).toEqual(["closed:task-1", "started:task-2"])
+      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:task-1", "started:task-2"])
     })
   })
   test("a started task on a machine with a custom start is left alone instead of read and reported", async () => {

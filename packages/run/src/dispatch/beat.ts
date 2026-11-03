@@ -13,6 +13,10 @@ import { closeFinished } from "./beat-close"
 import { taskLabel } from "./pueue-status"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
 import { flagStall } from "./stall"
+import { alertEvents, watchAlerts } from "./alert-events"
+import { readPullRequest } from "./pr-view"
+import { type Command } from "./runner"
+import { prEvents, type ReadPullRequest, stallEvent } from "./task-events"
 
 export type { BeatAction } from "./beat-action"
 export type { MachineRoom } from "./beat-place"
@@ -267,9 +271,28 @@ const renewTask = (context: BeatContext, task: TaskRecord): Effect.Effect<Option
 
 export interface BeatSources {
   readonly readLoad: ReadLoad
+  readonly readPullRequest: ReadPullRequest
+  readonly alerts: Command | null
 }
 
-export const liveSources = (): BeatSources => ({ readLoad: readMachineLoad })
+export const liveSources = (): BeatSources => ({
+  readLoad: readMachineLoad,
+  readPullRequest,
+  alerts: Bun.which("tui-dash") === null ? null : ["tui-dash", "alerts", "--json"]
+})
+
+const recordChatEvents = (
+  root: string,
+  sources: BeatSources,
+  tasks: ReadonlyArray<TaskRecord>,
+  at: string
+): Effect.Effect<ReadonlyArray<BeatAction>, BacklogError, BeatRequirements> =>
+  Effect.gen(function*() {
+    const prs = yield* Effect.forEach(tasks, (task) => prEvents(root, task, sources.readPullRequest, at))
+    const watched = sources.alerts === null ? [] : yield* watchAlerts(root, sources.alerts)
+    const unread = yield* alertEvents(root)
+    return [...prs.flatMap(Option.toArray), ...watched, ...unread]
+  })
 
 export const runBeat = (
   root: string,
@@ -301,7 +324,10 @@ export const runBeat = (
     const started = tasks.filter((task) => task.state.kind === "started")
     const progress = yield* Effect.forEach(started, (task) => closeFinished(context, task))
     const closed = progress.flatMap((entry) => entry.kind === "ended" ? [entry.action] : [])
-    const stalls = yield* Effect.forEach(started, (task, index) => flagStall(root, task, progress[index] ?? { kind: "untracked" }))
+    const stalls = yield* Effect.forEach(started, (task, index) =>
+      flagStall(root, task, progress[index] ?? { kind: "untracked" }).pipe(
+        Effect.tap((stall) => Option.isSome(stall) ? stallEvent(root, task, stall.value, at) : Effect.void)
+      ))
     for (const action of closed) {
       if (action.kind === "closed" || action.kind === "parked") {
         const slot = context.live.find((entry) => entry.machine === action.machine)
@@ -311,10 +337,18 @@ export const runBeat = (
       }
     }
     const current = yield* listTasks(root)
+    const events = yield* recordChatEvents(root, sources, current, at)
     const queued = current.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: current, overloaded }
     const renewals = yield* Effect.forEach(current, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, task))
-    return { beat, at, quota, room: readRoom(config.machines, current), actions: [...closed, ...stalls.flatMap(Option.toArray), ...renewals.flatMap(Option.toArray), ...actions] }
+    return { beat, at, quota, room: readRoom(config.machines, current), actions: [
+        ...closed,
+        ...stalls.flatMap(Option.toArray),
+        ...events,
+        ...renewals.flatMap(Option.toArray),
+        ...actions
+      ]
+    }
   })

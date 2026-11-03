@@ -2,6 +2,7 @@ import { dependencyOpen, type BeatAction, type BeatReport, type MachineRoom } fr
 import type { Project } from "./config"
 import { describeQuota } from "./quota"
 import type { TaskKind } from "../task-kind"
+import type { ChatEvent } from "./events"
 import { type Claim, type Hold, isHeld, openQuestions, type Parked, type Started, type TaskRecord } from "./task-record"
 
 const BACKLOG_JSON_SCHEMA = "orc.backlog.v1" as const
@@ -12,6 +13,7 @@ export type RoomList = { readonly kind: "read"; readonly room: ReadonlyArray<Mac
 
 export interface BacklogView {
   readonly tasks: ReadonlyArray<TaskRecord>
+  readonly events: ReadonlyArray<ChatEvent>
   readonly projects: ProjectList
   readonly room: RoomList
 }
@@ -47,6 +49,7 @@ type TaskJson = {
 interface BacklogJson {
   readonly schema: typeof BACKLOG_JSON_SCHEMA
   readonly tasks: ReadonlyArray<TaskJson>
+  readonly events: ReadonlyArray<ChatEvent>
   readonly projects: ReadonlyArray<Project> | null
   readonly room: ReadonlyArray<MachineRoom> | null
 }
@@ -97,6 +100,7 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     parked: record.parked,
     ...claimJson(record)
   })),
+  events: view.events,
   projects: view.projects.kind === "read" ? view.projects.projects : null,
   room: view.room.kind === "read" ? view.room.room : null
 })
@@ -197,12 +201,20 @@ const actionLine = (action: BeatAction): string => {
     case "stalled": {
       return "stalled " + action.task + " on " + action.machine + ": no output since " + action.since
     }
+    case "pr-unread": {
+      return "cannot read the PR of " + action.task + " for the chat: " + action.reason
+    }
+    case "alerts-started": {
+      return "started " + action.command + ", its alerts to " + action.output
+    }
+    case "alert-unread": {
+      return "cannot read alert line " + String(action.line) + " for the chat: " + action.reason
+    }
   }
 }
 
 const renewal = (action: BeatAction): boolean =>
-  action.kind === "renewed" || action.kind === "renew-failed" || action.kind === "closed" || action.kind === "close-failed" || action.kind === "parked" ||
-  action.kind === "stalled"
+  action.kind !== "started" && action.kind !== "start-failed" && action.kind !== "lost" && action.kind !== "given-back" && action.kind !== "waits"
 
 export const formatBeat = (report: BeatReport): string =>
   [

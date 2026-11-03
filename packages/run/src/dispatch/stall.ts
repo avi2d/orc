@@ -1,6 +1,6 @@
 import { DateTime, Effect, FileSystem, Option } from "effect"
 import { backlogPaths, type BacklogError } from "./backlog"
-import type { BeatAction } from "./beat-action"
+import type { StalledAction } from "./beat-action"
 import type { Progress } from "./beat-close"
 import { platformFailure } from "./backlog-write"
 import type { TaskRecord } from "./task-record"
@@ -22,7 +22,7 @@ const writtenAt = (task: TaskRecord, progress: Progress): Effect.Effect<string |
 }
 
 // The stall file keeps the write time it flagged, so one stall flags once and a log written since flags anew.
-export const flagStall = (root: string, task: TaskRecord, progress: Progress): Effect.Effect<Option.Option<BeatAction>, BacklogError, FileSystem.FileSystem> =>
+export const flagStall = (root: string, task: TaskRecord, progress: Progress): Effect.Effect<Option.Option<StalledAction>, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     if (task.state.kind !== "started") {
       return Option.none()
@@ -49,5 +49,5 @@ export const flagStall = (root: string, task: TaskRecord, progress: Progress): E
       return Option.none()
     }
     yield* fs.writeFileString(file, since).pipe(Effect.mapError(platformFailure("write " + file)))
-    return Option.some({ kind: "stalled", task: task.spec.id, machine: task.state.claim.machine, since } satisfies BeatAction)
+    return Option.some({ kind: "stalled", task: task.spec.id, machine: task.state.claim.machine, since } satisfies StalledAction)
   })

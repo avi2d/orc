@@ -71,6 +71,7 @@ To hand orc a stream of work:
 
 Once a task the chat added closes, the chat posts it with its outcome and its reason.
 The post carries the PR, or the report for a scout or task.
+The chat also posts each alert once, and when any task's PR turns green, merges, closes or its run stalls.
 [The backlog and the beat](packages/run/README.md#the-backlog-and-the-beat) shows both files and every option.
 
 ## Pick a task kind
@@ -135,7 +136,7 @@ Orc grows toward the full orchestrator one step at a time.
 | Per-project delivery: direct pull request or full review | Ships today |
 | Merge on your word, refusing red checks | Ships today |
 | Stalled runs and machine load flagged in the chat | Ships today |
-| Alerts and pull request events posted in the chat | Next |
+| Alerts and pull request events posted in the chat | Ships today |
 | Decision boards you answer once | Next |
 | Per-project instructions the run and the chat both read | Next |
 | A fresh checkout before every run, and follow-ups on upstream changes | Next |

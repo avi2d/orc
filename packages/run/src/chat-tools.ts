@@ -34,9 +34,9 @@ export interface ChatSession {
   readonly listParkedAgain: () => void
 }
 
-type PostKind = "closed" | "held" | "parked"
+type PostKind = "closed" | "event" | "held" | "parked"
 
-const postTypes = { closed: "orc-task-closed", held: "orc-held-decision", parked: "orc-parked-question" } as const satisfies Record<PostKind, string>
+const postTypes = { closed: "orc-task-closed", event: "orc-event", held: "orc-held-decision", parked: "orc-parked-question" } as const satisfies Record<PostKind, string>
 
 interface SessionStartContext {
   readonly isIdle: () => boolean
@@ -77,7 +77,9 @@ const OpenTask = Schema.Struct({
 type OpenTask = typeof OpenTask.Type
 type BacklogTask = ClosedTask | OpenTask
 
-const BacklogTasks = Schema.fromJsonString(Schema.Struct({ tasks: Schema.Array(Schema.Union([ClosedTask, OpenTask])) }))
+const BacklogEvent = Schema.Struct({ key: Schema.String, text: Schema.String })
+
+const BacklogTasks = Schema.fromJsonString(Schema.Struct({ tasks: Schema.Array(Schema.Union([ClosedTask, OpenTask])), events: Schema.Array(BacklogEvent) }))
 
 const closedPollMillis = 15_000
 
@@ -111,7 +113,7 @@ interface PostState {
 
 type Deliver = (text: string) => boolean
 
-const readBacklog = (env: Env): Effect.Effect<{ readonly tasks: ReadonlyArray<BacklogTask> }, ChatToolError> =>
+const readBacklog = (env: Env): Effect.Effect<typeof BacklogTasks.Type, ChatToolError> =>
   runOrc(env, ["backlog", "--json"], null).pipe(
     Effect.flatMap((text) =>
       Schema.decodeEffect(BacklogTasks)(text).pipe(
@@ -123,27 +125,33 @@ const readBacklog = (env: Env): Effect.Effect<{ readonly tasks: ReadonlyArray<Ba
 const isUnpostedClosed = (task: BacklogTask, isOpen: () => boolean): task is ClosedTask =>
   task.status === "closed" && task.postedAt === null && isOpen()
 
-const deliverOnce = (state: PostState, deliver: Deliver, task: ClosedTask): void => {
-  if (!state.delivered.has(task.id)) {
-    deliver(closedLine(task))
-    state.delivered.add(task.id)
+interface Post {
+  readonly key: string
+  readonly text: string
+  readonly deliver: Deliver
+}
+
+const deliverOnce = (state: PostState, post: Post): void => {
+  if (!state.delivered.has(post.key)) {
+    post.deliver(post.text)
+    state.delivered.add(post.key)
   }
 }
 
-const markOne = (env: Env, taskId: string): Effect.Effect<true | string> =>
-  runOrc(env, ["backlog", "posted", taskId], null).pipe(
+const markOne = (env: Env, key: string): Effect.Effect<true | string> =>
+  runOrc(env, ["backlog", "posted", key], null).pipe(
     Effect.as<true>(true),
     Effect.catchTag("ChatToolError", (error) => Effect.succeed(error.message))
   )
 
-const postTask = (env: Env, state: PostState, deliver: Deliver, task: ClosedTask): Effect.Effect<string | null> =>
+const postOne = (env: Env, state: PostState, post: Post): Effect.Effect<string | null> =>
   Effect.gen(function*() {
-    deliverOnce(state, deliver, task)
-    const marked = yield* markOne(env, task.id)
+    deliverOnce(state, post)
+    const marked = yield* markOne(env, post.key)
     if (typeof marked === "string") {
       return marked
     }
-    state.delivered.delete(task.id)
+    state.delivered.delete(post.key)
     return null
   })
 
@@ -157,7 +165,7 @@ const reportMarks = (state: PostState, deliver: Deliver, markProblem: string | n
       state.unreadBecause = markProblem
       return
     }
-    if (deliver("orc chat cannot post the closed tasks: " + markProblem)) {
+    if (deliver("orc chat cannot post the closed tasks and events: " + markProblem)) {
       state.unreadBecause = markProblem
     }
   })
@@ -165,25 +173,30 @@ const reportMarks = (state: PostState, deliver: Deliver, markProblem: string | n
 const reportReadError = (state: PostState, deliver: Deliver, error: ChatToolError): Effect.Effect<void> =>
   Effect.sync(() => {
     if (error.message !== state.unreadBecause) {
-      if (deliver("orc chat cannot post the closed tasks: " + error.message)) {
+      if (deliver("orc chat cannot post the closed tasks and events: " + error.message)) {
         state.unreadBecause = error.message
       }
     }
   })
 
-const postUnposted = (env: Env, isOpen: () => boolean, deliver: Deliver, state: PostState): Effect.Effect<void> =>
+const postUnposted = (env: Env, isOpen: () => boolean, deliverAs: (kind: PostKind) => Deliver, state: PostState): Effect.Effect<void> =>
   Effect.gen(function*() {
     const backlog = yield* readBacklog(env)
+    const deliver = deliverAs("closed")
+    const posts: ReadonlyArray<Post> = [
+      ...backlog.tasks.filter((task) => isUnpostedClosed(task, isOpen)).map((task) => ({ key: task.id, text: closedLine(task), deliver })),
+      ...backlog.events.map((event) => ({ key: event.key, text: event.text, deliver: deliverAs("event") }))
+    ]
     let markProblem: string | null = null
-    for (const task of backlog.tasks) {
-      if (!isUnpostedClosed(task, isOpen)) {
-        continue
+    for (const post of posts) {
+      if (!isOpen()) {
+        break
       }
-      const problem = yield* postTask(env, state, deliver, task)
+      const problem = yield* postOne(env, state, post)
       markProblem ??= problem
     }
     yield* reportMarks(state, deliver, markProblem)
-  }).pipe(Effect.catchTag("ChatToolError", (error) => reportReadError(state, deliver, error)))
+  }).pipe(Effect.catchTag("ChatToolError", (error) => reportReadError(state, deliverAs("closed"), error)))
 
 type OpenHeld = OpenTask & { readonly hold: typeof HoldJson.Type & { readonly answer: null } }
 
@@ -239,13 +252,12 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
     }
     return false
   }
-  const deliver = deliverAs("closed")
   const tools: ReadonlyArray<ChatTool> = [
     {
       name: "orc_backlog_add",
       label: "Add to the orc backlog",
       description:
-        "Adds one task to the orc backlog through orc backlog add, and returns the line orc prints, which names the new task's id. When the task closes, orc chat posts its outcome and its PR, or its report for a scout or task.",
+        "Adds one task to the orc backlog through orc backlog add, and returns the line orc prints, which names the new task's id. When the task closes, orc chat posts its outcome and its PR, or its report for a scout or task, and later posts when its PR turns green and when it merges.",
       parameters: Schema.toJsonSchemaDocument(AddTaskInput).schema,
       execute: (_toolCallId, params) =>
         Effect.runPromise(
@@ -309,7 +321,7 @@ export const chatSession = (env: Env, isOpen: () => boolean, post: (text: string
         runTool(MergeInput, "merge_task", params, env, (input) => ["merge", input.id, "--basis", input.basis])
     }
   ]
-  const postClosed = postUnposted(env, isOpen, deliver, state)
+  const postClosed = postUnposted(env, isOpen, deliverAs, state)
   const postHeld = postOpenHeld(env, deliverAs("held"), state)
   const parked = parkedListing(readBacklog(env).pipe(Effect.map((backlog) => backlog.tasks)), deliverAs("parked"))
   const postParked = () => Effect.runPromise(parked.post)

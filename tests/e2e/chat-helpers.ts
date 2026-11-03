@@ -31,6 +31,8 @@ export const withFixture = async (config: unknown, piExit: number, body: (fixtur
     await mkdir(join(home, "backlog"), { recursive: true })
     await writeFile(join(bin, "pi"), fakePi(piLog, piExit))
     await chmod(join(bin, "pi"), 0o755)
+    await writeFile(join(bin, "tui-dash"), "#!/bin/sh\nexit 0\n")
+    await chmod(join(bin, "tui-dash"), 0o755)
     if (config !== null) {
       await writeFile(join(home, "config.json"), JSON.stringify(config))
     }

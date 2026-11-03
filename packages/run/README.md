@@ -571,6 +571,10 @@ When it starts and every 15 seconds after, the chat reads `orc backlog --json`.
 While Pi is idle, it posts each closed task that has no `postedAt`, with its outcome, its reason and its PR or report, as in `task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
 It posts a task whoever added it: this chat, an earlier chat or the command line.
 It posts each close then runs `orc backlog posted <task-id>`, which writes `posted_at` into the closed task file, so a task closed while no chat ran is posted by the next chat to start, and every close is posted, with a close repeated at most when the chat stops between its post and its mark, or when two chats post the same close in the same moment.
+It posts each event the beat records the same way, then runs `orc backlog posted <event-key>`.
+The beat records an event when a task's run stalls, when a closed task's PR turns green, merges or closes without merging, and for each alert fire.
+It reads the fires from `alerts.jsonl` in the backlog folder, which `tui-dash alerts --json` writes when `tui-dash` is on the beat's PATH, and the beat starts that stream when none runs.
+Each event file under `events/` is named for the event, so a beat records it at most once, and a second stall of one task is a new event.
 When it cannot read or mark the backlog, it posts orc's error once Pi is idle and keeps polling.
 Each time the chat starts, it posts one line per held task you have not answered, once Pi is idle, as in `task-2 Pick the API is held for the captain: REST or gRPC, until 2026-12-01`.
 It posts one line per parked question you have not answered each time it starts, and once more when a task parks while it runs, as in `task-3 Fix the retries is parked on orc/task-3 for the captain's answer to question-4: Which retries are allowed?`.
