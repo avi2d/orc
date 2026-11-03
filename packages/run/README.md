@@ -441,13 +441,13 @@ A project with no `instructions` hands its runs and the chat no instructions.
 A project may also add `"upstream"`, a list of GitHub issue or pull request URLs on other people's repositories that the project's work filed.
 Only `orc beat` reads it, through `gh api graphql` under the `gh` login of the machine that runs the beat, and it only reads.
 Each beat reads each contribution's state: open, closed or merged, its comment count, and for a pull request its review count and head commit.
-It keeps the last state it read in `~/.orc/backlog/upstream/<project>/<owner>.<repo>.<number>.json`, never in `projects.json`.
+It keeps the last state it read in `~/.orc/backlog/upstream/<project>/<owner>.<repo>.<number>.json`, with the owner and repository in lower case, never in `projects.json`.
 The first beat to read a contribution records it, prints `watching <url> for <project>: <state>` and adds no task.
 A later beat that reads another state adds one scout task for the project, titled `Follow up on <owner>/<repo>#<number>: <changes>`, records the change as a chat event and prints `added <task-id> for <project> as a scout: <url> changed: <changes>`.
 The event's key names the change, so of two beats reading one change only one adds the task, and a repeat beat on the same state adds none.
 A contribution gh cannot read within 30 seconds, through no network, no login or a deleted issue, prints `upstream of <project>: cannot read <url>: <reason>`, adds no task and keeps the recorded state.
 A recorded state orc cannot read prints `upstream of <project>:` with the file and adds no task until you remove the file, and the next beat then records the contribution afresh.
-Orc refuses an `upstream` that is not a list, an entry that is not a `https://github.com/<owner>/<repo>/issues/<number>` or `/pull/<number>` URL, and a URL named twice.
+Orc refuses an `upstream` that is not a list, an entry that is not a `https://github.com/<owner>/<repo>/issues/<number>` or `/pull/<number>` URL, and a contribution named twice, even in another case or once as its `/issues/` and once as its `/pull/` URL.
 A project with no `upstream` makes the beat read nothing upstream.
 
 To add a task, run `orc backlog add <project> <task-file>`.

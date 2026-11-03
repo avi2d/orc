@@ -141,6 +141,16 @@ describe("the beat's upstream watch", () => {
     })
   })
 
+  test("a URL respelled in another case keeps its recorded state instead of being seen afresh", async () => {
+    await withBacklog([pull], async (root) => {
+      await beat(root, reads(openPull))
+      const respelled = "https://github.com/Acme/Widgets/pull/7"
+      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: "/checkout" }, upstream: [respelled] }] }))
+      expect(upstreamLines(await beat(root, reads(openPull)))).toEqual([])
+      expect(upstreamLines(await beat(root, reads(mergedPull)))).toEqual(["added task-1 for orc as a scout: " + respelled + " changed: merged, 1 new comment"])
+    })
+  })
+
   test("a project without upstream reads nothing upstream instead of asking gh", async () => {
     await withBacklog(null, async (root) => {
       expect(upstreamLines(await beat(root, () => Effect.die("read")))).toEqual([])
