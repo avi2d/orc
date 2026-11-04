@@ -217,7 +217,7 @@ Each provider names its Pi provider `id`, the part of a model name before the `/
   Orc writes them into the run's Pi folder, `session/agent/settings.json`, so the run's Pi loads the package your Pi loads.
   Pi installs an `npm:` or `git:` source into the run's folder on the first model list, so each run fetches it again.
   An absolute path to a package already on the machine, such as one under `~/.pi/agent/git`, loads without the fetch.
-  `env` names variables orc sets for the run's Pi over your environment, such as the `CLAUDE_CONFIG_DIR` of the account a Claude Code package runs on.
+  `env` names variables orc sets for the run's Pi over your environment, and for the chat's Pi when `models.orchestrator` names this provider, such as the `CLAUDE_CONFIG_DIR` of the account a Claude Code package runs on.
   The nono sandbox carries only a Pi login, so a package provider runs only with `--sandbox none`.
 
 Orc refuses a `config.json` key it does not know, so a misspelled key never drops a provider unnoticed.
@@ -614,6 +614,7 @@ Each time the chat starts, it posts one line per held task you have not answered
 It posts one line per parked question you have not answered each time it starts, and once more when a task parks while it runs, as in `task-3 Fix the retries is parked on orc/task-3 for the captain's answer to question-4: Which retries are allowed?`.
 A question whose line a failed read or a busy Pi kept back is posted on a later poll.
 The chat's Pi loads your Pi settings and packages, so a provider a package adds works as it does in your Pi.
+The chat's Pi also takes the `env` of the orchestrator's provider, so the chat and the runs of that provider use the same account whatever your shell exports.
 `ORC_HOME` reaches the tools from the shell that runs `orc chat`.
 
 ### Decision boards
