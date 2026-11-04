@@ -299,17 +299,17 @@ export const spendLines = (task: TaskRow, width: number, indent = rowIndent): Bl
 const failureWords = ({ source, failure }: SourceFailure): string =>
   `\u2717 ${source}: ${failure.kind === "unreachable" ? failure.reason : failure.issue}`;
 
-const sentenceLines = (text: string, width: number, tone: Tone): Block =>
-  wrapParts(text.split(" "), width, " ").map((part): Line => [span(ellipsize(part, width), tone)]);
+const sentenceLines = (text: string, width: number, tone: Tone, kept?: number): Block =>
+  wrapParts(text.split(" "), width, " ", kept).map((part): Line => [span(ellipsize(part, width), tone)]);
 
 export const descriptionLinesOf = (detail: string | undefined, width: number): Block =>
-  detail === undefined || detail.trim() === "" ? [] : sentenceLines(detail, width, "muted").slice(0, 2);
+  detail === undefined || detail.trim() === "" ? [] : sentenceLines(detail, width, "muted", 2).slice(0, 2);
 
 export const keptLineOf = (task: TaskRow, width: number): Line =>
   truncate([span(`kept   cpu ${cpuMinutes(task.cpuSeconds)} · peak memory ${memory(task.peakBytes)}`, "foreground")], width);
 
 export const failureLines = (failures: ReadonlyArray<SourceFailure>, width: number): Block =>
-  failures.flatMap((failure) => sentenceLines(failureWords(failure), width, "error").slice(0, 3));
+  failures.flatMap((failure) => sentenceLines(failureWords(failure), width, "error", 3).slice(0, 3));
 
 export const noticeLines = (text: string, width: number): Block => sentenceLines(text, width, "muted");
 

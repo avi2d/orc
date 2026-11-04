@@ -22,6 +22,7 @@ import { machineView, southReading } from "../../lib/machines-fixture";
 import { glanceBlock } from "../../lib/host-fixture";
 import { fixtureQueueReadings, fixtureQueues } from "../../lib/queues-fixture";
 import { fixtureSessionView, fiveHourAheadSessionView } from "../../lib/session-fixture";
+import { cellDiffs } from "../../lib/styled-screen";
 
 const width = 84;
 
@@ -311,6 +312,11 @@ describe("the dashboard screen, against its pinned recording", () => {
     const frame = printed(24, width).join("\n").concat("\n");
     expect(frame).toBe(fixture("screens/dashboard-84x24.txt"));
   });
+
+  test("keeps each cell's tone at 84x24, rejecting a panel painted in another panel's colours with the same text", async () => {
+    const rows = glanceRows({ blocks: blocks(), sessions: sessions(), machines: alone(view()) }, width, 24);
+    expect(await cellDiffs(rows, width, "dashboard-84x24")).toEqual([]);
+  });
 });
 
 const savedNames = ["third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth"];
@@ -499,6 +505,6 @@ describe("the dashboard with a second machine configured", () => {
   test("leaves out a report older than a minute and says how old it is", () => {
     const stale = { ...southResources(), generatedAt: DateTime.makeUnsafe("2026-10-13T20:15:16Z") };
     expect(machineRows(withSouth(ok(stale))).at(-1)).toBe("south    ! answered 3m ago, so its readings are left out");
-    expect(machineRows(withSouth(ok(stale)), 30).slice(-3)).toEqual(["south    ! answered 3m ago, so", "         its readings are left", "         out"]);
+    expect(machineRows(withSouth(ok(stale)), 30).slice(-3)).toEqual(["south    ! answered 3m ago, so", "         its readings are", "         left out"]);
   });
 });

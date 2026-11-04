@@ -1,0 +1,28 @@
+f  foreground
+m  muted
+s  success
+u  subtle
+
+mm mmmmmmm mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+m uu uuuuu                                                                         m
+m uuu   sssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm        sss m
+m uuu   sssssssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm  sssssssss m
+m   uuu     uuuuuuu              uuu  uuu                                          m
+m   uuuuuu  ff                   sss  ffff                                         m
+m   uuuuuu  ffff                  ss  ffff                                         m
+m   uuuuuuu ff                    ss  ffff                                         m
+m   uu      ffffffffffffffffff    ss  ffff                                         m
+m   uuuuuuu ffffff                ss  ffff                                         m
+m   u       fffffff               ss  ffff                                         m
+m   u       fffffffffffffff       ss  ffff                                         m
+m   uuu     ffffffff              ss  ffff                                         m
+m   u uuuu ffff ffff ffff                                                          m
+mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+mm mmm mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+m uuuuuu uuuuuuu uuu uuuu uuuuuu uuu                                               m
+m uuu   ssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm         ss m
+m uuuu  sssssssmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm  sssssssss m
+m   u uuuu sss                                                                     m
+m   uuu     uuuuuuu        uuuu                                                    m
+m   uuuuuuu ffffff         mmm mmmmmmmm                                            m
+mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm

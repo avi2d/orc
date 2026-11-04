@@ -5,6 +5,7 @@ import { decodeAlertSettings, type VerdictEntry } from "@tui-dash/schema";
 import { lineWidth, plain } from "@tui-dash/ui";
 import { recordedAlerts, recordedEntries, verdictLogPath } from "../../lib/alerts-fixture";
 import { fixture } from "../../lib/fixtures";
+import { cellDiffs } from "../../lib/styled-screen";
 
 const now = DateTime.makeUnsafe("2026-10-19T19:20:00Z");
 
@@ -39,8 +40,8 @@ describe("the alerts panel shows each rule's limits from the settings file", () 
     const lines = printed();
     expect(lines.filter((line) => line.startsWith("alert ")).map((line) => line.split(/ +/u)[1])).toEqual(["quota-pace", "heavy-load", "long-task", "nightly"]);
     expect(ruleOf(lines, "quota-pace").slice(0, 3)).toEqual([
-      "limits   a window runs ahead of pace past its first tenth and runs out before its",
-      "         reset",
+      "limits   a window runs ahead of pace past its first tenth and runs out before",
+      "         its reset",
       "         read every 1m",
     ]);
     expect(ruleOf(lines, "heavy-load").slice(0, 2)).toEqual([
@@ -174,5 +175,9 @@ describe("the alerts panel fits the terminal it runs in", () => {
 describe("the alerts panel, against its pinned recording", () => {
   test("renders the pinned frame at 84 columns", () => {
     expect(`${printed().join("\n")}\n`).toBe(fixture("screens/alerts-84x18.txt"));
+  });
+
+  test("keeps each cell's tone at 84 columns, rejecting a verdict painted in another verdict's colour", async () => {
+    expect(await cellDiffs(alertsSection(readings(), now, 84), 84, "alerts-84x18")).toEqual([]);
   });
 });

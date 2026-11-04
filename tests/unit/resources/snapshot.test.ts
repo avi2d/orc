@@ -17,6 +17,7 @@ import {
 import { blockDocument, type Block, frameText, plain } from "@tui-dash/ui";
 import { resourceLines } from "@tui-dash/resources";
 import { fixture } from "../../lib/fixtures";
+import { cellDiffs } from "../../lib/styled-screen";
 
 const now = DateTime.makeUnsafe("2026-10-13T20:18:16Z");
 
@@ -92,6 +93,10 @@ describe("the resources panel, against the pinned linux output", () => {
     const rows = lines();
     const frame = await Effect.runPromise(frameText(blockDocument(rows), width, rows.length + 1));
     expect(frame).toBe(pinned());
+  });
+
+  test("keeps each cell's tone, rejecting a meter painted in another load's colour", async () => {
+    expect(await cellDiffs(lines(), width, "resources-84x23")).toEqual([]);
   });
 });
 

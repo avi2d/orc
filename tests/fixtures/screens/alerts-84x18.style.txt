@@ -1,0 +1,25 @@
+f  foreground
+F  foreground bold
+m  muted
+
+FFFFFF
+fffff    FFFFFFFFFF
+ffffff   f ffffff ffff fffff ff ffff ffff fff fffff fffff fff ffff fff ffffff
+         fff fffff
+         ffff fffff ff
+fffff    mmmm mmmmmmmm
+fffff    FFFFFFFFFF
+ffffff   fffff ffff f ff ff ffffff ffff f fff f fffff ffff f ff ff ffffff ffff f fff
+         ffff fff ff f ffff fffff fff
+fffff    fff fff f fffff ffff ffffff f fffff ffff ffff
+fffffff  fffffffff f fffffff ffffffff ffff ff fffff
+fffff    FFFFFFFFF
+ffffff   fffff ffff ffff fffff fff f ffff ff ff fffff
+         fffffff ffffffff fffffff fff fffffff f ffff fffff fff
+fffff    fff fff f ffff fff ffffff fffffffff ff ffffff fffff fff
+fffffff  mmmm mm mmmm mmmm
+fffffff  mmm mmm m mmmm mmm mmmmmm mmmmmmmmm mm mmmmmm mmmmm mmm
+         fffff ffffff fff ffffff fff ff fff
+fffff    FFFFFFF
+ffffff   ff ffffffffff ffffff ff ff fffff ffff f ffff fffff ff
+fffff    mmmm mmmmmmmm

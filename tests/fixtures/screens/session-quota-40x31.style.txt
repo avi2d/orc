@@ -1,0 +1,42 @@
+C  claude bold
+E  error bold
+f  foreground
+F  foreground bold
+G  opencodeGo bold
+m  muted
+s  success
+u  subtle
+w  warning
+X  codex bold
+
+mmmmmmmmm mmmm mmmmm mmmmm mmmmm mmmmmm
+mmmmm mmmmm
+  mmmmmmm           mmmmm  mmm  mmm mmmm
+C CCCCCC CCCC m mmmmmmm mmm mmmm mmmmm
+uu uuuuuu uuu uuuu u uuuu uuuuuuuu uuuu
+mmmmmm mmmm
+s fffffffffff ffffff  fff  mmm mmmm mmmm
+s fffffffff ffffff    fff  mmm mmmm mmmm
+s fffffffff fff ffff   ff   mm mmmm mmmm
+uu uuuuuu uuuu uuuu u uuuu uuuuuuuu uuuu
+wwwww ww wwwww wwww wwww wwwww wwwwwww
+E FFFFFFFFFFF FFFFFF  fff  mmm  mmm wwww
+E FFFFFFFFF FFFFFF    fff  mmm  mmm wwww
+m mmmmmmm mmmmmmm      ff   mm mmmm mmmm
+E FFFFFFFFF FFF FFFF   ff   mm mmmm wwww
+X XXXXX m mmmmmm mm mmmmmmmmmm mmm
+mm mmmmmm mmm mmmm m mmmm mmmmmm mmmm
+uu uuuuuu uuuu uuuu u uuuu uuuuuuuu uuuu
+mmmmm mmm mmmmmm mm mmmm
+m mmmmm mmmmmmm      ffff mmmm  mmm mmmm
+G GGGGGGGGGGG m mmmmmmm mmm mmmm mmmmm
+mm mmmmmm mmm mmmm m mmmm mmmmmm mmmm
+uu uuuuuu uuu uuuu u uuuu uuuuuuuu uuuu
+mmmmmm mmmm
+s fffffffff ffffff   ffff mmmm mmmm wwww
+uuu uuuuuu uuuu uuuu
+uuuu uuuuuuuu uuuu
+wwwww ww wwwww wwww wwww wwwww wwwwwww
+m mmmmmmmmmm mmmmmmm  fff  mmm  mmm mmmm
+E FFFFFFFFF FFFFFF    fff  mmm mmmm wwww
+mmm mmmmmmmmmmmm m mmmmmm m mmmm
