@@ -10,6 +10,7 @@ jobs:
   checks:
     # Untrusted PR code must not run on the self-hosted runner.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
         with:
