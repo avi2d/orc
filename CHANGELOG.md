@@ -2,6 +2,24 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.9.0
+
+Released 2026-11-04.
+
+### Features
+
+- **run:** follow upstream contributions with scout tasks on change [#78](https://github.com/avi2d/orc/pull/78)
+- **run:** per-project instructions files for runs and chat [#77](https://github.com/avi2d/orc/pull/77)
+- **run:** open decision boards for held and parked tasks from chat [#76](https://github.com/avi2d/orc/pull/76)
+- **run:** post alerts and task events in chat [#75](https://github.com/avi2d/orc/pull/75)
+- **run:** fast-forward the default branch before each run; contribution scout split out [#74](https://github.com/avi2d/orc/pull/74)
+
+### Fixes
+
+- **dashboard:** check geometry at 80-240 columns, fix lone words and 7d fab… cut [#83](https://github.com/avi2d/orc/pull/83)
+- **run:** watch each upstream contribution once regardless of URL spelling [#79](https://github.com/avi2d/orc/pull/79)
+- **deps:** override minimatch to 11.0.3 and qs to 6.16.1 [#73](https://github.com/avi2d/orc/pull/73)
+
 ## 0.8.0
 
 Released 2026-11-02.
