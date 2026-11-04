@@ -7,7 +7,7 @@ export const tokenFileVar = "ORC_TOKEN_FILE"
 // A literal key here would leave the token in the run's Pi folder.
 export const tokenFileApiKey = "!cat \"$" + tokenFileVar + "\""
 
-const providerOf = (model: string): string => {
+export const providerOf = (model: string): string => {
   const slash = model.indexOf("/")
   return slash === -1 ? model : model.slice(0, slash)
 }

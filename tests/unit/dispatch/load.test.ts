@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -147,7 +148,7 @@ describe("reading a machine's load", () => {
     const machine = { name: "winbox", slots: 2, start: ["true", "runner", "start", "--", "sh", "-c", "echo busy"] } as const
     expect(await run(readMachineLoad(machine))).toEqual({ kind: "unread", reason: "sh -c echo busy runner load printed no load: busy" })
   })
-  test.skipIf(process.platform !== "linux")("a machine run here reads the five-minute field of /proc/loadavg instead of another", async () => {
+  test.skipIf(process.platform !== "linux")(skipReason("needs Linux's /proc/loadavg", "a machine run here reads the five-minute field of /proc/loadavg instead of another", "local"), async () => {
     const reading = await run(readMachineLoad({ name: "here", slots: 1, start: runnerStart }))
     const fiveMinute = Number((await readFile("/proc/loadavg", "utf8")).split(" ")[1])
     expect(reading.kind).toBe("read")
