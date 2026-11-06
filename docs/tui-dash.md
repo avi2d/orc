@@ -94,7 +94,7 @@ A second Codex login shows again only once the rollout's reading is an hour old.
 A log reading also replaces a window `quota-axi` reported when it was read later and its window has not reset.
 A block holding a window read from a log names where each window came from and how old the reading is, such as `week from codex rollout 38m ago`.
 It also names how the reading joined the account: by credential key, or as an assumption when the log names no account.
-The panel also reads the Claude readings that the Claude Code statusline hands the capture writer, as the [session quota README](../packages/session-quota/README.md#capture-usage-as-it-happens) describes.
+The panel also reads the Claude readings that the Claude Code statusline hands the capture writer, as [Capture usage as it happens](session-quota/capture.md) describes.
 Without that hook, the only Claude readings on disk are the rejections.
 
 To print one frame of plain text instead, run `tui-dash panel quota --print`.
@@ -141,7 +141,7 @@ To feed an account's block, give the `settings.json` in that account's folder a 
 }
 ```
 
-Run `bun run build` in the clone first, as the [session quota README](../packages/session-quota/README.md#build-the-writer) says, and put the clone's path in place of `/path/to/orc`.
+Run `bun run build` in the clone first, as [Build the writer](session-quota/capture.md#build-the-writer) says, and put the clone's path in place of `/path/to/orc`.
 Claude Code started with `CLAUDE_CONFIG_DIR` set to the folder reads that `settings.json` and runs the statusline with the same variable, so each reading names the folder.
 The writer prints nothing, so to keep another statusline's text, read stdin once and pipe it to both commands.
 
@@ -152,7 +152,7 @@ To print one frame of plain text instead, run `tui-dash panel session-quota --pr
 To print the versioned JSON report, run `bun run session-quota-json`.
 To print the report merged with a second machine's, run `bun run session-quota-composed-json`.
 To stream flag alerts as JSON lines, run `bun run session-quota-alerts`.
-The [session quota README](../packages/session-quota/README.md) documents both reports, the alert stream and how to configure the second machine.
+[Read the JSON report](session-quota/json-report.md), [Compose two machines](session-quota/compose-two-machines.md) and [Tail the alert stream](session-quota/alert-stream.md) document both reports, the alert stream and how to configure the second machine.
 
 ## Run the resources tool
 
@@ -721,7 +721,7 @@ A machine whose command is unset or blank has no entry.
 | `schemaVersion` | `1` |
 | `generatedAt` | The ISO instant the last source answered |
 | `machine` | This machine's name, `TUI_DASH_MACHINE` or `local` |
-| `sources.quota.report` | The report the [session quota README](../packages/session-quota/README.md#read-the-composed-report) describes as the composed report |
+| `sources.quota.report` | The report [Read the composed report](session-quota/compose-two-machines.md#read-the-composed-report) describes as the composed report |
 | `sources.resources.machines` | Each machine's `name` and a `reading` of the report [Read the resources report](#read-the-resources-report) describes |
 | `sources.queues.machines` | Each machine's `name` and a `pueue` reading of its `running` and `ended` tasks, how many are `queued` and `paused`, and its `groups` with their `status` and `parallel` count |
 | `sources.queues.machines` tasks | Each task's `id`, `command`, `project` and `startedAt`, and for an ended task its `endedAt` and `result` |

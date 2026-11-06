@@ -6,22 +6,13 @@ Orc is one orchestrator for all your agent work.
 You talk to it in a chat, it keeps the backlog, and it sends each task to a machine with room.
 A terminal dashboard shows every machine, queue and account at a glance.
 
-- **One front door.** Tell `orc chat` the work in plain words, or add a task file with `orc backlog add`.
-- **Every kind of task.** Code changes, investigations, reports and chores on a named machine, each ending in what it needs.
-- **Runs where there is room.** `orc beat` places each task on a machine with a free slot and an account with quota left.
-- **Asks only when it must.** A task that needs your call waits with its question, and your answer starts it again.
-  The chat can put a task's open questions on a local decision board, one card each with its options and a pick.
-- **Reviewed before you see it.** A code change passes your checks and lands as a pull request after the review [Pick a delivery mode](#pick-a-delivery-mode) names.
-- **Never loses work.** The backlog, the run history and the queues live on disk, so a restart picks up where it stopped.
-- **See it all.** `tui-dash` shows quota, machines, queues, tasks and alerts in one terminal screen.
-
 ## Before you begin
 
 - Bun, at the version `.bun-version` pins.
 - Git 2.48 or later.
 - Node, which the agent runs on.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, logged in to a model provider.
-- no-mistakes, installed as [Installing no-mistakes](packages/run/README.md#installing-no-mistakes) says, for every run except `direct-PR`.
+- no-mistakes, installed as [Installing no-mistakes](docs/run/installing-no-mistakes.md) says, for every run except `direct-PR`.
 - pueue, to queue runs on each machine.
 
 ## Install
@@ -73,119 +64,12 @@ To hand orc a stream of work:
 Once a task the chat added closes, the chat posts it with its outcome and its reason.
 The post carries the PR, or the report for a scout or task.
 The chat also posts each alert once, and when any task's PR turns green, merges, closes or its run stalls.
-[The backlog and the beat](packages/run/README.md#the-backlog-and-the-beat) shows both files and every option.
-
-## Pick a task kind
-
-Each task has a kind, and the kind decides how its run ends:
-
-- `ship`, the default, changes code and ends in a pull request through the checks and the delivery [Pick a delivery mode](#pick-a-delivery-mode) names.
-- `scout` reads the checkout, changes nothing and ends in a report.
-- `task` does the work it describes and ends in a report with its evidence.
-
-To pick one, add `--kind scout` or `--kind task` to `orc backlog add` or `orc run`, or say it in the chat.
-A scout or task run skips no-mistakes and the pull request.
-Pi works in the run folder and writes `agent-report.md` there.
-The task closes done with the report's path, or closes failed when no report exists.
-To keep a task on one machine, add `--machine <name>`, and it waits for room there instead of starting elsewhere.
-
-## Pick a delivery mode
-
-Each project in `projects.json` can name a `mode` that decides how its ship tasks reach a pull request:
-
-- `no-mistakes`, the default, runs the checks and then no-mistakes, which opens the pull request.
-- `direct-PR` runs the checks, then pushes the branch and opens the pull request itself.
-- `no-mistakes-prod-only` runs no-mistakes unless a task is marked internal, and then works as `direct-PR`.
-
-To mark a task internal, add `--internal` to `orc backlog add`, or say so in the chat.
-The task file keeps the mark, and the other two modes ignore it.
-A failed check closes a `direct-PR` task failed with no push and no pull request.
-The chat posts a `direct-PR` task's pull request the same way as any other.
-Orc refuses any other mode with a message that names the project.
-
-## Merge a PR and turn on yolo
-
-To land a closed task's PR, run `orc merge <task-id>`, or tell the chat to merge it.
-Orc squash-merges the PR only when it is open, every check is green and the branch is not behind its base.
-Otherwise it merges nothing and says why.
-
-The chat merges on your word.
-To let it merge a yolo project's PR when you ask and the PR is green, add `"yolo": true` to that project in `projects.json`.
-Orc refuses a `yolo` that is not `true` or `false`, and a project with no `yolo` waits for your word.
-[Merging a task's PR](packages/run/README.md#merging-a-tasks-pr) names every refusal.
-
-## Give a project its own instructions
-
-To give a project rules of its own, add `"instructions": "<file>"` to that project in `projects.json`.
-The file is Markdown, and its path is absolute or relative to the folder that holds `projects.json`.
-Each run of that project's tasks and `orc chat` add it to Pi's system prompt and name it on their first line of output.
-A project instructions file replaces a discovered APPEND_SYSTEM.md.
-Orc refuses an instructions value that is not a file path, and a list naming an instructions file that does not exist.
-A project with no `instructions` gets no extra rules.
-
-## Follow up on your upstream contributions
-
-To have orc follow the issues and pull requests you filed on other people's repositories, add `"upstream": ["<url>"]` to that project in `projects.json`.
-Each entry is a GitHub issue or pull request URL, such as `https://github.com/owner/repo/pull/12`.
-Only `orc beat` reads the list, through the `gh` login of the machine that runs it, so a private repository needs a login that can see it.
-The beat only reads upstream and never comments, pushes or opens anything there.
-The first beat to read a contribution records its state and adds no task.
-When a later beat finds it closed, merged, reopened, commented on, reviewed or pushed to, it adds one scout task for the project naming the URL and the change, and the chat posts the change.
-A contribution the beat cannot read prints `upstream of <project>: <reason>`, with the URL and why in the reason, and adds no task.
-Orc refuses an `upstream` that is not a list of such URLs, and a project with no `upstream` watches nothing.
+[The backlog and the beat](docs/run/backlog-and-beat.md) shows both files and every option.
 
 ## Open the dashboard
 
 To open the dashboard, run `bun run dashboard` from the repository root.
 [The dashboard guide](docs/tui-dash.md) names each panel and the tools it reads.
-
-## Where orc is going
-
-Orc grows toward the full orchestrator one step at a time.
-
-| Capability | State |
-| --- | --- |
-| Chat and backlog as the front door | Ships today |
-| Runs placed by free slot and account quota, across machines | Ships today |
-| Code changes through checks and review into a pull request | Ships today |
-| Terminal dashboard with quota, machines, queues, tasks and alerts | Ships today |
-| Orchestrator rules the chat follows | Next |
-| The chat posts every close, after a restart too | Next |
-| Decisions held for you with a reason, answered from the chat | Ships today |
-| Runs parked on a question resume on your answer | Ships today |
-| Reports, investigations and machine tasks that end without a pull request | Ships today |
-| Per-project delivery: direct pull request or full review | Ships today |
-| Merge on your word, refusing red checks | Ships today |
-| Stalled runs and machine load flagged in the chat | Ships today |
-| Alerts and pull request events posted in the chat | Ships today |
-| Decision boards you answer once | Ships today |
-| Per-project instructions the run and the chat both read | Ships today |
-| A fresh checkout before every run | Ships today |
-| Follow-ups on upstream changes | Ships today |
-
-Today a ship run counts as done once Pi stops cleanly with `ORC_COMPLETE` and the branch holds a new commit.
-The checks must pass too, and no-mistakes must open a pull request with green CI.
-A `direct-PR` ship run counts as done once the checks pass and its pull request opens.
-A ship task that changes no code closes failed.
-A scout or task run counts as done once its report exists.
-A queued run from the backlog runs without the nono sandbox.
-
-## Contribute
-
-To run the checks:
-
-1. Run `bun run build` to build the workspace.
-1. Run `bun run lint` to lint it.
-1. Run `bun run typecheck` to typecheck it.
-1. Run `bun run test` to test it.
-
-The secrets gate in `bun run lint` fails a change that adds a term from a private list of host and person names.
-The list is a JSON file in the format [checks-secrets](https://github.com/avi2d/checks/blob/main/docs/gates/checks-secrets.md#the-private-pack) reads, with keys such as `hosts` and `names`.
-It lives outside orc, at `~/.config/checks/secrets-pack.json`, or wherever `CHECKS_SECRETS_PACK` points.
-Lint fails on a machine with no list, so no change skips the gate.
-In CI the `CHECKS_SECRETS_PACK` repository secret holds the list.
-
-A panel package reaches another package only through the schema and ui packages, and `bun run lint` refuses any other import.
 
 ## Where things are
 
@@ -201,5 +85,13 @@ A panel package reaches another package only through the schema and ui packages,
 
 ## Related topics
 
+- [What orc does](docs/features.md)
+- [Pick a task kind](docs/pick-a-task-kind.md)
+- [Pick a delivery mode](docs/pick-a-delivery-mode.md)
+- [Merge a PR and turn on yolo](docs/merge-a-pr.md)
+- [Give a project its own instructions](docs/project-instructions.md)
+- [Follow up on your upstream contributions](docs/upstream-contributions.md)
+- [Where orc is going](docs/roadmap.md)
+- [Contribute](docs/contribute.md)
 - [The orc command in depth](packages/run/README.md)
 - [The tui-dash dashboard](docs/tui-dash.md)
