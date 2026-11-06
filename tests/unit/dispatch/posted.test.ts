@@ -6,6 +6,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { parseDispatchArgs } from "../../../packages/run/src/dispatch/args"
 import { addTask, claimTask, closeStartedTask, listTasks, markPosted, writeTaken } from "../../../packages/run/src/dispatch/backlog"
+import { markEventPosted, recordEvent, unpostedEvents } from "../../../packages/run/src/dispatch/events"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -45,6 +46,22 @@ describe("marking a close posted", () => {
       await run(closeStartedTask(root, record.spec.id, "done", "", { pr: null, report: null }, "2026-10-27T11:00:00.000Z"))
       expect(await run(markPosted(root, "acme.io-1", "2026-10-27T11:01:00.000Z"))).toBe(true)
       expect((await run(listTasks(root))).map((task) => task.state.kind === "closed" ? task.state.postedAt : null)).toEqual(["2026-10-27T11:01:00.000Z"])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  test("an uppercase-and-underscore project's merged event My_App-1.merged is posted instead of dropped", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-posted-"))
+    try {
+      const record = await run(addTask(root, { ...spec, project: "My_App" }))
+      expect(record.spec.id).toBe("My_App-1")
+      const key = record.spec.id + ".merged"
+      await run(recordEvent(root, { key, at: "2026-10-27T11:00:00.000Z", text: "My_App-1 Fix the thing merged" }))
+      expect((await run(unpostedEvents(root))).map((event) => event.key)).toEqual([key])
+      expect(parseDispatchArgs("backlog", ["posted", key])).toEqual({ kind: "MarkEventPosted", key })
+      expect(await run(markEventPosted(root, key))).toBe(true)
+      expect(await run(unpostedEvents(root))).toEqual([])
     } finally {
       await rm(root, { recursive: true, force: true })
     }
