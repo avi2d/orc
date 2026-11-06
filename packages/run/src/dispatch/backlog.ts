@@ -1,5 +1,5 @@
 import { Effect, FileSystem, Schema } from "effect"
-import { captainWait, type Hold, type ParkedQuestion, parseTaskFile, renderTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
+import { captainWait, type Hold, openQuestions, type ParkedQuestion, parseTaskFile, renderTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 import { BacklogError, platformFailure, publishOnce, scratchName } from "./backlog-write"
 
 export { BacklogError }
@@ -360,7 +360,7 @@ const holdOn = (id: string, ask: HoldAsk) => (fresh: TaskRecord): Effect.Effect<
   if (fresh.state.kind !== "new") {
     return Effect.fail(new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a new task is held" }))
   }
-  if (fresh.parked !== null) {
+  if (openQuestions(fresh).length > 0) {
     return Effect.fail(new BacklogError({ detail: id + " is parked for the captain's answer, so it cannot be held" }))
   }
   if (fresh.hold?.answer != null) {

@@ -1,6 +1,6 @@
 import { Effect, FileSystem } from "effect"
 import { BacklogError, findTask, type Rewrite, rewriteNew } from "./backlog"
-import type { TaskFileError, TaskRecord } from "./task-record"
+import { openQuestions, type TaskFileError, type TaskRecord } from "./task-record"
 
 const waitsOn = (from: string, target: string, tasks: ReadonlyArray<TaskRecord>): boolean => {
   const seen = new Set<string>()
@@ -36,7 +36,7 @@ const dependOn = (id: string, dependsOn: ReadonlyArray<string>) => (fresh: TaskR
   if (fresh.state.kind !== "new") {
     return Effect.fail(new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a new or held task takes other dependencies" }))
   }
-  if (fresh.parked !== null) {
+  if (openQuestions(fresh).length > 0) {
     return Effect.fail(new BacklogError({ detail: id + " is parked for the captain's answer, and only a new or held task takes other dependencies" }))
   }
   if (sameIds(fresh.spec.dependsOn, dependsOn)) {

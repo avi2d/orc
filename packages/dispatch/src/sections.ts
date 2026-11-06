@@ -1,4 +1,4 @@
-import type { DispatchView } from "@tui-dash/schema";
+import { type DispatchView, missingBacklog } from "@tui-dash/schema";
 import { type Block, type Label, labelledReadings, leastLabelWidth, reading } from "@tui-dash/ui";
 
 const labelOf = (text: string): Label => ({ text, width: leastLabelWidth });
@@ -7,7 +7,7 @@ const counted = (count: number, what: string): ReadonlyArray<string> => (count >
 
 export const dispatchSection = (view: DispatchView, width: number): Block => {
   const label = labelOf("dispatch");
-  if (view.missing) return labelledReadings(label, [reading("muted", "no backlog on this machine, only where orc beat runs")], width);
+  if (view.missing) return labelledReadings(label, [reading("muted", missingBacklog(view.root))], width);
   if (view.machines.kind !== "ok") {
     return labelledReadings(
       label,
