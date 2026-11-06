@@ -85,6 +85,7 @@ To open the dashboard, run `bun run dashboard` from the repository root.
 
 ## Related topics
 
+- [What orc does](docs/features.md)
 - [Pick a task kind](docs/pick-a-task-kind.md)
 - [Pick a delivery mode](docs/pick-a-delivery-mode.md)
 - [Merge a PR and turn on yolo](docs/merge-a-pr.md)

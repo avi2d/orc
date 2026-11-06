@@ -12,8 +12,21 @@ Its last line counts the rest and names the repository root's `session-quota-jso
 A terminal too narrow for that line on one row wraps it onto two.
 Heights under eight rows are not a supported layout, so there that line can be cut, and the script still lists every flag.
 The dashboard shows only the flags, each naming the agent's project, the account and the limit.
-It reads the Pi logs under `HOME`, the Codex logs under `CODEX_HOME` or `~/.codex`, and the Claude Code logs under `CLAUDE_CONFIG_DIR` or `~/.claude`.
+It reads the Pi logs under `HOME`, the Codex logs under `CODEX_HOME`, or `~/.codex`, and the Claude Code logs under `CLAUDE_CONFIG_DIR`, or `~/.claude`.
 Those are the homes of the logins `quota-axi` reads.
+It counts each model call once.
+It splits a window's used points across the sessions that made those calls.
+It flags each live session spending over its fair share of a window that runs ahead of pace and is past its first tenth.
+It flags only when the window runs out before its reset.
+Quota-axi's runway gives the verdict for a window it names.
+An early or unknown projection leaves the live rate to decide.
+A runway naming another window means this one runs to its reset.
+A harvested window or one with no runway reads its pace from its live sessions' total rate against the sustainable rate.
+A window with nothing left runs out before its reset.
+A session's fair share is what its window has left an hour, split evenly among the live sessions that spent in the trailing hour.
+It also reads the capture ledger that its writer appends to from a Pi hook and the Claude Code statusline.
+The bridge appends headless readings to the same ledger.
+It can merge a second machine's report, so an account both machines spend shows one estimate instead of two upper bounds.
 Each account opens with the assumption that joined its calls to it, such as joined by credential key or assumed the only login.
 A window is read from a harness log when the log covered its provider within the hour, or read it later than quota-axi did.
 Such a window names that log and the reading's age, such as from codex rollout 38m ago.
