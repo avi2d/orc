@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Effect, Result } from "effect"
 import { parseRefuseMarkers } from "../../packages/run/src/checkout"
-import { toolchainFromEnv } from "../../packages/run/src/run"
+import { idleTimeoutFromEnv, toolchainFromEnv } from "../../packages/run/src/run"
 
 describe("parseRefuseMarkers", () => {
   test("no value names no marker", () => {
@@ -44,5 +44,25 @@ describe("toolchainFromEnv", () => {
     expect(refusal("/Users")).toContain("holds HOME")
     expect(refusal("/Users/test")).toContain("holds HOME")
     expect(refusal("/opt/tools:.bun")).toContain("not an absolute path")
+  })
+})
+
+const idleTimeoutFor = (value: string | undefined) => Effect.runSync(Effect.result(idleTimeoutFromEnv(value)))
+
+describe("idleTimeoutFromEnv", () => {
+  test("no value waits 45 minutes, not sandcastle's 600 seconds", () => {
+    expect(idleTimeoutFor(undefined)).toEqual(Result.succeed(2700))
+    expect(idleTimeoutFor("  ")).toEqual(Result.succeed(2700))
+  })
+
+  test("a whole number of seconds is taken as given", () => {
+    expect(idleTimeoutFor(" 3600 ")).toEqual(Result.succeed(3600))
+  })
+
+  test("zero, a fraction, a unit and a negative are refused instead of read as a number", () => {
+    for (const value of ["0", "1.5", "45m", "-60", "0600"]) {
+      const result = idleTimeoutFor(value)
+      expect(Result.isFailure(result) && result.failure.message).toContain("ORC_IDLE_TIMEOUT_SECONDS is " + value)
+    }
   })
 })

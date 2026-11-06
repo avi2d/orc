@@ -41,6 +41,10 @@ Orc trims padding around each name and drops blank entries.
 Orc checks each marker in the project directory and its parent and refuses a checkout carrying one.
 An unset `ORC_REFUSE_MARKERS` names no marker and refuses no checkout for a marker.
 
+Orc ends a run whose Pi prints nothing for 45 minutes, which covers a full lint or test command that prints nothing until it ends.
+To change that limit, set `ORC_IDLE_TIMEOUT_SECONDS` to a whole number of seconds, for example `ORC_IDLE_TIMEOUT_SECONDS=3600 orc run task.md`.
+Orc refuses the run before Pi starts when the value is not a whole number above zero.
+
 To hand the run a project's instructions, add `--instructions <file>`, an absolute path or one relative to the folder you run orc in.
 Orc copies the file into the run's `session` folder and adds it to the system prompt of each Pi the run starts.
 The run's first line of output names the file, and orc refuses the run before Pi starts when the file is missing.

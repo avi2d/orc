@@ -4,4 +4,5 @@ dist/
 reports/
 .stryker-tmp/
 .orc-home/
+.sandcastle/
 repos/*
