@@ -150,10 +150,11 @@ const parsePosted = (rest: ReadonlyArray<string>): DispatchArgs => {
   if (extra.length > 0) {
     return unexpected(extra[0])
   }
-  if (isEventKey(id)) {
-    return { kind: "MarkEventPosted", key: id }
+  // A project name may hold a dot, so acme.io-1 also reads as an event key, and no event key ends in -<digits>.
+  if (isTaskId(id)) {
+    return { kind: "MarkPosted", id }
   }
-  return isTaskId(id) ? { kind: "MarkPosted", id } : { kind: "UsageError", detail: "orc backlog posted takes a task id or an event key, got \"" + id + "\"" }
+  return isEventKey(id) ? { kind: "MarkEventPosted", key: id } : { kind: "UsageError", detail: "orc backlog posted takes a task id or an event key, got \"" + id + "\"" }
 }
 
 interface HoldFlags {
