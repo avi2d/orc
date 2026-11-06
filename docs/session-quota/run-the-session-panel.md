@@ -2,6 +2,7 @@
 kind: reference
 ---
 # Run the session panel
+
 To run the live panel, run `tui-dash panel session-quota`.
 The panel paints again every 30 seconds and says `reading local session logs…` until the first read of the logs finishes.
 It fits the terminal's rows by showing fewer sessions a window, and it keeps every flagged session in view.
