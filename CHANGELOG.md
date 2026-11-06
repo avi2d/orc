@@ -2,6 +2,14 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.9.1
+
+Released 2026-11-06.
+
+### Fixes
+
+- **run:** apply orchestrator provider env to chat Pi [#85](https://github.com/avi2d/orc/pull/85)
+
 ## 0.9.0
 
 Released 2026-11-04.
