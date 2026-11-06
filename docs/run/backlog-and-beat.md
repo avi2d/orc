@@ -5,7 +5,10 @@ kind: reference
 Orc keeps one backlog of tasks in `~/.orc/backlog`, one Markdown file per task with its facts in YAML frontmatter.
 `ORC_HOME` moves the backlog elsewhere when set.
 The backlog lives only on the machine that runs `orc beat`.
-On a machine with no backlog folder, `orc backlog` prints `no backlog at <path>` and says where the backlog lives, and every other `orc backlog` command except `add` refuses with the same words.
+On a machine with no backlog folder, `orc backlog` without `--json` prints `no backlog at <path>` and says where the backlog lives.
+With `--json` it prints an empty backlog instead.
+Every other `orc backlog` command except `add` refuses with the same words.
+`orc merge` refuses the same way.
 A task file sits in `new`, `taken` or `closed`, and the folder it sits in is its state.
 Two files beside the folders tell the beat where tasks may go.
 `dispatch.json` names each machine, its slots, its start command and its renew command, and the quota.
