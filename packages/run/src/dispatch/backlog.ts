@@ -4,10 +4,14 @@ import { BacklogError, platformFailure, publishOnce, scratchName } from "./backl
 
 export { BacklogError }
 
-const taskFilePattern = /^task-(\d+)\.md$/
-const idPattern = /^task-(\d+)$/
+// A project name may hold dashes, so an id splits at its last dash.
+const idPattern = /^([A-Za-z0-9][A-Za-z0-9._-]*)-(\d+)$/
+const taskFilePattern = /^[A-Za-z0-9][A-Za-z0-9._-]*-\d+\.md$/
 
-const taskNumber = (id: string): number => Number(idPattern.exec(id)?.[1] ?? Number.NaN)
+const splitId = (id: string): { readonly project: string; readonly number: number } | null => {
+  const split = idPattern.exec(id)
+  return split === null ? null : { project: split[1], number: Number(split[2]) }
+}
 
 export const isTaskId = (id: string): boolean => idPattern.test(id)
 
@@ -55,7 +59,8 @@ const readNames = (folder: string): Effect.Effect<ReadonlyArray<string>, Backlog
     )
   })
 
-const byTaskNumber = (left: TaskRecord, right: TaskRecord): number => taskNumber(left.spec.id) - taskNumber(right.spec.id)
+const byCreated = (left: TaskRecord, right: TaskRecord): number =>
+  left.spec.created.localeCompare(right.spec.created) || left.spec.id.localeCompare(right.spec.id, "en", { numeric: true })
 
 // A beat may move a listed file to the next folder before it is read, so a vanished file is skipped rather than failed.
 const readFolder = (
@@ -90,18 +95,25 @@ export const listTasks = (
     Effect.map((folders) => {
       const all = folders.flat()
       const closed = new Set(all.filter((record) => record.state.kind === "closed").map((record) => record.spec.id))
-      return all.filter((record) => record.state.kind === "closed" || !closed.has(record.spec.id)).sort(byTaskNumber)
+      return all.filter((record) => record.state.kind === "closed" || !closed.has(record.spec.id)).sort(byCreated)
     })
   )
 
-const reserveId = (root: string): Effect.Effect<string, BacklogError, FileSystem.FileSystem> =>
+// An old task-<n> id names no project, so its task file says which project it counts for.
+const reserveId = (root: string, project: string): Effect.Effect<string, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const paths = backlogPaths(root)
-    const taken = (yield* readNames(paths.ids)).map(taskNumber).filter(Number.isFinite)
-    let next = Math.max(0, ...taken) + 1
+    const tasks = yield* listTasks(root).pipe(
+      Effect.catchTag("TaskFileError", (error) => Effect.fail(new BacklogError({ detail: "cannot read " + error.file + ": " + error.detail })))
+    )
+    const own = [
+      ...(yield* readNames(paths.ids)).map(splitId).filter((split) => split?.project === project),
+      ...tasks.filter((task) => task.spec.project === project).map((task) => splitId(task.spec.id))
+    ]
+    let next = Math.max(0, ...own.map((split) => split?.number ?? 0)) + 1
     for (;;) {
-      const id = "task-" + next
+      const id = project + "-" + next
       const reserved = yield* fs.writeFileString(paths.ids + "/" + id, "", { flag: "wx" }).pipe(
         Effect.as(true),
         Effect.catchReason("PlatformError", "AlreadyExists", () => Effect.succeed(false)),
@@ -120,7 +132,7 @@ export const addTask = (
 ): Effect.Effect<TaskRecord, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     yield* ensureBacklog(root)
-    const id = yield* reserveId(root)
+    const id = yield* reserveId(root, spec.project)
     const record: TaskRecord = { spec: { ...spec, id }, hold: null, parked: null, state: { kind: "new" } }
     if (!(yield* publishOnce(backlogPaths(root).folder("new"), id + ".md", renderTaskFile(record)))) {
       return yield* new BacklogError({ detail: "the reserved id " + id + " already names a task" })

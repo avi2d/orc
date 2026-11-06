@@ -171,8 +171,8 @@ const readJsonFile = (fs: FileSystem.FileSystem, file: string): Effect.Effect<Ou
   });
 
 const stemOf = (name: string): string | null => {
-  const stemmed = /^task-(\d+)\.md$/u.exec(name);
-  return stemmed === null ? null : "task-" + stemmed[1];
+  const stemmed = /^([A-Za-z0-9][A-Za-z0-9._-]*-\d+)\.md$/u.exec(name);
+  return stemmed?.[1] ?? null;
 };
 
 const takeTask = (
@@ -233,8 +233,9 @@ const readFolder = (
 const orderedTasks = (tasks: ReadonlyArray<DispatchTask>): ReadonlyArray<DispatchTask> => {
   const seen = new Map<string, DispatchTask>();
   for (const task of tasks) seen.set(task.id, task);
-  const numbered = (id: string): number => Number(id.slice(5));
-  return [...seen.values()].toSorted((left, right) => numbered(left.id) - numbered(right.id));
+  return [...seen.values()].toSorted(
+    (left, right) => left.created.localeCompare(right.created) || left.id.localeCompare(right.id, "en", { numeric: true }),
+  );
 };
 
 const readTasks = (

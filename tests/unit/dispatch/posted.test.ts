@@ -19,13 +19,13 @@ describe("marking a close posted", () => {
     try {
       const record = await run(addTask(root, spec))
       await run(claimTask(root, record.spec.id))
-      await run(writeTaken(root, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
+      await run(writeTaken(root, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/orc-1.log" } } }))
       await run(closeStartedTask(root, record.spec.id, "done", "", { pr: null, report: null }, "2026-10-27T11:00:00.000Z"))
-      const marks = await run(Effect.all(Array.from({ length: 8 }, () => markPosted(root, "task-1", "2026-10-27T11:01:00.000Z")), { concurrency: "unbounded" }))
+      const marks = await run(Effect.all(Array.from({ length: 8 }, () => markPosted(root, "orc-1", "2026-10-27T11:01:00.000Z")), { concurrency: "unbounded" }))
       expect(marks).toHaveLength(8)
       expect((await run(listTasks(root))).map((task) => task.state.kind === "closed" ? task.state.postedAt : null)).toEqual(["2026-10-27T11:01:00.000Z"])
-      expect(await readdir(join(root, "closed"))).toEqual(["task-1.md"])
-      expect(await run(markPosted(root, "task-1", "2026-10-27T11:02:00.000Z"))).toBe(false)
+      expect(await readdir(join(root, "closed"))).toEqual(["orc-1.md"])
+      expect(await run(markPosted(root, "orc-1", "2026-10-27T11:02:00.000Z"))).toBe(false)
       expect((await run(listTasks(root))).map((task) => task.state.kind === "closed" ? task.state.postedAt : null)).toEqual(["2026-10-27T11:01:00.000Z"])
     } finally {
       await rm(root, { recursive: true, force: true })

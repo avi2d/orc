@@ -80,10 +80,10 @@ describe("the beat's upstream watch", () => {
   test("a changed contribution adds one scout task naming it and the change instead of none or one per field", async () => {
     await withBacklog([pull], async (root) => {
       await beat(root, reads(openPull))
-      expect(upstreamLines(await beat(root, reads(mergedPull)))).toEqual(["added task-1 for orc as a scout: " + pull + " changed: merged, 1 new comment"])
+      expect(upstreamLines(await beat(root, reads(mergedPull)))).toEqual(["added orc-1 for orc as a scout: " + pull + " changed: merged, 1 new comment"])
       const tasks = await run(listTasks(root))
       expect(tasks.map((task) => [task.spec.id, task.spec.kind, task.spec.project, task.spec.title, task.state.kind])).toEqual([
-        ["task-1", "scout", "orc", "Follow up on acme/widgets#7: merged, 1 new comment", "new"]
+        ["orc-1", "scout", "orc", "Follow up on acme/widgets#7: merged, 1 new comment", "new"]
       ])
       expect(tasks[0]?.spec.body).toContain("The upstream pull request " + pull + ", which projects.json names for orc, changed since the last beat read it: merged, 1 new comment.")
       expect((await run(unpostedEvents(root))).map((event) => event.text)).toEqual(["upstream " + pull + " of orc changed: merged, 1 new comment"])
@@ -115,7 +115,7 @@ describe("the beat's upstream watch", () => {
     await withBacklog([pull], async (root) => {
       await beat(root, reads(openPull))
       await beat(root, reads(mergedPull))
-      expect(upstreamLines(await beat(root, reads({ ...mergedPull, comments: 5 })))).toEqual(["added task-2 for orc as a scout: " + pull + " changed: 2 new comments"])
+      expect(upstreamLines(await beat(root, reads({ ...mergedPull, comments: 5 })))).toEqual(["added orc-2 for orc as a scout: " + pull + " changed: 2 new comments"])
     })
   })
 
@@ -147,7 +147,7 @@ describe("the beat's upstream watch", () => {
       const respelled = "https://github.com/Acme/Widgets/pull/7"
       await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: "/checkout" }, upstream: [respelled] }] }))
       expect(upstreamLines(await beat(root, reads(openPull)))).toEqual([])
-      expect(upstreamLines(await beat(root, reads(mergedPull)))).toEqual(["added task-1 for orc as a scout: " + respelled + " changed: merged, 1 new comment"])
+      expect(upstreamLines(await beat(root, reads(mergedPull)))).toEqual(["added orc-1 for orc as a scout: " + respelled + " changed: merged, 1 new comment"])
     })
   })
 

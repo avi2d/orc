@@ -24,7 +24,7 @@ const refuseOnQuestions = async (fixture: Fixture): Promise<void> => {
     tasks: {
       "77": {
         id: 77,
-        label: fixture.home + " task-1",
+        label: fixture.home + " orc-1",
         group: "orc",
         path: fixture.checkout,
         status: { Done: { start: "2026-11-02T10:00:00Z", end: "2026-11-02T10:30:00Z", result: { Failed: 1 } } }
@@ -37,7 +37,7 @@ const refuseOnQuestions = async (fixture: Fixture): Promise<void> => {
     Effect.runSync(recordRun(db, {
       id: "run-1",
       project: fixture.checkout,
-      branch: "orc/task-1",
+      branch: "orc/orc-1",
       taskFile: "task.md",
       status: "failed",
       started: "2026-11-02T10:00:05.000Z",
@@ -65,17 +65,17 @@ describe("a parked run", () => {
       await startOnLinux(fixture)
       await refuseOnQuestions(fixture)
       const parked = await orcOk(fixture, ["beat"])
-      expect(parked).toContain("parked task-1 on orc/task-1 for the captain's answer to question-4, question-5")
-      expect(parked).not.toContain("closed task-1")
+      expect(parked).toContain("parked orc-1 on orc/orc-1 for the captain's answer to question-4, question-5")
+      expect(parked).not.toContain("closed orc-1")
       expect(await backlogTaskOne(fixture)).toMatchObject({
-        id: "task-1",
+        id: "orc-1",
         status: "new",
         parked: {
-          branch: "orc/task-1",
+          branch: "orc/orc-1",
           questions: [{ id: "question-4", text: "Which retries are allowed?", answer: null }, { id: "question-5", text: "", answer: null }]
         }
       })
-      expect(await orcOk(fixture, ["beat"])).toContain("waits task-1: parked on orc/task-1 for the captain's answer to question-4, question-5")
+      expect(await orcOk(fixture, ["beat"])).toContain("waits orc-1: parked on orc/orc-1 for the captain's answer to question-4, question-5")
       expect(await queuedSince(fixture)).toBeNull()
     })
   }, runnerTimeout)
@@ -85,14 +85,14 @@ describe("a parked run", () => {
       await startOnLinux(fixture)
       await refuseOnQuestions(fixture)
       await orcOk(fixture, ["beat"])
-      expect(await orcOk(fixture, ["backlog", "answer", "task-1", "question-4=Two retries, then stop"])).toBe("answered question-4 on task-1, and it stays parked for question-5\n")
-      expect(await orcOk(fixture, ["beat"])).toContain("waits task-1: parked on orc/task-1 for the captain's answer to question-5")
+      expect(await orcOk(fixture, ["backlog", "answer", "orc-1", "question-4=Two retries, then stop"])).toBe("answered question-4 on orc-1, and it stays parked for question-5\n")
+      expect(await orcOk(fixture, ["beat"])).toContain("waits orc-1: parked on orc/orc-1 for the captain's answer to question-5")
       expect(await queuedSince(fixture)).toBeNull()
-      expect(await orcOk(fixture, ["backlog", "answer", "task-1", "question-5=Only", "the", "wide", "scope"])).toBe("answered question-5 on task-1, so the beat resumes it on orc/task-1\n")
-      expect(await orcOk(fixture, ["beat"])).toContain("started task-1")
+      expect(await orcOk(fixture, ["backlog", "answer", "orc-1", "question-5=Only", "the", "wide", "scope"])).toBe("answered question-5 on orc-1, so the beat resumes it on orc/orc-1\n")
+      expect(await orcOk(fixture, ["beat"])).toContain("started orc-1")
       const added = await queuedArgs(fixture)
       expect(added?.slice(added.indexOf("--branch"))).toEqual([
-        "--branch", "orc/task-1", "--sandbox", "none", "--provider", "acme",
+        "--branch", "orc/orc-1", "--sandbox", "none", "--provider", "acme",
         "--answer", "question-4=Two retries, then stop", "--answer", "question-5=Only the wide scope",
         "--token-file", mainToken
       ])
@@ -104,9 +104,9 @@ describe("a parked run", () => {
       await startOnLinux(fixture)
       await refuseOnQuestions(fixture)
       await orcOk(fixture, ["beat"])
-      const refused = await runOrc(fixture, ["backlog", "answer", "task-1", "question-9=Yes"])
+      const refused = await runOrc(fixture, ["backlog", "answer", "orc-1", "question-9=Yes"])
       expect(refused.exitCode).not.toBe(0)
-      expect(refused.stderr).toContain("task-1 is parked for the captain's answer to question-4, question-5, so answer one as <question-id>=<text>")
+      expect(refused.stderr).toContain("orc-1 is parked for the captain's answer to question-4, question-5, so answer one as <question-id>=<text>")
     })
   }, runnerTimeout)
 })
