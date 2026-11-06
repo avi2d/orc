@@ -1,2 +1,3 @@
 [test]
 pathIgnorePatterns = ["**/tests/quarantine/**", "**/tests/live/**", "**/tests/pixel/**", "repos/**"]
+preload = ["./tests/preload.ts"]

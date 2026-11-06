@@ -484,7 +484,7 @@ describe("host git runs no filter the sandbox can name in the repository", () =>
         expect(await filter.ran()).toBe(true)
       })
     })
-  })
+  }, 30_000)
 })
 
 describe("host git runs no transport program the sandbox can name in the repository", () => {

@@ -1,4 +1,4 @@
-import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Schema } from "effect"
@@ -98,7 +98,7 @@ const scopeFixtureLabels = async (statusFile: string, home: string): Promise<voi
 }
 
 export const withFixture = async (body: (fixture: Fixture) => Promise<void>): Promise<void> => {
-  const dir = await mkdtemp(join(tmpdir(), "orc-runner-e2e-"))
+  const dir = await realpath(await mkdtemp(join(tmpdir(), "orc-runner-e2e-")))
   try {
     const bin = join(dir, "bin")
     const pueue = join(dir, "pueue")

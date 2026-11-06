@@ -17,7 +17,7 @@ const runOrc = async (args: ReadonlyArray<string>, home: string): Promise<OrcRes
   const proc = Bun.spawn([process.execPath, "packages/run/src/bin.ts", ...args], {
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, HOME: home }
+    env: { ...process.env, HOME: home, ORC_HOME: "" }
   })
   const stdout = proc.stdout
   const stderr = proc.stderr
