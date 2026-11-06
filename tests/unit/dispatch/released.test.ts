@@ -40,13 +40,13 @@ const runnerPueue: BeatSpawner =
 describe("a released run's input", () => {
   const answeredTaken = async (root: string): Promise<void> => {
     await run(addTask(root, { ...spec, title: "Pick the API", body: "# Pick the API\nChoose.\n" }))
-    await run(holdTask(root, "task-1", { reason: "REST or gRPC", until: null, questions: [] }))
-    await run(answerTask(root, "task-1", "REST", "2026-11-02T12:00:00.000Z"))
-    await run(claimTask(root, "task-1"))
+    await run(holdTask(root, "orc-1", { reason: "REST or gRPC", until: null, questions: [] }))
+    await run(answerTask(root, "orc-1", "REST", "2026-11-02T12:00:00.000Z"))
+    await run(claimTask(root, "orc-1"))
   }
   const startEnv = (root: string, checkout: string): Record<string, string> => ({
-    ORC_TASK_ID: "task-1",
-    ORC_TASK_FILE: join(root, "taken", "task-1.md"),
+    ORC_TASK_ID: "orc-1",
+    ORC_TASK_FILE: join(root, "taken", "orc-1.md"),
     ORC_TASK_CHECKOUT: checkout,
     ORC_TASK_PROVIDER: "test"
   })
@@ -67,7 +67,7 @@ describe("a released run's input", () => {
           Effect.provide(Layer.merge(BunServices.layer, runnerPueue))
         )
       )
-      expect(queued ?? "").toContain("queued task-1 as pueue task 77")
+      expect(queued ?? "").toContain("queued orc-1 as pueue task 77")
       const names = await readdir(join(root, "runner"))
       expect(names).toHaveLength(1)
       answeredBody(await readFile(join(root, "runner", names[0] ?? ""), "utf8"))

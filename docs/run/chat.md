@@ -19,7 +19,7 @@ The chat's Pi has six tools and no others:
 
 So a task from the chat enters the backlog the way any other does, and the beat starts it.
 When it starts and every 15 seconds after, the chat reads `orc backlog --json`.
-While Pi is idle, it posts each closed task that has no `postedAt`, with its outcome, its reason and its PR or report, as in `task-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
+While Pi is idle, it posts each closed task that has no `postedAt`, with its outcome, its reason and its PR or report, as in `orc-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
 It posts a task whoever added it: this chat, an earlier chat or the command line.
 It posts each close then runs `orc backlog posted <task-id>`, which writes `posted_at` into the closed task file, so a task closed while no chat ran is posted by the next chat to start, and every close is posted, with a close repeated at most when the chat stops between its post and its mark, or when two chats post the same close in the same moment.
 It posts each event the same way, then runs `orc backlog posted <event-key>`.
@@ -29,8 +29,8 @@ A second stall of one task is a new event.
 `orc backlog --json` also lists each alert fire from `alerts.jsonl` in the backlog folder, and the chat posts each fire once.
 The alert stream that `orc runner start` queues writes that file, as [The runner](runner.md) shows.
 When it cannot read or mark the backlog, it posts orc's error once Pi is idle and keeps polling.
-Each time the chat starts, it posts one line per held task you have not answered, once Pi is idle, as in `task-2 Pick the API is held for the captain: REST or gRPC, until 2026-12-01`.
-It posts one line per parked question you have not answered each time it starts, and once more when a task parks while it runs, as in `task-3 Fix the retries is parked on orc/task-3 for the captain's answer to question-4: Which retries are allowed?`.
+Each time the chat starts, it posts one line per held task you have not answered, once Pi is idle, as in `orc-2 Pick the API is held for the captain: REST or gRPC, until 2026-12-01`.
+It posts one line per parked question you have not answered each time it starts, and once more when a task parks while it runs, as in `orc-3 Fix the retries is parked on orc/orc-3 for the captain's answer to question-4: Which retries are allowed?`.
 A question whose line a failed read or a busy Pi kept back is posted on a later poll.
 The chat's Pi loads your Pi settings and packages, so a provider a package adds works as it does in your Pi.
 The chat's Pi also takes the `env` of the orchestrator's provider, so the chat and the runs of that provider use the same account whatever your shell exports.

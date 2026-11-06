@@ -29,8 +29,8 @@ const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>, kind: 
 }
 
 const pueueAddFor = (home: string, checkout: string): ReadonlyArray<string> => [
-  "--group", "orc", "--label", home + " task-1", "--working-directory", checkout, "--print-task-id", "--escape", "--",
-  process.execPath, binPath, "run", join(home, "runner", "task-1.md"), "--branch", "orc/task-1",
+  "--group", "orc", "--label", home + " orc-1", "--working-directory", checkout, "--print-task-id", "--escape", "--",
+  process.execPath, binPath, "run", join(home, "runner", "orc-1.md"), "--branch", "orc/orc-1",
   "--sandbox", "none", "--provider", "acme", "--token-file", mainToken
 ]
 
@@ -40,7 +40,7 @@ describe("orc runner start", () => {
       const added = await beatStarts(fixture, [process.execPath, binPath, "runner", "start"])
       expect(added).toEqual(pueueAddFor(fixture.home, fixture.checkout))
       expect(await queuedEnv(fixture)).toBe(fixture.home)
-      expect(await readFile(join(fixture.home, "runner", "task-1.md"), "utf8")).toBe(await readFile(join(fixture.dir, "task.md"), "utf8"))
+      expect(await readFile(join(fixture.home, "runner", "orc-1.md"), "utf8")).toBe(await readFile(join(fixture.dir, "task.md"), "utf8"))
     })
   }, runnerTimeout)
 
@@ -98,10 +98,10 @@ describe("orc runner start", () => {
     await withFixture(async (fixture) => {
       const far = join(fixture.dir, "far-home")
       const added = await beatStarts(fixture, [process.execPath, binPath, "runner", "start", "--", ...orcThere(far)])
-      const label = fixture.home + " task-1"
+      const label = fixture.home + " orc-1"
       expect(added).toEqual([
         "--group", "orc", "--label", label, "--working-directory", fixture.checkout, "--print-task-id", "--escape", "--",
-        process.execPath, binPath, "run", join(far, "runner", "label-" + encodeURIComponent(label) + ".md"), "--branch", "orc/task-1",
+        process.execPath, binPath, "run", join(far, "runner", "label-" + encodeURIComponent(label) + ".md"), "--branch", "orc/orc-1",
         "--sandbox", "none", "--provider", "acme", "--token-file", mainToken
       ])
       expect(await queuedEnv(fixture)).toBe(far)
@@ -134,7 +134,7 @@ describe("orc runner start", () => {
         tasks: {
           "77": {
             id: 77,
-            label: fixture.home + " task-1",
+            label: fixture.home + " orc-1",
             group: "orc",
             path: fixture.checkout,
             status: { Done: { start: "2026-10-28T02:36:39.176448491+03:00", end: "2026-10-28T02:36:39.489650573+03:00", result: "Success" } }
@@ -147,7 +147,7 @@ describe("orc runner start", () => {
         Effect.runSync(recordRun(db, {
           id: "run-1",
           project: fixture.checkout,
-          branch: "orc/task-1",
+          branch: "orc/orc-1",
           taskFile: "task.md",
           status: "succeeded",
           started: "2026-10-27T23:36:39.200Z",
@@ -158,9 +158,9 @@ describe("orc runner start", () => {
         db.close()
       }
       const second = await orcOk(fixture, ["beat"])
-      expect(second).toContain("closed task-1 done on linux: pueue task 77 succeeded, PR https://github.com/example/orc/pull/3")
+      expect(second).toContain("closed orc-1 done on linux: pueue task 77 succeeded, PR https://github.com/example/orc/pull/3")
       const backlog: unknown = JSON.parse(await orcOk(fixture, ["backlog", "--json"]))
-      expect(backlog).toMatchObject({ tasks: [{ id: "task-1", status: "closed", outcome: "done", pr: "https://github.com/example/orc/pull/3" }] })
+      expect(backlog).toMatchObject({ tasks: [{ id: "orc-1", status: "closed", outcome: "done", pr: "https://github.com/example/orc/pull/3" }] })
     })
   }, runnerTimeout)
 

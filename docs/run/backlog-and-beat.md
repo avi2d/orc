@@ -143,6 +143,11 @@ Orc refuses an `upstream` that is not a list, an entry that is not a `https://gi
 A project with no `upstream` makes the beat read nothing upstream.
 
 To add a task, run `orc backlog add <project> <task-file>`.
+Orc names the new task `<project>-<n>`, as in `orc-9`, with `<n>` one more than the highest number among that project's ids.
+A project name may hold dashes, so orc reads an id up to its last dash as the project, as in `orc-tui-3`.
+An old `task-<n>` id counts for the project its task file names, and it still works everywhere orc takes a task id.
+Orc reserves each id by creating its file in `~/.orc/backlog/ids` only when no file has that name.
+So two adds at once never get the same id.
 To pipe the task in instead, give `-` as the task file, as in `printf '# Fix the login page\n' | orc backlog add orc -`.
 It reads stdin to its end and refuses a terminal.
 Add `--machine <name>` to run the task on that machine only, and `--depends-on <task-id>` once per task it waits for.

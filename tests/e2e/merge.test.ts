@@ -44,11 +44,11 @@ const writeProject = (fixture: Fixture, extra: Record<string, unknown>): Promise
   writeFile(join(fixture.home, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: fixture.dir }, ...extra }] }))
 
 const closedWithPr = async (fixture: Fixture): Promise<void> => {
-  expect(await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" })).toBe("added task-1 for orc")
-  await closeTask(fixture, "task-1", ranClosing("done", "", prUrl))
+  expect(await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" })).toBe("added orc-1 for orc")
+  await closeTask(fixture, "orc-1", ranClosing("done", "", prUrl))
 }
 
-const taskFile = (fixture: Fixture): Promise<string> => readFile(join(fixture.home, "backlog", "closed", "task-1.md"), "utf8")
+const taskFile = (fixture: Fixture): Promise<string> => readFile(join(fixture.home, "backlog", "closed", "orc-1.md"), "utf8")
 
 const mergeCalls = async (fixture: Fixture): Promise<ReadonlyArray<string>> =>
   (await readFile(ghCalls(fixture), "utf8")).split("\n").filter((line) => line.startsWith("pr merge"))
@@ -57,9 +57,9 @@ const refusedMerge = async (forge: Forge, expected: string): Promise<void> => {
   await withFixture(orchestratorConfig, 0, async (fixture) => {
     await closedWithPr(fixture)
     await stubGh(fixture, forge)
-    const merged = await runOrc(fixture, ["merge", "task-1"])
+    const merged = await runOrc(fixture, ["merge", "orc-1"])
     expect(merged.exitCode).not.toBe(0)
-    expect(merged.stderr).toContain("orc merge refused task-1 and merged nothing: " + prUrl)
+    expect(merged.stderr).toContain("orc merge refused orc-1 and merged nothing: " + prUrl)
     expect(merged.stderr).toContain(expected)
     expect(await mergeCalls(fixture)).toEqual([])
     expect(await taskFile(fixture)).not.toContain("merged_at")
@@ -109,18 +109,18 @@ describe("orc merge lands a green PR", () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, {})
-      const merged = await runOrc(fixture, ["merge", "task-1"])
+      const merged = await runOrc(fixture, ["merge", "orc-1"])
       expect(merged.stderr).toBe("")
-      expect(merged.stdout.trim()).toBe("merged task-1 " + prUrl)
+      expect(merged.stdout.trim()).toBe("merged orc-1 " + prUrl)
       expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + head])
       expect(await readFile(ghCalls(fixture), "utf8")).toContain("api --hostname github.com repos/acme/orc/compare/main..." + head + " --jq .behind_by")
       expect(await taskFile(fixture)).toContain(prUrl)
       expect(await taskFile(fixture)).not.toContain("merged_at")
       const board = await runOrc(fixture, ["backlog"])
-      expect(board.stdout).toContain("task-1 orc done")
+      expect(board.stdout).toContain("orc-1 orc done")
       expect(board.stdout).not.toContain("done merged")
       const json: unknown = JSON.parse((await runOrc(fixture, ["backlog", "--json"])).stdout)
-      expect(json).toMatchObject({ tasks: [{ id: "task-1", status: "closed", pr: prUrl }] })
+      expect(json).toMatchObject({ tasks: [{ id: "orc-1", status: "closed", pr: prUrl }] })
       expect(JSON.stringify(json)).not.toContain("mergedAt")
     })
   }, 60_000)
@@ -129,17 +129,17 @@ describe("orc merge lands a green PR", () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, { checks: [{ __typename: "CheckRun", workflowName: "ci", detailsUrl: "https://github.com/acme/orc/actions/runs/31/job/1", name: "test", status: "COMPLETED", conclusion: "CANCELLED", startedAt: "2026-11-02T10:00:00Z" }, { __typename: "CheckRun", workflowName: "ci", detailsUrl: "https://github.com/acme/orc/actions/runs/31/job/2", name: "test", status: "COMPLETED", conclusion: "SUCCESS", startedAt: "2026-11-02T10:05:00Z" }] })
-      expect((await runOrc(fixture, ["merge", "task-1"])).stdout.trim()).toBe("merged task-1 " + prUrl)
+      expect((await runOrc(fixture, ["merge", "orc-1"])).stdout.trim()).toBe("merged orc-1 " + prUrl)
     })
   }, 60_000)
 
   test("a task with no PR is refused instead of calling gh", async () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
-      expect(await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" })).toBe("added task-1 for orc")
-      await closeTask(fixture, "task-1", ranClosing("failed", "no change", null))
+      expect(await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" })).toBe("added orc-1 for orc")
+      await closeTask(fixture, "orc-1", ranClosing("failed", "no change", null))
       await stubGh(fixture, {})
-      const merged = await runOrc(fixture, ["merge", "task-1"])
-      expect(merged.stderr).toContain("task-1 names no PR to merge")
+      const merged = await runOrc(fixture, ["merge", "orc-1"])
+      expect(merged.stderr).toContain("orc-1 names no PR to merge")
       expect(await readFile(ghCalls(fixture), "utf8")).toBe("")
     })
   }, 60_000)
@@ -154,8 +154,8 @@ describe("the merge_task chat tool", () => {
       await writeProject(fixture, { yolo: false })
       await closedWithPr(fixture)
       await stubGh(fixture, {})
-      const refused = await rejection(sessionFor(fixture).call("merge_task", { id: "task-1", basis: "yolo-green" }))
-      expect(refused).toBe("orc: orc merge refused task-1 on yolo-green and merged nothing: the project orc has no yolo true, so its PRs merge only on the captain's word")
+      const refused = await rejection(sessionFor(fixture).call("merge_task", { id: "orc-1", basis: "yolo-green" }))
+      expect(refused).toBe("orc: orc merge refused orc-1 on yolo-green and merged nothing: the project orc has no yolo true, so its PRs merge only on the captain's word")
       expect(await readFile(ghCalls(fixture), "utf8")).toBe("")
     })
   }, 60_000)
@@ -164,7 +164,7 @@ describe("the merge_task chat tool", () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, {})
-      expect(await rejection(sessionFor(fixture).call("merge_task", { id: "task-1", basis: "yolo-green" }))).toContain("the project orc has no yolo true")
+      expect(await rejection(sessionFor(fixture).call("merge_task", { id: "orc-1", basis: "yolo-green" }))).toContain("the project orc has no yolo true")
       expect(await readFile(ghCalls(fixture), "utf8")).toBe("")
     })
   }, 60_000)
@@ -174,7 +174,7 @@ describe("the merge_task chat tool", () => {
       await writeProject(fixture, { yolo: true })
       await closedWithPr(fixture)
       await stubGh(fixture, {})
-      expect(await sessionFor(fixture).call("merge_task", { id: "task-1", basis: "yolo-green" })).toBe("merged task-1 " + prUrl)
+      expect(await sessionFor(fixture).call("merge_task", { id: "orc-1", basis: "yolo-green" })).toBe("merged orc-1 " + prUrl)
       expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + head])
     })
   }, 60_000)
@@ -183,7 +183,7 @@ describe("the merge_task chat tool", () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await closedWithPr(fixture)
       await stubGh(fixture, {})
-      expect(await sessionFor(fixture).call("merge_task", { id: "task-1", basis: "captain-word" })).toBe("merged task-1 " + prUrl)
+      expect(await sessionFor(fixture).call("merge_task", { id: "orc-1", basis: "captain-word" })).toBe("merged orc-1 " + prUrl)
     })
   }, 60_000)
 
@@ -192,7 +192,7 @@ describe("the merge_task chat tool", () => {
       await writeProject(fixture, { yolo: true })
       await closedWithPr(fixture)
       await stubGh(fixture, { checks: [{ __typename: "CheckRun", workflowName: "ci", name: "test", status: "COMPLETED", conclusion: "FAILURE", startedAt: "2026-11-02T10:00:00Z" }] })
-      expect(await rejection(sessionFor(fixture).call("merge_task", { id: "task-1", basis: "yolo-green" }))).toContain("the check ci/test is red")
+      expect(await rejection(sessionFor(fixture).call("merge_task", { id: "orc-1", basis: "yolo-green" }))).toContain("the check ci/test is red")
       expect(await mergeCalls(fixture)).toEqual([])
     })
   }, 60_000)
@@ -203,7 +203,7 @@ describe("yolo in projects.json", () => {
     await withFixture(orchestratorConfig, 0, async (fixture) => {
       await writeProject(fixture, { yolo: "yes" })
       expect(await rejection(sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" }))).toContain("the project orc names yolo \"yes\", which is not true or false")
-      expect(await readFile(join(fixture.home, "backlog", "new", "task-1.md"), "utf8").catch(() => "no task file")).toBe("no task file")
+      expect(await readFile(join(fixture.home, "backlog", "new", "orc-1.md"), "utf8").catch(() => "no task file")).toBe("no task file")
     })
   }, 60_000)
 
@@ -212,7 +212,7 @@ describe("yolo in projects.json", () => {
       const json: unknown = JSON.parse((await runOrc(fixture, ["backlog", "--json"])).stdout)
       expect(json).toMatchObject({ projects: [{ name: "orc", checkouts: { mac: fixture.dir } }] })
       expect(JSON.stringify(json)).not.toContain("yolo")
-      expect(await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" })).toBe("added task-1 for orc")
+      expect(await sessionFor(fixture).call("orc_backlog_add", { project: "orc", task: "# Tidy the docs\n" })).toBe("added orc-1 for orc")
     })
   }, 60_000)
 })

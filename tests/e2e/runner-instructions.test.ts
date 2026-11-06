@@ -30,7 +30,7 @@ describe("orc runner start with a project's instructions file", () => {
     await withFixture(async (fixture) => {
       await writeProject(fixture, [process.execPath, binPath, "runner", "start"])
       const added = await queuedArgs(fixture)
-      const file = join(fixture.home, "runner", "task-1.instructions", "winbox-ru.md")
+      const file = join(fixture.home, "runner", "orc-1.instructions", "winbox-ru.md")
       expect(instructionsArg(added)).toBe(file)
       expect(added?.slice(-4)).toEqual(["--instructions", file, "--token-file", mainToken])
       expect(await readFile(file, "utf8")).toBe(instructionsText)

@@ -3,7 +3,7 @@ import { alertFires } from "./alert-events"
 import { BacklogError, platformFailure, publishOnce } from "./backlog-write"
 import type { ChatEvent } from "./chat-event"
 
-const keyPattern = /^[a-z0-9][a-z0-9.-]*$/
+const keyPattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 
 export const isEventKey = (key: string): boolean => keyPattern.test(key) && key.includes(".")
 

@@ -51,6 +51,18 @@ describe("the dispatcher source", () => {
     });
   });
 
+  test("reads orc-12.md as orc-12 beside task-3.md as task-3 instead of skipping the project-named id", async () => {
+    await withBacklog(async (root) => {
+      await writeFile(
+        join(root, "backlog", "new", "orc-12.md"),
+        ["---", 'id: "orc-12"', 'title: "Project task"', 'project: "orc"', "machine: null", "depends_on: []", 'created: "2026-10-27T10:00:00.000Z"', "---", "# Project task", ""].join("\n"),
+      );
+      const snapshot = snapshotOf(await readBacklog(root));
+      expect(snapshot.unread).toEqual([]);
+      expect(snapshot.tasks.map((task) => task.id)).toEqual(expect.arrayContaining(["orc-12", "task-3"]));
+    });
+  });
+
   test("lists a broken task file as unread instead of failing the read", async () => {
     await withBacklog(async (root) => {
       await writeFile(join(root, "backlog", "new", "task-11.md"), "no frontmatter here" + String.fromCharCode(10));

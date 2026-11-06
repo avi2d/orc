@@ -158,12 +158,12 @@ describe("a beat with a token command", () => {
       await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
       const beat = await orcOk(fixture, ["beat"])
       const added = await queuedArgs(fixture)
-      const dir = tokenDir(fixture, "task-1")
-      expect(beat).toContain("started task-1 on linux with main")
+      const dir = tokenDir(fixture, "orc-1")
+      expect(beat).toContain("started orc-1 on linux with main")
       expect(beat).not.toContain(placeholder)
       expect(added?.slice(added.indexOf("--") + 1)).toEqual([
-        ...orc, "runner", "hold", "task-1", "--",
-        ...orc, "run", join(fixture.home, "runner", "task-1.md"), "--branch", "orc/task-1",
+        ...orc, "runner", "hold", "orc-1", "--",
+        ...orc, "run", join(fixture.home, "runner", "orc-1.md"), "--branch", "orc/orc-1",
         "--sandbox", "none", "--provider", "acme", "--token-file", join(dir, "token")
       ])
       expect(added?.some((word) => word.includes(placeholder))).toBe(false)
@@ -184,7 +184,7 @@ describe("a beat with a token command", () => {
       await writeSession(session, pastMillis)
       await writeMachine(fixture, session, true)
       await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
-      expect(await orcOk(fixture, ["beat"])).toContain("waits task-1: the token for main runs out at " + past)
+      expect(await orcOk(fixture, ["beat"])).toContain("waits orc-1: the token for main runs out at " + past)
       expect(await stat(join(fixture.pueue, "added-tasks")).then(() => true, () => false)).toBe(false)
       expect(await orcOk(fixture, ["backlog"])).toStartWith("NEW (1) ")
     })
@@ -200,12 +200,12 @@ describe("a beat with a token command", () => {
       await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
       await orcOk(fixture, ["beat"])
       await queuedArgs(fixture)
-      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: { "77": runningTask(77, fixture.home + " task-1") }, groups: {} }))
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: { "77": runningTask(77, fixture.home + " orc-1") }, groups: {} }))
       const nextAt = hoursFromNowMillis(4)
       await writeSession(session, nextAt)
       const nextIso = new Date(nextAt).toISOString()
-      expect(await orcOk(fixture, ["beat"])).toContain("renewed the token of task-1 on linux")
-      expect(await readFile(join(tokenDir(fixture, "task-1"), "expires-at"), "utf8")).toBe(nextIso)
+      expect(await orcOk(fixture, ["beat"])).toContain("renewed the token of orc-1 on linux")
+      expect(await readFile(join(tokenDir(fixture, "orc-1"), "expires-at"), "utf8")).toBe(nextIso)
     })
   }, runnerTimeout)
 
@@ -219,8 +219,8 @@ describe("a beat with a token command", () => {
       await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
       await orcOk(fixture, ["beat"])
       await queuedArgs(fixture)
-      expect(await orcOk(fixture, ["beat"])).toContain("renew failed task-1 on linux: the renew command exited 1")
-      expect(await gone(tokenDir(fixture, "task-1"))).toBe(true)
+      expect(await orcOk(fixture, ["beat"])).toContain("renew failed orc-1 on linux: the renew command exited 1")
+      expect(await gone(tokenDir(fixture, "orc-1"))).toBe(true)
     })
   }, runnerTimeout)
 })
@@ -228,11 +228,11 @@ describe("a beat with a token command", () => {
 describe("orc runner queue with a token", () => {
   test("a request with both a token file and a token is refused without echoing either", async () => {
     await withFixture(async (fixture) => {
-      const request = { task: "task-9", checkout: fixture.checkout, provider: "acme", body: "# x\n", tokenFile: "/secrets/main-token", token: placeholder, expiresAt: newYear }
+      const request = { task: "orc-9", checkout: fixture.checkout, provider: "acme", body: "# x\n", tokenFile: "/secrets/main-token", token: placeholder, expiresAt: newYear }
       const result = await runOrc(fixture, ["runner", "queue"], {}, JSON.stringify(request))
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toBe("orc: the queue request on stdin is no task, checkout, provider and body with an optional tokenFile or an optional token and expiresAt\n")
-      expect(await stat(tokenDir(fixture, "task-9")).then(() => true, () => false)).toBe(false)
+      expect(await stat(tokenDir(fixture, "orc-9")).then(() => true, () => false)).toBe(false)
     })
   }, runnerTimeout)
 })
@@ -242,76 +242,76 @@ describe("orc runner hold", () => {
 
   test("a run that succeeds reads its owner-only token and leaves no folder behind", async () => {
     await withFixture(async (fixture) => {
-      await holdToken(fixture, "task-9", placeholder, hoursFromNowIso(2))
-      expect(await modeOf(tokenDir(fixture, "task-9"))).toBe(0o700)
-      expect(await modeOf(join(tokenDir(fixture, "task-9"), "token"))).toBe(0o600)
-      const result = await hold(fixture, "task-9", readsToken)
+      await holdToken(fixture, "orc-9", placeholder, hoursFromNowIso(2))
+      expect(await modeOf(tokenDir(fixture, "orc-9"))).toBe(0o700)
+      expect(await modeOf(join(tokenDir(fixture, "orc-9"), "token"))).toBe(0o600)
+      const result = await hold(fixture, "orc-9", readsToken)
       expect(result.stderr).toBe("")
-      expect(result.stdout).toBe("the run of task-9 finished\n")
-      expect(await gone(tokenDir(fixture, "task-9"))).toBe(true)
+      expect(result.stdout).toBe("the run of orc-9 finished\n")
+      expect(await gone(tokenDir(fixture, "orc-9"))).toBe(true)
     })
   }, runnerTimeout)
 
   test("a run that fails on a live token fails instead of rerunning and leaves no folder behind", async () => {
     await withFixture(async (fixture) => {
-      await holdToken(fixture, "task-9", placeholder, hoursFromNowIso(2))
-      const result = await hold(fixture, "task-9", "echo once >> '" + join(fixture.dir, "runs") + "'; exit 3")
+      await holdToken(fixture, "orc-9", placeholder, hoursFromNowIso(2))
+      const result = await hold(fixture, "orc-9", "echo once >> '" + join(fixture.dir, "runs") + "'; exit 3")
       expect(result.exitCode).not.toBe(0)
-      expect(result.stderr).toBe("orc: the run of task-9 exited 3\n")
+      expect(result.stderr).toBe("orc: the run of orc-9 exited 3\n")
       expect(await readFile(join(fixture.dir, "runs"), "utf8")).toBe("once\n")
-      expect(await gone(tokenDir(fixture, "task-9"))).toBe(true)
+      expect(await gone(tokenDir(fixture, "orc-9"))).toBe(true)
     })
   }, runnerTimeout)
 
   test("a pueue kill before its holder starts loses its folder without another beat instead of a token on disk", async () => {
     await withFixture(async (fixture) => {
-      await holdToken(fixture, "task-9", placeholder, hoursFromNowIso(2))
+      await holdToken(fixture, "orc-9", placeholder, hoursFromNowIso(2))
       const added = await readFile(join(fixture.pueue, "added-tasks"), "utf8")
       const id = added.trim().split("\n").pop()?.split(" ").pop() ?? ""
       const killed = Bun.spawnSync(["pueue", "kill", id], {
         env: { ...process.env, ...fixture.env }
       })
       expect(killed.exitCode).toBe(0)
-      expect(await gone(tokenDir(fixture, "task-9"))).toBe(true)
+      expect(await gone(tokenDir(fixture, "orc-9"))).toBe(true)
     })
   }, runnerTimeout)
 
   test("a task pueue cannot spawn loses its folder without another beat instead of a token on disk", async () => {
     await withFixture(async (fixture) => {
       await writeFile(join(fixture.pueue, "fail-spawn"), "")
-      await holdToken(fixture, "task-9", placeholder, hoursFromNowIso(2))
-      expect(await gone(tokenDir(fixture, "task-9"))).toBe(true)
+      await holdToken(fixture, "orc-9", placeholder, hoursFromNowIso(2))
+      expect(await gone(tokenDir(fixture, "orc-9"))).toBe(true)
     })
   }, runnerTimeout)
 
   test("a lost daemon connection keeps the folder so the run still waits for its turn instead of failing without a token", async () => {
     await withFixture(async (fixture) => {
       await writeFile(join(fixture.pueue, "wait-fails"), "")
-      await holdToken(fixture, "task-9", placeholder, hoursFromNowIso(2))
+      await holdToken(fixture, "orc-9", placeholder, hoursFromNowIso(2))
       expect(await appears(join(fixture.pueue, "wait-calls"))).toBe(true)
-      expect(await stat(tokenDir(fixture, "task-9")).then(() => true, () => false)).toBe(true)
-      const result = await hold(fixture, "task-9", readsToken)
+      expect(await stat(tokenDir(fixture, "orc-9")).then(() => true, () => false)).toBe(true)
+      const result = await hold(fixture, "orc-9", readsToken)
       expect(result.stderr).toBe("")
-      expect(result.stdout).toBe("the run of task-9 finished\n")
-      expect(await gone(tokenDir(fixture, "task-9"))).toBe(true)
+      expect(result.stdout).toBe("the run of orc-9 finished\n")
+      expect(await gone(tokenDir(fixture, "orc-9"))).toBe(true)
     })
   }, runnerTimeout)
 
   test("a lapsed token makes the run wait for a renewal instead of failing, then run on the fresh one", async () => {
     await withFixture(async (fixture) => {
-      await holdToken(fixture, "task-9", placeholder, past)
-      await runsInPueue(fixture, "task-9")
+      await holdToken(fixture, "orc-9", placeholder, past)
+      await runsInPueue(fixture, "orc-9")
       const seen = join(fixture.dir, "seen")
-      const holding = hold(fixture, "task-9", "cat \"$1\" > '" + seen + "'")
+      const holding = hold(fixture, "orc-9", "cat \"$1\" > '" + seen + "'")
       await Bun.sleep(1_000)
       expect(await readFile(seen, "utf8").catch(() => null)).toBeNull()
       const fresh = hoursFromNowIso(4)
-      const renewal = await runOrc(fixture, ["runner", "renew"], {}, JSON.stringify({ task: "task-9", token: renewedPlaceholder, expiresAt: fresh }))
-      expect(renewal.stdout).toBe("renewed the token for task-9 until " + fresh + "\n")
+      const renewal = await runOrc(fixture, ["runner", "renew"], {}, JSON.stringify({ task: "orc-9", token: renewedPlaceholder, expiresAt: fresh }))
+      expect(renewal.stdout).toBe("renewed the token for orc-9 until " + fresh + "\n")
       const result = await holding
-      expect(result.stdout).toBe("task-9 waits for a fresh token from the Mac: the one held here runs out at " + past + "\nthe run of task-9 finished\n")
+      expect(result.stdout).toBe("orc-9 waits for a fresh token from the Mac: the one held here runs out at " + past + "\nthe run of orc-9 finished\n")
       expect(await readFile(seen, "utf8")).toBe(renewedPlaceholder)
-      expect(await gone(tokenDir(fixture, "task-9"))).toBe(true)
+      expect(await gone(tokenDir(fixture, "orc-9"))).toBe(true)
     })
   }, runnerTimeout)
 
@@ -319,29 +319,29 @@ describe("orc runner hold", () => {
     await withFixture(async (fixture) => {
       const lapsesAt = Date.now() + 10_000
       const soon = new Date(lapsesAt + 5 * 60_000).toISOString()
-      await holdToken(fixture, "task-9", placeholder, soon)
-      await runsInPueue(fixture, "task-9")
+      await holdToken(fixture, "orc-9", placeholder, soon)
+      await runsInPueue(fixture, "orc-9")
       const runs = join(fixture.dir, "runs")
       const renewed = "[ \"$(cat \"$1\")\" = " + renewedPlaceholder + " ]"
-      const holding = hold(fixture, "task-9", "cat \"$1\" >> '" + runs + "'; echo >> '" + runs + "'; " + renewed + " && exit 0; until " + renewed + "; do sleep 0.2; done; exit 1")
+      const holding = hold(fixture, "orc-9", "cat \"$1\" >> '" + runs + "'; echo >> '" + runs + "'; " + renewed + " && exit 0; until " + renewed + "; do sleep 0.2; done; exit 1")
       expect(await appears(runs)).toBe(true)
       await Bun.sleep(Math.max(0, lapsesAt - Date.now()) + 500)
       const fresh = new Date(Date.now() + 4 * 3600_000).toISOString()
-      const renewal = await runOrc(fixture, ["runner", "renew"], {}, JSON.stringify({ task: "task-9", token: renewedPlaceholder, expiresAt: fresh }))
+      const renewal = await runOrc(fixture, ["runner", "renew"], {}, JSON.stringify({ task: "orc-9", token: renewedPlaceholder, expiresAt: fresh }))
       expect(renewal.exitCode).toBe(0)
       const result = await holding
-      expect(result.stdout).toContain("the run of task-9 exited 1 as its token ran out at " + soon + ", so it resumes on a fresh one\n")
+      expect(result.stdout).toContain("the run of orc-9 exited 1 as its token ran out at " + soon + ", so it resumes on a fresh one\n")
       expect(result.exitCode).toBe(0)
       expect(await readFile(runs, "utf8")).toBe(placeholder + "\n" + renewedPlaceholder + "\n")
-      expect(await gone(tokenDir(fixture, "task-9"))).toBe(true)
+      expect(await gone(tokenDir(fixture, "orc-9"))).toBe(true)
     })
   }, runnerTimeout)
 
   test("a hold with no token held is refused instead of running without one", async () => {
     await withFixture(async (fixture) => {
-      const result = await hold(fixture, "task-9", "exit 0")
+      const result = await hold(fixture, "orc-9", "exit 0")
       expect(result.exitCode).not.toBe(0)
-      expect(result.stderr).toBe("orc: no token is held for task-9 in " + tokenDir(fixture, "task-9") + "\n")
+      expect(result.stderr).toBe("orc: no token is held for orc-9 in " + tokenDir(fixture, "orc-9") + "\n")
     })
   }, runnerTimeout)
 })
@@ -349,17 +349,17 @@ describe("orc runner hold", () => {
 describe("orc runner renew", () => {
   test("a renewal for a task pueue never queued is refused and leaves no folder", async () => {
     await withFixture(async (fixture) => {
-      await holdToken(fixture, "task-9", placeholder, hoursFromNowIso(2))
-      const result = await runOrc(fixture, ["runner", "renew"], {}, JSON.stringify({ task: "task-9", token: renewedPlaceholder, expiresAt: newYear }))
+      await holdToken(fixture, "orc-9", placeholder, hoursFromNowIso(2))
+      const result = await runOrc(fixture, ["runner", "renew"], {}, JSON.stringify({ task: "orc-9", token: renewedPlaceholder, expiresAt: newYear }))
       expect(result.exitCode).not.toBe(0)
-      expect(result.stderr).toBe("orc: task-9 has no queued or running pueue task here, so no token is kept for it\n")
-      expect(await gone(tokenDir(fixture, "task-9"))).toBe(true)
+      expect(result.stderr).toBe("orc: orc-9 has no queued or running pueue task here, so no token is kept for it\n")
+      expect(await gone(tokenDir(fixture, "orc-9"))).toBe(true)
     })
   }, runnerTimeout)
 
   test("a renewal request that is no token document is refused without echoing it", async () => {
     await withFixture(async (fixture) => {
-      const result = await runOrc(fixture, ["runner", "renew"], {}, JSON.stringify({ task: "task-6", token: placeholder + " tail", expiresAt: newYear }))
+      const result = await runOrc(fixture, ["runner", "renew"], {}, JSON.stringify({ task: "orc-6", token: placeholder + " tail", expiresAt: newYear }))
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toBe("orc: the renew request on stdin is no task with a token and an expiresAt\n")
     })

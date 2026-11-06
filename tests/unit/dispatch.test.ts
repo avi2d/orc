@@ -373,7 +373,7 @@ describe("the backlog folders", () => {
       const record = await run(addTask(root, spec))
       const wins = await run(Effect.all(Array.from({ length: 10 }, () => claimTask(root, record.spec.id)), { concurrency: "unbounded" }))
       expect(wins.filter(Boolean)).toHaveLength(1)
-      expect(await readdir(join(root, "taken"))).toEqual(["task-1.md"])
+      expect(await readdir(join(root, "taken"))).toEqual(["orc-1.md"])
       expect(await readdir(join(root, "new"))).toEqual([])
     })
   })
@@ -381,7 +381,7 @@ describe("the backlog folders", () => {
     await withBacklog(async (root) => {
       const records = await run(Effect.all(Array.from({ length: 8 }, () => addTask(root, spec)), { concurrency: "unbounded" }))
       expect(new Set(records.map((record) => record.spec.id)).size).toBe(8)
-      expect((await run(listTasks(root))).map((record) => record.spec.id)).toEqual(Array.from({ length: 8 }, (_, index) => "task-" + (index + 1)))
+      expect((await run(listTasks(root))).map((record) => record.spec.id)).toEqual(Array.from({ length: 8 }, (_, index) => "orc-" + (index + 1)))
     })
   })
   test("a taken task given back is new again instead of lost", async () => {
@@ -406,7 +406,7 @@ describe("the backlog folders", () => {
     await withBacklog(async (root) => {
       const record = await run(addTask(root, spec))
       await run(claimTask(root, record.spec.id))
-      await run(writeTaken(root, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
+      await run(writeTaken(root, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/orc-1.log" } } }))
       await run(closeStartedTask(root, record.spec.id, "done", "merged", { pr: null, report: null }, "2026-10-27T11:00:00.000Z"))
       const tasks = await run(listTasks(root))
       expect(tasks.map((task) => task.state.kind)).toEqual(["closed"])
@@ -422,7 +422,7 @@ describe("the beat", () => {
       await writeFile(join(root, "projects.json"), JSON.stringify({ projects }))
       await run(addTask(root, spec))
       const seen: Array<string> = []
-      const spawner = recordingSpawner(join(root, "taken", "task-1.md"), seen).pipe(Layer.provide(BunServices.layer))
+      const spawner = recordingSpawner(join(root, "taken", "orc-1.md"), seen).pipe(Layer.provide(BunServices.layer))
       const report = await Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
       expect(report.actions.map((action) => action.kind)).toEqual(["started"])
       expect(seen).toHaveLength(1)
@@ -444,16 +444,16 @@ const startTaskOne = async (root: string, start: ReadonlyArray<string>, next: { 
   if (next !== null) {
     await run(addTask(root, { ...spec, title: "Fix the other thing", dependsOn: next.dependsOn }))
   }
-  await run(claimTask(root, "task-1"))
-  const first = (await run(listTasks(root))).find((task) => task.spec.id === "task-1")
+  await run(claimTask(root, "orc-1"))
+  const first = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
   if (first === undefined) {
-    throw new Error("the backlog holds no task-1")
+    throw new Error("the backlog holds no orc-1")
   }
-  await run(writeTaken(root, { spec: first.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
+  await run(writeTaken(root, { spec: first.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/orc-1.log" } } }))
 }
 
 const pueueAnswering = (root: string, status: unknown): BeatSpawner =>
-  pueueStub(JSON.stringify({ tasks: { "11": { id: 11, label: taskLabel(root, "task-1"), group: "orc", path: "/checkout", status } } })).pipe(Layer.provide(BunServices.layer))
+  pueueStub(JSON.stringify({ tasks: { "11": { id: 11, label: taskLabel(root, "orc-1"), group: "orc", path: "/checkout", status } } })).pipe(Layer.provide(BunServices.layer))
 
 const pueueDone = (root: string, result: unknown): BeatSpawner =>
   pueueAnswering(root, { Done: { start: "2026-10-27T10:02:00.000Z", end: "2026-10-27T10:05:00.000Z", result } })
@@ -487,7 +487,7 @@ interface BeatAfterRun {
 const recordRun = (home: string, prLink: string): Promise<void> =>
   run(Effect.acquireUseRelease(
     openDatabase(home),
-    (db) => Effect.sync(() => insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/task-1", taskFile: "task-1.md", status: "succeeded", started: "2026-10-27T10:02:00.000Z", prLink })),
+    (db) => Effect.sync(() => insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "succeeded", started: "2026-10-27T10:02:00.000Z", prLink })),
     (db) => Effect.sync(() => db.close())
   ))
 
@@ -508,9 +508,9 @@ describe("the beat's closing sweep", () => {
   test("a started task whose pueue run succeeded is closed done and its slot starts the next task instead of staying started", async () => {
     await withBacklog(async (root) => {
       const beat = await beatAfterRun(root, "Success")
-      expect(beat.states).toEqual(["task-1:closed", "task-2:started"])
+      expect(beat.states).toEqual(["orc-1:closed", "orc-2:started"])
       expect(beat.reasons).toEqual(["done:pueue task 11 succeeded"])
-      expect(beat.actions).toEqual(["closed:task-1", "started:task-2"])
+      expect(beat.actions).toEqual(["closed:orc-1", "started:orc-2"])
     })
   })
   test("a closed task keeps the PR its run opened instead of only the pueue reason", async () => {
@@ -518,8 +518,8 @@ describe("the beat's closing sweep", () => {
       await recordRun(root, "https://github.com/example/orc/pull/7")
       const beat = await beatAfterRun(root, "Success")
       expect(beat.prs).toEqual(["https://github.com/example/orc/pull/7"])
-      expect(beat.lines).toEqual(["closed task-1 done on mac: pueue task 11 succeeded, PR https://github.com/example/orc/pull/7"])
-      const closed = (await run(listTasks(root))).find((task) => task.spec.id === "task-1")
+      expect(beat.lines).toEqual(["closed orc-1 done on mac: pueue task 11 succeeded, PR https://github.com/example/orc/pull/7"])
+      const closed = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
       expect(closed === undefined ? "" : renderTaskFile(closed)).toContain('pr: "https://github.com/example/orc/pull/7"')
     })
   })
@@ -527,38 +527,38 @@ describe("the beat's closing sweep", () => {
     await withBacklog(async (root) => {
       const beat = await beatAfterRun(root, { Failed: 3 })
       expect(beat.prs).toEqual([null])
-      expect(beat.lines).toEqual(["closed task-1 failed on mac: orc exited 3"])
+      expect(beat.lines).toEqual(["closed orc-1 failed on mac: orc exited 3"])
     })
   })
   test("a started task whose pueue run still runs stays started and keeps its slot instead of closing early", async () => {
     await withBacklog(async (root) => {
       await startTaskOne(root, orcStart, { dependsOn: [] })
       const report = await beatWith(root, pueueAnswering(root, { Running: { start: "2026-10-27T10:02:00.000Z" } }))
-      expect(await backlogStates(root)).toEqual(["task-1:started", "task-2:new"])
-      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["stalled:task-1", "waits:task-2"])
+      expect(await backlogStates(root)).toEqual(["orc-1:started", "orc-2:new"])
+      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["stalled:orc-1", "waits:orc-2"])
     })
   })
   test("a started task whose pueue run failed is closed failed with the run's reason instead of staying started", async () => {
     await withBacklog(async (root) => {
       const beat = await beatAfterRun(root, { Failed: 3 })
-      expect(beat.states).toEqual(["task-1:closed", "task-2:started"])
+      expect(beat.states).toEqual(["orc-1:closed", "orc-2:started"])
       expect(beat.reasons).toEqual(["failed:orc exited 3"])
-      expect(beat.actions).toEqual(["closed:task-1", "started:task-2"])
+      expect(beat.actions).toEqual(["closed:orc-1", "started:orc-2"])
     })
   })
   test("a task waiting on a just-finished task starts in the same beat instead of waiting one more beat", async () => {
     await withBacklog(async (root) => {
-      await startTaskOne(root, orcStart, { dependsOn: ["task-1"] })
+      await startTaskOne(root, orcStart, { dependsOn: ["orc-1"] })
       const report = await beatWith(root, pueueDone(root, "Success"))
-      expect(await backlogStates(root)).toEqual(["task-1:closed", "task-2:started"])
-      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:task-1", "started:task-2"])
+      expect(await backlogStates(root)).toEqual(["orc-1:closed", "orc-2:started"])
+      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1", "started:orc-2"])
     })
   })
   test("a started task on a machine with a custom start is left alone instead of read and reported", async () => {
     await withBacklog(async (root) => {
       await startTaskOne(root, ["true"], null)
       const report = await beatWith(root, pueueInstead(() => Effect.die("the sweep read pueue on a custom-start machine")))
-      expect(await backlogStates(root)).toEqual(["task-1:started"])
+      expect(await backlogStates(root)).toEqual(["orc-1:started"])
       expect(report.actions).toEqual([])
     })
   })
@@ -566,7 +566,7 @@ describe("the beat's closing sweep", () => {
     await withBacklog(async (root) => {
       await startTaskOne(root, orcStart, null)
       const report = await beatWith(root, pueueInstead(() => Effect.never))
-      expect(await backlogStates(root)).toEqual(["task-1:started"])
+      expect(await backlogStates(root)).toEqual(["orc-1:started"])
       expect(report.actions.flatMap((action) => action.kind === "close-failed" ? [action.reason] : [])).toEqual(["the close read timed out after 30 seconds"])
     })
   }, 120_000)

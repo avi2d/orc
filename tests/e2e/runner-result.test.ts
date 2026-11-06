@@ -269,18 +269,18 @@ describe("orc runner result", () => {
       if (beatB.exitCode !== 0) {
         throw new Error("home-b beat exited " + beatB.exitCode + ": " + beatB.stderr)
       }
-      expect(beatB.stdout).toContain("started task-1")
+      expect(beatB.stdout).toContain("started orc-1")
       expect(beatB.stdout).not.toContain("already")
       const added = await waitForAddedTasks(fixture)
-      const labelA = homeA + " task-1"
-      const labelB = homeB + " task-1"
+      const labelA = homeA + " orc-1"
+      const labelB = homeB + " orc-1"
       expect(added.some((line) => line.startsWith(labelA + " orc "))).toBe(true)
       expect(added.some((line) => line.startsWith(labelB + " orc "))).toBe(true)
-      const queueA = await runOrc(fixture, ["runner", "queue"], { ORC_HOME: far }, JSON.stringify({ task: "task-1", checkout: fixture.checkout, provider: "acme", body: "# x\n", token: "tokenA123", expiresAt: "2027-01-01T00:00:00.000Z", label: labelA }))
+      const queueA = await runOrc(fixture, ["runner", "queue"], { ORC_HOME: far }, JSON.stringify({ task: "orc-1", checkout: fixture.checkout, provider: "acme", body: "# x\n", token: "tokenA123", expiresAt: "2027-01-01T00:00:00.000Z", label: labelA }))
       expect(queueA.exitCode).toBe(0)
-      const queueB = await runOrc(fixture, ["runner", "queue"], { ORC_HOME: far }, JSON.stringify({ task: "task-1", checkout: fixture.checkout, provider: "acme", body: "# x\n", token: "tokenB123", expiresAt: "2027-01-01T00:00:00.000Z", label: labelB }))
+      const queueB = await runOrc(fixture, ["runner", "queue"], { ORC_HOME: far }, JSON.stringify({ task: "orc-1", checkout: fixture.checkout, provider: "acme", body: "# x\n", token: "tokenB123", expiresAt: "2027-01-01T00:00:00.000Z", label: labelB }))
       expect(queueB.exitCode).toBe(0)
-      expect(queueB.stdout).toContain("queued task-1")
+      expect(queueB.stdout).toContain("queued orc-1")
       const tokenFileA = join(far, "runner", "tokens", "label-" + encodeURIComponent(labelA), "token")
       const tokenFileB = join(far, "runner", "tokens", "label-" + encodeURIComponent(labelB), "token")
       expect(await readFile(tokenFileA, "utf8")).toBe("tokenA123")
@@ -292,7 +292,7 @@ describe("orc runner result", () => {
         },
         groups: {}
       }))
-      const renewB = await runOrc(fixture, ["runner", "renew", "--", ...orcThere(far)], { ORC_HOME: homeB }, JSON.stringify({ task: "task-1", token: "tokenB456", expiresAt: "2027-01-01T00:00:00.000Z", label: labelB }))
+      const renewB = await runOrc(fixture, ["runner", "renew", "--", ...orcThere(far)], { ORC_HOME: homeB }, JSON.stringify({ task: "orc-1", token: "tokenB456", expiresAt: "2027-01-01T00:00:00.000Z", label: labelB }))
       expect(renewB.exitCode).toBe(0)
       expect(await readFile(tokenFileA, "utf8")).toBe("tokenA123")
       expect(await readFile(tokenFileB, "utf8")).toBe("tokenB456")
@@ -304,8 +304,8 @@ describe("orc runner result", () => {
         groups: {}
       }))
       const RunnerStatus = Schema.Struct({ result: Schema.Struct({ status: Schema.String, pueueTask: Schema.Finite }) })
-      const resultA = Schema.decodeUnknownSync(RunnerStatus)(JSON.parse(await orcOk(fixture, ["runner", "result", "task-1", "--label", labelA, "--json", "--", ...orcThere(far)], { ORC_HOME: homeA })))
-      const resultB = Schema.decodeUnknownSync(RunnerStatus)(JSON.parse(await orcOk(fixture, ["runner", "result", "task-1", "--label", labelB, "--json", "--", ...orcThere(far)], { ORC_HOME: homeB })))
+      const resultA = Schema.decodeUnknownSync(RunnerStatus)(JSON.parse(await orcOk(fixture, ["runner", "result", "orc-1", "--label", labelA, "--json", "--", ...orcThere(far)], { ORC_HOME: homeA })))
+      const resultB = Schema.decodeUnknownSync(RunnerStatus)(JSON.parse(await orcOk(fixture, ["runner", "result", "orc-1", "--label", labelB, "--json", "--", ...orcThere(far)], { ORC_HOME: homeB })))
       expect(resultA.result.status).toBe("succeeded")
       expect(resultA.result.pueueTask).toBe(77)
       expect(resultB.result.status).toBe("failed")

@@ -45,12 +45,12 @@ describe("held task files", () => {
     try {
       await run(addTask(root, spec))
       const ask = { reason: "two choices", until: null, questions: ["REST or gRPC?", "Which region?"] }
-      expect((await run(holdTask(root, "task-1", ask))).kind).toBe("held")
-      const file = join(root, "new", "task-1.md")
+      expect((await run(holdTask(root, "orc-1", ask))).kind).toBe("held")
+      const file = join(root, "new", "orc-1.md")
       const before = await readFile(file, "utf8")
-      expect((await run(holdTask(root, "task-1", ask))).kind).toBe("already held")
-      const failure = await run(Effect.flip(holdTask(root, "task-1", { ...ask, questions: ["Which database?"] })))
-      expect(failure.detail).toBe("task-1 is already held on question-1, question-2, so answer those first")
+      expect((await run(holdTask(root, "orc-1", ask))).kind).toBe("already held")
+      const failure = await run(Effect.flip(holdTask(root, "orc-1", { ...ask, questions: ["Which database?"] })))
+      expect(failure.detail).toBe("orc-1 is already held on question-1, question-2, so answer those first")
       expect(await readFile(file, "utf8")).toBe(before)
       expect((await run(listTasks(root)))[0]?.hold?.questions.map((question) => question.id + " " + question.text)).toEqual(["question-1 REST or gRPC?", "question-2 Which region?"])
     } finally {
@@ -61,13 +61,13 @@ describe("held task files", () => {
     const root = await mkdtemp(join(tmpdir(), "orc-hold-reason-"))
     try {
       await run(addTask(root, spec))
-      await run(holdTask(root, "task-1", { reason: "wait for budget", until: null, questions: [] }))
-      const file = join(root, "new", "task-1.md")
+      await run(holdTask(root, "orc-1", { reason: "wait for budget", until: null, questions: [] }))
+      const file = join(root, "new", "orc-1.md")
       const before = await readFile(file, "utf8")
-      const failure = await run(Effect.flip(holdTask(root, "task-1", { reason: "wait for budget", until: null, questions: ["Which API?"] })))
-      expect(failure.detail).toBe("task-1 is already held: wait for budget, so answer it first")
+      const failure = await run(Effect.flip(holdTask(root, "orc-1", { reason: "wait for budget", until: null, questions: ["Which API?"] })))
+      expect(failure.detail).toBe("orc-1 is already held: wait for budget, so answer it first")
       expect(await readFile(file, "utf8")).toBe(before)
-      expect((await run(holdTask(root, "task-1", { reason: "wait for budget", until: null, questions: [] }))).kind).toBe("already held")
+      expect((await run(holdTask(root, "orc-1", { reason: "wait for budget", until: null, questions: [] }))).kind).toBe("already held")
     } finally {
       await rm(root, { recursive: true, force: true })
     }
@@ -96,13 +96,13 @@ describe("held task files", () => {
     try {
       const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-10-27T10:01:00.000Z" }
       await run(addTask(root, spec))
-      await run(claimTask(root, "task-1"))
-      await run(writeTaken(root, { spec: { ...spec, id: "task-1", body: "# Fix the thing\n" }, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/task-1.log" } } }))
-      await run(parkStartedTask(root, "task-1", "orc/task-1", Arr.make({ id: "question-4", text: "Which retries are allowed?" })))
-      const file = join(root, "new", "task-1.md")
+      await run(claimTask(root, "orc-1"))
+      await run(writeTaken(root, { spec: { ...spec, id: "orc-1", body: "# Fix the thing\n" }, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/orc-1.log" } } }))
+      await run(parkStartedTask(root, "orc-1", "orc/orc-1", Arr.make({ id: "question-4", text: "Which retries are allowed?" })))
+      const file = join(root, "new", "orc-1.md")
       const before = await readFile(file, "utf8")
-      const failure = await run(Effect.flip(holdTask(root, "task-1", { reason: "wait for budget", until: null, questions: [] })))
-      expect(failure.detail).toBe("task-1 is parked for the captain's answer, so it cannot be held")
+      const failure = await run(Effect.flip(holdTask(root, "orc-1", { reason: "wait for budget", until: null, questions: [] })))
+      expect(failure.detail).toBe("orc-1 is parked for the captain's answer, so it cannot be held")
       expect(await readFile(file, "utf8")).toBe(before)
       expect((await run(listTasks(root)))[0]?.hold).toBeNull()
     } finally {
