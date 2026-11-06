@@ -82,7 +82,7 @@ type TaskFolder = "new" | "taken" | "closed";
 
 const backlogVariable = "ORC_HOME";
 
-const missingBacklog = (root: string): string => "no backlog at " + root + ": it lives on the machine that runs orc beat";
+export const missingBacklog = (root: string): string => "no backlog at " + root + ": it lives on the machine that runs orc beat";
 
 const backlogRoot: Config.Config<string> = Config.all({
   explicit: selector(backlogVariable),
