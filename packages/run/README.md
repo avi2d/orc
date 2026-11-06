@@ -23,6 +23,11 @@ To install orc:
 1. Run `cd packages/run` to enter the run package.
 1. Run `bun link` to put the `orc` command on your PATH.
 
+## Run a task
+
+To run one task, enter a clean checkout of the target project and run `orc run <task-file>`.
+[Running a task](https://github.com/avi2d/orc/blob/main/docs/run/running-a-task.md) names every flag and resume option.
+
 ## Print the version
 
 To print the orc version, run `orc --version` from any folder.

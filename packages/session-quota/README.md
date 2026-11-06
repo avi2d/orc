@@ -16,6 +16,12 @@ Every number is an estimate from local logs and an upper bound, never a quota re
 
 To install session quota, run `bun install --frozen-lockfile` at the repository root.
 
+## Run the panel
+
+To open the live panel, run `tui-dash panel session-quota`.
+To print one frame of plain text instead, run `tui-dash panel session-quota --print`.
+[Run the session panel](../../docs/session-quota/run-the-session-panel.md) names every key and option.
+
 ## Where things are
 
 | Path | What it holds |
