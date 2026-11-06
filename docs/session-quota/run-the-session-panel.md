@@ -12,6 +12,8 @@ Its last line counts the rest and names the repository root's `session-quota-jso
 A terminal too narrow for that line on one row wraps it onto two.
 Heights under eight rows are not a supported layout, so there that line can be cut, and the script still lists every flag.
 The dashboard shows only the flags, each naming the agent's project, the account and the limit.
+It reads the Pi logs under `HOME`, the Codex logs under `CODEX_HOME` or `~/.codex`, and the Claude Code logs under `CLAUDE_CONFIG_DIR` or `~/.claude`.
+Those are the homes of the logins `quota-axi` reads.
 Each account opens with the assumption that joined its calls to it, such as joined by credential key or assumed the only login.
 A window is read from a harness log when the log covered its provider within the hour, or read it later than quota-axi did.
 Such a window names that log and the reading's age, such as from codex rollout 38m ago.
@@ -26,6 +28,8 @@ A live session reads ● and an ended one ○, and a flagged session reads ⚑.
 A window with a flagged session reads over fair share flagged.
 It reads lasts to reset instead when the window is not running out before its reset.
 It reads none over fair share when the window runs out but no session carries a flag.
+A session that has ended is never flagged.
+It never pauses, stops or reroutes a session.
 A window with no local calls reads none logged here, and its used points count as unattributed.
 A window quota-axi still reports after its reset reads unknown pace, shows no fair share, counts only the calls before its reset, and flags nobody.
 A window read an hour old or more reads its age instead of its used points, fair share and pace.

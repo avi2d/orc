@@ -62,7 +62,9 @@ The composed report keeps the fields of the version 1 report, except `sources`, 
 | `schemaVersion` | `2` |
 | `scope` | `composed` |
 | `estimate.basis` | `machine-logs`, and `upperBound` stays `true` |
-| `machines` | Each machine's `name`, `role` `local` or `remote`, `status` `ok`, `unreachable`, `invalid` or `stale` with a `detail`, `generatedAt`, whether its calls are `combined`, the `sources` it read, and its `failedAccounts`, each account it could not read, with its `quota` status, where the merged account does not already carry that failure |
+| `machines` | Each machine's `name`, `role` `local` or `remote`, `status` `ok`, `unreachable`, `invalid` or `stale` with a `detail`, `generatedAt` and whether its calls are `combined` |
+| `machines[].sources` | The `sources` the machine read, as in the version 1 report |
+| `machines[].failedAccounts` | Each account the machine could not read, with its `quota` status, where the merged account does not already carry that failure |
 | `windows[].otherCycle` | The machines that read the window in another cycle, so their calls are left out of it |
 | `machine` | On each entry of `sessions`, `windows[].sessions`, `flags` and `unmatchedProcesses` |
 | `ledger` and `unmetered` | The sums over every combined machine |

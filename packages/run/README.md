@@ -4,15 +4,6 @@ You say a task in `orc chat` to Pi on the orchestrator model, or add one with `o
 Each `orc beat` starts the tasks that can start, and `orc runner start` queues each run in pueue on its machine.
 The beat later closes the task done or failed, with the PR link when its run opened one.
 
-A run takes one task from `orc run` and a task file.
-It makes an isolated copy of the project on a new branch.
-By default it runs the Pi agent inside a nono sandbox, then runs the project's checks.
-With `--sandbox none` it runs Pi and the checks directly on the host.
-A `no-mistakes` run hands the branch to no-mistakes, which reviews it, pushes it and opens a PR on a provider it supports, such as GitHub.
-A `direct-PR` run pushes the branch and opens the PR itself, as [Delivery modes](https://github.com/avi2d/orc/blob/main/docs/run/delivery-modes.md) shows.
-You read the PR and land it with `orc merge <task-id>`, as [Merging a task's PR](https://github.com/avi2d/orc/blob/main/docs/run/merging-a-tasks-pr.md) shows.
-[The backlog and the beat](https://github.com/avi2d/orc/blob/main/docs/run/backlog-and-beat.md), [Adding tasks from a chat](https://github.com/avi2d/orc/blob/main/docs/run/chat.md) and [The runner](https://github.com/avi2d/orc/blob/main/docs/run/runner.md) describe the path a task takes to its run.
-
 ## Before you begin
 
 - Bun, at the version `.bun-version` pins.

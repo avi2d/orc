@@ -1,24 +1,8 @@
 # session-quota
 
 Session quota estimates how much of each subscription quota window every agent session on this machine has spent.
-It reads the Pi logs under `HOME`, the Codex logs under `CODEX_HOME`, or `~/.codex`, and the Claude Code logs under `CLAUDE_CONFIG_DIR`, or `~/.claude`.
-Those are the homes of the logins `quota-axi` reads.
-It counts each model call once.
-It splits a window's used points across the sessions that made those calls.
-It flags each live session spending over its fair share of a window that runs ahead of pace and is past its first tenth.
-It flags only when the window runs out before its reset.
-Quota-axi's runway gives the verdict for a window it names.
-An early or unknown projection leaves the live rate to decide.
-A runway naming another window means this one runs to its reset.
-A harvested window or one with no runway reads its pace from its live sessions' total rate against the sustainable rate.
-A window with nothing left runs out before its reset.
-It never pauses, stops or reroutes a session.
-A session's fair share is what its window has left an hour, split evenly among the live sessions that spent in the trailing hour.
-A session that has ended is never flagged.
-It also reads the capture ledger that its writer appends to from a Pi hook and the Claude Code statusline.
-The bridge appends headless readings to the same ledger.
+It flags each live session spending over its fair share of a window that runs out before its reset.
 Every number is an estimate from local logs and an upper bound, never a quota reading.
-It can merge a second machine's report, so an account both machines spend shows one estimate instead of two upper bounds.
 
 ## Before you begin
 
