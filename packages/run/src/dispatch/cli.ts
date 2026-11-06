@@ -2,6 +2,7 @@ import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs, TaskSource } from "./args"
 import { addTask, backlogPaths, BacklogError, closeStartedTask, holdTask, isTaskId, listTasks, markPosted } from "./backlog"
+import { circularDependency, dependTask } from "./backlog-depend"
 import { answerTask } from "./parked"
 import { liveSources, readRoom, runBeat } from "./beat"
 import { fiveMinuteLoad } from "./load"
@@ -82,6 +83,49 @@ const readSessionToken = (session: string, stdoutIsTerminal: boolean) =>
 
 const refusedDependency = (dependsOn: ReadonlyArray<string>, tasks: ReadonlyArray<TaskRecord>): string | null =>
   dependsOn.find((id) => !isTaskId(id) || !tasks.some((task) => task.spec.id === id)) ?? null
+
+const dependNow = (args: Extract<CommandArgs, { readonly kind: "DependTask" }>, place: DispatchPlace) =>
+  Effect.gen(function*() {
+    const tasks = yield* listTasks(backlogRoot(place))
+    if (!tasks.some((task) => task.spec.id === args.id)) {
+      return yield* refuse("the backlog holds no " + args.id)
+    }
+    const dependency = refusedDependency(args.dependsOn, tasks)
+    if (dependency !== null) {
+      return yield* refuse("the backlog holds no task " + dependency)
+    }
+    const loop = circularDependency(args.id, args.dependsOn, tasks)
+    if (loop !== null) {
+      return yield* refuse(loop)
+    }
+    const outcome = yield* dependTask(backlogRoot(place), args.id, args.dependsOn)
+    const waits = args.dependsOn.length === 0 ? "no task" : args.dependsOn.join(", ")
+    return args.id + (outcome === "set" ? " now waits on " : " already waits on ") + waits
+  })
+
+const backlogPresent = (root: string) =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    return yield* fs.exists(root).pipe(Effect.mapError((error) => new BacklogError({ detail: "cannot read " + root + ": " + error.message })))
+  })
+
+const noBacklog = (root: string): string => "no backlog at " + root + ": the backlog lives on the machine that runs orc beat, so run this command there"
+
+const backlogText = (json: boolean, place: DispatchPlace) =>
+  Effect.gen(function*() {
+    if (!json && !(yield* backlogPresent(backlogRoot(place)))) {
+      return noBacklog(backlogRoot(place))
+    }
+    const view = yield* readView(backlogRoot(place))
+    return json ? JSON.stringify(backlogJson(view)) : formatBoard(view)
+  })
+
+const requireBacklog = (root: string) =>
+  Effect.gen(function*() {
+    if (!(yield* backlogPresent(root))) {
+      return yield* refuse(noBacklog(root))
+    }
+  })
 
 interface TaskText {
   readonly from: string
@@ -196,7 +240,7 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
-type TaskVerb = Extract<CommandArgs, { readonly kind: "CloseTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "MergeTask" }>
+type TaskVerb = Extract<CommandArgs, { readonly kind: "CloseTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "DependTask" | "MergeTask" }>
 
 const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   switch (args.kind) {
@@ -214,6 +258,9 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
     }
     case "AnswerTask": {
       return answerNow(args, place)
+    }
+    case "DependTask": {
+      return dependNow(args, place)
     }
     case "MergeTask": {
       return mergeTask(backlogRoot(place), args.id, args.basis)
@@ -236,8 +283,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
   Effect.gen(function*() {
     switch (args.kind) {
       case "ShowBacklog": {
-        const view = yield* readView(backlogRoot(place))
-        yield* Console.log(args.json ? JSON.stringify(backlogJson(view)) : formatBoard(view))
+        yield* Console.log(yield* backlogText(args.json, place))
         break
       }
       case "AddTask": {
@@ -249,7 +295,9 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       case "MarkEventPosted":
       case "HoldTask":
       case "AnswerTask":
+      case "DependTask":
       case "MergeTask": {
+        yield* requireBacklog(backlogRoot(place))
         yield* Console.log(yield* taskVerbLine(args, place))
         break
       }

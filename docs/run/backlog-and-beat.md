@@ -4,6 +4,8 @@ kind: reference
 # The backlog and the beat
 Orc keeps one backlog of tasks in `~/.orc/backlog`, one Markdown file per task with its facts in YAML frontmatter.
 `ORC_HOME` moves the backlog elsewhere when set.
+The backlog lives only on the machine that runs `orc beat`.
+On a machine with no backlog folder, `orc backlog` prints `no backlog at <path>` and says where the backlog lives, and every other `orc backlog` command except `add` refuses with the same words.
 A task file sits in `new`, `taken` or `closed`, and the folder it sits in is its state.
 Two files beside the folders tell the beat where tasks may go.
 `dispatch.json` names each machine, its slots, its start command and its renew command, and the quota.
@@ -151,6 +153,9 @@ So two adds at once never get the same id.
 To pipe the task in instead, give `-` as the task file, as in `printf '# Fix the login page\n' | orc backlog add orc -`.
 It reads stdin to its end and refuses a terminal.
 Add `--machine <name>` to run the task on that machine only, and `--depends-on <task-id>` once per task it waits for.
+To change what a new or held task waits for later, run `orc backlog depend <task-id> --on <task-id>,<task-id>`, which replaces its whole list, or `orc backlog depend <task-id> --clear` to empty it.
+Orc refuses a task the backlog does not hold, a task that is taken, started, closed or parked, and a dependency that would make two tasks wait on each other.
+A hold stays as it was when the dependencies change.
 Add `--kind scout` or `--kind task` for a task that ends in a report instead of a PR, as [Task kinds](task-kinds.md) shows.
 Add `--internal` to mark a ship task internal-only, which only a `no-mistakes-prod-only` project reads.
 To see the backlog, run `orc backlog`.

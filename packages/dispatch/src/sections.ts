@@ -7,7 +7,7 @@ const counted = (count: number, what: string): ReadonlyArray<string> => (count >
 
 export const dispatchSection = (view: DispatchView, width: number): Block => {
   const label = labelOf("dispatch");
-  if (view.missing) return labelledReadings(label, [reading("muted", "no backlog")], width);
+  if (view.missing) return labelledReadings(label, [reading("muted", "no backlog on this machine, only where orc beat runs")], width);
   if (view.machines.kind !== "ok") {
     return labelledReadings(
       label,

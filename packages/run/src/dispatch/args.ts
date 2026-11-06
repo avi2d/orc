@@ -24,6 +24,7 @@ export type DispatchArgs =
   | { readonly kind: "MarkEventPosted"; readonly key: string }
   | { readonly kind: "HoldTask"; readonly id: string; readonly reason: string; readonly until: string | null; readonly questions: ReadonlyArray<string> }
   | { readonly kind: "AnswerTask"; readonly id: string; readonly words: string }
+  | { readonly kind: "DependTask"; readonly id: string; readonly dependsOn: ReadonlyArray<string> }
   | { readonly kind: "MergeTask"; readonly id: string; readonly basis: MergeBasis }
   | { readonly kind: "Beat"; readonly json: boolean }
   | { readonly kind: "RunnerStart"; readonly reach: Reach }
@@ -36,7 +37,7 @@ export type DispatchArgs =
   | { readonly kind: "UsageError"; readonly detail: string }
 
 export const dispatchUsage =
-  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task>] [--internal] [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner load"
+  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task>] [--internal] [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner load"
 
 const parseJsonFlag = (rest: ReadonlyArray<string>, json: (json: boolean) => DispatchArgs): DispatchArgs => {
   if (rest.length === 0) {
@@ -218,6 +219,29 @@ const parseAnswer = (rest: ReadonlyArray<string>): DispatchArgs => {
   return said.trim() === "" ? { kind: "UsageError", detail: "orc backlog answer takes a task id and the captain's words" } : { kind: "AnswerTask", id, words: said }
 }
 
+const parseDepend = (rest: ReadonlyArray<string>): DispatchArgs => {
+  const [id = "", flag = "", ...after] = rest
+  if (!isTaskId(id)) {
+    return { kind: "UsageError", detail: "orc backlog depend takes a task id, got \"" + id + "\"" }
+  }
+  if (flag === "--clear") {
+    return after.length === 0 ? { kind: "DependTask", id, dependsOn: [] } : unexpected(after[0])
+  }
+  if (flag !== "--on") {
+    return { kind: "UsageError", detail: "orc backlog depend takes --on and the task ids it waits for, or --clear" }
+  }
+  const [list = "", ...extra] = after
+  if (extra.length > 0) {
+    return unexpected(extra[0])
+  }
+  const named = list.split(",").map((entry) => entry.trim())
+  const unnamed = named.find((entry) => !isTaskId(entry))
+  if (unnamed !== undefined) {
+    return { kind: "UsageError", detail: "orc backlog depend takes comma separated task ids after --on, got \"" + unnamed + "\"" }
+  }
+  return { kind: "DependTask", id, dependsOn: [...new Set(named)] }
+}
+
 const parseRunnerToken = (after: ReadonlyArray<string>): DispatchArgs => {
   const [session = "", ...extra] = after
   if (session === "" || session.startsWith("-")) {
@@ -353,6 +377,9 @@ export const parseDispatchArgs = (command: "backlog" | "beat" | "runner" | "merg
   }
   if (rest[0] === "answer") {
     return parseAnswer(rest.slice(1))
+  }
+  if (rest[0] === "depend") {
+    return parseDepend(rest.slice(1))
   }
   return parseJsonFlag(rest, (json) => ({ kind: "ShowBacklog", json }))
 }
