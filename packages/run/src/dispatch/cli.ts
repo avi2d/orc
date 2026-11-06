@@ -1,6 +1,5 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { missingBacklog } from "@tui-dash/schema"
 import type { DispatchArgs, TaskSource } from "./args"
 import { addTask, backlogPaths, BacklogError, closeStartedTask, holdTask, isTaskId, listTasks, markPosted } from "./backlog"
 import { circularDependency, dependTask } from "./backlog-depend"
@@ -110,7 +109,7 @@ const backlogPresent = (root: string) =>
     return yield* fs.exists(root).pipe(Effect.mapError((error) => new BacklogError({ detail: "cannot read " + root + ": " + error.message })))
   })
 
-const noBacklog = (root: string): string => missingBacklog(root) + ", so run this command there"
+const noBacklog = (root: string): string => "no backlog at " + root + ": the backlog lives on the machine that runs orc beat, so run this command there"
 
 const backlogText = (json: boolean, place: DispatchPlace) =>
   Effect.gen(function*() {

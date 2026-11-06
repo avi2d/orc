@@ -22,7 +22,6 @@
   "dependencies": {
     "@ai-hero/sandcastle": "0.12.0",
     "@effect/platform-bun": "4.0.0",
-    "@tui-dash/schema": "workspace:*",
     "effect": "4.0.0"
   },
   "devDependencies": {
