@@ -26,18 +26,81 @@ const summaryGates = (text: string): ReadonlyArray<string> => {
   return gates
 }
 
-const gateHeader = (line: string): string | null => {
-  const gate = /^([A-Za-z_][\w.-]*): \d+ [^\n]*\(s\)/.exec(line)?.[1]
+const genericHeader = (line: string): string | null => {
+  const gate = /^([A-Za-z_][\w.-]*): \d+ [^\n]*\((?:s|ies)\)/.exec(line)?.[1]
   return gate === undefined ? null : shortGate(gate)
 }
 
+const secretsHeader = (line: string): string | null =>
+  /^secrets: the range adds \d+ secret\(s\);/.test(line) ? "secrets" : null
+
+type GraphwalkSection = "imports" | "unused" | "exports"
+
+const graphwalkHeader = (line: string): GraphwalkSection | null => {
+  if (/^imports: \d+ violation\(s\) in/.test(line)) {
+    return "imports"
+  }
+  if (/^unused: \d+ unreferenced file\(s\):/.test(line)) {
+    return "unused"
+  }
+  if (/^exports: \d+ .*:$/.test(line)) {
+    return "exports"
+  }
+  return null
+}
+
 const locatorStripped = (line: string): string => {
-  const stripped = line.replace(/^(?:[\w+~./-]*\/)?[\w+~.-]+\.\w+(?::\d+)?(?::\s+|\s+)/, "")
+  const stripped = line.replace(/^(?:[\w+~./-]*\/)?[\w+~.-]+\.\w+(?::\d+(?::\d+)?)?(?::\s+|\s+)/, "")
   return stripped === "" ? line : stripped
+}
+
+const singleLineGates: ReadonlySet<string> = new Set([
+  "comment-gate",
+  "docs",
+  "no-plain-js",
+  "test-layout",
+  "css-size",
+  "copy",
+  "frontend-syntax",
+  "effect-scope",
+  "lint-coverage",
+  "secrets",
+  "commit-identity",
+  "graphwalk",
+  "repetition",
+  "suppressions-ratchet",
+  "ci-wiring",
+  "quarantine-clock",
+  "advisories",
+  "browser",
+  "commit-title",
+  "docs-only",
+  "test"
+])
+
+const passInfo = (rest: string): boolean => {
+  if (/^\d+\/\d+ /.test(rest)) {
+    return true
+  }
+  return /carry no refused|carry only allowed|each declared|\bholds?\b|\bsatisfy\b|\bpass\b|nothing was scanned|owns the verdict|\bunchanged\b|recorded no|\bcompared\b|had no|found no|\bscanned\b|advisory,|warning:|the full run|can skip|breaks no|hold to/i.test(rest) || /\bno (refused|secret|violation|plain|stylesheet|unreferenced|unused|finding|count|advisory|skip|tracked|quarantine|whole|mutation|test|more)\b/i.test(rest)
+}
+
+const secretsRule = (line: string): string | null => {
+  const rule = /^.+?\s+(\S+) in [0-9a-fA-F]+:\s*(.+)$/.exec(line)
+  if (rule?.[1] === undefined || rule[2] === undefined) {
+    return null
+  }
+  return rule[1] + ": " + rule[2]
+}
+
+const importsRule = (line: string): string | null => {
+  const rule = /^(\S+) (\S+): /.exec(line)
+  return rule?.[1] === undefined || rule[2] === undefined ? null : rule[1] + " " + rule[2]
 }
 
 export const refusalsIn = (output: string): ReadonlyArray<GateRefusal> => {
   const named = new Set(summaryGates(output))
+  const allowed = (gate: string): boolean => named.size === 0 || named.has(gate)
   const seen = new Set<string>()
   const refusals: Array<GateRefusal> = []
   const keep = (gate: string, rule: string): void => {
@@ -49,17 +112,80 @@ export const refusalsIn = (output: string): ReadonlyArray<GateRefusal> => {
     refusals.push({ gate, rule })
   }
   let gate: string | null = null
+  let section: GraphwalkSection | "secrets" | "commit" | "violation" | null = null
   for (const raw of output.split("\n")) {
-    const header = gateHeader(raw)
-    if (header !== null && (named.size === 0 || named.has(header))) {
-      gate = header
+    const secrets = secretsHeader(raw)
+    if (secrets !== null) {
+      gate = allowed(secrets) ? secrets : null
+      section = gate === null ? null : "secrets"
       continue
     }
-    if (gate !== null && /^ {2,}\S/.test(raw)) {
+    const graphwalk = graphwalkHeader(raw)
+    if (graphwalk !== null) {
+      gate = allowed("graphwalk") ? "graphwalk" : null
+      section = gate === null ? null : graphwalk
+      continue
+    }
+    const header = genericHeader(raw)
+    if (header !== null) {
+      gate = allowed(header) ? header : null
+      section = gate === null ? null : gate === "commit-identity" ? "commit" : "violation"
+      continue
+    }
+    if (/^ /.test(raw)) {
+      if (gate === null || section === null) {
+        continue
+      }
+      if (section === "commit") {
+        if (/^ {4}\S/.test(raw)) {
+          keep(gate, raw.trim())
+        }
+        continue
+      }
+      if (/^ {4}\S/.test(raw)) {
+        continue
+      }
+      if (!/^ {2}\S/.test(raw)) {
+        continue
+      }
+      if (section === "secrets") {
+        const rule = secretsRule(raw.trim())
+        if (rule !== null) {
+          keep(gate, rule)
+        }
+        continue
+      }
+      if (section === "imports") {
+        const rule = importsRule(raw.trim())
+        if (rule !== null) {
+          keep(gate, rule)
+        }
+        continue
+      }
+      if (section === "unused") {
+        if (!raw.trim().includes(":")) {
+          keep(gate, "unreferenced file")
+        }
+        continue
+      }
+      if (section === "exports") {
+        const rule = locatorStripped(raw.trim())
+        if (rule.includes("(") && rule.includes(")")) {
+          keep(gate, rule)
+        }
+        continue
+      }
       keep(gate, locatorStripped(raw.trim()))
       continue
     }
     gate = null
+    section = null
+    const single = /^([A-Za-z][A-Za-z0-9_-]*): (.+)$/.exec(raw)
+    const name = single?.[1]
+    const rest = single?.[2]?.trim()
+    if (name !== undefined && rest !== undefined && rest !== "" && singleLineGates.has(name) && !passInfo(rest)) {
+      keep(shortGate(name), rest)
+    }
   }
   return refusals
 }

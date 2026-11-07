@@ -127,7 +127,7 @@ export const recordResumePublish = (db: Database, run: HistoryRun, resume: Resum
         }
         for (const round of resume.inheritedRounds) {
           const planned = planChecksDone(run.runId, round)
-          insertPlannedStep(db, planned.step, [planned.checksEvidence], planned.signals)
+          insertPlannedStep(db, planned.step, [planned.checksEvidence], planned.signals.filter((signal) => signal.name !== refusalSignalName))
         }
         for (const fix of resume.inheritedFixes) {
           const planned = planFixDone(run.runId, fix)
