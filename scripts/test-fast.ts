@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 import { Config, Console, Effect, FileSystem, Path, Schema } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { changedPaths, defaultBranch, git, rangeEnds, type Change } from "../node_modules/@avi2dg/checks/src/core/git.ts";
-import { runMain, Usage } from "../node_modules/@avi2dg/checks/src/core/main.ts";
-import { parseReport, reporterArgs, ReportError } from "../node_modules/@avi2dg/checks/src/testing/test-report.ts";
-import { judgeSkips, passes, report, SkipGateError } from "../node_modules/@avi2dg/checks/src/testing/test.ts";
-import { readSkipDeclarations, type Environment } from "../node_modules/@avi2dg/checks/src/testing/test-skips.ts";
+import { changedPaths, defaultBranch, git, rangeEnds, type Change } from "@avi2dg/checks/core/git.ts";
+import { runMain, Usage } from "@avi2dg/checks/core/main.ts";
+import { parseReport, reporterArgs, ReportError } from "@avi2dg/checks/testing/test-report.ts";
+import { judgeSkips, passes, report, SkipGateError } from "@avi2dg/checks/testing/test.ts";
+import { readSkipDeclarations, type Environment } from "@avi2dg/checks/scripts/test-skips.ts";
 
 const NAME = "test-fast";
 const USAGE = "usage: test-fast, which runs the unit tier and the e2e test files the change touches, and it takes no arguments";
