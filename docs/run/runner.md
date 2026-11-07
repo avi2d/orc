@@ -55,6 +55,7 @@ A plain `orc runner result <task-id>` never reads standard input, so a pipe that
 Piping that document into `orc runner result <task-id> --stdin-label` yourself reads that home's run.
 It names pueue's state for the task and the orc run on `orc/<task-id>` with its PR.
 A task is queued, stashed, running, paused, succeeded or failed, or unknown when no pueue task in group `orc` carries that home's label.
+An unknown task with a stopped run still names that run with its end reason.
 To print the same facts as JSON, add `--json`, whose document names its version first as `orc.runner.v1`.
 The beat and the runner and the run on one task must share one orc version.
 To hand answers to a run waiting at its no-mistakes gate, pipe a JSON document into `orc runner answer <task-id>` on its machine.

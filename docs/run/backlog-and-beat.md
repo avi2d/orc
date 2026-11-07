@@ -204,11 +204,12 @@ It reads `orc runner result` on that machine and closes the task done, failed or
 A run marked stopped closes its task stopped with the run's end reason.
 A run still waiting at its gate for your answer stays started, and the beat relays your answers to it, as [Parked runs](parked-runs.md) shows.
 Either way the task frees its slot in the same beat.
-A start older than 10 minutes whose run the runner cannot see closes failed with `the runner holds no record of this task`.
+A start older than 10 minutes with neither a pueue record nor a stopped run closes failed with `the runner holds no record of this task`.
 A close read that stays unread for 10 minutes closes the task failed with the read's reason.
 A first unread beat only reports the read failure and starts the wait.
 To stop a task yourself, run `orc backlog stop <task-id>` where the backlog lives.
 It kills the run through the machine that started it and closes the task stopped.
+A stop for a task on a machine whose start runs any other program refuses, so close that task by hand with `orc backlog close <task-id> failed`.
 The closed task file keeps the PR link of the orc run on `orc/<task-id>` as `pr`, and `orc backlog --json` carries it as `pr`, or `null` when the run opened none.
 The beat prints `closed <task-id> <done|failed|stopped> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds, until it stays unread for 10 minutes.
 A machine whose start runs any other program keeps owning its tasks, which the beat closes once their logs go quiet rather than stalls.

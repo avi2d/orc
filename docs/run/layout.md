@@ -66,7 +66,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/alert-stream.ts` | The one alert stream `orc runner start` queues in pueue |
 | `packages/run/src/dispatch/pr-view.ts` | The `gh pr view` reading of a task's PR and its check verdicts |
 | `packages/run/src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
-| `packages/run/src/dispatch/runner.ts` | The runner: the start and the token renewal through pueue |
+| `packages/run/src/dispatch/runner.ts` | The runner: the start, the kill and the token renewal through pueue |
 | `packages/run/src/dispatch/runner-instructions.ts` | The project instructions a start carries to the machine that queues the run |
 | `packages/run/src/dispatch/runner-error.ts` | The runner's error |
 | `packages/run/src/dispatch/refresh.ts` | The fast-forward of the checkout's default branch when a run starts |
