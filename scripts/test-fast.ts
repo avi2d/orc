@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
-import { Config, Console, Effect, FileSystem, Path, Schema } from "effect";
+import { Config, Console, Effect, FileSystem, Option, Path, Schema } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { changedPaths, defaultBranch, git, rangeEnds, type Change } from "../node_modules/@avi2dg/checks/src/core/git.ts";
-import { runMain, Usage } from "../node_modules/@avi2dg/checks/src/core/main.ts";
-import { parseReport, reporterArgs, ReportError } from "../node_modules/@avi2dg/checks/src/testing/test-report.ts";
-import { judgeSkips, passes, report, SkipGateError } from "../node_modules/@avi2dg/checks/src/testing/test.ts";
-import { readSkipDeclarations, type Environment } from "../node_modules/@avi2dg/checks/src/testing/test-skips.ts";
+import { freemem } from "node:os";
+import { changedPaths, collect, defaultBranch, git, rangeEnds, type Change } from "@avi2dg/checks/core/git.ts";
+import { runMain, Usage } from "@avi2dg/checks/core/main.ts";
+import { parseReport, reporterArgs, ReportError } from "@avi2dg/checks/testing/test-report.ts";
+import { judgeSkips, passes, report, SkipGateError } from "@avi2dg/checks/testing/test.ts";
+import { readSkipDeclarations, type Environment } from "@avi2dg/checks/scripts/test-skips.ts";
 
 const NAME = "test-fast";
 const USAGE = "usage: test-fast, which runs the unit tier and the e2e test files the change touches, and it takes no arguments";
@@ -34,7 +35,45 @@ class BaseUnresolved extends Schema.TaggedError<BaseUnresolved>()("BaseUnresolve
 
 const splitZero = (output: string): readonly string[] => output.split("\0").filter((line) => line !== "");
 
-const workerCount = (): number => Math.max(1, navigator.hardwareConcurrency);
+// One test worker's peak memory, rounded up.
+const WORKER_BYTES = 1100 * 1024 * 1024;
+
+export function workerCountFor(freeBytes: number, cpus: number): number {
+  return Math.max(1, Math.min(cpus, Math.floor(freeBytes / WORKER_BYTES)));
+}
+
+// os.freemem() reports only free pages on macOS, so the reclaimable inactive and speculative pages come from vm_stat.
+export function reclaimableBytes(vmStat: string): number | undefined {
+  const pageSize = /page size of (\d+) bytes/.exec(vmStat)?.[1];
+  if (pageSize === undefined) return undefined;
+  let pages = 0;
+  for (const label of ["free", "inactive", "speculative"]) {
+    const count = new RegExp(`Pages ${label}:\\s+(\\d+)\\.`).exec(vmStat)?.[1];
+    if (count === undefined) return undefined;
+    pages += Number(count);
+  }
+  return pages * Number(pageSize);
+}
+
+class WorkerOverride extends Schema.TaggedError<WorkerOverride>()("WorkerOverride", {
+  message: Schema.String,
+}) {}
+
+const availableBytes = Effect.fn("availableBytes")(function* () {
+  if (process.platform !== "darwin") return freemem();
+  const vmStat = yield* collect("vm_stat", []).pipe(
+    Effect.map(({ stdout }) => stdout),
+    Effect.orElseSucceed(() => ""),
+  );
+  return reclaimableBytes(vmStat) ?? freemem();
+});
+
+const workerCount = Effect.fn("workerCount")(function* () {
+  const override = yield* Config.option(Config.Int("TEST_FAST_WORKERS"));
+  if (Option.isNone(override)) return workerCountFor(yield* availableBytes(), navigator.hardwareConcurrency);
+  if (override.value < 1) return yield* new WorkerOverride({ message: "TEST_FAST_WORKERS must be at least 1, not " + override.value });
+  return override.value;
+});
 
 const touchedFiles = Effect.fn("touchedFiles")(function* (root: string) {
   const target = "origin/" + (yield* defaultBranch(root));
@@ -112,7 +151,8 @@ const fastEntry = Effect.gen(function* () {
   if (process.argv.slice(2).length > 0) return yield* new Usage({ message: USAGE });
   const root = (yield* git(["rev-parse", "--show-toplevel"])).trim();
   const files = yield* touchedFiles(root);
-  const workers = workerCount();
+  const workers = yield* workerCount();
+  yield* Console.log(NAME + ": running " + workers + " worker(s)");
   const environment = yield* environmentOf;
   if (!(yield* runUnitTier(root, workers, environment))) return false;
   if (files.length === 0) {
