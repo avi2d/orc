@@ -3,7 +3,7 @@ import type { Database } from "bun:sqlite"
 import type { NoMistakesRecord } from "./no-mistakes"
 import type { DirectPrRecord } from "./direct-pr"
 import { noMistakesFile, prBodyFileName, type HistoryRun } from "./run-record"
-import { distinctRefusals, refusalSignalName, refusalValue } from "./gate-refusals"
+import { refusalSignalName, refusalValue } from "./gate-refusals"
 import type { ChecksRoundSummary, OrcRunReport, RecordedFixAttempt } from "./report"
 import { OrcRunError } from "./run-session"
 import { formatHistoryError, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, runById, stepIdFor, updateRun, updateStep } from "./run-history"
@@ -65,7 +65,7 @@ const planChecksDone = (runId: string, round: ChecksRoundSummary): PlannedChecks
   checksEvidence: { direction: "out", path: round.file, kind: "checks" },
   signals: [
     ...round.checks.map((check) => ({ name: "check " + check.name, value: check.passed ? "passed" : "failed" as const })),
-    ...distinctRefusals(round.refusals).map((refusal) => ({ name: refusalSignalName, value: refusalValue(refusal) }))
+    ...round.refusals.map((refusal) => ({ name: refusalSignalName, value: refusalValue(refusal) }))
   ]
 })
 

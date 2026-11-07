@@ -40,11 +40,61 @@ describe("refusalsIn", () => {
   test("merges the checks- bin spelling with the gate header spelling", () => {
     const output = [
       "docs: 2 violation(s):",
-      "  docs/guide.md:3 point at the words, not the page",
-      "  docs/other.md:7 point at the words, not the page",
+      "  docs/a.md:4: names `foo.ts`, which is not in the repository",
+      "  docs/a.md:4: names `foo.ts`, which is not in the repository",
       "checks-lint: 1 of 3 gate(s) failed: checks-docs",
     ].join("\n")
-    expect(refusalsIn(output)).toEqual([{ gate: "docs", rule: "point at the words, not the page" }])
+    expect(refusalsIn(output)).toEqual([{ gate: "docs", rule: "names `foo.ts`, which is not in the repository" }])
+  })
+
+  test("strips bracket, scope and spaced locators instead of keeping them in the rule", () => {
+    const output = [
+      "comment-gate: 3 violation(s):",
+      "  src/pages/[slug].astro:1 carries the machine-read directive `x`. Fix it",
+      "  packages/@scope/ui/src/x.ts:2 carries the machine-read directive `x`. Fix it",
+      "  my docs/guide.md:3 carries the machine-read directive `x`. Fix it",
+    ].join("\n")
+    expect(refusalsIn(output)).toEqual([{ gate: "comment-gate", rule: "carries the machine-read directive `x`. Fix it" }])
+  })
+
+  test("groups css-size counts under the budget instead of splitting by lines", () => {
+    const output = [
+      "css-size: 2 violation(s)",
+      "  src/a.css: 450 lines, over the 400-line budget; split the stylesheet into smaller files",
+      "  src/b.css: 500 lines, over the 400-line budget; split the stylesheet into smaller files",
+    ].join("\n")
+    expect(refusalsIn(output)).toEqual([
+      { gate: "css-size", rule: "over the 400-line budget; split the stylesheet into smaller files" },
+    ])
+  })
+
+  test("groups long sentences under the cap instead of splitting by words", () => {
+    const output = [
+      "docs: 2 violation(s):",
+      "  docs/a.md:12: carries a 41-word descriptive sentence, over the 25-word cap (procedural means an ordered list item, capped at 20 words)",
+      "  docs/b.md:8: carries a 30-word descriptive sentence, over the 25-word cap (procedural means an ordered list item, capped at 20 words)",
+    ].join("\n")
+    expect(refusalsIn(output)).toEqual([
+      { gate: "docs", rule: "over the 25-word cap (procedural means an ordered list item, capped at 20 words)" },
+    ])
+  })
+
+  test("keeps different test names as different rules instead of grouping skips", () => {
+    const output = [
+      "checks-test: 2 skipped test(s) undeclared in this local run:",
+      "  tests/unit/foo.test.ts:10 parses a: skipped with no reason at its test site; use test.skipIf(condition)(skipReason(reason, name), fn)",
+      "  tests/unit/foo.test.ts:20 parses b: skipped with no reason at its test site; use test.skipIf(condition)(skipReason(reason, name), fn)",
+    ].join("\n")
+    expect(refusalsIn(output)).toEqual([
+      {
+        gate: "test",
+        rule: "parses a: skipped with no reason at its test site; use test.skipIf(condition)(skipReason(reason, name), fn)",
+      },
+      {
+        gate: "test",
+        rule: "parses b: skipped with no reason at its test site; use test.skipIf(condition)(skipReason(reason, name), fn)",
+      },
+    ])
   })
 
   test("drops the file locator and keeps the kit wording as the rule", () => {
@@ -138,7 +188,7 @@ describe("refusalsIn", () => {
       "    author Alice <a@x>",
       "    committer Bob <b@y>",
       "    trailer Co-authored-by: Bob <b@y>",
-      "    Mallory <m@x>",
+      "    trailer Co-authored-by: Mallory <m@x>",
       "  allowed: Alice <a@x>",
       "  allowed as committer only: GitHub <noreply@github.com>, which also lets an allowed email author under any name",
     ].join("\n")
