@@ -82,18 +82,18 @@ describe("the live dashboard", () => {
     const setup = await createTestRenderer({ width: 84, height: 24 });
     const fiber = Effect.runFork(liveDashboard(setup.renderer, recordedSources));
     try {
-      const standard = rowsOf(await frameWhere(setup, (frame) => frame.includes("\u25cf") && frame.includes("no agent flagged") && frame.includes("nightly")));
+      const standard = rowsOf(await frameWhere(setup, (frame) => frame.includes("\u25cf") && frame.includes("no agent flagged") && frame.includes("long-task")));
       for (const header of ["\u25cf claude main", "\u25cf codex", "\u25cf opencode-go"]) {
         expect(standard.some((row) => row.startsWith(header))).toBe(true);
       }
       expect(standard.some((row) => row.startsWith("\u25cf claude second")) || standard.includes("+1 more claude profiles")).toBe(true);
       expect(standard).toContain("queue    local \u00b7 2 running \u00b7 2 queued \u00b7 1 paused \u00b7 gpu group paused");
       expect(standard).toContain("actions  toolshed \u00b7 2 running \u00b7 1 waiting");
-      expect(standard).toContain("+3 more rows");
+      expect(standard).toContain("+2 more rows");
       expect(standard[0]).toStartWith("\u25cf claude main");
       const alerts = standard.indexOf("alerts");
       expect(alerts).toBeGreaterThan(standard.findIndex((row) => row.startsWith("actions")));
-      expect(standard.slice(alerts + 1).map((row) => row.split(" ")[0])).toEqual(["quota-pace", "heavy-load", "long-task", "nightly"]);
+      expect(standard.slice(alerts + 1).map((row) => row.split(" ")[0])).toEqual(["quota-pace", "heavy-load", "long-task"]);
       expect(standard[alerts + 1]).toBe("quota-pace none recorded");
     } finally {
       await Effect.runPromise(Fiber.interrupt(fiber));

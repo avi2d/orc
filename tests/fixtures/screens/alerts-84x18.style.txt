@@ -20,6 +20,3 @@ fffff    fff fff f ffff fff ffffff fffffffff ff ffffff fffff fff
 fffffff  mmmm mm mmmm mmmm
 fffffff  mmm mmm m mmmm mmm mmmmmm mmmmmmmmm mm mmmmmm mmmmm mmm
          fffff ffffff fff ffffff fff ff fff
-fffff    FFFFFFF
-ffffff   ff ffffffffff ffffff ff ff fffff ffff f ffff fffff ff
-fffff    mmmm mmmmmmmm

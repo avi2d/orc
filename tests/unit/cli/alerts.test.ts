@@ -33,7 +33,6 @@ const quietTask: TaskEntry = {
 };
 
 const readers: AlertReaders<never> = {
-  nightly: Effect.succeed({ schedules: [], report: { repos: [], runs: [], failures: [] } }),
   quota: Effect.never,
   resources: Effect.map(DateTime.now, (now) => [{ name: "remote", reading: { kind: "ok", value: heavyRemote(now) } }]),
   tasks: Effect.succeed([

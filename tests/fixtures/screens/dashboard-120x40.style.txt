@@ -18,7 +18,7 @@ w  warning
 W  warning bold
 X  codex bold
 
-mm fffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mmmm Afffff f fffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mm
+mm fffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mmmm Gfffff f fffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mm
 m C CCCCCC CCCC m mmm W WWWW WWW WW WW WWW                 mm w ffff fff ffffff fffff ffffff f ff                      m
 m   f fffff    ssssassssssssssss  sss  sss sssss    mm mmm mm f fff fffffff fff fffff fff ffff fff ffffffff f ff       m
 m   ffff       wwwwwwuauuuuuuuuu  www  WW WWWW      mm mmm mm w ffff f ffff fff ffff fffffff f ff                      m
@@ -33,14 +33,13 @@ m   f fffff    ssssssssssssssssa ssss  mm mmmm      mm mmm mm                   
 m   ffff       sssssssssssssassu  sss  sss sssss     mm mm mm                                                          m
 m   fffff      ssssssssssssssauu  sss  W WWWW          mmm mm                                                          m
 mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm                                                          m
-mm AOOOOOOO m Ammmmm mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mm mmm                                                          m
+mm GOOOOOOO m Gmmmmm mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mm mmm                                                          m
 m E FFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF FFFFFF FFFF  mm                                                          m
 m E FFFFFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF           mm                                                          m
 m   FFFFFF FFFF                                            mm                                                          m
 m ww wwww wwwww                                            mm                                                          m
-m                                                          mm                                                          m
 mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-mm ffffffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mmoo AOOOOOOO O OOOOO ooooooooooooooooooooooooooooooo m mmm oo
+mm ffffffff mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mmoo GOOOOOOO O OOOOO ooooooooooooooooooooooooooooooo m mmm oo
 m FFFFF  mmm sss  mmm ssssssssss  mmm ss  mmmm sss         mo   uuuuuuu                 uuuu uuuu uuuu uuuuu uuuu uuuu o
 m   s ff ffff ffff fff fffff                               mo   uuuuu                      p    w    f     f    f    f o
 m                                                          mo 11111111111111111111111112222233333111111111111111111111 o
@@ -48,7 +47,7 @@ m FFFFF  mmm sss  mmm sssssssssss  mmm www  mmmm sss       mo   ffff            
 m   mmmm mmmmm mmm mmmmm mmmmmmmmmmmmmmmmmmmmmmmmm         mo                                                          o
 m   mm mmmmm                                               mo                                                          o
 mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmo                                                          o
-mm OAOOO m Ammmmmmmm mmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mmo                                                          o
+mm OGOOO m Gmmmmmmmm mmmmmmmmmmmmmmmmmmmmmmmmmmmmmm m mmm mmo                                                          o
 m f fffffff f f fffffff f f ffffff ff fffff                mo                                                          o
 m w ww wwww ww wwww www wwww                               mo                                                          o
 m p mmmmm fffff fffffff mmmmm mmm            fff       mmm mo                                                          o
@@ -56,5 +55,6 @@ m p mmmmm fffff fffffff mmmmm mmmm           fff       mmm mo                   
 m p mmmmm fffff ffff mmm mmmm                 ff       mmm mo                                                          o
 m p mm          ffff mm                       ff       mmm mo                                                          o
 m w mm          ffff mmmmmm                    f   wwwwwww mo                                                          o
+m s mmmmm fffff ffffffffffff mmmm mmmmmmm     ff     mmmmm mo                                                          o
 m mm mmmm mmmm                                             mo                                                          o
 mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo

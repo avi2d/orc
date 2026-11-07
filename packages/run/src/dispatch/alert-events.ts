@@ -25,15 +25,7 @@ const LongTask = Schema.Struct({
   quietMinutes: Schema.Finite,
   totalMinutes: Schema.Finite
 })
-const Nightly = Schema.Struct({
-  rule: Schema.Literal("nightly"),
-  at: Schema.String,
-  repo: Schema.String,
-  workflow: Schema.String,
-  runId: Schema.Finite,
-  conclusion: Schema.String
-})
-const AlertLine = Schema.fromJsonString(Schema.Union([QuotaPace, HeavyLoad, LongTask, Nightly]))
+const AlertLine = Schema.fromJsonString(Schema.Union([QuotaPace, HeavyLoad, LongTask]))
 type AlertLine = typeof AlertLine.Type
 
 const minutesSpan = (minutes: number): string => {
@@ -58,9 +50,6 @@ const alertText = (alert: AlertLine): string => {
     case "long-task": {
       return "alert: " + alert.task.title + " (" + alert.task.id + ") on " + alert.machine +
         (alert.reason === "quiet" ? " quiet for " + minutesSpan(alert.quietMinutes) : " running for " + minutesSpan(alert.totalMinutes))
-    }
-    case "nightly": {
-      return "alert: nightly " + alert.workflow + " of " + alert.repo + " run " + String(alert.runId) + " ended " + alert.conclusion
     }
   }
 }

@@ -16,6 +16,3 @@ fired    10m ago · Plot the bridge migration on north, quiet 30m
 verdict  none on this fire
 earlier  25m ago · Plot the bridge migration on north, quiet 15m
          still moving the queue, let it run
-alert    nightly
-limits   no repository mapped to an owner home · read every 5m
-fired    none recorded

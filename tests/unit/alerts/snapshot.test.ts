@@ -38,7 +38,7 @@ const labelled = (lines: ReadonlyArray<string>, label: string): ReadonlyArray<st
 describe("the alerts panel shows each rule's limits from the settings file", () => {
   test("for every rule, in the order the engine runs them", () => {
     const lines = printed();
-    expect(lines.filter((line) => line.startsWith("alert ")).map((line) => line.split(/ +/u)[1])).toEqual(["quota-pace", "heavy-load", "long-task", "nightly"]);
+    expect(lines.filter((line) => line.startsWith("alert ")).map((line) => line.split(/ +/u)[1])).toEqual(["quota-pace", "heavy-load", "long-task"]);
     expect(ruleOf(lines, "quota-pace").slice(0, 3)).toEqual([
       "limits   a window runs ahead of pace past its first tenth and runs out before",
       "         its reset",
@@ -52,10 +52,7 @@ describe("the alerts panel shows each rule's limits from the settings file", () 
       "limits   quiet 20m, then every 10m · past 3h in total",
       "         watches working, waiting and blocked · read every 30s",
     ]);
-    expect(ruleOf(lines, "nightly").slice(0, 2)).toEqual([
-      "limits   no repository mapped to an owner home · read every 5m",
-      "fired    none recorded",
-    ]);
+
   });
 
   // Oracle: half a minute is 30 seconds and a quarter hour is 15 minutes, by hand, and 0.001 percent is above zero.
@@ -111,12 +108,12 @@ describe("the alerts panel with a verdict log it cannot use", () => {
   test("gives the reason and leaves every fire unknown", () => {
     const shown = printed(readings({ verdicts: { kind: "unreachable", reason: `${verdictLogPath} cannot be read` } }));
     expect(labelled(shown, "verdicts").map((line) => line.slice(9)).join(" ")).toBe(`✗ unreachable: ${verdictLogPath} cannot be read`);
-    for (const rule of ["quota-pace", "heavy-load", "long-task", "nightly"]) expect(ruleOf(shown, rule).at(-1)).toBe("fired    unknown until the verdict log reads");
+    for (const rule of ["quota-pace", "heavy-load", "long-task"]) expect(ruleOf(shown, rule).at(-1)).toBe("fired    unknown until the verdict log reads");
   });
 
   test("says so in the summary's header, with every rule's last fire unknown", () => {
     const shown = alertsSummary(readings({ verdicts: { kind: "unreachable", reason: "lost" } }), now, 84).map(plain);
-    expect(shown).toEqual(["alerts · ✗ verdict log unread", "quota-pace unknown", "heavy-load unknown", "long-task  unknown", "nightly    unknown"]);
+    expect(shown).toEqual(["alerts · ✗ verdict log unread", "quota-pace unknown", "heavy-load unknown", "long-task  unknown"]);
   });
 
   test("counts the unreadable lines, with the last one's issue", () => {

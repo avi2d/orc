@@ -34,7 +34,6 @@ const defaults = {
     ],
   },
   longTask: { everySeconds: 30, quietMinutes: 15, repeatMinutes: 15, totalHours: 2, states: ["working", "waiting", "blocked"] },
-  nightly: { everySeconds: 300, homes: {} },
 } as const;
 
 const QuotaPaceSettings = Schema.Struct({
@@ -56,16 +55,10 @@ const LongTaskSettings = Schema.Struct({
   states: Schema.Array(TaskStateJson).pipe(Schema.withDecodingDefaultKey(Effect.succeed(defaults.longTask.states))),
 });
 
-const NightlySettings = Schema.Struct({
-  everySeconds: Positive.pipe(Schema.withDecodingDefaultKey(Effect.succeed(defaults.nightly.everySeconds))),
-  homes: Schema.Record(Schema.String, Schema.String).pipe(Schema.withDecodingDefaultKey(Effect.succeed(defaults.nightly.homes))),
-});
-
 export const AlertSettings = Schema.Struct({
   quotaPace: QuotaPaceSettings.pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),
   heavyLoad: HeavyLoadSettings.pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),
   longTask: LongTaskSettings.pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),
-  nightly: NightlySettings.pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),
 });
 
 export type AlertSettings = typeof AlertSettings.Type;
@@ -73,8 +66,6 @@ export type AlertSettings = typeof AlertSettings.Type;
 export type HeavyLoadSettings = AlertSettings["heavyLoad"];
 
 export type LongTaskSettings = AlertSettings["longTask"];
-
-export type NightlySettings = AlertSettings["nightly"];
 
 export const defaultAlertSettings: AlertSettings = defaults;
 
@@ -131,19 +122,7 @@ const LongTaskEvent = Schema.Struct({
   totalMinutes: Schema.Finite,
 });
 
-const NightlyEvent = Schema.Struct({
-  schemaVersion: Schema.Literal(1),
-  rule: Schema.Literal("nightly"),
-  at: Schema.String,
-  repo: Schema.String,
-  workflow: Schema.String,
-  runId: Schema.Int,
-  conclusion: Schema.String,
-  home: Schema.String,
-  recheckAt: Schema.String,
-});
-
-export const AlertEvent = Schema.Union([QuotaPaceEvent, HeavyLoadEvent, LongTaskEvent, NightlyEvent]);
+export const AlertEvent = Schema.Union([QuotaPaceEvent, HeavyLoadEvent, LongTaskEvent]);
 
 export type AlertEvent = typeof AlertEvent.Type;
 
@@ -152,5 +131,3 @@ export type QuotaPaceEvent = typeof QuotaPaceEvent.Type;
 export type HeavyLoadEvent = typeof HeavyLoadEvent.Type;
 
 export type LongTaskEvent = typeof LongTaskEvent.Type;
-
-export type NightlyEvent = typeof NightlyEvent.Type;

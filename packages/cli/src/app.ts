@@ -1,16 +1,12 @@
-import { type Config, Console, Effect, type FileSystem, Option } from "effect";
+import { type Config, Console, Effect, type FileSystem } from "effect";
 import { type QueueSources, readQueuesReport } from "@tui-dash/queues";
 import { readMachineReports, type TaskSources } from "@tui-dash/resources";
 import { readComposedSessionQuotaReport } from "@tui-dash/session-quota";
 import {
-  CiRuns,
-  type CiReport,
   type ConfigRefused,
   type HostSources,
-  MachineSchedules,
   machineNames,
   mapOutcome,
-  type NightlyInputs,
   readAlertSettings,
   type ResourceMachines,
   type SessionQuotaSources,
@@ -23,9 +19,7 @@ import { type SnapshotReaders, snapshotReport } from "./snapshot";
 
 export type SnapshotSources = SessionQuotaSources | HostSources | TaskSources | ResourceMachines | QueueSources | TasksMachines;
 
-export type AlertSources = SnapshotSources | MachineSchedules | CiRuns;
-
-const emptyReport: CiReport = { repos: [], runs: [], failures: [] };
+export type AlertSources = SnapshotSources;
 
 const readTaskMachines = Effect.flatMap(TasksMachines, (machines) =>
   Effect.forEach(machines, (machine) => Effect.map(machine.read, (reading) => ({ name: machine.name, reading })), {
@@ -44,19 +38,10 @@ export const liveReaders: SnapshotReaders<SnapshotSources> = {
   tasks: Effect.map(readTasksReports, (machines) => ({ machines })),
 };
 
-const readNightlySample: Effect.Effect<NightlyInputs, never, MachineSchedules | CiRuns> = Effect.gen(function* () {
-  const schedules = yield* (yield* MachineSchedules).read;
-  const runs = yield* CiRuns;
-  if (Option.isNone(runs)) return { schedules, report: emptyReport };
-  const reading = yield* runs.value.read;
-  return { schedules, report: reading.kind === "ok" ? reading.value : emptyReport };
-});
-
 const liveAlertReaders: AlertReaders<AlertSources> = {
   quota: readComposedSessionQuotaReport,
   resources: readMachineReports,
   tasks: readTaskMachines,
-  nightly: readNightlySample,
 };
 
 export const printSnapshotJson = (selected: ReadonlySet<SnapshotSource>): Effect.Effect<void, Config.ConfigError, SnapshotSources> =>

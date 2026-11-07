@@ -12,7 +12,8 @@
   month      ━━━━━━━━━━━━━━━━━┃───  81% left  runs out in 22d       resets in 25d
 ⚑ shop is spending over its share of claude main's week
 ⚑ my-home is spending over its share of claude main's week
-+2 more flags
+⚑ a no-mistakes run is spending over its share of claude main's week
+⚑ my-home is spending over its share of opencode-go's month
 queue    north · 2 running · 2 queued · 1 paused · gpu group paused
 actions  toolshed · 2 running · 1 waiting
 machine  cpu 11% · memory 5.5G of 31.3G
@@ -21,4 +22,3 @@ alerts
 quota-pace none recorded
 heavy-load just now · expected, a nightly baseline runs on south
 long-task  just now · no verdict on this fire
-nightly    none recorded

@@ -153,6 +153,22 @@ describe("an alert fire", () => {
       expect(await unposted(root)).toEqual([])
     })
   })
+  test("a retired nightly line posts as its error instead of firing the removed rule", async () => {
+    await withBacklog(async (root) => {
+      const retired = JSON.stringify({
+        rule: "nightly",
+        at: "2026-10-27T09:00:00.000Z",
+        repo: "example/website",
+        workflow: "night-run",
+        runId: 101,
+        conclusion: "failure",
+      })
+      await writeFile(join(root, "alerts.jsonl"), retired + "\n" + loadFire + "\n")
+      const [unread = "", ...rest] = await unposted(root)
+      expect(unread).toStartWith("orc cannot read alert line 1 of " + join(root, "alerts.jsonl") + ": ")
+      expect(rest).toEqual([fireTexts[1]])
+    })
+  })
   test("a key no fire carries is refused instead of marked", async () => {
     await withBacklog(async (root) => {
       await writeFile(join(root, "alerts.jsonl"), quotaFire + "\n")

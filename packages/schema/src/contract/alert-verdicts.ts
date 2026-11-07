@@ -4,7 +4,7 @@ import { AlertEvent } from "./alerts";
 
 export type AlertRule = AlertEvent["rule"];
 
-export const alertRules: ReadonlyArray<AlertRule> = ["quota-pace", "heavy-load", "long-task", "nightly"];
+export const alertRules: ReadonlyArray<AlertRule> = ["quota-pace", "heavy-load", "long-task"];
 
 export const AlertVerdictRecord = Schema.Struct({
   schemaVersion: Schema.Literal(1),

@@ -92,6 +92,23 @@ describe("a verdict line", () => {
     ["a recordedAt that is no instant", JSON.stringify({ ...judgedRecord, recordedAt: "yesterday" })],
     ["another schema version", JSON.stringify({ ...judgedRecord, schemaVersion: 2 })],
     ["an event of no rule the engine has", JSON.stringify({ ...judgedRecord, event: { ...judgedRecord.event, rule: "disk-full" } })],
+    [
+      "a retired nightly event the rule no longer names",
+      JSON.stringify({
+        ...judgedRecord,
+        event: {
+          schemaVersion: 1,
+          rule: "nightly",
+          at: "2026-10-27T09:00:00.000Z",
+          repo: "example/website",
+          workflow: "night-run",
+          runId: 101,
+          conclusion: "failure",
+          home: "my-website",
+          recheckAt: "2026-10-28T03:01:00.000Z",
+        },
+      }),
+    ],
     ["an event whose at is no instant", JSON.stringify({ ...judgedRecord, event: { ...judgedRecord.event, at: "soon" } })],
     ["text that is not JSON", "verdict: fine"],
   ];

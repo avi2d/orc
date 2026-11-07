@@ -9,9 +9,6 @@ import {
   longTaskStep,
   type MachineResources,
   type MachineTasks,
-  type NightlyInputs,
-  nightlyStart,
-  nightlyStep,
   type Outcome,
   quotaPaceStart,
   quotaPaceStep,
@@ -22,14 +19,7 @@ export interface AlertReaders<R> {
   readonly quota: Effect.Effect<ComposedSessionQuotaReport, never, R>;
   readonly resources: Effect.Effect<ReadonlyArray<MachineResources>, never, R>;
   readonly tasks: Effect.Effect<ReadonlyArray<MachineTasks>, never, R>;
-  readonly nightly: Effect.Effect<NightlyInputs, never, R>;
 }
-
-export interface AlertLimits extends SnapshotLimits {
-  readonly nightly: Duration.Duration;
-}
-
-export const alertLimits: AlertLimits = { ...snapshotLimits, nightly: Duration.minutes(5) };
 
 interface Rule<A, S> {
   readonly source: keyof AlertReaders<never>;
@@ -60,7 +50,7 @@ const ruleStream = <A, S, R>(rule: Rule<A, S>, read: Effect.Effect<A, never, R>,
     yield* round.pipe(Effect.repeat(Schedule.spaced(Duration.seconds(rule.everySeconds))));
   });
 
-export const streamAlerts = <R>(readers: AlertReaders<R>, settings: AlertSettings, limits: AlertLimits = alertLimits): Effect.Effect<void, never, R> =>
+export const streamAlerts = <R>(readers: AlertReaders<R>, settings: AlertSettings, limits: SnapshotLimits = snapshotLimits): Effect.Effect<void, never, R> =>
   Effect.all(
     [
       ruleStream(
@@ -87,16 +77,6 @@ export const streamAlerts = <R>(readers: AlertReaders<R>, settings: AlertSetting
         },
         readers.tasks,
         limits.tasks,
-      ),
-      ruleStream(
-        {
-          source: "nightly",
-          everySeconds: settings.nightly.everySeconds,
-          initial: nightlyStart,
-          step: (state, sample, now) => nightlyStep(state, sample, now, settings.nightly),
-        },
-        readers.nightly,
-        limits.nightly,
       ),
     ],
     { concurrency: "unbounded", discard: true },
