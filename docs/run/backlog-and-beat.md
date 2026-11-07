@@ -179,7 +179,8 @@ The date says when you mean to answer, and a past date releases nothing: the tas
 To answer, run `orc backlog answer <task-id> <words>`.
 The task file keeps your words as `answer` and the time as `answered_at`, and the next beat may start the task.
 The released run reads the task body with the reason and your words added after it.
-Orc refuses to hold a task that is taken, started, closed or parked, and to answer a task that is neither held nor parked.
+Orc refuses to hold a task that is taken, started, closed or parked.
+It refuses to answer a task with no open question for you.
 Holding a held task again keeps the first reason.
 To hold a task on several decisions at once, add one `--question <text>` for each, and orc names them `question-1` onward.
 Answer each one with `orc backlog answer <task-id> <question-id>=<words>`, and the task stays held until every question has an answer.

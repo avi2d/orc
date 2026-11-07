@@ -31,6 +31,7 @@ The alert stream that `orc runner start` queues writes that file, as [The runner
 When it cannot read or mark the backlog, it posts orc's error once Pi is idle and keeps polling.
 Each time the chat starts, it posts one line per held task you have not answered, once Pi is idle, as in `orc-2 Pick the API is held for the captain: REST or gRPC, until 2026-12-01`.
 It posts one line per parked question you have not answered each time it starts, and once more when a task parks while it runs, as in `orc-3 Fix the retries is parked on orc/orc-3 for the captain's answer to question-4: Which retries are allowed?`.
+Questions from a run waiting at its gate post the same way, as [Parked runs](parked-runs.md) shows.
 A question whose line a failed read or a busy Pi kept back is posted on a later poll.
 The chat's Pi loads your Pi settings and packages, so a provider a package adds works as it does in your Pi.
 The chat's Pi also takes the `env` of the orchestrator's provider, so the chat and the runs of that provider use the same account whatever your shell exports.
