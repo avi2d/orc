@@ -19,8 +19,6 @@ import { type SnapshotReaders, snapshotReport } from "./snapshot";
 
 export type SnapshotSources = SessionQuotaSources | HostSources | TaskSources | ResourceMachines | QueueSources | TasksMachines;
 
-export type AlertSources = SnapshotSources;
-
 const readTaskMachines = Effect.flatMap(TasksMachines, (machines) =>
   Effect.forEach(machines, (machine) => Effect.map(machine.read, (reading) => ({ name: machine.name, reading })), {
     concurrency: "unbounded",
@@ -38,7 +36,7 @@ export const liveReaders: SnapshotReaders<SnapshotSources> = {
   tasks: Effect.map(readTasksReports, (machines) => ({ machines })),
 };
 
-const liveAlertReaders: AlertReaders<AlertSources> = {
+const liveAlertReaders: AlertReaders<SnapshotSources> = {
   quota: readComposedSessionQuotaReport,
   resources: readMachineReports,
   tasks: readTaskMachines,
@@ -51,7 +49,7 @@ export const printSnapshotJson = (selected: ReadonlySet<SnapshotSource>): Effect
     yield* Console.log(JSON.stringify(report));
   });
 
-export const printAlertsJson: Effect.Effect<void, Config.ConfigError | ConfigRefused, AlertSources | FileSystem.FileSystem> = Effect.gen(
+export const printAlertsJson: Effect.Effect<void, Config.ConfigError | ConfigRefused, SnapshotSources | FileSystem.FileSystem> = Effect.gen(
   function* () {
     const settings = yield* readAlertSettings;
     yield* streamAlerts(liveAlertReaders, settings);
