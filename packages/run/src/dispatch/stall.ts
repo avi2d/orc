@@ -6,9 +6,9 @@ import type { Progress } from "./beat-close"
 import { platformFailure } from "./backlog-write"
 import type { TaskRecord } from "./task-record"
 
-const stallMillis = 30 * 60 * 1000
+export const stallMillis = 30 * 60 * 1000
 
-const logWrittenAt = (log: string): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
+export const logWrittenAt = (log: string): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const info = yield* fs.stat(log).pipe(Effect.orElseSucceed(() => null))

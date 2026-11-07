@@ -20,6 +20,7 @@ export type DispatchArgs =
     readonly dependsOn: ReadonlyArray<string>
   }
   | { readonly kind: "CloseTask"; readonly id: string; readonly outcome: "done" | "failed"; readonly reason: string }
+  | { readonly kind: "StopTask"; readonly id: string }
   | { readonly kind: "MarkPosted"; readonly id: string }
   | { readonly kind: "MarkEventPosted"; readonly key: string }
   | { readonly kind: "HoldTask"; readonly id: string; readonly reason: string; readonly until: string | null; readonly questions: ReadonlyArray<string> }
@@ -34,11 +35,12 @@ export type DispatchArgs =
   | { readonly kind: "RunnerHold"; readonly task: string; readonly label?: string; readonly run: readonly [string, ...Array<string>] }
   | { readonly kind: "RunnerToken"; readonly session: string }
   | { readonly kind: "RunnerResult"; readonly task: string; readonly label?: string; readonly json: boolean; readonly reach: Reach; readonly stdinLabel: boolean }
+  | { readonly kind: "RunnerKill"; readonly task: string; readonly label?: string; readonly stdinLabel: boolean }
   | { readonly kind: "RunnerAnswer"; readonly task: string }
   | { readonly kind: "UsageError"; readonly detail: string }
 
 export const dispatchUsage =
-  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task>] [--internal] [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner answer <task-id> | orc runner load"
+  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task>] [--internal] [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog stop <task-id> | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner kill <task-id> | orc runner answer <task-id> | orc runner load"
 
 const parseJsonFlag = (rest: ReadonlyArray<string>, json: (json: boolean) => DispatchArgs): DispatchArgs => {
   if (rest.length === 0) {
@@ -118,6 +120,14 @@ const parseAdd = (rest: ReadonlyArray<string>): DispatchArgs => {
   const [project = "", taskFile = ""] = split.kept
   const task: TaskSource = taskFile === "-" ? { kind: "stdin" } : { kind: "file", path: taskFile }
   return { kind: "AddTask", project, task, taskKind: taskKind.taskKind, internal: split.internal, machine, dependsOn: split.values["--depends-on"] }
+}
+
+const parseStop = (rest: ReadonlyArray<string>): DispatchArgs => {
+  const [id = "", ...extra] = rest
+  if (!isTaskId(id)) {
+    return { kind: "UsageError", detail: "orc backlog stop takes a task id, got \"" + id + "\"" }
+  }
+  return extra.length === 0 ? { kind: "StopTask", id } : unexpected(extra[0])
 }
 
 const parseClose = (rest: ReadonlyArray<string>): DispatchArgs => {
@@ -253,19 +263,19 @@ const parseRunnerToken = (after: ReadonlyArray<string>): DispatchArgs => {
 
 type StdinMarker = { readonly words: ReadonlyArray<string>; readonly stdinLabel: boolean } | { readonly error: string }
 
-const stripStdinMarker = (verb: "hold" | "result", words: ReadonlyArray<string>): StdinMarker => {
-  if (verb !== "result" || !words.includes("--stdin-label")) {
+const stripStdinMarker = (verb: "hold" | "result" | "kill", words: ReadonlyArray<string>): StdinMarker => {
+  if ((verb !== "result" && verb !== "kill") || !words.includes("--stdin-label")) {
     return { words, stdinLabel: false }
   }
   const kept = words.filter((word) => word !== "--stdin-label")
   return kept.length === words.length - 1
     ? { words: kept, stdinLabel: true }
-    : { error: "orc runner result takes one --stdin-label" }
+    : { error: "orc runner " + verb + " takes one --stdin-label" }
 }
 
 type TaskLabel = { readonly label: string | undefined; readonly kept: Array<string> } | { readonly error: string }
 
-const takeTaskLabel = (verb: "hold" | "result", words: ReadonlyArray<string>): TaskLabel => {
+const takeTaskLabel = (verb: "hold" | "result" | "kill", words: ReadonlyArray<string>): TaskLabel => {
   let label: string | undefined
   const kept: Array<string> = []
   for (let index = 0; index < words.length; index += 1) {
@@ -287,7 +297,7 @@ const takeTaskLabel = (verb: "hold" | "result", words: ReadonlyArray<string>): T
   return { label, kept }
 }
 
-const parseRunnerTask = (verb: "hold" | "result", split: Extract<ReachSplit, { readonly kind: "split" }>): DispatchArgs => {
+const parseRunnerTask = (verb: "hold" | "result" | "kill", split: Extract<ReachSplit, { readonly kind: "split" }>): DispatchArgs => {
   const [task = "", ...flags] = split.words
   if (!isTaskId(task)) {
     return { kind: "UsageError", detail: "orc runner " + verb + " takes a task id, got \"" + task + "\"" }
@@ -302,6 +312,11 @@ const parseRunnerTask = (verb: "hold" | "result", split: Extract<ReachSplit, { r
   }
   if (verb === "result") {
     return parseJsonFlag(taken.kept, (json) => ({ kind: "RunnerResult", task, ...(taken.label === undefined ? {} : { label: taken.label }), json, reach: split.reach, stdinLabel: marked.stdinLabel }))
+  }
+  if (verb === "kill") {
+    return taken.kept.length === 0 && split.reach.kind === "here"
+      ? { kind: "RunnerKill", task, ...(taken.label === undefined ? {} : { label: taken.label }), stdinLabel: marked.stdinLabel }
+      : { kind: "UsageError", detail: "orc runner kill takes a task id" }
   }
   if (split.reach.kind === "here" || taken.kept.length > 0) {
     return { kind: "UsageError", detail: "orc runner hold takes a task id, then -- and the run command" }
@@ -331,8 +346,8 @@ const parseRunner = (rest: ReadonlyArray<string>): DispatchArgs => {
   if (verb === "token") {
     return parseRunnerToken(after)
   }
-  if (verb !== "start" && verb !== "renew" && verb !== "hold" && verb !== "result" && verb !== "answer") {
-    return { kind: "UsageError", detail: "orc runner takes start, queue, renew, hold, token, result, answer or load" }
+  if (verb !== "start" && verb !== "renew" && verb !== "hold" && verb !== "result" && verb !== "kill" && verb !== "answer") {
+    return { kind: "UsageError", detail: "orc runner takes start, queue, renew, hold, token, result, kill, answer or load" }
   }
   const split = splitReach(after)
   if (split.kind === "UsageError") {
@@ -341,7 +356,7 @@ const parseRunner = (rest: ReadonlyArray<string>): DispatchArgs => {
   if (verb === "answer") {
     return parseRunnerAnswer(split)
   }
-  if (verb === "hold" || verb === "result") {
+  if (verb === "hold" || verb === "result" || verb === "kill") {
     return parseRunnerTask(verb, split)
   }
   if (split.words.length > 0) {
@@ -383,6 +398,9 @@ export const parseDispatchArgs = (command: "backlog" | "beat" | "runner" | "merg
   }
   if (rest[0] === "close") {
     return parseClose(rest.slice(1))
+  }
+  if (rest[0] === "stop") {
+    return parseStop(rest.slice(1))
   }
   if (rest[0] === "posted") {
     return parsePosted(rest.slice(1))

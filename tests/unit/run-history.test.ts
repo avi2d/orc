@@ -129,6 +129,24 @@ describe("openDatabase", () => {
     })
   })
 
+  test("a version 2 history gains the stopped status with its runs intact instead of refusing it", async () => {
+    await withHome(async (home) => {
+      const v2 = new Database(join(home, "orc.sqlite"), { create: true })
+      v2.run("CREATE TABLE runs (id TEXT PRIMARY KEY, project TEXT NOT NULL, branch TEXT NOT NULL, task_file TEXT NOT NULL, status TEXT NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')), started TEXT NOT NULL, ended TEXT, pr_link TEXT, end_reason TEXT, sandbox TEXT CHECK (sandbox IN ('nono', 'none')))")
+      v2.run("INSERT INTO runs (id, project, branch, task_file, status, started, sandbox) VALUES ('old-run', 'orc', 'orc/x', 'task.md', 'running', '2026-10-18T10:00:00.000Z', 'none')")
+      v2.run("PRAGMA user_version = 2")
+      v2.close()
+      const db = await openDb(home)
+      try {
+        expect((await readRuns(db)).map((run) => [run.id, run.status, run.sandbox])).toEqual([["old-run", "running", "none"]])
+        db.run("INSERT INTO runs (id, project, branch, task_file, status, started) VALUES ('stopped-run', 'orc', 'orc/y', 'task.md', 'stopped', '2026-10-18T10:00:00.000Z')")
+        expect((await readRuns(db)).map((run) => [run.id, run.status])).toContainEqual(["stopped-run", "stopped"])
+      } finally {
+        db.close()
+      }
+    })
+  })
+
   test("refuses a sandbox kind orc does not know instead of storing it", async () => {
     await openTemp(async (_home, db) => {
       expect(() =>

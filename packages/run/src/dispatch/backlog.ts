@@ -244,7 +244,7 @@ const missedClose = (
 export const closeStartedTask = (
   root: string,
   id: string,
-  outcome: "done" | "failed",
+  outcome: "done" | "failed" | "stopped",
   reason: string,
   delivered: { readonly pr: string | null; readonly report: string | null },
   closedAt: string

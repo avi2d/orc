@@ -4,6 +4,7 @@ import { closeStartedTask } from "./backlog"
 import type { BeatAction } from "./beat-action"
 import type { DispatchConfig } from "./config"
 import { ownedBySweep, throughFor } from "./machine-reach"
+import { logWrittenAt, stallMillis } from "./stall"
 import { answersFor, askStartedTask, markAnswersRelayed, parkStartedTask } from "./parked"
 import { taskLabel } from "./pueue-status"
 import { type RunnerError, type RunnerRequirements, taskBranch } from "./runner"
@@ -19,6 +20,42 @@ export interface CloseContext {
 const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
 const closeSeconds = 30
+
+// The beat writes started before the runner queues, so a runner that still holds no record this long after the start never will.
+const missingRunnerGraceMillis = 10 * 60 * 1000
+
+type CloseReading =
+  | { readonly kind: "read"; readonly result: RunnerResult; readonly ending: RunEnding | null; readonly outputAt: string | null; readonly asking: Asking | null }
+  | { readonly kind: "unread"; readonly reason: string }
+
+// A task the runner cannot see and a close read that keeps failing both release the machine once the start outgrows the queue delay.
+export const staleEndingOf = (startedAt: string, nowMillis: number, reading: CloseReading): RunEnding | null => {
+  const started = Date.parse(startedAt)
+  if (Number.isNaN(started) || nowMillis - started <= missingRunnerGraceMillis) {
+    return null
+  }
+  if (reading.kind === "unread") {
+    return { kind: "close", outcome: "failed", reason: reading.reason, pr: null, report: null }
+  }
+  return reading.ending === null && reading.result.status === "unknown"
+    ? { kind: "close", outcome: "failed", reason: "the runner holds no record of this task", pr: null, report: null }
+    : reading.ending
+}
+
+// An own-log machine keeps its own record, so the sweep only ends its task when the log itself goes quiet past the stall window.
+export const ownLogEndingOf = (startedAt: string, logAt: string | null, nowMillis: number): RunEnding | null => {
+  const started = Date.parse(startedAt)
+  if (Number.isNaN(started) || nowMillis - started <= stallMillis) {
+    return null
+  }
+  if (logAt !== null) {
+    const written = Date.parse(logAt)
+    if (!Number.isNaN(written) && nowMillis - written <= stallMillis) {
+      return null
+    }
+  }
+  return { kind: "close", outcome: "failed", reason: "the machine keeps its own log, and the log shows no run output", pr: null, report: null }
+}
 
 const endTask = (
   root: string,
@@ -104,35 +141,46 @@ export const closeFinished = (
       return { kind: "untracked" } satisfies Progress
     }
     const claim = task.state.claim
+    const started = task.state.started
     const label = taskLabel(context.home, task.spec.id)
     const machine = context.config.machines.find((entry) => entry.name === claim.machine)
     if (machine === undefined) {
       return { kind: "untracked" } satisfies Progress
     }
     if (!ownedBySweep(machine)) {
-      return { kind: "own-log" } satisfies Progress
+      const silent = ownLogEndingOf(started.at, yield* logWrittenAt(started.log), Date.parse(yield* nowIso))
+      if (silent === null) {
+        return { kind: "own-log" } satisfies Progress
+      }
+      const silentEnded = yield* endTask(context.root, task, claim.machine, silent)
+      return Option.match(silentEnded, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
     }
     const through = throughFor(machine)
     const read = through === null ? readResult(task.spec.id, context.home, label) : readResultThrough(through, task.spec.id, label)
-    const outcome = yield* read.pipe(
-      Effect.map((result) => ({ kind: "read" as const, ending: endingFromResult(result, task.spec.kind), outputAt: outputAtOf(result), asking: askingOf(result) })),
+    const reading: CloseReading = yield* read.pipe(
+      Effect.map((result) => ({ kind: "read" as const, result, ending: endingFromResult(result, task.spec.kind), outputAt: outputAtOf(result), asking: askingOf(result) })),
       Effect.catchTag("RunnerError", (error) => Effect.succeed({ kind: "unread" as const, reason: error.detail })),
       Effect.timeoutOrElse({
         duration: Duration.seconds(closeSeconds),
         orElse: () => Effect.succeed({ kind: "unread" as const, reason: "the close read timed out after " + closeSeconds + " seconds" })
       })
     )
-    if (outcome.kind === "unread") {
-      return { kind: "ended", action: { kind: "close-failed", task: task.spec.id, machine: claim.machine, reason: outcome.reason } } satisfies Progress
+    const stale = staleEndingOf(started.at, Date.parse(yield* nowIso), reading)
+    if (reading.kind === "unread" && stale === null) {
+      return { kind: "ended", action: { kind: "close-failed", task: task.spec.id, machine: claim.machine, reason: reading.reason } } satisfies Progress
     }
-    if (outcome.ending === null) {
+    const ending = stale ?? (reading.kind === "read" ? reading.ending : null)
+    if (ending === null) {
+      if (reading.kind === "unread") {
+        return { kind: "untracked" } satisfies Progress
+      }
       const relay = (handed: Relay) =>
         through === null
           ? relayAnswers(context.home, task.spec.id, Effect.succeed(JSON.stringify({ label, asking: handed.asking, answers: handed.answers })))
           : relayAnswersThrough(through, task.spec.id, label, handed)
-      const action = outcome.asking === null ? null : yield* serveAsking(context, task, claim.machine, outcome.asking, relay)
-      return { kind: "running", outputAt: outcome.outputAt, action } satisfies Progress
+      const action = reading.asking === null ? null : yield* serveAsking(context, task, claim.machine, reading.asking, relay)
+      return { kind: "running", outputAt: reading.outputAt, action } satisfies Progress
     }
-    const ended = yield* endTask(context.root, task, claim.machine, outcome.ending)
+    const ended = yield* endTask(context.root, task, claim.machine, ending)
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
   })

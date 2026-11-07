@@ -42,6 +42,11 @@ A `pueue kill` gives the hold no time to clean up, so the guard removes the fold
 Add `--` and the command that runs orc on another machine to send it there, as with `orc runner start`.
 A renewal for a task pueue no longer runs for that home is refused and removes that task's token folder.
 
+To stop a run yourself, run `orc runner kill <task-id>` on its machine.
+It kills the running pueue task that carries the label, or removes one still queued, and marks the orc run on `orc/<task-id>` stopped.
+The next beat then closes the task stopped with the run's end reason.
+A kill for a task pueue never queued is refused, as a kill for a task already done is.
+
 To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh linux-box orc` from another.
 The forwarded read defaults to that home's label, and `orc runner result <task-id> --label <label>` reads another home's run instead.
 The forwarded read carries the label as JSON on standard input, past any remote shell the reach uses, and marks the far command with `--stdin-label` so only a marked read waits on standard input.

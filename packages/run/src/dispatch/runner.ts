@@ -10,6 +10,9 @@ import { parseTaskFile } from "./task-record"
 import { reportKinds } from "../task-kind"
 import { readInstructions, TaskInstructions, writeInstructions } from "./runner-instructions"
 import { RunnerError } from "./runner-error"
+import { runsForBranch } from "../history-resume"
+import { markRunStopped } from "../history-write"
+import { formatHistoryError, openDatabase, stoppedEndReason } from "../run-history"
 
 export { RunnerError } from "./runner-error"
 import { isRunDelivery } from "../delivery"
@@ -119,6 +122,49 @@ export const readHeld = (home: string, task: string, label?: string | null): Eff
     Effect.flatMap((text) => decodeJson(text, PueueState, "pueue status --json")),
     Effect.map((state) => heldTask(state.tasks, home, task, label))
   )
+
+const markBranchRunsStopped = (home: string, project: string, branch: string): Effect.Effect<void, RunnerError, RunnerRequirements> =>
+  Effect.gen(function*() {
+    const ended = DateTime.formatIso(yield* DateTime.now)
+    yield* Effect.acquireUseRelease(
+      openDatabase(home),
+      (db) =>
+        runsForBranch(db, project, branch).pipe(
+          Effect.flatMap((runs) =>
+            Effect.forEach(runs.filter((run) => run.status === "running"), (run) => markRunStopped(db, run.id, ended, stoppedEndReason), { discard: true })
+          )
+        ),
+      (db) => Effect.sync(() => db.close())
+    )
+  }).pipe(
+    Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot mark the run stopped: " + formatHistoryError(error) }))
+  )
+
+export const killHeld = (
+  home: string,
+  task: string,
+  label?: string | null
+): Effect.Effect<string, RunnerError, RunnerRequirements> =>
+  Effect.gen(function*() {
+    const held = yield* readHeld(home, task, label)
+    if (held === null) {
+      return yield* refuse(task + " has no pueue task in group " + orcGroup + ", so nothing stops it")
+    }
+    if (pueueDone(held)) {
+      return yield* refuse(task + " already finished as pueue task " + held.id + ", so nothing stops it")
+    }
+    const killed = yield* pueue(["kill", String(held.id)]).pipe(
+      Effect.as(true),
+      Effect.catchTag("RunnerError", () => Effect.succeed(false))
+    )
+    if (killed) {
+      yield* markBranchRunsStopped(home, held.path, taskBranch(task))
+      return "killed pueue task " + held.id + " for " + task
+    }
+    yield* pueue(["remove", String(held.id)])
+    yield* markBranchRunsStopped(home, held.path, taskBranch(task))
+    return "removed pueue task " + held.id + " for " + task
+  })
 
 export const labelOf = (home: string, task: string, label?: string | null): string => label ?? taskLabel(home, task)
 

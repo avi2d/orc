@@ -5,11 +5,11 @@ import { homedir } from "node:os"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { sandboxKinds, type SandboxKind } from "./args"
 
-export const RUN_HISTORY_SCHEMA_VERSION = 2
+export const RUN_HISTORY_SCHEMA_VERSION = 3
 export const RUNS_JSON_SCHEMA = "orc.runs.v1" as const
 export const SHOW_JSON_SCHEMA = "orc.show.v1" as const
 
-export const RunStatusSchema = Schema.Literals(["running", "succeeded", "failed"])
+export const RunStatusSchema = Schema.Literals(["running", "succeeded", "failed", "stopped"])
 type RunStatus = typeof RunStatusSchema.Type
 export const StepStatusSchema = Schema.Literals(["running", "passed", "failed", "skipped"])
 type StepStatus = typeof StepStatusSchema.Type
@@ -120,18 +120,28 @@ export const orcHomeDir = (override?: string): string =>
 
 const sandboxColumn = "sandbox TEXT CHECK (sandbox IN (" + sandboxKinds.map((kind) => "'" + kind + "'").join(", ") + "))"
 
+const runsColumns =
+  "id TEXT PRIMARY KEY, " +
+  "project TEXT NOT NULL, " +
+  "branch TEXT NOT NULL, " +
+  "task_file TEXT NOT NULL, " +
+  "status TEXT NOT NULL CHECK (status IN ('running', 'succeeded', 'failed', 'stopped')), " +
+  "started TEXT NOT NULL, " +
+  "ended TEXT, " +
+  "pr_link TEXT, " +
+  "end_reason TEXT, " +
+  sandboxColumn
+
+const rebuildRunsForStopped: ReadonlyArray<string> = [
+  "CREATE TABLE runs_new (" + runsColumns + ")",
+  "INSERT INTO runs_new (id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox) " +
+    "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox FROM runs",
+  "DROP TABLE runs",
+  "ALTER TABLE runs_new RENAME TO runs"
+]
+
 const schemaStatements: ReadonlyArray<string> = [
-  "CREATE TABLE IF NOT EXISTS runs (" +
-    "id TEXT PRIMARY KEY, " +
-    "project TEXT NOT NULL, " +
-    "branch TEXT NOT NULL, " +
-    "task_file TEXT NOT NULL, " +
-    "status TEXT NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')), " +
-    "started TEXT NOT NULL, " +
-    "ended TEXT, " +
-    "pr_link TEXT, " +
-    "end_reason TEXT, " +
-    sandboxColumn + ")",
+  "CREATE TABLE IF NOT EXISTS runs (" + runsColumns + ")",
   "CREATE TABLE IF NOT EXISTS steps (" +
     "id INTEGER PRIMARY KEY, " +
     "run_id TEXT NOT NULL REFERENCES runs (id), " +
@@ -173,7 +183,11 @@ const SchemaVersionRow = Schema.Struct({ user_version: Schema.Finite })
 
 const busyTimeoutMillis = 5000
 
-const upgrades: ReadonlyMap<number, ReadonlyArray<string>> = new Map([[0, schemaStatements], [1, ["ALTER TABLE runs ADD COLUMN " + sandboxColumn]]])
+const upgrades: ReadonlyMap<number, ReadonlyArray<string>> = new Map([
+  [0, schemaStatements],
+  [1, ["ALTER TABLE runs ADD COLUMN " + sandboxColumn, ...rebuildRunsForStopped]],
+  [2, rebuildRunsForStopped]
+])
 
 const readSchemaVersion = (db: Database): Effect.Effect<number, HistoryError> =>
   sqlite(() => db.query("PRAGMA user_version").get()).pipe(Effect.flatMap(Schema.decodeUnknownEffect(SchemaVersionRow)), Effect.map((row) => row.user_version))
@@ -313,7 +327,19 @@ const runRecordOf = (row: typeof RunSqlRowSchema.Type): RunRecord => ({
   sandbox: row.sandbox
 })
 
+export const stoppedEndReason = "the run was stopped"
+
 const runColumns = "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox FROM runs"
+
+export const runById = (
+  db: Database,
+  id: string
+): Effect.Effect<RunRecord | null, Schema.SchemaError | SqliteFailure> =>
+  sqlite(() => db.query(runColumns + " WHERE id = ?").get(id)).pipe(
+    Effect.flatMap((row) =>
+      row === null || row === undefined ? Effect.succeed(null) : Schema.decodeUnknownEffect(RunSqlRowSchema)(row).pipe(Effect.map(runRecordOf))
+    )
+  )
 
 export const listRuns = (
   db: Database,

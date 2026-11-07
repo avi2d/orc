@@ -2,7 +2,7 @@ import { Array as Arr, Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { openQuestionsForRun, runsForBranch } from "../history-resume"
 import type { OpenQuestion } from "../no-mistakes-gate"
-import { formatHistoryError, openDatabase, type RunRecord, RunStatusSchema } from "../run-history"
+import { formatHistoryError, openDatabase, stoppedEndReason, type RunRecord, RunStatusSchema } from "../run-history"
 import { writtenReport } from "../report-run"
 import { gateLogFileName } from "../no-mistakes"
 import { Asking, askingFileName, AnswersFile, answersFileName, writeWhole } from "../answer-wait"
@@ -65,7 +65,7 @@ const failureReason = (result: typeof PueueResult.Type): string | null => {
 }
 
 export type RunEnding =
-  | { readonly kind: "close"; readonly outcome: "done" | "failed"; readonly reason: string; readonly pr: string | null; readonly report: string | null }
+  | { readonly kind: "close"; readonly outcome: "done" | "failed" | "stopped"; readonly reason: string; readonly pr: string | null; readonly report: string | null }
   | { readonly kind: "park"; readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion> }
 
 type FinishedResult = Extract<RunnerResult, { readonly status: "succeeded" | "failed" }>
@@ -75,12 +75,15 @@ const reportEnding = (result: FinishedResult): RunEnding => {
   if (report !== null) {
     return { kind: "close", outcome: "done", reason: "the run wrote its report", pr: null, report }
   }
-  const why = result.status === "failed" ? result.reason : result.run?.endReason ?? "pueue task " + result.pueueTask + " succeeded"
+  const why = result.status === "failed" ? (result.run?.endReason ?? result.reason) : result.run?.endReason ?? "pueue task " + result.pueueTask + " succeeded"
   return { kind: "close", outcome: "failed", reason: "the run wrote no report: " + why, pr: null, report: null }
 }
 
 // The beat ends a started task from this, so its done and failed match what runner result reports.
 export const endingFromResult = (result: RunnerResult, kind: TaskKind): RunEnding | null => {
+  if ((result.status === "succeeded" || result.status === "failed") && result.run?.status === "stopped") {
+    return { kind: "close", outcome: "stopped", reason: result.run.endReason ?? stoppedEndReason, pr: null, report: null }
+  }
   if (kind !== "ship" && (result.status === "succeeded" || result.status === "failed")) {
     return reportEnding(result)
   }
@@ -93,7 +96,7 @@ export const endingFromResult = (result: RunnerResult, kind: TaskKind): RunEndin
   const questions = result.run?.openQuestions ?? []
   return Arr.isReadonlyArrayNonEmpty(questions)
     ? { kind: "park", questions }
-    : { kind: "close", outcome: "failed", reason: result.reason, pr: result.run?.prLink ?? null, report: null }
+    : { kind: "close", outcome: "failed", reason: result.run?.endReason ?? result.reason, pr: result.run?.prLink ?? null, report: null }
 }
 
 interface PueueInterval {
@@ -293,6 +296,17 @@ export const readResultThrough = (command: Command, task: string, label?: string
         : refuse(command.join(" ") + " runner result exited " + result.exitCode + ": " + result.stderr.trim())
     ),
     Effect.map((document) => document.result)
+  )
+}
+
+export const killHeldThrough = (command: Command, task: string, label?: string | null): Effect.Effect<string, RunnerError, ChildProcessSpawner.ChildProcessSpawner> => {
+  const stdin = label == null ? null : JSON.stringify({ label })
+  return capture([...command, "runner", "kill", task, ...(stdin === null ? [] : ["--stdin-label"])], stdin).pipe(
+    Effect.flatMap((result) =>
+      result.exitCode === 0
+        ? Effect.succeed(result.stdout.trim())
+        : refuse(command.join(" ") + " runner kill exited " + result.exitCode + ": " + result.stderr.trim())
+    )
   )
 }
 

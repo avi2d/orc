@@ -5,9 +5,10 @@ import type { DirectPrRecord } from "./direct-pr"
 import { noMistakesFile, prBodyFileName, type HistoryRun } from "./run-record"
 import type { ChecksRoundSummary, OrcRunReport, RecordedFixAttempt } from "./report"
 import { OrcRunError } from "./run-session"
-import { formatHistoryError, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, stepIdFor, updateRun, updateStep } from "./run-history"
+import { formatHistoryError, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, runById, stepIdFor, updateRun, updateStep } from "./run-history"
 import type { EvidenceInput, SignalInput, StepInput } from "./run-history"
 import { measuredSignals, noMistakesSignals } from "./report"
+import { stepsForRun } from "./history-resume"
 import type { ResumePlan } from "./run-loop"
 
 type EvidenceRow = Omit<EvidenceInput, "stepId">
@@ -142,6 +143,20 @@ export const finishRun = (db: Database, runId: string, report: OrcRunReport, end
   updateRun(db, runId, { status: report.completed ? "succeeded" : "failed", ended, prLink: report.prLink, endReason: report.endReason }).pipe(
     Effect.mapError((cause) => historyFailure("record the run in", cause))
   )
+
+export const markRunStopped = (db: Database, runId: string, ended: string, endReason: string): Effect.Effect<void, OrcRunError> =>
+  Effect.gen(function*() {
+    const steps = yield* stepsForRun(db, runId).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
+    for (const step of steps) {
+      if (step.status === "running") {
+        yield* updateStep(db, runId, step.name, step.attempt, { status: "failed", ended }).pipe(Effect.mapError((cause) => historyFailure("record the step in", cause)))
+      }
+    }
+    const prior = yield* runById(db, runId).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
+    yield* updateRun(db, runId, { status: "stopped", ended, prLink: prior?.prLink ?? null, endReason }).pipe(
+      Effect.mapError((cause) => historyFailure("record the run in", cause))
+    )
+  })
 
 export const recordImplementStart = (db: Database, run: HistoryRun, started: string, piSessionFile?: string | null): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
