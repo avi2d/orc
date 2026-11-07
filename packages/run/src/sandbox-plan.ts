@@ -14,7 +14,7 @@ interface OwnAgentDir {
 }
 
 export type SandboxPlan =
-  | { readonly kind: "nono"; readonly credential: ModelCredential }
+  | { readonly kind: "nono"; readonly credential: ModelCredential; readonly readFolders: ReadonlyArray<string> }
   | { readonly kind: "none"; readonly own: OwnAgentDir | null }
 
 export interface ProviderChoice<P extends Provider = Provider> {
@@ -116,7 +116,7 @@ const planLogin = (
     yield* runLoginCheck(spawner, host, dirs.projectDir, provider.id, false)
     const checked = yield* checkedAgentWindows(spawner, host, dirs.runDir, models, { kind: "operator" })
     yield* writeAgentDir(fs, path, dirs.piAgentDir, providerKeyOf(credential), checked)
-    return { kind: "nono", credential }
+    return { kind: "nono", credential, readFolders: choice.config.sandbox?.read ?? [] }
   })
 
 // Pi prefers a stored login over a configured key, so a token-file run reads its own agent folder and never the operator's.

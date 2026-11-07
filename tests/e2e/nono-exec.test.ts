@@ -19,13 +19,24 @@ const git = (cwd: string, args: ReadonlyArray<string>): void => {
 // nono refuses a HOME whose state root falls under the /var or /tmp it grants, so the fixture home sits in the working tree.
 const fixtureHome = (): Promise<string> => mkdtemp(join(process.cwd(), ".orc-nono-exec-home-"))
 
-const runInNono = (dir: string, home: string, command: string) =>
+const seedCopy = async (dir: string): Promise<void> => {
+  const main = join(dir, "main")
+  await mkdir(main)
+  git(main, ["init", "-q", "-b", "main"])
+  await writeFile(join(main, "a.txt"), "a\n")
+  git(main, ["add", "a.txt"])
+  git(main, ["commit", "-qm", "seed"])
+  git(main, ["worktree", "add", "-q", "-b", "orc/t", join(dir, "copy")])
+}
+
+const runInNono = (dir: string, home: string, command: string, readFolders: ReadonlyArray<string> = []) =>
   Effect.runPromise(Effect.scoped(Effect.gen(function*() {
     const exec = yield* openNonoExec({
       worktree: join(dir, "copy"),
       piSessionDir: join(dir, "run", "session"),
       sessionsDir: join(dir, "run", "sessions"),
       hostEnv: { PATH: Bun.env.PATH, HOME: home },
+      readFolders,
       env: { ORC_HOME: join(dir, "orc-home"), AGENT_TOKEN_FILE: "/k" }
     })
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
@@ -39,13 +50,7 @@ describe("openNonoExec", () => {
       const dir = await realpath(await mkdtemp(join(tmpdir(), "orc-nono-exec-")))
       const home = await fixtureHome()
       try {
-        const main = join(dir, "main")
-        await mkdir(main)
-        git(main, ["init", "-q", "-b", "main"])
-        await writeFile(join(main, "a.txt"), "a\n")
-        git(main, ["add", "a.txt"])
-        git(main, ["commit", "-qm", "seed"])
-        git(main, ["worktree", "add", "-q", "-b", "orc/t", join(dir, "copy")])
+        await seedCopy(dir)
         const result = await runInNono(dir, home, [
           "env | grep '^ORC_' || true",
           "echo \"token=$AGENT_TOKEN_FILE bun=$BUN_OPTIONS\"",
@@ -58,6 +63,31 @@ describe("openNonoExec", () => {
         expect(await readFile(join(dir, "copy", "made.txt"), "utf8")).toBe("made\n")
         expect(await readFile(join(dir, "run", "sessions", "s.jsonl"), "utf8")).toBe("session\n")
         expect(await Bun.file(join(dir, "beside.txt")).exists()).toBe(false)
+      } finally {
+        await rm(dir, { recursive: true, force: true })
+        await rm(home, { recursive: true, force: true })
+      }
+    },
+    60_000
+  )
+
+  test.skipIf(Bun.which("nono") === null)(
+    skipReason("needs nono on PATH to run the sandbox", "a folder the operator lists is readable but not writable, and its unlisted sibling stays unreadable"),
+    async () => {
+      const dir = await realpath(await mkdtemp(join(tmpdir(), "orc-nono-exec-")))
+      const home = await fixtureHome()
+      try {
+        await seedCopy(dir)
+        await mkdir(join(home, "cache"))
+        await writeFile(join(home, "cache", "record"), "cached\n")
+        await mkdir(join(home, "other"))
+        await writeFile(join(home, "other", "secret"), "secret\n")
+        const result = await runInNono(dir, home, [
+          "cat \"" + join(home, "cache", "record") + "\"",
+          "echo x > \"" + join(home, "cache", "new") + "\" 2>/dev/null || echo write-refused",
+          "cat \"" + join(home, "other", "secret") + "\" 2>/dev/null || echo read-refused"
+        ].join("; "), [join(home, "cache")])
+        expect(result.stdout.split("\n").filter((line) => line !== "")).toEqual(["cached", "write-refused", "read-refused"])
       } finally {
         await rm(dir, { recursive: true, force: true })
         await rm(home, { recursive: true, force: true })

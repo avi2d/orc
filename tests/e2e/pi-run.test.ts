@@ -62,14 +62,14 @@ describe("runPi", () => {
     await withFakePi((fixture) => [
       emit(header),
       emit(toolStart),
-      "sleep 1",
+      "sleep 3",
       emit(toolEnd),
       emit(reply("First reply.")),
       emit(reply("Committed.\nORC_COMPLETE")),
       "echo '{}' > \"" + join(fixture.sessionDir, "2026-11-07T07-41-13-123Z_s1.jsonl") + "\""
     ], async (fixture) => {
       const stored: Array<string> = []
-      const result = await run(fixture, { tickMillis: 50, idleMillis: 300 }, stored)
+      const result = await run(fixture, { tickMillis: 50, idleMillis: 2_000 }, stored)
       expect(result).toEqual({ sessionId: "s1", sessionFile: join(fixture.sessionDir, "2026-11-07T07-41-13-123Z_s1.jsonl"), end: { kind: "exited", exitCode: 0 } })
       const log = await readFile(fixture.logFile, "utf8")
       expect(log).toBe([
@@ -106,9 +106,21 @@ describe("runPi", () => {
     ], async (fixture) => {
       const started = Date.now()
       const result = await run(fixture, { tickMillis: 50, idleMillis: 300 }, [])
-      expect(result.end).toEqual({ kind: "idle", idleMinutes: 0 })
+      expect(result.end).toEqual({ kind: "idle", idleSeconds: 0 })
       expect(Date.now() - started).toBeLessThan(10_000)
-      expect(await readFile(fixture.logFile, "utf8")).toContain("orc: stopped pi after 0 min with no output and no tool running")
+      expect(await readFile(fixture.logFile, "utf8")).toContain("orc: stopped pi, idle for 0 seconds with no tool running")
+    })
+  }, 20_000)
+
+  test("stops a quiet pi at the idle limit instead of waiting for the next still-running tick", async () => {
+    await withFakePi(() => [
+      emit(header),
+      "exec sleep 30"
+    ], async (fixture) => {
+      const started = Date.now()
+      const result = await run(fixture, { tickMillis: 60_000, idleMillis: 300 }, [])
+      expect(result.end.kind).toBe("idle")
+      expect(Date.now() - started).toBeLessThan(10_000)
     })
   }, 20_000)
 })

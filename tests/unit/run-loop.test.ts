@@ -20,12 +20,14 @@ import {
   recordNoMistakesStart,
   recordPullRequestDone,
   recordPullRequestStart,
-  recordResumePublish
+  recordResumePublish,
+  recordStepSession
 } from "../../packages/run/src/history-write"
 import { buildResumePlan } from "../../packages/run/src/run-resume"
 import { subprocessNoMistakesRunner } from "../../packages/run/src/no-mistakes"
 import type { HistoryRun } from "../../packages/run/src/run-record"
-import { runFull, type RunCheckpoints, type SandboxOps } from "../../packages/run/src/run-loop"
+import { runFull, type RunCheckpoints } from "../../packages/run/src/run-loop"
+import { fakeOps } from "../lib/fake-ops"
 
 const implementer: AgentFile = {
   kind: "implementer",
@@ -119,6 +121,7 @@ const stubNoMistakesBin = async (dir: string): Promise<string> => {
 
 const runLoopCheckpoints = (db: Database, run: HistoryRun): RunCheckpoints => ({
   implementStart: (started) => recordImplementStart(db, run, started),
+  implementSession: (file) => recordStepSession(db, run.runId, "implement", 1, file),
   implementDone: (outcome, started, ended) =>
     recordImplementDone(db, run, {
       agentPath: run.agent.path,
@@ -131,6 +134,7 @@ const runLoopCheckpoints = (db: Database, run: HistoryRun): RunCheckpoints => ({
   checksRoundStart: (round, started) => recordChecksStart(db, run.runId, round, started),
   checksRoundDone: (round) => recordChecksDone(db, run.runId, round),
   fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer.path, started),
+  fixSession: (attempt, file) => recordStepSession(db, run.runId, "fix", attempt, file),
   fixDone: (fix) => recordFixDone(db, run.runId, fix),
   noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
   noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
@@ -218,7 +222,7 @@ describe("resumed runs publish inherited progress atomically", () => {
           const plan = await Effect.runPromise(buildResumePlan(db, run))
           await Effect.runPromise(recordResumePublish(db, run, plan))
           const calls = { implementStart: 0, implementDone: 0, agent: 0, checks: 0 }
-          const ops: SandboxOps = {
+          const ops = fakeOps({
             runAgent: async () => {
               calls.agent += 1
               throw new Error("the agent ran despite skipped work")
@@ -227,7 +231,7 @@ describe("resumed runs publish inherited progress atomically", () => {
               calls.checks += 1
               return { stdout: "", stderr: "", exitCode: 0 }
             }
-          }
+          }, run.hostSessionsDir)
           const real = runLoopCheckpoints(db, run)
           const checkpoints: RunCheckpoints = {
             ...real,
@@ -263,7 +267,7 @@ describe("runFull has no checkpoint-free mode", () => {
         const plan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow: [], answers: [], inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null }
         let agentCalls = 0
         let checkCalls = 0
-        const ops: SandboxOps = {
+        const ops = fakeOps({
           runAgent: async () => {
             agentCalls += 1
             throw new Error("checkpoint-free agent work")
@@ -272,19 +276,19 @@ describe("runFull has no checkpoint-free mode", () => {
             checkCalls += 1
             return { stdout: "", stderr: "", exitCode: 0 }
           }
-        }
+        }, run.hostSessionsDir)
         const exit = await Effect.runPromiseExit(Reflect.apply(runFull, null, [run, ops, plan]))
         expect(Exit.isFailure(exit)).toBe(true)
         expect(agentCalls).toBe(0)
         expect(checkCalls).toBe(0)
         let checkpointedAgentCalls = 0
-        const failingOps: SandboxOps = {
+        const failingOps = fakeOps({
           runAgent: async () => {
             checkpointedAgentCalls += 1
             throw new Error("checkpointed agent work")
           },
           execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 })
-        }
+        }, run.hostSessionsDir)
         const checkpoints = runLoopCheckpoints(db, run)
         const checkpointedExit = await Effect.runPromiseExit(runFull(run, failingOps, plan, checkpoints))
         expect(Exit.isFailure(checkpointedExit)).toBe(true)

@@ -25,6 +25,25 @@ export const collectOutput = (
     exitCode: handle.exitCode
   }, { concurrency: "unbounded" })
 
+export const headOf = (spawner: ChildProcessSpawner.ChildProcessSpawner["Service"], git: string, cwd: string): Effect.Effect<string, OrcRunError> =>
+  runGit(spawner, git, ["rev-parse", "HEAD"], cwd).pipe(
+    Effect.flatMap((result) => result.exitCode === 0
+      ? Effect.succeed(result.stdout.trim())
+      : Effect.fail(new OrcRunError({ message: "orc: cannot read HEAD in " + cwd + ": " + result.stderr.trim() })))
+  )
+
+export const commitsSince = (
+  spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
+  git: string,
+  cwd: string,
+  base: string
+): Effect.Effect<ReadonlyArray<{ readonly sha: string }>, OrcRunError> =>
+  runGit(spawner, git, ["rev-list", "--reverse", base + "..HEAD"], cwd).pipe(
+    Effect.flatMap((result) => result.exitCode === 0
+      ? Effect.succeed(result.stdout.split("\n").map((line) => line.trim()).filter((line) => line !== "").map((sha) => ({ sha })))
+      : Effect.fail(new OrcRunError({ message: "orc: cannot list the commits made in " + cwd + ": " + result.stderr.trim() })))
+  )
+
 export const branchCommits = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
   git: string,

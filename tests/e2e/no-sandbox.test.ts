@@ -349,3 +349,45 @@ describe("orc run idle limit", () => {
     })
   }, 60_000)
 })
+
+const markerScript = async (dir: string, name: string, then: ReadonlyArray<string> = []): Promise<{ readonly script: string; readonly ran: () => Promise<boolean> }> => {
+  const marker = join(dir, name + "-ran")
+  const script = join(dir, name)
+  await writeScript(script, ["touch '" + marker + "'", ...then])
+  return { script, ran: () => Bun.file(marker).exists() }
+}
+
+describe("orc run after Pi plants a program in the repository's git config", () => {
+  test("runs none of the planted fsmonitor, filter or hook in its own host git instead of running them outside the sandbox", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const fsmonitor = await markerScript(fixture.fakeBin, "fsmonitor")
+      const filter = await markerScript(fixture.fakeBin, "filter", ["cat"])
+      const hook = await markerScript(fixture.fakeBin, "post-checkout")
+      const piPath = join(fixture.fakeBin, "pi")
+      const plainPi = join(fixture.fakeBin, "plain-pi")
+      await writeFile(plainPi, await readFile(piPath))
+      await chmod(plainPi, 0o755)
+      await writeScript(piPath, [
+        "\"" + plainPi + "\" \"$@\"; status=$?",
+        "if [ \"$1\" = -p ]; then",
+        "  common=$(git rev-parse --path-format=absolute --git-common-dir)",
+        "  git config core.fsmonitor '" + fsmonitor.script + "'",
+        "  git config filter.planted.clean '" + filter.script + "'",
+        "  mkdir -p \"$common/info\" \"$common/hooks\"",
+        "  echo 'greeting.txt filter=planted' > \"$common/info/attributes\"",
+        "  cp '" + hook.script + "' \"$common/hooks/post-checkout\"",
+        "  touch -m -t 202001010000 greeting.txt",
+        "fi",
+        "exit $status"
+      ])
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, fixture.env)
+      expect({ fsmonitor: await fsmonitor.ran(), filter: await filter.ran(), hook: await hook.ran() }).toEqual({ fsmonitor: false, filter: false, hook: false })
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stdout + result.stderr).toContain("core.fsmonitor")
+      const piCwd = (await readFile(join(fixture.fakeBin, "pi-cwd"), "utf8")).trim()
+      Bun.spawnSync(["git", "status", "--porcelain"], { cwd: piCwd, env: fixture.env })
+      Bun.spawnSync(["git", "worktree", "add", "-q", join(fixture.home, "after"), "-b", "orc/after"], { cwd: fixture.repo, env: fixture.env })
+      expect({ fsmonitor: await fsmonitor.ran(), filter: await filter.ran(), hook: await hook.ran() }).toEqual({ fsmonitor: true, filter: true, hook: true })
+    })
+  }, 60_000)
+})

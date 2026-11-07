@@ -15,7 +15,7 @@ const sessionJsonl = [
 ].join("\n") + "\n"
 
 const piStream = [
-  JSON.stringify({ type: "session", id: sessionId }),
+  JSON.stringify({ type: "session", version: 3, id: sessionId, timestamp: "2026-10-28T10:00:00.000Z", cwd: "/repo" }),
   JSON.stringify({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "Committed.\n" + orcCompletionLine } })
 ].join("\n") + "\n"
 
@@ -68,7 +68,7 @@ export const withNoSandboxFixture = async (body: (fixture: NoSandboxFixture) => 
       "if [ \"$1\" = --mode ]; then echo \"$*\" >> \"" + fakeBin + "/probe-argv\"; cat > /dev/null; echo '" + modelListReply + "'; exit 0; fi",
       "if [ \"$1\" != -p ]; then exit 2; fi",
       "cat > /dev/null",
-      "prev=''; for arg in \"$@\"; do if [ \"$prev\" = --append-system-prompt ]; then cp \"$arg\" \"" + fakeBin + "/pi-instructions\"; fi; prev=$arg; done",
+      "prev=''; for arg in \"$@\"; do if [ \"$prev\" = --append-system-prompt ]; then cp \"$arg\" \"" + fakeBin + "/pi-instructions\"; fi; if [ \"$prev\" = --session-dir ]; then session_dir=$arg; fi; prev=$arg; done",
       "echo \"$PI_CODING_AGENT_DIR\" > \"" + fakeBin + "/pi-agent-dir\"",
       "if [ -f \"$PI_CODING_AGENT_DIR/models.json\" ]; then cp \"$PI_CODING_AGENT_DIR/models.json\" \"" + fakeBin + "/pi-models\"; fi",
       "if [ -f \"$PI_CODING_AGENT_DIR/settings.json\" ]; then cp \"$PI_CODING_AGENT_DIR/settings.json\" \"" + fakeBin + "/pi-settings\"; fi",
@@ -78,8 +78,8 @@ export const withNoSandboxFixture = async (body: (fixture: NoSandboxFixture) => 
       "git rev-parse --show-toplevel --path-format=absolute --git-common-dir --abbrev-ref HEAD > \"" + fakeBin + "/pi-git\"",
       "echo \"$GIT_CONFIG_GLOBAL\" > \"" + fakeBin + "/pi-gitconfig\"",
       "echo hello > greeting.txt && git add greeting.txt && git commit -qm 'add greeting' || exit 1",
-      "mkdir -p \"$PI_CODING_AGENT_SESSION_DIR\"",
-      "cp \"" + fakeBin + "/session.jsonl\" \"$PI_CODING_AGENT_SESSION_DIR/2026-10-28T10-00-00-000Z_" + sessionId + ".jsonl\"",
+      "mkdir -p \"$session_dir\"",
+      "cp \"" + fakeBin + "/session.jsonl\" \"$session_dir/2026-10-28T10-00-00-000Z_" + sessionId + ".jsonl\"",
       "cat \"" + fakeBin + "/stream.jsonl\""
     ])
     await writeScript(join(fakeBin, "nono"), ["echo \"$*\" >> \"" + fakeBin + "/nono-calls\"", "exit 1"])

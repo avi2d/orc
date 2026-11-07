@@ -201,7 +201,7 @@ describe("runWithHistory decides the implement step", () => {
       await withHome(async (home) => {
         const sha = await commitOnBranch(dir, "orc/test")
         await capturedSession(home, sessionEnding(providerErrorEchoingPrompt))
-        const outcome = await runStep(dir, home, sandboxResult(sha, providerErrorEchoingPrompt))
+        const outcome = await runStep(dir, home, sandboxResult(sha))
         expect(outcome.report.commits?.map((commit) => commit.sha)).toEqual([sha])
         expect(outcome.report.completed).toBe(false)
         expect(outcome.run?.endReason).toStartWith("Pi's final reply did not stop cleanly with ORC_COMPLETE on its own line. It ended in an error: 400 invalid request: ")
@@ -217,7 +217,7 @@ describe("runWithHistory decides the implement step", () => {
         const sha = await commitOnBranch(dir, "orc/test")
         await capturedSession(home, sessionEnding(cleanFinish))
         await writeFile(join(dir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [passedWithPr, recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [passedWithPr, recordedNothing])
         expect(outcome.report.completed).toBe(true)
         expect(outcome.report.tokens).toEqual({ input: 150, output: 25 })
         expect(outcome.report.fixAttempts).toBe(0)
@@ -251,7 +251,7 @@ describe("runWithHistory decides the implement step", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await commitOnBranch(dir, "orc/test")
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish))
+        const outcome = await runStep(dir, home, sandboxResult(sha))
         expect(outcome.report.completed).toBe(false)
         expect(outcome.report.commits?.map((commit) => commit.sha)).toEqual([sha])
         expect(outcome.report.tokens).toBeNull()
@@ -273,7 +273,7 @@ describe("runWithHistory runs the project checks and fixes failures", () => {
         await capturedSession(home, sessionEnding(cleanFinish))
         await writeFile(join(dir, ".no-mistakes.yaml"), yaml)
         const seen: Array<string> = []
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async (command) => {
+        const outcome = await runStep(dir, home, sandboxResult(sha), async (command) => {
           seen.push(command)
           return { stdout: command + " ok", stderr: "", exitCode: 0 }
         }, [passedWithPr, recordedNothing])
@@ -301,10 +301,10 @@ describe("runWithHistory runs the project checks and fixes failures", () => {
         await writeFile(join(dir, ".no-mistakes.yaml"), yaml)
         let lintRuns = 0
         const agentCalls: Array<string> = []
-        const agent = sandboxResult(sha, cleanFinish)
-        const outcome = await runStep(dir, home, async (provider, seen, logFile) => {
-          agentCalls.push(seen + " // " + logFile)
-          return agent(provider, seen, logFile)
+        const agent = sandboxResult(sha)
+        const outcome = await runStep(dir, home, async (run, sessionsDir) => {
+          agentCalls.push(run.prompt + " // " + run.logFile)
+          return agent(run, sessionsDir)
         }, async (command) => {
           if (command === "bun run lint") {
             lintRuns += 1
@@ -345,10 +345,10 @@ describe("runWithHistory runs the project checks and fixes failures", () => {
         await capturedSession(home, sessionEnding(cleanFinish))
         await writeFile(join(dir, ".no-mistakes.yaml"), yaml)
         let agentRuns = 0
-        const agent = sandboxResult(sha, cleanFinish)
-        const outcome = await runStep(dir, home, async (provider, seen, logFile) => {
+        const agent = sandboxResult(sha)
+        const outcome = await runStep(dir, home, async (run, sessionsDir) => {
           agentRuns += 1
-          return agent(provider, seen, logFile)
+          return agent(run, sessionsDir)
         }, async (command) =>
           command === "bun run lint"
             ? { stdout: "", stderr: "lint blew up", exitCode: 1 }
@@ -386,31 +386,6 @@ const plainGit = (cwd: string, args: ReadonlyArray<string>): void => {
 }
 
 describe("host git ignores programs the sandbox can name in the repository", () => {
-  test("Sandcastle's host git during the run runs no repository fsmonitor or hook", async () => {
-    await withRepo(async (dir) => {
-      await withHome(async (home) => {
-        const fsmonitor = await markerScript(home, "fsmonitor")
-        const hook = await markerScript(home, "post-checkout")
-        git(dir, ["config", "core.fsmonitor", fsmonitor.script])
-        await mkdir(join(dir, ".git", "hooks"), { recursive: true })
-        await Bun.write(join(dir, ".git", "hooks", "post-checkout"), Bun.file(hook.script))
-        await chmod(join(dir, ".git", "hooks", "post-checkout"), 0o755)
-        const outcome = await runStep(dir, home, async () => {
-          plainGit(dir, ["status", "--porcelain"])
-          plainGit(dir, ["worktree", "add", "-q", join(home, "sandcastle-worktree"), "-b", "orc/test"])
-          return { iterations: [], stdout: "", commits: [], branch: "orc/test" }
-        })
-        expect(outcome.report.completed).toBe(false)
-        expect(await fsmonitor.ran()).toBe(false)
-        expect(await hook.ran()).toBe(false)
-        plainGit(dir, ["status", "--porcelain"])
-        plainGit(dir, ["worktree", "add", "-q", join(home, "after-worktree"), "-b", "orc/after"])
-        expect(await fsmonitor.ran()).toBe(true)
-        expect(await hook.ran()).toBe(true)
-      })
-    })
-  })
-
   test("orc's own checkout status runs no repository fsmonitor", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
@@ -437,21 +412,13 @@ const backdate = (file: string): void => {
 }
 
 describe("host git runs no filter the sandbox can name in the repository", () => {
-  test("orc's checkout status and Sandcastle's host git run no repository filter, whatever its driver name", async () => {
+  test("orc's checkout status runs no repository filter, whatever its driver name", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const filter = await markerScript(home, "filter")
         await plantFilter(dir, join(dir, ".git"), "seed.txt", filter.script)
         backdate(join(dir, "seed.txt"))
         expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home, branch: "orc/test" })).toContain("filter.planted.by.sandbox.clean")
-        expect(await filter.ran()).toBe(false)
-        backdate(join(dir, "seed.txt"))
-        const outcome = await runStep(dir, home, async () => {
-          plainGit(dir, ["status", "--porcelain"])
-          plainGit(dir, ["worktree", "add", "-q", join(home, "sandcastle-worktree"), "-b", "orc/test"])
-          return { iterations: [], stdout: "", commits: [], branch: "orc/test" }
-        })
-        expect(outcome.report.completed).toBe(false)
         expect(await filter.ran()).toBe(false)
         backdate(join(dir, "seed.txt"))
         plainGit(dir, ["status", "--porcelain"])
@@ -488,18 +455,13 @@ describe("host git runs no filter the sandbox can name in the repository", () =>
 })
 
 describe("host git runs no transport program the sandbox can name in the repository", () => {
-  test("a planted ssh command is refused before orc's git and Sandcastle's fetch run it", async () => {
+  test("a planted ssh command is refused before orc's git runs it", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const ssh = await markerScript(home, "ssh")
         git(dir, ["config", "core.sshCommand", ssh.script])
         git(dir, ["remote", "add", "origin", "ssh://git.example.invalid/repo.git"])
         expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home, branch: "orc/test" })).toContain("core.sshcommand")
-        const outcome = await runStep(dir, home, async () => {
-          plainGit(dir, ["fetch", "origin", "orc/test"])
-          return { iterations: [], stdout: "", commits: [], branch: "orc/test" }
-        })
-        expect(outcome.report.completed).toBe(false)
         expect(await ssh.ran()).toBe(false)
         plainGit(dir, ["fetch", "origin", "orc/test"])
         expect(await ssh.ran()).toBe(true)

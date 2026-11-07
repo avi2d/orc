@@ -21,7 +21,7 @@ export interface PiPacing {
 
 export type PiEnd =
   | { readonly kind: "exited"; readonly exitCode: number }
-  | { readonly kind: "idle"; readonly idleMinutes: number }
+  | { readonly kind: "idle"; readonly idleSeconds: number }
 
 export interface PiRun {
   readonly sessionId: string | null
@@ -42,6 +42,9 @@ interface RunningTool {
 }
 
 const minuteMillis = 60_000
+
+export const idleSpan = (seconds: number): string =>
+  seconds < 120 ? seconds.toString() + (seconds === 1 ? " second" : " seconds") : Math.floor(seconds / 60).toString() + " min"
 
 export const piArgv = (request: Pick<PiRequest, "agent" | "instructions" | "sessionDir" | "resumeSession">): Argv => [
   "pi", "-p", "--mode", "json",
@@ -135,10 +138,10 @@ export const runPi = (
       Effect.mapError((cause) => new OrcRunError({ message: "orc: pi did not start: " + String(cause) }))
     )
     const running = new Map<string, RunningTool>()
-    const state: { lastOutput: number; session: { readonly id: string; readonly file: string } | null; idleMinutes: number | null } = {
+    const state: { lastOutput: number; session: { readonly id: string; readonly file: string } | null; idleSeconds: number | null } = {
       lastOutput: Date.now(),
       session: null,
-      idleMinutes: null
+      idleSeconds: null
     }
     const onLine = (line: string): Effect.Effect<void, OrcRunError> =>
       Effect.gen(function*() {
@@ -157,19 +160,25 @@ export const runPi = (
           running.delete(read.id)
         }
       })
-    const watch = Effect.gen(function*() {
-      const now = Date.now()
-      for (const line of stillRunningLines(running.values(), now)) {
-        yield* log("orc: " + line)
+    const report = Effect.forEach(stillRunningLines(running.values(), Date.now()), (line) => log("orc: " + line)).pipe(
+      Effect.delay(pacing.tickMillis),
+      Effect.forever
+    )
+    const stopWhenIdle: Effect.Effect<void, OrcRunError> = Effect.suspend(() => {
+      const quietMillis = Date.now() - state.lastOutput
+      if (quietMillis < pacing.idleMillis) {
+        return Effect.sleep(pacing.idleMillis - quietMillis).pipe(Effect.andThen(stopWhenIdle))
       }
-      if (running.size === 0 && now - state.lastOutput >= pacing.idleMillis) {
-        const idleMinutes = Math.floor((now - state.lastOutput) / minuteMillis)
-        state.idleMinutes = idleMinutes
-        yield* log("orc: stopped pi after " + idleMinutes.toString() + " min with no output and no tool running")
-        yield* handle.kill().pipe(Effect.catch((cause) => log("orc: cannot stop pi: " + String(cause))))
+      if (running.size > 0) {
+        return Effect.sleep(pacing.idleMillis).pipe(Effect.andThen(stopWhenIdle))
       }
-    }).pipe(Effect.delay(pacing.tickMillis), Effect.forever)
-    const watcher = yield* Effect.forkScoped(watch)
+      const idleSeconds = Math.floor(quietMillis / 1000)
+      state.idleSeconds = idleSeconds
+      return log("orc: stopped pi, idle for " + idleSpan(idleSeconds) + " with no tool running").pipe(
+        Effect.andThen(handle.kill().pipe(Effect.catch((cause) => log("orc: cannot stop pi: " + String(cause)))))
+      )
+    })
+    const watchers = [yield* Effect.forkScoped(report), yield* Effect.forkScoped(stopWhenIdle)]
     const [, , exitCode] = yield* Effect.all([
       handle.stdout.pipe(
         Stream.decodeText(),
@@ -185,9 +194,9 @@ export const runPi = (
       ),
       handle.exitCode.pipe(Effect.map((code): number => code), Effect.orElseSucceed(() => 128))
     ], { concurrency: "unbounded" })
-    yield* Fiber.interrupt(watcher)
+    yield* Fiber.interruptAll(watchers)
     const session = state.session
     const found = session === null ? null : yield* findSessionFile(fs, path, request.sessionDir, session.id, session.file)
-    const end: PiEnd = state.idleMinutes === null ? { kind: "exited", exitCode } : { kind: "idle", idleMinutes: state.idleMinutes }
+    const end: PiEnd = state.idleSeconds === null ? { kind: "exited", exitCode } : { kind: "idle", idleSeconds: state.idleSeconds }
     return { sessionId: session?.id ?? null, sessionFile: found, end }
   }))

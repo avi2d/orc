@@ -12,7 +12,6 @@ import { readShow } from "../../packages/run/src/show"
 import { openDatabase } from "../../packages/run/src/run-history"
 import { runWithHistory } from "../../packages/run/src/run"
 import type { HistoryRun } from "../../packages/run/src/run-record"
-import type { SandboxOps } from "../../packages/run/src/run-loop"
 import { subprocessNoMistakesRunner, type NoMistakesRunner } from "../../packages/run/src/no-mistakes"
 import { drawTasks, type TasksReadings } from "@tui-dash/tasks"
 import { plain } from "@tui-dash/ui"
@@ -20,6 +19,7 @@ import { handoverFileName, longSessionWarning } from "../../packages/run/src/lon
 import { anchorOf, decodeOrcShow, ok, orcPipelineOf, orcRunOf, taskLevels } from "@tui-dash/schema"
 import { pipelineTaskReadings } from "../lib/task-levels-fixture"
 import { valueOf } from "../lib/outcomes"
+import { fakeOps } from "../lib/fake-ops"
 
 const compactions = (count: number): string =>
   Array.from({ length: count }, (_, index) =>
@@ -110,25 +110,23 @@ describe("a handover after a passed implement", () => {
         const runA = await Effect.runPromise(historyFor("run-a", home, project, "2026-10-01T09:00:00.000Z", git))
         await mkdir(runA.runDir, { recursive: true })
         await writeFile(runA.taskPath, taskText)
-        const sessionDirA = join(runA.hostSessionsDir, "host")
+        const sessionDirA = runA.hostSessionsDir
         await mkdir(sessionDirA, { recursive: true })
         await writeFile(join(sessionDirA, "2026-10-01T09-00-00-000Z_long-pass.jsonl"), compactions(5) + JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "work done\nORC_COMPLETE" }] } }) + "\n")
         let agentCalls = 0
         let checkCalls = 0
-        await Effect.runPromise(runWithHistory(db, runA, {
+        await Effect.runPromise(runWithHistory(db, runA, fakeOps({
           runAgent: async () => {
             agentCalls += 1
             if (agentCalls === 1) {
               await appendFile(logFile, "abc1234\x1fImplement A\n")
               return {
-                iterations: [{ sessionId: "long-pass" }],
-                stdout: "",
-                completionSignal: "ORC_COMPLETE",
+                sessionId: "long-pass",
                 commits: [{ sha: "abc1234" }]
               }
             }
             await appendFile(logFile, "def5678\x1fFix B\n")
-            return { iterations: [], stdout: "", commits: [{ sha: "def5678" }] }
+            return { commits: [{ sha: "def5678" }] }
           },
           execCheck: async () => {
             checkCalls += 1
@@ -137,7 +135,7 @@ describe("a handover after a passed implement", () => {
             }
             throw new Error("spawn bun ENOENT")
           }
-        }))
+        }, runA.hostSessionsDir)))
         expect(checkCalls).toBe(2)
         const handoverA = await readHandover(runA.runDir)
         expect(handoverA).toContain("abc1234")
@@ -172,7 +170,7 @@ describe("a handover written after no-mistakes", () => {
         await writeFile(run.taskPath, "Add a sample widget to the demo page.\n")
         const finalText = "work done\nORC_COMPLETE"
         const sessionJsonl = compactions(5) + JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: finalText }] } }) + "\n"
-        const sessionDir = join(run.hostSessionsDir, "host")
+        const sessionDir = run.hostSessionsDir
         await mkdir(sessionDir, { recursive: true })
         await writeFile(join(sessionDir, "2026-10-01T09-00-00-000Z_long-nm.jsonl"), sessionJsonl)
         const fixedAfterLoop: NoMistakesRunner = {
@@ -189,15 +187,13 @@ describe("a handover written after no-mistakes", () => {
           status: () => Effect.die("no status check in this test"),
           logs: () => Effect.die("no logs in this test")
         }
-        const report = await Effect.runPromise(runWithHistory(db, { ...run, delivery: { kind: "no-mistakes", runner: fixedAfterLoop } }, {
+        const report = await Effect.runPromise(runWithHistory(db, { ...run, delivery: { kind: "no-mistakes", runner: fixedAfterLoop } }, fakeOps({
           runAgent: async () => ({
-            iterations: [{ sessionId: "long-nm" }],
-            stdout: "",
-            completionSignal: "ORC_COMPLETE",
+            sessionId: "long-nm",
             commits: [{ sha: "abc1234" }]
           }),
           execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 })
-        }))
+        }, run.hostSessionsDir)))
         expect(report.completed).toBe(true)
         expect(report.commits?.some((commit) => commit.sha === "abc1234")).toBe(true)
         expect(report.commits?.some((commit) => commit.sha === "def5678")).toBe(false)
@@ -267,26 +263,24 @@ describe("a long session survives a later failure", () => {
         await writeFile(run.taskPath, "Add a sample widget to the demo page.\n")
         const finalText = "work done\nORC_COMPLETE"
         const sessionJsonl = compactions(5) + JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: finalText }] } }) + "\n"
-        const sessionDir = join(run.hostSessionsDir, "host")
+        const sessionDir = run.hostSessionsDir
         await mkdir(sessionDir, { recursive: true })
         await writeFile(join(sessionDir, "2026-10-01T09-00-00-000Z_long-ok.jsonl"), sessionJsonl)
         let agentCalls = 0
         let checkCalls = 0
         let checkpointSeen = false
-        const ops: SandboxOps = {
+        const ops = fakeOps({
           runAgent: async () => {
             agentCalls += 1
             if (agentCalls === 1) {
               await appendFile(logFile, "abc1234\x1fImplement A\n")
               return {
-                iterations: [{ sessionId: "long-ok" }],
-                stdout: "",
-                completionSignal: "ORC_COMPLETE",
+                sessionId: "long-ok",
                 commits: [{ sha: "abc1234" }]
               }
             }
             await appendFile(logFile, "def5678\x1fFix B\n")
-            return { iterations: [], stdout: "", commits: [{ sha: "def5678" }] }
+            return { commits: [{ sha: "def5678" }] }
           },
           execCheck: async () => {
             checkCalls += 1
@@ -301,7 +295,7 @@ describe("a long session survives a later failure", () => {
             }
             throw new Error("spawn bun ENOENT")
           }
-        }
+        }, run.hostSessionsDir)
         const report = await Effect.runPromise(runWithHistory(db, run, ops))
         expect(checkCalls).toBe(2)
         expect(agentCalls).toBe(2)

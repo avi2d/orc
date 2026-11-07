@@ -73,21 +73,22 @@ const refuseOnChangedIntent = (
     }
   })
 
+const sessionFilesIn = (run: HistoryRun, dir: string): Effect.Effect<ReadonlyArray<string>> =>
+  run.fs.readDirectory(dir).pipe(
+    Effect.map((names) => names.filter((name) => name.endsWith(".jsonl")).map((name) => run.path.join(dir, name))),
+    Effect.orElseSucceed(() => [] as ReadonlyArray<string>)
+  )
+
+// A resumed run's session may sit one folder below its sessions folder, so both depths are read.
 const latestSessionFile = (run: HistoryRun, dirs: ReadonlyArray<string>): Effect.Effect<string | null, OrcRunError> =>
   Effect.gen(function*() {
     const found: Array<{ readonly file: string; readonly mtime: number }> = []
     for (const dir of dirs) {
       const top = yield* run.fs.readDirectory(dir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
-      for (const sub of top) {
-        const files = yield* run.fs.readDirectory(run.path.join(dir, sub)).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
-        for (const file of files) {
-          if (!file.endsWith(".jsonl")) {
-            continue
-          }
-          const full = run.path.join(dir, sub, file)
-          const info = yield* run.fs.stat(full).pipe(Effect.orElseSucceed(() => null))
-          found.push({ file: full, mtime: info === null ? 0 : Option.match(info.mtime, { onNone: () => 0, onSome: (at) => at.getTime() }) })
-        }
+      const nested = yield* Effect.forEach(top, (sub) => sessionFilesIn(run, run.path.join(dir, sub)))
+      for (const full of [...(yield* sessionFilesIn(run, dir)), ...nested.flat()]) {
+        const info = yield* run.fs.stat(full).pipe(Effect.orElseSucceed(() => null))
+        found.push({ file: full, mtime: info === null ? 0 : Option.match(info.mtime, { onNone: () => 0, onSome: (at) => at.getTime() }) })
       }
     }
     if (found.length === 0) {
@@ -171,7 +172,7 @@ const carrySessionFile = (run: HistoryRun, source: string | null, sessionId: str
     if (carried === null) {
       return source
     }
-    const target = run.path.join(run.hostSessionsDir, "host", source.slice(source.lastIndexOf("/") + 1))
+    const target = run.path.join(run.hostSessionsDir, source.slice(source.lastIndexOf("/") + 1))
     yield* run.fs.makeDirectory(run.path.dirname(target), { recursive: true }).pipe(
       Effect.andThen(() => run.fs.writeFileString(target, pointSessionAt(carried, run.worktreeDir))),
       Effect.orElseSucceed(() => undefined)

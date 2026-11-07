@@ -12,7 +12,6 @@ import { readShow } from "../../packages/run/src/show"
 import { openDatabase } from "../../packages/run/src/run-history"
 import { runWithHistory } from "../../packages/run/src/run"
 import type { HistoryRun } from "../../packages/run/src/run-record"
-import type { SandboxOps } from "../../packages/run/src/run-loop"
 import { subprocessNoMistakesRunner } from "../../packages/run/src/no-mistakes"
 import {
   countSessionSize,
@@ -25,6 +24,7 @@ import {
   longSessionWarning
 } from "../../packages/run/src/long-session"
 import { fixture } from "../lib/fixtures"
+import { fakeOps } from "../lib/fake-ops"
 
 const message = (role: string, text?: string): string =>
   JSON.stringify({ type: "message", message: { role, content: text === undefined ? [] : [{ type: "text", text }] } })
@@ -260,17 +260,16 @@ describe("a replayed long session", () => {
         const run = await Effect.runPromise(historyFor("run-1", home, project, "2026-10-01T09:00:00.000Z", git))
         await mkdir(run.runDir, { recursive: true })
         await writeFile(run.taskPath, "Add a sample widget to the demo page.\n")
-        const sessionDir = join(run.hostSessionsDir, "host")
+        const sessionDir = run.hostSessionsDir
         await mkdir(sessionDir, { recursive: true })
         await writeFile(join(sessionDir, "2026-10-01T09-00-00-000Z_sample-session-1.jsonl"), fixture("long-session.jsonl"))
-        const ops: SandboxOps = {
+        const ops = fakeOps({
           runAgent: async () => ({
-            iterations: [{ sessionId: "sample-session-1" }],
-            stdout: "",
+            sessionId: "sample-session-1",
             commits: [{ sha: "abc1234" }]
           }),
           execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 })
-        }
+        }, run.hostSessionsDir)
         const report = await Effect.runPromise(runWithHistory(db, run, ops))
         expect(report.sessionSize).toEqual({ turns: 13, compactions: 5 })
         expect(longSessionWarning(report.sessionSize ?? { turns: 0, compactions: 0 })).toContain("5 compactions")
@@ -297,20 +296,20 @@ describe("a replayed long session", () => {
         expect(plan.implementSessionId).toBeNull()
         expect(plan.implementSessionFile).toBeNull()
         const prompts: Array<string> = []
-        const resumed: Array<string | undefined> = []
-        const nextOps: SandboxOps = {
-          runAgent: async (_agent, prompt, _log, resumeSession) => {
+        const resumed: Array<string | null> = []
+        const nextOps = fakeOps({
+          runAgent: async ({ prompt, resumeSession }) => {
             prompts.push(prompt)
             resumed.push(resumeSession)
-            return { iterations: [], stdout: "", commits: [] }
+            return { commits: [] }
           },
           execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 })
-        }
+        }, next.hostSessionsDir)
         await Effect.runPromise(runWithHistory(db, next, nextOps))
         expect(prompts.length).toBe(1)
         expect(prompts[0]).toContain(handover)
         expect(prompts[0]).toContain("task.md")
-        expect(resumed).toEqual([undefined])
+        expect(resumed).toEqual([null])
       } finally {
         db.close()
       }
@@ -333,13 +332,13 @@ describe("an inherited handover survives a failed restart", () => {
         const runA = await Effect.runPromise(historyFor("run-a", home, project, "2026-10-01T09:00:00.000Z", git))
         await mkdir(runA.runDir, { recursive: true })
         await writeFile(runA.taskPath, taskText)
-        const sessionDirA = join(runA.hostSessionsDir, "host")
+        const sessionDirA = runA.hostSessionsDir
         await mkdir(sessionDirA, { recursive: true })
         await writeFile(join(sessionDirA, "2026-10-01T09-00-00-000Z_long-a.jsonl"), compactions(5) + JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "work in progress" }] } }) + "\n")
-        const reportA = await Effect.runPromise(runWithHistory(db, runA, {
-          runAgent: async () => ({ iterations: [{ sessionId: "long-a" }], stdout: "", commits: [{ sha: "abc1234" }] }),
+        const reportA = await Effect.runPromise(runWithHistory(db, runA, fakeOps({
+          runAgent: async () => ({ sessionId: "long-a", commits: [{ sha: "abc1234" }] }),
           execCheck: async () => { throw new Error("checks must not run for an unverified implement") }
-        }))
+        }, runA.hostSessionsDir)))
         expect(reportA.completed).toBe(false)
         expect(reportA.sessionSize).toEqual({ turns: 1, compactions: 5 })
         const handoverA = await readHandover(runA.runDir)
@@ -347,10 +346,10 @@ describe("an inherited handover survives a failed restart", () => {
         const runB = await Effect.runPromise(historyFor("run-b", home, project, "2026-10-01T10:00:00.000Z", git))
         await mkdir(runB.runDir, { recursive: true })
         await writeFile(runB.taskPath, taskText)
-        const reportB = await Effect.runPromise(runWithHistory(db, runB, {
+        const reportB = await Effect.runPromise(runWithHistory(db, runB, fakeOps({
           runAgent: async () => { throw new Error("pi exploded") },
           execCheck: async () => { throw new Error("checks must not run when the agent never starts") }
-        }))
+        }, runB.hostSessionsDir)))
         expect(reportB.completed).toBe(false)
         const forwarded = await readHandover(runB.runDir, inheritedHandoverFileName)
         expect(forwarded).toBe(handoverA)
@@ -361,18 +360,18 @@ describe("an inherited handover survives a failed restart", () => {
         expect(planC.handover).toBe(forwarded)
         expect(planC.implementSessionId).toBeNull()
         const prompts: Array<string> = []
-        const resumed: Array<string | undefined> = []
-        const reportC = await Effect.runPromise(runWithHistory(db, runC, {
-          runAgent: async (_agent, prompt, _log, resumeSession) => {
+        const resumed: Array<string | null> = []
+        const reportC = await Effect.runPromise(runWithHistory(db, runC, fakeOps({
+          runAgent: async ({ prompt, resumeSession }) => {
             prompts.push(prompt)
             resumed.push(resumeSession)
-            return { iterations: [], stdout: "", commits: [] }
+            return { commits: [] }
           },
           execCheck: async () => { throw new Error("checks must not run for an unverified implement") }
-        }))
+        }, runC.hostSessionsDir)))
         expect(prompts.length).toBe(1)
         expect(prompts[0]).toContain("abc1234")
-        expect(resumed).toEqual([undefined])
+        expect(resumed).toEqual([null])
         expect(reportC.commits?.some((commit) => commit.sha === "abc1234")).toBe(true)
       } finally {
         db.close()
@@ -393,21 +392,21 @@ describe("an inherited handover survives a failed restart", () => {
         const runA = await Effect.runPromise(historyFor("run-a", home, project, "2026-10-01T09:00:00.000Z", git))
         await mkdir(runA.runDir, { recursive: true })
         await writeFile(runA.taskPath, taskText)
-        const sessionDirA = join(runA.hostSessionsDir, "host")
+        const sessionDirA = runA.hostSessionsDir
         await mkdir(sessionDirA, { recursive: true })
         await writeFile(join(sessionDirA, "2026-10-01T09-00-00-000Z_long-a.jsonl"), compactions(5) + JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "work in progress" }] } }) + "\n")
-        await Effect.runPromise(runWithHistory(db, runA, {
-          runAgent: async () => ({ iterations: [{ sessionId: "long-a" }], stdout: "", commits: [{ sha: "abc1234" }] }),
+        await Effect.runPromise(runWithHistory(db, runA, fakeOps({
+          runAgent: async () => ({ sessionId: "long-a", commits: [{ sha: "abc1234" }] }),
           execCheck: async () => { throw new Error("checks must not run for an unverified implement") }
-        }))
+        }, runA.hostSessionsDir)))
         const handoverA = await readHandover(runA.runDir)
         const runB = await Effect.runPromise(historyFor("run-b", home, project, "2026-10-01T10:00:00.000Z", git))
         await mkdir(join(home, "runs"), { recursive: true })
         await writeFile(runB.runDir, "not a directory\n")
-        const failure = await Effect.runPromise(Effect.flip(runWithHistory(db, runB, {
+        const failure = await Effect.runPromise(Effect.flip(runWithHistory(db, runB, fakeOps({
           runAgent: async () => { throw new Error("the agent must not start when forwarding fails") },
           execCheck: async () => { throw new Error("checks must not run when forwarding fails") }
-        })))
+        }, runB.hostSessionsDir))))
         expect(failure.message).toContain("handover")
         const runC = await Effect.runPromise(historyFor("run-c", home, project, "2026-10-01T11:00:00.000Z", git))
         await mkdir(runC.runDir, { recursive: true })
@@ -433,26 +432,26 @@ describe("an inherited handover survives a failed restart", () => {
         const runA = await Effect.runPromise(historyFor("run-a", home, project, "2026-10-01T09:00:00.000Z", git))
         await mkdir(runA.runDir, { recursive: true })
         await writeFile(runA.taskPath, taskText)
-        const sessionDirA = join(runA.hostSessionsDir, "host")
+        const sessionDirA = runA.hostSessionsDir
         await mkdir(sessionDirA, { recursive: true })
         await writeFile(join(sessionDirA, "2026-10-01T09-00-00-000Z_long-a.jsonl"), compactions(5) + JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "work in progress" }] } }) + "\n")
-        await Effect.runPromise(runWithHistory(db, runA, {
-          runAgent: async () => ({ iterations: [{ sessionId: "long-a" }], stdout: "", commits: [{ sha: "abc1234" }] }),
+        await Effect.runPromise(runWithHistory(db, runA, fakeOps({
+          runAgent: async () => ({ sessionId: "long-a", commits: [{ sha: "abc1234" }] }),
           execCheck: async () => { throw new Error("checks must not run for an unverified implement") }
-        }))
+        }, runA.hostSessionsDir)))
         const handoverA = await readHandover(runA.runDir)
         const runB = await Effect.runPromise(historyFor("run-b", home, project, "2026-10-01T10:00:00.000Z", git))
         await mkdir(runB.runDir, { recursive: true })
         await writeFile(runB.taskPath, taskText)
-        const reportB = await Effect.runPromise(runWithHistory(db, runB, {
+        const reportB = await Effect.runPromise(runWithHistory(db, runB, fakeOps({
           runAgent: async () => {
-            const liveDir = join(runB.hostSessionsDir, "host")
+            const liveDir = runB.hostSessionsDir
             await mkdir(liveDir, { recursive: true })
             await writeFile(join(liveDir, "2026-10-01T10-00-00-000Z_live-b.jsonl"), message("assistant", "halfway there") + "\n")
             throw new Error("killed mid-implement")
           },
           execCheck: async () => { throw new Error("checks must not run when implement never finishes") }
-        }))
+        }, runB.hostSessionsDir)))
         expect(reportB.completed).toBe(false)
         expect(await readHandover(runB.runDir, inheritedHandoverFileName)).toBe(handoverA)
         const runC = await Effect.runPromise(historyFor("run-c", home, project, "2026-10-01T11:00:00.000Z", git))
@@ -462,18 +461,18 @@ describe("an inherited handover survives a failed restart", () => {
         expect(planC.handover).toBe(handoverA)
         expect(planC.implementSessionId).toBe("live-b")
         const prompts: Array<string> = []
-        const resumed: Array<string | undefined> = []
-        const reportC = await Effect.runPromise(runWithHistory(db, runC, {
-          runAgent: async (_agent, prompt, _log, resumeSession) => {
+        const resumed: Array<string | null> = []
+        const reportC = await Effect.runPromise(runWithHistory(db, runC, fakeOps({
+          runAgent: async ({ prompt, resumeSession }) => {
             prompts.push(prompt)
             resumed.push(resumeSession)
-            return { iterations: [{ sessionId: "live-b" }], stdout: "", commits: [] }
+            return { sessionId: "live-b", commits: [] }
           },
           execCheck: async () => { throw new Error("checks must not run for an unverified implement") }
-        }))
+        }, runC.hostSessionsDir)))
         expect(prompts.length).toBe(1)
         expect(prompts[0]).toContain("abc1234")
-        expect(resumed).toEqual(["live-b"])
+        expect(resumed).toEqual([join(runC.hostSessionsDir, "2026-10-01T10-00-00-000Z_live-b.jsonl")])
         expect(reportC.commits?.some((commit) => commit.sha === "abc1234")).toBe(true)
       } finally {
         db.close()

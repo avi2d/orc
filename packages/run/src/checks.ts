@@ -70,6 +70,9 @@ export const readChecksCommands = (
     return commands
   })
 
+export const prepareCommandOf = (commands: ReadonlyArray<ChecksCommand>): string | null =>
+  commands.find((check) => check.name === "prepare")?.command ?? null
+
 const sectionOf = (outcome: CheckOutcome, stdout: string, stderr: string): string => {
   const output = (stdout + stderr).trim()
   return [
@@ -80,7 +83,7 @@ const sectionOf = (outcome: CheckOutcome, stdout: string, stderr: string): strin
 }
 
 export const runChecksRound = (
-  runCommand: (command: string) => Promise<CommandResult>,
+  runCommand: (command: string) => Effect.Effect<CommandResult, { readonly message: string }>,
   fs: FileSystem.FileSystem,
   path: Path.Path,
   runDir: string,
@@ -96,10 +99,9 @@ export const runChecksRound = (
     const outcomes: Array<CheckOutcome> = []
     let first = true
     for (const check of commands) {
-      const result = yield* Effect.tryPromise({
-        try: () => runCommand(check.command),
-        catch: (cause) => new ChecksError({ message: "orc: the " + check.name + " check failed to run: " + String(cause) })
-      })
+      const result = yield* runCommand(check.command).pipe(
+        Effect.mapError((cause) => new ChecksError({ message: "orc: the " + check.name + " check failed to run: " + cause.message }))
+      )
       const outcome: CheckOutcome = { name: check.name, command: check.command, exitCode: result.exitCode, passed: result.exitCode === 0 }
       outcomes.push(outcome)
       yield* fs.writeFileString(file, (first ? "" : "\n\n") + sectionOf(outcome, result.stdout, result.stderr), first ? undefined : { flag: "a" }).pipe(

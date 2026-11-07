@@ -1,6 +1,6 @@
 import { Console, Effect, type FileSystem, type Path } from "effect"
-import type { ChildProcessSpawner } from "effect/process"
-import { runGit } from "./git-run"
+import { ChildProcess, type ChildProcessSpawner } from "effect/process"
+import { collectOutput, runGit } from "./git-run"
 import { OrcRunError } from "./run-session"
 
 type Spawner = ChildProcessSpawner.ChildProcessSpawner["Service"]
@@ -90,4 +90,31 @@ export const closeTaskCopy = (spawner: Spawner, git: string, projectDir: string,
       return
     }
     yield* gitOrRefuse(spawner, git, ["worktree", "remove", copy.dir], projectDir, "remove the copy " + copy.dir)
+  })
+
+// runGit hides the operator's global config, where the identity usually lives; reading a key runs no repository program.
+const hostIdentity = (spawner: Spawner, realGit: string, projectDir: string, key: string): Effect.Effect<string> =>
+  Effect.scoped(spawner.spawn(ChildProcess.make(realGit, ["config", "--get", key], { cwd: projectDir })).pipe(
+    Effect.flatMap(collectOutput),
+    Effect.map((result) => result.exitCode === 0 ? result.stdout.trim() : "")
+  )).pipe(Effect.orElseSucceed(() => ""))
+
+// The agent's git reads this file as its global config, so commits in the copy carry the operator's identity without the operator's other settings.
+export const writeAgentGitConfig = (
+  spawner: Spawner,
+  git: string,
+  realGit: string,
+  projectDir: string,
+  copyDir: string,
+  file: string
+): Effect.Effect<void, OrcRunError> =>
+  Effect.gen(function*() {
+    const write = (args: ReadonlyArray<string>) => gitOrRefuse(spawner, git, ["config", "--file", file, ...args], projectDir, "write the agent's git config " + file)
+    yield* write(["--replace-all", "safe.directory", copyDir])
+    for (const key of ["user.name", "user.email"]) {
+      const value = yield* hostIdentity(spawner, realGit, projectDir, key)
+      if (value !== "") {
+        yield* write([key, value])
+      }
+    }
   })

@@ -23,7 +23,7 @@ describe("the run report", () => {
         const sha = await commitOnBranch(dir, "orc/test")
         await capturedSession(home, sessionEnding(cleanFinish))
         await writeFile(join(dir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [passedWithPr, recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [passedWithPr, recordedNothing])
         expect(outcome.report.completed).toBe(true)
         const runDir = join(home, "runs", "step-run-1")
         const report = await readFile(join(runDir, "report.md"), "utf8")
@@ -71,7 +71,7 @@ describe("the run report", () => {
             "gate: review"
           ].join("\n") + "\n"
         }
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [askUserGate, recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [askUserGate, recordedNothing])
         expect(outcome.report.completed).toBe(false)
         const report = await readFile(join(home, "runs", "step-run-1", "report.md"), "utf8")
         expect(report).toContain("# Run report step-run-1")

@@ -58,6 +58,9 @@ const OrcConfigFile = Schema.Struct({
     implementer: Schema.optional(ModelRef),
     fixer: Schema.optional(ModelRef),
     orchestrator: Schema.optional(ModelRef)
+  })),
+  sandbox: Schema.optional(Schema.Struct({
+    read: Schema.Array(AbsolutePath)
   }))
 })
 type OrcConfigFile = typeof OrcConfigFile.Type

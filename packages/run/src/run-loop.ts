@@ -1,18 +1,30 @@
-import type { AgentProvider, ExecResult, SandboxRunResult } from "@ai-hero/sandcastle"
 import { Effect, FileSystem } from "effect"
-import { withHostGitSafety } from "./host"
-import { buildFixPrompt, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
+import type { AgentFile } from "./agents"
+import { buildFixPrompt, type CommandResult, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
 import { branchCommits, runGit } from "./git-run"
-import { buildImplementPrompt, finalReplyError, orcCompletionLine, piWithTools, sessionPrintedSignal, type PiTokenUse } from "./pi"
-import { OrcRunError, describeCause, noSession, readSession } from "./run-session"
+import { buildImplementPrompt, finalReplyError, orcCompletionLine, sessionPrintedSignal, sumPiUsage, type PiTokenUse } from "./pi"
+import { idleSpan, type PiEnd, type PiRun } from "./pi-run"
+import { OrcRunError } from "./run-session"
 import { driveNoMistakes, type AllowWord, type NoMistakesRecord, type QuestionAnswer } from "./no-mistakes"
 import { type DirectPrRecord, openDirectPr, type PullRequestOpener } from "./direct-pr"
 import { countSessionSize, handoverImplementPrompt, type LongSessionCounts } from "./long-session"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 
+export interface AgentRun {
+  readonly agent: AgentFile
+  readonly prompt: string
+  readonly logFile: string
+  readonly resumeSession: string | null
+  readonly onSession: (file: string) => Effect.Effect<void, OrcRunError>
+}
+
+export interface AgentRunResult extends PiRun {
+  readonly commits: ReadonlyArray<{ readonly sha: string }>
+}
+
 export interface SandboxOps {
-  readonly runAgent: (agent: AgentProvider, prompt: string, logFile: string, resumeSession?: string) => Promise<SandboxRunResult>
-  readonly execCheck: (command: string) => Promise<ExecResult>
+  readonly runAgent: (run: AgentRun) => Effect.Effect<AgentRunResult, OrcRunError>
+  readonly execCheck: (command: string) => Effect.Effect<CommandResult, OrcRunError>
 }
 
 export interface ResumePlan {
@@ -43,10 +55,12 @@ interface AgentOutcome {
 
 export interface RunCheckpoints {
   readonly implementStart: (started: string) => Effect.Effect<void, OrcRunError>
+  readonly implementSession: (file: string) => Effect.Effect<void, OrcRunError>
   readonly implementDone: (outcome: AgentOutcome, started: string, ended: string) => Effect.Effect<void, OrcRunError>
   readonly checksRoundStart: (round: number, started: string) => Effect.Effect<void, OrcRunError>
   readonly checksRoundDone: (round: ChecksRoundSummary) => Effect.Effect<void, OrcRunError>
   readonly fixStart: (attempt: number, started: string) => Effect.Effect<void, OrcRunError>
+  readonly fixSession: (attempt: number, file: string) => Effect.Effect<void, OrcRunError>
   readonly fixDone: (fix: RecordedFixAttempt) => Effect.Effect<void, OrcRunError>
   readonly noMistakesStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly noMistakesDone: (record: NoMistakesRecord) => Effect.Effect<void, OrcRunError>
@@ -79,23 +93,28 @@ interface CapturedAgentRun {
   readonly failure: string | null
 }
 
-const sessionOf = (
-  run: HistoryRun,
-  storage: { readonly readHostSession: (cwd: string, id: string) => Promise<string | undefined> } | undefined,
-  result: SandboxRunResult
-): Effect.Effect<CapturedAgentRun, OrcRunError> =>
+const stoppedNote = (end: PiEnd): string | null =>
+  end.kind === "idle" ? "orc stopped Pi, idle for " + idleSpan(end.idleSeconds) + " with no tool running." : null
+
+const exitNote = (end: PiEnd): string =>
+  end.kind === "exited" && end.exitCode !== 0 ? " Pi exited with code " + end.exitCode.toString() + "." : ""
+
+const sessionOf = (run: HistoryRun, result: AgentRunResult): Effect.Effect<CapturedAgentRun, OrcRunError> =>
   Effect.gen(function*() {
-    const sessionId = result.iterations.map((iteration) => iteration.sessionId).find((id) => id !== undefined) ?? null
-    const sessionRead = yield* readSession(run, storage, sessionId).pipe(
-      Effect.map((session) => ({ session, failure: null })),
-      Effect.catchTag("OrcRunError", (error) => Effect.succeed({ session: noSession, failure: error.message }))
-    )
+    const jsonl = result.sessionFile === null ? null : yield* run.fs.readFileString(result.sessionFile).pipe(Effect.orElseSucceed(() => null))
     const commits = yield* collectCommits(run, result.commits)
-    return { sessionId, sessionFile: sessionRead.session.file, commits, tokens: sessionRead.session.usage, failure: sessionRead.failure, jsonl: sessionRead.session.jsonl }
+    return {
+      sessionId: result.sessionId,
+      sessionFile: jsonl === null ? null : result.sessionFile,
+      commits,
+      tokens: jsonl === null ? null : sumPiUsage(jsonl),
+      failure: stoppedNote(result.end),
+      jsonl
+    }
   })
 
-const verifiedMarker = (result: SandboxRunResult, jsonl: string | null): boolean =>
-  result.completionSignal === orcCompletionLine && jsonl !== null && sessionPrintedSignal(jsonl, orcCompletionLine)
+const verifiedMarker = (jsonl: string | null): boolean =>
+  jsonl !== null && sessionPrintedSignal(jsonl, orcCompletionLine)
 
 const resumedCommits = (run: HistoryRun): Effect.Effect<Array<OrcRunCommit>, OrcRunError> =>
   branchCommits(run.spawner, run.git, run.branch, run.projectDir)
@@ -126,25 +145,23 @@ const replyErrorNote = (jsonl: string | null): string => {
   return error === null ? "" : " It ended in an error: " + error
 }
 
-const implement = (run: HistoryRun, runAgent: SandboxOps["runAgent"], plan: Pick<ResumePlan, "implementSessionId" | "handover">): Effect.Effect<AgentOutcome, OrcRunError> =>
+const implement = (
+  run: HistoryRun,
+  runAgent: SandboxOps["runAgent"],
+  plan: Pick<ResumePlan, "implementSessionId" | "implementSessionFile" | "handover">,
+  onSession: AgentRun["onSession"]
+): Effect.Effect<AgentOutcome, OrcRunError> =>
   Effect.gen(function*() {
-    const agentProvider = piWithTools(run.agent, {
-      hostSessionsDir: run.hostSessionsDir,
-      sandboxSessionsDir: run.path.join(run.piSessionDir, "agent", "sessions")
-    }, run.instructions)
-    const result: SandboxRunResult = yield* Effect.tryPromise({
-      try: () => runAgent(agentProvider, implementPrompt(run, plan), "agent.log", plan.implementSessionId ?? undefined),
-      catch: (cause) => new OrcRunError({ message: "orc: the agent run failed: " + describeCause(cause) })
-    }).pipe(withHostGitSafety(run.git))
-    const session = yield* sessionOf(run, agentProvider.sessionStorage, result)
+    const result = yield* runAgent({ agent: run.agent, prompt: implementPrompt(run, plan), logFile: "agent.log", resumeSession: plan.implementSessionFile, onSession })
+    const session = yield* sessionOf(run, result)
     const sessionSize = session.jsonl === null ? null : countSessionSize(session.jsonl)
-    const verified = verifiedMarker(result, session.jsonl)
+    const verified = verifiedMarker(session.jsonl)
     const prior = plan.implementSessionId === null && plan.handover === null ? [] : yield* resumedCommits(run)
     const seen = new Set(session.commits.map((commit) => commit.sha))
     const commits = [...session.commits, ...prior.filter((commit) => !seen.has(commit.sha))]
     const completed = verified && commits.length > 0
     const endReason = session.failure ?? (!verified
-      ? "Pi's final reply did not stop cleanly with " + orcCompletionLine + " on its own line." + replyErrorNote(session.jsonl)
+      ? "Pi's final reply did not stop cleanly with " + orcCompletionLine + " on its own line." + replyErrorNote(session.jsonl) + exitNote(result.end)
       : (commits.length > 0
         ? "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + "."
         : "Pi printed ORC_COMPLETE but made no commit on " + run.branch + "."))
@@ -165,20 +182,14 @@ const fixOnce = (
   runAgent: SandboxOps["runAgent"],
   evidenceFile: string,
   attempt: number,
-  resumeSession: string | null
+  resumeSession: string | null,
+  onSession: AgentRun["onSession"]
 ): Effect.Effect<{ readonly fix: RecordedFixAttempt; readonly commits: ReadonlyArray<OrcRunCommit> }, OrcRunError> =>
   Effect.gen(function*() {
     const started = new Date().toISOString()
-    const fixerProvider = piWithTools(run.fixer, {
-      hostSessionsDir: run.hostSessionsDir,
-      sandboxSessionsDir: run.path.join(run.piSessionDir, "agent", "sessions")
-    }, run.instructions)
-    const result: SandboxRunResult = yield* Effect.tryPromise({
-      try: () => runAgent(fixerProvider, buildFixPrompt(run.fixer, evidenceFile), "fix-" + attempt + ".log", resumeSession ?? undefined),
-      catch: (cause) => new OrcRunError({ message: "orc: the fix run failed: " + describeCause(cause) })
-    }).pipe(withHostGitSafety(run.git))
-    const session = yield* sessionOf(run, fixerProvider.sessionStorage, result)
-    const verified = verifiedMarker(result, session.jsonl)
+    const result = yield* runAgent({ agent: run.fixer, prompt: buildFixPrompt(run.fixer, evidenceFile), logFile: "fix-" + attempt.toString() + ".log", resumeSession, onSession })
+    const session = yield* sessionOf(run, result)
+    const verified = verifiedMarker(session.jsonl)
     const ended = new Date().toISOString()
     return {
       fix: {
@@ -301,7 +312,7 @@ const runChecksFixLoop = (
       }
       const attempt = fixes.length + 1
       yield* checkpoints.fixStart(attempt, new Date().toISOString())
-      const fixed = yield* fixOnce(run, ops.runAgent, outcome.file, attempt, attempt === 1 ? plan.fixSessionId : null)
+      const fixed = yield* fixOnce(run, ops.runAgent, outcome.file, attempt, attempt === 1 ? plan.fixSessionFile : null, (file) => checkpoints.fixSession(attempt, file))
       fixes.push(fixed.fix)
       yield* checkpoints.fixDone(fixed.fix)
       commits.push(...fixed.commits)
@@ -317,7 +328,7 @@ export const runFull = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, ch
       ? yield* resumedOutcome(run, plan.implementSessionId, plan.implementSessionFile)
       : yield* Effect.gen(function*() {
         yield* checkpoints.implementStart(implementStarted)
-        const outcome = yield* implement(run, ops.runAgent, plan)
+        const outcome = yield* implement(run, ops.runAgent, plan, checkpoints.implementSession)
         yield* checkpoints.implementDone(outcome, implementStarted, new Date().toISOString())
         return outcome
       })
