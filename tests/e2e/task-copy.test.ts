@@ -76,6 +76,18 @@ describe("task copies", () => {
     })
   })
 
+  test("another branch's worktree whose folder is gone stays registered instead of pruned with the run's copy", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const other = join(home, "away")
+        git(dir, ["worktree", "add", "-q", "-b", "someone/else", other])
+        await Bun.$`rm -rf ${other}`.quiet()
+        await opened(dir, home, "orc/test")
+        expect(git(dir, ["worktree", "list", "--porcelain"])).toContain("branch refs/heads/someone/else")
+      })
+    })
+  })
+
   test("a copy whose folder was deleted is made again instead of refused as checked out", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {

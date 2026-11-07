@@ -13,6 +13,7 @@ export interface TaskCopy {
 interface ListedCopy {
   readonly dir: string
   readonly branch: string | null
+  readonly missing: boolean
 }
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
@@ -22,7 +23,8 @@ const parseWorktreeList = (porcelain: string): ReadonlyArray<ListedCopy> =>
     const lines = block.split("\n")
     const dir = lines.find((line) => line.startsWith("worktree "))?.slice("worktree ".length)
     const ref = lines.find((line) => line.startsWith("branch "))?.slice("branch ".length)
-    return dir === undefined ? [] : [{ dir, branch: ref?.startsWith("refs/heads/") === true ? ref.slice("refs/heads/".length) : null }]
+    const missing = lines.some((line) => line.startsWith("prunable"))
+    return dir === undefined ? [] : [{ dir, branch: ref?.startsWith("refs/heads/") === true ? ref.slice("refs/heads/".length) : null, missing }]
   })
 
 // A branch copy made before orc kept copies under its home is still reused where it sits, inside the checkout.
@@ -60,10 +62,12 @@ export const openTaskCopy = (
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot create the copies folder " + copies + ": " + String(cause) }))
     )
     const realHome = path.dirname(yield* realPathOf(fs, copies))
-    yield* gitOrRefuse(spawner, git, ["worktree", "prune"], projectDir, "prune the copies whose folders are gone")
     const listed = parseWorktreeList(yield* gitOrRefuse(spawner, git, ["worktree", "list", "--porcelain"], projectDir, "list the copies of " + projectDir))
     const existing = listed.find((copy) => copy.branch === branch)
-    if (existing !== undefined) {
+    // A global prune would also clear other tools' worktrees whose folders are briefly away, so only this branch's stale entry goes.
+    if (existing?.missing === true) {
+      yield* gitOrRefuse(spawner, git, ["worktree", "remove", existing.dir], projectDir, "clear the copy of " + branch + " whose folder " + existing.dir + " is gone")
+    } else if (existing !== undefined) {
       const dir = yield* realPathOf(fs, existing.dir)
       if (dir === projectDir) {
         return yield* refuse("orc: " + projectDir + " has " + branch + " checked out itself, and git checks a branch out in one place only, so switch the checkout to another branch")
