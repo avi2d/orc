@@ -538,6 +538,27 @@ describe("driveNoMistakes", () => {
     expect(gateSteps(gate)).toContain("asking")
   })
 
+  test("a finding re-raised after its answer was sent is asked again instead of resent", async () => {
+    const sent: Array<GateResponse> = []
+    const answering: NoMistakesRunner = {
+      ...endedFailed,
+      start: () => Effect.succeed({ stdout: parked, stderr: "", exitCode: 0 }),
+      respond: (response) => {
+        sent.push(response)
+        return Effect.succeed({ stdout: parked, stderr: "", exitCode: 0 })
+      }
+    }
+    let waited = 0
+    const wait: Wait = () => {
+      waited += 1
+      return Effect.succeed(waited === 1 ? [{ question: "r2", answer: "Keep the old behavior" }] : [])
+    }
+    const { record } = await driveIn(answering, [], [], wait)
+    expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"] }])
+    expect(sent.length).toBe(1)
+    expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior" }])
+  })
+
   test("a wait that runs out unanswered parks the question instead of sending an empty answer", async () => {
     const sent: Array<GateResponse> = []
     const asking: NoMistakesRunner = {
