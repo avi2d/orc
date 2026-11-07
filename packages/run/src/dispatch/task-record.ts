@@ -1,5 +1,4 @@
 import { Array as Arr, Data, Effect, Schema } from "effect"
-import { claimOf, startedOf, TaskFields } from "@tui-dash/schema"
 import { isTaskKind, type TaskKind, unknownKind } from "../task-kind"
 
 export const taskFolders = ["new", "taken", "closed"] as const
@@ -121,9 +120,14 @@ const QuestionFront = Schema.Struct({
 })
 
 const Frontmatter = Schema.Struct({
-  ...TaskFields.fields,
+  id: Schema.String,
+  title: Schema.String,
+  project: Schema.String,
   kind: Schema.optional(Schema.String),
   internal: Schema.optional(Schema.Boolean),
+  machine: Schema.NullOr(Schema.String),
+  depends_on: Schema.Array(Schema.String),
+  created: Schema.String,
   hold_reason: Schema.optional(Schema.String),
   hold_until: Schema.optional(Schema.String),
   hold_questions: Schema.optional(Schema.Array(QuestionFront)),
@@ -131,6 +135,15 @@ const Frontmatter = Schema.Struct({
   answered_at: Schema.optional(Schema.String),
   parked_branch: Schema.optional(Schema.String),
   parked_questions: Schema.optional(Schema.Array(QuestionFront)),
+  beat: Schema.optional(Schema.String),
+  taken_for: Schema.optional(Schema.String),
+  account: Schema.optional(Schema.String),
+  taken_at: Schema.optional(Schema.String),
+  started_at: Schema.optional(Schema.String),
+  start_log: Schema.optional(Schema.String),
+  outcome: Schema.optional(Schema.Literals(["done", "failed", "stopped", "start-failed"])),
+  closed_at: Schema.optional(Schema.String),
+  reason: Schema.optional(Schema.String),
   pr: Schema.optional(Schema.String),
   report: Schema.optional(Schema.String),
   posted_at: Schema.optional(Schema.String)
@@ -138,6 +151,14 @@ const Frontmatter = Schema.Struct({
 type Frontmatter = typeof Frontmatter.Type
 
 export const fence = "---"
+
+const claimOf = (front: Frontmatter): Claim | null =>
+  front.beat === undefined || front.taken_for === undefined || front.account === undefined || front.taken_at === undefined
+    ? null
+    : { beat: front.beat, machine: front.taken_for, account: front.account, takenAt: front.taken_at }
+
+const startedOf = (front: Frontmatter): Started | null =>
+  front.started_at === undefined ? null : { at: front.started_at, log: front.start_log ?? "" }
 
 const closingOf = (front: Frontmatter, started: Started | null): Closing | null => {
   const reason = front.reason ?? ""

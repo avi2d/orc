@@ -21,7 +21,6 @@
   },
   "dependencies": {
     "@effect/platform-bun": "4.0.0",
-    "@tui-dash/schema": "workspace:*",
     "effect": "4.0.0"
   },
   "devDependencies": {
