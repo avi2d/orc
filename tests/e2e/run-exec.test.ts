@@ -20,11 +20,8 @@ const runInstall = (copyDir: string, logFile: string): Promise<void> =>
     }).pipe(Effect.provide(BunServices.layer))
   )
 
-const piSeesPrepared = async (copyDir: string): Promise<boolean> =>
-  Bun.file(join(copyDir, "prepared.txt")).exists()
-
 describe("installCopy", () => {
-  test("writes the prepare output the later Pi start observes instead of skipping the install", async () => {
+  test("runs the prepare command in the copy instead of skipping the install", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-install-"))
     try {
       const copyDir = join(dir, "copy")
@@ -32,7 +29,6 @@ describe("installCopy", () => {
       await Bun.write(join(copyDir, ".no-mistakes.yaml"), "commands:\n  prepare: echo prepared > prepared.txt\n")
       const logFile = join(dir, "prepare.log")
       await runInstall(copyDir, logFile)
-      expect(await piSeesPrepared(copyDir)).toBe(true)
       expect(await Bun.file(join(copyDir, "prepared.txt")).text()).toBe("prepared\n")
       const log = await readFile(logFile, "utf8")
       expect(log).toContain("$ echo prepared > prepared.txt")
@@ -42,22 +38,21 @@ describe("installCopy", () => {
     }
   })
 
-  test("refuses the run when prepare fails instead of starting Pi", async () => {
+  test("refuses the run when prepare fails instead of ignoring the failure", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-install-"))
     try {
       const copyDir = join(dir, "copy")
       await Bun.$`mkdir -p ${copyDir}`.quiet()
       await Bun.write(join(copyDir, ".no-mistakes.yaml"), "commands:\n  prepare: exit 3\n")
       const logFile = join(dir, "prepare.log")
-      let piStarted = false
       let message = ""
       try {
         await runInstall(copyDir, logFile)
-        piStarted = true
+        throw new Error("installCopy succeeded when the prepare command failed")
       } catch (error) {
-        message = error instanceof OrcRunError ? error.message : String(error)
+        if (!(error instanceof OrcRunError)) throw error
+        message = error.message
       }
-      expect(piStarted).toBe(false)
       expect(message).toContain("so Pi did not start")
       expect(message).toContain("prepare.log")
       const log = await readFile(logFile, "utf8")
@@ -67,29 +62,28 @@ describe("installCopy", () => {
     }
   })
 
-  test("refuses the run when the prepare config cannot be read instead of starting Pi", async () => {
+  test("refuses the run when the prepare config names no prepare command instead of treating it as no prepare", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-install-"))
     try {
       const copyDir = join(dir, "copy")
       await Bun.$`mkdir -p ${copyDir}`.quiet()
       await Bun.write(join(copyDir, ".no-mistakes.yaml"), "other: 1\n")
       const logFile = join(dir, "prepare.log")
-      let piStarted = false
       let message = ""
       try {
         await runInstall(copyDir, logFile)
-        piStarted = true
+        throw new Error("installCopy succeeded when the prepare config named no checks")
       } catch (error) {
-        message = error instanceof OrcRunError ? error.message : String(error)
+        if (!(error instanceof OrcRunError)) throw error
+        message = error.message
       }
-      expect(piStarted).toBe(false)
       expect(message).toContain(".no-mistakes.yaml")
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
   })
 
-  test("starts Pi without an install when the copy holds no prepare file", async () => {
+  test("skips the install when the copy holds no prepare file instead of refusing the run", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-install-"))
     try {
       const copyDir = join(dir, "copy")
