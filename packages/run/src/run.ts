@@ -13,10 +13,10 @@ import { planSandbox, type SandboxPlan } from "./sandbox-plan"
 import { type Checkout, openCheckout, parseRefuseMarkers } from "./checkout"
 import { formatRefresh, refreshCheckout } from "./dispatch/refresh"
 import { OrcRunError } from "./run-session"
-import { openDatabase, orcHomeDir, updateStep } from "./run-history"
+import { openDatabase, orcHomeDir, stoppedEndReason, updateStep } from "./run-history"
 import { stepsForRun } from "./history-resume"
 import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "./run-resume"
-import { finishRun, historyFailure, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordPullRequestDone, recordPullRequestStart, recordResumePublish, recordStepSession } from "./history-write"
+import { finishRun, historyFailure, markRunStopped, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordPullRequestDone, recordPullRequestStart, recordResumePublish, recordStepSession } from "./history-write"
 import { failedReport, writeEvidence, writeHandover, writeReport, type HistoryRun, type OrcRunCommit, type OrcRunReport } from "./run-record"
 import { longSessionWarning, type LongSessionCounts } from "./long-session"
 import { runFull, type RunCheckpoints, type SandboxOps } from "./run-loop"
@@ -342,7 +342,8 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
           yield* finishRun(db, run.runId, failed, new Date().toISOString()).pipe(Effect.orElseSucceed(() => undefined))
           return failed
         })
-      )
+      ),
+      Effect.onInterrupt(() => markRunStopped(db, run.runId, new Date().toISOString(), stoppedEndReason))
     )
     yield* writeEvidence(run, report)
     yield* writeReport(run, report)

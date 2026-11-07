@@ -2,13 +2,13 @@ import { DateTime, Effect, FileSystem, Option } from "effect"
 import { backlogPaths, type BacklogError } from "./backlog"
 import type { StalledAction } from "./beat-action"
 import { stallEvent } from "./task-events"
-import type { Progress } from "./beat-close"
+import type { Progress } from "./beat-action"
 import { platformFailure } from "./backlog-write"
 import type { TaskRecord } from "./task-record"
 
-const stallMillis = 30 * 60 * 1000
+export const stallMillis = 30 * 60 * 1000
 
-const logWrittenAt = (log: string): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
+export const logWrittenAt = (log: string): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const info = yield* fs.stat(log).pipe(Effect.orElseSucceed(() => null))

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
@@ -536,19 +536,27 @@ describe("the beat's closing sweep", () => {
   test("a started task on a machine with a custom start is left alone instead of read and reported", async () => {
     await withBacklog(async (root) => {
       await startTaskOne(root, ["true"], null)
+      await mkdir(join(root, "logs"), { recursive: true })
+      await writeFile(join(root, "logs", "orc-1.log"), "run output\n")
       const report = await beatWith(root, pueueInstead(() => Effect.die("the sweep read pueue on a custom-start machine")))
       expect(await backlogStates(root)).toEqual(["orc-1:started"])
       expect(report.actions).toEqual([])
     })
   })
-  test("a close read that never answers is reported after 30 seconds instead of stopping the beat", async () => {
+  test("a close read that never answers reports close-failed after 30 seconds and closes only once unread past the grace instead of closing on the first timeout", async () => {
     await withBacklog(async (root) => {
       await startTaskOne(root, orcStart, null)
-      const report = await beatWith(root, pueueInstead(() => Effect.never))
+      const first = await beatWith(root, pueueInstead(() => Effect.never))
       expect(await backlogStates(root)).toEqual(["orc-1:started"])
-      expect(report.actions.flatMap((action) => action.kind === "close-failed" ? [action.reason] : [])).toEqual(["the close read timed out after 30 seconds"])
+      expect(first.actions.flatMap((action) => action.kind === "close-failed" ? [action.task + ":" + action.reason] : []))
+        .toEqual(["orc-1:the close read timed out after 30 seconds"])
+      await writeFile(join(root, "logs", "orc-1.unread"), "2026-10-27T10:02:00.000Z")
+      const report = await beatWith(root, pueueInstead(() => Effect.never))
+      expect(await backlogStates(root)).toEqual(["orc-1:closed"])
+      expect(report.actions.flatMap((action) => action.kind === "closed" ? [action.task + ":" + action.reason] : []))
+        .toEqual(["orc-1:the close read timed out after 30 seconds"])
     })
-  }, 120_000)
+  }, 180_000)
 })
 
 

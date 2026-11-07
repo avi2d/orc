@@ -2,7 +2,7 @@
 Orc keeps a backlog of agent tasks and starts each on a machine with room.
 You say a task in `orc chat` to Pi on the orchestrator model, or add one with `orc backlog add`.
 Each `orc beat` starts the tasks that can start, and `orc runner start` queues each run in pueue on its machine.
-The beat later closes the task done or failed, with the PR link when its run opened one.
+The beat later closes the task done, failed or stopped, with the PR link when its run opened one.
 
 ## Before you begin
 
@@ -45,7 +45,7 @@ An unknown flag prints the usage text and exits 1.
 | `src/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
 | `src/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
 | `src/dispatch/beat.ts` | The beat: room, placement, take and start |
-| `src/dispatch/runner.ts` | The runner: the start and the token renewal through pueue |
+| `src/dispatch/runner.ts` | The runner: the start, the kill and the token renewal through pueue |
 | `src/dispatch/cli.ts` | The `orc backlog`, `orc beat`, `orc runner` and `orc merge` commands |
 | `agents` | The bundled agent files |
 

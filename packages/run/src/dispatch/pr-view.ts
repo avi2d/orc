@@ -1,7 +1,8 @@
 import { Effect, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { BacklogError } from "./backlog-write"
-import { capture, type Captured, type RunnerError } from "./runner"
+import { capture, type Captured } from "./runner-exec"
+import type { RunnerError } from "./runner"
 
 const CheckRun = Schema.Struct({
   workflowName: Schema.optional(Schema.String),

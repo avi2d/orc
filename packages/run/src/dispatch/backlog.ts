@@ -24,6 +24,7 @@ interface BacklogPaths {
   readonly logs: string
   readonly logFile: (id: string) => string
   readonly stallFile: (id: string) => string
+  readonly unreadFile: (id: string) => string
   readonly dispatchConfig: string
   readonly projects: string
   readonly folder: (folder: TaskFolder) => string
@@ -36,6 +37,7 @@ export const backlogPaths = (root: string): BacklogPaths => ({
   logs: root + "/logs",
   logFile: (id: string): string => root + "/logs/" + id + ".log",
   stallFile: (id: string): string => root + "/logs/" + id + ".stall",
+  unreadFile: (id: string): string => root + "/logs/" + id + ".unread",
   dispatchConfig: root + "/dispatch.json",
   projects: root + "/projects.json",
   folder: (folder: TaskFolder): string => root + "/" + folder,
@@ -244,7 +246,7 @@ const missedClose = (
 export const closeStartedTask = (
   root: string,
   id: string,
-  outcome: "done" | "failed",
+  outcome: "done" | "failed" | "stopped",
   reason: string,
   delivered: { readonly pr: string | null; readonly report: string | null },
   closedAt: string
@@ -287,6 +289,7 @@ export const closeStartedTask = (
       return yield* new BacklogError({ detail: id + " was closed by another command" })
     }
     yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
+    yield* fs.remove(paths.unreadFile(id), { force: true }).pipe(Effect.orElseSucceed(() => undefined))
     return closed
   })
 

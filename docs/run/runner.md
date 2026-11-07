@@ -42,6 +42,12 @@ A `pueue kill` gives the hold no time to clean up, so the guard removes the fold
 Add `--` and the command that runs orc on another machine to send it there, as with `orc runner start`.
 A renewal for a task pueue no longer runs for that home is refused and removes that task's token folder.
 
+To stop a run yourself, run `orc runner kill <task-id>` on its machine.
+It kills the running pueue task that carries the label, or removes one still queued, and marks the orc run on `orc/<task-id>` stopped.
+Removing a queued task records a stopped run when no run of the branch is still running, since the run never started.
+The next beat then closes the task stopped with the run's end reason.
+A kill for a task pueue never queued is refused, as a kill for a task already done is.
+
 To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh linux-box orc` from another.
 The forwarded read defaults to that home's label, and `orc runner result <task-id> --label <label>` reads another home's run instead.
 The forwarded read carries the label as JSON on standard input, past any remote shell the reach uses, and marks the far command with `--stdin-label` so only a marked read waits on standard input.
@@ -49,6 +55,7 @@ A plain `orc runner result <task-id>` never reads standard input, so a pipe that
 Piping that document into `orc runner result <task-id> --stdin-label` yourself reads that home's run.
 It names pueue's state for the task and the orc run on `orc/<task-id>` with its PR.
 A task is queued, stashed, running, paused, succeeded or failed, or unknown when no pueue task in group `orc` carries that home's label.
+An unknown task with a stopped run still names that run with its end reason.
 To print the same facts as JSON, add `--json`, whose document names its version first as `orc.runner.v1`.
 The beat and the runner and the run on one task must share one orc version.
 To hand answers to a run waiting at its no-mistakes gate, pipe a JSON document into `orc runner answer <task-id>` on its machine.

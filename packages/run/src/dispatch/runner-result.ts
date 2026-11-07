@@ -1,8 +1,8 @@
 import { Array as Arr, Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { openQuestionsForRun, runsForBranch } from "../history-resume"
+import { latestRunForBranchName, openQuestionsForRun, runsForBranch } from "../history-resume"
 import type { OpenQuestion } from "../no-mistakes-gate"
-import { formatHistoryError, openDatabase, type RunRecord, RunStatusSchema } from "../run-history"
+import { formatHistoryError, openDatabase, stoppedEndReason, type RunRecord, RunStatusSchema } from "../run-history"
 import { writtenReport } from "../report-run"
 import { gateLogFileName } from "../no-mistakes"
 import { Asking, askingFileName, AnswersFile, answersFileName, writeWhole } from "../answer-wait"
@@ -12,7 +12,8 @@ import { runDirFor, type TaskKind } from "../task-kind"
 import { TaskId } from "./backlog"
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
 import { LabelArg } from "./token"
-import { capture, type Command, decodeJson, readHeld, refuse, resolveProjectDir, RunnerError, type RunnerRequirements, taskBranch } from "./runner"
+import { capture, decodeJson } from "./runner-exec"
+import { type Command, readHeld, refuse, resolveProjectDir, RunnerError, type RunnerRequirements, taskBranch } from "./runner"
 
 const RUNNER_JSON_SCHEMA = "orc.runner.v1" as const
 
@@ -34,7 +35,7 @@ const heldFields = {
 }
 
 const RunnerResult = Schema.Union([
-  Schema.Struct({ task: TaskId, status: Schema.Literal("unknown") }),
+  Schema.Struct({ task: TaskId, status: Schema.Literal("unknown"), run: Schema.optional(RunSummary) }),
   Schema.Struct({ ...heldFields, status: Schema.Literals(["queued", "stashed"]) }),
   Schema.Struct({ ...heldFields, status: Schema.Literals(["running", "paused"]), started: Schema.String, outputAt: Schema.optional(Schema.String) }),
   Schema.Struct({ ...heldFields, status: Schema.Literal("succeeded"), started: Schema.String, ended: Schema.String }),
@@ -65,7 +66,7 @@ const failureReason = (result: typeof PueueResult.Type): string | null => {
 }
 
 export type RunEnding =
-  | { readonly kind: "close"; readonly outcome: "done" | "failed"; readonly reason: string; readonly pr: string | null; readonly report: string | null }
+  | { readonly kind: "close"; readonly outcome: "done" | "failed" | "stopped"; readonly reason: string; readonly pr: string | null; readonly report: string | null }
   | { readonly kind: "park"; readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion> }
 
 type FinishedResult = Extract<RunnerResult, { readonly status: "succeeded" | "failed" }>
@@ -75,12 +76,15 @@ const reportEnding = (result: FinishedResult): RunEnding => {
   if (report !== null) {
     return { kind: "close", outcome: "done", reason: "the run wrote its report", pr: null, report }
   }
-  const why = result.status === "failed" ? result.reason : result.run?.endReason ?? "pueue task " + result.pueueTask + " succeeded"
+  const why = result.status === "failed" ? (result.run?.endReason ?? result.reason) : result.run?.endReason ?? "pueue task " + result.pueueTask + " succeeded"
   return { kind: "close", outcome: "failed", reason: "the run wrote no report: " + why, pr: null, report: null }
 }
 
 // The beat ends a started task from this, so its done and failed match what runner result reports.
 export const endingFromResult = (result: RunnerResult, kind: TaskKind): RunEnding | null => {
+  if ((result.status === "unknown" || result.status === "succeeded" || result.status === "failed") && result.run?.status === "stopped") {
+    return { kind: "close", outcome: "stopped", reason: result.run.endReason ?? stoppedEndReason, pr: result.run.prLink ?? null, report: null }
+  }
   if (kind !== "ship" && (result.status === "succeeded" || result.status === "failed")) {
     return reportEnding(result)
   }
@@ -93,7 +97,7 @@ export const endingFromResult = (result: RunnerResult, kind: TaskKind): RunEndin
   const questions = result.run?.openQuestions ?? []
   return Arr.isReadonlyArrayNonEmpty(questions)
     ? { kind: "park", questions }
-    : { kind: "close", outcome: "failed", reason: result.reason, pr: result.run?.prLink ?? null, report: null }
+    : { kind: "close", outcome: "failed", reason: result.run?.endReason ?? result.reason, pr: result.run?.prLink ?? null, report: null }
 }
 
 interface PueueInterval {
@@ -209,11 +213,32 @@ const runLogAt = (home: string, runId: string): Effect.Effect<string | null, nev
     return latest
   })
 
+const readStoppedRun = (home: string, task: string): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
+  Effect.gen(function*() {
+    return yield* Effect.acquireUseRelease(
+      openDatabase(home),
+      (db) =>
+        Effect.gen(function*() {
+          const latest = yield* latestRunForBranchName(db, taskBranch(task))
+          if (latest === null || latest.status !== "stopped") {
+            return null
+          }
+          return toSummary(latest, yield* openQuestionsForRun(db, latest.id), yield* writtenReport(runDirFor(home, latest.id)), null)
+        }),
+      (db) => Effect.sync(() => db.close())
+    )
+  }).pipe(
+    Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
+  )
+
 export const readResult = (task: string, home: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const held = yield* readHeld(home, task, label)
     if (held === null) {
-      return { task, status: "unknown" } satisfies RunnerResult
+      const stopped = yield* readStoppedRun(home, task)
+      return stopped === null
+        ? { task, status: "unknown" } satisfies RunnerResult
+        : { task, status: "unknown", run: stopped } satisfies RunnerResult
     }
     const status = yield* Schema.decodeUnknownEffect(PueueStatus)(held.status).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "pueue reports a status orc cannot read for task " + held.id + ": " + error.message }))
@@ -296,6 +321,17 @@ export const readResultThrough = (command: Command, task: string, label?: string
   )
 }
 
+export const killHeldThrough = (command: Command, task: string, label?: string | null): Effect.Effect<string, RunnerError, ChildProcessSpawner.ChildProcessSpawner> => {
+  const stdin = label == null ? null : JSON.stringify({ label })
+  return capture([...command, "runner", "kill", task, ...(stdin === null ? [] : ["--stdin-label"])], stdin).pipe(
+    Effect.flatMap((result) =>
+      result.exitCode === 0
+        ? Effect.succeed(result.stdout.trim())
+        : refuse(command.join(" ") + " runner kill exited " + result.exitCode + ": " + result.stderr.trim())
+    )
+  )
+}
+
 export const runnerJson = (result: RunnerResult): typeof RunnerDocument.Type => ({ schema: RUNNER_JSON_SCHEMA, result })
 
 const headLine = (result: RunnerResult): string => {
@@ -329,8 +365,8 @@ const runLine = (task: string, run: RunSummary | null): string =>
       (run.asking === undefined ? "" : ", waiting until " + run.asking.until + " for the captain's answer to " + run.asking.questions.map((question) => question.id).join(", "))
 
 export const formatResult = (result: RunnerResult): string => {
-  if (result.status === "unknown") {
+  if (result.status === "unknown" && result.run == null) {
     return headLine(result)
   }
-  return [headLine(result), runLine(result.task, result.run)].join("\n")
+  return [headLine(result), runLine(result.task, result.run ?? null)].join("\n")
 }

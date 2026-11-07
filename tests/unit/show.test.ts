@@ -6,8 +6,6 @@ import type { Database } from "bun:sqlite"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
 import {
-  decodeRunsJson,
-  encodeRunsJson,
   listRuns,
   openDatabase,
   recordEvidence,
@@ -16,6 +14,7 @@ import {
   recordSignal,
   recordStep
 } from "../../packages/run/src/run-history"
+import { decodeRunsJson, encodeRunsJson } from "../../packages/run/src/run-history-view"
 import { InvalidScore, recordStepScore, UnknownRun, UnknownStep } from "../../packages/run/src/run-scores"
 import { decodeShowJson, encodeShowJson, formatShow, readShow } from "../../packages/run/src/show"
 

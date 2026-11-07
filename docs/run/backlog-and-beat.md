@@ -200,16 +200,25 @@ The beat starts it detached in its own session, never waits for it and never kil
 So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
 From then on, each beat ends the finished runs on a machine whose start runs `orc runner start`.
-It reads `orc runner result` on that machine and closes the task done or failed, or parks it on your open questions.
+It reads `orc runner result` on that machine and closes the task done, failed or stopped, or parks it on your open questions.
+A run marked stopped closes its task stopped with the run's end reason.
 A run still waiting at its gate for your answer stays started, and the beat relays your answers to it, as [Parked runs](parked-runs.md) shows.
 Either way the task frees its slot in the same beat.
+A start older than 10 minutes with neither a pueue record nor a stopped run closes failed with `the runner holds no record of this task`.
+A close read that stays unread for 10 minutes closes the task failed with the read's reason.
+A first unread beat only reports the read failure and starts the wait.
+To stop a task yourself, run `orc backlog stop <task-id>` where the backlog lives.
+It kills the run through the machine that started it and closes the task stopped.
+A stop for a task on a machine whose start runs any other program refuses, so close that task by hand with `orc backlog close <task-id> failed`.
 The closed task file keeps the PR link of the orc run on `orc/<task-id>` as `pr`, and `orc backlog --json` carries it as `pr`, or `null` when the run opened none.
-The beat prints `closed <task-id> <done|failed> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds.
-A machine whose start runs any other program keeps owning its tasks, which the beat never reads.
-To close one of those, run `orc backlog close <task-id> <done|failed> [reason]`.
+The beat prints `closed <task-id> <done|failed|stopped> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds, until it stays unread for 10 minutes.
+A machine whose start runs any other program keeps owning its tasks, which the beat closes once their logs go quiet rather than stalls.
+To close one of those by hand, run `orc backlog close <task-id> <done|failed> [reason]`.
+A start older than 30 minutes whose log has not grown for 30 minutes closes failed with `the machine keeps its own log, and its log has not grown for 30 minutes`.
+The quiet log closes the task before the 30 minute stall flag can fire.
 A started run whose output has not grown for 30 minutes prints `stalled <task-id> on <machine>: no output since <time>` once, and again after new output stalls anew.
 A PR the beat cannot read for the chat prints `cannot read the PR of <task-id> for the chat: <reason>`.
-A missing start command exits 127 into its log and leaves the task started.
+A missing start command exits 127 into its log, and the task stays started until the 10 minute no-record grace or the 30 minute quiet-log grace closes it.
 Only a failure to spawn the log wrapper closes the task as `start-failed`.
 To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1`.
 It carries the endings as `closed`, `close-failed` and `parked` actions, and a run waiting for your answer as `asking`, `answered` or `answer-failed`.
