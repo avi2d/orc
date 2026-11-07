@@ -26,7 +26,7 @@ type TaskStatusJson =
     readonly status: "closed"
     readonly claim: Claim
     readonly started: Started | null
-    readonly outcome: "done" | "failed" | "start-failed"
+    readonly outcome: "done" | "failed" | "stopped" | "start-failed"
     readonly reason: string
     readonly pr: string | null
     readonly report: string | null

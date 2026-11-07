@@ -65,7 +65,7 @@ export interface Parked {
 
 type Closing =
   | { readonly outcome: "start-failed"; readonly reason: string }
-  | { readonly outcome: "done" | "failed"; readonly started: Started; readonly reason: string; readonly pr: string | null; readonly report: string | null }
+  | { readonly outcome: "done" | "failed" | "stopped"; readonly started: Started; readonly reason: string; readonly pr: string | null; readonly report: string | null }
 
 type TaskState =
   | { readonly kind: "new" }
@@ -141,7 +141,7 @@ const Frontmatter = Schema.Struct({
   taken_at: Schema.optional(Schema.String),
   started_at: Schema.optional(Schema.String),
   start_log: Schema.optional(Schema.String),
-  outcome: Schema.optional(Schema.Literals(["done", "failed", "start-failed"])),
+  outcome: Schema.optional(Schema.Literals(["done", "failed", "stopped", "start-failed"])),
   closed_at: Schema.optional(Schema.String),
   reason: Schema.optional(Schema.String),
   pr: Schema.optional(Schema.String),

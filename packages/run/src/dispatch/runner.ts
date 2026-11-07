@@ -1,6 +1,7 @@
 import { DateTime, Duration, Effect, FileSystem, Option, Path, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { Reach } from "./args"
+import { decodeJson, decodeSecret, pueue, type Command } from "./runner-exec"
 import { AbsolutePath } from "../json-file"
 import { ProviderId, readOrcConfig } from "../orc-config"
 import { TaskId } from "./backlog"
@@ -10,13 +11,17 @@ import { parseTaskFile } from "./task-record"
 import { reportKinds } from "../task-kind"
 import { readInstructions, TaskInstructions, writeInstructions } from "./runner-instructions"
 import { RunnerError } from "./runner-error"
+import { runsForBranch } from "../history-resume"
+import { markRunStopped } from "../history-write"
+import { formatHistoryError, openDatabase, recordRun, stoppedEndReason } from "../run-history"
 
 export { RunnerError } from "./runner-error"
+import { newRunId } from "../run-id"
 import { isRunDelivery } from "../delivery"
 import { decodeTokenText, encodeRenewal, encodeSecretJson, LabelArg, RenewRequest, type TokenEncodeError, tokenDocumentNote, tokenFields } from "./token"
 
 
-export type Command = readonly [string, ...Array<string>]
+export type { Command }
 
 const taskFields = {
   task: TaskId,
@@ -45,66 +50,6 @@ export const taskBranch = (task: string): string => "orc/" + task
 
 export const refuse = (detail: string): Effect.Effect<never, RunnerError> => Effect.fail(new RunnerError({ detail }))
 
-export interface Captured {
-  readonly exitCode: number
-  readonly stdout: string
-  readonly stderr: string
-}
-
-export const capture = (command: Command, stdin: string | null, env?: Record<string, string>): Effect.Effect<Captured, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.gen(function*() {
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const [program, ...args] = command
-    const handle = yield* spawner.spawn(ChildProcess.make(program, args, env === undefined
-      ? {
-        stdin: stdin === null ? "ignore" : Stream.fromIterable([new TextEncoder().encode(stdin)])
-      }
-      : {
-        stdin: stdin === null ? "ignore" : Stream.fromIterable([new TextEncoder().encode(stdin)]),
-        env,
-        extendEnv: true
-      }))
-    const [stdout, stderr, exitCode] = yield* Effect.all([
-      handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
-      handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
-      handle.exitCode
-    ], { concurrency: "unbounded" })
-    return { exitCode, stdout, stderr }
-  }).pipe(
-    Effect.scoped,
-    Effect.mapError((error) => new RunnerError({ detail: command[0] + " did not run: " + error.message }))
-  )
-
-export const pueue = (args: ReadonlyArray<string>, env?: Record<string, string>): Effect.Effect<string, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  capture(["pueue", ...args], null, env).pipe(
-    Effect.flatMap((result) =>
-      result.exitCode === 0
-        ? Effect.succeed(result.stdout)
-        : refuse("pueue " + (args[0] ?? "") + " exited " + result.exitCode + ": " + result.stderr.trim())
-    )
-  )
-
-export const decodeJson = <S extends Schema.Top & { readonly DecodingServices: never }>(
-  text: string,
-  schema: S,
-  what: string
-): Effect.Effect<S["Type"], RunnerError> =>
-  Effect.try({ try: (): unknown => JSON.parse(text), catch: () => new RunnerError({ detail: what + " printed no JSON" }) }).pipe(
-    Effect.flatMap(Schema.decodeUnknownEffect(schema)),
-    Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: what + " printed JSON orc cannot read: " + error.message }))
-  )
-
-// A decode failure carries the text it read, which may hold the token, so the refusal names only the shape it wanted.
-const decodeSecret = <S extends Schema.Top & { readonly DecodingServices: never }>(
-  text: string,
-  schema: S,
-  refusal: string
-): Effect.Effect<S["Type"], RunnerError> =>
-  Effect.try({ try: (): unknown => JSON.parse(text), catch: () => new RunnerError({ detail: refusal }) }).pipe(
-    Effect.flatMap((json) => Schema.decodeUnknownEffect(schema)(json, { onExcessProperty: "error" })),
-    Effect.mapError(() => new RunnerError({ detail: refusal }))
-  )
-
 const queueRefusal = "the queue request on stdin is no task, checkout, provider and body with an optional tokenFile or an optional token and expiresAt"
 
 const renewRefusal = "the renew request on stdin is no task with a token and an expiresAt"
@@ -119,6 +64,57 @@ export const readHeld = (home: string, task: string, label?: string | null): Eff
     Effect.flatMap((text) => decodeJson(text, PueueState, "pueue status --json")),
     Effect.map((state) => heldTask(state.tasks, home, task, label))
   )
+
+const markBranchRunsStopped = (home: string, project: string, branch: string, taskFile: string, started: string): Effect.Effect<void, RunnerError, RunnerRequirements> =>
+  Effect.gen(function*() {
+    const ended = DateTime.formatIso(yield* DateTime.now)
+    yield* Effect.acquireUseRelease(
+      openDatabase(home),
+      (db) =>
+        Effect.gen(function*() {
+          const runs = yield* runsForBranch(db, project, branch)
+          if (!runs.some((run) => run.status === "running")) {
+            yield* recordRun(db, { id: newRunId(), project, branch, taskFile, status: "stopped", started, ended, endReason: stoppedEndReason })
+            return
+          }
+          yield* Effect.forEach(runs.filter((run) => run.status === "running"), (run) => markRunStopped(db, run.id, ended, stoppedEndReason), { discard: true })
+        }),
+      (db) => Effect.sync(() => db.close())
+    )
+  }).pipe(
+    Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot mark the run stopped: " + formatHistoryError(error) }))
+  )
+
+export const killHeld = (
+  home: string,
+  task: string,
+  label?: string | null
+): Effect.Effect<string, RunnerError, RunnerRequirements> =>
+  Effect.gen(function*() {
+    const held = yield* readHeld(home, task, label)
+    if (held === null) {
+      return yield* refuse(task + " has no pueue task in group " + orcGroup + ", so nothing stops it")
+    }
+    if (pueueDone(held)) {
+      return yield* refuse(task + " already finished as pueue task " + held.id + ", so nothing stops it")
+    }
+    const killed = yield* pueue(["kill", String(held.id)]).pipe(
+      Effect.as(true),
+      Effect.catchTag("RunnerError", () => Effect.succeed(false))
+    )
+    const taskFile = home + "/runner/" + fileKeyOf(home, task, labelOf(home, task, label)) + ".md"
+    const started = Option.match(Schema.decodeUnknownOption(PueueStatus)(held.status), {
+      onNone: () => null,
+      onSome: (status) => "Running" in status ? status.Running.start : "Paused" in status ? status.Paused.start : null
+    }) ?? DateTime.formatIso(yield* DateTime.now)
+    if (killed) {
+      yield* markBranchRunsStopped(home, held.path, taskBranch(task), taskFile, started)
+      return "killed pueue task " + held.id + " for " + task
+    }
+    yield* pueue(["remove", String(held.id)])
+    yield* markBranchRunsStopped(home, held.path, taskBranch(task), taskFile, started)
+    return "removed pueue task " + held.id + " for " + task
+  })
 
 export const labelOf = (home: string, task: string, label?: string | null): string => label ?? taskLabel(home, task)
 

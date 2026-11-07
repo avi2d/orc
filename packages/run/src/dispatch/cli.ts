@@ -13,7 +13,8 @@ import { checkoutOn, type DispatchConfig, readDispatchConfig, readProjects } fro
 import { holdRun } from "./hold"
 import { mergeTask } from "./merge"
 import { taskLabel } from "./pueue-status"
-import { type Command, queueFromText, renewTask, RunnerError, startTask } from "./runner"
+import { type Command, killHeld, queueFromText, renewTask, RunnerError, startTask } from "./runner"
+import { stopNow } from "./cli-stop"
 import { formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson } from "./runner-result"
 import type { TaskFileError, TaskRecord } from "./task-record"
 import { encodeToken, sessionToken } from "./token"
@@ -207,6 +208,15 @@ const closeNow = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, pl
     return "closed " + args.id + " " + args.outcome
   })
 
+const killNow = (args: Extract<CommandArgs, { readonly kind: "RunnerKill" }>, place: DispatchPlace) =>
+  Effect.gen(function*() {
+    let label = args.label ?? taskLabel(place.home, args.task)
+    if (args.label === undefined && args.stdinLabel && !place.stdinIsTerminal) {
+      label = (yield* readStdinLabel(place.stdin)) ?? label
+    }
+    return yield* killHeld(place.home, args.task, label)
+  })
+
 const markPostedNow = (id: string, place: DispatchPlace) =>
   Effect.gen(function*() {
     const marked = yield* markPosted(backlogRoot(place), id, DateTime.formatIso(yield* DateTime.now))
@@ -272,12 +282,15 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   }
 }
 
-type RunnerVerb = Extract<CommandArgs, { readonly kind: "RunnerHold" | "RunnerToken" | "RunnerQueue" | "RunnerAnswer" | "RunnerLoad" }>
+type RunnerVerb = Extract<CommandArgs, { readonly kind: "RunnerHold" | "RunnerKill" | "RunnerToken" | "RunnerQueue" | "RunnerAnswer" | "RunnerLoad" }>
 
 const runnerVerbLine = (args: RunnerVerb, place: DispatchPlace) => {
   switch (args.kind) {
     case "RunnerHold": {
       return holdRun(args.task, args.run, place.home, args.label)
+    }
+    case "RunnerKill": {
+      return killNow(args, place)
     }
     case "RunnerToken": {
       return readSessionToken(args.session, place.stdoutIsTerminal)
@@ -327,6 +340,11 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         yield* Console.log(yield* taskVerbLine(args, place))
         break
       }
+      case "StopTask": {
+        yield* requireBacklog(backlogRoot(place))
+        yield* Console.log(yield* stopNow(args.id, backlogRoot(place), place.home))
+        break
+      }
       case "Beat": {
         const report = yield* runBeat(backlogRoot(place), place.home, liveSources())
         yield* Console.log(args.json ? JSON.stringify(beatJson(report)) : formatBeat(report))
@@ -352,6 +370,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         break
       }
       case "RunnerHold":
+      case "RunnerKill":
       case "RunnerToken":
       case "RunnerQueue":
       case "RunnerAnswer":

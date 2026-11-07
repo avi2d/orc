@@ -2,7 +2,8 @@ import { Effect } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { alertsFile } from "./events"
 import { PueueState, taskLabel } from "./pueue-status"
-import { type Command, decodeJson, ensureGroup, pueue, pueueDone, type RunnerError } from "./runner"
+import { type Command, ensureGroup, pueueDone, type RunnerError } from "./runner"
+import { decodeJson, pueue } from "./runner-exec"
 
 export const liveAlertStream = (): Command | null => {
   const dash = Bun.which("tui-dash")

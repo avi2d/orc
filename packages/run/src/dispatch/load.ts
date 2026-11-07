@@ -3,7 +3,8 @@ import { Duration, Effect } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { Machine } from "./config"
 import { throughFor } from "./machine-reach"
-import { capture, refuse, type RunnerError } from "./runner"
+import { refuse, type RunnerError } from "./runner"
+import { capture } from "./runner-exec"
 
 export type LoadReading = { readonly kind: "read"; readonly fiveMinute: number } | { readonly kind: "unread"; readonly reason: string }
 

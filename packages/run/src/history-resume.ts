@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite"
 import { Effect, Schema } from "effect"
 import type { OpenQuestion } from "./no-mistakes-gate"
 import { openQuestionSignal } from "./report"
-import { RunSqlRowSchema, sqlite, type RunRecord, type SqliteFailure } from "./run-history"
+import { RunSqlRowSchema, runRecordOf, sqlite, type RunRecord, type SqliteFailure } from "./run-history"
 
 export interface BranchStep {
   readonly name: string
@@ -18,33 +18,45 @@ const BranchStepRowSchema = Schema.Struct({
   pi_session_file: Schema.NullOr(Schema.String)
 })
 
-export const latestRunForBranch = (
+export const latestRunForBranchName = (
   db: Database,
-  project: string,
   branch: string
 ): Effect.Effect<RunRecord | null, Schema.SchemaError | SqliteFailure> =>
   sqlite(() =>
     db.query(
-      "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox FROM runs WHERE project = ? AND branch = ? ORDER BY started DESC, id DESC LIMIT 1"
-    ).get(project, branch)
+      "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox FROM runs WHERE branch = ? ORDER BY started DESC, id DESC LIMIT 1"
+    ).get(branch)
   ).pipe(
     Effect.flatMap((row) =>
       row === null || row === undefined
         ? Effect.succeed(null)
-        : Schema.decodeUnknownEffect(RunSqlRowSchema)(row).pipe(
-          Effect.map((decoded) => ({
-            id: decoded.id,
-            project: decoded.project,
-            branch: decoded.branch,
-            taskFile: decoded.task_file,
-            status: decoded.status,
-            started: decoded.started,
-            ended: decoded.ended,
-            prLink: decoded.pr_link,
-            endReason: decoded.end_reason,
-            sandbox: decoded.sandbox
-          }))
-        )
+        : Schema.decodeUnknownEffect(RunSqlRowSchema)(row).pipe(Effect.map(runRecordOf))
+    )
+  )
+
+export const resumePriorRun = (
+  db: Database,
+  project: string,
+  branch: string
+): Effect.Effect<RunRecord | null, Schema.SchemaError | SqliteFailure> =>
+  runsForBranch(db, project, branch).pipe(
+    Effect.flatMap((runs) =>
+      Effect.gen(function*() {
+        const latest = runs.at(0)
+        const rest = runs.slice(1)
+        if (latest === undefined) {
+          return null
+        }
+        if (latest.status !== "stopped" || (yield* stepsForRun(db, latest.id)).length > 0) {
+          return latest
+        }
+        for (const earlier of rest) {
+          if ((yield* stepsForRun(db, earlier.id)).length > 0) {
+            return earlier
+          }
+        }
+        return null
+      })
     )
   )
 
@@ -59,18 +71,7 @@ export const runsForBranch = (
     ).all(project, branch)
   ).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(RunSqlRowSchema))),
-    Effect.map((rows) => rows.map((decoded) => ({
-      id: decoded.id,
-      project: decoded.project,
-      branch: decoded.branch,
-      taskFile: decoded.task_file,
-      status: decoded.status,
-      started: decoded.started,
-      ended: decoded.ended,
-      prLink: decoded.pr_link,
-      endReason: decoded.end_reason,
-      sandbox: decoded.sandbox
-    })))
+    Effect.map((rows) => rows.map(runRecordOf))
   )
 
 export const stepsForRun = (

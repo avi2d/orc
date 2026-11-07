@@ -9,7 +9,7 @@ export const ClosedTask = Schema.Struct({
   status: Schema.Literal("closed"),
   hold: Schema.NullOr(HoldJson),
   parked: Schema.NullOr(ParkedJson),
-  outcome: Schema.Literals(["done", "failed", "start-failed"]),
+  outcome: Schema.Literals(["done", "failed", "stopped", "start-failed"]),
   reason: Schema.String,
   pr: Schema.NullOr(Schema.String),
   report: Schema.NullOr(Schema.String),

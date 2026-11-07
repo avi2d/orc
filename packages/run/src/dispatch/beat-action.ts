@@ -1,3 +1,9 @@
+export type Progress =
+  | { readonly kind: "ended"; readonly action: BeatAction }
+  | { readonly kind: "running"; readonly outputAt: string | null; readonly action: BeatAction | null }
+  | { readonly kind: "own-log" }
+  | { readonly kind: "untracked" }
+
 export type StalledAction = { readonly kind: "stalled"; readonly task: string; readonly machine: string; readonly since: string }
 
 export type BeatAction =
@@ -12,7 +18,7 @@ export type BeatAction =
     readonly kind: "closed"
     readonly task: string
     readonly machine: string
-    readonly outcome: "done" | "failed"
+    readonly outcome: "done" | "failed" | "stopped"
     readonly reason: string
     readonly pr: string | null
     readonly report: string | null
