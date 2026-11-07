@@ -51,6 +51,28 @@ export const latestRunForBranchName = (
     )
   )
 
+export const resumePriorRun = (
+  db: Database,
+  project: string,
+  branch: string
+): Effect.Effect<RunRecord | null, Schema.SchemaError | SqliteFailure> =>
+  runsForBranch(db, project, branch).pipe(
+    Effect.flatMap((runs) =>
+      Effect.gen(function*() {
+        const [latest, ...rest] = runs
+        if (latest === undefined || latest.status !== "stopped" || (yield* stepsForRun(db, latest.id)).length > 0) {
+          return latest ?? null
+        }
+        for (const earlier of rest) {
+          if ((yield* stepsForRun(db, earlier.id)).length > 0) {
+            return earlier
+          }
+        }
+        return null
+      })
+    )
+  )
+
 export const runsForBranch = (
   db: Database,
   project: string,

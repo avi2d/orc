@@ -217,7 +217,7 @@ A start older than 30 minutes with no run output in its log closes failed with `
 The quiet log closes the task before the 30 minute stall flag can fire.
 A started run whose output has not grown for 30 minutes prints `stalled <task-id> on <machine>: no output since <time>` once, and again after new output stalls anew.
 A PR the beat cannot read for the chat prints `cannot read the PR of <task-id> for the chat: <reason>`.
-A missing start command exits 127 into its log and leaves the task started.
+A missing start command exits 127 into its log, and the task stays started until the 10 minute no-record grace or the 30 minute quiet-log grace closes it.
 Only a failure to spawn the log wrapper closes the task as `start-failed`.
 To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1`.
 It carries the endings as `closed`, `close-failed` and `parked` actions, and a run waiting for your answer as `asking`, `answered` or `answer-failed`.

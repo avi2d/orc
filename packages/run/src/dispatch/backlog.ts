@@ -289,6 +289,7 @@ export const closeStartedTask = (
       return yield* new BacklogError({ detail: id + " was closed by another command" })
     }
     yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
+    yield* fs.remove(paths.unreadFile(id), { force: true }).pipe(Effect.orElseSucceed(() => undefined))
     return closed
   })
 

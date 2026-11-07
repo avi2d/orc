@@ -15,7 +15,7 @@ import { mergeTask } from "./merge"
 import { taskLabel } from "./pueue-status"
 import { type Command, killHeld, queueFromText, refuse as refuseRun, renewTask, RunnerError, startTask } from "./runner"
 import { formatResult, killHeldThrough, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson } from "./runner-result"
-import { throughFor } from "./machine-reach"
+import { ownedBySweep, throughFor } from "./machine-reach"
 import type { TaskFileError, TaskRecord } from "./task-record"
 import { encodeToken, sessionToken } from "./token"
 import { markEventPosted, unpostedEvents } from "./events"
@@ -224,6 +224,9 @@ const stopNow = (id: string, place: DispatchPlace) =>
       return yield* refuseRun("the machine " + started.claim.machine + " is not in dispatch.json")
     }
     const through = throughFor(machine)
+    if (through === null && !ownedBySweep(machine)) {
+      return yield* refuseRun(id + " started on " + machine.name + ", which orc cannot reach, so close it by hand with orc backlog close " + id + " failed")
+    }
     const label = taskLabel(place.home, id)
     const line = through === null
       ? yield* killHeld(place.home, id, label)

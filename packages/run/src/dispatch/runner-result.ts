@@ -367,8 +367,8 @@ const runLine = (task: string, run: RunSummary | null): string =>
       (run.asking === undefined ? "" : ", waiting until " + run.asking.until + " for the captain's answer to " + run.asking.questions.map((question) => question.id).join(", "))
 
 export const formatResult = (result: RunnerResult): string => {
-  if (result.status === "unknown") {
+  if (result.status === "unknown" && result.run == null) {
     return headLine(result)
   }
-  return [headLine(result), runLine(result.task, result.run)].join("\n")
+  return [headLine(result), runLine(result.task, result.run ?? null)].join("\n")
 }

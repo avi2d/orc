@@ -12,7 +12,7 @@ import { runBeat } from "../../../packages/run/src/dispatch/beat"
 import { ownLogEndingOf, staleEndingOf } from "../../../packages/run/src/dispatch/beat-close"
 import { taskLabel } from "../../../packages/run/src/dispatch/pueue-status"
 import { killHeld } from "../../../packages/run/src/dispatch/runner"
-import { endingFromResult } from "../../../packages/run/src/dispatch/runner-result"
+import { endingFromResult, formatResult } from "../../../packages/run/src/dispatch/runner-result"
 import { renderTaskFile } from "../../../packages/run/src/dispatch/task-record-render"
 import { markRunStopped } from "../../../packages/run/src/history-write"
 import { buildResumePlan } from "../../../packages/run/src/run-resume"
@@ -157,6 +157,57 @@ describe("backlog stop", () => {
   })
 })
 
+describe("backlog stop on an own-log machine", () => {
+  test("backlog stop refuses an unreachable machine instead of killing this host's pueue", async () => {
+    await withBacklog(async (root) => {
+      const backlog = join(root, "backlog")
+      await mkdir(backlog, { recursive: true })
+      await writeFile(join(backlog, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "box", slots: 1, start: ["ssh", "box", "run-thing"] }] }))
+      await writeFile(join(backlog, "projects.json"), JSON.stringify({ projects }))
+      await run(addTask(backlog, spec))
+      await run(claimTask(backlog, "orc-1"))
+      const first = (await run(listTasks(backlog))).find((task) => task.spec.id === "orc-1")
+      if (first === undefined) {
+        throw new Error("the backlog holds no orc-1")
+      }
+      await run(writeTaken(backlog, { spec: first.spec, hold: null, parked: null, state: { kind: "started", claim: { ...claim, machine: "box" }, started: { at: oldStart, log: backlog + "/logs/orc-1.log" } } }))
+      const place: DispatchPlace = { home: root, cwd: root, env: {}, self: ["orc"] as const, stdin: Effect.succeed(""), stdinIsTerminal: true, stdoutIsTerminal: false }
+      const failure = await Effect.runPromise(
+        Effect.flip(runDispatch({ kind: "StopTask", id: "orc-1" }, place)).pipe(Effect.provide(BunServices.layer))
+      )
+      expect(failure).toBe("orc-1 started on box, which orc cannot reach, so close it by hand with orc backlog close orc-1 failed")
+      expect((await run(listTasks(backlog))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["orc-1:started"])
+    })
+  })
+})
+
+describe("a stopped close keeps the run PR", () => {
+  test("runner result text names the stopped run instead of hiding it", () => {
+    expect(formatResult({ task: "orc-1", status: "unknown" })).toBe("orc-1: no pueue task in group orc holds it")
+    expect(formatResult({
+      task: "orc-1",
+      status: "unknown",
+      run: { id: "run-1", status: "stopped", prLink: "https://github.com/example/orc/pull/7", endReason: "the run was stopped", openQuestions: [] }
+    })).toBe("orc-1: no pueue task in group orc holds it\norc run run-1 stopped, PR https://github.com/example/orc/pull/7: the run was stopped")
+  })
+})
+
+describe("the unread marker", () => {
+  test("closing a task removes its unread marker instead of leaving it in logs", async () => {
+    await withBacklog(async (root) => {
+      await startTaskOne(root, ["orc", "runner", "start"], oldStart)
+      await mkdir(join(root, "logs"), { recursive: true })
+      await writeFile(join(root, "logs", "orc-1.unread"), oldStart)
+      await run(closeStartedTask(root, "orc-1", "failed", "the runner holds no record of this task", { pr: null, report: null }, "2026-11-07T10:00:00.000Z"))
+      const gone = await Effect.runPromise(Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        return !(yield* fs.exists(join(root, "logs", "orc-1.unread")))
+      }).pipe(Effect.provide(BunServices.layer)))
+      expect(gone).toBe(true)
+    })
+  })
+})
+
 describe("a task closed stopped", () => {
   test("a stopped task keeps its start and reason instead of dropping to start-failed", async () => {
     await withBacklog(async (root) => {
@@ -232,7 +283,10 @@ describe("runner kill", () => {
     await withBacklog(async (root) => {
       await Effect.runPromise(Effect.acquireUseRelease(
         openDatabase(root),
-        (db) => Effect.sync(() => insertRun(db, { id: "run-0", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "failed", started: oldStart, ended: "2026-10-27T10:05:00.000Z", endReason: "orc exited 1" })),
+        (db) => Effect.gen(function*() {
+          insertRun(db, { id: "run-0", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "failed", started: oldStart, ended: "2026-10-27T10:05:00.000Z", endReason: "orc exited 1" })
+          yield* recordStep(db, { runId: "run-0", name: "implement", attempt: 1, status: "running", started: oldStart, agentFile: "agent.md", piSessionFile: null })
+        }),
         (db) => Effect.sync(() => db.close())
       ).pipe(Effect.provide(BunServices.layer)))
       const spawner = pueueKillRefusing(JSON.stringify({ tasks: { "11": { id: 11, label: taskLabel(root, "orc-1"), group: "orc", path: "/checkout", status: { Queued: {} } } } }))
@@ -247,6 +301,34 @@ describe("runner kill", () => {
       ).pipe(Effect.provide(BunServices.layer)))
       expect(runs.map((run) => run.status)).toEqual(["stopped", "failed"])
       expect(runs[0]?.endReason).toBe(stoppedEndReason)
+      const liveId = "aaa111"
+      await mkdir(join(root, "runs", "run-0", "session", "agent", "sessions", "enc"), { recursive: true })
+      await writeFile(join(root, "runs", "run-0", "session", "agent", "sessions", "enc", "2026-11-07T09-30-00-000Z_" + liveId + ".jsonl"), JSON.stringify({ type: "session", id: liveId }) + "\n")
+      const agent: AgentFile = { kind: "implementer", model: "opencode-go/muse-spark", thinking: "high", tools: ["read"], body: "Do the task.", path: "bundled/implementer.md", source: "bundled" }
+      const next = await Effect.runPromise(Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const childSpawner = yield* ChildProcessSpawner.ChildProcessSpawner
+        const runDir = path.join(root, "runs", "run-9")
+        const history: HistoryRun = {
+          fs, path, spawner: childSpawner, git: "git", projectDir: "/checkout", runId: "run-9", runDir,
+          piSessionDir: path.join(runDir, "session"),
+          hostSessionsDir: path.join(runDir, "sessions"),
+          taskPath: path.join(runDir, "task.md"),
+          instructions: null, agent, fixer: { ...agent, kind: "fixer", body: "Fix the failure.", path: "bundled/fixer.md" }, branch: "orc/orc-1", sandbox: "nono",
+          started: "2026-11-07T10:00:00.000Z", worktreeDir: "/checkout",
+          delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner: childSpawner, binary: "no-mistakes", pathEnv: "", git: "git", worktreeDir: "/checkout" }) },
+          allow: [], answers: []
+        }
+        return history
+      }).pipe(Effect.provide(BunServices.layer)))
+      const plan = await Effect.runPromise(Effect.acquireUseRelease(
+        openDatabase(root),
+        (db) => buildResumePlan(db, next),
+        (db) => Effect.sync(() => db.close())
+      ).pipe(Effect.provide(BunServices.layer)))
+      expect(plan.implementSessionId).toBe(liveId)
+      expect(plan.skipImplement).toBe(false)
     })
   })
   test("kill on a running task with no run row starts the stopped run inside the pueue interval instead of after it", async () => {
@@ -325,6 +407,11 @@ describe("the beat's stale start", () => {
       expect(closed?.state.kind === "closed" ? closed.state.closing.outcome + ":" + closed.state.closing.reason : "")
         .toBe("failed:pueue status exited 3: pueue is down")
       expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1"])
+      const markerGone = await Effect.runPromise(Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        return !(yield* fs.exists(join(root, "logs", "orc-1.unread")))
+      }).pipe(Effect.provide(BunServices.layer)))
+      expect(markerGone).toBe(true)
     })
   })
   test("an unseen runner record with a stopped run closes stopped instead of failed", async () => {

@@ -3,7 +3,7 @@ import { Effect, FileSystem, Option, Schema } from "effect"
 import { defaultSandbox, type SandboxKind } from "./args"
 import { checksRoundsForRun, fixesForRun, type StoredFix } from "./history-resume"
 import { sessionIdFromFile, type RunRecord } from "./run-history"
-import { latestRunForBranch, stepsForRun } from "./history-resume"
+import { resumePriorRun, stepsForRun } from "./history-resume"
 import { historyFailure } from "./history-write"
 import type { HistoryRun } from "./run-record"
 import type { ResumePlan } from "./run-loop"
@@ -20,7 +20,7 @@ export const resolveTaskFile = (
   supplied: string | null | undefined
 ): Effect.Effect<string, OrcRunError> =>
   Effect.gen(function*() {
-    const prior = yield* latestRunForBranch(db, projectDir, branch).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
+    const prior = yield* resumePriorRun(db, projectDir, branch).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
     if (supplied === undefined || supplied === null) {
       if (prior === null) {
         return yield* refuse("orc: no previous run for branch " + branch + ", so pass a task file")
@@ -40,7 +40,7 @@ export const resolveSandboxKind = (
   flag: SandboxKind | undefined
 ): Effect.Effect<SandboxKind, OrcRunError> =>
   Effect.gen(function*() {
-    const prior = yield* latestRunForBranch(db, projectDir, branch).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
+    const prior = yield* resumePriorRun(db, projectDir, branch).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
     const recorded = prior?.sandbox ?? null
     if (recorded === null) {
       return flag ?? defaultSandbox
@@ -220,7 +220,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
     const allow = run.allow ?? []
     const answers = run.answers ?? []
     const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow, answers, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null }
-    const prior = yield* latestRunForBranch(db, run.projectDir, run.branch).pipe(
+    const prior = yield* resumePriorRun(db, run.projectDir, run.branch).pipe(
       Effect.mapError((cause) => historyFailure("read", cause))
     )
     if (prior === null || prior.id === run.runId) {
