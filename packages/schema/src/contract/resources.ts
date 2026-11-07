@@ -33,9 +33,9 @@ const GpuJson = Schema.Struct({
 
 export const GpuAppJson = Schema.Struct({ pid: Figure, program: Schema.NullOr(Schema.String), memoryUsedMiB: MeasuredJson });
 
-export const GpusJson = Schema.Struct({ gpus: Schema.Array(GpuJson), apps: outcomeOf(Schema.Array(GpuAppJson)) });
+const GpusJson = Schema.Struct({ gpus: Schema.Array(GpuJson), apps: outcomeOf(Schema.Array(GpuAppJson)) });
 
-export const TaskResourcesJson = Schema.Struct({
+const TaskResourcesJson = Schema.Struct({
   id: Schema.String,
   processes: Whole,
   cpuSeconds: Figure,

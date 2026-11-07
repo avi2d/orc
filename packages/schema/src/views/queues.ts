@@ -126,7 +126,7 @@ export interface ActionView {
   readonly running: boolean;
 }
 
-export const newestFirst = (a: ActionRun, b: ActionRun): number => DateTime.toEpochMillis(b.createdAt) - DateTime.toEpochMillis(a.createdAt);
+const newestFirst = (a: ActionRun, b: ActionRun): number => DateTime.toEpochMillis(b.createdAt) - DateTime.toEpochMillis(a.createdAt);
 
 const actionViews = (runs: ReadonlyArray<ActionRun>): ReadonlyArray<ActionView> =>
   runs.toSorted(newestFirst).map((run) => ({ title: run.displayTitle, workflow: run.workflowName, running: run.status === "in_progress" }));
