@@ -851,6 +851,7 @@ To run the checks:
 `bun run test:fast` starts one worker per CPU, or fewer when the memory available holds less than 1100 MiB per worker.
 
 Set `TEST_FAST_WORKERS=<n>` to start exactly `n` workers.
+Values below 1 fail.
 
 The kit refuses a full mutation run outside CI, so the `mutation` workflow runs it when dispatched.
 Run `bunx stryker run --mutate "packages/schema/src/sources/quota.ts"` to mutate one file against the unit suite.
