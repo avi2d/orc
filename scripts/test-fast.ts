@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { Config, Console, Effect, FileSystem, Option, Path, Schema } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { freemem } from "node:os";
+import { freemem, totalmem } from "node:os";
 import { changedPaths, collect, defaultBranch, git, rangeEnds, type Change } from "@avi2dg/checks/core/git.ts";
 import { runMain, Usage } from "@avi2dg/checks/core/main.ts";
 import { parseReport, reporterArgs, ReportError } from "@avi2dg/checks/testing/test-report.ts";
@@ -35,11 +35,13 @@ class BaseUnresolved extends Schema.TaggedError<BaseUnresolved>()("BaseUnresolve
 
 const splitZero = (output: string): readonly string[] => output.split("\0").filter((line) => line !== "");
 
-// One test worker's peak memory, rounded up.
-const WORKER_BYTES = 1100 * 1024 * 1024;
+const FIRST_WORKER_BYTES = 1074 * 1024 * 1024;
+const EXTRA_WORKER_BYTES = 100 * 1024 * 1024;
+const MEMORY_RESERVE_FRACTION = 0.1;
 
-export function workerCountFor(freeBytes: number, cpus: number): number {
-  return Math.max(1, Math.min(cpus, Math.floor(freeBytes / WORKER_BYTES)));
+export function workerCountFor(freeBytes: number, totalBytes: number, cpus: number): number {
+  const usable = freeBytes - MEMORY_RESERVE_FRACTION * totalBytes - FIRST_WORKER_BYTES;
+  return Math.max(1, Math.min(cpus, Math.floor(usable / EXTRA_WORKER_BYTES) + 1));
 }
 
 // os.freemem() reports only free pages on macOS, so the reclaimable inactive and speculative pages come from vm_stat.
@@ -70,7 +72,7 @@ const availableBytes = Effect.fn("availableBytes")(function* () {
 
 const workerCount = Effect.fn("workerCount")(function* () {
   const override = yield* Config.option(Config.Int("TEST_FAST_WORKERS"));
-  if (Option.isNone(override)) return workerCountFor(yield* availableBytes(), navigator.hardwareConcurrency);
+  if (Option.isNone(override)) return workerCountFor(yield* availableBytes(), totalmem(), navigator.hardwareConcurrency);
   if (override.value < 1) return yield* new WorkerOverride({ message: "TEST_FAST_WORKERS must be at least 1, not " + override.value });
   return override.value;
 });
