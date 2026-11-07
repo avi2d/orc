@@ -3,7 +3,8 @@ import type { OpenQuestion } from "../no-mistakes-gate"
 import { backlogPaths, findTask, type Rewrite, rewriteNew, rewriteTaken } from "./backlog"
 import { taskBranch } from "./runner"
 import { BacklogError, platformFailure, publishOnce, scratchName } from "./backlog-write"
-import { type Hold, type HoldQuestion, isHeld, openQuestions, type Parked, type ParkedQuestion, parseTaskFile, renderTaskFile, type TaskFileError, type TaskRecord } from "./task-record"
+import { type Hold, type HoldQuestion, isHeld, openQuestions, type Parked, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord } from "./task-record"
+import { renderTaskFile } from "./task-record-render"
 
 // An answer given while the run waited and ran out of time is kept, so the next run gets it instead of asking again.
 const parkedQuestions = (open: Arr.NonEmptyReadonlyArray<OpenQuestion>, before: TaskRecord): Parked["questions"] => {
@@ -102,7 +103,7 @@ const answerOneOf = <Q extends { readonly id: string; readonly answer: { readonl
   if (fresh.state.kind !== "new" && !(waits === "parked" && fresh.state.kind === "started")) {
     return Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" }))
   }
-  return Effect.succeed({ asked, answered: { ...asked, answer: { words: text, at } } as Q })
+  return Effect.succeed({ asked, answered: { ...asked, answer: { words: text, at } } })
 }
 
 const answerQuestionOn = (id: string, words: string, at: string, fresh: TaskRecord & { readonly parked: Parked }): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {

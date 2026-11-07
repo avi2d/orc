@@ -236,6 +236,49 @@ const awaitMissing = (
     return unanswered()
   })
 
+type ParkedAdvance =
+  | { readonly kind: "ending"; readonly ending: Ending }
+  | { readonly kind: "next"; readonly current: NoMistakesReply; readonly sent: Sent }
+
+const advanceParked = (
+  input: NoMistakesInput,
+  log: DriveLog,
+  supplied: Map<string, string>,
+  parsed: ParsedRun,
+  gate: ParkedGate,
+  stdout: string
+): Effect.Effect<ParkedAdvance, never, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    yield* appendGate(input.runDir, gate.step)
+    const open = openQuestionsIn(parsed.findings, omittedQuestionIds(stdout))
+    const missing = yield* awaitMissing(input, [...open, ...askUserFindings(parsed.findings, input.allow ?? [])], supplied)
+    if (missing.length > 0) {
+      return { kind: "ending", ending: log.awaitAnswers(gate, missing) }
+    }
+    if (open.length > 0) {
+      const outcome: OpenOutcome = yield* serveOpenQuestions(input, log, gate, open, supplied)
+      if (outcome.kind === "ending") {
+        return { kind: "ending", ending: outcome.ending }
+      }
+      for (const finding of open) {
+        supplied.delete(finding.id)
+      }
+      return { kind: "next", current: outcome.command, sent: { kind: "answer", gate } }
+    }
+    const carried = [...supplied].map(([question, words]) => ({ question, answer: words }))
+    const answer = gateAnswer(input, log, gate, parsed.findings, carried)
+    if (answer.kind === "refuse") {
+      return { kind: "ending", ending: log.refuse(gate, answer.reason) }
+    }
+    const current = yield* input.runner.respond(answer)
+    if (answer.kind === "fix") {
+      for (const settled of answeredAskUser(parsed.findings, carried)) {
+        supplied.delete(settled.id)
+      }
+    }
+    return { kind: "next", current, sent: { kind: "respond", gate } }
+  })
+
 const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     let sent: Sent = { kind: "start" }
@@ -253,36 +296,12 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending, nev
         yield* appendGate(input.runDir, "running")
         continue
       }
-      yield* appendGate(input.runDir, step.gate.step)
-      const open = openQuestionsIn(step.parsed.findings, omittedQuestionIds(current.stdout))
-      const missing = yield* awaitMissing(input, [...open, ...askUserFindings(step.parsed.findings, input.allow ?? [])], supplied)
-      if (missing.length > 0) {
-        return log.awaitAnswers(step.gate, missing)
+      const advance: ParkedAdvance = yield* advanceParked(input, log, supplied, step.parsed, step.gate, current.stdout)
+      if (advance.kind === "ending") {
+        return advance.ending
       }
-      if (open.length > 0) {
-        const outcome: OpenOutcome = yield* serveOpenQuestions(input, log, step.gate, open, supplied)
-        if (outcome.kind === "ending") {
-          return outcome.ending
-        }
-        current = outcome.command
-        sent = { kind: "answer", gate: step.gate }
-        for (const finding of open) {
-          supplied.delete(finding.id)
-        }
-        continue
-      }
-      const carried = [...supplied].map(([question, words]) => ({ question, answer: words }))
-      const answer = gateAnswer(input, log, step.gate, step.parsed.findings, carried)
-      if (answer.kind === "refuse") {
-        return log.refuse(step.gate, answer.reason)
-      }
-      current = yield* input.runner.respond(answer)
-      sent = { kind: "respond", gate: step.gate }
-      if (answer.kind === "fix") {
-        for (const settled of answeredAskUser(step.parsed.findings, carried)) {
-          supplied.delete(settled.id)
-        }
-      }
+      current = advance.current
+      sent = advance.sent
     }
   })
 

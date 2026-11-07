@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Result } from "effect"
-import { parseTaskFile, renderTaskFile, TaskFileError, type TaskRecord } from "../../../packages/run/src/dispatch/task-record"
+import { parseTaskFile, TaskFileError, type TaskRecord } from "../../../packages/run/src/dispatch/task-record"
+import { renderTaskFile } from "../../../packages/run/src/dispatch/task-record-render"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))

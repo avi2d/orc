@@ -1,5 +1,6 @@
 import { Array as Arr, Effect, FileSystem, Schema } from "effect"
-import { captainWait, type Hold, type HoldQuestion, type Parked, parseTaskFile, renderTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
+import { captainWait, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
+import { renderTaskFile } from "./task-record-render"
 import { BacklogError, platformFailure, publishOnce, scratchName } from "./backlog-write"
 
 export { BacklogError }
@@ -215,6 +216,31 @@ const answeredOnly = (parked: Parked | null): Parked | null => {
   return parked !== null && Arr.isReadonlyArrayNonEmpty(answered) ? { ...parked, questions: answered } : null
 }
 
+const missedClose = (
+  root: string,
+  id: string
+): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const paths = backlogPaths(root)
+    const takenNames = yield* fs.readDirectory(paths.folder("taken")).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
+    if (takenNames.some((name) => name.startsWith("." + id + "."))) {
+      return yield* new BacklogError({ detail: id + " moved while orc read it, so run the command again" })
+    }
+    const closedExists = yield* fs.exists(paths.taskFile("closed", id)).pipe(Effect.mapError(platformFailure("read " + id)))
+    if (closedExists) {
+      return yield* new BacklogError({ detail: id + " was closed by another command" })
+    }
+    const record = (yield* listTasks(root)).find((candidate) => candidate.spec.id === id)
+    if (record === undefined) {
+      return yield* new BacklogError({ detail: "the backlog holds no " + id })
+    }
+    if (record.state.kind !== "started") {
+      return yield* new BacklogError({ detail: id + " is " + record.state.kind + ", and only a started task closes" })
+    }
+    return yield* new BacklogError({ detail: id + " moved while orc read it, so run the command again" })
+  })
+
 export const closeStartedTask = (
   root: string,
   id: string,
@@ -234,22 +260,7 @@ export const closeStartedTask = (
       Effect.mapError(platformFailure("take " + id))
     )
     if (!took) {
-      const takenNames = yield* fs.readDirectory(paths.folder("taken")).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
-      if (takenNames.some((name) => name.startsWith("." + id + "."))) {
-        return yield* new BacklogError({ detail: id + " moved while orc read it, so run the command again" })
-      }
-      const closedExists = yield* fs.exists(paths.taskFile("closed", id)).pipe(Effect.mapError(platformFailure("read " + id)))
-      if (closedExists) {
-        return yield* new BacklogError({ detail: id + " was closed by another command" })
-      }
-      const record = (yield* listTasks(root)).find((candidate) => candidate.spec.id === id)
-      if (record === undefined) {
-        return yield* new BacklogError({ detail: "the backlog holds no " + id })
-      }
-      if (record.state.kind !== "started") {
-        return yield* new BacklogError({ detail: id + " is " + record.state.kind + ", and only a started task closes" })
-      }
-      return yield* new BacklogError({ detail: id + " moved while orc read it, so run the command again" })
+      return yield* missedClose(root, id)
     }
     const putBack = fs.rename(grabbed, file).pipe(Effect.mapError(platformFailure("put back " + id)))
     const text = yield* fs.readFileString(grabbed).pipe(
@@ -379,59 +390,4 @@ export const findTask = (root: string, id: string): Effect.Effect<TaskRecord, Ba
     Effect.filterOrFail((record) => record !== undefined, () => new BacklogError({ detail: "the backlog holds no " + id }))
   )
 
-export type HoldOutcome = { readonly kind: "held" | "already held"; readonly hold: Hold }
 
-export interface HoldAsk {
-  readonly reason: string
-  readonly until: string | null
-  readonly questions: ReadonlyArray<string>
-}
-
-const askedQuestions = (texts: ReadonlyArray<string>): ReadonlyArray<HoldQuestion> =>
-  texts.map((text, index) => ({ id: "question-" + String(index + 1), text, answer: null }))
-
-const asksTheSame = (held: ReadonlyArray<HoldQuestion>, texts: ReadonlyArray<string>): boolean =>
-  held.length === texts.length && held.every((question, index) => question.text === texts[index])
-
-const holdAgain = (id: string, fresh: TaskRecord, held: Hold, ask: HoldAsk): Effect.Effect<Rewrite<HoldOutcome>, BacklogError> => {
-  if (ask.questions.length === 0 || asksTheSame(held.questions, ask.questions)) {
-    return Effect.succeed({ kind: "keep", result: { kind: "already held", hold: held } })
-  }
-  if (held.questions.length > 0) {
-    return Effect.fail(new BacklogError({ detail: id + " is already held on " + held.questions.map((question) => question.id).join(", ") + ", so answer those first" }))
-  }
-  return Effect.fail(new BacklogError({ detail: id + " is already held: " + held.reason + ", so answer it first" }))
-}
-
-const holdOn = (id: string, ask: HoldAsk) => (fresh: TaskRecord): Effect.Effect<Rewrite<HoldOutcome>, BacklogError> => {
-  if (fresh.state.kind !== "new") {
-    return Effect.fail(new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a new task is held" }))
-  }
-  if (fresh.parked !== null) {
-    return Effect.fail(new BacklogError({ detail: id + " is parked for the captain's answer, so it cannot be held" }))
-  }
-  if (fresh.hold?.answer != null) {
-    return Effect.fail(new BacklogError({ detail: id + " was held and answered: " + fresh.hold.answer.words }))
-  }
-  if (fresh.hold !== null) {
-    return holdAgain(id, fresh, fresh.hold, ask)
-  }
-  const held: Hold = { reason: ask.reason, until: ask.until, questions: askedQuestions(ask.questions), answer: null }
-  return Effect.succeed({ kind: "write", record: { ...fresh, hold: held }, result: { kind: "held", hold: held } })
-}
-
-// A taken task belongs to a live beat that goes on writing its taken file, so only a new one is rewritten.
-export const holdTask = (
-  root: string,
-  id: string,
-  ask: HoldAsk
-): Effect.Effect<HoldOutcome, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const record = yield* findTask(root, id)
-    const decide = holdOn(id, ask)
-    if (record.state.kind !== "new") {
-      const refused = yield* decide(record)
-      return refused.result
-    }
-    return yield* rewriteNew(root, id, decide)
-  })
