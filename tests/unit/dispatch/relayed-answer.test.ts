@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
@@ -100,6 +100,18 @@ describe("a relayed answer", () => {
       await startStarted(root)
       const parked = await run(parkStartedTask(root, "orc-1", "orc/orc-1", [r2], "2026-10-27T10:35:00.000Z"))
       expect(parked.parked?.questions).toEqual([{ ...r2, asked: "2026-10-27T10:35:00.000Z", answer: null }])
+    })
+  })
+  test("a question with the legacy used flag asks anew instead of handing the old answer again", async () => {
+    await withBacklog(async (root) => {
+      await startStarted(root)
+      await writeFile(
+        join(root, "taken", "orc-1.md"),
+        ["---", `id: ${JSON.stringify("orc-1")}`, `title: ${JSON.stringify(spec.title)}`, `project: ${JSON.stringify(spec.project)}`, `kind: ${JSON.stringify("ship")}`, `machine: null`, `depends_on: ${JSON.stringify([])}`, `created: ${JSON.stringify(spec.created)}`, `parked_branch: ${JSON.stringify("orc/orc-1")}`, `parked_questions: ${JSON.stringify([{ id: r2.id, text: r2.text, answer: "Keep it", answered_at: "2026-10-27T10:05:00.000Z", used: true }])}`, `beat: ${JSON.stringify(claim.beat)}`, `taken_for: ${JSON.stringify(claim.machine)}`, `account: ${JSON.stringify(claim.account)}`, `taken_at: ${JSON.stringify(claim.takenAt)}`, `started_at: ${JSON.stringify("2026-10-27T10:02:00.000Z")}`, `start_log: ${JSON.stringify(root + "/logs/orc-1.log")}`, "---", spec.title + "\n"].join("\n")
+      )
+      expect(await run(askStartedTask(root, "orc-1", { asked: second, questions: [r2] }))).toBe(true)
+      expect((await current(root)).parked?.questions).toEqual([{ ...r2, asked: second, answer: null }])
+      expect(answersFor(await current(root), { asked: second, questions: [r2] })).toEqual([])
     })
   })
   test("a resume hands every answer to the asking it answers instead of leaving it to answer a later asking", () => {

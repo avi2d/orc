@@ -172,7 +172,9 @@ describe("a parked run", () => {
       await orcOk(fixture, ["beat"])
       const task = await backlogTaskOne(fixture)
       expect(task).toMatchObject({ parked: { questions: [{ id: "r2", asked: firstAsking.asked, answer: { words: "Keep it" } }] } })
-      expect(JSON.stringify(task)).not.toMatch(/used|relayed/)
+      const shown = (task as { readonly parked: { readonly questions: ReadonlyArray<{ readonly answer: Record<string, unknown> }> } }).parked.questions
+      expect(Object.keys(shown[0] ?? {}).sort()).toEqual(["answer", "asked", "id", "text"])
+      expect(Object.keys(shown[0]?.answer ?? {}).sort()).toEqual(["at", "words"])
     })
   }, runnerTimeout)
 

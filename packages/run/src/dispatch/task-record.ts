@@ -115,7 +115,8 @@ const QuestionFront = Schema.Struct({
   answer: Schema.optional(Schema.String),
   answered_at: Schema.optional(Schema.String),
   asked_at: Schema.optional(Schema.String),
-  relayed_to: Schema.optional(Schema.String)
+  relayed_to: Schema.optional(Schema.String),
+  used: Schema.optional(Schema.Boolean)
 })
 
 const Frontmatter = Schema.Struct({
@@ -184,7 +185,7 @@ const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: str
     if (typeof answer === "string") {
       return "the " + what + " question " + question.id + " names its answer with no words or no time"
     }
-    questions.push({ id: question.id, text: question.text, asked: question.asked_at ?? "", answer: answer === null ? null : { ...answer, relayedTo: question.relayed_to ?? null } })
+    questions.push({ id: question.id, text: question.text, asked: question.asked_at ?? "", answer: answer === null ? null : { ...answer, relayedTo: question.relayed_to ?? (question.used === true ? (question.asked_at ?? "") : null) } })
   }
   return questions
 }
