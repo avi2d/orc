@@ -7,7 +7,8 @@ import { buildNonoProfile, defaultToolchainFolders, defaultToolchainResolver, ty
 const roots = {
   worktree: "/tmp/orc-test/worktree",
   gitData: "/tmp/orc-test/git-data",
-  piSessionDir: "/tmp/orc-test/session"
+  piSessionDir: "/tmp/orc-test/session",
+  sessions: "/tmp/orc-test/sessions"
 }
 
 const noHost = { developerDir: null, toolchainFolders: defaultToolchainFolders, runtimeDirs: [] }
@@ -20,20 +21,21 @@ const profileFor = (input: NonoSandboxRoots, host: HostRuntime) =>
 const sentinelHeader = "Authorization: Basic b3JjLXNlbnRpbmVsOnNlY3JldA=="
 
 describe("buildNonoProfile", () => {
-  test("grants read-write access to exactly the three roots", async () => {
+  test("grants read-write access to exactly the four roots", async () => {
     const profile = await profileFor(roots, noHost)
-    expect(profile.filesystem.allow).toEqual([roots.worktree, roots.gitData, roots.piSessionDir])
+    expect(profile.filesystem.allow).toEqual([roots.worktree, roots.gitData, roots.piSessionDir, roots.sessions])
   })
 
   test("drops a root nested in another, so no grant can be retargeted through a writable one", async () => {
-    const nested = { worktree: "/w/copy", gitData: "/w/copy/.git", piSessionDir: "/w/copy/.pi/session" }
+    const nested = { worktree: "/w/copy", gitData: "/w/copy/.git", piSessionDir: "/w/copy/.pi/session", sessions: "/w/copy/.pi/sessions" }
     expect((await profileFor(nested, noHost)).filesystem.allow).toEqual(["/w/copy"])
     expect((await profileFor({ ...nested, piSessionDir: "/w/copy-session" }, noHost)).filesystem.allow).toEqual(["/w/copy", "/w/copy-session"])
+    expect((await profileFor({ ...nested, piSessionDir: "/w/run/session", sessions: "/w/run" }, noHost)).filesystem.allow).toEqual(["/w/copy", "/w/run"])
   })
 
   test("the only writable grants are the roots and /dev/null, and no socket is granted", async () => {
     const { filesystem } = await profileFor(roots, noHost)
-    expect([...filesystem.allow, ...filesystem.write]).toEqual([roots.worktree, roots.gitData, roots.piSessionDir])
+    expect([...filesystem.allow, ...filesystem.write]).toEqual([roots.worktree, roots.gitData, roots.piSessionDir, roots.sessions])
     expect([...filesystem.allow_file, ...filesystem.write_file]).toEqual(["/dev/null"])
     const sockets = [
       ...filesystem.unix_socket,

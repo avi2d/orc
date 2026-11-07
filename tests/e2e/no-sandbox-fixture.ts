@@ -73,7 +73,7 @@ export const withNoSandboxFixture = async (body: (fixture: NoSandboxFixture) => 
       "if [ -f \"$PI_CODING_AGENT_DIR/models.json\" ]; then cp \"$PI_CODING_AGENT_DIR/models.json\" \"" + fakeBin + "/pi-models\"; fi",
       "if [ -f \"$PI_CODING_AGENT_DIR/settings.json\" ]; then cp \"$PI_CODING_AGENT_DIR/settings.json\" \"" + fakeBin + "/pi-settings\"; fi",
       "echo \"$ACME_ACCOUNT_DIR\" > \"" + fakeBin + "/pi-account-dir\"",
-      "echo \"$ORC_TOKEN_FILE\" > \"" + fakeBin + "/pi-token-file\"",
+      "echo \"$AGENT_TOKEN_FILE\" > \"" + fakeBin + "/pi-token-file\"",
       "pwd > \"" + fakeBin + "/pi-cwd\"",
       "git rev-parse --show-toplevel --path-format=absolute --git-common-dir --abbrev-ref HEAD > \"" + fakeBin + "/pi-git\"",
       "echo \"$GIT_CONFIG_GLOBAL\" > \"" + fakeBin + "/pi-gitconfig\"",

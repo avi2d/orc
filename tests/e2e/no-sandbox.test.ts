@@ -175,7 +175,7 @@ describe("orc run on a token-file provider", () => {
       expect(apiKey).toStartWith("!")
       const handed = (await readFile(join(fixture.fakeBin, "pi-token-file"), "utf8")).trim()
       expect(handed).toBe(env.KEYED_TOKEN_FILE)
-      const resolved = Bun.spawnSync(["sh", "-c", apiKey.slice(1)], { env: { ORC_TOKEN_FILE: handed } })
+      const resolved = Bun.spawnSync(["sh", "-c", apiKey.slice(1)], { env: { AGENT_TOKEN_FILE: handed } })
       expect(resolved.stdout.toString()).toBe(fixtureToken)
       expect(await filesHolding([env["ORC_HOME"] ?? "", fixture.repo, fixture.home], fixtureToken)).toEqual([])
       expect(git(fixture.repo, ["log", "--all", "-p"], env)).not.toContain(fixtureToken)

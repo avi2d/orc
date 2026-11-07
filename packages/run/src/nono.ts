@@ -34,7 +34,7 @@ export const buildNonoRunArgs = (
 
 const inheritedEnvNames: ReadonlyArray<string> = ["PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TERM"]
 
-const sandboxRuntimes: ReadonlyArray<string> = ["bun", "node", "pi"]
+export const sandboxRuntimes: ReadonlyArray<string> = ["bun", "node", "pi"]
 
 export const inheritedEnv = (hostEnv: Readonly<Record<string, string | undefined>>): Record<string, string> => {
   const env: Record<string, string> = {}
@@ -65,7 +65,7 @@ export const buildSandboxEnv = (
   }
 }
 
-const sandboxEnv = (
+export const sandboxEnv = (
   hostEnv: NodeJS.ProcessEnv,
   piSessionDir: string,
   runtimeBinDirs: ReadonlyArray<string>,
@@ -169,7 +169,7 @@ const readGitConfig = (spawner: Spawner, { binary, env }: HostGit, file: string,
   )
 
 // The sandbox can read every config in the git data, every .gitmodules and embedded submodule git dir in the checkout, and every file they include, active or not.
-const refuseCredentialBearingCheckout = (
+export const refuseCredentialBearingCheckout = (
   spawner: Spawner,
   fs: FileSystem.FileSystem,
   path: Path.Path,
@@ -207,26 +207,29 @@ const refuseCredentialBearingCheckout = (
   })
 
 // nono resolves a grant's symlinks afresh on every run, so only canonical roots keep their meaning.
-const resolveRoots = (
+export const resolveRoots = (
   spawner: Spawner,
   fs: FileSystem.FileSystem,
   path: Path.Path,
   hostGit: HostGit,
   worktree: string,
-  piSessionDir: string
+  piSessionDir: string,
+  sessions: string
 ): Effect.Effect<NonoSandboxRoots, NonoProviderError | PlatformError> =>
   Effect.gen(function*() {
-    for (const root of [worktree, piSessionDir]) {
+    for (const root of [worktree, piSessionDir, sessions]) {
       if (!path.isAbsolute(root)) {
         return yield* new NonoProviderError({ message: `orc nono provider: sandbox root must be absolute: ${root}` })
       }
     }
     const gitData = yield* resolveGitDataDir(spawner, path, hostGit, worktree)
     yield* fs.makeDirectory(piSessionDir, { recursive: true })
+    yield* fs.makeDirectory(sessions, { recursive: true })
     return {
       worktree: yield* fs.realPath(worktree),
       gitData: yield* fs.realPath(gitData),
-      piSessionDir: yield* fs.realPath(piSessionDir)
+      piSessionDir: yield* fs.realPath(piSessionDir),
+      sessions: yield* fs.realPath(sessions)
     }
   })
 
@@ -268,7 +271,7 @@ const runSandboxed = (
 
 const NonoWhyVerdict = Schema.fromJsonString(Schema.Struct({ status: Schema.Literals(["allowed", "denied"]) }))
 
-const checkProfile = (
+export const checkProfile = (
   spawner: Spawner,
   nono: (args: ReadonlyArray<string>) => ChildProcess.Command,
   profilePath: string,
@@ -307,7 +310,7 @@ export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSa
       const path = yield* Path.Path
       const hostEnv = { ...Bun.env, ...(options.hostPath === undefined ? {} : { PATH: options.hostPath }), ...createOptions.env }
       const hostGit = { binary: yield* resolveHostBinary(fs, "git"), env: buildHostGitEnv(hostEnv) }
-      const roots = yield* resolveRoots(spawner, fs, path, hostGit, createOptions.worktreePath, options.piSessionDir)
+      const roots = yield* resolveRoots(spawner, fs, path, hostGit, createOptions.worktreePath, options.piSessionDir, options.piSessionDir)
       yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, hostGit)
       const toolchain = options.toolchain ?? defaultToolchainResolver(homedir())
       const runtimes = (yield* Effect.forEach(sandboxRuntimes, (name) => resolveRuntime(fs, path, name, Bun.env.PATH ?? "", toolchain))).filter((runtime) => runtime !== null)

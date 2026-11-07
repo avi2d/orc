@@ -12,7 +12,8 @@ import { buildNonoProfile, defaultToolchainFolders, runtimeReadFiles, systemRead
 const roots = {
   worktree: "/tmp/orc-test/worktree",
   gitData: "/tmp/orc-test/git-data",
-  piSessionDir: "/tmp/orc-test/session"
+  piSessionDir: "/tmp/orc-test/session",
+  sessions: "/tmp/orc-test/sessions"
 }
 
 const noHost = { developerDir: null, toolchainFolders: defaultToolchainFolders, runtimeDirs: [] }
@@ -124,7 +125,7 @@ describe("the policy nono resolves from the profile", () => {
 
   beforeAll(async () => {
     dir = await realpath(await mkdtemp(join(tmpdir(), "orc-nono-policy-")))
-    resolvedRoots = { worktree: join(dir, "copy"), gitData: join(dir, "git"), piSessionDir: join(dir, "session") }
+    resolvedRoots = { worktree: join(dir, "copy"), gitData: join(dir, "git"), piSessionDir: join(dir, "session"), sessions: join(dir, "sessions") }
     home = join(dir, "home")
     widened = join(dir, "widened")
     for (const created of [...Object.values(resolvedRoots), widened, join(home, ".config", "nono", "profiles")]) {
@@ -149,13 +150,14 @@ describe("the policy nono resolves from the profile", () => {
   })
 
   test.skipIf(Bun.which("nono") === null)(
-    skipReason("needs nono on PATH to resolve the profile", "grants writes to the three roots and /dev/null and nothing more"),
+    skipReason("needs nono on PATH to resolve the profile", "grants writes to the four roots and /dev/null and nothing more"),
     async () => {
       const { grants } = (await manifestOf(profilePath, home)).filesystem
       const writable = grants.filter((grant) => grant.access.includes("write")).map((grant) => `${grant.type} ${grant.path}`)
       expect(writable.toSorted((a, b) => a.localeCompare(b))).toEqual([
         `directory ${resolvedRoots.gitData}`,
         `directory ${resolvedRoots.piSessionDir}`,
+        `directory ${resolvedRoots.sessions}`,
         `directory ${resolvedRoots.worktree}`,
         "file /dev/null"
       ].toSorted((a, b) => a.localeCompare(b)))
