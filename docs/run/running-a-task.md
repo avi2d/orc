@@ -84,9 +84,13 @@ On a token file or package provider Pi reads the run's own Pi folder, so the mar
 Once the checks pass, a `no-mistakes` run runs `no-mistakes axi run` on the branch with the task as its intent.
 A `direct-PR` run pushes the branch and opens the PR instead, as [Delivery modes](delivery-modes.md) shows.
 At each gate orc asks no-mistakes to fix the findings marked `auto-fix`, ignores those marked `no-op`, and accepts the fix review.
-Orc refuses a no-mistakes gate holding an open review question without an `--answer` for that question.
+Orc treats an `ask-user` finding as a review question carrying the finding's id and text.
+A gate holding a question with no `--answer` keeps the run open there for 30 minutes while orc waits for your answer.
+While it waits, the run folder holds `asking.json` with the questions and the time the wait ends, and `orc runner result` reads the task as `paused`.
+An `answers.json` in the run folder, written whole as `[{"question": "<id>", "answer": "<text>"}]`, answers them, and the beat writes it from `orc backlog answer`, as [Parked runs](parked-runs.md) shows.
+To change the wait, set `ORC_ANSWER_WAIT_SECONDS` to a whole number of seconds, where `0` refuses the gate at once.
+A question still unanswered when the wait ends makes orc refuse the gate.
 Rerun with `--answer question-<id>="<text>"` and orc answers every open question before any gate response.
-Orc treats an `ask-user` finding the same way, as a question carrying the finding's id and text.
 Rerun with `--answer <finding-id>="<text>"` and orc asks no-mistakes to fix that finding with your text as its guidance.
 Rerun with `--allow ask-user` instead and orc declines every `ask-user` finding and accepts the rest.
 Orc leaves that no-mistakes gate parked for you to answer.

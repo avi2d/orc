@@ -19,6 +19,9 @@ export type BeatAction =
   }
   | { readonly kind: "close-failed"; readonly task: string; readonly machine: string; readonly reason: string }
   | { readonly kind: "parked"; readonly task: string; readonly machine: string; readonly branch: string; readonly questions: ReadonlyArray<string> }
+  | { readonly kind: "asking"; readonly task: string; readonly machine: string; readonly until: string; readonly questions: ReadonlyArray<string> }
+  | { readonly kind: "answered"; readonly task: string; readonly machine: string; readonly questions: ReadonlyArray<string> }
+  | { readonly kind: "answer-failed"; readonly task: string; readonly machine: string; readonly reason: string }
   | StalledAction
   | { readonly kind: "pr-unread"; readonly task: string; readonly reason: string }
   | { readonly kind: "upstream-seen"; readonly project: string; readonly url: string; readonly state: string }

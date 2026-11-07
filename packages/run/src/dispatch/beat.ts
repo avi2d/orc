@@ -305,6 +305,7 @@ export const runBeat = (
     const started = tasks.filter((task) => task.state.kind === "started")
     const progress = yield* Effect.forEach(started, (task) => closeFinished(context, task))
     const closed = progress.flatMap((entry) => entry.kind === "ended" ? [entry.action] : [])
+    const asking = progress.flatMap((entry) => entry.kind === "running" && entry.action !== null ? [entry.action] : [])
     const stalls = yield* Effect.forEach(started, (task, index) => flagStall(root, task, progress[index] ?? { kind: "untracked" }))
     for (const action of closed) {
       if (action.kind === "closed" || action.kind === "parked") {
@@ -324,6 +325,7 @@ export const runBeat = (
     const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))
     return { beat, at, quota, room: readRoom(config.machines, current), actions: [
         ...closed,
+        ...asking,
         ...stalls.flatMap(Option.toArray),
         ...prs.flatMap(Option.toArray),
         ...upstream,

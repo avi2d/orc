@@ -13,7 +13,7 @@ import { holdRun } from "./hold"
 import { mergeTask } from "./merge"
 import { taskLabel } from "./pueue-status"
 import { type Command, queueFromText, renewTask, RunnerError, startTask } from "./runner"
-import { formatResult, readResult, readResultThrough, readStdinLabel, runnerJson } from "./runner-result"
+import { forwardAnswers, formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson } from "./runner-result"
 import type { TaskFileError, TaskRecord } from "./task-record"
 import { encodeToken, sessionToken } from "./token"
 import { markEventPosted, unpostedEvents } from "./events"
@@ -235,6 +235,9 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
         ? "answered " + answered.question + " on " + args.id + ", so the beat may start it"
         : "answered " + answered.question + " on " + args.id + ", and it stays held for " + answered.open.map((question) => question.id).join(", ")
     }
+    if (answered.live) {
+      return "answered " + answered.question + " on " + args.id + ", so the next beat hands it to the run waiting on " + answered.branch
+    }
     return answered.open.length === 0
       ? "answered " + answered.question + " on " + args.id + ", so the beat resumes it on " + answered.branch
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
@@ -264,6 +267,28 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
     }
     case "MergeTask": {
       return mergeTask(backlogRoot(place), args.id, args.basis)
+    }
+  }
+}
+
+type RunnerVerb = Extract<CommandArgs, { readonly kind: "RunnerHold" | "RunnerToken" | "RunnerQueue" | "RunnerAnswer" | "RunnerLoad" }>
+
+const runnerVerbLine = (args: RunnerVerb, place: DispatchPlace) => {
+  switch (args.kind) {
+    case "RunnerHold": {
+      return holdRun(args.task, args.run, place.home, args.label)
+    }
+    case "RunnerToken": {
+      return readSessionToken(args.session, place.stdoutIsTerminal)
+    }
+    case "RunnerQueue": {
+      return place.stdin.pipe(Effect.flatMap((text) => queueFromText(text, place.self, place.home)))
+    }
+    case "RunnerAnswer": {
+      return args.reach.kind === "here" ? relayAnswers(place.home, args.task, place.stdin) : forwardAnswers(args.reach.command, args.task, place.stdin)
+    }
+    case "RunnerLoad": {
+      return Effect.succeed(String(fiveMinuteLoad()))
     }
   }
 }
@@ -321,24 +346,16 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         }
         break
       }
-      case "RunnerHold": {
-        yield* Console.log(yield* holdRun(args.task, args.run, place.home, args.label))
-        break
-      }
-      case "RunnerToken": {
-        yield* Console.log(yield* readSessionToken(args.session, place.stdoutIsTerminal))
-        break
-      }
-      case "RunnerQueue": {
-        yield* Console.log(yield* queueFromText(yield* place.stdin, place.self, place.home))
-        break
-      }
       case "RunnerResult": {
         yield* reportResult(args, place)
         break
       }
+      case "RunnerHold":
+      case "RunnerToken":
+      case "RunnerQueue":
+      case "RunnerAnswer":
       case "RunnerLoad": {
-        yield* Console.log(String(fiveMinuteLoad()))
+        yield* Console.log(yield* runnerVerbLine(args, place))
         break
       }
     }

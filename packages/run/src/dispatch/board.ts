@@ -133,10 +133,15 @@ const newCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>): string => 
   return named(record) + pinOf(record) + waits + held + parked + " " + record.spec.title
 }
 
+const askedOf = (record: TaskRecord): string => {
+  const asked = openQuestions(record)
+  return asked.length === 0 ? "" : " asking (" + asked.map((question) => question.id).join(",") + ")"
+}
+
 const takenCell = (record: TaskRecord): string => {
   const state = record.state
   if (state.kind === "started") {
-    return named(record) + " on " + state.claim.machine + " started"
+    return named(record) + " on " + state.claim.machine + " started" + askedOf(record)
   }
   const machine = state.kind === "taken" && state.claim !== null ? " on " + state.claim.machine : ""
   return named(record) + machine + " taken"
@@ -197,6 +202,15 @@ const actionLine = (action: BeatAction): string => {
     }
     case "parked": {
       return "parked " + action.task + " on " + action.branch + " for the captain's answer to " + action.questions.join(", ")
+    }
+    case "asking": {
+      return "asking " + action.task + " on " + action.machine + ": the run waits until " + action.until + " for the captain's answer to " + action.questions.join(", ")
+    }
+    case "answered": {
+      return "handed " + action.questions.join(", ") + " to the run of " + action.task + " on " + action.machine
+    }
+    case "answer-failed": {
+      return "cannot hand the answers to the run of " + action.task + " on " + action.machine + ": " + action.reason
     }
     case "stalled": {
       return "stalled " + action.task + " on " + action.machine + ": no output since " + action.since

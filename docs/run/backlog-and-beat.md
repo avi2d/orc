@@ -200,6 +200,7 @@ So the start command and what it leaves running outlive the beat, even when laun
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
 From then on, each beat ends the finished runs on a machine whose start runs `orc runner start`.
 It reads `orc runner result` on that machine and closes the task done or failed, or parks it on your open questions.
+A run still waiting at its gate for your answer stays started, and the beat relays your answers to it, as [Parked runs](parked-runs.md) shows.
 Either way the task frees its slot in the same beat.
 The closed task file keeps the PR link of the orc run on `orc/<task-id>` as `pr`, and `orc backlog --json` carries it as `pr`, or `null` when the run opened none.
 The beat prints `closed <task-id> <done|failed> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds.
@@ -209,5 +210,7 @@ A started run whose output has not grown for 30 minutes prints `stalled <task-id
 A PR the beat cannot read for the chat prints `cannot read the PR of <task-id> for the chat: <reason>`.
 A missing start command exits 127 into its log and leaves the task started.
 Only a failure to spawn the log wrapper closes the task as `start-failed`.
-To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1` and carries the endings as `closed`, `close-failed` and `parked` actions, a stall as `stalled`, a PR the beat cannot read as `pr-unread`, and an upstream contribution as `upstream-seen`, `upstream-changed` or `upstream-unread`.
+To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1`.
+It carries the endings as `closed`, `close-failed` and `parked` actions, and a run waiting for your answer as `asking`, `answered` or `answer-failed`.
+It carries a stall as `stalled`, a PR the beat cannot read as `pr-unread`, and an upstream contribution as `upstream-seen`, `upstream-changed` or `upstream-unread`.
 On a token command account, each beat first sends every started task its account's current token through its machine's `renew` command, as JSON on standard input.

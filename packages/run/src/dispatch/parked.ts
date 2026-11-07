@@ -1,13 +1,35 @@
 import { Array as Arr, Effect, FileSystem } from "effect"
 import type { OpenQuestion } from "../no-mistakes-gate"
-import { backlogPaths, findTask, type Rewrite, rewriteNew } from "./backlog"
+import { backlogPaths, findTask, type Rewrite, rewriteNew, rewriteTaken } from "./backlog"
+import { taskBranch } from "./runner"
 import { BacklogError, platformFailure, publishOnce, scratchName } from "./backlog-write"
 import { type Hold, isHeld, openQuestions, type Parked, type ParkedQuestion, parseTaskFile, renderTaskFile, type TaskFileError, type TaskRecord } from "./task-record"
 
+// An answer given while the run waited and ran out of time is kept, so the next run gets it instead of asking again.
 const parkedQuestions = (open: Arr.NonEmptyReadonlyArray<OpenQuestion>, before: TaskRecord): Parked["questions"] => {
-  const answered = before.parked?.questions.filter((question) => question.answer !== null && !open.some((asked) => asked.id === question.id)) ?? []
-  return Arr.appendAll(Arr.map(open, (question) => ({ ...question, answer: null })), answered)
+  const prior = before.parked?.questions ?? []
+  const answered = prior.filter((question) => question.answer !== null && !open.some((asked) => asked.id === question.id))
+  const answerOf = (id: string) => prior.find((question) => question.id === id)?.answer ?? null
+  return Arr.appendAll(Arr.map(open, (question) => ({ ...question, answer: answerOf(question.id) })), answered)
 }
+
+// The live run keeps its claim, so its questions sit on the started task and orc backlog answer reaches them there.
+export const askStartedTask = (
+  root: string,
+  id: string,
+  open: Arr.NonEmptyReadonlyArray<OpenQuestion>
+): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  rewriteTaken(root, id, (fresh): Effect.Effect<Rewrite<boolean>, BacklogError> => {
+    if (fresh.state.kind !== "started") {
+      return Effect.fail(new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a started task asks" }))
+    }
+    const known = fresh.parked?.questions ?? []
+    if (open.every((question) => known.some((candidate) => candidate.id === question.id))) {
+      return Effect.succeed({ kind: "keep", result: false })
+    }
+    const parked: Parked = { branch: fresh.parked?.branch ?? taskBranch(id), questions: parkedQuestions(open, fresh) }
+    return Effect.succeed({ kind: "write", record: { ...fresh, parked }, result: true })
+  })
 
 // rename(2) takes the taken file at most once, so of two beats parking one run exactly one moves it back to new.
 export const parkStartedTask = (
@@ -50,7 +72,7 @@ export const parkStartedTask = (
 export type AnswerOutcome =
   | { readonly kind: "hold"; readonly hold: Hold }
   | { readonly kind: "held question"; readonly question: string; readonly open: ReadonlyArray<ParkedQuestion> }
-  | { readonly kind: "question"; readonly question: string; readonly branch: string; readonly open: ReadonlyArray<ParkedQuestion> }
+  | { readonly kind: "question"; readonly question: string; readonly branch: string; readonly live: boolean; readonly open: ReadonlyArray<ParkedQuestion> }
 
 const unanswered = (questions: ReadonlyArray<ParkedQuestion>): ReadonlyArray<ParkedQuestion> => questions.filter((question) => question.answer === null)
 
@@ -73,7 +95,7 @@ const answerOneOf = (
   if (asked.answer !== null) {
     return Effect.fail(new BacklogError({ detail: id + " already has an answer to " + question + ": " + asked.answer.words }))
   }
-  if (fresh.state.kind !== "new") {
+  if (fresh.state.kind !== "new" && !(waits === "parked" && fresh.state.kind === "started")) {
     return Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" }))
   }
   return Effect.succeed({ asked, answered: { ...asked, answer: { words: text, at } } })
@@ -86,7 +108,7 @@ const answerQuestionOn = (id: string, words: string, at: string, fresh: TaskReco
   return answerOneOf(id, words, at, fresh.parked.questions, "parked", fresh).pipe(Effect.map(({ asked, answered }) => {
     const questions = Arr.map(fresh.parked.questions, (candidate) => candidate === asked ? answered : candidate)
     const record: TaskRecord = { ...fresh, parked: { ...fresh.parked, questions } }
-    return { kind: "write", record, result: { kind: "question", question: asked.id, branch: fresh.parked.branch, open: openQuestions(record) } }
+    return { kind: "write", record, result: { kind: "question", question: asked.id, branch: fresh.parked.branch, live: fresh.state.kind === "started", open: openQuestions(record) } }
   }))
 }
 
@@ -128,6 +150,9 @@ export const answerTask = (
   Effect.gen(function*() {
     const record = yield* findTask(root, id)
     const decide = answerOn(id, words, at)
+    if (record.state.kind === "started" && openQuestions(record).length > 0) {
+      return yield* rewriteTaken(root, id, decide)
+    }
     if (record.state.kind !== "new") {
       const refused = yield* decide(record)
       return refused.result

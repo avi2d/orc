@@ -49,6 +49,7 @@ export interface NoMistakesInput {
   readonly runDir: string
   readonly allow?: ReadonlyArray<AllowWord> | undefined
   readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
+  readonly waitForAnswers?: ((missing: ReadonlyArray<NoMistakesFinding>) => Effect.Effect<ReadonlyArray<QuestionAnswer>, never, FileSystem.FileSystem>) | undefined
 }
 
 export interface NoMistakesHost {
@@ -216,6 +217,23 @@ const appendGate = (runDir: string, step: string): Effect.Effect<void, never, Fi
     )
   })
 
+// supplied gains every answer the wait brings, so the rest of the gate sends them.
+const awaitMissing = (
+  input: NoMistakesInput,
+  asked: ReadonlyArray<NoMistakesFinding>,
+  supplied: Map<string, string>
+): Effect.Effect<ReadonlyArray<NoMistakesFinding>, never, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const unanswered = () => asked.filter((finding) => !supplied.has(finding.id))
+    if (unanswered().length > 0 && input.waitForAnswers !== undefined) {
+      yield* appendGate(input.runDir, "asking")
+      for (const entry of yield* input.waitForAnswers(unanswered())) {
+        supplied.set(entry.question, entry.answer)
+      }
+    }
+    return unanswered()
+  })
+
 const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     let sent: Sent = { kind: "start" }
@@ -235,7 +253,7 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending, nev
       }
       yield* appendGate(input.runDir, step.gate.step)
       const open = openQuestionsIn(step.parsed.findings, omittedQuestionIds(current.stdout))
-      const missing = [...open, ...askUserFindings(step.parsed.findings, input.allow ?? [])].filter((finding) => !supplied.has(finding.id))
+      const missing = yield* awaitMissing(input, [...open, ...askUserFindings(step.parsed.findings, input.allow ?? [])], supplied)
       if (missing.length > 0) {
         return log.awaitAnswers(step.gate, missing)
       }
@@ -248,7 +266,7 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending, nev
         sent = { kind: "answer", gate: step.gate }
         continue
       }
-      const answer = gateAnswer(input, log, step.gate, step.parsed.findings, [...supplied].map(([question, answer]) => ({ question, answer })))
+      const answer = gateAnswer(input, log, step.gate, step.parsed.findings, [...supplied].map(([question, words]) => ({ question, answer: words })))
       if (answer.kind === "refuse") {
         return log.refuse(step.gate, answer.reason)
       }

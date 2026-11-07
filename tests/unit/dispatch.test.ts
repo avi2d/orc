@@ -166,6 +166,18 @@ describe("parseDispatchArgs", () => {
   test("a result with a repeated stdin marker is refused instead of read twice", () => {
     expect(parseDispatchArgs("runner", ["result", "task-1", "--stdin-label", "--stdin-label"]).kind).toBe("UsageError")
   })
+  test("runner answer hands the words after -- to the command instead of reading them as answers", () => {
+    expect(parseDispatchArgs("runner", ["answer", "task-1", "--", "ssh", "linux", "orc"])).toEqual({
+      kind: "RunnerAnswer",
+      task: "task-1",
+      reach: { kind: "through", command: ["ssh", "linux", "orc"] }
+    })
+    expect(parseDispatchArgs("runner", ["answer", "task-1"])).toEqual({ kind: "RunnerAnswer", task: "task-1", reach: { kind: "here" } })
+  })
+  test("runner answer refuses an answer on argv instead of letting a remote shell split it", () => {
+    expect(parseDispatchArgs("runner", ["answer", "task-1", "r2=Keep it"])).toEqual({ kind: "UsageError", detail: "unexpected argument: r2=Keep it" })
+    expect(parseDispatchArgs("runner", ["answer", "../task-1"]).kind).toBe("UsageError")
+  })
   test("runner -- with no command is refused instead of reading here", () => {
     expect(parseDispatchArgs("runner", ["start", "--"]).kind).toBe("UsageError")
     expect(parseDispatchArgs("runner", ["result", "task-1", "--"]).kind).toBe("UsageError")

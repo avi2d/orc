@@ -31,6 +31,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/context-mark.ts` | The 150 thousand token compaction mark orc writes into the run's Pi folder |
 | `packages/run/agents` | The bundled agent files |
 | `packages/run/src/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
+| `packages/run/src/answer-wait.ts` | The wait at a no-mistakes gate for the captain's answers in the run folder |
 | `packages/run/src/toon.ts` | The reading of the TOON output no-mistakes prints |
 | `packages/run/src/run-history.ts` | The records home, the SQLite run history and `orc runs` |
 | `packages/run/src/nono.ts` | The Sandcastle sandbox provider that runs each command in `nono run` |
