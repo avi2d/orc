@@ -86,7 +86,9 @@ A `direct-PR` run pushes the branch and opens the PR instead, as [Delivery modes
 At each gate orc asks no-mistakes to fix the findings marked `auto-fix`, ignores those marked `no-op`, and accepts the fix review.
 Orc refuses a no-mistakes gate holding an open review question without an `--answer` for that question.
 Rerun with `--answer question-<id>="<text>"` and orc answers every open question before any gate response.
-Orc refuses a no-mistakes gate holding an `ask-user` finding without `--allow ask-user`.
+Orc treats an `ask-user` finding the same way, as a question carrying the finding's id and text.
+Rerun with `--answer <finding-id>="<text>"` and orc asks no-mistakes to fix that finding with your text as its guidance.
+Rerun with `--allow ask-user` instead and orc declines every `ask-user` finding and accepts the rest.
 Orc leaves that no-mistakes gate parked for you to answer.
 
 Orc records a `no-mistakes` run as succeeded only when four facts hold.

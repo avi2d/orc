@@ -5,6 +5,7 @@ import { hostGitSafetyEnv } from "./host"
 import {
   answerArgsFor,
   answerForGate,
+  askUserFindings,
   findingsTable,
   omittedQuestionIds,
   openQuestionsIn,
@@ -157,10 +158,10 @@ const stopOnRejection = (input: NoMistakesInput, log: DriveLog, sent: Sent, comm
   }))
 }
 
-const gateAnswer = (input: NoMistakesInput, log: DriveLog, gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>): GateAnswer =>
+const gateAnswer = (input: NoMistakesInput, log: DriveLog, gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>, answers: ReadonlyArray<QuestionAnswer>): GateAnswer =>
   log.gatesAnswered() >= maxGatesAnswered
     ? { kind: "refuse", reason: "orc answered " + maxGatesAnswered.toString() + " gates without reaching an outcome" }
-    : answerForGate(gate, findings, input.allow ?? [])
+    : answerForGate(gate, findings, input.allow ?? [], answers)
 
 type CurrentStep =
   | { readonly kind: "stop"; readonly ending: Ending }
@@ -192,13 +193,8 @@ type OpenOutcome =
   | { readonly kind: "ending"; readonly ending: Ending }
   | { readonly kind: "answered"; readonly command: NoMistakesReply }
 
-const serveOpenQuestions = (input: NoMistakesInput, log: DriveLog, gate: ParkedGate, open: ReadonlyArray<NoMistakesFinding>): Effect.Effect<OpenOutcome> =>
+const serveOpenQuestions = (input: NoMistakesInput, log: DriveLog, gate: ParkedGate, open: ReadonlyArray<NoMistakesFinding>, supplied: ReadonlyMap<string, string>): Effect.Effect<OpenOutcome> =>
   Effect.gen(function*() {
-    const supplied = new Map((input.answers ?? []).map((entry) => [entry.question, entry.answer] as const))
-    const missing = open.filter((finding) => !supplied.has(finding.id))
-    if (missing.length > 0) {
-      return { kind: "ending", ending: log.awaitAnswers(gate, missing) }
-    }
     for (let index = 0; index < open.length - 1; index += 1) {
       const pending = open[index] ?? { id: "", description: "" }
       const reply = yield* input.runner.answer({ question: pending.id, answer: supplied.get(pending.id) ?? "" })
@@ -225,6 +221,7 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending, nev
     let sent: Sent = { kind: "start" }
     yield* appendGate(input.runDir, "start")
     let current = yield* input.runner.start(input.taskFile)
+    const supplied = new Map((input.answers ?? []).map((entry) => [entry.question, entry.answer] as const))
     for (;;) {
       const step: CurrentStep = yield* stepCurrent(input, log, sent, current)
       if (step.kind === "stop") {
@@ -238,8 +235,12 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending, nev
       }
       yield* appendGate(input.runDir, step.gate.step)
       const open = openQuestionsIn(step.parsed.findings, omittedQuestionIds(current.stdout))
+      const missing = [...open, ...askUserFindings(step.parsed.findings, input.allow ?? [])].filter((finding) => !supplied.has(finding.id))
+      if (missing.length > 0) {
+        return log.awaitAnswers(step.gate, missing)
+      }
       if (open.length > 0) {
-        const outcome: OpenOutcome = yield* serveOpenQuestions(input, log, step.gate, open)
+        const outcome: OpenOutcome = yield* serveOpenQuestions(input, log, step.gate, open, supplied)
         if (outcome.kind === "ending") {
           return outcome.ending
         }
@@ -247,7 +248,7 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending, nev
         sent = { kind: "answer", gate: step.gate }
         continue
       }
-      const answer = gateAnswer(input, log, step.gate, step.parsed.findings)
+      const answer = gateAnswer(input, log, step.gate, step.parsed.findings, [...supplied].map(([question, answer]) => ({ question, answer })))
       if (answer.kind === "refuse") {
         return log.refuse(step.gate, answer.reason)
       }
