@@ -17,3 +17,7 @@ Use the step id from orc show JSON to score one resumed checks row when an attem
 Orc score refuses a score outside 1 to 5 with no write.
 Orc score refuses an unknown run or an unknown step with no write.
 Orc score keeps one row per score and orc show prints the latest score beside the signals.
+To count the gates and rules past runs kept hitting, run `orc refusals`.
+To print the same facts as JSON, run `orc refusals --json`.
+Its JSON document names its version first as `schema`, starting at `orc.refusals.v1`.
+Each row counts the runs that hit one gate and rule, so two failing rounds in one run count once.

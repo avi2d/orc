@@ -161,7 +161,7 @@ const seedRefusedPrior = async (db: Database, priorDir: string, project: string)
   await Effect.runPromise(recordChecksDone(db, "prior-a", {
     round: 1, file: join(priorDir, "checks-1.md"),
     started: "2026-10-19T09:20:00.000Z", ended: "2026-10-19T09:21:00.000Z",
-    passed: true, failed: [], checks: [{ name: "lint", passed: true }]
+    passed: true, failed: [], checks: [{ name: "lint", passed: true }], refusals: []
   }))
   await Effect.runPromise(recordFixDone(db, "prior-a", {
     attempt: 1, status: "passed",

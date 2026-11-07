@@ -15,11 +15,12 @@ import { runAgentStep, runReportStep } from "./run"
 import type { ReportKind } from "./task-kind"
 import { formatReport } from "./run-record"
 import { formatHistoryError, listRuns, openDatabase, orcHomeDir } from "./run-history"
+import { encodeRefusalsJson, formatRefusalsTable, readRefusals } from "./gate-refusals"
 import { encodeRunsJson, formatRunsTable } from "./run-history-view"
 import { recordStepScore } from "./run-scores"
 import { encodeShowJson, formatShow, readShow } from "./show"
 
-const usage = "Usage: orc [--version] [--help] | orc chat | orc runs [--json] | orc show <run> [--json] | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--kind ship|scout|task] [--delivery no-mistakes|direct-PR] [--branch <name>] [--sandbox nono|none] [--token-file <path>] [--provider <id>] [--instructions <path>] [--allow ask-user] [--answer <question-or-finding-id>=\"<text>\"] | " + dispatchUsage
+const usage = "Usage: orc [--version] [--help] | orc chat | orc runs [--json] | orc refusals [--json] | orc show <run> [--json] | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--kind ship|scout|task] [--delivery no-mistakes|direct-PR] [--branch <name>] [--sandbox nono|none] [--token-file <path>] [--provider <id>] [--instructions <path>] [--allow ask-user] [--answer <question-or-finding-id>=\"<text>\"] | " + dispatchUsage
 
 const readFailure = (error: unknown): string =>
   typeof error === "string" ? error : "orc: cannot read the run history: " + formatHistoryError(error)
@@ -136,6 +137,15 @@ const program = Effect.gen(function*() {
         yield* Console.log(yield* encodeRunsJson(runs))
       } else {
         yield* Console.log(formatRunsTable(runs))
+      }
+      break
+    }
+    case "ListRefusals": {
+      const counts = yield* readHistory((db) => readRefusals(db))
+      if (args.json) {
+        yield* Console.log(yield* encodeRefusalsJson(counts))
+      } else {
+        yield* Console.log(formatRefusalsTable(counts))
       }
       break
     }
