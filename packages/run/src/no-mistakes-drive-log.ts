@@ -31,7 +31,7 @@ export interface DriveLog {
   readonly gatesAnswered: () => number
   readonly countGate: () => void
   readonly refuse: (gate: ParkedGate | null, reason: string) => Ending
-  readonly awaitAnswers: (gate: ParkedGate, missing: ReadonlyArray<NoMistakesFinding>) => Ending
+  readonly awaitAnswers: (gate: ParkedGate, missing: ReadonlyArray<NoMistakesFinding>, asked: string | null) => Ending
   readonly fail: (reason: string) => Ending
   readonly finish: (parsed: ParsedRun) => Ending
   readonly close: (ending: Ending) => NoMistakesRecord
@@ -90,9 +90,9 @@ export const openDriveLog = (started: string): DriveLog => {
       gatesAnswered += 1
     },
     refuse,
-    awaitAnswers: (gate, missing) => ({
+    awaitAnswers: (gate, missing, asked) => ({
       ...refuse(gate, missingReason(missing)),
-      openQuestions: missing.map((finding) => ({ id: finding.id, text: finding.description }))
+      openQuestions: missing.map((finding) => ({ id: finding.id, text: finding.description, ...(asked === null ? {} : { asked }) }))
     }),
     fail,
     finish: (parsed) =>

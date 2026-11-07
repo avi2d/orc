@@ -33,11 +33,16 @@ interface Answer {
   readonly at: string
 }
 
+// relayedTo names the asking the answer was handed to, and null means no run has it yet.
+export interface ParkedAnswer extends Answer {
+  readonly relayedTo: string | null
+}
+
 export interface ParkedQuestion {
   readonly id: string
   readonly text: string
-  readonly answer: Answer | null
-  readonly used: boolean
+  readonly asked: string
+  readonly answer: ParkedAnswer | null
 }
 
 export interface HoldQuestion {
@@ -109,7 +114,8 @@ const QuestionFront = Schema.Struct({
   text: Schema.String,
   answer: Schema.optional(Schema.String),
   answered_at: Schema.optional(Schema.String),
-  used: Schema.optional(Schema.Boolean)
+  asked_at: Schema.optional(Schema.String),
+  relayed_to: Schema.optional(Schema.String)
 })
 
 const Frontmatter = Schema.Struct({
@@ -178,7 +184,7 @@ const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: str
     if (typeof answer === "string") {
       return "the " + what + " question " + question.id + " names its answer with no words or no time"
     }
-    questions.push({ id: question.id, text: question.text, answer, used: question.used ?? false })
+    questions.push({ id: question.id, text: question.text, asked: question.asked_at ?? "", answer: answer === null ? null : { ...answer, relayedTo: question.relayed_to ?? null } })
   }
   return questions
 }

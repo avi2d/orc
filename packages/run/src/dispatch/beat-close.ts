@@ -4,11 +4,10 @@ import { closeStartedTask } from "./backlog"
 import type { BeatAction } from "./beat-action"
 import type { DispatchConfig } from "./config"
 import { ownedBySweep, throughFor } from "./machine-reach"
-import type { QuestionAnswer } from "../no-mistakes-gate"
-import { askStartedTask, markAnswersRelayed, parkStartedTask } from "./parked"
+import { answersFor, askStartedTask, markAnswersRelayed, parkStartedTask } from "./parked"
 import { taskLabel } from "./pueue-status"
 import { type RunnerError, type RunnerRequirements, taskBranch } from "./runner"
-import { endingFromResult, relayAnswers, relayAnswersThrough, type RunEnding, readResult, readResultThrough, type RunnerResult } from "./runner-result"
+import { endingFromResult, type Relay, relayAnswers, relayAnswersThrough, type RunEnding, readResult, readResultThrough, type RunnerResult } from "./runner-result"
 import type { TaskFileError, TaskRecord } from "./task-record"
 
 export interface CloseContext {
@@ -31,7 +30,7 @@ const endTask = (
     const id = task.spec.id
     if (ending.kind === "park") {
       const branch = task.parked?.branch ?? taskBranch(id)
-      const parked = yield* parkStartedTask(root, id, branch, ending.questions).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
+      const parked = yield* parkStartedTask(root, id, branch, ending.questions, yield* nowIso).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
       return parked === null
         ? Option.none()
         : Option.some({ kind: "parked", task: id, machine, branch, questions: ending.questions.map((question) => question.id) } satisfies BeatAction)
@@ -64,28 +63,29 @@ const serveAsking = (
   task: TaskRecord,
   machine: string,
   asking: Asking,
-  relay: (answers: ReadonlyArray<QuestionAnswer>) => Effect.Effect<string, RunnerError, RunnerRequirements>
+  relay: (relay: Relay) => Effect.Effect<string, RunnerError, RunnerRequirements>
 ): Effect.Effect<BeatAction | null, TaskFileError, RunnerRequirements> =>
   Effect.gen(function*() {
     const id = task.spec.id
     if (!Arr.isReadonlyArrayNonEmpty(asking.questions)) {
       return null
     }
-    const asked = yield* askStartedTask(context.root, id, asking.questions).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(false)))
+    const live = { asked: asking.asked, questions: asking.questions }
+    const asked = yield* askStartedTask(context.root, id, live).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(false)))
     if (asked) {
       return { kind: "asking", task: id, machine, until: asking.until, questions: asking.questions.map((question) => question.id) } satisfies BeatAction
     }
-    const answers = (task.parked?.questions ?? []).flatMap((question) =>
-      question.answer !== null && !question.used && asking.questions.some((open) => open.id === question.id) ? [{ question: question.id, answer: question.answer.words }] : []
-    )
-    if (answers.length === 0) {
+    const answered = answersFor(task, live)
+    const fresh = answered.filter((question) => question.answer.relayedTo === null).map((question) => question.id)
+    if (fresh.length === 0) {
       return null
     }
-    return yield* relay(answers).pipe(
-      Effect.andThen(markAnswersRelayed(context.root, id, answers.map((entry) => entry.question)).pipe(
+    // answers.json is replaced whole, so each relay carries every answer of the asking and not only the new ones.
+    return yield* relay({ asking: asking.asked, answers: answered.map((question) => ({ question: question.id, answer: question.answer.words })) }).pipe(
+      Effect.andThen(markAnswersRelayed(context.root, id, asking.asked, fresh).pipe(
         Effect.catchTag("BacklogError", () => Effect.void)
       )),
-      Effect.as<BeatAction>({ kind: "answered", task: id, machine, questions: answers.map((entry) => entry.question) }),
+      Effect.as<BeatAction>({ kind: "answered", task: id, machine, questions: fresh }),
       Effect.catchTag("RunnerError", (error) => Effect.succeed<BeatAction>({ kind: "answer-failed", task: id, machine, reason: error.detail })),
       Effect.timeoutOrElse({
         duration: Duration.seconds(closeSeconds),
@@ -126,8 +126,10 @@ export const closeFinished = (
       return { kind: "ended", action: { kind: "close-failed", task: task.spec.id, machine: claim.machine, reason: outcome.reason } } satisfies Progress
     }
     if (outcome.ending === null) {
-      const relay = (answers: ReadonlyArray<QuestionAnswer>) =>
-        through === null ? relayAnswers(context.home, task.spec.id, Effect.succeed(JSON.stringify({ label, answers }))) : relayAnswersThrough(through, task.spec.id, label, answers)
+      const relay = (handed: Relay) =>
+        through === null
+          ? relayAnswers(context.home, task.spec.id, Effect.succeed(JSON.stringify({ label, asking: handed.asking, answers: handed.answers })))
+          : relayAnswersThrough(through, task.spec.id, label, handed)
       const action = outcome.asking === null ? null : yield* serveAsking(context, task, claim.machine, outcome.asking, relay)
       return { kind: "running", outputAt: outcome.outputAt, action } satisfies Progress
     }

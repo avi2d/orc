@@ -4,7 +4,7 @@ export const QuestionJson = Schema.Struct({ id: Schema.String, text: Schema.Stri
 
 export const ParkedJson = Schema.Struct({
   branch: Schema.String,
-  questions: Schema.Array(QuestionJson)
+  questions: Schema.Array(Schema.Struct({ ...QuestionJson.fields, asked: Schema.String }))
 })
 
 export const HoldJson = Schema.Struct({
@@ -34,7 +34,7 @@ const parkedLines = (task: ParkedTask): ReadonlyArray<{ readonly key: string; re
   return task.parked.questions.flatMap((question) =>
     question.answer === null
       ? [{
-        key: JSON.stringify([task.id, branch, question.id, question.text]),
+        key: JSON.stringify([task.id, branch, question.id, question.text, question.asked]),
         line: task.id + " " + task.title + " is parked on " + branch + " for the captain's answer to " + question.id + (question.text === "" ? "" : ": " + question.text)
       }]
       : []

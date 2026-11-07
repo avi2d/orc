@@ -24,7 +24,7 @@ describe("the parked-question listing", () => {
           title: "Pick the API",
           status: "new",
           hold: null,
-          parked: { branch: "orc/task-1", questions: [{ id: "question-4", text: "REST or gRPC?", answer: null }] }
+          parked: { branch: "orc/task-1", questions: [{ id: "question-4", text: "REST or gRPC?", asked: "2026-11-02T10:20:00.000Z", answer: null }] }
         }],
         events: []
       }))

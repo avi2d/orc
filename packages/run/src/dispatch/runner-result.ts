@@ -5,7 +5,7 @@ import type { OpenQuestion } from "../no-mistakes-gate"
 import { formatHistoryError, openDatabase, type RunRecord, RunStatusSchema } from "../run-history"
 import { writtenReport } from "../report-run"
 import { gateLogFileName } from "../no-mistakes"
-import { Asking, askingFileName, answersFileName, RelayedAnswers, writeWhole } from "../answer-wait"
+import { Asking, askingFileName, AnswersFile, answersFileName, writeWhole } from "../answer-wait"
 import type { QuestionAnswer } from "../no-mistakes-gate"
 import { readJsonFileIfPresent } from "../json-file"
 import { runDirFor, type TaskKind } from "../task-kind"
@@ -21,7 +21,7 @@ const RunSummary = Schema.Struct({
   status: RunStatusSchema,
   prLink: Schema.NullOr(Schema.String),
   endReason: Schema.NullOr(Schema.String),
-  openQuestions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String })),
+  openQuestions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String, asked: Schema.optional(Schema.String) })),
   report: Schema.optional(Schema.String),
   asking: Schema.optional(Asking)
 })
@@ -227,26 +227,34 @@ export const readResult = (task: string, home: string, label?: string | null): E
     return { ...result, status: run?.asking === undefined ? result.status : "paused", outputAt: runAt ?? result.started }
   })
 
-const AnswerStdin = Schema.Struct({ label: Schema.optional(LabelArg), answers: RelayedAnswers })
+const AnswerStdin = Schema.Struct({ ...AnswersFile.fields, label: Schema.optional(LabelArg) })
 
-const relayInto = (home: string, task: string, label: string | null, answers: ReadonlyArray<QuestionAnswer>): Effect.Effect<string, RunnerError, RunnerRequirements> =>
+export interface Relay {
+  readonly asking: string
+  readonly answers: ReadonlyArray<QuestionAnswer>
+}
+
+const relayInto = (home: string, task: string, label: string | null, relay: Relay): Effect.Effect<string, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const result = yield* readResult(task, home, label)
     const run = result.status === "unknown" ? null : result.run
     if (run === null || run.asking === undefined) {
       return yield* refuse("no run of " + task + " waits for an answer")
     }
+    if (run.asking.asked !== relay.asking) {
+      return yield* refuse("run " + run.id + " of " + task + " no longer waits on the asking of " + relay.asking + ", it waits on the asking of " + run.asking.asked)
+    }
     const file = runDirFor(home, run.id) + "/" + answersFileName
-    if (!(yield* writeWhole(file, JSON.stringify(answers)))) {
+    if (!(yield* writeWhole(file, JSON.stringify({ asking: relay.asking, answers: relay.answers })))) {
       return yield* refuse("cannot write " + file)
     }
-    return "handed " + answers.map((entry) => entry.question).join(", ") + " to run " + run.id + " of " + task
+    return "handed " + relay.answers.map((entry) => entry.question).join(", ") + " to run " + run.id + " of " + task
   })
 
 export const relayAnswers = (home: string, task: string, stdin: Effect.Effect<string, RunnerError>): Effect.Effect<string, RunnerError, RunnerRequirements> =>
   stdin.pipe(
     Effect.flatMap((text) => decodeJson(text, AnswerStdin, "the answers on stdin")),
-    Effect.flatMap((request) => relayInto(home, task, request.label ?? null, request.answers))
+    Effect.flatMap((request) => relayInto(home, task, request.label ?? null, request))
   )
 
 // The answers travel on stdin, so a reach that joins its argv for a remote shell cannot split the captain's words.
@@ -254,9 +262,9 @@ export const relayAnswersThrough = (
   command: Command,
   task: string,
   label: string | null,
-  answers: ReadonlyArray<QuestionAnswer>
+  relay: Relay
 ): Effect.Effect<string, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  capture([...command, "runner", "answer", task], JSON.stringify({ ...(label === null ? {} : { label }), answers })).pipe(
+  capture([...command, "runner", "answer", task], JSON.stringify({ ...(label === null ? {} : { label }), asking: relay.asking, answers: relay.answers })).pipe(
     Effect.flatMap((result) =>
       result.exitCode === 0
         ? Effect.succeed(result.stdout.trim())

@@ -1,5 +1,6 @@
 import { Effect, FileSystem } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import type { WaitResult } from "./answer-wait"
 import { collectOutput } from "./git-run"
 import { hostGitSafetyEnv } from "./host"
 import {
@@ -50,7 +51,7 @@ export interface NoMistakesInput {
   readonly runDir: string
   readonly allow?: ReadonlyArray<AllowWord> | undefined
   readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
-  readonly waitForAnswers?: ((missing: ReadonlyArray<NoMistakesFinding>) => Effect.Effect<ReadonlyArray<QuestionAnswer>, never, FileSystem.FileSystem>) | undefined
+  readonly waitForAnswers?: ((missing: ReadonlyArray<NoMistakesFinding>) => Effect.Effect<WaitResult, never, FileSystem.FileSystem>) | undefined
 }
 
 export interface NoMistakesHost {
@@ -223,17 +224,19 @@ const awaitMissing = (
   input: NoMistakesInput,
   asked: ReadonlyArray<NoMistakesFinding>,
   supplied: Map<string, string>
-): Effect.Effect<ReadonlyArray<NoMistakesFinding>, never, FileSystem.FileSystem> =>
+): Effect.Effect<{ readonly missing: ReadonlyArray<NoMistakesFinding>; readonly asking: string | null }, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const unanswered = () => asked.filter((finding) => !supplied.has(finding.id))
-    if (unanswered().length > 0 && input.waitForAnswers !== undefined) {
-      yield* appendGate(input.runDir, "asking")
-      for (const entry of yield* input.waitForAnswers(unanswered())) {
-        supplied.set(entry.question, entry.answer)
-      }
-      yield* appendGate(input.runDir, "answered")
+    if (unanswered().length === 0 || input.waitForAnswers === undefined) {
+      return { missing: unanswered(), asking: null }
     }
-    return unanswered()
+    yield* appendGate(input.runDir, "asking")
+    const waited = yield* input.waitForAnswers(unanswered())
+    for (const entry of waited.answers) {
+      supplied.set(entry.question, entry.answer)
+    }
+    yield* appendGate(input.runDir, "answered")
+    return { missing: unanswered(), asking: waited.asked }
   })
 
 type ParkedAdvance =
@@ -251,9 +254,9 @@ const advanceParked = (
   Effect.gen(function*() {
     yield* appendGate(input.runDir, gate.step)
     const open = openQuestionsIn(parsed.findings, omittedQuestionIds(stdout))
-    const missing = yield* awaitMissing(input, [...open, ...askUserFindings(parsed.findings, input.allow ?? [])], supplied)
+    const { missing, asking } = yield* awaitMissing(input, [...open, ...askUserFindings(parsed.findings, input.allow ?? [])], supplied)
     if (missing.length > 0) {
-      return { kind: "ending", ending: log.awaitAnswers(gate, missing) }
+      return { kind: "ending", ending: log.awaitAnswers(gate, missing, asking) }
     }
     if (open.length > 0) {
       const outcome: OpenOutcome = yield* serveOpenQuestions(input, log, gate, open, supplied)

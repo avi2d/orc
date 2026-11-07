@@ -100,7 +100,7 @@ describe("held task files", () => {
       await run(addTask(root, spec))
       await run(claimTask(root, "orc-1"))
       await run(writeTaken(root, { spec: { ...spec, id: "orc-1", body: "# Fix the thing\n" }, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/orc-1.log" } } }))
-      await run(parkStartedTask(root, "orc-1", "orc/orc-1", Arr.make({ id: "question-4", text: "Which retries are allowed?" })))
+      await run(parkStartedTask(root, "orc-1", "orc/orc-1", Arr.make({ id: "question-4", text: "Which retries are allowed?" }), "2026-10-27T10:30:00.000Z"))
       const file = join(root, "new", "orc-1.md")
       const before = await readFile(file, "utf8")
       const failure = await run(Effect.flip(holdTask(root, "orc-1", { reason: "wait for budget", until: null, questions: [] })))

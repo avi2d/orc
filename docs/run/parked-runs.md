@@ -9,6 +9,8 @@ The next beat writes the questions into the started task's `parked_questions` an
 `orc backlog` shows that task as `started asking (<question-ids>)`, and the chat posts its questions as it does a parked task's.
 Answer one with `orc backlog answer <task-id> <question-id>=<text>`, and the next beat hands every answer the run waits on to it through `orc runner answer` on its machine.
 It prints `handed <question-ids> to the run of <task-id> on <machine>`, and the run carries on at the same gate with no new dispatch.
+A wait on several questions gets every answer given so far each time the beat hands one more.
+A question the run asks again at a later wait is open again, and the chat posts it once more.
 
 A run whose wait ends with a question unanswered parks its task instead of closing it failed.
 The beat moves the task back to `new` with `parked_branch` and `parked_questions` in its file, each question with its id and text.

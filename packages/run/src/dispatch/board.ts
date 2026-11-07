@@ -43,8 +43,23 @@ type TaskJson = {
   readonly dependsOn: ReadonlyArray<string>
   readonly created: string
   readonly hold: Hold | null
-  readonly parked: Parked | null
+  readonly parked: ParkedJson | null
 } & TaskStatusJson
+
+interface ParkedJson {
+  readonly branch: string
+  readonly questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly asked: string; readonly answer: { readonly words: string; readonly at: string } | null }>
+}
+
+const parkedJson = (parked: Parked): ParkedJson => ({
+  branch: parked.branch,
+  questions: parked.questions.map((question) => ({
+    id: question.id,
+    text: question.text,
+    asked: question.asked,
+    answer: question.answer === null ? null : { words: question.answer.words, at: question.answer.at }
+  }))
+})
 
 interface BacklogJson {
   readonly schema: typeof BACKLOG_JSON_SCHEMA
@@ -97,7 +112,7 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     dependsOn: record.spec.dependsOn,
     created: record.spec.created,
     hold: record.hold,
-    parked: record.parked,
+    parked: record.parked === null ? null : parkedJson(record.parked),
     ...claimJson(record)
   })),
   events: view.events,

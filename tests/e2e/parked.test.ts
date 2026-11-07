@@ -52,7 +52,9 @@ const refuseOnQuestions = async (fixture: Fixture): Promise<void> => {
   }
 }
 
-const askWhileRunning = async (fixture: Fixture): Promise<string> => {
+const firstAsking = { asked: "2026-11-02T10:20:00.000Z", until: "2026-11-02T10:50:00.000Z", questions: [{ id: "r2", text: "Keep the old flag?" }] }
+
+const askWhileRunning = async (fixture: Fixture, asking: typeof firstAsking = firstAsking): Promise<string> => {
   await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({
     tasks: {
       "77": { id: 77, label: fixture.home + " orc-1", group: "orc", path: fixture.checkout, status: { Running: { start: "2026-11-02T10:00:00Z" } } }
@@ -76,7 +78,7 @@ const askWhileRunning = async (fixture: Fixture): Promise<string> => {
   }
   const runDir = join(fixture.home, "runs", "run-1")
   await mkdir(runDir, { recursive: true })
-  await writeFile(join(runDir, "asking.json"), JSON.stringify({ until: "2026-11-02T10:50:00.000Z", questions: [{ id: "r2", text: "Keep the old flag?" }] }))
+  await writeFile(join(runDir, "asking.json"), JSON.stringify(asking))
   return runDir
 }
 
@@ -132,15 +134,45 @@ describe("a parked run", () => {
       await startOnLinux(fixture)
       const runDir = await askWhileRunning(fixture)
       expect(await orcOk(fixture, ["beat"])).toContain("asking orc-1 on linux: the run waits until 2026-11-02T10:50:00.000Z for the captain's answer to r2")
-      expect(await backlogTaskOne(fixture)).toMatchObject({ id: "orc-1", status: "started", parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "Keep the old flag?", answer: null }] } })
+      expect(await backlogTaskOne(fixture)).toMatchObject({ id: "orc-1", status: "started", parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "Keep the old flag?", asked: firstAsking.asked, answer: null }] } })
       expect(await orcOk(fixture, ["backlog"])).toContain("orc-1 orc on linux started asking (r2)")
       expect(await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Keep", "it", "behind", "a", "flag"])).toBe("answered r2 on orc-1, so the next beat hands it to the run waiting on orc/orc-1\n")
       const relayed = await orcOk(fixture, ["beat"])
       expect(relayed).toContain("handed r2 to the run of orc-1 on linux")
       expect(relayed).not.toContain("parked orc-1")
-      expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual([{ question: "r2", answer: "Keep it behind a flag" }])
+      expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual({ asking: firstAsking.asked, answers: [{ question: "r2", answer: "Keep it behind a flag" }] })
       expect(await backlogTaskOne(fixture)).toMatchObject({ id: "orc-1", status: "started" })
       expect(await queuedSince(fixture)).toBeNull()
+    })
+  }, runnerTimeout)
+
+  test("a wait on two questions answered apart hands both answers on the second relay instead of only the newest", async () => {
+    await withFixture(async (fixture) => {
+      await startOnLinux(fixture)
+      const runDir = await askWhileRunning(fixture, { ...firstAsking, questions: [{ id: "r2", text: "Keep the old flag?" }, { id: "r3", text: "Drop the old docs?" }] })
+      await orcOk(fixture, ["beat"])
+      await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Keep it"])
+      expect(await orcOk(fixture, ["beat"])).toContain("handed r2 to the run of orc-1 on linux")
+      expect(await orcOk(fixture, ["beat"])).not.toContain("handed")
+      await orcOk(fixture, ["backlog", "answer", "orc-1", "r3=Drop them"])
+      expect(await orcOk(fixture, ["beat"])).toContain("handed r3 to the run of orc-1 on linux")
+      expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual({
+        asking: firstAsking.asked,
+        answers: [{ question: "r2", answer: "Keep it" }, { question: "r3", answer: "Drop them" }]
+      })
+    })
+  }, runnerTimeout)
+
+  test("the backlog json shows each answer's words and time instead of how orc relayed it", async () => {
+    await withFixture(async (fixture) => {
+      await startOnLinux(fixture)
+      await askWhileRunning(fixture)
+      await orcOk(fixture, ["beat"])
+      await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Keep it"])
+      await orcOk(fixture, ["beat"])
+      const task = await backlogTaskOne(fixture)
+      expect(task).toMatchObject({ parked: { questions: [{ id: "r2", asked: firstAsking.asked, answer: { words: "Keep it" } }] } })
+      expect(JSON.stringify(task)).not.toMatch(/used|relayed/)
     })
   }, runnerTimeout)
 
@@ -151,14 +183,16 @@ describe("a parked run", () => {
       await orcOk(fixture, ["beat"])
       await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Keep", "it"])
       expect(await orcOk(fixture, ["beat"])).toContain("handed r2 to the run of orc-1 on linux")
-      await writeFile(join(runDir, "asking.json"), JSON.stringify({ until: "2026-11-02T11:50:00.000Z", questions: [{ id: "r2", text: "Keep the old flag?" }] }))
+      const reasking = { ...firstAsking, asked: "2026-11-02T11:20:00.000Z", until: "2026-11-02T11:50:00.000Z" }
+      await writeFile(join(runDir, "asking.json"), JSON.stringify(reasking))
       const reasked = await orcOk(fixture, ["beat"])
       expect(reasked).toContain("asking orc-1 on linux")
       expect(reasked).not.toContain("handed r2")
+      expect(await backlogTaskOne(fixture)).toMatchObject({ parked: { questions: [{ id: "r2", asked: reasking.asked, answer: null }] } })
       expect(await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Restore", "it"])).toBe("answered r2 on orc-1, so the next beat hands it to the run waiting on orc/orc-1\n")
       const relayed = await orcOk(fixture, ["beat"])
       expect(relayed).toContain("handed r2 to the run of orc-1 on linux")
-      expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual([{ question: "r2", answer: "Restore it" }])
+      expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual({ asking: reasking.asked, answers: [{ question: "r2", answer: "Restore it" }] })
     })
   }, runnerTimeout)
 
