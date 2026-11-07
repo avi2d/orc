@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
@@ -15,13 +15,18 @@ const excludesFor = (projectDir: string, porcelain: string): Promise<ReadonlyArr
   )
 
 const withLinkedProject = async (use: (linked: string, real: string) => Promise<void>): Promise<void> => {
-  const linked = await mkdtemp(join(tmpdir(), "orc-excludes-"))
+  const realBase = await mkdtemp(join(tmpdir(), "orc-excludes-real-"))
+  const linkBase = await mkdtemp(join(tmpdir(), "orc-excludes-link-"))
+  const real = await realpath(realBase)
+  const linked = join(linkBase, "project")
+  await symlink(real, linked)
   try {
-    await mkdir(join(linked, ".old", "copy"), { recursive: true })
-    await mkdir(join(linked, "sub"), { recursive: true })
-    await use(linked, await realpath(linked))
+    await mkdir(join(real, ".old", "copy"), { recursive: true })
+    await mkdir(join(real, "sub"), { recursive: true })
+    await use(linked, real)
   } finally {
-    await rm(linked, { recursive: true, force: true })
+    await rm(linkBase, { recursive: true, force: true })
+    await rm(realBase, { recursive: true, force: true })
   }
 }
 
