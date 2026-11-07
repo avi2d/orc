@@ -132,6 +132,28 @@ describe("resume recovers an interrupted agent from its live session", () => {
     })
   })
 
+  test("an interrupted implementation whose recorded session Pi never wrote starts fresh instead of resuming a missing file", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "repo")
+        const priorDir = join(home, "runs", "prior-1")
+        await mkdir(priorDir, { recursive: true })
+        await writeFile(join(priorDir, "task.md"), "Do the thing.\n")
+        await seedRun(db, "prior-1", project, join(priorDir, "task.md"), "running", "2026-10-19T09:00:00.000Z")
+        const unwritten = join(priorDir, "session", "agent", "sessions", "enc", "2026-10-19T09-00-01-000Z_bbb222.jsonl")
+        await seedStep(db, "prior-1", "implement", "running", "2026-10-19T09:00:00.000Z", unwritten)
+        const run = await Effect.runPromise(historyFor("next-1", home, project, "2026-10-19T10:00:00.000Z"))
+        const plan = await Effect.runPromise(buildResumePlan(db, run))
+        expect(plan.skipImplement).toBe(false)
+        expect(plan.implementSessionFile).toBeNull()
+        expect(plan.implementSessionId).toBeNull()
+      } finally {
+        db.close()
+      }
+    })
+  })
+
   test("an interrupted fixer resumes its own live session instead of the completed implementation export", async () => {
     await withHome(async (home) => {
       const db = await openDb(home)
