@@ -1,15 +1,17 @@
-import { DateTime } from "effect";
+import { DateTime, Option } from "effect";
 import type { TaskSampleRecord } from "../contract/task-samples";
 import type { ReportedTasks, TaskEntry } from "../contract/tasks";
 import { plannedRowsOf, type PlannedRow } from "./planned";
 import { byProject } from "./project-order";
 import type { NoMistakesSnapshot } from "../contract/no-mistakes";
 import type { OrcSnapshot } from "../contract/orc";
-import type { Failed, Outcome } from "../reading";
+import { type Decoded, decoded, decodeJson, flatMapDecoded, rejected } from "../decode";
+import { type Failed, mapOutcome, type Outcome } from "../reading";
 import type { PueueStatus } from "../sources/pueue";
-import type { ProcessSamples } from "../sources/task-processes";
+import type { CountedProcess, LiveProcess, ProcessSamples } from "../sources/task-processes";
+import { CountedProcessJson, LiveProcessJson, LiveTasksReport, LiveTasksJson, ProcessSamplesJson } from "../contract/task-live";
 import { cueStageSecondsOf, orcStageSecondsOf } from "./stage-time";
-import { pueueView, type RunOwners, type TestRun } from "./queues";
+import { testsOf, type RunOwners, type TestRun } from "./queues";
 import { orcPipelineOf } from "./orc-pipeline";
 import {
   anchorOf,
@@ -28,7 +30,7 @@ import {
 import { type KeptProcess, keptCpuSeconds, type LimitEpisode, type TaskHistory, taskHistories } from "./task-history";
 import type { SessionQuotaView } from "./session-quota";
 import { treeRestsOf } from "./task-pane-assessment";
-import { ownedProcesses, taskOwning, totalSecondsOf, within } from "./task-resources";
+import { ownedProcesses, totalSecondsOf, within } from "./task-resources";
 import { type TaskSpend, taskSpend } from "./task-spend";
 import { isLive, projectOf, sumOf, type LiveUsage, type ProjectRow, type ShownState, type TaskRow } from "./task-projects";
 
@@ -132,24 +134,6 @@ const liveUsageOf = (tasks: ReadonlyArray<TaskEntry>, live: LiveTasks, treeRests
   return usage;
 };
 
-// Pueue dates a run to the millisecond, so a run that starts with its task still belongs to it.
-const pueuePrecisionMillis = 1;
-
-export const testsOf = (tasks: ReadonlyArray<TaskEntry>, status: PueueStatus): ReadonlyMap<string, ReadonlyArray<TestRun>> => {
-  const view = pueueView(status);
-  const runs: ReadonlyArray<TestRun> = [...view.running, ...view.ended];
-  const owned = runs.flatMap((run) => {
-    const owner = taskOwning(tasks, { folder: run.path, startedAtMillis: millis(run.startedAt) }, pueuePrecisionMillis);
-    return owner === undefined ? [] : [{ task: owner.id, run }];
-  });
-  return new Map(
-    [...Map.groupBy(owned, ({ task }) => task)].map(([task, own]) => [
-      task,
-      own.map(({ run }) => run).toSorted((left, right) => millis(right.startedAt) - millis(left.startedAt)),
-    ]),
-  );
-};
-
 const okValue = <A>(outcome: Outcome<A> | { readonly kind: "pending" | "unset" } | undefined): A | undefined =>
   outcome?.kind === "ok" ? outcome.value : undefined;
 
@@ -251,20 +235,6 @@ const heldStates: ReadonlyArray<readonly [StageMark, OpenTaskState]> = [
 ];
 
 const stateRank: ReadonlyArray<ShownState> = ["working", "parked", "waiting", "blocked"];
-
-// A recorded stage can hold a task the orchestrator still calls working, and never eases a state it reports.
-export interface GateHold {
-  readonly mark: Extract<StageMark, "needsYou" | "waiting">;
-  readonly seconds: number | undefined;
-}
-
-// Only the recorded full review row names a gate, so only it holds the pane; cue rows read their wait from the worker detail.
-export const gateHoldOf = (pipeline: TaskPipeline | undefined): GateHold | undefined => {
-  if (pipeline?.kind !== "full review fix") return undefined;
-  const anchor = anchorOf(pipeline.stages);
-  if (anchor?.mark !== "needsYou" && anchor?.mark !== "waiting") return undefined;
-  return { mark: anchor.mark, seconds: pipeline.parkedSeconds };
-};
 
 const stateHeldBy = (state: ShownState, pipeline: TaskPipeline | undefined): ShownState => {
   if (!isLive(state)) return state;
@@ -375,4 +345,55 @@ export const atInterval = (levels: TaskLevels, interval: Interval, now: DateTime
     levels.registered,
   );
   return { ...levels, interval, projects };
+};
+
+const countedJson = (process: CountedProcess): typeof CountedProcessJson.Type => ({ ...process });
+
+const liveJson = (process: LiveProcess): typeof LiveProcessJson.Type => ({ ...process, folder: process.folder ?? null });
+
+export const liveTasksReport = ({
+  generatedAt,
+  live,
+}: {
+  readonly generatedAt: DateTime.Utc;
+  readonly live: Outcome<LiveTasks>;
+}): LiveTasksReport => ({
+  schemaVersion: 1,
+  generatedAt: DateTime.formatIso(generatedAt),
+  live: mapOutcome(live, (tasks): typeof LiveTasksJson.Type => ({
+    samples: {
+      intervalSeconds: tasks.samples.intervalSeconds,
+      startPrecisionMillis: tasks.samples.startPrecisionMillis,
+      before: tasks.samples.before.map(countedJson),
+      after: tasks.samples.after.map(liveJson),
+    },
+    programs: [...tasks.programs].map(([pid, program]) => ({ pid, program })),
+    memoryBytes: tasks.memoryBytes,
+  })),
+});
+
+const samplesOf = (samples: typeof ProcessSamplesJson.Type): ProcessSamples => ({
+  ...samples,
+  after: samples.after.map((process) => ({ ...process, folder: process.folder ?? undefined })),
+});
+
+export const decodeLiveTasksReport = (stdout: string): Outcome<LiveTasks> => {
+  const report = flatMapDecoded(decodeJson(LiveTasksReport)(stdout), (parsed) =>
+    Option.match(DateTime.make(parsed.generatedAt), {
+      onNone: (): Decoded<LiveTasksReport> => rejected("generatedAt is not an instant"),
+      onSome: (): Decoded<LiveTasksReport> => decoded(parsed),
+    }),
+  );
+  if (report.kind !== "ok") return report;
+  const { live } = report.value;
+  if (live.kind !== "ok") return live;
+  const tasks = live.value;
+  return {
+    kind: "ok",
+    value: {
+      samples: samplesOf(tasks.samples),
+      programs: new Map(tasks.programs.map(({ pid, program }) => [pid, program] as const)),
+      memoryBytes: tasks.memoryBytes,
+    },
+  };
 };

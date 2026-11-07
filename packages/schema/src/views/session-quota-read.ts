@@ -1,14 +1,14 @@
 import { DateTime, Effect, Layer } from "effect";
 import type { Reading } from "../reading";
-import { composedSessionQuota } from "../views/composed-session-quota";
-import { sessionLogsSince, sessionQuotaFrom, type SessionQuotaView } from "../views/session-quota";
-import { SavedProfilesSource, savedProfilesSourceLayer, type SavedProfiles } from "./saved-profiles";
-import { HarnessProcessSource, HerdrSource, herdrSourceLayer, linuxHarnessProcessSourceLayer, macHarnessProcessSourceLayer } from "./live-sessions";
-import { readBeside } from "./machines";
-import { type QuotaSource, quotaSourceLayer } from "./quota";
-import { type QuotaRead, readQuota } from "./quota-read";
+import { composedSessionQuota } from "./composed-session-quota";
+import { sessionLogsSince, sessionQuotaFrom, type SessionQuotaView } from "./session-quota";
+import { SavedProfilesSource, savedProfilesSourceLayer, type SavedProfiles } from "../sources/saved-profiles";
+import { HarnessProcessSource, HerdrSource, herdrSourceLayer, linuxHarnessProcessSourceLayer, macHarnessProcessSourceLayer } from "../sources/live-sessions";
+import { readBeside } from "../sources/machines";
+import { type QuotaSource, quotaSourceLayer } from "../sources/quota";
+import { type QuotaRead, readQuota } from "../sources/quota-read";
 import { SessionMachines, sessionMachinesLayer } from "./remote-sessions";
-import { type HarvestLogSource, harvestLogSourceLayer, SessionLogSource, sessionLogSourceLayer } from "./session-logs";
+import { type HarvestLogSource, harvestLogSourceLayer, SessionLogSource, sessionLogSourceLayer } from "../sources/session-logs";
 
 export type SessionSources = HerdrSource | HarnessProcessSource | SessionLogSource | SessionMachines;
 

@@ -11,7 +11,7 @@ import {
   type LedgerFile,
   lastReadingOf,
   sameReading,
-} from "../sessions/capture";
+} from "../sources/capture";
 import { bytesBetween, decodedLines, type Grown, grownRecords, wholeLines } from "./append-only";
 
 const listedLedger = (fs: FileSystem.FileSystem, directory: string) =>

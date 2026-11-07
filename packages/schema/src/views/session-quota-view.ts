@@ -1,13 +1,13 @@
 import { DateTime, Option } from "effect";
 import { type Decoded, decoded, flatMapDecoded, rejected } from "../decode";
 import type { Failed } from "../reading";
-import type { HarvestOrigin } from "../sessions/harvest";
-import type { Session, SessionIdentity } from "../sessions/live";
-import type { Tokens } from "../sessions/tokens";
-import { spendGate } from "../views/estimate";
-import type { AccountView, SessionQuotaView, SessionShare, WindowView } from "../views/session-quota";
-import type { WindowSource } from "../views/window-sources";
-import type { SessionQuotaReport } from "./session-quota";
+import type { HarvestOrigin } from "../sources/harvest";
+import type { Session, SessionIdentity } from "../sources/live";
+import type { Tokens } from "../contract/tokens";
+import { spendGate } from "./estimate";
+import type { AccountView, SessionQuotaView, SessionShare, WindowView } from "./session-quota";
+import type { WindowSource } from "../sources/window-sources";
+import type { SessionQuotaReport } from "../contract/session-quota";
 
 type Report = SessionQuotaReport;
 

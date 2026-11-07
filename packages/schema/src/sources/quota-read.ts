@@ -1,8 +1,8 @@
 import { DateTime, Effect } from "effect";
 import { failureOf, type Reading } from "../reading";
-import type { AccountCaptured } from "../sessions/capture";
-import { type HarvestedReading, harvestedReadings } from "../sessions/harvest";
-import { type AccountJoin, nativeKeys } from "../views/account-join";
+import type { AccountCaptured } from "../sources/capture";
+import { type HarvestedReading, harvestedReadings } from "../sources/harvest";
+import { type AccountJoin, nativeKeys } from "./account-join";
 import {
   harvestedWindow,
   joinedReadings,
@@ -11,7 +11,7 @@ import {
   sourcedProvider,
   type WindowShape,
   type WindowSource,
-} from "../views/window-sources";
+} from "./window-sources";
 import { type FailedQuotaEntry, type QuotaProviderId, type QuotaReport, QuotaSource, shownQuotaProviders } from "./quota";
 import { HarvestLogSource } from "./session-logs";
 

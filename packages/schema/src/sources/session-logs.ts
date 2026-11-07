@@ -1,8 +1,8 @@
 import { Clock, Config, Context, Effect, FileSystem, Layer, Option } from "effect";
 import type { ClaudeAccount } from "../contract/config";
-import { type Captured, capturedOf } from "../sessions/capture";
-import type { LogFile } from "../sessions/ledger";
-import { type Harness, markedLogRecords, type SinceByHarness } from "../sessions/log-lines";
+import { type Captured, capturedOf } from "../sources/capture";
+import type { LogFile } from "../sources/ledger";
+import { type Harness, markedLogRecords, type SinceByHarness } from "../sources/log-lines";
 import { grownRecords, type Listed as ListedFile } from "./append-only";
 import { ledgerReaderAt } from "./capture-ledger";
 import { captureLedgerDirectory, claudeConfigDirectory, claudeLogged, selector, sessionLogsCacheDirectory } from "./environment";

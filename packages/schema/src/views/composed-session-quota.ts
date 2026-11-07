@@ -1,9 +1,9 @@
 import { DateTime } from "effect";
-import type { Outcome } from "../reading";
-import type { Session } from "../sessions/live";
-import { addTokens, sumTokens, type Tokens, type Weighting, weightings } from "../sessions/tokens";
+import type { Failed, Outcome } from "../reading";
+import type { Session } from "../sources/live";
+import { addTokens, priceRatios, sumTokens, type Tokens, type Weighting, weightings } from "../contract/tokens";
 import { byPricedShare, estimate, rateSpanHours, spendGate } from "./estimate";
-import { type AccountJoin, sameJoin } from "./account-join";
+import { type AccountJoin, sameJoin } from "../sources/account-join";
 import {
   type AccountView,
   type Composition,
@@ -14,6 +14,21 @@ import {
   type Unmetered,
   type WindowView,
 } from "./session-quota";
+
+import { instant } from "../contract/session-quota";
+import { ComposedSessionQuotaReport, type MachineJson } from "../contract/composed-session-quota";
+import {
+  accountJson,
+  accountRef,
+  flaggedRows,
+  modelsSinceMidnightOf,
+  sessionJson,
+  statusOf,
+  unmeteredJson,
+  windowJson,
+  windowSessionJson,
+  windowsOf,
+} from "./session-quota-report";
 
 const staleAfterMillis = 5 * 60_000;
 
@@ -283,5 +298,73 @@ export const composedSessionQuota = (
     unmetered: mergedUnmetered(machines),
     unjoinedCalls: machines.reduce((sum, { view }) => sum + view.unjoinedCalls, 0),
     composition,
+  };
+};
+
+const sourcesJson = (quota: Failed | undefined, panes: Failed | undefined, processes: Failed | undefined) => ({
+  quota: statusOf(quota),
+  herdr: statusOf(panes),
+  processes: statusOf(processes),
+});
+
+const failedAccountsOn = (machine: string, failed: ReadonlyArray<FailedAccount>): MachineJson["failedAccounts"] =>
+  failed.flatMap((entry) => (entry.machine === machine ? [{ ...accountRef(entry.account), quota: statusOf(entry.failure) }] : []));
+
+const remoteJson = (name: string, state: RemoteState, failed: ReadonlyArray<FailedAccount>): MachineJson => {
+  const head = { name, role: "remote" as const };
+  const unread = { combined: false, sources: null, failedAccounts: [] };
+  switch (state.kind) {
+    case "ok":
+      return {
+        ...head,
+        status: "ok",
+        generatedAt: instant(state.generatedAt),
+        combined: true,
+        sources: sourcesJson(state.quota, state.panes, state.processes),
+        failedAccounts: failedAccountsOn(name, failed),
+      };
+    case "stale":
+      return { ...head, status: "stale", generatedAt: instant(state.generatedAt), ...unread };
+    case "unreachable":
+      return { ...head, status: "unreachable", detail: state.reason, generatedAt: null, ...unread };
+    case "invalid":
+      return { ...head, status: "invalid", detail: state.issue, generatedAt: null, ...unread };
+  }
+};
+
+// Every session in a composed view carries its machine, and a view no remote composed reads as this machine's alone.
+export const composedSessionQuotaReport = (view: SessionQuotaView, localName: string): ComposedSessionQuotaReport => {
+  const composition = view.composition ?? { local: localName, remotes: [], failedAccounts: [] };
+  const machineOf = (machine: string | undefined): string => machine ?? composition.local;
+  return {
+    schemaVersion: 2,
+    generatedAt: instant(view.now),
+    scope: "composed",
+    estimate: { basis: "machine-logs", upperBound: true, priceRatios: { ...priceRatios } },
+    machines: [
+      {
+        name: composition.local,
+        role: "local",
+        status: "ok",
+        generatedAt: instant(view.now),
+        combined: true,
+        sources: sourcesJson(view.quota, view.panes, view.processes),
+        failedAccounts: failedAccountsOn(composition.local, composition.failedAccounts),
+      },
+      ...composition.remotes.map(({ name, state }) => remoteJson(name, state, composition.failedAccounts)),
+    ],
+    ledger: { ...view.ledger, unjoinedCalls: view.unjoinedCalls },
+    accounts: view.accounts.map(accountJson),
+    windows: view.accounts.flatMap((account) =>
+      windowsOf(account).map((window) => ({
+        ...windowJson(account, window),
+        otherCycle: window.otherCycle,
+        sessions: window.sessions.map((row) => ({ ...windowSessionJson(row), machine: machineOf(row.session.machine) })),
+      })),
+    ),
+    sessions: view.sessions.map((session) => ({ ...sessionJson(session, modelsSinceMidnightOf(view, session)), machine: machineOf(session.machine) })),
+    unmatchedProcesses: view.unmatched.map(({ machine, ...runs }) => ({ ...runs, machine: machineOf(machine) })),
+    flags: flaggedRows(view).map(({ session, flag }) => ({ ...flag, machine: machineOf(session.machine) })),
+    unmetered: view.unmetered.map(unmeteredJson),
   };
 };

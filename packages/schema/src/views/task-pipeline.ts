@@ -1,6 +1,8 @@
 import type { NoMistakesRun, NoMistakesSnapshot, NoMistakesStep } from "../contract/no-mistakes";
 import type { OrcRun, OrcSnapshot } from "../contract/orc";
 import type { TaskEntry, TaskState } from "../contract/tasks";
+import type { PipelineFolder } from "../sources/pipelines";
+export type { PipelineFolder };
 
 export const pipelineKinds = ["full review fix", "quick fix", "local only", "scout", "orc run"] as const;
 export type PipelineKind = (typeof pipelineKinds)[number];
@@ -371,11 +373,6 @@ export const orcRunOf = (snapshot: OrcSnapshot | undefined, id: string, branches
   if (snapshot === undefined) return undefined;
   return snapshot.runs.find((run) => run.id === id || (run.branch !== undefined && branches.includes(run.branch)));
 };
-
-export interface PipelineFolder {
-  readonly folder: string;
-  readonly branches: ReadonlyArray<string>;
-}
 
 export const pipelineFoldersOf = (tasks: ReadonlyArray<TaskEntry>, kind: "full review fix" | "orc run"): ReadonlyArray<PipelineFolder> => {
   const branches = new Map<string, Set<string>>();

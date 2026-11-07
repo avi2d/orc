@@ -1,9 +1,8 @@
 import { Config, Context, Duration, Effect, Layer, Option } from "effect";
 import { CommandRunner } from "../command";
-import { decodeLiveTasksReport } from "../contract/task-live";
 import type { Outcome } from "../reading";
-import type { LiveTasks } from "../views/task-levels";
-import { configuredMachines } from "./machines";
+import { decodeLiveTasksReport, type LiveTasks } from "./task-levels";
+import { configuredMachines } from "../sources/machines";
 
 export interface TaskLiveMachine {
   readonly name: string;

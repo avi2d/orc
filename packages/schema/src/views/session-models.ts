@@ -1,8 +1,8 @@
 import { DateTime } from "effect";
-import type { CountedCall } from "../sessions/ledger";
-import type { Session } from "../sessions/live";
+import type { CountedCall } from "../sources/ledger";
+import type { Session } from "../sources/live";
 import type { QuotaProviderId } from "../sources/quota";
-import { sumTokens, type Tokens, tokenTotal } from "../sessions/tokens";
+import { sumTokens, type Tokens, tokenTotal } from "../contract/tokens";
 
 export interface ModelTokens {
   readonly model: string | undefined;

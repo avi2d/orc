@@ -58,7 +58,7 @@ export interface DispatchReading {
 }
 
 
-const TaskFields = Schema.Struct({
+export const TaskFields = Schema.Struct({
   id: Schema.String,
   title: Schema.String,
   project: Schema.String,
@@ -76,7 +76,7 @@ const TaskFields = Schema.Struct({
   reason: Schema.optional(Schema.String),
 });
 
-type TaskFields = typeof TaskFields.Type;
+export type TaskFields = typeof TaskFields.Type;
 
 type TaskFolder = "new" | "taken" | "closed";
 
@@ -108,12 +108,12 @@ const taskFields = (file: string, text: string): TaskFields | string => {
   return fields.kind === "ok" ? fields.value : file + ": its frontmatter holds no task orc can read";
 };
 
-const claimOf = (front: TaskFields): DispatchClaim | null =>
+export const claimOf = (front: TaskFields): DispatchClaim | null =>
   front.beat === undefined || front.taken_for === undefined || front.account === undefined || front.taken_at === undefined
     ? null
     : { beat: front.beat, machine: front.taken_for, account: front.account, takenAt: front.taken_at };
 
-const startedOf = (front: TaskFields): DispatchStarted | null =>
+export const startedOf = (front: TaskFields): DispatchStarted | null =>
   front.started_at === undefined ? null : { at: front.started_at, log: front.start_log ?? "" };
 
 const closingOf = (front: TaskFields, started: DispatchStarted | null): DispatchClosing | null => {

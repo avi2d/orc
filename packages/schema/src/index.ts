@@ -136,8 +136,10 @@ export {
 } from "./sources/task-processes";
 export { outcomeOf } from "./contract/outcome";
 export { macRusageReader } from "./sources/mac-rusage-reader";
-export { decodeResourcesReport, ResourcesReport, resourcesReport } from "./contract/resources";
-export { QueuesReport, queuesReport } from "./contract/queues";
+export { ResourcesReport } from "./contract/resources";
+export { decodeResourcesReport, resourcesReport } from "./views/resources";
+export { QueuesReport } from "./contract/queues";
+export { queuesReport } from "./views/queues";
 export { type SnapshotFields, SnapshotReport, type SnapshotSource, snapshotSources } from "./contract/snapshot";
 export {
   AlertEvent,
@@ -182,14 +184,14 @@ export {
   taskSampleRecords,
   type TaskUsage,
 } from "./contract/task-samples";
-export { decodeLiveTasksReport, LiveTasksReport, liveTasksReport } from "./contract/task-live";
+export { LiveTasksReport } from "./contract/task-live";
+export { type GateHold, gateHoldOf } from "./views/task-gates";
+export { decodeLiveTasksReport, liveTasksReport } from "./views/task-levels";
 export { historyDays, type TaskSamples, TaskSamplesSource, taskSamplesAt, taskSamplesSourceLayer } from "./sources/task-samples";
 export { type KeptProcess, keptCpuSeconds, type LimitEpisode, type MachineLimit, type ResolvedDetail, resolvedOf, type TaskHistory, taskHistories } from "./views/task-history";
 export {
   atInterval, doneNewestFirst, type Interval,
   isLive,
-  gateHoldOf,
-  type GateHold,
   type LiveTasks,
   type LiveUsage,
   type ProjectRow,
@@ -202,7 +204,6 @@ export {
   taskLevels,
   type TaskProcessRow,
   type TaskRow,
-  testsOf,
   projectNameOf,
 } from "./views/task-levels";
 export { mergedTaskLevels, unsetTaskLevels } from "./views/merged-task-levels";
@@ -212,17 +213,18 @@ export { decodeOrcRuns, decodeOrcShow, type OrcRun, type OrcSnapshot, type OrcSt
 export { anchorOf, checksOf, cueMarkOf, cuePipelineOf, detailWithoutWaitsOf, donePipelineOf, fixRoundOf, fullReviewPipelineOf, kindOf, markGlyphOf, modelBadgeOf, noMistakesRunOf, orcPipelineOf, orcRunOf, type PipelineFolder, pipelineFoldersOf, type PipelineKind, pipelineKinds, type PipelineStage, rebuildStage, stageMarkNames, type StageMark, stageNamesOf, summaryOf, type TaskDerivedState, type TaskPipeline, unknownPipelineOf, waitsOnOf } from "./task-pipeline";
 export { longStageOf, type Staleness, stalenessOf } from "./views/stage-time";
 export { readableTestNameOf } from "./views/test-names";
-export { ResourceMachines, resourceMachinesLayer } from "./sources/remote-resources";
+export { ResourceMachines, resourceMachinesLayer } from "./views/remote-resources";
 export { LocalTasks, localTasksLayer, localTasksLayerWithin, type TasksMachine, TasksMachines, tasksMachinesLayer, watchedLocalTasksLayerWithin, watchedRead } from "./sources/tasks";
 export { type TaskHistoryMachine, RemoteTaskHistory, remoteTaskHistoryLayer } from "./sources/remote-task-samples";
-export { type TaskLiveMachine, RemoteTaskLive, remoteTaskLiveLayer } from "./sources/remote-task-live";
+export { type TaskLiveMachine, RemoteTaskLive, remoteTaskLiveLayer } from "./views/remote-task-live";
 export { readBeside } from "./sources/machines";
-export { type HostSources, hostSourcesLayer, readLocalResources, readMachines } from "./sources/local-resources";
-export { composedSessionQuotaOf, localSessionQuotaOf, type QuotaReadings, type QuotaReadSources, quotaReadSourcesLayer, readQuotas } from "./sources/session-quota-read";
-export { sessionQuotaOf, type SessionQuotaSources, sessionQuotaSourcesLayer, type SessionSources, sessionSourcesLayer } from "./sources/session-quota-read";
-export { ComposedSessionQuotaReport, composedSessionQuotaReport } from "./contract/composed-session-quota";
-export { sessionQuotaViewOf } from "./contract/session-quota-view";
-export { decodeRemoteSessionQuota, type RemoteSessionSource, SessionMachines, sessionMachinesLayer } from "./sources/remote-sessions";
+export { type HostSources, hostSourcesLayer, readLocalResources, readMachines } from "./views/local-resources";
+export { composedSessionQuotaOf, localSessionQuotaOf, type QuotaReadings, type QuotaReadSources, quotaReadSourcesLayer, readQuotas } from "./views/session-quota-read";
+export { sessionQuotaOf, type SessionQuotaSources, sessionQuotaSourcesLayer, type SessionSources, sessionSourcesLayer } from "./views/session-quota-read";
+export { ComposedSessionQuotaReport } from "./contract/composed-session-quota";
+export { composedSessionQuotaReport } from "./views/composed-session-quota";
+export { sessionQuotaViewOf } from "./views/session-quota-view";
+export { decodeRemoteSessionQuota, type RemoteSessionSource, SessionMachines, sessionMachinesLayer } from "./views/remote-sessions";
 export { composedSessionQuota, type RemoteReading } from "./views/composed-session-quota";
 export { type Estimate } from "./views/estimate";
 export {
@@ -230,10 +232,9 @@ export {
   sessionQuotaAlerts,
   type SessionQuotaFlag,
   SessionQuotaReport,
-  sessionQuotaFlags,
-  sessionQuotaReport,
 } from "./contract/session-quota";
-export { type Harness, type LogRecord, logRecords, markedLogRecords } from "./sessions/log-lines";
+export { sessionQuotaFlags, sessionQuotaReport } from "./views/session-quota-report";
+export { type Harness, type LogRecord, logRecords, markedLogRecords } from "./sources/log-lines";
 export {
   decodeHerdrPanes,
   decodeLinuxHarnessProcesses,
@@ -257,7 +258,7 @@ export {
   sessionLogSourceLayer,
   type SinceByHarness,
 } from "./sources/session-logs";
-export { type CountedCall, countedCalls, type Ledger, type LogFile } from "./sessions/ledger";
+export { type CountedCall, countedCalls, type Ledger, type LogFile } from "./sources/ledger";
 export {
   type LiveContext,
   placeOf,
@@ -269,8 +270,8 @@ export {
   sessionSuffix,
   tieFolderOf,
   type UnmatchedRuns,
-} from "./sessions/live";
-export { type HarvestedReading, harvestedReadings, type HarvestHarness, type HarvestOrigin } from "./sessions/harvest";
+} from "./sources/live";
+export { type HarvestedReading, harvestedReadings, type HarvestHarness, type HarvestOrigin } from "./sources/harvest";
 export {
   type Captured,
   type CapturedCall,
@@ -288,11 +289,11 @@ export {
   retainedDays,
   statuslineRecord,
   withCaptured,
-} from "./sessions/capture";
+} from "./sources/capture";
 export { appendCaptured, ledgerReaderAt } from "./sources/capture-ledger";
 export { captureLedgerDirectory, claudeConfigDirectory, claudeLogged, dashboardCacheDirectory, machineNames, selector } from "./sources/environment";
-export { type SourcedWindow, type WindowSource } from "./views/window-sources";
-export { type AccountJoin } from "./views/account-join";
+export { type SourcedWindow, type WindowSource } from "./sources/window-sources";
+export { type AccountJoin } from "./sources/account-join";
 export { type ModelTokens, type SessionModels } from "./views/session-models";
 export { type FairShare, type TaskSpend, taskSpend } from "./views/task-spend";
 export {
@@ -322,7 +323,7 @@ export {
   tokenTotal,
   type Weighting,
   weightings,
-} from "./sessions/tokens";
+} from "./contract/tokens";
 export {
   ActionRun,
   ActionsSource,
@@ -362,10 +363,10 @@ export {
   type ScheduleSource,
   type TimerSchedule,
 } from "./sources/schedules";
-export { type CalendarPattern, cronPattern, everyValue, nextMatch } from "./views/calendar";
+export { type CalendarPattern, cronPattern, everyValue, nextMatch } from "./sources/calendar";
 export { type NamedOrchestrator, type NamedPueue, type NextKind, type NextReadings, type NextRow, type NextSource, type NextSourceState, type NextUp, nextUp, type OrchestratorRead } from "./views/next-up";
 export { machineQueue, type MachineQueueView, type QueueEntry, type QueueRow, type QueueRowState, queueWindow } from "./views/machine-queue";
-export { type DispatchReading, type DispatchSnapshot, DispatchSource, dispatchSourceLayer, type DispatchTask, missingBacklog } from "./sources/dispatch";
+export { claimOf, type DispatchReading, type DispatchSnapshot, DispatchSource, dispatchSourceLayer, type DispatchTask, missingBacklog, startedOf, TaskFields } from "./sources/dispatch";
 export { type DispatchView, dispatchView, type RoomEntry, type RunRow, type WaitRow } from "./views/dispatch";
 export { decodePueue, knownProjects, type PueueMachine, PueueMachines, pueueMachinesLayer, PueueStatus } from "./sources/pueue";
 export { type MachineProjects } from "./sources/project-names";
@@ -386,6 +387,7 @@ export {
   queuesPending,
   type QueuesView,
   queuesView,
+  testsOf,
   type RunningRow,
   type RunOwners,
   type TestRun,
