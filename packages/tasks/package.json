@@ -8,6 +8,9 @@
   "license": "MIT",
   "type": "module",
   "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "dependencies": {
     "@effect/platform-bun": "4.0.0",
     "@opentui/core": "0.6.5",
