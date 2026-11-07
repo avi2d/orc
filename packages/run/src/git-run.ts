@@ -49,14 +49,14 @@ export const runGit = (
   git: string,
   args: ReadonlyArray<string>,
   cwd: string
-): Effect.Effect<{ readonly stdout: string; readonly exitCode: number }, OrcRunError> =>
+): Effect.Effect<{ readonly stdout: string; readonly stderr: string; readonly exitCode: number }, OrcRunError> =>
   Effect.scoped(Effect.gen(function*() {
     const handle = yield* spawner.spawn(ChildProcess.make(git, [...args], { cwd, env: gitEnv(), extendEnv: false }))
     const { stdout, stderr, exitCode } = yield* collectOutput(handle)
     if (exitCode === hostGitRefusalExit) {
       return yield* new OrcRunError({ message: stderr.trim() })
     }
-    return { stdout, exitCode }
+    return { stdout, stderr, exitCode }
   })).pipe(
     Effect.mapError((cause) => cause instanceof OrcRunError ? cause : new OrcRunError({ message: "orc: git failed to run: " + String(cause) }))
   )
