@@ -1,5 +1,5 @@
 import { Effect, type Scope } from "effect";
-import { loopTick } from "@tui-dash/schema";
+import { loopTick } from "@avi2dg/orc-schema";
 import type { Look, Mounted, PanelError, Placed, PrintFrame } from "./module";
 import { panelWidth } from "./panel";
 import { withinRows } from "./layout";

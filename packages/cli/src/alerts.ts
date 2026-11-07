@@ -12,7 +12,7 @@ import {
   type Outcome,
   quotaPaceStart,
   quotaPaceStep,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { awaitedWithin, type SnapshotLimits, snapshotLimits } from "./snapshot";
 
 export interface AlertReaders<R> {

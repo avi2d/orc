@@ -12,8 +12,8 @@ import {
   ruleRecords,
   type RuleVerdict,
   type VerdictLog,
-} from "@tui-dash/schema";
-import { agoWords, type Block, countdown, type Line, padEnd, secondsBetween, span, type Tone, truncate, widthOf, wrapParts } from "@tui-dash/ui";
+} from "@avi2dg/orc-schema";
+import { agoWords, type Block, countdown, type Line, padEnd, secondsBetween, span, type Tone, truncate, widthOf, wrapParts } from "@avi2dg/orc-ui";
 
 export type LogReading = Outcome<{ readonly path: string; readonly log: VerdictLog }>;
 

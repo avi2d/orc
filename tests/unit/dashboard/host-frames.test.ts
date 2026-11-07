@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { plain } from "@tui-dash/ui";
+import { plain } from "@avi2dg/orc-ui";
 import { bandedReadings } from "../../lib/banded-fixture";
 import { bandedLines, bandedScreen, type Step } from "../../lib/host-fixture";
 

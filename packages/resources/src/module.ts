@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { type Freshness, type HostSources, machinesCadence, refreshingOf, ResourceMachines, type SavedReadings, type TaskBoard, TaskBoardFeed } from "@tui-dash/schema";
+import { type Freshness, type HostSources, machinesCadence, refreshingOf, ResourceMachines, type SavedReadings, type TaskBoard, TaskBoardFeed } from "@avi2dg/orc-schema";
 import {
   type Block,
   boxOf,
@@ -14,7 +14,7 @@ import {
   type Placed,
   singleTitle,
   span,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 import { printResourcesFrame, runResourcesPanel } from "./app";
 import { type Machines, machinesBoxLines } from "./machines-box";
 import { machinesFeed, type MachinesShown } from "./machines-feed";

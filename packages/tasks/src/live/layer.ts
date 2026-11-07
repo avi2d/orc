@@ -13,8 +13,8 @@ import {
   sessionQuotaSourcesLayer,
   taskSamplesSourceLayer,
   tasksMachinesLayer,
-} from "@tui-dash/schema";
-import { liveCommandRunner } from "@tui-dash/ui";
+} from "@avi2dg/orc-schema";
+import { liveCommandRunner } from "@avi2dg/orc-ui";
 
 const taskProcessesSourceLayer = process.platform === "darwin" ? macTaskProcessesSourceLayer : linuxTaskProcessesSourceLayer;
 

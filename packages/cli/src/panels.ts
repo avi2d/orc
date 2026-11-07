@@ -1,9 +1,9 @@
 import { BunFileSystem } from "@effect/platform-bun";
 import { type Config, Console, Effect, Option } from "effect";
 import { Argument, CliError, Command, Flag } from "effect/cli";
-import { printDashboard, runDashboard } from "@tui-dash/dashboard";
-import type { ConfigRefused } from "@tui-dash/schema";
-import { Appearance, type PanelError, printFrameOf, type PrintFrame } from "@tui-dash/ui";
+import { printDashboard, runDashboard } from "@avi2dg/orc-dashboard";
+import type { ConfigRefused } from "@avi2dg/orc-schema";
+import { Appearance, type PanelError, printFrameOf, type PrintFrame } from "@avi2dg/orc-ui";
 import { withModules } from "./live/modules";
 import { type ModuleSources, modules } from "./modules";
 import { loadSetup, type Setup } from "./setup";

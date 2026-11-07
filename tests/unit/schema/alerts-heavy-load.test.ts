@@ -9,7 +9,7 @@ import {
   type MachineResources,
   type Outcome,
   type ResourcesReport,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 
 const start = Date.parse("2026-10-19T09:00:00Z");
 

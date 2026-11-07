@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { type SessionQuotaView, type WindowView } from "@tui-dash/schema";
+import { type SessionQuotaView, type WindowView } from "@avi2dg/orc-schema";
 import { fixtureHome, fixtureSessionView, recordedNow } from "../../lib/session-fixture";
 
 const windowOf = (view: SessionQuotaView, title: string, id: string): WindowView => {

@@ -23,7 +23,7 @@ import {
   TaskSamplesSource,
   TasksReport,
   tasksReport,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import {
   backgroundRemoteTaskPollsWithin,
   backgroundTaskPollsWithin,

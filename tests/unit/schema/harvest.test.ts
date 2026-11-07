@@ -15,7 +15,7 @@ import {
   type QuotaWindow,
   quotaBlocks,
   type SourcedWindow,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { quotaAxiRead, recordedQuotaRead } from "../../lib/quota-read";
 import {

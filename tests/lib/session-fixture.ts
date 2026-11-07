@@ -12,7 +12,7 @@ import {
   nothingCaptured,
   type SessionQuotaView,
   sessionQuotaFrom,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { fixture } from "./fixtures";
 import { claudeLogFile, readBeforeHarvest, rolloutFile } from "./harvest-fixture";
 import { recordedQuotaRead } from "./quota-read";

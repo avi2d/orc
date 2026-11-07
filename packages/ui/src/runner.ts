@@ -1,5 +1,5 @@
 import { Data, Duration, Effect, Layer } from "effect";
-import { acceptsExit, type Command, CommandRunner, CommandUnreachable } from "@tui-dash/schema";
+import { acceptsExit, type Command, CommandRunner, CommandUnreachable } from "@avi2dg/orc-schema";
 
 const colourCode = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 

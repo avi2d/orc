@@ -3,8 +3,8 @@ import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Duration, Effect, Exit } from "effect";
-import { CommandRunner } from "@tui-dash/schema";
-import { liveCommandRunner } from "@tui-dash/ui";
+import { CommandRunner } from "@avi2dg/orc-schema";
+import { liveCommandRunner } from "@avi2dg/orc-ui";
 
 const isRunning = (pid: number): boolean => {
   try {

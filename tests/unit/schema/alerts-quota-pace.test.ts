@@ -8,7 +8,7 @@ import {
   type Outcome,
   quotaPaceStart,
   quotaPaceStep,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { machineView } from "../../lib/machines-fixture";
 
 const fixtureReport = (): ComposedSessionQuotaReport => composedSessionQuotaReport(composedSessionQuota(machineView("north"), "north", []), "north");

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type Line, plain } from "@tui-dash/ui";
+import { type Line, plain } from "@avi2dg/orc-ui";
 import { bandedDrawn, bandedLines, bandedScreen, type Step, stepped } from "../../lib/host-fixture";
 
 const titlesOf = (line: Line): ReadonlyArray<Line> => {

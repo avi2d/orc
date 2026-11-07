@@ -1,5 +1,5 @@
 {
-  "name": "@tui-dash/alerts",
+  "name": "@avi2dg/orc-alerts",
   "version": "0.1.0",
   "private": true,
   "description": "The alerts panel of the tui-dash dashboard, showing each alert rule, its limits, its last fire and the listener's verdict, and its one-frame print",
@@ -14,8 +14,8 @@
   "dependencies": {
     "@effect/platform-bun": "4.0.0",
     "@opentui/core": "0.6.5",
-    "@tui-dash/schema": "workspace:*",
-    "@tui-dash/ui": "workspace:*",
+    "@avi2dg/orc-schema": "workspace:*",
+    "@avi2dg/orc-ui": "workspace:*",
     "effect": "4.0.0"
   }
 }

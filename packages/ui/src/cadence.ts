@@ -1,5 +1,5 @@
 import { Duration } from "effect";
-import type { Freshness } from "@tui-dash/schema";
+import type { Freshness } from "@avi2dg/orc-schema";
 
 const secondsOf = (cadence: Duration.Input): number => Duration.toMillis(Duration.fromInputUnsafe(cadence)) / 1000;
 

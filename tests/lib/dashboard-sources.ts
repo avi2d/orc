@@ -2,9 +2,9 @@ import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
 import { createTestRenderer, type TestRendererSetup } from "@opentui/core/testing";
 import { type Config, ConfigProvider, Effect, Fiber, type FileSystem, Layer } from "effect";
-import { type ModuleSources, moduleFeeds, modules } from "@tui-dash/cli";
+import { type ModuleSources, moduleFeeds, modules } from "@avi2dg/orc-cli";
 import type { CliRenderer } from "@opentui/core";
-import { dashboardScreen, printDashboard } from "@tui-dash/dashboard";
+import { dashboardScreen, printDashboard } from "@avi2dg/orc-dashboard";
 import {
   actionsSourceLayer,
   ciRunsLayer,
@@ -46,9 +46,9 @@ import {
   ReadModeReference,
   type SavedReadings,
   sessionLogSourceLayer,
-} from "@tui-dash/schema";
-import { liveScreen, type PanelError, type PanelModule, type PrintFrame } from "@tui-dash/ui";
-import { type ConversationReader, ConversationSource, conversationSourceLive } from "@tui-dash/ledger";
+} from "@avi2dg/orc-schema";
+import { liveScreen, type PanelError, type PanelModule, type PrintFrame } from "@avi2dg/orc-ui";
+import { type ConversationReader, ConversationSource, conversationSourceLive } from "@avi2dg/orc-ledger";
 import { fixture } from "./fixtures";
 import { fixtureActionsRepo, queueAnswers } from "./queues-fixture";
 import { fixtureHomeEnvironment } from "./session-fixture";

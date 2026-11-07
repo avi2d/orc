@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Effect } from "effect";
-import { boardOf, decodeLayout, type HostState, hostScreen, layoutPanels } from "@tui-dash/dashboard";
-import { type Block, type FocusReach, type Look, type Mounted, type Move, type Placed, plain, type ScreenSize, span, targetAt, truncate } from "@tui-dash/ui";
+import { boardOf, decodeLayout, type HostState, hostScreen, layoutPanels } from "@avi2dg/orc-dashboard";
+import { type Block, type FocusReach, type Look, type Mounted, type Move, type Placed, plain, type ScreenSize, span, targetAt, truncate } from "@avi2dg/orc-ui";
 import { membersOf } from "../../lib/host-fixture";
 
 interface Count {

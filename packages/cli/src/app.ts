@@ -1,7 +1,7 @@
 import { type Config, Console, Effect, type FileSystem } from "effect";
-import { type QueueSources, readQueuesReport } from "@tui-dash/queues";
-import { readMachineReports, type TaskSources } from "@tui-dash/resources";
-import { readComposedSessionQuotaReport } from "@tui-dash/session-quota";
+import { type QueueSources, readQueuesReport } from "@avi2dg/orc-queues";
+import { readMachineReports, type TaskSources } from "@avi2dg/orc-resources";
+import { readComposedSessionQuotaReport } from "@avi2dg/orc-session-quota";
 import {
   type ConfigRefused,
   type HostSources,
@@ -13,7 +13,7 @@ import {
   type SnapshotSource,
   TasksMachines,
   tasksReport,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { type AlertReaders, streamAlerts } from "./alerts";
 import { type SnapshotReaders, snapshotReport } from "./snapshot";
 

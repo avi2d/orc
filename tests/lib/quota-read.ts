@@ -14,7 +14,7 @@ import {
   QuotaSource,
   type Reading,
   readQuota,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 
 // quota-axi asked about every provider, as when no log reading is fresh enough to stand in for one.
 export const quotaAxiRead = (quotaAxi: Reading<QuotaReport>, logReadings: ReadonlyArray<HarvestedReading> = []): QuotaRead => ({

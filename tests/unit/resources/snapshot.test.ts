@@ -13,9 +13,9 @@ import {
   decodeOnlineCpus,
   ok,
   resourcesView,
-} from "@tui-dash/schema";
-import { blockDocument, type Block, frameText, plain } from "@tui-dash/ui";
-import { resourceLines } from "@tui-dash/resources";
+} from "@avi2dg/orc-schema";
+import { blockDocument, type Block, frameText, plain } from "@avi2dg/orc-ui";
+import { resourceLines } from "@avi2dg/orc-resources";
 import { fixture } from "../../lib/fixtures";
 import { cellDiffs } from "../../lib/styled-screen";
 

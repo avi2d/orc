@@ -1,5 +1,5 @@
 import { DateTime, Option } from "effect";
-import type { CiReport, MachineQueueView, Outcome, QueueRow, QueueRowState, Reading } from "@tui-dash/schema";
+import type { CiReport, MachineQueueView, Outcome, QueueRow, QueueRowState, Reading } from "@avi2dg/orc-schema";
 import {
   type Block,
   clock,
@@ -16,7 +16,7 @@ import {
   widthOf,
   withinRoom,
   wrapParts,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 import { counted } from "./sections";
 
 export type CiState = { readonly kind: "unset" } | { readonly kind: "pending" } | Reading<CiReport>;

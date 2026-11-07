@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { capturedOf, captureRecords, decodeSavedProfiles, decodeQuota, quotaBlocks } from "@tui-dash/schema";
-import { plain, quotaLines } from "@tui-dash/quota";
+import { capturedOf, captureRecords, decodeSavedProfiles, decodeQuota, quotaBlocks } from "@avi2dg/orc-schema";
+import { plain, quotaLines } from "@avi2dg/orc-quota";
 import { fixture } from "../../lib/fixtures";
 import { quotaAxiRead, recordedQuotaRead } from "../../lib/quota-read";
 

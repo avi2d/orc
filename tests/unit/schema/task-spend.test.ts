@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { type CountedCall, decodeTasksReport, historyDays, type Session, taskLevels, taskSpend } from "@tui-dash/schema";
+import { type CountedCall, decodeTasksReport, historyDays, type Session, taskLevels, taskSpend } from "@avi2dg/orc-schema";
 import { call, ended, fifthIn, hour, six, viewOf } from "../../lib/quota-view-fixture";
 
 const [a, b, c, d, e] = six;

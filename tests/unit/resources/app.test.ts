@@ -11,8 +11,8 @@ import {
   macHostSourceLayer,
   macProcessesSourceLayer,
   ResourceMachines,
-} from "@tui-dash/schema";
-import { livePanel } from "@tui-dash/resources";
+} from "@avi2dg/orc-schema";
+import { livePanel } from "@avi2dg/orc-resources";
 import { fixture } from "../../lib/fixtures";
 
 const recordedAnswers: ReadonlyArray<readonly [string, string]> = [

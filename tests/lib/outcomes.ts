@@ -1,4 +1,4 @@
-import type { Outcome } from "@tui-dash/schema";
+import type { Outcome } from "@avi2dg/orc-schema";
 
 export const valueOf = <A>(outcome: Outcome<A>): A => {
   if (outcome.kind !== "ok") throw new Error(`expected ok, got ${JSON.stringify(outcome)}`);

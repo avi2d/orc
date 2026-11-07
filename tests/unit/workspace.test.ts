@@ -19,6 +19,26 @@ describe("the orc workspace", () => {
     }
   })
 
+  test("no package keeps the retired tui-dash scope instead of moving to the orc name", async () => {
+    const root = new URL("../..", import.meta.url).pathname
+    const names: Array<string> = []
+    for await (const path of new Bun.Glob("packages/*/package.json").scan({ cwd: root })) {
+      if (path === "packages/run/package.json") {
+        continue
+      }
+      const manifest: unknown = await Bun.file(`${root}/${path}`).json()
+      if (typeof manifest !== "object" || manifest === null || !("name" in manifest)) {
+        throw new Error(`Package manifest holds no name: ${path}`)
+      }
+      if (typeof manifest.name !== "string") {
+        throw new Error(`Package name is not a string: ${path}`)
+      }
+      names.push(manifest.name)
+      expect(manifest.name).toBe(`@avi2dg/orc-${path.split("/")[1]}`)
+    }
+    expect(names.length).toBe(13)
+  })
+
   test("the root tooling resolves the same dependency copies the run package ships instead of loading them twice", () => {
     for (const name of sharedDependencies) {
       expect(Bun.resolveSync(name, new URL("../..", import.meta.url).pathname)).toBe(

@@ -1,5 +1,5 @@
 import { DateTime, Effect, type FileSystem, Option } from "effect";
-import { type Freshness, polled, readsCadence } from "@tui-dash/schema";
+import { type Freshness, polled, readsCadence } from "@avi2dg/orc-schema";
 import {
   type Drawn,
   frameRows,
@@ -11,7 +11,7 @@ import {
   type Placed,
   printSolo,
   runSolo,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 import { ConversationSource } from "./conversation";
 import { closedPick, type LedgerColumn, ledgerColumn, ledgerFullColumn, ledgerNatural, type LedgerPick, type LedgerReadings } from "./ledger-column";
 import { ledgerMoved, ledgerSettled, ledgerToggled } from "./ledger-moves";

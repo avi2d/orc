@@ -1,9 +1,9 @@
 import { Layer } from "effect";
-import { queueSourcesLive } from "@tui-dash/queues";
-import { resourceSourcesLive } from "@tui-dash/resources";
-import { sessionQuotaSourcesLive } from "@tui-dash/session-quota";
-import { tasksMachinesLayer } from "@tui-dash/schema";
-import { liveCommandRunner } from "@tui-dash/ui";
+import { queueSourcesLive } from "@avi2dg/orc-queues";
+import { resourceSourcesLive } from "@avi2dg/orc-resources";
+import { sessionQuotaSourcesLive } from "@avi2dg/orc-session-quota";
+import { tasksMachinesLayer } from "@avi2dg/orc-schema";
+import { liveCommandRunner } from "@avi2dg/orc-ui";
 
 export const snapshotSourcesLive = Layer.mergeAll(
   sessionQuotaSourcesLive,

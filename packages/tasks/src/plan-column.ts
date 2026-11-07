@@ -1,5 +1,5 @@
-import type { ProjectRow } from "@tui-dash/schema";
-import { type Line, span, type Tone } from "@tui-dash/ui";
+import type { ProjectRow } from "@avi2dg/orc-schema";
+import { type Line, span, type Tone } from "@avi2dg/orc-ui";
 import { dash, stateTones } from "./cells";
 
 export const planWidth = 4;

@@ -22,9 +22,9 @@ import {
   tasksMachinesLayer,
   remoteTaskHistoryLayer,
   remoteTaskLiveLayer,
-} from "@tui-dash/schema";
-import { backgroundRemoteTaskPollsWithin, drawTasks, finishedRemoteTaskPolls, type Navigation, readRemoteTaskLevels, type RemotePolls } from "@tui-dash/tasks";
-import { plain } from "@tui-dash/ui";
+} from "@avi2dg/orc-schema";
+import { backgroundRemoteTaskPollsWithin, drawTasks, finishedRemoteTaskPolls, type Navigation, readRemoteTaskLevels, type RemotePolls } from "@avi2dg/orc-tasks";
+import { plain } from "@avi2dg/orc-ui";
 import { fixture } from "../../lib/fixtures";
 import { live, southTaskReadings, taskReadings } from "../../lib/task-levels-fixture";
 

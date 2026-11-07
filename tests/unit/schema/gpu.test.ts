@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Effect } from "effect";
-import { CommandRunner, CommandUnreachable, decodeComputeApps, decodeGpus, GpuSource, gpuSourceLayer } from "@tui-dash/schema";
+import { CommandRunner, CommandUnreachable, decodeComputeApps, decodeGpus, GpuSource, gpuSourceLayer } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { issueOf, valueOf } from "../../lib/outcomes";
 

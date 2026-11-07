@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
 import { ConfigProvider, Effect, Layer } from "effect";
-import { DispatchSource, dispatchSourceLayer, type DispatchView, dispatchView } from "@tui-dash/schema";
-import { dispatchLines, dispatchSection } from "@tui-dash/dispatch";
-import { plain } from "@tui-dash/ui";
+import { DispatchSource, dispatchSourceLayer, type DispatchView, dispatchView } from "@avi2dg/orc-schema";
+import { dispatchLines, dispatchSection } from "@avi2dg/orc-dispatch";
+import { plain } from "@avi2dg/orc-ui";
 import { writeDispatchBacklog } from "../../lib/dispatch-fixture";
 
 const width = 84;

@@ -1,4 +1,4 @@
-import type { QuotaWindow } from "@tui-dash/schema";
+import type { QuotaWindow } from "@avi2dg/orc-schema";
 import { shortLabel } from "./quota";
 
 const hourSeconds = 3600;

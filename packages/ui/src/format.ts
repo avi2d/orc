@@ -1,5 +1,5 @@
 import { DateTime } from "effect";
-import type { Failed } from "@tui-dash/schema";
+import type { Failed } from "@avi2dg/orc-schema";
 import { type Block, wrapParts } from "./layout";
 import type { Tone } from "./palette";
 import { ellipsize, type Line, span, widthOf } from "./text";

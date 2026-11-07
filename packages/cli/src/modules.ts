@@ -1,13 +1,13 @@
-import { alertsModule } from "@tui-dash/alerts";
-import { dispatchModule } from "@tui-dash/dispatch";
-import { ledgerModule } from "@tui-dash/ledger";
-import { queuesModule } from "@tui-dash/queues";
-import { quotaModule } from "@tui-dash/quota";
-import { resourcesModule } from "@tui-dash/resources";
-import { schedulesModule } from "@tui-dash/schedules";
-import { sessionQuotaModule } from "@tui-dash/session-quota";
-import { tasksModule } from "@tui-dash/tasks";
-import type { PanelModule } from "@tui-dash/ui";
+import { alertsModule } from "@avi2dg/orc-alerts";
+import { dispatchModule } from "@avi2dg/orc-dispatch";
+import { ledgerModule } from "@avi2dg/orc-ledger";
+import { queuesModule } from "@avi2dg/orc-queues";
+import { quotaModule } from "@avi2dg/orc-quota";
+import { resourcesModule } from "@avi2dg/orc-resources";
+import { schedulesModule } from "@avi2dg/orc-schedules";
+import { sessionQuotaModule } from "@avi2dg/orc-session-quota";
+import { tasksModule } from "@avi2dg/orc-tasks";
+import type { PanelModule } from "@avi2dg/orc-ui";
 
 const each = [quotaModule, sessionQuotaModule, alertsModule, resourcesModule, queuesModule, schedulesModule, dispatchModule, tasksModule, ledgerModule] as const;
 

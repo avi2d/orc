@@ -7,7 +7,7 @@ import {
   type SessionQuotaView,
   sessionQuotaViewOf,
   type WindowView,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { claudeKeyed, claudeUnread, machineReport, machineView, southReading } from "../../lib/machines-fixture";
 import { issueOf, valueOf } from "../../lib/outcomes";
 import { fixtureSessionView } from "../../lib/session-fixture";

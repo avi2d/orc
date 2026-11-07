@@ -2,7 +2,7 @@
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Effect, Option, Runtime } from "effect";
 import { CliError, Command, Flag } from "effect/cli";
-import { snapshotSources } from "@tui-dash/schema";
+import { snapshotSources } from "@avi2dg/orc-schema";
 import packageJson from "../package.json" with { type: "json" };
 import { printAlertsJson, printSnapshotJson } from "./app";
 import { snapshotSourcesLive } from "./live/layer";

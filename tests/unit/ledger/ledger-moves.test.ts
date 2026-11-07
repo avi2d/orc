@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { clampLedgerInBox, closedPick, ledgerIdsInBox, type LedgerPick, ledgerMoved, ledgerPlaced, type LedgerReadings, openedAt } from "@tui-dash/ledger";
-import { type Block, plain, type ScreenSize } from "@tui-dash/ui";
+import { clampLedgerInBox, closedPick, ledgerIdsInBox, type LedgerPick, ledgerMoved, ledgerPlaced, type LedgerReadings, openedAt } from "@avi2dg/orc-ledger";
+import { type Block, plain, type ScreenSize } from "@avi2dg/orc-ui";
 import { bandedReadings } from "../../lib/banded-fixture";
 import { dashboardNow } from "../../lib/dashboard-fixture";
 

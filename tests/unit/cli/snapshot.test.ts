@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Duration, Effect, Option, Ref, Schema } from "effect";
-import { type SnapshotLimits, type SnapshotReaders, snapshotReport, sourcesNamed, unknownSources } from "@tui-dash/cli";
-import { composedSessionQuota, composedSessionQuotaReport, SnapshotReport, type SnapshotSource, snapshotSources } from "@tui-dash/schema";
+import { type SnapshotLimits, type SnapshotReaders, snapshotReport, sourcesNamed, unknownSources } from "@avi2dg/orc-cli";
+import { composedSessionQuota, composedSessionQuotaReport, SnapshotReport, type SnapshotSource, snapshotSources } from "@avi2dg/orc-schema";
 import { machineView } from "../../lib/machines-fixture";
 
 const quickly: SnapshotLimits = {

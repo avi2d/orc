@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime, Effect, Fiber, Layer, Schema } from "effect";
 import { TestClock, TestConsole } from "effect/testing";
-import { type AlertReaders, streamAlerts } from "@tui-dash/cli";
-import { AlertEvent, defaultAlertSettings, type ResourcesReport, type TaskEntry } from "@tui-dash/schema";
+import { type AlertReaders, streamAlerts } from "@avi2dg/orc-cli";
+import { AlertEvent, defaultAlertSettings, type ResourcesReport, type TaskEntry } from "@avi2dg/orc-schema";
 
 const start = DateTime.makeUnsafe("2026-10-19T09:00:00Z");
 

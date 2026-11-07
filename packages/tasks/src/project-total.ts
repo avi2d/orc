@@ -1,4 +1,4 @@
-import type { ProjectRow } from "@tui-dash/schema";
+import type { ProjectRow } from "@avi2dg/orc-schema";
 
 export type ProjectFigures = Pick<ProjectRow, "name" | "working" | "waiting" | "parked" | "blocked" | "done" | "ready" | "held">;
 

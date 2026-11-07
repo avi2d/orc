@@ -1,6 +1,6 @@
 import type { DateTime } from "effect";
-import { readsCadence } from "@tui-dash/schema";
-import { type Block, everyText, focusFrame, frameRows, type Look, panelChrome, panelled, restFrame, singleTitle, span, type Tone } from "@tui-dash/ui";
+import { readsCadence } from "@avi2dg/orc-schema";
+import { type Block, everyText, focusFrame, frameRows, type Look, panelChrome, panelled, restFrame, singleTitle, span, type Tone } from "@avi2dg/orc-ui";
 import type { LedgerFeed } from "./conversation";
 import { fullHints, heightsOf, ledgerFull, ledgerShown, ledgerTitle, type SaidMessage, windowOf } from "./ledger";
 

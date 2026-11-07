@@ -11,7 +11,7 @@ import type {
   Outcome,
   ProcessView,
   ResourcesView,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import {
   type Block,
   countdown,
@@ -33,7 +33,7 @@ import {
   widthOf,
   withinRows,
   wrapParts,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 
 const sharedFailure = (
   [first, ...rest]: readonly [Outcome<unknown>, ...ReadonlyArray<Outcome<unknown>>],

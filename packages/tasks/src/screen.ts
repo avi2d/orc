@@ -19,8 +19,8 @@ import {
   type TaskSamplesSource,
   type TasksMachines,
   unsetTaskLevels,
-} from "@tui-dash/schema";
-import { liveScreen, printScreen, runScreen, type Screen } from "@tui-dash/ui";
+} from "@avi2dg/orc-schema";
+import { liveScreen, printScreen, runScreen, type Screen } from "@avi2dg/orc-ui";
 import {
   backgroundRemoteTaskPolls,
   backgroundTaskPolls,

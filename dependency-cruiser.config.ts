@@ -6,14 +6,14 @@ export default defineConfig({
     {
       name: "panel-imports-package",
       severity: "error",
-      comment: "A panel package reaches the others only through @tui-dash/schema and @tui-dash/ui, and the dashboard reaches panels only through the modules the cli hands it.",
+      comment: "A panel package reaches the others only through @avi2dg/orc-schema and @avi2dg/orc-ui, and the dashboard reaches panels only through the modules the cli hands it.",
       from: { path: "^packages/([^/]+)/", pathNot: "^packages/(cli|schema|ui)/" },
       to: { path: "^packages/", pathNot: ["^packages/$1/", "^packages/(schema|ui)/"] },
     },
     {
       name: "ui-imports-package",
       severity: "error",
-      comment: "The ui package draws for every panel, so it reaches no package but @tui-dash/schema.",
+      comment: "The ui package draws for every panel, so it reaches no package but @avi2dg/orc-schema.",
       from: { path: "^packages/ui/" },
       to: { path: "^packages/", pathNot: "^packages/(ui|schema)/" },
     },

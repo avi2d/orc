@@ -1,4 +1,4 @@
-import { frameRows, type Move, type ScreenSize } from "@tui-dash/ui";
+import { frameRows, type Move, type ScreenSize } from "@avi2dg/orc-ui";
 import { clampLedgerFull, clampLedgerInBox, type LedgerPick, ledgerIdsInBox, type LedgerReadings, openedAt, openScrollRoom } from "./ledger-column";
 
 // The size is the full screen while the pick is full, and the compact box otherwise.

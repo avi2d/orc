@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { decodeArcStats, decodeCpuUsage, decodeLoadavg, decodeMeminfo, decodeOnlineCpus } from "@tui-dash/schema";
+import { decodeArcStats, decodeCpuUsage, decodeLoadavg, decodeMeminfo, decodeOnlineCpus } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { issueOf, valueOf } from "../../lib/outcomes";
 

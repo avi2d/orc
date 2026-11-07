@@ -1,6 +1,6 @@
 import { TextAttributes, TextRenderable } from "@opentui/core";
 import { createTestRenderer } from "@opentui/core/testing";
-import { blockDocument, type Block } from "@tui-dash/ui";
+import { blockDocument, type Block } from "@avi2dg/orc-ui";
 import { fixture } from "./fixtures";
 
 interface Look {

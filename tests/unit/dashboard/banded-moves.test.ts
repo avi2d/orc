@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { plain } from "@tui-dash/ui";
+import { plain } from "@avi2dg/orc-ui";
 import { bandedScreen, type Step, stepped } from "../../lib/host-fixture";
 
 const size = { columns: 240, rows: 40 };

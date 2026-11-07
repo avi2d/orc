@@ -1,4 +1,4 @@
-import { doneNewestFirst, type PlannedRow, plannedStateOf, type ProjectRow, type ShownState, type TaskRow } from "@tui-dash/schema";
+import { doneNewestFirst, type PlannedRow, plannedStateOf, type ProjectRow, type ShownState, type TaskRow } from "@avi2dg/orc-schema";
 
 export type ListedRow = { readonly kind: "task"; readonly task: TaskRow } | { readonly kind: "planned"; readonly planned: PlannedRow };
 

@@ -7,7 +7,7 @@ import {
   taskLevels,
   type TaskSampleRecord,
   unreachable,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { valueOf } from "../../lib/outcomes";
 import { fixture } from "../../lib/fixtures";
 import { at, gib, live, taskReadings, tasksNow } from "../../lib/task-levels-fixture";

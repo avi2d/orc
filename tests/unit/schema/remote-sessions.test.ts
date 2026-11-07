@@ -9,7 +9,7 @@ import {
   decodeRemoteSessionQuota,
   SessionMachines,
   sessionMachinesLayer,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { machineReport, machineStdout, machineView, southReading } from "../../lib/machines-fixture";
 import { issueOf, valueOf } from "../../lib/outcomes";
 

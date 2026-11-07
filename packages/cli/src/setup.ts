@@ -1,6 +1,6 @@
 import { type Config, Effect, type FileSystem } from "effect";
-import { ConfigRefused, type DashConfig, readConfig } from "@tui-dash/schema";
-import { type PanelModule, type Theme, themeOfSettings } from "@tui-dash/ui";
+import { ConfigRefused, type DashConfig, readConfig } from "@avi2dg/orc-schema";
+import { type PanelModule, type Theme, themeOfSettings } from "@avi2dg/orc-ui";
 
 export interface Setup {
   readonly path: string;

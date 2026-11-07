@@ -1,5 +1,5 @@
 import type { DateTime } from "effect";
-import type { GpusView, GpuView, MachinesView, MachineView, Measured, NamedMachine, ResourcesView } from "@tui-dash/schema";
+import type { GpusView, GpuView, MachinesView, MachineView, Measured, NamedMachine, ResourcesView } from "@avi2dg/orc-schema";
 import {
   type Block,
   countdown,
@@ -18,7 +18,7 @@ import {
   span,
   widthOf,
   wrapParts,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 
 const leastReadingWidth = 21;
 

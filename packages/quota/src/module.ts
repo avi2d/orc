@@ -1,5 +1,5 @@
 import { DateTime, Effect } from "effect";
-import { type Freshness, freshOf, type QuotaBlock, QuotaFeed, type QuotaReadSources, readsCadence, type Shown, shownValue } from "@tui-dash/schema";
+import { type Freshness, freshOf, type QuotaBlock, QuotaFeed, type QuotaReadSources, readsCadence, type Shown, shownValue } from "@avi2dg/orc-schema";
 import {
   type Block,
   boxOf,
@@ -17,7 +17,7 @@ import {
   type Placed,
   singleTitle,
   span,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 import { printQuotaFrame, runQuotaPanel } from "./app";
 import { quotaSection, reserveQuotaSection } from "./sections";
 

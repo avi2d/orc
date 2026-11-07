@@ -37,7 +37,7 @@ import {
   type Stamped,
   stampedInBackground,
   stampedNow,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import type { TasksReadings } from "./layout";
 
 export interface TaskPolls {

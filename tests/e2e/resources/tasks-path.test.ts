@@ -3,7 +3,7 @@ import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts";
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { decodeResourcesReport } from "@tui-dash/schema";
+import { decodeResourcesReport } from "@avi2dg/orc-schema";
 import { valueOf } from "../../lib/outcomes";
 
 const root = join(import.meta.dir, "..", "..", "..");

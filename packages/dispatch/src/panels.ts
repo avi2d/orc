@@ -1,5 +1,5 @@
-import { type DispatchView, missingBacklog, type RoomEntry, type RunRow, type WaitRow } from "@tui-dash/schema";
-import { type Block, ellipsize, type Line, padEnd, sentence, span, widthOf, withinRoom } from "@tui-dash/ui";
+import { type DispatchView, missingBacklog, type RoomEntry, type RunRow, type WaitRow } from "@avi2dg/orc-schema";
+import { type Block, ellipsize, type Line, padEnd, sentence, span, widthOf, withinRoom } from "@avi2dg/orc-ui";
 
 const counted = (count: number, what: string): ReadonlyArray<string> => (count > 0 ? [count + " " + what] : []);
 

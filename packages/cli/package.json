@@ -1,5 +1,5 @@
 {
-  "name": "@tui-dash/cli",
+  "name": "@avi2dg/orc-cli",
   "version": "0.1.0",
   "private": true,
   "description": "The tui-dash command, composing the panel modules into the dashboard, opening one panel alone, printing reports and snapshots, or streaming alert events",
@@ -21,18 +21,18 @@
   "dependencies": {
     "@effect/platform-bun": "4.0.0",
     "@opentui/core": "0.6.5",
-    "@tui-dash/alerts": "workspace:*",
-    "@tui-dash/dashboard": "workspace:*",
-    "@tui-dash/dispatch": "workspace:*",
-    "@tui-dash/ledger": "workspace:*",
-    "@tui-dash/queues": "workspace:*",
-    "@tui-dash/quota": "workspace:*",
-    "@tui-dash/resources": "workspace:*",
-    "@tui-dash/schedules": "workspace:*",
-    "@tui-dash/schema": "workspace:*",
-    "@tui-dash/session-quota": "workspace:*",
-    "@tui-dash/tasks": "workspace:*",
-    "@tui-dash/ui": "workspace:*",
+    "@avi2dg/orc-alerts": "workspace:*",
+    "@avi2dg/orc-dashboard": "workspace:*",
+    "@avi2dg/orc-dispatch": "workspace:*",
+    "@avi2dg/orc-ledger": "workspace:*",
+    "@avi2dg/orc-queues": "workspace:*",
+    "@avi2dg/orc-quota": "workspace:*",
+    "@avi2dg/orc-resources": "workspace:*",
+    "@avi2dg/orc-schedules": "workspace:*",
+    "@avi2dg/orc-schema": "workspace:*",
+    "@avi2dg/orc-session-quota": "workspace:*",
+    "@avi2dg/orc-tasks": "workspace:*",
+    "@avi2dg/orc-ui": "workspace:*",
     "effect": "4.0.0"
   }
 }

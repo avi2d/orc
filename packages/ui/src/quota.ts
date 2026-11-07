@@ -1,4 +1,4 @@
-import type { QuotaWindow } from "@tui-dash/schema";
+import type { QuotaWindow } from "@avi2dg/orc-schema";
 import { leftHealth } from "./format";
 import type { Tone } from "./palette";
 import { ellipsize, type Line, span, widthOf } from "./text";

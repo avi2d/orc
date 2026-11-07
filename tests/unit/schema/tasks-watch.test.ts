@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
 import { Clock, ConfigProvider, DateTime, Deferred, Duration, Effect, Fiber, Layer, Option } from "effect";
 import { TestClock } from "effect/testing";
-import { type Command, CommandRunner, CommandUnreachable, LocalTasks, type Reading, type ReportedTasks, decodeTasksReport, watchedLocalTasksLayerWithin, watchedRead } from "@tui-dash/schema";
+import { type Command, CommandRunner, CommandUnreachable, LocalTasks, type Reading, type ReportedTasks, decodeTasksReport, watchedLocalTasksLayerWithin, watchedRead } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 
 let home = "";

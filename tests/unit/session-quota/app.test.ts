@@ -15,7 +15,7 @@ import {
   sessionMachinesLayer,
   sessionQuotaReport,
   inBackground,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { createTestRenderer } from "@opentui/core/testing";
 import {
   livePanel,
@@ -25,7 +25,7 @@ import {
   printSessionQuotaJson,
   sessionLogSourceLive,
   streamSessionQuotaAlerts,
-} from "@tui-dash/session-quota";
+} from "@avi2dg/orc-session-quota";
 import { fixture } from "../../lib/fixtures";
 import { machineStdout } from "../../lib/machines-fixture";
 import {

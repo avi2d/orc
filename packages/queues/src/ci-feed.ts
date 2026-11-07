@@ -1,5 +1,5 @@
 import { DateTime, Effect, Option, type Scope } from "effect";
-import { CiCodec, type CiReport, CiRuns, polled, type Reading, type SavedReadings, savedStandIn, type Shown, slowReadsCadence, type Stamped } from "@tui-dash/schema";
+import { CiCodec, type CiReport, CiRuns, polled, type Reading, type SavedReadings, savedStandIn, type Shown, slowReadsCadence, type Stamped } from "@avi2dg/orc-schema";
 
 // unset: no repository to watch is configured, so the box says so rather than reading.
 export type CiShown = { readonly kind: "unset" } | Shown<Reading<CiReport>>;

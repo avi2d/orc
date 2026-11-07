@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import type { QuotaAvailability, QuotaWindow } from "@tui-dash/schema";
-import { quotaLines } from "@tui-dash/quota";
-import { type Line, lineWidth, plain } from "@tui-dash/quota";
-import type { QuotaBlock, QuotaBlockBody } from "@tui-dash/schema";
+import type { QuotaAvailability, QuotaWindow } from "@avi2dg/orc-schema";
+import { quotaLines } from "@avi2dg/orc-quota";
+import { type Line, lineWidth, plain } from "@avi2dg/orc-quota";
+import type { QuotaBlock, QuotaBlockBody } from "@avi2dg/orc-schema";
 
 const reportedAt = DateTime.makeUnsafe("2026-10-13T20:00:00Z");
 const now = DateTime.makeUnsafe("2026-10-13T20:30:00Z");

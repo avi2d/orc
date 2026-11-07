@@ -1,5 +1,5 @@
 {
-  "name": "@tui-dash/ledger",
+  "name": "@avi2dg/orc-ledger",
   "version": "0.1.0",
   "private": true,
   "description": "Optional ledger box for tui-dash, listing today's conversation with one agent",
@@ -12,8 +12,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@tui-dash/schema": "workspace:*",
-    "@tui-dash/ui": "workspace:*",
+    "@avi2dg/orc-schema": "workspace:*",
+    "@avi2dg/orc-ui": "workspace:*",
     "effect": "4.0.0"
   }
 }

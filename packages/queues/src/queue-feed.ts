@@ -1,5 +1,5 @@
 import { Duration, Effect, Layer } from "effect";
-import { type Freshness, freshOf, QueueFeed, QueuesCodec, ReadModeReference, readsCadence, type SavedReadings, savedStandIn } from "@tui-dash/schema";
+import { type Freshness, freshOf, QueueFeed, QueuesCodec, ReadModeReference, readsCadence, type SavedReadings, savedStandIn } from "@avi2dg/orc-schema";
 import { backgroundQueueReadings, type QueueSources, readQueueReadings } from "./app";
 
 export const queueFeedLayer: Layer.Layer<QueueFeed, never, QueueSources | SavedReadings> = Layer.effect(

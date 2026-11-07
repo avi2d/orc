@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { ConfigProvider, DateTime, Effect, Layer } from "effect";
 import { TestClock, TestConsole } from "effect/testing";
-import { actionsSourceLayer, CommandRunner, pueueMachinesLayer } from "@tui-dash/schema";
-import { printQueuesFrame } from "@tui-dash/queues";
+import { actionsSourceLayer, CommandRunner, pueueMachinesLayer } from "@avi2dg/orc-schema";
+import { printQueuesFrame } from "@avi2dg/orc-queues";
 import { fixtureActionsRepo, queueAnswers, queuesNow } from "../../lib/queues-fixture";
 import { escape, stripSgr } from "../../e2e/lib/print-color";
 

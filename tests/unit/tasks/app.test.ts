@@ -27,9 +27,9 @@ import {
   type TaskSampleRecord,
   TaskSamplesSource,
   tasksMachinesLayer,
-} from "@tui-dash/schema";
-import { harvestLogSourceLive, sessionLogSourceLive } from "@tui-dash/session-quota";
-import { liveTasksScreen, printTasksFrame, runSampler } from "@tui-dash/tasks";
+} from "@avi2dg/orc-schema";
+import { harvestLogSourceLive, sessionLogSourceLive } from "@avi2dg/orc-session-quota";
+import { liveTasksScreen, printTasksFrame, runSampler } from "@avi2dg/orc-tasks";
 import { fixture } from "../../lib/fixtures";
 import { queueAnswers } from "../../lib/queues-fixture";
 import { fixtureHomeEnvironment } from "../../lib/session-fixture";

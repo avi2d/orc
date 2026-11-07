@@ -1,4 +1,4 @@
-import type { Failed } from "@tui-dash/schema";
+import type { Failed } from "@avi2dg/orc-schema";
 import { failureLine, failureLines } from "./format";
 import { type Block, wrapParts } from "./layout";
 import type { Tone } from "./palette";

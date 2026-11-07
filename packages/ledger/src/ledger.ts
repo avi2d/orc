@@ -1,5 +1,5 @@
 import { DateTime } from "effect";
-import { ageText, behind, ellipsize, fit, span, widthOf, type Block, type Line, type Tone } from "@tui-dash/ui";
+import { ageText, behind, ellipsize, fit, span, widthOf, type Block, type Line, type Tone } from "@avi2dg/orc-ui";
 import type { SessionTurn } from "./session-turns";
 
 export type SaidWho = { readonly role: "you" } | { readonly role: "agent"; readonly name: string };

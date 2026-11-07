@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime, Effect, Option } from "effect";
-import { caption, flagLines, sessionLines, sessionPanelLines, sessionPanelWithin } from "@tui-dash/session-quota";
+import { caption, flagLines, sessionLines, sessionPanelLines, sessionPanelWithin } from "@avi2dg/orc-session-quota";
 import { createTestRenderer } from "@opentui/core/testing";
 import { TextRenderable } from "@opentui/core";
-import { type SessionQuotaView } from "@tui-dash/schema";
-import { blockDocument, failureLines, frameText, lineWidth, plain } from "@tui-dash/ui";
+import { type SessionQuotaView } from "@avi2dg/orc-schema";
+import { blockDocument, failureLines, frameText, lineWidth, plain } from "@avi2dg/orc-ui";
 import { fixture } from "../../lib/fixtures";
 import { cellDiffs } from "../../lib/styled-screen";
 import {

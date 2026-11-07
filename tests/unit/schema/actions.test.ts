@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { ConfigProvider, DateTime, Effect, Layer } from "effect";
-import { type ActionRun, ActionsSource, actionsSourceLayer, activeRuns, CommandRunner, decodeActions, ok, unreachable } from "@tui-dash/schema";
+import { type ActionRun, ActionsSource, actionsSourceLayer, activeRuns, CommandRunner, decodeActions, ok, unreachable } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { issueOf, valueOf } from "../../lib/outcomes";
 

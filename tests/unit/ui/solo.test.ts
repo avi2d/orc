@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Effect } from "effect";
-import { mountedOf, plain, soloScreen, span } from "@tui-dash/ui";
+import { mountedOf, plain, soloScreen, span } from "@avi2dg/orc-ui";
 
 describe("a solo screen through a refresh", () => {
   // Oracle: liveScreen draws only after a defined read; the mount reads 1 and one refresh must show 2.

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type Command, SavedProfilesSource, savedProfilesSourceLayer, CommandRunner, CommandUnreachable } from "@tui-dash/schema";
+import { type Command, SavedProfilesSource, savedProfilesSourceLayer, CommandRunner, CommandUnreachable } from "@avi2dg/orc-schema";
 import { ConfigProvider, Effect, Layer } from "effect";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";

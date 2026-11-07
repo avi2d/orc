@@ -9,7 +9,7 @@ import {
   printColor,
   printPanelKnown,
   span,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 
 const escape = String.fromCharCode(27);
 

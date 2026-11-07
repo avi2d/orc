@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { countdown } from "@tui-dash/quota";
-import type { Tone } from "@tui-dash/quota";
-import { quotaBar, shortLabel } from "@tui-dash/ui";
-import { plain } from "@tui-dash/quota";
+import { countdown } from "@avi2dg/orc-quota";
+import type { Tone } from "@avi2dg/orc-quota";
+import { quotaBar, shortLabel } from "@avi2dg/orc-ui";
+import { plain } from "@avi2dg/orc-quota";
 
 // [percent left, quota-axi's timeRemainingPercent, width, what quota-axi 0.1.56's own thinBar draws for them]
 const thinBars: ReadonlyArray<readonly [number, number | undefined, number, string]> = [

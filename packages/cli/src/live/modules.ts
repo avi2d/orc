@@ -1,9 +1,9 @@
 import { BunFileSystem } from "@effect/platform-bun";
 import { type Config, Duration, Effect, Layer } from "effect";
-import { alertSourcesLive } from "@tui-dash/alerts";
-import { dispatchSourcesLive } from "@tui-dash/dispatch";
-import { conversationSourceLive } from "@tui-dash/ledger";
-import { queueFeedLayer, queueSourcesLive } from "@tui-dash/queues";
+import { alertSourcesLive } from "@avi2dg/orc-alerts";
+import { dispatchSourcesLive } from "@avi2dg/orc-dispatch";
+import { conversationSourceLive } from "@avi2dg/orc-ledger";
+import { queueFeedLayer, queueSourcesLive } from "@avi2dg/orc-queues";
 import {
   ciRunsLayer,
   savedProfilesSourceLayer,
@@ -28,10 +28,10 @@ import {
   taskSamplesSourceLayer,
   tasksMachinesLayer,
   watchedLocalTasksLayerWithin,
-} from "@tui-dash/schema";
-import { harvestLogSourceLive, sessionSourcesLive } from "@tui-dash/session-quota";
-import { taskBoardFeedLayer } from "@tui-dash/tasks";
-import { liveCommandRunner } from "@tui-dash/ui";
+} from "@avi2dg/orc-schema";
+import { harvestLogSourceLive, sessionSourcesLive } from "@avi2dg/orc-session-quota";
+import { taskBoardFeedLayer } from "@avi2dg/orc-tasks";
+import { liveCommandRunner } from "@avi2dg/orc-ui";
 import type { ModuleSources } from "../modules";
 
 const onMac = process.platform === "darwin";

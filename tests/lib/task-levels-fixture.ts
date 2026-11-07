@@ -14,7 +14,7 @@ import {
   type TaskLevels,
   type TaskSampleRecord,
   type TaskSpend,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { fixture } from "./fixtures";
 import { valueOf } from "./outcomes";
 

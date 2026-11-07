@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
 import { ConfigProvider, Effect, Layer, Schema } from "effect";
-import { AlertSettings, configPath, readAlertSettings, readConfig, readConfigFile } from "@tui-dash/schema";
+import { AlertSettings, configPath, readAlertSettings, readConfig, readConfigFile } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 
 const root = mkdtempSync(join(tmpdir(), "tui-dash-config-file-"));

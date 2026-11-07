@@ -27,8 +27,8 @@ import {
   taskLevels,
   waitsOnOf,
   decodeTasksReport,
-} from "@tui-dash/schema";
-import { markToneOf } from "@tui-dash/tasks";
+} from "@avi2dg/orc-schema";
+import { markToneOf } from "@avi2dg/orc-tasks";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";
 import { taskReadings } from "../../lib/task-levels-fixture";

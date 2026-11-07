@@ -18,7 +18,7 @@ import {
   type Target,
   widthOf,
   withinRows,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 import { type Board, type BoardView, type BoardWide, type Group, lookOf, type Member, type Part, planOf, readSince, refreshing, savedOnly, savedSince, wideFor, wideMembers } from "./board";
 import { glanceLines } from "./glance";
 

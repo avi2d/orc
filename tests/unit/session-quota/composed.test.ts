@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime, Effect } from "effect";
-import { composedSessionQuota, type SessionQuotaView, sessionQuotaViewOf } from "@tui-dash/schema";
-import { flagLines, sessionLines } from "@tui-dash/session-quota";
-import { blockDocument, frameText, lineWidth, plain } from "@tui-dash/ui";
+import { composedSessionQuota, type SessionQuotaView, sessionQuotaViewOf } from "@avi2dg/orc-schema";
+import { flagLines, sessionLines } from "@avi2dg/orc-session-quota";
+import { blockDocument, frameText, lineWidth, plain } from "@avi2dg/orc-ui";
 import { fixture } from "../../lib/fixtures";
 import { claudeUnread, machineReport, machineView, southReading } from "../../lib/machines-fixture";
 import { valueOf } from "../../lib/outcomes";

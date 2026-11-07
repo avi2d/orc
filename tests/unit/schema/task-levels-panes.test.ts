@@ -12,7 +12,7 @@ import {
   SessionsCodec,
   taskLevels,
   unreachable,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";
 import { recordedNow, sessionViewOfQuota } from "../../lib/session-fixture";

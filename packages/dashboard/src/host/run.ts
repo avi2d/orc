@@ -1,6 +1,6 @@
 import { Clock, Effect, type Scope } from "effect";
-import { type DashConfig, loopTick, ReadModeReference } from "@tui-dash/schema";
-import { type Mounted, type PanelError, type PanelModule, panelWidth, printBlock, type PrintFrame, runScreen, type Screen } from "@tui-dash/ui";
+import { type DashConfig, loopTick, ReadModeReference } from "@avi2dg/orc-schema";
+import { type Mounted, type PanelError, type PanelModule, panelWidth, printBlock, type PrintFrame, runScreen, type Screen } from "@avi2dg/orc-ui";
 import { boardOf, type Member } from "./board";
 import { decodeLayout, layoutPanels } from "./layout";
 import { hostScreen, type HostState } from "./screen";

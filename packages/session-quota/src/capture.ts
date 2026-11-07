@@ -10,7 +10,7 @@ import {
   PiCallInput,
   piCallRecord,
   statuslineRecord,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 
 const captureKinds = ["pi-call", "claude-statusline"] as const;
 

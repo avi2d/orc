@@ -1,7 +1,7 @@
 import { Config, Context, DateTime, Duration, Effect, FileSystem, Layer, Option } from "effect";
 import { type AgentReplies, saidOfTurns, saidToday, type SaidMessage } from "./ledger";
-import { CommandRunner, selector } from "@tui-dash/schema";
-import { liveCommandRunner } from "@tui-dash/ui";
+import { CommandRunner, selector } from "@avi2dg/orc-schema";
+import { liveCommandRunner } from "@avi2dg/orc-ui";
 import { sessionTurns, type SessionTurn } from "./session-turns";
 
 type Runner = CommandRunner["Service"];

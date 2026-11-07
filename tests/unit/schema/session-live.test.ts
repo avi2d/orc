@@ -10,7 +10,7 @@ import {
   resolveSessions,
   taskLevels,
   tieFolderOf,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { taskReadings, tasksNow } from "../../lib/task-levels-fixture";
 import { viewOf } from "../../lib/quota-view-fixture";
 

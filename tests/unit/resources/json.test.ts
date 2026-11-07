@@ -16,8 +16,8 @@ import {
   macHostSourceLayer,
   macProcessesSourceLayer,
   macTaskProcessesSourceLayer,
-} from "@tui-dash/schema";
-import { printResourcesJson } from "@tui-dash/resources";
+} from "@avi2dg/orc-schema";
+import { printResourcesJson } from "@avi2dg/orc-resources";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";
 

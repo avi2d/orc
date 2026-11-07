@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { decodeNoMistakes, decodeTasksReport, ok, type TaskLevelReadings, taskLevels } from "@tui-dash/schema";
-import { drawTasks, type Navigation, type TasksReadings } from "@tui-dash/tasks";
-import { type Block, plain } from "@tui-dash/ui";
+import { decodeNoMistakes, decodeTasksReport, ok, type TaskLevelReadings, taskLevels } from "@avi2dg/orc-schema";
+import { drawTasks, type Navigation, type TasksReadings } from "@avi2dg/orc-tasks";
+import { type Block, plain } from "@avi2dg/orc-ui";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";
 import { cellDiffs } from "../../lib/styled-screen";

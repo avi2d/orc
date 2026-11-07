@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
 import { ConfigProvider, Effect, Layer } from "effect";
-import { DispatchSource, dispatchSourceLayer } from "@tui-dash/schema";
+import { DispatchSource, dispatchSourceLayer } from "@avi2dg/orc-schema";
 
 const root = mkdtempSync(join(tmpdir(), "tui-dash-dispatch-"));
 

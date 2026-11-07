@@ -14,9 +14,9 @@ import {
   ok,
   type RemoteResources,
   resourcesView,
-} from "@tui-dash/schema";
-import { lineWidth, plain } from "@tui-dash/ui";
-import { machinesLines } from "@tui-dash/resources";
+} from "@avi2dg/orc-schema";
+import { lineWidth, plain } from "@avi2dg/orc-ui";
+import { machinesLines } from "@avi2dg/orc-resources";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";
 

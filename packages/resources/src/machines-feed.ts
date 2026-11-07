@@ -17,7 +17,7 @@ import {
   SavedReadings,
   type Shown,
   type Stamped,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 
 export interface MachinesShown {
   readonly shown: Shown<MachinesView>;

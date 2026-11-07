@@ -7,8 +7,8 @@ import {
   type StageMark,
   type TaskPipeline,
   type TaskRow,
-} from "@tui-dash/schema";
-import { countdown, ellipsize, span, wrapParts, type Block, type Line, type Tone } from "@tui-dash/ui";
+} from "@avi2dg/orc-schema";
+import { countdown, ellipsize, span, wrapParts, type Block, type Line, type Tone } from "@avi2dg/orc-ui";
 
 // The board's legend pins each mark to one tone, so every pipe dot reads the same everywhere.
 export const markToneOf = (mark: StageMark): Tone => {

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { createTestRenderer, type TestRendererSetup } from "@opentui/core/testing";
 import { Effect, Fiber, Layer } from "effect";
-import { CommandRunner, HarvestLogSource, homeLogRoots, nothingCaptured, quotaSourceLayer } from "@tui-dash/schema";
-import { livePanel } from "@tui-dash/quota";
+import { CommandRunner, HarvestLogSource, homeLogRoots, nothingCaptured, quotaSourceLayer } from "@avi2dg/orc-schema";
+import { livePanel } from "@avi2dg/orc-quota";
 import { fixture } from "../../lib/fixtures";
 import { recordedSavedProfilesLayer } from "../../lib/saved-profiles";
 

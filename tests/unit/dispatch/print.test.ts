@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
 import { ConfigProvider, Effect, Layer } from "effect";
 import { TestConsole } from "effect/testing";
-import { dispatchSourceLayer } from "@tui-dash/schema";
-import { mountDispatch } from "@tui-dash/dispatch";
-import { printSolo } from "@tui-dash/ui";
+import { dispatchSourceLayer } from "@avi2dg/orc-schema";
+import { mountDispatch } from "@avi2dg/orc-dispatch";
+import { printSolo } from "@avi2dg/orc-ui";
 import { writeDispatchBacklog } from "../../lib/dispatch-fixture";
 import { stripSgr } from "../../e2e/lib/print-color";
 

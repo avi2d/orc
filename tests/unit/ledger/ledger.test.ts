@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { lineWidth, plain } from "@tui-dash/ui";
+import { lineWidth, plain } from "@avi2dg/orc-ui";
 import {
   fullHints,
   ledgerFull,
@@ -11,7 +11,7 @@ import {
   type SaidMessage,
   type SessionTurn,
   windowOf,
-} from "@tui-dash/ledger";
+} from "@avi2dg/orc-ledger";
 import { dashboardNow } from "../../lib/dashboard-fixture";
 
 const minutes = (n: number): DateTime.Utc => DateTime.addDuration(dashboardNow, `${0 - n} minutes`);

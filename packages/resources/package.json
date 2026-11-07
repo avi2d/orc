@@ -1,5 +1,5 @@
 {
-  "name": "@tui-dash/resources",
+  "name": "@avi2dg/orc-resources",
   "version": "0.1.0",
   "private": true,
   "description": "Standalone OpenTUI resources panel for tui-dash",
@@ -14,8 +14,8 @@
   "dependencies": {
     "@effect/platform-bun": "4.0.0",
     "@opentui/core": "0.6.5",
-    "@tui-dash/schema": "workspace:*",
-    "@tui-dash/ui": "workspace:*",
+    "@avi2dg/orc-schema": "workspace:*",
+    "@avi2dg/orc-ui": "workspace:*",
     "effect": "4.0.0"
   }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@tui-dash/schedules",
+  "name": "@avi2dg/orc-schedules",
   "version": "0.1.0",
   "private": true,
   "description": "Scheduled box for tui-dash, listing what runs next on each configured machine",
@@ -12,8 +12,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@tui-dash/schema": "workspace:*",
-    "@tui-dash/ui": "workspace:*",
+    "@avi2dg/orc-schema": "workspace:*",
+    "@avi2dg/orc-ui": "workspace:*",
     "effect": "4.0.0"
   }
 }

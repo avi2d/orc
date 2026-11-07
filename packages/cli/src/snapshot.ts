@@ -1,5 +1,5 @@
 import { Cause, DateTime, Duration, Effect, Exit, Fiber, Option } from "effect";
-import { type Outcome, type SnapshotFields, type SnapshotReport, type SnapshotSource, snapshotSources } from "@tui-dash/schema";
+import { type Outcome, type SnapshotFields, type SnapshotReport, type SnapshotSource, snapshotSources } from "@avi2dg/orc-schema";
 
 export type SnapshotReaders<R> = { readonly [K in SnapshotSource]: Effect.Effect<SnapshotFields<K>, never, R> };
 

@@ -1,5 +1,5 @@
 import { type Config, Effect } from "effect";
-import { anchorOf, machineNames, OrcMachines, orcPipelineOf, orcRunOf, pipelineFoldersOf, type ReportedTasks } from "@tui-dash/schema";
+import { anchorOf, machineNames, OrcMachines, orcPipelineOf, orcRunOf, pipelineFoldersOf, type ReportedTasks } from "@avi2dg/orc-schema";
 
 export const orcStagesOf = (reported: ReportedTasks): Effect.Effect<ReadonlyMap<string, string> | undefined, Config.ConfigError, OrcMachines> =>
   Effect.gen(function* () {

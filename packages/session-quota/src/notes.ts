@@ -1,5 +1,5 @@
-import type { Composition, Failed, FailedAccount, RemoteMachine, SessionQuotaView } from "@tui-dash/schema";
-import { type Block, countdown, ellipsize, type Line, secondsBetween, span, widthOf, wrapParts } from "@tui-dash/ui";
+import type { Composition, Failed, FailedAccount, RemoteMachine, SessionQuotaView } from "@avi2dg/orc-schema";
+import { type Block, countdown, ellipsize, type Line, secondsBetween, span, widthOf, wrapParts } from "@avi2dg/orc-ui";
 
 export const listed = (names: ReadonlyArray<string>, conjunction: string): string =>
   names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} ${conjunction} ${names.at(-1) ?? ""}`;

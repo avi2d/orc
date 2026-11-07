@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Effect, Layer } from "effect";
-import { CommandRunner, type QuotaProviderId, QuotaSource, quotaSourceLayer } from "@tui-dash/schema";
+import { CommandRunner, type QuotaProviderId, QuotaSource, quotaSourceLayer } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 
 const askedArgv = (providers: ReadonlyArray<QuotaProviderId>): ReadonlyArray<string> => {

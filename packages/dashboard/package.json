@@ -1,5 +1,5 @@
 {
-  "name": "@tui-dash/dashboard",
+  "name": "@avi2dg/orc-dashboard",
   "version": "0.1.0",
   "private": true,
   "description": "The dashboard host, laying out whichever panel modules it is handed by a layout setting, and owning no panel itself",
@@ -14,8 +14,8 @@
   "dependencies": {
     "@effect/platform-bun": "4.0.0",
     "@opentui/core": "0.6.5",
-    "@tui-dash/schema": "workspace:*",
-    "@tui-dash/ui": "workspace:*",
+    "@avi2dg/orc-schema": "workspace:*",
+    "@avi2dg/orc-ui": "workspace:*",
     "effect": "4.0.0"
   }
 }

@@ -15,13 +15,13 @@ import {
   type TaskRow,
   type TestRun,
   totalSecondsOf,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { dash, type ListedState, stateTones } from "./cells";
 import { listedDisplayIdOf, type ListedRow, listedRows } from "./listed";
 import { planSpans, planText, planWidth } from "./plan-column";
 import { type ProjectFigures, type ProjectTotal, quietOf, totalOf } from "./project-total";
 import { lasted, markToneOf } from "./pipeline";
-import { type Block, clock, countdown, ellipsize, gib, type Line, lineWidth, padEnd, padStart, span, type Span, type Tone, truncate, widthOf, wrapParts } from "@tui-dash/ui";
+import { type Block, clock, countdown, ellipsize, gib, type Line, lineWidth, padEnd, padStart, span, type Span, type Tone, truncate, widthOf, wrapParts } from "@avi2dg/orc-ui";
 
 const minuteSeconds = 60;
 

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { decodeTasksReport, mergedTaskLevels, type ProjectRow, taskLevels } from "@tui-dash/schema";
-import { drawTasks, moved, type Navigation, listedIdOf, listedRows, pickedTask, type TasksReadings } from "@tui-dash/tasks";
-import { plain } from "@tui-dash/ui";
+import { decodeTasksReport, mergedTaskLevels, type ProjectRow, taskLevels } from "@avi2dg/orc-schema";
+import { drawTasks, moved, type Navigation, listedIdOf, listedRows, pickedTask, type TasksReadings } from "@avi2dg/orc-tasks";
+import { plain } from "@avi2dg/orc-ui";
 import { fixture } from "../../lib/fixtures";
 import { southTaskReadings, taskReadings } from "../../lib/task-levels-fixture";
 
