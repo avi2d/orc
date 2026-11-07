@@ -39,7 +39,7 @@ export const stampedNow = <A, R>(read: Effect.Effect<A, never, R>): Effect.Effec
 // print: each source is read once and waited for, and no saved copy stands in. live: sources read on their own clocks beside the paint.
 export type ReadMode = "live" | "print";
 
-export const ReadModeReference = Context.Reference<ReadMode>("@avi2dg/orc-schema/ReadMode", { defaultValue: () => "print" });
+export const ReadModeReference = Context.Reference<ReadMode>("@tui-dash/schema/ReadMode", { defaultValue: () => "print" });
 
 export interface Polled<A> {
   // None until the source first answers.
@@ -101,7 +101,7 @@ export interface SavedStore {
   readonly slot: <A>(key: string, codec: Schema.Codec<A, unknown>) => SavedSlot<A>;
 }
 
-export class SavedReadings extends Context.Service<SavedReadings, SavedStore>()("@avi2dg/orc-schema/SavedReadings") {}
+export class SavedReadings extends Context.Service<SavedReadings, SavedStore>()("@tui-dash/schema/SavedReadings") {}
 
 // A box shows its own source once it answers, and until then the saved copy with its age, so what is shown and the age it claims never part.
 export const shownOf = <A>(fresh: Option.Option<Stamped<A>>, saved: Option.Option<Stamped<A>>): Shown<A> => {
