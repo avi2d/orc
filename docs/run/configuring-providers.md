@@ -45,6 +45,8 @@ Each provider names its Pi provider `id`, the part of a model name before the `/
   `env` names variables orc sets for the run's Pi over your environment, and for the chat's Pi when `models.orchestrator` names this provider, such as the `CLAUDE_CONFIG_DIR` of the account a Claude Code package runs on.
   The nono sandbox carries only a Pi login, so a package provider runs only with `--sandbox none`.
 
+`sandbox.read` lists folders the nono sandbox may read, as [Granting toolchain folders to the sandbox](toolchain-folders.md) shows.
+
 Orc refuses a `config.json` key it does not know, so a misspelled key never drops a provider unnoticed.
 Orc refuses `--token-file` on a provider that takes a Pi login or Pi packages.
 `orc run --provider <id>` refuses a run whose implementer model is on another provider, so a token meant for one provider never reaches another.
