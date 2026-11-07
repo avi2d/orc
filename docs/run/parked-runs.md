@@ -13,7 +13,7 @@ A wait on several questions gets every answer given so far each time the beat ha
 A question the run asks again at a later wait is open again, and the chat posts it once more.
 
 A run whose wait ends with a question unanswered parks its task instead of closing it failed.
-The beat moves the task back to `new` with `parked_branch` and `parked_questions` in its file, each question with its id and text.
+The beat moves the task back to `new` with `parked_branch` and `parked_questions` in its file, each question with its id, its text and the time it was asked.
 It prints `parked <task-id> on <branch> for the captain's answer to <question-ids>`.
 Each later beat prints `waits <task-id>: parked on <branch> for the captain's answer to <question-ids>` and never starts it.
 To answer one question, run `orc backlog answer <task-id> <question-id>=<text>`.
@@ -23,4 +23,4 @@ The run resumes there and hands your answers to no-mistakes, so no new branch an
 If the resumed run stops on new questions, the task parks again with those, and it keeps the answers it already has.
 An answer given after the beat last read the waiting run is kept too.
 So a task whose every question has an answer starts again at once.
-`orc backlog` shows a parked task as `parked (<question-ids>)`, and `orc backlog --json` gives every task a `parked`, either `null` or the branch and the questions with their answers.
+`orc backlog` shows a parked task as `parked (<question-ids>)`, and `orc backlog --json` gives every task a `parked`, either `null` or the branch and the questions with the time each was asked and their answers.
