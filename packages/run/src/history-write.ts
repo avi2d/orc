@@ -153,6 +153,12 @@ export const recordImplementStart = (db: Database, run: HistoryRun, started: str
     yield* recordStep(db, { runId: run.runId, name: "implement", attempt: 1, status: "running", started, agentFile: run.agent.path, piSessionFile: piSessionFile ?? null }).pipe(Effect.asVoid, Effect.mapError((cause) => historyFailure("record the step in", cause)))
   })
 
+export const recordStepSession = (db: Database, runId: string, name: "implement" | "fix", attempt: number, piSessionFile: string): Effect.Effect<void, OrcRunError> =>
+  updateStep(db, runId, name, attempt, { status: "running", ended: null, piSessionFile }).pipe(
+    Effect.asVoid,
+    Effect.mapError((cause) => historyFailure("record the session file in", cause))
+  )
+
 export const recordHandoverEvidence = (db: Database, runId: string, path: string): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
     const stepId = yield* stepIdFor(db, runId, "implement", 1).pipe(Effect.mapError((cause) => historyFailure("read the step in", cause)))

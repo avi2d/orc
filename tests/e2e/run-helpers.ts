@@ -9,9 +9,10 @@ import { subprocessNoMistakesRunner, type QuestionAnswer } from "../../packages/
 import { subprocessPullRequestOpener } from "../../packages/run/src/direct-pr"
 import { hostGitShim } from "../../packages/run/src/host"
 import { orcCompletionLine } from "../../packages/run/src/pi"
-import { runWithHistory, type SandboxOps } from "../../packages/run/src/run"
+import { runWithHistory } from "../../packages/run/src/run"
 import type { OrcRunReport, RunDeliverer } from "../../packages/run/src/run-record"
 import { listRuns, openDatabase, type RunRecord } from "../../packages/run/src/run-history"
+import { type FakeAgent, type FakeCheck, fakeOps } from "../lib/fake-ops"
 
 export const git = (dir: string, args: ReadonlyArray<string>): string => {
   const result = Bun.spawnSync(["git", ...args], { cwd: dir })
@@ -96,7 +97,7 @@ export interface StepOutcome {
   readonly evidence: string
 }
 
-const unexpectedChecks: SandboxOps["execCheck"] = async () => {
+const unexpectedChecks: FakeCheck = async () => {
   throw new Error("checks ran before implement completed")
 }
 
@@ -196,10 +197,10 @@ type DelivererFor = (spawner: ChildProcessSpawner.ChildProcessSpawner["Service"]
 const noMistakesDelivery: DelivererFor = (spawner, hostGit, pathEnv, dir) =>
   ({ kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv, git: hostGit, worktreeDir: dir }) })
 
-export const runStep = (dir: string, home: string, sandbox: SandboxOps["runAgent"], execCheck: SandboxOps["execCheck"] = unexpectedChecks, nmReplies: ReadonlyArray<NoMistakesReply> = unexpectedNoMistakes, answers: ReadonlyArray<QuestionAnswer> = []): Promise<StepOutcome & { readonly nmCalls: string }> =>
+export const runStep = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck = unexpectedChecks, nmReplies: ReadonlyArray<NoMistakesReply> = unexpectedNoMistakes, answers: ReadonlyArray<QuestionAnswer> = []): Promise<StepOutcome & { readonly nmCalls: string }> =>
   runStepWith(dir, home, sandbox, execCheck, nmReplies, answers, noMistakesDelivery, "")
 
-export const runDirectPrStep = async (dir: string, home: string, sandbox: SandboxOps["runAgent"], execCheck: SandboxOps["execCheck"]): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
+export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
   const gh = await stubGh()
   try {
     const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, [], (spawner, hostGit, pathEnv, worktreeDir) =>
@@ -210,7 +211,7 @@ export const runDirectPrStep = async (dir: string, home: string, sandbox: Sandbo
   }
 }
 
-const runStepWith = (dir: string, home: string, sandbox: SandboxOps["runAgent"], execCheck: SandboxOps["execCheck"], nmReplies: ReadonlyArray<NoMistakesReply>, answers: ReadonlyArray<QuestionAnswer>, deliver: DelivererFor, extraPath: string): Promise<StepOutcome & { readonly nmCalls: string }> =>
+const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, nmReplies: ReadonlyArray<NoMistakesReply>, answers: ReadonlyArray<QuestionAnswer>, deliver: DelivererFor, extraPath: string): Promise<StepOutcome & { readonly nmCalls: string }> =>
   Effect.runPromise(
     Effect.gen(function*() {
       const fs = yield* FileSystem.FileSystem
@@ -232,7 +233,7 @@ const runStepWith = (dir: string, home: string, sandbox: SandboxOps["runAgent"],
               worktreeDir: dir,
               delivery: deliver(spawner, hostGit, extraPath + stub.dir + ":" + (process.env.PATH ?? ""), dir),
               answers
-            }, { runAgent: sandbox, execCheck })
+            }, fakeOps({ runAgent: sandbox, execCheck }, path.join(runDir, "sessions")))
             const runs = yield* listRuns(db)
             const steps = db.query("SELECT name, status FROM steps WHERE run_id = ?").all("step-run-1")
             const signals = db.query("SELECT name, value FROM signals ORDER BY name").all()
@@ -255,15 +256,16 @@ const fixer: AgentFile = {
   source: "bundled"
 }
 
+const sessionFileName = "2026-10-19T10-00-00-000Z_" + sessionId + ".jsonl"
+
 export const capturedSession = (home: string, jsonl: string): Promise<void> => {
-  const dir = join(home, "runs", "step-run-1", "sessions", "--sandbox-repo--")
-  return mkdir(dir, { recursive: true }).then(() => writeFile(join(dir, "2026-10-19T10-00-00-000Z_" + sessionId + ".jsonl"), jsonl))
+  const dir = join(home, "runs", "step-run-1", "sessions")
+  return mkdir(dir, { recursive: true }).then(() => writeFile(join(dir, sessionFileName), jsonl))
 }
 
-export const sandboxResult = (sha: string, final: Record<string, unknown>): SandboxOps["runAgent"] => async () => ({
-  iterations: [{ sessionId }],
-  completionSignal: orcCompletionLine,
-  stdout: JSON.stringify({ type: "message_end", message: final }),
+export const sandboxResult = (sha: string): FakeAgent => async (_run, sessionsDir) => ({
+  sessionId,
+  sessionFile: join(sessionsDir, sessionFileName),
   commits: [{ sha }]
 })
 

@@ -55,11 +55,11 @@ describe("runChecksRound", () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-checks-"))
     try {
       const calls: Array<string> = []
-      const runCommand = async (command: string): Promise<CommandResult> => {
+      const runCommand = (command: string): Effect.Effect<CommandResult> => {
         calls.push(command)
-        return command === "bun run lint"
+        return Effect.succeed(command === "bun run lint"
           ? { stdout: "lint ok", stderr: "", exitCode: 0 }
-          : { stdout: "", stderr: "type error on line 3", exitCode: 1 }
+          : { stdout: "", stderr: "type error on line 3", exitCode: 1 })
       }
       const round = await provide(Effect.gen(function*() {
         const fs = yield* FileSystem.FileSystem
@@ -91,7 +91,7 @@ describe("runChecksRound", () => {
       const text = await provide(Effect.gen(function*() {
         const fs = yield* FileSystem.FileSystem
         const path = yield* Path.Path
-        const outcome = yield* runChecksRound(async () => ({ stdout: "", stderr: "", exitCode: 0 }), fs, path, dir, 1, [
+        const outcome = yield* runChecksRound(() => Effect.succeed({ stdout: "", stderr: "", exitCode: 0 }), fs, path, dir, 1, [
           { name: "lint", command: "bun run lint" }
         ])
         return yield* fs.readFileString(outcome.file)
@@ -109,9 +109,7 @@ describe("runChecksRound", () => {
       const failed = await provide(Effect.gen(function*() {
         const fs = yield* FileSystem.FileSystem
         const path = yield* Path.Path
-        return yield* runChecksRound(async () => {
-          throw new Error("sandbox blew up")
-        }, fs, path, dir, 1, [{ name: "lint", command: "bun run lint" }]).pipe(
+        return yield* runChecksRound(() => Effect.fail({ message: "sandbox blew up" }), fs, path, dir, 1, [{ name: "lint", command: "bun run lint" }]).pipe(
           Effect.map(() => "ran"),
           Effect.catchTag("ChecksError", (cause) => Effect.succeed(cause.message)))
       }))

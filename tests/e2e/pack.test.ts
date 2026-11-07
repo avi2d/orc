@@ -11,6 +11,7 @@ const expectedFiles = [
   "agents/implementer.md",
   "package.json",
   "scripts/patch-knip-jiti.ts",
+  "src/agent-exec.ts",
   "src/agents.ts",
   "src/answer-wait.ts",
   "src/args.ts",
@@ -81,14 +82,16 @@ const expectedFiles = [
   "src/no-mistakes-drive-log.ts",
   "src/no-mistakes-gate.ts",
   "src/no-mistakes.ts",
-  "src/no-sandbox.ts",
+  "src/nono-exec.ts",
   "src/nono-profile.ts",
   "src/nono.ts",
   "src/orc-config.ts",
+  "src/pi-run.ts",
   "src/pi.ts",
   "src/report-run.ts",
   "src/report.ts",
   "src/run-deliverer.ts",
+  "src/run-exec.ts",
   "src/run-folders.ts",
   "src/run-history.ts",
   "src/run-id.ts",
@@ -100,8 +103,10 @@ const expectedFiles = [
   "src/run.ts",
   "src/sandbox-plan.ts",
   "src/show.ts",
+  "src/task-copy.ts",
   "src/task-kind.ts",
-  "src/toon.ts"
+  "src/toon.ts",
+  "src/worktree-excludes.ts"
 ]
 
 const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => {

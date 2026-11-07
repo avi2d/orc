@@ -119,6 +119,22 @@ describe("orc run refreshes the checkout", () => {
     })
   }, runTimeout)
 
+  test("a checkout holding only a registered in-checkout worktree is refreshed instead of kept as dirty", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const branch = branchOf(fixture)
+      withUpstream(fixture, branch)
+      const other = join(fixture.repo, ".sandcastle", "worktrees", "other")
+      git(fixture.repo, ["worktree", "add", "-q", "-b", "other", other], fixture.env)
+      await writeFile(join(other, "unsaved.txt"), "work in progress\n")
+      const before = git(fixture.repo, ["rev-parse", "HEAD"], fixture.env)
+      const result = await runIt(fixture)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect(result.stdout).toStartWith(branch + " in " + fixture.repo + " is current with origin at " + before.slice(0, 7) + "\n")
+      expect(await Bun.file(join(other, "unsaved.txt")).text()).toBe("work in progress\n")
+      expect(git(fixture.repo, ["worktree", "list", "--porcelain"], fixture.env)).toContain("branch refs/heads/other")
+    })
+  }, runTimeout)
+
   test("a diverged checkout keeps its local commit and still runs from what it holds instead of being rebased", async () => {
     await withNoSandboxFixture(async (fixture) => {
       const branch = branchOf(fixture)

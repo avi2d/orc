@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { formatReport } from "../../packages/run/src/run-record"
-import { cleanFinish, passedWithPr, readyToCheck, recordedNothing, runStep, sandboxResult, withHome, withRepo, type NoMistakesReply } from "./run-helpers"
+import { passedWithPr, readyToCheck, recordedNothing, runStep, sandboxResult, withHome, withRepo, type NoMistakesReply } from "./run-helpers"
 
 const lintPasses = async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 })
 
@@ -29,7 +29,7 @@ describe("runWithHistory names the reviewer that served the run", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [passedWithPr, reviewedBy("pi/claude-bridge/claude-opus-5-5")])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [passedWithPr, reviewedBy("pi/claude-bridge/claude-opus-5-5")])
         expect(outcome.report.noMistakes?.reviewer).toBe("pi/claude-bridge/claude-opus-5-5")
         expect(formatReport(outcome.report)).toContain("no-mistakes: passed, 0 findings, 0 gates answered, reviewed by pi/claude-bridge/claude-opus-5-5")
         const text = await readFile(join(home, "runs", "step-run-1", "no-mistakes.txt"), "utf8")
@@ -45,7 +45,7 @@ describe("runWithHistory names the reviewer that served the run", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [passedWithPr, recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [passedWithPr, recordedNothing])
         expect(outcome.report.noMistakes?.reviewer).toBeNull()
         expect(formatReport(outcome.report)).toContain("no-mistakes: passed, 0 findings, 0 gates answered, reviewer not named\n")
         const text = await readFile(join(home, "runs", "step-run-1", "no-mistakes.txt"), "utf8")

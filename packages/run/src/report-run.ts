@@ -1,13 +1,14 @@
 import type { Database } from "bun:sqlite"
-import { Effect, FileSystem, Stream } from "effect"
-import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { Effect, FileSystem, Path } from "effect"
+import { ChildProcessSpawner } from "effect/process"
+import type { AgentExec } from "./agent-exec"
 import type { AgentFile } from "./agents"
 import type { SandboxKind } from "./args"
 import { historyFailure } from "./history-write"
-import { noSandboxEnv } from "./no-sandbox"
-import { orcCompletionLine, piWithTools } from "./pi"
+import { orcCompletionLine } from "./pi"
+import { idleSpan, type PiPacing, runPi } from "./pi-run"
 import { recordRun, updateRun } from "./run-history"
-import { describeCause, OrcRunError } from "./run-session"
+import type { OrcRunError } from "./run-session"
 import { agentReportFileName, type ReportKind } from "./task-kind"
 
 export interface ReportRun {
@@ -19,12 +20,11 @@ export interface ReportRun {
   readonly sandbox: SandboxKind
   readonly taskPath: string
   readonly instructions: string | null
-  readonly piSessionDir: string
   readonly hostSessionsDir: string
-  readonly piAgentDir: string | undefined
   readonly agent: AgentFile
   readonly started: string
-  readonly env: Readonly<Record<string, string | undefined>>
+  readonly exec: AgentExec
+  readonly pacing: PiPacing
 }
 
 export type ReportOutcome =
@@ -45,36 +45,22 @@ const buildReportPrompt = (run: ReportRun): string =>
     ". When the report is written, print " + orcCompletionLine + " on its own line and stop."
   ].join("\n")
 
-const definedEnv = (env: Readonly<Record<string, string | undefined>>): Record<string, string> =>
-  Object.fromEntries(Object.entries(env).flatMap(([name, value]) => value === undefined ? [] : [[name, value]]))
-
-const runPi = (run: ReportRun): Effect.Effect<number, OrcRunError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+const runReportPi = (run: ReportRun): Effect.Effect<number | string, OrcRunError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const print = piWithTools(run.agent, { hostSessionsDir: run.hostSessionsDir, sandboxSessionsDir: run.hostSessionsDir }, run.instructions)
-      .buildPrintCommand({ prompt: buildReportPrompt(run), dangerouslySkipPermissions: true })
-    const dirs = { piSessionDir: run.piSessionDir, hostSessionsDir: run.hostSessionsDir, piAgentDir: run.piAgentDir }
-    const handle = yield* spawner.spawn(ChildProcess.make("sh", ["-c", print.command], {
-      cwd: run.runDir,
-      env: { ...definedEnv(run.env), ...noSandboxEnv(dirs) },
-      extendEnv: false,
-      stdin: print.stdin === undefined ? "ignore" : Stream.fromIterable([new TextEncoder().encode(print.stdin)])
-    }))
-    const logPath = run.runDir + "/agent.log"
-    yield* fs.writeFileString(logPath, "").pipe(Effect.orElseSucceed(() => undefined))
-    const append = (chunk: string): Effect.Effect<void> =>
-      chunk === "" ? Effect.void : fs.writeFileString(logPath, chunk, { flag: "a" }).pipe(Effect.orElseSucceed(() => undefined))
-    const [, , exitCode] = yield* Effect.all([
-      handle.stdout.pipe(Stream.decodeText(), Stream.runForEach(append)),
-      handle.stderr.pipe(Stream.decodeText(), Stream.runForEach(append)),
-      handle.exitCode
-    ], { concurrency: "unbounded" })
-    return exitCode
-  }).pipe(
-    Effect.scoped,
-    Effect.mapError((cause) => cause instanceof OrcRunError ? cause : new OrcRunError({ message: "orc: pi did not run: " + describeCause(cause) }))
-  )
+    const pi = yield* runPi(spawner, fs, path, run.exec, {
+      agent: run.agent,
+      prompt: buildReportPrompt(run),
+      instructions: run.instructions,
+      sessionDir: run.hostSessionsDir,
+      resumeSession: null,
+      logFile: run.runDir + "/agent.log",
+      onSession: () => Effect.void
+    }, run.pacing)
+    return pi.end.kind === "exited" ? pi.end.exitCode : "orc stopped pi, idle for " + idleSpan(pi.end.idleSeconds) + " with no tool running"
+  })
 
 export const writtenReport = (runDir: string): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
@@ -95,12 +81,12 @@ const outcomeOf = (run: ReportRun, report: string | null, piExit: number | strin
 export const runReport = (
   db: Database,
   run: ReportRun
-): Effect.Effect<ReportOutcome, OrcRunError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+): Effect.Effect<ReportOutcome, OrcRunError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     yield* recordRun(db, {
       id: run.runId, project: run.projectDir, branch: run.branch, taskFile: run.taskPath, status: "running", started: run.started, sandbox: run.sandbox
     }).pipe(Effect.mapError((cause) => historyFailure("record the run in", cause)))
-    const piExit = yield* runPi(run).pipe(Effect.catchTag("OrcRunError", (error) => Effect.succeed(error.message)))
+    const piExit = yield* runReportPi(run).pipe(Effect.catchTag("OrcRunError", (error) => Effect.succeed(error.message)))
     const outcome = outcomeOf(run, yield* writtenReport(run.runDir), piExit)
     yield* updateRun(db, run.runId, {
       status: outcome.kind === "reported" ? "succeeded" : "failed",

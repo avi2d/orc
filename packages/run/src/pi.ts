@@ -1,34 +1,7 @@
-import { pi, type AgentCommandOptions, type AgentProvider } from "@ai-hero/sandcastle"
 import { Option, Schema } from "effect"
 import type { AgentFile } from "./agents"
 
 export const orcCompletionLine = "ORC_COMPLETE"
-
-export interface PiSessionDirs {
-  readonly hostSessionsDir: string
-  readonly sandboxSessionsDir: string
-}
-
-const shellEscape = (arg: string): string => "'" + arg.replace(/'/g, "'\\''") + "'"
-
-export const toolFlag = (agent: AgentFile): string => " --tools " + shellEscape(agent.tools.join(","))
-
-const instructionsFlag = (instructions: string | null): string =>
-  instructions === null ? "" : " --append-system-prompt " + shellEscape(instructions)
-
-export const piWithTools = (agent: AgentFile, sessions: PiSessionDirs, instructions: string | null): AgentProvider => {
-  const base = pi(agent.model, {
-    thinking: agent.thinking,
-    sessionStorage: { hostSessionsDir: sessions.hostSessionsDir, sandboxSessionsDir: sessions.sandboxSessionsDir }
-  })
-  return {
-    ...base,
-    buildPrintCommand: (options: AgentCommandOptions) => {
-      const command = base.buildPrintCommand(options)
-      return { ...command, command: command.command + toolFlag(agent) + instructionsFlag(instructions) }
-    }
-  }
-}
 
 const UsageTotals = Schema.Struct({ input: Schema.Finite, output: Schema.Finite })
 
@@ -67,7 +40,7 @@ const finalAssistantMessage = (jsonl: string) =>
 const printsOnOwnLine = (text: string, signal: string): boolean =>
   text.split("\n").some((line) => line.trim() === signal)
 
-// Sandcastle matches the completion marker anywhere in the agent output, including a Pi error payload that echoes the prompt back. Only a cleanly stopped final reply counts.
+// A Pi error payload can echo the prompt, marker included, so only a cleanly stopped final reply counts.
 export const sessionPrintedSignal = (jsonl: string, signal: string): boolean => {
   const final = finalAssistantMessage(jsonl)
   return final !== undefined &&

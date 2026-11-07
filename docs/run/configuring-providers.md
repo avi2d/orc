@@ -51,7 +51,7 @@ Orc refuses `--token-file` on a provider that takes a Pi login or Pi packages.
 Orc refuses a token file that is unset, relative, missing, empty, not a regular file or readable by other users.
 On a token file provider, Pi reads the run's own Pi folder instead of yours.
 So a login stored in your Pi config never stands in for the token.
-The run's `models.json` names the token file only through `ORC_TOKEN_FILE`.
+The run's `models.json` names the token file only through `AGENT_TOKEN_FILE`.
 Pi reads the file when it calls the provider and holds the token only in memory, so no run file keeps it.
 Orc never copies, moves or deletes the token file.
 A provider defined only in the operator's Pi models.json is not carried into a run directory, so use a provider Pi knows built in or one a configured package adds.

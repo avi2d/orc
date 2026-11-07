@@ -73,21 +73,22 @@ const refuseOnChangedIntent = (
     }
   })
 
+const sessionFilesIn = (run: HistoryRun, dir: string): Effect.Effect<ReadonlyArray<string>> =>
+  run.fs.readDirectory(dir).pipe(
+    Effect.map((names) => names.filter((name) => name.endsWith(".jsonl")).map((name) => run.path.join(dir, name))),
+    Effect.orElseSucceed(() => [] as ReadonlyArray<string>)
+  )
+
+// A resumed run's session may sit one folder below its sessions folder, so both depths are read.
 const latestSessionFile = (run: HistoryRun, dirs: ReadonlyArray<string>): Effect.Effect<string | null, OrcRunError> =>
   Effect.gen(function*() {
     const found: Array<{ readonly file: string; readonly mtime: number }> = []
     for (const dir of dirs) {
       const top = yield* run.fs.readDirectory(dir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
-      for (const sub of top) {
-        const files = yield* run.fs.readDirectory(run.path.join(dir, sub)).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
-        for (const file of files) {
-          if (!file.endsWith(".jsonl")) {
-            continue
-          }
-          const full = run.path.join(dir, sub, file)
-          const info = yield* run.fs.stat(full).pipe(Effect.orElseSucceed(() => null))
-          found.push({ file: full, mtime: info === null ? 0 : Option.match(info.mtime, { onNone: () => 0, onSome: (at) => at.getTime() }) })
-        }
+      const nested = yield* Effect.forEach(top, (sub) => sessionFilesIn(run, run.path.join(dir, sub)))
+      for (const full of [...(yield* sessionFilesIn(run, dir)), ...nested.flat()]) {
+        const info = yield* run.fs.stat(full).pipe(Effect.orElseSucceed(() => null))
+        found.push({ file: full, mtime: info === null ? 0 : Option.match(info.mtime, { onNone: () => 0, onSome: (at) => at.getTime() }) })
       }
     }
     if (found.length === 0) {
@@ -159,24 +160,27 @@ const pointLineAt = (line: string, cwd: string): string => {
 const pointSessionAt = (text: string, cwd: string): string =>
   text.split("\n").map((line) => pointLineAt(line, cwd)).join("\n")
 
-const carrySessionFile = (run: HistoryRun, source: string | null, sessionId: string | null): Effect.Effect<string | null, OrcRunError> =>
+interface CarriedSession {
+  readonly id: string
+  readonly file: string
+}
+
+// Pi writes a session file only once it holds a message, so a recorded path may name a file that never existed.
+const carrySession = (run: HistoryRun, source: string | null, sessionId: string | null): Effect.Effect<CarriedSession | null, OrcRunError> =>
   Effect.gen(function*() {
     if (source === null || sessionId === null) {
       return null
     }
-    const carried = yield* run.fs.readFileString(source).pipe(
-      Effect.map((text) => text),
-      Effect.orElseSucceed(() => null)
-    )
+    const carried = yield* run.fs.readFileString(source).pipe(Effect.orElseSucceed(() => null))
     if (carried === null) {
-      return source
+      return null
     }
-    const target = run.path.join(run.hostSessionsDir, "host", source.slice(source.lastIndexOf("/") + 1))
+    const target = run.path.join(run.hostSessionsDir, source.slice(source.lastIndexOf("/") + 1))
     yield* run.fs.makeDirectory(run.path.dirname(target), { recursive: true }).pipe(
       Effect.andThen(() => run.fs.writeFileString(target, pointSessionAt(carried, run.worktreeDir))),
       Effect.orElseSucceed(() => undefined)
     )
-    return target
+    return { id: sessionId, file: target }
   })
 
 const inheritedCompletion = (
@@ -238,24 +242,24 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       )
     }
     const fresh = !progress.implementPassed && (own !== null || (forwarded !== null && progress.implementSessionId === null))
-    const carriedImplement = fresh ? null : yield* carrySessionFile(run, progress.implementSource, progress.implementSessionId)
-    const carriedFix = yield* carrySessionFile(run, progress.fixSource, progress.fixSessionId)
+    const carriedImplement = fresh ? null : yield* carrySession(run, progress.implementSource, progress.implementSessionId)
+    const carriedFix = yield* carrySession(run, progress.fixSource, progress.fixSessionId)
     const skipImplement = progress.implementPassed
     const skipChecks = progress.implementPassed && progress.checksPassed
     const inherited = progress.implementPassed
       ? yield* inheritedCompletion(db, run, progress.priorId, progress.storedFixes)
       : { inheritedRounds: [], inheritedFixes: [] }
     return {
-      implementSessionId: fresh ? null : progress.implementSessionId,
-      implementSessionFile: carriedImplement,
+      implementSessionId: carriedImplement?.id ?? null,
+      implementSessionFile: carriedImplement?.file ?? null,
       skipImplement,
       skipChecks,
       allow,
       answers,
       inheritedRounds: inherited.inheritedRounds,
       inheritedFixes: inherited.inheritedFixes,
-      fixSessionId: progress.fixSessionId,
-      fixSessionFile: carriedFix,
+      fixSessionId: carriedFix?.id ?? null,
+      fixSessionFile: carriedFix?.file ?? null,
       fixRunning: progress.fixRunning,
       handover
     }

@@ -1,12 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
 import type { AgentFile } from "../../packages/run/src/agents"
-import { buildImplementPrompt, finalReplyError, orcCompletionLine, piWithTools, sessionPrintedSignal, sumPiUsage, toolFlag } from "../../packages/run/src/pi"
-
-const q = String.fromCharCode(39)
-const backslash = String.fromCharCode(92)
+import { buildImplementPrompt, finalReplyError, orcCompletionLine, sessionPrintedSignal, sumPiUsage } from "../../packages/run/src/pi"
 
 const agent = (tools: ReadonlyArray<string>): AgentFile => ({
   kind: "implementer",
@@ -16,48 +10,6 @@ const agent = (tools: ReadonlyArray<string>): AgentFile => ({
   body: "Do the task.",
   path: "bundled/implementer.md",
   source: "bundled"
-})
-
-describe("toolFlag", () => {
-  test("joins the tools into one quoted flag value", () => {
-    expect(toolFlag(agent(["read", "bash", "edit", "write"]))).toBe(" --tools " + q + "read,bash,edit,write" + q)
-  })
-  test("escapes a quote inside a tool name for POSIX shells", () => {
-    expect(toolFlag(agent(["a" + q + "b"]))).toBe(" --tools " + q + "a" + q + backslash + q + q + "b" + q)
-  })
-})
-
-describe("piWithTools", () => {
-  test("the print command names the model, the thinking level and only the listed tools", async () => {
-    const root = await mkdtemp(join(tmpdir(), "orc-pi-"))
-    try {
-      const provider = piWithTools(agent(["read", "bash"]), {
-        hostSessionsDir: join(root, "host"),
-        sandboxSessionsDir: join(root, "sandbox")
-      }, null)
-      const command = provider.buildPrintCommand({ prompt: "hi", dangerouslySkipPermissions: true })
-      expect(command.command).toContain("opencode-go/muse-spark")
-      expect(command.command).toContain("--thinking high")
-      expect(command.command).toContain("--tools " + q + "read,bash" + q)
-      expect(command.command).not.toContain("edit")
-      expect(command.command).not.toContain("--append-system-prompt")
-    } finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-  test("appends the instructions file to Pi's system prompt, quoted, instead of leaving it out", async () => {
-    const root = await mkdtemp(join(tmpdir(), "orc-pi-"))
-    try {
-      const provider = piWithTools(agent(["read"]), {
-        hostSessionsDir: join(root, "host"),
-        sandboxSessionsDir: join(root, "sandbox")
-      }, "/runs/r 1/session/instructions.md")
-      const command = provider.buildPrintCommand({ prompt: "hi", dangerouslySkipPermissions: true })
-      expect(command.command).toEndWith(" --append-system-prompt " + q + "/runs/r 1/session/instructions.md" + q)
-    } finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
 })
 
 describe("sumPiUsage", () => {
