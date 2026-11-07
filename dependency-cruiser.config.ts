@@ -24,5 +24,12 @@ export default defineConfig({
       from: { path: "^packages/schema/" },
       to: { path: "^packages/", pathNot: "^packages/schema/" },
     },
+    {
+      name: "test-relative-into-library",
+      severity: "error",
+      comment: "Root tests import a library package by name. Only the run application, which publishes no entry, is reached by path.",
+      from: { path: "^tests/" },
+      to: { path: "^packages/", pathNot: "^packages/run/", dependencyTypes: ["local"], dependencyTypesNot: ["aliased-workspace"] },
+    },
   ],
 });
