@@ -12,7 +12,8 @@ import { runDirFor, type TaskKind } from "../task-kind"
 import { TaskId } from "./backlog"
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
 import { LabelArg } from "./token"
-import { capture, type Command, decodeJson, readHeld, refuse, resolveProjectDir, RunnerError, type RunnerRequirements, taskBranch } from "./runner"
+import { capture, decodeJson } from "./runner-exec"
+import { type Command, readHeld, refuse, resolveProjectDir, RunnerError, type RunnerRequirements, taskBranch } from "./runner"
 
 const RUNNER_JSON_SCHEMA = "orc.runner.v1" as const
 

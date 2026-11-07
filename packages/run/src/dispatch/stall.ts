@@ -2,7 +2,7 @@ import { DateTime, Effect, FileSystem, Option } from "effect"
 import { backlogPaths, type BacklogError } from "./backlog"
 import type { StalledAction } from "./beat-action"
 import { stallEvent } from "./task-events"
-import type { Progress } from "./beat-close"
+import type { Progress } from "./beat-action"
 import { platformFailure } from "./backlog-write"
 import type { TaskRecord } from "./task-record"
 

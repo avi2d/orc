@@ -13,9 +13,9 @@ import { checkoutOn, type DispatchConfig, readDispatchConfig, readProjects } fro
 import { holdRun } from "./hold"
 import { mergeTask } from "./merge"
 import { taskLabel } from "./pueue-status"
-import { type Command, killHeld, queueFromText, refuse as refuseRun, renewTask, RunnerError, startTask } from "./runner"
-import { formatResult, killHeldThrough, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson } from "./runner-result"
-import { ownedBySweep, throughFor } from "./machine-reach"
+import { type Command, killHeld, queueFromText, renewTask, RunnerError, startTask } from "./runner"
+import { stopNow } from "./cli-stop"
+import { formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson } from "./runner-result"
 import type { TaskFileError, TaskRecord } from "./task-record"
 import { encodeToken, sessionToken } from "./token"
 import { markEventPosted, unpostedEvents } from "./events"
@@ -208,37 +208,6 @@ const closeNow = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, pl
     return "closed " + args.id + " " + args.outcome
   })
 
-const stopNow = (id: string, place: DispatchPlace) =>
-  Effect.gen(function*() {
-    const root = backlogRoot(place)
-    const record = (yield* listTasks(root)).find((candidate) => candidate.spec.id === id)
-    if (record === undefined) {
-      return yield* refuseRun("the backlog holds no " + id)
-    }
-    if (record.state.kind !== "started") {
-      return yield* refuseRun(id + " is " + record.state.kind + ", and only a started task stops")
-    }
-    const started = record.state
-    const machine = (yield* readDispatchConfig(backlogPaths(root).dispatchConfig)).machines.find((entry) => entry.name === started.claim.machine)
-    if (machine === undefined) {
-      return yield* refuseRun("the machine " + started.claim.machine + " is not in dispatch.json")
-    }
-    const through = throughFor(machine)
-    if (!ownedBySweep(machine)) {
-      return yield* refuseRun(id + " started on " + machine.name + ", which orc cannot reach, so close it by hand with orc backlog close " + id + " failed")
-    }
-    const label = taskLabel(place.home, id)
-    const line = through === null
-      ? yield* killHeld(place.home, id, label)
-      : yield* killHeldThrough(through, id, label)
-    const after = through === null
-      ? yield* readResult(id, place.home, label).pipe(Effect.orElseSucceed(() => null))
-      : yield* readResultThrough(through, id, label).pipe(Effect.orElseSucceed(() => null))
-    const closed = after?.run ?? null
-    yield* closeStartedTask(root, id, "stopped", closed?.endReason ?? "the captain stopped " + id, { pr: closed?.prLink ?? null, report: null }, DateTime.formatIso(yield* DateTime.now))
-    return line
-  })
-
 const killNow = (args: Extract<CommandArgs, { readonly kind: "RunnerKill" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
     let label = args.label ?? taskLabel(place.home, args.task)
@@ -373,7 +342,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       }
       case "StopTask": {
         yield* requireBacklog(backlogRoot(place))
-        yield* Console.log(yield* stopNow(args.id, place))
+        yield* Console.log(yield* stopNow(args.id, backlogRoot(place), place.home))
         break
       }
       case "Beat": {

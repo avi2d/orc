@@ -18,23 +18,6 @@ const BranchStepRowSchema = Schema.Struct({
   pi_session_file: Schema.NullOr(Schema.String)
 })
 
-export const latestRunForBranch = (
-  db: Database,
-  project: string,
-  branch: string
-): Effect.Effect<RunRecord | null, Schema.SchemaError | SqliteFailure> =>
-  sqlite(() =>
-    db.query(
-      "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox FROM runs WHERE project = ? AND branch = ? ORDER BY started DESC, id DESC LIMIT 1"
-    ).get(project, branch)
-  ).pipe(
-    Effect.flatMap((row) =>
-      row === null || row === undefined
-        ? Effect.succeed(null)
-        : Schema.decodeUnknownEffect(RunSqlRowSchema)(row).pipe(Effect.map(runRecordOf))
-    )
-  )
-
 export const latestRunForBranchName = (
   db: Database,
   branch: string
@@ -59,9 +42,13 @@ export const resumePriorRun = (
   runsForBranch(db, project, branch).pipe(
     Effect.flatMap((runs) =>
       Effect.gen(function*() {
-        const [latest, ...rest] = runs
-        if (latest === undefined || latest.status !== "stopped" || (yield* stepsForRun(db, latest.id)).length > 0) {
-          return latest ?? null
+        const latest = runs.at(0)
+        const rest = runs.slice(1)
+        if (latest === undefined) {
+          return null
+        }
+        if (latest.status !== "stopped" || (yield* stepsForRun(db, latest.id)).length > 0) {
+          return latest
         }
         for (const earlier of rest) {
           if ((yield* stepsForRun(db, earlier.id)).length > 0) {

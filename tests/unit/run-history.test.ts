@@ -8,7 +8,6 @@ import { Effect, Schema } from "effect"
 import {
   RUN_HISTORY_SCHEMA_VERSION,
   RUNS_JSON_SCHEMA,
-  formatRunsTable,
   listRuns,
   openDatabase,
   orcHomeDir,
@@ -17,9 +16,9 @@ import {
   recordScore,
   recordSignal,
   recordStep,
-  runsJson,
   type RunRecord,
 } from "../../packages/run/src/run-history"
+import { formatRunsTable, runsJson } from "../../packages/run/src/run-history-view"
 
 const withHome = async (use: (home: string) => Promise<void>): Promise<void> => {
   const home = await mkdtemp(join(tmpdir(), "orc-home-"))

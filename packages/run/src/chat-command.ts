@@ -3,7 +3,8 @@ import * as BunFileSystem from "@effect/platform-bun/BunFileSystem"
 import * as BunPath from "@effect/platform-bun/BunPath"
 import { Effect, Layer } from "effect"
 import { ChatToolError } from "./chat-error"
-import { capture, type Command } from "./dispatch/runner"
+import type { Command } from "./dispatch/runner"
+import { capture } from "./dispatch/runner-exec"
 
 export type Env = Readonly<Record<string, string | undefined>>
 

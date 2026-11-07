@@ -1,13 +1,13 @@
 import { Array as Arr, DateTime, Duration, Effect, FileSystem, Option, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { backlogPaths, closeStartedTask } from "./backlog"
-import type { BeatAction } from "./beat-action"
+import type { BeatAction, Progress } from "./beat-action"
 import type { DispatchConfig } from "./config"
 import { ownedBySweep, throughFor } from "./machine-reach"
 import { logWrittenAt, stallMillis } from "./stall"
 import { answersFor, askStartedTask, markAnswersRelayed, parkStartedTask } from "./parked"
 import { taskLabel } from "./pueue-status"
-import { type RunnerError, type RunnerRequirements, taskBranch } from "./runner"
+import { type Command, type RunnerError, type RunnerRequirements, taskBranch } from "./runner"
 import { endingFromResult, type Relay, relayAnswers, relayAnswersThrough, type RunEnding, readResult, readResultThrough, type RunnerResult } from "./runner-result"
 import type { TaskFileError, TaskRecord } from "./task-record"
 
@@ -83,12 +83,6 @@ const endTask = (
       : Option.some({ kind: "closed", task: id, machine, outcome: ending.outcome, reason: ending.reason, pr: ending.pr, report: ending.report } satisfies BeatAction)
   })
 
-export type Progress =
-  | { readonly kind: "ended"; readonly action: BeatAction }
-  | { readonly kind: "running"; readonly outputAt: string | null; readonly action: BeatAction | null }
-  | { readonly kind: "own-log" }
-  | { readonly kind: "untracked" }
-
 type Asking = NonNullable<NonNullable<Extract<RunnerResult, { readonly status: "running" | "paused" }>["run"]>["asking"]>
 
 const askingOf = (result: RunnerResult): Asking | null =>
@@ -134,6 +128,48 @@ const serveAsking = (
     )
   })
 
+const readClose = (
+  task: TaskRecord,
+  home: string,
+  label: string,
+  through: Command | null
+): Effect.Effect<CloseReading, never, RunnerRequirements> =>
+  (through === null ? readResult(task.spec.id, home, label) : readResultThrough(through, task.spec.id, label)).pipe(
+    Effect.map((result) => ({ kind: "read" as const, result, ending: endingFromResult(result, task.spec.kind), outputAt: outputAtOf(result), asking: askingOf(result) })),
+    Effect.catchTag("RunnerError", (error) => Effect.succeed({ kind: "unread" as const, reason: error.detail })),
+    Effect.timeoutOrElse({
+      duration: Duration.seconds(closeSeconds),
+      orElse: () => Effect.succeed({ kind: "unread" as const, reason: "the close read timed out after " + closeSeconds + " seconds" })
+    })
+  )
+
+const readUnreadSince = (
+  fs: FileSystem.FileSystem,
+  unreadFile: string,
+  nowText: string
+): Effect.Effect<number | null> =>
+  fs.readFileString(unreadFile).pipe(
+    Effect.map((text) => Date.parse(text)),
+    Effect.catchTag("PlatformError", () => Effect.succeed<number | null>(null)),
+    Effect.flatMap((parsed) =>
+      parsed === null || Number.isNaN(parsed)
+        ? fs.writeFileString(unreadFile, nowText).pipe(
+          Effect.as<number | null>(null),
+          Effect.catchTag("PlatformError", () => Effect.succeed<number | null>(null))
+        )
+        : Effect.succeed<number | null>(parsed)
+    )
+  )
+
+const clearUnread = (
+  fs: FileSystem.FileSystem,
+  unreadFile: string
+): Effect.Effect<number | null> =>
+  fs.remove(unreadFile, { force: true }).pipe(
+    Effect.as<number | null>(null),
+    Effect.catchTag("PlatformError", () => Effect.succeed<number | null>(null))
+  )
+
 // A finished run ends its task here, because no other beat step reads a started task after its run ends.
 export const closeFinished = (
   context: CloseContext,
@@ -159,35 +195,13 @@ export const closeFinished = (
       return Option.match(silentEnded, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
     }
     const through = throughFor(machine)
-    const read = through === null ? readResult(task.spec.id, context.home, label) : readResultThrough(through, task.spec.id, label)
-    const reading: CloseReading = yield* read.pipe(
-      Effect.map((result) => ({ kind: "read" as const, result, ending: endingFromResult(result, task.spec.kind), outputAt: outputAtOf(result), asking: askingOf(result) })),
-      Effect.catchTag("RunnerError", (error) => Effect.succeed({ kind: "unread" as const, reason: error.detail })),
-      Effect.timeoutOrElse({
-        duration: Duration.seconds(closeSeconds),
-        orElse: () => Effect.succeed({ kind: "unread" as const, reason: "the close read timed out after " + closeSeconds + " seconds" })
-      })
-    )
+    const reading: CloseReading = yield* readClose(task, context.home, label, through)
     const fs = yield* FileSystem.FileSystem
     const unreadFile = backlogPaths(context.root).unreadFile(task.spec.id)
     const nowText = yield* nowIso
     const unreadSince = reading.kind === "unread"
-      ? yield* fs.readFileString(unreadFile).pipe(
-        Effect.map((text) => Date.parse(text)),
-        Effect.catch(() => Effect.succeed<number | null>(null)),
-        Effect.flatMap((parsed) =>
-          parsed === null || Number.isNaN(parsed)
-            ? fs.writeFileString(unreadFile, nowText).pipe(
-              Effect.as<number | null>(null),
-              Effect.catch(() => Effect.succeed<number | null>(null))
-            )
-            : Effect.succeed<number | null>(parsed)
-        )
-      )
-      : yield* fs.remove(unreadFile, { force: true }).pipe(
-        Effect.as<number | null>(null),
-        Effect.catch(() => Effect.succeed<number | null>(null))
-      )
+      ? yield* readUnreadSince(fs, unreadFile, nowText)
+      : yield* clearUnread(fs, unreadFile)
     const stale = staleEndingOf(started.at, Date.parse(nowText), reading, unreadSince)
     const ending = reading.kind === "read" ? (stale ?? reading.ending) : stale
     if (ending === null) {
