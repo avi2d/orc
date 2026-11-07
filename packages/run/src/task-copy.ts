@@ -17,7 +17,7 @@ interface ListedCopy {
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
 
-export const parseWorktreeList = (porcelain: string): ReadonlyArray<ListedCopy> =>
+const parseWorktreeList = (porcelain: string): ReadonlyArray<ListedCopy> =>
   porcelain.split("\n\n").flatMap((block) => {
     const lines = block.split("\n")
     const dir = lines.find((line) => line.startsWith("worktree "))?.slice("worktree ".length)
@@ -25,7 +25,12 @@ export const parseWorktreeList = (porcelain: string): ReadonlyArray<ListedCopy> 
     return dir === undefined ? [] : [{ dir, branch: ref?.startsWith("refs/heads/") === true ? ref.slice("refs/heads/".length) : null }]
   })
 
-export const taskCopyDir = (path: Path.Path, home: string, projectDir: string, branch: string): string =>
+// A branch copy made before orc kept copies under its home is still reused where it sits, inside the checkout.
+const legacyCopiesDir = ".sandcastle/worktrees"
+
+export const legacyCopiesExcluded = ":(exclude)" + legacyCopiesDir
+
+const taskCopyDir = (path: Path.Path, home: string, projectDir: string, branch: string): string =>
   path.join(home, "worktrees", path.basename(projectDir), branch)
 
 const gitOrRefuse = (spawner: Spawner, git: string, args: ReadonlyArray<string>, cwd: string, action: string) =>
@@ -38,7 +43,7 @@ const realPathOf = (fs: FileSystem.FileSystem, dir: string): Effect.Effect<strin
 
 // Only the folders orc's own runs made copies in are swept; a copy found anywhere else belongs to someone else.
 const madeByOrc = (path: Path.Path, home: string, projectDir: string, dir: string): boolean =>
-  [path.join(home, "worktrees"), path.join(projectDir, ".sandcastle", "worktrees")].some((root) => dir.startsWith(root + "/"))
+  [path.join(home, "worktrees"), path.join(projectDir, legacyCopiesDir)].some((root) => dir.startsWith(root + "/"))
 
 export const openTaskCopy = (
   fs: FileSystem.FileSystem,

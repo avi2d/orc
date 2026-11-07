@@ -2,6 +2,7 @@ import { Duration, Effect, FileSystem, Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { hostGitRefusalExit, hostGitSafetyEnv, hostGitShim } from "../host"
 import { parseRefuseMarkers } from "../checkout"
+import { legacyCopiesExcluded } from "../task-copy"
 
 export type Refresh =
   | { readonly kind: "fast-forwarded"; readonly branch: string; readonly remote: string; readonly from: string; readonly to: string }
@@ -84,7 +85,7 @@ const cleanBranch = (gitBin: string, projectDir: string): Effect.Effect<{ readon
     if (head.exitCode !== 0) {
       return kept("it is on no branch")
     }
-    const status = yield* git(gitBin, projectDir, ["status", "--porcelain", "--", ".", ":(exclude).sandcastle/worktrees"])
+    const status = yield* git(gitBin, projectDir, ["status", "--porcelain", "--", ".", legacyCopiesExcluded])
     if (status.exitCode !== 0) {
       return kept("git status failed: " + firstLine(status.stderr))
     }

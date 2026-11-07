@@ -45,7 +45,7 @@ describe("runAgentStep refusals", () => {
     })
   })
 
-  test("a stopped run's Sandcastle worktree does not count as uncommitted changes and block its resume", async () => {
+  test("an old in-checkout copy of a stopped run's branch does not count as uncommitted changes and block its resume", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         git(dir, ["worktree", "add", "-q", join(dir, ".sandcastle", "worktrees", "orc-test"), "-b", "orc/test"])
@@ -54,7 +54,7 @@ describe("runAgentStep refusals", () => {
     })
   })
 
-  test("an untracked file beside the Sandcastle worktrees still counts as uncommitted", async () => {
+  test("an untracked file beside the old in-checkout copies still counts as uncommitted", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         await mkdir(join(dir, ".sandcastle"))
@@ -99,13 +99,11 @@ describe("runAgentStep refusals", () => {
     })
   })
 
-  test("a branch name the host shell would expand is refused, naming it", async () => {
+  test("a branch name git accepts passes the branch checks even when a shell would expand it", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         for (const branch of ["orc/$USER", "orc/`id`", "orc/$(id)", "orc/a\"b"]) {
-          const message = await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch })
-          expect(message).toContain(branch)
-          expect(message).toContain("shell metacharacter")
+          expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch })).toContain("cannot read the task file")
         }
       })
     })
