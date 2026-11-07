@@ -15,7 +15,6 @@ export type OrcArgs =
   | { readonly kind: "Dispatch"; readonly args: Exclude<DispatchArgs, { readonly kind: "UsageError" }> }
   | { readonly kind: "Chat" }
   | { readonly kind: "UsageError"; readonly detail: string }
-const questionPrefix = "question-"
 const parseShowArgs = (rest: readonly string[]): OrcArgs => {
   if (rest.length === 0) {
     return { kind: "UsageError", detail: "orc show takes a run id" }
@@ -56,17 +55,18 @@ type RunSplit =
 type AnswerParse =
   | { readonly kind: "ok"; readonly value: QuestionAnswer }
   | { readonly kind: "error"; readonly detail: string }
+const answerShape = "orc run takes id=text after --answer, with the id of a question or an ask-user finding"
 const parseAnswerAssignment = (raw: string): AnswerParse => {
   const cut = raw.indexOf("=")
   if (cut === -1) {
-    return { kind: "error", detail: "orc run takes question-id=text after --answer" }
+    return { kind: "error", detail: answerShape }
   }
   const question = raw.slice(0, cut)
   const answer = raw.slice(cut + 1)
   if (question === "" || answer === "") {
-    return { kind: "error", detail: "orc run takes question-id=text after --answer" }
+    return { kind: "error", detail: answerShape }
   }
-  if (!question.startsWith(questionPrefix) || question.length === questionPrefix.length || /\s/.test(question)) {
+  if (/\s/.test(question)) {
     return { kind: "error", detail: "unknown question for --answer: " + question }
   }
   return { kind: "ok", value: { question, answer } }

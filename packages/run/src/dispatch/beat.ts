@@ -9,6 +9,7 @@ import type { Claim, TaskFileError, TaskRecord } from "./task-record"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
 import type { BeatAction } from "./beat-action"
 import { closeFinished } from "./beat-close"
+import { handAnswersToResume } from "./parked"
 import { taskLabel } from "./pueue-status"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
 import { flagStall } from "./stall"
@@ -97,7 +98,7 @@ const startTask = (
       return { kind: "given-back", task: task.spec.id, machine: machine.name } satisfies BeatAction
     }
     const log = backlogPaths(root).logFile(task.spec.id)
-    yield* writeTaken(root, { ...task, state: { kind: "started", claim, started: { at: yield* nowIso, log } } })
+    yield* writeTaken(root, { ...handAnswersToResume(task), state: { kind: "started", claim, started: { at: yield* nowIso, log } } })
     const env = {
       ORC_TASK_LOG: log,
       ORC_TASK_ID: task.spec.id,
@@ -305,6 +306,7 @@ export const runBeat = (
     const started = tasks.filter((task) => task.state.kind === "started")
     const progress = yield* Effect.forEach(started, (task) => closeFinished(context, task))
     const closed = progress.flatMap((entry) => entry.kind === "ended" ? [entry.action] : [])
+    const asking = progress.flatMap((entry) => entry.kind === "running" && entry.action !== null ? [entry.action] : [])
     const stalls = yield* Effect.forEach(started, (task, index) => flagStall(root, task, progress[index] ?? { kind: "untracked" }))
     for (const action of closed) {
       if (action.kind === "closed" || action.kind === "parked") {
@@ -324,6 +326,7 @@ export const runBeat = (
     const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))
     return { beat, at, quota, room: readRoom(config.machines, current), actions: [
         ...closed,
+        ...asking,
         ...stalls.flatMap(Option.toArray),
         ...prs.flatMap(Option.toArray),
         ...upstream,

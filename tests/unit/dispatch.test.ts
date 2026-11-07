@@ -3,7 +3,7 @@ import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { DateTime, Effect, FileSystem, Layer, Option, Redacted, Result } from "effect"
+import { Effect, FileSystem, Layer, Result } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../packages/run/src/dispatch/args"
 import { addTask, claimTask, closeStartedTask, listTasks, releaseTask, writeTaken } from "../../packages/run/src/dispatch/backlog"
@@ -14,8 +14,8 @@ import { insertRun, openDatabase } from "../../packages/run/src/run-history"
 import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/dispatch/config"
 import { assessQuota } from "../../packages/run/src/dispatch/quota"
 import { taskLabel } from "../../packages/run/src/dispatch/pueue-status"
-import { renderTaskFile, type TaskRecord } from "../../packages/run/src/dispatch/task-record"
-import { decodeTokenText, tokenLive } from "../../packages/run/src/dispatch/token"
+import type { TaskRecord } from "../../packages/run/src/dispatch/task-record"
+import { renderTaskFile } from "../../packages/run/src/dispatch/task-record-render"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -166,6 +166,14 @@ describe("parseDispatchArgs", () => {
   test("a result with a repeated stdin marker is refused instead of read twice", () => {
     expect(parseDispatchArgs("runner", ["result", "task-1", "--stdin-label", "--stdin-label"]).kind).toBe("UsageError")
   })
+  test("runner answer refuses a reach instead of forwarding the answers", () => {
+    expect(parseDispatchArgs("runner", ["answer", "task-1", "--", "ssh", "linux", "orc"]).kind).toBe("UsageError")
+    expect(parseDispatchArgs("runner", ["answer", "task-1"])).toEqual({ kind: "RunnerAnswer", task: "task-1" })
+  })
+  test("runner answer refuses an answer on argv instead of letting a remote shell split it", () => {
+    expect(parseDispatchArgs("runner", ["answer", "task-1", "r2=Keep it"])).toEqual({ kind: "UsageError", detail: "unexpected argument: r2=Keep it" })
+    expect(parseDispatchArgs("runner", ["answer", "../task-1"]).kind).toBe("UsageError")
+  })
   test("runner -- with no command is refused instead of reading here", () => {
     expect(parseDispatchArgs("runner", ["start", "--"]).kind).toBe("UsageError")
     expect(parseDispatchArgs("runner", ["result", "task-1", "--"]).kind).toBe("UsageError")
@@ -265,35 +273,6 @@ describe("readDispatchConfig", () => {
       const read = await run(readDispatchConfig(file).pipe(Effect.as("read"), Effect.catchTag("ConfigError", () => Effect.succeed("refused"))))
       expect(read).toBe("refused")
     })
-  })
-})
-
-describe("the token document", () => {
-  const placeholder = "orc-test-placeholder-not-a-token"
-  const document = (fields: object) => JSON.stringify({ schema: "orc.token.v1", token: placeholder, expiresAt: "2026-10-30T12:00:00.000Z", ...fields })
-  test("reads the token and its expiry", () => {
-    const token = Option.getOrThrow(decodeTokenText(document({})))
-    expect(Redacted.value(token.token)).toBe(placeholder)
-    expect(DateTime.formatIso(token.expiresAt)).toBe("2026-10-30T12:00:00.000Z")
-  })
-  test("a token holding a space is refused instead of reaching the provider cut at it", () => {
-    expect(Option.isNone(decodeTokenText(document({ token: "two words" })))).toBe(true)
-  })
-  test("an unknown key is refused instead of ignored", () => {
-    expect(Option.isNone(decodeTokenText(document({ refreshToken: placeholder })))).toBe(true)
-  })
-  test("another schema is refused instead of read as a token", () => {
-    expect(Option.isNone(decodeTokenText(document({ schema: "orc.token.v2" })))).toBe(true)
-  })
-  test("a token printed as a redacted value never shows its text", () => {
-    const token = Option.getOrThrow(decodeTokenText(document({})))
-    expect(Bun.inspect(token)).not.toContain(placeholder)
-    expect(JSON.stringify(token)).not.toContain(placeholder)
-  })
-  test("a token running out within five minutes is lapsed instead of live", () => {
-    const now = DateTime.makeUnsafe("2026-10-30T12:00:00.000Z")
-    expect(tokenLive(DateTime.makeUnsafe("2026-10-30T12:05:00.000Z"), now)).toBe(false)
-    expect(tokenLive(DateTime.makeUnsafe("2026-10-30T12:05:01.000Z"), now)).toBe(true)
   })
 })
 

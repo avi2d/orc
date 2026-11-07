@@ -34,10 +34,11 @@ export type DispatchArgs =
   | { readonly kind: "RunnerHold"; readonly task: string; readonly label?: string; readonly run: readonly [string, ...Array<string>] }
   | { readonly kind: "RunnerToken"; readonly session: string }
   | { readonly kind: "RunnerResult"; readonly task: string; readonly label?: string; readonly json: boolean; readonly reach: Reach; readonly stdinLabel: boolean }
+  | { readonly kind: "RunnerAnswer"; readonly task: string }
   | { readonly kind: "UsageError"; readonly detail: string }
 
 export const dispatchUsage =
-  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task>] [--internal] [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner load"
+  "orc backlog [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task>] [--internal] [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <clauth session-token.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner answer <task-id> | orc runner load"
 
 const parseJsonFlag = (rest: ReadonlyArray<string>, json: (json: boolean) => DispatchArgs): DispatchArgs => {
   if (rest.length === 0) {
@@ -308,6 +309,17 @@ const parseRunnerTask = (verb: "hold" | "result", split: Extract<ReachSplit, { r
   return { kind: "RunnerHold", task, ...(taken.label === undefined ? {} : { label: taken.label }), run: split.reach.command }
 }
 
+const parseRunnerAnswer = (split: Extract<ReachSplit, { readonly kind: "split" }>): DispatchArgs => {
+  const [task = "", ...extra] = split.words
+  if (!isTaskId(task)) {
+    return { kind: "UsageError", detail: "orc runner answer takes a task id, got \"" + task + "\"" }
+  }
+  if (split.reach.kind !== "here") {
+    return unexpected("--")
+  }
+  return extra.length === 0 ? { kind: "RunnerAnswer", task } : unexpected(extra[0])
+}
+
 const parseRunner = (rest: ReadonlyArray<string>): DispatchArgs => {
   const [verb = "", ...after] = rest
   if (verb === "queue") {
@@ -319,12 +331,15 @@ const parseRunner = (rest: ReadonlyArray<string>): DispatchArgs => {
   if (verb === "token") {
     return parseRunnerToken(after)
   }
-  if (verb !== "start" && verb !== "renew" && verb !== "hold" && verb !== "result") {
-    return { kind: "UsageError", detail: "orc runner takes start, queue, renew, hold, token, result or load" }
+  if (verb !== "start" && verb !== "renew" && verb !== "hold" && verb !== "result" && verb !== "answer") {
+    return { kind: "UsageError", detail: "orc runner takes start, queue, renew, hold, token, result, answer or load" }
   }
   const split = splitReach(after)
   if (split.kind === "UsageError") {
     return split
+  }
+  if (verb === "answer") {
+    return parseRunnerAnswer(split)
   }
   if (verb === "hold" || verb === "result") {
     return parseRunnerTask(verb, split)

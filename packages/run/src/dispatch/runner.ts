@@ -27,7 +27,7 @@ const taskFields = {
   delivery: Schema.optional(Schema.Literal("direct-PR")),
   branch: Schema.optional(Schema.String.check(Schema.isPattern(/^[A-Za-z0-9._/-]+$/))),
   answers: Schema.optional(Schema.Array(Schema.Struct({
-    question: Schema.String.check(Schema.isPattern(/^question-\S+$/)),
+    question: Schema.String.check(Schema.isPattern(/^[^\s=]+$/)),
     answer: Schema.String.check(Schema.isNonEmpty())
   }))),
   instructions: Schema.optional(TaskInstructions)

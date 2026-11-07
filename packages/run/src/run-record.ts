@@ -40,6 +40,7 @@ export interface HistoryRun {
   readonly delivery: RunDeliverer
   readonly allow?: ReadonlyArray<AllowWord> | undefined
   readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
+  readonly answerWaitSeconds?: number | undefined
 }
 
 export const formatReport = (report: OrcRunReport): string =>

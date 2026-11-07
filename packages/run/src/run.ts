@@ -3,6 +3,7 @@ import { ChildProcessSpawner } from "effect/process"
 import type { Database } from "bun:sqlite"
 import { homedir } from "node:os"
 import { resolveAgentFile, type AgentFile } from "./agents"
+import { answerWaitFromEnv } from "./answer-wait"
 import { hostGitShim } from "./host"
 import type { SandboxKind } from "./args"
 import { defaultToolchainResolver, type HostTools, type ToolchainResolver, withInstallFolders, within } from "./nono-profile"
@@ -242,6 +243,7 @@ export const runAgentStep = (
     const hostPath = Bun.env.PATH
     const toolchain = yield* toolchainFromEnv(Bun.env.ORC_TOOLCHAIN_DIRS, homedir())
     const idleTimeoutSeconds = yield* idleTimeoutFromEnv(Bun.env.ORC_IDLE_TIMEOUT_SECONDS)
+    const answerWaitSeconds = yield* answerWaitFromEnv(Bun.env.ORC_ANSWER_WAIT_SECONDS)
     const opened = yield* openRun(request)
     const { fs, path, spawner, home, runId, git, checkout, sandboxKind } = opened
     const noMistakes = { spawner, binary: noMistakesBinary(Bun.env.ORC_NO_MISTAKES_BIN), pathEnv: hostPath ?? "", git: checkout.git }
@@ -263,7 +265,8 @@ export const runAgentStep = (
       worktreeDir: copy.dir,
       delivery: subprocessDeliverer(request.delivery ?? "no-mistakes", { ...noMistakes, worktreeDir: copy.dir, branch: checkout.branch }),
       allow: request.allow ?? [],
-      answers: request.answers ?? []
+      answers: request.answers ?? [],
+      answerWaitSeconds
     }
     return yield* Effect.acquireUseRelease(
       openDatabase(home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
