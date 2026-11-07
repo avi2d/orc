@@ -29,7 +29,7 @@
     "tasks-sample": "bun packages/cli/src/bin.ts sample tasks"
   },
   "devDependencies": {
-    "@avi2dg/checks": "0.69.0",
+    "@avi2dg/checks": "0.71.0",
     "@effect/platform-bun": "4.0.0",
     "@effect/tsgo": "0.45.0",
     "effect": "4.0.0",
