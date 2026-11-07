@@ -93,7 +93,7 @@ A question still unanswered when the wait ends makes orc refuse the gate.
 Rerun with `--answer question-<id>="<text>"` and orc answers every open question before any gate response.
 Rerun with `--answer <finding-id>="<text>"` and orc asks no-mistakes to fix that finding with your text as its guidance.
 Rerun with `--allow ask-user` instead and orc declines every `ask-user` finding and accepts the rest.
-Orc leaves that no-mistakes gate parked for you to answer.
+When the wait ends with a question unanswered, the task parks, as [Parked runs](parked-runs.md) shows.
 
 Orc records a `no-mistakes` run as succeeded only when four facts hold.
 Pi's final reply in its captured session stopped cleanly with `ORC_COMPLETE` on its own line.
