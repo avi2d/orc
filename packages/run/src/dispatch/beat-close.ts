@@ -83,7 +83,11 @@ const serveAsking = (
     }
     return yield* relay(answers).pipe(
       Effect.as<BeatAction>({ kind: "answered", task: id, machine, questions: answers.map((entry) => entry.question) }),
-      Effect.catchTag("RunnerError", (error) => Effect.succeed<BeatAction>({ kind: "answer-failed", task: id, machine, reason: error.detail }))
+      Effect.catchTag("RunnerError", (error) => Effect.succeed<BeatAction>({ kind: "answer-failed", task: id, machine, reason: error.detail })),
+      Effect.timeoutOrElse({
+        duration: Duration.seconds(closeSeconds),
+        orElse: () => Effect.succeed<BeatAction>({ kind: "answer-failed", task: id, machine, reason: "the answer relay timed out after " + closeSeconds + " seconds" })
+      })
     )
   })
 

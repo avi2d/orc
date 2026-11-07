@@ -224,21 +224,55 @@ export const closeStartedTask = (
   closedAt: string
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const record = (yield* listTasks(root)).find((candidate) => candidate.spec.id === id)
-    if (record === undefined) {
-      return yield* new BacklogError({ detail: "the backlog holds no " + id })
+    const fs = yield* FileSystem.FileSystem
+    const paths = backlogPaths(root)
+    const file = paths.taskFile("taken", id)
+    const grabbed = scratchName(paths.folder("taken"), id)
+    const took = yield* fs.rename(file, grabbed).pipe(
+      Effect.as(true),
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(false)),
+      Effect.mapError(platformFailure("take " + id))
+    )
+    if (!took) {
+      const takenNames = yield* fs.readDirectory(paths.folder("taken")).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
+      if (takenNames.some((name) => name.startsWith("." + id + "."))) {
+        return yield* new BacklogError({ detail: id + " moved while orc read it, so run the command again" })
+      }
+      const closedExists = yield* fs.exists(paths.taskFile("closed", id)).pipe(Effect.mapError(platformFailure("read " + id)))
+      if (closedExists) {
+        return yield* new BacklogError({ detail: id + " was closed by another command" })
+      }
+      const record = (yield* listTasks(root)).find((candidate) => candidate.spec.id === id)
+      if (record === undefined) {
+        return yield* new BacklogError({ detail: "the backlog holds no " + id })
+      }
+      return yield* new BacklogError({ detail: id + " moved while orc read it, so run the command again" })
     }
-    if (record.state.kind !== "started") {
-      return yield* new BacklogError({ detail: id + " is " + record.state.kind + ", and only a started task closes" })
+    const putBack = fs.rename(grabbed, file).pipe(Effect.mapError(platformFailure("put back " + id)))
+    const text = yield* fs.readFileString(grabbed).pipe(
+      Effect.mapError(platformFailure("read " + grabbed)),
+      Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error))))
+    )
+    const fresh = yield* parseTaskFile(file, "taken", text).pipe(
+      Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error))))
+    )
+    if (fresh.state.kind !== "started") {
+      yield* putBack
+      return yield* new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a started task closes" })
     }
     const closed: TaskRecord = {
-      ...record,
-      parked: answeredOnly(record.parked),
-      state: { kind: "closed", claim: record.state.claim, closing: { outcome, started: record.state.started, reason, ...delivered }, closedAt, postedAt: null }
+      ...fresh,
+      parked: answeredOnly(fresh.parked),
+      state: { kind: "closed", claim: fresh.state.claim, closing: { outcome, started: fresh.state.started, reason, ...delivered }, closedAt, postedAt: null }
     }
-    if (!(yield* publishClosed(root, closed))) {
+    const published = yield* publishOnce(paths.folder("closed"), id + ".md", renderTaskFile(closed)).pipe(
+      Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error))))
+    )
+    if (!published) {
+      yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
       return yield* new BacklogError({ detail: id + " was closed by another command" })
     }
+    yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
     return closed
   })
 

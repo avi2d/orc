@@ -50,6 +50,6 @@ Piping that document into `orc runner result <task-id> --stdin-label` yourself r
 It names pueue's state for the task and the orc run on `orc/<task-id>` with its PR.
 A task is queued, stashed, running, paused, succeeded or failed, or unknown when no pueue task in group `orc` carries that home's label.
 To print the same facts as JSON, add `--json`, whose document names its version first as `orc.runner.v1`.
-To hand answers to a run waiting at its no-mistakes gate, pipe `{"label": "<label>", "answers": [{"question": "<id>", "answer": "<text>"}]}` into `orc runner answer <task-id>` on its machine, or into `orc runner answer <task-id> -- ssh linux-box orc` from another, where the label is optional.
+To hand answers to a run waiting at its no-mistakes gate, pipe `{"label": "<label>", "answers": [{"question": "<id>", "answer": "<text>"}]}` into `orc runner answer <task-id>` on its machine, where the label is optional.
 It writes them into that run's `answers.json`, and refuses a task whose run waits for no answer.
 To print the five minute load average the beat compares against a load limit, run `orc runner load` on that machine.

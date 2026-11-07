@@ -13,7 +13,7 @@ import { holdRun } from "./hold"
 import { mergeTask } from "./merge"
 import { taskLabel } from "./pueue-status"
 import { type Command, queueFromText, renewTask, RunnerError, startTask } from "./runner"
-import { forwardAnswers, formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson } from "./runner-result"
+import { formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson } from "./runner-result"
 import type { TaskFileError, TaskRecord } from "./task-record"
 import { encodeToken, sessionToken } from "./token"
 import { markEventPosted, unpostedEvents } from "./events"
@@ -285,7 +285,7 @@ const runnerVerbLine = (args: RunnerVerb, place: DispatchPlace) => {
       return place.stdin.pipe(Effect.flatMap((text) => queueFromText(text, place.self, place.home)))
     }
     case "RunnerAnswer": {
-      return args.reach.kind === "here" ? relayAnswers(place.home, args.task, place.stdin) : forwardAnswers(args.reach.command, args.task, place.stdin)
+      return relayAnswers(place.home, args.task, place.stdin)
     }
     case "RunnerLoad": {
       return Effect.succeed(String(fiveMinuteLoad()))

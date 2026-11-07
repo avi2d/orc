@@ -230,6 +230,7 @@ const awaitMissing = (
       for (const entry of yield* input.waitForAnswers(unanswered())) {
         supplied.set(entry.question, entry.answer)
       }
+      yield* appendGate(input.runDir, "answered")
     }
     return unanswered()
   })

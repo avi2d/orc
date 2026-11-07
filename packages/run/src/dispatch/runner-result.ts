@@ -264,12 +264,6 @@ export const relayAnswersThrough = (
     )
   )
 
-export const forwardAnswers = (command: Command, task: string, stdin: Effect.Effect<string, RunnerError>): Effect.Effect<string, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  stdin.pipe(
-    Effect.flatMap((text) => decodeJson(text, AnswerStdin, "the answers on stdin")),
-    Effect.flatMap((request) => relayAnswersThrough(command, task, request.label ?? null, request.answers))
-  )
-
 const ResultStdin = Schema.Struct({ label: LabelArg })
 
 // The label travels on stdin like a queue or renew request, so a reach that joins its argv for a remote shell cannot split it.
