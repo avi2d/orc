@@ -72,8 +72,7 @@ test("a clone without the remote-tracking default branch fails before any tier r
 
 test("a change touching no e2e files runs only the unit tier", async () => {
   await repository();
-  await git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
-  await git(["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"]);
+  await withOriginMain();
   await git(["checkout", "-q", "-b", "feature"]);
   writeFileSync(join(dir, "tests", "unit", "c.test.ts"), PASSING);
   await git(["add", "."]);
@@ -90,8 +89,7 @@ test("an untouched e2e file whose path contains the touched path does not run", 
   writeFileSync(join(dir, "tests", "e2e", "x.test.tsx"), FAILING);
   await git(["add", "."]);
   await git(["commit", "-q", "-m", "test: add a lookalike e2e file"]);
-  await git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
-  await git(["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"]);
+  await withOriginMain();
   await git(["checkout", "-q", "-b", "feature"]);
   writeFileSync(join(dir, "tests", "e2e", "x.test.ts"), PASSING);
   await git(["add", "."]);

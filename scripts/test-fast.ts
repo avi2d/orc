@@ -35,7 +35,7 @@ class BaseUnresolved extends Schema.TaggedError<BaseUnresolved>()("BaseUnresolve
 
 const splitZero = (output: string): readonly string[] => output.split("\0").filter((line) => line !== "");
 
-// Peak memory of the largest test worker measured on a 16-CPU Linux machine, rounded up.
+// One test worker's peak memory, rounded up.
 const WORKER_BYTES = 1100 * 1024 * 1024;
 
 export function workerCountFor(freeBytes: number, cpus: number): number {
