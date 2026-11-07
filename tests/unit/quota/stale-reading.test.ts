@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import type { QuotaBlock, QuotaBlockBody, QuotaWindow } from "@tui-dash/schema";
-import { logFreshMillis } from "@tui-dash/schema";
-import { countdown, plain, quotaLines } from "@tui-dash/quota";
+import type { QuotaBlock, QuotaBlockBody, QuotaWindow } from "@avi2dg/orc-schema";
+import { logFreshMillis } from "@avi2dg/orc-schema";
+import { countdown, plain, quotaLines } from "@avi2dg/orc-quota";
 
 const reportedAt = DateTime.makeUnsafe("2026-10-13T07:18:16Z");
 const thirteenHoursLater = DateTime.makeUnsafe("2026-10-13T20:18:16Z");

@@ -1,5 +1,5 @@
 import type { DateTime } from "effect";
-import { projectNameOf, type ProjectRow, type TaskLevels } from "@tui-dash/schema";
+import { projectNameOf, type ProjectRow, type TaskLevels } from "@avi2dg/orc-schema";
 import {
   behind,
   type Block,
@@ -22,7 +22,7 @@ import {
   type Tone,
   truncate,
   widthOf,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 import { failureLines, noticeLines, projectList, spendLines, taskList, taskSections } from "./levels";
 import { listedDisplayIdOf, listedIdOf, type ListedRow } from "./listed";
 import { plannedTicketLines, ticketLines } from "./ticket";

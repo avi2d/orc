@@ -12,9 +12,9 @@ import {
   type RemoteResources,
   type ResourcesView,
   type SessionQuotaView,
-} from "@tui-dash/schema";
-import { queuesSection } from "@tui-dash/queues";
-import { blockDocument, type Block, frameText, lineWidth, plain } from "@tui-dash/ui";
+} from "@avi2dg/orc-schema";
+import { queuesSection } from "@avi2dg/orc-queues";
+import { blockDocument, type Block, frameText, lineWidth, plain } from "@avi2dg/orc-ui";
 import { dashboardNow as now, quotaBlocksOf as blocksOf, recordedResources as view, southResources } from "../../lib/dashboard-fixture";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";

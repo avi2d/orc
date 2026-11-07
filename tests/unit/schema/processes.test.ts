@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { decodeProcesses, decodeLinuxProcesses } from "@tui-dash/schema";
+import { decodeProcesses, decodeLinuxProcesses } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { issueOf, valueOf } from "../../lib/outcomes";
 

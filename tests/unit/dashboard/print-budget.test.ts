@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Effect } from "effect";
 import { TestConsole } from "effect/testing";
-import { modules } from "@tui-dash/cli";
+import { modules } from "@avi2dg/orc-cli";
 import { flowLimitMillis, slowReadMillis } from "../../lib/budgets";
 import { dashboardSources, printedDashboard, printedPanel, tasksCommand } from "../../lib/dashboard-sources";
 import { realSizeAnswer } from "../../lib/real-size";

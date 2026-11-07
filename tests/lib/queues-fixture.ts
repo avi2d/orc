@@ -1,5 +1,5 @@
 import { DateTime, Option } from "effect";
-import { type ActionRun, activeRuns, decodeActions, decodePueue, type Outcome, type QueueReadings, type QueuesView, queuesView } from "@tui-dash/schema";
+import { type ActionRun, activeRuns, decodeActions, decodePueue, type Outcome, type QueueReadings, type QueuesView, queuesView } from "@avi2dg/orc-schema";
 import { fixture } from "./fixtures";
 
 export const queuesNow = DateTime.makeUnsafe("2026-10-18T00:35:00Z");

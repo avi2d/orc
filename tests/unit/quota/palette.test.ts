@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type Rgb, rgbOfTone, type Tone } from "@tui-dash/quota";
+import { type Rgb, rgbOfTone, type Tone } from "@avi2dg/orc-quota";
 
 const rgb = (hex: string): Rgb => [
   Number.parseInt(hex.slice(1, 3), 16),

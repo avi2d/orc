@@ -1,15 +1,15 @@
 import { DateTime, Effect, Option } from "effect";
-import { alertsPlaced } from "@tui-dash/alerts";
-import { boardOf, decodeLayout, type HostState, hostScreen, layoutPanels, type Member } from "@tui-dash/dashboard";
-import { ledgerPlaced } from "@tui-dash/ledger";
-import { queuePlaced } from "@tui-dash/queues";
-import { quotaPlaced } from "@tui-dash/quota";
-import { machinesPlaced } from "@tui-dash/resources";
-import { schedulesPlaced } from "@tui-dash/schedules";
-import { loopTick, machinesCadence, readsCadence, type Shown, type TaskBoard } from "@tui-dash/schema";
-import { sessionsPlaced } from "@tui-dash/session-quota";
-import { tasksPlaced } from "@tui-dash/tasks";
-import { type Block, type Drawn, type FocusReach, type Mounted, type Move, type Placed, plain, type Screen, type ScreenSize } from "@tui-dash/ui";
+import { alertsPlaced } from "@avi2dg/orc-alerts";
+import { boardOf, decodeLayout, type HostState, hostScreen, layoutPanels, type Member } from "@avi2dg/orc-dashboard";
+import { ledgerPlaced } from "@avi2dg/orc-ledger";
+import { queuePlaced } from "@avi2dg/orc-queues";
+import { quotaPlaced } from "@avi2dg/orc-quota";
+import { machinesPlaced } from "@avi2dg/orc-resources";
+import { schedulesPlaced } from "@avi2dg/orc-schedules";
+import { loopTick, machinesCadence, readsCadence, type Shown, type TaskBoard } from "@avi2dg/orc-schema";
+import { sessionsPlaced } from "@avi2dg/orc-session-quota";
+import { tasksPlaced } from "@avi2dg/orc-tasks";
+import { type Block, type Drawn, type FocusReach, type Mounted, type Move, type Placed, plain, type Screen, type ScreenSize } from "@avi2dg/orc-ui";
 import { type BandedReadings, bandedReadings } from "./banded-fixture";
 
 interface Fixed {

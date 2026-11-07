@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { BunFileSystem, BunRuntime, BunStdio } from "@effect/platform-bun";
 import { Effect, Layer, Runtime } from "effect";
-import { binArgsExit, usageText } from "@tui-dash/ui/bin-args";
+import { binArgsExit, usageText } from "@avi2dg/orc-ui/bin-args";
 import { capture } from "./capture";
 
 const usage = usageText("tui-dash-capture (pi-call | claude-statusline) [--help]", "Read one JSON call on stdin and append its record to the capture ledger.", [

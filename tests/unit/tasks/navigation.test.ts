@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { decodeTasksReport, taskLevels } from "@tui-dash/schema";
-import { moved, type Navigation, startNavigation } from "@tui-dash/tasks";
+import { decodeTasksReport, taskLevels } from "@avi2dg/orc-schema";
+import { moved, type Navigation, startNavigation } from "@avi2dg/orc-tasks";
 import { fixture } from "../../lib/fixtures";
 import { taskReadings } from "../../lib/task-levels-fixture";
 

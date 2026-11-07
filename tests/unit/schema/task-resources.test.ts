@@ -8,7 +8,7 @@ import {
   type ProcessSamples,
   type TaskFolders,
   taskResources,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { issueOf, valueOf } from "../../lib/outcomes";
 

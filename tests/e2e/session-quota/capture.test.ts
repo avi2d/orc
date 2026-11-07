@@ -3,8 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { ConfigProvider, Effect, Layer, Schema } from "effect";
-import { decodeJson, HarvestLogSource, SessionLogSource } from "@tui-dash/schema";
-import { harvestLogSourceLive, sessionLogSourceLive } from "@tui-dash/session-quota";
+import { decodeJson, HarvestLogSource, SessionLogSource } from "@avi2dg/orc-schema";
+import { harvestLogSourceLive, sessionLogSourceLive } from "@avi2dg/orc-session-quota";
 import { fixture } from "../../lib/fixtures";
 
 const writer = join(import.meta.dir, "..", "..", "..", "packages", "session-quota", "src", "capture-bin.ts");

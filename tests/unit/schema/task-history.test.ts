@@ -14,7 +14,7 @@ import {
   taskSampleRecords,
   taskSamplesAt,
   type TaskUsage,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 
 const gib = 1024 ** 3;
 

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { Effect, Result, Schema } from "effect";
-import { AlertSettings } from "@tui-dash/schema";
-import { tasksSettings } from "@tui-dash/tasks";
-import { decodeSettings, noSettings, panelModule } from "@tui-dash/ui";
+import { AlertSettings } from "@avi2dg/orc-schema";
+import { tasksSettings } from "@avi2dg/orc-tasks";
+import { decodeSettings, noSettings, panelModule } from "@avi2dg/orc-ui";
 
 const decoded = <S>(section: string, settings: Parameters<typeof decodeSettings<S>>[1], raw: unknown) =>
   Effect.runPromise(Effect.result(decodeSettings(section, settings, raw)));

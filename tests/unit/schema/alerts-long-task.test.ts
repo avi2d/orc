@@ -10,7 +10,7 @@ import {
   type Outcome,
   type TaskEntry,
   type TaskState,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 
 const start = Date.parse("2026-10-19T09:00:00Z");
 

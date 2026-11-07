@@ -14,7 +14,7 @@ import {
   type VerdictEntry,
   type VerdictLog,
   verdictLogReaderAt,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 
 const recordedLines = fixture("alerts/verdicts.jsonl").split("\n").filter((line) => line !== "");

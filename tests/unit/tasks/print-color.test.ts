@@ -24,9 +24,9 @@ import {
   sessionMachinesLayer,
   TaskSamplesSource,
   tasksMachinesLayer,
-} from "@tui-dash/schema";
-import { harvestLogSourceLive, sessionLogSourceLive } from "@tui-dash/session-quota";
-import { printTasksFrame } from "@tui-dash/tasks";
+} from "@avi2dg/orc-schema";
+import { harvestLogSourceLive, sessionLogSourceLive } from "@avi2dg/orc-session-quota";
+import { printTasksFrame } from "@avi2dg/orc-tasks";
 import { fixture } from "../../lib/fixtures";
 import { escape, stripSgr } from "../../e2e/lib/print-color";
 import { queueAnswers } from "../../lib/queues-fixture";

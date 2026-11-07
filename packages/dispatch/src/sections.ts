@@ -1,5 +1,5 @@
-import type { DispatchView } from "@tui-dash/schema";
-import { type Block, type Label, labelledReadings, leastLabelWidth, reading } from "@tui-dash/ui";
+import type { DispatchView } from "@avi2dg/orc-schema";
+import { type Block, type Label, labelledReadings, leastLabelWidth, reading } from "@avi2dg/orc-ui";
 
 const labelOf = (text: string): Label => ({ text, width: leastLabelWidth });
 

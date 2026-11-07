@@ -18,8 +18,8 @@ import {
   shownValue,
   type TaskBoard,
   TaskBoardFeed,
-} from "@tui-dash/schema";
-import { listPlaced, mountedOf, noSettings, type NoSettings, panelModule, type PanelModule, type Placed } from "@tui-dash/ui";
+} from "@avi2dg/orc-schema";
+import { listPlaced, mountedOf, noSettings, type NoSettings, panelModule, type PanelModule, type Placed } from "@avi2dg/orc-ui";
 import { printQueuesFrame, type QueueSources, runQueuesPanel } from "./app";
 import { ciFeed, type CiShown } from "./ci-feed";
 import { type CiState, type QueueBoxReadings, queueBoxLines } from "./queue-box";

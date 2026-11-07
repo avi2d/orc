@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime, Option } from "effect";
-import type { QuotaBlock, QuotaBlockBody, QuotaWindow, SessionQuotaView } from "@tui-dash/schema";
-import { logFreshMillis } from "@tui-dash/schema";
-import { countdown } from "@tui-dash/ui";
+import type { QuotaBlock, QuotaBlockBody, QuotaWindow, SessionQuotaView } from "@avi2dg/orc-schema";
+import { logFreshMillis } from "@avi2dg/orc-schema";
+import { countdown } from "@avi2dg/orc-ui";
 import { dashboardNow } from "../../lib/dashboard-fixture";
 import { boxLines, glanceLines } from "../../lib/host-fixture";
 import { fixture } from "../../lib/fixtures";

@@ -1,5 +1,5 @@
 import { Effect, Result, Schema, SchemaIssue, SchemaTransformation } from "effect";
-import { SettingsRefused } from "@tui-dash/ui";
+import { SettingsRefused } from "@avi2dg/orc-ui";
 
 const PanelId = Schema.String;
 

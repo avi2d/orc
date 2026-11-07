@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Schema } from "effect";
-import { AlertEvent } from "@tui-dash/schema";
+import { AlertEvent } from "@avi2dg/orc-schema";
 
 const root = join(import.meta.dir, "..", "..", "..");
 

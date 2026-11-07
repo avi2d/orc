@@ -9,8 +9,8 @@ import {
   type SessionQuotaView,
   sessionQuotaView,
   type WindowView,
-} from "@tui-dash/schema";
-import { composedSessionQuota, sessionQuotaReport, sessionQuotaViewOf } from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
+import { composedSessionQuota, sessionQuotaReport, sessionQuotaViewOf } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";
 import { quotaAxiRead } from "../../lib/quota-read";

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { plain, quotaLines } from "@tui-dash/quota";
-import { decodeQuota, decodeSavedProfiles, quotaBlocks, taskLevels } from "@tui-dash/schema";
-import { panelWidth, widthOf } from "@tui-dash/ui";
+import { plain, quotaLines } from "@avi2dg/orc-quota";
+import { decodeQuota, decodeSavedProfiles, quotaBlocks, taskLevels } from "@avi2dg/orc-schema";
+import { panelWidth, widthOf } from "@avi2dg/orc-ui";
 import { type BandedReadings, bandedReadings } from "../../lib/banded-fixture";
 import { dashboardNow } from "../../lib/dashboard-fixture";
 import { fixture } from "../../lib/fixtures";

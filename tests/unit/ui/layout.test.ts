@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { panel, plain, wrapParts } from "@tui-dash/ui";
+import { panel, plain, wrapParts } from "@avi2dg/orc-ui";
 
 describe("wrapParts", () => {
   test("a title kept to two rows shows queue to the new rather than dropping new", () => {

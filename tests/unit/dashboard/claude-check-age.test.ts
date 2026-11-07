@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import type { QuotaBlock } from "@tui-dash/schema";
+import type { QuotaBlock } from "@avi2dg/orc-schema";
 import { dashboardNow } from "../../lib/dashboard-fixture";
 import { boxLines, glanceLines } from "../../lib/host-fixture";
 

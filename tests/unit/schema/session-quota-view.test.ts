@@ -13,7 +13,7 @@ import {
   sessionLogsSince,
   sessionQuotaView,
   sessionQuotaViewOf,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";
 import { quotaAxiRead, recordedQuotaRead } from "../../lib/quota-read";

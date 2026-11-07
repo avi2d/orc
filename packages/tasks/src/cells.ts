@@ -1,5 +1,5 @@
-import type { PlannedState, ShownState } from "@tui-dash/schema";
-import type { Tone } from "@tui-dash/ui";
+import type { PlannedState, ShownState } from "@avi2dg/orc-schema";
+import type { Tone } from "@avi2dg/orc-ui";
 
 export const dash = "\u2013";
 

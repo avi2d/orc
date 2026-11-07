@@ -13,7 +13,7 @@ import {
   sessionQuotaView,
   sessionQuotaViewOf,
   type WindowView,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { machineView } from "../../lib/machines-fixture";
 import { valueOf } from "../../lib/outcomes";

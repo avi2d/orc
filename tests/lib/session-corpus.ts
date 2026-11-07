@@ -1,6 +1,6 @@
 import { mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import type { Harness } from "@tui-dash/schema";
+import type { Harness } from "@avi2dg/orc-schema";
 
 interface PerKilobyte {
   readonly objects: number;

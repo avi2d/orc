@@ -10,8 +10,8 @@ import {
   linuxHarnessProcessSourceLayer,
   quotaSourceLayer,
   sessionMachinesLayer,
-} from "@tui-dash/schema";
-import { harvestLogSourceLive, printSessionQuotaFrame, sessionLogSourceLive } from "@tui-dash/session-quota";
+} from "@avi2dg/orc-schema";
+import { harvestLogSourceLive, printSessionQuotaFrame, sessionLogSourceLive } from "@avi2dg/orc-session-quota";
 import { fixture } from "../../lib/fixtures";
 import { copyFixtureHome, recordedNow } from "../../lib/session-fixture";
 import { escape, stripSgr } from "../../e2e/lib/print-color";

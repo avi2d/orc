@@ -15,7 +15,7 @@ import {
   type SessionQuotaSources,
   type SessionQuotaView,
   inBackground,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import {
   type Block,
   livePanel as liveUiPanel,
@@ -24,7 +24,7 @@ import {
   printFrame,
   runPanel,
   withinRows,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 import { printedSessions, scanningLines, sessionLines, sessionLinesWithin } from "./sessions";
 
 const refresh = "30 seconds";

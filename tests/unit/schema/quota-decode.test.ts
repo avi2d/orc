@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { decodeSavedProfiles, decodeQuota } from "@tui-dash/schema";
+import { decodeSavedProfiles, decodeQuota } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 
 const full = (): string => fixture("quota-axi/full.json");

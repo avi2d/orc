@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { activeRuns, decodeActions, decodePueue, decodeTasksReport, queuesReport, tasksReport } from "@tui-dash/schema";
+import { activeRuns, decodeActions, decodePueue, decodeTasksReport, queuesReport, tasksReport } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";
 

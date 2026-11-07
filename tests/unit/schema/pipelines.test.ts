@@ -10,7 +10,7 @@ import {
   OrcMachines,
   orcMachinesLayer,
   type PipelineFolder,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";
 

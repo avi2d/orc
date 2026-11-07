@@ -1,6 +1,6 @@
 import type { DateTime } from "effect";
-import { savedAgeSeconds, staleSavedAgeSeconds, staleSourceAgeSeconds, type AccountJoin, type QuotaAvailability, type QuotaWindow, type SourcedWindow } from "@tui-dash/schema";
-import type { QuotaBlock, QuotaBlockBody, SavedAge, SavedWindow } from "@tui-dash/schema";
+import { savedAgeSeconds, staleSavedAgeSeconds, staleSourceAgeSeconds, type AccountJoin, type QuotaAvailability, type QuotaWindow, type SourcedWindow } from "@avi2dg/orc-schema";
+import type { QuotaBlock, QuotaBlockBody, SavedAge, SavedWindow } from "@avi2dg/orc-schema";
 import {
   type Block,
   countdown,
@@ -22,7 +22,7 @@ import {
   span,
   truncate,
   widthOf,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 import { noProviderLines } from "./sections";
 
 const minimumLabel = 8;

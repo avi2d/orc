@@ -1,4 +1,4 @@
-import { type LogFile, logRecords } from "@tui-dash/schema";
+import { type LogFile, logRecords } from "@avi2dg/orc-schema";
 import { fixture } from "./fixtures";
 
 export const rolloutRelative =

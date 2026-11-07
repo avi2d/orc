@@ -1,6 +1,6 @@
 import { Duration } from "effect";
-import { savedAtOf, type Freshness } from "@tui-dash/schema";
-import { everyText, leastPanelWidth, type Look, type Mounted, type Placed, type ScreenSize, splitWidth, tabsTitle } from "@tui-dash/ui";
+import { savedAtOf, type Freshness } from "@avi2dg/orc-schema";
+import { everyText, leastPanelWidth, type Look, type Mounted, type Placed, type ScreenSize, splitWidth, tabsTitle } from "@avi2dg/orc-ui";
 import { type Cell, type Layout, type Row, type Slot, slotPanels, type Wide } from "./layout";
 
 export interface Member {

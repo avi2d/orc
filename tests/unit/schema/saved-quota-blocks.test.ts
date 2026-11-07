@@ -13,7 +13,7 @@ import {
   savedReadingsLayer,
   savedStandIn,
   type WindowView,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 
 const shownAt = Date.parse("2026-10-26T00:30:05Z");
 

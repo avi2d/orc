@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import type { CountedCall, ModelTokens } from "@tui-dash/schema";
-import { composedSessionQuota, sessionQuotaReport, sessionQuotaViewOf } from "@tui-dash/schema";
+import type { CountedCall, ModelTokens } from "@avi2dg/orc-schema";
+import { composedSessionQuota, sessionQuotaReport, sessionQuotaViewOf } from "@avi2dg/orc-schema";
 import { valueOf } from "../../lib/outcomes";
 import { call, fifthIn, hour, reset, six, viewOf, windowOf } from "../../lib/quota-view-fixture";
 

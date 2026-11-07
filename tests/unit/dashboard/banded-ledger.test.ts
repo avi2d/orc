@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { plain } from "@tui-dash/ui";
+import { plain } from "@avi2dg/orc-ui";
 import { bandedReadings } from "../../lib/banded-fixture";
 import { bandedDrawn, bandedScreen, stepped } from "../../lib/host-fixture";
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { markedLogRecords } from "@tui-dash/schema";
+import { markedLogRecords } from "@avi2dg/orc-schema";
 
 const byteOrderMark = [0xef, 0xbb, 0xbf];
 

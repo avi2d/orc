@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { cuePipelineOf, decodeNoMistakes, donePipelineOf, fullReviewPipelineOf, modelBadgeOf, stageNamesOf, taskLevels, taskSpend } from "@tui-dash/schema";
-import { effortOf, pillLines, ticketLines, tintOfModel } from "@tui-dash/tasks";
-import { plain, type Tone } from "@tui-dash/ui";
+import { cuePipelineOf, decodeNoMistakes, donePipelineOf, fullReviewPipelineOf, modelBadgeOf, stageNamesOf, taskLevels, taskSpend } from "@avi2dg/orc-schema";
+import { effortOf, pillLines, ticketLines, tintOfModel } from "@avi2dg/orc-tasks";
+import { plain, type Tone } from "@avi2dg/orc-ui";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";
-import type { TaskRow } from "@tui-dash/schema";
+import type { TaskRow } from "@avi2dg/orc-schema";
 import { call, fifthIn, hour, six, viewOf } from "../../lib/quota-view-fixture";
 import { pipelineTaskReadings } from "../../lib/task-levels-fixture";
 

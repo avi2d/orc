@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime, Option } from "effect";
-import { decodePueue, type LiveTasks, machinesView, ok, type QueueReadings, type ScheduleRead, type TaskListing, type TaskSampleRecord, taskLevels } from "@tui-dash/schema";
-import { lineWidth, plain } from "@tui-dash/ui";
+import { decodePueue, type LiveTasks, machinesView, ok, type QueueReadings, type ScheduleRead, type TaskListing, type TaskSampleRecord, taskLevels } from "@avi2dg/orc-schema";
+import { lineWidth, plain } from "@avi2dg/orc-ui";
 import { type BandedReadings, bandedReadings } from "../../lib/banded-fixture";
 import { dashboardNow, recordedResources } from "../../lib/dashboard-fixture";
 import { fixture } from "../../lib/fixtures";

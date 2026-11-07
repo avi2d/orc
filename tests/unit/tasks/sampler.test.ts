@@ -16,9 +16,9 @@ import {
   type TaskSampleRecord,
   taskSampleRecords,
   ok,
-} from "@tui-dash/schema";
-import { sampleRecords, spendLines, ticketLines, type WrittenLine, writtenOf } from "@tui-dash/tasks";
-import { plain } from "@tui-dash/ui";
+} from "@avi2dg/orc-schema";
+import { sampleRecords, spendLines, ticketLines, type WrittenLine, writtenOf } from "@avi2dg/orc-tasks";
+import { plain } from "@avi2dg/orc-ui";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";
 import { taskReadings } from "../../lib/task-levels-fixture";

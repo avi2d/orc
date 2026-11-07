@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import type { HarvestOrigin } from "@tui-dash/schema";
-import { joinWords, sourceWords } from "@tui-dash/ui";
+import type { HarvestOrigin } from "@avi2dg/orc-schema";
+import { joinWords, sourceWords } from "@avi2dg/orc-ui";
 
 const now = DateTime.makeUnsafe("2026-10-13T20:18:16Z");
 

@@ -1,6 +1,6 @@
 import type { DateTime } from "effect";
-import { type MachinesView, type Measured, type NamedMachine, type TaskLevels, unsetTaskLevels } from "@tui-dash/schema";
-import { type Block, ellipsize, failureLines, gib, type Line, percent, sentence, span, type Span, type Tone } from "@tui-dash/ui";
+import { type MachinesView, type Measured, type NamedMachine, type TaskLevels, unsetTaskLevels } from "@avi2dg/orc-schema";
+import { type Block, ellipsize, failureLines, gib, type Line, percent, sentence, span, type Span, type Tone } from "@avi2dg/orc-ui";
 
 export interface Machines {
   readonly names: ReadonlyArray<string>;

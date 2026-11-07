@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
 import { ConfigProvider, Effect, Layer } from "effect";
-import { savedReadingsLayer } from "@tui-dash/schema";
+import { savedReadingsLayer } from "@avi2dg/orc-schema";
 import { dashboardSources, frameWhere, recordedAnswer, tasksCommand, withLivePanel } from "../../lib/dashboard-sources";
 import { boxText } from "../../lib/host-fixture";
 

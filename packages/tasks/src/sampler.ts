@@ -31,7 +31,7 @@ import {
   testsOf,
   zipOutcomes,
   inBackground,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { orcStagesOf } from "./orc-stages";
 
 export interface MachineFigures {

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { type AlertReadings, alertsSection, alertsSummary } from "@tui-dash/alerts";
-import { decodeAlertSettings, type VerdictEntry } from "@tui-dash/schema";
-import { lineWidth, plain } from "@tui-dash/ui";
+import { type AlertReadings, alertsSection, alertsSummary } from "@avi2dg/orc-alerts";
+import { decodeAlertSettings, type VerdictEntry } from "@avi2dg/orc-schema";
+import { lineWidth, plain } from "@avi2dg/orc-ui";
 import { recordedAlerts, recordedEntries, verdictLogPath } from "../../lib/alerts-fixture";
 import { fixture } from "../../lib/fixtures";
 import { cellDiffs } from "../../lib/styled-screen";

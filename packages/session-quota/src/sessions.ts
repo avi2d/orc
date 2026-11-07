@@ -5,7 +5,7 @@ import {
   type SessionShare,
   staleSourceAgeSeconds,
   type WindowView,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import {
   type Block,
   countdown,
@@ -24,7 +24,7 @@ import {
   widthOf,
   withinRows,
   wrapParts,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 import { labelWithin, machinesOf } from "./labels";
 import { combinedNames, listed, panelFailure, sourceNotes } from "./notes";
 

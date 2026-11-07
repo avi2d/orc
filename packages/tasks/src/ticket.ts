@@ -14,8 +14,8 @@ import {
   type TaskRow,
   type TaskSpend,
   waitsOnOf,
-} from "@tui-dash/schema";
-import { type Block, clock, cycleName, ellipsize, type Line, lineWidth, plain, span, tintOfProvider, type Tone, truncate, widthOf, wrapParts } from "@tui-dash/ui";
+} from "@avi2dg/orc-schema";
+import { type Block, clock, cycleName, ellipsize, type Line, lineWidth, plain, span, tintOfProvider, type Tone, truncate, widthOf, wrapParts } from "@avi2dg/orc-ui";
 import { descriptionLinesOf, episodeLines, keptLineOf, ratioText, stateTones, tokensText, type TaskOrigin } from "./levels";
 import { activityOf, currentOf, lasted, markToneOf } from "./pipeline";
 

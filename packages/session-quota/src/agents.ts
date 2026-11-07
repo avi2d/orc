@@ -1,6 +1,6 @@
 import { type DateTime, Option } from "effect";
-import { type AccountView, type Session, type SessionQuotaView, staleSourceAgeSeconds, type WindowView } from "@tui-dash/schema";
-import { type Block, countdown, type Line, type Span, span, widthOf, windowName, wrapParts } from "@tui-dash/ui";
+import { type AccountView, type Session, type SessionQuotaView, staleSourceAgeSeconds, type WindowView } from "@avi2dg/orc-schema";
+import { type Block, countdown, type Line, type Span, span, widthOf, windowName, wrapParts } from "@avi2dg/orc-ui";
 import { listed } from "./notes";
 
 const pipelineWorktrees = "/.no-mistakes/worktrees/";

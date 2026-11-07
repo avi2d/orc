@@ -1,6 +1,6 @@
 import { DateTime } from "effect";
-import type { NextRow, NextSource, NextUp } from "@tui-dash/schema";
-import { type Block, countdown, ellipsize, failureLines, type Line, machineWidthOf, padEnd, sentence, span, withinRoom } from "@tui-dash/ui";
+import type { NextRow, NextSource, NextUp } from "@avi2dg/orc-schema";
+import { type Block, countdown, ellipsize, failureLines, type Line, machineWidthOf, padEnd, sentence, span, withinRoom } from "@avi2dg/orc-ui";
 
 const longestCountdown = 6;
 const whenWidth = "every ".length + longestCountdown + 1;

@@ -1,5 +1,5 @@
 import { type DateTime, Option } from "effect";
-import type { ActionsView, ActionView, EndedRow, FailureView, GroupView, MachineQueue, Outcome, PueueView, QueuesView, RunningRow } from "@tui-dash/schema";
+import type { ActionsView, ActionView, EndedRow, FailureView, GroupView, MachineQueue, Outcome, PueueView, QueuesView, RunningRow } from "@avi2dg/orc-schema";
 import {
   type Block,
   countdown,
@@ -19,7 +19,7 @@ import {
   widthOf,
   withinRows,
   wrapParts,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 
 const lasted = (seconds: number): string => (seconds < 60 ? `${Math.max(0, Math.floor(seconds))}s` : countdown(seconds));
 

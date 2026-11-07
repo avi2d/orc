@@ -21,4 +21,4 @@ export {
   span,
   type Tone,
   widthOf,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";

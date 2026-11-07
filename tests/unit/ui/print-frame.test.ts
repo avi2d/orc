@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { printFrameOf } from "@tui-dash/ui";
+import { printFrameOf } from "@avi2dg/orc-ui";
 
 // Oracle: the frame flags as the panel bins took them, 84 columns and every row a panel needs unless told otherwise,
 // with a width under the live panel's 30 column minimum raised to it.

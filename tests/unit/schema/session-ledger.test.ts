@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { countedCalls, type Harness, type LogFile, logRecords, sumTokens, tokenTotal } from "@tui-dash/schema";
+import { countedCalls, type Harness, type LogFile, logRecords, sumTokens, tokenTotal } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 
 const fileOf = (path: string, harness: Harness, text: string): LogFile => ({

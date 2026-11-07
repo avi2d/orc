@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Effect } from "effect";
-import { decodeLayout, defaultLayout, layoutPanels } from "@tui-dash/dashboard";
+import { decodeLayout, defaultLayout, layoutPanels } from "@avi2dg/orc-dashboard";
 
 const known = ["quota", "session-quota", "alerts", "resources", "queues", "schedules", "dispatch", "tasks", "ledger"];
 

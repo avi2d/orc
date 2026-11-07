@@ -1,5 +1,5 @@
 import type { DateTime } from "effect";
-import { savedAgeSeconds, staleSavedAgeSeconds, staleSourceAgeSeconds, type QuotaAvailability, type QuotaBlock, type QuotaBlockBody, type SourcedWindow } from "@tui-dash/schema";
+import { savedAgeSeconds, staleSavedAgeSeconds, staleSourceAgeSeconds, type QuotaAvailability, type QuotaBlock, type QuotaBlockBody, type SourcedWindow } from "@avi2dg/orc-schema";
 import {
   type Block,
   countdown,
@@ -18,7 +18,7 @@ import {
   quotaBar,
   savedName,
   windowName,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 
 type Outlook =
   | { readonly kind: "fine" }

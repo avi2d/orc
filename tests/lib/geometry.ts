@@ -1,4 +1,4 @@
-import { widthOf } from "@tui-dash/ui";
+import { widthOf } from "@avi2dg/orc-ui";
 
 type Cells = ReadonlyArray<string>;
 

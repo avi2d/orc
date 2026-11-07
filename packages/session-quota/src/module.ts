@@ -1,5 +1,5 @@
 import { DateTime, Effect, Option } from "effect";
-import { type Freshness, freshOf, readsCadence, type SessionQuotaSources, type SessionQuotaView, SessionsFeed, type Shown, shownValue } from "@tui-dash/schema";
+import { type Freshness, freshOf, readsCadence, type SessionQuotaSources, type SessionQuotaView, SessionsFeed, type Shown, shownValue } from "@avi2dg/orc-schema";
 import {
   type Block,
   boxOf,
@@ -19,7 +19,7 @@ import {
   type Placed,
   singleTitle,
   span,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 import { agentsSection, flagCount, flaggedProjects } from "./agents";
 import { printSessionQuotaFrame, runSessionQuotaPanel } from "./app";
 

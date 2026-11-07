@@ -1,4 +1,4 @@
-import type { Command } from "@tui-dash/schema";
+import type { Command } from "@avi2dg/orc-schema";
 import { recordedAnswer, tasksCommand } from "./dashboard-sources";
 import { fixture } from "./fixtures";
 

@@ -1,6 +1,6 @@
 import { Option } from "effect";
-import type { ActionsView, MachineQueue, PueueView, QueuesView } from "@tui-dash/schema";
-import { type Block, failureText, type Label, labelledReadings, leastLabelWidth, machineLabel, reading, span } from "@tui-dash/ui";
+import type { ActionsView, MachineQueue, PueueView, QueuesView } from "@avi2dg/orc-schema";
+import { type Block, failureText, type Label, labelledReadings, leastLabelWidth, machineLabel, reading, span } from "@avi2dg/orc-ui";
 import { repoName } from "./panels";
 
 const labelOf = (text: string): Label => ({ text, width: leastLabelWidth });

@@ -7,7 +7,7 @@ import {
   type QuotaReport,
   type SavedProfiles,
   type Reading,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { quotaAxiRead } from "../../lib/quota-read";
 

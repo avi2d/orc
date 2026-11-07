@@ -1,5 +1,5 @@
 import { DateTime, Effect, type FileSystem } from "effect";
-import { AlertSettings, loopTick } from "@tui-dash/schema";
+import { AlertSettings, loopTick } from "@avi2dg/orc-schema";
 import {
   type Block,
   boxOf,
@@ -14,7 +14,7 @@ import {
   runSolo,
   singleTitle,
   truncate,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 import { alertsReader, printAlertsFrame } from "./app";
 import { type AlertReadings, alertsSection, alertsSummary } from "./panels";
 

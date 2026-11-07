@@ -22,8 +22,8 @@ import {
   type Stamped,
   stampedInBackground,
   stampedNow,
-} from "@tui-dash/schema";
-import { type Block, livePanel as liveUiPanel, type Panel, panelWidth, printFrame, runPanel } from "@tui-dash/ui";
+} from "@avi2dg/orc-schema";
+import { type Block, livePanel as liveUiPanel, type Panel, panelWidth, printFrame, runPanel } from "@avi2dg/orc-ui";
 import { queueLines } from "./panels";
 
 export type QueueSources = PueueMachines | ActionsSource;

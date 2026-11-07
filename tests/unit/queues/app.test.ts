@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { createTestRenderer, type TestRendererSetup } from "@opentui/core/testing";
 import { ConfigProvider, Effect, Fiber, Layer } from "effect";
-import { actionsSourceLayer, CommandRunner, pueueMachinesLayer } from "@tui-dash/schema";
-import { livePanel } from "@tui-dash/queues";
+import { actionsSourceLayer, CommandRunner, pueueMachinesLayer } from "@avi2dg/orc-schema";
+import { livePanel } from "@avi2dg/orc-queues";
 import { fixtureActionsRepo, queueAnswers } from "../../lib/queues-fixture";
 
 const remoteLine = "ssh south.example.com pueue status --json";

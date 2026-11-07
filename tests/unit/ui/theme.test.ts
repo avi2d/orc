@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Effect } from "effect";
-import { Appearance, defaultTheme, printBlock, rgbOfTone, span, themeOf, themeOfSettings } from "@tui-dash/ui";
+import { Appearance, defaultTheme, printBlock, rgbOfTone, span, themeOf, themeOfSettings } from "@avi2dg/orc-ui";
 
 const escape = String.fromCharCode(27);
 

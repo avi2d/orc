@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { ConfigProvider, Effect, Layer } from "effect";
-import { type Command, CommandRunner, decodePueue, PueueMachines, pueueMachinesLayer, projectOf, pueueView } from "@tui-dash/schema";
+import { type Command, CommandRunner, decodePueue, PueueMachines, pueueMachinesLayer, projectOf, pueueView } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { issueOf, valueOf } from "../../lib/outcomes";
 

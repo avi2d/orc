@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
 import { Effect } from "effect";
-import { homeLogRoots, sessionLogSourceAt } from "@tui-dash/schema";
+import { homeLogRoots, sessionLogSourceAt } from "@avi2dg/orc-schema";
 import { attentionLimitMillis } from "../../lib/budgets";
 import { busyWeekBytes, writeWeekShare } from "../../lib/session-corpus";
 

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
 import { ConfigProvider, DateTime, Effect, Layer } from "effect";
 import { TestClock, TestConsole } from "effect/testing";
-import { printAlertsFrame } from "@tui-dash/alerts";
+import { printAlertsFrame } from "@avi2dg/orc-alerts";
 import { escape, stripSgr } from "../../e2e/lib/print-color";
 import { recordedSettings } from "../../lib/alerts-fixture";
 

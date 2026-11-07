@@ -1,7 +1,7 @@
 import { DateTime, Option } from "effect";
-import type { AlertReadings } from "@tui-dash/alerts";
-import type { SaidMessage } from "@tui-dash/ledger";
-import type { CiShown } from "@tui-dash/queues";
+import type { AlertReadings } from "@avi2dg/orc-alerts";
+import type { SaidMessage } from "@avi2dg/orc-ledger";
+import type { CiShown } from "@avi2dg/orc-queues";
 import {
   type CiReport,
   cronPattern,
@@ -20,7 +20,7 @@ import {
   type TaskLevels,
   type TaskListing,
   taskLevels,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { recordedAlerts } from "./alerts-fixture";
 import { dashboardNow, quotaBlocksOf, recordedResources, southResources } from "./dashboard-fixture";
 import { fixture } from "./fixtures";

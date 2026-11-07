@@ -10,7 +10,7 @@ import {
   DispatchSource,
   dispatchSourceLayer,
   dispatchView,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { writeDispatchBacklog } from "../../lib/dispatch-fixture";
 
 const readBacklog = (home: string): Promise<DispatchReading> =>

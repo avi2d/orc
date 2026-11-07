@@ -5,7 +5,7 @@ import {
   SessionQuotaReport,
   type SessionQuotaView,
   sessionQuotaViewOf,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { fixture } from "./fixtures";
 import { valueOf } from "./outcomes";
 

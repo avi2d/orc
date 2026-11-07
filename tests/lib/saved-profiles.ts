@@ -1,5 +1,5 @@
 import { ConfigProvider, Layer } from "effect";
-import { type Command, savedProfilesSourceLayer } from "@tui-dash/schema";
+import { type Command, savedProfilesSourceLayer } from "@avi2dg/orc-schema";
 
 const savedProfilesCommand = "saved-profiles --json";
 

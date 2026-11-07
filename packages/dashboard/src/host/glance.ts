@@ -1,6 +1,6 @@
 import { type Duration } from "effect";
-import type { Freshness } from "@tui-dash/schema";
-import { ageText, type Block, everyText, lineWidth, type Line, plain, type ScreenSize, span, truncate, withinRows } from "@tui-dash/ui";
+import type { Freshness } from "@avi2dg/orc-schema";
+import { ageText, type Block, everyText, lineWidth, type Line, plain, type ScreenSize, span, truncate, withinRows } from "@avi2dg/orc-ui";
 
 export interface GlanceSection {
   readonly id: string;

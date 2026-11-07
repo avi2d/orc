@@ -17,8 +17,8 @@ import {
   type Reading,
   ReadModeReference,
   savedReadingsLayer,
-} from "@tui-dash/schema";
-import { queueFeedLayer } from "@tui-dash/queues";
+} from "@avi2dg/orc-schema";
+import { queueFeedLayer } from "@avi2dg/orc-queues";
 import { fixture } from "../../lib/fixtures";
 import { fixtureActionsRepo } from "../../lib/queues-fixture";
 

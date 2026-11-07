@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts";
-import { macRusageReader } from "@tui-dash/schema";
+import { macRusageReader } from "@avi2dg/orc-schema";
 
 describe("macRusageReader on this Mac", () => {
   test.skipIf(process.platform !== "darwin")(skipReason("proc_pid_rusage exists only on macOS", "reads the live and the zombie, names launchd unread, and gives a reaped pid no line"), async () => {

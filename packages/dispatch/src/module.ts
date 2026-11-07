@@ -8,7 +8,7 @@ import {
   polled,
   readsCadence,
   type Stamped,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import {
   labelledReadings,
   leastLabelWidth,
@@ -26,7 +26,7 @@ import {
   sentence,
   type Block,
   type Label,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 import { dispatchLines } from "./panels";
 import { dispatchSection } from "./sections";
 

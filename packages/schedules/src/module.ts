@@ -15,8 +15,8 @@ import {
   type Stamped,
   TaskBoardFeed,
   type TaskListings,
-} from "@tui-dash/schema";
-import { listPlaced, mountedOf, noSettings, type NoSettings, panelModule, type PanelModule, type Placed, printSolo, runSolo } from "@tui-dash/ui";
+} from "@avi2dg/orc-schema";
+import { listPlaced, mountedOf, noSettings, type NoSettings, panelModule, type PanelModule, type Placed, printSolo, runSolo } from "@avi2dg/orc-ui";
 import { nextLines } from "./next-box";
 
 export interface SchedulesReading {

@@ -1,6 +1,6 @@
 import type { CliRenderer } from "@opentui/core";
 import { DateTime, Effect } from "effect";
-import { type QuotaBlock, type QuotaReadSources, quotaBlocks, readQuotas } from "@tui-dash/schema";
+import { type QuotaBlock, type QuotaReadSources, quotaBlocks, readQuotas } from "@avi2dg/orc-schema";
 import {
   type Block,
   livePanel as liveUiPanel,
@@ -9,7 +9,7 @@ import {
   printFrame,
   runPanel,
   withinRows,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 import { quotaLines } from "./quotas";
 
 interface Readings {

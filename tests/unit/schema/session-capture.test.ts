@@ -17,7 +17,7 @@ import {
   sumTokens,
   tokenTotal,
   withCaptured,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 
 const at = (iso: string): number => Date.parse(iso);

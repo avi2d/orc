@@ -1,5 +1,5 @@
-import type { ProjectRow, TaskLevels } from "@tui-dash/schema";
-import type { Move } from "@tui-dash/ui";
+import type { ProjectRow, TaskLevels } from "@avi2dg/orc-schema";
+import type { Move } from "@avi2dg/orc-ui";
 import { listedIdOf, type ListedRow, listedRows } from "./listed";
 
 const levelOrder = ["projects", "tasks", "task"] as const;

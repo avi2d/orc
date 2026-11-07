@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
-import { flagLines, sessionLines, sessionLinesWithin } from "@tui-dash/session-quota";
-import { plain } from "@tui-dash/ui";
+import { flagLines, sessionLines, sessionLinesWithin } from "@avi2dg/orc-session-quota";
+import { plain } from "@avi2dg/orc-ui";
 import { fixture } from "../../lib/fixtures";
 import { fixtureSessionView, recordedNow, sessionViewOfQuota } from "../../lib/session-fixture";
 

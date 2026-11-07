@@ -1,8 +1,8 @@
 import { Effect } from "effect";
 import { Argument, Command } from "effect/cli";
-import { printResourcesJson, resourceSourcesLive } from "@tui-dash/resources";
-import { printComposedSessionQuotaJson, printSessionQuotaJson, sessionQuotaSourcesLive, streamSessionQuotaAlerts } from "@tui-dash/session-quota";
-import { printTaskLiveJson, runSampler, tasksSourcesLive } from "@tui-dash/tasks";
+import { printResourcesJson, resourceSourcesLive } from "@avi2dg/orc-resources";
+import { printComposedSessionQuotaJson, printSessionQuotaJson, sessionQuotaSourcesLive, streamSessionQuotaAlerts } from "@avi2dg/orc-session-quota";
+import { printTaskLiveJson, runSampler, tasksSourcesLive } from "@avi2dg/orc-tasks";
 
 const reportChoices = [
   ["session-quota", printSessionQuotaJson.pipe(Effect.provide(sessionQuotaSourcesLive))],

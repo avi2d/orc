@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { Clock, DateTime, type Duration, Effect, Fiber, Layer, Option, Schema } from "effect";
 import { TestClock, TestConsole } from "effect/testing";
-import { modules } from "@tui-dash/cli";
-import { dashboardScreen } from "@tui-dash/dashboard";
+import { modules } from "@avi2dg/orc-cli";
+import { dashboardScreen } from "@avi2dg/orc-dashboard";
 import {
   type Command,
   decodePueue,
@@ -14,8 +14,8 @@ import {
   RunnerRepos,
   SavedReadings,
   type SavedSlot,
-} from "@tui-dash/schema";
-import { plain } from "@tui-dash/ui";
+} from "@avi2dg/orc-schema";
+import { plain } from "@avi2dg/orc-ui";
 import { dashboardNow } from "../../lib/dashboard-fixture";
 import { dashboardSources, printedDashboard, recordedAnswer, tasksCommand } from "../../lib/dashboard-sources";
 import { fixture } from "../../lib/fixtures";

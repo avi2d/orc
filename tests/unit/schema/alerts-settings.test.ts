@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { decodeAlertSettings, defaultAlertSettings } from "@tui-dash/schema";
+import { decodeAlertSettings, defaultAlertSettings } from "@avi2dg/orc-schema";
 import { issueOf, valueOf } from "../../lib/outcomes";
 
 describe("the alert settings", () => {

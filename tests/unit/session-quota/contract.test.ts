@@ -10,7 +10,7 @@ import {
   SessionQuotaReport,
   sessionQuotaReport,
   sessionQuotaViewOf,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { rolloutPath } from "../../lib/harvest-fixture";
 import { claudeUnread, machineReport, machineView, southReading } from "../../lib/machines-fixture";
 import { valueOf } from "../../lib/outcomes";

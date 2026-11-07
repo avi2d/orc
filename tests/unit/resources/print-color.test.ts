@@ -11,8 +11,8 @@ import {
   macHostSourceLayer,
   macProcessesSourceLayer,
   ResourceMachines,
-} from "@tui-dash/schema";
-import { printResourcesFrame } from "@tui-dash/resources";
+} from "@avi2dg/orc-schema";
+import { printResourcesFrame } from "@avi2dg/orc-resources";
 import { fixture } from "../../lib/fixtures";
 import { escape, stripSgr } from "../../e2e/lib/print-color";
 

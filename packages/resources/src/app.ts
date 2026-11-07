@@ -15,8 +15,8 @@ import {
   ResourcesReport,
   resourcesReport,
   TaskProcessesSource,
-} from "@tui-dash/schema";
-import { livePanel as liveUiPanel, type Panel, panelWidth, printFrame, runPanel } from "@tui-dash/ui";
+} from "@avi2dg/orc-schema";
+import { livePanel as liveUiPanel, type Panel, panelWidth, printFrame, runPanel } from "@avi2dg/orc-ui";
 import { machinesLines } from "./panels";
 
 export type TaskSources = LocalTasks | TaskProcessesSource;

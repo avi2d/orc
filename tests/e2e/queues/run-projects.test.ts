@@ -3,8 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ConfigProvider, Effect, Layer } from "effect";
-import { readQueuesReport } from "@tui-dash/queues";
-import { actionsSourceLayer, type Command, CommandRunner, CommandUnreachable, copyPathsOfStatus, decodePueue, pueueMachinesLayer, pueueView, type QueuesReport } from "@tui-dash/schema";
+import { readQueuesReport } from "@avi2dg/orc-queues";
+import { actionsSourceLayer, type Command, CommandRunner, CommandUnreachable, copyPathsOfStatus, decodePueue, pueueMachinesLayer, pueueView, type QueuesReport } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";
 

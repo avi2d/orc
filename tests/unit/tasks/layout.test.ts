@@ -8,9 +8,9 @@ import {
   taskLevels,
   type TaskRow,
   type TaskSpend,
-} from "@tui-dash/schema";
-import { drawTasks, type Navigation, type TasksReadings, ticketLines } from "@tui-dash/tasks";
-import { type Line, lineWidth, plain } from "@tui-dash/ui";
+} from "@avi2dg/orc-schema";
+import { drawTasks, type Navigation, type TasksReadings, ticketLines } from "@avi2dg/orc-tasks";
+import { type Line, lineWidth, plain } from "@avi2dg/orc-ui";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";
 import { at, gib, harborCrowdedToday, live, notesEndedToday, pipelineTaskReadings, southTaskReadings, taskReadings, tasksNow, withSpend } from "../../lib/task-levels-fixture";

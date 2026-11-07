@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ellipsize, span, widthOf } from "@tui-dash/ui";
+import { ellipsize, span, widthOf } from "@avi2dg/orc-ui";
 
 const family = "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}";
 

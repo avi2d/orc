@@ -1,5 +1,5 @@
-import { type Session, type SessionQuotaView, type SessionShare, sessionSuffix } from "@tui-dash/schema";
-import { ellipsize, widthOf } from "@tui-dash/ui";
+import { type Session, type SessionQuotaView, type SessionShare, sessionSuffix } from "@avi2dg/orc-schema";
+import { ellipsize, widthOf } from "@avi2dg/orc-ui";
 import { combinedNames } from "./notes";
 
 export const machinesOf = (view: SessionQuotaView): ReadonlyArray<string> =>

@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 import { BunFileSystem } from "@effect/platform-bun";
 import { ConfigProvider, DateTime, Effect, Layer } from "effect";
-import { type Command, CommandUnreachable } from "@tui-dash/schema";
-import { ConversationSource, conversationSourceLive, type LedgerFeed, makeConversationReader } from "@tui-dash/ledger";
+import { type Command, CommandUnreachable } from "@avi2dg/orc-schema";
+import { ConversationSource, conversationSourceLive, type LedgerFeed, makeConversationReader } from "@avi2dg/orc-ledger";
 
 const utc = DateTime.zoneMakeNamedUnsafe("UTC");
 const at = (iso: string): DateTime.Utc => DateTime.makeUnsafe(iso);

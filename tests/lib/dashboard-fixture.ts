@@ -17,7 +17,7 @@ import {
   type ReportedResources,
   type ResourcesView,
   resourcesView,
-} from "@tui-dash/schema";
+} from "@avi2dg/orc-schema";
 import { fixture } from "./fixtures";
 import { valueOf } from "./outcomes";
 import { quotaAxiRead } from "./quota-read";

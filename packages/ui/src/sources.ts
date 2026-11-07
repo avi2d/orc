@@ -1,5 +1,5 @@
 import type { DateTime } from "effect";
-import type { AccountJoin, HarvestOrigin, WindowSource } from "@tui-dash/schema";
+import type { AccountJoin, HarvestOrigin, WindowSource } from "@avi2dg/orc-schema";
 import { countdown, secondsBetween } from "./format";
 
 const minuteSeconds = 60;

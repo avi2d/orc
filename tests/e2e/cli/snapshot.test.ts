@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { Schema } from "effect";
-import { SnapshotReport } from "@tui-dash/schema";
+import { SnapshotReport } from "@avi2dg/orc-schema";
 
 const root = join(import.meta.dir, "..", "..", "..");
 

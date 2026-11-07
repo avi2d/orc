@@ -1,5 +1,5 @@
 import { DateTime, Effect, Schema } from "effect";
-import { atInterval, type Freshness, type Interval, mergedTaskLevels, readsCadence, type TaskBoard, TaskBoardFeed, type TaskLevels } from "@tui-dash/schema";
+import { atInterval, type Freshness, type Interval, mergedTaskLevels, readsCadence, type TaskBoard, TaskBoardFeed, type TaskLevels } from "@avi2dg/orc-schema";
 import {
   type Block,
   cadencedTitle,
@@ -19,7 +19,7 @@ import {
   splitWidth,
   type Target,
   titleEdge,
-} from "@tui-dash/ui";
+} from "@avi2dg/orc-ui";
 import { printTasksFrame, runTasksScreen, type TasksSources } from "./screen";
 import { boxColumn, contentHeight, drawTasks, levelColumns, pickToneOf } from "./layout";
 import { levelIndex, moved, type Navigation, startNavigation } from "./navigation";

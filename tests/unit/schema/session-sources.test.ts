@@ -11,8 +11,8 @@ import {
   logRecords,
   type SessionLogs,
   SessionLogSource,
-} from "@tui-dash/schema";
-import { sessionLogSourceLive } from "@tui-dash/session-quota";
+} from "@avi2dg/orc-schema";
+import { sessionLogSourceLive } from "@avi2dg/orc-session-quota";
 import { fixture } from "../../lib/fixtures";
 import { fixtureHomeDirectory } from "../../lib/session-fixture";
 import { issueOf, valueOf } from "../../lib/outcomes";

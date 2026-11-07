@@ -1,6 +1,6 @@
 import { DateTime, Effect, FileSystem } from "effect";
-import { type AlertSettings, alertVerdictsPath, mapOutcome, unreachable, verdictLogReaderAt } from "@tui-dash/schema";
-import { printFrame, withinRows } from "@tui-dash/ui";
+import { type AlertSettings, alertVerdictsPath, mapOutcome, unreachable, verdictLogReaderAt } from "@avi2dg/orc-schema";
+import { printFrame, withinRows } from "@avi2dg/orc-ui";
 import { type AlertReadings, alertsSection, type LogReading } from "./panels";
 
 const readerOfLog: Effect.Effect<Effect.Effect<LogReading>, never, FileSystem.FileSystem> = Effect.all([FileSystem.FileSystem, alertVerdictsPath]).pipe(
