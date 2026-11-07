@@ -51,19 +51,27 @@ Pages purgeable:                                7522.
 `;
 
 test("ample memory runs one worker per CPU, not fewer", () => {
-  expect(workerCountFor(35 * GiB, 16)).toBe(16);
+  expect(workerCountFor(35 * GiB, 47 * GiB, 16)).toBe(16);
 });
 
-test("a worker is charged its whole budget, so memory for three workers runs three, not four", () => {
-  expect(workerCountFor(4 * GiB, 16)).toBe(3);
+test("a second worker costs the increment, so memory for three workers runs three, not four", () => {
+  expect(workerCountFor(2348 * MiB, 10 * GiB, 16)).toBe(3);
 });
 
 test("more memory than CPUs never adds workers past the CPU count", () => {
-  expect(workerCountFor(100 * GiB, 4)).toBe(4);
+  expect(workerCountFor(100 * GiB, 110 * GiB, 4)).toBe(4);
 });
 
 test("less memory than one worker still runs one worker, not none", () => {
-  expect(workerCountFor(512 * MiB, 10)).toBe(1);
+  expect(workerCountFor(512 * MiB, 8 * GiB, 10)).toBe(1);
+});
+
+test("eight gib free on a 47 gib box runs 24 workers on 32 cpus, not seven", () => {
+  expect(workerCountFor(8 * GiB, 47 * GiB, 32)).toBe(24);
+});
+
+test("five gib free on a 47 gib box runs one worker, not four", () => {
+  expect(workerCountFor(5 * GiB, 47 * GiB, 16)).toBe(1);
 });
 
 test("macOS counts inactive and speculative pages as reclaimable, not only free ones", () => {
