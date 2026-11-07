@@ -22,7 +22,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
 | `packages/run/src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
 | `packages/run/src/checkout.ts` | The checks on the checkout a run starts from: its git root, refused markers, uncommitted changes and branch name |
-| `packages/run/src/task-copy.ts` | The task copy under `$ORC_HOME/worktrees`, its reuse and removal, and the agent's git identity |
+| `packages/run/src/task-copy.ts` | The task copy under `$ORC_HOME/worktrees`, keyed by the project folder's name, a hash of its real path and the branch, its reuse and removal, and the agent's git identity |
 | `packages/run/src/run-exec.ts` | The sandbox a run opens, the install that prepares the copy and the steps that run in it |
 | `packages/run/src/run-loop.ts` | The implement, check and fix steps of one run |
 | `packages/run/src/run-resume.ts` | The prior run's session and passed steps a resume starts from |

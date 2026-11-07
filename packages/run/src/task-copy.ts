@@ -27,8 +27,9 @@ const parseWorktreeList = (porcelain: string): ReadonlyArray<ListedCopy> =>
     return dir === undefined ? [] : [{ dir, branch: ref?.startsWith("refs/heads/") === true ? ref.slice("refs/heads/".length) : null, missing }]
   })
 
-const taskCopyDir = (path: Path.Path, home: string, projectDir: string, branch: string): string =>
-  path.join(home, "worktrees", path.basename(projectDir), branch)
+// Two checkouts can share a folder name, so the real path's hash keeps their copies apart.
+const taskCopyDir = (path: Path.Path, home: string, realProjectDir: string, branch: string): string =>
+  path.join(home, "worktrees", path.basename(realProjectDir) + "-" + new Bun.CryptoHasher("sha256").update(realProjectDir).digest("hex").slice(0, 8), branch)
 
 const gitOrRefuse = (spawner: Spawner, git: string, args: ReadonlyArray<string>, cwd: string, action: string) =>
   runGit(spawner, git, args, cwd).pipe(
@@ -57,6 +58,7 @@ export const openTaskCopy = (
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot create the copies folder " + copies + ": " + String(cause) }))
     )
     const realHome = path.dirname(yield* realPathOf(fs, copies))
+    const realProjectDir = yield* realPathOf(fs, projectDir)
     const listed = parseWorktreeList(yield* gitOrRefuse(spawner, git, ["worktree", "list", "--porcelain"], projectDir, "list the copies of " + projectDir))
     const existing = listed.find((copy) => copy.branch === branch)
     // A global prune would also clear other tools' worktrees whose folders are briefly away, so only this branch's stale entry goes.
@@ -64,13 +66,13 @@ export const openTaskCopy = (
       yield* gitOrRefuse(spawner, git, ["worktree", "remove", existing.dir], projectDir, "clear the copy of " + branch + " whose folder " + existing.dir + " is gone")
     } else if (existing !== undefined) {
       const dir = yield* realPathOf(fs, existing.dir)
-      if (dir === projectDir) {
+      if (dir === realProjectDir) {
         return yield* refuse("orc: " + projectDir + " has " + branch + " checked out itself, and git checks a branch out in one place only, so switch the checkout to another branch")
       }
       yield* Console.log("orc: reusing the copy of " + branch + " at " + dir)
       return { dir, removable: madeByOrc(path, realHome, dir) }
     }
-    const dir = taskCopyDir(path, realHome, projectDir, branch)
+    const dir = taskCopyDir(path, realHome, realProjectDir, branch)
     if (yield* fs.exists(dir).pipe(Effect.orElseSucceed(() => true))) {
       return yield* refuse("orc: " + dir + " already exists and is no copy of " + projectDir + ", so orc leaves it alone; move it aside and rerun")
     }

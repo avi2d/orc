@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { createHash } from "node:crypto"
 import { existsSync } from "node:fs"
 import { mkdir, realpath, writeFile } from "node:fs/promises"
 import { basename, join } from "node:path"
@@ -6,7 +7,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { closeTaskCopy, openTaskCopy, type TaskCopy } from "../../packages/run/src/task-copy"
-import { git, withHome, withRepo } from "./run-helpers"
+import { git, seedRepo, withHome, withRepo } from "./run-helpers"
 
 const gitBin = Bun.which("git") ?? "git"
 
@@ -31,6 +32,11 @@ const close = (projectDir: string, copy: TaskCopy): Promise<void> =>
     }).pipe(Effect.provide(BunServices.layer))
   )
 
+const copyFolder = async (projectDir: string): Promise<string> => {
+  const real = await realpath(projectDir)
+  return basename(real) + "-" + createHash("sha256").update(real).digest("hex").slice(0, 8)
+}
+
 const opened = async (projectDir: string, home: string, branch: string): Promise<TaskCopy> => {
   const copy = await open(projectDir, home, branch)
   if (typeof copy === "string") {
@@ -44,9 +50,36 @@ describe("task copies", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const copy = await opened(dir, home, "orc/test")
-        expect(copy.dir).toBe(join(await realpath(home), "worktrees", basename(dir), "orc/test"))
+        expect(copy.dir).toBe(join(await realpath(home), "worktrees", await copyFolder(dir), "orc/test"))
         expect(git(copy.dir, ["branch", "--show-current"])).toBe("orc/test")
         expect(git(dir, ["status", "--porcelain"])).toBe("")
+      })
+    })
+  })
+
+  test("two checkouts with the same folder name on one branch get their own copies instead of the second refused", async () => {
+    await withHome(async (home) => {
+      const first = join(home, "projects", "orc")
+      const second = join(home, "work", "orc")
+      await mkdir(first, { recursive: true })
+      await mkdir(second, { recursive: true })
+      await seedRepo(first)
+      await seedRepo(second)
+      const firstCopy = await opened(first, home, "feature")
+      const secondCopy = await opened(second, home, "feature")
+      expect(firstCopy.dir).not.toBe(secondCopy.dir)
+      expect(git(firstCopy.dir, ["rev-parse", "--git-common-dir"])).toBe(join(await realpath(first), ".git"))
+      expect(git(secondCopy.dir, ["rev-parse", "--git-common-dir"])).toBe(join(await realpath(second), ".git"))
+    })
+  })
+
+  test("a copy at the place orc used before the hash is reused and removable instead of made again", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const old = join(home, "worktrees", basename(dir), "orc/test")
+        git(dir, ["worktree", "add", "-q", "-b", "orc/test", old])
+        const copy = await opened(dir, home, "orc/test")
+        expect(copy).toEqual({ dir: await realpath(old), removable: true })
       })
     })
   })
@@ -112,7 +145,7 @@ describe("task copies", () => {
   test("a foreign folder at the copy's place is refused instead of overwritten", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
-        const place = join(home, "worktrees", basename(dir), "orc/test")
+        const place = join(home, "worktrees", await copyFolder(dir), "orc/test")
         await mkdir(place, { recursive: true })
         await writeFile(join(place, "keep.txt"), "mine\n")
         expect(await open(dir, home, "orc/test")).toContain("already exists")
