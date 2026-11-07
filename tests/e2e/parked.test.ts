@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { insertSignal, insertStep, openDatabase, recordRun } from "../../packages/run/src/run-history"
-import { binPath, fakeQuota, type Fixture, mainToken, orcOk, queuedArgs, runnerTimeout, runOrc, withFixture } from "./runner-helpers"
+import { binPath, fakeQuota, type Fixture, isRecord, mainToken, orcOk, queuedArgs, runnerTimeout, runOrc, withFixture } from "./runner-helpers"
 
 const startOnLinux = async (fixture: Fixture): Promise<void> => {
   await fakeQuota(fixture)
@@ -172,9 +172,18 @@ describe("a parked run", () => {
       await orcOk(fixture, ["beat"])
       const task = await backlogTaskOne(fixture)
       expect(task).toMatchObject({ parked: { questions: [{ id: "r2", asked: firstAsking.asked, answer: { words: "Keep it" } }] } })
-      const shown = (task as { readonly parked: { readonly questions: ReadonlyArray<{ readonly answer: Record<string, unknown> }> } }).parked.questions
-      expect(Object.keys(shown[0] ?? {}).sort()).toEqual(["answer", "asked", "id", "text"])
-      expect(Object.keys(shown[0]?.answer ?? {}).sort()).toEqual(["at", "words"])
+      if (!isRecord(task) || !isRecord(task.parked) || !Array.isArray(task.parked.questions)) {
+        throw new Error("backlog task holds no parked questions")
+      }
+      const first = task.parked.questions[0]
+      if (!isRecord(first)) {
+        throw new Error("backlog task holds no parked question")
+      }
+      expect(Object.keys(first).sort()).toEqual(["answer", "asked", "id", "text"])
+      if (!isRecord(first.answer)) {
+        throw new Error("parked question holds no answer")
+      }
+      expect(Object.keys(first.answer).sort()).toEqual(["at", "words"])
     })
   }, runnerTimeout)
 
