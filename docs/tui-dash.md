@@ -744,7 +744,6 @@ A rule starts no new read while its last one is still running, and reports that 
 | `quota-pace` | `quota` | A window runs ahead of pace past its first tenth and runs out before its reset |
 | `heavy-load` | `resources` | A machine stays over its load or memory limit in every sample for the sustained minutes, 5 by default |
 | `long-task` | `tasks` | A task goes 15 minutes with no new milestone, then every 15 minutes while it has none, and once when it passes 2 hours in total |
-| `nightly` | `nightly` | A CI workflow on a night schedule ends red, once per red run for each repository and workflow |
 
 `quota-pace` and `heavy-load` fire once per episode.
 An episode ends at the first sample below the limit, and the next sample over it starts a new one.
@@ -756,8 +755,6 @@ A task's quiet time starts when the command first sees it, so starting the comma
 The total counts from the task's `firstStartedAt`.
 A task fires its total event once, even after it rests in a state the rule skips and comes back.
 A gap between samples longer than the repeat fires one event, not one for each repeat it spans.
-A night workflow stays filed while its runs stay red, and a green run on the same workflow files again on the next red one.
-A cancelled or skipped rerun says nothing, so the rule looks back to the older run that decided.
 
 ### Configure the alerts
 
@@ -782,8 +779,6 @@ A key the command does not know, or a value out of range, stops the command with
 | `longTask.repeatMinutes` | The minutes between two events while the task stays without one | `15` |
 | `longTask.totalHours` | The hours from the task's first start to its total event | `2` |
 | `longTask.states` | The task states the rule watches | `working`, `waiting` and `blocked` |
-| `nightly.everySeconds` | The seconds between two reads of the schedules and CI runs sources | `300` |
-| `nightly.homes` | Each repository the rule files for, with the owner home its fix task names | No repository |
 
 A machine name is the one `TUI_DASH_MACHINE` or `TUI_DASH_REMOTE_MACHINE` gives it, and a machine the list does not name has no heavy load rule.
 A list in the file replaces the default list whole.
@@ -799,7 +794,6 @@ Every event carries `rule` and `at`, the ISO instant of the sample that fired it
 | `quota-pace` | The window's `account`, `window`, `windowLabel`, `leftPoints`, `elapsedFraction` and `resetsAt`, and the `flags` raised on it, each with its `machine` |
 | `heavy-load` | The `machine`, the episode's first sample as `since`, the limits `crossed`, the machine's `limits`, its `load` and `memory` with `usedPercent`, or `null` where unread, and `topProcesses` `byCpu` and `byMemory` |
 | `long-task` | `reason` `quiet` or `total`, the `machine`, the `task` with its `id`, `title`, `project`, `state`, `detail` and `firstStartedAt`, then `quietSince`, `quietMinutes` and `totalMinutes` |
-| `nightly` | The `repo`, the `workflow`, the red run's `runId` and `conclusion`, the owner `home`, and the next night slot as `recheckAt` |
 
 ### Record a verdict
 

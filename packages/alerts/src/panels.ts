@@ -54,13 +54,6 @@ const limitParts: { readonly [K in AlertRule]: (settings: AlertSettings) => Read
     longTask.states.length === 0 ? "watches no state" : `watches ${listed(longTask.states)}`,
     `read every ${duration(longTask.everySeconds)}`,
   ],
-  nightly: ({ nightly }) => {
-    const owned = Object.entries(nightly.homes).map(([repo, home]) => `${repo} in ${home}`);
-    return [
-      ...(owned.length === 0 ? ["no repository mapped to an owner home"] : owned),
-      `read every ${duration(nightly.everySeconds)}`,
-    ];
-  },
 };
 
 const subjectOf = (event: AlertEvent): string => {
@@ -73,8 +66,6 @@ const subjectOf = (event: AlertEvent): string => {
       return event.reason === "quiet"
         ? `${event.task.title} on ${event.machine}, quiet ${countdown(event.quietMinutes * 60)}`
         : `${event.task.title} on ${event.machine}, ${countdown(event.totalMinutes * 60)} in total`;
-    case "nightly":
-      return `${event.workflow} on ${event.repo} red, fix in ${event.home}`;
   }
 };
 

@@ -50,7 +50,7 @@ describe("the banded dashboard", () => {
       expect(alerts).toHaveLength(rows);
       for (const line of alerts) expect(lineWidth(line)).toBe(columns);
       const text = alerts.map(plain).join("\n");
-      for (const rule of ["quota-pace", "heavy-load", "long-task", "nightly"]) expect(text).toContain(rule);
+      for (const rule of ["quota-pace", "heavy-load", "long-task"]) expect(text).toContain(rule);
     });
   }
 

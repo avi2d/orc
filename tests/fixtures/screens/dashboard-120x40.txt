@@ -18,7 +18,6 @@
 │ ⚑ my-home is spending over its share of claude           ││                                                          │
 │   main's week                                            ││                                                          │
 │ +2 more flags                                            ││                                                          │
-│                                                          ││                                                          │
 ╰──────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯
 ╭─ machines ─────────────────────────────────────── ↻ 10s ─╮╭─ projects · today ─────────────────────────────── ↻ 10s ─╮
 │ north  cpu 11%  mem 5.5G/31.3G  gpu 9%  disk 19%         ││   project                 work wait park block done plan │
@@ -36,5 +35,6 @@
 │ ▶ pueue south kelp bun test                 0s       now ││                                                          │
 │ ▶ CI          shop ci                       3m       now ││                                                          │
 │ · CI          shop deploy                    –   waiting ││                                                          │
-│ +7 more runs                                             ││                                                          │
+│ ✓ pueue north tasks-inbox… echo queued…     0s     19:53 ││                                                          │
+│ +6 more runs                                             ││                                                          │
 ╰──────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯

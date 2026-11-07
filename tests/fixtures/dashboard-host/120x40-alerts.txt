@@ -17,7 +17,6 @@
 │ quota-pace none recorded                                 ││                                                          │
 │ heavy-load just now · expected, a nightly baseline runs… ││                                                          │
 │ long-task  just now · no verdict on this fire            ││                                                          │
-│ nightly    none recorded                                 ││                                                          │
 │ gluttons: 4 flags, shop and my-home over their share     ││                                                          │
 ╰──────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯
 ╭─ machines ─────────────────────────────────────── ↻ 10s ─╮╭─ projects · today ─────────────────────────────── ↻ 10s ─╮
@@ -36,5 +35,6 @@
 │ ▶ pueue south kelp bun test                 0s       now ││                                                          │
 │ ▶ CI          shop ci                       3m       now ││                                                          │
 │ · CI          shop deploy                    –   waiting ││                                                          │
-│ +7 more runs                                             ││                                                          │
+│ ✓ pueue north tasks-inbox… echo queued…     0s     19:53 ││                                                          │
+│ +6 more runs                                             ││                                                          │
 ╰──────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯

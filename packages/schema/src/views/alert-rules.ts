@@ -28,8 +28,6 @@ const eventKey = (event: AlertEvent): string => {
       return event.machine;
     case "long-task":
       return `${event.machine} ${event.task.id} ${event.reason}`;
-    case "nightly":
-      return `${event.repo} ${event.workflow}`;
   }
 };
 
