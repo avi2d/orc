@@ -2,6 +2,7 @@ import { Effect, type FileSystem, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { runGit } from "./git-run"
 import { OrcRunError } from "./run-session"
+import { nestedWorktreeExcludes } from "./worktree-excludes"
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
 
@@ -15,9 +16,6 @@ export interface Checkout {
   readonly projectDir: string
   readonly branch: string
 }
-
-// Sandcastle interpolates the branch into host shell commands, so any other character can be expanded or run.
-const shellSafeBranch = /^[A-Za-z0-9._/-]+$/
 
 export const parseRefuseMarkers = (value: string | undefined): ReadonlyArray<string> =>
   value === undefined ? [] : value.split(",").map((entry) => entry.trim()).filter((entry) => entry !== "")
@@ -46,7 +44,12 @@ export const openCheckout = (
         return yield* refuse("orc: " + candidate + " marks this checkout as refused, so orc refuses to run in it")
       }
     }
-    const status = yield* runGit(spawner, git, ["status", "--porcelain", "--", ".", ":(exclude).sandcastle/worktrees"], projectDir)
+    const listed = yield* runGit(spawner, git, ["worktree", "list", "--porcelain"], projectDir).pipe(
+      Effect.map((result) => result.stdout),
+      Effect.orElseSucceed(() => "")
+    )
+    const excludes = yield* nestedWorktreeExcludes(fs, projectDir, listed)
+    const status = yield* runGit(spawner, git, ["status", "--porcelain", "--", ".", ...excludes], projectDir)
     if (status.exitCode !== 0) {
       return yield* refuse("orc: git status failed in " + projectDir)
     }
@@ -55,9 +58,6 @@ export const openCheckout = (
       return yield* refuse("orc: the checkout at " + projectDir + " holds " + dirty.toString() + " uncommitted changes, so commit or stash them before orc runs")
     }
     const branch = branchName ?? ("orc/" + runId)
-    if (!shellSafeBranch.test(branch)) {
-      return yield* refuse("orc: Sandcastle interpolates " + branch + " into host shell commands, so a branch holding a shell metacharacter is refused and orc takes only letters, digits, '.', '_', '-' and '/' in a branch name")
-    }
     const named = yield* runGit(spawner, git, ["check-ref-format", "--branch", branch], projectDir)
     if (named.exitCode !== 0) {
       return yield* refuse("orc: " + branch + " is no usable branch name")

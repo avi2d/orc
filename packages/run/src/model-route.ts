@@ -2,7 +2,7 @@ import { Effect, FileSystem, Result } from "effect"
 import type { OrcConfig, Provider, TokenFileLocation } from "./orc-config"
 import { OrcRunError } from "./run-session"
 
-export const tokenFileVar = "ORC_TOKEN_FILE"
+export const tokenFileVar = "AGENT_TOKEN_FILE"
 
 // A literal key here would leave the token in the run's Pi folder.
 export const tokenFileApiKey = "!cat \"$" + tokenFileVar + "\""

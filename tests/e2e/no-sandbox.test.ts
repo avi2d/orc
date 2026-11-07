@@ -65,6 +65,40 @@ describe("orc run --sandbox none", () => {
     })
   }, 60_000)
 
+  test("with a prepare command that fails is refused before Pi runs instead of starting Pi without its install", async () => {
+    await withNoSandboxFixture(async ({ repo, fakeBin, env }) => {
+      await writeFile(join(repo, ".no-mistakes.yaml"), "commands:\n  prepare: exit 3\n  greeting: test -f greeting.txt\n")
+      git(repo, ["add", ".no-mistakes.yaml"], env)
+      git(repo, ["commit", "-qm", "prepare that fails"], env)
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], repo, env)
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stdout + result.stderr).toContain("prepare.log")
+      expect(result.stdout + result.stderr).toContain("so Pi did not start")
+      expect(await Bun.file(join(fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+
+  test("runs the prepare command in the copy before Pi starts instead of starting Pi without its install", async () => {
+    await withNoSandboxFixture(async ({ repo, fakeBin, env }) => {
+      await writeFile(join(repo, ".no-mistakes.yaml"), "commands:\n  prepare: touch prepared\n  greeting: test -f greeting.txt\n")
+      git(repo, ["add", ".no-mistakes.yaml"], env)
+      git(repo, ["commit", "-qm", "prepare that touches"], env)
+      const piPath = join(fakeBin, "pi")
+      const realPi = join(fakeBin, "real-pi")
+      await writeFile(realPi, await readFile(piPath))
+      await chmod(realPi, 0o755)
+      await writeScript(piPath, [
+        'if [ "$1" = -p ]; then if [ -f prepared ]; then touch "' + fakeBin + '/pi-saw-prepared"; fi; fi',
+        'exec "' + realPi + '" "$@"'
+      ])
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], repo, env)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect(await Bun.file(join(fakeBin, "pi-saw-prepared")).exists()).toBe(true)
+      const piCwd = (await readFile(join(fakeBin, "pi-cwd"), "utf8")).trim()
+      expect(await Bun.file(join(piCwd, "prepared")).exists()).toBe(true)
+    })
+  }, 60_000)
+
   test("with --instructions names the file on the first output line and hands Pi its words instead of running without them", async () => {
     await withNoSandboxFixture(async ({ repo, fakeBin, env }) => {
       const instructions = join(repo, "..", "orc-instructions.md")
@@ -175,7 +209,7 @@ describe("orc run on a token-file provider", () => {
       expect(apiKey).toStartWith("!")
       const handed = (await readFile(join(fixture.fakeBin, "pi-token-file"), "utf8")).trim()
       expect(handed).toBe(env.KEYED_TOKEN_FILE)
-      const resolved = Bun.spawnSync(["sh", "-c", apiKey.slice(1)], { env: { ORC_TOKEN_FILE: handed } })
+      const resolved = Bun.spawnSync(["sh", "-c", apiKey.slice(1)], { env: { AGENT_TOKEN_FILE: handed } })
       expect(resolved.stdout.toString()).toBe(fixtureToken)
       expect(await filesHolding([env["ORC_HOME"] ?? "", fixture.repo, fixture.home], fixtureToken)).toEqual([])
       expect(git(fixture.repo, ["log", "--all", "-p"], env)).not.toContain(fixtureToken)
@@ -346,6 +380,48 @@ describe("orc run idle limit", () => {
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toContain("ORC_IDLE_TIMEOUT_SECONDS is 45m")
       expect(await Bun.file(join(fixture.fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+})
+
+const markerScript = async (dir: string, name: string, then: ReadonlyArray<string> = []): Promise<{ readonly script: string; readonly ran: () => Promise<boolean> }> => {
+  const marker = join(dir, name + "-ran")
+  const script = join(dir, name)
+  await writeScript(script, ["touch '" + marker + "'", ...then])
+  return { script, ran: () => Bun.file(marker).exists() }
+}
+
+describe("orc run after Pi plants a program in the repository's git config", () => {
+  test("runs none of the planted fsmonitor, filter or hook in its own host git instead of running them outside the sandbox", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const fsmonitor = await markerScript(fixture.fakeBin, "fsmonitor")
+      const filter = await markerScript(fixture.fakeBin, "filter", ["cat"])
+      const hook = await markerScript(fixture.fakeBin, "post-checkout")
+      const piPath = join(fixture.fakeBin, "pi")
+      const plainPi = join(fixture.fakeBin, "plain-pi")
+      await writeFile(plainPi, await readFile(piPath))
+      await chmod(plainPi, 0o755)
+      await writeScript(piPath, [
+        "\"" + plainPi + "\" \"$@\"; status=$?",
+        "if [ \"$1\" = -p ]; then",
+        "  common=$(git rev-parse --path-format=absolute --git-common-dir)",
+        "  git config core.fsmonitor '" + fsmonitor.script + "'",
+        "  git config filter.planted.clean '" + filter.script + "'",
+        "  mkdir -p \"$common/info\" \"$common/hooks\"",
+        "  echo 'greeting.txt filter=planted' > \"$common/info/attributes\"",
+        "  cp '" + hook.script + "' \"$common/hooks/post-checkout\"",
+        "  touch -m -t 202001010000 greeting.txt",
+        "fi",
+        "exit $status"
+      ])
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, fixture.env)
+      expect({ fsmonitor: await fsmonitor.ran(), filter: await filter.ran(), hook: await hook.ran() }).toEqual({ fsmonitor: false, filter: false, hook: false })
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stdout + result.stderr).toContain("core.fsmonitor")
+      const piCwd = (await readFile(join(fixture.fakeBin, "pi-cwd"), "utf8")).trim()
+      Bun.spawnSync(["git", "status", "--porcelain"], { cwd: piCwd, env: fixture.env })
+      Bun.spawnSync(["git", "worktree", "add", "-q", join(fixture.home, "after"), "-b", "orc/after"], { cwd: fixture.repo, env: fixture.env })
+      expect({ fsmonitor: await fsmonitor.ran(), filter: await filter.ran(), hook: await hook.ran() }).toEqual({ fsmonitor: true, filter: true, hook: true })
     })
   }, 60_000)
 })

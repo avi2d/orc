@@ -1,53 +1,15 @@
-import {
-  createBindMountSandboxProvider,
-  type BindMountCreateOptions,
-  type BindMountSandboxHandle,
-  type BindMountSandboxProvider,
-  type ExecResult
-} from "@ai-hero/sandcastle"
-import { BunServices } from "@effect/platform-bun"
-import { Effect, FiberSet, FileSystem, Path, Schema, Scope, Stream } from "effect"
+import { Effect, FileSystem, Path, Schema } from "effect"
 import type { PlatformError } from "effect/PlatformError"
-import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { homedir } from "node:os"
-import {
-  closeNonoSandbox,
-  type HostCommandResult,
-  hostGitSafetyEnv,
-  NonoProviderError,
-  prepareSandboxShims,
-  resolveDeveloperDir,
-  resolveHostBinary,
-  resolvePiAgentDir,
-  resolveRuntime,
-  runHostCommand,
-  type Spawner
-} from "./host"
+import { ChildProcess } from "effect/process"
+import { pickEnv, sandboxedEnvNames } from "./agent-exec"
+import { hostGitSafetyEnv, NonoProviderError, runHostCommand, type Spawner } from "./host"
 import { credentialBearingKeys, includePathKeys, includeTargets, submoduleCheckouts } from "./git-config"
-import { defaultToolchainResolver, selectNonoProfile, type ModelCredential, type NonoSandboxRoots, type ToolchainResolver, within } from "./nono-profile"
+import { type NonoSandboxRoots, within } from "./nono-profile"
 
-export const buildNonoRunArgs = (
-  profilePath: string,
-  command: string,
-  positional: ReadonlyArray<string> = []
-): ReadonlyArray<string> => ["run", "--silent", "--profile", profilePath, "--", "sh", "-c", command, "sh", ...positional]
+export const sandboxRuntimes: ReadonlyArray<string> = ["bun", "node", "pi"]
 
-const inheritedEnvNames: ReadonlyArray<string> = ["PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TERM"]
+export const inheritedEnv = (hostEnv: Readonly<Record<string, string | undefined>>): Record<string, string> => pickEnv(hostEnv, sandboxedEnvNames)
 
-const sandboxRuntimes: ReadonlyArray<string> = ["bun", "node", "pi"]
-
-export const inheritedEnv = (hostEnv: Readonly<Record<string, string | undefined>>): Record<string, string> => {
-  const env: Record<string, string> = {}
-  for (const name of inheritedEnvNames) {
-    const value = hostEnv[name]
-    if (value !== undefined) {
-      env[name] = value
-    }
-  }
-  return env
-}
-
-// Sandcastle writes safe.directory and the commit identity with `git config --global`, so the global config must be writable.
 export const buildSandboxEnv = (
   hostEnv: Readonly<Record<string, string | undefined>>,
   piSessionDir: string,
@@ -65,7 +27,7 @@ export const buildSandboxEnv = (
   }
 }
 
-const sandboxEnv = (
+export const sandboxEnv = (
   hostEnv: NodeJS.ProcessEnv,
   piSessionDir: string,
   runtimeBinDirs: ReadonlyArray<string>,
@@ -81,21 +43,6 @@ export const buildHostGitEnv = (hostEnv: Readonly<Record<string, string | undefi
   GIT_CONFIG_GLOBAL: "/dev/null",
   GIT_CONFIG_NOSYSTEM: "1"
 })
-
-export { NonoProviderError }
-
-export interface NonoSandboxProviderOptions {
-  readonly piSessionDir: string
-  readonly piAgentDir?: string | undefined
-  readonly modelCredential?: ModelCredential | undefined
-  readonly hostPath?: string | undefined
-  readonly toolchain?: ToolchainResolver | undefined
-}
-
-// Sandcastle 0.12.0's provider type omits the runtime `create`.
-export interface NonoSandboxProvider extends BindMountSandboxProvider {
-  readonly create: (options: BindMountCreateOptions) => Promise<BindMountSandboxHandle>
-}
 
 interface HostGit {
   readonly binary: string
@@ -169,7 +116,7 @@ const readGitConfig = (spawner: Spawner, { binary, env }: HostGit, file: string,
   )
 
 // The sandbox can read every config in the git data, every .gitmodules and embedded submodule git dir in the checkout, and every file they include, active or not.
-const refuseCredentialBearingCheckout = (
+export const refuseCredentialBearingCheckout = (
   spawner: Spawner,
   fs: FileSystem.FileSystem,
   path: Path.Path,
@@ -207,68 +154,35 @@ const refuseCredentialBearingCheckout = (
   })
 
 // nono resolves a grant's symlinks afresh on every run, so only canonical roots keep their meaning.
-const resolveRoots = (
+export const resolveRoots = (
   spawner: Spawner,
   fs: FileSystem.FileSystem,
   path: Path.Path,
   hostGit: HostGit,
   worktree: string,
-  piSessionDir: string
+  piSessionDir: string,
+  sessions: string
 ): Effect.Effect<NonoSandboxRoots, NonoProviderError | PlatformError> =>
   Effect.gen(function*() {
-    for (const root of [worktree, piSessionDir]) {
+    for (const root of [worktree, piSessionDir, sessions]) {
       if (!path.isAbsolute(root)) {
         return yield* new NonoProviderError({ message: `orc nono provider: sandbox root must be absolute: ${root}` })
       }
     }
     const gitData = yield* resolveGitDataDir(spawner, path, hostGit, worktree)
     yield* fs.makeDirectory(piSessionDir, { recursive: true })
+    yield* fs.makeDirectory(sessions, { recursive: true })
     return {
       worktree: yield* fs.realPath(worktree),
       gitData: yield* fs.realPath(gitData),
-      piSessionDir: yield* fs.realPath(piSessionDir)
+      piSessionDir: yield* fs.realPath(piSessionDir),
+      sessions: yield* fs.realPath(sessions)
     }
   })
 
-const requireSuccess = (action: string) => (result: HostCommandResult): Effect.Effect<HostCommandResult, NonoProviderError> =>
-  result.exitCode === 0
-    ? Effect.succeed(result)
-    : Effect.fail(new NonoProviderError({ message: `orc nono provider: cannot ${action}: ${result.stderr.trim()}` }))
-
-interface Sandbox {
-  readonly nonoBinary: string
-  readonly profilePath: string
-  readonly env: Readonly<Record<string, string>>
-}
-
-interface SandboxedRun {
-  readonly cwd: string
-  readonly stdin: "ignore" | Stream.Stream<Uint8Array>
-  readonly onLine?: ((line: string) => void) | undefined
-  readonly positional?: ReadonlyArray<string>
-}
-
-const runSandboxed = (
-  spawner: Spawner,
-  sandbox: Sandbox,
-  command: string,
-  run: SandboxedRun
-): Effect.Effect<HostCommandResult, NonoProviderError> =>
-  runHostCommand(
-    spawner,
-    ChildProcess.make(sandbox.nonoBinary, buildNonoRunArgs(sandbox.profilePath, command, run.positional), {
-      cwd: run.cwd,
-      env: sandbox.env,
-      extendEnv: false,
-      stdin: run.stdin,
-      forceKillAfter: "1 second"
-    }),
-    { onLine: run.onLine }
-  )
-
 const NonoWhyVerdict = Schema.fromJsonString(Schema.Struct({ status: Schema.Literals(["allowed", "denied"]) }))
 
-const checkProfile = (
+export const checkProfile = (
   spawner: Spawner,
   nono: (args: ReadonlyArray<string>) => ChildProcess.Command,
   profilePath: string,
@@ -298,96 +212,3 @@ const checkProfile = (
       }
     }
   })
-
-export const nonoSandboxProvider = (options: NonoSandboxProviderOptions): NonoSandboxProvider => {
-  const create = (createOptions: BindMountCreateOptions): Promise<BindMountSandboxHandle> => {
-    const program = Effect.gen(function*() {
-      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-      const fs = yield* FileSystem.FileSystem
-      const path = yield* Path.Path
-      const hostEnv = { ...Bun.env, ...(options.hostPath === undefined ? {} : { PATH: options.hostPath }), ...createOptions.env }
-      const hostGit = { binary: yield* resolveHostBinary(fs, "git"), env: buildHostGitEnv(hostEnv) }
-      const roots = yield* resolveRoots(spawner, fs, path, hostGit, createOptions.worktreePath, options.piSessionDir)
-      yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, hostGit)
-      const toolchain = options.toolchain ?? defaultToolchainResolver(homedir())
-      const runtimes = (yield* Effect.forEach(sandboxRuntimes, (name) => resolveRuntime(fs, path, name, Bun.env.PATH ?? "", toolchain))).filter((runtime) => runtime !== null)
-      const agentDir = yield* resolvePiAgentDir(fs, roots.piSessionDir, options.piAgentDir)
-      const shims = yield* prepareSandboxShims(fs, path, roots.piSessionDir)
-      const env = sandboxEnv(hostEnv, roots.piSessionDir, [shims.shimDir, ...runtimes.map((runtime) => runtime.binDir)], agentDir)
-      const runtimeDirs = runtimes.flatMap((runtime) => runtime.installDir === null ? [] : [runtime.installDir])
-      const developerDir = yield* resolveDeveloperDir(spawner, fs, env)
-      const nonoBinary = yield* resolveHostBinary(fs, "nono")
-      const nono = (args: ReadonlyArray<string>) => ChildProcess.make(nonoBinary, args, { env, extendEnv: false })
-      const profileDir = yield* fs.makeTempDirectory({ prefix: "orc-nono-" })
-      const profilePath = path.join(profileDir, "profile.json")
-      const hostTrustedPaths = [profileDir, nonoBinary, path.dirname(nonoBinary)]
-      const profile = yield* selectNonoProfile(roots, { developerDir, toolchainFolders: toolchain.folders, runtimeDirs }, options.modelCredential)
-      yield* fs.writeFileString(profilePath, `${JSON.stringify(profile, null, 2)}\n`).pipe(
-        Effect.andThen(() => checkProfile(spawner, nono, profilePath, hostTrustedPaths)),
-        Effect.andThen(() => fs.makeDirectory(env.TMPDIR, { recursive: true })),
-        Effect.onError(() => fs.remove(profileDir, { recursive: true }).pipe(Effect.result))
-      )
-      const sandboxed = (command: string, run: SandboxedRun) => runSandboxed(spawner, { nonoBinary, profilePath, env }, command, run)
-      const lifetime = yield* Scope.make()
-      const runOwned = yield* FiberSet.makeRuntimePromise().pipe(Scope.provide(lifetime))
-      return {
-        worktreePath: createOptions.worktreePath,
-        exec: (
-          command: string,
-          execOptions?: {
-            readonly onLine?: ((line: string) => void) | undefined
-            readonly cwd?: string | undefined
-            readonly stdin?: string | undefined
-          }
-        ): Promise<ExecResult> => {
-          const cwd = execOptions?.cwd ?? createOptions.worktreePath
-          const stdin = execOptions?.stdin === undefined ? "ignore" : Stream.fromIterable([new TextEncoder().encode(execOptions.stdin)])
-          return runOwned(
-            fs.realPath(cwd).pipe(
-              Effect.mapError((cause) =>
-                new NonoProviderError({ message: `orc nono provider: cannot resolve working directory ${cwd}: ${String(cause)}` })
-              ),
-              Effect.filterOrFail(
-                (realCwd) => [roots.worktree, roots.gitData, roots.piSessionDir].some((root) => within(root, realCwd)),
-                () => new NonoProviderError({ message: `orc nono provider: working directory is outside the sandbox roots: ${cwd}` })
-              ),
-              Effect.andThen((realCwd) => sandboxed(command, { cwd: realCwd, stdin, onLine: execOptions?.onLine })),
-              Effect.map(({ stdout, stderr, exitCode }) => ({ stdout, stderr, exitCode })),
-              Effect.provide(BunServices.layer)
-            )
-          )
-        },
-        copyFileIn: (hostPath: string, sandboxPath: string): Promise<void> =>
-          runOwned(
-            fs.readFile(hostPath).pipe(
-              Effect.andThen((bytes) =>
-                sandboxed(`mkdir -p -- "$(dirname -- "$1")" && cat > "$1"`, {
-                  cwd: roots.worktree,
-                  stdin: Stream.fromIterable([bytes]),
-                  positional: [sandboxPath]
-                })
-              ),
-              Effect.andThen(requireSuccess(`copy ${hostPath} into the sandbox at ${sandboxPath}`)),
-              Effect.asVoid,
-              Effect.provide(BunServices.layer)
-            )
-          ),
-        copyFileOut: (sandboxPath: string, hostPath: string): Promise<void> =>
-          runOwned(
-            sandboxed(`cat -- "$1"`, { cwd: roots.worktree, stdin: "ignore", positional: [sandboxPath] }).pipe(
-              Effect.andThen(requireSuccess(`copy ${sandboxPath} out of the sandbox`)),
-              Effect.andThen(({ stdoutBytes }) =>
-                fs.makeDirectory(path.dirname(hostPath), { recursive: true }).pipe(
-                  Effect.andThen(() => fs.writeFile(hostPath, stdoutBytes))
-                )
-              ),
-              Effect.provide(BunServices.layer)
-            )
-          ),
-        close: (): Promise<void> => closeNonoSandbox(lifetime, profileDir, shims.shimDir)
-      } satisfies BindMountSandboxHandle
-    })
-    return Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(BunServices.layer)))
-  }
-  return { ...createBindMountSandboxProvider({ name: "orc-nono", create }), create }
-}

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { access, readFile, realpath, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { isRecord } from "./runner-helpers"
-import { checksPassedWhileMonitoring, cleanFinish, git, passedWithPr, readyToCheck, recordedNothing, runStep, sandboxResult, withHome, withRepo, type NoMistakesReply } from "./run-helpers"
+import { checksPassedWhileMonitoring, git, passedWithPr, readyToCheck, recordedNothing, runStep, sandboxResult, withHome, withRepo, type NoMistakesReply } from "./run-helpers"
 
 const fixableGate: NoMistakesReply = {
   stdout: [
@@ -71,7 +71,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         const sha = await readyToCheck(dir, home)
         const taskPath = join(home, "runs", "step-run-1", "task.md")
         const workdir = await realpath(dir)
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [passedWithPr, recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [passedWithPr, recordedNothing])
         expect(outcome.report.completed).toBe(true)
         expect(outcome.report.prLink).toBe("https://github.com/o/r/pull/7")
         expect(outcome.run?.prLink).toBe("https://github.com/o/r/pull/7")
@@ -96,7 +96,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         const sha = await readyToCheck(dir, home)
         const taskPath = join(home, "runs", "step-run-1", "task.md")
         const workdir = await realpath(dir)
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [fixableGate, passedWithPr, recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [fixableGate, passedWithPr, recordedNothing])
         expect(outcome.nmCalls.split("\n").filter((line) => line !== "")).toEqual([
           "axi run --intent-file " + taskPath,
           workdir,
@@ -134,7 +134,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
             "gate: review"
           ].join("\n") + "\n"
         }
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [askUserGate, recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [askUserGate, recordedNothing])
         expect(axiCalls(outcome.nmCalls)).toEqual(["axi run --intent-file " + join(home, "runs", "step-run-1", "task.md"), statusLookup])
         expect(outcome.report.completed).toBe(false)
         expect(outcome.report.prLink).toBeNull()
@@ -170,7 +170,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
             "gate: review"
           ].join("\n") + "\n"
         }
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [questionGate, fixableGate, passedWithPr, recordedNothing], [{ question: "question-3", answer: "Use the wide scope" }])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [questionGate, fixableGate, passedWithPr, recordedNothing], [{ question: "question-3", answer: "Use the wide scope" }])
         const calls = axiCalls(outcome.nmCalls)
         expect(calls).toContain("axi answer --question question-3 --answer Use the wide scope")
         expect(calls.indexOf("axi answer --question question-3 --answer Use the wide scope")).toBeLessThan(calls.findIndex((line) => line.startsWith("axi respond")))
@@ -199,7 +199,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
             "gate: review"
           ].join("\n") + "\n"
         }
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [questionGate, recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [questionGate, recordedNothing])
         expect(axiCalls(outcome.nmCalls)).toEqual(["axi run --intent-file " + join(home, "runs", "step-run-1", "task.md"), statusLookup])
         expect(outcome.report.completed).toBe(false)
         expect(outcome.report.noMistakes?.status).toBe("refused")
@@ -230,7 +230,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
             "gate: review"
           ].join("\n") + "\n"
         }
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [questionGate, recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [questionGate, recordedNothing])
         expect(axiCalls(outcome.nmCalls)).toEqual(["axi run --intent-file " + join(home, "runs", "step-run-1", "task.md"), statusLookup])
         expect(outcome.report.completed).toBe(false)
         expect(outcome.report.noMistakes?.status).toBe("refused")
@@ -265,7 +265,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
             "gate: review"
           ].join("\n") + "\n"
         }
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [questionGate, recordedNothing], [{ question: "question-3", answer: "Use the wide scope" }])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [questionGate, recordedNothing], [{ question: "question-3", answer: "Use the wide scope" }])
         expect(outcome.report.noMistakes?.status).toBe("refused")
         const signals: ReadonlyArray<unknown> = Array.isArray(outcome.signals) ? outcome.signals : []
         const open = signals.flatMap((signal) => isRecord(signal) && signal.name === "open-question" ? [String(signal.value)] : [])
@@ -297,7 +297,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
           ].join("\n") + "\n"
         }
         const answered: NoMistakesReply = { stdout: "answered\n" }
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [questionGate, answered, answered, fixableGate, passedWithPr, recordedNothing], [
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [questionGate, answered, answered, fixableGate, passedWithPr, recordedNothing], [
           { question: "question-3", answer: "Use the wide scope" },
           { question: "question-4", answer: "Allow both retries" },
           { question: "question-5", answer: "Focus on the report" }
@@ -322,7 +322,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         const sha = await readyToCheck(dir, home)
         const taskPath = join(home, "runs", "step-run-1", "task.md")
         const workdir = await realpath(dir)
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [{ stdout: "still working\n" }, passedWithPr, recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [{ stdout: "still working\n" }, passedWithPr, recordedNothing])
         expect(outcome.nmCalls.split("\n").filter((line) => line !== "")).toEqual([
           "axi run --intent-file " + taskPath,
           workdir,
@@ -341,7 +341,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [
+        const outcome = await runStep(dir, home, sandboxResult(sha), async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 }), [
           fixableGate,
           { stdout: "", stderr: "refused: protected path docs/launch.md needs your word", exitCode: 1 },
           recordedNothing
@@ -362,7 +362,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [checksPassedWhileMonitoring, recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [checksPassedWhileMonitoring, recordedNothing])
         expect(axiCalls(outcome.nmCalls)).toEqual(["axi run --intent-file " + join(home, "runs", "step-run-1", "task.md"), statusLookup])
         expect(outcome.report.completed).toBe(true)
         expect(outcome.report.noMistakes?.status).toBe("passed")
@@ -375,7 +375,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [finalOutcome("completed", "passed-with-skips", "https://github.com/o/r/pull/7"), recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [finalOutcome("completed", "passed-with-skips", "https://github.com/o/r/pull/7"), recordedNothing])
         expect(outcome.report.completed).toBe(false)
         expect(outcome.report.noMistakes?.status).toBe("failed")
         expect(outcome.report.prLink).toBe("https://github.com/o/r/pull/7")
@@ -390,7 +390,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [finalOutcome("failed", "failed", "https://github.com/o/r/pull/7"), recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [finalOutcome("failed", "failed", "https://github.com/o/r/pull/7"), recordedNothing])
         expect(outcome.report.checksRounds).toHaveLength(1)
         expect(outcome.report.noMistakes?.status).toBe("failed")
         expect(outcome.run?.prLink).toBe("https://github.com/o/r/pull/7")
@@ -406,7 +406,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [fixableGate, finalOutcome("failed", "failed", ""), recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [fixableGate, finalOutcome("failed", "failed", ""), recordedNothing])
         expect(axiCalls(outcome.nmCalls)).toHaveLength(3)
         expect(outcome.report.noMistakes?.status).toBe("failed")
         expect(outcome.report.noMistakes?.gatesAnswered).toBe(1)
@@ -419,7 +419,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [
           { stdout: "error: no-mistakes is not initialized in this repository\nhelp[1]:\n  Run `no-mistakes init`\n", exitCode: 1 }
         ])
         expect(outcome.report.checksRounds).toHaveLength(1)
@@ -435,7 +435,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [
           { stdout: "", stderr: "unknown flag: --intent-file\n", exitCode: 1 }
         ])
         expect(outcome.report.noMistakes?.status).toBe("failed")
@@ -450,7 +450,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [fixableGate, fixReviewGate, checksPassedWhileMonitoring, recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [fixableGate, fixReviewGate, checksPassedWhileMonitoring, recordedNothing])
         expect(nmCallLines(outcome.nmCalls).filter((line) => line.startsWith("axi "))).toEqual([
           "axi run --intent-file " + join(home, "runs", "step-run-1", "task.md"),
           "axi respond --action fix --findings R7",
@@ -468,7 +468,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
         const mixedGate: NoMistakesReply = { stdout: fixableGate.stdout.replace("findings[1]", "findings[2]").replace("auto-fix,spelling", "auto-fix,spelling\n    R8,info,notes.md,,no-op,style note") }
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [mixedGate, checksPassedWhileMonitoring, recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [mixedGate, checksPassedWhileMonitoring, recordedNothing])
         expect(nmCallLines(outcome.nmCalls)).toContain("axi respond --action fix --findings R7 --ignore R8")
         expect(outcome.report.completed).toBe(true)
         expect(outcome.report.noMistakes?.findings.map((finding) => finding.id)).toEqual(["R7", "R8"])
@@ -504,7 +504,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
             "  L2,info,src/b.ts,auto-fix,,\"imports out of order, fixed\""
           ].join("\n") + "\n"
         }
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [withFixes, status, lintLog])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [withFixes, status, lintLog])
         expect(axiCalls(outcome.nmCalls)).toEqual([
           "axi run --intent-file " + join(home, "runs", "step-run-1", "task.md"),
           statusLookup,
@@ -524,7 +524,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [waitExpired, checksPassedWhileMonitoring, recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [waitExpired, checksPassedWhileMonitoring, recordedNothing])
         expect(axiCalls(outcome.nmCalls)).toEqual(["axi run --intent-file " + join(home, "runs", "step-run-1", "task.md"), "axi run", statusLookup])
         expect(outcome.report.completed).toBe(true)
         expect(outcome.report.noMistakes?.gatesAnswered).toBe(0)
@@ -536,7 +536,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [fixableGate, waitExpired, checksPassedWhileMonitoring, recordedNothing])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [fixableGate, waitExpired, checksPassedWhileMonitoring, recordedNothing])
         expect(axiCalls(outcome.nmCalls)).toEqual([
           "axi run --intent-file " + join(home, "runs", "step-run-1", "task.md"),
           "axi respond --action fix --findings R7",
@@ -560,7 +560,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
           git(dir, ["config", "core.fsmonitor", fsmonitor])
           return { stdout: "lint ok", stderr: "", exitCode: 0 }
         }
-        await runStep(dir, home, sandboxResult(sha, cleanFinish), checkWritesConfig, [passedWithPr, recordedNothing])
+        await runStep(dir, home, sandboxResult(sha), checkWritesConfig, [passedWithPr, recordedNothing])
         expect(await exists(marker)).toBe(false)
       })
     })
@@ -572,7 +572,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         const sha = await readyToCheck(dir, home)
         const lintRecordedTwo: NoMistakesReply = { stdout: recordedNothing.stdout.replace("steps[2]", "steps[3]").replace("    ci,running", "    lint,completed,2,812\n    ci,running") }
         const logsFail: NoMistakesReply = { stdout: "error: cannot read the lint step log\n", exitCode: 1 }
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [checksPassedWhileMonitoring, lintRecordedTwo, logsFail])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [checksPassedWhileMonitoring, lintRecordedTwo, logsFail])
         expect(axiCalls(outcome.nmCalls)).toContain("axi logs --run 01STUB --step lint")
         expect(outcome.report.completed).toBe(false)
         expect(outcome.report.noMistakes?.status).toBe("failed")
@@ -589,7 +589,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const outcome = await runStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses, [checksPassedWhileMonitoring, { stdout: "", stderr: "daemon unreachable", exitCode: 1 }])
+        const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [checksPassedWhileMonitoring, { stdout: "", stderr: "daemon unreachable", exitCode: 1 }])
         expect(outcome.report.noMistakes?.status).toBe("failed")
         expect(outcome.report.prLink).toBe("https://github.com/o/r/pull/7")
         expect(outcome.run?.endReason).toContain("daemon unreachable")

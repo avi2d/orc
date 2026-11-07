@@ -1,5 +1,4 @@
-import { BunServices } from "@effect/platform-bun"
-import { Data, Effect, Exit, FileSystem, type Path, type PlatformError, Scope, Stream } from "effect"
+import { Data, Effect, FileSystem, type Path, type PlatformError, type Scope, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { type Runtime, type ToolchainResolver, within } from "./nono-profile"
 
@@ -87,28 +86,6 @@ export const hostGitShim = (
     yield* fs.writeFileString(shim, hostGitShimScript(realGit), { mode: 0o755 })
     return shim
   })
-
-// Sandcastle spawns host git with the process env and finds it on the process PATH, so both have to name the shim while it runs.
-export const withHostGitSafety = (hostGit: string) => <A, E>(use: Effect.Effect<A, E>): Effect.Effect<A, E> =>
-  Effect.acquireUseRelease(
-    Effect.sync(() => {
-      const safety = { ...hostGitSafetyEnv, PATH: hostGit.slice(0, hostGit.lastIndexOf("/")) + ":" + (Bun.env.PATH ?? "") }
-      const saved = Object.keys(safety).map((name) => [name, Bun.env[name]] as const)
-      Object.assign(Bun.env, safety)
-      return saved
-    }),
-    () => use,
-    (saved) =>
-      Effect.sync(() => {
-        for (const [name, value] of saved) {
-          if (value === undefined) {
-            delete Bun.env[name]
-          } else {
-            Bun.env[name] = value
-          }
-        }
-      })
-  )
 
 export const resolvePiAgentDir = (
   fs: FileSystem.FileSystem,
@@ -260,20 +237,3 @@ export const resolveRuntime = (
     }
     return null
   })
-
-export const closeNonoSandbox = (lifetime: Scope.Closeable, profileDir: string, shimDir: string): Promise<void> =>
-  Effect.runPromise(
-    Scope.close(lifetime, Exit.void).pipe(
-      Effect.andThen(() =>
-        Effect.gen(function*() {
-          const fs = yield* FileSystem.FileSystem
-          yield* fs.remove(profileDir, { recursive: true })
-          yield* fs.remove(shimDir, { recursive: true })
-        })
-      ),
-      // A leftover rendered profile is litter, never a teardown failure.
-      Effect.result,
-      Effect.asVoid,
-      Effect.provide(BunServices.layer)
-    )
-  )

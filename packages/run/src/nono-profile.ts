@@ -11,6 +11,7 @@ export interface NonoSandboxRoots {
   readonly worktree: string
   readonly gitData: string
   readonly piSessionDir: string
+  readonly sessions: string
 }
 
 // nono applies these to a profile that names no base unless they are excluded; its required deny groups cannot be.
@@ -283,7 +284,7 @@ const profileWithFiles = (
 ) => ({
   meta: {
     name: "orc-nono-agent",
-    description: "orc agent sandbox: the isolated copy, its git data and Pi's session folder"
+    description: "orc agent sandbox: the isolated copy, its git data and Pi's session folders"
   },
   groups: {
     include: [],
@@ -294,7 +295,7 @@ const profileWithFiles = (
     capability_elevation: false
   },
   filesystem: {
-    allow: outermost([roots.worktree, roots.gitData, roots.piSessionDir]),
+    allow: outermost([roots.worktree, roots.gitData, roots.piSessionDir, roots.sessions]),
     read: [...systemReadPaths, ...host.toolchainFolders, ...host.runtimeDirs],
     write: [],
     allow_file: [],

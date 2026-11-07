@@ -1,13 +1,10 @@
-import { createSandbox, type Sandbox } from "@ai-hero/sandcastle"
 import { Console, Effect, FileSystem, Path, type Scope } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { Database } from "bun:sqlite"
 import { homedir } from "node:os"
 import { resolveAgentFile, type AgentFile } from "./agents"
 import { answerWaitFromEnv } from "./answer-wait"
-import { hostGitShim, withHostGitSafety } from "./host"
-import { nonoSandboxProvider } from "./nono"
-import { noSandboxProvider } from "./no-sandbox"
+import { hostGitShim } from "./host"
 import type { SandboxKind } from "./args"
 import { defaultToolchainResolver, type HostTools, type ToolchainResolver, withInstallFolders, within } from "./nono-profile"
 import { routeOfAgents } from "./model-route"
@@ -15,12 +12,11 @@ import { readOrcConfig } from "./orc-config"
 import { planSandbox, type SandboxPlan } from "./sandbox-plan"
 import { type Checkout, openCheckout, parseRefuseMarkers } from "./checkout"
 import { formatRefresh, refreshCheckout } from "./dispatch/refresh"
-import { orcCompletionLine } from "./pi"
-import { OrcRunError, describeCause } from "./run-session"
+import { OrcRunError } from "./run-session"
 import { openDatabase, orcHomeDir, updateStep } from "./run-history"
 import { stepsForRun } from "./history-resume"
 import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "./run-resume"
-import { finishRun, historyFailure, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordPullRequestDone, recordPullRequestStart, recordResumePublish } from "./history-write"
+import { finishRun, historyFailure, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordPullRequestDone, recordPullRequestStart, recordResumePublish, recordStepSession } from "./history-write"
 import { failedReport, writeEvidence, writeHandover, writeReport, type HistoryRun, type OrcRunCommit, type OrcRunReport } from "./run-record"
 import { longSessionWarning, type LongSessionCounts } from "./long-session"
 import { runFull, type RunCheckpoints, type SandboxOps } from "./run-loop"
@@ -31,6 +27,9 @@ import { newRunId } from "./run-id"
 import { prepareRunFolders, type RunFolders, runInstructions } from "./run-folders"
 import { subprocessDeliverer } from "./run-deliverer"
 import type { RunDelivery } from "./delivery"
+import { closeTaskCopy, openTaskCopy, writeAgentGitConfig } from "./task-copy"
+import { agentGitConfig, agentOps, installCopy, openAgentExec } from "./run-exec"
+import type { PiPacing } from "./pi-run"
 
 export type { SandboxOps }
 
@@ -72,7 +71,6 @@ export const toolchainFromEnv = (value: string | undefined, home: string): Effec
 
 const defaultIdleTimeoutSeconds = 45 * 60
 
-// Sandcastle counts a tool that prints nothing as idle, so its own 600 second default ends a run inside a quiet lint or test command.
 export const idleTimeoutFromEnv = (value: string | undefined): Effect.Effect<number, OrcRunError> => {
   const text = (value ?? "").trim()
   if (text === "") {
@@ -169,26 +167,6 @@ const readRunStart = (
     (db) => Effect.sync(() => db.close())
   )
 
-const openSandboxForRun = (
-  plan: SandboxPlan,
-  git: string,
-  checkout: Checkout,
-  folders: RunFolders,
-  hostPath: string | undefined,
-  toolchain: ToolchainResolver,
-  operatorEnv: Readonly<Record<string, string | undefined>>
-): Effect.Effect<Sandbox, OrcRunError> =>
-  Effect.tryPromise({
-    try: () => createSandbox({
-      branch: checkout.branch,
-      sandbox: plan.kind === "none"
-        ? noSandboxProvider({ piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir, piAgentDir: plan.own?.piAgentDir }, { ...operatorEnv, ...plan.own?.env })
-        : nonoSandboxProvider({ piSessionDir: folders.piSessionDir, piAgentDir: folders.piAgentDir, modelCredential: plan.credential, hostPath, toolchain }),
-      cwd: checkout.projectDir
-    }),
-    catch: (cause) => new OrcRunError({ message: "orc: the sandbox failed to start: " + describeCause(cause) })
-  }).pipe(withHostGitSafety(git))
-
 interface OpenedRun {
   readonly fs: FileSystem.FileSystem
   readonly path: Path.Path
@@ -228,24 +206,28 @@ const prepareRunAgents = (opened: OpenedRun, request: OrcRunRequest) =>
     { tokenFile: request.tokenFile, provider: request.provider }
   )
 
+const piPacing = (idleTimeoutSeconds: number): PiPacing => ({ tickMillis: 60_000, idleMillis: idleTimeoutSeconds * 1000 })
+
 const removeRunDir = (opened: OpenedRun) => opened.fs.remove(opened.runDir, { recursive: true }).pipe(Effect.result)
 
-// A report run starts Pi on the host in its run folder, outside Sandcastle, so a nono run would go unsandboxed without saying so.
+// A report run starts Pi on the host in its run folder, outside any task copy, so a nono run would go unsandboxed without saying so.
 export const runReportStep = (
   request: OrcRunRequest,
   kind: ReportKind
 ): Effect.Effect<ReportOutcome, OrcRunError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.scoped(Effect.gen(function*() {
+    const toolchain = yield* toolchainFromEnv(Bun.env.ORC_TOOLCHAIN_DIRS, homedir())
+    const idleTimeoutSeconds = yield* idleTimeoutFromEnv(Bun.env.ORC_IDLE_TIMEOUT_SECONDS)
     const opened = yield* openRun(request)
     if (opened.sandboxKind !== "none") {
       return yield* refuse("orc: a " + kind + " run starts Pi on the host in its run folder, so it takes --sandbox none and refuses --sandbox " + opened.sandboxKind)
     }
     const { folders, agent, plan } = yield* prepareRunAgents(opened, request).pipe(Effect.onError(() => removeRunDir(opened)))
+    const exec = yield* openAgentExec(plan, folders, folders.runDir, toolchain)
     const run: ReportRun = {
       kind, runId: opened.runId, runDir: folders.runDir, projectDir: opened.checkout.projectDir, branch: opened.checkout.branch, sandbox: opened.sandboxKind,
-      taskPath: folders.taskPath, instructions: folders.instructionsPath, piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir,
-      piAgentDir: plan.kind === "none" ? plan.own?.piAgentDir : undefined, agent, started: new Date().toISOString(),
-      env: { ...Bun.env, ...(plan.kind === "none" ? plan.own?.env : undefined) }
+      taskPath: folders.taskPath, instructions: folders.instructionsPath, hostSessionsDir: folders.hostSessionsDir, agent, started: new Date().toISOString(),
+      exec, pacing: piPacing(idleTimeoutSeconds)
     }
     return yield* Effect.acquireUseRelease(
       openDatabase(opened.home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
@@ -258,7 +240,6 @@ export const runAgentStep = (
   request: OrcRunRequest
 ): Effect.Effect<OrcRunReport, OrcRunError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.scoped(Effect.gen(function*() {
-    const operatorEnv = { ...Bun.env }
     const hostPath = Bun.env.PATH
     const toolchain = yield* toolchainFromEnv(Bun.env.ORC_TOOLCHAIN_DIRS, homedir())
     const idleTimeoutSeconds = yield* idleTimeoutFromEnv(Bun.env.ORC_IDLE_TIMEOUT_SECONDS)
@@ -271,38 +252,27 @@ export const runAgentStep = (
       Effect.onError(() => removeRunDir(opened))
     )
     const started = new Date().toISOString()
-    const sandbox: Sandbox = yield* openSandboxForRun(plan, git, checkout, folders, hostPath, toolchain, operatorEnv)
-    const ops: SandboxOps = {
-      runAgent: (agentProvider, prompt, logFile, resumeSession) =>
-        sandbox.run({
-          agent: agentProvider,
-          prompt,
-          completionSignal: orcCompletionLine,
-          idleTimeoutSeconds,
-          logging: { type: "file", path: path.join(folders.runDir, logFile) },
-          name: "orc-" + runId,
-          ...(resumeSession === undefined ? {} : { resumeSession })
-        }),
-      execCheck: (command) => sandbox.exec(command)
-    }
+    const copy = yield* openTaskCopy(fs, path, spawner, git, checkout, home)
+    yield* Effect.addFinalizer(() => closeTaskCopy(spawner, git, checkout.projectDir, copy).pipe(Effect.catch((error) => Console.log(error.message))))
+    yield* writeAgentGitConfig(spawner, git, Bun.which("git") ?? "git", checkout.projectDir, copy.dir, agentGitConfig(folders))
+    const exec = yield* openAgentExec(plan, folders, copy.dir, toolchain)
+    yield* installCopy(spawner, fs, path, exec, path.join(folders.runDir, "prepare.log"))
+    const ops = agentOps({ spawner, fs, path, git }, exec, folders, piPacing(idleTimeoutSeconds))
     const history: HistoryRun = {
       fs, path, spawner, git: checkout.git, projectDir: checkout.projectDir, runId,
       runDir: folders.runDir, piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir,
       taskPath: folders.taskPath, instructions: folders.instructionsPath, agent, fixer, branch: checkout.branch, sandbox: sandboxKind, started,
-      worktreeDir: sandbox.worktreePath,
-      delivery: subprocessDeliverer(request.delivery ?? "no-mistakes", { ...noMistakes, worktreeDir: sandbox.worktreePath, branch: checkout.branch }),
+      worktreeDir: copy.dir,
+      delivery: subprocessDeliverer(request.delivery ?? "no-mistakes", { ...noMistakes, worktreeDir: copy.dir, branch: checkout.branch }),
       allow: request.allow ?? [],
       answers: request.answers ?? [],
       answerWaitSeconds
     }
-    const report = yield* Effect.acquireUseRelease(
+    return yield* Effect.acquireUseRelease(
       openDatabase(home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
       (db) => runWithHistory(db, history, ops),
       (db) => Effect.sync(() => db.close())
-    ).pipe(
-      Effect.ensuring(Effect.promise(() => sandbox.close().then(() => undefined, () => undefined)))
     )
-    return report
   }))
 
 export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): Effect.Effect<OrcRunReport, OrcRunError> =>
@@ -312,6 +282,7 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
     let implementLong: { readonly counts: LongSessionCounts; readonly commits: Array<OrcRunCommit>; readonly sessionFile: string | null } | null = null
     const checkpoints: RunCheckpoints = {
       implementStart: (started) => recordImplementStart(db, run, started, resume.implementSessionFile ?? undefined),
+      implementSession: (file) => recordStepSession(db, run.runId, "implement", 1, file),
       implementDone: (outcome, started, ended) => Effect.gen(function*() {
         yield* recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: outcome.sessionFile, tokens: outcome.tokens, commits: outcome.commits, sessionSize: outcome.sessionSize, implementPassed: outcome.completed }, started, ended)
         if (outcome.sessionSize !== null && longSessionWarning(outcome.sessionSize) !== null) {
@@ -344,6 +315,7 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       checksRoundStart: (round, started) => recordChecksStart(db, run.runId, round, started),
       checksRoundDone: (round) => recordChecksDone(db, run.runId, round),
       fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer.path, started, attempt === 1 ? resume.fixSessionFile ?? undefined : undefined),
+      fixSession: (attempt, file) => recordStepSession(db, run.runId, "fix", attempt, file),
       fixDone: (fix) => recordFixDone(db, run.runId, fix),
       noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
       noMistakesDone: (record) => recordNoMistakesDone(db, run, record),

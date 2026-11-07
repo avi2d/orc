@@ -30,7 +30,7 @@ describe("a direct-PR run opens its own PR after the checks", () => {
       await withHome(async (home) => {
         await withOrigin(dir, async (origin) => {
           const sha = await readyToCheck(dir, home)
-          const outcome = await runDirectPrStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses)
+          const outcome = await runDirectPrStep(dir, home, sandboxResult(sha), lintPasses)
           const bodyFile = join(home, "runs", "step-run-1", "pr-body.md")
           expect(outcome.nmCalls).toBe("")
           expect(branchOn(origin)).toBe(sha)
@@ -59,7 +59,7 @@ describe("a direct-PR run opens its own PR after the checks", () => {
       await withHome(async (home) => {
         await withOrigin(dir, async () => {
           const sha = await readyToCheck(dir, home)
-          const outcome = await runDirectPrStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses)
+          const outcome = await runDirectPrStep(dir, home, sandboxResult(sha), lintPasses)
           expect(callLines(outcome.ghCalls)[0]).toBe("pr list --head orc/test --state open --json url --jq .[0].url // empty")
           expect(callLines(outcome.ghCalls).some((line) => line.startsWith("pr create --head orc/test"))).toBe(true)
           expect(outcome.report.prLink).toBe(ghPrLink)
@@ -76,7 +76,7 @@ describe("a direct-PR run opens its own PR after the checks", () => {
           const sha = await commitOnBranch(dir, "orc/test")
           await capturedSession(home, sessionEnding(cleanFinish))
           await writeFile(join(dir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
-          const outcome = await runDirectPrStep(dir, home, sandboxResult(sha, cleanFinish), async () => ({ stdout: "", stderr: "lint blew up", exitCode: 1 }))
+          const outcome = await runDirectPrStep(dir, home, sandboxResult(sha), async () => ({ stdout: "", stderr: "lint blew up", exitCode: 1 }))
           expect(outcome.ghCalls).toBe("")
           expect(outcome.nmCalls).toBe("")
           expect(branchOn(origin)).toBeNull()
@@ -93,7 +93,7 @@ describe("a direct-PR run opens its own PR after the checks", () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
-        const outcome = await runDirectPrStep(dir, home, sandboxResult(sha, cleanFinish), lintPasses)
+        const outcome = await runDirectPrStep(dir, home, sandboxResult(sha), lintPasses)
         expect(outcome.ghCalls).toBe("")
         expect(outcome.report.completed).toBe(false)
         expect(outcome.report.prLink).toBeNull()

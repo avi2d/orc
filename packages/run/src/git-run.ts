@@ -25,6 +25,25 @@ export const collectOutput = (
     exitCode: handle.exitCode
   }, { concurrency: "unbounded" })
 
+export const headOf = (spawner: ChildProcessSpawner.ChildProcessSpawner["Service"], git: string, cwd: string): Effect.Effect<string, OrcRunError> =>
+  runGit(spawner, git, ["rev-parse", "HEAD"], cwd).pipe(
+    Effect.flatMap((result) => result.exitCode === 0
+      ? Effect.succeed(result.stdout.trim())
+      : Effect.fail(new OrcRunError({ message: "orc: cannot read HEAD in " + cwd + ": " + result.stderr.trim() })))
+  )
+
+export const commitsSince = (
+  spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
+  git: string,
+  cwd: string,
+  base: string
+): Effect.Effect<ReadonlyArray<{ readonly sha: string }>, OrcRunError> =>
+  runGit(spawner, git, ["rev-list", "--reverse", base + "..HEAD"], cwd).pipe(
+    Effect.flatMap((result) => result.exitCode === 0
+      ? Effect.succeed(result.stdout.split("\n").map((line) => line.trim()).filter((line) => line !== "").map((sha) => ({ sha })))
+      : Effect.fail(new OrcRunError({ message: "orc: cannot list the commits made in " + cwd + ": " + result.stderr.trim() })))
+  )
+
 export const branchCommits = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
   git: string,
@@ -49,14 +68,14 @@ export const runGit = (
   git: string,
   args: ReadonlyArray<string>,
   cwd: string
-): Effect.Effect<{ readonly stdout: string; readonly exitCode: number }, OrcRunError> =>
+): Effect.Effect<{ readonly stdout: string; readonly stderr: string; readonly exitCode: number }, OrcRunError> =>
   Effect.scoped(Effect.gen(function*() {
     const handle = yield* spawner.spawn(ChildProcess.make(git, [...args], { cwd, env: gitEnv(), extendEnv: false }))
     const { stdout, stderr, exitCode } = yield* collectOutput(handle)
     if (exitCode === hostGitRefusalExit) {
       return yield* new OrcRunError({ message: stderr.trim() })
     }
-    return { stdout, exitCode }
+    return { stdout, stderr, exitCode }
   })).pipe(
     Effect.mapError((cause) => cause instanceof OrcRunError ? cause : new OrcRunError({ message: "orc: git failed to run: " + String(cause) }))
   )

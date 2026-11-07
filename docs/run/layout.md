@@ -21,12 +21,20 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `packages/run/src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
 | `packages/run/src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
-| `packages/run/src/run-folders.ts` | A run's folders, its task copies and the instructions file `--instructions` names |
+| `packages/run/src/checkout.ts` | The checks on the checkout a run starts from: its git root, refused markers, uncommitted changes and branch name |
+| `packages/run/src/task-copy.ts` | The task copy under `$ORC_HOME/worktrees`, its reuse and removal, and the agent's git identity |
+| `packages/run/src/run-exec.ts` | The sandbox a run opens, the install that prepares the copy and the steps that run in it |
+| `packages/run/src/run-loop.ts` | The implement, check and fix steps of one run |
+| `packages/run/src/run-resume.ts` | The prior run's session and passed steps a resume starts from |
+| `packages/run/src/checks.ts` | The check commands `.no-mistakes.yaml` names and their run in the copy |
+| `packages/run/src/git-run.ts` | The git calls orc makes on the host with the operator's git config hidden |
+| `packages/run/src/run-folders.ts` | A run's folders, its copy of the task file and the instructions file `--instructions` names |
 | `packages/run/src/history-write.ts` | The history checkpoints a run records as each step starts and ends |
 | `packages/run/src/report.ts` | The `report.md` shape and the signal facts it carries |
 | `packages/run/src/show.ts` | The `orc show` reading of one run from the history |
-| `packages/run/src/run-session.ts` | The reading of the Pi session from the host sessions folder |
-| `packages/run/src/pi.ts` | The Pi agent command, its prompt and the check of its final reply |
+| `packages/run/src/run-session.ts` | The `OrcRunError` a run fails with |
+| `packages/run/src/pi.ts` | The Pi prompt and the check of its final reply |
+| `packages/run/src/pi-run.ts` | The Pi process in JSON mode: its event lines, the agent log, the session file and the idle stop |
 | `packages/run/src/agents.ts` | The agent file parsing and lookup |
 | `packages/run/src/context-mark.ts` | The 150 thousand token compaction mark orc writes into the run's Pi folder |
 | `packages/run/agents` | The bundled agent files |
@@ -34,10 +42,11 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/answer-wait.ts` | The wait at a no-mistakes gate for the captain's answers in the run folder |
 | `packages/run/src/toon.ts` | The reading of the TOON output no-mistakes prints |
 | `packages/run/src/run-history.ts` | The records home, the SQLite run history and `orc runs` |
-| `packages/run/src/nono.ts` | The Sandcastle sandbox provider that runs each command in `nono run` |
+| `packages/run/src/nono.ts` | The nono sandbox environment, its roots and the `nono why` check of a rendered profile |
+| `packages/run/src/nono-exec.ts` | The opening of the nono sandbox a run's commands go through: the runtimes, the shims and the checked profile |
+| `packages/run/src/agent-exec.ts` | The one way a run starts Pi and the checks, in `nono run` or on the host, with the environment built from an allow list |
 | `packages/run/src/host.ts` | The host-side processes and tools the provider runs outside nono, and the guard on host git |
 | `packages/run/src/nono-profile.ts` | The nono profile that lets a command write only the copy, its git data and the Pi session folder, and routes the model credential |
-| `packages/run/src/no-sandbox.ts` | The Sandcastle provider that runs Pi and the checks directly on the host |
 | `packages/run/src/git-config.ts` | The git config parsing that finds the credentials, includes and submodules a checkout carries |
 | `packages/run/src/dispatch/backlog.ts` | The backlog folders, the id reservation and the atomic take of a task |
 | `packages/run/src/dispatch/task-record.ts` | The task file and its frontmatter |

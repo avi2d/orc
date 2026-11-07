@@ -60,7 +60,7 @@ An unknown flag prints the usage text and exits 1.
 - [Choosing the no-mistakes binary](https://github.com/avi2d/orc/blob/main/docs/run/choosing-the-no-mistakes-binary.md)
 - [What the no-mistakes fork adds](https://github.com/avi2d/orc/blob/main/docs/run/no-mistakes-fork.md)
 - [Granting toolchain folders to the sandbox](https://github.com/avi2d/orc/blob/main/docs/run/toolchain-folders.md)
-- [The agent provider contract](https://github.com/avi2d/orc/blob/main/docs/run/agent-provider-contract.md)
+- [How orc runs Pi](https://github.com/avi2d/orc/blob/main/docs/run/how-orc-runs-pi.md)
 - [Seeing runs](https://github.com/avi2d/orc/blob/main/docs/run/seeing-runs.md)
 - [The backlog and the beat](https://github.com/avi2d/orc/blob/main/docs/run/backlog-and-beat.md)
 - [Parked runs](https://github.com/avi2d/orc/blob/main/docs/run/parked-runs.md)

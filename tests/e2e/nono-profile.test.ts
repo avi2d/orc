@@ -49,7 +49,7 @@ describe("configured credential injection", () => {
       const written = await readFile(join(piAgentDir, "models.json"), "utf8")
       expect(written).toContain("$ACME_VAULT_KEY")
       expect(written).not.toContain(fixtureKey)
-      const profile = await Effect.runPromise(buildAgentNonoProfile({ worktree: join(root, "work"), gitData: join(root, "work.git"), piSessionDir: join(root, "session") }, { developerDir: null, toolchainFolders: [], runtimeDirs: [] }, plan.credential).pipe(Effect.provide(BunServices.layer)))
+      const profile = await Effect.runPromise(buildAgentNonoProfile({ worktree: join(root, "work"), gitData: join(root, "work.git"), piSessionDir: join(root, "session"), sessions: join(root, "sessions") }, { developerDir: null, toolchainFolders: [], runtimeDirs: [] }, plan.credential).pipe(Effect.provide(BunServices.layer)))
       expect(profile.network.credentials).toEqual(["acme_vault"])
       expect(profile.network.custom_credentials).toEqual({
         acme_vault: {

@@ -12,7 +12,6 @@ import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "../../pack
 import type { SandboxKind } from "../../packages/run/src/args"
 import { recordResumePublish } from "../../packages/run/src/history-write"
 import { subprocessNoMistakesRunner } from "../../packages/run/src/no-mistakes"
-import { noSandboxEnv } from "../../packages/run/src/no-sandbox"
 import type { HistoryRun } from "../../packages/run/src/run-record"
 
 const implementer: AgentFile = {
@@ -125,8 +124,30 @@ describe("resume recovers an interrupted agent from its live session", () => {
         expect(plan.implementSessionId).toBe(liveId)
         expect(plan.skipImplement).toBe(false)
         expect(plan.fixSessionId).toBeNull()
-        expect(plan.implementSessionFile ?? "").toContain(join("sessions", "host"))
+        expect(dirname(plan.implementSessionFile ?? "")).toBe(join(home, "runs", "next-1", "sessions"))
         expect(plan.implementSessionFile ?? "").toContain(liveId)
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("an interrupted implementation whose recorded session Pi never wrote starts fresh instead of resuming a missing file", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "repo")
+        const priorDir = join(home, "runs", "prior-1")
+        await mkdir(priorDir, { recursive: true })
+        await writeFile(join(priorDir, "task.md"), "Do the thing.\n")
+        await seedRun(db, "prior-1", project, join(priorDir, "task.md"), "running", "2026-10-19T09:00:00.000Z")
+        const unwritten = join(priorDir, "session", "agent", "sessions", "enc", "2026-10-19T09-00-01-000Z_bbb222.jsonl")
+        await seedStep(db, "prior-1", "implement", "running", "2026-10-19T09:00:00.000Z", unwritten)
+        const run = await Effect.runPromise(historyFor("next-1", home, project, "2026-10-19T10:00:00.000Z"))
+        const plan = await Effect.runPromise(buildResumePlan(db, run))
+        expect(plan.skipImplement).toBe(false)
+        expect(plan.implementSessionFile).toBeNull()
+        expect(plan.implementSessionId).toBeNull()
       } finally {
         db.close()
       }
@@ -157,7 +178,7 @@ describe("resume recovers an interrupted agent from its live session", () => {
         expect(plan.implementSessionId).toBe(implementId)
         expect(plan.fixSessionId).toBe(fixId)
         expect(plan.fixSessionId ?? "").not.toContain("/")
-        expect(plan.fixSessionFile ?? "").toContain(join("sessions", "host"))
+        expect(dirname(plan.fixSessionFile ?? "")).toBe(join(home, "runs", "next-1", "sessions"))
         expect(plan.fixSessionFile ?? "").toContain(fixId)
       } finally {
         db.close()
@@ -194,7 +215,7 @@ describe("resume recovers an interrupted agent from its live session", () => {
     })
   })
 
-  test("an interrupted no-sandbox implementation resumes the session Pi wrote under sessions instead of starting fresh", async () => {
+  test("an interrupted implementation resumes the session Pi wrote one folder below sessions and carries it into the next run's sessions instead of starting fresh", async () => {
     await withHome(async (home) => {
       const db = await openDb(home)
       try {
@@ -205,14 +226,13 @@ describe("resume recovers an interrupted agent from its live session", () => {
         await seedRun(db, "prior-1", project, join(priorDir, "task.md"), "running", "2026-10-19T09:00:00.000Z")
         await seedStep(db, "prior-1", "implement", "running", "2026-10-19T09:00:00.000Z", null)
         const liveId = "ccc333"
-        const sessionDir = noSandboxEnv({ piSessionDir: join(priorDir, "session"), hostSessionsDir: join(priorDir, "sessions") }).PI_CODING_AGENT_SESSION_DIR
+        const sessionDir = join(priorDir, "sessions", "host")
         await writeSession(sessionDir, "2026-10-19T09-30-00-000Z", liveId, new Date("2026-10-19T09:30:00.000Z"))
         const run = await Effect.runPromise(historyFor("next-1", home, project, "2026-10-19T10:00:00.000Z"))
         const plan = await Effect.runPromise(buildResumePlan(db, run))
         expect(plan.implementSessionId).toBe(liveId)
         expect(plan.skipImplement).toBe(false)
-        const nextSessions = noSandboxEnv({ piSessionDir: join(home, "runs", "next-1", "session"), hostSessionsDir: join(home, "runs", "next-1", "sessions") }).PI_CODING_AGENT_SESSION_DIR
-        expect(dirname(plan.implementSessionFile ?? "")).toBe(nextSessions)
+        expect(dirname(plan.implementSessionFile ?? "")).toBe(join(home, "runs", "next-1", "sessions"))
         expect(plan.implementSessionFile ?? "").toContain(liveId)
       } finally {
         db.close()

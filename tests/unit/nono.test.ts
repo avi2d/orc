@@ -1,13 +1,15 @@
 import { describe, expect, test } from "bun:test"
 import { BunServices } from "@effect/platform-bun"
-import { Effect } from "effect"
-import { buildHostGitEnv, buildNonoRunArgs, buildSandboxEnv, nonoSandboxProvider } from "../../packages/run/src/nono"
-import { buildNonoProfile, defaultToolchainFolders, defaultToolchainResolver, type HostRuntime, type NonoSandboxRoots } from "../../packages/run/src/nono-profile"
+import { Effect, Path } from "effect"
+import { buildHostGitEnv, buildSandboxEnv } from "../../packages/run/src/nono"
+import { checksCacheReads } from "../../packages/run/src/nono-exec"
+import { buildNonoProfile, defaultToolchainFolders, defaultToolchainResolver, within, type HostRuntime, type NonoSandboxRoots } from "../../packages/run/src/nono-profile"
 
 const roots = {
   worktree: "/tmp/orc-test/worktree",
   gitData: "/tmp/orc-test/git-data",
-  piSessionDir: "/tmp/orc-test/session"
+  piSessionDir: "/tmp/orc-test/session",
+  sessions: "/tmp/orc-test/sessions"
 }
 
 const noHost = { developerDir: null, toolchainFolders: defaultToolchainFolders, runtimeDirs: [] }
@@ -20,20 +22,21 @@ const profileFor = (input: NonoSandboxRoots, host: HostRuntime) =>
 const sentinelHeader = "Authorization: Basic b3JjLXNlbnRpbmVsOnNlY3JldA=="
 
 describe("buildNonoProfile", () => {
-  test("grants read-write access to exactly the three roots", async () => {
+  test("grants read-write access to exactly the four roots", async () => {
     const profile = await profileFor(roots, noHost)
-    expect(profile.filesystem.allow).toEqual([roots.worktree, roots.gitData, roots.piSessionDir])
+    expect(profile.filesystem.allow).toEqual([roots.worktree, roots.gitData, roots.piSessionDir, roots.sessions])
   })
 
   test("drops a root nested in another, so no grant can be retargeted through a writable one", async () => {
-    const nested = { worktree: "/w/copy", gitData: "/w/copy/.git", piSessionDir: "/w/copy/.pi/session" }
+    const nested = { worktree: "/w/copy", gitData: "/w/copy/.git", piSessionDir: "/w/copy/.pi/session", sessions: "/w/copy/.pi/sessions" }
     expect((await profileFor(nested, noHost)).filesystem.allow).toEqual(["/w/copy"])
     expect((await profileFor({ ...nested, piSessionDir: "/w/copy-session" }, noHost)).filesystem.allow).toEqual(["/w/copy", "/w/copy-session"])
+    expect((await profileFor({ ...nested, piSessionDir: "/w/run/session", sessions: "/w/run" }, noHost)).filesystem.allow).toEqual(["/w/copy", "/w/run"])
   })
 
   test("the only writable grants are the roots and /dev/null, and no socket is granted", async () => {
     const { filesystem } = await profileFor(roots, noHost)
-    expect([...filesystem.allow, ...filesystem.write]).toEqual([roots.worktree, roots.gitData, roots.piSessionDir])
+    expect([...filesystem.allow, ...filesystem.write]).toEqual([roots.worktree, roots.gitData, roots.piSessionDir, roots.sessions])
     expect([...filesystem.allow_file, ...filesystem.write_file]).toEqual(["/dev/null"])
     const sockets = [
       ...filesystem.unix_socket,
@@ -101,32 +104,30 @@ describe("buildNonoProfile", () => {
     expect(read.filter((grant) => grant.startsWith("/opt/homebrew") || grant.startsWith("/usr/local"))).toEqual([])
   })
 
+  test("reads the checks clone cache from the operator HOME and nothing else under it", async () => {
+    const folders = await Effect.runPromise(Effect.gen(function*() {
+      const path = yield* Path.Path
+      return checksCacheReads(path, { HOME: "/h" })
+    }).pipe(Effect.provide(BunServices.layer)))
+    expect(folders).toEqual(["/h/.cache/avi2dg-checks"])
+    const { filesystem } = await profileFor(roots, { ...noHost, toolchainFolders: [...defaultToolchainFolders, ...folders] })
+    expect(filesystem.read.filter((grant) => within("/h", grant))).toEqual(["/h/.cache/avi2dg-checks"])
+    expect(filesystem.allow.filter((grant) => within("/h", grant))).toEqual([])
+    expect(filesystem.write.filter((grant) => within("/h", grant))).toEqual([])
+  })
+
+  test("grants no cache folder when HOME is unset or empty", async () => {
+    const unreadable = await Effect.runPromise(Effect.gen(function*() {
+      const path = yield* Path.Path
+      return [checksCacheReads(path, {}), checksCacheReads(path, { HOME: "" })]
+    }).pipe(Effect.provide(BunServices.layer)))
+    expect(unreadable).toEqual([[], []])
+  })
+
   test("keeps an isolated security posture", async () => {
     const profile = await profileFor(roots, noHost)
     expect(profile.security.signal_mode).toBe("isolated")
     expect(profile.security.capability_elevation).toBe(false)
-  })
-})
-
-describe("buildNonoRunArgs", () => {
-  test("wraps the command in nono run with the profile and no cwd grant", () => {
-    expect(buildNonoRunArgs("/tmp/p.json", "git status")).toEqual([
-      "run",
-      "--silent",
-      "--profile",
-      "/tmp/p.json",
-      "--",
-      "sh",
-      "-c",
-      "git status",
-      "sh"
-    ])
-  })
-
-  test("passes hostile commands through verbatim", () => {
-    const command = "echo 'a; rm -rf /' && $(touch evil)"
-    const argv = buildNonoRunArgs("/tmp/p.json", command)
-    expect(argv[argv.indexOf("-c") + 1]).toBe(command)
   })
 })
 
@@ -175,10 +176,6 @@ describe("buildSandboxEnv", () => {
       GIT_CONFIG_GLOBAL: "/dev/null",
       GIT_CONFIG_NOSYSTEM: "1"
     })
-  })
-
-  test("the provider declares no env; create time builds the sandbox env", () => {
-    expect(nonoSandboxProvider({ piSessionDir: "/tmp/orc-test/session" }).env).toEqual({})
   })
 
   test("points the temp dir and the global git config into the session folder and drops the system git config", () => {

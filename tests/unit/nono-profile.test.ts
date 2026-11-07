@@ -20,6 +20,7 @@ const roots = {
   worktree: "/work/tree",
   gitData: "/work/tree.git",
   piSessionDir: "/sessions",
+  sessions: "/run/sessions",
   taskTmp: "/work/tree/.orc/tmp"
 }
 
