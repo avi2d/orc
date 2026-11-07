@@ -144,6 +144,24 @@ describe("a parked run", () => {
     })
   }, runnerTimeout)
 
+  test("a question asked again after its answer was handed out asks anew instead of handing the old answer again", async () => {
+    await withFixture(async (fixture) => {
+      await startOnLinux(fixture)
+      const runDir = await askWhileRunning(fixture)
+      await orcOk(fixture, ["beat"])
+      await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Keep", "it"])
+      expect(await orcOk(fixture, ["beat"])).toContain("handed r2 to the run of orc-1 on linux")
+      await writeFile(join(runDir, "asking.json"), JSON.stringify({ until: "2026-11-02T11:50:00.000Z", questions: [{ id: "r2", text: "Keep the old flag?" }] }))
+      const reasked = await orcOk(fixture, ["beat"])
+      expect(reasked).toContain("asking orc-1 on linux")
+      expect(reasked).not.toContain("handed r2")
+      expect(await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Restore", "it"])).toBe("answered r2 on orc-1, so the next beat hands it to the run waiting on orc/orc-1\n")
+      const relayed = await orcOk(fixture, ["beat"])
+      expect(relayed).toContain("handed r2 to the run of orc-1 on linux")
+      expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual([{ question: "r2", answer: "Restore it" }])
+    })
+  }, runnerTimeout)
+
   test("an answer given as the wait ran out resumes the run with it instead of parking it unanswered", async () => {
     await withFixture(async (fixture) => {
       await startOnLinux(fixture)

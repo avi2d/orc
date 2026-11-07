@@ -8,9 +8,12 @@ import { type Hold, isHeld, openQuestions, type Parked, type ParkedQuestion, par
 // An answer given while the run waited and ran out of time is kept, so the next run gets it instead of asking again.
 const parkedQuestions = (open: Arr.NonEmptyReadonlyArray<OpenQuestion>, before: TaskRecord): Parked["questions"] => {
   const prior = before.parked?.questions ?? []
-  const answered = prior.filter((question) => question.answer !== null && !open.some((asked) => asked.id === question.id))
-  const answerOf = (id: string) => prior.find((question) => question.id === id)?.answer ?? null
-  return Arr.appendAll(Arr.map(open, (question) => ({ ...question, answer: answerOf(question.id) })), answered)
+  const answered = prior.filter((question) => question.answer !== null && !question.used && !open.some((asked) => asked.id === question.id))
+  const answerOf = (id: string) => {
+    const kept = prior.find((question) => question.id === id)
+    return kept === undefined || kept.used ? null : kept.answer
+  }
+  return Arr.appendAll(Arr.map(open, (question) => ({ ...question, answer: answerOf(question.id), used: false })), answered)
 }
 
 // The live run keeps its claim, so its questions sit on the started task and orc backlog answer reaches them there.
@@ -24,7 +27,8 @@ export const askStartedTask = (
       return Effect.fail(new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a started task asks" }))
     }
     const known = fresh.parked?.questions ?? []
-    if (open.every((question) => known.some((candidate) => candidate.id === question.id))) {
+    const reasked = open.some((question) => known.some((candidate) => candidate.id === question.id && candidate.used))
+    if (!reasked && open.every((question) => known.some((candidate) => candidate.id === question.id))) {
       return Effect.succeed({ kind: "keep", result: false })
     }
     const parked: Parked = { branch: fresh.parked?.branch ?? taskBranch(id), questions: parkedQuestions(open, fresh) }
@@ -106,7 +110,7 @@ const answerQuestionOn = (id: string, words: string, at: string, fresh: TaskReco
     return Effect.fail(new BacklogError({ detail: id + " is not parked: its questions were answered" }))
   }
   return answerOneOf(id, words, at, fresh.parked.questions, "parked", fresh).pipe(Effect.map(({ asked, answered }) => {
-    const questions = Arr.map(fresh.parked.questions, (candidate) => candidate === asked ? answered : candidate)
+    const questions = Arr.map(fresh.parked.questions, (candidate) => candidate === asked ? { ...answered, used: false } : candidate)
     const record: TaskRecord = { ...fresh, parked: { ...fresh.parked, questions } }
     return { kind: "write", record, result: { kind: "question", question: asked.id, branch: fresh.parked.branch, live: fresh.state.kind === "started", open: openQuestions(record) } }
   }))
@@ -140,6 +144,24 @@ const answerOn = (id: string, words: string, at: string) => (fresh: TaskRecord):
   const answered: Hold = { ...fresh.hold, answer: { words, at } }
   return Effect.succeed({ kind: "write", record: { ...fresh, hold: answered }, result: { kind: "hold", hold: answered } })
 }
+
+export const markAnswersRelayed = (
+  root: string,
+  id: string,
+  ids: ReadonlyArray<string>
+): Effect.Effect<void, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  rewriteTaken(root, id, (fresh): Effect.Effect<Rewrite<void>, BacklogError> => {
+    if (fresh.state.kind !== "started" || fresh.parked === null) {
+      return Effect.succeed({ kind: "keep", result: undefined })
+    }
+    const questions = Arr.map(fresh.parked.questions, (question) =>
+      question.answer !== null && !question.used && ids.includes(question.id) ? { ...question, used: true } : question
+    )
+    if (questions.every((question, index) => question === fresh.parked?.questions[index])) {
+      return Effect.succeed({ kind: "keep", result: undefined })
+    }
+    return Effect.succeed({ kind: "write", record: { ...fresh, parked: { ...fresh.parked, questions } }, result: undefined })
+  })
 
 export const answerTask = (
   root: string,

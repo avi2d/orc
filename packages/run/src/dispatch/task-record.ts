@@ -37,6 +37,7 @@ export interface ParkedQuestion {
   readonly id: string
   readonly text: string
   readonly answer: Answer | null
+  readonly used: boolean
 }
 
 export interface Hold {
@@ -101,7 +102,8 @@ const QuestionFront = Schema.Struct({
   id: Schema.String,
   text: Schema.String,
   answer: Schema.optional(Schema.String),
-  answered_at: Schema.optional(Schema.String)
+  answered_at: Schema.optional(Schema.String),
+  used: Schema.optional(Schema.Boolean)
 })
 
 const Frontmatter = Schema.Struct({
@@ -170,7 +172,7 @@ const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: str
     if (typeof answer === "string") {
       return "the " + what + " question " + question.id + " names its answer with no words or no time"
     }
-    questions.push({ id: question.id, text: question.text, answer })
+    questions.push({ id: question.id, text: question.text, answer, used: question.used ?? false })
   }
   return questions
 }
@@ -313,7 +315,8 @@ const questionFronts = (questions: ReadonlyArray<ParkedQuestion>) =>
   questions.map((question) => ({
     id: question.id,
     text: question.text,
-    ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at })
+    ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at }),
+    ...(question.used ? { used: true } : {})
   }))
 
 const holdFields = (hold: Hold | null): ReadonlyArray<string> =>

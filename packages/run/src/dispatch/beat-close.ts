@@ -5,7 +5,7 @@ import type { BeatAction } from "./beat-action"
 import type { DispatchConfig } from "./config"
 import { ownedBySweep, throughFor } from "./machine-reach"
 import type { QuestionAnswer } from "../no-mistakes-gate"
-import { askStartedTask, parkStartedTask } from "./parked"
+import { askStartedTask, markAnswersRelayed, parkStartedTask } from "./parked"
 import { taskLabel } from "./pueue-status"
 import { type RunnerError, type RunnerRequirements, taskBranch } from "./runner"
 import { endingFromResult, relayAnswers, relayAnswersThrough, type RunEnding, readResult, readResultThrough, type RunnerResult } from "./runner-result"
@@ -76,12 +76,15 @@ const serveAsking = (
       return { kind: "asking", task: id, machine, until: asking.until, questions: asking.questions.map((question) => question.id) } satisfies BeatAction
     }
     const answers = (task.parked?.questions ?? []).flatMap((question) =>
-      question.answer !== null && asking.questions.some((open) => open.id === question.id) ? [{ question: question.id, answer: question.answer.words }] : []
+      question.answer !== null && !question.used && asking.questions.some((open) => open.id === question.id) ? [{ question: question.id, answer: question.answer.words }] : []
     )
     if (answers.length === 0) {
       return null
     }
     return yield* relay(answers).pipe(
+      Effect.andThen(markAnswersRelayed(context.root, id, answers.map((entry) => entry.question)).pipe(
+        Effect.catchTag("BacklogError", () => Effect.void)
+      )),
       Effect.as<BeatAction>({ kind: "answered", task: id, machine, questions: answers.map((entry) => entry.question) }),
       Effect.catchTag("RunnerError", (error) => Effect.succeed<BeatAction>({ kind: "answer-failed", task: id, machine, reason: error.detail })),
       Effect.timeoutOrElse({

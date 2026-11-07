@@ -388,7 +388,7 @@ export interface HoldAsk {
 }
 
 const askedQuestions = (texts: ReadonlyArray<string>): ReadonlyArray<ParkedQuestion> =>
-  texts.map((text, index) => ({ id: "question-" + String(index + 1), text, answer: null }))
+  texts.map((text, index) => ({ id: "question-" + String(index + 1), text, answer: null, used: false }))
 
 const asksTheSame = (held: ReadonlyArray<ParkedQuestion>, texts: ReadonlyArray<string>): boolean =>
   held.length === texts.length && held.every((question, index) => question.text === texts[index])
