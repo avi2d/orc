@@ -1,5 +1,5 @@
 import { Array as Arr, Effect, FileSystem, Schema } from "effect"
-import { captainWait, type Hold, type Parked, type ParkedQuestion, parseTaskFile, renderTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
+import { captainWait, type Hold, type HoldQuestion, type Parked, parseTaskFile, renderTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 import { BacklogError, platformFailure, publishOnce, scratchName } from "./backlog-write"
 
 export { BacklogError }
@@ -387,10 +387,10 @@ export interface HoldAsk {
   readonly questions: ReadonlyArray<string>
 }
 
-const askedQuestions = (texts: ReadonlyArray<string>): ReadonlyArray<ParkedQuestion> =>
-  texts.map((text, index) => ({ id: "question-" + String(index + 1), text, answer: null, used: false }))
+const askedQuestions = (texts: ReadonlyArray<string>): ReadonlyArray<HoldQuestion> =>
+  texts.map((text, index) => ({ id: "question-" + String(index + 1), text, answer: null }))
 
-const asksTheSame = (held: ReadonlyArray<ParkedQuestion>, texts: ReadonlyArray<string>): boolean =>
+const asksTheSame = (held: ReadonlyArray<HoldQuestion>, texts: ReadonlyArray<string>): boolean =>
   held.length === texts.length && held.every((question, index) => question.text === texts[index])
 
 const holdAgain = (id: string, fresh: TaskRecord, held: Hold, ask: HoldAsk): Effect.Effect<Rewrite<HoldOutcome>, BacklogError> => {

@@ -3,7 +3,7 @@ import type { OpenQuestion } from "../no-mistakes-gate"
 import { backlogPaths, findTask, type Rewrite, rewriteNew, rewriteTaken } from "./backlog"
 import { taskBranch } from "./runner"
 import { BacklogError, platformFailure, publishOnce, scratchName } from "./backlog-write"
-import { type Hold, isHeld, openQuestions, type Parked, type ParkedQuestion, parseTaskFile, renderTaskFile, type TaskFileError, type TaskRecord } from "./task-record"
+import { type Hold, type HoldQuestion, isHeld, openQuestions, type Parked, type ParkedQuestion, parseTaskFile, renderTaskFile, type TaskFileError, type TaskRecord } from "./task-record"
 
 // An answer given while the run waited and ran out of time is kept, so the next run gets it instead of asking again.
 const parkedQuestions = (open: Arr.NonEmptyReadonlyArray<OpenQuestion>, before: TaskRecord): Parked["questions"] => {
@@ -75,19 +75,19 @@ export const parkStartedTask = (
 
 export type AnswerOutcome =
   | { readonly kind: "hold"; readonly hold: Hold }
-  | { readonly kind: "held question"; readonly question: string; readonly open: ReadonlyArray<ParkedQuestion> }
+  | { readonly kind: "held question"; readonly question: string; readonly open: ReadonlyArray<HoldQuestion> }
   | { readonly kind: "question"; readonly question: string; readonly branch: string; readonly live: boolean; readonly open: ReadonlyArray<ParkedQuestion> }
 
-const unanswered = (questions: ReadonlyArray<ParkedQuestion>): ReadonlyArray<ParkedQuestion> => questions.filter((question) => question.answer === null)
+const unanswered = <Q extends { readonly answer: { readonly words: string; readonly at: string } | null }>(questions: ReadonlyArray<Q>): ReadonlyArray<Q> => questions.filter((question) => question.answer === null)
 
-const answerOneOf = (
+const answerOneOf = <Q extends { readonly id: string; readonly answer: { readonly words: string; readonly at: string } | null }>(
   id: string,
   words: string,
   at: string,
-  questions: ReadonlyArray<ParkedQuestion>,
+  questions: ReadonlyArray<Q>,
   waits: "parked" | "held",
   fresh: TaskRecord
-): Effect.Effect<{ readonly asked: ParkedQuestion; readonly answered: ParkedQuestion }, BacklogError> => {
+): Effect.Effect<{ readonly asked: Q; readonly answered: Q }, BacklogError> => {
   const open = unanswered(questions)
   const cut = words.indexOf("=")
   const question = cut === -1 ? "" : words.slice(0, cut)
@@ -102,7 +102,7 @@ const answerOneOf = (
   if (fresh.state.kind !== "new" && !(waits === "parked" && fresh.state.kind === "started")) {
     return Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" }))
   }
-  return Effect.succeed({ asked, answered: { ...asked, answer: { words: text, at } } })
+  return Effect.succeed({ asked, answered: { ...asked, answer: { words: text, at } } as Q })
 }
 
 const answerQuestionOn = (id: string, words: string, at: string, fresh: TaskRecord & { readonly parked: Parked }): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
@@ -117,7 +117,7 @@ const answerQuestionOn = (id: string, words: string, at: string, fresh: TaskReco
 }
 
 // The released run reads only hold.answer, so the last answer writes every question's words into it.
-const releasedWords = (questions: ReadonlyArray<ParkedQuestion>): string =>
+const releasedWords = (questions: ReadonlyArray<HoldQuestion>): string =>
   questions.map((question) => question.text + ": " + (question.answer?.words ?? "")).join("\n")
 
 const answerHeldQuestionOn = (id: string, words: string, at: string, fresh: TaskRecord & { readonly hold: Hold }): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> =>

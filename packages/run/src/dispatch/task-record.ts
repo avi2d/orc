@@ -40,10 +40,16 @@ export interface ParkedQuestion {
   readonly used: boolean
 }
 
+export interface HoldQuestion {
+  readonly id: string
+  readonly text: string
+  readonly answer: Answer | null
+}
+
 export interface Hold {
   readonly reason: string
   readonly until: string | null
-  readonly questions: ReadonlyArray<ParkedQuestion>
+  readonly questions: ReadonlyArray<HoldQuestion>
   readonly answer: Answer | null
 }
 
@@ -177,6 +183,18 @@ const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: str
   return questions
 }
 
+const holdQuestionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string): Array<HoldQuestion> | string => {
+  const questions: Array<HoldQuestion> = []
+  for (const question of fronts) {
+    const answer = answerOf(question)
+    if (typeof answer === "string") {
+      return "the " + what + " question " + question.id + " names its answer with no words or no time"
+    }
+    questions.push({ id: question.id, text: question.text, answer })
+  }
+  return questions
+}
+
 const parkedOf = (front: Frontmatter): Parked | null | string => {
   if (front.parked_branch === undefined && front.parked_questions === undefined) {
     return null
@@ -205,7 +223,7 @@ const holdOf = (front: Frontmatter): Hold | null | string => {
   if (front.hold_until !== undefined && !isCalendarDate(front.hold_until)) {
     return "the hold_until " + front.hold_until + " is no YYYY-MM-DD date"
   }
-  const questions = questionsOf(front.hold_questions ?? [], "held")
+  const questions = holdQuestionsOf(front.hold_questions ?? [], "held")
   if (typeof questions === "string") {
     return questions
   }
@@ -319,13 +337,20 @@ const questionFronts = (questions: ReadonlyArray<ParkedQuestion>) =>
     ...(question.used ? { used: true } : {})
   }))
 
+const holdQuestionFronts = (questions: ReadonlyArray<HoldQuestion>) =>
+  questions.map((question) => ({
+    id: question.id,
+    text: question.text,
+    ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at })
+  }))
+
 const holdFields = (hold: Hold | null): ReadonlyArray<string> =>
   hold === null
     ? []
     : [
       field("hold_reason", hold.reason),
       ...(hold.until === null ? [] : [field("hold_until", hold.until)]),
-      ...(hold.questions.length === 0 ? [] : [field("hold_questions", questionFronts(hold.questions))]),
+      ...(hold.questions.length === 0 ? [] : [field("hold_questions", holdQuestionFronts(hold.questions))]),
       ...(hold.answer === null ? [] : [field("answer", hold.answer.words), field("answered_at", hold.answer.at)])
     ]
 
