@@ -4,7 +4,7 @@ export const nestedWorktreeExcludes = (
   fs: FileSystem.FileSystem,
   projectDir: string,
   porcelain: string
-): Effect.Effect<ReadonlyArray<string>, never, never> =>
+): Effect.Effect<ReadonlyArray<string>> =>
   Effect.gen(function*() {
     const specs: Array<string> = []
     const dirs = porcelain
