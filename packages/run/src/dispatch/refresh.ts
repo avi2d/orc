@@ -1,8 +1,9 @@
-import { Duration, Effect, FileSystem, Path, Stream } from "effect"
+import { Duration, Effect, FileSystem, Path } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { hostGitRefusalExit, hostGitSafetyEnv, hostGitShim } from "../host"
 import { parseRefuseMarkers } from "../checkout"
 import { nestedWorktreeExcludes } from "../worktree-excludes"
+import { collectedOutput } from "./runner-exec"
 
 export type Refresh =
   | { readonly kind: "fast-forwarded"; readonly branch: string; readonly remote: string; readonly from: string; readonly to: string }
@@ -28,11 +29,7 @@ const git = (gitBin: string, projectDir: string, args: ReadonlyArray<string>): E
   Effect.gen(function*() {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const handle = yield* spawner.spawn(ChildProcess.make(gitBin, [...args], { cwd: projectDir, env: gitEnv, extendEnv: true, stdin: "ignore" }))
-    const [stdout, stderr, exitCode] = yield* Effect.all([
-      handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
-      handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
-      handle.exitCode
-    ], { concurrency: "unbounded" })
+    const [stdout, stderr, exitCode] = yield* collectedOutput(handle)
     return { exitCode, stdout: stdout.trim(), stderr: stderr.trim() }
   }).pipe(
     Effect.scoped,

@@ -1,4 +1,5 @@
 import { Array as Arr, Data, Effect, Schema } from "effect"
+import { claimOf, startedOf, TaskFields } from "@tui-dash/schema"
 import { isTaskKind, type TaskKind, unknownKind } from "../task-kind"
 
 export const taskFolders = ["new", "taken", "closed"] as const
@@ -120,14 +121,9 @@ const QuestionFront = Schema.Struct({
 })
 
 const Frontmatter = Schema.Struct({
-  id: Schema.String,
-  title: Schema.String,
-  project: Schema.String,
+  ...TaskFields.fields,
   kind: Schema.optional(Schema.String),
   internal: Schema.optional(Schema.Boolean),
-  machine: Schema.NullOr(Schema.String),
-  depends_on: Schema.Array(Schema.String),
-  created: Schema.String,
   hold_reason: Schema.optional(Schema.String),
   hold_until: Schema.optional(Schema.String),
   hold_questions: Schema.optional(Schema.Array(QuestionFront)),
@@ -135,15 +131,6 @@ const Frontmatter = Schema.Struct({
   answered_at: Schema.optional(Schema.String),
   parked_branch: Schema.optional(Schema.String),
   parked_questions: Schema.optional(Schema.Array(QuestionFront)),
-  beat: Schema.optional(Schema.String),
-  taken_for: Schema.optional(Schema.String),
-  account: Schema.optional(Schema.String),
-  taken_at: Schema.optional(Schema.String),
-  started_at: Schema.optional(Schema.String),
-  start_log: Schema.optional(Schema.String),
-  outcome: Schema.optional(Schema.Literals(["done", "failed", "stopped", "start-failed"])),
-  closed_at: Schema.optional(Schema.String),
-  reason: Schema.optional(Schema.String),
   pr: Schema.optional(Schema.String),
   report: Schema.optional(Schema.String),
   posted_at: Schema.optional(Schema.String)
@@ -151,14 +138,6 @@ const Frontmatter = Schema.Struct({
 type Frontmatter = typeof Frontmatter.Type
 
 export const fence = "---"
-
-const claimOf = (front: Frontmatter): Claim | null =>
-  front.beat === undefined || front.taken_for === undefined || front.account === undefined || front.taken_at === undefined
-    ? null
-    : { beat: front.beat, machine: front.taken_for, account: front.account, takenAt: front.taken_at }
-
-const startedOf = (front: Frontmatter): Started | null =>
-  front.started_at === undefined ? null : { at: front.started_at, log: front.start_log ?? "" }
 
 const closingOf = (front: Frontmatter, started: Started | null): Closing | null => {
   const reason = front.reason ?? ""
@@ -178,29 +157,28 @@ const answerOf = (front: { readonly answer?: string | undefined; readonly answer
   return { words: front.answer, at: front.answered_at }
 }
 
-const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string): Array<ParkedQuestion> | string => {
-  const questions: Array<ParkedQuestion> = []
+const checkedQuestions = <Q>(fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string, toQuestion: (question: typeof QuestionFront.Type, answer: Answer | null) => Q): Array<Q> | string => {
+  const questions: Array<Q> = []
   for (const question of fronts) {
     const answer = answerOf(question)
     if (typeof answer === "string") {
       return "the " + what + " question " + question.id + " names its answer with no words or no time"
     }
-    questions.push({ id: question.id, text: question.text, asked: question.asked_at ?? "", answer: answer === null ? null : { ...answer, relayedTo: question.relayed_to ?? (question.used === true ? (question.asked_at ?? "") : null) } })
+    questions.push(toQuestion(question, answer))
   }
   return questions
 }
 
-const holdQuestionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string): Array<HoldQuestion> | string => {
-  const questions: Array<HoldQuestion> = []
-  for (const question of fronts) {
-    const answer = answerOf(question)
-    if (typeof answer === "string") {
-      return "the " + what + " question " + question.id + " names its answer with no words or no time"
-    }
-    questions.push({ id: question.id, text: question.text, answer })
-  }
-  return questions
-}
+const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string): Array<ParkedQuestion> | string =>
+  checkedQuestions(fronts, what, (question, answer) => ({
+    id: question.id,
+    text: question.text,
+    asked: question.asked_at ?? "",
+    answer: answer === null ? null : { ...answer, relayedTo: question.relayed_to ?? (question.used === true ? (question.asked_at ?? "") : null) }
+  }))
+
+const holdQuestionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string): Array<HoldQuestion> | string =>
+  checkedQuestions(fronts, what, (question, answer) => ({ id: question.id, text: question.text, answer }))
 
 const parkedOf = (front: Frontmatter): Parked | null | string => {
   if (front.parked_branch === undefined && front.parked_questions === undefined) {

@@ -1,4 +1,5 @@
 import { Array as Arr, Effect, FileSystem, Option, Schema } from "effect"
+import type { Database } from "bun:sqlite"
 import type { ChildProcessSpawner } from "effect/process"
 import { latestRunForBranchName, openQuestionsForRun, runsForBranch } from "../history-resume"
 import type { OpenQuestion } from "../no-mistakes-gate"
@@ -170,6 +171,11 @@ const toSummary = (run: RunRecord, openQuestions: ReadonlyArray<OpenQuestion>, r
   ...(asking === null ? {} : { asking })
 })
 
+const withRunDatabase = <A, E>(home: string, use: (db: Database) => Effect.Effect<A, E, RunnerRequirements>): Effect.Effect<A, RunnerError, RunnerRequirements> =>
+  Effect.acquireUseRelease(openDatabase(home), use, (db) => Effect.sync(() => db.close())).pipe(
+    Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
+  )
+
 const askingOf = (run: RunRecord, home: string): Effect.Effect<typeof Asking.Type | null, never, FileSystem.FileSystem> =>
   run.status === "running"
     ? readJsonFileIfPresent(runDirFor(home, run.id) + "/" + askingFileName, Asking).pipe(Effect.orElseSucceed(() => null))
@@ -178,21 +184,16 @@ const askingOf = (run: RunRecord, home: string): Effect.Effect<typeof Asking.Typ
 const readRun = (home: string, checkout: string, task: string, interval: PueueInterval | null): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const project = yield* resolveProjectDir(checkout)
-    return yield* Effect.acquireUseRelease(
-      openDatabase(home),
-      (db) =>
-        Effect.gen(function*() {
-          const runs = yield* runsForBranch(db, project, taskBranch(task))
-          const run = runs.find((candidate) => interval === null || startsWithin(candidate.started, interval)) ?? null
-          return run === null
+    return yield* withRunDatabase(home, (db) =>
+      Effect.gen(function*() {
+        const runs = yield* runsForBranch(db, project, taskBranch(task))
+        const run = runs.find((candidate) => interval === null || startsWithin(candidate.started, interval)) ?? null
+        return run === null
             ? null
             : toSummary(run, yield* openQuestionsForRun(db, run.id), yield* writtenReport(runDirFor(home, run.id)), yield* askingOf(run, home))
-        }),
-      (db) => Effect.sync(() => db.close())
+      })
     )
-  }).pipe(
-    Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
-  )
+  })
 
 const runLogAt = (home: string, runId: string): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
@@ -215,21 +216,16 @@ const runLogAt = (home: string, runId: string): Effect.Effect<string | null, nev
 
 const readStoppedRun = (home: string, task: string): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
-    return yield* Effect.acquireUseRelease(
-      openDatabase(home),
-      (db) =>
-        Effect.gen(function*() {
-          const latest = yield* latestRunForBranchName(db, taskBranch(task))
-          if (latest === null || latest.status !== "stopped") {
-            return null
-          }
-          return toSummary(latest, yield* openQuestionsForRun(db, latest.id), yield* writtenReport(runDirFor(home, latest.id)), null)
-        }),
-      (db) => Effect.sync(() => db.close())
+    return yield* withRunDatabase(home, (db) =>
+      Effect.gen(function*() {
+        const latest = yield* latestRunForBranchName(db, taskBranch(task))
+        if (latest === null || latest.status !== "stopped") {
+          return null
+        }
+        return toSummary(latest, yield* openQuestionsForRun(db, latest.id), yield* writtenReport(runDirFor(home, latest.id)), null)
+      })
     )
-  }).pipe(
-    Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
-  )
+  })
 
 export const readResult = (task: string, home: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
