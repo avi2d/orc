@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { Effect } from "effect"
+import { parkedListing } from "../../packages/run/src/chat-parked"
 import { chatSession, orcCommandVar } from "../../packages/run/src/chat-tools"
 
 describe("the parked-question listing", () => {
@@ -24,7 +26,7 @@ describe("the parked-question listing", () => {
           title: "Pick the API",
           status: "new",
           hold: null,
-          parked: { branch: "orc/task-1", questions: [{ id: "question-4", text: "REST or gRPC?", answer: null }] }
+          parked: { branch: "orc/task-1", questions: [{ id: "question-4", text: "REST or gRPC?", asked: "2026-11-02T10:20:00.000Z", answer: null }] }
         }],
         events: []
       }))
@@ -39,6 +41,26 @@ describe("the parked-question listing", () => {
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
+  })
+  test("a question asked again posts again instead of staying hidden as already shown", async () => {
+    const task = (asked: string) => ({
+      id: "task-1",
+      title: "Pick the API",
+      parked: { branch: "orc/task-1", questions: [{ id: "question-4", text: "REST or gRPC?", asked, answer: null }] }
+    })
+    let asked = "2026-11-02T10:20:00.000Z"
+    const delivered: Array<string> = []
+    const listing = parkedListing(Effect.sync(() => [task(asked)]), (text) => {
+      delivered.push(text)
+      return true
+    })
+    await Effect.runPromise(listing.post)
+    expect(delivered).toHaveLength(1)
+    asked = "2026-11-02T11:20:00.000Z"
+    await Effect.runPromise(listing.post)
+    expect(delivered).toHaveLength(2)
+    expect(delivered[0]).toContain("question-4")
+    expect(delivered[1]).toContain("question-4")
   })
 })
 

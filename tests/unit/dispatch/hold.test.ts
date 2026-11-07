@@ -4,9 +4,11 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Array as Arr, Effect, Result } from "effect"
-import { addTask, claimTask, holdTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
+import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
+import { holdTask } from "../../../packages/run/src/dispatch/backlog-hold"
 import { parkStartedTask } from "../../../packages/run/src/dispatch/parked"
-import { parseTaskFile, renderTaskFile, type TaskRecord } from "../../../packages/run/src/dispatch/task-record"
+import { parseTaskFile, type TaskRecord } from "../../../packages/run/src/dispatch/task-record"
+import { renderTaskFile } from "../../../packages/run/src/dispatch/task-record-render"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -98,7 +100,7 @@ describe("held task files", () => {
       await run(addTask(root, spec))
       await run(claimTask(root, "orc-1"))
       await run(writeTaken(root, { spec: { ...spec, id: "orc-1", body: "# Fix the thing\n" }, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/orc-1.log" } } }))
-      await run(parkStartedTask(root, "orc-1", "orc/orc-1", Arr.make({ id: "question-4", text: "Which retries are allowed?" })))
+      await run(parkStartedTask(root, "orc-1", "orc/orc-1", Arr.make({ id: "question-4", text: "Which retries are allowed?" }), "2026-10-27T10:30:00.000Z"))
       const file = join(root, "new", "orc-1.md")
       const before = await readFile(file, "utf8")
       const failure = await run(Effect.flip(holdTask(root, "orc-1", { reason: "wait for budget", until: null, questions: [] })))

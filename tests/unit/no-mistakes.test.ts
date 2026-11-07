@@ -4,8 +4,10 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
+import { respondArgs, type GateResponse, type QuestionAnswer } from "../../packages/run/src/no-mistakes-gate"
 import { answerArgsFor, answerForGate, askUserWord, driveNoMistakes, noMistakesBinary, omittedQuestionIds, parseRun, type AllowWord, type NoMistakesFinding, type NoMistakesRecord, type NoMistakesRunner } from "../../packages/run/src/no-mistakes"
 import { formatReport, type OrcRunReport } from "../../packages/run/src/run-record"
+import type { WaitResult } from "../../packages/run/src/answer-wait"
 
 const approvalGate = { step: "review", stage: "approval" } as const
 const fixReview = { step: "review", stage: "fix-review" } as const
@@ -298,6 +300,28 @@ describe("answerForGate refuses only what needs your word", () => {
   test("a fix review still holding an ask-user finding is refused", () => {
     expect(answerForGate(fixReview, [stubFinding("r1", "auto-fix"), stubFinding("r2", "ask-user")]).kind).toBe("refuse")
   })
+
+  test("an answered ask-user finding is fixed with the answer as guidance instead of refused or declined", () => {
+    const answer = answerForGate(approvalGate, parseRun(parked).findings, [], [{ question: "r2", answer: "Keep the old behavior behind a flag" }])
+    expect(answer).toEqual({
+      kind: "fix",
+      ids: ["r1", "r2"],
+      ignore: [],
+      instructions: "The captain answered these findings; fix each as the answer says:\nr2: Keep the old behavior behind a flag"
+    })
+    if (answer.kind === "fix") {
+      expect(respondArgs(answer).slice(-2)).toEqual(["--instructions", "The captain answered these findings; fix each as the answer says:\nr2: Keep the old behavior behind a flag"])
+    }
+  })
+
+  test("an answered ask-user finding in fix review is fixed with the answer instead of approved", () => {
+    expect(answerForGate(fixReview, [stubFinding("r2", "ask-user")], [], [{ question: "r2", answer: "Keep it" }])).toEqual({
+      kind: "fix",
+      ids: ["r2"],
+      ignore: [],
+      instructions: "The captain answered these findings; fix each as the answer says:\nr2: Keep it"
+    })
+  })
 })
 
 const report = (overrides: Partial<OrcRunReport>): OrcRunReport => ({
@@ -412,10 +436,18 @@ const endedSkippingPr: NoMistakesRunner = {
 }
 
 describe("driveNoMistakes", () => {
-  const driveIn = async (runner: NoMistakesRunner, allow: ReadonlyArray<AllowWord> = []): Promise<{ readonly record: NoMistakesRecord; readonly gate: string }> => {
+  type Wait = (missing: ReadonlyArray<NoMistakesFinding>) => Effect.Effect<WaitResult>
+  const asked = "2026-11-02T10:20:00.000Z"
+  const driveIn = async (
+    runner: NoMistakesRunner,
+    allow: ReadonlyArray<AllowWord> = [],
+    answers: ReadonlyArray<QuestionAnswer> = [],
+    waitForAnswers?: Wait
+  ): Promise<{ readonly record: NoMistakesRecord; readonly gate: string }> => {
     const dir = await mkdtemp(join(tmpdir(), "orc-gate-"))
     try {
-      const record = await Effect.runPromise(driveNoMistakes({ runner, taskFile: "/task.md", runDir: dir, allow }).pipe(Effect.provide(BunServices.layer)))
+      const waiting = waitForAnswers === undefined ? {} : { waitForAnswers }
+      const record = await Effect.runPromise(driveNoMistakes({ runner, taskFile: "/task.md", runDir: dir, allow, answers, ...waiting }).pipe(Effect.provide(BunServices.layer)))
       return { record, gate: await readFile(join(dir, "gate.log"), "utf8") }
     } finally {
       await rm(dir, { recursive: true, force: true })
@@ -461,6 +493,87 @@ describe("driveNoMistakes", () => {
     }
     const { gate } = await driveIn(repark, [askUserWord])
     expect(gateSteps(gate)).toEqual(["start", "review", "review"])
+  })
+
+  test("an unanswered ask-user finding stops as an open question with its text instead of a refusal with none", async () => {
+    const asking: NoMistakesRunner = { ...endedFailed, start: () => Effect.succeed({ stdout: parked, stderr: "", exitCode: 0 }) }
+    const { record } = await driveIn(asking)
+    expect(record.status).toBe("refused")
+    expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior" }])
+    expect(record.result).toContain("--answer r2=")
+  })
+
+  test("an answered ask-user finding is sent as a fix carrying the answer instead of stopping the run", async () => {
+    const sent: Array<GateResponse> = []
+    const answering: NoMistakesRunner = {
+      ...endedFailed,
+      start: () => Effect.succeed({ stdout: parked, stderr: "", exitCode: 0 }),
+      respond: (response) => {
+        sent.push(response)
+        return Effect.succeed({ stdout: failedRun, stderr: "", exitCode: 0 })
+      }
+    }
+    const { record } = await driveIn(answering, [], [{ question: "r2", answer: "Keep the old behavior" }])
+    expect(record.openQuestions).toEqual([])
+    expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"], instructions: "The captain answered these findings; fix each as the answer says:\nr2: Keep the old behavior" }])
+  })
+
+  test("an ask-user finding answered within the wait is sent at the same gate instead of ending the run", async () => {
+    const sent: Array<GateResponse> = []
+    const waitedOn: Array<ReadonlyArray<string>> = []
+    const answering: NoMistakesRunner = {
+      ...endedFailed,
+      start: () => Effect.succeed({ stdout: parked, stderr: "", exitCode: 0 }),
+      respond: (response) => {
+        sent.push(response)
+        return Effect.succeed({ stdout: failedRun, stderr: "", exitCode: 0 })
+      }
+    }
+    const wait: Wait = (missing) => {
+      waitedOn.push(missing.map((finding) => finding.id))
+      return Effect.succeed({ asked, answers: [{ question: "r2", answer: "Keep the old behavior" }] })
+    }
+    const { record, gate } = await driveIn(answering, [], [], wait)
+    expect(waitedOn).toEqual([["r2"]])
+    expect(record.openQuestions).toEqual([])
+    expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"], instructions: "The captain answered these findings; fix each as the answer says:\nr2: Keep the old behavior" }])
+    expect(gateSteps(gate)).toContain("asking")
+  })
+
+  test("a finding re-raised after its answer was sent is asked again instead of resent", async () => {
+    const sent: Array<GateResponse> = []
+    const answering: NoMistakesRunner = {
+      ...endedFailed,
+      start: () => Effect.succeed({ stdout: parked, stderr: "", exitCode: 0 }),
+      respond: (response) => {
+        sent.push(response)
+        return Effect.succeed({ stdout: parked, stderr: "", exitCode: 0 })
+      }
+    }
+    let waited = 0
+    const wait: Wait = () => {
+      waited += 1
+      return Effect.succeed(waited === 1 ? { asked, answers: [{ question: "r2", answer: "Keep the old behavior" }] } : { asked: "2026-11-02T10:40:00.000Z", answers: [] })
+    }
+    const { record } = await driveIn(answering, [], [], wait)
+    expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"] }])
+    expect(sent.length).toBe(1)
+    expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior", asked: "2026-11-02T10:40:00.000Z" }])
+  })
+
+  test("a wait that runs out unanswered parks the question instead of sending an empty answer", async () => {
+    const sent: Array<GateResponse> = []
+    const asking: NoMistakesRunner = {
+      ...endedFailed,
+      start: () => Effect.succeed({ stdout: parked, stderr: "", exitCode: 0 }),
+      respond: (response) => {
+        sent.push(response)
+        return Effect.succeed({ stdout: failedRun, stderr: "", exitCode: 0 })
+      }
+    }
+    const { record } = await driveIn(asking, [], [], () => Effect.succeed({ asked, answers: [] }))
+    expect(sent).toEqual([])
+    expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior", asked }])
   })
 
   test("a gate that answers without parking leaves a running line instead of silence", async () => {
