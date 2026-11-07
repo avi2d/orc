@@ -105,7 +105,8 @@ const expectedFiles = [
   "src/show.ts",
   "src/task-copy.ts",
   "src/task-kind.ts",
-  "src/toon.ts"
+  "src/toon.ts",
+  "src/worktree-excludes.ts"
 ]
 
 const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => {

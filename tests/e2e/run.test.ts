@@ -114,12 +114,10 @@ describe("runAgentStep refusals", () => {
     })
   })
 
-  test("a branch name git accepts passes the branch checks even when a shell would expand it", async () => {
+  test.each(["orc/$USER", "orc/`id`", "orc/$(id)", "orc/a\"b"])("the branch name %p passes the branch checks even when a shell would expand it", async (branch) => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
-        for (const branch of ["orc/$USER", "orc/`id`", "orc/$(id)", "orc/a\"b"]) {
-          expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch })).toContain("cannot read the task file")
-        }
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch })).toContain("cannot read the task file")
       })
     })
   })
