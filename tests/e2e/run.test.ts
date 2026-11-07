@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, exists, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, exists, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { openCheckout } from "../../packages/run/src/checkout"
+import { openTaskCopy } from "../../packages/run/src/task-copy"
 import { runAgentStep } from "../../packages/run/src/run"
 import { capturedSession, cleanFinish, commitOnBranch, git, passedWithPr, recordedNothing, providerErrorEchoingPrompt, runStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
@@ -45,11 +46,25 @@ describe("runAgentStep refusals", () => {
     })
   })
 
-  test("an old in-checkout copy of a stopped run's branch counts as uncommitted changes and blocks its resume", async () => {
+  test("an old in-checkout copy of a stopped run's branch is reused where it sits with its uncommitted work", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
-        git(dir, ["worktree", "add", "-q", join(dir, ".sandcastle", "worktrees", "orc-test"), "-b", "orc/test"])
-        expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test" })).toContain("uncommitted changes")
+        const old = join(dir, ".sandcastle", "worktrees", "orc-test")
+        git(dir, ["worktree", "add", "-q", "-b", "orc/test", old])
+        await writeFile(join(old, "unsaved.txt"), "work in progress\n")
+        const reused = await Effect.runPromise(
+          Effect.gen(function*() {
+            const fs = yield* FileSystem.FileSystem
+            const path = yield* Path.Path
+            const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+            const checkout = yield* openCheckout(fs, path, spawner, Bun.which("git") ?? "git", dir, "orc/test", "test-run-1", [])
+            const copy = yield* openTaskCopy(fs, path, spawner, Bun.which("git") ?? "git", checkout, home)
+            return copy.dir
+          }).pipe(Effect.scoped, Effect.provide(BunServices.layer))
+        )
+        expect(reused).toBe(await realpath(old))
+        expect(await readFile(join(old, "unsaved.txt"), "utf8")).toBe("work in progress\n")
+        expect(git(dir, ["worktree", "list", "--porcelain"])).toContain("branch refs/heads/orc/test")
       })
     })
   })

@@ -2,6 +2,7 @@ import { Effect, type FileSystem, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { runGit } from "./git-run"
 import { OrcRunError } from "./run-session"
+import { nestedWorktreeExcludes } from "./worktree-excludes"
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
 
@@ -43,7 +44,12 @@ export const openCheckout = (
         return yield* refuse("orc: " + candidate + " marks this checkout as refused, so orc refuses to run in it")
       }
     }
-    const status = yield* runGit(spawner, git, ["status", "--porcelain", "--", "."], projectDir)
+    const listed = yield* runGit(spawner, git, ["worktree", "list", "--porcelain"], projectDir).pipe(
+      Effect.map((result) => result.stdout),
+      Effect.orElseSucceed(() => "")
+    )
+    const excludes = yield* nestedWorktreeExcludes(fs, projectDir, listed)
+    const status = yield* runGit(spawner, git, ["status", "--porcelain", "--", ".", ...excludes], projectDir)
     if (status.exitCode !== 0) {
       return yield* refuse("orc: git status failed in " + projectDir)
     }

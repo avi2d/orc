@@ -2,6 +2,7 @@ import { Duration, Effect, FileSystem, Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { hostGitRefusalExit, hostGitSafetyEnv, hostGitShim } from "../host"
 import { parseRefuseMarkers } from "../checkout"
+import { nestedWorktreeExcludes } from "../worktree-excludes"
 
 export type Refresh =
   | { readonly kind: "fast-forwarded"; readonly branch: string; readonly remote: string; readonly from: string; readonly to: string }
@@ -66,7 +67,7 @@ const refusedMarker = (
     return null
   })
 
-const cleanBranch = (gitBin: string, projectDir: string): Effect.Effect<{ readonly branch: string } | Kept, never, Requirements> =>
+const cleanBranch = (fs: FileSystem.FileSystem, gitBin: string, projectDir: string): Effect.Effect<{ readonly branch: string } | Kept, never, Requirements> =>
   Effect.gen(function*() {
     const inside = yield* git(gitBin, projectDir, ["rev-parse", "--is-inside-work-tree"])
     const stopInside = refused(inside)
@@ -84,7 +85,9 @@ const cleanBranch = (gitBin: string, projectDir: string): Effect.Effect<{ readon
     if (head.exitCode !== 0) {
       return kept("it is on no branch")
     }
-    const status = yield* git(gitBin, projectDir, ["status", "--porcelain", "--", "."])
+    const listed = yield* git(gitBin, projectDir, ["worktree", "list", "--porcelain"])
+    const excludes = listed.exitCode === 0 ? yield* nestedWorktreeExcludes(fs, projectDir, listed.stdout) : []
+    const status = yield* git(gitBin, projectDir, ["status", "--porcelain", "--", ".", ...excludes])
     if (status.exitCode !== 0) {
       return kept("git status failed: " + firstLine(status.stderr))
     }
@@ -196,7 +199,7 @@ export const refreshCheckout = (projectDir: string): Effect.Effect<Refresh, neve
     if (shim === null) {
       return kept("cannot write the host git shim")
     }
-    const local = yield* cleanBranch(shim, projectDir)
+    const local = yield* cleanBranch(fs, shim, projectDir)
     if ("kind" in local) {
       return local
     }
