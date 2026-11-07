@@ -850,8 +850,6 @@ It counts 100 MiB more for each extra worker.
 Set `TEST_FAST_WORKERS=<n>` to start exactly `n` workers.
 Values below 1 fail.
 
-Run `bunx stryker run --mutate "packages/schema/src/sources/quota.ts"` to mutate one file against the unit suite.
-
 ## Find the code
 
 | Path | What it holds |
