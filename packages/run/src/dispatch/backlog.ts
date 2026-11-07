@@ -246,6 +246,9 @@ export const closeStartedTask = (
       if (record === undefined) {
         return yield* new BacklogError({ detail: "the backlog holds no " + id })
       }
+      if (record.state.kind !== "started") {
+        return yield* new BacklogError({ detail: id + " is " + record.state.kind + ", and only a started task closes" })
+      }
       return yield* new BacklogError({ detail: id + " moved while orc read it, so run the command again" })
     }
     const putBack = fs.rename(grabbed, file).pipe(Effect.mapError(platformFailure("put back " + id)))

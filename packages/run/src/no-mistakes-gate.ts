@@ -148,6 +148,12 @@ const answeredGuidance = (settled: ReadonlyArray<NoMistakesFinding>, answers: Re
   ["The captain answered these findings; fix each as the answer says:",
     ...settled.map((finding) => finding.id + ": " + (answers.find((entry) => entry.question === finding.id)?.answer ?? ""))].join("\n")
 
+export const answeredAskUser = (
+  findings: ReadonlyArray<NoMistakesFinding>,
+  answers: ReadonlyArray<QuestionAnswer>
+): ReadonlyArray<NoMistakesFinding> =>
+  findings.filter(isAskUser).filter((finding) => answers.some((entry) => entry.question === finding.id))
+
 export const answerForGate = (
   gate: ParkedGate,
   findings: ReadonlyArray<NoMistakesFinding>,
@@ -158,28 +164,36 @@ export const answerForGate = (
   if (open.length > 0) {
     return { kind: "refuse", reason: missingReason(open) }
   }
-  const answered = (finding: NoMistakesFinding): boolean => answers.some((entry) => entry.question === finding.id)
   const asked = findings.filter(isAskUser)
-  const settled = asked.filter(answered)
-  const unsettled = askUserFindings(asked.filter((finding) => !answered(finding)), allow)
+  const settled = answeredAskUser(findings, answers)
+  const unsettled = askUserFindings(asked.filter((finding) => !answers.some((entry) => entry.question === finding.id)), allow)
   if (unsettled.length > 0) {
     return { kind: "refuse", reason: missingReason(unsettled) }
   }
-  const worded = asked.filter((finding) => !answered(finding))
+  const worded = asked.filter((finding) => !answers.some((entry) => entry.question === finding.id))
   const rest = findings.filter((finding) => !isAskUser(finding))
   const other = rest.find((finding) => finding.action !== "auto-fix" && finding.action !== "no-op")
   if (other !== undefined) {
     return { kind: "refuse", reason: "finding " + other.id + " needs an answer orc cannot give" }
   }
-  if (gate.stage === "fix-review") {
-    return { kind: "approve" }
-  }
   const fixable = [...rest.filter((finding) => finding.action === "auto-fix"), ...settled]
+  const ignore = [...rest.filter((finding) => finding.action === "no-op"), ...worded].map((finding) => finding.id)
+  if (gate.stage === "fix-review") {
+    if (settled.length === 0) {
+      return { kind: "approve" }
+    }
+    return {
+      kind: "fix",
+      ids: fixable.map((finding) => finding.id),
+      ignore,
+      instructions: answeredGuidance(settled, answers)
+    }
+  }
   if (fixable.length > 0) {
     return {
       kind: "fix",
       ids: fixable.map((finding) => finding.id),
-      ignore: [...rest.filter((finding) => finding.action === "no-op"), ...worded].map((finding) => finding.id),
+      ignore,
       ...(settled.length === 0 ? {} : { instructions: answeredGuidance(settled, answers) })
     }
   }

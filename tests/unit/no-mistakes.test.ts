@@ -313,8 +313,13 @@ describe("answerForGate refuses only what needs your word", () => {
     }
   })
 
-  test("an answered ask-user finding in fix review is accepted instead of refused", () => {
-    expect(answerForGate(fixReview, [stubFinding("r2", "ask-user")], [], [{ question: "r2", answer: "Keep it" }])).toEqual({ kind: "approve" })
+  test("an answered ask-user finding in fix review is fixed with the answer instead of approved", () => {
+    expect(answerForGate(fixReview, [stubFinding("r2", "ask-user")], [], [{ question: "r2", answer: "Keep it" }])).toEqual({
+      kind: "fix",
+      ids: ["r2"],
+      ignore: [],
+      instructions: "The captain answered these findings; fix each as the answer says:\nr2: Keep it"
+    })
   })
 })
 

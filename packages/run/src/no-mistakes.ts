@@ -5,6 +5,7 @@ import { hostGitSafetyEnv } from "./host"
 import {
   answerArgsFor,
   answerForGate,
+  answeredAskUser,
   askUserFindings,
   findingsTable,
   omittedQuestionIds,
@@ -65,7 +66,7 @@ export interface SubprocessRunnerOptions extends NoMistakesHost {
 
 type Sent =
   | { readonly kind: "start" }
-  | { readonly kind: "respond"; readonly gate: ParkedGate }
+  | { readonly kind: "respond"; readonly gate: ParkedGate; readonly fallback: ReadonlyArray<NoMistakesFinding> }
   | { readonly kind: "answer"; readonly gate: ParkedGate }
   | { readonly kind: "reattach" }
 
@@ -149,6 +150,9 @@ export const noMistakesVersionProblem = (options: NoMistakesHost, cwd: string): 
 const stopOnRejection = (input: NoMistakesInput, log: DriveLog, sent: Sent, command: NoMistakesReply): Effect.Effect<Ending> => {
   if (sent.kind === "start") {
     return Effect.succeed(log.fail("no-mistakes refused to start: " + errorDetail(command)))
+  }
+  if (sent.kind === "respond" && sent.fallback.length > 0) {
+    return Effect.succeed(log.awaitAnswers(sent.gate, sent.fallback))
   }
   if (sent.kind === "respond" || sent.kind === "answer") {
     return Effect.succeed(log.refuse(sent.gate, "no-mistakes refused the answer: " + errorDetail(command)))
@@ -271,8 +275,11 @@ const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending, nev
       if (answer.kind === "refuse") {
         return log.refuse(step.gate, answer.reason)
       }
+      const fallback = answer.kind === "fix" && step.gate.stage === "fix-review"
+        ? answeredAskUser(step.parsed.findings, [...supplied].map(([question, words]) => ({ question, answer: words })))
+        : []
       current = yield* input.runner.respond(answer)
-      sent = { kind: "respond", gate: step.gate }
+      sent = { kind: "respond", gate: step.gate, fallback }
     }
   })
 
