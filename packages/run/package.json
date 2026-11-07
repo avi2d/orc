@@ -20,7 +20,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@ai-hero/sandcastle": "0.12.0",
     "@effect/platform-bun": "4.0.0",
     "effect": "4.0.0"
   },

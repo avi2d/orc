@@ -16,7 +16,7 @@ export type AgentExec =
 
 export const sandboxedEnvNames: ReadonlyArray<string> = ["PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TERM"]
 
-export const hostEnvNames: ReadonlyArray<string> = [
+const hostEnvNames: ReadonlyArray<string> = [
   ...sandboxedEnvNames,
   "SHELL",
   "TMPDIR",

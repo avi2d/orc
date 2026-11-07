@@ -1,5 +1,4 @@
-import { BunServices } from "@effect/platform-bun"
-import { Data, Effect, Exit, FileSystem, type Path, type PlatformError, Scope, Stream } from "effect"
+import { Data, Effect, FileSystem, type Path, type PlatformError, type Scope, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { type Runtime, type ToolchainResolver, within } from "./nono-profile"
 
@@ -238,20 +237,3 @@ export const resolveRuntime = (
     }
     return null
   })
-
-export const closeNonoSandbox = (lifetime: Scope.Closeable, profileDir: string, shimDir: string): Promise<void> =>
-  Effect.runPromise(
-    Scope.close(lifetime, Exit.void).pipe(
-      Effect.andThen(() =>
-        Effect.gen(function*() {
-          const fs = yield* FileSystem.FileSystem
-          yield* fs.remove(profileDir, { recursive: true })
-          yield* fs.remove(shimDir, { recursive: true })
-        })
-      ),
-      // A leftover rendered profile is litter, never a teardown failure.
-      Effect.result,
-      Effect.asVoid,
-      Effect.provide(BunServices.layer)
-    )
-  )

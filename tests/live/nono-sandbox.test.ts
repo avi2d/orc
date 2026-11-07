@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, realpath, rename, rm, stat, symlink, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, realpath, rename, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
-import type { BindMountSandboxHandle } from "@ai-hero/sandcastle"
-import { NonoProviderError, nonoSandboxProvider } from "../../packages/run/src/nono"
+import { NonoProviderError } from "../../packages/run/src/host"
+import type { NonoExecOptions } from "../../packages/run/src/nono-exec"
+import { nonoOpenError, type NonoShellRun, runNonoShell, withNonoShell } from "../lib/nono-shell"
 
 // Nesting a nono sandbox is forbidden inside an already-sandboxed macOS session, so these run on demand:
 //   ORC_NONO_E2E=1 bun run test:live
@@ -82,7 +83,7 @@ const cgiResponse = (output: Uint8Array): Response => {
   return new Response(output.slice(separator + 4), { status, headers })
 }
 
-describe("nono sandbox provider", () => {
+describe("the nono exec", () => {
   let root = ""
   let copy = ""
   let outside = ""
@@ -91,14 +92,19 @@ describe("nono sandbox provider", () => {
   let remoteUrl = ""
   let unauthorizedRequests = 0
   let server: ReturnType<typeof Bun.serve> | null = null
-  let handle: BindMountSandboxHandle | null = null
 
-  const execOrThrow = async (...args: Parameters<BindMountSandboxHandle["exec"]>) => {
-    if (handle === null) {
-      throw new Error("sandbox handle was not created")
-    }
-    return handle.exec(...args)
-  }
+  const sandboxAt = (hostEnv: Readonly<Record<string, string>>, piSessionDir = session): NonoExecOptions => ({
+    worktree: copy,
+    piSessionDir,
+    sessionsDir: piSessionDir,
+    hostEnv: { ...Bun.env, ...hostEnv },
+    readFolders: [],
+    env: {}
+  })
+
+  const sandbox = (): NonoExecOptions => sandboxAt({ ...credentialEnv, HOME: fixtureHome, NONO_ALLOW: outside })
+
+  const execOrThrow = (command: string, run?: NonoShellRun) => runNonoShell(sandbox(), command, run)
 
   const serveGitBehindCredential = async (request: Request): Promise<Response> => {
     if (request.headers.get("authorization") !== sentinelAuthorization) {
@@ -152,16 +158,9 @@ describe("nono sandbox provider", () => {
     await gitOrThrow(["add", "-A"], copy)
     await gitOrThrow(["commit", "-qm", "seed"], copy)
     await gitOrThrow(["remote", "add", "origin", remoteUrl], copy)
-    handle = await nonoSandboxProvider({ piSessionDir: session }).create({
-      worktreePath: copy,
-      hostRepoPath: copy,
-      mounts: [],
-      env: { ...credentialEnv, HOME: fixtureHome, NONO_ALLOW: outside }
-    })
   })
 
   afterAll(async () => {
-    await handle?.close()
     await server?.stop(true)
     for (const dir of [root, outside]) {
       if (dir !== "") {
@@ -203,19 +202,17 @@ describe("nono sandbox provider", () => {
     for (const config of configs) {
       await writeFile(config, `[http]\n\textraHeader = Authorization: ${sentinelAuthorization}\n`)
     }
-    const sandbox = await nonoSandboxProvider({ piSessionDir: session }).create({ worktreePath: copy, hostRepoPath: copy, mounts: [], env: { HOME: home } })
     try {
       for (const config of [...configs, ...configs.map((path) => `/System/Volumes/Data${path}`)]) {
-        const result = await sandbox.exec(`cat -- ${JSON.stringify(config)}`)
+        const result = await runNonoShell(sandboxAt({ HOME: home }), `cat -- ${JSON.stringify(config)}`)
         expect({ config, exitCode: result.exitCode, stdout: result.stdout }).toEqual({ config, exitCode: 1, stdout: "" })
       }
     } finally {
-      await sandbox.close()
       await rm(home, { recursive: true, force: true })
     }
   })
 
-  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "runs Sandcastle's git setup"), async () => {
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "lets the agent write its own global git config"), async () => {
     for (const command of [
       `git config --global --add safe.directory "${copy}"`,
       `git config --global user.name "orc agent"`,
@@ -225,52 +222,6 @@ describe("nono sandbox provider", () => {
       expect(result).toEqual({ stdout: "", stderr: "", exitCode: 0 })
     }
     expect((await execOrThrow("git config --global user.name")).stdout).toBe("orc agent\n")
-  })
-
-  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "copies files in and out byte for byte, replacing what was there"), async () => {
-    if (handle === null) {
-      throw new Error("sandbox handle was not created")
-    }
-    const hostSide = await mkdtemp(join(process.cwd(), ".orc-nono-transfer-"))
-    try {
-      const bytes = new Uint8Array([0, 255, 13, 10, 0xe2, 0x82, 0xac, 1])
-      await writeFile(join(hostSide, "a"), bytes)
-      await handle.copyFileIn(join(hostSide, "a"), join(copy, "transfer", "nested", "f"))
-      expect(new Uint8Array(await Bun.file(join(copy, "transfer", "nested", "f")).arrayBuffer())).toEqual(bytes)
-      await writeFile(join(hostSide, "a"), "second")
-      await handle.copyFileIn(join(hostSide, "a"), join(copy, "transfer", "nested", "f"))
-      expect(await Bun.file(join(copy, "transfer", "nested", "f")).text()).toBe("second")
-      await handle.copyFileOut(join(copy, "transfer", "nested", "f"), join(hostSide, "out", "f"))
-      await writeFile(join(copy, "transfer", "nested", "f"), bytes)
-      await handle.copyFileOut(join(copy, "transfer", "nested", "f"), join(hostSide, "out", "f"))
-      expect(new Uint8Array(await Bun.file(join(hostSide, "out", "f")).arrayBuffer())).toEqual(bytes)
-    } finally {
-      await rm(hostSide, { recursive: true, force: true })
-      await rm(join(copy, "transfer"), { recursive: true, force: true })
-    }
-  })
-
-  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "refuses file transfers through a symlink that leads outside the roots"), async () => {
-    if (handle === null) {
-      throw new Error("sandbox handle was not created")
-    }
-    const hostSide = await mkdtemp(join(process.cwd(), ".orc-nono-transfer-"))
-    try {
-      await writeFile(join(outside, "host-secret"), "host secret\n")
-      await writeFile(join(hostSide, "payload"), "payload\n")
-      const linked = await execOrThrow(`ln -s ${outside} imports && echo linked`)
-      expect(linked.stdout).toBe("linked\n")
-      const copiedIn = await handle.copyFileIn(join(hostSide, "payload"), join(copy, "imports", "new-file")).then(() => null, (cause: unknown) => cause)
-      expect(copiedIn).toBeInstanceOf(NonoProviderError)
-      expect(await exists(join(outside, "new-file"))).toBe(false)
-      const copiedOut = await handle.copyFileOut(join(copy, "imports", "host-secret"), join(hostSide, "exported")).then(() => null, (cause: unknown) => cause)
-      expect(copiedOut).toBeInstanceOf(NonoProviderError)
-      expect(await exists(join(hostSide, "exported"))).toBe(false)
-    } finally {
-      await rm(join(copy, "imports"), { force: true })
-      await rm(join(outside, "host-secret"), { force: true })
-      await rm(hostSide, { recursive: true, force: true })
-    }
   })
 
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "streams stdout lines to onLine"), async () => {
@@ -359,33 +310,6 @@ describe("nono sandbox provider", () => {
     expect(result.stdout).toMatch(/^[46]\n$/)
   })
 
-  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "rejects a working directory outside the roots"), async () => {
-    const error = await execOrThrow("touch cwd-probe", { cwd: outside }).then(() => null, (cause: unknown) => cause)
-    expect(error).toBeInstanceOf(NonoProviderError)
-    expect(await exists(join(outside, "cwd-probe"))).toBe(false)
-  })
-
-  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "rejects a symlinked working directory that leads outside the roots"), async () => {
-    const link = join(copy, "outside-link")
-    await symlink(outside, link)
-    try {
-      const error = await execOrThrow("touch cwd-probe", { cwd: link }).then(() => null, (cause: unknown) => cause)
-      expect(error).toBeInstanceOf(NonoProviderError)
-      if (error instanceof NonoProviderError) {
-        expect(error.message).toContain("outside the sandbox roots")
-      }
-      expect(await exists(join(outside, "cwd-probe"))).toBe(false)
-    } finally {
-      await rm(link)
-    }
-  })
-
-  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "accepts a working directory inside the session folder"), async () => {
-    const result = await execOrThrow("pwd", { cwd: session })
-    expect(result.exitCode).toBe(0)
-    expect(result.stdout).toBe(`${await realpath(session)}\n`)
-  })
-
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "no host credential reaches the command"), async () => {
     const result = await execOrThrow("env; git config --list")
     expect(result.exitCode).toBe(0)
@@ -417,30 +341,25 @@ describe("nono sandbox provider", () => {
       join(home, ".config", "nono", "profiles", "default.json"),
       JSON.stringify({ meta: { name: "default", description: "widens" }, filesystem: { allow: [outside] } })
     )
-    const widened = await nonoSandboxProvider({ piSessionDir: session }).create({
-      worktreePath: copy,
-      hostRepoPath: copy,
-      mounts: [],
-      env: { HOME: home }
-    })
     try {
       const target = join(outside, "widened-probe")
-      const result = await widened.exec(`touch ${target} && echo escaped`)
+      const result = await runNonoShell(sandboxAt({ HOME: home }), `touch ${target} && echo escaped`)
       expect(result.exitCode).not.toBe(0)
       expect(result.stdout).not.toContain("escaped")
       expect(await exists(target)).toBe(false)
     } finally {
-      await widened.close()
       await rm(home, { recursive: true, force: true })
     }
   })
 
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "swapping the git data for a symlink to outside retargets no grant"), async () => {
-    const swapped = await execOrThrow(`mv .git .git-moved && ln -s ${outside} .git && echo swapped`)
     try {
-      expect(swapped.stdout).toBe("swapped\n")
       const target = join(outside, "retargeted-probe")
-      const result = await execOrThrow(`touch .git/retargeted-probe && echo escaped`)
+      const [swapped, result] = await withNonoShell(sandbox(), async (shell) => [
+        await shell(`mv .git .git-moved && ln -s ${outside} .git && echo swapped`),
+        await shell("touch .git/retargeted-probe && echo escaped")
+      ])
+      expect(swapped.stdout).toBe("swapped\n")
       expect(result.exitCode).not.toBe(0)
       expect(result.stdout).not.toContain("escaped")
       expect(await exists(target)).toBe(false)
@@ -458,56 +377,52 @@ describe("nono sandbox provider", () => {
     await mkdir(plantedDir, { recursive: true })
     await writeFile(join(plantedDir, "nono"), `#!/bin/sh\ntouch ${marker}\necho planted\n`)
     await chmod(join(plantedDir, "nono"), 0o755)
-    const planted = await nonoSandboxProvider({ piSessionDir: session }).create({
-      worktreePath: copy,
-      hostRepoPath: copy,
-      mounts: [],
-      env: { HOME: fixtureHome, PATH: `${plantedDir}:${Bun.env.PATH ?? ""}` }
-    })
     try {
-      const result = await planted.exec("echo sandboxed")
+      const result = await runNonoShell(sandboxAt({ HOME: fixtureHome, PATH: `${plantedDir}:${Bun.env.PATH ?? ""}` }), "echo sandboxed")
       expect(result.stdout).toBe("sandboxed\n")
       expect(await exists(marker)).toBe(false)
     } finally {
-      await planted.close()
       await rm(plantedDir, { recursive: true, force: true })
     }
   })
 
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "a linked task copy commits into the main checkout's git data but cannot write the main checkout's files"), async () => {
+    const main = join(root, "main")
+    const linked = join(root, "linked")
+    await mkdir(main)
+    await gitOrThrow(["init", "-q", "-b", "main"], main)
+    await writeFile(join(main, "kept.txt"), "kept\n")
+    await gitOrThrow(["add", "-A"], main)
+    await gitOrThrow(["-c", "user.name=orc live", "-c", "user.email=orc-live@example.com", "commit", "-qm", "seed"], main)
+    await gitOrThrow(["worktree", "add", "-q", "-b", "orc/live", linked], main)
+    const result = await runNonoShell({ ...sandbox(), worktree: linked }, [
+      "echo work > work.txt",
+      "git add work.txt && git -c user.name=a -c user.email=a@example.com commit -qm work && echo committed",
+      `echo overwritten > "${join(main, "kept.txt")}" 2>/dev/null || echo refused`
+    ].join("; "))
+    expect(result.stdout).toBe("committed\nrefused\n")
+    expect((await runGit(["log", "-1", "--format=%s", "orc/live"], main)).output).toBe("work\n")
+    expect(await Bun.file(join(main, "kept.txt")).text()).toBe("kept\n")
+  }, 15_000)
+
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "refuses a session folder that would hold its own profile"), async () => {
-    const error = await nonoSandboxProvider({ piSessionDir: tmpdir() })
-      .create({ worktreePath: copy, hostRepoPath: copy, mounts: [], env: { HOME: fixtureHome } })
-      .then(() => null, (cause: unknown) => cause)
+    const error = await nonoOpenError(sandboxAt({ HOME: fixtureHome }, tmpdir()))
     expect(error).toBeInstanceOf(NonoProviderError)
     if (error instanceof NonoProviderError) {
       expect(error.message).toContain("the sandbox could write")
     }
   })
 
-  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "stops every running and later command once close resolves"), async () => {
+  test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "an interrupted command stops with its background children instead of finishing later"), async () => {
     const lateMarkers = [join(copy, "late-foreground"), join(copy, "late-background")]
-    const sandbox = await nonoSandboxProvider({ piSessionDir: session }).create({ worktreePath: copy, hostRepoPath: copy, mounts: [], env: { HOME: fixtureHome } })
-    const started = sandbox.exec(`(trap '' TERM; sleep 2; touch "${lateMarkers[1]}") & trap '' TERM; sleep 2; touch "${lateMarkers[0]}"`)
-    const outcome = started.then(() => "resolved", () => "rejected")
-    let settled = false
-    void outcome.then(() => {
-      settled = true
-    })
-    await Bun.sleep(500)
-    await sandbox.close()
-    await Bun.sleep(0)
-    expect(settled).toBe(true)
+    const stop = new AbortController()
+    const started = Promise.withResolvers<void>()
+    const outcome = execOrThrow(`(trap '' TERM; sleep 2; touch "${lateMarkers[1]}") & trap '' TERM; echo started; sleep 2; touch "${lateMarkers[0]}"`, { signal: stop.signal, onLine: () => started.resolve() })
+      .then(() => "resolved", () => "rejected")
+    await started.promise
+    stop.abort()
     expect(await outcome).toBe("rejected")
     await Bun.sleep(2500)
     expect(await Promise.all(lateMarkers.map(exists))).toEqual([false, false])
-    const source = join(outside, "after-close-source")
-    await writeFile(source, "after close\n")
-    const afterClose = await Promise.all([
-      sandbox.exec(`touch "${join(copy, "late-exec")}"`),
-      sandbox.copyFileIn(source, join(copy, "late-copy-in")),
-      sandbox.copyFileOut(join(copy, "seed.txt"), join(outside, "late-copy-out"))
-    ].map((pending) => pending.then(() => "resolved", () => "rejected")))
-    expect(afterClose).toEqual(["rejected", "rejected", "rejected"])
-    expect(await Promise.all([join(copy, "late-exec"), join(copy, "late-copy-in"), join(outside, "late-copy-out")].map(exists))).toEqual([false, false, false])
   })
 })

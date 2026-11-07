@@ -18,7 +18,7 @@ export interface AgentRun {
   readonly onSession: (file: string) => Effect.Effect<void, OrcRunError>
 }
 
-export interface AgentRunResult extends PiRun {
+interface AgentRunResult extends PiRun {
   readonly commits: ReadonlyArray<{ readonly sha: string }>
 }
 

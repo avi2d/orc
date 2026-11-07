@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import rootManifest from "../../package.json" with { type: "json" }
 import runManifest from "../../packages/run/package.json" with { type: "json" }
 
-const sharedDependencies = ["@ai-hero/sandcastle", "@effect/platform-bun", "effect"] as const
+const sharedDependencies = ["@effect/platform-bun", "effect"] as const
 
 describe("the orc workspace", () => {
   test("the run package keeps the scoped name instead of the taken orc name", () => {

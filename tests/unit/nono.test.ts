@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { buildHostGitEnv, buildNonoRunArgs, buildSandboxEnv, nonoSandboxProvider } from "../../packages/run/src/nono"
+import { buildHostGitEnv, buildSandboxEnv } from "../../packages/run/src/nono"
 import { buildNonoProfile, defaultToolchainFolders, defaultToolchainResolver, type HostRuntime, type NonoSandboxRoots } from "../../packages/run/src/nono-profile"
 
 const roots = {
@@ -110,28 +110,6 @@ describe("buildNonoProfile", () => {
   })
 })
 
-describe("buildNonoRunArgs", () => {
-  test("wraps the command in nono run with the profile and no cwd grant", () => {
-    expect(buildNonoRunArgs("/tmp/p.json", "git status")).toEqual([
-      "run",
-      "--silent",
-      "--profile",
-      "/tmp/p.json",
-      "--",
-      "sh",
-      "-c",
-      "git status",
-      "sh"
-    ])
-  })
-
-  test("passes hostile commands through verbatim", () => {
-    const command = "echo 'a; rm -rf /' && $(touch evil)"
-    const argv = buildNonoRunArgs("/tmp/p.json", command)
-    expect(argv[argv.indexOf("-c") + 1]).toBe(command)
-  })
-})
-
 describe("buildSandboxEnv", () => {
   const hostEnv = {
     PATH: "/usr/bin:/bin",
@@ -177,10 +155,6 @@ describe("buildSandboxEnv", () => {
       GIT_CONFIG_GLOBAL: "/dev/null",
       GIT_CONFIG_NOSYSTEM: "1"
     })
-  })
-
-  test("the provider declares no env; create time builds the sandbox env", () => {
-    expect(nonoSandboxProvider({ piSessionDir: "/tmp/orc-test/session" }).env).toEqual({})
   })
 
   test("points the temp dir and the global git config into the session folder and drops the system git config", () => {

@@ -3,8 +3,10 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
-import { NonoProviderError, nonoSandboxProvider } from "../../packages/run/src/nono"
-import { modelCredentialFor } from "../../packages/run/src/nono-profile"
+import { NonoProviderError } from "../../packages/run/src/host"
+import type { NonoExecOptions } from "../../packages/run/src/nono-exec"
+import { modelCredentialFor, type ModelCredential } from "../../packages/run/src/nono-profile"
+import { nonoOpenError, runNonoShell } from "../lib/nono-shell"
 
 const systemTempRoots = ["/tmp", "/private/tmp", "/var", "/private/var"]
 const underSystemTemp = (candidate: string): boolean =>
@@ -35,6 +37,25 @@ const checkoutWithSession = async (dir: string): Promise<{ readonly worktree: st
   return { worktree, session }
 }
 
+interface SandboxFor {
+  readonly worktree: string
+  readonly session: string
+  readonly piAgentDir?: string
+  readonly modelCredential?: ModelCredential
+  readonly hostEnv?: Readonly<Record<string, string>>
+}
+
+const sandboxFor = (sandbox: SandboxFor): NonoExecOptions => ({
+  worktree: sandbox.worktree,
+  piSessionDir: sandbox.session,
+  sessionsDir: sandbox.session,
+  piAgentDir: sandbox.piAgentDir,
+  modelCredential: sandbox.modelCredential,
+  hostEnv: { ...Bun.env, HOME: fixtureHome, ...sandbox.hostEnv },
+  readFolders: [],
+  env: {}
+})
+
 const noNono = Bun.which("nono") === null
 const insideSandbox = Bun.env.PI_SESSION_FILE !== undefined || Bun.env.NONO_CAP_FILE !== undefined
 
@@ -48,19 +69,9 @@ describe("the agent directory", () => {
       const { worktree, session } = await checkoutWithSession(dir)
       const agentDir = join(await realpath(session), "pi-agent")
       await mkdir(agentDir, { recursive: true })
-      const handle = await nonoSandboxProvider({ piSessionDir: session, piAgentDir: agentDir }).create({
-        worktreePath: worktree,
-        hostRepoPath: worktree,
-        mounts: [],
-        env: { HOME: fixtureHome }
-      })
-      try {
-        const result = await handle.exec("printenv PI_CODING_AGENT_DIR")
-        expect(result.exitCode).toBe(0)
-        expect(result.stdout.trim()).toBe(agentDir)
-      } finally {
-        await handle.close()
-      }
+      const result = await runNonoShell(sandboxFor({ worktree, session, piAgentDir: agentDir }), "printenv PI_CODING_AGENT_DIR")
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout.trim()).toBe(agentDir)
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -72,15 +83,7 @@ describe("the agent directory", () => {
       const { worktree, session } = await checkoutWithSession(dir)
       const outside = join(dir, "elsewhere")
       await mkdir(outside, { recursive: true })
-      const error = await nonoSandboxProvider({ piSessionDir: session, piAgentDir: outside }).create({
-        worktreePath: worktree,
-        hostRepoPath: worktree,
-        mounts: [],
-        env: { HOME: fixtureHome }
-      }).then(async (handle) => {
-        await handle.close()
-        return null
-      }, (cause: unknown) => cause)
+      const error = await nonoOpenError(sandboxFor({ worktree, session, piAgentDir: outside }))
       expect(error).toBeInstanceOf(NonoProviderError)
       if (error instanceof NonoProviderError) {
         expect(error.message).toContain("PI_CODING_AGENT_DIR sits outside the session dir")
@@ -96,19 +99,9 @@ describe("the agent directory", () => {
       const { worktree, session } = await checkoutWithSession(dir)
       const ambient = join(dir, "operator-agent")
       await mkdir(ambient, { recursive: true })
-      const handle = await nonoSandboxProvider({ piSessionDir: session }).create({
-        worktreePath: worktree,
-        hostRepoPath: worktree,
-        mounts: [],
-        env: { HOME: fixtureHome, PI_CODING_AGENT_DIR: ambient }
-      })
-      try {
-        const result = await handle.exec("printenv PI_CODING_AGENT_DIR")
-        expect(result.exitCode).toBe(0)
-        expect(result.stdout.trim()).toBe(join(await realpath(session), "agent"))
-      } finally {
-        await handle.close()
-      }
+      const result = await runNonoShell(sandboxFor({ worktree, session, hostEnv: { PI_CODING_AGENT_DIR: ambient } }), "printenv PI_CODING_AGENT_DIR")
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout.trim()).toBe(join(await realpath(session), "agent"))
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
@@ -138,22 +131,12 @@ describe("the nono credential proxy", () => {
       const stubPi = join(dir, "pi")
       await writeFile(stubPi, "#!/bin/sh\nif [ \"$1\" = auth ]; then echo \"" + fixtureKey + "\"; exit 0; fi\nexit 2\n", { mode: 0o755 })
       const credential = modelCredentialFor({ id: "acme-vault", upstream, injectHeader: "X-Api-Key", credentialFormat: "{}" }, { piBinary: stubPi, nodeBinary: "/bin/sh", homeDir: fixtureHome })
-      const handle = await nonoSandboxProvider({ piSessionDir: session, piAgentDir: agentDir, modelCredential: credential }).create({
-        worktreePath: worktree,
-        hostRepoPath: worktree,
-        mounts: [],
-        env: { HOME: fixtureHome }
-      })
-      try {
-        const result = await handle.exec("curl -s --max-time 10 '" + upstream + "/probe'")
-        expect(result.exitCode).toBe(0)
-        expect(result.stdout).toContain("proxy-ok")
-        expect(seen["x-api-key"]).toBe(fixtureKey)
-        expect(seen["x-api-key"]).not.toBe("$ACME_VAULT_KEY")
-        expect(seen["authorization"]).toBeNull()
-      } finally {
-        await handle.close()
-      }
+      const result = await runNonoShell(sandboxFor({ worktree, session, piAgentDir: agentDir, modelCredential: credential }), "curl -s --max-time 10 '" + upstream + "/probe'")
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toContain("proxy-ok")
+      expect(seen["x-api-key"]).toBe(fixtureKey)
+      expect(seen["x-api-key"]).not.toBe("$ACME_VAULT_KEY")
+      expect(seen["authorization"]).toBeNull()
     } finally {
       await server?.stop(true)
       await rm(dir, { recursive: true, force: true })
@@ -171,19 +154,9 @@ describe("the model credential profile", () => {
       const stubPi = join(dir, "pi")
       await writeFile(stubPi, "#!/bin/sh\necho fixture-captured-token\n", { mode: 0o755 })
       const credential = modelCredentialFor({ id: "acme-go", upstream: "https://llm.acme.test/v1" }, { piBinary: stubPi, nodeBinary: "/bin/sh", homeDir: fixtureHome })
-      const handle = await nonoSandboxProvider({ piSessionDir: session, piAgentDir: agentDir, modelCredential: credential }).create({
-        worktreePath: worktree,
-        hostRepoPath: worktree,
-        mounts: [],
-        env: { HOME: fixtureHome }
-      })
-      try {
-        const result = await handle.exec("printenv PI_CODING_AGENT_DIR && echo sandboxed")
-        expect(result.exitCode).toBe(0)
-        expect(result.stdout).toContain("sandboxed")
-      } finally {
-        await handle.close()
-      }
+      const result = await runNonoShell(sandboxFor({ worktree, session, piAgentDir: agentDir, modelCredential: credential }), "printenv PI_CODING_AGENT_DIR && echo sandboxed")
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toContain("sandboxed")
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

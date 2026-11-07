@@ -50,7 +50,7 @@ describe("toolchainFromEnv", () => {
 const idleTimeoutFor = (value: string | undefined) => Effect.runSync(Effect.result(idleTimeoutFromEnv(value)))
 
 describe("idleTimeoutFromEnv", () => {
-  test("no value waits 45 minutes, not sandcastle's 600 seconds", () => {
+  test("no value waits 45 minutes, not the 600 seconds that killed quiet lint runs", () => {
     expect(idleTimeoutFor(undefined)).toEqual(Result.succeed(2700))
     expect(idleTimeoutFor("  ")).toEqual(Result.succeed(2700))
   })
