@@ -5,6 +5,9 @@ import type { OpenQuestion } from "../no-mistakes-gate"
 import { formatHistoryError, openDatabase, type RunRecord, RunStatusSchema } from "../run-history"
 import { writtenReport } from "../report-run"
 import { gateLogFileName } from "../no-mistakes"
+import { Asking, askingFileName, answersFileName, RelayedAnswers, writeWhole } from "../answer-wait"
+import type { QuestionAnswer } from "../no-mistakes-gate"
+import { readJsonFileIfPresent } from "../json-file"
 import { runDirFor, type TaskKind } from "../task-kind"
 import { TaskId } from "./backlog"
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
@@ -19,7 +22,8 @@ const RunSummary = Schema.Struct({
   prLink: Schema.NullOr(Schema.String),
   endReason: Schema.NullOr(Schema.String),
   openQuestions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String })),
-  report: Schema.optional(Schema.String)
+  report: Schema.optional(Schema.String),
+  asking: Schema.optional(Asking)
 })
 type RunSummary = typeof RunSummary.Type
 
@@ -152,14 +156,20 @@ const assessHeld = (
   return { ...held, status: "Stashed" in status ? "stashed" : "queued" }
 }
 
-const toSummary = (run: RunRecord, openQuestions: ReadonlyArray<OpenQuestion>, report: string | null): RunSummary => ({
+const toSummary = (run: RunRecord, openQuestions: ReadonlyArray<OpenQuestion>, report: string | null, asking: typeof Asking.Type | null): RunSummary => ({
   id: run.id,
   status: run.status,
   prLink: run.prLink,
   endReason: run.endReason,
   openQuestions,
-  ...(report === null ? {} : { report })
+  ...(report === null ? {} : { report }),
+  ...(asking === null ? {} : { asking })
 })
+
+const askingOf = (run: RunRecord, home: string): Effect.Effect<typeof Asking.Type | null, never, FileSystem.FileSystem> =>
+  run.status === "running"
+    ? readJsonFileIfPresent(runDirFor(home, run.id) + "/" + askingFileName, Asking).pipe(Effect.orElseSucceed(() => null))
+    : Effect.succeed(null)
 
 const readRun = (home: string, checkout: string, task: string, interval: PueueInterval | null): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
@@ -170,7 +180,9 @@ const readRun = (home: string, checkout: string, task: string, interval: PueueIn
         Effect.gen(function*() {
           const runs = yield* runsForBranch(db, project, taskBranch(task))
           const run = runs.find((candidate) => interval === null || startsWithin(candidate.started, interval)) ?? null
-          return run === null ? null : toSummary(run, yield* openQuestionsForRun(db, run.id), yield* writtenReport(runDirFor(home, run.id)))
+          return run === null
+            ? null
+            : toSummary(run, yield* openQuestionsForRun(db, run.id), yield* writtenReport(runDirFor(home, run.id)), yield* askingOf(run, home))
         }),
       (db) => Effect.sync(() => db.close())
     )
@@ -212,8 +224,45 @@ export const readResult = (task: string, home: string, label?: string | null): E
       return result
     }
     const runAt = run === null ? null : yield* runLogAt(home, run.id)
-    return { ...result, outputAt: runAt ?? result.started }
+    return { ...result, status: run?.asking === undefined ? result.status : "paused", outputAt: runAt ?? result.started }
   })
+
+const AnswerStdin = Schema.Struct({ label: Schema.optional(LabelArg), answers: RelayedAnswers })
+
+const relayInto = (home: string, task: string, label: string | null, answers: ReadonlyArray<QuestionAnswer>): Effect.Effect<string, RunnerError, RunnerRequirements> =>
+  Effect.gen(function*() {
+    const result = yield* readResult(task, home, label)
+    const run = result.status === "unknown" ? null : result.run
+    if (run === null || run.asking === undefined) {
+      return yield* refuse("no run of " + task + " waits for an answer")
+    }
+    const file = runDirFor(home, run.id) + "/" + answersFileName
+    if (!(yield* writeWhole(file, JSON.stringify(answers)))) {
+      return yield* refuse("cannot write " + file)
+    }
+    return "handed " + answers.map((entry) => entry.question).join(", ") + " to run " + run.id + " of " + task
+  })
+
+export const relayAnswers = (home: string, task: string, stdin: Effect.Effect<string, RunnerError>): Effect.Effect<string, RunnerError, RunnerRequirements> =>
+  stdin.pipe(
+    Effect.flatMap((text) => decodeJson(text, AnswerStdin, "the answers on stdin")),
+    Effect.flatMap((request) => relayInto(home, task, request.label ?? null, request.answers))
+  )
+
+// The answers travel on stdin, so a reach that joins its argv for a remote shell cannot split the captain's words.
+export const relayAnswersThrough = (
+  command: Command,
+  task: string,
+  label: string | null,
+  answers: ReadonlyArray<QuestionAnswer>
+): Effect.Effect<string, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  capture([...command, "runner", "answer", task], JSON.stringify({ ...(label === null ? {} : { label }), answers })).pipe(
+    Effect.flatMap((result) =>
+      result.exitCode === 0
+        ? Effect.succeed(result.stdout.trim())
+        : refuse(command.join(" ") + " runner answer exited " + result.exitCode + ": " + result.stderr.trim())
+    )
+  )
 
 const ResultStdin = Schema.Struct({ label: LabelArg })
 
@@ -268,7 +317,8 @@ const runLine = (task: string, run: RunSummary | null): string =>
   run === null
     ? "orc holds no run on " + taskBranch(task)
     : "orc run " + run.id + " " + run.status + (run.prLink === null ? "" : ", PR " + run.prLink) + (run.report === undefined ? "" : ", report " + run.report) +
-      (run.endReason === null ? "" : ": " + run.endReason)
+      (run.endReason === null ? "" : ": " + run.endReason) +
+      (run.asking === undefined ? "" : ", waiting until " + run.asking.until + " for the captain's answer to " + run.asking.questions.map((question) => question.id).join(", "))
 
 export const formatResult = (result: RunnerResult): string => {
   if (result.status === "unknown") {

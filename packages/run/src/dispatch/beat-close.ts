@@ -1,13 +1,14 @@
-import { DateTime, Duration, Effect, type FileSystem, Option, type Path } from "effect"
+import { Array as Arr, DateTime, Duration, Effect, type FileSystem, Option, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { closeStartedTask } from "./backlog"
 import type { BeatAction } from "./beat-action"
 import type { DispatchConfig } from "./config"
 import { ownedBySweep, throughFor } from "./machine-reach"
-import { parkStartedTask } from "./parked"
+import type { QuestionAnswer } from "../no-mistakes-gate"
+import { askStartedTask, markAnswersRelayed, parkStartedTask } from "./parked"
 import { taskLabel } from "./pueue-status"
-import { taskBranch } from "./runner"
-import { endingFromResult, type RunEnding, readResult, readResultThrough, type RunnerResult } from "./runner-result"
+import { type RunnerError, type RunnerRequirements, taskBranch } from "./runner"
+import { endingFromResult, relayAnswers, relayAnswersThrough, type RunEnding, readResult, readResultThrough, type RunnerResult } from "./runner-result"
 import type { TaskFileError, TaskRecord } from "./task-record"
 
 export interface CloseContext {
@@ -45,12 +46,53 @@ const endTask = (
 
 export type Progress =
   | { readonly kind: "ended"; readonly action: BeatAction }
-  | { readonly kind: "running"; readonly outputAt: string | null }
+  | { readonly kind: "running"; readonly outputAt: string | null; readonly action: BeatAction | null }
   | { readonly kind: "own-log" }
   | { readonly kind: "untracked" }
 
+type Asking = NonNullable<NonNullable<Extract<RunnerResult, { readonly status: "running" | "paused" }>["run"]>["asking"]>
+
+const askingOf = (result: RunnerResult): Asking | null =>
+  (result.status === "running" || result.status === "paused") && result.run?.asking !== undefined ? result.run.asking : null
+
+// A run waiting on the captain writes no output, and that silence is no stall.
 const outputAtOf = (result: RunnerResult): string | null =>
-  (result.status === "running" || result.status === "paused") && result.outputAt !== undefined ? result.outputAt : null
+  (result.status === "running" || result.status === "paused") && result.outputAt !== undefined && askingOf(result) === null ? result.outputAt : null
+
+const serveAsking = (
+  context: CloseContext,
+  task: TaskRecord,
+  machine: string,
+  asking: Asking,
+  relay: (answers: ReadonlyArray<QuestionAnswer>) => Effect.Effect<string, RunnerError, RunnerRequirements>
+): Effect.Effect<BeatAction | null, TaskFileError, RunnerRequirements> =>
+  Effect.gen(function*() {
+    const id = task.spec.id
+    if (!Arr.isReadonlyArrayNonEmpty(asking.questions)) {
+      return null
+    }
+    const asked = yield* askStartedTask(context.root, id, asking.questions).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(false)))
+    if (asked) {
+      return { kind: "asking", task: id, machine, until: asking.until, questions: asking.questions.map((question) => question.id) } satisfies BeatAction
+    }
+    const answers = (task.parked?.questions ?? []).flatMap((question) =>
+      question.answer !== null && !question.used && asking.questions.some((open) => open.id === question.id) ? [{ question: question.id, answer: question.answer.words }] : []
+    )
+    if (answers.length === 0) {
+      return null
+    }
+    return yield* relay(answers).pipe(
+      Effect.andThen(markAnswersRelayed(context.root, id, answers.map((entry) => entry.question)).pipe(
+        Effect.catchTag("BacklogError", () => Effect.void)
+      )),
+      Effect.as<BeatAction>({ kind: "answered", task: id, machine, questions: answers.map((entry) => entry.question) }),
+      Effect.catchTag("RunnerError", (error) => Effect.succeed<BeatAction>({ kind: "answer-failed", task: id, machine, reason: error.detail })),
+      Effect.timeoutOrElse({
+        duration: Duration.seconds(closeSeconds),
+        orElse: () => Effect.succeed<BeatAction>({ kind: "answer-failed", task: id, machine, reason: "the answer relay timed out after " + closeSeconds + " seconds" })
+      })
+    )
+  })
 
 // A finished run ends its task here, because no other beat step reads a started task after its run ends.
 export const closeFinished = (
@@ -73,7 +115,7 @@ export const closeFinished = (
     const through = throughFor(machine)
     const read = through === null ? readResult(task.spec.id, context.home, label) : readResultThrough(through, task.spec.id, label)
     const outcome = yield* read.pipe(
-      Effect.map((result) => ({ kind: "read" as const, ending: endingFromResult(result, task.spec.kind), outputAt: outputAtOf(result) })),
+      Effect.map((result) => ({ kind: "read" as const, ending: endingFromResult(result, task.spec.kind), outputAt: outputAtOf(result), asking: askingOf(result) })),
       Effect.catchTag("RunnerError", (error) => Effect.succeed({ kind: "unread" as const, reason: error.detail })),
       Effect.timeoutOrElse({
         duration: Duration.seconds(closeSeconds),
@@ -84,7 +126,10 @@ export const closeFinished = (
       return { kind: "ended", action: { kind: "close-failed", task: task.spec.id, machine: claim.machine, reason: outcome.reason } } satisfies Progress
     }
     if (outcome.ending === null) {
-      return { kind: "running", outputAt: outcome.outputAt } satisfies Progress
+      const relay = (answers: ReadonlyArray<QuestionAnswer>) =>
+        through === null ? relayAnswers(context.home, task.spec.id, Effect.succeed(JSON.stringify({ label, answers }))) : relayAnswersThrough(through, task.spec.id, label, answers)
+      const action = outcome.asking === null ? null : yield* serveAsking(context, task, claim.machine, outcome.asking, relay)
+      return { kind: "running", outputAt: outcome.outputAt, action } satisfies Progress
     }
     const ended = yield* endTask(context.root, task, claim.machine, outcome.ending)
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })

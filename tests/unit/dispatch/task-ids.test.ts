@@ -5,9 +5,11 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { parseDispatchArgs } from "../../../packages/run/src/dispatch/args"
-import { addTask, claimTask, closeStartedTask, ensureBacklog, holdTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
+import { addTask, claimTask, closeStartedTask, ensureBacklog, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
+import { holdTask } from "../../../packages/run/src/dispatch/backlog-hold"
 import { answerTask } from "../../../packages/run/src/dispatch/parked"
-import { renderTaskFile, type TaskRecord } from "../../../packages/run/src/dispatch/task-record"
+import type { TaskRecord } from "../../../packages/run/src/dispatch/task-record"
+import { renderTaskFile } from "../../../packages/run/src/dispatch/task-record-render"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))

@@ -39,7 +39,7 @@ export interface ParsedRun {
 }
 
 export type GateAnswer =
-  | { readonly kind: "fix"; readonly ids: ReadonlyArray<string>; readonly ignore: ReadonlyArray<string> }
+  | { readonly kind: "fix"; readonly ids: ReadonlyArray<string>; readonly ignore: ReadonlyArray<string>; readonly instructions?: string }
   | { readonly kind: "approve" }
   | { readonly kind: "refuse"; readonly reason: string }
 
@@ -114,9 +114,16 @@ export const parseRun = (output: string): ParsedRun => {
 
 const isQuestion = (finding: NoMistakesFinding): boolean => finding.id.startsWith("question-")
 
+const isAskUser = (finding: NoMistakesFinding): boolean => finding.action === "ask-user" && !isQuestion(finding)
+
+export const askUserFindings = (findings: ReadonlyArray<NoMistakesFinding>, allow: ReadonlyArray<AllowWord>): ReadonlyArray<NoMistakesFinding> =>
+  allow.includes(askUserWord) ? [] : findings.filter(isAskUser)
+
 const questionReason = (question: NoMistakesFinding): string => {
   const quoted = question.description === "" ? "" : ` "${question.description}"`
-  return `finding ${question.id} is a question${quoted} and needs your answer on a rerun with --answer ${question.id}="<answer>"`
+  return isQuestion(question)
+    ? `finding ${question.id} is a question${quoted} and needs your answer on a rerun with --answer ${question.id}="<answer>"`
+    : `finding ${question.id} is marked ask-user${quoted} and needs your word on a rerun with --answer ${question.id}="<answer>" or --allow ask-user`
 }
 
 export const missingReason = (missing: ReadonlyArray<NoMistakesFinding>): string =>
@@ -137,31 +144,57 @@ export const openQuestionsIn = (findings: ReadonlyArray<NoMistakesFinding>, omit
 export const answerArgsFor = (question: string, answer: string): ReadonlyArray<string> =>
   ["axi", "answer", "--question", question, "--answer", answer]
 
-export const answerForGate = (gate: ParkedGate, findings: ReadonlyArray<NoMistakesFinding>, allow: ReadonlyArray<AllowWord> = []): GateAnswer => {
+const answeredGuidance = (settled: ReadonlyArray<NoMistakesFinding>, answers: ReadonlyArray<QuestionAnswer>): string =>
+  ["The captain answered these findings; fix each as the answer says:",
+    ...settled.map((finding) => finding.id + ": " + (answers.find((entry) => entry.question === finding.id)?.answer ?? ""))].join("\n")
+
+export const answeredAskUser = (
+  findings: ReadonlyArray<NoMistakesFinding>,
+  answers: ReadonlyArray<QuestionAnswer>
+): ReadonlyArray<NoMistakesFinding> =>
+  findings.filter(isAskUser).filter((finding) => answers.some((entry) => entry.question === finding.id))
+
+export const answerForGate = (
+  gate: ParkedGate,
+  findings: ReadonlyArray<NoMistakesFinding>,
+  allow: ReadonlyArray<AllowWord> = [],
+  answers: ReadonlyArray<QuestionAnswer> = []
+): GateAnswer => {
   const open = findings.filter(isQuestion)
   if (open.length > 0) {
     return { kind: "refuse", reason: missingReason(open) }
   }
-  const askUserAllowed = allow.includes(askUserWord)
-  const asked = findings.find((finding) => finding.action === "ask-user")
-  if (asked !== undefined && !askUserAllowed) {
-    return { kind: "refuse", reason: "finding " + asked.id + " is marked ask-user and needs your word on a rerun with --allow ask-user" }
+  const asked = findings.filter(isAskUser)
+  const settled = answeredAskUser(findings, answers)
+  const unsettled = askUserFindings(asked.filter((finding) => !answers.some((entry) => entry.question === finding.id)), allow)
+  if (unsettled.length > 0) {
+    return { kind: "refuse", reason: missingReason(unsettled) }
   }
-  const worded = askUserAllowed ? findings.filter((finding) => finding.action === "ask-user") : []
-  const rest = askUserAllowed ? findings.filter((finding) => finding.action !== "ask-user") : findings
+  const worded = asked.filter((finding) => !answers.some((entry) => entry.question === finding.id))
+  const rest = findings.filter((finding) => !isAskUser(finding))
   const other = rest.find((finding) => finding.action !== "auto-fix" && finding.action !== "no-op")
   if (other !== undefined) {
     return { kind: "refuse", reason: "finding " + other.id + " needs an answer orc cannot give" }
   }
+  const fixable = [...rest.filter((finding) => finding.action === "auto-fix"), ...settled]
+  const ignore = [...rest.filter((finding) => finding.action === "no-op"), ...worded].map((finding) => finding.id)
   if (gate.stage === "fix-review") {
-    return { kind: "approve" }
+    if (settled.length === 0) {
+      return { kind: "approve" }
+    }
+    return {
+      kind: "fix",
+      ids: fixable.map((finding) => finding.id),
+      ignore,
+      instructions: answeredGuidance(settled, answers)
+    }
   }
-  const fixable = rest.filter((finding) => finding.action === "auto-fix")
   if (fixable.length > 0) {
     return {
       kind: "fix",
       ids: fixable.map((finding) => finding.id),
-      ignore: [...rest.filter((finding) => finding.action === "no-op"), ...worded].map((finding) => finding.id)
+      ignore,
+      ...(settled.length === 0 ? {} : { instructions: answeredGuidance(settled, answers) })
     }
   }
   if (rest.length > 0 || worded.length > 0) {
@@ -173,4 +206,8 @@ export const answerForGate = (gate: ParkedGate, findings: ReadonlyArray<NoMistak
 export const respondArgs = (answer: GateResponse): ReadonlyArray<string> =>
   answer.kind === "approve"
     ? ["axi", "respond", "--action", "approve"]
-    : ["axi", "respond", "--action", "fix", "--findings", answer.ids.join(","), ...(answer.ignore.length === 0 ? [] : ["--ignore", answer.ignore.join(",")])]
+    : [
+      "axi", "respond", "--action", "fix", "--findings", answer.ids.join(","),
+      ...(answer.ignore.length === 0 ? [] : ["--ignore", answer.ignore.join(",")]),
+      ...(answer.instructions === undefined ? [] : ["--instructions", answer.instructions])
+    ]

@@ -179,11 +179,14 @@ describe("parseArgs", () => {
   test("run rejects the answerless flag after a refusal", () => {
     expect(parseArgs(["run", "task.md", "--branch", "orc/demo", "--answer"])).toEqual({ kind: "UsageError", detail: "orc run takes an answer after --answer" })
   })
-  test("run rejects an answer without question-id=text", () => {
-    expect(parseArgs(["run", "task.md", "--answer", "wide scope"])).toEqual({ kind: "UsageError", detail: "orc run takes question-id=text after --answer" })
+  test("run rejects an answer without id=text", () => {
+    expect(parseArgs(["run", "task.md", "--answer", "wide scope"])).toEqual({ kind: "UsageError", detail: "orc run takes id=text after --answer, with the id of a question or an ask-user finding" })
   })
-  test("run rejects an unknown question for the answer flag", () => {
-    expect(parseArgs(["run", "task.md", "--answer", "finding-1=no"])).toEqual({ kind: "UsageError", detail: "unknown question for --answer: finding-1" })
+  test("run takes an ask-user finding id after --answer instead of only question ids", () => {
+    expect(parseArgs(["run", "task.md", "--answer", "syntax-not-single-source=Keep one parser"])).toMatchObject({ kind: "RunAgent", answers: [{ question: "syntax-not-single-source", answer: "Keep one parser" }] })
+  })
+  test("run rejects an answer id holding a space", () => {
+    expect(parseArgs(["run", "task.md", "--answer", "finding 1=no"])).toEqual({ kind: "UsageError", detail: "unknown question for --answer: finding 1" })
   })
   test("run rejects a repeated answer for one question", () => {
     expect(parseArgs(["run", "task.md", "--answer", "question-3=a", "--answer", "question-3=b"])).toEqual({ kind: "UsageError", detail: "duplicate answer for --answer: question-3" })

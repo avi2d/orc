@@ -3,10 +3,11 @@ import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { DateTime, Effect, FileSystem, Layer, Option, Redacted, Result } from "effect"
+import { Effect, FileSystem, Layer, Result } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../packages/run/src/dispatch/args"
 import { addTask, claimTask, closeStartedTask, listTasks, releaseTask, writeTaken } from "../../packages/run/src/dispatch/backlog"
+import { answerTask, askStartedTask, markAnswersRelayed, parkStartedTask } from "../../packages/run/src/dispatch/parked"
 import { placeTask, runBeat } from "../../packages/run/src/dispatch/beat"
 import { quietSources } from "../lib/beat-sources"
 import { formatBeat } from "../../packages/run/src/dispatch/board"
@@ -14,8 +15,8 @@ import { insertRun, openDatabase } from "../../packages/run/src/run-history"
 import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/dispatch/config"
 import { assessQuota } from "../../packages/run/src/dispatch/quota"
 import { taskLabel } from "../../packages/run/src/dispatch/pueue-status"
-import { renderTaskFile, type TaskRecord } from "../../packages/run/src/dispatch/task-record"
-import { decodeTokenText, tokenLive } from "../../packages/run/src/dispatch/token"
+import type { TaskRecord } from "../../packages/run/src/dispatch/task-record"
+import { renderTaskFile } from "../../packages/run/src/dispatch/task-record-render"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -166,6 +167,14 @@ describe("parseDispatchArgs", () => {
   test("a result with a repeated stdin marker is refused instead of read twice", () => {
     expect(parseDispatchArgs("runner", ["result", "task-1", "--stdin-label", "--stdin-label"]).kind).toBe("UsageError")
   })
+  test("runner answer refuses a reach instead of forwarding the answers", () => {
+    expect(parseDispatchArgs("runner", ["answer", "task-1", "--", "ssh", "linux", "orc"]).kind).toBe("UsageError")
+    expect(parseDispatchArgs("runner", ["answer", "task-1"])).toEqual({ kind: "RunnerAnswer", task: "task-1" })
+  })
+  test("runner answer refuses an answer on argv instead of letting a remote shell split it", () => {
+    expect(parseDispatchArgs("runner", ["answer", "task-1", "r2=Keep it"])).toEqual({ kind: "UsageError", detail: "unexpected argument: r2=Keep it" })
+    expect(parseDispatchArgs("runner", ["answer", "../task-1"]).kind).toBe("UsageError")
+  })
   test("runner -- with no command is refused instead of reading here", () => {
     expect(parseDispatchArgs("runner", ["start", "--"]).kind).toBe("UsageError")
     expect(parseDispatchArgs("runner", ["result", "task-1", "--"]).kind).toBe("UsageError")
@@ -265,35 +274,6 @@ describe("readDispatchConfig", () => {
       const read = await run(readDispatchConfig(file).pipe(Effect.as("read"), Effect.catchTag("ConfigError", () => Effect.succeed("refused"))))
       expect(read).toBe("refused")
     })
-  })
-})
-
-describe("the token document", () => {
-  const placeholder = "orc-test-placeholder-not-a-token"
-  const document = (fields: object) => JSON.stringify({ schema: "orc.token.v1", token: placeholder, expiresAt: "2026-10-30T12:00:00.000Z", ...fields })
-  test("reads the token and its expiry", () => {
-    const token = Option.getOrThrow(decodeTokenText(document({})))
-    expect(Redacted.value(token.token)).toBe(placeholder)
-    expect(DateTime.formatIso(token.expiresAt)).toBe("2026-10-30T12:00:00.000Z")
-  })
-  test("a token holding a space is refused instead of reaching the provider cut at it", () => {
-    expect(Option.isNone(decodeTokenText(document({ token: "two words" })))).toBe(true)
-  })
-  test("an unknown key is refused instead of ignored", () => {
-    expect(Option.isNone(decodeTokenText(document({ refreshToken: placeholder })))).toBe(true)
-  })
-  test("another schema is refused instead of read as a token", () => {
-    expect(Option.isNone(decodeTokenText(document({ schema: "orc.token.v2" })))).toBe(true)
-  })
-  test("a token printed as a redacted value never shows its text", () => {
-    const token = Option.getOrThrow(decodeTokenText(document({})))
-    expect(Bun.inspect(token)).not.toContain(placeholder)
-    expect(JSON.stringify(token)).not.toContain(placeholder)
-  })
-  test("a token running out within five minutes is lapsed instead of live", () => {
-    const now = DateTime.makeUnsafe("2026-10-30T12:00:00.000Z")
-    expect(tokenLive(DateTime.makeUnsafe("2026-10-30T12:05:00.000Z"), now)).toBe(false)
-    expect(tokenLive(DateTime.makeUnsafe("2026-10-30T12:05:01.000Z"), now)).toBe(true)
   })
 })
 
@@ -411,6 +391,37 @@ describe("the backlog folders", () => {
       const tasks = await run(listTasks(root))
       expect(tasks.map((task) => task.state.kind)).toEqual(["closed"])
       expect(await readdir(join(root, "taken"))).toEqual([])
+    })
+  })
+})
+
+describe("a relayed answer", () => {
+  const open = [{ id: "r2", text: "Keep the old flag?" }] as const
+  const startStarted = async (root: string): Promise<void> => {
+    const record = await run(addTask(root, spec))
+    await run(claimTask(root, record.spec.id))
+    await run(writeTaken(root, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/orc-1.log" } } }))
+  }
+  test("a re-asked question clears its relayed answer instead of resending it, and the new answer is accepted", async () => {
+    await withBacklog(async (root) => {
+      await startStarted(root)
+      expect(await run(askStartedTask(root, "orc-1", open))).toBe(true)
+      await run(answerTask(root, "orc-1", "r2=Keep it", "2026-10-27T10:05:00.000Z"))
+      await run(markAnswersRelayed(root, "orc-1", ["r2"]))
+      expect(await run(askStartedTask(root, "orc-1", open))).toBe(true)
+      const tasks = await run(listTasks(root))
+      expect(tasks.flatMap((task) => task.parked?.questions ?? [])).toMatchObject([{ id: "r2", text: "Keep the old flag?", answer: null }])
+      expect(await run(answerTask(root, "orc-1", "r2=Restore it", "2026-10-27T10:06:00.000Z"))).toMatchObject({ kind: "question", question: "r2" })
+    })
+  })
+  test("parking drops a relayed answer instead of carrying it to the next run", async () => {
+    await withBacklog(async (root) => {
+      await startStarted(root)
+      expect(await run(askStartedTask(root, "orc-1", open))).toBe(true)
+      await run(answerTask(root, "orc-1", "r2=Keep it", "2026-10-27T10:05:00.000Z"))
+      await run(markAnswersRelayed(root, "orc-1", ["r2"]))
+      const parked = await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ id: "r3", text: "Something else?" }] as const))
+      expect(parked.parked?.questions.map((question) => question.id)).toEqual(["r3"])
     })
   })
 })
