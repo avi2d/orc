@@ -57,7 +57,7 @@ describe("an ask-user finding parks as a question", () => {
         status: "new",
         parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "changes product behavior", answer: null }] }
       })
-      expect(await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Keep the flag"])).toBe("answered r2 on orc-1, so the beat resumes it on orc/orc-1" + "\n")
+      expect(await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Keep the flag"])).toBe("answered r2 on orc-1, so the beat resumes it on orc/orc-1\n")
       await rm(join(fixture.pueue, "add-args"), { force: true })
       expect(await orcOk(fixture, ["beat"])).toContain("started orc-1")
       const added = await queuedArgs(fixture)
