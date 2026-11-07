@@ -314,7 +314,7 @@ export const RunSqlRowSchema = Schema.Struct({
   sandbox: Schema.NullOr(Schema.Literals(sandboxKinds))
 })
 
-const runRecordOf = (row: typeof RunSqlRowSchema.Type): RunRecord => ({
+export const runRecordOf = (row: typeof RunSqlRowSchema.Type): RunRecord => ({
   id: row.id,
   project: row.project,
   branch: row.branch,

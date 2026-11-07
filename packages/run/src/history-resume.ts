@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite"
 import { Effect, Schema } from "effect"
 import type { OpenQuestion } from "./no-mistakes-gate"
 import { openQuestionSignal } from "./report"
-import { RunSqlRowSchema, sqlite, type RunRecord, type SqliteFailure } from "./run-history"
+import { RunSqlRowSchema, runRecordOf, sqlite, type RunRecord, type SqliteFailure } from "./run-history"
 
 export interface BranchStep {
   readonly name: string
@@ -31,20 +31,7 @@ export const latestRunForBranch = (
     Effect.flatMap((row) =>
       row === null || row === undefined
         ? Effect.succeed(null)
-        : Schema.decodeUnknownEffect(RunSqlRowSchema)(row).pipe(
-          Effect.map((decoded) => ({
-            id: decoded.id,
-            project: decoded.project,
-            branch: decoded.branch,
-            taskFile: decoded.task_file,
-            status: decoded.status,
-            started: decoded.started,
-            ended: decoded.ended,
-            prLink: decoded.pr_link,
-            endReason: decoded.end_reason,
-            sandbox: decoded.sandbox
-          }))
-        )
+        : Schema.decodeUnknownEffect(RunSqlRowSchema)(row).pipe(Effect.map(runRecordOf))
     )
   )
 
@@ -60,20 +47,7 @@ export const latestRunForBranchName = (
     Effect.flatMap((row) =>
       row === null || row === undefined
         ? Effect.succeed(null)
-        : Schema.decodeUnknownEffect(RunSqlRowSchema)(row).pipe(
-          Effect.map((decoded) => ({
-            id: decoded.id,
-            project: decoded.project,
-            branch: decoded.branch,
-            taskFile: decoded.task_file,
-            status: decoded.status,
-            started: decoded.started,
-            ended: decoded.ended,
-            prLink: decoded.pr_link,
-            endReason: decoded.end_reason,
-            sandbox: decoded.sandbox
-          }))
-        )
+        : Schema.decodeUnknownEffect(RunSqlRowSchema)(row).pipe(Effect.map(runRecordOf))
     )
   )
 
@@ -88,18 +62,7 @@ export const runsForBranch = (
     ).all(project, branch)
   ).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(RunSqlRowSchema))),
-    Effect.map((rows) => rows.map((decoded) => ({
-      id: decoded.id,
-      project: decoded.project,
-      branch: decoded.branch,
-      taskFile: decoded.task_file,
-      status: decoded.status,
-      started: decoded.started,
-      ended: decoded.ended,
-      prLink: decoded.pr_link,
-      endReason: decoded.end_reason,
-      sandbox: decoded.sandbox
-    })))
+    Effect.map((rows) => rows.map(runRecordOf))
   )
 
 export const stepsForRun = (

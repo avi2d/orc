@@ -210,7 +210,7 @@ A first unread beat only reports the read failure and starts the wait.
 To stop a task yourself, run `orc backlog stop <task-id>` where the backlog lives.
 It kills the run through the machine that started it and closes the task stopped.
 The closed task file keeps the PR link of the orc run on `orc/<task-id>` as `pr`, and `orc backlog --json` carries it as `pr`, or `null` when the run opened none.
-The beat prints `closed <task-id> <done|failed|stopped> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when a fresh start's read fails or runs past 30 seconds.
+The beat prints `closed <task-id> <done|failed|stopped> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds, until it stays unread for 10 minutes.
 A machine whose start runs any other program keeps owning its tasks, which the beat closes rather than stalls.
 To close one of those by hand, run `orc backlog close <task-id> <done|failed> [reason]`.
 A start older than 30 minutes with no run output in its log closes failed with `the machine keeps its own log, and the log shows no run output`.

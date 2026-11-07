@@ -224,10 +224,15 @@ const stopNow = (id: string, place: DispatchPlace) =>
       return yield* refuseRun("the machine " + started.claim.machine + " is not in dispatch.json")
     }
     const through = throughFor(machine)
+    const label = taskLabel(place.home, id)
     const line = through === null
-      ? yield* killHeld(place.home, id, taskLabel(place.home, id))
-      : yield* killHeldThrough(through, id, taskLabel(place.home, id))
-    yield* closeStartedTask(root, id, "stopped", "the captain stopped " + id, { pr: null, report: null }, DateTime.formatIso(yield* DateTime.now))
+      ? yield* killHeld(place.home, id, label)
+      : yield* killHeldThrough(through, id, label)
+    const after = through === null
+      ? yield* readResult(id, place.home, label).pipe(Effect.orElseSucceed(() => null))
+      : yield* readResultThrough(through, id, label).pipe(Effect.orElseSucceed(() => null))
+    const closed = after?.run ?? null
+    yield* closeStartedTask(root, id, "stopped", closed?.endReason ?? "the captain stopped " + id, { pr: closed?.prLink ?? null, report: null }, DateTime.formatIso(yield* DateTime.now))
     return line
   })
 

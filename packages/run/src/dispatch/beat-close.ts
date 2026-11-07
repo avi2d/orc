@@ -189,13 +189,10 @@ export const closeFinished = (
         Effect.catch(() => Effect.succeed<number | null>(null))
       )
     const stale = staleEndingOf(started.at, Date.parse(nowText), reading, unreadSince)
-    if (reading.kind === "unread" && stale === null) {
-      return { kind: "ended", action: { kind: "close-failed", task: task.spec.id, machine: claim.machine, reason: reading.reason } } satisfies Progress
-    }
-    const ending = stale ?? (reading.kind === "read" ? reading.ending : null)
+    const ending = reading.kind === "read" ? (stale ?? reading.ending) : stale
     if (ending === null) {
       if (reading.kind === "unread") {
-        return { kind: "untracked" } satisfies Progress
+        return { kind: "ended", action: { kind: "close-failed", task: task.spec.id, machine: claim.machine, reason: reading.reason } } satisfies Progress
       }
       const relay = (handed: Relay) =>
         through === null
@@ -204,9 +201,6 @@ export const closeFinished = (
       const action = reading.asking === null ? null : yield* serveAsking(context, task, claim.machine, reading.asking, relay)
       return { kind: "running", outputAt: reading.outputAt, action } satisfies Progress
     }
-    yield* fs.remove(unreadFile, { force: true }).pipe(
-      Effect.orElseSucceed(() => undefined)
-    )
     const ended = yield* endTask(context.root, task, claim.machine, ending)
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
   })

@@ -6,6 +6,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Layer, Path } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../../packages/run/src/dispatch/args"
+import { runDispatch, type DispatchPlace } from "../../../packages/run/src/dispatch/cli"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
 import { runBeat } from "../../../packages/run/src/dispatch/beat"
 import { ownLogEndingOf, staleEndingOf } from "../../../packages/run/src/dispatch/beat-close"
@@ -118,6 +119,44 @@ describe("stop and kill args", () => {
   })
 })
 
+describe("backlog stop", () => {
+  test("backlog stop closes the killed run stopped with its PR instead of a bare captain close", async () => {
+    await withBacklog(async (root) => {
+      const backlog = join(root, "backlog")
+      await mkdir(backlog, { recursive: true })
+      await writeFile(join(backlog, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["orc", "runner", "start"] }] }))
+      await writeFile(join(backlog, "projects.json"), JSON.stringify({ projects }))
+      await run(addTask(backlog, spec))
+      await run(claimTask(backlog, "orc-1"))
+      const first = (await run(listTasks(backlog))).find((task) => task.spec.id === "orc-1")
+      if (first === undefined) {
+        throw new Error("the backlog holds no orc-1")
+      }
+      await run(writeTaken(backlog, { spec: first.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: oldStart, log: backlog + "/logs/orc-1.log" } } }))
+      await Effect.runPromise(Effect.acquireUseRelease(
+        openDatabase(root),
+        (db) => Effect.gen(function*() {
+          insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "running", started: oldStart, prLink: "https://github.com/example/orc/pull/7" })
+          yield* recordStep(db, { runId: "run-1", name: "implement", attempt: 1, status: "running", started: oldStart, agentFile: "agent.md", piSessionFile: null })
+        }),
+        (db) => Effect.sync(() => db.close())
+      ).pipe(Effect.provide(BunServices.layer)))
+      const spawner = pueueStub(JSON.stringify({ tasks: { "11": { id: 11, label: taskLabel(root, "orc-1"), group: "orc", path: "/checkout", status: { Running: { start: oldStart } } } } }))
+      const place: DispatchPlace = { home: root, cwd: root, env: {}, self: ["orc"] as const, stdin: Effect.succeed(""), stdinIsTerminal: true, stdoutIsTerminal: false }
+      await Effect.runPromise(
+        runDispatch({ kind: "StopTask", id: "orc-1" }, place).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner)))
+      )
+      const closed = (await run(listTasks(backlog))).find((task) => task.spec.id === "orc-1")
+      if (closed?.state.kind !== "closed") {
+        throw new Error("orc-1 never closed")
+      }
+      expect(closed.state.closing.outcome).toBe("stopped")
+      expect(closed.state.closing.reason).toBe(stoppedEndReason)
+      expect(closed.state.closing.outcome === "start-failed" ? null : closed.state.closing.pr).toBe("https://github.com/example/orc/pull/7")
+    })
+  })
+})
+
 describe("a task closed stopped", () => {
   test("a stopped task keeps its start and reason instead of dropping to start-failed", async () => {
     await withBacklog(async (root) => {
@@ -189,6 +228,42 @@ describe("runner kill", () => {
       expect(runs.map((run) => run.endReason)).toEqual([stoppedEndReason])
     })
   })
+  test("kill on a queued restart records a stopped run instead of closing the old failed run again", async () => {
+    await withBacklog(async (root) => {
+      await Effect.runPromise(Effect.acquireUseRelease(
+        openDatabase(root),
+        (db) => Effect.sync(() => insertRun(db, { id: "run-0", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "failed", started: oldStart, ended: "2026-10-27T10:05:00.000Z", endReason: "orc exited 1" })),
+        (db) => Effect.sync(() => db.close())
+      ).pipe(Effect.provide(BunServices.layer)))
+      const spawner = pueueKillRefusing(JSON.stringify({ tasks: { "11": { id: 11, label: taskLabel(root, "orc-1"), group: "orc", path: "/checkout", status: { Queued: {} } } } }))
+      const line = await Effect.runPromise(
+        killHeld(root, "orc-1", taskLabel(root, "orc-1")).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner)))
+      )
+      expect(line).toBe("removed pueue task 11 for orc-1")
+      const runs = await Effect.runPromise(Effect.acquireUseRelease(
+        openDatabase(root),
+        (db) => runsForBranch(db, "/checkout", "orc/orc-1"),
+        (db) => Effect.sync(() => db.close())
+      ).pipe(Effect.provide(BunServices.layer)))
+      expect(runs.map((run) => run.status)).toEqual(["stopped", "failed"])
+      expect(runs[0]?.endReason).toBe(stoppedEndReason)
+    })
+  })
+  test("kill on a running task with no run row starts the stopped run inside the pueue interval instead of after it", async () => {
+    await withBacklog(async (root) => {
+      const spawner = pueueStub(JSON.stringify({ tasks: { "11": { id: 11, label: taskLabel(root, "orc-1"), group: "orc", path: "/checkout", status: { Running: { start: oldStart } } } } }))
+      await Effect.runPromise(
+        killHeld(root, "orc-1", taskLabel(root, "orc-1")).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner)))
+      )
+      const runs = await Effect.runPromise(Effect.acquireUseRelease(
+        openDatabase(root),
+        (db) => runsForBranch(db, "/checkout", "orc/orc-1"),
+        (db) => Effect.sync(() => db.close())
+      ).pipe(Effect.provide(BunServices.layer)))
+      expect(runs.map((run) => run.status)).toEqual(["stopped"])
+      expect(runs.map((run) => run.started)).toEqual([oldStart])
+    })
+  })
   test("kill stops the pueue task and marks its run stopped instead of leaving it running", async () => {
     await withBacklog(async (root) => {
       await Effect.runPromise(Effect.acquireUseRelease(
@@ -257,7 +332,7 @@ describe("the beat's stale start", () => {
       await startTaskOne(root, ["orc", "runner", "start"], oldStart)
       await Effect.runPromise(Effect.acquireUseRelease(
         openDatabase(root),
-        (db) => Effect.sync(() => insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "stopped", started: oldStart, ended: oldStart, endReason: "the run was stopped" })),
+        (db) => Effect.sync(() => insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "stopped", started: oldStart, ended: oldStart, prLink: "https://github.com/example/orc/pull/7", endReason: "the run was stopped" })),
         (db) => Effect.sync(() => db.close())
       ).pipe(Effect.provide(BunServices.layer)))
       const report = await Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueStub(JSON.stringify({ tasks: {} }))))))
@@ -265,6 +340,8 @@ describe("the beat's stale start", () => {
       const closed = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
       expect(closed?.state.kind === "closed" ? closed.state.closing.outcome + ":" + closed.state.closing.reason : "")
         .toBe("stopped:the run was stopped")
+      expect(closed?.state.kind === "closed" && closed.state.closing.outcome !== "start-failed" ? closed.state.closing.pr : null).toBe("https://github.com/example/orc/pull/7")
+      expect(closed === undefined ? "" : renderTaskFile(closed)).toContain("pr: \"https://github.com/example/orc/pull/7\"")
       expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1"])
     })
   })
@@ -310,6 +387,23 @@ describe("a stopped run", () => {
       report: null
     })
   })
+  test("a stopped close keeps the run PR instead of dropping it", () => {
+    const stoppedRun = { ...failedRun, status: "stopped" as const, prLink: "https://github.com/example/orc/pull/7" }
+    expect(endingFromResult({ task: "orc-1", pueueTask: 11, status: "failed", started: oldStart, ended: oldStart, reason: "orc exited 1", run: stoppedRun }, "ship")).toEqual({
+      kind: "close",
+      outcome: "stopped",
+      reason: "the run was stopped",
+      pr: "https://github.com/example/orc/pull/7",
+      report: null
+    })
+    expect(endingFromResult({ task: "orc-1", status: "unknown", run: stoppedRun }, "ship")).toEqual({
+      kind: "close",
+      outcome: "stopped",
+      reason: "the run was stopped",
+      pr: "https://github.com/example/orc/pull/7",
+      report: null
+    })
+  })
   test("a failed run closes with its end reason instead of the bare pueue reason", () => {
     expect(endingFromResult({ task: "orc-1", pueueTask: 11, status: "failed", started: oldStart, ended: oldStart, reason: "orc exited 1", run: failedRun }, "ship")).toEqual({
       kind: "close",
@@ -320,11 +414,11 @@ describe("a stopped run", () => {
     })
   })
   test("an unknown runner result with a stopped run closes stopped instead of failed", () => {
-    expect(endingFromResult({ task: "orc-1", status: "unknown", run: { id: "run-1", status: "stopped", prLink: null, endReason: "the run was stopped", openQuestions: [] } }, "ship")).toEqual({
+    expect(endingFromResult({ task: "orc-1", status: "unknown", run: { id: "run-1", status: "stopped", prLink: "https://github.com/example/orc/pull/7", endReason: "the run was stopped", openQuestions: [] } }, "ship")).toEqual({
       kind: "close",
       outcome: "stopped",
       reason: "the run was stopped",
-      pr: null,
+      pr: "https://github.com/example/orc/pull/7",
       report: null
     })
   })

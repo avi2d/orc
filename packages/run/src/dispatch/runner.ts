@@ -124,7 +124,7 @@ export const readHeld = (home: string, task: string, label?: string | null): Eff
     Effect.map((state) => heldTask(state.tasks, home, task, label))
   )
 
-const markBranchRunsStopped = (home: string, project: string, branch: string, taskFile: string): Effect.Effect<void, RunnerError, RunnerRequirements> =>
+const markBranchRunsStopped = (home: string, project: string, branch: string, taskFile: string, started: string): Effect.Effect<void, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const ended = DateTime.formatIso(yield* DateTime.now)
     yield* Effect.acquireUseRelease(
@@ -132,8 +132,8 @@ const markBranchRunsStopped = (home: string, project: string, branch: string, ta
       (db) =>
         Effect.gen(function*() {
           const runs = yield* runsForBranch(db, project, branch)
-          if (runs.length === 0) {
-            yield* recordRun(db, { id: newRunId(), project, branch, taskFile, status: "stopped", started: ended, ended, endReason: stoppedEndReason })
+          if (!runs.some((run) => run.status === "running")) {
+            yield* recordRun(db, { id: newRunId(), project, branch, taskFile, status: "stopped", started, ended, endReason: stoppedEndReason })
             return
           }
           yield* Effect.forEach(runs.filter((run) => run.status === "running"), (run) => markRunStopped(db, run.id, ended, stoppedEndReason), { discard: true })
@@ -162,12 +162,16 @@ export const killHeld = (
       Effect.catchTag("RunnerError", () => Effect.succeed(false))
     )
     const taskFile = home + "/runner/" + fileKeyOf(home, task, labelOf(home, task, label)) + ".md"
+    const started = Option.match(Schema.decodeUnknownOption(PueueStatus)(held.status), {
+      onNone: () => null,
+      onSome: (status) => "Running" in status ? status.Running.start : "Paused" in status ? status.Paused.start : null
+    }) ?? DateTime.formatIso(yield* DateTime.now)
     if (killed) {
-      yield* markBranchRunsStopped(home, held.path, taskBranch(task), taskFile)
+      yield* markBranchRunsStopped(home, held.path, taskBranch(task), taskFile, started)
       return "killed pueue task " + held.id + " for " + task
     }
     yield* pueue(["remove", String(held.id)])
-    yield* markBranchRunsStopped(home, held.path, taskBranch(task), taskFile)
+    yield* markBranchRunsStopped(home, held.path, taskBranch(task), taskFile, started)
     return "removed pueue task " + held.id + " for " + task
   })
 

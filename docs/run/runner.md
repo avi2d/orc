@@ -44,7 +44,7 @@ A renewal for a task pueue no longer runs for that home is refused and removes t
 
 To stop a run yourself, run `orc runner kill <task-id>` on its machine.
 It kills the running pueue task that carries the label, or removes one still queued, and marks the orc run on `orc/<task-id>` stopped.
-Removing a queued task records a stopped run, since the run never started.
+Removing a queued task records a stopped run when no run of the branch is still running, since the run never started.
 The next beat then closes the task stopped with the run's end reason.
 A kill for a task pueue never queued is refused, as a kill for a task already done is.
 
