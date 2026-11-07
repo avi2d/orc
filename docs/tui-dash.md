@@ -848,6 +848,11 @@ To run the checks:
 1. CI runs `bun run test` for the full unit and e2e suites.
 1. Run `bun run build` to bundle every tool and the `tui-dash` command into each package's `dist/` and write the changelog.
 
+`bun run test:fast` starts one worker per CPU, or fewer when the memory available holds less than 1100 MiB per worker.
+
+Set `TEST_FAST_WORKERS=<n>` to start exactly `n` workers.
+Values below 1 fail.
+
 The kit refuses a full mutation run outside CI, so the `mutation` workflow runs it when dispatched.
 Run `bunx stryker run --mutate "packages/schema/src/sources/quota.ts"` to mutate one file against the unit suite.
 
