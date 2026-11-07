@@ -54,35 +54,40 @@ const locatorStripped = (line: string): string => {
   return stripped === "" ? line : stripped
 }
 
-const singleLineGates: ReadonlySet<string> = new Set([
-  "comment-gate",
-  "docs",
-  "no-plain-js",
-  "test-layout",
-  "css-size",
-  "copy",
-  "frontend-syntax",
-  "effect-scope",
-  "lint-coverage",
-  "secrets",
-  "commit-identity",
-  "graphwalk",
-  "repetition",
-  "suppressions-ratchet",
-  "ci-wiring",
-  "quarantine-clock",
-  "advisories",
-  "browser",
-  "commit-title",
-  "docs-only",
-  "test"
-])
+const singleLinePrefixes: ReadonlyArray<readonly [string, string]> = [
+  ["effect-scope", "the @effect/language-service entry in tsconfig.json differs"],
+  ["lint-coverage", "oxlint skips "],
+  ["lint-coverage", "oxlint could not walk"],
+  ["lint-coverage", "tsc could not list"],
+  ["lint-coverage", "the program tsconfig.json builds drops"],
+  ["commit-identity", "package.json declares no author"],
+]
 
-const passInfo = (rest: string): boolean => {
-  if (/^\d+\/\d+ /.test(rest)) {
-    return true
+const singleLineRule = (gate: string, rest: string): string =>
+  gate === "lint-coverage" ? rest.replace(/^oxlint skips \d+\/\d+ /, "oxlint skips ") : rest
+
+const repetitionRule = (line: string): string | null => {
+  const rise = /^(\d+) repeated line\(s\)(, up from (\d+))?$/.exec(line)
+  if (rise === null) {
+    return null
   }
-  return /carry no refused|carry only allowed|each declared|\bholds?\b|\bsatisfy\b|\bpass\b|nothing was scanned|owns the verdict|\bunchanged\b|recorded no|\bcompared\b|had no|found no|\bscanned\b|advisory,|warning:|the full run|can skip|breaks no|hold to/i.test(rest) || /\bno (refused|secret|violation|plain|stylesheet|unreferenced|unused|finding|count|advisory|skip|tracked|quarantine|whole|mutation|test|more)\b/i.test(rest)
+  return rise[2] === undefined ? "repeated line(s)" : "repeated line(s), up from"
+}
+
+const testLayoutRule = (line: string): string =>
+  line.replace(/; move it to \S+$/, "")
+
+const commitRule = (line: string): string | null => {
+  const kind = /^(author|committer)\s/.exec(line)?.[1]
+  if (kind !== undefined) {
+    return kind
+  }
+  const trailer = /^trailer\s+(.*)$/.exec(line)?.[1]?.trim()
+  if (trailer !== undefined) {
+    const key = /^([^:]+:)/.exec(trailer)?.[1]
+    return key === undefined ? "trailer" : "trailer " + key
+  }
+  return null
 }
 
 const secretsRule = (line: string): string | null => {
@@ -138,7 +143,10 @@ export const refusalsIn = (output: string): ReadonlyArray<GateRefusal> => {
       }
       if (section === "commit") {
         if (/^ {4}\S/.test(raw)) {
-          keep(gate, raw.trim())
+          const rule = commitRule(raw.trim())
+          if (rule !== null) {
+            keep(gate, rule)
+          }
         }
         continue
       }
@@ -175,6 +183,17 @@ export const refusalsIn = (output: string): ReadonlyArray<GateRefusal> => {
         }
         continue
       }
+      if (gate === "repetition") {
+        const rule = repetitionRule(locatorStripped(raw.trim()))
+        if (rule !== null) {
+          keep(gate, rule)
+        }
+        continue
+      }
+      if (gate === "test-layout") {
+        keep(gate, testLayoutRule(locatorStripped(raw.trim())))
+        continue
+      }
       keep(gate, locatorStripped(raw.trim()))
       continue
     }
@@ -183,8 +202,13 @@ export const refusalsIn = (output: string): ReadonlyArray<GateRefusal> => {
     const single = /^([A-Za-z][A-Za-z0-9_-]*): (.+)$/.exec(raw)
     const name = single?.[1]
     const rest = single?.[2]?.trim()
-    if (name !== undefined && rest !== undefined && rest !== "" && singleLineGates.has(name) && !passInfo(rest)) {
-      keep(shortGate(name), rest)
+    if (name !== undefined && rest !== undefined && rest !== "") {
+      for (const [prefixGate, prefix] of singleLinePrefixes) {
+        if (name === prefixGate && rest.startsWith(prefix) && allowed(prefixGate)) {
+          keep(prefixGate, singleLineRule(prefixGate, rest))
+          break
+        }
+      }
     }
   }
   return refusals

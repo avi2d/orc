@@ -94,10 +94,10 @@ describe("refusalsIn", () => {
     const output = [
       "checks-lint: 1 of 3 gate(s) failed: checks-graphwalk",
       "imports: 1 violation(s) in 12 file(s) from 3 entrypoint(s):",
-      "  error no-cycle: src/a.ts -> src/b.ts",
+      "  error no-cycle: src/a.ts \u2192 src/b.ts",
       "unused: 1 unreferenced file(s):",
       "  src/unused.ts",
-      "exports: 1 unused export(s) not in baseline:",
+      "exports: 1 unused export(s) not in exports-baseline.json:",
       "  src/c.ts: myFunc (export)",
     ].join("\n")
     expect(refusalsIn(output)).toEqual([
@@ -110,52 +110,87 @@ describe("refusalsIn", () => {
   test("records secrets ranges that carry no digit after the colon instead of skipping them", () => {
     const output = [
       "checks-lint: 1 of 2 gate(s) failed: checks-secrets",
-      "secrets: the range adds 1 secret(s); carry only allowed secrets:",
+      "secrets: the range adds 1 secret(s); put a placeholder such as <private-key> in its place in the commit that added it, and rotate any secret that left this machine:",
       "  src/foo.ts:10 SECRET123 in abcdef12: description here",
     ].join("\n")
     expect(refusalsIn(output)).toEqual([{ gate: "secrets", rule: "SECRET123: description here" }])
   })
 
-  test("keeps commit-identity reasons instead of recording the sha and allowed lines", () => {
+  test("ignores secrets notices and docs pass lines when only comment-gate failed", () => {
     const output = [
-      "commit-identity: 1 of 2 commit(s) carry a foreign identity:",
+      "checks-lint: 1 of 9 gate(s) failed: checks-comment-gate",
+      "comment-gate: 1 violation(s):",
+      "  src/a.ts:1 carries the machine-read directive `x`. Fix it",
+      "secrets: CHECKS_SECRETS_PACK is unset, so the kit's rules ran without a private pack",
+      "secrets: the kit's rules and the private pack CHECKS_SECRETS_PACK names ran",
+      "docs: no line the range adds or edits copies a version package.json or .bun-version pins",
+      "docs: 2 doc file(s) the range touches hold to their templates",
+      "lint-coverage: 10/10 tracked .ts/.tsx/.astro files",
+      "effect-scope: tsconfig.json holds the Effect paths of oxlint.config.ts and the kit's severities",
+    ].join("\n")
+    expect(refusalsIn(output)).toEqual([{ gate: "comment-gate", rule: "carries the machine-read directive `x`. Fix it" }])
+  })
+
+  test("normalizes commit-identity reasons instead of recording names and emails", () => {
+    const output = [
+      "commit-identity: 1 of 2 commit(s) in base..head carry a foreign identity:",
       "  abc123def456 some subject",
-      "    author Alice <a@x> differs from the allowed one",
-      "    committer Bob <b@y> differs from the allowed one",
+      "    author Alice <a@x>",
+      "    committer Bob <b@y>",
+      "    trailer Co-authored-by: Bob <b@y>",
+      "    Mallory <m@x>",
       "  allowed: Alice <a@x>",
-      "  allowed as committer only: Bob <b@y>",
+      "  allowed as committer only: GitHub <noreply@github.com>, which also lets an allowed email author under any name",
     ].join("\n")
     expect(refusalsIn(output)).toEqual([
-      { gate: "commit-identity", rule: "author Alice <a@x> differs from the allowed one" },
-      { gate: "commit-identity", rule: "committer Bob <b@y> differs from the allowed one" },
+      { gate: "commit-identity", rule: "author" },
+      { gate: "commit-identity", rule: "committer" },
+      { gate: "commit-identity", rule: "trailer Co-authored-by:" },
     ])
   })
 
   test("records single-line gate failures instead of missing them or keeping pass lines", () => {
     const output = [
-      "effect-scope: the @effect/language-service entry in tsconfig.json differs from the generated one; run checks-effect-scope to rewrite them",
-      "effect-scope: tsconfig.json holds the Effect paths from the template",
-      "lint-coverage: oxlint skips 1/10 matched files in 1 command(s); missing:",
-      "lint-coverage: 10/10 matched files in 1 command(s)",
-      "src/a.ts:1:2: error TS1234: boom",
-      "checks-lint: 1 of 2 gate(s) failed: checks-docs",
+      "checks-lint: 3 of 9 gate(s) failed: checks-effect-scope, checks-lint-coverage, checks-commit-identity",
+      "effect-scope: the @effect/language-service entry in tsconfig.json differs from the Effect paths of oxlint.config.ts or the kit's severities; run checks-effect-scope to rewrite them",
+      "effect-scope: tsconfig.json holds the Effect paths of oxlint.config.ts and the kit's severities",
+      "lint-coverage: oxlint skips 1/10 tracked .ts/.tsx/.astro files; missing:",
+      "lint-coverage: oxlint skips 3/10 tracked .ts/.tsx/.astro files; missing:",
+      "src/missing-a.ts",
+      "src/missing-b.ts",
+      "lint-coverage: 10/10 tracked .ts/.tsx/.astro files",
+      "lint-coverage: the program tsconfig.json builds holds the ts-reset rules is-array and json-parse",
+      "commit-identity: package.json declares no author or contributors, so no identity is allowed; declare the owners there",
+      "src/a.ts:2:1: error eslint(no-debugger): `debugger` statement is not allowed help: Remove the debugger statement",
     ].join("\n")
     expect(refusalsIn(output)).toEqual([
-      { gate: "effect-scope", rule: "the @effect/language-service entry in tsconfig.json differs from the generated one; run checks-effect-scope to rewrite them" },
-      { gate: "lint-coverage", rule: "oxlint skips 1/10 matched files in 1 command(s); missing:" },
+      { gate: "effect-scope", rule: "the @effect/language-service entry in tsconfig.json differs from the Effect paths of oxlint.config.ts or the kit's severities; run checks-effect-scope to rewrite them" },
+      { gate: "lint-coverage", rule: "oxlint skips tracked .ts/.tsx/.astro files; missing:" },
+      { gate: "commit-identity", rule: "package.json declares no author or contributors, so no identity is allowed; declare the owners there" },
     ])
   })
 
-  test("keeps repetition counts as distinct rules instead of grouping them", () => {
+  test("drops the move target from test-layout rules instead of recording the path", () => {
     const output = [
-      "repetition: 2 file(s) hold repeat more lines than the baseline:",
+      "test-layout: 1 violation(s)",
+      "  tests/lib/foo.test.ts: tests/lib and tests/fixtures hold helpers and data, never tests; move it to tests/unit/foo.test.ts",
+    ].join("\n")
+    expect(refusalsIn(output)).toEqual([
+      { gate: "test-layout", rule: "tests/lib and tests/fixtures hold helpers and data, never tests" },
+    ])
+  })
+
+  test("groups repetition rises into one rule instead of splitting by counted lines", () => {
+    const output = [
+      "repetition: 2 file(s) .jscpd.json holds repeat more lines than where the range starts, at 50 tokens and 5 lines:",
       "  src/a.ts: 30 repeated line(s), up from 20",
       "    src/a.ts:1-5 repeats src/a.ts:10-14",
       "  src/a.ts: 40 repeated line(s), up from 20",
+      "  src/b.ts: 5 repeated line(s)",
     ].join("\n")
     expect(refusalsIn(output)).toEqual([
-      { gate: "repetition", rule: "30 repeated line(s), up from 20" },
-      { gate: "repetition", rule: "40 repeated line(s), up from 20" },
+      { gate: "repetition", rule: "repeated line(s), up from" },
+      { gate: "repetition", rule: "repeated line(s)" },
     ])
   })
 
