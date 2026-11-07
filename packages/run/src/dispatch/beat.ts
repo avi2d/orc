@@ -9,6 +9,7 @@ import type { Claim, TaskFileError, TaskRecord } from "./task-record"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
 import type { BeatAction } from "./beat-action"
 import { closeFinished } from "./beat-close"
+import { handAnswersToResume } from "./parked"
 import { taskLabel } from "./pueue-status"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
 import { flagStall } from "./stall"
@@ -97,7 +98,7 @@ const startTask = (
       return { kind: "given-back", task: task.spec.id, machine: machine.name } satisfies BeatAction
     }
     const log = backlogPaths(root).logFile(task.spec.id)
-    yield* writeTaken(root, { ...task, state: { kind: "started", claim, started: { at: yield* nowIso, log } } })
+    yield* writeTaken(root, { ...handAnswersToResume(task), state: { kind: "started", claim, started: { at: yield* nowIso, log } } })
     const env = {
       ORC_TASK_LOG: log,
       ORC_TASK_ID: task.spec.id,

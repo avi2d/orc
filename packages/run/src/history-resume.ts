@@ -84,7 +84,7 @@ export const stepsForRun = (
     Effect.map((rows) => rows.map((row) => ({ name: row.name, status: row.status, attempt: row.attempt, piSessionFile: row.pi_session_file })))
   )
 
-const SignalValues = Schema.Array(Schema.Struct({ value: Schema.fromJsonString(Schema.Struct({ id: Schema.String, text: Schema.String })) }))
+const SignalValues = Schema.Array(Schema.Struct({ value: Schema.fromJsonString(Schema.Struct({ id: Schema.String, text: Schema.String, asked: Schema.optional(Schema.String) })) }))
 
 export const openQuestionsForRun = (
   db: Database,

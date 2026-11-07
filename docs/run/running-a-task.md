@@ -86,8 +86,11 @@ A `direct-PR` run pushes the branch and opens the PR instead, as [Delivery modes
 At each gate orc asks no-mistakes to fix the findings marked `auto-fix`, ignores those marked `no-op`, and accepts the fix review.
 Orc treats an `ask-user` finding as a review question carrying the finding's id and text.
 A gate holding a question with no `--answer` keeps the run open there for 30 minutes while orc waits for your answer.
-While it waits, the run folder holds `asking.json` with the questions and the time the wait ends, and `orc runner result` reads the task as `paused`.
-An `answers.json` in the run folder, written whole as `[{"question": "<id>", "answer": "<text>"}]`, answers them, and the beat writes it from `orc backlog answer`, as [Parked runs](parked-runs.md) shows.
+While it waits, the run folder holds `asking.json` with the questions, the time it asked them and the time the wait ends.
+Meanwhile `orc runner result` reads the task as `paused`.
+An `answers.json` in the run folder answers them, written whole as `{"asking": "<asked>", "answers": [{"question": "<id>", "answer": "<text>"}]}`.
+Its `asking` names the time in `asking.json`, and a wait ignores answers that name another asking.
+The beat writes it from `orc backlog answer`, as [Parked runs](parked-runs.md) shows.
 To change the wait, set `ORC_ANSWER_WAIT_SECONDS` to a whole number of seconds, where `0` refuses the gate at once.
 A question still unanswered when the wait ends makes orc refuse the gate.
 Rerun with `--answer question-<id>="<text>"` and orc answers every open question before any gate response.

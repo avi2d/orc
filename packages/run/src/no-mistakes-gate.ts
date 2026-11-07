@@ -10,6 +10,7 @@ export interface QuestionAnswer {
 export interface OpenQuestion {
   readonly id: string
   readonly text: string
+  readonly asked?: string | undefined
 }
 
 export interface NoMistakesFinding {

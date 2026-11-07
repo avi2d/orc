@@ -13,8 +13,9 @@ const questionFronts = (questions: ReadonlyArray<ParkedQuestion>) =>
   questions.map((question) => ({
     id: question.id,
     text: question.text,
+    asked_at: question.asked,
     ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at }),
-    ...(question.used ? { used: true } : {})
+    ...(question.answer?.relayedTo == null ? {} : { relayed_to: question.answer.relayedTo })
   }))
 
 const holdQuestionFronts = (questions: ReadonlyArray<HoldQuestion>) =>

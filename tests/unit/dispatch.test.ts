@@ -7,7 +7,6 @@ import { Effect, FileSystem, Layer, Result } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../packages/run/src/dispatch/args"
 import { addTask, claimTask, closeStartedTask, listTasks, releaseTask, writeTaken } from "../../packages/run/src/dispatch/backlog"
-import { answerTask, askStartedTask, markAnswersRelayed, parkStartedTask } from "../../packages/run/src/dispatch/parked"
 import { placeTask, runBeat } from "../../packages/run/src/dispatch/beat"
 import { quietSources } from "../lib/beat-sources"
 import { formatBeat } from "../../packages/run/src/dispatch/board"
@@ -391,37 +390,6 @@ describe("the backlog folders", () => {
       const tasks = await run(listTasks(root))
       expect(tasks.map((task) => task.state.kind)).toEqual(["closed"])
       expect(await readdir(join(root, "taken"))).toEqual([])
-    })
-  })
-})
-
-describe("a relayed answer", () => {
-  const open = [{ id: "r2", text: "Keep the old flag?" }] as const
-  const startStarted = async (root: string): Promise<void> => {
-    const record = await run(addTask(root, spec))
-    await run(claimTask(root, record.spec.id))
-    await run(writeTaken(root, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/orc-1.log" } } }))
-  }
-  test("a re-asked question clears its relayed answer instead of resending it, and the new answer is accepted", async () => {
-    await withBacklog(async (root) => {
-      await startStarted(root)
-      expect(await run(askStartedTask(root, "orc-1", open))).toBe(true)
-      await run(answerTask(root, "orc-1", "r2=Keep it", "2026-10-27T10:05:00.000Z"))
-      await run(markAnswersRelayed(root, "orc-1", ["r2"]))
-      expect(await run(askStartedTask(root, "orc-1", open))).toBe(true)
-      const tasks = await run(listTasks(root))
-      expect(tasks.flatMap((task) => task.parked?.questions ?? [])).toMatchObject([{ id: "r2", text: "Keep the old flag?", answer: null }])
-      expect(await run(answerTask(root, "orc-1", "r2=Restore it", "2026-10-27T10:06:00.000Z"))).toMatchObject({ kind: "question", question: "r2" })
-    })
-  })
-  test("parking drops a relayed answer instead of carrying it to the next run", async () => {
-    await withBacklog(async (root) => {
-      await startStarted(root)
-      expect(await run(askStartedTask(root, "orc-1", open))).toBe(true)
-      await run(answerTask(root, "orc-1", "r2=Keep it", "2026-10-27T10:05:00.000Z"))
-      await run(markAnswersRelayed(root, "orc-1", ["r2"]))
-      const parked = await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ id: "r3", text: "Something else?" }] as const))
-      expect(parked.parked?.questions.map((question) => question.id)).toEqual(["r3"])
     })
   })
 })

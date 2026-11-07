@@ -13,7 +13,8 @@ The chat's Pi has six tools and no others:
   It may add a kind, an internal mark, a machine and the ids the task depends on.
 - `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
 - `orc_backlog_hold` holds one new task through `orc backlog hold`, with the reason, an optional date and optional questions.
-- `orc_backlog_answer` answers a held task, a parked task, or a started task waiting at its gate through `orc backlog answer`, with your words as you said them, or one open question on such a task when it names the question's id.
+- `orc_backlog_answer` answers a held task, a parked task, or a started task waiting at its gate through `orc backlog answer`.
+  It passes your words as you said them, or answers one open question when it names the question's id.
 - `merge_task` lands a closed task's PR through `orc merge <task-id> --basis <basis>`, as [Merging a task's PR](merging-a-tasks-pr.md) shows.
 - `orc_decision_board` opens a decision board for one held task, one parked task, or one started task waiting at its gate, as [Decision boards](chat.md#decision-boards) shows.
 
@@ -32,6 +33,7 @@ When it cannot read or mark the backlog, it posts orc's error once Pi is idle an
 Each time the chat starts, it posts one line per held task you have not answered, once Pi is idle, as in `orc-2 Pick the API is held for the captain: REST or gRPC, until 2026-12-01`.
 It posts one line per parked question you have not answered each time it starts, and once more when a task parks while it runs, as in `orc-3 Fix the retries is parked on orc/orc-3 for the captain's answer to question-4: Which retries are allowed?`.
 Questions from a run waiting at its gate post the same way, as [Parked runs](parked-runs.md) shows.
+A question the run asks again at a later wait posts again.
 A question whose line a failed read or a busy Pi kept back is posted on a later poll.
 The chat's Pi loads your Pi settings and packages, so a provider a package adds works as it does in your Pi.
 The chat's Pi also takes the `env` of the orchestrator's provider, so the chat and the runs of that provider use the same account whatever your shell exports.
