@@ -27,11 +27,6 @@ const parseWorktreeList = (porcelain: string): ReadonlyArray<ListedCopy> =>
     return dir === undefined ? [] : [{ dir, branch: ref?.startsWith("refs/heads/") === true ? ref.slice("refs/heads/".length) : null, missing }]
   })
 
-// A branch copy made before orc kept copies under its home is still reused where it sits, inside the checkout.
-const legacyCopiesDir = ".sandcastle/worktrees"
-
-export const legacyCopiesExcluded = ":(exclude)" + legacyCopiesDir
-
 const taskCopyDir = (path: Path.Path, home: string, projectDir: string, branch: string): string =>
   path.join(home, "worktrees", path.basename(projectDir), branch)
 
@@ -44,8 +39,8 @@ const realPathOf = (fs: FileSystem.FileSystem, dir: string): Effect.Effect<strin
   fs.realPath(dir).pipe(Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot resolve " + dir + ": " + String(cause) })))
 
 // Only the folders orc's own runs made copies in are swept; a copy found anywhere else belongs to someone else.
-const madeByOrc = (path: Path.Path, home: string, projectDir: string, dir: string): boolean =>
-  [path.join(home, "worktrees"), path.join(projectDir, legacyCopiesDir)].some((root) => dir.startsWith(root + "/"))
+const madeByOrc = (path: Path.Path, home: string, dir: string): boolean =>
+  dir.startsWith(path.join(home, "worktrees") + "/")
 
 export const openTaskCopy = (
   fs: FileSystem.FileSystem,
@@ -73,7 +68,7 @@ export const openTaskCopy = (
         return yield* refuse("orc: " + projectDir + " has " + branch + " checked out itself, and git checks a branch out in one place only, so switch the checkout to another branch")
       }
       yield* Console.log("orc: reusing the copy of " + branch + " at " + dir)
-      return { dir, removable: madeByOrc(path, realHome, projectDir, dir) }
+      return { dir, removable: madeByOrc(path, realHome, dir) }
     }
     const dir = taskCopyDir(path, realHome, projectDir, branch)
     if (yield* fs.exists(dir).pipe(Effect.orElseSucceed(() => true))) {

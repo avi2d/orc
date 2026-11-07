@@ -1,5 +1,5 @@
 commands:
-  prepare: bun install
+  prepare: bun install --frozen-lockfile
   lint: bun run lint
   typecheck: bun run typecheck
   test: bun run test

@@ -4,7 +4,7 @@ import type { SandboxKind } from "./args"
 import { checkedModelWindows, contextMarkJson, type ModelProbe, readModelWindows } from "./context-mark"
 import { requireTokenFile, tokenFileApiKey, tokenFileSource, tokenFileVar } from "./model-route"
 import { inheritedEnv } from "./nono"
-import { type CheckedModelWindow, type HostTools, loginCheckCommand, type ModelCredential, modelCredentialFor, piAgentModels, type ProviderKey, providerKeyOf, within } from "./nono-profile"
+import { type CheckedModelWindow, type HostTools, loginCheckCommand, type ModelCredential, modelCredentialFor, piAgentModels, type ProviderKey, providerKeyOf } from "./nono-profile"
 import type { LoginProvider, OrcConfig, PackageProvider, Provider, TokenFileProvider } from "./orc-config"
 import { OrcRunError } from "./run-session"
 
@@ -14,7 +14,7 @@ interface OwnAgentDir {
 }
 
 export type SandboxPlan =
-  | { readonly kind: "nono"; readonly credential: ModelCredential; readonly readFolders: ReadonlyArray<string> }
+  | { readonly kind: "nono"; readonly credential: ModelCredential }
   | { readonly kind: "none"; readonly own: OwnAgentDir | null }
 
 export interface ProviderChoice<P extends Provider = Provider> {
@@ -35,15 +35,6 @@ interface AgentModels {
 }
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
-
-// The sandbox reads each folder whole, so a folder holding HOME would hand it the operator's credentials.
-export const sandboxReadFolders = (config: Pick<OrcConfig, "file" | "sandbox">, home: string): Effect.Effect<ReadonlyArray<string>, OrcRunError> => {
-  const folders = (config.sandbox?.read ?? []).map((folder) => folder.replace(/\/+$/, ""))
-  const holdsHome = folders.find((folder) => folder === "" || within(folder, home))
-  return holdsHome === undefined
-    ? Effect.succeed(folders)
-    : refuse("orc: " + config.file + " lists " + (holdsHome === "" ? "/" : holdsHome) + " under sandbox.read, which holds HOME, and the sandbox reads each listed folder whole")
-}
 
 const runLoginCheck = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
@@ -121,12 +112,11 @@ const planLogin = (
     if (provider.nono === undefined) {
       return yield* refuse("orc: " + choice.config.file + " gives the provider " + provider.id + " no nono entry, so the nono sandbox cannot carry its key; add one with its upstream or run with --sandbox none")
     }
-    const readFolders = yield* sandboxReadFolders(choice.config, host.homeDir)
     const credential = modelCredentialFor({ id: provider.id, ...provider.nono }, host)
     yield* runLoginCheck(spawner, host, dirs.projectDir, provider.id, false)
     const checked = yield* checkedAgentWindows(spawner, host, dirs.runDir, models, { kind: "operator" })
     yield* writeAgentDir(fs, path, dirs.piAgentDir, providerKeyOf(credential), checked)
-    return { kind: "nono", credential, readFolders }
+    return { kind: "nono", credential }
   })
 
 // Pi prefers a stored login over a configured key, so a token-file run reads its own agent folder and never the operator's.

@@ -34,7 +34,6 @@ export const openAgentExec = (
       modelCredential: plan.credential,
       hostEnv: Bun.env,
       toolchain,
-      readFolders: plan.readFolders,
       env: {}
     }).pipe(Effect.mapError((cause) => new OrcRunError({ message: "orc: the sandbox failed to start: " + cause.message })))
 

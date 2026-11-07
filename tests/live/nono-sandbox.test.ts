@@ -98,7 +98,6 @@ describe("the nono exec", () => {
     piSessionDir,
     sessionsDir: piSessionDir,
     hostEnv: { ...Bun.env, ...hostEnv },
-    readFolders: [],
     env: {}
   })
 

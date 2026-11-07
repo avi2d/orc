@@ -29,14 +29,13 @@ const seedCopy = async (dir: string): Promise<void> => {
   git(main, ["worktree", "add", "-q", "-b", "orc/t", join(dir, "copy")])
 }
 
-const runInNono = (dir: string, home: string, command: string, readFolders: ReadonlyArray<string> = []) =>
+const runInNono = (dir: string, home: string, command: string) =>
   Effect.runPromise(Effect.scoped(Effect.gen(function*() {
     const exec = yield* openNonoExec({
       worktree: join(dir, "copy"),
       piSessionDir: join(dir, "run", "session"),
       sessionsDir: join(dir, "run", "sessions"),
       hostEnv: { PATH: Bun.env.PATH, HOME: home },
-      readFolders,
       env: { ORC_HOME: join(dir, "orc-home"), AGENT_TOKEN_FILE: "/k" }
     })
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
@@ -71,28 +70,4 @@ describe("openNonoExec", () => {
     60_000
   )
 
-  test.skipIf(Bun.which("nono") === null)(
-    skipReason("needs nono on PATH to run the sandbox", "a folder the operator lists is readable but not writable, and its unlisted sibling stays unreadable"),
-    async () => {
-      const dir = await realpath(await mkdtemp(join(tmpdir(), "orc-nono-exec-")))
-      const home = await fixtureHome()
-      try {
-        await seedCopy(dir)
-        await mkdir(join(home, "cache"))
-        await writeFile(join(home, "cache", "record"), "cached\n")
-        await mkdir(join(home, "other"))
-        await writeFile(join(home, "other", "secret"), "secret\n")
-        const result = await runInNono(dir, home, [
-          "cat \"" + join(home, "cache", "record") + "\"",
-          "echo x > \"" + join(home, "cache", "new") + "\" 2>/dev/null || echo write-refused",
-          "cat \"" + join(home, "other", "secret") + "\" 2>/dev/null || echo read-refused"
-        ].join("; "), [join(home, "cache")])
-        expect(result.stdout.split("\n").filter((line) => line !== "")).toEqual(["cached", "write-refused", "read-refused"])
-      } finally {
-        await rm(dir, { recursive: true, force: true })
-        await rm(home, { recursive: true, force: true })
-      }
-    },
-    60_000
-  )
 })

@@ -42,7 +42,7 @@ const withFakePi = async (body: (fixture: Fixture) => ReadonlyArray<string>, use
   }
 }
 
-const run = (fixture: Fixture, pacing: { readonly tickMillis: number; readonly idleMillis: number }, stored: Array<string>): Promise<PiRun> =>
+const run = (fixture: Fixture, pacing: { readonly tickMillis: number; readonly idleMillis: number; readonly minuteMillis?: number }, stored: Array<string>): Promise<PiRun> =>
   Effect.runPromise(Effect.gen(function*() {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const fs = yield* FileSystem.FileSystem
@@ -121,6 +121,21 @@ describe("runPi", () => {
       const result = await run(fixture, { tickMillis: 60_000, idleMillis: 300 }, [])
       expect(result.end.kind).toBe("idle")
       expect(Date.now() - started).toBeLessThan(10_000)
+    })
+  }, 20_000)
+
+  test("logs still running while a tool runs instead of staying silent", async () => {
+    await withFakePi((fixture) => [
+      emit(header),
+      emit(toolStart),
+      "sleep 0.6",
+      emit(toolEnd),
+      emit(reply("Done.")),
+      "echo '{}' > \"" + join(fixture.sessionDir, "2026-11-07T07-41-13-123Z_s1.jsonl") + "\""
+    ], async (fixture) => {
+      const result = await run(fixture, { tickMillis: 20, idleMillis: 5_000, minuteMillis: 100 }, [])
+      expect(result.end).toEqual({ kind: "exited", exitCode: 0 })
+      expect(await readFile(fixture.logFile, "utf8")).toContain("orc: still running bun run test")
     })
   }, 20_000)
 })

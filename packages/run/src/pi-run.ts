@@ -17,6 +17,7 @@ export interface PiRequest {
 export interface PiPacing {
   readonly tickMillis: number
   readonly idleMillis: number
+  readonly minuteMillis?: number
 }
 
 export type PiEnd =
@@ -41,7 +42,7 @@ interface RunningTool {
   readonly since: number
 }
 
-const minuteMillis = 60_000
+const defaultMinuteMillis = 60_000
 
 export const idleSpan = (seconds: number): string =>
   seconds < 120 ? seconds.toString() + (seconds === 1 ? " second" : " seconds") : Math.floor(seconds / 60).toString() + " min"
@@ -101,7 +102,7 @@ export const readPiLine = (line: string, sessionDir: string): PiLine =>
     }
   })
 
-export const stillRunningLines = (running: Iterable<RunningTool>, now: number): ReadonlyArray<string> =>
+export const stillRunningLines = (running: Iterable<RunningTool>, now: number, minuteMillis: number = defaultMinuteMillis): ReadonlyArray<string> =>
   [...running].flatMap((tool) => {
     const minutes = Math.floor((now - tool.since) / minuteMillis)
     return minutes < 1 ? [] : ["still running " + tool.label + " (" + minutes.toString() + " min)"]
@@ -160,7 +161,7 @@ export const runPi = (
           running.delete(read.id)
         }
       })
-    const report = Effect.forEach(stillRunningLines(running.values(), Date.now()), (line) => log("orc: " + line)).pipe(
+    const report = Effect.suspend(() => Effect.forEach(stillRunningLines(running.values(), Date.now(), pacing.minuteMillis ?? defaultMinuteMillis), (line) => log("orc: " + line))).pipe(
       Effect.delay(pacing.tickMillis),
       Effect.forever
     )

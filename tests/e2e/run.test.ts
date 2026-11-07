@@ -45,11 +45,11 @@ describe("runAgentStep refusals", () => {
     })
   })
 
-  test("an old in-checkout copy of a stopped run's branch does not count as uncommitted changes and block its resume", async () => {
+  test("an old in-checkout copy of a stopped run's branch counts as uncommitted changes and blocks its resume", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         git(dir, ["worktree", "add", "-q", join(dir, ".sandcastle", "worktrees", "orc-test"), "-b", "orc/test"])
-        expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test" })).toContain("cannot read the task file")
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test" })).toContain("uncommitted changes")
       })
     })
   })

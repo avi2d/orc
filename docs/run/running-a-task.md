@@ -34,8 +34,8 @@ Orc refuses a resume whose `--sandbox` names another kind than the one recorded.
 A run recorded before orc stored the sandbox takes it from the flag, with nono as the default.
 On resume orc reuses the copy that holds the branch, wherever git lists it, and Pi resumes its prior session.
 A resumed `no-mistakes` run reattaches to no-mistakes with the same intent.
-A copy from before orc kept copies under `$ORC_HOME`, in the project's `.sandcastle/worktrees` folder, is reused where it sits.
-When the run ends, orc removes the copy it made unless the copy holds uncommitted changes, which it keeps and names.
+A copy from before orc kept copies under `$ORC_HOME`, in the project's `.sandcastle/worktrees` folder, is reused where it sits and kept when the run ends.
+When the run ends, orc removes the copy it made under `$ORC_HOME` unless the copy holds uncommitted changes, which it keeps and names.
 After a refusal, run the same resume command with `--allow` and the name from the report, or with `--answer` and your answer for a question.
 No-mistakes takes the word for that `--allow` kind, and the answer for that question.
 Orc also refuses a checkout whose own git config sets any key outside a short list known to run no program.
@@ -44,7 +44,7 @@ Orc trims padding around each name and drops blank entries.
 Orc checks each marker in the project directory and its parent and refuses a checkout carrying one.
 An unset `ORC_REFUSE_MARKERS` names no marker and refuses no checkout for a marker.
 
-Before Pi starts, orc runs the `prepare` command from the copy's `.no-mistakes.yaml`, such as `bun install`, inside the same sandbox as Pi.
+Before Pi starts, orc runs the `prepare` command from the copy's `.no-mistakes.yaml`, such as `bun install --frozen-lockfile`, inside the same sandbox as Pi.
 A copy without a `prepare` command starts Pi without an install.
 Orc refuses the run before Pi starts when the command fails, and its output is in the run folder's `prepare.log`.
 Pi and the checks run with `BUN_OPTIONS=--no-install`, so a missing package fails on its import instead of Bun fetching it on the fly.

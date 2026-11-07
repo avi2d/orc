@@ -2,7 +2,6 @@ import { Effect, type FileSystem, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { runGit } from "./git-run"
 import { OrcRunError } from "./run-session"
-import { legacyCopiesExcluded } from "./task-copy"
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
 
@@ -44,7 +43,7 @@ export const openCheckout = (
         return yield* refuse("orc: " + candidate + " marks this checkout as refused, so orc refuses to run in it")
       }
     }
-    const status = yield* runGit(spawner, git, ["status", "--porcelain", "--", ".", legacyCopiesExcluded], projectDir)
+    const status = yield* runGit(spawner, git, ["status", "--porcelain", "--", "."], projectDir)
     if (status.exitCode !== 0) {
       return yield* refuse("orc: git status failed in " + projectDir)
     }

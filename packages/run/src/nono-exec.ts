@@ -15,7 +15,6 @@ export interface NonoExecOptions {
   readonly modelCredential?: ModelCredential | undefined
   readonly hostEnv: Readonly<Record<string, string | undefined>>
   readonly toolchain?: ToolchainResolver | undefined
-  readonly readFolders: ReadonlyArray<string>
   readonly env: Readonly<Record<string, string>>
 }
 
@@ -45,7 +44,7 @@ export const openNonoExec = (
     const nono = (args: ReadonlyArray<string>) => ChildProcess.make(nonoBinary, args, { env, extendEnv: false })
     const profileDir = yield* fs.makeTempDirectoryScoped({ prefix: "orc-nono-" })
     const profilePath = path.join(profileDir, "profile.json")
-    const profile = yield* selectNonoProfile(roots, { developerDir, toolchainFolders: [...toolchain.folders, ...options.readFolders], runtimeDirs }, options.modelCredential)
+    const profile = yield* selectNonoProfile(roots, { developerDir, toolchainFolders: [...toolchain.folders], runtimeDirs }, options.modelCredential)
     yield* fs.writeFileString(profilePath, `${JSON.stringify(profile, null, 2)}\n`)
     yield* checkProfile(spawner, nono, profilePath, [profileDir, nonoBinary, path.dirname(nonoBinary)])
     yield* fs.makeDirectory(sandboxed.TMPDIR, { recursive: true })

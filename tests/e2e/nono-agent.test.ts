@@ -52,7 +52,6 @@ const sandboxFor = (sandbox: SandboxFor): NonoExecOptions => ({
   piAgentDir: sandbox.piAgentDir,
   modelCredential: sandbox.modelCredential,
   hostEnv: { ...Bun.env, HOME: fixtureHome, ...sandbox.hostEnv },
-  readFolders: [],
   env: {}
 })
 
