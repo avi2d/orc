@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { NonoProviderError } from "../../packages/run/src/host"
 import type { NonoExecOptions } from "../../packages/run/src/nono-exec"
+import { makeNonoFixtureHome } from "../lib/nono-home"
 import { nonoOpenError, type NonoShellRun, runNonoShell, withNonoShell } from "../lib/nono-shell"
 
 // Nesting a nono sandbox is forbidden inside an already-sandboxed macOS session, so these run on demand:
@@ -21,13 +22,7 @@ const credentialEnv = {
   GIT_CONFIG_VALUE_0: `Authorization: ${sentinelAuthorization}`
 }
 
-// nono refuses a HOME whose state root falls under the /var or /tmp it grants, so the fixture home is not under the system temp dir.
-const systemTempRoots = ["/tmp", "/private/tmp", "/var", "/private/var"]
-const underSystemTemp = (candidate: string): boolean =>
-  systemTempRoots.some((root) => candidate === root || candidate.startsWith(root + "/"))
-const homeBase = (cwd: string, systemTmp: string): string =>
-  !underSystemTemp(cwd) ? cwd : (!underSystemTemp(systemTmp) ? systemTmp : cwd)
-const fixtureHome = await mkdtemp(join(homeBase(process.cwd(), tmpdir()), ".orc-nono-home-"))
+const fixtureHome = await makeNonoFixtureHome(".orc-nono-home-")
 await writeFile(join(fixtureHome, ".gitconfig"), "")
 const fixtureGitEnv = { PATH: Bun.env.PATH ?? "", HOME: fixtureHome, GIT_CONFIG_GLOBAL: join(fixtureHome, ".gitconfig"), GIT_CONFIG_NOSYSTEM: "1" }
 

@@ -278,7 +278,6 @@ const summaryAt1920 = [
   "quota-pace none recorded",
   "heavy-load 40m ago · expected, a nightly baseline runs on south",
   "long-task  10m ago · no verdict on this fire",
-  "nightly    none recorded",
 ];
 
 describe("the dashboard's alerts panel", () => {
@@ -295,7 +294,7 @@ describe("the dashboard's alerts panel", () => {
     expect(shown).toHaveLength(standardRows);
     expect(shown.slice(-summaryAt1920.length)).toEqual(summaryAt1920);
     expect(shown).toContain("+1 more claude profiles");
-    expect(shown.filter((line) => line.startsWith("⚑"))).toHaveLength(2);
+    expect(shown.filter((line) => line.startsWith("⚑"))).toHaveLength(4);
     for (const kept of ["queue    north", "actions  toolshed", "machine  cpu 11%", "gpu      NVIDIA"]) expect(shown.some((line) => line.startsWith(kept))).toBe(true);
   });
 
@@ -334,11 +333,11 @@ const manyGpuView = (cards: number) => {
 describe("the dashboard with eight saved claude profiles and sixteen gpus in a standard 84x24 terminal", () => {
   const lines = () => glanceRows({ blocks: busyBlocks(), sessions: sessions(), machines: alone(manyGpuView(16)) }, width, standardRows).map(plain);
 
-  test("keeps every live account, two flags and the machine, and sums the gpus up on one line", () => {
+  test("keeps every live account, four flags and the machine, and sums the gpus up on one line", () => {
     const shown = lines();
     expect(shown.length).toBeLessThanOrEqual(standardRows);
     for (const header of ["● claude main", "● codex", "● opencode-go"]) expect(shown.some((line) => line.startsWith(header))).toBe(true);
-    expect(shown.filter((line) => line.startsWith("⚑"))).toHaveLength(2);
+    expect(shown.filter((line) => line.startsWith("⚑"))).toHaveLength(4);
     expect(shown).toContain("machine  cpu 11% · memory 5.5G of 31.3G");
     expect(shown).toContain("gpus     16 cards · busiest 9% · memory 29.2G of 256.0G");
   });

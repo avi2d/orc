@@ -7,6 +7,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
 import { NonoProviderError } from "../../packages/run/src/host"
 import { buildSandboxEnv } from "../../packages/run/src/nono"
+import { makeNonoFixtureHome } from "../lib/nono-home"
 import { nonoOpenError } from "../lib/nono-shell"
 import { buildNonoProfile, defaultToolchainFolders, runtimeReadFiles, systemReadPaths } from "../../packages/run/src/nono-profile"
 
@@ -19,13 +20,7 @@ const roots = {
 
 const noHost = { developerDir: null, toolchainFolders: defaultToolchainFolders, runtimeDirs: [] }
 
-// nono refuses a HOME whose state root falls under the /var or /tmp it grants, so the fixture home is not under the system temp dir.
-const systemTempRoots = ["/tmp", "/private/tmp", "/var", "/private/var"]
-const underSystemTemp = (candidate: string): boolean =>
-  systemTempRoots.some((root) => candidate === root || candidate.startsWith(root + "/"))
-const homeBase = (cwd: string, systemTmp: string): string =>
-  !underSystemTemp(cwd) ? cwd : (!underSystemTemp(systemTmp) ? systemTmp : cwd)
-const fixtureHome = await mkdtemp(join(homeBase(process.cwd(), tmpdir()), ".orc-nono-home-"))
+const fixtureHome = await makeNonoFixtureHome(".orc-nono-home-")
 await writeFile(join(fixtureHome, ".gitconfig"), "")
 const fixtureGitEnv = { PATH: Bun.env.PATH ?? "", HOME: fixtureHome, GIT_CONFIG_GLOBAL: join(fixtureHome, ".gitconfig"), GIT_CONFIG_NOSYSTEM: "1" }
 

@@ -8,14 +8,14 @@
 │   5 hours    ━━━━━━━━━━━━━━━━┃ 100%  on pace      4h 59m ││                                                          │
 │   week       ━━━━━━━━━━━━━━──┃  82%  11 over      6d 11h ││                                                          │
 │ ● opencode-go · runs out in 22d                          ││                                                          │
-│ +3 more rows                                             ││                                                          │
+│   5 hours    ━━━━━━━━━━━━━━━━┃ 100%  on pace      4h 59m ││                                                          │
+│ +2 more rows                                             ││                                                          │
 ╰──────────────────────────────────────────────────────────╯│                                                          │
 ╭─ gluttons | alerts ─────────────────────────────── ↻ 2s ─╮│                                                          │
 │ ⚑ shop is spending over its share of claude main's week  ││                                                          │
 │ ⚑ my-home is spending over its share of claude           ││                                                          │
 │   main's week                                            ││                                                          │
 │ +2 more flags                                            ││                                                          │
-│                                                          ││                                                          │
 ╰──────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯
 ╭─ machines ─────────────────────────────────────── ↻ 10s ─╮╭─ projects · today ─────────────────────────────── ↻ 10s ─╮
 │ north  cpu 11%  mem 5.5G/31.3G  gpu 9%  disk 19%         ││   project                 work wait park block done plan │

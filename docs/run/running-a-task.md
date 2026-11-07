@@ -4,7 +4,10 @@ kind: reference
 # Running a task
 
 A run takes one task from `orc run` and a task file.
-It makes an isolated copy of the project on a new branch, a git worktree at `$ORC_HOME/worktrees/<project>/<branch>`.
+It makes an isolated copy of the project on a new branch, a git worktree at `$ORC_HOME/worktrees/<project>-<hash>/<branch>`.
+The `<hash>` is the first 8 hex digits of the SHA-256 of the project's real path.
+Two checkouts with the same folder name, such as `~/Projects/acme` and `~/work/acme`, thus get separate copies.
+A copy an earlier orc made at `$ORC_HOME/worktrees/<project>/<branch>` is still found through `git worktree list` and reused.
 By default it runs the Pi agent inside a nono sandbox, then runs the project's checks.
 With `--sandbox none` it runs Pi and the checks directly on the host.
 A `no-mistakes` run hands the branch to no-mistakes, which reviews it, pushes it and opens a PR on a provider it supports, such as GitHub.

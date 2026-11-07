@@ -8,14 +8,14 @@
 │   5 hours    ━━━━━━━━━━━━━━━━┃ 100%  on pace      4h 59m ││                                                          │
 │   week       ━━━━━━━━━━━━━━──┃  82%  11 over      6d 11h ││                                                          │
 │ ● opencode-go · runs out in 22d                          ││                                                          │
-│ +3 more rows                                             ││                                                          │
+│   5 hours    ━━━━━━━━━━━━━━━━┃ 100%  on pace      4h 59m ││                                                          │
+│ +2 more rows                                             ││                                                          │
 ╰──────────────────────────────────────────────────────────╯│                                                          │
 ╭─ gluttons | alerts ─────────────────────────────── ↻ 2s ─╮│                                                          │
 │ ⚑ shop is spending over its share of claude main's week  ││                                                          │
 │ ⚑ my-home is spending over its share of claude           ││                                                          │
 │   main's week                                            ││                                                          │
 │ +2 more flags                                            ││                                                          │
-│                                                          ││                                                          │
 ╰──────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯
 ╭─ kelp · tasks ─────────────────────────────────── ↻ 10s ─╮╭─ tasks-kelp-tend ──────────────────────────────── ↻ 10s ─╮
 │   task               state   machine model  tests   time ││ tasks-kelp-tend · build                                  │

@@ -18,7 +18,6 @@
 │ ⚑ my-home is spending over its share of claude main's week                   ││                                                                              │
 │ ⚑ a no-mistakes run is spending over its share of claude main's week         ││                                                                              │
 │ ⚑ my-home is spending over its share of opencode-go's month                  ││                                                                              │
-│                                                                              ││                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ machines ─────────────────────────────────────────────────────────── ↻ 10s ─╮╭─ projects · today ─────────────────────────────────────────────────── ↻ 10s ─╮
 │ north  cpu 11%  mem 5.5G/31.3G  gpu 9%  disk 19%                             ││   project                                     work wait park block done plan │
@@ -33,6 +32,7 @@
 │ in 6h 41m    nightly in 2 repos                                              ││                                                                              │
 │ in 10h 0m    weekly review                                                   ││                                                                              │
 │ ! schedules of blog not read                                                 ││                                                                              │
+│                                                                              ││                                                                              │
 │                                                                              ││                                                                              │
 │                                                                              ││                                                                              │
 │                                                                              ││                                                                              │

@@ -147,13 +147,11 @@ export {
   type HeavyLoadSettings,
   type LongTaskSettings,
   type MachineLimits,
-  type NightlyEvent, type NightlySettings,
   type MemoryLimit,
 } from "./contract/alerts";
 export { heavyLoadStart, heavyLoadStep, type MachineResources } from "./alerts/heavy-load";
 export { longTaskStart, longTaskStep, type MachineTasks } from "./alerts/long-task";
 export { quotaPaceStart, quotaPaceStep } from "./alerts/quota-pace";
-export { nightlyStart, nightlyStep, type NightlyInputs, type NightlySample, type NightlyState } from "./alerts/nightly";
 export { type ConfigFile, ConfigRefused, configPath, decodeConfigText, readAlertSettings, readClaudeAccounts, readConfig, readConfigFile } from "./sources/config-file";
 export { type DashConfig, strictly } from "./contract/config";
 export { type AlertRule, alertRules, AlertVerdictRecord, decodeVerdictLine, type VerdictEntry } from "./contract/alert-verdicts";

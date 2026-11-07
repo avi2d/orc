@@ -13,7 +13,6 @@ describe("the alert settings", () => {
       ],
     });
     expect(defaultAlertSettings.longTask).toMatchObject({ quietMinutes: 15, repeatMinutes: 15, totalHours: 2 });
-    expect(defaultAlertSettings.nightly).toEqual({ everySeconds: 300, homes: {} });
   });
 
   test("keep every default a file leaves out", () => {
@@ -25,10 +24,9 @@ describe("the alert settings", () => {
     });
     expect(settings.longTask).toEqual(defaultAlertSettings.longTask);
     expect(settings.quotaPace).toEqual(defaultAlertSettings.quotaPace);
-    expect(settings.nightly).toEqual(defaultAlertSettings.nightly);
   });
 
-  test("refuse a misspelt key, a percent past 100, a home that is no string, a memory limit naming both kinds, and a state no task takes", () => {
+  test("refuse a misspelt key, a percent past 100, a memory limit naming both kinds, and a state no task takes", () => {
     expect(issueOf(decodeAlertSettings({ heavyLoad: { sustainedMinute: 1 } }))).toContain('["heavyLoad"]["sustainedMinute"]');
     expect(issueOf(decodeAlertSettings({ heavyLoad: { machines: [{ name: "north", loadAtLeast: 2, memory: { usedAtLeastPercent: 120 } }] } }))).toContain(
       "less than or equal to 100",
@@ -39,6 +37,5 @@ describe("the alert settings", () => {
       ),
     ).toContain("excess property");
     expect(issueOf(decodeAlertSettings({ longTask: { states: ["working", "sleeping"] } }))).toContain('["longTask"]["states"][1]');
-    expect(issueOf(decodeAlertSettings({ nightly: { homes: { "example/website": 3 } } }))).toContain('["nightly"]["homes"]');
   });
 });

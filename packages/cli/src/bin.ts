@@ -5,7 +5,7 @@ import { CliError, Command, Flag } from "effect/cli";
 import { snapshotSources } from "@tui-dash/schema";
 import packageJson from "../package.json" with { type: "json" };
 import { printAlertsJson, printSnapshotJson } from "./app";
-import { alertCommandLive, snapshotSourcesLive } from "./live/layer";
+import { snapshotSourcesLive } from "./live/layer";
 import { dashboardHandler, frameFlags, panel } from "./panels";
 import { report, sample } from "./reports";
 import { sourcesNamed, unknownSources } from "./snapshot";
@@ -34,7 +34,7 @@ const alerts = Command.make(
     Effect.gen(function* () {
       if (!json) return yield* new CliError.UserError({ cause: "alerts prints JSON lines alone, so run it as tui-dash alerts --json" });
       yield* printAlertsJson.pipe(
-        Effect.provide(alertCommandLive),
+        Effect.provide(snapshotSourcesLive),
         Effect.catchTag("ConfigRefused", ({ reason }) => Effect.fail(new CliError.UserError({ cause: reason }))),
       );
     }),

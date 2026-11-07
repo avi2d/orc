@@ -22,15 +22,19 @@ export const git = (dir: string, args: ReadonlyArray<string>): string => {
   return result.stdout.toString().trim()
 }
 
+export const seedRepo = async (dir: string): Promise<void> => {
+  git(dir, ["init", "-q"])
+  git(dir, ["config", "user.name", "orc test"])
+  git(dir, ["config", "user.email", "orc@test.invalid"])
+  await writeFile(join(dir, "seed.txt"), "seed\n")
+  git(dir, ["add", "seed.txt"])
+  git(dir, ["commit", "-qm", "seed"])
+}
+
 export const withRepo = async (use: (dir: string) => Promise<void>): Promise<void> => {
   const dir = await mkdtemp(join(tmpdir(), "orc-run-unit-"))
   try {
-    git(dir, ["init", "-q"])
-    git(dir, ["config", "user.name", "orc test"])
-    git(dir, ["config", "user.email", "orc@test.invalid"])
-    await writeFile(join(dir, "seed.txt"), "seed\n")
-    git(dir, ["add", "seed.txt"])
-    git(dir, ["commit", "-qm", "seed"])
+    await seedRepo(dir)
     await use(dir)
   } finally {
     await rm(dir, { recursive: true, force: true })

@@ -25,7 +25,8 @@ G GGGGGGGGGGG
   fffff      sssssssssssssssssauuu  sss ssss  WWWW WWW WW WWW       mmmmmm mm mmm
 E FFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF FFFFFF FFFF
 E FFFFFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF FFFFFF FFFF
-ww wwww wwwww
+E F FFFFFFFFFFF FFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFF FFFFFF FFFF
+E FFFFFFF FF FFFFFFFF FFFF FFF FFFFF FF FFFFFFFFFFFFF FFFFF
 fffff    fffff m f fffffff m f ffffff m w wwwwww m www wwwww wwwwww
 fffffff  ffffffff m f fffffff m f fffffff
 fffffff  sss sss m ssssss ssss ss sssss
@@ -34,4 +35,3 @@ FFFFFF
 ffffffffff mmmm mmmmmmmm
 ffffffffff ffff fff f fffffffff f fffffff ffffffff ffff ff fffff
 fffffffff  ffff fff f mm mmmmmmm mm mmmm mmmm
-fffffff    mmmm mmmmmmmm

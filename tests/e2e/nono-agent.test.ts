@@ -1,19 +1,14 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { NonoProviderError } from "../../packages/run/src/host"
 import type { NonoExecOptions } from "../../packages/run/src/nono-exec"
 import { modelCredentialFor, type ModelCredential } from "../../packages/run/src/nono-profile"
+import { makeNonoFixtureHome } from "../lib/nono-home"
 import { nonoOpenError, runNonoShell } from "../lib/nono-shell"
 
-const systemTempRoots = ["/tmp", "/private/tmp", "/var", "/private/var"]
-const underSystemTemp = (candidate: string): boolean =>
-  systemTempRoots.some((root) => candidate === root || candidate.startsWith(root + "/"))
-const homeBase = (cwd: string, systemTmp: string): string =>
-  !underSystemTemp(cwd) ? cwd : (!underSystemTemp(systemTmp) ? systemTmp : cwd)
-const fixtureHome = await mkdtemp(join(homeBase(process.cwd(), tmpdir()), ".orc-nono-agent-home-"))
+const fixtureHome = await makeNonoFixtureHome(".orc-nono-agent-home-")
 await writeFile(join(fixtureHome, ".gitconfig"), "")
 const fixtureGitEnv = { PATH: Bun.env.PATH ?? "", HOME: fixtureHome, GIT_CONFIG_GLOBAL: join(fixtureHome, ".gitconfig"), GIT_CONFIG_NOSYSTEM: "1" }
 

@@ -16,9 +16,9 @@ queue    north · 2 running · 2 queued · 1 paused · gpu group paused
 actions  shop · none queued
 north    cpu 11% · memory 5.5G of 31.3G
 gpu      NVIDIA GeForce RTX 3080 Laptop GPU · 9% · memory 1.8G of 16.0G
-+2 more rows
+south    cpu 42% · memory 12.0G of 64.0G
+gpu      NVIDIA GeForce RTX 4090 · 63% · memory 8.0G of 24.0G
 alerts
 quota-pace none recorded
 heavy-load just now · expected, a nightly baseline runs on south
 long-task  just now · no verdict on this fire
-nightly    none recorded
