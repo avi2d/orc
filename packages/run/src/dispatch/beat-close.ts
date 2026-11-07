@@ -1,6 +1,6 @@
-import { Array as Arr, DateTime, Duration, Effect, type FileSystem, Option, type Path } from "effect"
+import { Array as Arr, DateTime, Duration, Effect, FileSystem, Option, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { closeStartedTask } from "./backlog"
+import { backlogPaths, closeStartedTask } from "./backlog"
 import type { BeatAction } from "./beat-action"
 import type { DispatchConfig } from "./config"
 import { ownedBySweep, throughFor } from "./machine-reach"
@@ -28,14 +28,17 @@ type CloseReading =
   | { readonly kind: "read"; readonly result: RunnerResult; readonly ending: RunEnding | null; readonly outputAt: string | null; readonly asking: Asking | null }
   | { readonly kind: "unread"; readonly reason: string }
 
-// A task the runner cannot see and a close read that keeps failing both release the machine once the start outgrows the queue delay.
-export const staleEndingOf = (startedAt: string, nowMillis: number, reading: CloseReading): RunEnding | null => {
+// A close read that stays unread past the queue delay releases the machine, measured from its first unread beat.
+export const staleEndingOf = (startedAt: string, nowMillis: number, reading: CloseReading, unreadSinceMillis: number | null): RunEnding | null => {
+  if (reading.kind === "unread") {
+    if (unreadSinceMillis === null || Number.isNaN(unreadSinceMillis) || nowMillis - unreadSinceMillis <= missingRunnerGraceMillis) {
+      return null
+    }
+    return { kind: "close", outcome: "failed", reason: reading.reason, pr: null, report: null }
+  }
   const started = Date.parse(startedAt)
   if (Number.isNaN(started) || nowMillis - started <= missingRunnerGraceMillis) {
     return null
-  }
-  if (reading.kind === "unread") {
-    return { kind: "close", outcome: "failed", reason: reading.reason, pr: null, report: null }
   }
   return reading.ending === null && reading.result.status === "unknown"
     ? { kind: "close", outcome: "failed", reason: "the runner holds no record of this task", pr: null, report: null }
@@ -165,7 +168,27 @@ export const closeFinished = (
         orElse: () => Effect.succeed({ kind: "unread" as const, reason: "the close read timed out after " + closeSeconds + " seconds" })
       })
     )
-    const stale = staleEndingOf(started.at, Date.parse(yield* nowIso), reading)
+    const fs = yield* FileSystem.FileSystem
+    const unreadFile = backlogPaths(context.root).unreadFile(task.spec.id)
+    const nowText = yield* nowIso
+    const unreadSince = reading.kind === "unread"
+      ? yield* fs.readFileString(unreadFile).pipe(
+        Effect.map((text) => Date.parse(text)),
+        Effect.catch(() => Effect.succeed<number | null>(null)),
+        Effect.flatMap((parsed) =>
+          parsed === null || Number.isNaN(parsed)
+            ? fs.writeFileString(unreadFile, nowText).pipe(
+              Effect.as<number | null>(null),
+              Effect.catch(() => Effect.succeed<number | null>(null))
+            )
+            : Effect.succeed<number | null>(parsed)
+        )
+      )
+      : yield* fs.remove(unreadFile, { force: true }).pipe(
+        Effect.as<number | null>(null),
+        Effect.catch(() => Effect.succeed<number | null>(null))
+      )
+    const stale = staleEndingOf(started.at, Date.parse(nowText), reading, unreadSince)
     if (reading.kind === "unread" && stale === null) {
       return { kind: "ended", action: { kind: "close-failed", task: task.spec.id, machine: claim.machine, reason: reading.reason } } satisfies Progress
     }
@@ -181,6 +204,9 @@ export const closeFinished = (
       const action = reading.asking === null ? null : yield* serveAsking(context, task, claim.machine, reading.asking, relay)
       return { kind: "running", outputAt: reading.outputAt, action } satisfies Progress
     }
+    yield* fs.remove(unreadFile, { force: true }).pipe(
+      Effect.orElseSucceed(() => undefined)
+    )
     const ended = yield* endTask(context.root, task, claim.machine, ending)
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
   })

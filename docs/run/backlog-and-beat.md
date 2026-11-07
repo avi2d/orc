@@ -205,14 +205,16 @@ A run marked stopped closes its task stopped with the run's end reason.
 A run still waiting at its gate for your answer stays started, and the beat relays your answers to it, as [Parked runs](parked-runs.md) shows.
 Either way the task frees its slot in the same beat.
 A start older than 10 minutes whose run the runner cannot see closes failed with `the runner holds no record of this task`.
-A close read that stays unread on a start that old closes the task failed with the read's reason.
+A close read that stays unread for 10 minutes closes the task failed with the read's reason.
+A first unread beat only reports the read failure and starts the wait.
 To stop a task yourself, run `orc backlog stop <task-id>` where the backlog lives.
 It kills the run through the machine that started it and closes the task stopped.
 The closed task file keeps the PR link of the orc run on `orc/<task-id>` as `pr`, and `orc backlog --json` carries it as `pr`, or `null` when the run opened none.
 The beat prints `closed <task-id> <done|failed|stopped> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when a fresh start's read fails or runs past 30 seconds.
-A machine whose start runs any other program keeps owning its tasks, which the beat never reads.
-To close one of those, run `orc backlog close <task-id> <done|failed> [reason]`.
-A start older than 10 minutes with no run output in its log closes failed with `the machine keeps its own log, and the log shows no run output`.
+A machine whose start runs any other program keeps owning its tasks, which the beat closes rather than stalls.
+To close one of those by hand, run `orc backlog close <task-id> <done|failed> [reason]`.
+A start older than 30 minutes with no run output in its log closes failed with `the machine keeps its own log, and the log shows no run output`.
+The quiet log closes the task before the 30 minute stall flag can fire.
 A started run whose output has not grown for 30 minutes prints `stalled <task-id> on <machine>: no output since <time>` once, and again after new output stalls anew.
 A PR the beat cannot read for the chat prints `cannot read the PR of <task-id> for the chat: <reason>`.
 A missing start command exits 127 into its log and leaves the task started.

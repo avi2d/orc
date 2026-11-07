@@ -48,6 +48,35 @@ export const latestRunForBranch = (
     )
   )
 
+export const latestRunForBranchName = (
+  db: Database,
+  branch: string
+): Effect.Effect<RunRecord | null, Schema.SchemaError | SqliteFailure> =>
+  sqlite(() =>
+    db.query(
+      "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox FROM runs WHERE branch = ? ORDER BY started DESC, id DESC LIMIT 1"
+    ).get(branch)
+  ).pipe(
+    Effect.flatMap((row) =>
+      row === null || row === undefined
+        ? Effect.succeed(null)
+        : Schema.decodeUnknownEffect(RunSqlRowSchema)(row).pipe(
+          Effect.map((decoded) => ({
+            id: decoded.id,
+            project: decoded.project,
+            branch: decoded.branch,
+            taskFile: decoded.task_file,
+            status: decoded.status,
+            started: decoded.started,
+            ended: decoded.ended,
+            prLink: decoded.pr_link,
+            endReason: decoded.end_reason,
+            sandbox: decoded.sandbox
+          }))
+        )
+    )
+  )
+
 export const runsForBranch = (
   db: Database,
   project: string,

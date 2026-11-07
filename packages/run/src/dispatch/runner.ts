@@ -12,9 +12,10 @@ import { readInstructions, TaskInstructions, writeInstructions } from "./runner-
 import { RunnerError } from "./runner-error"
 import { runsForBranch } from "../history-resume"
 import { markRunStopped } from "../history-write"
-import { formatHistoryError, openDatabase, stoppedEndReason } from "../run-history"
+import { formatHistoryError, openDatabase, recordRun, stoppedEndReason } from "../run-history"
 
 export { RunnerError } from "./runner-error"
+import { newRunId } from "../run-id"
 import { isRunDelivery } from "../delivery"
 import { decodeTokenText, encodeRenewal, encodeSecretJson, LabelArg, RenewRequest, type TokenEncodeError, tokenDocumentNote, tokenFields } from "./token"
 
@@ -123,17 +124,20 @@ export const readHeld = (home: string, task: string, label?: string | null): Eff
     Effect.map((state) => heldTask(state.tasks, home, task, label))
   )
 
-const markBranchRunsStopped = (home: string, project: string, branch: string): Effect.Effect<void, RunnerError, RunnerRequirements> =>
+const markBranchRunsStopped = (home: string, project: string, branch: string, taskFile: string): Effect.Effect<void, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const ended = DateTime.formatIso(yield* DateTime.now)
     yield* Effect.acquireUseRelease(
       openDatabase(home),
       (db) =>
-        runsForBranch(db, project, branch).pipe(
-          Effect.flatMap((runs) =>
-            Effect.forEach(runs.filter((run) => run.status === "running"), (run) => markRunStopped(db, run.id, ended, stoppedEndReason), { discard: true })
-          )
-        ),
+        Effect.gen(function*() {
+          const runs = yield* runsForBranch(db, project, branch)
+          if (runs.length === 0) {
+            yield* recordRun(db, { id: newRunId(), project, branch, taskFile, status: "stopped", started: ended, ended, endReason: stoppedEndReason })
+            return
+          }
+          yield* Effect.forEach(runs.filter((run) => run.status === "running"), (run) => markRunStopped(db, run.id, ended, stoppedEndReason), { discard: true })
+        }),
       (db) => Effect.sync(() => db.close())
     )
   }).pipe(
@@ -157,12 +161,13 @@ export const killHeld = (
       Effect.as(true),
       Effect.catchTag("RunnerError", () => Effect.succeed(false))
     )
+    const taskFile = home + "/runner/" + fileKeyOf(home, task, labelOf(home, task, label)) + ".md"
     if (killed) {
-      yield* markBranchRunsStopped(home, held.path, taskBranch(task))
+      yield* markBranchRunsStopped(home, held.path, taskBranch(task), taskFile)
       return "killed pueue task " + held.id + " for " + task
     }
     yield* pueue(["remove", String(held.id)])
-    yield* markBranchRunsStopped(home, held.path, taskBranch(task))
+    yield* markBranchRunsStopped(home, held.path, taskBranch(task), taskFile)
     return "removed pueue task " + held.id + " for " + task
   })
 

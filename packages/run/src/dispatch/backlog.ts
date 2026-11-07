@@ -24,6 +24,7 @@ interface BacklogPaths {
   readonly logs: string
   readonly logFile: (id: string) => string
   readonly stallFile: (id: string) => string
+  readonly unreadFile: (id: string) => string
   readonly dispatchConfig: string
   readonly projects: string
   readonly folder: (folder: TaskFolder) => string
@@ -36,6 +37,7 @@ export const backlogPaths = (root: string): BacklogPaths => ({
   logs: root + "/logs",
   logFile: (id: string): string => root + "/logs/" + id + ".log",
   stallFile: (id: string): string => root + "/logs/" + id + ".stall",
+  unreadFile: (id: string): string => root + "/logs/" + id + ".unread",
   dispatchConfig: root + "/dispatch.json",
   projects: root + "/projects.json",
   folder: (folder: TaskFolder): string => root + "/" + folder,

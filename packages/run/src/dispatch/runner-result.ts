@@ -1,6 +1,6 @@
 import { Array as Arr, Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { openQuestionsForRun, runsForBranch } from "../history-resume"
+import { latestRunForBranchName, openQuestionsForRun, runsForBranch } from "../history-resume"
 import type { OpenQuestion } from "../no-mistakes-gate"
 import { formatHistoryError, openDatabase, stoppedEndReason, type RunRecord, RunStatusSchema } from "../run-history"
 import { writtenReport } from "../report-run"
@@ -34,7 +34,7 @@ const heldFields = {
 }
 
 const RunnerResult = Schema.Union([
-  Schema.Struct({ task: TaskId, status: Schema.Literal("unknown") }),
+  Schema.Struct({ task: TaskId, status: Schema.Literal("unknown"), run: Schema.optional(RunSummary) }),
   Schema.Struct({ ...heldFields, status: Schema.Literals(["queued", "stashed"]) }),
   Schema.Struct({ ...heldFields, status: Schema.Literals(["running", "paused"]), started: Schema.String, outputAt: Schema.optional(Schema.String) }),
   Schema.Struct({ ...heldFields, status: Schema.Literal("succeeded"), started: Schema.String, ended: Schema.String }),
@@ -81,6 +81,9 @@ const reportEnding = (result: FinishedResult): RunEnding => {
 
 // The beat ends a started task from this, so its done and failed match what runner result reports.
 export const endingFromResult = (result: RunnerResult, kind: TaskKind): RunEnding | null => {
+  if (result.status === "unknown" && result.run?.status === "stopped") {
+    return { kind: "close", outcome: "stopped", reason: result.run.endReason ?? stoppedEndReason, pr: null, report: null }
+  }
   if ((result.status === "succeeded" || result.status === "failed") && result.run?.status === "stopped") {
     return { kind: "close", outcome: "stopped", reason: result.run.endReason ?? stoppedEndReason, pr: null, report: null }
   }
@@ -212,11 +215,32 @@ const runLogAt = (home: string, runId: string): Effect.Effect<string | null, nev
     return latest
   })
 
+const readStoppedRun = (home: string, task: string): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
+  Effect.gen(function*() {
+    return yield* Effect.acquireUseRelease(
+      openDatabase(home),
+      (db) =>
+        Effect.gen(function*() {
+          const latest = yield* latestRunForBranchName(db, taskBranch(task))
+          if (latest === null || latest.status !== "stopped") {
+            return null
+          }
+          return toSummary(latest, yield* openQuestionsForRun(db, latest.id), yield* writtenReport(runDirFor(home, latest.id)), null)
+        }),
+      (db) => Effect.sync(() => db.close())
+    )
+  }).pipe(
+    Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
+  )
+
 export const readResult = (task: string, home: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const held = yield* readHeld(home, task, label)
     if (held === null) {
-      return { task, status: "unknown" } satisfies RunnerResult
+      const stopped = yield* readStoppedRun(home, task)
+      return stopped === null
+        ? { task, status: "unknown" } satisfies RunnerResult
+        : { task, status: "unknown", run: stopped } satisfies RunnerResult
     }
     const status = yield* Schema.decodeUnknownEffect(PueueStatus)(held.status).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "pueue reports a status orc cannot read for task " + held.id + ": " + error.message }))

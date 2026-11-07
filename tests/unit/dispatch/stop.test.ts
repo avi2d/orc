@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, Layer } from "effect"
+import { Effect, FileSystem, Layer, Path } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../../packages/run/src/dispatch/args"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
@@ -14,8 +14,12 @@ import { killHeld } from "../../../packages/run/src/dispatch/runner"
 import { endingFromResult } from "../../../packages/run/src/dispatch/runner-result"
 import { renderTaskFile } from "../../../packages/run/src/dispatch/task-record-render"
 import { markRunStopped } from "../../../packages/run/src/history-write"
+import { buildResumePlan } from "../../../packages/run/src/run-resume"
+import type { AgentFile } from "../../../packages/run/src/agents"
+import type { HistoryRun } from "../../../packages/run/src/run-record"
+import { subprocessNoMistakesRunner } from "../../../packages/run/src/no-mistakes"
 import { insertRun, openDatabase, recordStep, runById, stoppedEndReason } from "../../../packages/run/src/run-history"
-import { stepsForRun } from "../../../packages/run/src/history-resume"
+import { runsForBranch, stepsForRun } from "../../../packages/run/src/history-resume"
 import type { DispatchConfig, Project } from "../../../packages/run/src/dispatch/config"
 import { quietSources } from "../../lib/beat-sources"
 
@@ -170,6 +174,21 @@ describe("runner kill", () => {
       expect(line).toBe("removed pueue task 11 for orc-1")
     })
   })
+  test("kill on a queued pueue task leaves a stopped run instead of no record", async () => {
+    await withBacklog(async (root) => {
+      const spawner = pueueKillRefusing(JSON.stringify({ tasks: { "11": { id: 11, label: taskLabel(root, "orc-1"), group: "orc", path: "/checkout", status: { Queued: {} } } } }))
+      await Effect.runPromise(
+        killHeld(root, "orc-1", taskLabel(root, "orc-1")).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner)))
+      )
+      const runs = await Effect.runPromise(Effect.acquireUseRelease(
+        openDatabase(root),
+        (db) => runsForBranch(db, "/checkout", "orc/orc-1"),
+        (db) => Effect.sync(() => db.close())
+      ).pipe(Effect.provide(BunServices.layer)))
+      expect(runs.map((run) => run.status)).toEqual(["stopped"])
+      expect(runs.map((run) => run.endReason)).toEqual([stoppedEndReason])
+    })
+  })
   test("kill stops the pueue task and marks its run stopped instead of leaving it running", async () => {
     await withBacklog(async (root) => {
       await Effect.runPromise(Effect.acquireUseRelease(
@@ -217,14 +236,35 @@ describe("the beat's stale start", () => {
       expect(report.actions.map((action) => action.kind)).toEqual([])
     })
   })
-  test("a close read that keeps failing closes the task failed instead of retrying forever", async () => {
+  test("a close read that keeps failing closes the task failed once unread past the grace instead of retrying forever", async () => {
     await withBacklog(async (root) => {
       await startTaskOne(root, ["orc", "runner", "start"], oldStart)
+      const first = await Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueFailing))))
+      expect((await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["orc-1:started"])
+      expect(first.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["close-failed:orc-1"])
+      await mkdir(join(root, "logs"), { recursive: true })
+      await writeFile(join(root, "logs", "orc-1.unread"), oldStart)
       const report = await Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueFailing))))
       expect((await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["orc-1:closed"])
       const closed = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
       expect(closed?.state.kind === "closed" ? closed.state.closing.outcome + ":" + closed.state.closing.reason : "")
         .toBe("failed:pueue status exited 3: pueue is down")
+      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1"])
+    })
+  })
+  test("an unseen runner record with a stopped run closes stopped instead of failed", async () => {
+    await withBacklog(async (root) => {
+      await startTaskOne(root, ["orc", "runner", "start"], oldStart)
+      await Effect.runPromise(Effect.acquireUseRelease(
+        openDatabase(root),
+        (db) => Effect.sync(() => insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "stopped", started: oldStart, ended: oldStart, endReason: "the run was stopped" })),
+        (db) => Effect.sync(() => db.close())
+      ).pipe(Effect.provide(BunServices.layer)))
+      const report = await Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueStub(JSON.stringify({ tasks: {} }))))))
+      expect((await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["orc-1:closed"])
+      const closed = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
+      expect(closed?.state.kind === "closed" ? closed.state.closing.outcome + ":" + closed.state.closing.reason : "")
+        .toBe("stopped:the run was stopped")
       expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1"])
     })
   })
@@ -279,6 +319,15 @@ describe("a stopped run", () => {
       report: null
     })
   })
+  test("an unknown runner result with a stopped run closes stopped instead of failed", () => {
+    expect(endingFromResult({ task: "orc-1", status: "unknown", run: { id: "run-1", status: "stopped", prLink: null, endReason: "the run was stopped", openQuestions: [] } }, "ship")).toEqual({
+      kind: "close",
+      outcome: "stopped",
+      reason: "the run was stopped",
+      pr: null,
+      report: null
+    })
+  })
   test("a failed run with no end reason keeps the pueue reason instead of closing blank", () => {
     expect(endingFromResult({ task: "orc-1", pueueTask: 11, status: "failed", started: oldStart, ended: oldStart, reason: "orc exited 1", run: { ...failedRun, endReason: null } }, "ship")).toEqual({
       kind: "close",
@@ -293,7 +342,7 @@ describe("a stopped run", () => {
 describe("the stale close decision", () => {
   const unknownReading = { kind: "read" as const, result: { task: "orc-1", status: "unknown" as const }, ending: null, outputAt: null, asking: null }
   test("an unseen runner record closes the task failed once the start outgrows the queue delay instead of waiting forever", () => {
-    expect(staleEndingOf(oldStart, Date.parse("2026-11-07T10:00:00.000Z"), unknownReading)).toEqual({
+    expect(staleEndingOf(oldStart, Date.parse("2026-11-07T10:00:00.000Z"), unknownReading, null)).toEqual({
       kind: "close",
       outcome: "failed",
       reason: "the runner holds no record of this task",
@@ -302,10 +351,10 @@ describe("the stale close decision", () => {
     })
   })
   test("an unseen runner record on a fresh start keeps running instead of closing on the first beat", () => {
-    expect(staleEndingOf(new Date().toISOString(), Date.now(), unknownReading)).toBeNull()
+    expect(staleEndingOf(new Date().toISOString(), Date.now(), unknownReading, null)).toBeNull()
   })
-  test("an unread close on an old start closes the task failed instead of retrying forever", () => {
-    expect(staleEndingOf(oldStart, Date.parse("2026-11-07T10:00:00.000Z"), { kind: "unread", reason: "pueue status exited 3: pueue is down" })).toEqual({
+  test("an unread close that stays unread past the grace closes the task failed instead of retrying forever", () => {
+    expect(staleEndingOf(oldStart, Date.parse("2026-11-07T10:00:00.000Z"), { kind: "unread", reason: "pueue status exited 3: pueue is down" }, Date.parse(oldStart))).toEqual({
       kind: "close",
       outcome: "failed",
       reason: "pueue status exited 3: pueue is down",
@@ -313,8 +362,11 @@ describe("the stale close decision", () => {
       report: null
     })
   })
-  test("an unread close on a fresh start waits for the next beat instead of closing failed", () => {
-    expect(staleEndingOf(new Date().toISOString(), Date.now(), { kind: "unread", reason: "pueue is down" })).toBeNull()
+  test("a first unread close waits for the next beat instead of closing failed", () => {
+    expect(staleEndingOf(new Date().toISOString(), Date.now(), { kind: "unread", reason: "pueue is down" }, null)).toBeNull()
+  })
+  test("an unread close seen again before the grace waits instead of closing failed", () => {
+    expect(staleEndingOf(oldStart, Date.now(), { kind: "unread", reason: "pueue is down" }, Date.now())).toBeNull()
   })
 })
 
@@ -346,13 +398,23 @@ describe("the own-log close decision", () => {
 })
 
 describe("an interrupted run", () => {
-  test("marking a run stopped ends its steps and keeps their session files for a resume instead of deleting the run", async () => {
+  const agent: AgentFile = {
+    kind: "implementer",
+    model: "opencode-go/muse-spark",
+    thinking: "high",
+    tools: ["read"],
+    body: "Do the task.",
+    path: "bundled/implementer.md",
+    source: "bundled"
+  }
+  const fixer: AgentFile = { ...agent, kind: "fixer", body: "Fix the failure.", path: "bundled/fixer.md" }
+  test("marking a run stopped keeps its running steps and finds their live session for a resume instead of ending the steps", async () => {
     await withBacklog(async (root) => {
       await Effect.runPromise(Effect.acquireUseRelease(
         openDatabase(root),
         (db) => Effect.gen(function*() {
           insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "running", started: oldStart, prLink: "https://github.com/example/orc/pull/7" })
-          yield* recordStep(db, { runId: "run-1", name: "implement", attempt: 1, status: "running", started: oldStart, agentFile: "agent.md", piSessionFile: "sessions/s.jsonl" })
+          yield* recordStep(db, { runId: "run-1", name: "implement", attempt: 1, status: "running", started: oldStart, agentFile: "agent.md", piSessionFile: null })
           yield* recordStep(db, { runId: "run-1", name: "checks", attempt: 1, status: "passed", started: oldStart, ended: oldStart, agentFile: "agent.md" })
         }),
         (db) => Effect.sync(() => db.close())
@@ -373,8 +435,34 @@ describe("an interrupted run", () => {
       expect(after.run?.ended).toBe("2026-11-07T10:00:00.000Z")
       expect(after.run?.endReason).toBe(stoppedEndReason)
       expect(after.run?.prLink).toBe("https://github.com/example/orc/pull/7")
-      expect(after.steps.map((step) => step.name + ":" + step.status)).toEqual(["implement:failed", "checks:passed"])
-      expect(after.steps.find((step) => step.name === "implement")?.piSessionFile).toBe("sessions/s.jsonl")
+      expect(after.steps.map((step) => step.name + ":" + step.status)).toEqual(["implement:running", "checks:passed"])
+      const liveId = "aaa111"
+      await mkdir(join(root, "runs", "run-1", "session", "agent", "sessions", "enc"), { recursive: true })
+      await writeFile(join(root, "runs", "run-1", "session", "agent", "sessions", "enc", "2026-11-07T09-30-00-000Z_" + liveId + ".jsonl"), JSON.stringify({ type: "session", id: liveId }) + "\n")
+      const next = await Effect.runPromise(Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+        const runDir = path.join(root, "runs", "run-2")
+        const history: HistoryRun = {
+          fs, path, spawner, git: "git", projectDir: "/checkout", runId: "run-2", runDir,
+          piSessionDir: path.join(runDir, "session"),
+          hostSessionsDir: path.join(runDir, "sessions"),
+          taskPath: path.join(runDir, "task.md"),
+          instructions: null, agent, fixer, branch: "orc/orc-1", sandbox: "nono",
+          started: "2026-11-07T10:00:00.000Z", worktreeDir: "/checkout",
+          delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git: "git", worktreeDir: "/checkout" }) },
+          allow: [], answers: []
+        }
+        return history
+      }).pipe(Effect.provide(BunServices.layer)))
+      const plan = await Effect.runPromise(Effect.acquireUseRelease(
+        openDatabase(root),
+        (db) => buildResumePlan(db, next),
+        (db) => Effect.sync(() => db.close())
+      ).pipe(Effect.provide(BunServices.layer)))
+      expect(plan.implementSessionId).toBe(liveId)
+      expect(plan.skipImplement).toBe(false)
     })
   })
 })

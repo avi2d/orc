@@ -543,15 +543,20 @@ describe("the beat's closing sweep", () => {
       expect(report.actions).toEqual([])
     })
   })
-  test("a close read that never answers closes the task failed after 30 seconds instead of stopping the beat", async () => {
+  test("a close read that never answers reports close-failed after 30 seconds and closes only once unread past the grace instead of closing on the first timeout", async () => {
     await withBacklog(async (root) => {
       await startTaskOne(root, orcStart, null)
+      const first = await beatWith(root, pueueInstead(() => Effect.never))
+      expect(await backlogStates(root)).toEqual(["orc-1:started"])
+      expect(first.actions.flatMap((action) => action.kind === "close-failed" ? [action.task + ":" + action.reason] : []))
+        .toEqual(["orc-1:the close read timed out after 30 seconds"])
+      await writeFile(join(root, "logs", "orc-1.unread"), "2026-10-27T10:02:00.000Z")
       const report = await beatWith(root, pueueInstead(() => Effect.never))
       expect(await backlogStates(root)).toEqual(["orc-1:closed"])
       expect(report.actions.flatMap((action) => action.kind === "closed" ? [action.task + ":" + action.reason] : []))
         .toEqual(["orc-1:the close read timed out after 30 seconds"])
     })
-  }, 120_000)
+  }, 180_000)
 })
 
 

@@ -25,7 +25,7 @@ interface DispatchStarted {
 
 type DispatchClosing =
   | { readonly outcome: "start-failed"; readonly reason: string }
-  | { readonly outcome: "done" | "failed"; readonly started: DispatchStarted; readonly reason: string };
+  | { readonly outcome: "done" | "failed" | "stopped"; readonly started: DispatchStarted; readonly reason: string };
 
 type DispatchTaskState =
   | { readonly kind: "new" }
@@ -71,7 +71,7 @@ const TaskFields = Schema.Struct({
   taken_at: Schema.optional(Schema.String),
   started_at: Schema.optional(Schema.String),
   start_log: Schema.optional(Schema.String),
-  outcome: Schema.optional(Schema.Literals(["done", "failed", "start-failed"])),
+  outcome: Schema.optional(Schema.Literals(["done", "failed", "stopped", "start-failed"])),
   closed_at: Schema.optional(Schema.String),
   reason: Schema.optional(Schema.String),
 });
