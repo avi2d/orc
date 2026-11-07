@@ -211,9 +211,9 @@ To stop a task yourself, run `orc backlog stop <task-id>` where the backlog live
 It kills the run through the machine that started it and closes the task stopped.
 The closed task file keeps the PR link of the orc run on `orc/<task-id>` as `pr`, and `orc backlog --json` carries it as `pr`, or `null` when the run opened none.
 The beat prints `closed <task-id> <done|failed|stopped> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds, until it stays unread for 10 minutes.
-A machine whose start runs any other program keeps owning its tasks, which the beat closes rather than stalls.
+A machine whose start runs any other program keeps owning its tasks, which the beat closes once their logs go quiet rather than stalls.
 To close one of those by hand, run `orc backlog close <task-id> <done|failed> [reason]`.
-A start older than 30 minutes with no run output in its log closes failed with `the machine keeps its own log, and the log shows no run output`.
+A start older than 30 minutes whose log has not grown for 30 minutes closes failed with `the machine keeps its own log, and its log has not grown for 30 minutes`.
 The quiet log closes the task before the 30 minute stall flag can fire.
 A started run whose output has not grown for 30 minutes prints `stalled <task-id> on <machine>: no output since <time>` once, and again after new output stalls anew.
 A PR the beat cannot read for the chat prints `cannot read the PR of <task-id> for the chat: <reason>`.

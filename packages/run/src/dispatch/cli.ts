@@ -224,7 +224,7 @@ const stopNow = (id: string, place: DispatchPlace) =>
       return yield* refuseRun("the machine " + started.claim.machine + " is not in dispatch.json")
     }
     const through = throughFor(machine)
-    if (through === null && !ownedBySweep(machine)) {
+    if (!ownedBySweep(machine)) {
       return yield* refuseRun(id + " started on " + machine.name + ", which orc cannot reach, so close it by hand with orc backlog close " + id + " failed")
     }
     const label = taskLabel(place.home, id)

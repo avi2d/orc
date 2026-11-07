@@ -81,10 +81,7 @@ const reportEnding = (result: FinishedResult): RunEnding => {
 
 // The beat ends a started task from this, so its done and failed match what runner result reports.
 export const endingFromResult = (result: RunnerResult, kind: TaskKind): RunEnding | null => {
-  if (result.status === "unknown" && result.run?.status === "stopped") {
-    return { kind: "close", outcome: "stopped", reason: result.run.endReason ?? stoppedEndReason, pr: result.run.prLink ?? null, report: null }
-  }
-  if ((result.status === "succeeded" || result.status === "failed") && result.run?.status === "stopped") {
+  if ((result.status === "unknown" || result.status === "succeeded" || result.status === "failed") && result.run?.status === "stopped") {
     return { kind: "close", outcome: "stopped", reason: result.run.endReason ?? stoppedEndReason, pr: result.run.prLink ?? null, report: null }
   }
   if (kind !== "ship" && (result.status === "succeeded" || result.status === "failed")) {

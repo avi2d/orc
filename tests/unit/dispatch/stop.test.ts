@@ -447,7 +447,7 @@ describe("the beat's stale start", () => {
       expect((await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["orc-1:closed"])
       const closed = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
       expect(closed?.state.kind === "closed" ? closed.state.closing.outcome + ":" + closed.state.closing.reason : "")
-        .toBe("failed:the machine keeps its own log, and the log shows no run output")
+        .toBe("failed:the machine keeps its own log, and its log has not grown for 30 minutes")
       expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1"])
     })
   })
@@ -556,7 +556,7 @@ describe("the own-log close decision", () => {
     expect(ownLogEndingOf(oldStart, oldStart, Date.parse("2026-11-07T10:00:00.000Z"))).toEqual({
       kind: "close",
       outcome: "failed",
-      reason: "the machine keeps its own log, and the log shows no run output",
+      reason: "the machine keeps its own log, and its log has not grown for 30 minutes",
       pr: null,
       report: null
     })
@@ -565,7 +565,7 @@ describe("the own-log close decision", () => {
     expect(ownLogEndingOf(oldStart, null, Date.parse("2026-11-07T10:00:00.000Z"))).toEqual({
       kind: "close",
       outcome: "failed",
-      reason: "the machine keeps its own log, and the log shows no run output",
+      reason: "the machine keeps its own log, and its log has not grown for 30 minutes",
       pr: null,
       report: null
     })

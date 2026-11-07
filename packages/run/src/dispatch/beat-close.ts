@@ -42,7 +42,7 @@ export const staleEndingOf = (startedAt: string, nowMillis: number, reading: Clo
   }
   return reading.ending === null && reading.result.status === "unknown"
     ? { kind: "close", outcome: "failed", reason: "the runner holds no record of this task", pr: null, report: null }
-    : reading.ending
+    : null
 }
 
 // An own-log machine keeps its own record, so the sweep only ends its task when the log itself goes quiet past the stall window.
@@ -57,7 +57,7 @@ export const ownLogEndingOf = (startedAt: string, logAt: string | null, nowMilli
       return null
     }
   }
-  return { kind: "close", outcome: "failed", reason: "the machine keeps its own log, and the log shows no run output", pr: null, report: null }
+  return { kind: "close", outcome: "failed", reason: "the machine keeps its own log, and its log has not grown for 30 minutes", pr: null, report: null }
 }
 
 const endTask = (
