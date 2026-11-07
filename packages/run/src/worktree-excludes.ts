@@ -23,7 +23,7 @@ export const nestedWorktreeExcludes = (
       if (!real.startsWith(projectDir + "/")) {
         continue
       }
-      specs.push(":(exclude,top)" + real.slice(projectDir.length + 1))
+      specs.push(":(exclude,top,literal)" + real.slice(projectDir.length + 1))
     }
     return specs
   })

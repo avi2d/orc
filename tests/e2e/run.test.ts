@@ -69,6 +69,16 @@ describe("runAgentStep refusals", () => {
     })
   })
 
+  test("an untracked file a glob in a nested worktree's folder name would match still counts as uncommitted", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        git(dir, ["worktree", "add", "-q", join(dir, "old*"), "-b", "orc/glob"])
+        await writeFile(join(dir, "oldnotes.txt"), "uncommitted\n")
+        expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home })).toContain("uncommitted changes")
+      })
+    })
+  })
+
   test("an untracked file beside the old in-checkout copies still counts as uncommitted", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
