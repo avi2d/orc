@@ -62,7 +62,7 @@ describe("installCopy", () => {
     }
   })
 
-  test("refuses the run when the prepare config names no prepare command instead of treating it as no prepare", async () => {
+  test("refuses the run when .no-mistakes.yaml names no commands instead of skipping the install", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-install-"))
     try {
       const copyDir = join(dir, "copy")
@@ -78,6 +78,20 @@ describe("installCopy", () => {
         message = error.message
       }
       expect(message).toContain(".no-mistakes.yaml")
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("skips the install when the copy names checks but no prepare command instead of refusing the run", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-install-"))
+    try {
+      const copyDir = join(dir, "copy")
+      await Bun.$`mkdir -p ${copyDir}`.quiet()
+      await Bun.write(join(copyDir, ".no-mistakes.yaml"), "commands:\n  test: \"true\"\n")
+      const logFile = join(dir, "prepare.log")
+      await runInstall(copyDir, logFile)
+      expect(await Bun.file(logFile).exists()).toBe(false)
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

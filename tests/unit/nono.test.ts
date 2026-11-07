@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { BunServices } from "@effect/platform-bun"
-import { Effect } from "effect"
+import { Effect, Path } from "effect"
 import { buildHostGitEnv, buildSandboxEnv } from "../../packages/run/src/nono"
-import { buildNonoProfile, defaultToolchainFolders, defaultToolchainResolver, type HostRuntime, type NonoSandboxRoots } from "../../packages/run/src/nono-profile"
+import { checksCacheReads } from "../../packages/run/src/nono-exec"
+import { buildNonoProfile, defaultToolchainFolders, defaultToolchainResolver, within, type HostRuntime, type NonoSandboxRoots } from "../../packages/run/src/nono-profile"
 
 const roots = {
   worktree: "/tmp/orc-test/worktree",
@@ -101,6 +102,26 @@ describe("buildNonoProfile", () => {
     expect(read).toContain("/custom/tools")
     expect(read).toContain("/usr/bin")
     expect(read.filter((grant) => grant.startsWith("/opt/homebrew") || grant.startsWith("/usr/local"))).toEqual([])
+  })
+
+  test("reads the checks clone cache from the operator HOME and nothing else under it", async () => {
+    const folders = await Effect.runPromise(Effect.gen(function*() {
+      const path = yield* Path.Path
+      return checksCacheReads(path, { HOME: "/h" })
+    }).pipe(Effect.provide(BunServices.layer)))
+    expect(folders).toEqual(["/h/.cache/avi2dg-checks"])
+    const { filesystem } = await profileFor(roots, { ...noHost, toolchainFolders: [...defaultToolchainFolders, ...folders] })
+    expect(filesystem.read.filter((grant) => within("/h", grant))).toEqual(["/h/.cache/avi2dg-checks"])
+    expect(filesystem.allow.filter((grant) => within("/h", grant))).toEqual([])
+    expect(filesystem.write.filter((grant) => within("/h", grant))).toEqual([])
+  })
+
+  test("grants no cache folder when HOME is unset or empty", async () => {
+    const unreadable = await Effect.runPromise(Effect.gen(function*() {
+      const path = yield* Path.Path
+      return [checksCacheReads(path, {}), checksCacheReads(path, { HOME: "" })]
+    }).pipe(Effect.provide(BunServices.layer)))
+    expect(unreadable).toEqual([[], []])
   })
 
   test("keeps an isolated security posture", async () => {

@@ -18,6 +18,12 @@ export interface NonoExecOptions {
   readonly env: Readonly<Record<string, string>>
 }
 
+export const checksCacheReads = (
+  path: Path.Path,
+  hostEnv: Readonly<Record<string, string | undefined>>
+): ReadonlyArray<string> =>
+  hostEnv.HOME === undefined || hostEnv.HOME === "" ? [] : [path.join(hostEnv.HOME, ".cache", "avi2dg-checks")]
+
 export type NonoExec = Extract<AgentExec, { readonly kind: "nono" }>
 
 export const openNonoExec = (
@@ -44,7 +50,7 @@ export const openNonoExec = (
     const nono = (args: ReadonlyArray<string>) => ChildProcess.make(nonoBinary, args, { env, extendEnv: false })
     const profileDir = yield* fs.makeTempDirectoryScoped({ prefix: "orc-nono-" })
     const profilePath = path.join(profileDir, "profile.json")
-    const profile = yield* selectNonoProfile(roots, { developerDir, toolchainFolders: [...toolchain.folders], runtimeDirs }, options.modelCredential)
+    const profile = yield* selectNonoProfile(roots, { developerDir, toolchainFolders: [...toolchain.folders, ...checksCacheReads(path, hostEnv)], runtimeDirs }, options.modelCredential)
     yield* fs.writeFileString(profilePath, `${JSON.stringify(profile, null, 2)}\n`)
     yield* checkProfile(spawner, nono, profilePath, [profileDir, nonoBinary, path.dirname(nonoBinary)])
     yield* fs.makeDirectory(sandboxed.TMPDIR, { recursive: true })
