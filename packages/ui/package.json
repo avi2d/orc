@@ -8,6 +8,10 @@
   "license": "MIT",
   "type": "module",
   "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./bin-args": "./src/bin-args.ts"
+  },
   "dependencies": {
     "@opentui/core": "0.6.5",
     "effect": "4.0.0"
