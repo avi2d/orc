@@ -46,8 +46,14 @@ export const installCopy = (
   logFile: string
 ): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
-    const text = yield* fs.readFileString(path.join(exec.cwd, ".no-mistakes.yaml")).pipe(Effect.orElseSucceed(() => null))
-    const commands = text === null ? [] : yield* readChecksCommands(text, ".no-mistakes.yaml").pipe(Effect.orElseSucceed(() => []))
+    const file = path.join(exec.cwd, ".no-mistakes.yaml")
+    const text = yield* fs.readFileString(file).pipe(
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed<string | null>(null)),
+      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read " + file + ": " + String(cause) }))
+    )
+    const commands = text === null ? [] : yield* readChecksCommands(text, file).pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
+    )
     const prepare = prepareCommandOf(commands)
     if (prepare === null) {
       return

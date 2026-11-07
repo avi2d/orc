@@ -34,7 +34,7 @@ Orc refuses a resume whose `--sandbox` names another kind than the one recorded.
 A run recorded before orc stored the sandbox takes it from the flag, with nono as the default.
 On resume orc reuses the copy that holds the branch, wherever git lists it, and Pi resumes its prior session.
 A resumed `no-mistakes` run reattaches to no-mistakes with the same intent.
-A copy from before orc kept copies under `$ORC_HOME`, in the project's `.sandcastle/worktrees` folder, is reused where it sits and kept when the run ends.
+A copy in the project's `.sandcastle/worktrees` folder, made before orc kept copies under `$ORC_HOME`, is reused where it sits and kept when the run ends.
 When the run ends, orc removes the copy it made under `$ORC_HOME` unless the copy holds uncommitted changes, which it keeps and names.
 After a refusal, run the same resume command with `--allow` and the name from the report, or with `--answer` and your answer for a question.
 No-mistakes takes the word for that `--allow` kind, and the answer for that question.
