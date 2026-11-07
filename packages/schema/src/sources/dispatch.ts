@@ -82,6 +82,8 @@ type TaskFolder = "new" | "taken" | "closed";
 
 const backlogVariable = "ORC_HOME";
 
+export const missingBacklog = (root: string): string => "no backlog at " + root + ": it lives on the machine that runs orc beat";
+
 const backlogRoot: Config.Config<string> = Config.all({
   explicit: selector(backlogVariable),
   home: Config.String("HOME"),
@@ -270,8 +272,8 @@ const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<Di
       return {
         root,
         missing: true,
-        machines: unreachable("no backlog at " + root),
-        projects: unreachable("no backlog at " + root),
+        machines: unreachable(missingBacklog(root)),
+        projects: unreachable(missingBacklog(root)),
         tasks: [],
         unread: [],
       };

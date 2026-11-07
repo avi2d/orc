@@ -1,4 +1,4 @@
-import type { DispatchView, RoomEntry, RunRow, WaitRow } from "@tui-dash/schema";
+import { type DispatchView, missingBacklog, type RoomEntry, type RunRow, type WaitRow } from "@tui-dash/schema";
 import { type Block, ellipsize, type Line, padEnd, sentence, span, widthOf, withinRoom } from "@tui-dash/ui";
 
 const counted = (count: number, what: string): ReadonlyArray<string> => (count > 0 ? [count + " " + what] : []);
@@ -36,7 +36,7 @@ const waitLine = (wait: WaitRow, width: number): Line => {
 const withinBacklog = (root: string, missed: string): string => (missed.startsWith(root + "/") ? missed.slice(root.length + 1) : missed);
 
 export const dispatchLines = (view: DispatchView, width: number, rows: number): Block => {
-  if (view.missing) return sentence("no backlog at " + view.root, "muted", width);
+  if (view.missing) return sentence(missingBacklog(view.root), "muted", width);
   const counts = headParts(view);
   const countHead: Block = counts.length === 0 ? [] : [[span(counts.join(" \u00b7 "), "foreground")]];
   const unreadNotes: Block = view.unread.map((missed): Line => [span("! " + ellipsize(withinBacklog(view.root, missed), width - 2), "warning")]);

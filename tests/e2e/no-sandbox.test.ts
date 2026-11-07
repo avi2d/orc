@@ -313,3 +313,39 @@ describe("orc run on a package provider", () => {
     })
   }, 60_000)
 })
+
+const withQuietPi = async (fixture: NoSandboxFixture, quietSeconds: number): Promise<void> => {
+  const piPath = join(fixture.fakeBin, "pi")
+  const loudPi = join(fixture.fakeBin, "loud-pi")
+  await writeFile(loudPi, await readFile(piPath))
+  await chmod(loudPi, 0o755)
+  await writeScript(piPath, ["if [ \"$1\" = -p ]; then sleep " + quietSeconds.toString() + "; fi", "exec \"" + loudPi + "\" \"$@\""])
+}
+
+describe("orc run idle limit", () => {
+  test("a Pi quiet past ORC_IDLE_TIMEOUT_SECONDS ends the run as idle instead of waiting on it", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      await withQuietPi(fixture, 4)
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, { ...fixture.env, ORC_IDLE_TIMEOUT_SECONDS: "1" })
+      expect(result.exitCode).toBe(1)
+      expect(result.stdout + result.stderr).toContain("idle for 1 second")
+    })
+  }, 60_000)
+
+  test("a Pi quiet for less than ORC_IDLE_TIMEOUT_SECONDS runs on to its PR instead of being ended as idle", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      await withQuietPi(fixture, 2)
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, { ...fixture.env, ORC_IDLE_TIMEOUT_SECONDS: "30" })
+      expect({ exitCode: result.exitCode, stdout: result.stdout }).toEqual({ exitCode: 0, stdout: expect.stringContaining(prUrl) })
+    })
+  }, 60_000)
+
+  test("an ORC_IDLE_TIMEOUT_SECONDS that is not a number of seconds is refused before Pi runs instead of read as zero", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, { ...fixture.env, ORC_IDLE_TIMEOUT_SECONDS: "45m" })
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain("ORC_IDLE_TIMEOUT_SECONDS is 45m")
+      expect(await Bun.file(join(fixture.fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+})

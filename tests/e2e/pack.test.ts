@@ -35,6 +35,7 @@ const expectedFiles = [
   "src/dispatch/alert-events.ts",
   "src/dispatch/alert-stream.ts",
   "src/dispatch/args.ts",
+  "src/dispatch/backlog-depend.ts",
   "src/dispatch/backlog-write.ts",
   "src/dispatch/backlog.ts",
   "src/dispatch/beat-action.ts",

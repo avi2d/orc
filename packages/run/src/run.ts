@@ -69,6 +69,19 @@ export const toolchainFromEnv = (value: string | undefined, home: string): Effec
     return withInstallFolders(defaultToolchainResolver(home), folders)
   })
 
+const defaultIdleTimeoutSeconds = 45 * 60
+
+// Sandcastle counts a tool that prints nothing as idle, so its own 600 second default ends a run inside a quiet lint or test command.
+export const idleTimeoutFromEnv = (value: string | undefined): Effect.Effect<number, OrcRunError> => {
+  const text = (value ?? "").trim()
+  if (text === "") {
+    return Effect.succeed(defaultIdleTimeoutSeconds)
+  }
+  return /^[1-9]\d*$/.test(text)
+    ? Effect.succeed(Number(text))
+    : refuse("orc: ORC_IDLE_TIMEOUT_SECONDS is " + text + ", which is not a whole number of seconds above zero")
+}
+
 
 const openHostGit = (fs: FileSystem.FileSystem, path: Path.Path): Effect.Effect<string, OrcRunError, Scope.Scope> => {
   const realGit = Bun.which("git")
@@ -247,6 +260,7 @@ export const runAgentStep = (
     const operatorEnv = { ...Bun.env }
     const hostPath = Bun.env.PATH
     const toolchain = yield* toolchainFromEnv(Bun.env.ORC_TOOLCHAIN_DIRS, homedir())
+    const idleTimeoutSeconds = yield* idleTimeoutFromEnv(Bun.env.ORC_IDLE_TIMEOUT_SECONDS)
     const opened = yield* openRun(request)
     const { fs, path, spawner, home, runId, git, checkout, sandboxKind } = opened
     const noMistakes = { spawner, binary: noMistakesBinary(Bun.env.ORC_NO_MISTAKES_BIN), pathEnv: hostPath ?? "", git: checkout.git }
@@ -262,6 +276,7 @@ export const runAgentStep = (
           agent: agentProvider,
           prompt,
           completionSignal: orcCompletionLine,
+          idleTimeoutSeconds,
           logging: { type: "file", path: path.join(folders.runDir, logFile) },
           name: "orc-" + runId,
           ...(resumeSession === undefined ? {} : { resumeSession })
