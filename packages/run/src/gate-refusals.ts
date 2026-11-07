@@ -50,7 +50,7 @@ const graphwalkHeader = (line: string): GraphwalkSection | null => {
 }
 
 const locatorStripped = (line: string): string => {
-  const stripped = line.replace(/^.+?:\d+(?::\d+)?(?::)?\s+|^\S+:\s+|^\S+\s+/, "")
+  const stripped = line.replace(/^\S+ line \d+:\s+|^[^:]+?:\d+(?::\d+)?:?\s+|^\S+:\s+|^(?=\S*[/.])\S+\s+/, "")
   return stripped === "" ? line : stripped
 }
 
@@ -194,7 +194,13 @@ export const refusalsIn = (output: string): ReadonlyArray<GateRefusal> => {
         keep(gate, testLayoutRule(locatorStripped(raw.trim())))
         continue
       }
-      keep(gate, locatorStripped(raw.trim()).replace(/^.*,\s+over the /, "over the "))
+      keep(
+        gate,
+        locatorStripped(raw.trim()).replace(/^.*,\s+over the /, "over the ").replace(
+          /\. Its largest section is [^.]*\./,
+          "."
+        )
+      )
       continue
     }
     gate = null

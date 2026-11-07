@@ -97,6 +97,68 @@ describe("refusalsIn", () => {
     ])
   })
 
+  test("keeps browser nesting wording instead of merging into of the rendered page", () => {
+    const output = [
+      "browser: 2 failure(s) in 1 check run(s) over 1 route(s), 1 viewport(s), 1 state(s) and 1 target(s):",
+      "  nesting at /about (en), desktop 1280x720, default: <p> is not permitted as content under <span> at 3:5 of the rendered page",
+      "  nesting at /about (en), desktop 1280x720, default: <div> is not permitted as content under <button> at 7:2 of the rendered page",
+    ].join("\n")
+    expect(refusalsIn(output)).toEqual([
+      {
+        gate: "browser",
+        rule: "nesting at /about (en), desktop 1280x720, default: <p> is not permitted as content under <span> at 3:5 of the rendered page",
+      },
+      {
+        gate: "browser",
+        rule: "nesting at /about (en), desktop 1280x720, default: <div> is not permitted as content under <button> at 7:2 of the rendered page",
+      },
+    ])
+  })
+
+  test("keeps the check and package names instead of stripping the first word", () => {
+    const output = [
+      "browser: 1 contrast check(s) axe cannot measure, reported as unverified:",
+      "  contrast at /about (en), desktop 1280x720, default: color-contrast on .cta could not be measured",
+      "advisories: 1 acknowledgement(s) in advisory-acks.json do not hold:",
+      "  lodash GHSA-abcd-1234 expired on 2026-01-01; upgrade the package and delete the entry, or renew it with a later day",
+    ].join("\n")
+    expect(refusalsIn(output)).toEqual([
+      {
+        gate: "browser",
+        rule: "contrast at /about (en), desktop 1280x720, default: color-contrast on .cta could not be measured",
+      },
+      {
+        gate: "advisories",
+        rule: "lodash GHSA-abcd-1234 expired on 2026-01-01; upgrade the package and delete the entry, or renew it with a later day",
+      },
+    ])
+  })
+
+  test("groups one workflow fault across lines instead of splitting by line number", () => {
+    const output = [
+      "ci-wiring: 2 bun setup step(s) drift from the fleet bun version:",
+      "  .github/workflows/ci.yml line 12: job lint step 1 requests bun 1.1.0 from package.json, want 1.2.0",
+      "  .github/workflows/ci.yml line 30: job lint step 1 requests bun 1.1.0 from package.json, want 1.2.0",
+    ].join("\n")
+    expect(refusalsIn(output)).toEqual([
+      { gate: "ci-wiring", rule: "job lint step 1 requests bun 1.1.0 from package.json, want 1.2.0" },
+    ])
+  })
+
+  test("groups README ceilings instead of splitting by largest section", () => {
+    const output = [
+      "docs: 2 violation(s):",
+      "  README.md: is 6123 characters, over the 6,000-character ceiling for a README. Its largest section is Install at 2345 characters. Move that section to a page under docs/ and link it from the README in one line",
+      "  README.md: is 7010 characters, over the 6,000-character ceiling for a README. Its largest section is Usage at 3102 characters. Move that section to a page under docs/ and link it from the README in one line",
+    ].join("\n")
+    expect(refusalsIn(output)).toEqual([
+      {
+        gate: "docs",
+        rule: "over the 6,000-character ceiling for a README. Move that section to a page under docs/ and link it from the README in one line",
+      },
+    ])
+  })
+
   test("drops the file locator and keeps the kit wording as the rule", () => {
     const refusal = refusalsIn(lintOutput)[0]
     expect(refusal.rule.startsWith("src/a.ts")).toBe(false)
