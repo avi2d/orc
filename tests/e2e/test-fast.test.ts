@@ -14,7 +14,8 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-const environment = (): Record<string, string> => ({
+const environment = (extra: Record<string, string>): Record<string, string> => ({
+  ...extra,
   PATH: process.env["PATH"] ?? "",
   HOME: dir,
   GIT_AUTHOR_NAME: "Fixture User",
@@ -29,8 +30,8 @@ interface Ran {
   readonly text: string;
 }
 
-const run = async (args: string[], cwd: string): Promise<Ran> => {
-  const child = Bun.spawn(args, { cwd, env: environment(), stdout: "pipe", stderr: "pipe" });
+const run = async (args: string[], cwd: string, extra: Record<string, string> = {}): Promise<Ran> => {
+  const child = Bun.spawn(args, { cwd, env: environment(extra), stdout: "pipe", stderr: "pipe" });
   const code = await child.exited;
   const text = (await new Response(child.stdout).text()) + (await new Response(child.stderr).text());
   return { code, text };
@@ -48,7 +49,12 @@ async function repository(): Promise<void> {
   await git(["commit", "-q", "-m", "feat: base"]);
 }
 
-const fast = (): Promise<Ran> => run(["bun", testFast], dir);
+const fast = (extra: Record<string, string> = {}): Promise<Ran> => run(["bun", testFast], dir, extra);
+
+const withOriginMain = async (): Promise<void> => {
+  await git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
+  await git(["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"]);
+};
 
 test("a clone without the remote-tracking default branch fails before any tier runs", async () => {
   await repository();
@@ -94,5 +100,21 @@ test("an untouched e2e file whose path contains the touched path does not run", 
   const ran = await fast();
   expect(ran.text).toContain("the change touches 1 e2e test file(s): tests/e2e/x.test.ts");
   expect(ran.text).not.toContain("x.test.tsx");
+  expect(ran.code).toBe(0);
+}, 120_000);
+
+test("a worker override of zero is refused, not run with no workers", async () => {
+  await repository();
+  await withOriginMain();
+  const refused = await fast({ TEST_FAST_WORKERS: "0" });
+  expect(refused.code).not.toBe(0);
+  expect(refused.text).toContain("TEST_FAST_WORKERS must be at least 1, not 0");
+}, 120_000);
+
+test("TEST_FAST_WORKERS starts the count it names, not the memory cap", async () => {
+  await repository();
+  await withOriginMain();
+  const ran = await fast({ TEST_FAST_WORKERS: "3" });
+  expect(ran.text).toContain("test-fast: running 3 worker(s)");
   expect(ran.code).toBe(0);
 }, 120_000);
