@@ -22,7 +22,7 @@ It would slow each report poll with the sampling gap the samples need.
 
 ## Decision
 
-The other machine prints its live usage as JSON through `orc-dash-tasks --live-json`.
+The other machine prints its live usage as JSON through `orc-dash report tasks-live`.
 The dashboard runs that command over the same ssh route as its task list.
 The reading decodes with the same schema as this machine's.
 A failed read keeps the task usage not read line.
