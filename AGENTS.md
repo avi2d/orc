@@ -4,7 +4,7 @@ This repository holds the orc command and the tui-dash panels it ships beside, a
 
 ## Checks
 
-- Run `bun run build`, `bun run lint`, `bun run typecheck` and `bun run test` before a change is done, as `.no-mistakes.yaml` and [Contribute](docs/contribute.md) list.
+- Run `bun run build`, `bun run lint`, `bun run typecheck` and `bun run test:fast` before a change is done. `.no-mistakes.yaml` runs `test:fast` and [Contribute](docs/contribute.md) lists the full `bun run test` kept for PRs.
 - `bun run lint` needs the private secrets pack, as [Contribute](docs/contribute.md) says, and fails on a machine without it.
 - A panel package imports another package only through `packages/schema` and `packages/ui`, which `dependency-cruiser.config.ts` holds.
 - Tests sit by level under `tests/unit`, `tests/e2e` and `tests/live`.
