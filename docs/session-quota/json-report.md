@@ -12,7 +12,7 @@ A reader checks `schemaVersion` first, and version 1 is the only version.
 | `generatedAt` | The ISO instant of the read |
 | `scope` | `local`, since the report covers only the machine it ran on |
 | `estimate` | `basis` `local-logs`, `upperBound` `true`, and the `priceRatios` of input, output, cache read and cache write tokens |
-| `sources` | The status of the `quota`, `herdr` and `processes` reads, each `ok`, `unreachable` or `invalid` with a `detail` |
+| `sources` | The status of the `quota`, `herdr` and `processes` reads, each `ok`, `unreachable` or `invalid` with a `detail`, and a herdr not installed reads `ok` with no panes, the same as an installed herdr that lists none |
 | `ledger` | How many bridge copies, repeated lines, empty rows, fork copies and repeated Codex counts the count dropped, and the `unjoinedCalls` no account took |
 | `accounts` | Each account with its `provider`, `accountKey`, `credentialKey`, `accountKeys`, `title`, the `joins` that put calls on it and its `quota` read status |
 | `accounts[].credentialKey` | The account's own credential key, which stays the same whichever source read the account: the harness's native login, `codex-home` for Codex or `default` for Claude, when the account holds it, or else the first of quota-axi's `accountKeys` |

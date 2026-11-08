@@ -96,7 +96,7 @@ const filesHolding = async (dir: string, text: string, except: ReadonlyArray<str
 }
 
 describe("orc runner token", () => {
-  test("prints an armed rolling session's access token with its expiry in ISO time instead of epoch milliseconds", async () => {
+  test("prints a credentials file's access token with its expiry in ISO time instead of epoch milliseconds", async () => {
     await withFixture(async (fixture) => {
       const session = join(fixture.dir, "claude-credentials.json")
       await writeSession(session, newYearMillis)
@@ -309,7 +309,7 @@ describe("orc runner hold", () => {
       const renewal = await runOrc(fixture, ["runner", "renew"], {}, JSON.stringify({ task: "orc-9", token: renewedPlaceholder, expiresAt: fresh }))
       expect(renewal.stdout).toBe("renewed the token for orc-9 until " + fresh + "\n")
       const result = await holding
-      expect(result.stdout).toBe("orc-9 waits for a fresh token from the Mac: the one held here runs out at " + past + "\nthe run of orc-9 finished\n")
+      expect(result.stdout).toBe("orc-9 waits for a fresh token from the machine that runs the beat: the one held here runs out at " + past + "\nthe run of orc-9 finished\n")
       expect(await readFile(seen, "utf8")).toBe(renewedPlaceholder)
       expect(await gone(tokenDir(fixture, "orc-9"))).toBe(true)
     })
