@@ -99,6 +99,7 @@ A refusal names only the command and what it missed, never the token.
 It prints the file's access token and expiry as `orc.token.v1`, and writes only into a pipe, never onto a terminal.
 It refuses a file that still holds a refresh token, since that login would then leave the machine.
 Whatever keeps the file fresh is yours to run, and orc only reads it.
+With no such file, take a token-file account, whose file holds only the token, or a kind none account as shown below.
 
 An account of kind `none` holds no token: the beat mints nothing, sends nothing, renews nothing and never waits on a token for it.
 A Pi package that logs in on its own takes this kind, as in a `claude-bridge` package that drives the Claude Code SDK while the dispatched run still goes through the `main` account named here:

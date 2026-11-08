@@ -113,7 +113,7 @@ describe("orc runner token", () => {
       const result = await runOrc(fixture, ["runner", "token", session])
       expect(result.exitCode).not.toBe(0)
       expect(result.stdout).toBe("")
-      expect(result.stderr).toBe("orc: " + session + " holds a refresh token, so its login would leave this machine; give orc a credentials file that holds only an access token\n")
+      expect(result.stderr).toBe("orc: " + session + " holds a refresh token, so its login would leave this machine; give orc a credentials file that holds only an access token, or take a token-file or kind none account instead\n")
     })
   }, runnerTimeout)
 
