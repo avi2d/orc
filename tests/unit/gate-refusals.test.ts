@@ -77,6 +77,15 @@ describe("refusalsIn", () => {
     expect(refusalsIn(output, "typecheck")).toEqual([{ gate: "typecheck", rule: "TS1234" }])
   })
 
+  test("ignores a diagnostic string inside bun context lines instead of recording it", () => {
+    const output = [
+      "tests/unit/gate-refusals.test.ts:",
+      "41 | const output = \"src/a.ts(1,2): error TS1234: this type is not assignable\"",
+      "error: expect(received).toBe(expected)",
+    ].join("\n")
+    expect(refusalsIn(output, "test")).toEqual([{ gate: "test", rule: null }])
+  })
+
   test("records the failing test command instead of parsing bun output", () => {
     const output = "checks-test: bun test failed before it wrote a report, so no skip was judged"
     expect(refusalsIn(output, "test")).toEqual([{ gate: "test", rule: null }])

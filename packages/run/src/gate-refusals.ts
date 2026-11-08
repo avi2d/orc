@@ -29,8 +29,8 @@ const summaryGates = (text: string): ReadonlyArray<string> => {
 const stableRules = (output: string): ReadonlyArray<string> => {
   const rules: Array<string> = []
   for (const line of output.split("\n")) {
-    const tool = /\berror\s+([A-Za-z][\w-]*\([^()\s]+\))/.exec(line)?.[1]
-      ?? /\berror\s+(TS\d+)\b/.exec(line)?.[1]
+    const tool = /^\S+:\d+:\d+: error ([A-Za-z][\w-]*\([^()\s]+\))/.exec(line)?.[1]
+      ?? /^(?:\S+\(\d+,\d+\): )?error (TS\d+):/.exec(line)?.[1]
     if (tool !== undefined && !rules.includes(tool)) {
       rules.push(tool)
     }
