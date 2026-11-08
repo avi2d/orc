@@ -1,5 +1,6 @@
-import { Data, DateTime, Duration, Effect, Option, type Redacted, Schema, Stream } from "effect"
-import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { Data, DateTime, Duration, Effect, Option, type Redacted, Schema } from "effect"
+import { ChildProcessSpawner } from "effect/process"
+import { spawnedQuiet } from "./runner-exec"
 import { TaskId } from "./backlog"
 import type { Command } from "./config"
 
@@ -87,8 +88,7 @@ export const readToken = (command: Command): Effect.Effect<TokenReading, never, 
   const unread = (why: string): TokenReading => ({ kind: "unread", reason: "the token command " + program + " " + why })
   return Effect.gen(function*() {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const handle = yield* spawner.spawn(ChildProcess.make(program, args, { stdin: "ignore", stderr: "ignore" }))
-    const [stdout, exitCode] = yield* Effect.all([handle.stdout.pipe(Stream.decodeText(), Stream.mkString), handle.exitCode], { concurrency: "unbounded" })
+    const [stdout, exitCode] = yield* spawnedQuiet(spawner, program, args)
     if (exitCode !== 0) {
       return unread("exited " + exitCode)
     }

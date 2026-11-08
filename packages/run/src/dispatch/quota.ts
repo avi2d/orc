@@ -1,5 +1,6 @@
-import { Duration, Effect, Result, Schema, Stream } from "effect"
-import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { Duration, Effect, Result, Schema } from "effect"
+import { ChildProcessSpawner } from "effect/process"
+import { spawnedQuiet } from "./runner-exec"
 import { duplicateOf } from "../json-file"
 
 type AccountReading =
@@ -68,8 +69,7 @@ export const readQuota = (
   const [program, ...args] = settings.command
   return Effect.gen(function*() {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const handle = yield* spawner.spawn(ChildProcess.make(program, args, { stdin: "ignore", stderr: "ignore" }))
-    const [stdout, exitCode] = yield* Effect.all([handle.stdout.pipe(Stream.decodeText(), Stream.mkString), handle.exitCode], { concurrency: "unbounded" })
+    const [stdout, exitCode] = yield* spawnedQuiet(spawner, program, args)
     if (exitCode !== 0) {
       return { kind: "unread", reason: "the quota command " + program + " exited " + exitCode } satisfies QuotaReading
     }

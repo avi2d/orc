@@ -1,8 +1,18 @@
 import { DateTime, Option } from "effect";
 import { mapOutcome, type Outcome } from "../reading";
 import type { ActionRun } from "../sources/actions";
+import type { TaskEntry } from "../contract/tasks";
+import { taskOwning } from "./task-resources";
 import type { PueueGroupStatus, PueueStatus, PueueTask, PueueTaskResult } from "../sources/pueue";
 import { type MachineProjects, type ProjectNames, unknownProject } from "../sources/project-names";
+
+import {
+  type EndedJson,
+  type PueueJson,
+  type QueuesReport,
+  type RunningJson,
+  type RunJson,
+} from "../contract/queues";
 
 export type FailureView =
   | { readonly kind: "exit"; readonly code: number }
@@ -116,7 +126,7 @@ export interface ActionView {
   readonly running: boolean;
 }
 
-export const newestFirst = (a: ActionRun, b: ActionRun): number => DateTime.toEpochMillis(b.createdAt) - DateTime.toEpochMillis(a.createdAt);
+const newestFirst = (a: ActionRun, b: ActionRun): number => DateTime.toEpochMillis(b.createdAt) - DateTime.toEpochMillis(a.createdAt);
 
 const actionViews = (runs: ReadonlyArray<ActionRun>): ReadonlyArray<ActionView> =>
   runs.toSorted(newestFirst).map((run) => ({ title: run.displayTitle, workflow: run.workflowName, running: run.status === "in_progress" }));
@@ -148,3 +158,60 @@ export const queuesView = (readings: QueueReadings, projects?: MachineProjects):
 
 export const queuesPending = (view: QueuesView): boolean =>
   view.machines.some((machine) => Option.isNone(machine.pueue)) || Option.isNone(view.actions.runs);
+
+const runningJson = (row: RunningRow): typeof RunningJson.Type => ({
+  id: row.id,
+  command: row.command,
+  project: row.project,
+  startedAt: DateTime.formatIso(row.startedAt),
+});
+
+const endedJson = (row: EndedRow): typeof EndedJson.Type => ({
+  ...runningJson(row),
+  endedAt: DateTime.formatIso(row.endedAt),
+  result: row.result,
+});
+
+const pueueJson = (projects: ProjectNames | undefined) => (status: PueueStatus): typeof PueueJson.Type => {
+  const view = pueueView(status, projects);
+  return {
+    running: view.running.map(runningJson),
+    ended: view.ended.map(endedJson),
+    queued: view.queued,
+    paused: view.paused,
+    groups: view.groups,
+  };
+};
+
+const runJson = (run: ActionRun): typeof RunJson.Type => ({
+  id: run.databaseId,
+  title: run.displayTitle,
+  workflow: run.workflowName,
+  status: run.status,
+  createdAt: DateTime.formatIso(run.createdAt),
+});
+
+const millis = DateTime.toEpochMillis;
+
+// Pueue dates a run to the millisecond, so a run that starts with its task still belongs to it.
+const pueuePrecisionMillis = 1;
+
+export const testsOf = (tasks: ReadonlyArray<TaskEntry>, status: PueueStatus): ReadonlyMap<string, ReadonlyArray<TestRun>> => {
+  const view = pueueView(status);
+  const runs: ReadonlyArray<TestRun> = [...view.running, ...view.ended];
+  const owned = runs.flatMap((run) => {
+    const owner = taskOwning(tasks, { folder: run.path, startedAtMillis: millis(run.startedAt) }, pueuePrecisionMillis);
+    return owner === undefined ? [] : [{ task: owner.id, run }];
+  });
+  return new Map(
+    [...Map.groupBy(owned, ({ task }) => task)].map(([task, own]) => [
+      task,
+      own.map(({ run }) => run).toSorted((left, right) => millis(right.startedAt) - millis(left.startedAt)),
+    ]),
+  );
+};
+
+export const queuesReport = ({ machines, actions }: QueueOutcomes, projects?: MachineProjects): QueuesReport => ({
+  machines: machines.map(({ name, status }) => ({ name, pueue: mapOutcome(status, pueueJson(projects?.get(name))) })),
+  actions: { repo: actions.repo, runs: mapOutcome(actions.runs, (runs) => runs.toSorted(newestFirst).map(runJson)) },
+});

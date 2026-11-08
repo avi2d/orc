@@ -312,6 +312,11 @@ export const runRecordOf = (row: typeof RunSqlRowSchema.Type): RunRecord => ({
   sandbox: row.sandbox
 })
 
+export const decodedRunRow = (row: unknown): Effect.Effect<RunRecord | null, Schema.SchemaError> =>
+  row === null || row === undefined
+    ? Effect.succeed(null)
+    : Schema.decodeUnknownEffect(RunSqlRowSchema)(row).pipe(Effect.map(runRecordOf))
+
 export const stoppedEndReason = "the run was stopped"
 
 const runColumns = "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox FROM runs"
@@ -320,11 +325,7 @@ export const runById = (
   db: Database,
   id: string
 ): Effect.Effect<RunRecord | null, Schema.SchemaError | SqliteFailure> =>
-  sqlite(() => db.query(runColumns + " WHERE id = ?").get(id)).pipe(
-    Effect.flatMap((row) =>
-      row === null || row === undefined ? Effect.succeed(null) : Schema.decodeUnknownEffect(RunSqlRowSchema)(row).pipe(Effect.map(runRecordOf))
-    )
-  )
+  sqlite(() => db.query(runColumns + " WHERE id = ?").get(id)).pipe(Effect.flatMap(decodedRunRow))
 
 export const listRuns = (
   db: Database,

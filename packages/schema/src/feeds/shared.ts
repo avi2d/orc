@@ -1,7 +1,7 @@
 import { Context, DateTime, Effect, Layer, Option } from "effect";
 import { SavedProfilesSource } from "../sources/saved-profiles";
 import { readQuota } from "../sources/quota-read";
-import { type QuotaReadings, type QuotaReadSources, sessionQuotaOf, type SessionSources } from "../sources/session-quota-read";
+import { type QuotaReadings, type QuotaReadSources, sessionQuotaOf, type SessionSources } from "../views/session-quota-read";
 import type { QueueReadings } from "../views/queues";
 import { type QuotaBlock, quotaBlocks } from "../views/quotas";
 import type { SessionQuotaView } from "../views/session-quota";

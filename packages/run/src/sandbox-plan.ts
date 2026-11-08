@@ -88,6 +88,11 @@ const checkedAgentWindows = (
     ))
   )
 
+const refuseTokenFile = (choice: { readonly config: OrcConfig; readonly provider: Provider; readonly tokenFileFlag: string | undefined }, reason: string): Effect.Effect<void, OrcRunError> =>
+  choice.tokenFileFlag === undefined
+    ? Effect.void
+    : refuse("orc: --token-file names a token file, and " + choice.config.file + " has the provider " + choice.provider.id + " " + reason)
+
 const planLogin = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
@@ -100,9 +105,7 @@ const planLogin = (
 ): Effect.Effect<SandboxPlan, OrcRunError> =>
   Effect.gen(function*() {
     const provider = choice.provider
-    if (choice.tokenFileFlag !== undefined) {
-      return yield* refuse("orc: --token-file names a token file, and " + choice.config.file + " has the provider " + provider.id + " take a Pi login, so drop the flag or give the provider a token file")
-    }
+    yield* refuseTokenFile(choice, "take a Pi login, so drop the flag or give the provider a token file")
     if (sandboxKind === "none") {
       yield* runLoginCheck(spawner, host, dirs.projectDir, provider.id, true)
       const operatorAgentDir = Bun.env.PI_CODING_AGENT_DIR
@@ -159,9 +162,7 @@ const planPackage = (
 ): Effect.Effect<SandboxPlan, OrcRunError> =>
   Effect.gen(function*() {
     const provider = choice.provider
-    if (choice.tokenFileFlag !== undefined) {
-      return yield* refuse("orc: --token-file names a token file, and " + choice.config.file + " has the provider " + provider.id + " reach its service through its Pi packages, so drop the flag")
-    }
+    yield* refuseTokenFile(choice, "reach its service through its Pi packages, so drop the flag")
     if (sandboxKind === "nono") {
       return yield* refuse("orc: the implementer runs on model " + models.agent + ", whose provider " + provider.id + " reaches its service through its Pi packages, and the nono sandbox carries only a Pi login, so run it with --sandbox none")
     }

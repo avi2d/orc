@@ -1,6 +1,6 @@
-import type { QuotaProviderId } from "../sources/quota";
+import type { QuotaProviderId } from "./quota";
 import type { Harness, LogRecord } from "./log-lines";
-import { type Tokens, tokenTotal } from "./tokens";
+import { type Tokens, tokenTotal } from "../contract/tokens";
 
 export interface LogFile {
   readonly path: string;
