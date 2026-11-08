@@ -96,9 +96,9 @@ const filesHolding = async (dir: string, text: string, except: ReadonlyArray<str
 }
 
 describe("orc runner token", () => {
-  test("prints an armed rolling session's access token with its expiry in ISO time instead of epoch milliseconds", async () => {
+  test("prints a credentials file's access token with its expiry in ISO time instead of epoch milliseconds", async () => {
     await withFixture(async (fixture) => {
-      const session = join(fixture.dir, "session-token.json")
+      const session = join(fixture.dir, "claude-credentials.json")
       await writeSession(session, newYearMillis)
       const result = await runOrc(fixture, ["runner", "token", session])
       expect(result.exitCode).toBe(0)
@@ -106,20 +106,30 @@ describe("orc runner token", () => {
     })
   }, runnerTimeout)
 
-  test("a session holding a refresh token is refused instead of sending its access token off the Mac", async () => {
+  test("a session holding a refresh token is refused instead of sending its access token off this machine", async () => {
     await withFixture(async (fixture) => {
-      const session = join(fixture.dir, "session-token.json")
+      const session = join(fixture.dir, "claude-credentials.json")
       await writeSession(session, newYearMillis, { refreshToken: placeholder })
       const result = await runOrc(fixture, ["runner", "token", session])
       expect(result.exitCode).not.toBe(0)
       expect(result.stdout).toBe("")
-      expect(result.stderr).toBe("orc: " + session + " holds a refresh token, so clauth has not armed it with rolling-token and its login would leave this machine\n")
+      expect(result.stderr).toBe("orc: " + session + " holds a refresh token, so its login would leave this machine; give orc a credentials file that holds only an access token, or take a token-file or kind none account instead\n")
+    })
+  }, runnerTimeout)
+
+  test("a missing credentials file is refused as missing instead of with the file system's raw error", async () => {
+    await withFixture(async (fixture) => {
+      const session = join(fixture.dir, "claude-credentials.json")
+      const result = await runOrc(fixture, ["runner", "token", session])
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stdout).toBe("")
+      expect(result.stderr).toBe("orc: cannot read " + session + ": the file is missing\n")
     })
   }, runnerTimeout)
 
   test("a session with no expiry is refused without echoing the file", async () => {
     await withFixture(async (fixture) => {
-      const session = join(fixture.dir, "session-token.json")
+      const session = join(fixture.dir, "claude-credentials.json")
       await writeFile(session, JSON.stringify({ claudeAiOauth: { accessToken: placeholder } }))
       const result = await runOrc(fixture, ["runner", "token", session])
       expect(result.exitCode).not.toBe(0)
@@ -130,7 +140,7 @@ describe("orc runner token", () => {
 
   test("a terminal on stdout is refused instead of shown the token", async () => {
     await withFixture(async (fixture) => {
-      const session = join(fixture.dir, "session-token.json")
+      const session = join(fixture.dir, "claude-credentials.json")
       await writeSession(session, hoursFromNowMillis(2))
       const terminal = process.platform === "darwin"
         ? ["script", "-q", "/dev/null", ...orc, "runner", "token", session]
@@ -146,9 +156,9 @@ describe("orc runner token", () => {
 })
 
 describe("a beat with a token command", () => {
-  test("hands the token to winbox on stdin into an owner-only folder instead of an argument, a log or the worktree", async () => {
+  test("hands the token to the linux machine on stdin into an owner-only folder instead of an argument, a log or the worktree", async () => {
     await withFixture(async (fixture) => {
-      const session = join(fixture.dir, "session-token.json")
+      const session = join(fixture.dir, "claude-credentials.json")
       await fakeQuota(fixture)
       const liveAt = hoursFromNowMillis(2)
       await writeSession(session, liveAt)
@@ -179,7 +189,7 @@ describe("a beat with a token command", () => {
 
   test("a lapsed token leaves the task waiting instead of starting it on a dead token", async () => {
     await withFixture(async (fixture) => {
-      const session = join(fixture.dir, "session-token.json")
+      const session = join(fixture.dir, "claude-credentials.json")
       await fakeQuota(fixture)
       await writeSession(session, pastMillis)
       await writeMachine(fixture, session, true)
@@ -192,7 +202,7 @@ describe("a beat with a token command", () => {
 
   test("the next beat renews a started run's token instead of leaving it to lapse", async () => {
     await withFixture(async (fixture) => {
-      const session = join(fixture.dir, "session-token.json")
+      const session = join(fixture.dir, "claude-credentials.json")
       await fakeQuota(fixture)
       await writeSession(session, hoursFromNowMillis(2))
       await writeMachine(fixture, session, true)
@@ -211,7 +221,7 @@ describe("a beat with a token command", () => {
 
   test("a renewal for a run pueue no longer holds drops its folder and reports a failure instead of a renewal", async () => {
     await withFixture(async (fixture) => {
-      const session = join(fixture.dir, "session-token.json")
+      const session = join(fixture.dir, "claude-credentials.json")
       await fakeQuota(fixture)
       await writeSession(session, hoursFromNowMillis(2))
       await writeMachine(fixture, session, true)
@@ -309,7 +319,7 @@ describe("orc runner hold", () => {
       const renewal = await runOrc(fixture, ["runner", "renew"], {}, JSON.stringify({ task: "orc-9", token: renewedPlaceholder, expiresAt: fresh }))
       expect(renewal.stdout).toBe("renewed the token for orc-9 until " + fresh + "\n")
       const result = await holding
-      expect(result.stdout).toBe("orc-9 waits for a fresh token from the Mac: the one held here runs out at " + past + "\nthe run of orc-9 finished\n")
+      expect(result.stdout).toBe("orc-9 waits for a fresh token from the machine that runs the beat: the one held here runs out at " + past + "\nthe run of orc-9 finished\n")
       expect(await readFile(seen, "utf8")).toBe(renewedPlaceholder)
       expect(await gone(tokenDir(fixture, "orc-9"))).toBe(true)
     })

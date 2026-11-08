@@ -74,7 +74,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/refresh.ts` | The fast-forward of the checkout's default branch when a run starts |
 | `packages/run/src/dispatch/runner-result.ts` | The reading of a task's result and the `orc.runner.v1` JSON |
 | `packages/run/src/dispatch/upstream.ts` | The beat's read of each project's upstream contributions and the scout task a change adds |
-| `packages/run/src/dispatch/token.ts` | The `orc.token.v1` document, the token command and the clauth session reading |
+| `packages/run/src/dispatch/token.ts` | The `orc.token.v1` document, the token command and the Claude credentials reading |
 | `packages/run/src/dispatch/held-token.ts` | The owner-only token folder a run on another machine reads |
 | `packages/run/src/dispatch/hold.ts` | `orc runner hold`: the wait for a live token, the rerun and the folder removal |
 | `packages/run/src/dispatch/pueue-status.ts` | The pueue status shapes and the held-task lookup the runner reads |

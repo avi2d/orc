@@ -43,8 +43,8 @@ const runnerStart = ["true", "runner", "start"] as const
 const spec = { title: "Fix the login page", project: "orc", kind: "ship" as const, internal: false, machine: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the login page\n" }
 
 const writeBacklog = async (root: string, machine: Record<string, unknown>): Promise<void> => {
-  await writeFile(join(root, "dispatch.json"), JSON.stringify({ machines: [{ name: "winbox", slots: 2, start: runnerStart, ...machine }], quota }))
-  await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { winbox: "/home/a/orc" } }] }))
+  await writeFile(join(root, "dispatch.json"), JSON.stringify({ machines: [{ name: "ridge", slots: 2, start: runnerStart, ...machine }], quota }))
+  await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { ridge: "/home/a/orc" } }] }))
   await run(addTask(root, spec))
 }
 
@@ -61,7 +61,7 @@ describe("a machine's five-minute load limit", () => {
   test("a load above the limit leaves the task queued instead of starting it", async () => {
     await withBacklog(async (root) => {
       expect(await beatAt(root, { loadLimit: 16 }, loadOf(16.5))).toEqual({
-        actions: ["waits: winbox's five-minute load is 16.5, above its limit of 16"],
+        actions: ["waits: ridge's five-minute load is 16.5, above its limit of 16"],
         states: ["new"]
       })
     })
@@ -84,9 +84,9 @@ describe("a machine's five-minute load limit", () => {
   })
   test("an unread load leaves the task queued instead of starting blind", async () => {
     await withBacklog(async (root) => {
-      const unread = () => Effect.succeed<LoadReading>({ kind: "unread", reason: "ssh winbox orc runner load exited 255: " })
+      const unread = () => Effect.succeed<LoadReading>({ kind: "unread", reason: "ssh ridge orc runner load exited 255: " })
       expect(await beatAt(root, { loadLimit: 16 }, unread)).toEqual({
-        actions: ["waits: the load on winbox is unread: ssh winbox orc runner load exited 255: "],
+        actions: ["waits: the load on ridge is unread: ssh ridge orc runner load exited 255: "],
         states: ["new"]
       })
     })
@@ -94,10 +94,10 @@ describe("a machine's five-minute load limit", () => {
   test("an overloaded machine sends an unpinned task to another with room instead of holding it", async () => {
     await withBacklog(async (root) => {
       await writeFile(join(root, "dispatch.json"), JSON.stringify({
-        machines: [{ name: "winbox", slots: 4, start: runnerStart, loadLimit: 16 }, { name: "mac", slots: 1, start: runnerStart }],
+        machines: [{ name: "ridge", slots: 4, start: runnerStart, loadLimit: 16 }, { name: "mac", slots: 1, start: runnerStart }],
         quota
       }))
-      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { winbox: "/home/a/orc", mac: "/Users/a/orc" } }] }))
+      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { ridge: "/home/a/orc", mac: "/Users/a/orc" } }] }))
       await run(addTask(root, spec))
       const report = await Effect.runPromise(runBeat(root, root, quietSources(loadOf(20))).pipe(Effect.provide(Layer.merge(BunServices.layer, quotaStub))))
       expect(report.actions.map((action) => action.kind === "started" ? action.machine : action.kind)).toEqual(["mac"])
@@ -108,23 +108,23 @@ describe("a machine's five-minute load limit", () => {
 describe("reading a load limit from dispatch.json", () => {
   const refusal = async (machine: Record<string, unknown>): Promise<string> =>
     withBacklogResult(async (root) => {
-      await writeFile(join(root, "dispatch.json"), JSON.stringify({ machines: [{ name: "winbox", slots: 2, start: runnerStart, ...machine }], quota }))
+      await writeFile(join(root, "dispatch.json"), JSON.stringify({ machines: [{ name: "ridge", slots: 2, start: runnerStart, ...machine }], quota }))
       const result = await run(Effect.result(readDispatchConfig(join(root, "dispatch.json"))))
       return Result.isFailure(result) ? result.failure.detail : "read"
     })
   test("a word, zero or a negative limit is refused naming the machine instead of read", async () => {
-    expect(await refusal({ loadLimit: "16" })).toBe("the machine winbox names the load limit \"16\", which is not a number above 0")
-    expect(await refusal({ loadLimit: 0 })).toBe("the machine winbox names the load limit 0, which is not a number above 0")
-    expect(await refusal({ loadLimit: -2 })).toBe("the machine winbox names the load limit -2, which is not a number above 0")
+    expect(await refusal({ loadLimit: "16" })).toBe("the machine ridge names the load limit \"16\", which is not a number above 0")
+    expect(await refusal({ loadLimit: 0 })).toBe("the machine ridge names the load limit 0, which is not a number above 0")
+    expect(await refusal({ loadLimit: -2 })).toBe("the machine ridge names the load limit -2, which is not a number above 0")
   })
   test("a limit on a machine whose start is not orc runner start is refused instead of never read", async () => {
     expect(await refusal({ start: ["my-start"], loadLimit: 16 })).toBe(
-      "the machine winbox names a load limit, but its start does not run orc runner start, which the beat reads its load through"
+      "the machine ridge names a load limit, but its start does not run orc runner start, which the beat reads its load through"
     )
   })
   test("a fractional limit is read as given instead of rounded", async () => {
     await withBacklogResult(async (root) => {
-      await writeFile(join(root, "dispatch.json"), JSON.stringify({ machines: [{ name: "winbox", slots: 2, start: runnerStart, loadLimit: 7.5 }], quota }))
+      await writeFile(join(root, "dispatch.json"), JSON.stringify({ machines: [{ name: "ridge", slots: 2, start: runnerStart, loadLimit: 7.5 }], quota }))
       expect((await run(readDispatchConfig(join(root, "dispatch.json")))).machines.map((machine) => machine.loadLimit)).toEqual([7.5])
     })
   })
@@ -141,11 +141,11 @@ const withBacklogResult = async <A>(body: (root: string) => Promise<A>): Promise
 
 describe("reading a machine's load", () => {
   test("a machine reached through a command reads the far side's load instead of this one's", async () => {
-    const machine = { name: "winbox", slots: 2, start: ["true", "runner", "start", "--", "sh", "-c", "[ \"$0 $1\" = 'runner load' ] && echo 12.25"] } as const
+    const machine = { name: "ridge", slots: 2, start: ["true", "runner", "start", "--", "sh", "-c", "[ \"$0 $1\" = 'runner load' ] && echo 12.25"] } as const
     expect(await run(readMachineLoad(machine))).toEqual({ kind: "read", fiveMinute: 12.25 })
   })
   test("a far side that prints no number leaves the load unread instead of reading zero", async () => {
-    const machine = { name: "winbox", slots: 2, start: ["true", "runner", "start", "--", "sh", "-c", "echo busy"] } as const
+    const machine = { name: "ridge", slots: 2, start: ["true", "runner", "start", "--", "sh", "-c", "echo busy"] } as const
     expect(await run(readMachineLoad(machine))).toEqual({ kind: "unread", reason: "sh -c echo busy runner load printed no load: busy" })
   })
   test.skipIf(process.platform !== "linux")(skipReason("needs Linux's /proc/loadavg", "a machine run here reads the five-minute field of /proc/loadavg instead of another", "local"), async () => {

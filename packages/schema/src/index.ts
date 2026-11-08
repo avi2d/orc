@@ -1,4 +1,4 @@
-export { acceptsExit, type Command, CommandRunner, CommandUnreachable } from "./command";
+export { acceptsExit, type Command, CommandAbsent, CommandRunner, CommandUnreachable } from "./command";
 export { decodeJson, decodeValue, type Decoded, decoded, flatMapDecoded, rejected } from "./decode";
 export {
   failureOf,

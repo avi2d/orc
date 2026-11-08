@@ -72,7 +72,7 @@ describe("readDispatchConfig", () => {
   })
   test("refuses a token file kind that also names a token command instead of picking one", async () => {
     await withBacklog(async (root) => {
-            const problem = await configProblem(root, { accounts: [{ name: "main", kind: "token-file", tokenFile: "/a", tokenCommand: ["clauth-token", "main"] }] })
+            const problem = await configProblem(root, { accounts: [{ name: "main", kind: "token-file", tokenFile: "/a", tokenCommand: ["my-token-command", "main"] }] })
       expect(problem).toContain("the account main")
       expect(problem).toContain("no excess property")
       expect(problem).toContain("tokenCommand")
@@ -80,7 +80,7 @@ describe("readDispatchConfig", () => {
   })
   test("refuses a token command kind that also names a token file instead of picking one", async () => {
     await withBacklog(async (root) => {
-            const problem = await configProblem(root, { accounts: [{ name: "main", kind: "token-command", tokenCommand: ["clauth-token", "main"], tokenFile: "/a" }] })
+            const problem = await configProblem(root, { accounts: [{ name: "main", kind: "token-command", tokenCommand: ["my-token-command", "main"], tokenFile: "/a" }] })
       expect(problem).toContain("the account main")
       expect(problem).toContain("no excess property")
       expect(problem).toContain("tokenFile")
@@ -88,7 +88,7 @@ describe("readDispatchConfig", () => {
   })
   test("refuses a kind none account that also names a token command instead of holding it", async () => {
     await withBacklog(async (root) => {
-            const problem = await configProblem(root, { accounts: [{ name: "main", kind: "none", tokenCommand: ["clauth-token", "main"] }] })
+            const problem = await configProblem(root, { accounts: [{ name: "main", kind: "none", tokenCommand: ["my-token-command", "main"] }] })
       expect(problem).toContain("the account main")
       expect(problem).toContain("no excess property")
       expect(problem).toContain("tokenCommand")
@@ -136,8 +136,8 @@ describe("readDispatchConfig", () => {
     await withBacklog(async (root) => {
       const file = join(root, "dispatch.json")
       const machines = config.machines.map((machine) => ({ ...machine, renew: ["true"] }))
-      await writeFile(file, JSON.stringify({ machines, quota: { ...config.quota, accounts: [{ name: "main", tokenFile: "/a" }, { name: "alt", tokenCommand: ["clauth-token", "alt"] }] } }))
-      expect((await run(readDispatchConfig(file))).quota.accounts).toEqual([{ name: "main", kind: "token-file", tokenFile: "/a" }, { name: "alt", kind: "token-command", tokenCommand: ["clauth-token", "alt"] }])
+      await writeFile(file, JSON.stringify({ machines, quota: { ...config.quota, accounts: [{ name: "main", tokenFile: "/a" }, { name: "alt", tokenCommand: ["my-token-command", "alt"] }] } }))
+      expect((await run(readDispatchConfig(file))).quota.accounts).toEqual([{ name: "main", kind: "token-file", tokenFile: "/a" }, { name: "alt", kind: "token-command", tokenCommand: ["my-token-command", "alt"] }])
     })
   })
 })

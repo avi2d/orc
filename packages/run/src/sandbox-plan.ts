@@ -53,7 +53,7 @@ const runLoginCheck = (
       handle.exitCode
     ], { concurrency: "unbounded" })
     if (exitCode !== 0) {
-      return yield* refuse("orc: pi auth check found no " + providerId + " login, so a key held only in the keychain or in an environment variable is refused; add a " + providerId + " login to pi on the host and rerun")
+      return yield* refuse("orc: pi auth check found no " + providerId + " login, so a key held only in the keychain or in an environment variable is refused; log pi in to " + providerId + " on the host and rerun")
     }
   })).pipe(
     Effect.mapError((cause) => cause instanceof OrcRunError ? cause : new OrcRunError({ message: "orc: the login check failed to run: " + String(cause) }))

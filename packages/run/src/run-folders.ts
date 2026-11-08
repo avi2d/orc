@@ -1,4 +1,5 @@
 import { Console, Effect, type FileSystem, type Path } from "effect"
+import { readFailure } from "./json-file"
 import { OrcRunError } from "./run-session"
 
 export const runInstructions = (fs: FileSystem.FileSystem, path: Path.Path, cwd: string, named: string | undefined): Effect.Effect<string | null, OrcRunError> =>
@@ -61,7 +62,7 @@ export const prepareRunFolders = (
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot create the sessions folder: " + String(cause) }))
     )
     const taskText = yield* fs.readFileString(taskFile).pipe(
-      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the task file " + taskFile + ": " + String(cause) }))
+      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the task file " + taskFile + ": " + readFailure(cause) }))
     )
     const taskPath = path.join(runDir, "task.md")
     const sandboxTaskPath = path.join(piSessionDir, "task.md")

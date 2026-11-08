@@ -9,6 +9,7 @@ import { idleSpan, type PiEnd, type PiRun } from "./pi-run"
 import { OrcRunError } from "./run-session"
 import { driveNoMistakes, type AllowWord, type NoMistakesRecord, type QuestionAnswer } from "./no-mistakes"
 import { type DirectPrRecord, openDirectPr, type PullRequestOpener } from "./direct-pr"
+import { readFailure } from "./json-file"
 import { countSessionSize, handoverImplementPrompt, type LongSessionCounts } from "./long-session"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 
@@ -211,7 +212,7 @@ const fixOnce = (
 
 const readProjectChecks = (run: HistoryRun): Effect.Effect<ReadonlyArray<ChecksCommand>, OrcRunError> =>
   run.fs.readFileString(run.path.join(run.worktreeDir, ".no-mistakes.yaml")).pipe(
-    Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the checks config .no-mistakes.yaml: " + String(cause) })),
+    Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the checks config .no-mistakes.yaml: " + readFailure(cause) })),
     Effect.flatMap((text) =>
       readChecksCommands(text, ".no-mistakes.yaml").pipe(
         Effect.mapError((cause) => new OrcRunError({ message: cause.message }))

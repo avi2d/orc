@@ -1,5 +1,6 @@
 import { Context, Duration, Layer, Schema } from "effect";
 import { type Decoded, decodeJson, decodeValue, flatMapDecoded } from "../decode";
+import { ok } from "../reading";
 import { runDecoded, sourceOf, stamped, type Source } from "../source";
 import { nonEmptyLines, splitEach } from "./lines";
 import { CountText } from "./numerals";
@@ -86,7 +87,8 @@ export class HarnessProcessSource extends Context.Service<HarnessProcessSource, 
   "orc-dash/HarnessProcessSource",
 ) {}
 
-export const herdrSourceLayer = Layer.effect(HerdrSource, sourceOf(stamped(runDecoded(herdrCommand, decodeHerdrPanes))));
+// No session runs in a herdr pane where herdr is not installed, so its absence reads as no panes rather than as a failure.
+export const herdrSourceLayer = Layer.effect(HerdrSource, sourceOf(stamped(runDecoded(herdrCommand, decodeHerdrPanes, ok([])))));
 
 export const linuxHarnessProcessSourceLayer = Layer.effect(
   HarnessProcessSource,

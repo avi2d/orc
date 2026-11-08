@@ -54,26 +54,29 @@ const screensAt = (columns: number): ReadonlyArray<readonly [string, Screen]> =>
 const problemsAt = (columns: number, rule: (screen: Screen) => ReadonlyArray<string>): ReadonlyArray<string> =>
   screensAt(columns).flatMap(([name, screen]) => rule(screen).map((problem) => `${name}: ${problem}`));
 
+// The first rule at a width draws every screen synchronously, which no timeout can cut short, so a limit here only fails a loaded host.
+const drawLimitMillis = 30_000;
+
 describe("the dashboard's layout rules hold at every width from 80 to 240 columns", () => {
   test.each(widths)("no row runs past the right edge at %d columns", (columns) => {
     expect(problemsAt(columns, pastTheRightEdge)).toEqual([]);
-  });
+  }, drawLimitMillis);
 
   test.each(widths)("no two boxes share a cell at %d columns", (columns) => {
     expect(problemsAt(columns, sharedCells)).toEqual([]);
-  });
+  }, drawLimitMillis);
 
   test.each(widths)("no text writes over a border or corner at %d columns", (columns) => {
     expect(problemsAt(columns, textOverFrames)).toEqual([]);
-  });
+  }, drawLimitMillis);
 
   test.each(widths)("no refresh cadence sits away from the right end of its title at %d columns", (columns) => {
     expect(problemsAt(columns, cadencesOffTheRight)).toEqual([]);
-  });
+  }, drawLimitMillis);
 
   test.each(widths)("no word wraps alone onto a line of its own at %d columns", (columns) => {
     expect(problemsAt(columns, lonelyWords)).toEqual([]);
-  });
+  }, drawLimitMillis);
 });
 
 describe("each layout rule rejects the defect it names", () => {

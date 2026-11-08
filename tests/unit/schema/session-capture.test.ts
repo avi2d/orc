@@ -161,8 +161,8 @@ describe("capturedOf, reading the statusline's Claude readings back, an idle ses
   });
 
   test("keys a reading taken under an account's folder by that account's name, and gives it to no other, not to second or the shared home", () => {
-    const main = { name: "main", folder: "/home/tester/.claude-accounts/main" };
-    const second = { name: "second", folder: "/home/tester/.claude-accounts/second" };
+    const main = { name: "main", folder: "/home/tester/claude-profiles/main" };
+    const second = { name: "second", folder: "/home/tester/claude-profiles/second" };
     const ledger = ledgerOf("/state/2026-10-17.jsonl", [
       statuslineLine("00", 20, 1000),
       statuslineLine("01", 70, 1000, "w1", main.folder),
@@ -179,7 +179,7 @@ describe("capturedOf, reading the statusline's Claude readings back, an idle ses
   });
 
   test("lists every account, with no reading while the read asks nothing of Claude Code", () => {
-    const main = { name: "main", folder: "/home/tester/.claude-accounts/main" };
+    const main = { name: "main", folder: "/home/tester/claude-profiles/main" };
     const ledger = ledgerOf("/state/2026-10-17.jsonl", [statuslineLine("01", 70, 1000, "w1", main.folder)]);
     expect(capturedOf([ledger], { pi: 0 }, projects, [main]).accounts).toEqual([{ name: "main", readings: [] }]);
   });
@@ -204,7 +204,7 @@ describe("capturedOf, reading the statusline's Claude readings back, an idle ses
 
 describe("capturedOf, reading the bridge's headless rate-limit entries back", () => {
   const projects = "/home/tester/.claude/projects";
-  const main = { name: "main", folder: "/home/tester/.claude-accounts/main" };
+  const main = { name: "main", folder: "/home/tester/claude-profiles/main" };
 
   test("keeps every headless event as its own observation even when its numbers repeat", () => {
     const ledger = ledgerOf("/state/2026-10-17.jsonl", [
