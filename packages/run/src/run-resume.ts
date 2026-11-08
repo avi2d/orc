@@ -199,7 +199,8 @@ const inheritedCompletion = (
         ended: round.ended,
         passed: round.passed,
         failed: round.checks.filter((check) => !check.passed).map((check) => check.name),
-        checks: [...round.checks]
+        checks: [...round.checks],
+        refusals: [...round.refusals]
       })),
       inheritedFixes: storedFixes.filter((fix) => fix.evidenceIn !== "").map((fix) => ({
         attempt: fix.attempt,

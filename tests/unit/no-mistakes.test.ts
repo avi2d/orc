@@ -348,7 +348,7 @@ const report = (overrides: Partial<OrcRunReport>): OrcRunReport => ({
   ...overrides
 })
 
-const round = (number: number, passed: boolean) => ({ round: number, file: "checks-" + number.toString() + ".txt", started: "", ended: "", passed, failed: passed ? [] : ["lint"], checks: [] })
+const round = (number: number, passed: boolean) => ({ round: number, file: "checks-" + number.toString() + ".txt", started: "", ended: "", passed, failed: passed ? [] : ["lint"], checks: [], refusals: [] })
 
 const statusLine = (text: string): string | undefined => text.split("\n").find((line) => line.startsWith("status: "))
 
