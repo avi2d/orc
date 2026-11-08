@@ -121,6 +121,22 @@ Its `config.json` provider names the package with `credential` `package`, and it
 With no `CLAUDE_CONFIG_DIR` the runs take your ordinary Claude login under `~/.claude`.
 A quota that names more than one account when any of them is kind `none` is refused, and so is a kind `none` account beside a machine `renew` command.
 
+With one login and no tool that reads its room, name one account of kind `none` and a quota command that always reports room:
+
+```json
+{
+  "machines": [{ "name": "laptop", "slots": 1, "start": ["orc", "runner", "start"] }],
+  "quota": {
+    "provider": "opencode-go",
+    "command": ["sh", "-c", "echo '{\"schema\":\"orc.quota.v1\",\"accounts\":[{\"name\":\"main\",\"remainingPercent\":100}]}'"],
+    "accounts": [{ "name": "main", "kind": "none" }],
+    "floorPercent": 0
+  }
+}
+```
+
+The runs then take the login the provider already holds, such as Pi's own login for a `pi-login` provider.
+
 `projects.json` names each project and its checkout on each machine:
 
 ```json

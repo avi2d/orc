@@ -13,7 +13,7 @@ A terminal dashboard shows every machine, queue and account at a glance.
 - Node, which the agent runs on.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, logged in to a model provider.
 - no-mistakes, installed as [Installing no-mistakes](docs/run/installing-no-mistakes.md) says, for every run except `direct-PR`.
-- pueue, to queue runs on each machine.
+- pueue, to queue runs on each machine, with its daemon started by `pueued -d`.
 
 ## Install
 
