@@ -1,4 +1,5 @@
-import { Data, Effect, FileSystem, Schema } from "effect"
+import { Data, Effect, FileSystem, Predicate, Schema } from "effect"
+import type { PlatformError } from "effect/PlatformError"
 import type { ParseOptions } from "effect/SchemaAST"
 
 export class ConfigError extends Data.TaggedError("ConfigError")<{
@@ -7,6 +8,9 @@ export class ConfigError extends Data.TaggedError("ConfigError")<{
 }> {}
 
 export const AbsolutePath = Schema.String.check(Schema.isPattern(/^\//))
+
+export const readFailure = (error: PlatformError): string =>
+  Predicate.isTagged(error.reason, "NotFound") ? "the file is missing" : error.message
 
 export const duplicateOf = (names: ReadonlyArray<string>): string | null =>
   names.find((name, index) => names.indexOf(name) !== index) ?? null

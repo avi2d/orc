@@ -117,6 +117,16 @@ describe("orc runner token", () => {
     })
   }, runnerTimeout)
 
+  test("a missing credentials file is refused as missing instead of with the file system's raw error", async () => {
+    await withFixture(async (fixture) => {
+      const session = join(fixture.dir, "claude-credentials.json")
+      const result = await runOrc(fixture, ["runner", "token", session])
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stdout).toBe("")
+      expect(result.stderr).toBe("orc: cannot read " + session + ": the file is missing\n")
+    })
+  }, runnerTimeout)
+
   test("a session with no expiry is refused without echoing the file", async () => {
     await withFixture(async (fixture) => {
       const session = join(fixture.dir, "claude-credentials.json")

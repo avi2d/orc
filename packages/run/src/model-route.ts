@@ -1,4 +1,5 @@
 import { Effect, FileSystem, Result } from "effect"
+import { readFailure } from "./json-file"
 import type { OrcConfig, Provider, TokenFileLocation } from "./orc-config"
 import { OrcRunError } from "./run-session"
 
@@ -63,7 +64,7 @@ export const requireTokenFile = (fs: FileSystem.FileSystem, model: string, sourc
       return yield* refuse("and " + source.origin + " names " + tokenFile + ", which is not an absolute path")
     }
     const info = yield* fs.stat(tokenFile).pipe(
-      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the token file " + tokenFile + ": " + cause.message }))
+      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the token file " + tokenFile + ": " + readFailure(cause) }))
     )
     if (info.type !== "File") {
       return yield* refuse("and the token file " + tokenFile + " is not a regular file")

@@ -140,10 +140,11 @@ describe("runAgentStep refusals", () => {
     })
   })
 
-  test("a missing task file is refused", async () => {
+  test("a missing task file is refused as missing instead of with the file system's raw error", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
-        expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home, branch: "orc/test" })).toContain("cannot read the task file")
+        const missing = join(dir, "missing.md")
+        expect(await refusal({ cwd: dir, taskFile: missing, home, branch: "orc/test" })).toBe("orc: cannot read the task file " + missing + ": the file is missing")
       })
     })
   })

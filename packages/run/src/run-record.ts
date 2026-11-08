@@ -9,6 +9,7 @@ import { toFileUrl } from "./run-history"
 import { findingLine, reportFileName, reportMarkdown, runStatus, type OrcRunCommit, type OrcRunReport } from "./report"
 import { handoverFileName, handoverNote, lastAssistantReply, longSessionWarning } from "./long-session"
 import { branchCommits } from "./git-run"
+import { readFailure } from "./json-file"
 import type { PullRequestOpener } from "./direct-pr"
 
 export type { ChecksRoundSummary, OrcRunCommit, OrcRunReport, RecordedFixAttempt } from "./report"
@@ -171,7 +172,7 @@ export const writeHandover = (run: HistoryRun, report: OrcRunReport): Effect.Eff
 export const writeReport = (run: HistoryRun, report: OrcRunReport): Effect.Effect<void, OrcRunError> => {
   const file = run.path.join(run.runDir, reportFileName)
   return run.fs.readFileString(run.taskPath).pipe(
-    Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the task file for the report: " + String(cause) })),
+    Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the task file for the report: " + readFailure(cause) })),
     Effect.flatMap((taskText) =>
       run.fs.writeFileString(file, reportMarkdown(taskText, toFileUrl(run.taskPath), toFileUrl(file), report)).pipe(
         Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write the report file: " + String(cause) }))

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { spawn } from "node:child_process"
 import { once } from "node:events"
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -318,6 +318,14 @@ describe("orc beat", () => {
       expect(result.stdout).toBe("added orc-1 for orc\n")
       expect(await backlogTask(fixture, "orc-1")).toMatchObject({ title: "Fix the login page", status: "new" })
       expect(await readFile(join(fixture.dir, "home", "backlog", "new", "orc-1.md"), "utf8")).toEndWith(said)
+    })
+  }, beatTimeout)
+
+  test("a missing task file is refused as missing instead of with the file system's raw error", async () => {
+    await withFixture({ mac: 1, linux: 1, floorPercent: 15 }, async (fixture) => {
+      const result = await runOrc(fixture, ["backlog", "add", "orc", "missing.md"])
+      expect([result.exitCode, result.stdout, result.stderr]).toEqual([1, "", "orc: cannot read the task file " + join(await realpath(fixture.dir), "missing.md") + ": the file is missing\n"])
+      expect(await backlogTasks(fixture)).toEqual([])
     })
   }, beatTimeout)
 

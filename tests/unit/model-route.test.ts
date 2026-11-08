@@ -135,11 +135,17 @@ describe("requireTokenFile", () => {
     })
   })
 
-  test("a missing file, a folder and an empty file are each refused", async () => {
+  test("a missing file is refused as missing instead of with the file system's raw error", async () => {
+    await withDir(async (dir) => {
+      const missing = join(dir, "missing")
+      expect(await tokenFileProblem(fromVariable(missing))).toBe("orc: cannot read the token file " + missing + ": the file is missing")
+    })
+  })
+
+  test("a folder and an empty file are each refused", async () => {
     await withDir(async (dir) => {
       await mkdir(join(dir, "folder"), { mode: 0o700 })
       await writeToken(join(dir, "empty"), 0o600, "")
-      expect(await tokenFileProblem(fromVariable(join(dir, "missing")))).toContain("cannot read the token file")
       expect(await tokenFileProblem(fromVariable(join(dir, "folder")))).toContain("is not a regular file")
       expect(await tokenFileProblem(fromVariable(join(dir, "empty")))).toContain("is empty")
     })

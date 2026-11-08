@@ -5,6 +5,7 @@ import { chatToolNames, orcCommandVar } from "./chat-tools"
 import { backlogPaths } from "./dispatch/backlog"
 import { type ProjectInstructions, readProjectInstructions } from "./dispatch/config"
 import type { Command } from "./dispatch/runner"
+import { readFailure } from "./json-file"
 import { providerOf } from "./model-route"
 import { type OrcConfig, readOrcConfig } from "./orc-config"
 
@@ -45,7 +46,7 @@ const chatInstructions = (orcHome: string): Effect.Effect<ReadonlyArray<LoadedIn
     return yield* Effect.forEach(named, (entry) =>
       fs.readFileString(entry.file).pipe(
         Effect.map((text) => ({ ...entry, text })),
-        Effect.mapError((error) => new ChatError({ message: "orc chat: cannot read the instructions file " + entry.file + ": " + error.message }))
+        Effect.mapError((error) => new ChatError({ message: "orc chat: cannot read the instructions file " + entry.file + ": " + readFailure(error) }))
       ))
   })
 
