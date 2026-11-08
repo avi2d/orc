@@ -1,8 +1,9 @@
 import type { Database } from "bun:sqlite"
 import { Effect, Schema } from "effect"
+import { GateRefusalSchema, refusalSignalName, type GateRefusal } from "./gate-refusals"
 import type { OpenQuestion } from "./no-mistakes-gate"
 import { openQuestionSignal } from "./report"
-import { RunSqlRowSchema, runRecordOf, sqlite, type RunRecord, type SqliteFailure } from "./run-history"
+import { decodedRunRow, RunSqlRowSchema, runRecordOf, sqlite, type RunRecord, type SqliteFailure } from "./run-history"
 
 export interface BranchStep {
   readonly name: string
@@ -26,13 +27,7 @@ export const latestRunForBranchName = (
     db.query(
       "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox FROM runs WHERE branch = ? ORDER BY started DESC, id DESC LIMIT 1"
     ).get(branch)
-  ).pipe(
-    Effect.flatMap((row) =>
-      row === null || row === undefined
-        ? Effect.succeed(null)
-        : Schema.decodeUnknownEffect(RunSqlRowSchema)(row).pipe(Effect.map(runRecordOf))
-    )
-  )
+  ).pipe(Effect.flatMap(decodedRunRow))
 
 export const resumePriorRun = (
   db: Database,
@@ -105,6 +100,7 @@ export interface StoredChecksRound {
   readonly ended: string
   readonly passed: boolean
   readonly checks: ReadonlyArray<{ readonly name: string; readonly passed: boolean }>
+  readonly refusals: ReadonlyArray<GateRefusal>
 }
 
 export interface StoredFix {
@@ -156,6 +152,16 @@ const checksSignalsFor = (db: Database, stepId: number): Effect.Effect<ReadonlyA
     )
   )
 
+const RefusalSignalRowSchema = Schema.Struct({
+  value: Schema.fromJsonString(GateRefusalSchema)
+})
+
+const refusalSignalsFor = (db: Database, stepId: number): Effect.Effect<ReadonlyArray<GateRefusal>, Schema.SchemaError | SqliteFailure> =>
+  sqlite(() => db.query("SELECT value FROM signals WHERE step_id = ? AND name = ? ORDER BY id ASC").all(stepId, refusalSignalName)).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(RefusalSignalRowSchema))),
+    Effect.map((rows) => rows.map((row) => ({ gate: row.value.gate, rule: row.value.rule })))
+  )
+
 export const checksRoundsForRun = (db: Database, runId: string): Effect.Effect<ReadonlyArray<StoredChecksRound>, Schema.SchemaError | SqliteFailure> =>
   sqlite(() => db.query("SELECT id, attempt, status, started, ended FROM steps WHERE run_id = ? AND name = ? ORDER BY attempt ASC").all(runId, "checks")).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(ChecksStepRowSchema))),
@@ -164,7 +170,8 @@ export const checksRoundsForRun = (db: Database, runId: string): Effect.Effect<R
         Effect.gen(function*() {
           const file = yield* checksFileFor(db, step.id)
           const checks = yield* checksSignalsFor(db, step.id)
-          return { round: step.attempt, file, started: step.started, ended: step.ended ?? step.started, passed: step.status === "passed", checks }
+          const refusals = yield* refusalSignalsFor(db, step.id)
+          return { round: step.attempt, file, started: step.started, ended: step.ended ?? step.started, passed: step.status === "passed", checks, refusals }
         })
       )
     )

@@ -4,9 +4,7 @@ import { type Decoded, decodeJson, decoded } from "../decode";
 import { mapOutcome, type Outcome, type Reading, zipOutcomes } from "../reading";
 import { runDecoded, stamped } from "../source";
 import { selector } from "./environment";
-
-// In the order a run moves through them, so a later status is the more advanced one.
-export const activeRunStatuses = ["requested", "pending", "waiting", "queued", "in_progress"] as const;
+import { activeRunStatuses } from "../contract/queues";
 
 export const ActionRun = Schema.Struct({
   databaseId: Schema.Int,

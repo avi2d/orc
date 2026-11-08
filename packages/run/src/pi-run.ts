@@ -59,11 +59,13 @@ export const piArgv = (request: Pick<PiRequest, "agent" | "instructions" | "sess
 
 const SessionHeader = Schema.Struct({ type: Schema.Literal("session"), id: Schema.String, timestamp: Schema.String })
 
+export const assistantContent = Schema.Array(Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String) }))
+
 const ReplyEnd = Schema.Struct({
   type: Schema.Literal("message_end"),
   message: Schema.Struct({
     role: Schema.Literal("assistant"),
-    content: Schema.Array(Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String) }))
+    content: assistantContent
   })
 })
 

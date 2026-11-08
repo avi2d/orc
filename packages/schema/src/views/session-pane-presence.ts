@@ -1,6 +1,6 @@
 import type { Outcome } from "../reading";
-import type { LogFile } from "../sessions/ledger";
-import { tieFolderOf } from "../sessions/live";
+import type { LogFile } from "../sources/ledger";
+import { tieFolderOf } from "../sources/live";
 import type { HerdrPane } from "../sources/live-sessions";
 import type { LogRoots } from "../sources/session-logs";
 

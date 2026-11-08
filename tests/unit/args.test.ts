@@ -44,6 +44,17 @@ describe("parseArgs", () => {
   test("an extra runs argument is a usage error", () => {
     expect(parseArgs(["runs", "--json", "extra"])).toEqual({ kind: "UsageError", detail: "unexpected argument: extra" })
   })
+  describe("refusals", () => {
+    test("refusals counts recorded gate refusals", () => {
+      expect(parseArgs(["refusals"])).toEqual({ kind: "ListRefusals", json: false })
+    })
+    test("refusals --json counts recorded gate refusals as JSON", () => {
+      expect(parseArgs(["refusals", "--json"])).toEqual({ kind: "ListRefusals", json: true })
+    })
+    test("an unknown refusals flag is a usage error", () => {
+      expect(parseArgs(["refusals", "--frobnicate"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --frobnicate" })
+    })
+  })
   test("show takes a run id", () => {
     expect(parseArgs(["show", "step-run-1"])).toEqual({ kind: "ShowRun", id: "step-run-1", json: false })
   })

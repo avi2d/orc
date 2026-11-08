@@ -4,7 +4,7 @@ import type { Failed, Outcome } from "../reading";
 import type { RepoFailure } from "../sources/ci-runs";
 import type { PueueStatus } from "../sources/pueue";
 import type { MachineSchedule, ScheduleRead, ScheduleSource } from "../sources/schedules";
-import { nextMatch } from "./calendar";
+import { nextMatch } from "../sources/calendar";
 import { projectOf } from "./queues";
 
 export type NextKind = ScheduleSource | "pueue" | "task";

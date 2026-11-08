@@ -1,9 +1,9 @@
 import { Array as Arr, Effect, FileSystem, Schema } from "effect"
 import { captainWait, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 import { renderTaskFile } from "./task-record-render"
-import { BacklogError, platformFailure, publishOnce, scratchName } from "./backlog-write"
+import { BacklogError, backlogPaths, grabbedFile, platformFailure, publishOnce, scratchName, takeFile, takenGrab } from "./backlog-write"
 
-export { BacklogError }
+export { BacklogError, backlogPaths } from "./backlog-write"
 
 // A project name may hold dashes, so an id splits at its last dash.
 const idPattern = /^([A-Za-z0-9][A-Za-z0-9._-]*)-(\d+)$/
@@ -18,32 +18,6 @@ export const isTaskId = (id: string): boolean => idPattern.test(id)
 
 export const TaskId = Schema.String.check(Schema.isPattern(idPattern))
 
-interface BacklogPaths {
-  readonly root: string
-  readonly ids: string
-  readonly logs: string
-  readonly logFile: (id: string) => string
-  readonly stallFile: (id: string) => string
-  readonly unreadFile: (id: string) => string
-  readonly dispatchConfig: string
-  readonly projects: string
-  readonly folder: (folder: TaskFolder) => string
-  readonly taskFile: (folder: TaskFolder, id: string) => string
-}
-
-export const backlogPaths = (root: string): BacklogPaths => ({
-  root,
-  ids: root + "/ids",
-  logs: root + "/logs",
-  logFile: (id: string): string => root + "/logs/" + id + ".log",
-  stallFile: (id: string): string => root + "/logs/" + id + ".stall",
-  unreadFile: (id: string): string => root + "/logs/" + id + ".unread",
-  dispatchConfig: root + "/dispatch.json",
-  projects: root + "/projects.json",
-  folder: (folder: TaskFolder): string => root + "/" + folder,
-  taskFile: (folder: TaskFolder, id: string): string => root + "/" + folder + "/" + id + ".md"
-})
-
 export const ensureBacklog = (root: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
@@ -53,7 +27,7 @@ export const ensureBacklog = (root: string): Effect.Effect<void, BacklogError, F
     }
   })
 
-const readNames = (folder: string): Effect.Effect<ReadonlyArray<string>, BacklogError, FileSystem.FileSystem> =>
+export const readNames = (folder: string): Effect.Effect<ReadonlyArray<string>, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     return yield* fs.readDirectory(folder).pipe(
@@ -221,7 +195,7 @@ const answeredOnly = (parked: Parked | null): Parked | null => {
 const missedClose = (
   root: string,
   id: string
-): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+): Effect.Effect<never, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const paths = backlogPaths(root)
@@ -252,23 +226,8 @@ export const closeStartedTask = (
   closedAt: string
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const paths = backlogPaths(root)
-    const file = paths.taskFile("taken", id)
-    const grabbed = scratchName(paths.folder("taken"), id)
-    const took = yield* fs.rename(file, grabbed).pipe(
-      Effect.as(true),
-      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(false)),
-      Effect.mapError(platformFailure("take " + id))
-    )
-    if (!took) {
-      return yield* missedClose(root, id)
-    }
-    const putBack = fs.rename(grabbed, file).pipe(Effect.mapError(platformFailure("put back " + id)))
-    const text = yield* fs.readFileString(grabbed).pipe(
-      Effect.mapError(platformFailure("read " + grabbed)),
-      Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error))))
-    )
+    const { fs, paths, file, grabbed, putBack, read } = yield* takenGrab(root, id, missedClose(root, id))
+    const text = yield* read.pipe(Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error)))))
     const fresh = yield* parseTaskFile(file, "taken", text).pipe(
       Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error))))
     )
@@ -348,17 +307,13 @@ const rewriteIn = (folder: "new" | "taken") => <A>(
     const paths = backlogPaths(root)
     const file = paths.taskFile(folder, id)
     const grabbed = scratchName(paths.folder(folder), id)
-    const took = yield* fs.rename(file, grabbed).pipe(
-      Effect.as(true),
-      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(false)),
-      Effect.mapError(platformFailure("take " + id))
-    )
+    const took = yield* takeFile(fs, file, grabbed, id)
     if (!took) {
       return yield* new BacklogError({ detail: id + " moved while orc read it, so run the command again" })
     }
-    const putBack = fs.rename(grabbed, file).pipe(Effect.mapError(platformFailure("put back " + id)))
+    const { putBack, read } = grabbedFile(fs, file, grabbed, id)
     const settle = Effect.gen(function*() {
-      const text = yield* fs.readFileString(grabbed).pipe(Effect.mapError(platformFailure("read " + grabbed)))
+      const text = yield* read
       const rewrite = yield* decide(yield* parseTaskFile(file, folder, text))
       if (rewrite.kind === "keep") {
         yield* putBack

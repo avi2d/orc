@@ -63,7 +63,7 @@ It lives in `$XDG_STATE_HOME/orc-dash/usage`, or in `~/.local/state/orc-dash/usa
 Only the user may read the folder and its files.
 The writer deletes a day file once it is more than 32 days old.
 That keeps the start of a 31 day month window in the ledger.
-`CaptureRecord` in `packages/schema/src/sessions/capture.ts` decodes each line.
+`CaptureRecord` in `packages/schema/src/sources/capture.ts` decodes each line.
 
 | Field | What it holds |
 | --- | --- |

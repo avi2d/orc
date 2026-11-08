@@ -1,6 +1,6 @@
 import { Context, DateTime, Effect, FileSystem, Layer, type Config, type PlatformError, type Schema } from "effect";
 import { encodeTaskSample, type TaskSampleRecord, taskSampleRecords } from "../contract/task-samples";
-import { dayFileOf, dayFiles, expiredDayFiles } from "../sessions/capture";
+import { dayFileOf, dayFiles, expiredDayFiles } from "../sources/capture";
 import { dayFileReaderAt, prunedDayFiles } from "./capture-ledger";
 import { taskSamplesDirectory } from "./environment";
 

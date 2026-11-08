@@ -1,3 +1,4 @@
+import type { GateRefusal } from "./gate-refusals"
 import type { OrcRunCommit } from "./git-run"
 import type { PiTokenUse } from "./pi"
 import { longSessionSignal, type LongSessionCounts } from "./long-session"
@@ -16,6 +17,7 @@ export interface ChecksRoundSummary {
   readonly passed: boolean
   readonly failed: ReadonlyArray<string>
   readonly checks: ReadonlyArray<{ readonly name: string; readonly passed: boolean }>
+  readonly refusals: ReadonlyArray<GateRefusal>
 }
 
 export interface RecordedFixAttempt {
@@ -130,6 +132,9 @@ const signalEntries = (report: OrcRunReport): Array<{ readonly name: string; rea
   for (const round of report.checksRounds ?? []) {
     for (const check of round.checks) {
       entries.push({ name: "check " + check.name + " round " + round.round.toString(), value: check.passed ? "passed" : "failed" })
+    }
+    for (const refusal of round.refusals) {
+      entries.push({ name: "refusal " + refusal.gate + " round " + round.round.toString(), value: refusal.rule ?? "\u2014" })
     }
   }
   if (report.noMistakes !== null) {

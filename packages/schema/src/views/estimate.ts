@@ -1,8 +1,8 @@
 import { DateTime } from "effect";
-import type { CountedCall } from "../sessions/ledger";
-import type { Session } from "../sessions/live";
+import type { CountedCall } from "../sources/ledger";
+import type { Session } from "../sources/live";
 import type { QuotaAvailability } from "../sources/quota";
-import { tokenTotal, type Tokens, type Weighting, weightings } from "../sessions/tokens";
+import { tokenTotal, type Tokens, type Weighting, weightings } from "../contract/tokens";
 
 export const hourMillis = 3_600_000;
 

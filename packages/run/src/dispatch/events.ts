@@ -1,6 +1,7 @@
 import { Effect, FileSystem, Schema } from "effect"
 import { alertFires } from "./alert-events"
 import { BacklogError, platformFailure, publishOnce } from "./backlog-write"
+import { readNames } from "./backlog"
 import type { ChatEvent } from "./chat-event"
 
 const keyPattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
@@ -57,15 +58,6 @@ export const markEventPosted = (root: string, key: string): Effect.Effect<boolea
     return yield* publishOnce(folder, key, "")
   })
 
-const namesIn = (folder: string): Effect.Effect<ReadonlyArray<string>, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    return yield* fs.readDirectory(folder).pipe(
-      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed<ReadonlyArray<string>>([])),
-      Effect.mapError(platformFailure("list " + folder))
-    )
-  })
-
 const readEvent = (root: string, key: string): Effect.Effect<ChatEvent, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
@@ -79,8 +71,8 @@ const readEvent = (root: string, key: string): Effect.Effect<ChatEvent, BacklogE
 
 export const unpostedEvents = (root: string): Effect.Effect<ReadonlyArray<ChatEvent>, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const posted = new Set(yield* namesIn(postedFolder(root)))
-    const keys = (yield* namesIn(eventsFolder(root)))
+    const posted = new Set(yield* readNames(postedFolder(root)))
+    const keys = (yield* readNames(eventsFolder(root)))
       .filter((name) => name.endsWith(fileSuffix))
       .map((name) => name.slice(0, -fileSuffix.length))
       .filter((key) => isEventKey(key) && !posted.has(key))

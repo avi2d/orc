@@ -2,6 +2,7 @@ import { Effect, FileSystem } from "effect"
 import { waitForAnswers } from "./answer-wait"
 import type { AgentFile } from "./agents"
 import { buildFixPrompt, type CommandResult, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
+import { distinctRefusals } from "./gate-refusals"
 import { branchCommits, runGit } from "./git-run"
 import { buildImplementPrompt, finalReplyError, orcCompletionLine, sessionPrintedSignal, sumPiUsage, type PiTokenUse } from "./pi"
 import { idleSpan, type PiEnd, type PiRun } from "./pi-run"
@@ -295,7 +296,8 @@ const runChecksFixLoop = (
         ended,
         passed: failed.length === 0,
         failed,
-        checks: outcome.outcomes.map((check) => ({ name: check.name, passed: check.passed }))
+        checks: outcome.outcomes.map((check) => ({ name: check.name, passed: check.passed })),
+        refusals: distinctRefusals(outcome.outcomes.flatMap((check) => check.refusals))
       }
       rounds.push(summary)
       yield* checkpoints.checksRoundDone(summary)

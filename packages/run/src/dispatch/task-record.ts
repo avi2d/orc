@@ -178,29 +178,28 @@ const answerOf = (front: { readonly answer?: string | undefined; readonly answer
   return { words: front.answer, at: front.answered_at }
 }
 
-const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string): Array<ParkedQuestion> | string => {
-  const questions: Array<ParkedQuestion> = []
+const checkedQuestions = <Q>(fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string, toQuestion: (question: typeof QuestionFront.Type, answer: Answer | null) => Q): Array<Q> | string => {
+  const questions: Array<Q> = []
   for (const question of fronts) {
     const answer = answerOf(question)
     if (typeof answer === "string") {
       return "the " + what + " question " + question.id + " names its answer with no words or no time"
     }
-    questions.push({ id: question.id, text: question.text, asked: question.asked_at ?? "", answer: answer === null ? null : { ...answer, relayedTo: question.relayed_to ?? (question.used === true ? (question.asked_at ?? "") : null) } })
+    questions.push(toQuestion(question, answer))
   }
   return questions
 }
 
-const holdQuestionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string): Array<HoldQuestion> | string => {
-  const questions: Array<HoldQuestion> = []
-  for (const question of fronts) {
-    const answer = answerOf(question)
-    if (typeof answer === "string") {
-      return "the " + what + " question " + question.id + " names its answer with no words or no time"
-    }
-    questions.push({ id: question.id, text: question.text, answer })
-  }
-  return questions
-}
+const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string): Array<ParkedQuestion> | string =>
+  checkedQuestions(fronts, what, (question, answer) => ({
+    id: question.id,
+    text: question.text,
+    asked: question.asked_at ?? "",
+    answer: answer === null ? null : { ...answer, relayedTo: question.relayed_to ?? (question.used === true ? (question.asked_at ?? "") : null) }
+  }))
+
+const holdQuestionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string): Array<HoldQuestion> | string =>
+  checkedQuestions(fronts, what, (question, answer) => ({ id: question.id, text: question.text, answer }))
 
 const parkedOf = (front: Frontmatter): Parked | null | string => {
   if (front.parked_branch === undefined && front.parked_questions === undefined) {

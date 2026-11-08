@@ -1,15 +1,8 @@
 import { DateTime, Schema } from "effect";
-import type { Failed } from "../reading";
-import { type Session, sessionLabel } from "../sessions/live";
-import { priceRatios, type Tokens, tokenTotal } from "../sessions/tokens";
-import type { Estimate } from "../views/estimate";
-import type { ModelTokens } from "../views/session-models";
-import type { AccountView, SessionQuotaView, SessionShare, WindowView } from "../views/session-quota";
-import type { WindowSource } from "../views/window-sources";
 
 const Count = Schema.Finite;
 
-const TokensJson = Schema.Struct({
+export const TokensJson = Schema.Struct({
   input: Count,
   output: Count,
   cacheRead: Count,
@@ -17,7 +10,7 @@ const TokensJson = Schema.Struct({
   total: Count,
 });
 
-const EstimateJson = Schema.Struct({ share: Count, contributionPoints: Count, pointsPerHour: Count });
+export const EstimateJson = Schema.Struct({ share: Count, contributionPoints: Count, pointsPerHour: Count });
 
 export const SourceStatus = Schema.Struct({
   status: Schema.Literals(["ok", "unreachable", "invalid"]),
@@ -54,7 +47,7 @@ export const UnmatchedRunsJson = Schema.Struct({
   pids: Schema.Array(Count),
 });
 
-const PanePresenceJson = Schema.Struct({
+export const PanePresenceJson = Schema.Struct({
   pane: Schema.String,
   paneStatus: Schema.optionalKey(Schema.String),
   tie: Schema.optionalKey(Schema.String),
@@ -79,7 +72,7 @@ const Join = Schema.Union([
 const HarvestedFields = { kind: Schema.Literal("harvested"), observedAt: Schema.String, file: Schema.String, join: Join };
 
 // A report with no via predates the capture ledger, when every harvested reading came from a log.
-const WindowSourceJson = Schema.Union([
+export const WindowSourceJson = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("quota-axi"), readAt: Schema.String }),
   Schema.Struct({ ...HarvestedFields, harness: Schema.Literal("codex"), via: Schema.optionalKey(Schema.Literal("log")) }),
   Schema.Struct({
@@ -202,171 +195,6 @@ export const SessionQuotaAlert = Schema.Struct({
 export type SessionQuotaAlert = typeof SessionQuotaAlert.Type;
 
 export const instant = (value: DateTime.Utc): string => DateTime.formatIso(value);
-
-const tokensJson = (tokens: Tokens): typeof TokensJson.Type => ({ ...tokens, total: tokenTotal(tokens) });
-
-const estimateJson = (estimate: Estimate): typeof EstimateJson.Type => ({ ...estimate });
-
-export const statusOf = (failure: Failed | undefined): typeof SourceStatus.Type => {
-  if (failure === undefined) return { status: "ok" };
-  return failure.kind === "unreachable"
-    ? { status: "unreachable", detail: failure.reason }
-    : { status: "invalid", detail: failure.issue };
-};
-
-export const sessionJson = (session: Session, models: ReadonlyArray<ModelTokens>): typeof SessionJson.Type => {
-  const identity = session.identity;
-  return {
-    id: session.id,
-    kind: identity.kind,
-    live: identity.kind !== "ended",
-    ...(identity.kind === "pane"
-      ? { pane: identity.pane, ...(identity.status === undefined ? {} : { paneStatus: identity.status }) }
-      : {}),
-    ...(identity.kind === "process" ? { pid: identity.pid } : {}),
-    harness: session.harness,
-    cwd: session.cwd ?? null,
-    place: session.place,
-    label: sessionLabel(session),
-    files: session.files,
-    modelsSinceMidnight: models.map((model) => ({
-      model: model.model ?? null,
-      tokens: tokensJson(model.tokens),
-      ...(model.provider === undefined ? {} : { provider: model.provider }),
-    })),
-  };
-};
-
-export const modelsSinceMidnightOf = (view: SessionQuotaView, session: Session): ReadonlyArray<ModelTokens> =>
-  view.modelsSinceMidnight.find((entry) => entry.session === session)?.models ?? [];
-
-export const accountRef = (account: Pick<AccountView, "provider" | "accountKey" | "credentialKey" | "title">): typeof AccountRef.Type => ({
-  provider: account.provider,
-  accountKey: account.accountKey ?? null,
-  credentialKey: account.credentialKey ?? null,
-  title: account.title,
-});
-
-export const windowSessionJson = (row: SessionShare): typeof WindowSessionJson.Type => ({
-  session: row.session.id,
-  label: row.label,
-  calls: row.calls,
-  tokens: tokensJson(row.tokens),
-  trailingHourTokens: tokensJson(row.trailingHourTokens),
-  raw: estimateJson(row.raw),
-  priced: estimateJson(row.priced),
-  models: row.models.map((model) => ({
-    model: model.model ?? null,
-    calls: model.calls,
-    tokens: tokensJson(model.tokens),
-    trailingHourTokens: tokensJson(model.trailingHourTokens),
-    priced: estimateJson(model.priced),
-  })),
-  flagged: row.flagged,
-});
-
-const sourceJson = (source: WindowSource): typeof WindowSourceJson.Type =>
-  source.kind === "quota-axi"
-    ? { kind: "quota-axi", readAt: instant(source.readAt) }
-    : { ...source, observedAt: instant(source.observedAt) };
-
-export const windowJson = (account: AccountView, window: WindowView): typeof WindowJson.Type => ({
-  account: accountRef(account),
-  id: window.id,
-  label: window.label,
-  kind: window.kind,
-  source: sourceJson(window.source),
-  startsAt: instant(window.startsAt),
-  resetsAt: instant(window.resetsAt),
-  usedPoints: window.usedPoints,
-  leftPoints: window.leftPoints,
-  pace: window.pace,
-  elapsedFraction: window.elapsedFraction,
-  gate: {
-    aheadOfPace: window.aheadOfPace,
-    pastFirstTenth: window.pastFirstTenth,
-    open: window.aheadOfPace && window.pastFirstTenth,
-  },
-  exhaustsBeforeReset: window.exhaustsBeforeReset,
-  verdict: window.verdict,
-  sustainablePointsPerHour: window.sustainablePointsPerHour,
-  activeSessions: window.activeSessions,
-  fairPointsPerHour: window.fairPointsPerHour,
-  observed: { calls: window.observedCalls, tokens: tokensJson(window.observedTokens) },
-  unattributedPoints: window.unattributedPoints,
-  sessions: window.sessions.map(windowSessionJson),
-});
-
-export const windowsOf = (account: AccountView): ReadonlyArray<WindowView> =>
-  account.body.kind === "windows" ? account.body.windows : [];
-
-export interface FlaggedRow {
-  readonly session: Session;
-  readonly flag: SessionQuotaFlag;
-}
-
-export const flaggedRows = (view: SessionQuotaView): ReadonlyArray<FlaggedRow> =>
-  view.accounts.flatMap((account) =>
-    windowsOf(account).flatMap(({ fairPointsPerHour, ...window }) =>
-      // A window past its reset has an unknown pace, so its gate is shut and it holds no flag.
-      fairPointsPerHour === null
-        ? []
-        : window.sessions
-            .filter((row) => row.flagged)
-            .map((row) => ({
-              session: row.session,
-              flag: {
-                session: row.session.id,
-                label: row.label,
-                account: accountRef(account),
-                window: window.id,
-                windowLabel: window.label,
-                pricedPointsPerHour: row.priced.pointsPerHour,
-                fairPointsPerHour,
-                pricedShare: row.priced.share,
-                rawShare: row.raw.share,
-              },
-            })),
-    ),
-  );
-
-export const sessionQuotaFlags = (view: SessionQuotaView): ReadonlyArray<SessionQuotaFlag> =>
-  flaggedRows(view).map(({ flag }) => flag);
-
-export const accountJson = (account: AccountView): typeof AccountJson.Type => ({
-  ...accountRef(account),
-  accountKeys: account.accountKeys,
-  joins: account.joins,
-  quota: statusOf(account.body.kind === "windows" ? undefined : account.body),
-});
-
-export const unmeteredJson = (entry: SessionQuotaView["unmetered"][number]): typeof UnmeteredJson.Type => ({
-  ...entry,
-  tokens: tokensJson(entry.tokens),
-});
-
-const panePresenceJson = (pane: NonNullable<SessionQuotaView["panePresence"]>[number]): typeof PanePresenceJson.Type => ({
-  pane: pane.pane,
-  ...(pane.status === undefined ? {} : { paneStatus: pane.status }),
-  ...(pane.tie === undefined ? {} : { tie: pane.tie }),
-});
-
-export const sessionQuotaReport = (view: SessionQuotaView): SessionQuotaReport => ({
-  schemaVersion: 1,
-  generatedAt: instant(view.now),
-  panePresence: (view.panePresence ?? []).map(panePresenceJson),
-  headlessFolders: (view.headlessFolders ?? []).map(({ cwd }) => ({ cwd })),
-  scope: "local",
-  estimate: { basis: "local-logs", upperBound: true, priceRatios: { ...priceRatios } },
-  sources: { quota: statusOf(view.quota), herdr: statusOf(view.panes), processes: statusOf(view.processes) },
-  ledger: { ...view.ledger, unjoinedCalls: view.unjoinedCalls },
-  accounts: view.accounts.map(accountJson),
-  windows: view.accounts.flatMap((account) => windowsOf(account).map((window) => windowJson(account, window))),
-  sessions: view.sessions.map((session) => sessionJson(session, modelsSinceMidnightOf(view, session))),
-  unmatchedProcesses: view.unmatched.map(({ machine: _, ...runs }) => ({ ...runs })),
-  flags: sessionQuotaFlags(view),
-  unmetered: view.unmetered.map(unmeteredJson),
-});
 
 // quota-axi names an account's row differently once the provider has more than one, so an edge follows the account's own credential.
 const flagKey = (flag: SessionQuotaFlag): string =>

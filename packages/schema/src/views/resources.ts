@@ -1,4 +1,4 @@
-import { DateTime } from "effect";
+import { DateTime, Option } from "effect";
 import { type Failed, mapOutcome, type Outcome, type Reading, zipOutcomes } from "../reading";
 import type { DiskUsage } from "../sources/disk";
 import type { ComputeApp, GpuMetric, GpuReading } from "../sources/gpu";
@@ -8,6 +8,8 @@ import type { ProcessRow } from "../sources/processes";
 import type { ProcessSamples } from "../sources/task-processes";
 import type { ReportedTasks } from "../contract/tasks";
 import { type TaskResources, taskResources } from "./task-resources";
+import { type Decoded, decodeJson, decoded, flatMapDecoded, rejected } from "../decode";
+import { GpuAppJson, ResourcesReport } from "../contract/resources";
 
 export interface ProcessView {
   readonly pid: number;
@@ -223,3 +225,38 @@ export const machinesView = (
     ...remotes.map((remote) => remoteMachine(remote, now)),
   ],
 });
+
+const appJson = (app: GpuAppView): typeof GpuAppJson.Type => ({ ...app, program: app.program ?? null });
+
+const appOf = (app: typeof GpuAppJson.Type): GpuAppView => ({ ...app, program: app.program ?? undefined });
+
+export const resourcesReport = ({ generatedAt, view, tasks }: ReportedResources): ResourcesReport => {
+  const { disk, ...machine } = view.machine;
+  return {
+    schemaVersion: 1,
+    generatedAt: DateTime.formatIso(generatedAt),
+    machine: disk === undefined ? machine : { ...machine, disk },
+    gpu: view.gpu === undefined ? null : mapOutcome(view.gpu, (gpus) => ({ ...gpus, apps: mapOutcome(gpus.apps, (apps) => apps.map(appJson)) })),
+    ...(tasks === undefined ? {} : { tasks }),
+  };
+};
+
+const reportedOf = (report: ResourcesReport): Decoded<ReportedResources> =>
+  Option.match(DateTime.make(report.generatedAt), {
+    onNone: () => rejected("generatedAt is not an instant"),
+    onSome: (generatedAt) =>
+      decoded({
+        generatedAt: DateTime.toUtc(generatedAt),
+        view: {
+          machine: { ...report.machine, disk: report.machine.disk },
+          gpu:
+            report.gpu === null
+              ? undefined
+              : mapOutcome(report.gpu, (gpus) => ({ ...gpus, apps: mapOutcome(gpus.apps, (apps) => apps.map(appOf)) })),
+        },
+        tasks: report.tasks,
+      }),
+  });
+
+export const decodeResourcesReport = (stdout: string): Decoded<ReportedResources> =>
+  flatMapDecoded(decodeJson(ResourcesReport)(stdout), reportedOf);

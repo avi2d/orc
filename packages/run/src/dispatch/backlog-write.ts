@@ -1,5 +1,6 @@
 import { Data, Effect, FileSystem } from "effect"
 import type { PlatformError } from "effect/PlatformError"
+import type { TaskFileError, TaskFolder } from "./task-record"
 
 export class BacklogError extends Data.TaggedError("BacklogError")<{
   readonly detail: string
@@ -28,4 +29,79 @@ export const publishOnce = (
     )
     yield* fs.remove(scratch).pipe(Effect.mapError(platformFailure("remove " + scratch)))
     return published
+  })
+
+export interface BacklogPaths {
+  readonly root: string
+  readonly ids: string
+  readonly logs: string
+  readonly logFile: (id: string) => string
+  readonly stallFile: (id: string) => string
+  readonly unreadFile: (id: string) => string
+  readonly dispatchConfig: string
+  readonly projects: string
+  readonly folder: (folder: TaskFolder) => string
+  readonly taskFile: (folder: TaskFolder, id: string) => string
+}
+
+export const backlogPaths = (root: string): BacklogPaths => ({
+  root,
+  ids: root + "/ids",
+  logs: root + "/logs",
+  logFile: (id: string): string => root + "/logs/" + id + ".log",
+  stallFile: (id: string): string => root + "/logs/" + id + ".stall",
+  unreadFile: (id: string): string => root + "/logs/" + id + ".unread",
+  dispatchConfig: root + "/dispatch.json",
+  projects: root + "/projects.json",
+  folder: (folder: TaskFolder): string => root + "/" + folder,
+  taskFile: (folder: TaskFolder, id: string): string => root + "/" + folder + "/" + id + ".md"
+})
+
+// rename(2) moves the one task file at most once, so the grab below takes it or reports it gone.
+export const takeFile = (fs: FileSystem.FileSystem, file: string, grabbed: string, id: string): Effect.Effect<boolean, BacklogError> =>
+  fs.rename(file, grabbed).pipe(
+    Effect.as(true),
+    Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(false)),
+    Effect.mapError(platformFailure("take " + id))
+  )
+
+// A failed read leaves putBack for the caller to run.
+export const grabbedFile = (
+  fs: FileSystem.FileSystem,
+  file: string,
+  grabbed: string,
+  id: string
+): {
+  readonly putBack: Effect.Effect<void, BacklogError>
+  readonly read: Effect.Effect<string, BacklogError>
+} => ({
+  putBack: fs.rename(grabbed, file).pipe(Effect.mapError(platformFailure("put back " + id))),
+  read: fs.readFileString(grabbed).pipe(Effect.mapError(platformFailure("read " + grabbed)))
+})
+
+export const takenGrab = (
+  root: string,
+  id: string,
+  missed: Effect.Effect<never, BacklogError | TaskFileError, FileSystem.FileSystem>
+): Effect.Effect<
+  {
+    readonly fs: FileSystem.FileSystem
+    readonly paths: BacklogPaths
+    readonly file: string
+    readonly grabbed: string
+    readonly putBack: Effect.Effect<void, BacklogError>
+    readonly read: Effect.Effect<string, BacklogError>
+  },
+  BacklogError | TaskFileError,
+  FileSystem.FileSystem
+> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const paths = backlogPaths(root)
+    const file = paths.taskFile("taken", id)
+    const grabbed = scratchName(paths.folder("taken"), id)
+    if (!(yield* takeFile(fs, file, grabbed, id))) {
+      return yield* missed
+    }
+    return { fs, paths, file, grabbed, ...grabbedFile(fs, file, grabbed, id) }
   })

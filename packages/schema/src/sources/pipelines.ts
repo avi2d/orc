@@ -4,8 +4,13 @@ import { mapOutcome, ok, type Outcome, type Reading } from "../reading";
 import { runDecoded, stamped } from "../source";
 import { decodeNoMistakes, type NoMistakesRun, type NoMistakesSnapshot } from "../contract/no-mistakes";
 import { decodeOrcRuns, decodeOrcShow, type OrcSnapshot } from "../contract/orc";
-import type { PipelineFolder } from "../views/task-pipeline";
+
 import { machineNames, selector } from "./environment";
+
+export interface PipelineFolder {
+  readonly folder: string;
+  readonly branches: ReadonlyArray<string>;
+}
 
 export interface NoMistakesMachine {
   readonly name: string;

@@ -4,7 +4,7 @@ import { recordLines } from "../decode";
 import { claudeCycles, type HarvestedReading } from "./harvest";
 import { type LogFile, usageKey } from "./ledger";
 import type { LogRecord, SinceByHarness } from "./log-lines";
-import { type Tokens, tokenTotal } from "./tokens";
+import { type Tokens, tokenTotal } from "../contract/tokens";
 
 const Count = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 
