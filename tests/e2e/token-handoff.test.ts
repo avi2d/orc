@@ -146,7 +146,7 @@ describe("orc runner token", () => {
 })
 
 describe("a beat with a token command", () => {
-  test("hands the token to winbox on stdin into an owner-only folder instead of an argument, a log or the worktree", async () => {
+  test("hands the token to the linux machine on stdin into an owner-only folder instead of an argument, a log or the worktree", async () => {
     await withFixture(async (fixture) => {
       const session = join(fixture.dir, "session-token.json")
       await fakeQuota(fixture)

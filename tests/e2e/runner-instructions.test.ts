@@ -6,9 +6,9 @@ import { binPath, fakeQuota, type Fixture, mainToken, orcOk, orcThere, queuedArg
 const instructionsText = "Answer the captain in Russian. Check word: PELICAN-7.\n"
 
 const writeProject = async (fixture: Fixture, start: ReadonlyArray<string>): Promise<void> => {
-  await writeFile(join(fixture.home, "backlog", "winbox-ru.md"), instructionsText)
+  await writeFile(join(fixture.home, "backlog", "atlas-rules.md"), instructionsText)
   await writeFile(join(fixture.home, "backlog", "projects.json"), JSON.stringify({
-    projects: [{ name: "orc", checkouts: { linux: fixture.checkout }, instructions: "winbox-ru.md" }]
+    projects: [{ name: "orc", checkouts: { linux: fixture.checkout }, instructions: "atlas-rules.md" }]
   }))
   await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify({
     machines: [{ name: "linux", slots: 1, start }],
@@ -30,7 +30,7 @@ describe("orc runner start with a project's instructions file", () => {
     await withFixture(async (fixture) => {
       await writeProject(fixture, [process.execPath, binPath, "runner", "start"])
       const added = await queuedArgs(fixture)
-      const file = join(fixture.home, "runner", "orc-1.instructions", "winbox-ru.md")
+      const file = join(fixture.home, "runner", "orc-1.instructions", "atlas-rules.md")
       expect(instructionsArg(added)).toBe(file)
       expect(added?.slice(-4)).toEqual(["--instructions", file, "--token-file", mainToken])
       expect(await readFile(file, "utf8")).toBe(instructionsText)
@@ -43,7 +43,7 @@ describe("orc runner start with a project's instructions file", () => {
       await writeProject(fixture, [process.execPath, binPath, "runner", "start", "--", ...orcThere(far)])
       const file = instructionsArg(await queuedArgs(fixture)) ?? ""
       expect(file.startsWith(join(far, "runner") + "/")).toBe(true)
-      expect(file.endsWith("/winbox-ru.md")).toBe(true)
+      expect(file.endsWith("/atlas-rules.md")).toBe(true)
       expect(await readFile(file, "utf8")).toBe(instructionsText)
     })
   }, runnerTimeout)

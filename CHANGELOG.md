@@ -119,7 +119,7 @@ Released 2026-10-30.
 - **dispatch:** add backlog and beat that starts each task once [#27](https://github.com/avi2d/orc/pull/27)
 - **run:** write 150k token compaction mark into each run's Pi folder [#26](https://github.com/avi2d/orc/pull/26)
 - **run:** move orc command into scoped workspace package [#21](https://github.com/avi2d/orc/pull/21)
-- install and run orc without firstmate tooling [#17](https://github.com/avi2d/orc/pull/17)
+- install and run orc without private tooling [#17](https://github.com/avi2d/orc/pull/17)
 - publish to npm under MIT with ORC_HOME and configurable refuse markers [#16](https://github.com/avi2d/orc/pull/16)
 
 ### Fixes

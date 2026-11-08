@@ -139,7 +139,7 @@ const accountsFile = (accounts: unknown): string => join(folderWith({ "config.js
 
 describe("the accounts in the config file", () => {
   test("map each account name to its own Claude config folder, in the order written", async () => {
-    const accounts = { main: `${root}/.claude-accounts/main`, second: `${root}/.claude-accounts/second` };
+    const accounts = { main: `${root}/claude-profiles/main`, second: `${root}/claude-profiles/second` };
     expect(await accountsReadAt(accountsFile(accounts))).toEqual({ kind: "read", accounts });
   });
 
@@ -168,7 +168,7 @@ describe("the accounts in the config file", () => {
   });
 
   // A second spelling of one folder would slip past the one-folder check, so every spelling but the plain one is refused.
-  for (const folder of ["relative/main", "/srv/claude/main/", "/srv//claude", "/srv/./claude", "/srv/claude/../.claude", "~/.claude-accounts/main"]) {
+  for (const folder of ["relative/main", "/srv/claude/main/", "/srv//claude", "/srv/./claude", "/srv/claude/../.claude", "~/claude-profiles/main"]) {
     test(`refuse the folder ${folder}`, async () => {
       expect(await accountsReadAt(accountsFile({ main: folder }))).toEqual({
         kind: "refused",

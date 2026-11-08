@@ -242,12 +242,12 @@ describe("readDispatchConfig", () => {
   })
   test("refuses an account with both a token file and a token command instead of picking one", async () => {
     await withBacklog(async (root) => {
-      expect(await configProblem(root, { accounts: [{ name: "main", tokenFile: "/a", tokenCommand: ["clauth-token", "main"] }] })).not.toBeNull()
+      expect(await configProblem(root, { accounts: [{ name: "main", tokenFile: "/a", tokenCommand: ["my-token-command", "main"] }] })).not.toBeNull()
     })
   })
   test("refuses a token command account while a machine has no renew command instead of letting its runs lapse", async () => {
     await withBacklog(async (root) => {
-      expect(await configProblem(root, { accounts: [{ name: "main", tokenCommand: ["clauth-token", "main"] }] })).toBe(
+      expect(await configProblem(root, { accounts: [{ name: "main", tokenCommand: ["my-token-command", "main"] }] })).toBe(
         "the machine mac has no renew command, which the account main needs to carry its token past its expiry"
       )
     })
@@ -256,9 +256,9 @@ describe("readDispatchConfig", () => {
     await withBacklog(async (root) => {
       const file = join(root, "dispatch.json")
       const machines = config.machines.map((machine) => ({ ...machine, renew: ["true"] }))
-      const accounts = [{ name: "main", tokenCommand: ["clauth-token", "main"] }] as const
+      const accounts = [{ name: "main", tokenCommand: ["my-token-command", "main"] }] as const
       await writeFile(file, JSON.stringify({ machines, quota: { ...config.quota, accounts } }))
-      expect((await run(readDispatchConfig(file))).quota.accounts).toEqual([{ name: "main", kind: "token-command", tokenCommand: ["clauth-token", "main"] }])
+      expect((await run(readDispatchConfig(file))).quota.accounts).toEqual([{ name: "main", kind: "token-command", tokenCommand: ["my-token-command", "main"] }])
     })
   })
   test("refuses a quota with no command instead of reading a built-in tool", async () => {

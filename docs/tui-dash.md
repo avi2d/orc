@@ -119,7 +119,7 @@ The panel shows a block for each Claude account named by the config file's `acco
 `accounts` maps each name to the absolute path of that account's own Claude config folder:
 
 ```json
-{ "accounts": { "main": "/home/me/.claude-accounts/main", "second": "/home/me/.claude-accounts/second" } }
+{ "accounts": { "main": "/home/me/claude-profiles/main", "second": "/home/me/claude-profiles/second" } }
 ```
 
 A name starts with a letter or digit and holds only letters, digits, `.`, `_` and `-`.

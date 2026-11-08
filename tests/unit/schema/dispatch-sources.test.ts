@@ -49,7 +49,7 @@ describe("the dispatch panel reader", () => {
   });
   test("refuses a token command account while a machine has no renew instead of reporting room", async () => {
     const machines = await machinesAt(
-      backlogWith({ machines: [machine], quota: { ...quota, accounts: [{ name: "main", tokenCommand: ["clauth-token", "main"] }] } }),
+      backlogWith({ machines: [machine], quota: { ...quota, accounts: [{ name: "main", tokenCommand: ["my-token-command", "main"] }] } }),
     );
     expect(machines.kind).toBe("unreachable");
     if (machines.kind === "unreachable") expect(machines.reason).toContain("has no renew command");
