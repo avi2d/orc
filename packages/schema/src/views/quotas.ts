@@ -3,7 +3,7 @@ import { type Failed, failureOf, type Reading } from "../reading";
 import type { SavedProfile, SavedProfiles } from "../sources/saved-profiles";
 import type { QuotaAvailability, QuotaProvider, QuotaProviderId } from "../sources/quota";
 import { type AccountRead, type QuotaRead, type SavedAge, sourcedEntries } from "../sources/quota-read";
-import type { SourcedEntry, SourcedProvider, SourcedWindow } from "./window-sources";
+import type { SourcedEntry, SourcedProvider, SourcedWindow } from "../sources/window-sources";
 
 export type { SavedAge };
 

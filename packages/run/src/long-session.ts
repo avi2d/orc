@@ -1,6 +1,7 @@
 import { Option, Schema } from "effect"
 import type { AgentFile } from "./agents"
 import { orcCompletionLine } from "./pi"
+import { assistantContent } from "./pi-run"
 
 const longSessionTurnLimit = 300
 const longSessionCompactionLimit = 5
@@ -76,7 +77,7 @@ const AssistantReplyLine = Schema.Struct({
   type: Schema.Literal("message"),
   message: Schema.Struct({
     role: Schema.Literal("assistant"),
-    content: Schema.Array(Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String) }))
+    content: assistantContent
   })
 })
 

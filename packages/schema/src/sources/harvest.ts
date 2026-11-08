@@ -1,4 +1,4 @@
-import type { QuotaProviderId } from "../sources/quota";
+import type { QuotaProviderId } from "./quota";
 import { type LogFile, nativeCodexKey } from "./ledger";
 import type { CodexLimitWindow, Harness, LogRecord } from "./log-lines";
 

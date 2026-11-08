@@ -3,7 +3,7 @@ import { CommandRunner } from "../command";
 import { type Decoded, decoded, decodeJson, decodeValue, flatMapDecoded, recordLines, rejected } from "../decode";
 import { mapOutcome, ok, type Outcome } from "../reading";
 import { runDecoded } from "../source";
-import { type CalendarPattern, cronPattern, everyValue } from "../views/calendar";
+import { type CalendarPattern, cronPattern, everyValue } from "./calendar";
 import type { RepoFailure } from "./ci-runs";
 import { RunnerRepos } from "./runners";
 

@@ -1,19 +1,19 @@
 import { DateTime } from "effect";
 import { type Failed, failureOf, type Outcome, type Reading } from "../reading";
-import { withCaptured } from "../sessions/capture";
-import { type CountedCall, countedCalls, type Ledger } from "../sessions/ledger";
-import { resolveSessions, type Session, sessionLabel, type UnmatchedRuns } from "../sessions/live";
-import { sumTokens, type Tokens, tokenTotal } from "../sessions/tokens";
+import { withCaptured } from "../sources/capture";
+import { type CountedCall, countedCalls, type Ledger } from "../sources/ledger";
+import { resolveSessions, type Session, sessionLabel, type UnmatchedRuns } from "../sources/live";
+import { sumTokens, type Tokens, tokenTotal } from "../contract/tokens";
 import type { SavedProfiles } from "../sources/saved-profiles";
 import type { HarnessProcess, HerdrPane } from "../sources/live-sessions";
 import type { QuotaAvailability, QuotaProviderId, QuotaWindow } from "../sources/quota";
 import { type QuotaRead, sourcedEntries } from "../sources/quota-read";
 import type { SessionLogs, SinceByHarness } from "../sources/session-logs";
-import { type AccountJoin, callJoin, credentialKeyOf, keysOf, sameJoin } from "./account-join";
+import { type AccountJoin, callJoin, credentialKeyOf, keysOf, sameJoin } from "../sources/account-join";
 import { byPricedShare, type Estimate, estimate, hourMillis, rateSpanHours, spendGate, verdictBeforeReset, type Weighed, weighed } from "./estimate";
 import { accountTitle } from "./quotas";
 import { localMidnight, type SessionModels, sessionModelsSinceMidnight } from "./session-models";
-import type { SourcedEntry, SourcedProvider, SourcedWindow, WindowSource } from "./window-sources";
+import type { SourcedEntry, SourcedProvider, SourcedWindow, WindowSource } from "../sources/window-sources";
 import { presenceFieldsOf, presenceOf, type PresenceFields } from "./session-pane-presence";
 
 interface ModelShare {

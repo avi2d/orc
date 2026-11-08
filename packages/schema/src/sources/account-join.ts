@@ -1,5 +1,5 @@
-import { nativeCodexKey } from "../sessions/ledger";
-import type { QuotaProviderId } from "../sources/quota";
+import { nativeCodexKey } from "./ledger";
+import type { QuotaProviderId } from "./quota";
 
 export type AccountJoin =
   | { readonly kind: "credential-key"; readonly key: string }

@@ -3,7 +3,7 @@ import { Effect, Schema } from "effect"
 import { GateRefusalSchema, refusalSignalName, type GateRefusal } from "./gate-refusals"
 import type { OpenQuestion } from "./no-mistakes-gate"
 import { openQuestionSignal } from "./report"
-import { RunSqlRowSchema, runRecordOf, sqlite, type RunRecord, type SqliteFailure } from "./run-history"
+import { decodedRunRow, RunSqlRowSchema, runRecordOf, sqlite, type RunRecord, type SqliteFailure } from "./run-history"
 
 export interface BranchStep {
   readonly name: string
@@ -27,13 +27,7 @@ export const latestRunForBranchName = (
     db.query(
       "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox FROM runs WHERE branch = ? ORDER BY started DESC, id DESC LIMIT 1"
     ).get(branch)
-  ).pipe(
-    Effect.flatMap((row) =>
-      row === null || row === undefined
-        ? Effect.succeed(null)
-        : Schema.decodeUnknownEffect(RunSqlRowSchema)(row).pipe(Effect.map(runRecordOf))
-    )
-  )
+  ).pipe(Effect.flatMap(decodedRunRow))
 
 export const resumePriorRun = (
   db: Database,

@@ -1,6 +1,6 @@
 import { DateTime } from "effect";
-import type { HarvestedReading, HarvestOrigin } from "../sessions/harvest";
-import type { FailedQuotaEntry, QuotaProvider, QuotaProviderEntry, QuotaWindow } from "../sources/quota";
+import type { HarvestedReading, HarvestOrigin } from "./harvest";
+import type { FailedQuotaEntry, QuotaProvider, QuotaProviderEntry, QuotaWindow } from "./quota";
 import { type AccountJoin, readingJoin } from "./account-join";
 
 export type WindowSource =

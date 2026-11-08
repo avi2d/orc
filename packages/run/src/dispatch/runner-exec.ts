@@ -1,5 +1,6 @@
-import { Effect, Schema, Stream } from "effect"
+import { Effect, Schema, Scope, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import type { PlatformError } from "effect/PlatformError"
 import { RunnerError } from "./runner-error"
 
 export type Command = readonly [string, ...Array<string>]
@@ -9,6 +10,17 @@ export interface Captured {
   readonly stdout: string
   readonly stderr: string
 }
+
+export const spawnedQuiet = (spawner: ChildProcessSpawner.ChildProcessSpawner["Service"], program: string, args: ReadonlyArray<string>): Effect.Effect<readonly [string, ChildProcessSpawner.ExitCode], PlatformError, Scope.Scope> =>
+  Effect.flatMap(spawner.spawn(ChildProcess.make(program, args, { stdin: "ignore", stderr: "ignore" })), (handle) =>
+    Effect.all([handle.stdout.pipe(Stream.decodeText(), Stream.mkString), handle.exitCode], { concurrency: "unbounded" }))
+
+export const collectedOutput = (handle: ChildProcessSpawner.ChildProcessHandle): Effect.Effect<readonly [string, string, ChildProcessSpawner.ExitCode], PlatformError> =>
+  Effect.all([
+    handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
+    handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
+    handle.exitCode
+  ], { concurrency: "unbounded" })
 
 export const capture = (command: Command, stdin: string | null, env?: Record<string, string>): Effect.Effect<Captured, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
@@ -23,11 +35,7 @@ export const capture = (command: Command, stdin: string | null, env?: Record<str
         env,
         extendEnv: true
       }))
-    const [stdout, stderr, exitCode] = yield* Effect.all([
-      handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
-      handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
-      handle.exitCode
-    ], { concurrency: "unbounded" })
+    const [stdout, stderr, exitCode] = yield* collectedOutput(handle)
     return { exitCode, stdout, stderr }
   }).pipe(
     Effect.scoped,

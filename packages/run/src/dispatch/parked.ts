@@ -1,8 +1,8 @@
 import { Array as Arr, Effect, FileSystem } from "effect"
 import type { OpenQuestion } from "../no-mistakes-gate"
-import { backlogPaths, findTask, type Rewrite, rewriteNew, rewriteTaken } from "./backlog"
+import { findTask, type Rewrite, rewriteNew, rewriteTaken } from "./backlog"
 import { taskBranch } from "./runner"
-import { BacklogError, platformFailure, publishOnce, scratchName } from "./backlog-write"
+import { BacklogError, platformFailure, publishOnce, takenGrab } from "./backlog-write"
 import { type Hold, type HoldQuestion, isHeld, openQuestions, type Parked, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord } from "./task-record"
 import { renderTaskFile } from "./task-record-render"
 
@@ -81,21 +81,9 @@ export const parkStartedTask = (
   at: string
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const paths = backlogPaths(root)
-    const file = paths.taskFile("taken", id)
-    const grabbed = scratchName(paths.folder("taken"), id)
-    const took = yield* fs.rename(file, grabbed).pipe(
-      Effect.as(true),
-      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(false)),
-      Effect.mapError(platformFailure("take " + id))
-    )
-    if (!took) {
-      return yield* new BacklogError({ detail: id + " was parked or closed by another command" })
-    }
-    const putBack = fs.rename(grabbed, file).pipe(Effect.mapError(platformFailure("put back " + id)))
+    const { fs, paths, file, grabbed, putBack, read } = yield* takenGrab(root, id, Effect.fail(new BacklogError({ detail: id + " was parked or closed by another command" })))
     const park = Effect.gen(function*() {
-      const text = yield* fs.readFileString(grabbed).pipe(Effect.mapError(platformFailure("read " + grabbed)))
+      const text = yield* read
       const record = yield* parseTaskFile(file, "taken", text)
       if (record.state.kind !== "started") {
         return yield* new BacklogError({ detail: id + " is " + record.state.kind + ", and only a started task parks" })

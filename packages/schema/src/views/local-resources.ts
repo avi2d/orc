@@ -1,11 +1,11 @@
 import { DateTime, Effect, Layer } from "effect";
-import { type MachinesView, machinesView, resourcesView, type ResourcesView } from "../views/resources";
-import { LinuxDiskSource, linuxDiskSourceLayer, MacDiskSource, macDiskSourceLayer } from "./disk";
-import { GpuSource, gpuSourceLayer } from "./gpu";
-import { LinuxHostSource, linuxHostSourceLayer } from "./linux-host";
-import { MacHostSource, macHostSourceLayer } from "./mac-host";
-import { readBeside } from "./machines";
-import { LinuxProcessesSource, linuxProcessesSourceLayer, MacProcessesSource, macProcessesSourceLayer } from "./processes";
+import { type MachinesView, machinesView, resourcesView, type ResourcesView } from "./resources";
+import { LinuxDiskSource, linuxDiskSourceLayer, MacDiskSource, macDiskSourceLayer } from "../sources/disk";
+import { GpuSource, gpuSourceLayer } from "../sources/gpu";
+import { LinuxHostSource, linuxHostSourceLayer } from "../sources/linux-host";
+import { MacHostSource, macHostSourceLayer } from "../sources/mac-host";
+import { readBeside } from "../sources/machines";
+import { LinuxProcessesSource, linuxProcessesSourceLayer, MacProcessesSource, macProcessesSourceLayer } from "../sources/processes";
 import { ResourceMachines } from "./remote-resources";
 
 export type HostSources = MacHostSource | MacProcessesSource | MacDiskSource | LinuxHostSource | LinuxProcessesSource | LinuxDiskSource | GpuSource;
