@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { Database } from "bun:sqlite"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, FileSystem, Path } from "effect"
+import { Effect, FileSystem, Path, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../packages/run/src/agents"
 import { openDatabase, recordRun, recordSignal, recordStep } from "../../packages/run/src/run-history"
@@ -276,9 +276,11 @@ describe("resumed refusals", () => {
         expect(await Effect.runPromise(readRefusals(db))).toEqual([
           { gate: "comment-gate", rule: null, runs: 1 },
         ])
-        const resumed = db.query(
-          "SELECT COUNT(*) AS count FROM signals JOIN steps ON signals.step_id = steps.id WHERE steps.run_id = ? AND signals.name = ?"
-        ).get("next-1", "refusal") as { readonly count: number }
+        const resumed = Schema.decodeUnknownSync(Schema.Struct({ count: Schema.Finite }))(
+          db.query(
+            "SELECT COUNT(*) AS count FROM signals JOIN steps ON signals.step_id = steps.id WHERE steps.run_id = ? AND signals.name = ?"
+          ).get("next-1", "refusal")
+        )
         expect(resumed.count).toBe(0)
       } finally {
         db.close()
