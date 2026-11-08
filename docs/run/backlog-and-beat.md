@@ -76,7 +76,7 @@ A quota with a token command account then looks like this:
   "quota": {
     "provider": "anthropic",
     "command": ["my-quota-reader", "--json"],
-    "accounts": [{ "name": "main", "tokenCommand": ["orc", "runner", "token", "/Users/me/profiles/main/session-token.json"] }],
+    "accounts": [{ "name": "main", "tokenCommand": ["orc", "runner", "token", "/Users/me/claude-credentials/main.json"] }],
     "floorPercent": 15
   }
 }
@@ -95,10 +95,10 @@ The beat then starts nothing on it.
 A later beat that reads a live token starts the task.
 A refusal names only the command and what it missed, never the token.
 
-`orc runner token <session-token.json>` is a token command for a clauth profile.
-It prints the profile's access token and expiry as `orc.token.v1`, and writes only into a pipe, never onto a terminal.
-It refuses a session that still holds a refresh token, since that login would then leave the machine.
-Run `clauth rolling-token` on the profile first.
+`orc runner token <claude-credentials.json>` is a token command for a file in Claude Code's credentials shape, `{ "claudeAiOauth": { "accessToken": ..., "expiresAt": <epoch milliseconds> } }`.
+It prints the file's access token and expiry as `orc.token.v1`, and writes only into a pipe, never onto a terminal.
+It refuses a file that still holds a refresh token, since that login would then leave the machine.
+Whatever keeps the file fresh is yours to run, and orc only reads it.
 
 An account of kind `none` holds no token: the beat mints nothing, sends nothing, renews nothing and never waits on a token for it.
 A Pi package that logs in on its own takes this kind, as in a `claude-bridge` package that drives the Claude Code SDK while the dispatched run still goes through the `main` account named here:
@@ -117,7 +117,8 @@ A Pi package that logs in on its own takes this kind, as in a `claude-bridge` pa
 }
 ```
 
-Its `config.json` provider names the package with `credential` `package`, and its `env` points at the login the runs take, such as the `CLAUDE_CONFIG_DIR` of the account above.
+Its `config.json` provider names the package with `credential` `package`, and its `env` points at the login the runs take, such as a `CLAUDE_CONFIG_DIR`.
+With no `CLAUDE_CONFIG_DIR` the runs take your ordinary Claude login under `~/.claude`.
 A quota that names more than one account when any of them is kind `none` is refused, and so is a kind `none` account beside a machine `renew` command.
 
 `projects.json` names each project and its checkout on each machine:

@@ -66,7 +66,7 @@ const splitReach = (rest: ReadonlyArray<string>): ReachSplit => {
 const parseRunnerToken = (after: ReadonlyArray<string>): DispatchArgs => {
   const [session = "", ...extra] = after
   if (session === "" || session.startsWith("-")) {
-    return { kind: "UsageError", detail: "orc runner token takes the path of a clauth session-token.json" }
+    return { kind: "UsageError", detail: "orc runner token takes the path of a Claude credentials file" }
   }
   return extra.length === 0 ? { kind: "RunnerToken", session } : unexpected(extra[0])
 }

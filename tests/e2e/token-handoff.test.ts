@@ -98,7 +98,7 @@ const filesHolding = async (dir: string, text: string, except: ReadonlyArray<str
 describe("orc runner token", () => {
   test("prints an armed rolling session's access token with its expiry in ISO time instead of epoch milliseconds", async () => {
     await withFixture(async (fixture) => {
-      const session = join(fixture.dir, "session-token.json")
+      const session = join(fixture.dir, "claude-credentials.json")
       await writeSession(session, newYearMillis)
       const result = await runOrc(fixture, ["runner", "token", session])
       expect(result.exitCode).toBe(0)
@@ -106,20 +106,20 @@ describe("orc runner token", () => {
     })
   }, runnerTimeout)
 
-  test("a session holding a refresh token is refused instead of sending its access token off the Mac", async () => {
+  test("a session holding a refresh token is refused instead of sending its access token off this machine", async () => {
     await withFixture(async (fixture) => {
-      const session = join(fixture.dir, "session-token.json")
+      const session = join(fixture.dir, "claude-credentials.json")
       await writeSession(session, newYearMillis, { refreshToken: placeholder })
       const result = await runOrc(fixture, ["runner", "token", session])
       expect(result.exitCode).not.toBe(0)
       expect(result.stdout).toBe("")
-      expect(result.stderr).toBe("orc: " + session + " holds a refresh token, so clauth has not armed it with rolling-token and its login would leave this machine\n")
+      expect(result.stderr).toBe("orc: " + session + " holds a refresh token, so its login would leave this machine; give orc a credentials file that holds only an access token\n")
     })
   }, runnerTimeout)
 
   test("a session with no expiry is refused without echoing the file", async () => {
     await withFixture(async (fixture) => {
-      const session = join(fixture.dir, "session-token.json")
+      const session = join(fixture.dir, "claude-credentials.json")
       await writeFile(session, JSON.stringify({ claudeAiOauth: { accessToken: placeholder } }))
       const result = await runOrc(fixture, ["runner", "token", session])
       expect(result.exitCode).not.toBe(0)
@@ -130,7 +130,7 @@ describe("orc runner token", () => {
 
   test("a terminal on stdout is refused instead of shown the token", async () => {
     await withFixture(async (fixture) => {
-      const session = join(fixture.dir, "session-token.json")
+      const session = join(fixture.dir, "claude-credentials.json")
       await writeSession(session, hoursFromNowMillis(2))
       const terminal = process.platform === "darwin"
         ? ["script", "-q", "/dev/null", ...orc, "runner", "token", session]
@@ -148,7 +148,7 @@ describe("orc runner token", () => {
 describe("a beat with a token command", () => {
   test("hands the token to the linux machine on stdin into an owner-only folder instead of an argument, a log or the worktree", async () => {
     await withFixture(async (fixture) => {
-      const session = join(fixture.dir, "session-token.json")
+      const session = join(fixture.dir, "claude-credentials.json")
       await fakeQuota(fixture)
       const liveAt = hoursFromNowMillis(2)
       await writeSession(session, liveAt)
@@ -179,7 +179,7 @@ describe("a beat with a token command", () => {
 
   test("a lapsed token leaves the task waiting instead of starting it on a dead token", async () => {
     await withFixture(async (fixture) => {
-      const session = join(fixture.dir, "session-token.json")
+      const session = join(fixture.dir, "claude-credentials.json")
       await fakeQuota(fixture)
       await writeSession(session, pastMillis)
       await writeMachine(fixture, session, true)
@@ -192,7 +192,7 @@ describe("a beat with a token command", () => {
 
   test("the next beat renews a started run's token instead of leaving it to lapse", async () => {
     await withFixture(async (fixture) => {
-      const session = join(fixture.dir, "session-token.json")
+      const session = join(fixture.dir, "claude-credentials.json")
       await fakeQuota(fixture)
       await writeSession(session, hoursFromNowMillis(2))
       await writeMachine(fixture, session, true)
@@ -211,7 +211,7 @@ describe("a beat with a token command", () => {
 
   test("a renewal for a run pueue no longer holds drops its folder and reports a failure instead of a renewal", async () => {
     await withFixture(async (fixture) => {
-      const session = join(fixture.dir, "session-token.json")
+      const session = join(fixture.dir, "claude-credentials.json")
       await fakeQuota(fixture)
       await writeSession(session, hoursFromNowMillis(2))
       await writeMachine(fixture, session, true)
