@@ -9,6 +9,7 @@ export type OrcArgs =
   | { readonly kind: "PrintVersion" }
   | { readonly kind: "PrintHelp" }
   | { readonly kind: "ListRuns"; readonly json: boolean }
+  | { readonly kind: "ListRefusals"; readonly json: boolean }
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
   | { readonly kind: "ScoreStep"; readonly runId: string; readonly step: string; readonly score: number; readonly note: string }
   | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly taskKind: TaskKind; readonly delivery: RunDelivery; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly instructions: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
@@ -236,6 +237,19 @@ const parseRunsArgs = (rest: readonly string[]): OrcArgs => {
   }
   return { kind: "ListRuns", json: true }
 }
+const parseRefusalsArgs = (rest: readonly string[]): OrcArgs => {
+  if (rest.length === 0) {
+    return { kind: "ListRefusals", json: false }
+  }
+  const [flag, ...extra] = rest
+  if (flag !== "--json") {
+    return { kind: "UsageError", detail: `unexpected argument: ${flag}` }
+  }
+  if (extra.length > 0) {
+    return { kind: "UsageError", detail: `unexpected argument: ${extra[0]}` }
+  }
+  return { kind: "ListRefusals", json: true }
+}
 const helpFlags = new Set(["--help", "-h"])
 const holdValueFlags = new Set(["--reason", "--until"])
 const scanWords = (rest: readonly string[]): readonly string[] => {
@@ -253,7 +267,7 @@ const asksForHelp = (rest: readonly string[]): boolean => {
   const end = words.indexOf("--")
   return (end === -1 ? words : words.slice(0, end)).some((word) => helpFlags.has(word))
 }
-const subcommands = new Set(["runs", "show", "score", "run", "chat", "backlog", "beat", "runner", "merge"])
+const subcommands = new Set(["runs", "refusals", "show", "score", "run", "chat", "backlog", "beat", "runner", "merge"])
 const parseWords = (args: readonly string[]): OrcArgs => {
   if (args.length === 0) {
     return { kind: "UsageError", detail: "orc takes one flag" }
@@ -261,6 +275,9 @@ const parseWords = (args: readonly string[]): OrcArgs => {
   const [first, ...rest] = args
   if (first === "runs") {
     return parseRunsArgs(rest)
+  }
+  if (first === "refusals") {
+    return parseRefusalsArgs(rest)
   }
   if (first === "show") {
     return parseShowArgs(rest)

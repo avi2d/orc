@@ -3,6 +3,7 @@ import type { Database } from "bun:sqlite"
 import type { NoMistakesRecord } from "./no-mistakes"
 import type { DirectPrRecord } from "./direct-pr"
 import { noMistakesFile, prBodyFileName, type HistoryRun } from "./run-record"
+import { refusalSignalName, refusalValue } from "./gate-refusals"
 import type { ChecksRoundSummary, OrcRunReport, RecordedFixAttempt } from "./report"
 import { OrcRunError } from "./run-session"
 import { formatHistoryError, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, runById, stepIdFor, updateRun, updateStep } from "./run-history"
@@ -62,7 +63,10 @@ const planChecksDone = (runId: string, round: ChecksRoundSummary): PlannedChecks
     started: round.started, ended: round.ended, agentFile: null, piSessionFile: null
   },
   checksEvidence: { direction: "out", path: round.file, kind: "checks" },
-  signals: round.checks.map((check) => ({ name: "check " + check.name, value: check.passed ? "passed" : "failed" }))
+  signals: [
+    ...round.checks.map((check) => ({ name: "check " + check.name, value: check.passed ? "passed" : "failed" as const })),
+    ...round.refusals.map((refusal) => ({ name: refusalSignalName, value: refusalValue(refusal) }))
+  ]
 })
 
 const planFixDone = (runId: string, fix: RecordedFixAttempt): PlannedFix => ({
@@ -123,7 +127,7 @@ export const recordResumePublish = (db: Database, run: HistoryRun, resume: Resum
         }
         for (const round of resume.inheritedRounds) {
           const planned = planChecksDone(run.runId, round)
-          insertPlannedStep(db, planned.step, [planned.checksEvidence], planned.signals)
+          insertPlannedStep(db, planned.step, [planned.checksEvidence], planned.signals.filter((signal) => signal.name !== refusalSignalName))
         }
         for (const fix of resume.inheritedFixes) {
           const planned = planFixDone(run.runId, fix)

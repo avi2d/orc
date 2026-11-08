@@ -43,6 +43,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/answer-wait.ts` | The wait at a no-mistakes gate for the captain's answers in the run folder |
 | `packages/run/src/toon.ts` | The reading of the TOON output no-mistakes prints |
 | `packages/run/src/run-history.ts` | The records home, the SQLite run history and `orc runs` |
+| `packages/run/src/gate-refusals.ts` | The gate and rule parse from a failed check's output, the `refusal` history signals and `orc refusals` |
 | `packages/run/src/nono.ts` | The nono sandbox environment, its roots and the `nono why` check of a rendered profile |
 | `packages/run/src/nono-exec.ts` | The opening of the nono sandbox a run's commands go through: the runtimes, the shims and the checked profile |
 | `packages/run/src/agent-exec.ts` | The one way a run starts Pi and the checks, in `nono run` or on the host, with the environment built from an allow list |
