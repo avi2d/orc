@@ -135,7 +135,7 @@
     },
     "packages/run": {
       "name": "@avi2dg/orc",
-      "version": "0.9.0",
+      "version": "0.10.0",
       "bin": {
         "orc": "src/bin.ts",
       },

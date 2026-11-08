@@ -2,6 +2,27 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.10.0
+
+Released 2026-11-08.
+
+### Features
+
+- **run:** stop started tasks and close runs the runner lost [#101](https://github.com/avi2d/orc/pull/101)
+- **alerts:** remove nightly alert rule [#99](https://github.com/avi2d/orc/pull/99)
+- **run:** drop sandcastle, run each task in its own git worktree [#98](https://github.com/avi2d/orc/pull/98)
+- **run:** pause on review questions instead of failing the task [#94](https://github.com/avi2d/orc/pull/94)
+- **test-fast:** cap workers by base plus increment past a reserve [#95](https://github.com/avi2d/orc/pull/95)
+- **test-fast:** cap workers by available memory [#93](https://github.com/avi2d/orc/pull/93)
+- **dispatch:** backlog depend, missing-backlog notice, 45-min idle limit, test home [#91](https://github.com/avi2d/orc/pull/91)
+
+### Fixes
+
+- **run:** separate same named task copies and correct nested worktree excludes [#100](https://github.com/avi2d/orc/pull/100)
+- **run:** keep and relay every answer of a parked wait [#96](https://github.com/avi2d/orc/pull/96)
+- **dispatch:** number backlog task ids per project [#90](https://github.com/avi2d/orc/pull/90)
+- **run:** apply orchestrator provider env to chat Pi [#85](https://github.com/avi2d/orc/pull/85)
+
 ## 0.9.0
 
 Released 2026-11-04.
