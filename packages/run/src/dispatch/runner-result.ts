@@ -214,20 +214,18 @@ const runLogAt = (home: string, runId: string): Effect.Effect<string | null, nev
   })
 
 const readStoppedRun = (home: string, task: string): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
-  Effect.gen(function*() {
-    return yield* Effect.acquireUseRelease(
-      openDatabase(home),
-      (db) =>
-        Effect.gen(function*() {
-          const latest = yield* latestRunForBranchName(db, taskBranch(task))
-          if (latest === null || latest.status !== "stopped") {
-            return null
-          }
-          return toSummary(latest, yield* openQuestionsForRun(db, latest.id), yield* writtenReport(runDirFor(home, latest.id)), null)
-        }),
-      (db) => Effect.sync(() => db.close())
-    )
-  }).pipe(
+  Effect.acquireUseRelease(
+    openDatabase(home),
+    (db) =>
+      Effect.gen(function*() {
+        const latest = yield* latestRunForBranchName(db, taskBranch(task))
+        if (latest === null || latest.status !== "stopped") {
+          return null
+        }
+        return toSummary(latest, yield* openQuestionsForRun(db, latest.id), yield* writtenReport(runDirFor(home, latest.id)), null)
+      }),
+    (db) => Effect.sync(() => db.close())
+  ).pipe(
     Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
   )
 

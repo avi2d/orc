@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Duration, Effect, Exit } from "effect";
-import { CommandRunner } from "@avi2dg/orc-schema";
+import { CommandAbsent, CommandRunner, CommandUnreachable } from "@avi2dg/orc-schema";
 import { liveCommandRunner } from "@avi2dg/orc-ui";
 
 const isRunning = (pid: number): boolean => {
@@ -115,25 +115,23 @@ describe("the live command runner", () => {
   }, 60_000);
 
   test("a program missing from the PATH fails as absent instead of as a command that ran and failed", async () => {
-    const tag = await Effect.runPromise(
+    const error = await Effect.runPromise(
       CommandRunner.use((runner) => runner.run({ argv: ["orc-test-no-such-program"], timeout: Duration.seconds(5) })).pipe(
         Effect.flip,
-        Effect.map((error) => error._tag),
         Effect.provide(liveCommandRunner),
       ),
     );
-    expect(tag).toBe("CommandAbsent");
+    expect(error).toBeInstanceOf(CommandAbsent);
   });
 
   test("a program that starts and exits non-zero fails as unreachable instead of as absent", async () => {
-    const tag = await Effect.runPromise(
+    const error = await Effect.runPromise(
       CommandRunner.use((runner) => runner.run({ argv: ["sh", "-c", "exit 3"], timeout: Duration.seconds(5) })).pipe(
         Effect.flip,
-        Effect.map((error) => error._tag),
         Effect.provide(liveCommandRunner),
       ),
     );
-    expect(tag).toBe("CommandUnreachable");
+    expect(error).toBeInstanceOf(CommandUnreachable);
   });
 
   // Oracle: the recorded decision that stopping the stream kills every in-flight command group.
