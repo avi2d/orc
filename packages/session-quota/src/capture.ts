@@ -53,7 +53,7 @@ const captured = Effect.gen(function* () {
 
 const patience = "2 seconds";
 
-const dropped = (reason: string) => Console.error(`tui-dash-capture: ${reason.split("\n").at(0) ?? reason}`);
+const dropped = (reason: string) => Console.error(`orc-dash-capture: ${reason.split("\n").at(0) ?? reason}`);
 
 // The hook runs inside the agent's turn, so a slow or failed capture is dropped with one line rather than holding or failing the turn.
 export const capture: Effect.Effect<void, never, Stdio.Stdio | FileSystem.FileSystem> = captured.pipe(

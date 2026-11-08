@@ -23,7 +23,7 @@ const printed = (color: boolean): Promise<string> =>
                 run: (command) => Effect.succeed(recordedAnswer(command.argv.join(" "))),
               }),
             ),
-            Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ TUI_DASH_MACHINE: "north", TUI_DASH_ACTIONS_REPO: fixtureActionsRepo }))),
+            Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ ORC_DASH_MACHINE: "north", ORC_DASH_ACTIONS_REPO: fixtureActionsRepo }))),
           ),
           TestConsole.layer,
           TestClock.layer(),

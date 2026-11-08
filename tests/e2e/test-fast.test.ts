@@ -40,7 +40,7 @@ const run = async (args: string[], cwd: string, extra: Record<string, string> = 
 const git = (args: readonly string[]): Promise<Ran> => run(["git", ...args], dir);
 
 async function repository(): Promise<void> {
-  dir = mkdtempSync(join(tmpdir(), "tui-dash-test-fast-"));
+  dir = mkdtempSync(join(tmpdir(), "orc-dash-test-fast-"));
   mkdirSync(join(dir, "tests", "unit"), { recursive: true });
   writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "test-fast-fixture", type: "module" }));
   writeFileSync(join(dir, "tests", "unit", "a.test.ts"), PASSING);

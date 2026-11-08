@@ -100,7 +100,7 @@ describe("the resources report's tasks block", () => {
   });
 
   test("holds each task's processes from the configured command and this machine's listing", async () => {
-    const { report, asked } = await printed({ TUI_DASH_TASKS: tasksCommand });
+    const { report, asked } = await printed({ ORC_DASH_TASKS: tasksCommand });
     const { tasks, view } = valueOf(decodeResourcesReport(report));
     expect(view.machine.cpu.kind).toBe("ok");
     expect(valueOf(tasks ?? { kind: "invalid", issue: "no block" }).map(({ id, processes }) => [id, processes])).toEqual([
@@ -114,7 +114,7 @@ describe("the resources report's tasks block", () => {
   // Oracle: the other machine's report gets 15 seconds, ssh and bun start included, and 5 is set for each read
   // the tasks block waits on. Rejects the tasks command keeping the 15 seconds the tasks panel gives it.
   test("gives the tasks command and the process listing 5 seconds each, so their timeout lands in the block", async () => {
-    const { millisAllowed } = await printed({ TUI_DASH_TASKS: tasksCommand });
+    const { millisAllowed } = await printed({ ORC_DASH_TASKS: tasksCommand });
     const sampled = [...millisAllowed].find(([line]) => line.startsWith(sampler));
     expect(millisAllowed.get("sh -c " + tasksCommand)).toBe(5000);
     expect(sampled?.[1]).toBe(5000);
@@ -122,7 +122,7 @@ describe("the resources report's tasks block", () => {
 
   test("carries the tasks command's failure while the machine still reads", async () => {
     const { report } = await printed(
-      { TUI_DASH_TASKS: tasksCommand },
+      { ORC_DASH_TASKS: tasksCommand },
       Effect.fail(new CommandUnreachable({ reason: "sh exited 127: harbor-tasks: command not found" })),
     );
     const { tasks, view } = valueOf(decodeResourcesReport(report));

@@ -2,7 +2,7 @@
   "name": "@avi2dg/orc-schedules",
   "version": "0.1.0",
   "private": true,
-  "description": "Scheduled box for tui-dash, listing what runs next on each configured machine",
+  "description": "Scheduled box for orc-dash, listing what runs next on each configured machine",
   "repository": "https://github.com/avi2d/orc.git",
   "author": "avi2d <avi2dg@gmail.com>",
   "license": "MIT",

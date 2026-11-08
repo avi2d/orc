@@ -9,8 +9,8 @@ export class ConfigRefused extends Data.TaggedError("ConfigRefused")<{ readonly 
 export const configPath: Config.Config<string> = Config.all({
   home: Config.String("HOME"),
   configHome: selector("XDG_CONFIG_HOME"),
-  config: selector("TUI_DASH_CONFIG"),
-}).pipe(Config.map(({ home, configHome, config }) => config ?? `${configHome ?? `${home}/.config`}/tui-dash/config.json`));
+  config: selector("ORC_DASH_CONFIG"),
+}).pipe(Config.map(({ home, configHome, config }) => config ?? `${configHome ?? `${home}/.config`}/orc-dash/config.json`));
 
 const besideConfig = (path: string, name: string): string => `${path.slice(0, path.lastIndexOf("/") + 1)}${name}`;
 
@@ -71,7 +71,7 @@ const sharedClaudeFolder = (home: string): string => `${home.replace(/\/+$/u, ""
 export const readConfig: Effect.Effect<ConfigFile, ConfigRefused | Config.ConfigError, FileSystem.FileSystem> = Effect.gen(function* () {
   const path = yield* configPath;
   const home = yield* Config.String("HOME");
-  const alertsSettings = yield* selector("TUI_DASH_ALERTS_SETTINGS");
+  const alertsSettings = yield* selector("ORC_DASH_ALERTS_SETTINGS");
   const file = yield* readConfigFile(path, alertsSettings);
   const shared = claudeAccountsOf(file.config).find((account) => account.folder === sharedClaudeFolder(home));
   if (shared === undefined) return file;

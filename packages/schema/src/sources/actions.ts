@@ -64,7 +64,7 @@ export interface ActionsReading {
   readonly read: Effect.Effect<Reading<ReadonlyArray<ActionRun>>>;
 }
 
-export class ActionsSource extends Context.Service<ActionsSource, ActionsReading>()("tui-dash/ActionsSource") {}
+export class ActionsSource extends Context.Service<ActionsSource, ActionsReading>()("orc-dash/ActionsSource") {}
 
 // Without --repo, gh lists the runs of the repository its working directory belongs to.
 const workingRepository = "this repository";
@@ -75,7 +75,7 @@ const reuseFor = Duration.seconds(30);
 export const actionsSourceLayer: Layer.Layer<ActionsSource, Config.ConfigError, CommandRunner> = Layer.effect(
   ActionsSource,
   Effect.gen(function* () {
-    const named = Option.fromUndefinedOr(yield* selector("TUI_DASH_ACTIONS_REPO"));
+    const named = Option.fromUndefinedOr(yield* selector("ORC_DASH_ACTIONS_REPO"));
     const runner = yield* CommandRunner;
     const read = stamped(
       Effect.forEach(activeRunStatuses, (status) => runDecoded(actionsCommand(named, status), decodeActions), {

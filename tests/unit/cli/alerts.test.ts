@@ -79,7 +79,7 @@ const expectedEvents = [
 
 const summaryOf = (event: AlertEvent) => [event.rule, event.at, event.rule === "long-task" ? event.reason : event.rule === "heavy-load" ? event.machine : ""];
 
-describe("tui-dash alerts --json", () => {
+describe("orc-dash alerts --json", () => {
   test("prints each rule's events as JSON lines on the default timings while a source never answers", async () => {
     expect((await streamedFor31Minutes(readers)).map(summaryOf)).toEqual(expectedEvents);
   });

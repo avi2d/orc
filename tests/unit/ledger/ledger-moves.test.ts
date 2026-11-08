@@ -45,11 +45,11 @@ describe("the ledger's moves", () => {
     expect(text).not.toContain("no messages today");
   });
 
-  // Oracle: the README's ledger settings, where the ledger stays empty while TUI_DASH_LEDGER_SESSIONS is unset, and the
+  // Oracle: the README's ledger settings, where the ledger stays empty while ORC_DASH_LEDGER_SESSIONS is unset, and the
   // tasks panel's wording for its own unset report. Rejects an unset folder drawn as a quiet day.
   test("names the unset sessions folder instead of claiming a quiet day", () => {
     const textOf = (sessions: LedgerReadings["sessions"]): string => wholeOf({ ...readings, sessions, ledger: [] }, full).map(plain).join("\n");
-    expect(textOf("unset")).toContain("TUI_DASH_LEDGER_SESSIONS is unset, so no messages show");
+    expect(textOf("unset")).toContain("ORC_DASH_LEDGER_SESSIONS is unset, so no messages show");
     expect(textOf("unset")).not.toContain("no messages today");
     expect(textOf("set")).toContain("no messages today");
   });

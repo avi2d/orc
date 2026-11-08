@@ -4,7 +4,7 @@ import { Effect, Layer, Runtime } from "effect";
 import { binArgsExit, usageText } from "@avi2dg/orc-ui/bin-args";
 import { capture } from "./capture";
 
-const usage = usageText("tui-dash-capture (pi-call | claude-statusline) [--help]", "Read one JSON call on stdin and append its record to the capture ledger.", [
+const usage = usageText("orc-dash-capture (pi-call | claude-statusline) [--help]", "Read one JSON call on stdin and append its record to the capture ledger.", [
   "-h, --help      print this usage and exit",
 ]);
 

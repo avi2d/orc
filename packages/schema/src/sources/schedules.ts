@@ -188,7 +188,7 @@ export interface MachineSchedulesReading {
   readonly read: Effect.Effect<ReadonlyArray<ScheduleRead>>;
 }
 
-export class MachineSchedules extends Context.Service<MachineSchedules, MachineSchedulesReading>()("tui-dash/MachineSchedules") {}
+export class MachineSchedules extends Context.Service<MachineSchedules, MachineSchedulesReading>()("orc-dash/MachineSchedules") {}
 
 // A workflow file changes far less often than once an hour, and reading every file of every repository costs dozens of GitHub calls.
 const reuseCronsFor = Duration.hours(1);

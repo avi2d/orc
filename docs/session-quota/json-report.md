@@ -2,7 +2,7 @@
 kind: reference
 ---
 # Read the JSON report
-To print the report once, run `tui-dash report session-quota`.
+To print the report once, run `orc-dash report session-quota`.
 The report is one JSON object on one line, and `SessionQuotaReport` in `packages/schema/src/contract/session-quota.ts` decodes it.
 A reader checks `schemaVersion` first, and version 1 is the only version.
 

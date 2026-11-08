@@ -22,8 +22,8 @@ const readWith = async (env: Record<string, string>) => {
 
 describe("the saved profiles source", () => {
   // The default runs no private tool, so a stranger sees no error.
-  test("runs nothing and holds no profile while TUI_DASH_SAVED_PROFILES is unset or blank", async () => {
-    for (const env of [{}, { TUI_DASH_SAVED_PROFILES: "  " }]) {
+  test("runs nothing and holds no profile while ORC_DASH_SAVED_PROFILES is unset or blank", async () => {
+    for (const env of [{}, { ORC_DASH_SAVED_PROFILES: "  " }]) {
       const { reading, asked } = await readWith(env);
       expect(asked).toEqual([]);
       expect(valueOf(reading)).toEqual({ schema: 2, active_profile: null, profiles: [] });
@@ -31,7 +31,7 @@ describe("the saved profiles source", () => {
   });
 
   test("runs the configured shell line and decodes its profiles", async () => {
-    const { reading, asked } = await readWith({ TUI_DASH_SAVED_PROFILES: "ssh other-box 'saved --json'" });
+    const { reading, asked } = await readWith({ ORC_DASH_SAVED_PROFILES: "ssh other-box 'saved --json'" });
     expect(asked.map((command) => command.argv)).toEqual([["sh", "-c", "ssh other-box 'saved --json'"]]);
     expect(valueOf(reading).active_profile).toBe("main");
   });

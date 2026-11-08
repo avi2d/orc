@@ -41,7 +41,7 @@ let home = "";
 
 beforeEach(() => {
   roundsStarted = 0;
-  home = mkdtempSync(join(tmpdir(), "tui-dash-session-quota-"));
+  home = mkdtempSync(join(tmpdir(), "orc-dash-session-quota-"));
   copyFixtureHome(home);
 });
 
@@ -53,9 +53,9 @@ const atHome = (text: string) => relocated(text, home);
 
 let roundsStarted = 0;
 
-const remoteCommand = "ssh south.example.com tui-dash-session-quota --json";
+const remoteCommand = "ssh south.example.com orc-dash-session-quota --json";
 
-const remoteEnv = { TUI_DASH_MACHINE: "north", TUI_DASH_REMOTE_MACHINE: "south", TUI_DASH_REMOTE_SESSION_QUOTA: remoteCommand };
+const remoteEnv = { ORC_DASH_MACHINE: "north", ORC_DASH_REMOTE_MACHINE: "south", ORC_DASH_REMOTE_SESSION_QUOTA: remoteCommand };
 
 interface Remote {
   readonly env: Record<string, string>;

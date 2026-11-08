@@ -21,7 +21,7 @@ const place = (relative: string, text: string) => {
 };
 
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "tui-dash-quota-harvest-"));
+  home = mkdtempSync(join(tmpdir(), "orc-dash-quota-harvest-"));
   place(claudeLogRelative, fixture("harvest/claude-code.jsonl"));
 });
 

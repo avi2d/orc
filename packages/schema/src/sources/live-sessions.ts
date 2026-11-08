@@ -80,10 +80,10 @@ const macHarnessCommand = {
   timeout: Duration.seconds(10),
 } as const;
 
-export class HerdrSource extends Context.Service<HerdrSource, Source<ReadonlyArray<HerdrPane>>>()("tui-dash/HerdrSource") {}
+export class HerdrSource extends Context.Service<HerdrSource, Source<ReadonlyArray<HerdrPane>>>()("orc-dash/HerdrSource") {}
 
 export class HarnessProcessSource extends Context.Service<HarnessProcessSource, Source<ReadonlyArray<HarnessProcess>>>()(
-  "tui-dash/HarnessProcessSource",
+  "orc-dash/HarnessProcessSource",
 ) {}
 
 export const herdrSourceLayer = Layer.effect(HerdrSource, sourceOf(stamped(runDecoded(herdrCommand, decodeHerdrPanes))));

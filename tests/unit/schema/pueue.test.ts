@@ -107,15 +107,15 @@ describe("the pueue machines", () => {
   });
 
   test("leave out a blank remote command", async () => {
-    expect((await machinesWith({ TUI_DASH_REMOTE_PUEUE: "  " })).machines).toHaveLength(1);
+    expect((await machinesWith({ ORC_DASH_REMOTE_PUEUE: "  " })).machines).toHaveLength(1);
   });
 
   test("add the other machine, read through the shell, when its command is set", async () => {
     const line = "ssh south.example.com 'pueue status --json'";
     const { machines, asked } = await machinesWith({
-      TUI_DASH_MACHINE: "north",
-      TUI_DASH_REMOTE_MACHINE: "south",
-      TUI_DASH_REMOTE_PUEUE: line,
+      ORC_DASH_MACHINE: "north",
+      ORC_DASH_REMOTE_MACHINE: "south",
+      ORC_DASH_REMOTE_PUEUE: line,
     });
     expect(machines).toEqual([
       { name: "north", kind: "ok" },

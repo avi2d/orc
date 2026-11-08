@@ -8,7 +8,7 @@ import { savedReadingsLayer } from "@avi2dg/orc-schema";
 import { dashboardSources, frameWhere, recordedAnswer, tasksCommand, withLivePanel } from "../../lib/dashboard-sources";
 import { boxText } from "../../lib/host-fixture";
 
-const remoteResourcesCommand = "ssh south.example.com tui-dash-resources --json";
+const remoteResourcesCommand = "ssh south.example.com orc-dash-resources --json";
 
 const ledgerLayout = join(import.meta.dir, "..", "..", "fixtures", "config", "ledger.json");
 
@@ -20,7 +20,7 @@ describe("the live dashboard's cadences", () => {
       const asked: Array<{ command: string; at: number }> = [];
       let passes = 0;
       const sources = dashboardSources({
-        env: { TUI_DASH_MACHINE: "north", TUI_DASH_REMOTE_MACHINE: "south", TUI_DASH_REMOTE_RESOURCES: remoteResourcesCommand },
+        env: { ORC_DASH_MACHINE: "north", ORC_DASH_REMOTE_MACHINE: "south", ORC_DASH_REMOTE_RESOURCES: remoteResourcesCommand },
         run: (command) =>
           Effect.sync(() => {
             asked.push({ command: command.argv.join(" "), at: performance.now() });
@@ -106,7 +106,7 @@ describe("the live dashboard's machines cadence", () => {
 });
 
 const withStateDirectory = async (body: (directory: string) => Promise<void>): Promise<void> => {
-  const directory = await mkdtemp(join(tmpdir(), "tui-dash-cache-"));
+  const directory = await mkdtemp(join(tmpdir(), "orc-dash-cache-"));
   try {
     await body(directory);
   } finally {
@@ -114,7 +114,7 @@ const withStateDirectory = async (body: (directory: string) => Promise<void>): P
   }
 };
 
-const env = { TUI_DASH_MACHINE: "north", TUI_DASH_TASKS: tasksCommand };
+const env = { ORC_DASH_MACHINE: "north", ORC_DASH_TASKS: tasksCommand };
 
 describe("the live dashboard's saved readings", () => {
   test(

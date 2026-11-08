@@ -109,7 +109,7 @@ const runFiles = Effect.fn("runFiles")(function* (
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const outfile = path.join(yield* fs.makeTempDirectoryScoped({ prefix: "tui-dash-test-fast-" }), "junit.xml");
+  const outfile = path.join(yield* fs.makeTempDirectoryScoped({ prefix: "orc-dash-test-fast-" }), "junit.xml");
   const suitePassed = (yield* spawner.exitCode(
     ChildProcess.make(process.execPath, ["test", "--randomize", `--parallel=${workers}`, ...reporterArgs(outfile), ...files], {
       stdin: "ignore",

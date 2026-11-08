@@ -17,7 +17,7 @@ const sourcesWithRemote = (remote: Effect.Effect<string>) => Layer.mergeAll(pueu
   ),
   Layer.provide(
     ConfigProvider.layer(
-      ConfigProvider.fromEnvRecord({ TUI_DASH_MACHINE: "north", TUI_DASH_REMOTE_MACHINE: "south", TUI_DASH_REMOTE_PUEUE: remoteLine, TUI_DASH_ACTIONS_REPO: fixtureActionsRepo }),
+      ConfigProvider.fromEnvRecord({ ORC_DASH_MACHINE: "north", ORC_DASH_REMOTE_MACHINE: "south", ORC_DASH_REMOTE_PUEUE: remoteLine, ORC_DASH_ACTIONS_REPO: fixtureActionsRepo }),
     ),
   ),
 );

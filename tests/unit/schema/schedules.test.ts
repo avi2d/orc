@@ -221,7 +221,7 @@ const paintsAfter = (waits: ReadonlyArray<Duration.Input>): Promise<ReadonlyArra
                 },
               }),
             ),
-            Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ TUI_DASH_RUNNERS: runnersCommand }))),
+            Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ ORC_DASH_RUNNERS: runnersCommand }))),
           ),
           TestClock.layer(),
         ),

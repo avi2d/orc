@@ -2,7 +2,7 @@
 kind: reference
 ---
 # Capture usage as it happens
-The writer `tui-dash-capture` appends one record to the capture ledger each time a hook calls it.
+The writer `orc-dash-capture` appends one record to the capture ledger each time a hook calls it.
 The ledger keeps Claude statusline and headless readings, which no log keeps, and Pi calls whose log was rotated or deleted.
 The readers prefer the ledger where it holds a call, and count from the logs where it does not.
 
@@ -14,7 +14,7 @@ Hooks run `bun packages/session-quota/dist/capture-bin.js` with the kind of reco
 The writer exits 0 after it handles a record, even when it captures nothing.
 `--help` prints usage and exits 0.
 An unknown flag prints usage and exits 1.
-When it cannot capture, it prints one line that starts with `tui-dash-capture:` to stderr and writes nothing.
+When it cannot capture, it prints one line that starts with `orc-dash-capture:` to stderr and writes nothing.
 It gives up after 2 seconds, so a hook that never closes stdin costs the agent nothing.
 
 ## Capture a Pi call
@@ -59,7 +59,7 @@ The bridge appends one entry for each SDK event, so each headless reading counts
 ## Read the ledger
 
 The ledger is a folder of one JSON Lines file a UTC day, such as `2026-10-17.jsonl`.
-It lives in `$XDG_STATE_HOME/tui-dash/usage`, or in `~/.local/state/tui-dash/usage` when `XDG_STATE_HOME` is not set.
+It lives in `$XDG_STATE_HOME/orc-dash/usage`, or in `~/.local/state/orc-dash/usage` when `XDG_STATE_HOME` is not set.
 Only the user may read the folder and its files.
 The writer deletes a day file once it is more than 32 days old.
 That keeps the start of a 31 day month window in the ledger.

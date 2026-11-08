@@ -8,7 +8,7 @@ Every number is an estimate from local logs and an upper bound, never a quota re
 
 - Bun, at the version `.bun-version` pins.
 - `quota-axi` 0.1.56 on the `PATH`, since the windows the harness logs do not cover come from `quota-axi --full --json --provider`.
-- Optionally `TUI_DASH_SAVED_PROFILES`, the shell command that prints the saved profiles, since the Claude account title comes from the active one, as the [tui-dash guide](../../docs/tui-dash.md#show-saved-profiles) tells.
+- Optionally `ORC_DASH_SAVED_PROFILES`, the shell command that prints the saved profiles, since the Claude account title comes from the active one, as the [orc-dash guide](../../docs/dash.md#show-saved-profiles) tells.
 - `herdr` 0.9.5 on the `PATH` to name live sessions by pane, since the tool reads `herdr agent list` and changes nothing in Herdr.
 - `/proc` on Linux or `lsof` on macOS to find headless Pi, Claude Code and Codex processes.
 
@@ -18,8 +18,8 @@ To install session quota, run `bun install --frozen-lockfile` at the repository 
 
 ## Run the panel
 
-To open the live panel, run `tui-dash panel session-quota`.
-To print one frame of plain text instead, run `tui-dash panel session-quota --print`.
+To open the live panel, run `orc-dash panel session-quota`.
+To print one frame of plain text instead, run `orc-dash panel session-quota --print`.
 [Run the session panel](../../docs/session-quota/run-the-session-panel.md) names every key and option.
 
 ## Where things are
@@ -49,4 +49,4 @@ To print one frame of plain text instead, run `tui-dash panel session-quota --pr
 - [Tail the alert stream](../../docs/session-quota/alert-stream.md)
 - [Troubleshoot the session panel](../../docs/session-quota/troubleshoot.md)
 - [Capture usage as it happens](../../docs/session-quota/capture.md)
-- [The tui-dash dashboard](../../docs/tui-dash.md)
+- [The orc-dash dashboard](../../docs/dash.md)

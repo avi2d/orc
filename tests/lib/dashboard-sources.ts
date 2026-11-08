@@ -147,7 +147,7 @@ const recordedSources = (
       remoteTaskHistoryLayer,
       remoteTaskLiveLayer,
       Layer.mergeAll(ciRunsLayer, machineSchedulesLayer("linux")).pipe(Layer.provideMerge(repos)),
-    ).pipe(Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ TUI_DASH_ACTIONS_REPO: fixtureActionsRepo, ...env })))),
+    ).pipe(Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ ORC_DASH_ACTIONS_REPO: fixtureActionsRepo, ...env })))),
     Layer.succeed(TaskSamplesSource, samples),
     dispatchSourceLayer.pipe(
       Layer.provide(fileSystem),
@@ -169,8 +169,8 @@ const recordedSources = (
           ConfigProvider.fromEnvRecord({
             ...env,
             HOME: "/home/tester",
-            TUI_DASH_CONFIG: config,
-            TUI_DASH_ALERTS_VERDICTS: join(alertFixtures, "verdicts.jsonl"),
+            ORC_DASH_CONFIG: config,
+            ORC_DASH_ALERTS_VERDICTS: join(alertFixtures, "verdicts.jsonl"),
           }),
         ),
       ),

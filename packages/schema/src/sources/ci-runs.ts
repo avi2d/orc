@@ -160,7 +160,7 @@ export interface CiRunsReading {
   readonly read: Effect.Effect<Reading<CiReport>>;
 }
 
-export class CiRuns extends Context.Service<CiRuns, Option.Option<CiRunsReading>>()("tui-dash/CiRuns") {}
+export class CiRuns extends Context.Service<CiRuns, Option.Option<CiRunsReading>>()("orc-dash/CiRuns") {}
 
 // Every repository costs a call a read against GitHub's hourly limit, so a screen repainting every 10 seconds reuses a read this young.
 const reuseFor = Duration.seconds(60);

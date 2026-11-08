@@ -71,7 +71,7 @@ const queueRowLine = (row: QueueRow, now: DateTime.Utc, zone: DateTime.TimeZone,
 const ciNotes = (ci: CiState, width: number): Block => {
   switch (ci.kind) {
     case "unset":
-      return sentence("TUI_DASH_RUNNERS is unset, so no CI run shows", "muted", width);
+      return sentence("ORC_DASH_RUNNERS is unset, so no CI run shows", "muted", width);
     case "pending":
       return sentence("reading the CI runs\u2026", "muted", width);
     case "unreachable":

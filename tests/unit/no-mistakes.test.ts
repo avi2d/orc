@@ -380,7 +380,7 @@ describe("noMistakesBinary", () => {
 const failedRun = [
   "run:",
   "  id: \"01M5EH9DXNBCAYWRHSF7VM1480\"",
-  "  branch: fm/tui-dash-captain-log",
+  "  branch: fm/orc-dash-captain-log",
   "  status: failed",
   "  steps[2]{step,status,findings,duration_ms}:",
   "    test,completed,0,582251",

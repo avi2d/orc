@@ -7,7 +7,7 @@ const root = join(import.meta.dir, "..", "..", "..");
 
 const fixtures = join(root, "tests", "fixtures", "alerts");
 
-const home = mkdtempSync(join(tmpdir(), "tui-dash-alerts-panel-e2e-"));
+const home = mkdtempSync(join(tmpdir(), "orc-dash-alerts-panel-e2e-"));
 
 afterAll(() => rmSync(home, { recursive: true, force: true }));
 
@@ -24,10 +24,10 @@ const printed = async (environment: Record<string, string>): Promise<string> => 
   return stdout;
 };
 
-describe("tui-dash panel alerts --print", () => {
+describe("orc-dash panel alerts --print", () => {
   test("reads the settings and the verdict log from their default paths", async () => {
-    const state = join(home, ".local", "state", "tui-dash");
-    const config = join(home, ".config", "tui-dash");
+    const state = join(home, ".local", "state", "orc-dash");
+    const config = join(home, ".config", "orc-dash");
     await Bun.write(join(state, "alerts-verdicts.jsonl"), Bun.file(join(fixtures, "verdicts.jsonl")));
     await Bun.write(join(config, "config.json"), Bun.file(join(fixtures, "..", "config", "config.json")));
     appendFileSync(join(state, "alerts-verdicts.jsonl"), "verdict: fine\n");
@@ -42,10 +42,10 @@ describe("tui-dash panel alerts --print", () => {
     expect(warning).toContain("is not a verdict record");
   });
 
-  test("reads the verdict log TUI_DASH_ALERTS_VERDICTS names", async () => {
+  test("reads the verdict log ORC_DASH_ALERTS_VERDICTS names", async () => {
     const elsewhere = join(home, "elsewhere.jsonl");
     copyFileSync(join(fixtures, "verdicts.jsonl"), elsewhere);
-    const frame = await printed({ TUI_DASH_ALERTS_VERDICTS: elsewhere, TUI_DASH_CONFIG: join(home, "absent.json") });
+    const frame = await printed({ ORC_DASH_ALERTS_VERDICTS: elsewhere, ORC_DASH_CONFIG: join(home, "absent.json") });
     expect(frame).toContain("earlier  ");
     expect(frame).toContain("limits   quiet 15m, then every 15m · past 2h in total");
     expect(frame).not.toContain("! ");

@@ -11,7 +11,7 @@ const command = join(root, "packages", "cli", "src", "bin.ts");
 
 const recordedTasks = join(root, "tests", "fixtures", "tasks", "east.json");
 
-const home = mkdtempSync(join(tmpdir(), "tui-dash-alerts-e2e-"));
+const home = mkdtempSync(join(tmpdir(), "orc-dash-alerts-e2e-"));
 
 afterAll(() => rmSync(home, { recursive: true, force: true }));
 
@@ -24,9 +24,9 @@ const settingsFile = (name: string, settings: unknown): string => {
 const environment = (settings: string) => ({
   PATH: process.env["PATH"] ?? "",
   HOME: home,
-  TUI_DASH_MACHINE: "north",
-  TUI_DASH_CONFIG: settings,
-  TUI_DASH_TASKS: `cat '${recordedTasks}'`,
+  ORC_DASH_MACHINE: "north",
+  ORC_DASH_CONFIG: settings,
+  ORC_DASH_TASKS: `cat '${recordedTasks}'`,
 });
 
 const isRunning = (pid: number): boolean => {
@@ -65,7 +65,7 @@ const eventsUntil = async (settings: string, enough: (events: ReadonlyArray<Aler
   return events;
 };
 
-describe("tui-dash alerts --json", () => {
+describe("orc-dash alerts --json", () => {
   test("prints a heavy load event for this machine and a total event for each live recorded task", async () => {
     const settings = settingsFile("low.json", {
       heavyLoad: { everySeconds: 0.2, sustainedMinutes: 0.001, machines: [{ name: "north", loadAtLeast: 1000, memory: { usedAtLeastPercent: 0.001 } }] },
@@ -84,7 +84,7 @@ describe("tui-dash alerts --json", () => {
   test("stopping the stream leaves no tasks command running, even one that ignores SIGTERM", async () => {
     const pids = join(home, "hung-pids");
     const child = Bun.spawn(["bun", command, "alerts", "--json"], {
-      env: { ...environment(join(home, "absent.json")), TUI_DASH_TASKS: `trap "" TERM INT HUP; sleep 6003 & echo $! >> '${pids}'; wait` },
+      env: { ...environment(join(home, "absent.json")), ORC_DASH_TASKS: `trap "" TERM INT HUP; sleep 6003 & echo $! >> '${pids}'; wait` },
       stdin: "ignore",
       stdout: "ignore",
       stderr: "ignore",

@@ -392,7 +392,7 @@ describe("a task's pipeline on screen", () => {
         tasks: reported.view.tasks.map((task) => (task.id === "tasks-pipe-full" && task.state !== "done" ? { ...task, state: "blocked" as const } : task)),
       },
     });
-    const fixing = valueOf(decodeNoMistakes(fixture("no-mistakes/run-fixing.txt"))).map((run) => ({ ...run, branch: "fm/tui-dash-fast-start" }));
+    const fixing = valueOf(decodeNoMistakes(fixture("no-mistakes/run-fixing.txt"))).map((run) => ({ ...run, branch: "fm/orc-dash-fast-start" }));
     const lines = ticket(row(pipe({ tasks: stopped, noMistakes: ok(fixing) }).levels, "tasks-pipe-full"));
     expect(lines.map(plain)).toContain("review · validation still running · reviewer Opus");
     expect(lines.map(plain)).toContain("6 awaiting, 6 auto-fix · fix 1 of 2");
