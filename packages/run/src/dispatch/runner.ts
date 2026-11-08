@@ -2,7 +2,7 @@ import { DateTime, Duration, Effect, FileSystem, Option, Path, Schema, Stream } 
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { Reach } from "./args"
 import { decodeJson, decodeSecret, pueue, type Command } from "./runner-exec"
-import { AbsolutePath } from "../json-file"
+import { AbsolutePath, readFailure } from "../json-file"
 import { ProviderId, readOrcConfig } from "../orc-config"
 import { TaskId } from "./backlog"
 import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldToken } from "./held-token"
@@ -283,7 +283,7 @@ const readRequest = (
     const checkout = yield* requiredEnv(env, "ORC_TASK_CHECKOUT")
     const provider = yield* requiredEnv(env, "ORC_TASK_PROVIDER")
     const text = yield* fs.readFileString(file).pipe(
-      Effect.mapError((error) => new RunnerError({ detail: "cannot read the task file " + file + ": " + error.message }))
+      Effect.mapError((error) => new RunnerError({ detail: "cannot read the task file " + file + ": " + readFailure(error) }))
     )
     const record = yield* parseTaskFile(file, "taken", text).pipe(
       Effect.mapError((error) => new RunnerError({ detail: error.file + ": " + error.detail }))

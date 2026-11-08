@@ -7,7 +7,9 @@ The panel names each warning beside the rows it affects.
 ## Every live session reads as ended
 
 The panel shows a warning that Herdr gave no panes or that there is no process table.
-Install `herdr` and check `herdr agent list` answers on the `PATH` the panel runs on.
+Herdr gave no panes means `herdr` is on the `PATH` but `herdr agent list` did not answer, so check that it answers on the `PATH` the panel runs on.
+Without `herdr` installed the panel gives no such warning, and it reads live sessions from the process table.
+No process table means `/proc` on Linux or `lsof` on macOS did not answer.
 
 ## A headless run reads as ended
 

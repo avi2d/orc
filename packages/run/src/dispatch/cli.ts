@@ -8,7 +8,7 @@ import { answerTask } from "./parked"
 import { liveSources, readRoom, runBeat } from "./beat"
 import { fiveMinuteLoad } from "./load"
 import { backlogJson, type BacklogView, beatJson, formatBeat, formatBoard, type ProjectList, type RoomList } from "./board"
-import type { ConfigError } from "../json-file"
+import { type ConfigError, readFailure } from "../json-file"
 import { checkoutOn, type DispatchConfig, readDispatchConfig, readProjects } from "./config"
 import { holdRun } from "./hold"
 import { mergeTask } from "./merge"
@@ -74,7 +74,7 @@ const readSessionToken = (session: string, stdoutIsTerminal: boolean) =>
     }
     const fs = yield* FileSystem.FileSystem
     const text = yield* fs.readFileString(session).pipe(
-      Effect.mapError((error) => new BacklogError({ detail: "cannot read " + session + ": " + error.message }))
+      Effect.mapError((error) => new BacklogError({ detail: "cannot read " + session + ": " + readFailure(error) }))
     )
     const reading = sessionToken(text)
     if (reading.kind === "unread") {
@@ -147,7 +147,7 @@ const readTaskText = (source: TaskSource, place: DispatchPlace) =>
     const path = yield* Path.Path
     const taskPath = path.resolve(place.cwd, source.path)
     const body = yield* fs.readFileString(taskPath).pipe(
-      Effect.mapError((error) => new BacklogError({ detail: "cannot read the task file " + taskPath + ": " + error.message }))
+      Effect.mapError((error) => new BacklogError({ detail: "cannot read the task file " + taskPath + ": " + readFailure(error) }))
     )
     return { from: "the task file " + taskPath, body } satisfies TaskText
   })

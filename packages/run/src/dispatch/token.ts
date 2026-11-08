@@ -60,7 +60,7 @@ export type RenewRequest = typeof RenewRequest.Type
 
 export const encodeRenewal = encodeSecretJson(RenewRequest, "renewal")
 
-// clauth stamps a profile's session-token.json in Claude Code's credentials shape, its expiry in epoch milliseconds.
+// Claude Code's credentials shape, its expiry in epoch milliseconds.
 const ClaudeSession = Schema.Struct({
   claudeAiOauth: Schema.Struct({
     accessToken: TokenValue,
@@ -78,7 +78,7 @@ export const sessionToken = (text: string): TokenReading => {
   }
   const { accessToken, expiresAt, refreshToken } = session.value.claudeAiOauth
   if (refreshToken !== undefined) {
-    return unread("holds a refresh token, so clauth has not armed it with rolling-token and its login would leave this machine")
+    return unread("holds a refresh token, so its login would leave this machine; give orc a credentials file that holds only an access token, or take a token-file or kind none account instead")
   }
   return { kind: "read", token: { token: accessToken, expiresAt: DateTime.makeUnsafe(expiresAt) } }
 }

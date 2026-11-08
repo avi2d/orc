@@ -19,7 +19,7 @@ const waitForLiveToken = (home: string, task: string, label?: string | null): Ef
         return expiry.value
       }
       if (!told) {
-        yield* Console.log(task + " waits for a fresh token from the Mac: the one held here runs out at " + DateTime.formatIso(expiry.value))
+        yield* Console.log(task + " waits for a fresh token from the machine that runs the beat: the one held here runs out at " + DateTime.formatIso(expiry.value))
         told = true
       }
       yield* Effect.sleep(Duration.seconds(pollSeconds))

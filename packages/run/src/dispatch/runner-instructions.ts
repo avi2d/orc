@@ -1,4 +1,5 @@
 import { Effect, FileSystem, Path, Schema } from "effect"
+import { readFailure } from "../json-file"
 import { RunnerError } from "./runner-error"
 
 export const TaskInstructions = Schema.Struct({
@@ -12,7 +13,7 @@ export const readInstructions = (file: string): Effect.Effect<{ readonly instruc
     ? Effect.succeed({})
     : Effect.all([FileSystem.FileSystem, Path.Path]).pipe(
       Effect.flatMap(([fs, path]) => fs.readFileString(file).pipe(Effect.map((text) => ({ instructions: { name: path.basename(file), text } })))),
-      Effect.mapError((error) => new RunnerError({ detail: "cannot read the instructions file " + file + ": " + error.message }))
+      Effect.mapError((error) => new RunnerError({ detail: "cannot read the instructions file " + file + ": " + readFailure(error) }))
     )
 
 export const writeInstructions = (folder: string, instructions: TaskInstructions): Effect.Effect<string, RunnerError, FileSystem.FileSystem> =>

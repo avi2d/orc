@@ -51,8 +51,8 @@ describe("the quota panel, against the recorded schema-6 replay", () => {
 
 // Claude Code's statusline reports used_percentage, so 23 used is 77 left.
 describe("the quota panel, with an account's statusline reading", () => {
-  const main = { name: "main", folder: "/home/tester/.claude-accounts/main" };
-  const second = { name: "second", folder: "/home/tester/.claude-accounts/second" };
+  const main = { name: "main", folder: "/home/tester/claude-profiles/main" };
+  const second = { name: "second", folder: "/home/tester/claude-profiles/second" };
   const reading = {
     schemaVersion: 1,
     kind: "claude-code-reading",
@@ -98,8 +98,8 @@ describe("the quota panel, with an account's statusline reading", () => {
 // ledger, tagged by config folder. The recorded SDK turn carries 0.14 and 0.01 utilization, so 86 and 99 are left.
 // Rejects main's reading drawn on second's block, and a headless join named beside its source line.
 describe("the quota panel, with an account's headless reading", () => {
-  const main = { name: "main", folder: "/home/tester/.claude-accounts/main" };
-  const second = { name: "second", folder: "/home/tester/.claude-accounts/second" };
+  const main = { name: "main", folder: "/home/tester/claude-profiles/main" };
+  const second = { name: "second", folder: "/home/tester/claude-profiles/second" };
   const reading = {
     schemaVersion: 1,
     kind: "claude-headless-reading",

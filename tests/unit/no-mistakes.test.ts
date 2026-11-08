@@ -68,7 +68,7 @@ const unbracedPrecursor = [
   "    prior-1,warning,a.go,ask-user,an earlier already-resolved row",
   "    prior-2,info,b.go,ask-user,another earlier row",
   "  findings[1]{id,severity,file,action,description}:",
-  "    r1,warning,a.go,auto-fix,the live gate is owed to the crewmate",
+  "    r1,warning,a.go,auto-fix,the live gate is owed to the worker",
   "gate: review"
 ].join("\n")
 

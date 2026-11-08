@@ -50,7 +50,7 @@ const projectResolver = (runner: CommandRunner["Service"], argvOf: (script: stri
           const origins = stdout.replace(/\n$/u, "").split("\n").slice(-asked.length);
           asked.forEach((path, index) => names.set(path, nameOfOrigin(origins[index])));
         }),
-        Effect.catchTag("CommandUnreachable", () => Effect.void),
+        Effect.catchTags({ CommandUnreachable: () => Effect.void, CommandAbsent: () => Effect.void }),
       );
     },
     known: Effect.sync(() => new Map(names)),

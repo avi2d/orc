@@ -215,17 +215,15 @@ const runLogAt = (home: string, runId: string): Effect.Effect<string | null, nev
   })
 
 const readStoppedRun = (home: string, task: string): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
-  Effect.gen(function*() {
-    return yield* withRunDatabase(home, (db) =>
-      Effect.gen(function*() {
-        const latest = yield* latestRunForBranchName(db, taskBranch(task))
-        if (latest === null || latest.status !== "stopped") {
-          return null
-        }
-        return toSummary(latest, yield* openQuestionsForRun(db, latest.id), yield* writtenReport(runDirFor(home, latest.id)), null)
-      })
-    )
-  })
+  withRunDatabase(home, (db) =>
+    Effect.gen(function*() {
+      const latest = yield* latestRunForBranchName(db, taskBranch(task))
+      if (latest === null || latest.status !== "stopped") {
+        return null
+      }
+      return toSummary(latest, yield* openQuestionsForRun(db, latest.id), yield* writtenReport(runDirFor(home, latest.id)), null)
+    })
+  )
 
 export const readResult = (task: string, home: string, label?: string | null): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {

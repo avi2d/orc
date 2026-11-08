@@ -9,12 +9,16 @@ export interface Source<A> {
 export const runDecoded = <A>(
   command: Command,
   decode: (stdout: string) => Outcome<A>,
+  whenAbsent?: Outcome<A>,
 ): Effect.Effect<Outcome<A>, never, CommandRunner> =>
   Effect.gen(function* () {
     const runner = yield* CommandRunner;
     return yield* runner.run(command).pipe(
       Effect.map(decode),
-      Effect.catchTag("CommandUnreachable", (failure) => Effect.succeed(unreachable(failure.reason))),
+      Effect.catchTags({
+        CommandUnreachable: (failure) => Effect.succeed(unreachable(failure.reason)),
+        CommandAbsent: (failure) => Effect.succeed(whenAbsent ?? unreachable(failure.reason)),
+      }),
     );
   });
 
