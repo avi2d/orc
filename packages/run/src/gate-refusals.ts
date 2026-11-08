@@ -73,7 +73,7 @@ const RefusalCountSchema = Schema.Struct({
 
 export type RefusalCount = typeof RefusalCountSchema.Type
 
-export const REFUSALS_JSON_SCHEMA = "orc.refusals.v1" as const
+const REFUSALS_JSON_SCHEMA = "orc.refusals.v1" as const
 
 const RefusalsJsonSchema = Schema.Struct({
   schema: Schema.Literal(REFUSALS_JSON_SCHEMA),
