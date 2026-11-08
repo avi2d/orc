@@ -107,7 +107,7 @@ const topCommand = {
   timeout: Duration.seconds(15),
 } as const;
 
-export class MacHostSource extends Context.Service<MacHostSource, Source<MacHost>>()("tui-dash/MacHostSource") {}
+export class MacHostSource extends Context.Service<MacHostSource, Source<MacHost>>()("orc-dash/MacHostSource") {}
 
 export const macHostSourceLayer = Layer.effect(
   MacHostSource,

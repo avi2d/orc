@@ -2,7 +2,7 @@
   "name": "@avi2dg/orc-queues",
   "version": "0.1.0",
   "private": true,
-  "description": "Standalone OpenTUI queues panel for tui-dash, showing pueue on each configured machine and the active GitHub Actions runs",
+  "description": "Standalone OpenTUI queues panel for orc-dash, showing pueue on each configured machine and the active GitHub Actions runs",
   "repository": "https://github.com/avi2d/orc.git",
   "author": "avi2d <avi2dg@gmail.com>",
   "license": "MIT",

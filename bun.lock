@@ -49,7 +49,7 @@
       "name": "@avi2dg/orc-cli",
       "version": "0.1.0",
       "bin": {
-        "tui-dash": "src/bin.ts",
+        "orc-dash": "src/bin.ts",
       },
       "dependencies": {
         "@avi2dg/orc-alerts": "workspace:*",
@@ -167,7 +167,7 @@
       "name": "@avi2dg/orc-session-quota",
       "version": "0.1.0",
       "bin": {
-        "tui-dash-capture": "src/capture-bin.ts",
+        "orc-dash-capture": "src/capture-bin.ts",
       },
       "dependencies": {
         "@avi2dg/orc-schema": "workspace:*",

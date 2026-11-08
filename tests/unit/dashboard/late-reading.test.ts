@@ -54,7 +54,7 @@ const liveFrame = (afterMount: Duration.Input, beforeDraw: Duration.Input) =>
     return { wide: draw(240, 60), glance: draw(84, 40) };
   }).pipe(
     Effect.scoped,
-    Effect.provide(dashboardSources({ env: { TUI_DASH_TASKS: tasksCommand }, run: ciOnceRun, repos: stubRepos })),
+    Effect.provide(dashboardSources({ env: { ORC_DASH_TASKS: tasksCommand }, run: ciOnceRun, repos: stubRepos })),
     Effect.provideService(ReadModeReference, "live"),
     Effect.provide(TestClock.layer()),
   );
@@ -97,7 +97,7 @@ const cachedCiFrame = () =>
       return { wide: draw(240, 60), glance: draw(84, 40) };
     }),
   ).pipe(
-    Effect.provide(dashboardSources({ env: { TUI_DASH_TASKS: tasksCommand }, run: ciDelayedRun(), repos: stubRepos })),
+    Effect.provide(dashboardSources({ env: { ORC_DASH_TASKS: tasksCommand }, run: ciDelayedRun(), repos: stubRepos })),
     Effect.provideService(ReadModeReference, "live"),
     Effect.provide(TestClock.layer()),
   );
@@ -115,7 +115,7 @@ const printedAged = (width: number, height: number) =>
     Effect.gen(function* () {
       yield* TestClock.setTime(startMillis);
       const fiber = yield* Effect.forkScoped(
-        printedDashboard({ width, height, color: false }, dashboardSources({ env: { TUI_DASH_TASKS: tasksCommand }, run: slowPueueRun })),
+        printedDashboard({ width, height, color: false }, dashboardSources({ env: { ORC_DASH_TASKS: tasksCommand }, run: slowPueueRun })),
       );
       yield* Effect.forkScoped(Effect.forever(TestClock.adjust("1 second")));
       yield* Fiber.join(fiber);
@@ -164,7 +164,7 @@ describe("a saved queue standing in while its sources hang", () => {
         keep: () => Effect.void,
       }),
     });
-    const sources = dashboardSources({ env: { TUI_DASH_TASKS: tasksCommand }, run: hangingRun, saved });
+    const sources = dashboardSources({ env: { ORC_DASH_TASKS: tasksCommand }, run: hangingRun, saved });
     const screen = await Effect.runPromise(
       Effect.scoped(Effect.flatMap(readConfig, ({ config }) => dashboardScreen(modules, config))).pipe(
         Effect.provide(sources),

@@ -2,7 +2,7 @@
   "name": "@avi2dg/orc-cli",
   "version": "0.1.0",
   "private": true,
-  "description": "The tui-dash command, composing the panel modules into the dashboard, opening one panel alone, printing reports and snapshots, or streaming alert events",
+  "description": "The orc-dash command, composing the panel modules into the dashboard, opening one panel alone, printing reports and snapshots, or streaming alert events",
   "repository": "https://github.com/avi2d/orc.git",
   "author": "avi2d <avi2dg@gmail.com>",
   "license": "MIT",
@@ -12,7 +12,7 @@
     ".": "./src/index.ts"
   },
   "bin": {
-    "tui-dash": "src/bin.ts"
+    "orc-dash": "src/bin.ts"
   },
   "scripts": {
     "build": "bun build src/bin.ts --outdir dist --target bun --external @opentui/core --external effect --external @effect/platform-bun",

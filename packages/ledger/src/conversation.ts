@@ -13,11 +13,11 @@ interface LedgerSettings {
 }
 
 const ledgerSettings: Config.Config<LedgerSettings> = Config.all({
-  sessions: selector("TUI_DASH_LEDGER_SESSIONS"),
-  classify: selector("TUI_DASH_LEDGER_CLASSIFY"),
-  name: selector("TUI_DASH_LEDGER_AGENT"),
-  address: selector("TUI_DASH_LEDGER_ADDRESS"),
-  ack: selector("TUI_DASH_LEDGER_ACK"),
+  sessions: selector("ORC_DASH_LEDGER_SESSIONS"),
+  classify: selector("ORC_DASH_LEDGER_CLASSIFY"),
+  name: selector("ORC_DASH_LEDGER_AGENT"),
+  address: selector("ORC_DASH_LEDGER_ADDRESS"),
+  ack: selector("ORC_DASH_LEDGER_ACK"),
 }).pipe(
   Config.map(({ sessions, classify, name, address, ack }) => ({
     sessions,
@@ -67,7 +67,7 @@ const scoreTurns = (runner: Runner, command: string, turns: ReadonlyArray<Sessio
       : Effect.succeed(turn),
   );
 
-export class ConversationSource extends Context.Service<ConversationSource, ConversationReader>()("tui-dash/Conversation") {}
+export class ConversationSource extends Context.Service<ConversationSource, ConversationReader>()("orc-dash/Conversation") {}
 
 interface FileState {
   readonly offset: number;

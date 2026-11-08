@@ -12,14 +12,14 @@ const writer = join(import.meta.dir, "..", "..", "..", "packages", "session-quot
 let home = "";
 
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "tui-dash-capture-"));
+  home = mkdtempSync(join(tmpdir(), "orc-dash-capture-"));
 });
 
 afterEach(() => {
   rmSync(home, { recursive: true, force: true });
 });
 
-const ledgerDirectory = () => join(home, "state", "tui-dash", "usage");
+const ledgerDirectory = () => join(home, "state", "orc-dash", "usage");
 
 const environment = (extra: Readonly<Record<string, string>> = {}): Record<string, string> => ({
   PATH: process.env["PATH"] ?? "",
@@ -68,7 +68,7 @@ const readBack = <A>(use: Effect.Effect<A, never, SessionLogSource | HarvestLogS
 
 const sinceYesterday = () => Date.now() - 86_400_000;
 
-describe("tui-dash-capture pi-call, run as the Pi hook runs it", () => {
+describe("orc-dash-capture pi-call, run as the Pi hook runs it", () => {
   test("appends one usage-only record that the session reader counts", async () => {
     const ran = await capture("pi-call", fixture("capture/pi-message-end.json"));
     expect(ran).toMatchObject({ code: 0, stderr: "" });
@@ -112,7 +112,7 @@ const statuslineReading = () => ({
   ],
 });
 
-describe("tui-dash-capture claude-statusline, run as the statusline runs it", () => {
+describe("orc-dash-capture claude-statusline, run as the statusline runs it", () => {
   test("appends a reading once while the statusline repeats it, which the harvest reads as what is left", async () => {
     const input = fixture("capture/claude-statusline.json");
     expect(await capture("claude-statusline", input)).toMatchObject({ code: 0, stderr: "" });
@@ -193,12 +193,12 @@ describe("tui-dash-capture claude-statusline, run as the statusline runs it", ()
   });
 });
 
-describe("tui-dash-capture claude-statusline, run from an account folder's settings as the README sets it", () => {
+describe("orc-dash-capture claude-statusline, run from an account folder's settings as the README sets it", () => {
   const repository = join(import.meta.dir, "..", "..", "..");
 
   const captureAccountReading = async (folders: { readonly main: string; readonly second: string }): Promise<void> => {
-    mkdirSync(join(home, "config", "tui-dash"), { recursive: true });
-    writeFileSync(join(home, "config", "tui-dash", "config.json"), JSON.stringify({ accounts: folders }));
+    mkdirSync(join(home, "config", "orc-dash"), { recursive: true });
+    writeFileSync(join(home, "config", "orc-dash", "config.json"), JSON.stringify({ accounts: folders }));
     const settings = decodeJson(Schema.Struct({ statusLine: Schema.Struct({ command: Schema.String }) }))(fixture("capture/account-settings.json"));
     if (settings.kind !== "ok") throw new Error(settings.issue);
     // The build is not part of a test run, and dist holds the same writer bundled.
@@ -252,22 +252,22 @@ describe("tui-dash-capture claude-statusline, run from an account folder's setti
 });
 
 // The hook runs inside the agent's turn, so the writer always exits 0.
-describe("tui-dash-capture, when it cannot capture", () => {
+describe("orc-dash-capture, when it cannot capture", () => {
   test("drops input that is not JSON with one line and exit 0", async () => {
     const ran = await capture("pi-call", "not json");
-    expect(ran).toMatchObject({ code: 0, stderr: "tui-dash-capture: stdin is not JSON\n" });
+    expect(ran).toMatchObject({ code: 0, stderr: "orc-dash-capture: stdin is not JSON\n" });
     expect(ledgerLines()).toEqual([]);
   });
 
   test("drops a kind it does not know with one line and exit 0", async () => {
     const ran = await capture("codex-call", "{}");
     expect(ran.code).toBe(0);
-    expect(ran.stderr.trim().split("\n")).toEqual(["tui-dash-capture: expected one of pi-call, claude-statusline, got codex-call"]);
+    expect(ran.stderr.trim().split("\n")).toEqual(["orc-dash-capture: expected one of pi-call, claude-statusline, got codex-call"]);
   });
 
   test("gives up on a stdin that never closes within seconds, with one line and exit 0", async () => {
     const ran = await capture("pi-call", undefined);
-    expect(ran).toMatchObject({ code: 0, stderr: "tui-dash-capture: gave up after 2 seconds\n" });
+    expect(ran).toMatchObject({ code: 0, stderr: "orc-dash-capture: gave up after 2 seconds\n" });
     expect(ran.seconds).toBeLessThan(10);
   }, 20_000);
 });

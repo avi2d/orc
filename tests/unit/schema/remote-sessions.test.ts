@@ -29,9 +29,9 @@ const machinesWith = (env: Record<string, string>, answer: (command: Command) =>
     ),
   );
 
-const remoteCommand = "ssh south.example.com 'cd tui-dash && bun run session-quota-json'";
+const remoteCommand = "ssh south.example.com 'cd orc && bun run session-quota-json'";
 
-const configured = { TUI_DASH_MACHINE: "north", TUI_DASH_REMOTE_MACHINE: "south", TUI_DASH_REMOTE_SESSION_QUOTA: remoteCommand };
+const configured = { ORC_DASH_MACHINE: "north", ORC_DASH_REMOTE_MACHINE: "south", ORC_DASH_REMOTE_SESSION_QUOTA: remoteCommand };
 
 describe("the remote session source", () => {
   test("reads nothing remote when no command is configured", async () => {
@@ -45,7 +45,7 @@ describe("the remote session source", () => {
   });
 
   test("treats a blank command as none", async () => {
-    expect((await machinesWith({ TUI_DASH_REMOTE_SESSION_QUOTA: "  " }, () => Effect.succeed(""))).names).toEqual([]);
+    expect((await machinesWith({ ORC_DASH_REMOTE_SESSION_QUOTA: "  " }, () => Effect.succeed(""))).names).toEqual([]);
   });
 
   // The line goes to the shell whole, so its quotes survive.
@@ -80,7 +80,7 @@ describe("a remote's printed report", () => {
   });
 
   test("refuses output that is not JSON", () => {
-    expect(issueOf(decodeRemoteSessionQuota("south")("bash: tui-dash-session-quota: command not found\n"))).toBe(
+    expect(issueOf(decodeRemoteSessionQuota("south")("bash: orc-dash-session-quota: command not found\n"))).toBe(
       "the output is not JSON",
     );
   });

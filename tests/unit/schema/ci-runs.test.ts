@@ -129,7 +129,7 @@ const ciRunsWith = (env: Record<string, string>) =>
 
 describe("the CI runs of the repositories with a runner", () => {
   test("are each repository's runs with their job spans, naming a repository GitHub did not answer for", async () => {
-    const read = await ciRunsWith({ TUI_DASH_RUNNERS: runnersCommand });
+    const read = await ciRunsWith({ ORC_DASH_RUNNERS: runnersCommand });
     const report = Option.isSome(read) ? valueOf(read.value) : undefined;
     expect(report?.repos).toEqual(["example/blog", "example/shop"]);
     expect(report?.runs.map((each) => [each.id, each.status, iso(each.jobs?.startedAt), iso(each.jobs?.endedAt)])).toEqual([

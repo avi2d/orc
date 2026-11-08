@@ -17,7 +17,7 @@ const millisOf = async <E>(printed: (sources: Sources) => Effect.Effect<void, E>
       Effect.orDie(
         printed(
           dashboardSources({
-            env: { TUI_DASH_TASKS: tasksCommand },
+            env: { ORC_DASH_TASKS: tasksCommand },
             run: (command) => Effect.delay(Effect.sync(() => realSizeAnswer(command)), slowReadMillis),
             fileSystem,
           }),

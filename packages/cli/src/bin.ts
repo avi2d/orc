@@ -22,7 +22,7 @@ const snapshot = Command.make(
   },
   ({ json, only }) =>
     Effect.gen(function* () {
-      if (!json) return yield* new CliError.UserError({ cause: "snapshot prints JSON alone, so run it as tui-dash snapshot --json" });
+      if (!json) return yield* new CliError.UserError({ cause: "snapshot prints JSON alone, so run it as orc-dash snapshot --json" });
       yield* printSnapshotJson(Option.getOrElse(only, () => new Set(snapshotSources))).pipe(Effect.provide(snapshotSourcesLive));
     }),
 ).pipe(Command.withDescription("Read every source once and print what each answered, or why it failed"));
@@ -32,7 +32,7 @@ const alerts = Command.make(
   { json: Flag.Boolean("json").pipe(Flag.withDescription("Print each alert event as one JSON object on its own line"), Flag.withDefault(false)) },
   ({ json }) =>
     Effect.gen(function* () {
-      if (!json) return yield* new CliError.UserError({ cause: "alerts prints JSON lines alone, so run it as tui-dash alerts --json" });
+      if (!json) return yield* new CliError.UserError({ cause: "alerts prints JSON lines alone, so run it as orc-dash alerts --json" });
       yield* printAlertsJson.pipe(
         Effect.provide(snapshotSourcesLive),
         Effect.catchTag("ConfigRefused", ({ reason }) => Effect.fail(new CliError.UserError({ cause: reason }))),
@@ -40,12 +40,12 @@ const alerts = Command.make(
     }),
 ).pipe(Command.withDescription("Watch quota pace, machine load and long tasks, and print an event each time a rule fires"));
 
-const tuiDash = Command.make("tui-dash", frameFlags, dashboardHandler).pipe(
+const orcDash = Command.make("orc-dash", frameFlags, dashboardHandler).pipe(
   Command.withDescription("The live dashboard of the panels its config lays out, or one printed frame of it"),
   Command.withSubcommands([panel, report, sample, snapshot, alerts]),
 );
 
 // A source abandoned at its limit can stay blocked opening a file, which would keep the process alive after it prints.
-BunRuntime.runMain(Command.run(tuiDash, { version: packageJson.version }).pipe(Effect.provide(BunServices.layer)), {
+BunRuntime.runMain(Command.run(orcDash, { version: packageJson.version }).pipe(Effect.provide(BunServices.layer)), {
   teardown: (exit) => Runtime.defaultTeardown(exit, (code) => process.exit(code)),
 });

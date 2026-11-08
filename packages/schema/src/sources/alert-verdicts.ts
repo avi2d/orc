@@ -8,8 +8,8 @@ import { nonEmptyLines } from "./lines";
 
 export const alertVerdictsPath: Config.Config<string> = Config.all({
   home: Config.String("HOME"),
-  verdicts: selector("TUI_DASH_ALERTS_VERDICTS"),
-}).pipe(Config.map(({ home, verdicts }) => verdicts ?? `${home}/.local/state/tui-dash/alerts-verdicts.jsonl`));
+  verdicts: selector("ORC_DASH_ALERTS_VERDICTS"),
+}).pipe(Config.map(({ home, verdicts }) => verdicts ?? `${home}/.local/state/orc-dash/alerts-verdicts.jsonl`));
 
 export interface VerdictLog {
   readonly entries: ReadonlyArray<VerdictEntry>;

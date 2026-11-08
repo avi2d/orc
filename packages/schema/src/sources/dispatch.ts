@@ -349,7 +349,7 @@ export interface DispatchReader {
   readonly read: Effect.Effect<DispatchReading>;
 }
 
-export class DispatchSource extends Context.Service<DispatchSource, DispatchReader>()("tui-dash/DispatchSource") {}
+export class DispatchSource extends Context.Service<DispatchSource, DispatchReader>()("orc-dash/DispatchSource") {}
 
 export const dispatchSourceLayer: Layer.Layer<DispatchSource, Config.ConfigError, FileSystem.FileSystem> = Layer.effect(
   DispatchSource,

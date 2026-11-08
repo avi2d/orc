@@ -24,7 +24,7 @@
 │   ✓ no task over its share                               ││   total                      2    2    –     –    –    – │
 │                                                          ││   harbor                     1    1    –     –    –    – │
 │ south  cpu 42%  mem 12.0G/64.0G  gpu 63%  disk 19%       ││   kelp                       1    1    –     –    –    – │
-│   task usage not read: TUI_DASH_REMOTE_TASK_LIVE         ││                                                          │
+│   task usage not read: ORC_DASH_REMOTE_TASK_LIVE         ││                                                          │
 │   is unset                                               ││                                                          │
 ╰──────────────────────────────────────────────────────────╯│                                                          │
 ╭─ queue | scheduled ────────────────────────────── ↻ 10s ─╮│                                                          │

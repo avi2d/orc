@@ -10,4 +10,4 @@ kind: explanation
   The chat can put a task's open questions on a local decision board, one card each with its options and a pick.
 - **Reviewed before you see it.** A code change passes your checks and lands as a pull request after the review [Pick a delivery mode](pick-a-delivery-mode.md) names.
 - **Never loses work.** The backlog, the run history and the queues live on disk, so a restart picks up where it stopped.
-- **See it all.** `tui-dash` shows quota, machines, queues, tasks and alerts in one terminal screen.
+- **See it all.** `orc-dash` shows quota, machines, queues, tasks and alerts in one terminal screen.

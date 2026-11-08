@@ -205,7 +205,7 @@ describe("taskHistories over lines that carry detail only on change, keeping the
 const folders: Array<string> = [];
 
 const scratch = (): string => {
-  const folder = mkdtempSync(join(tmpdir(), "tui-dash-task-samples-"));
+  const folder = mkdtempSync(join(tmpdir(), "orc-dash-task-samples-"));
   folders.push(folder);
   return folder;
 };

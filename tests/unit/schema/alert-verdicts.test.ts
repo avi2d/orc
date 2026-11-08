@@ -119,7 +119,7 @@ describe("a verdict line", () => {
   }
 });
 
-const directory = mkdtempSync(join(tmpdir(), "tui-dash-verdicts-"));
+const directory = mkdtempSync(join(tmpdir(), "orc-dash-verdicts-"));
 
 afterAll(() => rmSync(directory, { recursive: true, force: true }));
 

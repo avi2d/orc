@@ -52,16 +52,16 @@ const readOrc = (folders: ReadonlyArray<PipelineFolder>) => {
 
 describe("no-mistakes reads the runs open tasks work on", () => {
   test("the overview runs in the task's folder and the branch's newest run reads by id", async () => {
-    const { reading, asked } = await readNoMistakes([{ folder: harbor, branches: ["fm/tui-dash-projects-hide-done"] }]);
+    const { reading, asked } = await readNoMistakes([{ folder: harbor, branches: ["fm/orc-dash-projects-hide-done"] }]);
     expect(asked.map((command) => [command.argv.join(" "), command.cwd])).toEqual([
       ["no-mistakes axi status", harbor],
       ["no-mistakes axi status --run 01M5CSJ295YDZNJ7FDQXB0RN1M", undefined],
     ]);
-    expect(valueOf(reading).find((run) => run.branch === "fm/tui-dash-fast-start")?.steps).toHaveLength(9);
+    expect(valueOf(reading).find((run) => run.branch === "fm/orc-dash-fast-start")?.steps).toHaveLength(9);
   });
 
   test("the detail stands in for its step-less overview row", async () => {
-    const { reading } = await readNoMistakes([{ folder: harbor, branches: ["fm/tui-dash-fast-start"] }]);
+    const { reading } = await readNoMistakes([{ folder: harbor, branches: ["fm/orc-dash-fast-start"] }]);
     const runs = valueOf(reading).filter((run) => run.id === "01M5CFR1F0AA7A1FF8AM4DYM9V");
     expect(runs).toHaveLength(1);
     expect(runs[0]?.steps.map((step) => step.step)).toEqual(["intent", "rebase", "review", "test", "document", "lint", "push", "pr", "ci"]);
@@ -82,22 +82,22 @@ describe("no-mistakes reads the runs open tasks work on", () => {
 describe("no-mistakes merges the folders open tasks work in", () => {
   test("a pipeline's own copy failing leaves the worktree's runs", async () => {
     const { reading } = await readNoMistakes([
-      { folder: pipelineCopy, branches: ["fm/tui-dash-fast-start"] },
-      { folder: harbor, branches: ["fm/tui-dash-fast-start"] },
+      { folder: pipelineCopy, branches: ["fm/orc-dash-fast-start"] },
+      { folder: harbor, branches: ["fm/orc-dash-fast-start"] },
     ]);
-    expect(valueOf(reading).find((run) => run.branch === "fm/tui-dash-fast-start")?.steps).toHaveLength(9);
+    expect(valueOf(reading).find((run) => run.branch === "fm/orc-dash-fast-start")?.steps).toHaveLength(9);
   });
 
   test("a run read in detail in its own worktree wins over the bare row another folder lists, in either order", async () => {
     const folders = [
       { folder: harbor, branches: ["fm/never-recorded"] },
-      { folder: fastStart, branches: ["fm/tui-dash-fast-start"] },
+      { folder: fastStart, branches: ["fm/orc-dash-fast-start"] },
     ];
     for (const ordered of [folders, folders.toReversed()]) {
       const { reading } = await readNoMistakes(ordered);
       const runs = valueOf(reading).filter((run) => run.id === "01M5CFR1F0AA7A1FF8AM4DYM9V");
       expect(runs).toHaveLength(1);
-      expect(noMistakesRunOf(valueOf(reading), ["fm/tui-dash-fast-start"])?.steps).toHaveLength(9);
+      expect(noMistakesRunOf(valueOf(reading), ["fm/orc-dash-fast-start"])?.steps).toHaveLength(9);
     }
   });
 });
@@ -141,9 +141,9 @@ describe("pipelines ride the other machine's tasks route", () => {
   const kelp = "/home/south/work/kelp";
 
   const env = {
-    TUI_DASH_MACHINE: "north",
-    TUI_DASH_REMOTE_MACHINE: "south",
-    TUI_DASH_REMOTE_TASKS: "ssh -o BatchMode=yes south.example.com 'harbor-tasks --json'",
+    ORC_DASH_MACHINE: "north",
+    ORC_DASH_REMOTE_MACHINE: "south",
+    ORC_DASH_REMOTE_TASKS: "ssh -o BatchMode=yes south.example.com 'harbor-tasks --json'",
   };
 
   const withEnv = <A, E, R>(effect: Effect.Effect<A, E, R>) =>

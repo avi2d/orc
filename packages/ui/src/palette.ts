@@ -85,6 +85,6 @@ export const themeOf = (overrides: ThemeHexes): Theme => {
 export const defaultTheme: Theme = themeOf({});
 
 // Panels name tones and only the painter reads this, so a theme recolours every panel without one of them changing.
-export const Appearance = Context.Reference<Theme>("@tui-dash/ui/Appearance", { defaultValue: () => defaultTheme });
+export const Appearance = Context.Reference<Theme>("@avi2dg/orc-ui/Appearance", { defaultValue: () => defaultTheme });
 
 export const rgbOfTone = (tone: Tone, theme: Theme = defaultTheme): Rgb => theme.tones[tone];

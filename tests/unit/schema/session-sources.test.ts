@@ -22,7 +22,7 @@ const everything = { pi: 0, "claude-code": 0, codex: 0 };
 let home = "";
 
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "tui-dash-sessions-"));
+  home = mkdtempSync(join(tmpdir(), "orc-dash-sessions-"));
   cpSync(fixtureHomeDirectory, home, { recursive: true });
 });
 
@@ -150,7 +150,7 @@ describe("the session log source, reading a copy of the fixture home through the
   });
 });
 
-const keptCopy = () => join(home, ".local/state/tui-dash/session-logs/session.json");
+const keptCopy = () => join(home, ".local/state/orc-dash/session-logs/session.json");
 
 const readOnce = (): Promise<SessionLogs> => withSource((read) => read(everything));
 

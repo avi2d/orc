@@ -15,7 +15,7 @@ interface Ran {
   readonly stderr: string;
 }
 
-const tuiDash = async (args: ReadonlyArray<string>, extra: Readonly<Record<string, string>> = {}): Promise<Ran> => {
+const orcDash = async (args: ReadonlyArray<string>, extra: Readonly<Record<string, string>> = {}): Promise<Ran> => {
   const child = Bun.spawn(["bun", command, ...args], {
     env: { PATH: process.env["PATH"] ?? "", HOME: process.env["HOME"] ?? "", ...extra },
     stdin: "ignore",
@@ -26,13 +26,13 @@ const tuiDash = async (args: ReadonlyArray<string>, extra: Readonly<Record<strin
   return { code, stdout, stderr };
 };
 
-describe("tui-dash snapshot --json", () => {
+describe("orc-dash snapshot --json", () => {
   test("prints the selected source, with this machine's tasks and the other machine's failure", async () => {
-    const ran = await tuiDash(["snapshot", "--json", "--only", "tasks"], {
-      TUI_DASH_MACHINE: "north",
-      TUI_DASH_REMOTE_MACHINE: "south",
-      TUI_DASH_TASKS: `cat '${recordedTasks}'`,
-      TUI_DASH_REMOTE_TASKS: "echo 'south.example.com refused the connection' >&2; exit 255",
+    const ran = await orcDash(["snapshot", "--json", "--only", "tasks"], {
+      ORC_DASH_MACHINE: "north",
+      ORC_DASH_REMOTE_MACHINE: "south",
+      ORC_DASH_TASKS: `cat '${recordedTasks}'`,
+      ORC_DASH_REMOTE_TASKS: "echo 'south.example.com refused the connection' >&2; exit 255",
     });
     expect(ran.code).toBe(0);
     const report = Schema.decodeUnknownSync(SnapshotReport)(JSON.parse(ran.stdout));
@@ -47,13 +47,13 @@ describe("tui-dash snapshot --json", () => {
   });
 
   test("refuses a source it does not know and names it", async () => {
-    const ran = await tuiDash(["snapshot", "--json", "--only", "tasks,load"]);
+    const ran = await orcDash(["snapshot", "--json", "--only", "tasks,load"]);
     expect(ran.code).not.toBe(0);
     expect(ran.stdout + ran.stderr).toContain('"load" is not one of them');
   });
 
   test("refuses to run without --json", async () => {
-    const ran = await tuiDash(["snapshot"]);
+    const ran = await orcDash(["snapshot"]);
     expect(ran.code).not.toBe(0);
     expect(ran.stdout + ran.stderr).toContain("--json");
   });

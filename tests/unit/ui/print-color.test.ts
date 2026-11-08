@@ -55,7 +55,7 @@ describe("the --color flag plumbing", () => {
   });
 
   test("refuses --color without --print the way binArgsExit refuses unknown flags", () => {
-    const usage = "usage: tui-dash-quota";
+    const usage = "usage: orc-dash-quota";
     const errors: Array<string> = [];
     const report = console.error;
     console.error = (message: string) => void errors.push(message);

@@ -42,7 +42,7 @@ const sessionsWith = async (lines: ReadonlyArray<string>): Promise<{ readonly di
   return { dir, sessions };
 };
 
-// Oracle: the README's ledger settings, where the ledger stays empty until TUI_DASH_LEDGER_SESSIONS names a folder.
+// Oracle: the README's ledger settings, where the ledger stays empty until ORC_DASH_LEDGER_SESSIONS names a folder.
 // Rejects a ledger that falls back to session files somewhere under the home folder.
 describe("the conversation reader without configured sessions", () => {
   test("yields an empty ledger instead of reading the real home", async () => {
@@ -54,13 +54,13 @@ describe("the conversation reader without configured sessions", () => {
   });
 });
 
-// Oracle: the README's classifier contract, where the command TUI_DASH_LEDGER_CLASSIFY names reads the message on stdin
+// Oracle: the README's classifier contract, where the command ORC_DASH_LEDGER_CLASSIFY names reads the message on stdin
 // and prints something only for an operational one. Rejects the operational turn shown as said by you.
 describe("the live ledger's operational filter", () => {
   test("shows only the ordinary question, never the operational turn as said by you", async () => {
     const stamp = new Date().toISOString();
     const { dir, sessions } = await sessionsWith([sessionLine(stamp, "user", ordinary), sessionLine(stamp, "user", operational)]);
-    const said = await readWith(recorded, { HOME: dir, TUI_DASH_LEDGER_SESSIONS: sessions, TUI_DASH_LEDGER_CLASSIFY: classifier }, at(stamp));
+    const said = await readWith(recorded, { HOME: dir, ORC_DASH_LEDGER_SESSIONS: sessions, ORC_DASH_LEDGER_CLASSIFY: classifier }, at(stamp));
     expect(saidOf(said).map((message) => [message.who.role, message.text])).toEqual([["you", ordinary]]);
   });
 
@@ -76,10 +76,10 @@ describe("the live ledger's operational filter", () => {
       conversationSourceLive,
       {
         HOME: dir,
-        TUI_DASH_LEDGER_SESSIONS: sessions,
-        TUI_DASH_LEDGER_CLASSIFY: "grep -q OPERATIONAL && echo operational",
-        TUI_DASH_LEDGER_ADDRESS: "Chief,",
-        TUI_DASH_LEDGER_AGENT: "helper",
+        ORC_DASH_LEDGER_SESSIONS: sessions,
+        ORC_DASH_LEDGER_CLASSIFY: "grep -q OPERATIONAL && echo operational",
+        ORC_DASH_LEDGER_ADDRESS: "Chief,",
+        ORC_DASH_LEDGER_AGENT: "helper",
       },
       at(stamp),
     );
@@ -101,8 +101,8 @@ describe("the live ledger's classifier", () => {
       conversationSourceLive,
       {
         HOME: dir,
-        TUI_DASH_LEDGER_SESSIONS: sessions,
-        TUI_DASH_LEDGER_CLASSIFY: "ps -o args= -p $$ | grep -q 'private-[m]arker' && echo leaked",
+        ORC_DASH_LEDGER_SESSIONS: sessions,
+        ORC_DASH_LEDGER_CLASSIFY: "ps -o args= -p $$ | grep -q 'private-[m]arker' && echo leaked",
       },
       at(stamp),
     );

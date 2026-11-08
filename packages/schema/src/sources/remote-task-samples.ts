@@ -12,7 +12,7 @@ export interface TaskHistoryMachine {
 }
 
 export class RemoteTaskHistory extends Context.Service<RemoteTaskHistory, Option.Option<TaskHistoryMachine>>()(
-  "tui-dash/RemoteTaskHistory",
+  "orc-dash/RemoteTaskHistory",
 ) {}
 
 // A torn or foreign line carries nothing to count, so the day files skip it, and a history printed over ssh reads the same way.
@@ -20,7 +20,7 @@ const decodeHistory = (stdout: string): Decoded<ReadonlyArray<TaskSampleRecord>>
 
 const historyTimeout = Duration.seconds(15);
 
-const historyConfig = Config.all({ names: machineNames, command: selector("TUI_DASH_REMOTE_TASK_HISTORY") });
+const historyConfig = Config.all({ names: machineNames, command: selector("ORC_DASH_REMOTE_TASK_HISTORY") });
 
 // The configured command is a shell line, such as an ssh call printing the other machine's day files, so the shell parses its quoting.
 export const remoteTaskHistoryLayer: Layer.Layer<RemoteTaskHistory, Config.ConfigError, CommandRunner> = Layer.effect(
