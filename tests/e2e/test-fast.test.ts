@@ -70,7 +70,7 @@ test("a clone without the remote-tracking default branch fails before any tier r
   expect(refused.text).not.toContain("1 pass");
 }, 120_000);
 
-test("a change touching no e2e files runs only the unit tier", async () => {
+test("a change touching only a unit file runs that file, not the whole unit tier", async () => {
   await repository();
   await withOriginMain();
   await git(["checkout", "-q", "-b", "feature"]);
@@ -79,7 +79,7 @@ test("a change touching no e2e files runs only the unit tier", async () => {
   await git(["commit", "-q", "-m", "test: add a unit file"]);
 
   const ran = await fast();
-  expect(ran.text).toContain("the change touches no e2e test files, so only the unit tier ran");
+  expect(ran.text).toContain("the change touches 1 test file(s): tests/unit/c.test.ts");
   expect(ran.code).toBe(0);
 }, 120_000);
 
@@ -96,7 +96,7 @@ test("an untouched e2e file whose path contains the touched path does not run", 
   await git(["commit", "-q", "-m", "test: add an e2e file"]);
 
   const ran = await fast();
-  expect(ran.text).toContain("the change touches 1 e2e test file(s): tests/e2e/x.test.ts");
+  expect(ran.text).toContain("the change touches 1 test file(s): tests/e2e/x.test.ts");
   expect(ran.text).not.toContain("x.test.tsx");
   expect(ran.code).toBe(0);
 }, 120_000);

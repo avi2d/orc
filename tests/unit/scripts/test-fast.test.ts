@@ -1,54 +1,79 @@
 import { expect, test } from "bun:test";
-import { keptPaths, reclaimableBytes, touchedE2eFiles, workerCountFor } from "../../../scripts/test-fast.ts";
-import type { Change } from "@avi2dg/checks/core/git.ts";
+import { cappedWorkerCount, reclaimableBytes, selectFiles, touchedTestFiles, workerCountFor } from "../../../scripts/test-fast.ts";
 
-const written = (path: string): Change => ({ kind: "written", path });
-
-test("a change touching unit sources runs no e2e files", () => {
-  expect(touchedE2eFiles(["packages/quota/src/panel.ts", "tests/unit/quota/app.test.ts", "package.json"])).toEqual([]);
-});
-
-test("a change touching e2e tests runs those files and nothing else", () => {
-  expect(touchedE2eFiles([
+test("a change touching unit and e2e tests runs those files and nothing else", () => {
+  expect(touchedTestFiles([
     "packages/schema/src/source.ts",
+    "tests/unit/session-quota/app.test.ts",
+    "tests/e2e/session-quota/capture.test.ts",
+    "tests/e2e/test-fast.test.ts",
+    "tests/fixtures/quota.json",
+    "tests/lib/fixtures.ts",
+  ])).toEqual([
     "tests/e2e/session-quota/capture.test.ts",
     "tests/e2e/test-fast.test.ts",
     "tests/unit/session-quota/app.test.ts",
-    "tests/fixtures/quota.json",
-    "tests/lib/fixtures.ts",
-  ])).toEqual(["tests/e2e/session-quota/capture.test.ts", "tests/e2e/test-fast.test.ts"]);
+  ]);
 });
 
-test("a quarantined e2e path is not an e2e file the change touches", () => {
-  expect(touchedE2eFiles(["tests/quarantine/e2e/capture.test.ts"])).toEqual([]);
-});
-
-test("helpers and data under the e2e level never run as tests", () => {
-  expect(touchedE2eFiles(["tests/e2e/lib/helper.ts", "tests/e2e/session-quota/capture.test.ts"])).toEqual([
+test("helpers and data under the test tree never run as tests, only the test files do", () => {
+  expect(touchedTestFiles(["tests/e2e/lib/helper.ts", "tests/unit/lib/helper.ts", "tests/e2e/session-quota/capture.test.ts"])).toEqual([
     "tests/e2e/session-quota/capture.test.ts",
   ]);
 });
 
+test("a quarantined path is not a test file the change touches", () => {
+  expect(touchedTestFiles(["tests/quarantine/e2e/capture.test.ts"])).toEqual([]);
+});
+
 test("a repeated path runs once and the files sort", () => {
-  expect(touchedE2eFiles([
+  expect(touchedTestFiles([
     "tests/e2e/test-fast.test.ts",
+    "tests/unit/session-quota/app.test.ts",
     "tests/e2e/session-quota/capture.test.ts",
     "tests/e2e/session-quota/capture.test.ts",
-  ])).toEqual(["tests/e2e/session-quota/capture.test.ts", "tests/e2e/test-fast.test.ts"]);
+  ])).toEqual([
+    "tests/e2e/session-quota/capture.test.ts",
+    "tests/e2e/test-fast.test.ts",
+    "tests/unit/session-quota/app.test.ts",
+  ]);
+});
+
+test("a files narrowing runs the narrowed files, not the directly changed ones", () => {
+  expect(selectFiles({ kind: "files", files: ["tests/unit/app.test.ts"] }, ["tests/e2e/other.test.ts"])).toEqual([
+    "tests/unit/app.test.ts",
+  ]);
+});
+
+test("a full narrowing runs only the directly changed tests, not the whole suite", () => {
+  expect(selectFiles({ kind: "full", because: "the pull request changes bun.lock, a lockfile" }, [
+    "tests/unit/app.test.ts",
+  ])).toEqual(["tests/unit/app.test.ts"]);
+});
+
+test("a full narrowing with no directly changed test runs nothing, not the suite", () => {
+  expect(selectFiles({ kind: "full", because: "the pull request changes bun.lock, a lockfile" }, [])).toEqual([]);
+});
+
+test("three or fewer computed workers run unchanged, not reduced", () => {
+  expect(cappedWorkerCount(2)).toBe(2);
+});
+
+test("more than three computed workers run three, not the computed count", () => {
+  expect(cappedWorkerCount(16)).toBe(3);
 });
 
 const GiB = 1024 ** 3;
 const MiB = 1024 ** 2;
 
-const MAC_VM_STAT = `Mach Virtual Memory Statistics: (page size of 16384 bytes)
-Pages free:                                    52285.
-Pages active:                                 326890.
-Pages inactive:                               313571.
-Pages speculative:                             12661.
-Pages throttled:                                   0.
-Pages wired down:                             250219.
-Pages purgeable:                                7522.
-`;
+const MAC_VM_STAT = "Mach Virtual Memory Statistics: (page size of 16384 bytes)\n" +
+  "Pages free:                                    52285.\n" +
+  "Pages active:                                 326890.\n" +
+  "Pages inactive:                               313571.\n" +
+  "Pages speculative:                             12661.\n" +
+  "Pages throttled:                                   0.\n" +
+  "Pages wired down:                             250219.\n" +
+  "Pages purgeable:                                7522.\n";
 
 test("ample memory runs one worker per CPU, not fewer", () => {
   expect(workerCountFor(35 * GiB, 47 * GiB, 16)).toBe(16);
@@ -80,12 +105,4 @@ test("macOS counts inactive and speculative pages as reclaimable, not only free 
 
 test("vm_stat output without a page size gives no figure", () => {
   expect(reclaimableBytes("Pages free: 52285.\n")).toBeUndefined();
-});
-
-test("a deleted path drops out while a renamed path enters under its new name", () => {
-  expect(keptPaths([
-    written("tests/e2e/session-quota/capture.test.ts"),
-    { kind: "deleted", path: "tests/e2e/old.test.ts" },
-    { kind: "renamed", from: "tests/e2e/old.test.ts", path: "tests/e2e/new.test.ts", edited: false },
-  ])).toEqual(["tests/e2e/session-quota/capture.test.ts", "tests/e2e/new.test.ts"]);
 });
