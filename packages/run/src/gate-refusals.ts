@@ -29,7 +29,7 @@ const summaryGates = (text: string): ReadonlyArray<string> => {
 const stableRules = (output: string): ReadonlyArray<string> => {
   const rules: Array<string> = []
   for (const line of output.split("\n")) {
-    const tool = /\b(?:error|warning)\s+([A-Za-z][\w-]*\([^()\s]+\))/.exec(line)?.[1]
+    const tool = /\berror\s+([A-Za-z][\w-]*\([^()\s]+\))/.exec(line)?.[1]
       ?? /\berror\s+(TS\d+)\b/.exec(line)?.[1]
     if (tool !== undefined && !rules.includes(tool)) {
       rules.push(tool)
@@ -39,24 +39,17 @@ const stableRules = (output: string): ReadonlyArray<string> => {
 }
 
 export const refusalsIn = (output: string, check: string): ReadonlyArray<GateRefusal> => {
-  const seen = new Set<string>()
   const refusals: Array<GateRefusal> = []
   const keep = (gate: string, rule: string | null): void => {
-    const key = gate + "\0" + (rule ?? "")
-    if (gate === "" || seen.has(key)) {
-      return
-    }
-    seen.add(key)
     refusals.push({ gate, rule })
   }
-  const bins = summaryGates(output)
-  for (const bin of bins) {
+  for (const bin of summaryGates(output)) {
     keep(bin, null)
   }
   for (const rule of stableRules(output)) {
     keep(check, rule)
   }
-  if (bins.length === 0 && refusals.length === 0) {
+  if (refusals.length === 0) {
     keep(check, null)
   }
   return refusals
@@ -131,10 +124,7 @@ export const readRefusals = (
     })
   )
 
-const ruleColumnWidth = 96
-
-const displayRule = (rule: string | null): string =>
-  rule === null ? "\u2014" : rule.length <= ruleColumnWidth ? rule : rule.slice(0, ruleColumnWidth - 1) + "\u2026"
+const displayRule = (rule: string | null): string => rule ?? "\u2014"
 
 export const formatRefusalsTable = (counts: ReadonlyArray<RefusalCount>): string => {
   if (counts.length === 0) {

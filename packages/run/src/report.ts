@@ -134,7 +134,7 @@ const signalEntries = (report: OrcRunReport): Array<{ readonly name: string; rea
       entries.push({ name: "check " + check.name + " round " + round.round.toString(), value: check.passed ? "passed" : "failed" })
     }
     for (const refusal of round.refusals) {
-      entries.push({ name: "refusal " + refusal.gate + " round " + round.round.toString(), value: refusal.rule ?? "" })
+      entries.push({ name: "refusal " + refusal.gate + " round " + round.round.toString(), value: refusal.rule ?? "\u2014" })
     }
   }
   if (report.noMistakes !== null) {

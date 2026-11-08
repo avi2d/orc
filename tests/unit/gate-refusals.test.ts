@@ -64,6 +64,14 @@ describe("refusalsIn", () => {
     ])
   })
 
+  test("records the error code instead of an oxlint warning", () => {
+    const output = [
+      "src/a.ts:2:1: error eslint(no-debugger): `debugger` statement is not allowed help: Remove the debugger statement",
+      "src/b.ts:2:5: warning eslint(no-unused-vars): `x` is defined but never used help: Remove the unused variable",
+    ].join("\n")
+    expect(refusalsIn(output, "lint")).toEqual([{ gate: "lint", rule: "eslint(no-debugger)" }])
+  })
+
   test("records the tsc rule code instead of the message", () => {
     const output = "src/a.ts(1,2): error TS1234: this type is not assignable"
     expect(refusalsIn(output, "typecheck")).toEqual([{ gate: "typecheck", rule: "TS1234" }])
