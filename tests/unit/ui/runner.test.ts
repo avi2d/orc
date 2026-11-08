@@ -114,6 +114,28 @@ describe("the live command runner", () => {
     }
   }, 60_000);
 
+  test("a program missing from the PATH fails as absent instead of as a command that ran and failed", async () => {
+    const tag = await Effect.runPromise(
+      CommandRunner.use((runner) => runner.run({ argv: ["orc-test-no-such-program"], timeout: Duration.seconds(5) })).pipe(
+        Effect.flip,
+        Effect.map((error) => error._tag),
+        Effect.provide(liveCommandRunner),
+      ),
+    );
+    expect(tag).toBe("CommandAbsent");
+  });
+
+  test("a program that starts and exits non-zero fails as unreachable instead of as absent", async () => {
+    const tag = await Effect.runPromise(
+      CommandRunner.use((runner) => runner.run({ argv: ["sh", "-c", "exit 3"], timeout: Duration.seconds(5) })).pipe(
+        Effect.flip,
+        Effect.map((error) => error._tag),
+        Effect.provide(liveCommandRunner),
+      ),
+    );
+    expect(tag).toBe("CommandUnreachable");
+  });
+
   // Oracle: the recorded decision that stopping the stream kills every in-flight command group.
   // Rejects a runner whose detached commands outlive the scope that provided it.
   test("closing the runner's scope kills a command still in flight that ignores SIGTERM", async () => {

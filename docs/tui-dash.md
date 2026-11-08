@@ -31,10 +31,10 @@ A panel whose tool is missing says so on its own line, and the rest of the scree
 | --- | --- | --- |
 | `quota-axi` 0.1.56 | Quota windows the harness logs do not cover, from `quota-axi --full --json --provider` | Those providers read unreachable, and the windows the logs hold still show |
 | `nvidia-smi`, on the `PATH` or in `/usr/lib/wsl/lib` under WSL | The GPU line of the resources panel | The resources panel leaves the GPU out |
-| `herdr` 0.9.5 | Live agent sessions named by pane, from `herdr agent list` | Sessions in panes read as ended, and headless sessions still show |
+| `herdr` 0.9.5 | Live agent sessions named by pane, from `herdr agent list` | Sessions show from their processes and logs with no pane names, and only a `herdr` that is installed but does not answer warns |
 | `pueue` 4.0.4 | The queues panel's jobs, from `pueue status --json` | The queues panel reads pueue unreachable |
-| `no-mistakes` | The stages of a `full review fix` task, from `no-mistakes axi status` | Those tasks show no stages, and the projects box says `no-mistakes` did not start |
-| `orc` | The stages of an `orc run` task, from `orc runs --json` and `orc show <run> --json` | Those tasks show no stages, and the projects box says `orc` did not start |
+| `no-mistakes` | The stages of a `full review fix` task, from `no-mistakes axi status` | Those tasks show no stages, and the projects box says `no-mistakes` is not installed |
+| `orc` | The stages of an `orc run` task, from `orc runs --json` and `orc show <run> --json` | Those tasks show no stages, and the projects box says `orc` is not installed |
 | `gh`, signed in to an account that can read the repository | The GitHub Actions runs the queues panel lists, from `gh run list`, and the runner repositories the dashboard reads through `gh api` | The actions panel reads gh unreachable |
 
 A tasks report, a second machine and saved quota profiles each come from a shell command you set, and stay off until you set it.

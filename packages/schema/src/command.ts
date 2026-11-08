@@ -14,7 +14,12 @@ export class CommandUnreachable extends Data.TaggedError("CommandUnreachable")<{
   readonly reason: string;
 }> {}
 
+export class CommandAbsent extends Data.TaggedError("CommandAbsent")<{
+  readonly program: string;
+  readonly reason: string;
+}> {}
+
 export class CommandRunner extends Context.Service<
   CommandRunner,
-  { readonly run: (command: Command) => Effect.Effect<string, CommandUnreachable> }
+  { readonly run: (command: Command) => Effect.Effect<string, CommandUnreachable | CommandAbsent> }
 >()("tui-dash/CommandRunner") {}

@@ -1,5 +1,5 @@
 import { Data, Duration, Effect, Layer } from "effect";
-import { acceptsExit, type Command, CommandRunner, CommandUnreachable } from "@avi2dg/orc-schema";
+import { acceptsExit, type Command, CommandAbsent, CommandRunner, CommandUnreachable } from "@avi2dg/orc-schema";
 
 const colourCode = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 
@@ -57,9 +57,15 @@ const spawn = ({ argv, cwd, stdin }: Command, groups: Set<number>) =>
     catch: (cause) => new CommandUnreachable({ reason: `${argv[0]} did not start: ${String(cause)}` }),
   });
 
+const installed = (program: string): Effect.Effect<void, CommandAbsent> =>
+  Bun.which(program) === null
+    ? Effect.fail(new CommandAbsent({ program, reason: `${program} is not installed on the PATH` }))
+    : Effect.void;
+
 const runnerOf = (groups: Set<number>): CommandRunner["Service"] => ({
   run: (command) =>
-    spawn(command, groups).pipe(
+    installed(command.argv[0]).pipe(
+      Effect.andThen(spawn(command, groups)),
       Effect.timeoutOrElse({
         duration: command.timeout,
         orElse: () =>
