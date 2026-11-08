@@ -1,12 +1,12 @@
-current_branch: fm/tui-dash-task-pipeline
+current_branch: fm/orc-dash-task-pipeline
 other_branch_run:
   id: "01M5CFR1F0AA7A1FF8AM4DYM9V"
-  branch: fm/tui-dash-fast-start
+  branch: fm/orc-dash-fast-start
   status: completed
   head: 6d180687
   head_sha: 6d1806878ef13f2748bc6cc44341105aa4422667
   verification_plan: none
-  pr: "https://github.com/avi2d/tui-dash/pull/39"
+  pr: "https://github.com/avi2d/orc/pull/39"
   findings: "7 awaiting, 1 auto-fix"
   steps[9]{step,status,findings,duration_ms}:
     intent,completed,0,49

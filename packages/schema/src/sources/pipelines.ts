@@ -12,14 +12,14 @@ export interface NoMistakesMachine {
   readonly read: (folders: ReadonlyArray<PipelineFolder>) => Effect.Effect<Reading<NoMistakesSnapshot>>;
 }
 
-export class NoMistakesMachines extends Context.Service<NoMistakesMachines, ReadonlyArray<NoMistakesMachine>>()("tui-dash/NoMistakesMachines") {}
+export class NoMistakesMachines extends Context.Service<NoMistakesMachines, ReadonlyArray<NoMistakesMachine>>()("orc-dash/NoMistakesMachines") {}
 
 export interface OrcMachine {
   readonly name: string;
   readonly read: (folders: ReadonlyArray<PipelineFolder>) => Effect.Effect<Reading<OrcSnapshot>>;
 }
 
-export class OrcMachines extends Context.Service<OrcMachines, ReadonlyArray<OrcMachine>>()("tui-dash/OrcMachines") {}
+export class OrcMachines extends Context.Service<OrcMachines, ReadonlyArray<OrcMachine>>()("orc-dash/OrcMachines") {}
 
 const timeout = Duration.seconds(15);
 
@@ -138,7 +138,7 @@ const remoteOrcIn = (prefix: string) => ({ folder, branches }: PipelineFolder) =
     );
   });
 
-const pipelinesConfig = Config.all({ names: machineNames, remote: selector("TUI_DASH_REMOTE_TASKS") });
+const pipelinesConfig = Config.all({ names: machineNames, remote: selector("ORC_DASH_REMOTE_TASKS") });
 
 const orcOf = (
   name: string,

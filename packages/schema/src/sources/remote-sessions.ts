@@ -8,7 +8,7 @@ import { configuredMachines, type Machines, type RemoteSource } from "./machines
 
 export type RemoteSessionSource = RemoteSource<SessionQuotaView>;
 
-export class SessionMachines extends Context.Service<SessionMachines, Machines<SessionQuotaView>>()("tui-dash/SessionMachines") {}
+export class SessionMachines extends Context.Service<SessionMachines, Machines<SessionQuotaView>>()("orc-dash/SessionMachines") {}
 
 const remoteTimeout = Duration.seconds(90);
 
@@ -19,5 +19,5 @@ export const decodeRemoteSessionQuota =
 
 export const sessionMachinesLayer: Layer.Layer<SessionMachines, Config.ConfigError, CommandRunner> = Layer.effect(
   SessionMachines,
-  configuredMachines("TUI_DASH_REMOTE_SESSION_QUOTA", remoteTimeout, decodeRemoteSessionQuota),
+  configuredMachines("ORC_DASH_REMOTE_SESSION_QUOTA", remoteTimeout, decodeRemoteSessionQuota),
 );

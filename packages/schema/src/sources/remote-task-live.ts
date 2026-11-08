@@ -10,12 +10,12 @@ export interface TaskLiveMachine {
   readonly read: Effect.Effect<Outcome<LiveTasks>>;
 }
 
-export class RemoteTaskLive extends Context.Service<RemoteTaskLive, Option.Option<TaskLiveMachine>>()("tui-dash/RemoteTaskLive") {}
+export class RemoteTaskLive extends Context.Service<RemoteTaskLive, Option.Option<TaskLiveMachine>>()("orc-dash/RemoteTaskLive") {}
 
 export const remoteTaskLiveLayer: Layer.Layer<RemoteTaskLive, Config.ConfigError, CommandRunner> = Layer.effect(
   RemoteTaskLive,
   Effect.map(
-    configuredMachines("TUI_DASH_REMOTE_TASK_LIVE", Duration.seconds(15), () => decodeLiveTasksReport),
+    configuredMachines("ORC_DASH_REMOTE_TASK_LIVE", Duration.seconds(15), () => decodeLiveTasksReport),
     (machines) => Option.fromUndefinedOr(machines.remotes[0]),
   ),
 );

@@ -16,10 +16,10 @@ export interface QuotaFeedShape {
   readonly refreshing: Effect.Effect<boolean>;
 }
 
-export class QuotaFeed extends Context.Service<QuotaFeed, QuotaFeedShape>()("@tui-dash/schema/QuotaFeed") {}
+export class QuotaFeed extends Context.Service<QuotaFeed, QuotaFeedShape>()("@avi2dg/orc-schema/QuotaFeed") {}
 
 export class SessionsFeed extends Context.Service<SessionsFeed, { readonly read: Effect.Effect<Shown<SessionQuotaView>>; readonly refreshing: Effect.Effect<boolean> }>()(
-  "@tui-dash/schema/SessionsFeed",
+  "@avi2dg/orc-schema/SessionsFeed",
 ) {}
 
 export interface MachineListing {
@@ -47,7 +47,7 @@ export interface TaskListings {
 export class TaskBoardFeed extends Context.Service<
   TaskBoardFeed,
   { readonly read: Effect.Effect<TaskBoard>; readonly listings: Effect.Effect<TaskListings>; readonly refreshing: Effect.Effect<boolean>; readonly listingsRefreshing: Effect.Effect<boolean> }
->()("@tui-dash/schema/TaskBoardFeed") {}
+>()("@avi2dg/orc-schema/TaskBoardFeed") {}
 
 export interface QueueShown {
   readonly shown: Shown<QueueReadings>;
@@ -55,7 +55,7 @@ export interface QueueShown {
   readonly freshness: ReadonlyArray<Freshness>;
 }
 
-export class QueueFeed extends Context.Service<QueueFeed, { readonly read: Effect.Effect<QueueShown>; readonly refreshing: Effect.Effect<boolean> }>()("@tui-dash/schema/QueueFeed") {}
+export class QueueFeed extends Context.Service<QueueFeed, { readonly read: Effect.Effect<QueueShown>; readonly refreshing: Effect.Effect<boolean> }>()("@avi2dg/orc-schema/QueueFeed") {}
 
 export const quotaFeedLayer: Layer.Layer<QuotaFeed, never, QuotaReadSources | SavedReadings> = Layer.effect(
   QuotaFeed,

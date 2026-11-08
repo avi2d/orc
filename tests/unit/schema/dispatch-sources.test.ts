@@ -6,7 +6,7 @@ import { BunFileSystem } from "@effect/platform-bun";
 import { ConfigProvider, Effect, Layer } from "effect";
 import { DispatchSource, dispatchSourceLayer } from "@avi2dg/orc-schema";
 
-const root = mkdtempSync(join(tmpdir(), "tui-dash-dispatch-"));
+const root = mkdtempSync(join(tmpdir(), "orc-dash-dispatch-"));
 
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 

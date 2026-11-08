@@ -2,7 +2,7 @@ import type { AlertReadings } from "@avi2dg/orc-alerts";
 import { type AlertSettings, decodeAlertSettings, decodeConfigText, decodeVerdictLine, type VerdictEntry } from "@avi2dg/orc-schema";
 import { fixture } from "./fixtures";
 
-export const verdictLogPath = "/home/tester/.local/state/tui-dash/alerts-verdicts.jsonl";
+export const verdictLogPath = "/home/tester/.local/state/orc-dash/alerts-verdicts.jsonl";
 
 export const recordedEntries = (text = fixture("alerts/verdicts.jsonl")): ReadonlyArray<VerdictEntry> =>
   text

@@ -71,7 +71,7 @@ export interface PueueMachine {
   readonly projects: ProjectResolver;
 }
 
-export class PueueMachines extends Context.Service<PueueMachines, ReadonlyArray<PueueMachine>>()("tui-dash/PueueMachines") {}
+export class PueueMachines extends Context.Service<PueueMachines, ReadonlyArray<PueueMachine>>()("orc-dash/PueueMachines") {}
 
 export const knownProjects = (machines: ReadonlyArray<PueueMachine>): Effect.Effect<MachineProjects> =>
   Effect.map(Effect.forEach(machines, (machine) => Effect.map(machine.projects.known, (names) => [machine.name, names] as const)), (known) => new Map(known));
@@ -80,7 +80,7 @@ const localTimeout = Duration.seconds(10);
 
 const remoteTimeout = Duration.seconds(20);
 
-const machinesConfig = Config.all({ names: machineNames, command: selector("TUI_DASH_REMOTE_PUEUE") });
+const machinesConfig = Config.all({ names: machineNames, command: selector("ORC_DASH_REMOTE_PUEUE") });
 
 const machineOf = (name: string, argv: readonly [string, ...string[]], timeout: Duration.Duration, runner: CommandRunner["Service"], projects: ProjectResolver): PueueMachine => ({
   name,

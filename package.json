@@ -28,6 +28,9 @@
     "tasks-live-json": "bun packages/cli/src/bin.ts report tasks-live",
     "tasks-sample": "bun packages/cli/src/bin.ts sample tasks"
   },
+  "checks": {
+    "smoke": ["tests/e2e/retired-name.test.ts"]
+  },
   "devDependencies": {
     "@avi2dg/checks": "0.71.0",
     "@effect/platform-bun": "4.0.0",

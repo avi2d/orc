@@ -1,8 +1,8 @@
 ---
 kind: how-to
 ---
-# tui-dash
-Tui-dash is a set of OpenTUI terminal panels and a dashboard composed from them, held in the orc workspace.
+# orc-dash
+Orc-dash is a set of OpenTUI terminal panels and a dashboard composed from them, held in the orc workspace.
 It holds the quota, session quota, resources, queues, schedules, dispatch, tasks, alerts and ledger panels.
 It is built in Bun and Effect with one package per panel plus shared packages.
 Each panel opens on its own in the terminal, and the dashboard lays out the panels a config file names.
@@ -17,7 +17,7 @@ It also lists the GitHub Actions runs of one repository that wait or run.
 The dispatch panel shows the orc dispatcher's machines, the room on each, the taken and started claims as runs and the tasks still waiting with why.
 The tasks tool walks from the registered projects to one project's tasks and to one task.
 It keeps a history of what each task used.
-The `tui-dash` command runs the dashboard, opens one panel, and prints every source's readings as one JSON snapshot for a script to read.
+The `orc-dash` command runs the dashboard, opens one panel, and prints every source's readings as one JSON snapshot for a script to read.
 It also watches quota pace, machine load and long tasks, and prints an alert event each time a rule fires.
 The dashboard's alerts panel shows each rule, its limits, its last fire and the verdict a listener recorded.
 
@@ -41,22 +41,22 @@ A tasks report, a second machine and saved quota profiles each come from a shell
 
 ## Install
 
-To install tui-dash:
+To install orc-dash:
 
 1. Run `git clone https://github.com/avi2d/orc.git` to clone the repository.
 1. Run `cd orc` to enter it.
 1. Run `bun install --frozen-lockfile` to install the pinned dependencies.
-1. Run `mkdir -p ~/.local/bin && ln -s "$PWD/packages/cli/src/bin.ts" ~/.local/bin/tui-dash` to put the `tui-dash` command in a folder the `PATH` holds.
+1. Run `mkdir -p ~/.local/bin && ln -s "$PWD/packages/cli/src/bin.ts" ~/.local/bin/orc-dash` to put the `orc-dash` command in a folder the `PATH` holds.
    When `~/.local/bin` is not on the `PATH`, add `export PATH="$HOME/.local/bin:$PATH"` to the shell startup file and restart the shell.
 
 The command runs the clone's code through `bun`, so `bun` must be on the `PATH` as well.
 
 ## Open one panel
 
-To list the panels with what each shows, run `tui-dash panel --list`.
-To run one panel live, run `tui-dash panel` with its name, such as `tui-dash panel quota`.
+To list the panels with what each shows, run `orc-dash panel --list`.
+To run one panel live, run `orc-dash panel` with its name, such as `orc-dash panel quota`.
 Press `q` or Control C to quit.
-To print one frame of plain text instead, add `--print`, such as `tui-dash panel quota --print`.
+To print one frame of plain text instead, add `--print`, such as `orc-dash panel quota --print`.
 Add `--width 120 --height 30` for a frame of that size.
 Add `--color` to colour the printed frame with ANSI escapes, which works only with `--print`.
 In the clone, `bun run dashboard panel quota` runs the same command.
@@ -64,7 +64,7 @@ A panel reads its settings from its own key under `panels` in the config file, a
 
 ## Run the quota tool
 
-To run the live quota panel, run `tui-dash panel quota`.
+To run the live quota panel, run `orc-dash panel quota`.
 
 The panel reads `quota-axi` on the machine it runs on and paints again every 30 seconds.
 Two Claude accounts share the Claude brand clay, and Codex and OpenCode Go keep their own colours.
@@ -97,12 +97,12 @@ It also names how the reading joined the account: by credential key, or as an as
 The panel also reads the Claude readings that the Claude Code statusline hands the capture writer, as [Capture usage as it happens](session-quota/capture.md) describes.
 Without that hook, the only Claude readings on disk are the rejections.
 
-To print one frame of plain text instead, run `tui-dash panel quota --print`.
+To print one frame of plain text instead, run `orc-dash panel quota --print`.
 
 ### Show saved profiles
 
-The panel shows a block for each saved Claude profile other than the active one when `TUI_DASH_SAVED_PROFILES` names a shell command that prints them.
-With `TUI_DASH_SAVED_PROFILES` unset or blank, the panel runs nothing for them and shows no saved block.
+The panel shows a block for each saved Claude profile other than the active one when `ORC_DASH_SAVED_PROFILES` names a shell command that prints them.
+With `ORC_DASH_SAVED_PROFILES` unset or blank, the panel runs nothing for them and shows no saved block.
 
 The command prints one JSON object with `schema` 2, the `active_profile` name or `null`, and `profiles`.
 Each profile carries `name`, `active`, `provider`, `harness`, `tier` or `null`, `stale`, `fetched_at` or `null`, and `windows`.
@@ -111,7 +111,7 @@ Both panels title the Claude account with the active profile's name, such as `cl
 
 | Variable | What it sets |
 | --- | --- |
-| `TUI_DASH_SAVED_PROFILES` | The shell command that prints the saved profiles |
+| `ORC_DASH_SAVED_PROFILES` | The shell command that prints the saved profiles |
 
 ### Show each Claude account
 
@@ -147,8 +147,8 @@ The writer prints nothing, so to keep another statusline's text, read stdin once
 
 ## Run the session quota tool
 
-To run the live session quota panel, run `tui-dash panel session-quota`.
-To print one frame of plain text instead, run `tui-dash panel session-quota --print`.
+To run the live session quota panel, run `orc-dash panel session-quota`.
+To print one frame of plain text instead, run `orc-dash panel session-quota --print`.
 To print the versioned JSON report, run `bun run session-quota-json`.
 To print the report merged with a second machine's, run `bun run session-quota-composed-json`.
 To stream flag alerts as JSON lines, run `bun run session-quota-alerts`.
@@ -156,12 +156,12 @@ To stream flag alerts as JSON lines, run `bun run session-quota-alerts`.
 
 ## Run the resources tool
 
-To run the live resources panel, run `tui-dash panel resources`.
+To run the live resources panel, run `orc-dash panel resources`.
 The panel reads CPU, memory, load and processes on the machine it runs on and paints again every 10 seconds.
 It adds GPU utilisation, VRAM and temperature where `nvidia-smi` answers, and leaves the GPU panel out where it does not.
 On a short terminal it lists fewer processes, the same number on every machine.
 Press `q` or Control C to quit.
-To print one frame of plain text instead, run `tui-dash panel resources --print`.
+To print one frame of plain text instead, run `orc-dash panel resources --print`.
 To print the versioned JSON report, run `bun run resources-json`.
 
 ### Show a second machine's resources
@@ -172,12 +172,12 @@ Set these variables where the panel runs:
 
 | Variable | What it holds |
 | --- | --- |
-| `TUI_DASH_REMOTE_RESOURCES` | The shell command that prints the other machine's report, such as `ssh -o BatchMode=yes -o ConnectTimeout=5 other-box 'cd orc && bun run resources-json'` |
-| `TUI_DASH_REMOTE_MACHINE` | The other machine's name on its panels and lines, `remote` when unset |
-| `TUI_DASH_MACHINE` | This machine's name on its panels and lines, `local` when unset |
+| `ORC_DASH_REMOTE_RESOURCES` | The shell command that prints the other machine's report, such as `ssh -o BatchMode=yes -o ConnectTimeout=5 other-box 'cd orc && bun run resources-json'` |
+| `ORC_DASH_REMOTE_MACHINE` | The other machine's name on its panels and lines, `remote` when unset |
+| `ORC_DASH_MACHINE` | This machine's name on its panels and lines, `local` when unset |
 
 The session quota tool reads the same two names.
-With `TUI_DASH_REMOTE_RESOURCES` unset or blank, the panel shows this machine alone, under the titles `machine` and `gpu`.
+With `ORC_DASH_REMOTE_RESOURCES` unset or blank, the panel shows this machine alone, under the titles `machine` and `gpu`.
 Otherwise each machine's panels carry its name, this machine's first.
 The command runs through `sh -c` with a 15 second limit, beside this machine's own read.
 Its stdout must be that report alone, whitespace aside, so a login banner goes to stderr.
@@ -208,7 +208,7 @@ Each card and app figure is `kind` `value` with its `value`, or `not-reported` w
 
 ### Read the tasks block
 
-Where `TUI_DASH_TASKS` names a command that prints the tasks report, the resources report gains a `tasks` reading.
+Where `ORC_DASH_TASKS` names a command that prints the tasks report, the resources report gains a `tasks` reading.
 It holds one entry for each task with a live process on this machine, in the order of the tasks report.
 A process belongs to a task when its working folder is one of the task's `folders` or inside one.
 Where the listing missed its working folder, it takes the folder of its nearest sampled ancestor that has one.
@@ -220,7 +220,7 @@ A task that had ended by the time the process started cannot own it.
 Of the tasks that could own a process, one still running outranks one that has ended.
 So a task relaunched in a folder another task used since keeps its processes.
 Between tasks both running or both ended, the one with the later `firstStartedAt` owns it, since a pool folder serves one task after another.
-With `TUI_DASH_TASKS` unset or blank, the report has no `tasks` key and reads no task processes.
+With `ORC_DASH_TASKS` unset or blank, the report has no `tasks` key and reads no task processes.
 The tasks command and the process listing each get 5 seconds, well inside the 15 the other machine's report gets.
 When either fails or runs out of time, the `tasks` reading gives the reason and the rest of the report still reads.
 
@@ -267,40 +267,40 @@ To read the report, set these variables where the reader runs.
 
 | Variable | What it holds |
 | --- | --- |
-| `TUI_DASH_TASKS` | The shell command that prints this machine's report |
-| `TUI_DASH_TASKS_WATCH` | The files and folders the orchestrator writes, separated by `:`, whose change makes the tasks tool and the dashboard run this machine's report again |
-| `TUI_DASH_REMOTE_TASKS` | The shell command that prints the other machine's report, such as `ssh -o BatchMode=yes -o ConnectTimeout=5 south.example.com 'harbor-tasks --json'` |
-| `TUI_DASH_REMOTE_TASK_HISTORY` | The shell command that prints the other machine's task samples, one JSON object per line |
-| `TUI_DASH_REMOTE_TASK_LIVE` | The shell command that prints the other machine's live usage, from `bun run tasks-live-json` |
-| `TUI_DASH_MACHINE` | This machine's name on its readings, `local` when unset |
-| `TUI_DASH_REMOTE_MACHINE` | The other machine's name on its readings, `remote` when unset |
+| `ORC_DASH_TASKS` | The shell command that prints this machine's report |
+| `ORC_DASH_TASKS_WATCH` | The files and folders the orchestrator writes, separated by `:`, whose change makes the tasks tool and the dashboard run this machine's report again |
+| `ORC_DASH_REMOTE_TASKS` | The shell command that prints the other machine's report, such as `ssh -o BatchMode=yes -o ConnectTimeout=5 south.example.com 'harbor-tasks --json'` |
+| `ORC_DASH_REMOTE_TASK_HISTORY` | The shell command that prints the other machine's task samples, one JSON object per line |
+| `ORC_DASH_REMOTE_TASK_LIVE` | The shell command that prints the other machine's live usage, from `bun run tasks-live-json` |
+| `ORC_DASH_MACHINE` | This machine's name on its readings, `local` when unset |
+| `ORC_DASH_REMOTE_MACHINE` | The other machine's name on its readings, `remote` when unset |
 
 Each command runs through `sh -c`.
 The other machine's command has a 15 second limit.
 This machine's has 5 seconds in the resources report and 2 minutes in the tasks tool.
 The tasks tool and the dashboard start this machine's report at most once each 30 seconds, and never while one still runs.
-With `TUI_DASH_TASKS_WATCH` set, such as `/home/me/harbor/state:/home/me/harbor/backlog.md`, they start it again only once something it names has changed.
+With `ORC_DASH_TASKS_WATCH` set, such as `/home/me/harbor/state:/home/me/harbor/backlog.md`, they start it again only once something it names has changed.
 A file has changed when its time or size has.
 A folder has changed when an entry directly inside it comes, goes or changes, and an entry whose name starts with `.` does not count.
 A report that failed runs again only once something it names has changed and 30 seconds have passed since the last run started.
-With `TUI_DASH_TASKS_WATCH` unset or blank, the watch list is each home's `state` folder and `data/backlog.md` for one release.
+With `ORC_DASH_TASKS_WATCH` unset or blank, the watch list is each home's `state` folder and `data/backlog.md` for one release.
 The homes are `FM_TASKS_HOMES` when set, else every `fm-*` folder under `HOME` holding a `state` folder plus `FM_HOME` when it holds one and is not already listed.
-This fallback goes once launchers set `TUI_DASH_TASKS_WATCH`.
+This fallback goes once launchers set `ORC_DASH_TASKS_WATCH`.
 With nothing to watch, the report runs once and never again.
 Its stdout must be that report alone, whitespace aside, so a login banner goes to stderr.
 With a command unset or blank, that machine yields no tasks and no error.
-The resources report reads `TUI_DASH_TASKS` too, for its tasks block.
+The resources report reads `ORC_DASH_TASKS` too, for its tasks block.
 
 ## Run the queues tool
 
-To run the live queues panel, run `tui-dash panel queues`.
+To run the live queues panel, run `orc-dash panel queues`.
 The panel reads pueue and the GitHub Actions runs and paints again every 10 seconds.
 Each machine's panel counts the running, queued and paused tasks, the ended ones and the failed ones.
 It lists the running tasks, then the ended ones newest first.
 Each run shows its project, when it started, how long it took and its command, and a failed run says why, such as `exit 1` or `killed`.
 A no-mistakes run copy shows the project its git origin names, read once on the machine that ran it.
 It shows `unknown` until then, or when it has no origin.
-The other machine's copies are read through the words before `pueue status` in `TUI_DASH_REMOTE_PUEUE`.
+The other machine's copies are read through the words before `pueue status` in `ORC_DASH_REMOTE_PUEUE`.
 They show `unknown` when that command names pueue by its path or runs other shell commands before it.
 In a terminal too narrow for the command beside the times, the command goes on a line of its own under its run.
 The groups panel lists each machine's pueue groups with whether each is running, paused or resetting, and how many tasks it runs at once.
@@ -309,7 +309,7 @@ It counts how many run and how many wait.
 When the terminal is too short for every run, each list shows fewer and counts the rest.
 A source that has not answered yet, such as the other machine over ssh, shows as reading while the others paint.
 Press `q` or Control C to quit.
-To print one frame of plain text instead, run `tui-dash panel queues --print`.
+To print one frame of plain text instead, run `orc-dash panel queues --print`.
 
 The panel drops each task's environment as it reads pueue, since that environment can hold secrets.
 It asks GitHub about the runs at most every 30 seconds, since each read takes five calls against the hourly API limit.
@@ -318,28 +318,28 @@ To configure the queues, set these variables where the panel runs:
 
 | Variable | What it holds |
 | --- | --- |
-| `TUI_DASH_REMOTE_PUEUE` | The shell command that prints the other machine's `pueue status --json`, such as `ssh other-host pueue status --json` |
-| `TUI_DASH_REMOTE_MACHINE` | The other machine's name on its panel, `remote` when unset |
-| `TUI_DASH_MACHINE` | This machine's name on its panel, `local` when unset |
-| `TUI_DASH_ACTIONS_REPO` | The repository whose runs the panel lists, such as `example/shop`. When unset, gh lists the runs of the repository the panel runs in, and the panel names it `this repository` |
+| `ORC_DASH_REMOTE_PUEUE` | The shell command that prints the other machine's `pueue status --json`, such as `ssh other-host pueue status --json` |
+| `ORC_DASH_REMOTE_MACHINE` | The other machine's name on its panel, `remote` when unset |
+| `ORC_DASH_MACHINE` | This machine's name on its panel, `local` when unset |
+| `ORC_DASH_ACTIONS_REPO` | The repository whose runs the panel lists, such as `example/shop`. When unset, gh lists the runs of the repository the panel runs in, and the panel names it `this repository` |
 
-With `TUI_DASH_REMOTE_PUEUE` unset or blank, the panel reads this machine's pueue alone.
+With `ORC_DASH_REMOTE_PUEUE` unset or blank, the panel reads this machine's pueue alone.
 The command runs through `sh -c` with a 20 second limit, beside this machine's own read.
 The session quota tool reads the same two machine names.
 
 ## Run the dispatch tool
 
-To run the live dispatch panel, run `tui-dash panel dispatch`.
+To run the live dispatch panel, run `orc-dash panel dispatch`.
 The panel reads `$ORC_HOME/backlog`, or `~/.orc/backlog` when `ORC_HOME` is unset or blank, and paints again every 10 seconds.
 It shows each machine with its busy room, the taken and started claims as runs and each new task with why it waits.
 A backlog that does not exist reads as missing.
 A folder or file the panel cannot read, including dispatch.json and projects.json, is named as unread.
-To print one frame of plain text instead, run `tui-dash panel dispatch --print`.
+To print one frame of plain text instead, run `orc-dash panel dispatch --print`.
 
 ## Run the tasks tool
 
-To run the live tasks screen, run `tui-dash panel tasks`.
-The screen shows the registered projects of this machine and of the other machine that `TUI_DASH_REMOTE_TASKS` reads, in three levels.
+To run the live tasks screen, run `orc-dash panel tasks`.
+The screen shows the registered projects of this machine and of the other machine that `ORC_DASH_REMOTE_TASKS` reads, in three levels.
 A project on both machines keeps one row, and each task and planned row names its machine whenever the screen reads two machines.
 There a task id too long to sit beside its state and machine is clipped rather than the machine dropped.
 Where the report names none, the first level lists only the projects with work in the last 7 days.
@@ -398,11 +398,11 @@ A list longer than its box scrolls to keep the pick in sight and ends with a cou
 Each level is a 60 column box.
 A screen 240 columns wide shows every level, one under 240 columns shows two, and one under 120 columns shows one.
 It paints again every 10 seconds, and runs this machine's report again as [Read the tasks report](#read-the-tasks-report) tells.
-To print one frame of plain text instead, run `tui-dash panel tasks --print`, and add `--width 120 --height 30` for a frame of that size.
+To print one frame of plain text instead, run `orc-dash panel tasks --print`, and add `--width 120 --height 30` for a frame of that size.
 
-The screen reads `TUI_DASH_TASKS` and `TUI_DASH_MACHINE` as the tasks report does, and this machine's pueue for the test runs.
-It reads `TUI_DASH_REMOTE_TASKS` and `TUI_DASH_REMOTE_MACHINE` the same way, and it reads live processes there only when `TUI_DASH_REMOTE_TASK_LIVE` is set.
-With `TUI_DASH_TASKS` unset or blank, it shows only the tasks sampled earlier and says so.
+The screen reads `ORC_DASH_TASKS` and `ORC_DASH_MACHINE` as the tasks report does, and this machine's pueue for the test runs.
+It reads `ORC_DASH_REMOTE_TASKS` and `ORC_DASH_REMOTE_MACHINE` the same way, and it reads live processes there only when `ORC_DASH_REMOTE_TASK_LIVE` is set.
+With `ORC_DASH_TASKS` unset or blank, it shows only the tasks sampled earlier and says so.
 
 ### Follow a task's stages
 
@@ -462,17 +462,17 @@ Either can take most of a minute, and a sample that waited on it would leave gap
 A task with none gets a line when its last process ends, and when the report, model or test runs change.
 The sampler repeats unchanged spend and test runs after half the 7 day span, when a task ends, and in a final line when a task leaves the report.
 A sampler that starts again goes on from the lines it kept.
-The day files are in `$XDG_STATE_HOME/tui-dash/tasks`, or `~/.local/state/tui-dash/tasks` when that is unset.
+The day files are in `$XDG_STATE_HOME/orc-dash/tasks`, or `~/.local/state/orc-dash/tasks` when that is unset.
 The sampler keeps 8 of them, so the last 7 days are always whole, and removes older ones when a new day starts.
 A round that fails says why on stderr, and the next round tries again.
-The other machine keeps no samples of its own here, so set `TUI_DASH_REMOTE_TASK_HISTORY` to a command that prints its day lines, one JSON object per line.
+The other machine keeps no samples of its own here, so set `ORC_DASH_REMOTE_TASK_HISTORY` to a command that prints its day lines, one JSON object per line.
 The tasks tool and the dashboard read them for that machine's peaks the way they read the day files for this machine's.
-The other machine's live usage needs its own command, so set `TUI_DASH_REMOTE_TASK_LIVE` to a command that prints its live report, such as `ssh south.example.com 'cd orc && bun run tasks-live-json'`.
+The other machine's live usage needs its own command, so set `ORC_DASH_REMOTE_TASK_LIVE` to a command that prints its live report, such as `ssh south.example.com 'cd orc && bun run tasks-live-json'`.
 The dashboard polls it in the background and checks that machine's tasks against their limits the way it checks this machine's.
 
 ## Run the dashboard
 
-To run the live dashboard, run `tui-dash`, or `bun run dashboard` in the clone.
+To run the live dashboard, run `orc-dash`, or `bun run dashboard` in the clone.
 The dashboard shows at a glance how much each account has left and whether a limit runs out before it resets.
 It also shows which agent is spending a limit that runs ahead, and how busy the machine is.
 Each account lists its limits by their length, such as 5 hours, week, fable week and month, whatever its provider calls them.
@@ -482,7 +482,8 @@ A saved Claude profile read that long ago leaves its age to its rows, so its hea
 A limit with a pace marks on its bar how much of its time is left, as the quota tool does.
 Beside the share, a reserve column reads spare, over, on pace, no pace or used up.
 A projection made early in a limit reads muted, such as may run out in 2d 7h.
-Below the accounts, a flag names each agent spending over its share of a running-ahead limit that runs out before its reset by its project, such as tui-dash.
+Below the accounts, a flag names each agent spending over its share of a running-ahead limit that runs out before its reset.
+The flag names the agent by its project, such as orc.
 With a second machine configured, a flag for an agent there names that machine too.
 A line says when that machine could not be checked.
 A limit read an hour old or more flags no agent.
@@ -498,7 +499,7 @@ In the top row, the alerts tab gives each alert rule, as [Read the alerts panel]
 It paints again every 2 seconds.
 Each box title pins its refresh cadence at the right end, such as machines ↻ 10s, and the glance lists the intervals at the right of its first line when they fit.
 The ledger, quota and the GitHub reads refresh on longer cadences, and the paint never waits on them.
-The dashboard saves its last readings in `$XDG_STATE_HOME/tui-dash/dashboard`, or `~/.local/state/tui-dash/dashboard` when that is unset.
+The dashboard saves its last readings in `$XDG_STATE_HOME/orc-dash/dashboard`, or `~/.local/state/orc-dash/dashboard` when that is unset.
 On start, a box whose source has not answered yet shows its saved reading and says how old it is, such as saved 3m ago.
 When the whole alerts panel does not fit in its box, it shrinks to one row per rule.
 Each row gives the rule's last fire and verdict.
@@ -509,7 +510,7 @@ On a narrow one it drops the bars, then shortens the words around the numbers, t
 At last it moves each warning to a row of its own.
 Session shares, where each reading came from, the task and run lists, the process list and the load averages show only in their own panels.
 That holds for the second machine too.
-Those are `tui-dash panel quota`, `tui-dash panel session-quota`, `tui-dash panel queues` and `tui-dash panel resources`.
+Those are `orc-dash panel quota`, `orc-dash panel session-quota`, `orc-dash panel queues` and `orc-dash panel resources`.
 In the default layout, a screen under 120 columns or 36 rows opens the tasks levels one at a time on Return.
 Those levels work as [Run the tasks tool](#run-the-tasks-tool) tells.
 Escape from the projects comes back to the glance.
@@ -564,18 +565,18 @@ A source that fails says why.
 | `t` | Switch the projects board between today and all |
 
 A click on a row opens it.
-Live processes are read on this machine, and on the other machine only when `TUI_DASH_REMOTE_TASK_LIVE` is set, so a task without that reading says so.
+Live processes are read on this machine, and on the other machine only when `ORC_DASH_REMOTE_TASK_LIVE` is set, so a task without that reading says so.
 The CI runs and the scheduled workflows come from GitHub through `gh`.
 The CI runs are read again once a minute at most.
 Each repository's workflow files are read again once an hour, and a repository whose read failed is tried again after a minute.
 
 | Variable | What it holds |
 | --- | --- |
-| `TUI_DASH_RUNNERS` | The shell command that prints the `.runner` files of this machine's GitHub runners, such as `cat ~/actions-runner/.runner` |
-| `TUI_DASH_TASKS` | The shell command that prints this machine's tasks report, as [Read the tasks report](#read-the-tasks-report) tells |
-| `TUI_DASH_REMOTE_TASKS` | The shell command that prints the other machine's tasks report, as [Read the tasks report](#read-the-tasks-report) tells |
+| `ORC_DASH_RUNNERS` | The shell command that prints the `.runner` files of this machine's GitHub runners, such as `cat ~/actions-runner/.runner` |
+| `ORC_DASH_TASKS` | The shell command that prints this machine's tasks report, as [Read the tasks report](#read-the-tasks-report) tells |
+| `ORC_DASH_REMOTE_TASKS` | The shell command that prints the other machine's tasks report, as [Read the tasks report](#read-the-tasks-report) tells |
 
-With `TUI_DASH_RUNNERS` unset or blank, the queue lists pueue runs alone and the scheduled box has no workflows.
+With `ORC_DASH_RUNNERS` unset or blank, the queue lists pueue runs alone and the scheduled box has no workflows.
 
 ### Follow the ledger
 
@@ -594,27 +595,27 @@ Press `l` or Escape to close the full screen.
 
 ### Fill the ledger
 
-The ledger reads today's session files from the folder `TUI_DASH_LEDGER_SESSIONS` names, and says the variable is unset until you set it.
+The ledger reads today's session files from the folder `ORC_DASH_LEDGER_SESSIONS` names, and says the variable is unset until you set it.
 Each file ends in `.jsonl` and holds one JSON object a line.
 A turn's object has `type` set to `message`, a `timestamp`, and a `message` with its `role` and its `content` text parts.
 A `user` turn is your message, and an `assistant` turn is the agent's reply.
 
 | Variable | What it holds |
 | --- | --- |
-| `TUI_DASH_LEDGER_SESSIONS` | The folder of session files the ledger reads |
-| `TUI_DASH_LEDGER_CLASSIFY` | The shell command that reads one of your messages on stdin and prints something when the ledger should hide it |
-| `TUI_DASH_LEDGER_ADDRESS` | The text a reply must open with to show, and the ledger shows the reply without it |
-| `TUI_DASH_LEDGER_ACK` | A whole reply the ledger leaves out, such as a bare acknowledgement |
-| `TUI_DASH_LEDGER_AGENT` | The name the full screen gives the agent, `assistant` when unset |
+| `ORC_DASH_LEDGER_SESSIONS` | The folder of session files the ledger reads |
+| `ORC_DASH_LEDGER_CLASSIFY` | The shell command that reads one of your messages on stdin and prints something when the ledger should hide it |
+| `ORC_DASH_LEDGER_ADDRESS` | The text a reply must open with to show, and the ledger shows the reply without it |
+| `ORC_DASH_LEDGER_ACK` | A whole reply the ledger leaves out, such as a bare acknowledgement |
+| `ORC_DASH_LEDGER_AGENT` | The name the full screen gives the agent, `assistant` when unset |
 
-With `TUI_DASH_LEDGER_CLASSIFY` unset, the ledger shows every message of yours.
-With `TUI_DASH_LEDGER_ADDRESS` unset, the ledger shows every reply whole.
+With `ORC_DASH_LEDGER_CLASSIFY` unset, the ledger shows every message of yours.
+With `ORC_DASH_LEDGER_ADDRESS` unset, the ledger shows every reply whole.
 The classifier exits zero or one, and a classifier that cannot run leaves the message shown.
 
 ## Configure the dashboard
 
 The dashboard and every panel read one config file.
-The config file is `TUI_DASH_CONFIG`, or else `tui-dash/config.json` under `XDG_CONFIG_HOME`, which is `~/.config` when unset.
+The config file is `ORC_DASH_CONFIG`, or else `orc-dash/config.json` under `XDG_CONFIG_HOME`, which is `~/.config` when unset.
 It holds one JSON object, and every key it leaves out keeps its default.
 Without the file, the dashboard shows its default layout in its default colours.
 A key the command does not know, or a value out of range, stops the command with the file's path, the section and the issue.
@@ -632,7 +633,7 @@ A panel with no settings refuses any key under its name.
 | Setting | What it holds | Default |
 | --- | --- | --- |
 | `panels.alerts` | The alert rules, as [Configure the alerts](#configure-the-alerts) tells | Every rule on its defaults |
-| `panels.tasks.remote` | Whether `tui-dash panel tasks` shows the other machine's work alone instead of both machines' | `false` |
+| `panels.tasks.remote` | Whether `orc-dash panel tasks` shows the other machine's work alone instead of both machines' | `false` |
 
 ### Lay out the dashboard
 
@@ -688,8 +689,8 @@ The colours hold in the dashboard, in a panel opened alone and in a frame printe
 
 ## Take a snapshot
 
-To read every source once and print one JSON object, run `tui-dash snapshot --json`.
-To read only some sources, name them in `--only`, separated by commas, such as `tui-dash snapshot --json --only resources,tasks`.
+To read every source once and print one JSON object, run `orc-dash snapshot --json`.
+To read only some sources, name them in `--only`, separated by commas, such as `orc-dash snapshot --json --only resources,tasks`.
 The sources are `quota`, `resources`, `queues` and `tasks`, and a name that is none of them stops the command before it reads anything.
 The sources read at the same time, and each has its own time limit.
 A source that runs past its limit or breaks reports `failed` with its error, and the others still report.
@@ -698,10 +699,10 @@ Each source reads the variables its tool reads, so a second machine configured f
 
 | Source | What it holds | Limit |
 | --- | --- | --- |
-| `quota` | The composed session quota report, with every account's windows, their pace and gate, and the flags, merged with the second machine's report where `TUI_DASH_REMOTE_SESSION_QUOTA` is set | 3 minutes |
-| `resources` | This machine's resources report, then the one `TUI_DASH_REMOTE_RESOURCES` prints | 30 seconds |
-| `queues` | This machine's pueue, then the one `TUI_DASH_REMOTE_PUEUE` prints, and the GitHub Actions runs that wait or run | 30 seconds |
-| `tasks` | The tasks reports `TUI_DASH_TASKS` and `TUI_DASH_REMOTE_TASKS` print | 30 seconds |
+| `quota` | The composed session quota report, with every account's windows, their pace and gate, and the flags, merged with the second machine's report where `ORC_DASH_REMOTE_SESSION_QUOTA` is set | 3 minutes |
+| `resources` | This machine's resources report, then the one `ORC_DASH_REMOTE_RESOURCES` prints | 30 seconds |
+| `queues` | This machine's pueue, then the one `ORC_DASH_REMOTE_PUEUE` prints, and the GitHub Actions runs that wait or run | 30 seconds |
+| `tasks` | The tasks reports `ORC_DASH_TASKS` and `ORC_DASH_REMOTE_TASKS` print | 30 seconds |
 
 The longest chain of commands a source runs ends inside its limit.
 So a slow machine's reason lands in its reading, and the source still answers.
@@ -720,7 +721,7 @@ A machine whose command is unset or blank has no entry.
 | --- | --- |
 | `schemaVersion` | `1` |
 | `generatedAt` | The ISO instant the last source answered |
-| `machine` | This machine's name, `TUI_DASH_MACHINE` or `local` |
+| `machine` | This machine's name, `ORC_DASH_MACHINE` or `local` |
 | `sources.quota.report` | The report [Read the composed report](session-quota/compose-two-machines.md#read-the-composed-report) describes as the composed report |
 | `sources.resources.machines` | Each machine's `name` and a `reading` of the report [Read the resources report](#read-the-resources-report) describes |
 | `sources.queues.machines` | Each machine's `name` and a `pueue` reading of its `running` and `ended` tasks, how many are `queued` and `paused`, and its `groups` with their `status` and `parallel` count |
@@ -731,9 +732,9 @@ A machine whose command is unset or blank has no entry.
 
 ## Watch for alerts
 
-To stream alert events, run `tui-dash alerts --json`.
+To stream alert events, run `orc-dash alerts --json`.
 The command runs until it is stopped and prints one JSON object per line each time a rule fires.
-It prints nothing else on stdout, so a listener reads it line by line, as in `tui-dash alerts --json | while read -r line; do ...; done`.
+It prints nothing else on stdout, so a listener reads it line by line, as in `orc-dash alerts --json | while read -r line; do ...; done`.
 The events only report what crossed a limit, and what to do about one is up to the listener.
 Each rule reads its own source on its own schedule, with the time limit the snapshot gives that source.
 A read that fails or runs past its limit ends no episode and restarts no clock, and the other rules keep reading.
@@ -759,8 +760,8 @@ A gap between samples longer than the repeat fires one event, not one for each r
 ### Configure the alerts
 
 The settings are the `panels.alerts` object of the config file.
-The config file is `TUI_DASH_CONFIG`, or else `tui-dash/config.json` under `XDG_CONFIG_HOME`, which is `~/.config` when unset.
-Where the config file sets no `panels.alerts`, the file `TUI_DASH_ALERTS_SETTINGS` names is read as `panels.alerts`.
+The config file is `ORC_DASH_CONFIG`, or else `orc-dash/config.json` under `XDG_CONFIG_HOME`, which is `~/.config` when unset.
+Where the config file sets no `panels.alerts`, the file `ORC_DASH_ALERTS_SETTINGS` names is read as `panels.alerts`.
 Where that variable names no file that exists, every rule runs on its defaults and no `alerts.json` beside the config file is read.
 While no config file exists and that variable is unset, an `alerts.json` beside it is read as `panels.alerts`.
 Without any of these files, every rule runs on its defaults.
@@ -780,7 +781,7 @@ A key the command does not know, or a value out of range, stops the command with
 | `longTask.totalHours` | The hours from the task's first start to its total event | `2` |
 | `longTask.states` | The task states the rule watches | `working`, `waiting` and `blocked` |
 
-A machine name is the one `TUI_DASH_MACHINE` or `TUI_DASH_REMOTE_MACHINE` gives it, and a machine the list does not name has no heavy load rule.
+A machine name is the one `ORC_DASH_MACHINE` or `ORC_DASH_REMOTE_MACHINE` gives it, and a machine the list does not name has no heavy load rule.
 A list in the file replaces the default list whole.
 
 ### Read the alert events
@@ -798,7 +799,7 @@ Every event carries `rule` and `at`, the ISO instant of the sample that fired it
 ### Record a verdict
 
 A listener records what it made of each event in the verdict log, so the alerts panel can show it.
-The log lives at `TUI_DASH_ALERTS_VERDICTS`, or else at `~/.local/state/tui-dash/alerts-verdicts.jsonl`.
+The log lives at `ORC_DASH_ALERTS_VERDICTS`, or else at `~/.local/state/orc-dash/alerts-verdicts.jsonl`.
 It holds one JSON object per line, and a listener only ever appends to it.
 `AlertVerdictRecord` in `packages/schema/src/contract/alert-verdicts.ts` decodes each line.
 When an event arrives, the listener appends it with `verdict` `null`.
@@ -809,13 +810,13 @@ The alerts command itself writes nothing to the log.
 | Field | What it holds |
 | --- | --- |
 | `schemaVersion` | `1` |
-| `event` | The alert event exactly as `tui-dash alerts --json` printed it |
+| `event` | The alert event exactly as `orc-dash alerts --json` printed it |
 | `verdict` | `null`, or one line of the listener's text |
 | `recordedAt` | The ISO instant the listener appended the line |
 
 ## Read the alerts panel
 
-The dashboard keeps the alerts panel in a tab with session-quota in the top row, so `tui-dash` shows it live.
+The dashboard keeps the alerts panel in a tab with session-quota in the top row, so `orc-dash` shows it live.
 The panel starts with an `alerts` line, then starts each rule with an `alert` line naming the rule as its events do.
 Under it come the rule's limits from the settings file, its last fire and the listener's verdict.
 The last fire is the latest event of that rule in the verdict log, with how long ago it fired and what crossed, such as `south over memory`.
@@ -830,7 +831,7 @@ A line of the log that is not a record is counted on that line with its issue, a
 On a terminal too short for the whole panel, the summary gives each rule one row, such as `heavy-load 40m ago · expected, a nightly baseline runs on south`.
 Its `alerts` line says when the log could not be read, or some of its lines are unreadable.
 The panel changes nothing.
-To print one frame of the panel alone as plain text, run `tui-dash panel alerts --print`, and add `--width 40` for a narrow frame.
+To print one frame of the panel alone as plain text, run `orc-dash panel alerts --print`, and add `--width 40` for a narrow frame.
 
 ## Run the checks
 
@@ -840,7 +841,7 @@ To run the checks:
 1. Run `bun run typecheck` to run `tsc` and the Effect language service diagnostics.
 1. Run `bun run test:fast` to run the unit tier and the e2e files the change touches.
 1. CI runs `bun run test` for the full unit and e2e suites.
-1. Run `bun run build` to bundle every tool and the `tui-dash` command into each package's `dist/` and write the changelog.
+1. Run `bun run build` to bundle every tool and the `orc-dash` command into each package's `dist/` and write the changelog.
 
 `bun run test:fast` starts one worker per CPU.
 It keeps 10 percent of total memory as reserve.
@@ -866,7 +867,7 @@ Values below 1 fail.
 | `packages/dashboard/` | The dashboard host, which lays out the panel modules it is given from the layout setting |
 | `packages/alerts/` | The alerts panel module of each alert rule and its one-frame print |
 | `packages/tasks/` | The tasks panel module, its three levels and the sampler that keeps each task's history |
-| `packages/cli/` | The `tui-dash` command, which composes the panel modules into the dashboard, opens one panel, prints the snapshot and the reports, or streams alerts |
+| `packages/cli/` | The `orc-dash` command, which composes the panel modules into the dashboard, opens one panel, prints the snapshot and the reports, or streams alerts |
 | `scripts/` | The fast test tier behind `bun run test:fast` |
 | `tests/unit/` | Unit tests, one directory per package |
 | `tests/e2e/` | End-to-end tests that run the tools and scripts as a user does |
@@ -879,11 +880,11 @@ Values below 1 fail.
 
 The quota tool could not start `quota-axi`.
 Install it and check it runs on the `PATH` of the machine the panel runs on.
-A `claude saved` line that reads unreachable means the `TUI_DASH_SAVED_PROFILES` command failed, so run `sh -c "$TUI_DASH_SAVED_PROFILES"` and check its stdout.
+A `claude saved` line that reads unreachable means the `ORC_DASH_SAVED_PROFILES` command failed, so run `sh -c "$ORC_DASH_SAVED_PROFILES"` and check its stdout.
 
 ### The other machine's resources panel says it is unreachable
 
 The configured command failed, and the panel gives its reason, such as `sh exited 255` from ssh.
-Run `sh -c "$TUI_DASH_REMOTE_RESOURCES"` on this machine and check that its stdout is the version 1 report alone.
+Run `sh -c "$ORC_DASH_REMOTE_RESOURCES"` on this machine and check that its stdout is the version 1 report alone.
 A reason of `sh exited 127` means the shell ssh starts found no `bun` on its `PATH`, so put bun's folder on the `PATH` inside the command, such as `cd orc && PATH=$HOME/.bun/bin:$PATH bun run resources-json`.
 Naming `bun` by its full path is not enough, because the `resources-json` script runs `bun` again by name.

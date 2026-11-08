@@ -102,7 +102,7 @@ describe("each layout rule rejects the defect it names", () => {
   });
 
   test("the projects notice's last word alone on its line is caught", () => {
-    expect(lonelyWords(box(titled, ["TUI_DASH_TASKS is unset, so only tasks sampled earlier", "show"], closed))).toHaveLength(1);
+    expect(lonelyWords(box(titled, ["ORC_DASH_TASKS is unset, so only tasks sampled earlier", "show"], closed))).toHaveLength(1);
   });
 
   test("a one-word heading under a short row is not a word wrapped alone", () => {

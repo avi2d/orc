@@ -19,7 +19,7 @@ describe("the orc workspace", () => {
     }
   })
 
-  test("no package keeps the retired tui-dash scope instead of moving to the orc name", async () => {
+  test("no package keeps a retired scope instead of moving to the orc name", async () => {
     const root = new URL("../..", import.meta.url).pathname
     const names: Array<string> = []
     for await (const path of new Bun.Glob("packages/*/package.json").scan({ cwd: root })) {

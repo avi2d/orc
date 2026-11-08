@@ -336,7 +336,7 @@ const listedTasks = ({ latest, lastListed }: Listing): Effect.Effect<ReportedTas
     if (Option.isSome(reading) && reading.value.kind !== "ok") {
       const reason = reading.value.kind === "unreachable" ? reading.value.reason : reading.value.issue;
       if (Option.isNone(listed)) return yield* new SampleSkipped({ reason });
-      yield* Console.error(`tui-dash-tasks: the tasks report failed, so this sample goes by the last one: ${reason}`);
+      yield* Console.error(`orc-dash-tasks: the tasks report failed, so this sample goes by the last one: ${reason}`);
     }
     if (Option.isNone(listed)) return yield* new SampleSkipped({ reason: "the tasks report has not answered yet" });
     return listed.value;
@@ -379,7 +379,7 @@ export const runSampler: Effect.Effect<void, Config.ConfigError, SamplerSources>
   Effect.gen(function* () {
     const local = yield* LocalTasks;
     if (Option.isNone(local)) {
-      yield* Console.error("tui-dash-tasks: TUI_DASH_TASKS is unset, so there is no task to sample");
+      yield* Console.error("orc-dash-tasks: ORC_DASH_TASKS is unset, so there is no task to sample");
       process.exitCode = 1;
       return;
     }
@@ -390,9 +390,9 @@ export const runSampler: Effect.Effect<void, Config.ConfigError, SamplerSources>
     const written = yield* Ref.make(writtenOf(yield* history.read(yield* DateTime.now)));
     const round = sampleRound(written, listing, sessions(undefined)).pipe(
       Effect.catchTags({
-        SampleSkipped: ({ reason }) => Console.error(`tui-dash-tasks: skipped a sample: ${reason}`),
-        PlatformError: (error) => Console.error(`tui-dash-tasks: could not write the sample: ${error.message}`),
-        SchemaError: (error) => Console.error(`tui-dash-tasks: could not write the sample: ${error.message}`),
+        SampleSkipped: ({ reason }) => Console.error(`orc-dash-tasks: skipped a sample: ${reason}`),
+        PlatformError: (error) => Console.error(`orc-dash-tasks: could not write the sample: ${error.message}`),
+        SchemaError: (error) => Console.error(`orc-dash-tasks: could not write the sample: ${error.message}`),
       }),
     );
     yield* round.pipe(Effect.repeat(Schedule.fixed(sampleEvery)));

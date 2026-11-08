@@ -31,10 +31,10 @@ const macDiskCommand = { argv: ["sh", "-c", 'df -kP "$HOME"'], timeout: Duration
 
 const linuxDiskCommand = { argv: ["df", "-kP", "/"], timeout: Duration.seconds(10) } as const;
 
-export class MacDiskSource extends Context.Service<MacDiskSource, Source<DiskUsage>>()("tui-dash/MacDiskSource") {}
+export class MacDiskSource extends Context.Service<MacDiskSource, Source<DiskUsage>>()("orc-dash/MacDiskSource") {}
 
 export const macDiskSourceLayer = Layer.effect(MacDiskSource, hostSource(probe(macDiskCommand, decodeDf)));
 
-export class LinuxDiskSource extends Context.Service<LinuxDiskSource, Source<DiskUsage>>()("tui-dash/LinuxDiskSource") {}
+export class LinuxDiskSource extends Context.Service<LinuxDiskSource, Source<DiskUsage>>()("orc-dash/LinuxDiskSource") {}
 
 export const linuxDiskSourceLayer = Layer.effect(LinuxDiskSource, hostSource(probe(linuxDiskCommand, decodeDf)));

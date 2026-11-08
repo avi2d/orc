@@ -1,6 +1,6 @@
 # Project agent memory
 
-This repository holds the orc command and the tui-dash panels it ships beside, and README.md holds what a person reads.
+This repository holds the orc command and the orc-dash panels it ships beside, and README.md holds what a person reads.
 
 ## Checks
 

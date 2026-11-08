@@ -80,7 +80,7 @@ export const clampLedgerFull = (readings: LedgerReadings, pick: LedgerPick, widt
 
 const emptyText: Record<LedgerReadings["sessions"], string> = {
   pending: "reading the ledger\u2026",
-  unset: "TUI_DASH_LEDGER_SESSIONS is unset, so no messages show",
+  unset: "ORC_DASH_LEDGER_SESSIONS is unset, so no messages show",
   set: "no messages today",
 };
 

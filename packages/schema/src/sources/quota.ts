@@ -150,7 +150,7 @@ const quotaCommand = (providers: ReadonlyArray<QuotaProviderId>) =>
 export class QuotaSource extends Context.Service<
   QuotaSource,
   { readonly read: (providers: ReadonlyArray<QuotaProviderId>) => Effect.Effect<Reading<QuotaReport>> }
->()("tui-dash/QuotaSource") {}
+>()("orc-dash/QuotaSource") {}
 
 export const quotaSourceLayer = Layer.effect(
   QuotaSource,

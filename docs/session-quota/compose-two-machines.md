@@ -10,11 +10,11 @@ To configure the second machine, set these variables where the panel runs:
 
 | Variable | What it holds |
 | --- | --- |
-| `TUI_DASH_REMOTE_SESSION_QUOTA` | The shell command that prints the other machine's report, such as `ssh other-host 'bun orc/packages/cli/src/bin.ts report session-quota'` |
-| `TUI_DASH_REMOTE_MACHINE` | The other machine's name on its rows, `remote` when unset |
-| `TUI_DASH_MACHINE` | This machine's name on its rows, `local` when unset |
+| `ORC_DASH_REMOTE_SESSION_QUOTA` | The shell command that prints the other machine's report, such as `ssh other-host 'bun orc/packages/cli/src/bin.ts report session-quota'` |
+| `ORC_DASH_REMOTE_MACHINE` | The other machine's name on its rows, `remote` when unset |
+| `ORC_DASH_MACHINE` | This machine's name on its rows, `local` when unset |
 
-With `TUI_DASH_REMOTE_SESSION_QUOTA` unset or blank, the panel reads this machine alone.
+With `ORC_DASH_REMOTE_SESSION_QUOTA` unset or blank, the panel reads this machine alone.
 The command runs through `sh -c` with a 90 second limit, beside this machine's own read.
 Its stdout must be that report alone, whitespace aside, so a login banner or anything else the command prints goes to stderr.
 
@@ -49,11 +49,11 @@ A warning line beside them names the machine and the account, with the reason.
 
 ## Read the composed report
 
-To print the merged report once, run `tui-dash report session-quota-composed`.
+To print the merged report once, run `orc-dash report session-quota-composed`.
 It prints this machine's report alone, in the composed shape, when no second machine is configured.
 `ComposedSessionQuotaReport` in `packages/schema/src/contract/composed-session-quota.ts` decodes it.
 Its `schemaVersion` is `2`, so a reader of the version 1 report never mistakes one for the other.
-`tui-dash report session-quota` prints this machine's version 1 report alone, and the alert stream reads this machine alone.
+`orc-dash report session-quota` prints this machine's version 1 report alone, and the alert stream reads this machine alone.
 
 The composed report keeps the fields of the version 1 report, except `sources`, and changes these:
 

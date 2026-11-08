@@ -7,7 +7,7 @@ import { ConfigProvider, Effect, Layer, Schema } from "effect";
 import { AlertSettings, configPath, readAlertSettings, readConfig, readConfigFile } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 
-const root = mkdtempSync(join(tmpdir(), "tui-dash-config-file-"));
+const root = mkdtempSync(join(tmpdir(), "orc-dash-config-file-"));
 
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
@@ -27,7 +27,7 @@ const refusalAt = (path: string) => Effect.runPromise(readConfigFile(path).pipe(
 
 const pathFrom = (env: Record<string, string>) => Effect.runPromise(configPath.parse(ConfigProvider.fromEnvRecord(env)));
 
-const configAt = (path: string) => Layer.mergeAll(BunFileSystem.layer, ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: root, TUI_DASH_CONFIG: path })));
+const configAt = (path: string) => Layer.mergeAll(BunFileSystem.layer, ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: root, ORC_DASH_CONFIG: path })));
 
 const alertSettingsAt = (path: string) => Effect.runPromise(readAlertSettings.pipe(Effect.provide(configAt(path))));
 
@@ -37,7 +37,7 @@ const alertSettingsEnvAt = (config: string, settings: string) =>
       Effect.provide(
         Layer.mergeAll(
           BunFileSystem.layer,
-          ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: root, TUI_DASH_CONFIG: config, TUI_DASH_ALERTS_SETTINGS: settings })),
+          ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: root, ORC_DASH_CONFIG: config, ORC_DASH_ALERTS_SETTINGS: settings })),
         ),
       ),
     ),
@@ -45,10 +45,10 @@ const alertSettingsEnvAt = (config: string, settings: string) =>
 
 // Unknown keys are refused, so a misspelt section fails loudly.
 describe("the config file", () => {
-  test("lives where TUI_DASH_CONFIG names, or else under the config home", async () => {
-    expect(await pathFrom({ HOME: "/home/example", TUI_DASH_CONFIG: "/etc/example/config.json" })).toBe("/etc/example/config.json");
-    expect(await pathFrom({ HOME: "/home/example", XDG_CONFIG_HOME: "/home/example/.cfg" })).toBe("/home/example/.cfg/tui-dash/config.json");
-    expect(await pathFrom({ HOME: "/home/example", TUI_DASH_CONFIG: " " })).toBe("/home/example/.config/tui-dash/config.json");
+  test("lives where ORC_DASH_CONFIG names, or else under the config home", async () => {
+    expect(await pathFrom({ HOME: "/home/example", ORC_DASH_CONFIG: "/etc/example/config.json" })).toBe("/etc/example/config.json");
+    expect(await pathFrom({ HOME: "/home/example", XDG_CONFIG_HOME: "/home/example/.cfg" })).toBe("/home/example/.cfg/orc-dash/config.json");
+    expect(await pathFrom({ HOME: "/home/example", ORC_DASH_CONFIG: " " })).toBe("/home/example/.config/orc-dash/config.json");
   });
 
   test("is empty when neither it nor alerts.json exists", async () => {
@@ -67,7 +67,7 @@ describe("the config file", () => {
     expect((await alertSettingsAt(join(folder, "config.json"))).longTask.quietMinutes).toBe(30);
   });
 
-  test("reads the file TUI_DASH_ALERTS_SETTINGS names while no config.json exists", async () => {
+  test("reads the file ORC_DASH_ALERTS_SETTINGS names while no config.json exists", async () => {
     const wanted = Schema.decodeUnknownSync(AlertSettings)(JSON.parse(fixture("alerts/settings.json")));
     const folder = folderWith({ "custom.json": fixture("alerts/settings.json") });
     const settings = await alertSettingsEnvAt(join(folder, "config.json"), join(folder, "custom.json"));
@@ -161,7 +161,7 @@ describe("the accounts in the config file", () => {
     const slashed = await Effect.runPromise(
       readConfig.pipe(
         Effect.flip,
-        Effect.provide(Layer.mergeAll(BunFileSystem.layer, ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: `${root}/`, TUI_DASH_CONFIG: path })))),
+        Effect.provide(Layer.mergeAll(BunFileSystem.layer, ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: `${root}/`, ORC_DASH_CONFIG: path })))),
       ),
     );
     expect("reason" in slashed ? slashed.reason : slashed.message).toContain("names the shared Claude folder");

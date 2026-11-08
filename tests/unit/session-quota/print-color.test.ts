@@ -20,7 +20,7 @@ import { isSavedProfilesCall, recordedSavedProfilesLayer } from "../../lib/saved
 let home = "";
 
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "tui-dash-session-quota-color-"));
+  home = mkdtempSync(join(tmpdir(), "orc-dash-session-quota-color-"));
   copyFixtureHome(home);
 });
 

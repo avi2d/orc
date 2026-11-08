@@ -12,7 +12,7 @@ describe("the dashboard --print frame", () => {
     async () => {
       const probe = startOrderProbe();
       const sources = dashboardSources({
-        env: { TUI_DASH_TASKS: tasksCommand },
+        env: { ORC_DASH_TASKS: tasksCommand },
         run: (command) =>
           lateQuotaOrTasks(command.argv, tasksCommand)
             ? lateRead(command.argv, Effect.sync(() => recordedAnswer(command)), probe)
@@ -32,7 +32,7 @@ describe("the dashboard --print frame without session-quota", () => {
     async () => {
       const probe = startOrderProbe();
       const sources = dashboardSources({
-        env: { TUI_DASH_TASKS: tasksCommand },
+        env: { ORC_DASH_TASKS: tasksCommand },
         config: join(import.meta.dir, "..", "..", "fixtures", "config", "tasks-only.json"),
         run: (command) =>
           lateQuotaOrTasks(command.argv, tasksCommand)

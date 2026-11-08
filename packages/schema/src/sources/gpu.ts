@@ -90,6 +90,6 @@ const readGpu: Effect.Effect<Outcome<GpuReading>, never, CommandRunner> = readWi
   ),
 );
 
-export class GpuSource extends Context.Service<GpuSource, Source<GpuReading>>()("tui-dash/GpuSource") {}
+export class GpuSource extends Context.Service<GpuSource, Source<GpuReading>>()("orc-dash/GpuSource") {}
 
 export const gpuSourceLayer = Layer.effect(GpuSource, sourceOf(stamped(readGpu)));

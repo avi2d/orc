@@ -36,7 +36,7 @@ const jobsB: PueueStatus = {
 };
 
 const withStateDirectory = async (body: (directory: string) => Promise<void>): Promise<void> => {
-  const directory = await mkdtemp(join(tmpdir(), "tui-dash-queue-"));
+  const directory = await mkdtemp(join(tmpdir(), "orc-dash-queue-"));
   try {
     await body(directory);
   } finally {

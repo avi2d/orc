@@ -22,7 +22,7 @@ const printed = (color: boolean): Promise<string> =>
           ConfigProvider.layer(
             ConfigProvider.fromEnvRecord({
               HOME: "/home/tester",
-              TUI_DASH_ALERTS_VERDICTS: join(alertFixtures, "verdicts.jsonl"),
+              ORC_DASH_ALERTS_VERDICTS: join(alertFixtures, "verdicts.jsonl"),
             }),
           ),
           TestConsole.layer,

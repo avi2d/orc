@@ -19,7 +19,7 @@ export interface TaskSamples {
   readonly append: (records: ReadonlyArray<TaskSampleRecord>) => Effect.Effect<void, PlatformError.PlatformError | Schema.SchemaError>;
 }
 
-export class TaskSamplesSource extends Context.Service<TaskSamplesSource, TaskSamples>()("tui-dash/TaskSamplesSource") {}
+export class TaskSamplesSource extends Context.Service<TaskSamplesSource, TaskSamples>()("orc-dash/TaskSamplesSource") {}
 
 // One write of whole lines under O_APPEND lands whole beside a reader, which a rewrite of the file would race.
 const appended =

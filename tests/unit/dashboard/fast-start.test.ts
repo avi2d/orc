@@ -19,16 +19,16 @@ const slowStagesSources = dashboardSources({
   },
 });
 
-const remoteResourcesCommand = "ssh south.example.com tui-dash-resources --json";
+const remoteResourcesCommand = "ssh south.example.com orc-dash-resources --json";
 
 const slowSouthSources = dashboardSources({
-  env: { TUI_DASH_MACHINE: "north", TUI_DASH_REMOTE_MACHINE: "south", TUI_DASH_REMOTE_RESOURCES: remoteResourcesCommand },
+  env: { ORC_DASH_MACHINE: "north", ORC_DASH_REMOTE_MACHINE: "south", ORC_DASH_REMOTE_RESOURCES: remoteResourcesCommand },
   run: (command) =>
     command.argv.join(" ").includes(remoteResourcesCommand) ? Effect.as(Effect.sleep("3 seconds"), "") : Effect.sync(() => recordedAnswer(command)),
 });
 
 const hangingSouthSources = dashboardSources({
-  env: { TUI_DASH_MACHINE: "north", TUI_DASH_REMOTE_MACHINE: "south", TUI_DASH_REMOTE_RESOURCES: remoteResourcesCommand },
+  env: { ORC_DASH_MACHINE: "north", ORC_DASH_REMOTE_MACHINE: "south", ORC_DASH_REMOTE_RESOURCES: remoteResourcesCommand },
   run: (command) => (command.argv.join(" ").includes(remoteResourcesCommand) ? Effect.never : Effect.sync(() => recordedAnswer(command))),
 });
 
@@ -98,7 +98,7 @@ const hangingAgentsSources = dashboardSources({
   run: (command) => (command.argv.join(" ").startsWith("herdr agent list") ? Effect.never : Effect.sync(() => recordedAnswer(command))),
 });
 
-const hangingSources = dashboardSources({ env: { TUI_DASH_TASKS: tasksCommand }, run: () => Effect.never, conversation: { read: () => Effect.never } });
+const hangingSources = dashboardSources({ env: { ORC_DASH_TASKS: tasksCommand }, run: () => Effect.never, conversation: { read: () => Effect.never } });
 
 const readingLines = ["reading the quota\u2026", "reading the agents\u2026", "reading the machines\u2026", "reading the tasks\u2026", "reading pueue\u2026"];
 

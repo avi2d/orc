@@ -3,7 +3,7 @@ kind: reference
 ---
 # Run the session panel
 
-To run the live panel, run `tui-dash panel session-quota`.
+To run the live panel, run `orc-dash panel session-quota`.
 The panel paints again every 30 seconds and says `reading local session logs…` until the first read of the logs finishes.
 It fits the terminal's rows by showing fewer sessions a window, and it keeps every flagged session in view.
 Below one row a window, it shows the flags first and then whatever notes still fit.
@@ -56,4 +56,4 @@ It also needs no Herdr pane of that harness to name a log there or run there.
 Otherwise the panel names the processes that share the folder, and the folder's logs read as ended.
 Press `q` or Control C to quit.
 
-To print one frame of plain text instead, run `tui-dash panel session-quota --print`, and add `--width 40` for a narrow frame.
+To print one frame of plain text instead, run `orc-dash panel session-quota --print`, and add `--width 40` for a narrow frame.

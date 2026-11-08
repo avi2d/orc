@@ -60,7 +60,7 @@ const listed = (fs: FileSystem.FileSystem, root: string, harness: Harness, since
 export class SessionLogSource extends Context.Service<
   SessionLogSource,
   { readonly read: (listing: SinceByHarness, captured?: SinceByHarness) => Effect.Effect<SessionLogs> }
->()("tui-dash/SessionLogSource") {}
+>()("orc-dash/SessionLogSource") {}
 
 // A restart within this re-reads only what the logs appended since, so keeping more often only rewrites the copy.
 const keepWindowMillis = 300_000;
@@ -151,7 +151,7 @@ export const sessionLogSourceLayer: Layer.Layer<SessionLogSource, Config.ConfigE
 
 // The harvest reads back an hour and the session read back a whole window, so sharing one cache would evict the other's files on every read.
 export class HarvestLogSource extends Context.Service<HarvestLogSource, SessionLogSource["Service"]>()(
-  "tui-dash/HarvestLogSource",
+  "orc-dash/HarvestLogSource",
 ) {}
 
 export const harvestLogSourceLayer = <E, R>(

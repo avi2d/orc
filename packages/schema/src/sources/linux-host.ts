@@ -120,7 +120,7 @@ const arcReclaimableBytes = runDecoded(arcStatsCommand, decodeArcStats).pipe(
 );
 
 export class LinuxHostSource extends Context.Service<LinuxHostSource, Source<LinuxHost>>()(
-  "tui-dash/LinuxHostSource",
+  "orc-dash/LinuxHostSource",
 ) {}
 
 export const linuxHostSourceLayer = Layer.effect(

@@ -68,8 +68,8 @@ const projectsContent = (levels: TaskLevels, navigation: Navigation, width: numb
     ...(levels.unset
       ? noticeLines(
           levels.source === "remote"
-            ? "TUI_DASH_REMOTE_TASKS is unset, so only tasks sampled earlier show"
-            : "TUI_DASH_TASKS is unset, so only tasks sampled earlier show",
+            ? "ORC_DASH_REMOTE_TASKS is unset, so only tasks sampled earlier show"
+            : "ORC_DASH_TASKS is unset, so only tasks sampled earlier show",
           width,
         )
       : []),

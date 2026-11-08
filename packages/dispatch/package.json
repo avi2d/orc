@@ -2,7 +2,7 @@
   "name": "@avi2dg/orc-dispatch",
   "version": "0.1.0",
   "private": true,
-  "description": "Standalone OpenTUI dispatch panel for tui-dash, showing the orc dispatcher's machines, room, runs and waiting tasks",
+  "description": "Standalone OpenTUI dispatch panel for orc-dash, showing the orc dispatcher's machines, room, runs and waiting tasks",
   "repository": "https://github.com/avi2d/orc.git",
   "author": "avi2d <avi2dg@gmail.com>",
   "license": "MIT",

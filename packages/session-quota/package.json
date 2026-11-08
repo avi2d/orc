@@ -2,7 +2,7 @@
   "name": "@avi2dg/orc-session-quota",
   "version": "0.1.0",
   "private": true,
-  "description": "Standalone OpenTUI session quota panel, JSON contract and alert stream for tui-dash",
+  "description": "Standalone OpenTUI session quota panel, JSON contract and alert stream for orc-dash",
   "repository": "https://github.com/avi2d/orc.git",
   "author": "avi2d <avi2dg@gmail.com>",
   "license": "MIT",
@@ -12,7 +12,7 @@
     ".": "./src/index.ts"
   },
   "bin": {
-    "tui-dash-capture": "src/capture-bin.ts"
+    "orc-dash-capture": "src/capture-bin.ts"
   },
   "scripts": {
     "build": "bun build src/capture-bin.ts --outdir dist --target bun --minify"

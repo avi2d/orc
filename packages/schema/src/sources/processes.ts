@@ -149,11 +149,11 @@ export const linuxProcessesCommand = {
 } as const;
 
 export class MacProcessesSource extends Context.Service<MacProcessesSource, Source<ReadonlyArray<ProcessRow>>>()(
-  "tui-dash/MacProcessesSource",
+  "orc-dash/MacProcessesSource",
 ) {}
 
 export class LinuxProcessesSource extends Context.Service<LinuxProcessesSource, Source<ReadonlyArray<ProcessRow>>>()(
-  "tui-dash/LinuxProcessesSource",
+  "orc-dash/LinuxProcessesSource",
 ) {}
 
 export const macProcessesSourceLayer = Layer.effect(

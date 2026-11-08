@@ -5,11 +5,11 @@ import { fixture } from "../../lib/fixtures";
 import { dashboardSources, frameWhere, liveDashboard, recordedAnswer, tasksCommand } from "../../lib/dashboard-sources";
 import { machineStdout } from "../../lib/machines-fixture";
 
-const remoteCommand = "ssh south.example.com tui-dash-session-quota --json";
+const remoteCommand = "ssh south.example.com orc-dash-session-quota --json";
 
 const remotePueueCommand = "ssh south.example.com pueue status --json";
 
-const remoteResourcesCommand = "ssh south.example.com tui-dash-resources --json";
+const remoteResourcesCommand = "ssh south.example.com orc-dash-resources --json";
 
 const remoteTasksCommand = "ssh south.example.com tasks-report --json";
 
@@ -63,10 +63,10 @@ const southNow = () => machineStdout("south", (report) => ({ ...report, generate
 
 const twoMachineSources = recordedSourcesWith(Effect.void, {
   env: {
-    TUI_DASH_MACHINE: "north",
-    TUI_DASH_REMOTE_MACHINE: "south",
-    TUI_DASH_REMOTE_SESSION_QUOTA: remoteCommand,
-    TUI_DASH_REMOTE_RESOURCES: remoteResourcesCommand,
+    ORC_DASH_MACHINE: "north",
+    ORC_DASH_REMOTE_MACHINE: "south",
+    ORC_DASH_REMOTE_SESSION_QUOTA: remoteCommand,
+    ORC_DASH_REMOTE_RESOURCES: remoteResourcesCommand,
   },
   stdout: southNow,
 });
@@ -132,7 +132,7 @@ describe("the live dashboard", () => {
     const { promise: remoteHeld, resolve: answerRemote } = Promise.withResolvers<void>();
     const setup = await createTestRenderer({ width: 84, height: 30 });
     const held = recordedSourcesWith(Effect.void, {
-      env: { TUI_DASH_MACHINE: "north", TUI_DASH_REMOTE_MACHINE: "south", TUI_DASH_REMOTE_PUEUE: remotePueueCommand },
+      env: { ORC_DASH_MACHINE: "north", ORC_DASH_REMOTE_MACHINE: "south", ORC_DASH_REMOTE_PUEUE: remotePueueCommand },
       stdout: () => "",
       pueue: Effect.promise(() => remoteHeld).pipe(Effect.as(fixture("pueue/status.json"))),
     });
@@ -240,21 +240,21 @@ describe("the live dashboard", () => {
 
 const leveledSources = recordedSourcesWith(Effect.void, {
   env: {
-    TUI_DASH_MACHINE: "north",
-    TUI_DASH_REMOTE_MACHINE: "south",
-    TUI_DASH_REMOTE_RESOURCES: remoteResourcesCommand,
-    TUI_DASH_TASKS: tasksCommand,
+    ORC_DASH_MACHINE: "north",
+    ORC_DASH_REMOTE_MACHINE: "south",
+    ORC_DASH_REMOTE_RESOURCES: remoteResourcesCommand,
+    ORC_DASH_TASKS: tasksCommand,
   },
   stdout: southNow,
 });
 
 const remoteLeveledSources = recordedSourcesWith(Effect.void, {
   env: {
-    TUI_DASH_MACHINE: "north",
-    TUI_DASH_REMOTE_MACHINE: "south",
-    TUI_DASH_REMOTE_RESOURCES: remoteResourcesCommand,
-    TUI_DASH_TASKS: tasksCommand,
-    TUI_DASH_REMOTE_TASKS: remoteTasksCommand,
+    ORC_DASH_MACHINE: "north",
+    ORC_DASH_REMOTE_MACHINE: "south",
+    ORC_DASH_REMOTE_RESOURCES: remoteResourcesCommand,
+    ORC_DASH_TASKS: tasksCommand,
+    ORC_DASH_REMOTE_TASKS: remoteTasksCommand,
   },
   stdout: southNow,
 });

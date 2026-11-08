@@ -11,7 +11,7 @@ import { fixture } from "../../lib/fixtures";
 let home = "";
 
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "tui-dash-tasks-watch-"));
+  home = mkdtempSync(join(tmpdir(), "orc-dash-tasks-watch-"));
   mkdirSync(join(home, "state"));
   mkdirSync(join(home, "data"));
   writeFileSync(join(home, "state", "bridge.meta"), "kind=ship\n");
@@ -61,7 +61,7 @@ const watching = <A>(
   const sources = Layer.mergeAll(
     Layer.succeed(CommandRunner, countingRunner(runs, answer)),
     BunFileSystem.layer,
-    ConfigProvider.layer(ConfigProvider.fromEnvRecord({ TUI_DASH_TASKS: "tasks-report.sh", ...env })),
+    ConfigProvider.layer(ConfigProvider.fromEnvRecord({ ORC_DASH_TASKS: "tasks-report.sh", ...env })),
   );
   return Effect.runPromise(
     Effect.gen(function* () {
@@ -78,7 +78,7 @@ const capturedSecond = (reading: Reading<ReportedTasks>): number => DateTime.toE
 
 describe("the live tasks report, rerun only when what the orchestrator writes has changed", () => {
   test("runs the report once while nothing it watches changes, however often the screen asks", async () => {
-    const started = await watching({ TUI_DASH_TASKS_WATCH: watchedHome() }, {}, (read, runs) =>
+    const started = await watching({ ORC_DASH_TASKS_WATCH: watchedHome() }, {}, (read, runs) =>
       Effect.gen(function* () {
         for (const seconds of [0, 10, 31, 61, 91, 121, 181]) yield* readAt(read, seconds);
         return runs.started;
@@ -88,7 +88,7 @@ describe("the live tasks report, rerun only when what the orchestrator writes ha
   });
 
   test("reruns on the first read 30 seconds after the last run once the backlog changed, and not sooner", async () => {
-    const seen = await watching({ TUI_DASH_TASKS_WATCH: watchedHome() }, {}, (read, runs) =>
+    const seen = await watching({ ORC_DASH_TASKS_WATCH: watchedHome() }, {}, (read, runs) =>
       Effect.gen(function* () {
         yield* readAt(read, 0);
         appendFileSync(join(home, "data", "backlog.md"), "- [ ] bridge-plot - plot the bridge\n");
@@ -102,7 +102,7 @@ describe("the live tasks report, rerun only when what the orchestrator writes ha
   });
 
   test("reruns once a line is appended to a task's status file in a watched folder", async () => {
-    const started = await watching({ TUI_DASH_TASKS_WATCH: watchedHome() }, {}, (read, runs) =>
+    const started = await watching({ ORC_DASH_TASKS_WATCH: watchedHome() }, {}, (read, runs) =>
       Effect.gen(function* () {
         yield* readAt(read, 0);
         yield* readAt(read, 40);
@@ -116,7 +116,7 @@ describe("the live tasks report, rerun only when what the orchestrator writes ha
   });
 
   test("counts a new entry in a watched folder but not a hidden one", async () => {
-    const started = await watching({ TUI_DASH_TASKS_WATCH: watchedHome() }, {}, (read, runs) =>
+    const started = await watching({ ORC_DASH_TASKS_WATCH: watchedHome() }, {}, (read, runs) =>
       Effect.gen(function* () {
         yield* readAt(read, 0);
         writeFileSync(join(home, "state", ".last-watcher-beat"), "");
@@ -209,7 +209,7 @@ describe("the live tasks report, rerun only when what the orchestrator writes ha
   });
 
   test("reruns a failed report only once something it watches changed", async () => {
-    const seen = await watching({ TUI_DASH_TASKS_WATCH: watchedHome() }, { fails: (run) => run === 1 }, (read, runs) =>
+    const seen = await watching({ ORC_DASH_TASKS_WATCH: watchedHome() }, { fails: (run) => run === 1 }, (read, runs) =>
       Effect.gen(function* () {
         const failed = yield* readAt(read, 0);
         const held = yield* readAt(read, 30);
@@ -223,7 +223,7 @@ describe("the live tasks report, rerun only when what the orchestrator writes ha
 
   test("watches entries with space around the separator", async () => {
     const spaced = `${join(home, "state")} : ${join(home, "data", "backlog.md")}`;
-    const started = await watching({ TUI_DASH_TASKS_WATCH: spaced }, {}, (read, runs) =>
+    const started = await watching({ ORC_DASH_TASKS_WATCH: spaced }, {}, (read, runs) =>
       Effect.gen(function* () {
         yield* readAt(read, 0);
         appendFileSync(join(home, "data", "backlog.md"), "- [ ] bridge-plot - plot the bridge\n");
@@ -244,7 +244,7 @@ describe("the live tasks report, rerun only when what the orchestrator writes ha
     mkdirSync(join(east, "data"), { recursive: true });
     writeFileSync(join(east, "data", "backlog.md"), "# Backlog\n");
     const seen = await watching(
-      { TUI_DASH_TASKS_WATCH: watchedHome(), FM_TASKS_HOMES: other, FM_HOME: other, HOME: home },
+      { ORC_DASH_TASKS_WATCH: watchedHome(), FM_TASKS_HOMES: other, FM_HOME: other, HOME: home },
       {},
       (read, runs) =>
         Effect.gen(function* () {
