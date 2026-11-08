@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite"
 import { Effect, Schema } from "effect"
 import { sqlite, type SqliteFailure } from "./run-history"
 
-export const GateRefusalSchema = Schema.Struct({ gate: Schema.String, rule: Schema.String })
+export const GateRefusalSchema = Schema.Struct({ gate: Schema.String, rule: Schema.NullOr(Schema.String) })
 
 export type GateRefusal = typeof GateRefusalSchema.Type
 
@@ -26,203 +26,45 @@ const summaryGates = (text: string): ReadonlyArray<string> => {
   return gates
 }
 
-const genericHeader = (line: string): string | null => {
-  const gate = /^([A-Za-z_][\w.-]*): \d+ [^\n]*\((?:s|ies)\)/.exec(line)?.[1]
-  return gate === undefined ? null : shortGate(gate)
+const stableRules = (output: string): ReadonlyArray<string> => {
+  const rules: Array<string> = []
+  for (const line of output.split("\n")) {
+    const tool = /\b(?:error|warning)\s+([A-Za-z][\w-]*\([^()\s]+\))/.exec(line)?.[1]
+      ?? /\berror\s+(TS\d+)\b/.exec(line)?.[1]
+    if (tool !== undefined && !rules.includes(tool)) {
+      rules.push(tool)
+    }
+  }
+  return rules
 }
 
-const secretsHeader = (line: string): string | null =>
-  /^secrets: the range adds \d+ secret\(s\);/.test(line) ? "secrets" : null
-
-type GraphwalkSection = "imports" | "unused" | "exports"
-
-const graphwalkHeader = (line: string): GraphwalkSection | null => {
-  if (/^imports: \d+ violation\(s\) in/.test(line)) {
-    return "imports"
-  }
-  if (/^unused: \d+ unreferenced file\(s\):/.test(line)) {
-    return "unused"
-  }
-  if (/^exports: \d+ .*:$/.test(line)) {
-    return "exports"
-  }
-  return null
-}
-
-const locatorStripped = (line: string): string => {
-  const stripped = line.replace(/^\S+ line \d+:\s+|^[^:]+?:\d+(?::\d+)?:?\s+|^\S+:\s+|^(?=\S*[/.])\S+\s+/, "")
-  return stripped === "" ? line : stripped
-}
-
-const singleLinePrefixes: ReadonlyArray<readonly [string, string]> = [
-  ["effect-scope", "the @effect/language-service entry in tsconfig.json differs"],
-  ["lint-coverage", "oxlint skips "],
-  ["lint-coverage", "oxlint could not walk"],
-  ["lint-coverage", "tsc could not list"],
-  ["lint-coverage", "the program tsconfig.json builds drops"],
-  ["commit-identity", "package.json declares no author"],
-]
-
-const singleLineRule = (gate: string, rest: string): string =>
-  gate === "lint-coverage" ? rest.replace(/^oxlint skips \d+\/\d+ /, "oxlint skips ") : rest
-
-const repetitionRule = (line: string): string | null => {
-  const rise = /^(\d+) repeated line\(s\)(, up from (\d+))?$/.exec(line)
-  if (rise === null) {
-    return null
-  }
-  return rise[2] === undefined ? "repeated line(s)" : "repeated line(s), up from"
-}
-
-const testLayoutRule = (line: string): string =>
-  line.replace(/; move it to \S+$/, "")
-
-const commitRule = (line: string): string | null => {
-  const kind = /^(author|committer)\s/.exec(line)?.[1]
-  if (kind !== undefined) {
-    return kind
-  }
-  const trailer = /^trailer\s+(.*)$/.exec(line)?.[1]?.trim()
-  if (trailer !== undefined) {
-    const key = /^([^:]+:)/.exec(trailer)?.[1]
-    return key === undefined ? "trailer" : "trailer " + key
-  }
-  return null
-}
-
-const secretsRule = (line: string): string | null => {
-  const rule = /^.+?\s+(\S+) in [0-9a-fA-F]+:\s*(.+)$/.exec(line)
-  if (rule?.[1] === undefined || rule[2] === undefined) {
-    return null
-  }
-  return rule[1] + ": " + rule[2]
-}
-
-const importsRule = (line: string): string | null => {
-  const rule = /^(\S+) (\S+): /.exec(line)
-  return rule?.[1] === undefined || rule[2] === undefined ? null : rule[1] + " " + rule[2]
-}
-
-export const refusalsIn = (output: string): ReadonlyArray<GateRefusal> => {
-  const named = new Set(summaryGates(output))
-  const allowed = (gate: string): boolean => named.size === 0 || named.has(gate)
+export const refusalsIn = (output: string, check: string): ReadonlyArray<GateRefusal> => {
   const seen = new Set<string>()
   const refusals: Array<GateRefusal> = []
-  const keep = (gate: string, rule: string): void => {
-    const key = gate + "\0" + rule
-    if (rule === "" || seen.has(key)) {
+  const keep = (gate: string, rule: string | null): void => {
+    const key = gate + "\0" + (rule ?? "")
+    if (gate === "" || seen.has(key)) {
       return
     }
     seen.add(key)
     refusals.push({ gate, rule })
   }
-  let gate: string | null = null
-  let section: GraphwalkSection | "secrets" | "commit" | "violation" | null = null
-  for (const raw of output.split("\n")) {
-    const secrets = secretsHeader(raw)
-    if (secrets !== null) {
-      gate = allowed(secrets) ? secrets : null
-      section = gate === null ? null : "secrets"
-      continue
-    }
-    const graphwalk = graphwalkHeader(raw)
-    if (graphwalk !== null) {
-      gate = allowed("graphwalk") ? "graphwalk" : null
-      section = gate === null ? null : graphwalk
-      continue
-    }
-    const header = genericHeader(raw)
-    if (header !== null) {
-      gate = allowed(header) ? header : null
-      section = gate === null ? null : gate === "commit-identity" ? "commit" : "violation"
-      continue
-    }
-    if (/^ /.test(raw)) {
-      if (gate === null || section === null) {
-        continue
-      }
-      if (section === "commit") {
-        if (/^ {4}\S/.test(raw)) {
-          const rule = commitRule(raw.trim())
-          if (rule !== null) {
-            keep(gate, rule)
-          }
-        }
-        continue
-      }
-      if (/^ {4}\S/.test(raw)) {
-        continue
-      }
-      if (!/^ {2}\S/.test(raw)) {
-        continue
-      }
-      if (section === "secrets") {
-        const rule = secretsRule(raw.trim())
-        if (rule !== null) {
-          keep(gate, rule)
-        }
-        continue
-      }
-      if (section === "imports") {
-        const rule = importsRule(raw.trim())
-        if (rule !== null) {
-          keep(gate, rule)
-        }
-        continue
-      }
-      if (section === "unused") {
-        if (!raw.trim().includes(":")) {
-          keep(gate, "unreferenced file")
-        }
-        continue
-      }
-      if (section === "exports") {
-        const rule = locatorStripped(raw.trim())
-        if (rule.includes("(") && rule.includes(")")) {
-          keep(gate, rule)
-        }
-        continue
-      }
-      if (gate === "repetition") {
-        const rule = repetitionRule(locatorStripped(raw.trim()))
-        if (rule !== null) {
-          keep(gate, rule)
-        }
-        continue
-      }
-      if (gate === "test-layout") {
-        keep(gate, testLayoutRule(locatorStripped(raw.trim())))
-        continue
-      }
-      keep(
-        gate,
-        locatorStripped(raw.trim()).replace(/^.*,\s+over the /, "over the ").replace(
-          /\. Its largest section is [^.]*\./,
-          "."
-        )
-      )
-      continue
-    }
-    gate = null
-    section = null
-    const single = /^([A-Za-z][A-Za-z0-9_-]*): (.+)$/.exec(raw)
-    const name = single?.[1]
-    const rest = single?.[2]?.trim()
-    if (name !== undefined && rest !== undefined && rest !== "") {
-      for (const [prefixGate, prefix] of singleLinePrefixes) {
-        if (name === prefixGate && rest.startsWith(prefix) && allowed(prefixGate)) {
-          keep(prefixGate, singleLineRule(prefixGate, rest))
-          break
-        }
-      }
-    }
+  const bins = summaryGates(output)
+  for (const bin of bins) {
+    keep(bin, null)
+  }
+  for (const rule of stableRules(output)) {
+    keep(check, rule)
+  }
+  if (bins.length === 0 && refusals.length === 0) {
+    keep(check, null)
   }
   return refusals
 }
 
 export const distinctRefusals = (refusals: ReadonlyArray<GateRefusal>): ReadonlyArray<GateRefusal> =>
   refusals.filter((refusal, index, all) =>
-    all.findIndex((other) => other.gate === refusal.gate && other.rule === refusal.rule) === index
+    all.findIndex((other) => other.gate === refusal.gate && (other.rule ?? "") === (refusal.rule ?? "")) === index
   )
 
 export const refusalValue = (refusal: GateRefusal): string =>
@@ -232,7 +74,7 @@ export const refusalSignalName = "refusal"
 
 const RefusalCountSchema = Schema.Struct({
   gate: Schema.String,
-  rule: Schema.String,
+  rule: Schema.NullOr(Schema.String),
   runs: Schema.Finite
 })
 
@@ -273,9 +115,9 @@ export const readRefusals = (
   ).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(RefusalRowSchema))),
     Effect.map((rows) => {
-      const runsByRefusal = new Map<string, { readonly gate: string; readonly rule: string; readonly runs: Set<string> }>()
+      const runsByRefusal = new Map<string, { readonly gate: string; readonly rule: string | null; readonly runs: Set<string> }>()
       for (const row of rows) {
-        const key = row.value.gate + "\0" + row.value.rule
+        const key = row.value.gate + "\0" + (row.value.rule ?? "")
         const entry = runsByRefusal.get(key)
         if (entry === undefined) {
           runsByRefusal.set(key, { gate: row.value.gate, rule: row.value.rule, runs: new Set([row.run_id]) })
@@ -285,14 +127,14 @@ export const readRefusals = (
       }
       return [...runsByRefusal.values()]
         .map((entry) => ({ gate: entry.gate, rule: entry.rule, runs: entry.runs.size }))
-        .toSorted((left, right) => right.runs - left.runs || left.gate.localeCompare(right.gate) || left.rule.localeCompare(right.rule))
+        .toSorted((left, right) => right.runs - left.runs || left.gate.localeCompare(right.gate) || (left.rule ?? "").localeCompare(right.rule ?? ""))
     })
   )
 
 const ruleColumnWidth = 96
 
-const displayRule = (rule: string): string =>
-  rule.length <= ruleColumnWidth ? rule : rule.slice(0, ruleColumnWidth - 1) + "\u2026"
+const displayRule = (rule: string | null): string =>
+  rule === null ? "\u2014" : rule.length <= ruleColumnWidth ? rule : rule.slice(0, ruleColumnWidth - 1) + "\u2026"
 
 export const formatRefusalsTable = (counts: ReadonlyArray<RefusalCount>): string => {
   if (counts.length === 0) {

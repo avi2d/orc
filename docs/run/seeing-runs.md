@@ -20,4 +20,4 @@ Orc score keeps one row per score and orc show prints the latest score beside th
 To count the gates and rules past runs kept hitting, run `orc refusals`.
 To print the same facts as JSON, run `orc refusals --json`.
 Its JSON document names its version first as `schema`, starting at `orc.refusals.v1`.
-Each row counts the runs that hit one gate and rule, so two failing rounds in one run count once.
+Each row counts the runs that hit one gate, and one rule where the failure names a stable rule code, so two failing rounds in one run count once.

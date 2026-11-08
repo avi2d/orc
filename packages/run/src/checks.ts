@@ -105,7 +105,7 @@ export const runChecksRound = (
         Effect.mapError((cause) => new ChecksError({ message: "orc: the " + check.name + " check failed to run: " + cause.message }))
       )
       const passed = result.exitCode === 0
-      const outcome: CheckOutcome = { name: check.name, command: check.command, exitCode: result.exitCode, passed, refusals: passed ? [] : refusalsIn(result.stdout + "\n" + result.stderr) }
+      const outcome: CheckOutcome = { name: check.name, command: check.command, exitCode: result.exitCode, passed, refusals: passed ? [] : refusalsIn(result.stdout + "\n" + result.stderr, check.name) }
       outcomes.push(outcome)
       yield* fs.writeFileString(file, (first ? "" : "\n\n") + sectionOf(outcome, result.stdout, result.stderr), first ? undefined : { flag: "a" }).pipe(
         Effect.mapError((cause) => new ChecksError({ message: "orc: cannot write the checks evidence file: " + String(cause) }))
