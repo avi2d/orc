@@ -15,7 +15,6 @@ export class CommandUnreachable extends Data.TaggedError("CommandUnreachable")<{
 }> {}
 
 export class CommandAbsent extends Data.TaggedError("CommandAbsent")<{
-  readonly program: string;
   readonly reason: string;
 }> {}
 

@@ -59,7 +59,7 @@ const spawn = ({ argv, cwd, stdin }: Command, groups: Set<number>) =>
 
 const installed = (program: string): Effect.Effect<void, CommandAbsent> =>
   Bun.which(program) === null
-    ? Effect.fail(new CommandAbsent({ program, reason: `${program} is not installed on the PATH` }))
+    ? Effect.fail(new CommandAbsent({ reason: `${program} is not installed on the PATH` }))
     : Effect.void;
 
 const runnerOf = (groups: Set<number>): CommandRunner["Service"] => ({

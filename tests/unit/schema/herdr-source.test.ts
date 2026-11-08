@@ -14,7 +14,7 @@ const readAnswering = (answer: Effect.Effect<string, CommandUnreachable | Comman
 
 describe("the herdr source", () => {
   test("reads no panes where herdr is not installed instead of a failed read", async () => {
-    const absent = new CommandAbsent({ program: "herdr", reason: "herdr is not installed on the PATH" });
+    const absent = new CommandAbsent({ reason: "herdr is not installed on the PATH" });
     expect(await readAnswering(Effect.fail(absent))).toEqual({ kind: "ok", value: [] });
   });
 
