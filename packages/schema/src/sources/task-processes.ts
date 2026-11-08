@@ -349,7 +349,7 @@ const macTaskProcessesCommand = {
 } as const;
 
 export class TaskProcessesSource extends Context.Service<TaskProcessesSource, Source<ProcessSamples>>()(
-  "tui-dash/TaskProcessesSource",
+  "orc-dash/TaskProcessesSource",
 ) {}
 
 export const linuxTaskProcessesSourceLayer = Layer.effect(

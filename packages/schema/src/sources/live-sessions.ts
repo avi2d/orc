@@ -81,10 +81,10 @@ const macHarnessCommand = {
   timeout: Duration.seconds(10),
 } as const;
 
-export class HerdrSource extends Context.Service<HerdrSource, Source<ReadonlyArray<HerdrPane>>>()("tui-dash/HerdrSource") {}
+export class HerdrSource extends Context.Service<HerdrSource, Source<ReadonlyArray<HerdrPane>>>()("orc-dash/HerdrSource") {}
 
 export class HarnessProcessSource extends Context.Service<HarnessProcessSource, Source<ReadonlyArray<HarnessProcess>>>()(
-  "tui-dash/HarnessProcessSource",
+  "orc-dash/HarnessProcessSource",
 ) {}
 
 // No session runs in a herdr pane where herdr is not installed, so its absence reads as no panes rather than as a failure.

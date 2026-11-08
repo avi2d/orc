@@ -62,7 +62,7 @@ const readTwice = async (env: Record<string, string>) => {
 
 describe("the actions source", () => {
   test("asks gh about each active status of the configured repository, and reuses a fresh read", async () => {
-    const { repo, runs, asked } = await readTwice({ TUI_DASH_ACTIONS_REPO: "example/shop" });
+    const { repo, runs, asked } = await readTwice({ ORC_DASH_ACTIONS_REPO: "example/shop" });
     expect(repo).toBe("example/shop");
     expect(valueOf(runs)).toHaveLength(2);
     const statuses = asked.map((line) => /--repo example\/shop --status (\S+) /u.exec(line)?.[1]);
@@ -70,7 +70,7 @@ describe("the actions source", () => {
     expect(new Set(statuses)).toEqual(new Set(["requested", "pending", "waiting", "queued", "in_progress"]));
   });
 
-  for (const env of [{}, { TUI_DASH_ACTIONS_REPO: " " }]) {
+  for (const env of [{}, { ORC_DASH_ACTIONS_REPO: " " }]) {
     test(`leaves the repository to gh's working directory when the variable is ${JSON.stringify(env)}`, async () => {
       const { repo, asked } = await readTwice(env);
       expect(repo).toBe("this repository");

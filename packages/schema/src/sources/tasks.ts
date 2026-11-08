@@ -10,9 +10,9 @@ export interface TasksMachine {
   readonly read: Effect.Effect<Reading<ReportedTasks>>;
 }
 
-export class TasksMachines extends Context.Service<TasksMachines, ReadonlyArray<TasksMachine>>()("tui-dash/TasksMachines") {}
+export class TasksMachines extends Context.Service<TasksMachines, ReadonlyArray<TasksMachine>>()("orc-dash/TasksMachines") {}
 
-export class LocalTasks extends Context.Service<LocalTasks, Option.Option<TasksMachine>>()("tui-dash/LocalTasks") {}
+export class LocalTasks extends Context.Service<LocalTasks, Option.Option<TasksMachine>>()("orc-dash/LocalTasks") {}
 
 // The adapter prints one orchestrator snapshot, so the command answers in seconds on either machine.
 const tasksTimeout = Duration.seconds(15);
@@ -22,8 +22,8 @@ const localTasksTimeout = Duration.seconds(5);
 
 const machinesConfig = Config.all({
   names: machineNames,
-  local: selector("TUI_DASH_TASKS"),
-  remote: selector("TUI_DASH_REMOTE_TASKS"),
+  local: selector("ORC_DASH_TASKS"),
+  remote: selector("ORC_DASH_REMOTE_TASKS"),
 });
 
 const machineOf = (
@@ -68,7 +68,7 @@ const splitWatch = (value: string): Array<string> =>
   value.split(":").map((part) => part.trim()).filter((part) => part !== "");
 
 const watchSettings = Config.all({
-  watch: selector("TUI_DASH_TASKS_WATCH"),
+  watch: selector("ORC_DASH_TASKS_WATCH"),
   taskHomes: selector("FM_TASKS_HOMES"),
   fmHome: selector("FM_HOME"),
   home: selector("HOME"),

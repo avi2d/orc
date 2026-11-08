@@ -6,8 +6,8 @@ export const selector = (name: string): Config.Config<string | undefined> =>
   );
 
 export const machineNames: Config.Config<{ readonly local: string; readonly remote: string }> = Config.all({
-  local: Config.String("TUI_DASH_MACHINE").pipe(Config.withDefault("local")),
-  remote: Config.String("TUI_DASH_REMOTE_MACHINE").pipe(Config.withDefault("remote")),
+  local: Config.String("ORC_DASH_MACHINE").pipe(Config.withDefault("local")),
+  remote: Config.String("ORC_DASH_REMOTE_MACHINE").pipe(Config.withDefault("remote")),
 });
 
 export const claudeConfigDirectory: Config.Config<string> = Config.all({
@@ -25,7 +25,7 @@ const stateDirectory = (folder: string): Config.Config<string> =>
   Config.all({
     home: Config.String("HOME"),
     state: selector("XDG_STATE_HOME"),
-  }).pipe(Config.map(({ home, state }) => `${state ?? `${home}/.local/state`}/tui-dash/${folder}`));
+  }).pipe(Config.map(({ home, state }) => `${state ?? `${home}/.local/state`}/orc-dash/${folder}`));
 
 export const captureLedgerDirectory: Config.Config<string> = stateDirectory("usage");
 

@@ -91,7 +91,7 @@ const sourcesOf = (remote: string, shell: Shell) =>
         },
       }),
     ),
-    Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ TUI_DASH_MACHINE: "north", TUI_DASH_REMOTE_MACHINE: "south", TUI_DASH_REMOTE_PUEUE: remote }))),
+    Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ ORC_DASH_MACHINE: "north", ORC_DASH_REMOTE_MACHINE: "south", ORC_DASH_REMOTE_PUEUE: remote }))),
   );
 
 const projectsOn = (report: QueuesReport, machine: string) => {

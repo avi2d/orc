@@ -42,7 +42,7 @@ describe("the alert stream orc runner start queues", () => {
       expect(await linesOf(join(fixture.pueue, "alerts-add-args"))).toEqual([
         "add", "--group", group, "--label", fixture.home + " alerts", "--working-directory", fixture.home, "--print-task-id", "--escape", "--",
         "sh", "-c", "out=$1; shift; exec \"$@\" >> \"$out\"", "orc-alerts", join(fixture.home, "backlog", "alerts.jsonl"),
-        join(fixture.dir, "bin", "tui-dash"), "alerts", "--json"
+        join(fixture.dir, "bin", "orc-dash"), "alerts", "--json"
       ])
       expect(started.stdout).toBe(
         "queued task-9 as pueue task 77 in group orc\n" +

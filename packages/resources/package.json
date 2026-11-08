@@ -2,7 +2,7 @@
   "name": "@avi2dg/orc-resources",
   "version": "0.1.0",
   "private": true,
-  "description": "Standalone OpenTUI resources panel for tui-dash",
+  "description": "Standalone OpenTUI resources panel for orc-dash",
   "repository": "https://github.com/avi2d/orc.git",
   "author": "avi2d <avi2dg@gmail.com>",
   "license": "MIT",

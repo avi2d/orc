@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 const command = join(import.meta.dir, "..", "..", "..", "packages", "cli", "src", "bin.ts");
 
-const home = mkdtempSync(join(tmpdir(), "tui-dash-panel-e2e-"));
+const home = mkdtempSync(join(tmpdir(), "orc-dash-panel-e2e-"));
 
 afterAll(() => rmSync(home, { recursive: true, force: true }));
 
@@ -17,7 +17,7 @@ interface Ran {
 
 const run = async (args: ReadonlyArray<string>, config = join(home, "absent.json")): Promise<Ran> => {
   const child = Bun.spawn(["bun", command, ...args], {
-    env: { PATH: process.env["PATH"] ?? "", HOME: home, TUI_DASH_CONFIG: config },
+    env: { PATH: process.env["PATH"] ?? "", HOME: home, ORC_DASH_CONFIG: config },
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
@@ -28,7 +28,7 @@ const run = async (args: ReadonlyArray<string>, config = join(home, "absent.json
 
 const panels = ["quota", "session-quota", "alerts", "resources", "queues", "schedules", "dispatch", "tasks", "ledger"];
 
-describe("tui-dash panel", () => {
+describe("orc-dash panel", () => {
   test("--list names every panel with what it shows", async () => {
     const listed = await run(["panel", "--list"]);
     expect(listed.code).toBe(0);
@@ -118,7 +118,7 @@ describe("a setting the command refuses", () => {
   }, 60_000);
 });
 
-describe("tui-dash", () => {
+describe("orc-dash", () => {
   test("refuses --color without --print", async () => {
     const refused = await run(["--color"]);
     expect(refused.code).toBe(1);

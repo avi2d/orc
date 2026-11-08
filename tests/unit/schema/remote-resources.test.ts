@@ -180,18 +180,18 @@ const machinesWith = (env: Record<string, string>, answer: (command: Command) =>
     ),
   );
 
-const remoteCommand = "ssh -o BatchMode=yes south.example.com 'cd tui-dash && bun run resources-json'";
+const remoteCommand = "ssh -o BatchMode=yes south.example.com 'cd orc && bun run resources-json'";
 
 describe("the remote resources source", () => {
   test("reads nothing remote when no command is configured", async () => {
-    const found = await machinesWith({ TUI_DASH_REMOTE_RESOURCES: "  " }, () => Effect.die("no command runs"));
+    const found = await machinesWith({ ORC_DASH_REMOTE_RESOURCES: "  " }, () => Effect.die("no command runs"));
     expect(found).toEqual({ local: "local", names: [], readings: [] });
   });
 
   test("runs the configured command through the shell and reads its report", async () => {
     const asked: Array<Command> = [];
     const found = await machinesWith(
-      { TUI_DASH_MACHINE: "north", TUI_DASH_REMOTE_MACHINE: "south", TUI_DASH_REMOTE_RESOURCES: remoteCommand },
+      { ORC_DASH_MACHINE: "north", ORC_DASH_REMOTE_MACHINE: "south", ORC_DASH_REMOTE_RESOURCES: remoteCommand },
       (command) => {
         asked.push(command);
         return Effect.succeed(southReport());
@@ -205,7 +205,7 @@ describe("the remote resources source", () => {
   });
 
   test("reports the command's failure as the machine's", async () => {
-    const found = await machinesWith({ TUI_DASH_REMOTE_RESOURCES: remoteCommand }, () =>
+    const found = await machinesWith({ ORC_DASH_REMOTE_RESOURCES: remoteCommand }, () =>
       Effect.fail(new CommandUnreachable({ reason: "sh exited 255: ssh: connect to host south.example.com port 22: Connection refused" })),
     );
     expect(found.names).toEqual(["remote"]);

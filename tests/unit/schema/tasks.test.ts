@@ -154,7 +154,7 @@ describe("the tasks command source, run through the shell with a time limit", ()
   });
 
   test("treats a blank command as none", async () => {
-    const found = await machinesWith({ TUI_DASH_TASKS: "  ", TUI_DASH_REMOTE_TASKS: "" }, () =>
+    const found = await machinesWith({ ORC_DASH_TASKS: "  ", ORC_DASH_REMOTE_TASKS: "" }, () =>
       Effect.die("no command runs"),
     );
     expect(found).toEqual({ names: [], readings: [] });
@@ -162,7 +162,7 @@ describe("the tasks command source, run through the shell with a time limit", ()
 
   test("runs the local command through the shell and reads its report", async () => {
     const asked: Array<Command> = [];
-    const found = await machinesWith({ TUI_DASH_MACHINE: "north", TUI_DASH_TASKS: localCommand }, (command) => {
+    const found = await machinesWith({ ORC_DASH_MACHINE: "north", ORC_DASH_TASKS: localCommand }, (command) => {
       asked.push(command);
       return Effect.succeed(report());
     });
@@ -176,7 +176,7 @@ describe("the tasks command source, run through the shell with a time limit", ()
   test("reads the other machine beside this one under its own name", async () => {
     const asked: Array<Command> = [];
     const found = await machinesWith(
-      { TUI_DASH_MACHINE: "north", TUI_DASH_TASKS: localCommand, TUI_DASH_REMOTE_MACHINE: "south", TUI_DASH_REMOTE_TASKS: remoteCommand },
+      { ORC_DASH_MACHINE: "north", ORC_DASH_TASKS: localCommand, ORC_DASH_REMOTE_MACHINE: "south", ORC_DASH_REMOTE_TASKS: remoteCommand },
       (command) => {
         asked.push(command);
         return Effect.succeed(report());
@@ -191,7 +191,7 @@ describe("the tasks command source, run through the shell with a time limit", ()
   });
 
   test("reports the command failure as the machine's", async () => {
-    const found = await machinesWith({ TUI_DASH_TASKS: localCommand }, () =>
+    const found = await machinesWith({ ORC_DASH_TASKS: localCommand }, () =>
       Effect.fail(new CommandUnreachable({ reason: "sh exited 127: harbor-tasks: command not found" })),
     );
     expect(found.names).toEqual(["local"]);

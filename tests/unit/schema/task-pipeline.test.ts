@@ -92,9 +92,9 @@ describe("a full review fix reads its recorded pipeline steps, a merge not done 
 
   test("the recorded run keeps its reviewer, findings, outcome and PR", () => {
     expect(run).toMatchObject({
-      branch: "fm/tui-dash-fast-start",
+      branch: "fm/orc-dash-fast-start",
       status: "completed",
-      pr: "https://github.com/avi2d/tui-dash/pull/39",
+      pr: "https://github.com/avi2d/orc/pull/39",
       outcome: "passed",
       findings: "7 awaiting, 1 auto-fix",
       reviewer: "pi/openai/gpt-6.1-sol",
@@ -243,14 +243,14 @@ describe("the recorded overview joins each run to its branch, and no run invente
   test("the overview keeps every run with its branch, status and PR", () => {
     expect(snapshot).toHaveLength(8);
     expect(snapshot.find((run) => run.id === "01M5CRTKB9KS7MPBNCZA1EFWFH")).toMatchObject({
-      branch: "fm/tui-dash-projects-hide-done",
+      branch: "fm/orc-dash-projects-hide-done",
       status: "failed",
       pr: "",
     });
   });
 
   test("a task meets the run on its own branch and no other", () => {
-    expect(noMistakesRunOf(snapshot, ["fm/tui-dash-fast-start"])?.id).toBe("01M5CFR1F0AA7A1FF8AM4DYM9V");
+    expect(noMistakesRunOf(snapshot, ["fm/orc-dash-fast-start"])?.id).toBe("01M5CFR1F0AA7A1FF8AM4DYM9V");
     expect(noMistakesRunOf(snapshot, ["fm/never-recorded"])).toBeUndefined();
   });
 
@@ -513,7 +513,7 @@ describe("only open tasks of a recorded kind ask for a read", () => {
   const tasks = valueOf(decodeTasksReport(fixture("tasks/pipeline.json"))).view.tasks;
 
   test("each folder asks once with every branch its open tasks work on", () => {
-    expect(pipelineFoldersOf(tasks, "full review fix")).toEqual([{ folder: "/home/example/work/harbor", branches: ["fm/tui-dash-fast-start"] }]);
+    expect(pipelineFoldersOf(tasks, "full review fix")).toEqual([{ folder: "/home/example/work/harbor", branches: ["fm/orc-dash-fast-start"] }]);
     expect(pipelineFoldersOf(tasks, "orc run").map((wanted) => wanted.folder)).toEqual(["/home/example/work/harbor"]);
     expect(pipelineFoldersOf(tasks.filter((task) => task.kind !== "full review fix"), "full review fix")).toEqual([]);
   });

@@ -130,10 +130,10 @@ const sourcesAnswering = (run: (command: Command) => Effect.Effect<string>) => L
     Layer.provide(
       ConfigProvider.layer(
         ConfigProvider.fromEnvRecord({
-          TUI_DASH_MACHINE: "north",
-          TUI_DASH_TASKS: tasksCommand,
-          TUI_DASH_REMOTE_MACHINE: "south",
-          TUI_DASH_REMOTE_TASKS: remoteTasksCommand,
+          ORC_DASH_MACHINE: "north",
+          ORC_DASH_TASKS: tasksCommand,
+          ORC_DASH_REMOTE_MACHINE: "south",
+          ORC_DASH_REMOTE_TASKS: remoteTasksCommand,
         }),
       ),
     ),
@@ -167,10 +167,10 @@ const frameWhere = async (setup: TestRendererSetup, matches: (frame: string) => 
 
 const bothMachines = ConfigProvider.layer(
   ConfigProvider.fromEnvRecord({
-    TUI_DASH_MACHINE: "north",
-    TUI_DASH_REMOTE_MACHINE: "south",
-    TUI_DASH_TASKS: tasksCommand,
-    TUI_DASH_REMOTE_TASKS: remoteTasksCommand,
+    ORC_DASH_MACHINE: "north",
+    ORC_DASH_REMOTE_MACHINE: "south",
+    ORC_DASH_TASKS: tasksCommand,
+    ORC_DASH_REMOTE_TASKS: remoteTasksCommand,
   }),
 );
 
@@ -185,7 +185,7 @@ describe("the live tasks screen", () => {
         yield* liveTasksScreen(setup.renderer);
       }).pipe(
         Effect.provide(
-          Layer.mergeAll(recordedSources, ConfigProvider.layer(ConfigProvider.fromEnvRecord({ TUI_DASH_MACHINE: "north" })), TestClock.layer()),
+          Layer.mergeAll(recordedSources, ConfigProvider.layer(ConfigProvider.fromEnvRecord({ ORC_DASH_MACHINE: "north" })), TestClock.layer()),
         ),
       ),
     );
@@ -223,7 +223,7 @@ describe("the live tasks screen", () => {
     );
     try {
       const first = await frameWhere(setup, (frame) => ["harbor", "notes", "kelp"].every((project) => frame.includes(` ${project} `)));
-      expect(topLine(first)).not.toMatch(/tui-dash|north|south/u);
+      expect(topLine(first)).not.toMatch(/orc-dash|north|south/u);
       let kelp = first;
       for (let step = 0; step < 3 && !kelp.includes("╭─ kelp · tasks "); step += 1) {
         setup.mockInput.pressArrow("down");

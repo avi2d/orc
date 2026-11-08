@@ -144,7 +144,7 @@ const savedUnder = (directory: string) =>
   );
 
 const saveAndRestore = async <A>(key: string, codec: Schema.Codec<A, unknown>, value: A, at: number): Promise<Shown<A>> => {
-  const directory = await mkdtemp(join(tmpdir(), "tui-dash-saved-"));
+  const directory = await mkdtemp(join(tmpdir(), "orc-dash-saved-"));
   try {
     await Effect.runPromise(
       Effect.gen(function* () {

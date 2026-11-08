@@ -27,7 +27,7 @@ describe("the session quota's first read of a week of logs, each log read once, 
   test(
     `reads 1/${fraction} of a busy machine's week within that share of the attention limit`,
     async () => {
-      const home = mkdtempSync(join(tmpdir(), "tui-dash-week-"));
+      const home = mkdtempSync(join(tmpdir(), "orc-dash-week-"));
       try {
         const now = Date.now();
         const corpus = writeWeekShare(home, fraction, now);

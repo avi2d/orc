@@ -57,7 +57,7 @@ const painted = async (screenFile: string): Promise<true | undefined> =>
 type HangUp = (terminal: Bun.Subprocess, dashboard: number) => Promise<void>;
 
 const exitCodeAfter = async (hangUp: HangUp): Promise<{ readonly gone: boolean; readonly code: string | undefined }> => {
-  const home = mkdtempSync(join(tmpdir(), "tui-dash-hangup-e2e-"));
+  const home = mkdtempSync(join(tmpdir(), "orc-dash-hangup-e2e-"));
   const codeFile = join(home, "exit-code");
   const screenFile = join(home, "screen");
   const terminal = Bun.spawn(
@@ -86,7 +86,7 @@ const exitCodeAfter = async (hangUp: HangUp): Promise<{ readonly gone: boolean; 
 };
 
 // Linux delivers the pty hangup SIGHUP only to the session leader, so the test sends SIGHUP itself.
-describe("tui-dash on terminal hangup", () => {
+describe("orc-dash on terminal hangup", () => {
   test.skipIf(process.platform !== "linux")(skipReason("needs util-linux script -c and Linux pty hangup semantics", "losing its pseudo terminal exits the dashboard with code 0 within a few seconds", "local"), async () => {
     const outcome = await exitCodeAfter(async (terminal) => {
       terminal.kill("SIGKILL");

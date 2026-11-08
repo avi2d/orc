@@ -14,7 +14,7 @@ import { recordedSavedProfilesLayer } from "../../lib/saved-profiles";
 let home = "";
 
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "tui-dash-quota-color-"));
+  home = mkdtempSync(join(tmpdir(), "orc-dash-quota-color-"));
 });
 
 afterEach(() => {

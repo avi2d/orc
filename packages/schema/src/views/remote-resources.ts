@@ -5,7 +5,7 @@ import type { ReportedResources } from "./resources";
 import { configuredMachines, type Machines } from "../sources/machines";
 
 export class ResourceMachines extends Context.Service<ResourceMachines, Machines<ReportedResources>>()(
-  "tui-dash/ResourceMachines",
+  "orc-dash/ResourceMachines",
 ) {}
 
 // The other machine samples its cpu over a second, so it answers in a few seconds, and a hung answer holds a paint no longer than this.
@@ -13,5 +13,5 @@ const remoteTimeout = Duration.seconds(15);
 
 export const resourceMachinesLayer: Layer.Layer<ResourceMachines, Config.ConfigError, CommandRunner> = Layer.effect(
   ResourceMachines,
-  configuredMachines("TUI_DASH_REMOTE_RESOURCES", remoteTimeout, () => decodeResourcesReport),
+  configuredMachines("ORC_DASH_REMOTE_RESOURCES", remoteTimeout, () => decodeResourcesReport),
 );

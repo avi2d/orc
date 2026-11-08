@@ -65,7 +65,7 @@ const unflaggedLines = (levels: TaskLevels, width: number): Block => {
     return sentence("! tasks report not read, so no task is checked against the machine", "error", width);
   }
   if (!levels.usageRead && levels.source === "remote" && !levels.liveConfigured)
-    return sentence("task usage not read: TUI_DASH_REMOTE_TASK_LIVE is unset", "muted", width);
+    return sentence("task usage not read: ORC_DASH_REMOTE_TASK_LIVE is unset", "muted", width);
   if (!levels.usageRead) return sentence("task usage not read", "muted", width);
   return [[span("\u2713 ", "success"), span(ellipsize("no task over its share", width - 2), "foreground")]];
 };

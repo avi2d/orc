@@ -6,7 +6,7 @@ import { type Command, ensureGroup, pueueDone, type RunnerError } from "./runner
 import { decodeJson, pueue } from "./runner-exec"
 
 export const liveAlertStream = (): Command | null => {
-  const dash = Bun.which("tui-dash")
+  const dash = Bun.which("orc-dash")
   return dash === null ? null : [dash, "alerts", "--json"]
 }
 

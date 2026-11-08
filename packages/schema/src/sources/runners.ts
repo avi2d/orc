@@ -85,7 +85,7 @@ export interface RunnerReposReading {
   readonly read: Effect.Effect<Reading<ReadonlyArray<string>>>;
 }
 
-export class RunnerRepos extends Context.Service<RunnerRepos, Option.Option<RunnerReposReading>>()("tui-dash/RunnerRepos") {}
+export class RunnerRepos extends Context.Service<RunnerRepos, Option.Option<RunnerReposReading>>()("orc-dash/RunnerRepos") {}
 
 const runnersTimeout = Duration.seconds(15);
 
@@ -93,7 +93,7 @@ const runnersTimeout = Duration.seconds(15);
 export const runnerReposLayer: Layer.Layer<RunnerRepos, Config.ConfigError, CommandRunner> = Layer.effect(
   RunnerRepos,
   Effect.gen(function* () {
-    const command = yield* selector("TUI_DASH_RUNNERS");
+    const command = yield* selector("ORC_DASH_RUNNERS");
     if (command === undefined) return Option.none();
     const runner = yield* CommandRunner;
     const read = stamped(runDecoded({ argv: ["sh", "-c", command], timeout: runnersTimeout }, decodeRunnerRepos));

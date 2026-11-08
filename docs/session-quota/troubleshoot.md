@@ -21,7 +21,7 @@ Run each headless session in its own working directory, or in a Herdr pane.
 ## The panel says the other machine is unreachable
 
 The configured command failed, and the line under the warning gives its reason, such as `sh exited 255` from ssh.
-Run `sh -c "$TUI_DASH_REMOTE_SESSION_QUOTA"` on this machine and check that its stdout is the version 1 report alone.
+Run `sh -c "$ORC_DASH_REMOTE_SESSION_QUOTA"` on this machine and check that its stdout is the version 1 report alone.
 
 ## The panel says the other machine answered minutes ago
 

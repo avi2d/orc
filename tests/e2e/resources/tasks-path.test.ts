@@ -35,15 +35,15 @@ const tasksReport = (folder: string) => ({
   schedules: [],
 });
 
-describe("tui-dash report resources under a user service's PATH on the Mac", () => {
+describe("orc-dash report resources under a user service's PATH on the Mac", () => {
   test.skipIf(process.platform !== "darwin")(skipReason("launchd's PATH and the bun-less collector exist only on macOS", "reads the task's live process with no bun on the PATH"), async () => {
-    const folder = realpathSync(mkdtempSync(join(tmpdir(), "tui-dash-tasks-path-")));
+    const folder = realpathSync(mkdtempSync(join(tmpdir(), "orc-dash-tasks-path-")));
     const sleeper = Bun.spawn(["sleep", "30"], { cwd: folder });
     try {
       const report = join(folder, "tasks.json");
       writeFileSync(report, JSON.stringify(tasksReport(folder)));
       const child = Bun.spawn([process.execPath, command, "report", "resources"], {
-        env: { PATH: launchdPath, HOME: process.env["HOME"] ?? "", TUI_DASH_TASKS: `cat '${report}'` },
+        env: { PATH: launchdPath, HOME: process.env["HOME"] ?? "", ORC_DASH_TASKS: `cat '${report}'` },
         stdin: "ignore",
         stdout: "pipe",
         stderr: "pipe",

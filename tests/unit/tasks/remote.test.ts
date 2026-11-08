@@ -62,11 +62,11 @@ const liveCommandLayers = () => {
   const printed = JSON.stringify(liveTasksReport({ generatedAt: southNow, live: ok(live()) }));
   const config = ConfigProvider.layer(
     ConfigProvider.fromEnvRecord({
-      TUI_DASH_MACHINE: "north",
-      TUI_DASH_REMOTE_MACHINE: "south",
-      TUI_DASH_TASKS: "tasks-report --json",
-      TUI_DASH_REMOTE_TASKS: "ssh south.example.com tasks-report --json",
-      TUI_DASH_REMOTE_TASK_LIVE: liveCommand,
+      ORC_DASH_MACHINE: "north",
+      ORC_DASH_REMOTE_MACHINE: "south",
+      ORC_DASH_TASKS: "tasks-report --json",
+      ORC_DASH_REMOTE_TASKS: "ssh south.example.com tasks-report --json",
+      ORC_DASH_REMOTE_TASK_LIVE: liveCommand,
     }),
   );
   const layers = Layer.mergeAll(tasksMachinesLayer, pueueMachinesLayer, noMistakesMachinesLayer, orcMachinesLayer, remoteTaskHistoryLayer, remoteTaskLiveLayer).pipe(
@@ -146,7 +146,7 @@ describe("the remote machine's levels", () => {
 
   test("an unset remote report names its variable, like the local one names its own", async () => {
     const levels = taskLevels(taskReadings({ machine: "south", origin: "remote", tasks: { kind: "unset" } }));
-    expect(texts({ levels, zone: utc }, onProjects).join("\n")).toContain("TUI_DASH_REMOTE_TASKS is unset");
+    expect(texts({ levels, zone: utc }, onProjects).join("\n")).toContain("ORC_DASH_REMOTE_TASKS is unset");
   });
 
   test("a task's detail says so when the other machine's live processes were not read", async () => {
@@ -203,7 +203,7 @@ describe("the remote machine's levels", () => {
     const listing = decodeTasksReport(
       JSON.stringify({
         ...typed,
-        tasks: typed.tasks.map((task, index) => (index === 0 ? { ...task, kind: "full review fix", branches: ["fm/tui-dash-fast-start"] } : task)),
+        tasks: typed.tasks.map((task, index) => (index === 0 ? { ...task, kind: "full review fix", branches: ["fm/orc-dash-fast-start"] } : task)),
       }),
     );
     const mistakes = decodeNoMistakes(fixture("no-mistakes/run.txt"));
@@ -222,16 +222,16 @@ describe("the remote machine's levels", () => {
     const typed = Schema.decodeUnknownSync(TasksReport)(JSON.parse(fixture("tasks/south.json")));
     const report = JSON.stringify({
       ...typed,
-      tasks: typed.tasks.map((task, index) => (index === 0 ? { ...task, kind: "full review fix", branches: ["fm/tui-dash-fast-start"] } : task)),
+      tasks: typed.tasks.map((task, index) => (index === 0 ? { ...task, kind: "full review fix", branches: ["fm/orc-dash-fast-start"] } : task)),
     });
     const gated = fixture("no-mistakes/run.txt")
       .replace("status: completed", "status: running")
       .replace("review,completed,8,4501436", "review,awaiting_approval,8,4501436");
     const config = ConfigProvider.layer(
       ConfigProvider.fromEnvRecord({
-        TUI_DASH_MACHINE: "north",
-        TUI_DASH_REMOTE_MACHINE: "south",
-        TUI_DASH_REMOTE_TASKS: "ssh south.example.com tasks-report --json",
+        ORC_DASH_MACHINE: "north",
+        ORC_DASH_REMOTE_MACHINE: "south",
+        ORC_DASH_REMOTE_TASKS: "ssh south.example.com tasks-report --json",
       }),
     );
     const layers = Layer.mergeAll(tasksMachinesLayer, pueueMachinesLayer, noMistakesMachinesLayer, orcMachinesLayer, remoteTaskHistoryLayer, remoteTaskLiveLayer).pipe(

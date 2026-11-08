@@ -39,13 +39,13 @@ const savedProfilesTimeout = Duration.seconds(10);
 
 const noSavedProfiles: SavedProfiles = { schema: 2, active_profile: null, profiles: [] };
 
-export class SavedProfilesSource extends Context.Service<SavedProfilesSource, Source<SavedProfiles>>()("tui-dash/SavedProfilesSource") {}
+export class SavedProfilesSource extends Context.Service<SavedProfilesSource, Source<SavedProfiles>>()("orc-dash/SavedProfilesSource") {}
 
 // The configured command is a shell line, so the shell parses its quoting.
 export const savedProfilesSourceLayer: Layer.Layer<SavedProfilesSource, Config.ConfigError, CommandRunner> = Layer.effect(
   SavedProfilesSource,
   Effect.gen(function* () {
-    const command = yield* selector("TUI_DASH_SAVED_PROFILES");
+    const command = yield* selector("ORC_DASH_SAVED_PROFILES");
     if (command === undefined) return { read: stamped(Effect.succeed(ok(noSavedProfiles))) };
     return yield* sourceOf(stamped(runDecoded({ argv: ["sh", "-c", command], timeout: savedProfilesTimeout }, decodeSavedProfiles)));
   }),

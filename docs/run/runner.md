@@ -15,7 +15,7 @@ When the task names instructions, the queued `orc run` gets `--instructions` poi
 A task queued for another home keeps a scoped file instead, so two homes holding the same task id never share one file.
 A task this home already holds queued or running in group `orc` is not queued again, and a task whose earlier run is done there is queued again, as a parked task is once answered.
 
-When `tui-dash` is on its PATH, `orc runner start` also queues `tui-dash alerts --json` in pueue on the machine it runs on, with its output appended to `~/.orc/backlog/alerts.jsonl`.
+When `orc-dash` is on its PATH, `orc runner start` also queues `orc-dash alerts --json` in pueue on the machine it runs on, with its output appended to `~/.orc/backlog/alerts.jsonl`.
 It queues that stream once, in a group of its own home that runs one task at a time, so a stream already queued or running is not queued again, and one that ended is queued again at the next start.
 When pueue refuses the stream, the start prints why on standard error and still queues the task.
 

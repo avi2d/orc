@@ -69,14 +69,14 @@ The chat also posts each alert once, and when any task's PR turns green, merges,
 ## Open the dashboard
 
 To open the dashboard, run `bun run dashboard` from the repository root.
-[The dashboard guide](docs/tui-dash.md) names each panel and the tools it reads.
+[The dashboard guide](docs/dash.md) names each panel and the tools it reads.
 
 ## Where things are
 
 | Path | What it holds |
 | --- | --- |
 | `packages/run` | The orc command |
-| `packages/cli` | The `tui-dash` command, which composes the panels into the dashboard |
+| `packages/cli` | The `orc-dash` command, which composes the panels into the dashboard |
 | `packages/dashboard` | The dashboard host, which lays out the panels it is given |
 | `packages/schema`, `packages/ui` | The dashboard's shared decoders, view models, theme and screen runner |
 | `packages/alerts`, `packages/dispatch`, `packages/ledger`, `packages/queues`, `packages/quota`, `packages/resources`, `packages/schedules`, `packages/session-quota`, `packages/tasks` | One dashboard panel each |
@@ -94,4 +94,4 @@ To open the dashboard, run `bun run dashboard` from the repository root.
 - [Where orc is going](docs/roadmap.md)
 - [Contribute](docs/contribute.md)
 - [The orc command in depth](packages/run/README.md)
-- [The tui-dash dashboard](docs/tui-dash.md)
+- [The orc-dash dashboard](docs/dash.md)
