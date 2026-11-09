@@ -177,7 +177,14 @@ describe("the heavy stand-in", () => {
       stdout: "ignore",
       stderr: "pipe"
     })
-    await new Promise((resolve) => setTimeout(resolve, 800))
+    const deadline = Date.now() + 10_000
+    while (!(await harness.pueueLog()).includes("log --json")) {
+      if (Date.now() > deadline) {
+        child.kill()
+        throw new Error("the stand-in never reached its wait loop")
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
     child.kill()
     expect(await child.exited).toBe(130)
     const log = await harness.pueueLog()
