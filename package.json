@@ -33,7 +33,7 @@
     ]
   },
   "devDependencies": {
-    "@avi2dg/checks": "0.90.0",
+    "@avi2dg/checks": "0.91.0",
     "@effect/platform-bun": "4.0.0",
     "@effect/tsgo": "0.45.0",
     "effect": "4.0.0",
