@@ -51,7 +51,7 @@ const helpers: ReadonlyArray<string> = [
   '      --changed|-t|--test-name-pattern|-g|--grep|-k|-run) return 0;;',
   '      *.test.*|*.spec.*|*_test.go|test_*.py|*_test.py|*/test_*.py) return 0;;',
   '    esac',
-  '    if heavy_valueflag "$1"; then shift; if [ $# -eq 0 ]; then break; fi; shift; if [ $# -eq 0 ]; then break; fi; fi',
+  '    if heavy_valueflag "$1"; then shift; if [ $# -eq 0 ]; then break; fi; shift; if [ $# -eq 0 ]; then break; fi; continue; fi',
   '    case "$1" in',
   '      -*) ;;',
   '      ./...|.) ;;',
@@ -67,7 +67,7 @@ const helpers: ReadonlyArray<string> = [
   '    case "$1" in',
   '      --changed|-t|--test-name-pattern|-g|--grep|-k|-run) return 0;;',
   '    esac',
-  '    if heavy_valueflag "$1"; then shift; if [ $# -eq 0 ]; then break; fi; shift; if [ $# -eq 0 ]; then break; fi; fi',
+  '    if heavy_valueflag "$1"; then shift; if [ $# -eq 0 ]; then break; fi; shift; if [ $# -eq 0 ]; then break; fi; continue; fi',
   '    case "$1" in',
   '      -*) ;;',
   '      ./...|.) ;;',
@@ -84,37 +84,67 @@ const helpers: ReadonlyArray<string> = [
   '    checks-*)',
   '      shift; heavy_queue=1; if heavy_targeted "$@"; then heavy_prio=1; fi;;',
   '    vitest)',
-  '      shift; case "${1:-}" in watch) return;; esac',
+  '      shift; case "${1:-}" in watch|dev) return;; esac',
+  '      for heavy_a in "$@"; do case "$heavy_a" in -w) return;; esac; done',
   '      if [ "${1:-}" = "run" ]; then shift; fi',
   '      heavy_queue=1; if heavy_targeted_bare "$@"; then heavy_prio=1; fi;;',
   '    jest)',
   '      shift; heavy_queue=1; if heavy_targeted_bare "$@"; then heavy_prio=1; fi;;',
-  '    playwright|tsc|eslint|oxlint)',
+  '    tsc)',
+  '      shift; for heavy_a in "$@"; do case "$heavy_a" in -w) return;; esac; done',
+  '      heavy_queue=1; if heavy_targeted "$@"; then heavy_prio=1; fi;;',
+  '    playwright|eslint|oxlint)',
   '      shift; heavy_queue=1; if heavy_targeted "$@"; then heavy_prio=1; fi;;',
   '  esac',
   '}',
   '',
   'heavy_run_script() {',
-  '  heavy_script=""',
-  '  for heavy_a in "$@"; do',
-  '    case "$heavy_a" in',
-  '      dev|start|serve|preview|watch|storybook|test|tests|lint|typecheck|build|check|checks|e2e|coverage|mutation|checks-*|test:*|build:*|lint:*|typecheck:*|vitest|jest|tsc|eslint|oxlint|playwright) heavy_script="$heavy_a"; break;;',
+  '  while [ $# -gt 0 ]; do',
+  '    case "$1" in',
+  '      --filter|--cwd|-w|--workspace|--prefix) shift; if [ $# -eq 0 ]; then break; fi; shift; if [ $# -eq 0 ]; then break; fi;;',
+  '      -*) shift;;',
+  '      *) break;;',
   '    esac',
   '  done',
-  '  case "$heavy_script" in',
+  '  case "${1:-}" in',
   '    ""|dev|start|serve|preview|watch|storybook|*:watch|*:ui|*:dev) return;;',
+  '    test|tests|lint|typecheck|build|check|checks|e2e|coverage|mutation|checks-*|test:*|build:*|lint:*|typecheck:*|vitest|jest|tsc|eslint|oxlint|playwright)',
+  '      shift; if heavy_watchflag "$@"; then return; fi',
+  '      heavy_queue=1; if heavy_targeted "$@"; then heavy_prio=1; fi;;',
   '  esac',
-  '  while [ $# -gt 0 ] && [ "$1" != "$heavy_script" ]; do shift; done',
-  '  shift',
-  '  if heavy_watchflag "$@"; then return; fi',
-  '  heavy_queue=1; if heavy_targeted "$@"; then heavy_prio=1; fi',
   '}'
 ]
+
+const pmStrip: ReadonlyArray<string> = [
+  '  while [ $# -gt 0 ]; do',
+  '    case "$1" in',
+  '      --filter|-F|--workspace|-w|--prefix) shift; if [ $# -eq 0 ]; then break; fi; shift; if [ $# -eq 0 ]; then break; fi;;',
+  '      --filter=*|--workspace=*|--prefix=*) shift;;',
+  '      -r|--recursive) shift;;',
+  '      workspace) shift; if [ $# -eq 0 ]; then break; fi; shift; if [ $# -eq 0 ]; then break; fi;;',
+  '      *) break;;',
+  '    esac',
+  '  done',
+  '  if [ $# -eq 0 ]; then return; fi'
+]
+
+const bunStrip: ReadonlyArray<string> = [
+  '  while [ $# -gt 0 ]; do',
+  '    case "$1" in',
+  '      --filter) shift; if [ $# -eq 0 ]; then break; fi; shift; if [ $# -eq 0 ]; then break; fi;;',
+  '      --filter=*) shift;;',
+  '      *) break;;',
+  '    esac',
+  '  done',
+  '  if [ $# -eq 0 ]; then return; fi'
+]
+
 const decideBody = (tool: string): ReadonlyArray<string> => {
   switch (tool) {
     case "bun": {
       return [
         '  if [ $# -eq 0 ]; then return; fi',
+        ...bunStrip,
         '  if heavy_watchflag "$@" || heavy_version "$@"; then return; fi',
         '  case "$1" in',
         '    test) shift; heavy_queue=1; if heavy_targeted_bare "$@"; then heavy_prio=1; fi;;',
@@ -133,15 +163,32 @@ const decideBody = (tool: string): ReadonlyArray<string> => {
         '  heavy_exec_tool "$@"'
       ]
     }
-    case "npm":
+    case "npm": {
+      return [
+        '  if [ $# -eq 0 ]; then return; fi',
+        ...pmStrip,
+        '  if heavy_watchflag "$@" || heavy_version "$@"; then return; fi',
+        '  case "$1" in',
+        '    run) shift; heavy_run_script "$@";;',
+        '    exec) shift; if [ "${1:-}" = "--" ]; then shift; fi; heavy_exec_tool "$@";;',
+        '    *:watch|*:ui|*:dev) return;;',
+        '    test|tests|t|lint|typecheck|build|check|checks|e2e|coverage|mutation|checks-*|test:*)',
+        '      shift; heavy_queue=1; if heavy_targeted "$@"; then heavy_prio=1; fi;;',
+        '    build:*|lint:*|typecheck:*)',
+        '      shift; heavy_queue=1; if heavy_targeted "$@"; then heavy_prio=1; fi;;',
+        '    *) heavy_exec_tool "$@";;',
+        '  esac'
+      ]
+    }
     case "pnpm":
     case "yarn": {
       return [
         '  if [ $# -eq 0 ]; then return; fi',
+        ...pmStrip,
         '  if heavy_watchflag "$@" || heavy_version "$@"; then return; fi',
         '  case "$1" in',
         '    run) shift; heavy_run_script "$@";;',
-        '    exec) shift; heavy_exec_tool "$@";;',
+        '    exec) shift; if [ "${1:-}" = "--" ]; then shift; fi; heavy_exec_tool "$@";;',
         '    *:watch|*:ui|*:dev) return;;',
         '    test|tests|lint|typecheck|build|check|checks|e2e|coverage|mutation|checks-*|test:*)',
         '      shift; heavy_queue=1; if heavy_targeted "$@"; then heavy_prio=1; fi;;',
@@ -154,7 +201,8 @@ const decideBody = (tool: string): ReadonlyArray<string> => {
     case "vitest": {
       return [
         '  if heavy_watchflag "$@" || heavy_version "$@"; then return; fi',
-        '  case "${1:-}" in watch) return;; esac',
+        '  case "${1:-}" in watch|dev) return;; esac',
+        '  for heavy_a in "$@"; do case "$heavy_a" in -w) return;; esac; done',
         '  if [ "${1:-}" = "run" ]; then shift; fi',
         '  heavy_queue=1; if heavy_targeted_bare "$@"; then heavy_prio=1; fi'
       ]
@@ -165,8 +213,14 @@ const decideBody = (tool: string): ReadonlyArray<string> => {
         '  heavy_queue=1; if heavy_targeted_bare "$@"; then heavy_prio=1; fi'
       ]
     }
+    case "tsc": {
+      return [
+        '  if heavy_watchflag "$@" || heavy_version "$@"; then return; fi',
+        '  for heavy_a in "$@"; do case "$heavy_a" in -w) return;; esac; done',
+        '  heavy_queue=1; if heavy_targeted "$@"; then heavy_prio=1; fi'
+      ]
+    }
     case "pytest":
-    case "tsc":
     case "oxlint":
     case "eslint": {
       return [
@@ -306,7 +360,6 @@ const standinUtils = (): ReadonlyArray<string> => [
     '}',
     '',
     'heavy_inside_slot() {',
-    '  if [ "$PUEUE_GROUP" = "$heavy_group" ]; then return 0; fi',
     '  heavy_state_json="$(pueue status --json -g "$heavy_group" 2>/dev/null)" || return 1',
     '  heavy_cmds="$(printf "%s" "$heavy_state_json" | grep -E -o \'"command":"(\\.|[^"\\])*"\')"',
     '  if [ -z "$heavy_cmds" ]; then return 1; fi',
@@ -403,7 +456,7 @@ const standinUtils = (): ReadonlyArray<string> => [
     '',
     'heavy_remove() {',
     '  case "$(heavy_task_status "$1")" in',
-    '    Running) pueue kill "$1" >/dev/null 2>&1;;',
+    '    Running) pueue kill "$1" >/dev/null 2>&1; pueue wait -q "$1" >/dev/null 2>&1; pueue remove "$1" >/dev/null 2>&1;;',
     '    *) pueue remove "$1" >/dev/null 2>&1;;',
     '  esac',
     '}',
@@ -555,7 +608,7 @@ const standinWait = (timing?: StandinTiming): ReadonlyArray<string> => [
 ]
 
 export const standinScript = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, timing?: StandinTiming): string => {
-  const decide = defaultHeavyTools.includes(tool) ? decideBody(tool) : extraSub(tool, commands)
+  const decide = defaultHeavyTools.includes(tool) ? [...decideBody(tool), ...extraSub(tool, commands)] : extraSub(tool, commands)
   return [...standinHead(tool, settings), ...helpers, ...standinDecideFn(decide), ...standinUtils(), ...standinQueue(), ...standinWait(timing), ...standinFinish()].join("\n") + "\n"
 }
 

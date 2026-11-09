@@ -13,8 +13,8 @@ A stand in queues the call with `pueue add` into the `heavy` group and waits for
 The wait message names how many queued calls stand ahead, counting higher priority calls and earlier calls at the same priority.
 A finished call leaves the queue after the stand in reads its exit code.
 The stand in runs the real tool under a utility priority on macOS and with no wrapper on other systems.
-Calls already inside the `heavy` pueue group run at once instead of queuing again.
 A call started by a queued call runs at once instead of queuing again.
+The stand in trusts the process tree above the call, never an exported group variable on its own.
 Set `HEAVY_QUEUE_BYPASS` to a reason to skip the queue for one command, and the reason is logged to the alerts file and counted by the check command.
 Under `GITHUB_ACTIONS` a queued call waits up to 30 minutes, then fails with the queue length in its message.
 
@@ -35,7 +35,7 @@ Run `orc heavy watch-once` to run one watchdog pass and print its counts.
 ## Tune the queue
 The `heavy` key in `~/.orc/config.json` tunes the queue.
 The `group` key renames the pueue group.
-The `commands` key adds command words that count as heavy beyond the built in tool list.
+The `commands` key adds command words that count as heavy, including subcommands of the built in tools.
 The `limit` key takes `auto` or `none`, and `none` runs the real tool with no priority wrapper.
 
 ## Sandboxed runs hold the slot

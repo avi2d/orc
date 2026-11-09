@@ -111,11 +111,11 @@ describe("the heavy stand-in", () => {
     expect(log).not.toContain("-o 1")
   })
 
-  test("inside pueue the command runs directly", async () => {
+  test("an exported pueue group alone still queues the command", async () => {
     const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
     const result = run(harness, "bun", ["test", "x"], { PUEUE_GROUP: "heavy" })
     expect(result.code).toBe(0)
-    expect(await harness.pueueLog()).toBe("")
+    expect(await harness.pueueLog()).toContain("add --group heavy")
   })
 
   test("inside another pueue group the command still queues", async () => {
@@ -347,6 +347,135 @@ describe("the heavy stand-in", () => {
     const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
     const result = run(harness, "bun", ["test", "--watch"])
     expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toBe("")
+  })
+
+  test("a tsc watch run never queues", async () => {
+    const harness = harnesses[harnesses.push(await setup(["tsc"])) - 1]
+    const result = run(harness, "tsc", ["-w"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toBe("")
+  })
+
+  test("a vitest watch run never queues", async () => {
+    const harness = harnesses[harnesses.push(await setup(["vitest"])) - 1]
+    const result = run(harness, "vitest", ["-w"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toBe("")
+  })
+
+  test("a vitest dev run never queues", async () => {
+    const harness = harnesses[harnesses.push(await setup(["vitest"])) - 1]
+    const result = run(harness, "vitest", ["dev"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toBe("")
+  })
+
+  test("a filtered pnpm test run queues", async () => {
+    const harness = harnesses[harnesses.push(await setup(["pnpm"])) - 1]
+    const result = run(harness, "pnpm", ["--filter", "web", "test"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
+  })
+
+  test("a recursive pnpm test run queues", async () => {
+    const harness = harnesses[harnesses.push(await setup(["pnpm"])) - 1]
+    const result = run(harness, "pnpm", ["-r", "test"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
+  })
+
+  test("a yarn workspace test run queues", async () => {
+    const harness = harnesses[harnesses.push(await setup(["yarn"])) - 1]
+    const result = run(harness, "yarn", ["workspace", "web", "test"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
+  })
+
+  test("an npm test run under a directory flag queues", async () => {
+    const harness = harnesses[harnesses.push(await setup(["npm"])) - 1]
+    const result = run(harness, "npm", ["--prefix", "web", "test"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
+  })
+
+  test("npm t queues like npm test", async () => {
+    const harness = harnesses[harnesses.push(await setup(["npm"])) - 1]
+    const result = run(harness, "npm", ["t"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
+  })
+
+  test("an npm exec of a heavy tool queues", async () => {
+    const harness = harnesses[harnesses.push(await setup(["npm"])) - 1]
+    const result = run(harness, "npm", ["exec", "--", "vitest", "run"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
+  })
+
+  test("a filtered bun test run queues", async () => {
+    const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
+    const result = run(harness, "bun", ["--filter", "web", "test"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
+  })
+
+  test("bun run with a build argument past the script never queues", async () => {
+    const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
+    const result = run(harness, "bun", ["run", "scripts/release.ts", "build"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toBe("")
+  })
+
+  test("npm run with a test flag past the script never queues", async () => {
+    const harness = harnesses[harnesses.push(await setup(["npm"])) - 1]
+    const result = run(harness, "npm", ["run", "deploy", "--", "--env", "test"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toBe("")
+  })
+
+  test("a configured cargo subcommand queues through the built in body", async () => {
+    const harness = harnesses[harnesses.push(await setup(["cargo"], ["cargo nextest"])) - 1]
+    const result = run(harness, "cargo", ["nextest", "run"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
+  })
+
+  test("a configured npm subcommand queues through the built in body", async () => {
+    const harness = harnesses[harnesses.push(await setup(["npm"], ["npm ci"])) - 1]
+    const result = run(harness, "npm", ["ci"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
+  })
+
+  test("classify keeps priority on a filter past an option value", async () => {
+    const harness = harnesses[harnesses.push(await setup(["pytest", "playwright"])) - 1]
+    const classify = { HEAVY_CLASSIFY: "1" }
+    expect(run(harness, "pytest", ["-c", "cfg.ini", "-k", "foo"], classify).stdout.trim()).toBe("1 1")
+    expect(run(harness, "playwright", ["test", "--project", "chromium", "-g", "login"], classify).stdout.trim()).toBe("1 1")
+    expect(await harness.pueueLog()).toBe("")
+  })
+
+  test("classify leaves watch runs out of the queue", async () => {
+    const harness = harnesses[harnesses.push(await setup(["tsc", "vitest", "npx"])) - 1]
+    const classify = { HEAVY_CLASSIFY: "1" }
+    expect(run(harness, "tsc", ["-w"], classify).stdout.trim()).toBe("0 0")
+    expect(run(harness, "vitest", ["-w"], classify).stdout.trim()).toBe("0 0")
+    expect(run(harness, "vitest", ["dev"], classify).stdout.trim()).toBe("0 0")
+    expect(run(harness, "npx", ["tsc", "-w"], classify).stdout.trim()).toBe("0 0")
+    expect(await harness.pueueLog()).toBe("")
+  })
+
+  test("classify queues monorepo test runs", async () => {
+    const harness = harnesses[harnesses.push(await setup(["pnpm", "yarn", "npm", "bun"])) - 1]
+    const classify = { HEAVY_CLASSIFY: "1" }
+    expect(run(harness, "pnpm", ["--filter", "web", "test"], classify).stdout.trim()).toBe("1 0")
+    expect(run(harness, "pnpm", ["-r", "test"], classify).stdout.trim()).toBe("1 0")
+    expect(run(harness, "yarn", ["workspace", "web", "test"], classify).stdout.trim()).toBe("1 0")
+    expect(run(harness, "npm", ["--prefix", "web", "test"], classify).stdout.trim()).toBe("1 0")
+    expect(run(harness, "npm", ["t"], classify).stdout.trim()).toBe("1 0")
+    expect(run(harness, "npm", ["exec", "--", "vitest", "run"], classify).stdout.trim()).toBe("1 0")
+    expect(run(harness, "bun", ["--filter", "web", "test"], classify).stdout.trim()).toBe("1 0")
     expect(await harness.pueueLog()).toBe("")
   })
 

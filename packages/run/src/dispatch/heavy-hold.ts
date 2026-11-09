@@ -45,12 +45,14 @@ const acquireHold = (group: string): Effect.Effect<string, RunnerError, ChildPro
     if (!/^[0-9]+$/.test(id)) {
       return yield* new RunnerError({ detail: "pueue refused the heavy hold: " + id })
     }
-    yield* pueue(["wait", "-q", "-s", "running", id]).pipe(
-      Effect.onError(() => pueue(["remove", id]).pipe(Effect.ignore))
-    )
-    yield* Console.log("orc: holding the " + group + " queue slot for the sandbox run")
     return id
   })
+
+const waitRunning = (id: string): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  pueue(["wait", "-q", "-s", "running", id]).pipe(
+    Effect.asVoid,
+    Effect.onError(() => pueue(["remove", id]).pipe(Effect.ignore))
+  )
 
 const releaseHold = (id: string): Effect.Effect<void, never, ChildProcessSpawner.ChildProcessSpawner> =>
   pueue(["kill", id]).pipe(
@@ -63,4 +65,11 @@ export const withHeavyHold = <A, E, R>(
   group: string,
   use: () => Effect.Effect<A, E, R>
 ): Effect.Effect<A, E | RunnerError, R | ChildProcessSpawner.ChildProcessSpawner> =>
-  Effect.acquireUseRelease(acquireHold(group), () => use(), (id) => releaseHold(id))
+  Effect.acquireUseRelease(
+    acquireHold(group),
+    (id) => waitRunning(id).pipe(
+      Effect.andThen(Console.log("orc: holding the " + group + " queue slot for the sandbox run")),
+      Effect.andThen(use())
+    ),
+    (id) => releaseHold(id)
+  )
