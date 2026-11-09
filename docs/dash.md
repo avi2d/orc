@@ -843,7 +843,7 @@ To run the checks:
 1. CI runs `bun run test` for the full unit and e2e suites.
 1. Run `bun run build` to bundle every tool and the `orc-dash` command into each package's `dist/` and write the changelog.
 
-`bun run test:fast` starts one worker per CPU.
+`bun run test:fast` starts at most three workers, one per CPU within what free memory allows.
 It keeps 10 percent of total memory as reserve.
 It counts 1074 MiB of free memory past the reserve for the first worker.
 It counts 100 MiB more for each extra worker.

@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite"
 import { Effect, Schema } from "effect"
 import { sqlite, type SqliteFailure } from "./run-history"
+import { formatTable } from "./table"
 
 export const GateRefusalSchema = Schema.Struct({ gate: Schema.String, rule: Schema.NullOr(Schema.String) })
 
@@ -126,19 +127,5 @@ export const readRefusals = (
 
 const displayRule = (rule: string | null): string => rule ?? "\u2014"
 
-export const formatRefusalsTable = (counts: ReadonlyArray<RefusalCount>): string => {
-  if (counts.length === 0) {
-    return "no gate refusals recorded"
-  }
-  const header: ReadonlyArray<string> = ["GATE", "RULE", "RUNS"]
-  const body = counts.map((count): ReadonlyArray<string> => [count.gate, displayRule(count.rule), count.runs.toString()])
-  const table: ReadonlyArray<ReadonlyArray<string>> = [header, ...body]
-  const widths: Array<number> = []
-  for (const row of table) {
-    row.forEach((cell, index) => {
-      widths[index] = Math.max(widths[index] ?? 0, cell.length)
-    })
-  }
-  return table.map((row) => row.map((cell, index) => cell.padEnd(widths[index] ?? cell.length)).join("  ").trimEnd())
-    .join("\n")
-}
+export const formatRefusalsTable = (counts: ReadonlyArray<RefusalCount>): string =>
+  formatTable(["GATE", "RULE", "RUNS"], counts.map((count): ReadonlyArray<string> => [count.gate, displayRule(count.rule), count.runs.toString()]), "no gate refusals recorded")

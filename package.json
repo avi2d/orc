@@ -29,16 +29,16 @@
     "tasks-sample": "bun packages/cli/src/bin.ts sample tasks"
   },
   "checks": {
-    "smoke": ["tests/e2e/retired-name.test.ts"]
+    "smoke": [
+      "tests/e2e/retired-name.test.ts"
+    ]
   },
   "devDependencies": {
-    "@avi2dg/checks": "0.71.0",
+    "@avi2dg/checks": "0.90.0",
     "@effect/platform-bun": "4.0.0",
     "@effect/tsgo": "0.45.0",
     "effect": "4.0.0",
-    "@hughescr/stryker-bun-runner": "1.4.0",
     "@opentui/core": "0.6.5",
-    "@stryker-mutator/core": "10.0.0",
     "@swc/core": "1.16.2",
     "@avi2dg/orc-alerts": "workspace:*",
     "@avi2dg/orc-cli": "workspace:*",
