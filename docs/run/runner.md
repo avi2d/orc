@@ -64,3 +64,7 @@ Its `asking` is the time the run asked, as `orc runner result --json` shows it.
 It writes them into that run's `answers.json`.
 It refuses a task whose run waits for no answer, or waits on an asking other than the one named.
 To print the five minute load average the beat compares against a load limit, run `orc runner load` on that machine.
+
+## Queue heavy calls
+`orc runner start` puts stand in scripts for heavy tools first on `PATH` and arms the watchdog beside the alert stream.
+[The heavy queue](heavy-queue.md) names the queued tools, the bypass, the check command and the tuning keys.

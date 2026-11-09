@@ -35,6 +35,10 @@ export type DispatchArgs =
   | { readonly kind: "RunnerResult"; readonly task: string; readonly label?: string; readonly json: boolean; readonly reach: Reach; readonly stdinLabel: boolean }
   | { readonly kind: "RunnerKill"; readonly task: string; readonly label?: string; readonly stdinLabel: boolean }
   | { readonly kind: "RunnerAnswer"; readonly task: string }
+  | { readonly kind: "HeavyPath" }
+  | { readonly kind: "HeavyCheck"; readonly json: boolean }
+  | { readonly kind: "HeavyWatch" }
+  | { readonly kind: "HeavyWatchOnce" }
   | { readonly kind: "UsageError"; readonly detail: string }
 
 export const parseJsonFlag = (rest: ReadonlyArray<string>, json: (json: boolean) => DispatchArgs): DispatchArgs => {

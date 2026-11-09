@@ -73,6 +73,21 @@ const recordingSpawner = (taskFile: string, seen: Array<string>): Layer.Layer<Ch
   }))
 
 describe("parseDispatchArgs", () => {
+  test("heavy path prints the stand-in folder", () => {
+    expect(parseDispatchArgs("heavy", ["path"])).toEqual({ kind: "HeavyPath" })
+  })
+  test("heavy check reads the queue, or the same as JSON", () => {
+    expect(parseDispatchArgs("heavy", ["check"])).toEqual({ kind: "HeavyCheck", json: false })
+    expect(parseDispatchArgs("heavy", ["check", "--json"])).toEqual({ kind: "HeavyCheck", json: true })
+  })
+  test("heavy watch arms the watchdog and watch-once runs one pass", () => {
+    expect(parseDispatchArgs("heavy", ["watch"])).toEqual({ kind: "HeavyWatch" })
+    expect(parseDispatchArgs("heavy", ["watch-once"])).toEqual({ kind: "HeavyWatchOnce" })
+  })
+  test("heavy rejects a verb it does not know", () => {
+    expect(parseDispatchArgs("heavy", ["lift"]).kind).toBe("UsageError")
+    expect(parseDispatchArgs("heavy", ["path", "extra"]).kind).toBe("UsageError")
+  })
   test("backlog with no argument shows the board, not JSON", () => {
     expect(parseDispatchArgs("backlog", [])).toEqual({ kind: "ShowBacklog", json: false })
   })

@@ -28,6 +28,8 @@ import { prepareRunFolders, type RunFolders, runInstructions } from "./run-folde
 import { subprocessDeliverer } from "./run-deliverer"
 import type { RunDelivery } from "./delivery"
 import { closeTaskCopy, openTaskCopy, writeAgentGitConfig } from "./task-copy"
+import { ensureHeavySetup } from "./dispatch/heavy-setup"
+import { withHeavyPath } from "./dispatch/heavy"
 import { agentGitConfig, agentOps, installCopy, openAgentExec } from "./run-exec"
 import type { PiPacing } from "./pi-run"
 
@@ -190,6 +192,7 @@ const openRun = (
     const path = yield* Path.Path
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const home = orcHomeDir(request.homeDir ?? Bun.env.ORC_HOME)
+    yield* ensureHeavySetup(home).pipe(Effect.mapError((cause) => new OrcRunError({ message: "orc: the heavy queue failed to start: " + cause.detail })))
     const runId = request.runId ?? newRunId()
     const instructionsFile = yield* runInstructions(fs, path, request.cwd, request.instructions)
     const git = yield* openHostGit(fs, path)
@@ -223,7 +226,7 @@ export const runReportStep = (
       return yield* refuse("orc: a " + kind + " run starts Pi on the host in its run folder, so it takes --sandbox none and refuses --sandbox " + opened.sandboxKind)
     }
     const { folders, agent, plan } = yield* prepareRunAgents(opened, request).pipe(Effect.onError(() => removeRunDir(opened)))
-    const exec = yield* openAgentExec(plan, folders, folders.runDir, toolchain)
+    const exec = yield* openAgentExec(plan, folders, folders.runDir, toolchain, { ...Bun.env, PATH: withHeavyPath(opened.home, Bun.env.PATH ?? "") })
     const run: ReportRun = {
       kind, runId: opened.runId, runDir: folders.runDir, projectDir: opened.checkout.projectDir, branch: opened.checkout.branch, sandbox: opened.sandboxKind,
       taskPath: folders.taskPath, instructions: folders.instructionsPath, hostSessionsDir: folders.hostSessionsDir, agent, started: new Date().toISOString(),
@@ -246,7 +249,7 @@ export const runAgentStep = (
     const answerWaitSeconds = yield* answerWaitFromEnv(Bun.env.ORC_ANSWER_WAIT_SECONDS)
     const opened = yield* openRun(request)
     const { fs, path, spawner, home, runId, git, checkout, sandboxKind } = opened
-    const noMistakes = { spawner, binary: noMistakesBinary(Bun.env.ORC_NO_MISTAKES_BIN), pathEnv: hostPath ?? "", git: checkout.git }
+    const noMistakes = { spawner, binary: noMistakesBinary(Bun.env.ORC_NO_MISTAKES_BIN), pathEnv: withHeavyPath(home, hostPath ?? ""), git: checkout.git }
     const { folders, agent, fixer, plan } = yield* prepareRunAgents(opened, request).pipe(
       Effect.tap(() => request.delivery === "direct-PR" ? Effect.void : requireNoMistakes(noMistakes, checkout.projectDir)),
       Effect.onError(() => removeRunDir(opened))
@@ -255,7 +258,7 @@ export const runAgentStep = (
     const copy = yield* openTaskCopy(fs, path, spawner, git, checkout, home)
     yield* Effect.addFinalizer(() => closeTaskCopy(spawner, git, checkout.projectDir, copy).pipe(Effect.catch((error) => Console.log(error.message))))
     yield* writeAgentGitConfig(spawner, git, Bun.which("git") ?? "git", checkout.projectDir, copy.dir, agentGitConfig(folders))
-    const exec = yield* openAgentExec(plan, folders, copy.dir, toolchain)
+    const exec = yield* openAgentExec(plan, folders, copy.dir, toolchain, { ...Bun.env, PATH: withHeavyPath(home, Bun.env.PATH ?? "") })
     yield* installCopy(spawner, fs, path, exec, path.join(folders.runDir, "prepare.log"))
     const ops = agentOps({ spawner, fs, path, git }, exec, folders, piPacing(idleTimeoutSeconds))
     const history: HistoryRun = {

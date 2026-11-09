@@ -20,6 +20,7 @@ import type { TaskFileError, TaskRecord } from "./task-record"
 import { encodeToken, sessionToken } from "./token"
 import { markEventPosted, unpostedEvents } from "./events"
 import { ensureAlertStream, liveAlertStream } from "./alert-stream"
+import { runHeavy, startHeavyWatch } from "./heavy-cli"
 
 type CommandArgs = Exclude<DispatchArgs, { readonly kind: "UsageError" }>
 
@@ -356,6 +357,14 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
           yield* Console.log(line)
         }
         yield* startAlertStream(place.home)
+        yield* startHeavyWatch(place.home, place.self, "orc runner start")
+        break
+      }
+      case "HeavyPath":
+      case "HeavyCheck":
+      case "HeavyWatch":
+      case "HeavyWatchOnce": {
+        yield* runHeavy(args, place)
         break
       }
       case "RunnerRenew": {
