@@ -1,5 +1,5 @@
 import { Console, Effect, type FileSystem, type Path, type Scope } from "effect"
-import { ChildProcessSpawner } from "effect/process"
+import type { ChildProcessSpawner } from "effect/process"
 import { type AgentExec, hostExec, shellInAgent } from "./agent-exec"
 import { prepareCommandOf, readChecksCommands } from "./checks"
 import { commitsSince, headOf } from "./git-run"
@@ -78,7 +78,7 @@ export const agentOps = (
   runAgent: (agentRun) =>
     Effect.gen(function*() {
       const base = yield* headOf(run.spawner, run.git, exec.cwd)
-      const request = {
+      const pi = yield* runPi(run.spawner, run.fs, run.path, exec, {
         agent: agentRun.agent,
         prompt: agentRun.prompt,
         instructions: folders.instructionsPath,
@@ -86,8 +86,7 @@ export const agentOps = (
         resumeSession: agentRun.resumeSession,
         logFile: run.path.join(folders.runDir, agentRun.logFile),
         onSession: agentRun.onSession
-      }
-      const pi = yield* runPi(run.spawner, run.fs, run.path, exec, request, pacing)
+      }, pacing)
       const commits = yield* commitsSince(run.spawner, run.git, exec.cwd, base)
       return { ...pi, commits }
     }),

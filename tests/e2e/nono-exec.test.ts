@@ -16,6 +16,7 @@ const git = (cwd: string, args: ReadonlyArray<string>): void => {
   }
 }
 
+// nono refuses a HOME whose state root falls under the /var or /tmp it grants, so the fixture home sits in the working tree.
 const fixtureHome = (): Promise<string> => mkdtemp(join(process.cwd(), ".orc-nono-exec-home-"))
 
 const seedCopy = async (dir: string): Promise<void> => {
@@ -68,4 +69,5 @@ describe("openNonoExec", () => {
     },
     60_000
   )
+
 })

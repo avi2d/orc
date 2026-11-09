@@ -1,5 +1,5 @@
 import { Effect, Stream } from "effect"
-import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { ChildProcess, type ChildProcessSpawner } from "effect/process"
 import type { CommandResult } from "./checks"
 import { runHostCommand } from "./host"
 import { OrcRunError } from "./run-session"
