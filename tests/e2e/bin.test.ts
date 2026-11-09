@@ -13,7 +13,7 @@ const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathna
 const resumeTimeout = 30_000
 
 const runOrc = async (args: ReadonlyArray<string>, cwd?: string, env?: Record<string, string | undefined>): Promise<{ exitCode: number; stdout: string; stderr: string }> => {
-  const proc = Bun.spawn([process.execPath, binPath, ...args], { stdout: "pipe", stderr: "pipe", cwd: cwd ?? process.cwd(), env: { ...process.env, ...env } })
+  const proc = Bun.spawn([process.execPath, binPath, ...args], { stdout: "pipe", stderr: "pipe", cwd: cwd ?? process.cwd(), env: { HEAVY_QUEUE_BYPASS: "e2e fixture without a pueue daemon", ...process.env, ...env } })
   const stdout = proc.stdout
   const stderr = proc.stderr
   if (!(stdout instanceof ReadableStream) || !(stderr instanceof ReadableStream)) {

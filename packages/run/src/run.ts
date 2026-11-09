@@ -28,7 +28,7 @@ import { prepareRunFolders, type RunFolders, runInstructions } from "./run-folde
 import { subprocessDeliverer } from "./run-deliverer"
 import type { RunDelivery } from "./delivery"
 import { closeTaskCopy, openTaskCopy, writeAgentGitConfig } from "./task-copy"
-import { ensureHeavySetup } from "./dispatch/heavy-setup"
+import { ensureHeavyQueue, readHeavySettings } from "./dispatch/heavy-setup"
 import { withHeavyPath } from "./dispatch/heavy"
 import { agentGitConfig, agentOps, installCopy, openAgentExec } from "./run-exec"
 import type { PiPacing } from "./pi-run"
@@ -192,7 +192,8 @@ const openRun = (
     const path = yield* Path.Path
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const home = orcHomeDir(request.homeDir ?? Bun.env.ORC_HOME)
-    yield* ensureHeavySetup(home).pipe(Effect.mapError((cause) => new OrcRunError({ message: "orc: the heavy queue failed to start: " + cause.detail })))
+    const heavySettings = yield* readHeavySettings(home).pipe(Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read " + cause.detail })))
+    yield* ensureHeavyQueue(home, heavySettings).pipe(Effect.mapError((cause) => new OrcRunError({ message: "orc: the heavy queue failed to start: " + cause.detail })))
     const runId = request.runId ?? newRunId()
     const instructionsFile = yield* runInstructions(fs, path, request.cwd, request.instructions)
     const git = yield* openHostGit(fs, path)

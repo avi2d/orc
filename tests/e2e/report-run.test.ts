@@ -53,7 +53,8 @@ const withReportFixture = async (writesReport: boolean, body: (fixture: ReportFi
       PATH: fakeBin + ":" + (process.env["PATH"] ?? ""),
       HOME: root,
       ORC_HOME: orcHome,
-      ORC_NO_MISTAKES_BIN: join(fakeBin, "no-mistakes")
+      ORC_NO_MISTAKES_BIN: join(fakeBin, "no-mistakes"),
+      HEAVY_QUEUE_BYPASS: "e2e fixture without a pueue daemon"
     }
     git(repo, ["init", "-q"], env)
     git(repo, ["config", "user.name", "orc test"], env)
@@ -139,6 +140,15 @@ describe("orc run --kind scout", () => {
         exitCode: 1,
         stderr: "orc: a scout run starts Pi on the host in its run folder, so it takes --sandbox none and refuses --sandbox nono"
       })
+      expect(await Bun.file(join(fakeBin, "pi-cwd")).exists()).toBe(false)
+    })
+  }, 60_000)
+
+  test("without a queue bypass a run fails naming the heavy queue instead of running unqueued", async () => {
+    await withReportFixture(true, async ({ repo, fakeBin, env }) => {
+      const result = await runOrc(scoutRun, repo, { ...env, HEAVY_QUEUE_BYPASS: "" })
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain("orc: the heavy queue failed to start")
       expect(await Bun.file(join(fakeBin, "pi-cwd")).exists()).toBe(false)
     })
   }, 60_000)

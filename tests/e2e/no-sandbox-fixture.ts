@@ -101,7 +101,8 @@ export const withNoSandboxFixture = async (body: (fixture: NoSandboxFixture) => 
       PATH: fakeBin + ":" + (process.env["PATH"] ?? ""),
       HOME: home,
       ORC_HOME: join(root, "orc-home"),
-      ORC_NO_MISTAKES_BIN: join(fakeBin, "no-mistakes")
+      ORC_NO_MISTAKES_BIN: join(fakeBin, "no-mistakes"),
+      HEAVY_QUEUE_BYPASS: "e2e fixture without a pueue daemon"
     }
     git(repo, ["init", "-q"], env)
     git(repo, ["config", "user.name", "orc test"], env)

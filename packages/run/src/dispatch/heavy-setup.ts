@@ -59,9 +59,15 @@ export const writeHeavyBin = (
     return tools
   })
 
+export const ensureHeavyQueue = (home: string, settings: HeavySettings): Effect.Effect<ReadonlyArray<string>, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    if ((Bun.env.HEAVY_QUEUE_BYPASS ?? "").trim() === "") {
+      yield* ensureHeavyGroup(settings)
+    }
+    return yield* writeHeavyBin(home, settings, platformOf())
+  })
+
 export const ensureHeavySetup = (home: string): Effect.Effect<ReadonlyArray<string>, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    const settings = yield* readHeavySettings(home)
-    yield* ensureHeavyGroup(settings)
-    return yield* writeHeavyBin(home, settings, platformOf())
+    return yield* ensureHeavyQueue(home, yield* readHeavySettings(home))
   })
