@@ -128,7 +128,7 @@ describe("the heavy stand-in", () => {
   test("a heavy call inside a queued task runs directly instead of queueing behind the slot it holds", async () => {
     const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
     const realBun = join(harness.root, "fake", "bun")
-    const waiter = "sh -c 'o=$1; shift; \"$@\" & c=$!; wait \"$c\"' orc-heavy-wait 99 '' " + realBun + " test x"
+    const waiter = "sh -c 'o=$1; shift; \"$@\" & c=$!; wait \"$c\"' orc-heavy-wait 99 " + realBun + " test x"
     await writeFile(join(harness.root, "fake", "status.json"), JSON.stringify({ tasks: { 9: { id: 9, command: waiter, status: { Running: {} } } } }))
     await writeFile(
       join(harness.root, "fake", "pueue"),
@@ -148,12 +148,14 @@ describe("the heavy stand-in", () => {
       join(harness.root, "fake", "ps"),
       "#!/bin/sh\n" +
         'p="$PPID"\n' +
-        's="$(/bin/ps -o ppid= -p "$p" 2>/dev/null | tr -d \' \')"\n' +
-        "w=$((s + 1000)); b=$((s + 2000)); d=$((s + 3000))\n" +
+        'q="$(/bin/ps -o ppid= -p "$p" 2>/dev/null | tr -d \' \')"\n' +
+        'case "$q" in ""|*[!0-9]*) q="$p";; esac\n' +
+        "w=$((q + 1000)); b=$((q + 2000)); d=$((q + 3000))\n" +
         "printf 'PID PPID COMMAND\\n'\n" +
-        'printf \'%s %s /bin/sh ' + join(harness.bin, "bun") + ' test x\\n\' "$s" "$w"\n' +
+        'printf \'%s %s /bin/sh ' + join(harness.bin, "bun") + ' test x\\n\' "$p" "$w"\n' +
+        'if [ "$q" != "$p" ]; then printf \'%s %s /bin/sh ' + join(harness.bin, "bun") + ' test x\\n\' "$q" "$w"; fi\n' +
         "printf '%s %s " + realBun + " test x\\n' \"$w\" \"$b\"\n" +
-        "printf '%s %s sh -c o=$1; shift; waiter-body orc-heavy-wait 99  " + realBun + " test x\\n' \"$b\" \"$d\"\n" +
+        "printf '%s %s sh -c o=$1; shift; waiter-body orc-heavy-wait 99 " + realBun + " test x\\n' \"$b\" \"$d\"\n" +
         "printf '%s 1 pueued\\n' \"$d\"\n" +
         "printf '1 0 init\\n'\n",
       { mode: 0o755 }
