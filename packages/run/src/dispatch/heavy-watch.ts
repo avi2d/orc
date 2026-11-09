@@ -1,9 +1,9 @@
+import { hostname } from "node:os"
 import { Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { backlogPaths } from "./backlog"
 import { readDispatchConfig } from "./config"
 import { alertsFile } from "./events"
-import { classifyHeavy } from "./heavy"
 import { readHeavySettings } from "./heavy-setup"
 import { standinTools } from "./heavy-standin"
 import { PueueStatus, taskLabel } from "./pueue-status"
@@ -20,6 +20,7 @@ const WatchTask = Schema.Struct({
   command: Schema.String,
   created_at: Schema.String,
   group: Schema.String,
+  priority: Schema.Int,
   status: Schema.Unknown
 })
 const WatchState = Schema.Struct({
@@ -34,6 +35,12 @@ const AlertFire = Schema.Struct({
   machine: Schema.String
 })
 const decodeFire = Schema.decodeUnknownOption(Schema.fromJsonString(AlertFire))
+
+const BypassFire = Schema.Struct({ rule: Schema.Literal("heavy-bypass") })
+const decodeBypass = Schema.decodeUnknownOption(Schema.fromJsonString(BypassFire))
+
+export const countBypass = (text: string): number =>
+  text.split("\n").filter((line) => line.trim() !== "" && Option.isSome(decodeBypass(line))).length
 
 export const lastAlertByMachine = (text: string): Record<string, string> => {
   const last: Record<string, string> = {}
@@ -65,73 +72,118 @@ export const staleMachines = (
     return Number.isNaN(seen) || nowMs - seen > ttlMinutes * 60_000
   })
 
-const quotedToken = (command: string, start: number, quote: string): { readonly text: string; readonly next: number } => {
-  let text = ""
-  let index = start
-  while (index < command.length) {
-    const char = command[index] ?? ""
-    if (char === quote) {
-      return { text, next: index + 1 }
-    }
-    if (char === "\\" && quote === "\"" && index + 1 < command.length) {
-      text += command[index + 1] ?? ""
-      index += 2
-      continue
-    }
-    text += char
-    index += 1
-  }
-  return { text, next: index }
+export interface SlipTask {
+  readonly pid: number
+  readonly command: string
 }
 
-export const splitCommand = (command: string): ReadonlyArray<string> => {
-  const tokens: Array<string> = []
-  let current = ""
-  let index = 0
-  while (index < command.length) {
-    const char = command[index] ?? ""
-    if (char === "'" || char === '"') {
-      const quoted = quotedToken(command, index + 1, char)
-      current += quoted.text
-      index = quoted.next
+const argvBase = (word: string): string => {
+  const base = word.slice(word.lastIndexOf("/") + 1)
+  return base.startsWith("-") ? base.slice(1) : base
+}
+
+interface PsRow {
+  readonly ppid: number
+  readonly args: string
+}
+
+const psRows = (ps: string): Map<number, PsRow> => {
+  const rows = new Map<number, PsRow>()
+  for (const line of ps.split("\n")) {
+    const parts = line.trim().split(" ").filter((part) => part !== "")
+    const pid = Number(parts[0] ?? "")
+    const ppid = Number(parts[1] ?? "")
+    if (!Number.isInteger(pid) || !Number.isInteger(ppid) || parts.length < 3) {
       continue
     }
-    if (char === " " || char === "\t") {
-      if (current !== "") {
-        tokens.push(current)
-        current = ""
+    rows.set(pid, { ppid, args: parts.slice(2).join(" ") })
+  }
+  return rows
+}
+
+const pueueNames: ReadonlySet<string> = new Set(["pueue", "pueued"])
+
+const ownTree = (rows: Map<number, PsRow>, selfPids: ReadonlySet<number>): Set<number> => {
+  const excluded = new Set<number>()
+  for (const pid of selfPids) {
+    let current: number | undefined = pid
+    while (current !== undefined && current !== 0 && !excluded.has(current)) {
+      excluded.add(current)
+      current = rows.get(current)?.ppid
+    }
+  }
+  return excluded
+}
+
+const behindPueue = (rows: Map<number, PsRow>, pid: number): boolean => {
+  const seen = new Set<number>()
+  let current: number | undefined = rows.get(pid)?.ppid
+  while (current !== undefined && current !== 0 && !seen.has(current)) {
+    seen.add(current)
+    const row = rows.get(current)
+    if (row === undefined) {
+      return false
+    }
+    const first = row.args.split(" ").filter((part) => part !== "")[0] ?? ""
+    if (pueueNames.has(argvBase(first))) {
+      return true
+    }
+    current = row.ppid
+  }
+  return false
+}
+
+export const slipProcesses = (
+  ps: string,
+  tools: ReadonlyArray<string>,
+  selfPids: ReadonlySet<number>
+): ReadonlyArray<SlipTask> => {
+  const rows = psRows(ps)
+  const excluded = ownTree(rows, selfPids)
+  const slips = new Map<string, SlipTask>()
+  for (const [pid, row] of rows) {
+    if (excluded.has(pid)) {
+      continue
+    }
+    const first = row.args.split(" ").filter((part) => part !== "")[0] ?? ""
+    if (!tools.includes(argvBase(first))) {
+      continue
+    }
+    if (behindPueue(rows, pid)) {
+      continue
+    }
+    if (!slips.has(row.args)) {
+      slips.set(row.args, { pid, command: row.args })
+    }
+  }
+  return [...slips.values()].sort((a, b) => a.pid - b.pid)
+}
+
+const SlipFire = Schema.Struct({
+  rule: Schema.Literal("heavy-slip"),
+  at: Schema.String,
+  machine: Schema.String,
+  command: Schema.String
+})
+const decodeSlip = Schema.decodeUnknownOption(Schema.fromJsonString(SlipFire))
+
+export const lastSlipByCommand = (text: string): Record<string, string> => {
+  const last: Record<string, string> = {}
+  for (const line of text.split("\n")) {
+    Option.match(decodeSlip(line), {
+      onNone: () => undefined,
+      onSome: (fire) => {
+        if ((last[fire.command] ?? "") < fire.at) {
+          last[fire.command] = fire.at
+        }
       }
-      index += 1
-      continue
-    }
-    current += char
-    index += 1
+    })
   }
-  if (current !== "") {
-    tokens.push(current)
-  }
-  return tokens
+  return last
 }
 
-const toolToken = (tokens: ReadonlyArray<string>, tools: ReadonlyArray<string>): { readonly tool: string; readonly args: ReadonlyArray<string> } | null => {
-  for (let index = 0; index < tokens.length; index += 1) {
-    const word = tokens[index] ?? ""
-    const base = word.slice(word.lastIndexOf("/") + 1)
-    if (tools.includes(base)) {
-      return { tool: base, args: tokens.slice(index + 1) }
-    }
-  }
-  return null
-}
-
-export const isWholeSuite = (command: string, extra: ReadonlyArray<string>, tools: ReadonlyArray<string>): boolean => {
-  const found = toolToken(splitCommand(command), tools)
-  if (found === null) {
-    return false
-  }
-  const classified = classifyHeavy(found.tool, found.args, extra)
-  return classified.queue && classified.priority === 0
-}
+const slipLine = (machine: string, command: string, at: string): string =>
+  JSON.stringify({ rule: "heavy-slip", at, machine, command })
 
 export interface OldTask {
   readonly id: number
@@ -146,9 +198,7 @@ export const oldRunningTasks = (
   state: WatchState,
   group: string,
   nowMs: number,
-  ttlMinutes: number,
-  extra: ReadonlyArray<string>,
-  tools: ReadonlyArray<string>
+  ttlMinutes: number
 ): ReadonlyArray<OldTask> => {
   const old: Array<OldTask> = []
   for (const task of Object.values(state.tasks)) {
@@ -163,7 +213,7 @@ export const oldRunningTasks = (
     if (Number.isNaN(started) || nowMs - started <= ttlMinutes * 60_000) {
       continue
     }
-    if (isWholeSuite(task.command, extra, tools)) {
+    if (task.priority === 0) {
       continue
     }
     old.push({ id: task.id, command: task.command, ageMinutes: Math.floor((nowMs - started) / 60_000) })
@@ -197,6 +247,7 @@ export interface WatchReport {
   readonly stale: ReadonlyArray<string>
   readonly old: ReadonlyArray<OldTask>
   readonly alerts: ReadonlyArray<string>
+  readonly slips: ReadonlyArray<string>
 }
 
 export const watchOnce = (home: string, nowMs: number = Date.now()): Effect.Effect<WatchReport, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
@@ -204,21 +255,41 @@ export const watchOnce = (home: string, nowMs: number = Date.now()): Effect.Effe
     const settings = yield* readHeavySettings(home)
     const backlog = home + "/backlog"
     const dispatch = yield* readDispatchConfig(backlogPaths(backlog).dispatchConfig).pipe(
-      Effect.mapError((error) => new RunnerError({ detail: error.file + ": " + error.detail }))
+      Effect.mapError((error) => new RunnerError({ detail: error.file + ": " + error.detail })),
+      Effect.orElseSucceed(() => null)
     )
+    const machine = hostname()
     const fs = yield* FileSystem.FileSystem
     const fired = yield* fs.readFileString(alertsFile(backlog)).pipe(Effect.orElseSucceed(() => ""))
     const state = yield* pueue(["status", "--json"]).pipe(
       Effect.flatMap((text) => decodeJson(text, WatchState, "pueue status --json"))
     )
-    const tools = standinTools(settings.commands)
-    const stale = staleMachines(dispatch.machines.map((machine) => machine.name), lastAlertByMachine(fired), nowMs, watchTtlMinutes)
-    const old = oldRunningTasks(state, settings.group, nowMs, watchTtlMinutes, settings.commands, tools)
+    const names = dispatch === null ? [] : dispatch.machines.map((entry) => entry.name)
+    const lastAlert = lastAlertByMachine(fired)
+    const stale = names.length === 0
+      ? staleMachines([machine], lastAlert, nowMs, watchTtlMinutes)
+      : staleMachines(names, lastAlert, nowMs, watchTtlMinutes)
+    const old = oldRunningTasks(state, settings.group, nowMs, watchTtlMinutes)
     const oldest = old.reduce<OldTask | null>((latest, task) => latest === null || task.ageMinutes > latest.ageMinutes ? task : latest, null)
+    const localStale = staleMachines([machine], lastAlert, nowMs, watchTtlMinutes).length > 0
     const at = new Date(nowMs).toISOString()
-    const alerts = oldest === null ? [] : stale.map((machine) => stallLine(machine, oldest, at))
-    yield* appendLines(alertsFile(backlog), alerts)
-    return { stale, old, alerts }
+    const stalls = oldest === null || !localStale ? [] : [stallLine(machine, oldest, at)]
+    const ps = yield* capture(["ps", "-eo", "pid,ppid,command"], null).pipe(
+      Effect.map((result) => result.stdout),
+      Effect.orElseSucceed(() => "")
+    )
+    const seenSlip = lastSlipByCommand(fired)
+    const slips = slipProcesses(ps, standinTools(settings.commands), new Set([process.pid])).filter((slip) => {
+      const last = seenSlip[slip.command]
+      if (last === undefined) {
+        return true
+      }
+      const firedAt = Date.parse(last)
+      return Number.isNaN(firedAt) || nowMs - firedAt > watchTtlMinutes * 60_000
+    })
+    const slipAlerts = slips.map((slip) => slipLine(machine, slip.command, at))
+    yield* appendLines(alertsFile(backlog), [...stalls, ...slipAlerts])
+    return { stale, old, alerts: [...stalls, ...slipAlerts], slips: slips.map((slip) => slip.command) }
   })
 
 export const watchGroup = (home: string): string =>
@@ -263,6 +334,7 @@ export interface HeavyCheck {
   readonly parallel: number
   readonly running: ReadonlyArray<HeavyCheckTask>
   readonly queued: ReadonlyArray<HeavyCheckTask>
+  readonly bypass: number
 }
 
 const taskAge = (iso: string, nowMs: number): number | null => {
@@ -273,6 +345,10 @@ const taskAge = (iso: string, nowMs: number): number | null => {
 export const checkHeavy = (home: string, nowMs: number = Date.now()): Effect.Effect<HeavyCheck, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const settings = yield* readHeavySettings(home)
+    const backlog = home + "/backlog"
+    const fs = yield* FileSystem.FileSystem
+    const fired = yield* fs.readFileString(alertsFile(backlog)).pipe(Effect.orElseSucceed(() => ""))
+    const bypass = countBypass(fired)
     const state = yield* pueue(["status", "--json"]).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "heavy check: pueue is unreachable: " + error.detail })),
       Effect.flatMap((text) => decodeJson(text, WatchState, "pueue status --json"))
@@ -302,7 +378,7 @@ export const checkHeavy = (home: string, nowMs: number = Date.now()): Effect.Eff
     }
     running.sort((a, b) => a.id - b.id)
     queued.sort((a, b) => a.id - b.id)
-    return { group: settings.group, parallel: entry.parallel_tasks, running, queued }
+    return { group: settings.group, parallel: entry.parallel_tasks, running, queued, bypass }
   })
 
 export const formatCheck = (check: HeavyCheck): string => {
@@ -310,7 +386,8 @@ export const formatCheck = (check: HeavyCheck): string => {
   const oldest = check.queued.reduce((max, task) => Math.max(max, task.ageMinutes), 0)
   const head = "heavy: " + String(check.parallel) + " slot" + (check.parallel === 1 ? "" : "s") + ", " +
     String(free) + " free, " + String(check.running.length) + " running, " + String(check.queued.length) + " queued" +
-    (check.queued.length === 0 ? "" : ", oldest queued " + String(oldest) + "m")
+    (check.queued.length === 0 ? "" : ", oldest queued " + String(oldest) + "m") +
+    ", " + String(check.bypass) + " bypass" + (check.bypass === 1 ? "" : "es")
   const lines = check.running.map((task) => "  running #" + String(task.id) + " " + String(task.ageMinutes) + "m " + task.command)
     .concat(check.queued.map((task) => "  queued #" + String(task.id) + " " + String(task.ageMinutes) + "m " + task.command))
   return [head, ...lines].join("\n")

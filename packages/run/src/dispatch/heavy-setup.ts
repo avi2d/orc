@@ -20,25 +20,16 @@ export const readHeavySettings = (home: string): Effect.Effect<HeavySettings, Ru
 const ensureHeavyGroup = (settings: HeavySettings): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   ensureGroup(settings.group, ["--parallel", "1"])
 
-const systemdSlice = "/run/systemd/system"
-
-const systemdPresent: Effect.Effect<boolean, never, FileSystem.FileSystem> =
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    return yield* fs.exists(systemdSlice).pipe(Effect.orElseSucceed(() => false))
-  })
-
 export const writeHeavyBin = (
   home: string,
   settings: HeavySettings,
-  platform: HeavyPlatform,
-  systemd: boolean
+  platform: HeavyPlatform
 ): Effect.Effect<ReadonlyArray<string>, RunnerError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const bin = heavyBinDir(home)
-    const wrap = detectWrap(platform, systemd, settings.limit)
-    const standins: StandinSettings = { home, group: settings.group, through: settings.through, wrap }
+    const wrap = detectWrap(platform, settings.limit)
+    const standins: StandinSettings = { home, group: settings.group, wrap }
     const scripts = standinScripts(standins, settings.commands)
     yield* fs.makeDirectory(bin, { recursive: true }).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "cannot write " + bin + ": " + error.message }))
@@ -47,8 +38,10 @@ export const writeHeavyBin = (
     for (const tool of tools) {
       const file = bin + "/" + tool
       const script = scripts[tool] ?? ""
-      yield* fs.writeFileString(file, script).pipe(
-        Effect.andThen(fs.chmod(file, 0o755)),
+      const staging = file + ".pending-" + process.pid
+      yield* fs.writeFileString(staging, script).pipe(
+        Effect.andThen(fs.chmod(staging, 0o755)),
+        Effect.andThen(fs.rename(staging, file)),
         Effect.mapError((error) => new RunnerError({ detail: "cannot write " + file + ": " + error.message }))
       )
     }
@@ -59,6 +52,5 @@ export const ensureHeavySetup = (home: string): Effect.Effect<ReadonlyArray<stri
   Effect.gen(function*() {
     const settings = yield* readHeavySettings(home)
     yield* ensureHeavyGroup(settings)
-    const systemd = yield* systemdPresent
-    return yield* writeHeavyBin(home, settings, platformOf(), systemd)
+    return yield* writeHeavyBin(home, settings, platformOf())
   })

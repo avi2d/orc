@@ -3,6 +3,7 @@ import type { PlatformError } from "effect/PlatformError"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { homedir } from "node:os"
 import { agentEnv, type AgentExec } from "./agent-exec"
+import { standinDirSuffix } from "./dispatch/heavy"
 import { NonoProviderError, prepareSandboxShims, resolveDeveloperDir, resolveHostBinary, resolvePiAgentDir, resolveRuntime } from "./host"
 import { buildHostGitEnv, checkProfile, refuseCredentialBearingCheckout, resolveRoots, sandboxEnv, sandboxRuntimes } from "./nono"
 import { defaultToolchainResolver, selectNonoProfile, type ModelCredential, type ToolchainResolver } from "./nono-profile"
@@ -24,6 +25,9 @@ export const checksCacheReads = (
 ): ReadonlyArray<string> =>
   hostEnv.HOME === undefined || hostEnv.HOME === "" ? [] : [path.join(hostEnv.HOME, ".cache", "avi2dg-checks")]
 
+export const runtimeSearchPath = (searchPath: string): string =>
+  searchPath.split(":").filter((entry) => !entry.endsWith(standinDirSuffix)).join(":")
+
 export type NonoExec = Extract<AgentExec, { readonly kind: "nono" }>
 
 export const openNonoExec = (
@@ -38,7 +42,7 @@ export const openNonoExec = (
     const roots = yield* resolveRoots(spawner, fs, path, hostGit, options.worktree, options.piSessionDir, options.sessionsDir)
     yield* refuseCredentialBearingCheckout(spawner, fs, path, roots, hostGit)
     const toolchain = options.toolchain ?? defaultToolchainResolver(homedir())
-    const runtimes = (yield* Effect.forEach(sandboxRuntimes, (name) => resolveRuntime(fs, path, name, hostEnv.PATH ?? "", toolchain))).filter((runtime) => runtime !== null)
+    const runtimes = (yield* Effect.forEach(sandboxRuntimes, (name) => resolveRuntime(fs, path, name, runtimeSearchPath(hostEnv.PATH ?? ""), toolchain))).filter((runtime) => runtime !== null)
     const agentDir = yield* resolvePiAgentDir(fs, roots.piSessionDir, options.piAgentDir)
     const shims = yield* prepareSandboxShims(fs, path, roots.piSessionDir)
     yield* Effect.addFinalizer(() => fs.remove(shims.shimDir, { recursive: true }).pipe(Effect.result))

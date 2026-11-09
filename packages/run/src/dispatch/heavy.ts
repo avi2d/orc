@@ -2,7 +2,9 @@ import type { HeavyConfig } from "../orc-config"
 
 export const heavyGroup = "heavy"
 
-export const heavyBinDir = (home: string): string => home + "/heavy/bin"
+export const standinDirSuffix = "/heavy/bin"
+
+export const heavyBinDir = (home: string): string => home + standinDirSuffix
 
 export const withHeavyPath = (home: string, path: string): string => heavyBinDir(home) + ":" + path
 
@@ -24,30 +26,40 @@ const watching = (args: ReadonlyArray<string>): boolean =>
 const testFile = (arg: string): boolean =>
   !arg.startsWith("-") && (/\.(test|spec)\.[A-Za-z]+$/.test(arg) || /_test\.go$/.test(arg) || /(^|\/)test_[^/]*\.py$/.test(arg) || /[^/]*_test\.py$/.test(arg))
 
+const packagePath = (arg: string): boolean =>
+  !arg.startsWith("-") && arg.includes("/") && arg !== "./..." && arg !== "."
+
 const targeted = (args: ReadonlyArray<string>): boolean =>
   args.some((arg) =>
-    arg === "--changed" || arg === "-t" || arg === "--test-name-pattern" || arg === "-g" || arg === "--grep" || arg === "-k" || arg === "-run" || testFile(arg) ||
-    (!arg.startsWith("-") && arg !== "./..." && arg !== "."))
-
-const namedTargeted = (args: ReadonlyArray<string>): boolean =>
-  args.some((arg) => arg === "--changed" || arg === "-t" || arg === "--test-name-pattern" || arg === "-g" || arg === "--grep" || arg === "-k" || testFile(arg))
+    arg === "--changed" || arg === "-t" || arg === "--test-name-pattern" || arg === "-g" || arg === "--grep" || arg === "-k" || arg === "-run" || testFile(arg) || packagePath(arg))
 
 const lightScripts: ReadonlySet<string> = new Set(["dev", "start", "serve", "preview", "watch", "storybook"])
 
 const heavyScripts: ReadonlySet<string> = new Set(["test", "tests", "lint", "typecheck", "build", "check", "checks", "e2e", "coverage", "mutation"])
 
+const scriptToken = (token: string): boolean =>
+  lightScripts.has(token) || heavyScripts.has(token) || token.startsWith("checks-") || token.startsWith("test:")
+
+const runScript = (args: ReadonlyArray<string>): { readonly script: string; readonly rest: ReadonlyArray<string> } | null => {
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index] ?? ""
+    if (scriptToken(token)) {
+      return { script: token, rest: args.slice(index + 1) }
+    }
+  }
+  return null
+}
+
 // An unknown run script runs directly: a server under a custom name would hold the only slot forever.
-const bunRun = (script: string | undefined, rest: ReadonlyArray<string>): HeavyDecision => {
-  if (script === undefined || versionOf([script, ...rest])) {
+const bunRun = (args: ReadonlyArray<string>): HeavyDecision => {
+  if (versionOf(args)) {
     return direct
   }
-  if (lightScripts.has(script)) {
+  const found = runScript(args)
+  if (found === null || lightScripts.has(found.script)) {
     return direct
   }
-  if (heavyScripts.has(script) || script.startsWith("checks-") || script.startsWith("test:")) {
-    return namedTargeted(rest) ? idle(1) : idle(0)
-  }
-  return direct
+  return targeted(found.rest) ? idle(1) : idle(0)
 }
 
 const bunDecision = (args: ReadonlyArray<string>): HeavyDecision => {
@@ -58,8 +70,11 @@ const bunDecision = (args: ReadonlyArray<string>): HeavyDecision => {
   if (first === "test") {
     return targeted(rest) ? idle(1) : idle(0)
   }
-  if (first === "run" || first === "x") {
-    return bunRun(rest[0], rest.slice(1))
+  if (first === "run") {
+    return bunRun(rest)
+  }
+  if (first === "x") {
+    return execDecision(rest)
   }
   if (first === "build") {
     return idle(0)
@@ -67,22 +82,26 @@ const bunDecision = (args: ReadonlyArray<string>): HeavyDecision => {
   return direct
 }
 
-const bunxDecision = (args: ReadonlyArray<string>): HeavyDecision => {
+const execToolNames: ReadonlySet<string> = new Set(["vitest", "playwright", "jest", "tsc", "eslint", "oxlint"])
+
+const execDecision = (args: ReadonlyArray<string>): HeavyDecision => {
   const [first = "", ...rest] = args
   if (first === "" || first.startsWith("-") || watching(args) || versionOf(args)) {
     return direct
   }
-  if (first.startsWith("checks-") || first === "vitest" || first === "playwright" || first === "jest" || first === "tsc" || first === "eslint" || first === "oxlint") {
-    return namedTargeted(rest) ? idle(1) : idle(0)
+  if (first.startsWith("checks-") || execToolNames.has(first)) {
+    return targeted(rest) ? idle(1) : idle(0)
   }
   return direct
 }
+
+const bunxDecision = (args: ReadonlyArray<string>): HeavyDecision => execDecision(args)
 
 const testRunner = (args: ReadonlyArray<string>): HeavyDecision => {
   if (watching(args) || versionOf(args)) {
     return direct
   }
-  return namedTargeted(args) ? idle(1) : idle(0)
+  return targeted(args) ? idle(1) : idle(0)
 }
 
 const subcommand = (args: ReadonlyArray<string>, heavy: ReadonlySet<string>): HeavyDecision | null => {
@@ -110,7 +129,27 @@ const playwrightDecision = (args: ReadonlyArray<string>): HeavyDecision => {
   }
   const [first = "", ...rest] = args
   if (first === "test") {
-    return namedTargeted(rest) ? idle(1) : idle(0)
+    return targeted(rest) ? idle(1) : idle(0)
+  }
+  return direct
+}
+
+const scriptRunner = (args: ReadonlyArray<string>): HeavyDecision => {
+  const [first = "", ...rest] = args
+  if (first === "" || watching(args) || versionOf(args)) {
+    return direct
+  }
+  if (first === "test") {
+    return targeted(rest) ? idle(1) : idle(0)
+  }
+  if (first === "run") {
+    return bunRun(rest)
+  }
+  if (first === "exec") {
+    return execDecision(rest)
+  }
+  if (heavyScripts.has(first) || first.startsWith("checks-") || first.startsWith("test:")) {
+    return targeted(rest) ? idle(1) : idle(0)
   }
   return direct
 }
@@ -118,6 +157,10 @@ const playwrightDecision = (args: ReadonlyArray<string>): HeavyDecision => {
 export const defaultHeavyTools: ReadonlyArray<string> = [
   "bun",
   "bunx",
+  "npm",
+  "npx",
+  "pnpm",
+  "yarn",
   "vitest",
   "playwright",
   "jest",
@@ -134,7 +177,11 @@ export const defaultHeavyTools: ReadonlyArray<string> = [
 const builtin = (tool: string, args: ReadonlyArray<string>): HeavyDecision | null => {
   switch (tool) {
     case "bun": return bunDecision(args)
-    case "bunx": return bunxDecision(args)
+    case "bunx":
+    case "npx": return bunxDecision(args)
+    case "npm":
+    case "pnpm":
+    case "yarn": return scriptRunner(args)
     case "vitest":
     case "jest":
     case "pytest":
@@ -163,13 +210,13 @@ const extraEntryDecision = (tool: string, args: ReadonlyArray<string>, want: str
     return direct
   }
   if (sub === null) {
-    return namedTargeted(args) ? idle(1) : idle(0)
+    return targeted(args) ? idle(1) : idle(0)
   }
   const [first = "", ...rest] = args
   if (first !== sub) {
     return null
   }
-  return namedTargeted(rest) ? idle(1) : idle(0)
+  return targeted(rest) ? idle(1) : idle(0)
 }
 
 const extraDecision = (tool: string, args: ReadonlyArray<string>, extra: ReadonlyArray<string>): HeavyDecision | null => {
@@ -189,13 +236,11 @@ export const classifyHeavy = (tool: string, args: ReadonlyArray<string>, extra: 
 export interface HeavySettings {
   readonly group: string
   readonly commands: ReadonlyArray<string>
-  readonly through: ReadonlyArray<string>
   readonly limit: "auto" | "none"
 }
 
 export const resolveHeavy = (config: HeavyConfig | undefined): HeavySettings => ({
   group: config?.group ?? heavyGroup,
   commands: config?.commands ?? [],
-  through: config?.through ?? [],
   limit: config?.limit ?? "auto"
 })

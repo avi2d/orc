@@ -1,18 +1,15 @@
 import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { hostname, tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import {
-  checkHeavy, ensureHeavyWatch, formatCheck, isWholeSuite, lastAlertByMachine, oldRunningTasks,
-  splitCommand, staleMachines, watchGroup, watchOnce, watchTtlMinutes
+  checkHeavy, countBypass, ensureHeavyWatch, formatCheck, lastAlertByMachine, lastSlipByCommand, oldRunningTasks,
+  slipProcesses, staleMachines, watchGroup, watchOnce, watchTtlMinutes
 } from "../../../packages/run/src/dispatch/heavy-watch"
-import { standinTools } from "../../../packages/run/src/dispatch/heavy-standin"
 import { taskLabel } from "../../../packages/run/src/dispatch/pueue-status"
-
-const tools = standinTools([])
 
 describe("the heavy watch", () => {
   test("the latest fire per machine decides freshness", () => {
@@ -33,18 +30,43 @@ describe("the heavy watch", () => {
     expect(staleMachines(["a", "b", "c", "d"], { b: fresh, c: old, d: "not-a-date" }, now)).toEqual(["a", "c", "d"])
   })
 
-  test("quoted arguments stay one token", () => {
-    expect(splitCommand('taskpolicy -c utility /bin/bun test "my file"')).toEqual(
-      ["taskpolicy", "-c", "utility", "/bin/bun", "test", "my file"]
-    )
+  test("a heavy tool process with no pueue task behind it slips, a queued one does not", () => {
+    const ps = [
+      "PID PPID COMMAND",
+      "1 0 /sbin/init",
+      "100 1 pueued",
+      "101 100 bun test login.test.ts",
+      "200 1 bun test other.test.ts",
+      "201 1 bun test other.test.ts",
+      "300 1 /usr/local/bin/vitest run",
+      "400 1 ps -eo pid,ppid,command"
+    ].join("\n")
+    expect(slipProcesses(ps, ["bun", "vitest"], new Set([400]))).toEqual([
+      { pid: 200, command: "bun test other.test.ts" },
+      { pid: 300, command: "/usr/local/bin/vitest run" }
+    ])
   })
 
-  test("a whole suite run is exempt and a targeted run is not", () => {
-    expect(isWholeSuite("bun test", [], tools)).toBe(true)
-    expect(isWholeSuite("taskpolicy -c utility /usr/local/bin/bun test", [], tools)).toBe(true)
-    expect(isWholeSuite("bun test x", [], tools)).toBe(false)
-    expect(isWholeSuite("bun install", [], tools)).toBe(false)
-    expect(isWholeSuite("make build", [], tools)).toBe(false)
+  test("the latest slip fire per command decides the reminder", () => {
+    const text = [
+      JSON.stringify({ rule: "heavy-slip", at: "2026-01-01T00:10:00Z", machine: "ridge", command: "bun test a" }),
+      JSON.stringify({ rule: "heavy-slip", at: "2026-01-01T00:05:00Z", machine: "ridge", command: "bun test a" }),
+      JSON.stringify({ rule: "heavy-slip", at: "2026-01-01T00:30:00Z", machine: "ridge", command: "bun test b" }),
+      "not json",
+      ""
+    ].join("\n")
+    expect(lastSlipByCommand(text)).toEqual({ "bun test a": "2026-01-01T00:10:00Z", "bun test b": "2026-01-01T00:30:00Z" })
+  })
+
+  test("bypass lines count and nothing else does", () => {
+    const text = [
+      JSON.stringify({ rule: "heavy-bypass", at: "2026-01-01T00:10:00Z", reason: "x", command: "bun test" }),
+      JSON.stringify({ rule: "heavy-bypass", at: "2026-01-01T00:11:00Z", reason: "y", command: "go test" }),
+      JSON.stringify({ rule: "long-task", at: "2026-01-01T00:12:00Z", reason: "total", machine: "m", task: { id: "pueue-1", title: "t" }, quietMinutes: 0, totalMinutes: 20 }),
+      "not json",
+      ""
+    ].join("\n")
+    expect(countBypass(text)).toBe(2)
   })
 })
 
@@ -53,8 +75,8 @@ const stateOf = (tasks: Record<string, ReturnType<typeof heavyTask>>, group: str
   groups: { [group]: { status: "Running", parallel_tasks: 1 } }
 })
 
-const taskOf = (id: number, group: string, status: unknown, command: string, created: string) => ({
-  id, label: null, command, created_at: created, group, status
+const taskOf = (id: number, group: string, status: unknown, command: string, created: string, priority: number) => ({
+  id, label: null, command, created_at: created, group, priority, status
 })
 
 describe("the stall search", () => {
@@ -62,13 +84,13 @@ describe("the stall search", () => {
     const now = Date.parse("2026-01-01T01:00:00Z")
     const minute = 60_000
     const state = stateOf({
-      "1": taskOf(1, "heavy", { Running: { start: new Date(now - 20 * minute).toISOString() } }, "bun test x", new Date(now - 20 * minute).toISOString()),
-      "2": taskOf(2, "heavy", { Running: { start: new Date(now - 20 * minute).toISOString() } }, "bun test", new Date(now - 20 * minute).toISOString()),
-      "3": taskOf(3, "heavy", { Running: { start: new Date(now - 2 * minute).toISOString() } }, "bun test y", new Date(now - 2 * minute).toISOString()),
-      "4": taskOf(4, "other", { Running: { start: new Date(now - 20 * minute).toISOString() } }, "bun test z", new Date(now - 20 * minute).toISOString()),
-      "5": taskOf(5, "heavy", { Queued: {} }, "bun test w", new Date(now - 20 * minute).toISOString())
+      "1": taskOf(1, "heavy", { Running: { start: new Date(now - 20 * minute).toISOString() } }, "bun test login.test.ts", new Date(now - 20 * minute).toISOString(), 1),
+      "2": taskOf(2, "heavy", { Running: { start: new Date(now - 20 * minute).toISOString() } }, "bun test", new Date(now - 20 * minute).toISOString(), 0),
+      "3": taskOf(3, "heavy", { Running: { start: new Date(now - 2 * minute).toISOString() } }, "bun test other.test.ts", new Date(now - 2 * minute).toISOString(), 1),
+      "4": taskOf(4, "other", { Running: { start: new Date(now - 20 * minute).toISOString() } }, "bun test stray.test.ts", new Date(now - 20 * minute).toISOString(), 1),
+      "5": taskOf(5, "heavy", { Queued: {} }, "bun test queued.test.ts", new Date(now - 20 * minute).toISOString(), 1)
     }, "heavy")
-    const old = oldRunningTasks(state, "heavy", now, watchTtlMinutes, [], tools)
+    const old = oldRunningTasks(state, "heavy", now, watchTtlMinutes)
     expect(old.map((task) => task.id)).toEqual([1])
     expect(old[0]?.ageMinutes).toBe(20)
   })
@@ -83,10 +105,11 @@ describe("the check readout", () => {
       queued: [
         { id: 2, command: "bun test y", ageMinutes: 4 },
         { id: 3, command: "bun test", ageMinutes: 1 }
-      ]
+      ],
+      bypass: 2
     }
     expect(formatCheck(check)).toBe(
-      "heavy: 1 slot, 0 free, 1 running, 2 queued, oldest queued 4m\n" +
+      "heavy: 1 slot, 0 free, 1 running, 2 queued, oldest queued 4m, 2 bypasses\n" +
       "  running #1 12m bun test x\n" +
       "  queued #2 4m bun test y\n" +
       "  queued #3 1m bun test"
@@ -94,7 +117,7 @@ describe("the check readout", () => {
   })
 
   test("an empty queue reads quiet", () => {
-    expect(formatCheck({ group: "heavy", parallel: 1, running: [], queued: [] })).toBe("heavy: 1 slot, 1 free, 0 running, 0 queued")
+    expect(formatCheck({ group: "heavy", parallel: 1, running: [], queued: [], bypass: 0 })).toBe("heavy: 1 slot, 1 free, 0 running, 0 queued, 0 bypasses")
   })
 })
 
@@ -110,13 +133,21 @@ esac
 exit 0
 `
 
+const fakeWatchPs = `#!/bin/sh
+cat "$FAKE_PS_FILE"
+`
+
+const emptyPs = "PID PPID COMMAND\n1 0 /sbin/init\n"
+
 const withFakePueue = async <A>(home: string, fn: () => Promise<A>): Promise<A> => {
   const path = process.env.PATH ?? ""
   const savedLog = process.env.FAKE_PUEUE_LOG
   const savedState = process.env.FAKE_STATE_FILE
+  const savedPs = process.env.FAKE_PS_FILE
   process.env.PATH = join(home, "bin") + ":" + path
   process.env.FAKE_PUEUE_LOG = join(home, "pueue.log")
   process.env.FAKE_STATE_FILE = join(home, "state.json")
+  process.env.FAKE_PS_FILE = join(home, "ps.txt")
   try {
     return await fn()
   } finally {
@@ -130,6 +161,11 @@ const withFakePueue = async <A>(home: string, fn: () => Promise<A>): Promise<A> 
       delete process.env.FAKE_STATE_FILE
     } else {
       process.env.FAKE_STATE_FILE = savedState
+    }
+    if (savedPs === undefined) {
+      delete process.env.FAKE_PS_FILE
+    } else {
+      process.env.FAKE_PS_FILE = savedPs
     }
   }
 }
@@ -148,6 +184,8 @@ const setupHome = async (machines: ReadonlyArray<string>, alerts: string): Promi
   const bin = join(home, "bin")
   await mkdir(bin, { recursive: true })
   await writeFile(join(bin, "pueue"), fakeWatchPueue, { mode: 0o755 })
+  await writeFile(join(bin, "ps"), fakeWatchPs, { mode: 0o755 })
+  await writeFile(join(home, "ps.txt"), emptyPs)
   await writeFile(join(home, "state.json"), JSON.stringify({ tasks: {}, groups: {} }))
   return home
 }
@@ -155,8 +193,8 @@ const setupHome = async (machines: ReadonlyArray<string>, alerts: string): Promi
 const minute = 60_000
 const at = (now: number, back: number): string => new Date(now - back * minute).toISOString()
 
-const heavyTask = (id: number, command: string, status: unknown, created: string) => ({
-  id, label: null, command, created_at: created, group: "heavy", status
+const heavyTask = (id: number, command: string, status: unknown, created: string, priority: number) => ({
+  id, label: null, command, created_at: created, group: "heavy", priority, status
 })
 
 const heavyState = (tasks: Record<string, unknown>) => ({
@@ -170,15 +208,16 @@ describe("the watch loop", () => {
     try {
       const now = Date.parse("2026-01-01T01:00:00Z")
       await writeFile(join(home, "state.json"), JSON.stringify(heavyState({
-        "1": heavyTask(1, "bun test x", { Running: { start: at(now, 20) } }, at(now, 20))
+        "1": heavyTask(1, "bun test login.test.ts", { Running: { start: at(now, 20) } }, at(now, 20), 1)
       })))
       const report = await withFakePueue(home, () => runWatch(watchOnce(home, now)))
       expect(report.stale).toEqual(["ridge"])
       expect(report.old.map((task) => task.id)).toEqual([1])
       expect(report.alerts.length).toBe(1)
+      expect(report.slips).toEqual([])
       const fired = await readFile(join(home, "backlog", "alerts.jsonl"), "utf8")
       expect(fired).toContain('"rule":"long-task"')
-      expect(fired).toContain('"machine":"ridge"')
+      expect(fired).toContain('"machine":"' + hostname() + '"')
     } finally {
       await rm(home, { recursive: true, force: true })
     }
@@ -186,15 +225,38 @@ describe("the watch loop", () => {
 
   test("a machine that fired recently gets no stall alert", async () => {
     const now = Date.parse("2026-01-01T01:00:00Z")
-    const fire = JSON.stringify({ rule: "heavy-load", at: at(now, 1), machine: "ridge", since: at(now, 1), crossed: ["load"] })
-    const home = await setupHome(["ridge"], fire + "\n")
+    const fire = JSON.stringify({ rule: "heavy-load", at: at(now, 1), machine: hostname(), since: at(now, 1), crossed: ["load"] })
+    const home = await setupHome([hostname()], fire + "\n")
     try {
       await writeFile(join(home, "state.json"), JSON.stringify(heavyState({
-        "1": heavyTask(1, "bun test x", { Running: { start: at(now, 20) } }, at(now, 20))
+        "1": heavyTask(1, "bun test login.test.ts", { Running: { start: at(now, 20) } }, at(now, 20), 1)
       })))
       const report = await withFakePueue(home, () => runWatch(watchOnce(home, now)))
       expect(report.stale).toEqual([])
       expect(report.alerts).toEqual([])
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  test("a heavy tool process with no queued task gets one slip alert", async () => {
+    const home = await setupHome([], "")
+    try {
+      const now = Date.parse("2026-01-01T01:00:00Z")
+      await writeFile(
+        join(home, "ps.txt"),
+        ["PID PPID COMMAND", "1 0 /sbin/init", "100 1 pueued", "101 100 bun test queued.test.ts", "200 1 bun test rogue.test.ts"].join("\n") + "\n"
+      )
+      const first = await withFakePueue(home, () => runWatch(watchOnce(home, now)))
+      expect(first.slips).toEqual(["bun test rogue.test.ts"])
+      expect(first.alerts.length).toBe(1)
+      const fired = await readFile(join(home, "backlog", "alerts.jsonl"), "utf8")
+      expect(fired).toContain('"rule":"heavy-slip"')
+      expect(fired).toContain('"machine":"' + hostname() + '"')
+      expect(fired).toContain('"command":"bun test rogue.test.ts"')
+      const second = await withFakePueue(home, () => runWatch(watchOnce(home, now)))
+      expect(second.slips).toEqual([])
+      expect(second.alerts).toEqual([])
     } finally {
       await rm(home, { recursive: true, force: true })
     }
@@ -205,14 +267,28 @@ describe("the watch loop", () => {
     try {
       const now = Date.parse("2026-01-01T01:00:00Z")
       await writeFile(join(home, "state.json"), JSON.stringify(heavyState({
-        "1": heavyTask(1, "bun test x", { Running: { start: at(now, 12) } }, at(now, 12)),
-        "2": heavyTask(2, "go test ./...", { Queued: {} }, at(now, 5))
+        "1": heavyTask(1, "bun test x", { Running: { start: at(now, 12) } }, at(now, 12), 1),
+        "2": heavyTask(2, "go test ./...", { Queued: {} }, at(now, 5), 0)
       })))
       const check = await withFakePueue(home, () => runWatch(checkHeavy(home, now)))
       expect(check.group).toBe("heavy")
       expect(check.running.map((task) => task.ageMinutes)).toEqual([12])
       expect(check.queued.map((task) => task.ageMinutes)).toEqual([5])
+      expect(check.bypass).toBe(0)
       expect(formatCheck(check)).toContain("oldest queued 5m")
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  test("the check counts bypasses off the alerts log", async () => {
+    const bypass = JSON.stringify({ rule: "heavy-bypass", at: at(Date.now(), 1), reason: "hotfix", command: "bun test" })
+    const home = await setupHome(["ridge"], bypass + "\n" + bypass + "\n")
+    try {
+      await writeFile(join(home, "state.json"), JSON.stringify(heavyState({})))
+      const check = await withFakePueue(home, () => runWatch(checkHeavy(home)))
+      expect(check.bypass).toBe(2)
+      expect(formatCheck(check)).toContain(", 2 bypasses")
     } finally {
       await rm(home, { recursive: true, force: true })
     }
@@ -253,7 +329,7 @@ describe("the watch loop", () => {
         tasks: {
           "9": {
             id: 9, label: taskLabel(home, "heavy-watch"), command: "sh", created_at: at(Date.now(), 1),
-            group: watchGroup(home), status: { Running: { start: at(Date.now(), 1) } }
+            group: watchGroup(home), priority: 0, status: { Running: { start: at(Date.now(), 1) } }
           }
         },
         groups: {}

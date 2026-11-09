@@ -31,7 +31,13 @@ const HeavyBypass = Schema.Struct({
   reason: Schema.String,
   command: Schema.String
 })
-const AlertLine = Schema.fromJsonString(Schema.Union([QuotaPace, HeavyLoad, LongTask, HeavyBypass]))
+const HeavySlip = Schema.Struct({
+  rule: Schema.Literal("heavy-slip"),
+  at: Schema.String,
+  machine: Schema.String,
+  command: Schema.String
+})
+const AlertLine = Schema.fromJsonString(Schema.Union([QuotaPace, HeavyLoad, LongTask, HeavyBypass, HeavySlip]))
 type AlertLine = typeof AlertLine.Type
 
 const minutesSpan = (minutes: number): string => {
@@ -59,6 +65,9 @@ const alertText = (alert: AlertLine): string => {
     }
     case "heavy-bypass": {
       return "alert: " + alert.command + " bypassed the heavy queue: " + alert.reason
+    }
+    case "heavy-slip": {
+      return "alert: " + alert.command + " on " + alert.machine + " skipped the heavy queue"
     }
   }
 }

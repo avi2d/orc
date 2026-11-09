@@ -39,7 +39,7 @@ export const runHeavy = (args: HeavyVerb, place: HeavyPlace): Effect.Effect<void
       }
       case "HeavyWatchOnce": {
         const report = yield* watchOnce(place.home)
-        yield* Console.log("heavy watch: " + String(report.stale.length) + " stale, " + String(report.old.length) + " old, " + String(report.alerts.length) + " alerts")
+        yield* Console.log("heavy watch: " + String(report.stale.length) + " stale, " + String(report.old.length) + " old, " + String(report.alerts.length) + " alerts, " + String(report.slips.length) + " slips")
         break
       }
     }

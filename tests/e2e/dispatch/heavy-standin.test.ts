@@ -12,6 +12,7 @@ case "$1" in
   add) echo 7;;
   wait) sleep "\${FAKE_WAIT_SECS:-0.2}";;
   log) printf '%s' "$FAKE_LOG_JSON";;
+  follow) printf '%s' "$FAKE_FOLLOW_OUTPUT";;
   status) echo "7 | Queued | fake command";;
   remove|kill) exit 0;;
 esac
@@ -30,7 +31,7 @@ interface Harness {
   readonly pueueLog: () => Promise<string>
 }
 
-const settingsOf = (home: string) => ({ home, group: "heavy", through: [], wrap: "" })
+const settingsOf = (home: string) => ({ home, group: "heavy", wrap: "" })
 
 const setup = async (tools: ReadonlyArray<string>): Promise<Harness> => {
   const root = await mkdtemp(join(tmpdir(), "orc-heavy-"))
@@ -41,6 +42,8 @@ const setup = async (tools: ReadonlyArray<string>): Promise<Harness> => {
   await writeFile(join(fake, "pueue"), fakePueue, { mode: 0o755 })
   await writeFile(join(fake, "bun"), fakeTool, { mode: 0o755 })
   await writeFile(join(fake, "mytool"), fakeTool, { mode: 0o755 })
+  await writeFile(join(fake, "vitest"), fakeTool, { mode: 0o755 })
+  await writeFile(join(fake, "npm"), fakeTool, { mode: 0o755 })
   for (const tool of tools) {
     await writeFile(join(bin, tool), standinScript(tool, settingsOf(root), []), { mode: 0o755 })
   }
@@ -49,7 +52,8 @@ const setup = async (tools: ReadonlyArray<string>): Promise<Harness> => {
     FAKE_PUEUE_LOG: join(root, "pueue.log"),
     FAKE_TOOL_LOG: join(root, "tool.log"),
     FAKE_LOG_JSON: '{"7":{"status":{"Done":{"result":"Success"}}}}',
-    HEAVY_QUEUE_POLL_SECONDS: "1"
+    FAKE_FOLLOW_OUTPUT: "",
+    ORC_HEAVY_TEST_POLL_SECONDS: "1"
   }
   return { root, bin, env, pueueLog: () => readFile(join(root, "pueue.log"), "utf8").catch(() => "") }
 }
@@ -62,13 +66,13 @@ const noPueue = (): boolean => {
   }
 }
 
-const run = (harness: Harness, tool: string, args: ReadonlyArray<string>, extraEnv: Record<string, string> = {}): { code: number; stderr: string } => {
+const run = (harness: Harness, tool: string, args: ReadonlyArray<string>, extraEnv: Record<string, string> = {}): { code: number; stdout: string; stderr: string } => {
   const child = Bun.spawnSync([join(harness.bin, tool), ...args], {
     env: { ...harness.env, ...extraEnv },
-    stdout: "ignore",
+    stdout: "pipe",
     stderr: "pipe"
   })
-  return { code: child.exitCode, stderr: child.stderr.toString() }
+  return { code: child.exitCode, stdout: child.stdout.toString(), stderr: child.stderr.toString() }
 }
 
 let harnesses: Array<Harness> = []
@@ -81,9 +85,9 @@ afterEach(async () => {
 })
 
 describe("the heavy stand-in", () => {
-  test("bun test on a named file becomes a pueue task in the heavy group with priority", async () => {
+  test("bun test on a named test file becomes a pueue task in the heavy group with priority", async () => {
     const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
-    const result = run(harness, "bun", ["test", "x"])
+    const result = run(harness, "bun", ["test", "login.test.ts"])
     expect(result.code).toBe(0)
     const log = await harness.pueueLog()
     expect(log).toContain("add --group heavy -o 1")
@@ -105,6 +109,57 @@ describe("the heavy stand-in", () => {
     const result = run(harness, "bun", ["test", "x"], { PUEUE_GROUP: "heavy", PUEUE_WORKER_ID: "0" })
     expect(result.code).toBe(0)
     expect(await harness.pueueLog()).toBe("")
+  })
+
+  test("inside another pueue group the command still queues", async () => {
+    const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
+    const result = run(harness, "bun", ["test"], { PUEUE_GROUP: "other", PUEUE_WORKER_ID: "0" })
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
+  })
+
+  test("the queued command output reaches the caller", async () => {
+    const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
+    const result = run(harness, "bun", ["test"], { FAKE_FOLLOW_OUTPUT: "hello-from-the-queue" })
+    expect(result.code).toBe(0)
+    expect(result.stdout).toContain("hello-from-the-queue")
+  })
+
+  test("a bypass runs directly and logs a valid event for the command", async () => {
+    const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
+    const result = run(harness, "bun", ["test", "x"], { HEAVY_QUEUE_BYPASS: 'fix "flaky"\\ seed' })
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toBe("")
+    const line = await readFile(join(harness.root, "backlog", "alerts.jsonl"), "utf8")
+    const event = JSON.parse(line.trim()) as { rule: string; reason: string; command: string }
+    expect(event.rule).toBe("heavy-bypass")
+    expect(event.reason).toBe("fix flaky seed")
+    expect(event.command).toBe("bun test x")
+  })
+
+  test("bun x runs a heavy tool through the queue", async () => {
+    const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
+    const result = run(harness, "bun", ["x", "vitest", "run"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
+  })
+
+  test("bun run finds the script past option flags", async () => {
+    const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
+    const result = run(harness, "bun", ["run", "--filter", "proj", "build"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
+  })
+
+  test("npm test queues and npm install never queues", async () => {
+    const harness = harnesses[harnesses.push(await setup(["npm"])) - 1]
+    const queued = run(harness, "npm", ["test"])
+    expect(queued.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
+    const direct = run(harness, "npm", ["install"])
+    expect(direct.code).toBe(0)
+    expect(await harness.pueueLog()).not.toContain("install")
+    expect(await readFile(join(harness.root, "tool.log"), "utf8")).toContain("npm install")
   })
 
   test("bun install never queues", async () => {
@@ -143,7 +198,7 @@ describe("the heavy stand-in", () => {
       harnesses.push({ root, bin: "", env: {}, pueueLog: async () => "" })
       const bin = join(root, "bin")
       await mkdir(bin, { recursive: true })
-      await writeFile(join(bin, "bun"), standinScript("bun", { home: root, group, through: [], wrap: "" }, []), { mode: 0o755 })
+      await writeFile(join(bin, "bun"), standinScript("bun", { home: root, group, wrap: "" }, []), { mode: 0o755 })
       await writeFile(join(root, "pass.test.ts"), 'test("x", () => {})\n')
       await writeFile(join(root, "fail.test.ts"), 'test("x", () => { throw new Error("x") })\n')
       const realEnv = { ...process.env, PATH: bin + ":" + process.env.PATH, HOME: userInfo().homedir }
@@ -162,7 +217,7 @@ describe("the heavy stand-in", () => {
 
   test("a wait past the budget fails the step with a queue message", async () => {
     const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
-    const result = run(harness, "bun", ["test", "x"], { FAKE_LOG_JSON: '{"7":{"status":{"Queued":{}}}}', HEAVY_QUEUE_WAIT_MINUTES: "0" })
+    const result = run(harness, "bun", ["test", "x"], { FAKE_LOG_JSON: '{"7":{"status":{"Queued":{}}}}', ORC_HEAVY_TEST_WAIT_MINUTES: "0" })
     expect(result.code).toBe(1)
     expect(result.stderr).toContain("waited 0 min for the heavy queue")
     expect(await harness.pueueLog()).toContain("pueue remove 7")

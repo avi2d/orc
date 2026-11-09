@@ -11,33 +11,32 @@ const runEffect = <A, E>(effect: Effect.Effect<A, E, FileSystem.FileSystem>): Pr
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
 
 describe("the heavy queue setup", () => {
-  test("the macOS wrapper outranks everything except an explicit limit", () => {
-    expect(detectWrap("darwin", false, "auto")).toBe("taskpolicy -c utility")
-    expect(detectWrap("darwin", false, "none")).toBe("")
-    expect(detectWrap("linux", true, "auto")).toBe("systemd-run --user --scope --slice=orc-heavy.slice")
-    expect(detectWrap("linux", false, "auto")).toBe("")
-    expect(detectWrap("other", false, "auto")).toBe("")
+  test("the macOS wrapper applies on darwin under auto, and nowhere else", () => {
+    expect(detectWrap("darwin", "auto")).toBe("taskpolicy -c utility")
+    expect(detectWrap("darwin", "none")).toBe("")
+    expect(detectWrap("linux", "auto")).toBe("")
+    expect(detectWrap("other", "auto")).toBe("")
   })
 
   test("an empty home resolves the public defaults", async () => {
     const home = await mkdtemp(join(tmpdir(), "orc-heavy-home-"))
     try {
       const settings = await runEffect(Effect.provide(readHeavySettings(home), BunServices.layer))
-      expect(settings).toEqual({ group: "heavy", commands: [], through: [], limit: "auto" })
+      expect(settings).toEqual({ group: "heavy", commands: [], limit: "auto" })
     } finally {
       await rm(home, { recursive: true, force: true })
     }
   })
 
-  test("the home config names the group, the extra commands, the wrapper and the limit", async () => {
+  test("the home config names the group, the extra commands and the limit", async () => {
     const home = await mkdtemp(join(tmpdir(), "orc-heavy-home-"))
     try {
       await writeFile(
         join(home, "config.json"),
-        JSON.stringify({ providers: [], heavy: { group: "g", commands: ["tool"], through: ["nice", "-n", "10"], limit: "none" } })
+        JSON.stringify({ providers: [], heavy: { group: "g", commands: ["tool"], limit: "none" } })
       )
       const settings = await runEffect(Effect.provide(readHeavySettings(home), BunServices.layer))
-      expect(settings).toEqual({ group: "g", commands: ["tool"], through: ["nice", "-n", "10"], limit: "none" })
+      expect(settings).toEqual({ group: "g", commands: ["tool"], limit: "none" })
     } finally {
       await rm(home, { recursive: true, force: true })
     }
@@ -48,7 +47,7 @@ describe("the heavy queue setup", () => {
     try {
       const tools = await runEffect(
         Effect.provide(
-          writeHeavyBin(home, { group: "heavy", commands: ["tool"], through: [], limit: "auto" }, "linux", false),
+          writeHeavyBin(home, { group: "heavy", commands: ["tool"], limit: "auto" }, "linux"),
           BunServices.layer
         )
       )
