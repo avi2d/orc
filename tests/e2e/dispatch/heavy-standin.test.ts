@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir, userInfo } from "node:os"
 import { join } from "node:path"
@@ -183,7 +184,7 @@ describe("the heavy stand-in", () => {
     expect(log).toMatch(/pueue (remove|kill) 7/)
   })
 
-  test.skipIf(noPueue())("a real pueue task runs the queued command and keeps its exit code", async () => {
+  test.skipIf(noPueue())(skipReason("needs a live pueue daemon", "a real pueue task runs the queued command and keeps its exit code"), async () => {
     const group = "orc-heavy-test"
     Bun.spawnSync(["pueue", "group", "add", group, "--parallel", "1"], { stdout: "ignore", stderr: "ignore" })
     try {

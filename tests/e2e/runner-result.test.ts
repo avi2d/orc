@@ -272,7 +272,7 @@ const prepareTwoHomes = async (fixture: Fixture, homeB: string, far: string): Pr
 }
 
 const waitForBothDispatches = async (fixture: Fixture, labelA: string, labelB: string): Promise<void> => {
-  const added = await waitForAddedTasks(fixture)
+  const added = await waitForAddedTasks(fixture, [labelA + " orc", labelB + " orc"])
   expect(added.some((line) => line.startsWith(labelA + " orc "))).toBe(true)
   expect(added.some((line) => line.startsWith(labelB + " orc "))).toBe(true)
 }

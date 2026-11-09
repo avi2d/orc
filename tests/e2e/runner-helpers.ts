@@ -190,12 +190,12 @@ export const writeTwoHomeDispatches = async (homeA: string, homeB: string, machi
   }
 }
 
-export const waitForAddedTasks = async (fixture: Fixture): Promise<ReadonlyArray<string>> => {
+export const waitForAddedTasks = async (fixture: Fixture, wanted: ReadonlyArray<string>): Promise<ReadonlyArray<string>> => {
   const deadline = Date.now() + startWaitMillis
   let added: ReadonlyArray<string> = []
   while (Date.now() < deadline) {
     added = (await readFile(join(fixture.pueue, "added-tasks"), "utf8").catch(() => "")).split("\n").slice(0, -1)
-    if (added.length >= 2) {
+    if (wanted.every((label) => added.some((line) => line.startsWith(label + " ")))) {
       break
     }
     await Bun.sleep(20)
