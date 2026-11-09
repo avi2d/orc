@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
 import { openDatabase, recordRun } from "../../packages/run/src/run-history"
-import { binPath, fakeQuota, isRecord, orcOk, orcThere, resultJson, RunnerRun, runnerTimeout, runOrc, waitForAddedTasks, withFixture, writeTwoHomeDispatches } from "./runner-helpers"
+import { binPath, fakeQuota, isRecord, orcOk, orcThere, resultJson, RunnerRun, runnerTimeout, runOrc, startWaitMillis, withFixture, writeTwoHomeDispatches } from "./runner-helpers"
 
 describe("orc runner result", () => {
   test("a label-less result returns without stdin closing instead of waiting on stdin to EOF", async () => {
@@ -271,9 +271,17 @@ describe("orc runner result", () => {
       }
       expect(beatB.stdout).toContain("started orc-1")
       expect(beatB.stdout).not.toContain("already")
-      const added = await waitForAddedTasks(fixture)
       const labelA = homeA + " orc-1"
       const labelB = homeB + " orc-1"
+      const deadline = Date.now() + startWaitMillis
+      let added: ReadonlyArray<string> = []
+      while (Date.now() < deadline) {
+        added = (await readFile(join(fixture.pueue, "added-tasks"), "utf8").catch(() => "")).split("\n").slice(0, -1)
+        if (added.some((line) => line.startsWith(labelA + " orc ")) && added.some((line) => line.startsWith(labelB + " orc "))) {
+          break
+        }
+        await Bun.sleep(20)
+      }
       expect(added.some((line) => line.startsWith(labelA + " orc "))).toBe(true)
       expect(added.some((line) => line.startsWith(labelB + " orc "))).toBe(true)
       const queueA = await runOrc(fixture, ["runner", "queue"], { ORC_HOME: far }, JSON.stringify({ task: "orc-1", checkout: fixture.checkout, provider: "acme", body: "# x\n", token: "tokenA123", expiresAt: "2027-01-01T00:00:00.000Z", label: labelA }))

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { type Fixture, mainToken, type OrcResult, runnerTimeout, runOrc, withFixture } from "./runner-helpers"
+import { watchGroup } from "../../packages/run/src/dispatch/heavy-watch"
 
 const startTask = async (fixture: Fixture, home: string = fixture.home): Promise<OrcResult> => {
   await mkdir(join(home, "backlog", "taken"), { recursive: true })
@@ -46,7 +47,8 @@ describe("the alert stream orc runner start queues", () => {
       ])
       expect(started.stdout).toBe(
         "queued task-9 as pueue task 77 in group orc\n" +
-          "queued the alert stream as pueue task 900 in group " + group + ", its fires to " + join(fixture.home, "backlog", "alerts.jsonl") + "\n"
+          "queued the alert stream as pueue task 900 in group " + group + ", its fires to " + join(fixture.home, "backlog", "alerts.jsonl") + "\n" +
+          "queued the heavy watch as pueue task 78 in group " + watchGroup(fixture.home) + "\n"
       )
     })
   }, runnerTimeout)
@@ -58,7 +60,7 @@ describe("the alert stream orc runner start queues", () => {
       await writeStream(fixture, group, { Running: { start: "2026-10-27T10:00:00.000Z" } })
       await Bun.write(join(fixture.pueue, "alerts-add-args"), "")
       const again = await startTask(fixture)
-      expect(again.stdout).toBe("queued task-9 as pueue task 78 in group orc\n")
+      expect(again.stdout).toBe("queued task-9 as pueue task 79 in group orc\n")
       expect(await readFile(join(fixture.pueue, "alerts-add-args"), "utf8")).toBe("")
     })
   }, runnerTimeout)
@@ -87,7 +89,10 @@ describe("the alert stream orc runner start queues", () => {
       await writeFile(join(fixture.pueue, "fail-alerts"), "")
       const started = await startTask(fixture)
       expect(started.exitCode).toBe(0)
-      expect(started.stdout).toBe("queued task-9 as pueue task 77 in group orc\n")
+      expect(started.stdout).toBe(
+        "queued task-9 as pueue task 77 in group orc\n" +
+          "queued the heavy watch as pueue task 78 in group " + watchGroup(fixture.home) + "\n"
+      )
       expect(started.stderr).toBe("orc runner start queued no alert stream: pueue group exited 1: fake pueue refuses the alert stream\n")
     })
   }, runnerTimeout)
