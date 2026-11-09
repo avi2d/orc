@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import type { NonoExecOptions } from "../../packages/run/src/nono-exec"
-import { makeNonoFixtureHome } from "../lib/nono-home"
+import { makeNonoFixtureDir } from "../lib/nono-home"
 import { runNonoShell } from "../lib/nono-shell"
 
 const liveSandbox = Bun.env.ORC_NONO_E2E === "1"
@@ -46,7 +46,7 @@ describe("the copy's install under nono", () => {
       return
     }
     root = await mkdtemp(join(tmpdir(), "orc-nono-install-"))
-    home = await makeNonoFixtureHome(".orc-nono-install-home-")
+    home = await makeNonoFixtureDir("orc-nono-install-home-")
     await mkdir(join(home, ".cache", "avi2dg-checks", "repos", "example.com", "acme", "lib"), { recursive: true })
     await writeFile(join(home, cachedCommit), vendoredCommit)
     await mkdir(join(home, ".ssh"))
