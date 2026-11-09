@@ -38,27 +38,42 @@ const helpers: ReadonlyArray<string> = [
   '  return 1',
   '}',
   '',
+  'heavy_valueflag() {',
+  '  case "$1" in',
+  '    --timeout|--reporter|--maxWorkers|--max-workers|--project|--config|--output|--outDir|--outdir|--manifest-path|--target|-p|-c|-o) return 0;;',
+  '  esac',
+  '  return 1',
+  '}',
+  '',
   'heavy_targeted() {',
-  '  for heavy_a in "$@"; do',
-  '    case "$heavy_a" in',
+  '  while [ $# -gt 0 ]; do',
+  '    case "$1" in',
   '      --changed|-t|--test-name-pattern|-g|--grep|-k|-run) return 0;;',
   '      *.test.*|*.spec.*|*_test.go|test_*.py|*_test.py|*/test_*.py) return 0;;',
+  '    esac',
+  '    if heavy_valueflag "$1"; then shift; if [ $# -eq 0 ]; then break; fi; shift; if [ $# -eq 0 ]; then break; fi; fi',
+  '    case "$1" in',
   '      -*) ;;',
   '      ./...|.) ;;',
   '      */*) return 0;;',
   '    esac',
+  '    shift',
   '  done',
   '  return 1',
   '}',
   '',
   'heavy_targeted_bare() {',
-  '  for heavy_a in "$@"; do',
-  '    case "$heavy_a" in',
+  '  while [ $# -gt 0 ]; do',
+  '    case "$1" in',
   '      --changed|-t|--test-name-pattern|-g|--grep|-k|-run) return 0;;',
+  '    esac',
+  '    if heavy_valueflag "$1"; then shift; if [ $# -eq 0 ]; then break; fi; shift; if [ $# -eq 0 ]; then break; fi; fi',
+  '    case "$1" in',
   '      -*) ;;',
   '      ./...|.) ;;',
   '      *) return 0;;',
   '    esac',
+  '    shift',
   '  done',
   '  return 1',
   '}',
@@ -83,7 +98,7 @@ const helpers: ReadonlyArray<string> = [
   '  heavy_script=""',
   '  for heavy_a in "$@"; do',
   '    case "$heavy_a" in',
-  '      dev|start|serve|preview|watch|storybook|test|tests|lint|typecheck|build|check|checks|e2e|coverage|mutation|checks-*|test:*) heavy_script="$heavy_a"; break;;',
+  '      dev|start|serve|preview|watch|storybook|test|tests|lint|typecheck|build|check|checks|e2e|coverage|mutation|checks-*|test:*|build:*|lint:*|typecheck:*|vitest|jest|tsc|eslint|oxlint|playwright) heavy_script="$heavy_a"; break;;',
   '    esac',
   '  done',
   '  case "$heavy_script" in',
@@ -106,6 +121,7 @@ const decideBody = (tool: string): ReadonlyArray<string> => {
         '    run) shift; heavy_run_script "$@";;',
         '    x) shift; heavy_exec_tool "$@";;',
         '    build) heavy_queue=1;;',
+        '    *) heavy_exec_tool "$@";;',
         '  esac'
       ]
     }
@@ -129,6 +145,9 @@ const decideBody = (tool: string): ReadonlyArray<string> => {
         '    *:watch|*:ui|*:dev) return;;',
         '    test|tests|lint|typecheck|build|check|checks|e2e|coverage|mutation|checks-*|test:*)',
         '      shift; heavy_queue=1; if heavy_targeted "$@"; then heavy_prio=1; fi;;',
+        '    build:*|lint:*|typecheck:*)',
+        '      shift; heavy_queue=1; if heavy_targeted "$@"; then heavy_prio=1; fi;;',
+        '    *) heavy_exec_tool "$@";;',
         '  esac'
       ]
     }
@@ -277,15 +296,26 @@ const standinUtils = (): ReadonlyArray<string> => [
     '  pueue log --json "$1" 2>/dev/null | grep -o \'"status":{"[A-Za-z]*\' | head -1 | cut -d\\" -f4',
     '}',
     '',
+    'heavy_unwrap() {',
+    '  heavy_u="$1"',
+    '  case "$heavy_u" in *orc-heavy-wait\\ *)',
+    '    heavy_u="${heavy_u#*orc-heavy-wait }"; heavy_u="${heavy_u#* }";;',
+    '  esac',
+    '  case "$heavy_u" in "taskpolicy -c utility "*) heavy_u="${heavy_u#taskpolicy -c utility }";; esac',
+    '  printf "%s" "$heavy_u"',
+    '}',
+    '',
     'heavy_inside_slot() {',
     '  if [ "$PUEUE_GROUP" = "$heavy_group" ]; then return 0; fi',
     '  heavy_state_json="$(pueue status --json -g "$heavy_group" 2>/dev/null)" || return 1',
     '  heavy_cmds="$(printf "%s" "$heavy_state_json" | grep -E -o \'"command":"(\\.|[^"\\])*"\')"',
     '  if [ -z "$heavy_cmds" ]; then return 1; fi',
+    '  heavy_cmds="$(printf "%s\\n" "$heavy_cmds" | while IFS= read -r heavy_cl; do heavy_unwrap "$heavy_cl"; printf "\\n"; done)"',
     '  heavy_tree="$(ps -eo pid,ppid,command 2>/dev/null)" || return 1',
     '  heavy_pid=$$; heavy_depth=0; heavy_selfhit=0; heavy_anchit=0; heavy_pueue=0',
     '  while :; do',
     '    heavy_acmd="$(printf "%s\\n" "$heavy_tree" | awk -v p="$heavy_pid" \'$1 == p { $1=""; $2=""; sub(/^  */, ""); print; exit }\')"',
+    '    heavy_acmd="$(heavy_unwrap "$heavy_acmd")"',
     '    if [ -z "$heavy_acmd" ]; then return 1; fi',
     '    if [ "$heavy_depth" = 0 ]; then heavy_selfv=1; else heavy_selfv=0; fi',
     '    heavy_abin="$(printf "%s" "$heavy_acmd" | awk \'{ print $1; exit }\')"',
@@ -379,8 +409,21 @@ const standinUtils = (): ReadonlyArray<string> => [
     '}',
 ]
 
-const standinMain = (): ReadonlyArray<string> => [
+const waiterBody =
+  'o=$1; shift; "$@" & c=$!; ' +
+  '(while kill -0 "$o" 2>/dev/null && kill -0 "$c" 2>/dev/null; do sleep 5; done; kill "$c" 2>/dev/null) & k=$!; ' +
+  'trap "kill $c 2>/dev/null; kill $k 2>/dev/null" TERM INT; wait "$c"; r=$?; kill "$k" 2>/dev/null; wait "$k" 2>/dev/null; exit "$r"'
+
+const waiterAdd =
+  'sh -c ' + "'" + waiterBody + "'" + ' orc-heavy-wait $$ $heavy_wrap "$heavy_real_bin" "$@"'
+
+const standinQueue = (): ReadonlyArray<string> => [
     'heavy_main() {',
+    '  if [ -n "$HEAVY_CLASSIFY" ]; then',
+    '    heavy_decide "$@"',
+    '    echo "$heavy_queue $heavy_prio"',
+    '    return 0',
+    '  fi',
     '  heavy_real_bin="$(heavy_real)"',
     '  if [ -z "$heavy_real_bin" ]; then',
     '    echo "orc heavy: no $heavy_tool beyond the stand-in folder on PATH" >&2',
@@ -406,18 +449,20 @@ const standinMain = (): ReadonlyArray<string> => [
     '    return 1',
     '  fi',
     '  if [ "$heavy_prio" = 1 ]; then',
-    '    heavy_id="$(pueue add --group "$heavy_group" -o 1 --working-directory "$PWD" --print-task-id --escape -- $heavy_wrap "$heavy_real_bin" "$@" 2>&1)" || {',
+    '    heavy_id="$(pueue add --group "$heavy_group" -o 1 --working-directory "$PWD" --print-task-id --escape -- ' + waiterAdd + ' 2>&1)" || {',
     '      echo "orc heavy: pueue refused the task; repair pueue (pueue status) or bypass once with HEAVY_QUEUE_BYPASS=<reason>" >&2',
     '      return 1',
     '    }',
     '  else',
-    '    heavy_id="$(pueue add --group "$heavy_group" --working-directory "$PWD" --print-task-id --escape -- $heavy_wrap "$heavy_real_bin" "$@" 2>&1)" || {',
+    '    heavy_id="$(pueue add --group "$heavy_group" --working-directory "$PWD" --print-task-id --escape -- ' + waiterAdd + ' 2>&1)" || {',
     '      echo "orc heavy: pueue refused the task; repair pueue (pueue status) or bypass once with HEAVY_QUEUE_BYPASS=<reason>" >&2',
     '      return 1',
     '    }',
     '  fi',
     '  case "$heavy_id" in \'\'|*[!0-9]*) echo "orc heavy: pueue refused the task: $heavy_id" >&2; return 1;; esac',
-    ...standinWait(),
+]
+
+const standinFinish = (): ReadonlyArray<string> => [
     '  trap - INT TERM HUP',
     '  pueue follow "$heavy_id" 2>/dev/null || true',
     '  heavy_result="$(pueue log --json "$heavy_id" 2>/dev/null)"',
@@ -437,24 +482,30 @@ const standinMain = (): ReadonlyArray<string> => [
     ''
 ]
 
-const standinWait = (): ReadonlyArray<string> => [
+export interface StandinTiming {
+  readonly budgetMinutes: number | null
+  readonly pollSeconds: number
+}
+
+const standinWait = (timing?: StandinTiming): ReadonlyArray<string> => [
     '  heavy_on_signal() {',
     '    heavy_remove "$heavy_id"',
     '    exit 130',
     '  }',
     '  trap heavy_on_signal INT TERM HUP',
-    '  if [ "$GITHUB_ACTIONS" = "true" ]; then',
-    '    heavy_budget=30',
-    '  else',
-    '    heavy_budget=""',
-    '  fi',
-    '  if [ -n "$ORC_HEAVY_TEST_WAIT_MINUTES" ]; then',
-    '    heavy_budget="$ORC_HEAVY_TEST_WAIT_MINUTES"',
-    '  fi',
-    '  heavy_poll=60',
-    '  if [ -n "$ORC_HEAVY_TEST_POLL_SECONDS" ]; then',
-    '    heavy_poll="$ORC_HEAVY_TEST_POLL_SECONDS"',
-    '  fi',
+    ...(timing === undefined
+      ? [
+        '  if [ "$GITHUB_ACTIONS" = "true" ]; then',
+        '    heavy_budget=30',
+        '  else',
+        '    heavy_budget=""',
+        '  fi',
+        '  heavy_poll=60'
+      ]
+      : [
+        '  heavy_budget=' + (timing.budgetMinutes === null ? '""' : String(timing.budgetMinutes)),
+        '  heavy_poll=' + String(timing.pollSeconds)
+      ]),
     '  case "$heavy_poll" in ""|*[!0-9]*|0) heavy_poll=60;; esac',
     '  heavy_elapsed=0',
     '  heavy_polls=0',
@@ -503,13 +554,14 @@ const standinWait = (): ReadonlyArray<string> => [
     '  trap - INT TERM HUP',
 ]
 
-export const standinScript = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>): string => {
+export const standinScript = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, timing?: StandinTiming): string => {
   const decide = defaultHeavyTools.includes(tool) ? decideBody(tool) : extraSub(tool, commands)
-  return [...standinHead(tool, settings), ...helpers, ...standinDecideFn(decide), ...standinUtils(), ...standinMain()].join("\n") + "\n"
+  return [...standinHead(tool, settings), ...helpers, ...standinDecideFn(decide), ...standinUtils(), ...standinQueue(), ...standinWait(timing), ...standinFinish()].join("\n") + "\n"
 }
 
 export const standinScripts = (
   settings: StandinSettings,
   commands: ReadonlyArray<string>,
-  tools: ReadonlyArray<string> = standinTools(commands)
-): Record<string, string> => Object.fromEntries(tools.map((tool) => [tool, standinScript(tool, settings, commands)]))
+  tools: ReadonlyArray<string> = standinTools(commands),
+  timing?: StandinTiming
+): Record<string, string> => Object.fromEntries(tools.map((tool) => [tool, standinScript(tool, settings, commands, timing)]))

@@ -35,6 +35,17 @@ export const writeHeavyBin = (
       Effect.mapError((error) => new RunnerError({ detail: "cannot write " + bin + ": " + error.message }))
     )
     const tools = Object.keys(scripts)
+    const kept = new Set(tools)
+    const present = yield* fs.readDirectory(bin).pipe(
+      Effect.mapError((error) => new RunnerError({ detail: "cannot read " + bin + ": " + error.message }))
+    )
+    for (const entry of present) {
+      if (!kept.has(entry) && !entry.includes(".pending-")) {
+        yield* fs.remove(bin + "/" + entry).pipe(
+          Effect.mapError((error) => new RunnerError({ detail: "cannot remove " + bin + "/" + entry + ": " + error.message }))
+        )
+      }
+    }
     for (const tool of tools) {
       const file = bin + "/" + tool
       const script = scripts[tool] ?? ""

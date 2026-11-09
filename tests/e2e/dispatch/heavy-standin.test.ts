@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir, userInfo } from "node:os"
 import { join } from "node:path"
-import { standinScript } from "../../../packages/run/src/dispatch/heavy-standin"
+import { standinScript, type StandinTiming } from "../../../packages/run/src/dispatch/heavy-standin"
 
 const fakePueue = `#!/bin/sh
 echo "pueue $*" >> "$FAKE_PUEUE_LOG"
@@ -33,7 +33,7 @@ interface Harness {
 
 const settingsOf = (home: string) => ({ home, group: "heavy", wrap: "" })
 
-const setup = async (tools: ReadonlyArray<string>, commands: ReadonlyArray<string> = []): Promise<Harness> => {
+const setup = async (tools: ReadonlyArray<string>, commands: ReadonlyArray<string> = [], timing?: StandinTiming): Promise<Harness> => {
   const root = await mkdtemp(join(tmpdir(), "orc-heavy-"))
   const bin = join(root, "bin")
   const fake = join(root, "fake")
@@ -53,15 +53,14 @@ const setup = async (tools: ReadonlyArray<string>, commands: ReadonlyArray<strin
   await writeFile(join(fake, "xcrun"), fakeTool, { mode: 0o755 })
   for (const tool of tools) {
     await writeFile(join(fake, tool), fakeTool, { mode: 0o755 })
-    await writeFile(join(bin, tool), standinScript(tool, settingsOf(root), commands), { mode: 0o755 })
+    await writeFile(join(bin, tool), standinScript(tool, settingsOf(root), commands, timing), { mode: 0o755 })
   }
   const env: Record<string, string> = {
     PATH: bin + ":" + fake + ":/usr/bin:/bin",
     FAKE_PUEUE_LOG: join(root, "pueue.log"),
     FAKE_TOOL_LOG: join(root, "tool.log"),
     FAKE_LOG_JSON: '{"7":{"status":{"Done":{"result":"Success"}}}}',
-    FAKE_FOLLOW_OUTPUT: "",
-    ORC_HEAVY_TEST_POLL_SECONDS: "1"
+    FAKE_FOLLOW_OUTPUT: ""
   }
   return { root, bin, env, pueueLog: () => readFile(join(root, "pueue.log"), "utf8").catch(() => "") }
 }
@@ -222,8 +221,8 @@ describe("the heavy stand-in", () => {
   })
 
   test("a wait past the budget fails the step with a queue message", async () => {
-    const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
-    const result = run(harness, "bun", ["test", "x"], { FAKE_LOG_JSON: '{"7":{"status":{"Queued":{}}}}', ORC_HEAVY_TEST_WAIT_MINUTES: "0" })
+    const harness = harnesses[harnesses.push(await setup(["bun"], [], { budgetMinutes: 0, pollSeconds: 1 })) - 1]
+    const result = run(harness, "bun", ["test", "x"], { FAKE_LOG_JSON: '{"7":{"status":{"Queued":{}}}}' })
     expect(result.code).toBe(1)
     expect(result.stderr).toContain("waited 0 min for the heavy queue")
     expect(await harness.pueueLog()).toContain("pueue remove 7")
@@ -242,11 +241,84 @@ describe("the heavy stand-in", () => {
     expect(await harness.pueueLog()).toContain("-o 1")
   })
 
-  test("bun test with an option value queues with priority on the bare value", async () => {
+  test("bun test with an option value queues without priority", async () => {
     const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
     const result = run(harness, "bun", ["test", "--timeout", "20000"])
     expect(result.code).toBe(0)
+    const log = await harness.pueueLog()
+    expect(log).toContain("add --group heavy")
+    expect(log).not.toContain("-o 1")
+  })
+
+  test("vitest run with an option value queues without priority", async () => {
+    const harness = harnesses[harnesses.push(await setup(["vitest"])) - 1]
+    const result = run(harness, "vitest", ["run", "--reporter", "verbose"])
+    expect(result.code).toBe(0)
+    const log = await harness.pueueLog()
+    expect(log).toContain("add --group heavy")
+    expect(log).not.toContain("-o 1")
+  })
+
+  test("jest with an option value queues without priority", async () => {
+    const harness = harnesses[harnesses.push(await setup(["jest"])) - 1]
+    const result = run(harness, "jest", ["--maxWorkers", "2"])
+    expect(result.code).toBe(0)
+    const log = await harness.pueueLog()
+    expect(log).toContain("add --group heavy")
+    expect(log).not.toContain("-o 1")
+  })
+
+  test("tsc with a project path queues without priority", async () => {
+    const harness = harnesses[harnesses.push(await setup(["tsc"])) - 1]
+    const result = run(harness, "tsc", ["-p", "packages/x/tsconfig.json"])
+    expect(result.code).toBe(0)
+    const log = await harness.pueueLog()
+    expect(log).toContain("add --group heavy")
+    expect(log).not.toContain("-o 1")
+  })
+
+  test("go build with an output path keeps priority on the package", async () => {
+    const harness = harnesses[harnesses.push(await setup(["go"])) - 1]
+    const result = run(harness, "go", ["build", "-o", "bin/app", "./cmd/app"])
+    expect(result.code).toBe(0)
     expect(await harness.pueueLog()).toContain("-o 1")
+  })
+
+  test("pnpm runs a heavy bin through the queue", async () => {
+    const harness = harnesses[harnesses.push(await setup(["pnpm"])) - 1]
+    const result = run(harness, "pnpm", ["vitest", "run"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
+  })
+
+  test("bun runs a heavy bin directly", async () => {
+    const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
+    const result = run(harness, "bun", ["vitest", "run"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
+  })
+
+  test("bun run queues build and lint scripts", async () => {
+    const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
+    const build = run(harness, "bun", ["run", "build:ci"])
+    expect(build.code).toBe(0)
+    const lint = run(harness, "bun", ["run", "lint:fix"])
+    expect(lint.code).toBe(0)
+    const tsc = run(harness, "bun", ["run", "tsc"])
+    expect(tsc.code).toBe(0)
+    const log = await harness.pueueLog()
+    expect(log.match(/add --group heavy/g)?.length).toBe(3)
+  })
+
+  test("classify names the queue decision without queueing", async () => {
+    const harness = harnesses[harnesses.push(await setup(["bun", "npm", "go"])) - 1]
+    const classify = { HEAVY_CLASSIFY: "1" }
+    expect(run(harness, "bun", ["test", "x"], classify).stdout.trim()).toBe("1 1")
+    expect(run(harness, "bun", ["test", "--timeout", "20000"], classify).stdout.trim()).toBe("1 0")
+    expect(run(harness, "bun", ["run", "dev"], classify).stdout.trim()).toBe("0 0")
+    expect(run(harness, "npm", ["install"], classify).stdout.trim()).toBe("0 0")
+    expect(run(harness, "go", ["test", "-timeout", "10m", "./..."], classify).stdout.trim()).toBe("1 0")
+    expect(await harness.pueueLog()).toBe("")
   })
 
   test("bun x on a named test file queues with priority", async () => {

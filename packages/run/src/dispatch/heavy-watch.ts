@@ -3,6 +3,7 @@ import { Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { alertsFile } from "./events"
 import { heavyBinDir } from "./heavy"
+import { heavyHoldLabel } from "./heavy-hold"
 import { readHeavySettings } from "./heavy-setup"
 import { standinTools } from "./heavy-standin"
 import { PueueStatus, taskLabel } from "./pueue-status"
@@ -139,18 +140,31 @@ const unwrapShell = (words: ReadonlyArray<string>): ReadonlyArray<string> => {
   return shellNames.has(argvBase(first)) && second === "-c" ? rest : words
 }
 
-const normalizeTaskCommand = (command: string): string =>
-  unwrapShell(command.split(" ").filter((part) => part !== "")).join(" ").replace(/["'\\]/g, "")
+const unwrapWords = (words: ReadonlyArray<string>): ReadonlyArray<string> => {
+  let rest = words
+  const marker = rest.indexOf("orc-heavy-wait")
+  if (marker !== -1) {
+    rest = rest.slice(marker + 2)
+  }
+  if (rest[0] === "taskpolicy" && rest[1] === "-c" && rest[2] === "utility") {
+    rest = rest.slice(3)
+  }
+  return unwrapShell(rest)
+}
 
-const orcNames: ReadonlySet<string> = new Set(["orc", "pi"])
+export const stripHeavyWrapper = (command: string): string =>
+  unwrapWords(command.split(" ").filter((part) => part !== "")).join(" ")
 
-const toolWord = (words: ReadonlyArray<string>, tools: ReadonlyArray<string>): string | null => {
+export const normalizeTaskCommand = (command: string): string =>
+  stripHeavyWrapper(command).replace(/["'\\]/g, "")
+
+const toolMatch = (words: ReadonlyArray<string>, tools: ReadonlyArray<string>): { readonly word: string; readonly index: number } | null => {
   const first = argvBase(words[0] ?? "")
   if (tools.includes(first)) {
-    return words[0] ?? ""
+    return { word: words[0] ?? "", index: 0 }
   }
   if (first === "node" && words.length > 1 && tools.includes(argvBase(words[1] ?? ""))) {
-    return words[1] ?? ""
+    return { word: words[1] ?? "", index: 1 }
   }
   return null
 }
@@ -171,40 +185,59 @@ const ancestorArgs = (rows: Map<number, PsRow>, pid: number): ReadonlyArray<stri
   return commands
 }
 
-export const slipProcesses = (
+export interface SlipCandidate {
+  readonly pid: number
+  readonly command: string
+  readonly script: string
+  readonly args: ReadonlyArray<string>
+}
+
+export const slipCandidates = (
   ps: string,
   tools: ReadonlyArray<string>,
   selfPids: ReadonlySet<number>,
-  running: ReadonlyArray<string>,
   binDir: string
-): ReadonlyArray<SlipTask> => {
+): ReadonlyArray<SlipCandidate> => {
   const rows = psRows(ps)
   const excluded = ownTree(rows, selfPids)
-  const queued = new Set(running.map(normalizeTaskCommand))
-  const slips = new Map<string, SlipTask>()
+  const found: Array<SlipCandidate> = []
   for (const [pid, row] of rows) {
     if (excluded.has(pid)) {
       continue
     }
     const words = row.args.split(" ").filter((part) => part !== "")
-    if (orcNames.has(argvBase(words[0] ?? ""))) {
+    const match = toolMatch(words, tools)
+    if (match === null || match.word.includes(binDir)) {
       continue
     }
-    const word = toolWord(words, tools)
-    if (word === null || word.includes(binDir)) {
-      continue
-    }
-    const held = behindPueue(rows, pid) &&
-      ancestorArgs(rows, pid).some((args) => queued.has(normalizeTaskCommand(args)))
-    if (held) {
-      continue
-    }
-    if (!slips.has(row.args)) {
-      slips.set(row.args, { pid, command: row.args })
-    }
+    found.push({ pid, command: row.args, script: binDir + "/" + argvBase(match.word), args: words.slice(match.index + 1) })
   }
-  return [...slips.values()].sort((a, b) => a.pid - b.pid)
+  return found.sort((a, b) => a.pid - b.pid)
 }
+
+export const slipHeld = (ps: string, pid: number, running: ReadonlySet<string>): boolean => {
+  const rows = psRows(ps)
+  return behindPueue(rows, pid) &&
+    ancestorArgs(rows, pid).some((args) => running.has(normalizeTaskCommand(args)))
+}
+
+export const slipCovered = (ps: string, pid: number): boolean => {
+  const rows = psRows(ps)
+  return ancestorArgs(rows, pid).some((args) => {
+    const first = args.split(" ").filter((part) => part !== "")[0] ?? ""
+    return argvBase(first) === "nono"
+  })
+}
+
+const classifyCalls = (
+  candidates: ReadonlyArray<SlipCandidate>
+): Effect.Effect<ReadonlyMap<number, boolean>, never, ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.forEach(candidates, (candidate) =>
+    capture([candidate.script, ...candidate.args], null, { HEAVY_CLASSIFY: "1" }).pipe(
+      Effect.map((result) => [candidate.pid, result.stdout.trim().split(" ")[0] === "1"] as const),
+      Effect.orElseSucceed(() => [candidate.pid, true] as const)
+    )
+  ).pipe(Effect.map((entries) => new Map(entries)))
 
 const SlipFire = Schema.Struct({
   rule: Schema.Literal("heavy-slip"),
@@ -263,7 +296,7 @@ export const oldRunningTasks = (
     if (task.priority === 0) {
       continue
     }
-    old.push({ id: task.id, command: task.command, ageMinutes: Math.floor((nowMs - started) / 60_000) })
+    old.push({ id: task.id, command: stripHeavyWrapper(task.command), ageMinutes: Math.floor((nowMs - started) / 60_000) })
   }
   return old.sort((a, b) => a.id - b.id)
 }
@@ -324,7 +357,32 @@ export const watchOnce = (home: string, nowMs: number = Date.now()): Effect.Effe
       return status !== null && "Running" in status ? [task.command] : []
     })
     const seenSlip = lastSlipByCommand(fired)
-    const slips = slipProcesses(ps, standinTools(settings.commands), new Set([process.pid]), alive, heavyBinDir(home)).filter((slip) => {
+    const queued = new Set(alive.map(normalizeTaskCommand))
+    const holdRunning = Object.values(state.tasks).some((task) => {
+      if (task.group !== settings.group || task.label !== heavyHoldLabel) {
+        return false
+      }
+      const status = decodedStatus(task.status)
+      return status !== null && "Running" in status
+    })
+    const candidates = slipCandidates(ps, standinTools(settings.commands), new Set([process.pid]), heavyBinDir(home))
+    const queuedByPid = yield* classifyCalls(candidates)
+    const found = new Map<string, SlipTask>()
+    for (const candidate of candidates) {
+      if (queuedByPid.get(candidate.pid) !== true) {
+        continue
+      }
+      if (slipHeld(ps, candidate.pid, queued)) {
+        continue
+      }
+      if (holdRunning && slipCovered(ps, candidate.pid)) {
+        continue
+      }
+      if (!found.has(candidate.command)) {
+        found.set(candidate.command, { pid: candidate.pid, command: candidate.command })
+      }
+    }
+    const slips = [...found.values()].sort((a, b) => a.pid - b.pid).filter((slip) => {
       const last = seenSlip[slip.command]
       if (last === undefined) {
         return true
@@ -412,12 +470,12 @@ export const checkHeavy = (home: string, nowMs: number = Date.now()): Effect.Eff
       if (status !== null && "Running" in status) {
         const age = taskAge(status.Running.start, nowMs)
         if (age !== null) {
-          running.push({ id: task.id, command: task.command, ageMinutes: age })
+          running.push({ id: task.id, command: stripHeavyWrapper(task.command), ageMinutes: age })
         }
       } else if (status !== null && "Queued" in status) {
         const age = taskAge(task.created_at, nowMs)
         if (age !== null) {
-          queued.push({ id: task.id, command: task.command, ageMinutes: age })
+          queued.push({ id: task.id, command: stripHeavyWrapper(task.command), ageMinutes: age })
         }
       }
     }

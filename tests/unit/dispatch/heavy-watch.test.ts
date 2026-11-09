@@ -6,9 +6,11 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import {
-  checkHeavy, countBypass, ensureHeavyWatch, formatCheck, lastAlertByMachine, lastSlipByCommand, oldRunningTasks,
-  slipProcesses, staleMachines, watchGroup, watchOnce, watchTtlMinutes
+  checkHeavy, countBypass, ensureHeavyWatch, formatCheck, lastAlertByMachine, lastSlipByCommand, normalizeTaskCommand, oldRunningTasks,
+  slipCandidates, slipCovered, slipHeld, staleMachines, stripHeavyWrapper, watchGroup, watchOnce, watchTtlMinutes
 } from "../../../packages/run/src/dispatch/heavy-watch"
+import { standinScript } from "../../../packages/run/src/dispatch/heavy-standin"
+import { heavyBinDir } from "../../../packages/run/src/dispatch/heavy"
 import { taskLabel } from "../../../packages/run/src/dispatch/pueue-status"
 
 describe("the heavy watch", () => {
@@ -30,37 +32,69 @@ describe("the heavy watch", () => {
     expect(staleMachines(["a", "b", "c", "d"], { b: fresh, c: old, d: "not-a-date" }, now)).toEqual(["a", "c", "d"])
   })
 
-  test("a heavy tool process slips unless a running task of the heavy group holds it", () => {
+  test("tool processes become candidates with their script and args", () => {
     const ps = [
       "PID PPID COMMAND",
       "1 0 /sbin/init",
       "100 1 pueued",
       "101 100 bun test queued.test.ts",
-      "102 100 bun test other.test.ts",
       "200 1 bun test rogue.test.ts",
       "201 1 /usr/local/bin/vitest run",
       "202 1 node /usr/local/bin/vitest run",
       "203 1 node server.js",
       "204 1 /tmp/home/heavy/bin/bun test x",
-      "205 1 orc heavy watch-once",
+      "205 1 /opt/homebrew/bin/bun /repo/src/bin.ts runner hold x",
       "400 1 ps -eo pid,ppid,command"
     ].join("\n")
-    expect(slipProcesses(ps, ["bun", "vitest"], new Set([400]), ["bun test queued.test.ts", "go test ./..."], "/tmp/home/heavy/bin")).toEqual([
-      { pid: 102, command: "bun test other.test.ts" },
-      { pid: 200, command: "bun test rogue.test.ts" },
-      { pid: 201, command: "/usr/local/bin/vitest run" },
-      { pid: 202, command: "node /usr/local/bin/vitest run" }
+    expect(slipCandidates(ps, ["bun", "vitest"], new Set([400]), "/tmp/home/heavy/bin")).toEqual([
+      { pid: 101, command: "bun test queued.test.ts", script: "/tmp/home/heavy/bin/bun", args: ["test", "queued.test.ts"] },
+      { pid: 200, command: "bun test rogue.test.ts", script: "/tmp/home/heavy/bin/bun", args: ["test", "rogue.test.ts"] },
+      { pid: 201, command: "/usr/local/bin/vitest run", script: "/tmp/home/heavy/bin/vitest", args: ["run"] },
+      { pid: 202, command: "node /usr/local/bin/vitest run", script: "/tmp/home/heavy/bin/vitest", args: ["run"] },
+      { pid: 205, command: "/opt/homebrew/bin/bun /repo/src/bin.ts runner hold x", script: "/tmp/home/heavy/bin/bun", args: ["/repo/src/bin.ts", "runner", "hold", "x"] }
     ])
   })
 
-  test("a quoted queued command still holds its task child", () => {
-    const ps = ["PID PPID COMMAND", "1 0 /sbin/init", "100 1 pueued", "101 100 env -i PATH=/bin bun test x"].join("\n")
-    expect(slipProcesses(ps, ["bun"], new Set([]), ["env -i 'PATH=/bin' bun test x"], "/nope")).toEqual([])
+  test("a running task holds its child behind pueue, a queued task does not", () => {
+    const ps = [
+      "PID PPID COMMAND",
+      "1 0 /sbin/init",
+      "100 1 pueued",
+      "101 100 /real/bun test queued.test.ts",
+      "102 100 /real/bun test other.test.ts",
+      "200 1 /real/bun test queued.test.ts"
+    ].join("\n")
+    const running = new Set([normalizeTaskCommand("taskpolicy -c utility /real/bun test queued.test.ts")])
+    expect(slipHeld(ps, 101, running)).toBe(true)
+    expect(slipHeld(ps, 102, running)).toBe(false)
+    expect(slipHeld(ps, 200, running)).toBe(false)
   })
 
-  test("a process matching only a queued task still slips", () => {
-    const ps = ["PID PPID COMMAND", "1 0 /sbin/init", "200 1 bun test queued.test.ts"].join("\n")
-    expect(slipProcesses(ps, ["bun"], new Set([]), ["bun test other.test.ts"], "/nope")).toEqual([{ pid: 200, command: "bun test queued.test.ts" }])
+  test("a waiter-wrapped task holds its child and quotes still match", () => {
+    const wrapped = "sh -c 'o=$1; shift' orc-heavy-wait 4242 /real/bun test x"
+    const ps = ["PID PPID COMMAND", "1 0 /sbin/init", "100 1 pueued", "101 100 /real/bun test x"].join("\n")
+    expect(slipHeld(ps, 101, new Set([normalizeTaskCommand(wrapped)]))).toBe(true)
+    const quoted = ["PID PPID COMMAND", "1 0 /sbin/init", "100 1 pueued", "101 100 env -i PATH=/bin bun test x"].join("\n")
+    expect(slipHeld(quoted, 101, new Set([normalizeTaskCommand("env -i 'PATH=/bin' bun test x")]))).toBe(true)
+  })
+
+  test("a process under nono is covered and a plain one is not", () => {
+    const ps = [
+      "PID PPID COMMAND",
+      "1 0 /sbin/init",
+      "50 1 /opt/homebrew/bin/orc run",
+      "51 50 /opt/homebrew/bin/nono run --silent",
+      "52 51 bun test x",
+      "60 1 bun test y"
+    ].join("\n")
+    expect(slipCovered(ps, 52)).toBe(true)
+    expect(slipCovered(ps, 60)).toBe(false)
+  })
+
+  test("the wrapper and the priority wrap strip off a task command", () => {
+    expect(stripHeavyWrapper("sh -c 'o=$1; shift' orc-heavy-wait 4242 taskpolicy -c utility /real/bun test x")).toBe("/real/bun test x")
+    expect(stripHeavyWrapper("taskpolicy -c utility /real/bun test x")).toBe("/real/bun test x")
+    expect(stripHeavyWrapper("bun test x")).toBe("bun test x")
   })
 
   test("the latest slip fire per command decides the reminder", () => {
@@ -197,6 +231,11 @@ const setupHome = async (alerts: string): Promise<string> => {
   await writeFile(join(bin, "ps"), fakeWatchPs, { mode: 0o755 })
   await writeFile(join(home, "ps.txt"), emptyPs)
   await writeFile(join(home, "state.json"), JSON.stringify({ tasks: {}, groups: {} }))
+  const heavyBin = heavyBinDir(home)
+  await mkdir(heavyBin, { recursive: true })
+  const settings = { home, group: "heavy", wrap: "" }
+  await writeFile(join(heavyBin, "bun"), standinScript("bun", settings, []), { mode: 0o755 })
+  await writeFile(join(heavyBin, "vitest"), standinScript("vitest", settings, []), { mode: 0o755 })
   return home
 }
 

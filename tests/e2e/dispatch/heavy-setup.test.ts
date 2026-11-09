@@ -42,6 +42,30 @@ describe("the heavy queue setup", () => {
     }
   })
 
+  test("a stale stand-in leaves the bin dir on the next write", async () => {
+    const home = await mkdtemp(join(tmpdir(), "orc-heavy-bin-"))
+    try {
+      const first = await runEffect(
+        Effect.provide(
+          writeHeavyBin(home, { group: "heavy", commands: ["tool"], limit: "auto" }, "linux"),
+          BunServices.layer
+        )
+      )
+      expect(first).toContain("tool")
+      const second = await runEffect(
+        Effect.provide(
+          writeHeavyBin(home, { group: "heavy", commands: [], limit: "auto" }, "linux"),
+          BunServices.layer
+        )
+      )
+      expect(second).not.toContain("tool")
+      expect(await Bun.file(join(home, "heavy", "bin", "tool")).exists()).toBe(false)
+      expect(await Bun.file(join(home, "heavy", "bin", "bun")).exists()).toBe(true)
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
   test("every generated stand-in passes the shell syntax check and runs", async () => {
     const home = await mkdtemp(join(tmpdir(), "orc-heavy-bin-"))
     try {

@@ -19,6 +19,38 @@ const git = (cwd: string, args: ReadonlyArray<string>): void => {
 // nono refuses a HOME whose state root falls under the /var or /tmp it grants, so the fixture home sits in the working tree.
 const fixtureHome = (): Promise<string> => mkdtemp(join(process.cwd(), ".orc-nono-exec-home-"))
 
+const fakePueue = `#!/bin/sh
+echo "pueue $*" >> "$FAKE_PUEUE_LOG"
+case "$1" in
+  group) echo '{}';;
+  status) echo '{"tasks":{},"groups":{}}';;
+  add) echo 7;;
+esac
+exit 0
+`
+
+const withFakePueue = async <A>(fn: (log: string) => Promise<A>): Promise<A> => {
+  const dir = await mkdtemp(join(tmpdir(), "orc-nono-pueue-"))
+  const log = join(dir, "pueue.log")
+  await writeFile(join(dir, "pueue"), fakePueue, { mode: 0o755 })
+  await writeFile(log, "")
+  const path = process.env.PATH ?? ""
+  const savedLog = process.env.FAKE_PUEUE_LOG
+  process.env.PATH = dir + ":" + path
+  process.env.FAKE_PUEUE_LOG = log
+  try {
+    return await fn(log)
+  } finally {
+    process.env.PATH = path
+    if (savedLog === undefined) {
+      delete process.env.FAKE_PUEUE_LOG
+    } else {
+      process.env.FAKE_PUEUE_LOG = savedLog
+    }
+    await rm(dir, { recursive: true, force: true })
+  }
+}
+
 const seedCopy = async (dir: string): Promise<void> => {
   const main = join(dir, "main")
   await mkdir(main)
@@ -49,6 +81,7 @@ describe("openNonoExec", () => {
     async () => {
       const dir = await realpath(await mkdtemp(join(tmpdir(), "orc-nono-exec-")))
       const home = await fixtureHome()
+      await withFakePueue(async (pueueLog) => {
       try {
         await seedCopy(dir)
         const result = await runInNono(dir, home, [
@@ -63,10 +96,15 @@ describe("openNonoExec", () => {
         expect(await readFile(join(dir, "copy", "made.txt"), "utf8")).toBe("made\n")
         expect(await readFile(join(dir, "run", "sessions", "s.jsonl"), "utf8")).toBe("session\n")
         expect(await Bun.file(join(dir, "beside.txt")).exists()).toBe(false)
+        const calls = (await Bun.file(pueueLog).text()).split("\n").filter((line) => line !== "")
+        expect(calls.some((line) => line.startsWith("pueue add ") && line.includes("--label orc-heavy-hold"))).toBe(true)
+        expect(calls.some((line) => line === "pueue remove 7")).toBe(true)
+        expect(calls.findIndex((line) => line.startsWith("pueue add "))).toBeLessThan(calls.findIndex((line) => line === "pueue remove 7"))
       } finally {
         await rm(dir, { recursive: true, force: true })
         await rm(home, { recursive: true, force: true })
       }
+      })
     },
     60_000
   )

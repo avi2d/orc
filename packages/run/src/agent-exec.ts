@@ -1,6 +1,7 @@
 import { Effect, Stream } from "effect"
-import { ChildProcess, type ChildProcessSpawner } from "effect/process"
+import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { CommandResult } from "./checks"
+import { withHeavyHold } from "./dispatch/heavy-hold"
 import { runHostCommand } from "./host"
 import { OrcRunError } from "./run-session"
 
@@ -58,10 +59,19 @@ export const shellInAgent = (
   exec: AgentExec,
   command: string,
   onLine?: (line: string) => void
-): Effect.Effect<CommandResult, OrcRunError> =>
-  runHostCommand(spawner, agentCommand(exec, ["sh", "-c", command]), { onLine }).pipe(
+): Effect.Effect<CommandResult, OrcRunError> => {
+  const run = runHostCommand(spawner, agentCommand(exec, ["sh", "-c", command]), { onLine }).pipe(
     Effect.map(({ stdout, stderr, exitCode }) => ({ stdout, stderr, exitCode })),
     Effect.mapError((cause) => new OrcRunError({ message: "orc: " + command + " did not run: " + cause.message }))
   )
+  return exec.kind === "none"
+    ? run
+    : withHeavyHold(exec.heavyGroup, () => run).pipe(
+      Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+      Effect.mapError((cause) => cause instanceof OrcRunError
+        ? cause
+        : new OrcRunError({ message: "orc: the heavy queue hold failed: " + cause.detail }))
+    )
+}
 
 export const textInput = (text: string): ChildProcess.CommandInput => Stream.fromIterable([new TextEncoder().encode(text)])

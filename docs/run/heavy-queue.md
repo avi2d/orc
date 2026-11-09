@@ -39,8 +39,9 @@ The `commands` key adds command words that count as heavy beyond the built in to
 The `limit` key takes `auto` or `none`, and `none` runs the real tool with no priority wrapper.
 
 ## Sandboxed runs hold the slot
-A sandboxed run holds the `heavy` slot for the whole run, so its heavy calls never run beside other heavy work.
-The sandbox cannot reach pueue, so a sandboxed call that reaches a stand in runs at once and logs a bypass naming the hold.
+A sandboxed agent run holds the `heavy` slot for the whole run, and each sandboxed check or prepare call holds it for that call, so sandboxed heavy work never runs beside other heavy work.
+The sandbox cannot reach pueue, so a sandboxed call that reaches a stand in runs at once and names the hold in a bypass.
+The sandbox cannot write the bypass log, so the stand in prints a note instead and the bypass stays uncounted.
 
 ## Watch the queue
 `orc runner start` arms the watchdog beside the alert stream.
