@@ -3,7 +3,7 @@ kind: reference
 ---
 # The heavy queue
 Each machine queues its heavy shell calls through one pueue group named `heavy` with one slot.
-Heavy calls are test runs, builds and browser runs through tools like `bun`, `bunx`, `npm`, `npx`, `pnpm`, `yarn`, `go`, `cargo`, `vitest`, `playwright`, `xcodebuild` and `xcrun`.
+Heavy calls are test runs, builds and browser runs through tools like `bun`, `bunx`, `npm`, `npx`, `pnpm`, `yarn`, `vitest`, `playwright`, `jest`, `go`, `cargo`, `pytest`, `tsc`, `oxlint`, `eslint`, `xcodebuild` and `xcrun`.
 The queue keeps two such calls from overloading the machine at the same time.
 
 ## How calls reach the queue
