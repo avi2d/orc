@@ -2,7 +2,7 @@ commands:
   prepare: bun install --frozen-lockfile
   lint: bun run lint
   typecheck: bun run typecheck
-  test: bun run test:fast
+  test: bunx checks-test --changed --parallel=3
 review:
   path_instructions:
     - path: "packages/run/**"
