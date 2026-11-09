@@ -9,10 +9,7 @@ class TreeRefused extends Schema.TaggedError<TreeRefused>()("TreeRefused", {
   message: Schema.String,
 }) {}
 
-const RELEASE_SUBJECT = /^chore: release (\d+\.\d+\.\d+)(?: \(#\d+\))?$/;
-
-// The squash merge names the pull request it lands.
-const PULL_NUMBER = / \(#(\d+)\)$/;
+const RELEASE_SUBJECT = /^chore: release (\d+\.\d+\.\d+)(?: \(#(\d+)\))?$/;
 
 const lastTag = git(["describe", "--tags", "--abbrev=0", "--match=v[0-9]*.[0-9]*.[0-9]*", "HEAD"]).pipe(
   Effect.map((tag) => tag.trim()),
@@ -22,13 +19,12 @@ const lastTag = git(["describe", "--tags", "--abbrev=0", "--match=v[0-9]*.[0-9]*
 
 const check = Effect.gen(function* () {
   const [head = "", subject = ""] = (yield* git(["log", "-1", "--format=%H%n%s", "HEAD"])).split("\n");
-  const version = RELEASE_SUBJECT.exec(subject)?.[1];
-  if (version === undefined) {
+  const [, version = "", number = ""] = RELEASE_SUBJECT.exec(subject) ?? [];
+  if (version === "") {
     return yield* new TreeRefused({
       message: `${head.slice(0, 12)} is no release commit, so no release pull request tested it; merge the release pull request to land the release, and tag nothing by hand`,
     });
   }
-  const [, number = ""] = PULL_NUMBER.exec(subject) ?? [];
   if (number === "") {
     return yield* new TreeRefused({
       message: `${head.slice(0, 12)} names no pull request, so no release pull request tested it; merge the release pull request to land the release, and tag nothing by hand`,
