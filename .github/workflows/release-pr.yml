@@ -36,6 +36,8 @@ jobs:
       - uses: avi2d/workflows/setup@v1
         with:
           fetch-depth: 0
+      - name: landed tree matches the tested pull request tree
+        run: bun scripts/tested-tree.ts
       - name: tag the release
         env:
           GH_TOKEN: ${{ github.token }}

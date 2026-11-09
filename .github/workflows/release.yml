@@ -29,6 +29,8 @@ jobs:
           fetch-depth: 0
       - name: tag is on main
         run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - name: landed tree matches the tested pull request tree
+        run: bun scripts/tested-tree.ts
       - run: bun run build
       - run: git diff --exit-code
       - name: write the private pack
@@ -39,7 +41,6 @@ jobs:
           echo "CHECKS_SECRETS_PACK=$RUNNER_TEMP/secrets-pack.json" >> "$GITHUB_ENV"
       - run: bun run lint
       - run: bun run typecheck
-      - run: bun run test
       - name: tag matches package version
         run: test "v$(bun -p "require('./packages/run/package.json').version")" = "$GITHUB_REF_NAME"
   github-release:
