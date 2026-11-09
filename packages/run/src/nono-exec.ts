@@ -25,7 +25,7 @@ export const checksCacheReads = (
 ): ReadonlyArray<string> =>
   hostEnv.HOME === undefined || hostEnv.HOME === "" ? [] : [path.join(hostEnv.HOME, ".cache", "avi2dg-checks")]
 
-export const runtimeSearchPath = (searchPath: string): string =>
+const runtimeSearchPath = (searchPath: string): string =>
   searchPath.split(":").filter((entry) => !entry.endsWith(standinDirSuffix)).join(":")
 
 export type NonoExec = Extract<AgentExec, { readonly kind: "nono" }>
