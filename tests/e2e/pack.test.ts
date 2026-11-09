@@ -108,6 +108,7 @@ const expectedFiles = [
   "src/run.ts",
   "src/sandbox-plan.ts",
   "src/show.ts",
+  "src/table.ts",
   "src/task-copy.ts",
   "src/task-kind.ts",
   "src/toon.ts",

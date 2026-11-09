@@ -224,9 +224,9 @@ const parseRunArgs = (rest: readonly string[]): OrcArgs => {
   const taskFile = split.kept.length === 1 ? split.kept[0] : null
   return { kind: "RunAgent", taskFile, taskKind: split.taskKind, delivery: split.delivery, branch: split.branch, sandbox: split.sandbox, tokenFile: split.tokenFile, provider: split.provider, instructions: split.instructions, allow: split.allow, answers: split.answers }
 }
-const parseRunsArgs = (rest: readonly string[]): OrcArgs => {
+const parseJsonListArgs = (rest: readonly string[], kind: "ListRuns" | "ListRefusals"): OrcArgs => {
   if (rest.length === 0) {
-    return { kind: "ListRuns", json: false }
+    return { kind, json: false }
   }
   const [flag, ...extra] = rest
   if (flag !== "--json") {
@@ -235,20 +235,7 @@ const parseRunsArgs = (rest: readonly string[]): OrcArgs => {
   if (extra.length > 0) {
     return { kind: "UsageError", detail: `unexpected argument: ${extra[0]}` }
   }
-  return { kind: "ListRuns", json: true }
-}
-const parseRefusalsArgs = (rest: readonly string[]): OrcArgs => {
-  if (rest.length === 0) {
-    return { kind: "ListRefusals", json: false }
-  }
-  const [flag, ...extra] = rest
-  if (flag !== "--json") {
-    return { kind: "UsageError", detail: `unexpected argument: ${flag}` }
-  }
-  if (extra.length > 0) {
-    return { kind: "UsageError", detail: `unexpected argument: ${extra[0]}` }
-  }
-  return { kind: "ListRefusals", json: true }
+  return { kind, json: true }
 }
 const helpFlags = new Set(["--help", "-h"])
 const holdValueFlags = new Set(["--reason", "--until"])
@@ -274,10 +261,10 @@ const parseWords = (args: readonly string[]): OrcArgs => {
   }
   const [first, ...rest] = args
   if (first === "runs") {
-    return parseRunsArgs(rest)
+    return parseJsonListArgs(rest, "ListRuns")
   }
   if (first === "refusals") {
-    return parseRefusalsArgs(rest)
+    return parseJsonListArgs(rest, "ListRefusals")
   }
   if (first === "show") {
     return parseShowArgs(rest)

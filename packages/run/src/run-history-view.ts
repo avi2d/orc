@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect"
 import { RunStatusSchema, RUNS_JSON_SCHEMA, type RunRecord } from "./run-history"
+import { formatTable } from "./table"
 
 const RunJsonEntrySchema = Schema.Struct({
   id: Schema.String,
@@ -33,19 +34,5 @@ export const encodeRunsJson = (runs: ReadonlyArray<RunRecord>): Effect.Effect<st
 export const decodeRunsJson = (value: unknown): Effect.Effect<RunsJsonDocument, Schema.SchemaError> =>
   Schema.decodeUnknownEffect(RunsJsonSchema)(value)
 
-export const formatRunsTable = (runs: ReadonlyArray<RunRecord>): string => {
-  if (runs.length === 0) {
-    return "no runs recorded"
-  }
-  const header: ReadonlyArray<string> = ["ID", "PROJECT", "BRANCH", "STATUS", "PR"]
-  const body = runs.map((run): ReadonlyArray<string> => [run.id, run.project, run.branch, run.status, run.prLink ?? "-"])
-  const table: ReadonlyArray<ReadonlyArray<string>> = [header, ...body]
-  const widths: Array<number> = []
-  for (const row of table) {
-    row.forEach((cell, index) => {
-      widths[index] = Math.max(widths[index] ?? 0, cell.length)
-    })
-  }
-  return table.map((row) => row.map((cell, index) => cell.padEnd(widths[index] ?? cell.length)).join("  ").trimEnd())
-    .join("\n")
-}
+export const formatRunsTable = (runs: ReadonlyArray<RunRecord>): string =>
+  formatTable(["ID", "PROJECT", "BRANCH", "STATUS", "PR"], runs.map((run): ReadonlyArray<string> => [run.id, run.project, run.branch, run.status, run.prLink ?? "-"]), "no runs recorded")
