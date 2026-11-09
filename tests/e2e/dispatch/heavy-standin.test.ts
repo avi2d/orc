@@ -125,6 +125,60 @@ describe("the heavy stand-in", () => {
     expect(await harness.pueueLog()).toContain("add --group heavy")
   })
 
+  test("a heavy call inside a queued task runs directly instead of queueing behind the slot it holds", async () => {
+    const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
+    const realBun = join(harness.root, "fake", "bun")
+    const waiter = "sh -c 'o=$1; shift; \"$@\" & c=$!; wait \"$c\"' orc-heavy-wait 99 '' " + realBun + " test x"
+    await writeFile(join(harness.root, "fake", "status.json"), JSON.stringify({ tasks: { 9: { id: 9, command: waiter, status: { Running: {} } } } }))
+    await writeFile(
+      join(harness.root, "fake", "pueue"),
+      "#!/bin/sh\n" +
+        'echo "pueue $*" >> "' + join(harness.root, "pueue.log") + '"\n' +
+        'case "$1" in\n' +
+        "  group) echo '{}';;\n" +
+        "  add) echo 7;;\n" +
+        "  log) printf '{\"7\":{\"status\":{\"Done\":{\"result\":\"Success\"}}}}';;\n" +
+        "  follow) echo nested-output;;\n" +
+        '  status) cat "' + join(harness.root, "fake", "status.json") + '";;\n' +
+        "  remove|kill|wait) exit 0;;\n" +
+        "esac\nexit 0\n",
+      { mode: 0o755 }
+    )
+    await writeFile(
+      join(harness.root, "fake", "ps"),
+      "#!/bin/sh\n" +
+        'p="$PPID"\n' +
+        's="$(/bin/ps -o ppid= -p "$p" 2>/dev/null | tr -d \' \')"\n' +
+        "w=$((s + 1000)); b=$((s + 2000)); d=$((s + 3000))\n" +
+        "printf 'PID PPID COMMAND\\n'\n" +
+        'printf \'%s %s /bin/sh ' + join(harness.bin, "bun") + ' test x\\n\' "$s" "$w"\n' +
+        "printf '%s %s " + realBun + " test x\\n' \"$w\" \"$b\"\n" +
+        "printf '%s %s sh -c o=$1; shift; waiter-body orc-heavy-wait 99  " + realBun + " test x\\n' \"$b\" \"$d\"\n" +
+        "printf '%s 1 pueued\\n' \"$d\"\n" +
+        "printf '1 0 init\\n'\n",
+      { mode: 0o755 }
+    )
+    const result = run(harness, "bun", ["test", "x"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).not.toContain("add --group heavy")
+    expect(await readFile(join(harness.root, "tool.log"), "utf8")).toContain("bun test x")
+  })
+
+  test("a stand-in folder spelled with a trailing slash or doubled slashes runs the real tool instead of itself", async () => {
+    const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
+    const rest = join(harness.root, "fake") + ":/usr/bin:/bin"
+    for (const bin of [harness.bin + "/", harness.root + "//bin"]) {
+      const child = Bun.spawnSync([join(harness.bin, "bun"), "--version"], {
+        env: { ...harness.env, PATH: bin + ":" + rest },
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: 3_000
+      })
+      expect(child.exitCode).toBe(0)
+    }
+    expect(await readFile(join(harness.root, "tool.log"), "utf8")).toContain("bun --version")
+  })
+
   test("the queued command output reaches the caller", async () => {
     const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
     const result = run(harness, "bun", ["test"], { FAKE_FOLLOW_OUTPUT: "hello-from-the-queue" })
