@@ -32,6 +32,7 @@ const seedCopy = async (dir: string): Promise<void> => {
 const runInNono = (dir: string, home: string, command: string) =>
   Effect.runPromise(Effect.scoped(Effect.gen(function*() {
     const exec = yield* openNonoExec({
+      home,
       worktree: join(dir, "copy"),
       piSessionDir: join(dir, "run", "session"),
       sessionsDir: join(dir, "run", "sessions"),
@@ -52,13 +53,13 @@ describe("openNonoExec", () => {
         await seedCopy(dir)
         const result = await runInNono(dir, home, [
           "env | grep '^ORC_' || true",
-          "echo \"token=$AGENT_TOKEN_FILE bun=$BUN_OPTIONS\"",
+          "echo \"token=$AGENT_TOKEN_FILE bun=$BUN_OPTIONS bypass=$HEAVY_QUEUE_BYPASS\"", 
           "echo made > made.txt",
           "echo session > \"" + join(dir, "run", "sessions", "s.jsonl") + "\"",
           "git add made.txt && git -c user.name=a -c user.email=a@b commit -qm made && echo committed",
           "echo escaped > \"" + join(dir, "beside.txt") + "\" 2>/dev/null || echo refused"
         ].join("; "))
-        expect(result.stdout.split("\n").filter((line) => line !== "")).toEqual(["token=/k bun=--no-install", "committed", "refused"])
+        expect(result.stdout.split("\n").filter((line) => line !== "")).toEqual(["token=/k bun=--no-install bypass=orc holds the heavy queue slot for this sandbox run", "committed", "refused"])
         expect(await readFile(join(dir, "copy", "made.txt"), "utf8")).toBe("made\n")
         expect(await readFile(join(dir, "run", "sessions", "s.jsonl"), "utf8")).toBe("session\n")
         expect(await Bun.file(join(dir, "beside.txt")).exists()).toBe(false)

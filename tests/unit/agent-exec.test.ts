@@ -24,7 +24,7 @@ describe("agentCommand", () => {
   test("a nono exec runs the argv under nono with the profile instead of on the host", () => {
     const argv = ["pi", "-p", "a b"] as const
     expect(nonoRunArgs("/p.json", argv)).toEqual(["run", "--silent", "--profile", "/p.json", "--", "pi", "-p", "a b"])
-    const command = agentCommand({ kind: "nono", cwd: "/w", env: {}, nonoBinary: "/bin/nono", profilePath: "/p.json" }, argv)
+    const command = agentCommand({ kind: "nono", cwd: "/w", env: {}, nonoBinary: "/bin/nono", profilePath: "/p.json", heavyGroup: "heavy" }, argv)
     expect(ChildProcess.isStandardCommand(command) ? [command.command, ...command.args] : []).toEqual(["/bin/nono", "run", "--silent", "--profile", "/p.json", "--", "pi", "-p", "a b"])
   })
 

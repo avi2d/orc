@@ -12,7 +12,7 @@ export type Argv = readonly [string, ...Array<string>]
 
 export type AgentExec =
   | { readonly kind: "none"; readonly cwd: string; readonly env: Env }
-  | { readonly kind: "nono"; readonly cwd: string; readonly env: Env; readonly nonoBinary: string; readonly profilePath: string }
+  | { readonly kind: "nono"; readonly cwd: string; readonly env: Env; readonly nonoBinary: string; readonly profilePath: string; readonly heavyGroup: string }
 
 export const sandboxedEnvNames: ReadonlyArray<string> = ["PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TERM"]
 

@@ -30,21 +30,37 @@ describe("the heavy watch", () => {
     expect(staleMachines(["a", "b", "c", "d"], { b: fresh, c: old, d: "not-a-date" }, now)).toEqual(["a", "c", "d"])
   })
 
-  test("a heavy tool process with no pueue task behind it slips, a queued one does not", () => {
+  test("a heavy tool process slips unless a running task of the heavy group holds it", () => {
     const ps = [
       "PID PPID COMMAND",
       "1 0 /sbin/init",
       "100 1 pueued",
-      "101 100 bun test login.test.ts",
-      "200 1 bun test other.test.ts",
-      "201 1 bun test other.test.ts",
-      "300 1 /usr/local/bin/vitest run",
+      "101 100 bun test queued.test.ts",
+      "102 100 bun test other.test.ts",
+      "200 1 bun test rogue.test.ts",
+      "201 1 /usr/local/bin/vitest run",
+      "202 1 node /usr/local/bin/vitest run",
+      "203 1 node server.js",
+      "204 1 /tmp/home/heavy/bin/bun test x",
+      "205 1 orc heavy watch-once",
       "400 1 ps -eo pid,ppid,command"
     ].join("\n")
-    expect(slipProcesses(ps, ["bun", "vitest"], new Set([400]))).toEqual([
-      { pid: 200, command: "bun test other.test.ts" },
-      { pid: 300, command: "/usr/local/bin/vitest run" }
+    expect(slipProcesses(ps, ["bun", "vitest"], new Set([400]), ["bun test queued.test.ts", "go test ./..."], "/tmp/home/heavy/bin")).toEqual([
+      { pid: 102, command: "bun test other.test.ts" },
+      { pid: 200, command: "bun test rogue.test.ts" },
+      { pid: 201, command: "/usr/local/bin/vitest run" },
+      { pid: 202, command: "node /usr/local/bin/vitest run" }
     ])
+  })
+
+  test("a quoted queued command still holds its task child", () => {
+    const ps = ["PID PPID COMMAND", "1 0 /sbin/init", "100 1 pueued", "101 100 env -i PATH=/bin bun test x"].join("\n")
+    expect(slipProcesses(ps, ["bun"], new Set([]), ["env -i 'PATH=/bin' bun test x"], "/nope")).toEqual([])
+  })
+
+  test("a process matching only a queued task still slips", () => {
+    const ps = ["PID PPID COMMAND", "1 0 /sbin/init", "200 1 bun test queued.test.ts"].join("\n")
+    expect(slipProcesses(ps, ["bun"], new Set([]), ["bun test other.test.ts"], "/nope")).toEqual([{ pid: 200, command: "bun test queued.test.ts" }])
   })
 
   test("the latest slip fire per command decides the reminder", () => {
@@ -121,8 +137,6 @@ describe("the check readout", () => {
   })
 })
 
-const quota = { provider: "keyed", command: ["orc-quota"], accounts: [{ name: "main", tokenFile: "/secrets/main-token" }], floorPercent: 15 }
-
 const fakeWatchPueue = `#!/bin/sh
 echo "pueue $*" >> "$FAKE_PUEUE_LOG"
 case "$1" in
@@ -173,13 +187,9 @@ const withFakePueue = async <A>(home: string, fn: () => Promise<A>): Promise<A> 
 const runWatch = <A, E>(effect: Effect.Effect<A, E, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
 
-const setupHome = async (machines: ReadonlyArray<string>, alerts: string): Promise<string> => {
+const setupHome = async (alerts: string): Promise<string> => {
   const home = await mkdtemp(join(tmpdir(), "orc-heavy-watch-"))
   await mkdir(join(home, "backlog"), { recursive: true })
-  await writeFile(
-    join(home, "backlog", "dispatch.json"),
-    JSON.stringify({ machines: machines.map((name) => ({ name, slots: 1, start: ["true", "runner", "start"] })), quota })
-  )
   await writeFile(join(home, "backlog", "alerts.jsonl"), alerts)
   const bin = join(home, "bin")
   await mkdir(bin, { recursive: true })
@@ -203,15 +213,14 @@ const heavyState = (tasks: Record<string, unknown>) => ({
 })
 
 describe("the watch loop", () => {
-  test("a stale machine with an old targeted task gets a stall alert", async () => {
-    const home = await setupHome(["ridge"], "")
+  test("an old targeted task gets a stall alert", async () => {
+    const home = await setupHome("")
     try {
       const now = Date.parse("2026-01-01T01:00:00Z")
       await writeFile(join(home, "state.json"), JSON.stringify(heavyState({
         "1": heavyTask(1, "bun test login.test.ts", { Running: { start: at(now, 20) } }, at(now, 20), 1)
       })))
       const report = await withFakePueue(home, () => runWatch(watchOnce(home, now)))
-      expect(report.stale).toEqual(["ridge"])
       expect(report.old.map((task) => task.id)).toEqual([1])
       expect(report.alerts.length).toBe(1)
       expect(report.slips).toEqual([])
@@ -226,23 +235,25 @@ describe("the watch loop", () => {
   test("a machine that fired recently gets no stall alert", async () => {
     const now = Date.parse("2026-01-01T01:00:00Z")
     const fire = JSON.stringify({ rule: "heavy-load", at: at(now, 1), machine: hostname(), since: at(now, 1), crossed: ["load"] })
-    const home = await setupHome([hostname()], fire + "\n")
+    const home = await setupHome(fire + "\n")
     try {
       await writeFile(join(home, "state.json"), JSON.stringify(heavyState({
         "1": heavyTask(1, "bun test login.test.ts", { Running: { start: at(now, 20) } }, at(now, 20), 1)
       })))
       const report = await withFakePueue(home, () => runWatch(watchOnce(home, now)))
-      expect(report.stale).toEqual([])
       expect(report.alerts).toEqual([])
     } finally {
       await rm(home, { recursive: true, force: true })
     }
   })
 
-  test("a heavy tool process with no queued task gets one slip alert", async () => {
-    const home = await setupHome([], "")
+  test("a heavy tool process with no running task gets one slip alert", async () => {
+    const home = await setupHome("")
     try {
       const now = Date.parse("2026-01-01T01:00:00Z")
+      await writeFile(join(home, "state.json"), JSON.stringify(heavyState({
+        "1": heavyTask(1, "bun test queued.test.ts", { Running: { start: at(now, 1) } }, at(now, 1), 0)
+      })))
       await writeFile(
         join(home, "ps.txt"),
         ["PID PPID COMMAND", "1 0 /sbin/init", "100 1 pueued", "101 100 bun test queued.test.ts", "200 1 bun test rogue.test.ts"].join("\n") + "\n"
@@ -263,7 +274,7 @@ describe("the watch loop", () => {
   })
 
   test("the check reads running and queued work off the queue", async () => {
-    const home = await setupHome(["ridge"], "")
+    const home = await setupHome("")
     try {
       const now = Date.parse("2026-01-01T01:00:00Z")
       await writeFile(join(home, "state.json"), JSON.stringify(heavyState({
@@ -283,7 +294,7 @@ describe("the watch loop", () => {
 
   test("the check counts bypasses off the alerts log", async () => {
     const bypass = JSON.stringify({ rule: "heavy-bypass", at: at(Date.now(), 1), reason: "hotfix", command: "bun test" })
-    const home = await setupHome(["ridge"], bypass + "\n" + bypass + "\n")
+    const home = await setupHome(bypass + "\n" + bypass + "\n")
     try {
       await writeFile(join(home, "state.json"), JSON.stringify(heavyState({})))
       const check = await withFakePueue(home, () => runWatch(checkHeavy(home)))
@@ -295,7 +306,7 @@ describe("the watch loop", () => {
   })
 
   test("the check names pueue when the daemon is unreachable", async () => {
-    const home = await setupHome(["ridge"], "")
+    const home = await setupHome("")
     try {
       await rm(join(home, "state.json"))
       const failure = await withFakePueue(home, () => runWatch(Effect.flip(checkHeavy(home))))
@@ -306,7 +317,7 @@ describe("the watch loop", () => {
   })
 
   test("the check names the group when the queue is missing", async () => {
-    const home = await setupHome(["ridge"], "")
+    const home = await setupHome("")
     try {
       await writeFile(join(home, "state.json"), JSON.stringify({ tasks: {}, groups: {} }))
       const failure = await withFakePueue(home, () => runWatch(Effect.flip(checkHeavy(home))))
@@ -317,7 +328,7 @@ describe("the watch loop", () => {
   })
 
   test("the watch queues once per home and then stands down", async () => {
-    const home = await setupHome(["ridge"], "")
+    const home = await setupHome("")
     try {
       const line = await withFakePueue(home, () => runWatch(ensureHeavyWatch(home, ["orc"])))
       expect(line).toContain("queued the heavy watch as pueue task 9")

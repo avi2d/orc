@@ -74,7 +74,7 @@ const manifestOf = (profilePath: string, home: string) =>
 
 
 const createError = (worktree: string, piSessionDir: string, env: Record<string, string> = {}): Promise<unknown> =>
-  nonoOpenError({ worktree, piSessionDir, sessionsDir: piSessionDir, hostEnv: { ...Bun.env, HOME: fixtureHome, ...env }, env: {} })
+  nonoOpenError({ home: fixtureHome, worktree, piSessionDir, sessionsDir: piSessionDir, hostEnv: { ...Bun.env, HOME: fixtureHome, ...env }, env: {} })
 
 const refusalOf = async (worktree: string, piSessionDir: string, env: Record<string, string> = {}): Promise<string> => {
   const error = await createError(worktree, piSessionDir, env)

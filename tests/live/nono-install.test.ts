@@ -34,6 +34,7 @@ describe("the copy's install under nono", () => {
   let sessions = ""
 
   const sandbox = (): NonoExecOptions => ({
+    home,
     worktree: copy,
     piSessionDir: sessions,
     sessionsDir: sessions,

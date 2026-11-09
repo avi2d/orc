@@ -1,9 +1,8 @@
 import { hostname } from "node:os"
 import { Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { backlogPaths } from "./backlog"
-import { readDispatchConfig } from "./config"
 import { alertsFile } from "./events"
+import { heavyBinDir } from "./heavy"
 import { readHeavySettings } from "./heavy-setup"
 import { standinTools } from "./heavy-standin"
 import { PueueStatus, taskLabel } from "./pueue-status"
@@ -133,23 +132,71 @@ const behindPueue = (rows: Map<number, PsRow>, pid: number): boolean => {
   return false
 }
 
+const shellNames: ReadonlySet<string> = new Set(["sh", "bash", "dash", "zsh"])
+
+const unwrapShell = (words: ReadonlyArray<string>): ReadonlyArray<string> => {
+  const [first = "", second = "", ...rest] = words
+  return shellNames.has(argvBase(first)) && second === "-c" ? rest : words
+}
+
+const normalizeTaskCommand = (command: string): string =>
+  unwrapShell(command.split(" ").filter((part) => part !== "")).join(" ").replace(/["'\\]/g, "")
+
+const orcNames: ReadonlySet<string> = new Set(["orc", "pi"])
+
+const toolWord = (words: ReadonlyArray<string>, tools: ReadonlyArray<string>): string | null => {
+  const first = argvBase(words[0] ?? "")
+  if (tools.includes(first)) {
+    return words[0] ?? ""
+  }
+  if (first === "node" && words.length > 1 && tools.includes(argvBase(words[1] ?? ""))) {
+    return words[1] ?? ""
+  }
+  return null
+}
+
+const ancestorArgs = (rows: Map<number, PsRow>, pid: number): ReadonlyArray<string> => {
+  const commands: Array<string> = []
+  const seen = new Set<number>()
+  let current: number | undefined = pid
+  while (current !== undefined && current !== 0 && !seen.has(current)) {
+    seen.add(current)
+    const row = rows.get(current)
+    if (row === undefined) {
+      break
+    }
+    commands.push(row.args)
+    current = row.ppid
+  }
+  return commands
+}
+
 export const slipProcesses = (
   ps: string,
   tools: ReadonlyArray<string>,
-  selfPids: ReadonlySet<number>
+  selfPids: ReadonlySet<number>,
+  running: ReadonlyArray<string>,
+  binDir: string
 ): ReadonlyArray<SlipTask> => {
   const rows = psRows(ps)
   const excluded = ownTree(rows, selfPids)
+  const queued = new Set(running.map(normalizeTaskCommand))
   const slips = new Map<string, SlipTask>()
   for (const [pid, row] of rows) {
     if (excluded.has(pid)) {
       continue
     }
-    const first = row.args.split(" ").filter((part) => part !== "")[0] ?? ""
-    if (!tools.includes(argvBase(first))) {
+    const words = row.args.split(" ").filter((part) => part !== "")
+    if (orcNames.has(argvBase(words[0] ?? ""))) {
       continue
     }
-    if (behindPueue(rows, pid)) {
+    const word = toolWord(words, tools)
+    if (word === null || word.includes(binDir)) {
+      continue
+    }
+    const held = behindPueue(rows, pid) &&
+      ancestorArgs(rows, pid).some((args) => queued.has(normalizeTaskCommand(args)))
+    if (held) {
       continue
     }
     if (!slips.has(row.args)) {
@@ -244,7 +291,6 @@ const appendLines = (file: string, lines: ReadonlyArray<string>): Effect.Effect<
     )
 
 export interface WatchReport {
-  readonly stale: ReadonlyArray<string>
   readonly old: ReadonlyArray<OldTask>
   readonly alerts: ReadonlyArray<string>
   readonly slips: ReadonlyArray<string>
@@ -254,32 +300,31 @@ export const watchOnce = (home: string, nowMs: number = Date.now()): Effect.Effe
   Effect.gen(function*() {
     const settings = yield* readHeavySettings(home)
     const backlog = home + "/backlog"
-    const dispatch = yield* readDispatchConfig(backlogPaths(backlog).dispatchConfig).pipe(
-      Effect.mapError((error) => new RunnerError({ detail: error.file + ": " + error.detail })),
-      Effect.orElseSucceed(() => null)
-    )
     const machine = hostname()
     const fs = yield* FileSystem.FileSystem
     const fired = yield* fs.readFileString(alertsFile(backlog)).pipe(Effect.orElseSucceed(() => ""))
     const state = yield* pueue(["status", "--json"]).pipe(
       Effect.flatMap((text) => decodeJson(text, WatchState, "pueue status --json"))
     )
-    const names = dispatch === null ? [] : dispatch.machines.map((entry) => entry.name)
     const lastAlert = lastAlertByMachine(fired)
-    const stale = names.length === 0
-      ? staleMachines([machine], lastAlert, nowMs, watchTtlMinutes)
-      : staleMachines(names, lastAlert, nowMs, watchTtlMinutes)
     const old = oldRunningTasks(state, settings.group, nowMs, watchTtlMinutes)
     const oldest = old.reduce<OldTask | null>((latest, task) => latest === null || task.ageMinutes > latest.ageMinutes ? task : latest, null)
-    const localStale = staleMachines([machine], lastAlert, nowMs, watchTtlMinutes).length > 0
+    const firedRecently = staleMachines([machine], lastAlert, nowMs, watchTtlMinutes).length === 0
     const at = new Date(nowMs).toISOString()
-    const stalls = oldest === null || !localStale ? [] : [stallLine(machine, oldest, at)]
+    const stalls = oldest === null || firedRecently ? [] : [stallLine(machine, oldest, at)]
     const ps = yield* capture(["ps", "-eo", "pid,ppid,command"], null).pipe(
       Effect.map((result) => result.stdout),
       Effect.orElseSucceed(() => "")
     )
+    const alive = Object.values(state.tasks).flatMap((task) => {
+      if (task.group !== settings.group) {
+        return []
+      }
+      const status = decodedStatus(task.status)
+      return status !== null && "Running" in status ? [task.command] : []
+    })
     const seenSlip = lastSlipByCommand(fired)
-    const slips = slipProcesses(ps, standinTools(settings.commands), new Set([process.pid])).filter((slip) => {
+    const slips = slipProcesses(ps, standinTools(settings.commands), new Set([process.pid]), alive, heavyBinDir(home)).filter((slip) => {
       const last = seenSlip[slip.command]
       if (last === undefined) {
         return true
@@ -289,7 +334,7 @@ export const watchOnce = (home: string, nowMs: number = Date.now()): Effect.Effe
     })
     const slipAlerts = slips.map((slip) => slipLine(machine, slip.command, at))
     yield* appendLines(alertsFile(backlog), [...stalls, ...slipAlerts])
-    return { stale, old, alerts: [...stalls, ...slipAlerts], slips: slips.map((slip) => slip.command) }
+    return { old, alerts: [...stalls, ...slipAlerts], slips: slips.map((slip) => slip.command) }
   })
 
 export const watchGroup = (home: string): string =>
