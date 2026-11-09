@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize]
   push:
     branches: [main]
-    paths: ["src/**", "tests/unit/**", "stryker.conf.mjs", "package.json", "bun.lock", ".bun-version", "bunfig.toml"]
+    paths: ["packages/*/src/**", "tests/unit/**", "stryker.conf.mjs", "package.json", "bun.lock", ".bun-version", "bunfig.toml"]
   workflow_dispatch:
     inputs:
       mode: { type: choice, options: [baseline, refresh], default: baseline }
