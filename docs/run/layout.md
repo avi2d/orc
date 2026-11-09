@@ -85,7 +85,6 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/merge-basis.ts` | The `captain-word` and `yolo-green` bases `orc merge` takes |
 | `packages/run/src/dispatch/heavy.ts` | The heavy settings, the stand in folder and the default heavy tool list |
 | `packages/run/src/dispatch/heavy-cli.ts` | The `orc heavy` path, check, watch and watch-once commands |
-| `packages/run/src/dispatch/heavy-hold.ts` | The host side hold of the heavy queue slot for a sandboxed run |
 | `packages/run/src/dispatch/heavy-setup.ts` | The reading of the heavy settings and the writing of the stand in folder |
 | `packages/run/src/dispatch/heavy-standin.ts` | The generated stand in scripts that queue heavy tool calls |
 | `packages/run/src/dispatch/heavy-watch.ts` | The watchdog that reports stalled calls and queue slips |

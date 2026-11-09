@@ -1,7 +1,6 @@
 import { Console, Effect, type FileSystem, type Path, type Scope } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { type AgentExec, hostExec, shellInAgent } from "./agent-exec"
-import { withHeavyHold } from "./dispatch/heavy-hold"
 import { prepareCommandOf, readChecksCommands } from "./checks"
 import { commitsSince, headOf } from "./git-run"
 import { openNonoExec } from "./nono-exec"
@@ -21,8 +20,7 @@ export const openAgentExec = (
   folders: RunFolders,
   copyDir: string,
   toolchain: ToolchainResolver,
-  hostEnv: Readonly<Record<string, string | undefined>>,
-  home: string
+  hostEnv: Readonly<Record<string, string | undefined>>
 ): Effect.Effect<AgentExec, OrcRunError, ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path | Scope.Scope> =>
   plan.kind === "none"
     ? Effect.succeed(hostExec(copyDir, hostEnv, {
@@ -30,7 +28,6 @@ export const openAgentExec = (
       ...(plan.own === null ? {} : { PI_CODING_AGENT_DIR: plan.own.piAgentDir, ...plan.own.env })
     }))
     : openNonoExec({
-      home,
       worktree: copyDir,
       piSessionDir: folders.piSessionDir,
       sessionsDir: folders.hostSessionsDir,
@@ -90,14 +87,7 @@ export const agentOps = (
         logFile: run.path.join(folders.runDir, agentRun.logFile),
         onSession: agentRun.onSession
       }
-      const pi = exec.kind === "none"
-        ? yield* runPi(run.spawner, run.fs, run.path, exec, request, pacing)
-        : yield* withHeavyHold(exec.heavyGroup, () => runPi(run.spawner, run.fs, run.path, exec, request, pacing)).pipe(
-          Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, run.spawner),
-          Effect.mapError((cause) => cause instanceof OrcRunError
-            ? cause
-            : new OrcRunError({ message: "orc: the heavy queue hold failed: " + cause.detail }))
-        )
+      const pi = yield* runPi(run.spawner, run.fs, run.path, exec, request, pacing)
       const commits = yield* commitsSince(run.spawner, run.git, exec.cwd, base)
       return { ...pi, commits }
     }),

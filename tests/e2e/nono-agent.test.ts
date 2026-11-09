@@ -41,7 +41,6 @@ interface SandboxFor {
 }
 
 const sandboxFor = (sandbox: SandboxFor): NonoExecOptions => ({
-  home: fixtureHome,
   worktree: sandbox.worktree,
   piSessionDir: sandbox.session,
   sessionsDir: sandbox.session,

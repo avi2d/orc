@@ -4,14 +4,11 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { homedir } from "node:os"
 import { agentEnv, type AgentExec } from "./agent-exec"
 import { standinDirSuffix } from "./dispatch/heavy"
-import { heavyHoldBypass } from "./dispatch/heavy-hold"
-import { readHeavySettings } from "./dispatch/heavy-setup"
 import { NonoProviderError, prepareSandboxShims, resolveDeveloperDir, resolveHostBinary, resolvePiAgentDir, resolveRuntime } from "./host"
 import { buildHostGitEnv, checkProfile, refuseCredentialBearingCheckout, resolveRoots, sandboxEnv, sandboxRuntimes } from "./nono"
 import { defaultToolchainResolver, selectNonoProfile, type ModelCredential, type ToolchainResolver } from "./nono-profile"
 
 export interface NonoExecOptions {
-  readonly home: string
   readonly worktree: string
   readonly piSessionDir: string
   readonly sessionsDir: string
@@ -50,10 +47,7 @@ export const openNonoExec = (
     const shims = yield* prepareSandboxShims(fs, path, roots.piSessionDir)
     yield* Effect.addFinalizer(() => fs.remove(shims.shimDir, { recursive: true }).pipe(Effect.result))
     const sandboxed = sandboxEnv(hostEnv, roots.piSessionDir, [shims.shimDir, ...runtimes.map((runtime) => runtime.binDir)], agentDir)
-    const settings = yield* readHeavySettings(options.home).pipe(
-      Effect.mapError((cause) => new NonoProviderError({ message: "orc: the heavy queue has no settings: " + cause.detail }))
-    )
-    const env = agentEnv(sandboxed, { ...options.env, HEAVY_QUEUE_BYPASS: heavyHoldBypass(settings.group) })
+    const env = agentEnv(sandboxed, options.env)
     const runtimeDirs = runtimes.flatMap((runtime) => runtime.installDir === null ? [] : [runtime.installDir])
     const developerDir = yield* resolveDeveloperDir(spawner, fs, sandboxed)
     const nonoBinary = yield* resolveHostBinary(fs, "nono")
@@ -64,5 +58,5 @@ export const openNonoExec = (
     yield* fs.writeFileString(profilePath, `${JSON.stringify(profile, null, 2)}\n`)
     yield* checkProfile(spawner, nono, profilePath, [profileDir, nonoBinary, path.dirname(nonoBinary)])
     yield* fs.makeDirectory(sandboxed.TMPDIR, { recursive: true })
-    return { kind: "nono", cwd: roots.worktree, env, nonoBinary, profilePath, heavyGroup: settings.group } as const
+    return { kind: "nono", cwd: roots.worktree, env, nonoBinary, profilePath } as const
   })

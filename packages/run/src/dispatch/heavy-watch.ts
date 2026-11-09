@@ -3,7 +3,6 @@ import { Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { alertsFile } from "./events"
 import { heavyBinDir } from "./heavy"
-import { heavyHoldLabel } from "./heavy-hold"
 import { readHeavySettings } from "./heavy-setup"
 import { standinTools } from "./heavy-standin"
 import { PueueStatus, taskLabel } from "./pueue-status"
@@ -221,14 +220,6 @@ export const slipHeld = (ps: string, pid: number, running: ReadonlySet<string>):
     ancestorArgs(rows, pid).some((args) => running.has(normalizeTaskCommand(args)))
 }
 
-export const slipCovered = (ps: string, pid: number): boolean => {
-  const rows = psRows(ps)
-  return ancestorArgs(rows, pid).some((args) => {
-    const first = args.split(" ").filter((part) => part !== "")[0] ?? ""
-    return argvBase(first) === "nono"
-  })
-}
-
 const classifyCalls = (
   candidates: ReadonlyArray<SlipCandidate>
 ): Effect.Effect<ReadonlyMap<number, boolean>, never, ChildProcessSpawner.ChildProcessSpawner> =>
@@ -358,13 +349,6 @@ export const watchOnce = (home: string, nowMs: number = Date.now()): Effect.Effe
     })
     const seenSlip = lastSlipByCommand(fired)
     const queued = new Set(alive.map(normalizeTaskCommand))
-    const holdRunning = Object.values(state.tasks).some((task) => {
-      if (task.group !== settings.group || task.label !== heavyHoldLabel) {
-        return false
-      }
-      const status = decodedStatus(task.status)
-      return status !== null && "Running" in status
-    })
     const candidates = slipCandidates(ps, standinTools(settings.commands), new Set([process.pid]), heavyBinDir(home))
     const queuedByPid = yield* classifyCalls(candidates)
     const found = new Map<string, SlipTask>()
@@ -373,9 +357,6 @@ export const watchOnce = (home: string, nowMs: number = Date.now()): Effect.Effe
         continue
       }
       if (slipHeld(ps, candidate.pid, queued)) {
-        continue
-      }
-      if (holdRunning && slipCovered(ps, candidate.pid)) {
         continue
       }
       if (!found.has(candidate.command)) {

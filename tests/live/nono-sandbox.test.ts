@@ -89,7 +89,6 @@ describe("the nono exec", () => {
   let server: ReturnType<typeof Bun.serve> | null = null
 
   const sandboxAt = (hostEnv: Readonly<Record<string, string>>, piSessionDir = session): NonoExecOptions => ({
-    home: fixtureHome,
     worktree: copy,
     piSessionDir,
     sessionsDir: piSessionDir,

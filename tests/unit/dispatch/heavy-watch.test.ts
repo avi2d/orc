@@ -7,7 +7,7 @@ import { Effect, FileSystem } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import {
   checkHeavy, countBypass, ensureHeavyWatch, formatCheck, lastAlertByMachine, lastSlipByCommand, normalizeTaskCommand, oldRunningTasks,
-  slipCandidates, slipCovered, slipHeld, staleMachines, stripHeavyWrapper, watchGroup, watchOnce, watchTtlMinutes
+  slipCandidates, slipHeld, staleMachines, stripHeavyWrapper, watchGroup, watchOnce, watchTtlMinutes
 } from "../../../packages/run/src/dispatch/heavy-watch"
 import { standinScript } from "../../../packages/run/src/dispatch/heavy-standin"
 import { heavyBinDir } from "../../../packages/run/src/dispatch/heavy"
@@ -76,19 +76,6 @@ describe("the heavy watch", () => {
     expect(slipHeld(ps, 101, new Set([normalizeTaskCommand(wrapped)]))).toBe(true)
     const quoted = ["PID PPID COMMAND", "1 0 /sbin/init", "100 1 pueued", "101 100 env -i PATH=/bin bun test x"].join("\n")
     expect(slipHeld(quoted, 101, new Set([normalizeTaskCommand("env -i 'PATH=/bin' bun test x")]))).toBe(true)
-  })
-
-  test("a process under nono is covered and a plain one is not", () => {
-    const ps = [
-      "PID PPID COMMAND",
-      "1 0 /sbin/init",
-      "50 1 /opt/homebrew/bin/orc run",
-      "51 50 /opt/homebrew/bin/nono run --silent",
-      "52 51 bun test x",
-      "60 1 bun test y"
-    ].join("\n")
-    expect(slipCovered(ps, 52)).toBe(true)
-    expect(slipCovered(ps, 60)).toBe(false)
   })
 
   test("the wrapper and the priority wrap strip off a task command", () => {
