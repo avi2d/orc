@@ -3,12 +3,10 @@ on:
   schedule:
     - cron: "51 5 * * 1"
   workflow_dispatch:
-permissions:
-  contents: read
+
 jobs:
   advisories:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: avi2d/workflows/setup@v1
-      - run: bunx checks-advisories --all
+    permissions:
+      contents: read
+      issues: write
+    uses: avi2d/workflows/.github/workflows/advisories.yml@v1

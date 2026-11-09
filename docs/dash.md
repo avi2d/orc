@@ -839,17 +839,13 @@ To run the checks:
 
 1. Run `bun run lint` to run oxlint and every kit lint gate.
 1. Run `bun run typecheck` to run `tsc` and the Effect language service diagnostics.
-1. Run `bun run test:fast` to run the unit tier and the e2e files the change touches.
+1. Run `bunx checks-test --changed` to run the unit and e2e test files the change reaches.
 1. CI runs `bun run test` for the full unit and e2e suites.
 1. Run `bun run build` to bundle every tool and the `orc-dash` command into each package's `dist/` and write the changelog.
 
-`bun run test:fast` starts at most three workers, one per CPU within what free memory allows.
-It keeps 10 percent of total memory as reserve.
-It counts 1074 MiB of free memory past the reserve for the first worker.
-It counts 100 MiB more for each extra worker.
-
-Set `TEST_FAST_WORKERS=<n>` to start exactly `n` workers.
-Values below 1 fail.
+`bunx checks-test --changed` also reads the working tree edits and the untracked files.
+It never widens to the whole suite.
+The pull request run covers what a shared file reaches.
 
 ## Find the code
 
@@ -868,7 +864,7 @@ Values below 1 fail.
 | `packages/alerts/` | The alerts panel module of each alert rule and its one-frame print |
 | `packages/tasks/` | The tasks panel module, its three levels and the sampler that keeps each task's history |
 | `packages/cli/` | The `orc-dash` command, which composes the panel modules into the dashboard, opens one panel, prints the snapshot and the reports, or streams alerts |
-| `scripts/` | The fast test tier behind `bun run test:fast` |
+| `scripts/` | The release tree guard the tag run checks before it builds |
 | `tests/unit/` | Unit tests, one directory per package |
 | `tests/e2e/` | End-to-end tests that run the tools and scripts as a user does |
 | `tests/fixtures/` | Recorded tool reports, host captures, invented session logs and pinned screens |
