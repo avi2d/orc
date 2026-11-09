@@ -8,7 +8,7 @@ import { parseReport, reporterArgs, ReportError } from "@avi2dg/checks/testing/t
 import { judgeSkips, passes, report, SkipGateError } from "@avi2dg/checks/testing/test.ts";
 import { readSkipDeclarations, type Environment } from "@avi2dg/checks/scripts/test-skips.ts";
 import { narrowTests, type Narrowing, type Repository } from "./affected-tests.ts";
-import { decodeBunfig, preloadPaths, resolved } from "./mutation-scope-graph.ts";
+import { decodeBunfig, preloadPaths, resolved } from "./affected-tests.ts";
 
 const NAME = "test-fast";
 const USAGE = "usage: test-fast, which runs the unit and e2e test files the change touches, and it takes no arguments";
