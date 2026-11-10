@@ -7,6 +7,7 @@ import type { CliRenderer } from "@opentui/core";
 import { dashboardScreen, printDashboard } from "@avi2dg/orc-dashboard";
 import {
   actionsSourceLayer,
+  attentionSourceLayer,
   ciRunsLayer,
   type Command,
   CommandRunner,
@@ -126,6 +127,7 @@ const recordedSources = (
 ) =>
   Layer.mergeAll(
     quotaSourceLayer,
+    attentionSourceLayer,
     recordedSavedProfilesLayer,
     macHostSourceLayer,
     macProcessesSourceLayer,
