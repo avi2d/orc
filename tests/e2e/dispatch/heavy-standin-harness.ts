@@ -107,13 +107,14 @@ export interface ThroughHarness extends Harness {
   readonly holderLog: () => Promise<string>
 }
 
-export const setupThrough = async (tools: ReadonlyArray<string>, through: ReadonlyArray<string>): Promise<ThroughHarness> => {
+export const setupThrough = async (tools: ReadonlyArray<string>, through: ReadonlyArray<string>, throughFirst?: (fake: string) => string): Promise<ThroughHarness> => {
   const root = await mkdtemp(join(tmpdir(), "orc-heavy-through-"))
   const { bin, fake } = await makeDirs(root)
   await writeStaticFakes(fake)
   await writeFile(join(fake, "winbox-heavy"), fakeHolder, { mode: 0o755 })
+  await writeFile(join(fake, "winbox-heavy.sh"), fakeHolder, { mode: 0o755 })
   await writeFile(join(fake, "winbox-heavy.ts"), bunHolder, { mode: 0o755 })
-  await writeToolStandins(bin, root, fake, tools, [], undefined, through)
+  await writeToolStandins(bin, root, fake, tools, [], undefined, throughFirst ? [throughFirst(fake), ...through.slice(1)] : through)
   const env = { ...harnessEnv(root, bin, fake), FAKE_HOLDER_LOG: join(root, "holder.log"), FAKE_HOLDER_LOCK: join(root, "holder.lock") }
   return {
     root,
