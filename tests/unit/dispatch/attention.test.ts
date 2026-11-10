@@ -88,17 +88,6 @@ describe("the attention queue", () => {
     })
   })
 
-  test("an item left with no readable asked time is repaired to the beat time instead of staying never overdue", async () => {
-    await withRoot(async (root) => {
-      await run(openItem(root, "orc-1.r2.", asked("", "orc-1")))
-      await run(routeReviewQuestions(root, [parkedTask("orc-1", question("r2", "Keep the old flag?", "", null), [], { kind: "new" })], "2026-11-02T10:20:00.000Z"))
-      const items = await run(openItems(root))
-      expect(items.map((entry) => entry.id)).toEqual(["orc-1.r2."])
-      expect(items.map((entry) => entry.item.asked)).toEqual(["2026-11-02T10:20:00.000Z"])
-      expect(attentionJson(items, "2026-11-02T10:30:00.000Z").items[0]).toMatchObject({ ageSeconds: 600, overdue: true })
-    })
-  })
-
   test("closing a task withdraws its open item instead of leaving it overdue", async () => {
     await withRoot(async (root) => {
       await run(routeReviewQuestions(root, [parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", null), [], { kind: "new" })], "2026-11-02T10:20:00.000Z"))

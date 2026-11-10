@@ -13,7 +13,9 @@ An open item is overdue once more than 5 minutes have passed since it was asked.
 A review question a run asks is an item of kind `review-question`, owned by the user.
 The beat that writes the question into the task's `parked_questions`, as [Parked runs](parked-runs.md) shows, opens its item.
 Answering it with `orc backlog answer <task-id> <question-id>=<text>` closes the item.
-A question the run asks again at a later wait opens a new item, and the old item is withdrawn.
+A question asked again with the same words keeps its item.
+A question asked again with different words opens a new item, and the old item is withdrawn.
+An answered question asked again opens a new item, and the old item keeps its answer.
 
 To see every open item, oldest first, run `orc attention`.
 It prints each item's id, kind, task, owner, age and text, and marks an overdue one `overdue`.

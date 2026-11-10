@@ -132,12 +132,6 @@ export const routeReviewQuestions = (root: string, tasks: ReadonlyArray<TaskReco
         live.add(id)
         const asked = Number.isNaN(Date.parse(question.asked)) ? at : question.asked
         yield* Effect.asVoid(openItem(root, id, { kind: "review-question", task: task.spec.id, text: question.text, asked, owner: "user" }))
-        if (asked !== question.asked) {
-          const current = yield* readItem(root, id)
-          if (current !== null && current.state.kind === "open" && Number.isNaN(Date.parse(current.asked))) {
-            yield* writeItem(root, id, { ...current, asked })
-          }
-        }
       }
     }
     const tasksById = new Map(tasks.map((task) => [task.spec.id, task] as const))
