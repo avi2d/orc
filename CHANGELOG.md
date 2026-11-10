@@ -2,6 +2,26 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.11.0
+
+Released 2026-11-10.
+
+### Breaking changes
+
+- rename the dashboard from tui-dash to orc-dash [#108](https://github.com/avi2d/orc/pull/108)
+
+### Features
+
+- spread heavy queues across machines [#116](https://github.com/avi2d/orc/pull/116)
+- **run:** queue heavy shell calls through one slot per machine [#114](https://github.com/avi2d/orc/pull/114)
+- read any Claude credentials file and treat herdr as optional [#109](https://github.com/avi2d/orc/pull/109)
+- **run:** record gate refusals and count them in orc refusals [#107](https://github.com/avi2d/orc/pull/107)
+
+### Fixes
+
+- correct heavy line docs, not-setup detection, and minutes formatting [#117](https://github.com/avi2d/orc/pull/117)
+- drop stale smol-toml advisory acknowledgements [#113](https://github.com/avi2d/orc/pull/113)
+
 ## 0.10.0
 
 Released 2026-11-08.
