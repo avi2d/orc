@@ -319,7 +319,7 @@ export const runBeat = (
     }
     const upstream = yield* watchUpstream(root, projects, sources.readUpstream, at)
     const current = yield* listTasks(root)
-    yield* routeReviewQuestions(root, current)
+    yield* routeReviewQuestions(root, current, at)
     const queued = current.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: current, overloaded }

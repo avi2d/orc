@@ -200,7 +200,9 @@ const reportResult = (args: Extract<CommandArgs, { readonly kind: "RunnerResult"
 
 const closeNow = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
-    yield* closeStartedTask(backlogRoot(place), args.id, args.outcome, args.reason, { pr: null, report: null }, DateTime.formatIso(yield* DateTime.now))
+    const at = DateTime.formatIso(yield* DateTime.now)
+    const closed = yield* closeStartedTask(backlogRoot(place), args.id, args.outcome, args.reason, { pr: null, report: null }, at)
+    yield* routeReviewQuestions(backlogRoot(place), [closed], at)
     return "closed " + args.id + " " + args.outcome
   })
 
@@ -233,8 +235,9 @@ const holdNow = (args: Extract<CommandArgs, { readonly kind: "HoldTask" }>, plac
 
 const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
-    const answered = yield* answerTask(backlogRoot(place), args.id, args.words, DateTime.formatIso(yield* DateTime.now))
-    yield* routeReviewQuestions(backlogRoot(place), [yield* findTask(backlogRoot(place), args.id)])
+    const at = DateTime.formatIso(yield* DateTime.now)
+    const answered = yield* answerTask(backlogRoot(place), args.id, args.words, at)
+    yield* routeReviewQuestions(backlogRoot(place), [yield* findTask(backlogRoot(place), args.id)], at)
     if (answered.kind === "hold") {
       return "answered " + args.id + ", so the beat may start it"
     }

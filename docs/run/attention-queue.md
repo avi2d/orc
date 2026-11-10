@@ -6,13 +6,14 @@ Everything that waits on someone is one item in one queue, kept beside the backl
 Each item is one JSON file with its `kind`, its `task`, its `text`, the time it was `asked`, its `owner` and its `state`.
 The owner names who must answer it, `decider` or `user`.
 The state is `open` until an answer closes it, and a closed item keeps the answer's words and time.
+When its task closes, or its question is no longer asked, the item closes as `withdrawn` with its reason and time.
 Showing an item never closes it.
 An open item is overdue once more than 5 minutes have passed since it was asked.
 
 A review question a run asks is an item of kind `review-question`, owned by the user.
 The beat that writes the question into the task's `parked_questions`, as [Parked runs](parked-runs.md) shows, opens its item.
 Answering it with `orc backlog answer <task-id> <question-id>=<text>` closes the item.
-A question the run asks again at a later wait opens a new item.
+A question the run asks again at a later wait opens a new item, and the old item is withdrawn.
 
 To see every open item, oldest first, run `orc attention`.
 It prints each item's id, kind, task, owner, age and text, and marks an overdue one `overdue`.

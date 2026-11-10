@@ -13,7 +13,11 @@ const AttentionItem = Schema.Struct({
   text: Schema.String,
   asked: Schema.String,
   owner: Schema.Literals(["decider", "user"]),
-  state: Schema.Union([Schema.Struct({ kind: Schema.Literal("open") }), Schema.Struct({ kind: Schema.Literal("closed"), answer: Answer })])
+  state: Schema.Union([
+    Schema.Struct({ kind: Schema.Literal("open") }),
+    Schema.Struct({ kind: Schema.Literal("closed"), answer: Answer }),
+    Schema.Struct({ kind: Schema.Literal("withdrawn"), reason: Schema.String, at: Schema.String })
+  ])
 })
 
 export type AttentionItem = typeof AttentionItem.Type
@@ -30,6 +34,15 @@ const itemFile = (root: string, id: string): string => attentionFolder(root) + "
 
 const encodeItem = (id: string, item: AttentionItem): Effect.Effect<string, BacklogError> =>
   Schema.encodeEffect(ItemFile)(item).pipe(Effect.mapError((error) => new BacklogError({ detail: "cannot write the item " + id + ": " + error.message })))
+
+const writeItem = (root: string, id: string, item: AttentionItem): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const scratch = scratchName(attentionFolder(root), id)
+    const file = itemFile(root, id)
+    yield* fs.writeFileString(scratch, yield* encodeItem(id, item)).pipe(Effect.mapError(platformFailure("write " + scratch)))
+    yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
+  })
 
 // The same question at the same asking always names one file, so routing it again opens nothing new.
 const reviewQuestionId = (task: string, question: string, asked: string): string =>
@@ -61,15 +74,26 @@ export const closeItem = (root: string, id: string, answer: ItemAnswer): Effect.
     if (item === null) {
       return "missing"
     }
-    if (item.state.kind === "closed") {
+    if (item.state.kind !== "open") {
       return "already closed"
     }
-    const fs = yield* FileSystem.FileSystem
-    const scratch = scratchName(attentionFolder(root), id)
-    const file = itemFile(root, id)
-    yield* fs.writeFileString(scratch, yield* encodeItem(id, { ...item, state: { kind: "closed", answer } })).pipe(Effect.mapError(platformFailure("write " + scratch)))
-    yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
+    yield* writeItem(root, id, { ...item, state: { kind: "closed", answer } })
     return "closed"
+  })
+
+type WithdrawOutcome = "withdrawn" | "already closed" | "missing"
+
+export const withdrawItem = (root: string, id: string, reason: string, at: string): Effect.Effect<WithdrawOutcome, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const item = yield* readItem(root, id)
+    if (item === null) {
+      return "missing"
+    }
+    if (item.state.kind !== "open") {
+      return "already closed"
+    }
+    yield* writeItem(root, id, { ...item, state: { kind: "withdrawn", reason, at } })
+    return "withdrawn"
   })
 
 export interface OpenItem {
@@ -92,16 +116,34 @@ export const ageMillis = (item: AttentionItem, nowMillis: number): number => Mat
 
 export const isOverdue = (item: AttentionItem, nowMillis: number): boolean => item.state.kind === "open" && ageMillis(item, nowMillis) > overdueMillis
 
-// With no decider running, an item the decider owned would never close.
-export const routeReviewQuestions = (root: string, tasks: ReadonlyArray<TaskRecord>): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
-  Effect.forEach(
-    tasks.filter((task) => task.state.kind !== "closed"),
-    (task) =>
-      Effect.forEach(task.parked?.questions ?? [], (question) => {
+export const routeReviewQuestions = (root: string, tasks: ReadonlyArray<TaskRecord>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const live = new Set<string>()
+    for (const task of tasks) {
+      if (task.state.kind === "closed") {
+        continue
+      }
+      for (const question of task.parked?.questions ?? []) {
         const id = reviewQuestionId(task.spec.id, question.id, question.asked)
-        return question.answer === null
-          ? Effect.asVoid(openItem(root, id, { kind: "review-question", task: task.spec.id, text: question.text, asked: question.asked, owner: "user" }))
-          : Effect.asVoid(closeItem(root, id, { words: question.answer.words, at: question.answer.at }))
-      }, { discard: true }),
-    { discard: true }
-  )
+        if (question.answer !== null) {
+          yield* Effect.asVoid(closeItem(root, id, { words: question.answer.words, at: question.answer.at }))
+          continue
+        }
+        live.add(id)
+        const asked = Number.isNaN(Date.parse(question.asked)) ? at : question.asked
+        yield* Effect.asVoid(openItem(root, id, { kind: "review-question", task: task.spec.id, text: question.text, asked, owner: "user" }))
+        if (asked !== question.asked) {
+          const current = yield* readItem(root, id)
+          if (current !== null && current.state.kind === "open" && Number.isNaN(Date.parse(current.asked))) {
+            yield* writeItem(root, id, { ...current, asked })
+          }
+        }
+      }
+    }
+    const tasksById = new Map(tasks.map((task) => [task.spec.id, task] as const))
+    const stale = (yield* openItems(root)).filter((entry) => tasksById.has(entry.item.task) && !live.has(entry.id))
+    yield* Effect.forEach(stale, (entry) => {
+      const reason = tasksById.get(entry.item.task)?.state.kind === "closed" ? "task closed" : "question no longer asked"
+      return Effect.asVoid(withdrawItem(root, entry.id, reason, at))
+    }, { discard: true })
+  })
