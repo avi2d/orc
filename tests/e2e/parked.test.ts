@@ -82,6 +82,11 @@ const askWhileRunning = async (fixture: Fixture, asking: typeof firstAsking = fi
   return runDir
 }
 
+const openAttention = async (fixture: Fixture): Promise<unknown> => {
+  const queue: unknown = JSON.parse(await orcOk(fixture, ["attention", "--json"]))
+  return isRecord(queue) ? queue.items : null
+}
+
 const queuedSince = (fixture: Fixture): Promise<string | null> => readFile(join(fixture.pueue, "add-args"), "utf8").catch(() => null)
 
 const backlogTaskOne = async (fixture: Fixture): Promise<unknown> => {
@@ -232,6 +237,47 @@ describe("a parked run", () => {
       expect(beat).toContain("started orc-1")
       const added = await queuedArgs(fixture)
       expect(added?.slice(added.indexOf("--answer"), added.indexOf("--answer") + 2)).toEqual(["--answer", "r2=Yes"])
+    })
+  }, runnerTimeout)
+
+  test("a waiting run's review question stays in orc attention after showing and leaves it only on its answer", async () => {
+    await withFixture(async (fixture) => {
+      await startOnLinux(fixture)
+      await askWhileRunning(fixture)
+      await orcOk(fixture, ["beat"])
+      const asked = { kind: "review-question", task: "orc-1", text: "Keep the old flag?", asked: firstAsking.asked, owner: "user", overdue: true }
+      expect(await openAttention(fixture)).toMatchObject([asked])
+      const shown = await orcOk(fixture, ["attention"])
+      expect(shown).toContain("orc-1")
+      expect(shown).toContain("overdue")
+      expect(await openAttention(fixture)).toMatchObject([asked])
+      await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Keep it"])
+      expect(await openAttention(fixture)).toEqual([])
+      expect(await orcOk(fixture, ["attention"])).toBe("nothing needs anyone\n")
+    })
+  }, runnerTimeout)
+
+  test("a parked run's questions each wait in orc attention, and one answer closes only its own item", async () => {
+    await withFixture(async (fixture) => {
+      await startOnLinux(fixture)
+      await refuseOnQuestions(fixture)
+      await orcOk(fixture, ["beat"])
+      expect(await openAttention(fixture)).toMatchObject([{ task: "orc-1", text: "Which retries are allowed?" }, { task: "orc-1", text: "" }])
+      await orcOk(fixture, ["backlog", "answer", "orc-1", "question-4=Two retries"])
+      expect(await openAttention(fixture)).toMatchObject([{ task: "orc-1", text: "" }])
+    })
+  }, runnerTimeout)
+
+  test("a question asked again after its answer opens a new item instead of staying closed", async () => {
+    await withFixture(async (fixture) => {
+      await startOnLinux(fixture)
+      const runDir = await askWhileRunning(fixture)
+      await orcOk(fixture, ["beat"])
+      await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Keep it"])
+      await orcOk(fixture, ["beat"])
+      await writeFile(join(runDir, "asking.json"), JSON.stringify({ ...firstAsking, asked: "2026-11-02T11:20:00.000Z", until: "2026-11-02T11:50:00.000Z" }))
+      await orcOk(fixture, ["beat"])
+      expect(await openAttention(fixture)).toMatchObject([{ task: "orc-1", asked: "2026-11-02T11:20:00.000Z" }])
     })
   }, runnerTimeout)
 

@@ -1,0 +1,33 @@
+---
+kind: reference
+---
+# The attention queue
+Everything that waits on someone is one item in one queue, kept beside the backlog in `~/.orc/backlog/attention`.
+Each item is one JSON file with its `kind`, its `task`, its `text`, the time it was `asked`, its `owner` and its `state`.
+The owner names who must answer it, `decider` or `user`.
+The state is `open` until an answer closes it, and a closed item keeps the answer's words and time.
+Showing an item never closes it.
+An open item is overdue once more than 5 minutes have passed since it was asked.
+
+A review question a run asks is an item of kind `review-question`, owned by the user.
+The beat that writes the question into the task's `parked_questions`, as [Parked runs](parked-runs.md) shows, opens its item.
+Answering it with `orc backlog answer <task-id> <question-id>=<text>` closes the item.
+A question the run asks again at a later wait opens a new item.
+
+To see every open item, oldest first, run `orc attention`.
+It prints each item's id, kind, task, owner, age and text, and marks an overdue one `overdue`.
+With no open item it prints `nothing needs anyone`.
+To print the same facts as JSON, run `orc attention --json`, whose document names its version first as `orc.attention.v1`:
+
+```json
+{
+  "schema": "orc.attention.v1",
+  "at": "2026-11-02T10:10:00.000Z",
+  "items": [
+    { "id": "orc-1.r2.2026-11-02T10_00_00_000Z", "kind": "review-question", "task": "orc-1", "text": "Keep the old flag?", "asked": "2026-11-02T10:00:00.000Z", "owner": "user", "ageSeconds": 600, "overdue": true }
+  ]
+}
+```
+
+`at` is the time the queue was read, and each item's age and overdue flag are taken at that time.
+On a machine with no backlog folder, `orc attention` prints `no backlog at <path>`, and `orc attention --json` prints an empty queue.

@@ -1,7 +1,10 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs, TaskSource } from "./args"
-import { addTask, backlogPaths, BacklogError, closeStartedTask, isTaskId, listTasks, markPosted } from "./backlog"
+import { addTask, backlogPaths, BacklogError, closeStartedTask, findTask, isTaskId, listTasks, markPosted } from "./backlog"
+import { backlogPresent, noBacklog } from "./backlog-write"
+import { routeReviewQuestions } from "./attention"
+import { attentionText } from "./attention-view"
 import { holdTask } from "./backlog-hold"
 import { circularDependency, dependTask } from "./backlog-depend"
 import { answerTask } from "./parked"
@@ -105,14 +108,6 @@ const dependNow = (args: Extract<CommandArgs, { readonly kind: "DependTask" }>, 
     const waits = args.dependsOn.length === 0 ? "no task" : args.dependsOn.join(", ")
     return args.id + (outcome === "set" ? " now waits on " : " already waits on ") + waits
   })
-
-const backlogPresent = (root: string) =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    return yield* fs.exists(root).pipe(Effect.mapError((error) => new BacklogError({ detail: "cannot read " + root + ": " + error.message })))
-  })
-
-const noBacklog = (root: string): string => "no backlog at " + root + ": the backlog lives on the machine that runs orc beat, so run this command there"
 
 const backlogText = (json: boolean, place: DispatchPlace) =>
   Effect.gen(function*() {
@@ -239,6 +234,7 @@ const holdNow = (args: Extract<CommandArgs, { readonly kind: "HoldTask" }>, plac
 const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
     const answered = yield* answerTask(backlogRoot(place), args.id, args.words, DateTime.formatIso(yield* DateTime.now))
+    yield* routeReviewQuestions(backlogRoot(place), [yield* findTask(backlogRoot(place), args.id)])
     if (answered.kind === "hold") {
       return "answered " + args.id + ", so the beat may start it"
     }
@@ -322,8 +318,9 @@ const startAlertStream = (home: string) => {
 const execute = (args: CommandArgs, place: DispatchPlace) =>
   Effect.gen(function*() {
     switch (args.kind) {
-      case "ShowBacklog": {
-        yield* Console.log(yield* backlogText(args.json, place))
+      case "ShowBacklog":
+      case "ShowAttention": {
+        yield* Console.log(yield* (args.kind === "ShowBacklog" ? backlogText(args.json, place) : attentionText(args.json, backlogRoot(place))))
         break
       }
       case "AddTask": {

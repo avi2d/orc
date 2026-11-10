@@ -64,6 +64,7 @@ An unknown flag prints the usage text and exits 1.
 - [Seeing runs](https://github.com/avi2d/orc/blob/main/docs/run/seeing-runs.md)
 - [The backlog and the beat](https://github.com/avi2d/orc/blob/main/docs/run/backlog-and-beat.md)
 - [Parked runs](https://github.com/avi2d/orc/blob/main/docs/run/parked-runs.md)
+- [The attention queue](https://github.com/avi2d/orc/blob/main/docs/run/attention-queue.md)
 - [Task kinds](https://github.com/avi2d/orc/blob/main/docs/run/task-kinds.md)
 - [Delivery modes](https://github.com/avi2d/orc/blob/main/docs/run/delivery-modes.md)
 - [Merging a task's PR](https://github.com/avi2d/orc/blob/main/docs/run/merging-a-tasks-pr.md)

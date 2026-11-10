@@ -63,6 +63,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/load.ts` | The five minute load reading and the overloaded machines |
 | `packages/run/src/dispatch/machine-reach.ts` | The sweep ownership check and the remote command prefix |
 | `packages/run/src/dispatch/stall.ts` | The stalled run flag kept in the backlog logs |
+| `packages/run/src/dispatch/attention.ts` | The attention queue under `attention/`: one file per item, its open and close, and the review questions routed into it |
+| `packages/run/src/dispatch/attention-view.ts` | The `orc attention` table and its `orc.attention.v1` JSON |
 | `packages/run/src/dispatch/events.ts` | The chat events under `events/`, their posted marks and the alert fires the backlog lists |
 | `packages/run/src/dispatch/task-events.ts` | The stall and PR events the beat records for every task |
 | `packages/run/src/dispatch/alert-events.ts` | The reading of each `alerts.jsonl` line as one alert fire |

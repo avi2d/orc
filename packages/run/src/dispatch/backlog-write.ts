@@ -9,6 +9,23 @@ export class BacklogError extends Data.TaggedError("BacklogError")<{
 export const platformFailure = (action: string) => (error: PlatformError): BacklogError =>
   new BacklogError({ detail: "cannot " + action + ": " + error.message })
 
+export const backlogPresent = (root: string): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    return yield* fs.exists(root).pipe(Effect.mapError((error) => new BacklogError({ detail: "cannot read " + root + ": " + error.message })))
+  })
+
+export const noBacklog = (root: string): string => "no backlog at " + root + ": the backlog lives on the machine that runs orc beat, so run this command there"
+
+export const readIfPresent = (file: string): Effect.Effect<string | null, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    return yield* fs.readFileString(file).pipe(
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)),
+      Effect.mapError(platformFailure("read " + file))
+    )
+  })
+
 export const scratchName = (folder: string, id: string): string => folder + "/." + id + "." + crypto.randomUUID() + ".tmp"
 
 // link(2) refuses an existing name, so the file appears whole and at most once.
