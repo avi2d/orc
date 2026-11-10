@@ -30,6 +30,7 @@ export type BeatAction =
   | { readonly kind: "answer-failed"; readonly task: string; readonly machine: string; readonly reason: string }
   | StalledAction
   | { readonly kind: "pr-unread"; readonly task: string; readonly reason: string }
+  | { readonly kind: "attention"; readonly item: string; readonly task: string; readonly owner: "decider" | "user"; readonly overdue: boolean; readonly text: string }
   | { readonly kind: "upstream-seen"; readonly project: string; readonly url: string; readonly state: string }
   | { readonly kind: "upstream-changed"; readonly project: string; readonly url: string; readonly changes: ReadonlyArray<string>; readonly task: string }
   | { readonly kind: "upstream-unread"; readonly project: string; readonly url: string; readonly reason: string }

@@ -18,6 +18,23 @@ A question asked again with the same words keeps its item.
 A question asked again with different words opens a new item, and the old item is withdrawn.
 An answered question asked again opens a new item, and the old item keeps its answer.
 
+The beat opens an item for each run event, owned by the user:
+
+- A run that died opens a `run-died` item, when its task closes failed or its start fails.
+  A run that ends done or that you stop opens none.
+- A red check on a closed task's PR opens a `check-red` item for the PR's head commit.
+  Checks that turn green on that commit, or a new commit, withdraw it.
+- A PR whose checks are all green opens a `pr-ready` item for its head commit.
+  A red check or a new commit withdraws it, and merging the PR closes it with the answer `merged`.
+
+To answer one of these, run `orc attention answer <item-id> <words>`.
+It refuses a review question or an overdue wait and names the task to answer with `orc backlog answer` instead.
+
+A held task whose `--until` date has passed opens an `overdue-wait` item, owned by the user and asked at the end of that date.
+Answering the hold closes the item with the hold's answer.
+
+Each beat reads the queue before it starts a new task, and prints one `needs the <owner> <item-id>: <text>` line per open item, oldest first, with `, overdue` after the owner for an overdue one.
+
 To see every open item, oldest first, run `orc attention`.
 It prints each item's id, kind, task, owner, age and text, and marks an overdue one `overdue`.
 With no open item it prints `nothing needs anyone`.

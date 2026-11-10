@@ -1,6 +1,6 @@
 import { DateTime, Effect, type FileSystem } from "effect"
-import { ageMillis, type AttentionItem, isOverdue, type OpenItem, openItems } from "./attention"
-import { type BacklogError, backlogPresent, noBacklog } from "./backlog-write"
+import { ageMillis, answerItem, type AttentionItem, isOverdue, type OpenItem, openItems } from "./attention"
+import { BacklogError, backlogPresent, noBacklog } from "./backlog-write"
 import { formatTable } from "../table"
 
 const ATTENTION_JSON_SCHEMA = "orc.attention.v1"
@@ -43,6 +43,25 @@ const formatAttention = (items: ReadonlyArray<OpenItem>, at: string): string =>
     attentionJson(items, at).items.map((item) => [item.id, item.kind, item.task, item.owner, ageText(item.ageSeconds) + (item.overdue ? " overdue" : ""), item.text]),
     "nothing needs anyone"
   )
+
+export const answerItemText = (root: string, id: string, answer: { readonly words: string; readonly at: string }): Effect.Effect<string, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const outcome = yield* answerItem(root, id, answer)
+    switch (outcome) {
+      case "closed": {
+        return "answered " + id
+      }
+      case "already closed": {
+        return yield* new BacklogError({ detail: id + " is no longer open" })
+      }
+      case "missing": {
+        return yield* new BacklogError({ detail: "the attention queue holds no " + id })
+      }
+      default: {
+        return yield* new BacklogError({ detail: id + " closes when its task's question is answered, so run orc backlog answer " + outcome.task })
+      }
+    }
+  })
 
 export const attentionText = (json: boolean, root: string): Effect.Effect<string, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {

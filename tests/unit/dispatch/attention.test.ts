@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Array as Arr, Effect } from "effect"
 import { parseDispatchArgs } from "../../../packages/run/src/dispatch/args"
-import { type Asked, closeItem, isOverdue, openItem, openItems, routeReviewQuestions } from "../../../packages/run/src/dispatch/attention"
+import { type Asked, closeItem, isOverdue, openItem, openItems, routeTaskItems } from "../../../packages/run/src/dispatch/attention"
 import { attentionJson, attentionText } from "../../../packages/run/src/dispatch/attention-view"
 import type { ParkedQuestion, TaskRecord } from "../../../packages/run/src/dispatch/task-record"
 
@@ -81,7 +81,7 @@ describe("the attention queue", () => {
 
   test("a question asked before asked_at existed opens its item at the beat time instead of an unreadable age", async () => {
     await withRoot(async (root) => {
-      await run(routeReviewQuestions(root, [parkedTask("orc-1", question("r2", "Keep the old flag?", "", null), [], { kind: "new" })], "2026-11-02T10:20:00.000Z"))
+      await run(routeTaskItems(root, [parkedTask("orc-1", question("r2", "Keep the old flag?", "", null), [], { kind: "new" })], "2026-11-02T10:20:00.000Z"))
       const items = await run(openItems(root))
       expect(items.map((entry) => entry.item.asked)).toEqual(["2026-11-02T10:20:00.000Z"])
       expect(attentionJson(items, "2026-11-02T10:30:00.000Z").items[0]).toMatchObject({ ageSeconds: 600, overdue: true })
@@ -90,9 +90,9 @@ describe("the attention queue", () => {
 
   test("closing a task withdraws its open item instead of leaving it overdue", async () => {
     await withRoot(async (root) => {
-      await run(routeReviewQuestions(root, [parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", null), [], { kind: "new" })], "2026-11-02T10:20:00.000Z"))
+      await run(routeTaskItems(root, [parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", null), [], { kind: "new" })], "2026-11-02T10:20:00.000Z"))
       expect((await run(openItems(root))).map((entry) => entry.id)).toEqual(["orc-1.r2.2026-11-02T10_20_00_000Z"])
-      await run(routeReviewQuestions(root, [closedTask("orc-1")], "2026-11-02T10:40:00.000Z"))
+      await run(routeTaskItems(root, [closedTask("orc-1")], "2026-11-02T10:40:00.000Z"))
       expect(await run(openItems(root))).toEqual([])
       expect(JSON.parse(await readFile(join(root, "attention", "orc-1.r2.2026-11-02T10_20_00_000Z.json"), "utf8"))).toMatchObject({
         state: { kind: "withdrawn", reason: "task closed", at: "2026-11-02T10:40:00.000Z" }
@@ -102,8 +102,8 @@ describe("the attention queue", () => {
 
   test("asking a question again withdraws the old item and opens the new asking instead of keeping both", async () => {
     await withRoot(async (root) => {
-      await run(routeReviewQuestions(root, [parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", null), [], { kind: "new" })], "2026-11-02T10:20:00.000Z"))
-      await run(routeReviewQuestions(root, [parkedTask("orc-1", question("r2", "Drop the flag?", "2026-11-02T11:20:00.000Z", null), [], { kind: "new" })], "2026-11-02T11:20:00.000Z"))
+      await run(routeTaskItems(root, [parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", null), [], { kind: "new" })], "2026-11-02T10:20:00.000Z"))
+      await run(routeTaskItems(root, [parkedTask("orc-1", question("r2", "Drop the flag?", "2026-11-02T11:20:00.000Z", null), [], { kind: "new" })], "2026-11-02T11:20:00.000Z"))
       expect((await run(openItems(root))).map((entry) => entry.item.text)).toEqual(["Drop the flag?"])
       expect(JSON.parse(await readFile(join(root, "attention", "orc-1.r2.2026-11-02T10_20_00_000Z.json"), "utf8"))).toMatchObject({
         state: { kind: "withdrawn", reason: "question no longer asked" }
@@ -113,8 +113,8 @@ describe("the attention queue", () => {
 
   test("an answer still closes its live question instead of withdrawing it", async () => {
     await withRoot(async (root) => {
-      await run(routeReviewQuestions(root, [parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", null), [], { kind: "new" })], "2026-11-02T10:20:00.000Z"))
-      await run(routeReviewQuestions(root, [parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", { words: "Keep it", at: "2026-11-02T10:25:00.000Z" }), [], { kind: "new" })], "2026-11-02T10:25:00.000Z"))
+      await run(routeTaskItems(root, [parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", null), [], { kind: "new" })], "2026-11-02T10:20:00.000Z"))
+      await run(routeTaskItems(root, [parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", { words: "Keep it", at: "2026-11-02T10:25:00.000Z" }), [], { kind: "new" })], "2026-11-02T10:25:00.000Z"))
       expect(await run(openItems(root))).toEqual([])
       expect(JSON.parse(await readFile(join(root, "attention", "orc-1.r2.2026-11-02T10_20_00_000Z.json"), "utf8"))).toMatchObject({
         state: { kind: "closed", answer: { words: "Keep it", at: "2026-11-02T10:25:00.000Z" } }

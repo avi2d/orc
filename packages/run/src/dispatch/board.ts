@@ -244,6 +244,9 @@ const actionLine = (action: BeatAction): string => {
     case "stalled": {
       return "stalled " + action.task + " on " + action.machine + ": no output since " + action.since
     }
+    case "attention": {
+      return "needs the " + action.owner + (action.overdue ? ", overdue" : "") + " " + action.item + ": " + action.text
+    }
     case "pr-unread": {
       return "cannot read the PR of " + action.task + " for the chat: " + action.reason
     }

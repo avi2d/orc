@@ -197,7 +197,7 @@ A parent task also waits for every scout and task child closed done and every sh
 
 To keep a new task back for a decision of yours, run `orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>]`.
 Each beat then prints `waits <task-id>: held for the captain: <reason>`, with the date when the hold names one, and never starts it.
-The date says when you mean to answer, and a past date releases nothing: the task stays held until you answer it.
+The date says when you mean to answer, and a past date releases nothing: the task stays held until you answer it, and its wait opens an item in the [attention queue](attention-queue.md).
 To answer, run `orc backlog answer <task-id> <words>`.
 The task file keeps your words as `answer` and the time as `answered_at`, and the next beat may start the task.
 The released run reads the task body with the reason and your words added after it.

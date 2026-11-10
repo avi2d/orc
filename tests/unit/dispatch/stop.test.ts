@@ -378,7 +378,7 @@ describe("the beat's stale start", () => {
       await startTaskOne(root, ["orc", "runner", "start"], oldStart)
       const report = await Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueStub(JSON.stringify({ tasks: {} }))))))
       expect((await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["orc-1:closed"])
-      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1"])
+      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1", "attention:orc-1"])
       const closed = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
       expect(closed?.state.kind === "closed" ? closed.state.closing.outcome + ":" + closed.state.closing.reason : "")
         .toBe("failed:the runner holds no record of this task")
@@ -405,7 +405,7 @@ describe("the beat's stale start", () => {
       const closed = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
       expect(closed?.state.kind === "closed" ? closed.state.closing.outcome + ":" + closed.state.closing.reason : "")
         .toBe("failed:pueue status exited 3: pueue is down")
-      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1"])
+      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1", "attention:orc-1"])
       const markerGone = await Effect.runPromise(Effect.gen(function*() {
         const fs = yield* FileSystem.FileSystem
         return !(yield* fs.exists(join(root, "logs", "orc-1.unread")))
@@ -447,7 +447,7 @@ describe("the beat's stale start", () => {
       const closed = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
       expect(closed?.state.kind === "closed" ? closed.state.closing.outcome + ":" + closed.state.closing.reason : "")
         .toBe("failed:the machine keeps its own log, and its log has not grown for 30 minutes")
-      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1"])
+      expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1", "attention:orc-1"])
     })
   })
   test("an own-log task with a fresh log keeps its own record instead of closing", async () => {
