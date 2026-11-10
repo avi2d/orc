@@ -1,15 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { createTestRenderer, type TestRendererSetup } from "@opentui/core/testing";
-import { ConfigProvider, Effect, Fiber, Layer } from "effect";
-import { actionsSourceLayer, HeavyMachines, CommandRunner, pueueMachinesLayer } from "@avi2dg/orc-schema";
-import { livePanel } from "@avi2dg/orc-queues";
+import { ConfigProvider, DateTime, Effect, Fiber, Layer } from "effect";
+import { actionsSourceLayer, type HeavyMachine, HeavyMachines, CommandRunner, pueueMachinesLayer } from "@avi2dg/orc-schema";
+import { backgroundQueues, livePanel, readQueues } from "@avi2dg/orc-queues";
 import { fixtureActionsRepo, queueAnswers } from "../../lib/queues-fixture";
 
 const remoteLine = "ssh south.example.com pueue status --json";
 
 const recordedAnswer = (asked: string): string => queueAnswers.find(([answers]) => asked.startsWith(answers))?.[1] ?? "";
 
-const sourcesWithRemote = (remote: Effect.Effect<string>) => Layer.mergeAll(pueueMachinesLayer, actionsSourceLayer, Layer.succeed(HeavyMachines, [])).pipe(
+const sourcesWithRemote = (remote: Effect.Effect<string>, heavies: ReadonlyArray<HeavyMachine> = []) => Layer.mergeAll(pueueMachinesLayer, actionsSourceLayer, Layer.succeed(HeavyMachines, heavies)).pipe(
   Layer.provide(
     Layer.succeed(CommandRunner, {
       run: (command) => (command.argv[2] === remoteLine ? remote : Effect.succeed(recordedAnswer(command.argv.join(" ")))),
@@ -83,4 +83,27 @@ describe("the live panel", () => {
       await setup.dispose();
     }
   }, 15_000);
+});
+
+describe("the standalone queues panel", () => {
+  const countingHeavy = (reads: { count: number }): HeavyMachine => ({
+    name: "north",
+    read: Effect.map(DateTime.now, (capturedAt) => {
+      reads.count += 1;
+      return { kind: "ok" as const, value: { group: "heavy", parallel: 1, running: [], queued: [], bypass: 0, bypassWeek: 0 }, capturedAt };
+    }),
+  });
+
+  test("reading the queues never reads a machine's heavy check", async () => {
+    const reads = { count: 0 };
+    await Effect.runPromise(readQueues.pipe(Effect.provide(sourcesWithRemote(Effect.succeed(recordedAnswer("pueue status --json")), [countingHeavy(reads)]))));
+    expect(reads.count).toBe(0);
+  });
+
+  test("the background queues never read a machine's heavy check", async () => {
+    const reads = { count: 0 };
+    const sources = sourcesWithRemote(Effect.succeed(recordedAnswer("pueue status --json")), [countingHeavy(reads)]);
+    await Effect.runPromise(Effect.scoped(Effect.flatMap(backgroundQueues, (read) => read)).pipe(Effect.provide(sources)));
+    expect(reads.count).toBe(0);
+  });
 });

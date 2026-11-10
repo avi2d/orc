@@ -108,7 +108,7 @@ export const readQueueReadings: Effect.Effect<QueueRead, never, QueueSources> = 
 
 export const readQueues: Effect.Effect<QueuesView, never, QueueSources> = Effect.gen(function* () {
   const machines = yield* PueueMachines;
-  return queuesView((yield* readQueueReadings).fresh, yield* knownProjects(machines));
+  return queuesView((yield* Effect.provideService(readQueueReadings, HeavyMachines, [])).fresh, yield* knownProjects(machines));
 });
 
 export const readQueuesReport: Effect.Effect<QueuesReport, never, QueueSources> = Effect.gen(function* () {
@@ -158,7 +158,7 @@ export const backgroundQueueReadings = (
   });
 
 export const backgroundQueues: Effect.Effect<Effect.Effect<QueuesView>, never, QueueSources | Scope.Scope> = Effect.map(
-  Effect.all([PueueMachines, backgroundQueueReadings()], { concurrency: "unbounded" }),
+  Effect.all([PueueMachines, Effect.provideService(backgroundQueueReadings(), HeavyMachines, [])], { concurrency: "unbounded" }),
   ([machines, feeds]) => Effect.map(Effect.all([feeds.read, knownProjects(machines)]), ([readings, projects]) => queuesView(readings.fresh, projects)),
 );
 
