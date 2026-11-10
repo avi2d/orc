@@ -83,6 +83,7 @@ export const renderTaskFile = (record: TaskRecord): string =>
     field("kind", record.spec.kind),
     ...(record.spec.internal ? [field("internal", true)] : []),
     field("machine", record.spec.machine),
+    ...(record.spec.parent === null ? [] : [field("parent", record.spec.parent)]),
     field("depends_on", record.spec.dependsOn),
     field("created", record.spec.created),
     ...holdFields(record.hold),

@@ -11,6 +11,7 @@ export interface TaskSpec {
   readonly kind: TaskKind
   readonly internal: boolean
   readonly machine: string | null
+  readonly parent: string | null
   readonly dependsOn: ReadonlyArray<string>
   readonly created: string
   readonly body: string
@@ -126,6 +127,7 @@ const Frontmatter = Schema.Struct({
   kind: Schema.optional(Schema.String),
   internal: Schema.optional(Schema.Boolean),
   machine: Schema.NullOr(Schema.String),
+  parent: Schema.optional(Schema.String),
   depends_on: Schema.Array(Schema.String),
   created: Schema.String,
   hold_reason: Schema.optional(Schema.String),
@@ -316,6 +318,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
         kind,
         internal: front.internal ?? false,
         machine: front.machine,
+        parent: front.parent ?? null,
         dependsOn: front.depends_on,
         created: front.created,
         body: parts.body

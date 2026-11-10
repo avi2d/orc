@@ -1,9 +1,9 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs, TaskSource } from "./args"
-import { addTask, backlogPaths, BacklogError, closeStartedTask, isTaskId, listTasks, markPosted } from "./backlog"
+import { addTask, backlogPaths, BacklogError, closeStartedTask, listTasks, markPosted } from "./backlog"
 import { holdTask } from "./backlog-hold"
-import { circularDependency, dependTask } from "./backlog-depend"
+import { circularDependency, dependTask, refusedLinks } from "./backlog-depend"
 import { answerTask } from "./parked"
 import { liveSources, readRoom, runBeat } from "./beat"
 import { runnerLoadText } from "./load"
@@ -16,7 +16,7 @@ import { taskLabel } from "./pueue-status"
 import { type Command, killHeld, queueFromText, renewTask, RunnerError, startTask } from "./runner"
 import { stopNow } from "./cli-stop"
 import { formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson } from "./runner-result"
-import type { TaskFileError, TaskRecord } from "./task-record"
+import type { TaskFileError } from "./task-record"
 import { encodeToken, sessionToken } from "./token"
 import { markEventPosted, unpostedEvents } from "./events"
 import { ensureAlertStream, liveAlertStream } from "./alert-stream"
@@ -84,18 +84,15 @@ const readSessionToken = (session: string, stdoutIsTerminal: boolean) =>
     return yield* encodeToken(reading.token).pipe(Effect.mapError((error) => new BacklogError({ detail: "the " + error.what + " would not encode" })))
   })
 
-const refusedDependency = (dependsOn: ReadonlyArray<string>, tasks: ReadonlyArray<TaskRecord>): string | null =>
-  dependsOn.find((id) => !isTaskId(id) || !tasks.some((task) => task.spec.id === id)) ?? null
-
 const dependNow = (args: Extract<CommandArgs, { readonly kind: "DependTask" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
     const tasks = yield* listTasks(backlogRoot(place))
     if (!tasks.some((task) => task.spec.id === args.id)) {
       return yield* refuse("the backlog holds no " + args.id)
     }
-    const dependency = refusedDependency(args.dependsOn, tasks)
-    if (dependency !== null) {
-      return yield* refuse("the backlog holds no task " + dependency)
+    const missing = refusedLinks(null, args.dependsOn, tasks)
+    if (missing !== null) {
+      return yield* refuse(missing)
     }
     const loop = circularDependency(args.id, args.dependsOn, tasks)
     if (loop !== null) {
@@ -164,9 +161,9 @@ const add = (args: Extract<CommandArgs, { readonly kind: "AddTask" }>, place: Di
     if (args.machine !== null && checkoutOn(project, args.machine) === null) {
       return yield* refuse("the project " + args.project + " has no checkout on " + args.machine + " in " + paths.projects)
     }
-    const dependency = refusedDependency(args.dependsOn, yield* listTasks(backlogRoot(place)))
-    if (dependency !== null) {
-      return yield* refuse("the backlog holds no task " + dependency)
+    const links = refusedLinks(args.parent, args.dependsOn, yield* listTasks(backlogRoot(place)))
+    if (links !== null) {
+      return yield* refuse(links)
     }
     const { from, body } = yield* readTaskText(args.task, place)
     const title = titleOf(body)
@@ -180,13 +177,15 @@ const add = (args: Extract<CommandArgs, { readonly kind: "AddTask" }>, place: Di
       kind: args.taskKind,
       internal: args.internal,
       machine: args.machine,
+      parent: args.parent,
       dependsOn: args.dependsOn,
       created,
       body
     })
     yield* Console.log(
       "added " + record.spec.id + " for " + project.name + (args.machine === null ? "" : " on " + args.machine) +
-        (record.spec.kind === "ship" ? "" : " as a " + record.spec.kind) + (record.spec.internal ? " marked internal" : "")
+        (record.spec.kind === "ship" ? "" : " as a " + record.spec.kind) + (record.spec.internal ? " marked internal" : "") +
+        (record.spec.parent === null ? "" : " as a child of " + record.spec.parent)
     )
   })
 

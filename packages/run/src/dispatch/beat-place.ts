@@ -22,10 +22,32 @@ const freeRoom = (room: MachineRoom): number => Math.max(0, room.slots - room.bu
 export const dependencyOpen = (dependency: TaskRecord | undefined): boolean =>
   dependency === undefined || dependency.state.kind !== "closed" || dependency.state.closing.outcome !== "done"
 
+export interface ChildCount {
+  readonly done: number
+  readonly total: number
+}
+
+export const childCount = (parent: TaskRecord, tasks: ReadonlyArray<TaskRecord>): ChildCount => {
+  const children = tasks.filter((task) => task.spec.parent === parent.spec.id)
+  return { done: children.filter((child) => !dependencyOpen(child)).length, total: children.length }
+}
+
+const childrenWait = (parent: TaskRecord, tasks: ReadonlyArray<TaskRecord>): string | null => {
+  const count = childCount(parent, tasks)
+  if (count.total === 0) {
+    return "waits for its first child"
+  }
+  return count.done < count.total ? "waits on its children, " + count.done + " of " + count.total + " done" : null
+}
+
 export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>): string | null => {
   const held = captainWait(task)
   if (held !== null) {
     return held
+  }
+  const children = task.spec.kind === "parent" ? childrenWait(task, tasks) : null
+  if (children !== null) {
+    return children
   }
   for (const id of task.spec.dependsOn) {
     const dependency = tasks.find((candidate) => candidate.spec.id === id)

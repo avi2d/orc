@@ -15,6 +15,7 @@ export type DispatchArgs =
     readonly taskKind: TaskKind
     readonly internal: boolean
     readonly machine: string | null
+    readonly parent: string | null
     readonly dependsOn: ReadonlyArray<string>
   }
   | { readonly kind: "CloseTask"; readonly id: string; readonly outcome: "done" | "failed"; readonly reason: string }

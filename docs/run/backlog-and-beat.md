@@ -180,6 +180,7 @@ To change what a new or held task waits for later, run `orc backlog depend <task
 Orc refuses a task the backlog does not hold, a task that is taken, started or closed, a task parked for the captain's answer, and a dependency on itself or one that would make two tasks wait on each other.
 A hold stays as it was when the dependencies change.
 Add `--kind scout` or `--kind task` for a task that ends in a report instead of a PR, as [Task kinds](task-kinds.md) shows.
+To split a large task, add it with `--kind parent`, then add each part with `--parent <task-id>`, as [Parent tasks](task-kinds.md#parent-tasks) shows.
 Add `--internal` to mark a ship task internal-only, which only a `no-mistakes-prod-only` project reads.
 To see the backlog, run `orc backlog`.
 It prints the new, taken and closed tasks side by side with the project list and each machine's busy slots beside them.
@@ -189,7 +190,7 @@ Each beat runs the quota command and reads the room on each machine before it ta
 A task starts only once four things hold:
 
 1. No hold or parked question for the captain waits on it unanswered.
-2. Every task it depends on closed done.
+2. Every task it depends on closed done, and for a parent task every child closed done.
 3. Its project has a checkout on a machine with a free slot.
 4. An account has room at or above the floor, and the runs take the account with the most room.
 
