@@ -335,7 +335,6 @@ export const runBeat = (
     const current = yield* listTasks(root)
     yield* routeTaskItems(root, current, at)
     yield* openRunDeaths(root, settled.closed, at)
-    const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))
     const queue = (yield* openItems(root)).map(({ id, item }): BeatAction => ({
       kind: "attention", item: id, task: item.task, owner: item.owner, overdue: isOverdue(item, Date.parse(at)), text: item.text
     }))
@@ -345,15 +344,16 @@ export const runBeat = (
     const renewals = yield* Effect.forEach(current, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, task))
     yield* openRunDeaths(root, actions, at)
+    const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))
     return { beat, at, quota, room: readRoom(config.machines, current), actions: [
         ...settled.closed,
         ...settled.asking,
         ...stalls.flatMap(Option.toArray),
-        ...prs.flatMap(Option.toArray),
         ...upstream,
         ...queue,
         ...renewals.flatMap(Option.toArray),
-        ...actions
+        ...actions,
+        ...prs.flatMap(Option.toArray)
       ]
     }
   })

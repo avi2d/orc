@@ -24,8 +24,11 @@ The beat opens an item for each run event, owned by the user:
   A run that ends done or that you stop opens none.
 - A red check on a closed task's PR opens a `check-red` item for the PR's head commit.
   Checks that turn green on that commit, or a new commit, withdraw it.
+  Merging the PR or closing it without merging withdraws it.
 - A PR whose checks are all green opens a `pr-ready` item for its head commit.
-  A red check or a new commit withdraws it, and merging the PR closes it with the answer `merged`.
+  A red check or a new commit withdraws it.
+  Merging the PR closes it with the answer `merged`.
+  Closing the PR without merging closes it with the answer `closed without merging`.
 
 To answer one of these, run `orc attention answer <item-id> <words>`.
 It refuses a review question or an overdue wait and names the task to answer with `orc backlog answer` instead.

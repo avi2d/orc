@@ -99,10 +99,10 @@ export interface OpenItem {
   readonly item: AttentionItem
 }
 
-export const openItems = (root: string): Effect.Effect<ReadonlyArray<OpenItem>, BacklogError, FileSystem.FileSystem> =>
+export const openItems = (root: string, keep?: (name: string) => boolean): Effect.Effect<ReadonlyArray<OpenItem>, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const ids = (yield* readNames(attentionFolder(root)))
-      .filter((name) => name.endsWith(fileSuffix) && !name.startsWith("."))
+      .filter((name) => name.endsWith(fileSuffix) && !name.startsWith(".") && (keep === undefined || keep(name)))
       .map((name) => name.slice(0, -fileSuffix.length))
     const read = yield* Effect.forEach(ids, (id) => readItem(root, id).pipe(Effect.map((item) => (item === null ? null : { id, item }))))
     return read
@@ -174,16 +174,6 @@ export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, 
       ? Effect.asVoid(openItem(root, itemId(action.task, "run-died"), { kind: "run-died", task: action.task, text: "the run on " + action.machine + " died: " + action.reason, asked: at, owner: "user" }))
       : Effect.void, { discard: true })
 
-const prOpenItems = (root: string, task: string): Effect.Effect<ReadonlyArray<OpenItem>, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const prefixes = [itemId(task, "check-red") + ".", itemId(task, "pr-ready") + "."]
-    const ids = (yield* readNames(attentionFolder(root)))
-      .filter((name) => name.endsWith(fileSuffix) && !name.startsWith(".") && prefixes.some((prefix) => name.startsWith(prefix)))
-      .map((name) => name.slice(0, -fileSuffix.length))
-    const read = yield* Effect.forEach(ids, (id) => readItem(root, id).pipe(Effect.map((item) => (item === null ? null : { id, item }))))
-    return read.filter((entry): entry is OpenItem => entry !== null && entry.item.state.kind === "open")
-  })
-
 const openOrReopenPrItem = (root: string, id: string, asked: Asked): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const item = yield* readItem(root, id)
@@ -201,7 +191,8 @@ export const routePullRequest = (root: string, task: string, pr: string, view: P
     const refusals = checkRefusals(view)
     const red = redChecks(view)
     const holds = (kind: AttentionItem["kind"]): boolean => ended === null && (kind === "check-red" ? refusals.length > 0 : red.length === 0)
-    const settled = (yield* prOpenItems(root, task)).filter((entry) =>
+    const prefixes = [itemId(task, "check-red") + ".", itemId(task, "pr-ready") + "."]
+    const settled = (yield* openItems(root, (name) => prefixes.some((prefix) => name.startsWith(prefix)))).filter((entry) =>
       !(entry.id === itemId(task, entry.item.kind, view.headRefOid) && holds(entry.item.kind))
     )
     yield* Effect.forEach(settled, (entry) =>
