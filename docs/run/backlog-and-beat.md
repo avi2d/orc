@@ -190,7 +190,7 @@ Each beat runs the quota command and reads the room on each machine before it ta
 A task starts only once four things hold:
 
 1. No hold or parked question for the captain waits on it unanswered.
-2. Every task it depends on closed done, and for a parent task every child closed done.
+2. Every task it depends on closed done, and for a parent task every scout and task child closed done and every ship child with a PR merged.
 3. Its project has a checkout on a machine with a free slot.
 4. An account has room at or above the floor, and the runs take the account with the most room.
 

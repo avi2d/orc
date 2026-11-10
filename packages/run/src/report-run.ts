@@ -44,7 +44,7 @@ const kindAsks: Record<ReportKind, string> = {
 const passLine = "verdict: pass"
 
 export const checkPassed = (report: string): boolean =>
-  report.split("\n").map((line) => line.trim()).filter((line) => line !== "").at(-1)?.toLowerCase() === passLine
+  report.split("\n").map((line) => line.trim()).filter((line) => line !== "").at(-1) === passLine
 
 const buildReportPrompt = (run: ReportRun): string =>
   [

@@ -113,6 +113,31 @@ describe("orc backlog add --parent", () => {
     })
   }, beatTimeout)
 
+  test("waits for the merge instead of starting the final check on an open PR", async () => {
+    await withFixture(async (fixture) => {
+      await orcOk(fixture, ["backlog", "add", "orc", "parent.md", "--kind", "parent"])
+      await addChild(fixture)
+      await orcOk(fixture, ["beat"])
+      await orcOk(fixture, ["backlog", "close", "orc-2", "done"])
+      const pr = "https://github.com/example/repo/pull/1"
+      const closedFile = join(fixture.dir, "home", "backlog", "closed", "orc-2.md")
+      const text = await readFile(closedFile, "utf8")
+      const fence = "\n---"
+      const at = text.lastIndexOf(fence)
+      await writeFile(closedFile, text.slice(0, at) + "\npr: " + JSON.stringify(pr) + text.slice(at))
+      expect(await orcOk(fixture, ["beat"])).toContain("waits orc-1: waits on its children, 0 of 1 done")
+      expect(await listLine(fixture, "orc-1")).toContain("orc-1 parent orc 0 of 1 done")
+      await mkdir(join(fixture.dir, "home", "backlog", "events"), { recursive: true })
+      await writeFile(
+        join(fixture.dir, "home", "backlog", "events", "orc-2.merged.json"),
+        JSON.stringify({ at: new Date().toISOString(), text: "orc-2 Ship one part merged: " + pr })
+      )
+      await orcOk(fixture, ["beat"])
+      expect(await startsAfter(fixture, 2)).toEqual(["orc-1", "orc-2"])
+      expect(await listLine(fixture, "orc-1")).toContain("orc-1 parent orc 1 of 1 done")
+    })
+  }, beatTimeout)
+
   test("refuses a missing parent, a parent that is not a parent task, a second parent and a parent of a parent instead of linking them", async () => {
     await withFixture(async (fixture) => {
       expect(await refusal(fixture, ["backlog", "add", "orc", "child.md", "--parent", "orc-9"])).toEqual([1, "orc: the backlog holds no task orc-9"])

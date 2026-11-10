@@ -292,6 +292,7 @@ export const runBeat = (
     yield* ensureBacklog(root)
     const quota = yield* readQuota(config.quota)
     const tasks = yield* listTasks(root)
+    const merged = yield* mergedIds(root)
     const room = readRoom(config.machines, tasks)
     const context: BeatContext = {
       root,
@@ -300,7 +301,7 @@ export const runBeat = (
       config,
       projects,
       tasks,
-      merged: new Set(),
+      merged,
       account: quota.kind === "read" ? (config.quota.accounts.find((account) => account.name === quota.pick) ?? null) : null,
       live: room.map((entry) => ({ ...entry })),
       overloaded: new Map(),
@@ -323,7 +324,7 @@ export const runBeat = (
     const current = yield* listTasks(root)
     const queued = current.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
-    const fresh: BeatContext = { ...context, tasks: current, merged: yield* mergedIds(root), overloaded }
+    const fresh: BeatContext = { ...context, tasks: current, overloaded }
     const renewals = yield* Effect.forEach(current, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, task))
     const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))

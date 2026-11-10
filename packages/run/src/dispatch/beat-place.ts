@@ -38,7 +38,7 @@ export const childDone = (child: TaskRecord, merged: ReadonlySet<string>): boole
   return pr === null || merged.has(child.spec.id)
 }
 
-export const childCount = (parent: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string> = new Set()): ChildCount => {
+export const childCount = (parent: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): ChildCount => {
   const children = tasks.filter((task) => task.spec.parent === parent.spec.id)
   return { done: children.filter((child) => childDone(child, merged)).length, total: children.length }
 }
@@ -51,7 +51,7 @@ const childrenWait = (parent: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merg
   return count.done < count.total ? "waits on its children, " + count.done + " of " + count.total + " done" : null
 }
 
-export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string> = new Set()): string | null => {
+export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string | null => {
   const held = captainWait(task)
   if (held !== null) {
     return held

@@ -17,11 +17,8 @@ export interface BacklogView {
   readonly events: ReadonlyArray<ChatEvent>
   readonly projects: ProjectList
   readonly room: RoomList
-  readonly merged?: ReadonlySet<string>
+  readonly merged: ReadonlySet<string>
 }
-
-const mergedOf = (view: BacklogView): ReadonlySet<string> =>
-  view.merged ?? new Set(view.events.filter((event) => event.key.endsWith(".merged")).map((event) => event.key.slice(0, -".merged".length)))
 
 type TaskStatusJson =
   | { readonly status: "new" }
@@ -117,7 +114,7 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     kind: record.spec.kind,
     machine: record.spec.machine,
     parent: record.spec.parent,
-    children: record.spec.kind === "parent" ? childCount(record, view.tasks, mergedOf(view)) : null,
+    children: record.spec.kind === "parent" ? childCount(record, view.tasks, view.merged) : null,
     dependsOn: record.spec.dependsOn,
     created: record.spec.created,
     hold: record.hold,
@@ -194,11 +191,10 @@ const headed = (title: string, cells: ReadonlyArray<string>): ReadonlyArray<stri
 
 export const formatBoard = (view: BacklogView): string => {
   const inState = (...kinds: ReadonlyArray<TaskRecord["state"]["kind"]>) => view.tasks.filter((task) => kinds.includes(task.state.kind))
-  const merged = mergedOf(view)
   return sideBySide([
-    headed("NEW", inState("new").map((task) => newCell(task, view.tasks, merged))),
-    headed("TAKEN", inState("taken", "started").map((task) => takenCell(task, view.tasks, merged))),
-    headed("CLOSED", inState("closed").map((task) => closedCell(task, view.tasks, merged))),
+    headed("NEW", inState("new").map((task) => newCell(task, view.tasks, view.merged))),
+    headed("TAKEN", inState("taken", "started").map((task) => takenCell(task, view.tasks, view.merged))),
+    headed("CLOSED", inState("closed").map((task) => closedCell(task, view.tasks, view.merged))),
     ["PROJECTS", ...projectCells(view.projects), "", "MACHINES", ...roomCells(view.room)]
   ])
 }

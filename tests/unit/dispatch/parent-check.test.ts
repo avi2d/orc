@@ -9,11 +9,11 @@ const failedCheck = { id: "run-1", status: "failed" as const, prLink: null, endR
 describe("a parent's final check", () => {
   test("passes only when the last line of the report is the pass verdict", () => {
     expect(checkPassed("# Check\n\nAll three criteria hold.\n\nverdict: pass\n\n")).toBe(true)
-    expect(checkPassed("# Check\n\nVerdict: Pass")).toBe(true)
   })
 
   test("a pass verdict above a later line fails instead of passing", () => {
     expect(checkPassed("verdict: pass\n\nOne criterion does not hold.\n")).toBe(false)
+    expect(checkPassed("# Check\n\nVerdict: Pass")).toBe(false)
     expect(checkPassed("verdict: fail\n")).toBe(false)
     expect(checkPassed("")).toBe(false)
   })
