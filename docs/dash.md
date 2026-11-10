@@ -503,6 +503,7 @@ The line counts running calls and slots, queued calls with the oldest one's age,
 The queue box gives each machine the same heavy line.
 A machine with no heavy queue or no orc shows heavy queue not set up on its heavy line.
 A machine whose check fails for another reason shows the reason on its heavy line.
+Set `ORC_DASH_REMOTE_HEAVY` to the shell command that prints the other machine's `orc heavy check --json`, such as `ssh other-host orc heavy check --json`.
 With `ORC_DASH_REMOTE_HEAVY` unset or blank, the dashboard reads this machine's heavy check alone, with a 10 second limit.
 The standalone queues and resources panels show no heavy line.
 The ledger, quota and the GitHub reads refresh on longer cadences, and the paint never waits on them.

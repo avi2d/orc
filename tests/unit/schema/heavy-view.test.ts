@@ -15,10 +15,10 @@ describe("the heavy summary line", () => {
 
 describe("the heavy queue not set up note", () => {
   test("a zsh shell that cannot find orc reads as not set up, not as a failure", () => {
-    expect(isHeavyNotSetup({ kind: "unreachable", reason: "sh exited 127: zsh: command not found: orc" })).toBe(true);
+    expect(isHeavyNotSetup({ kind: "unreachable", reason: "sh exited 127: zsh:1: command not found: orc" })).toBe(true);
   });
 
   test("a zsh shell that cannot find another command starting with orc is still a failure", () => {
-    expect(isHeavyNotSetup({ kind: "unreachable", reason: "sh exited 127: zsh: command not found: orc-dash" })).toBe(false);
+    expect(isHeavyNotSetup({ kind: "unreachable", reason: "sh exited 127: zsh:1: command not found: orc-dash" })).toBe(false);
   });
 });
