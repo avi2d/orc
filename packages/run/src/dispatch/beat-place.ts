@@ -27,7 +27,7 @@ export interface ChildCount {
   readonly total: number
 }
 
-export const childDone = (child: TaskRecord, merged: ReadonlySet<string>): boolean => {
+const childDone = (child: TaskRecord, merged: ReadonlySet<string>): boolean => {
   if (dependencyOpen(child)) {
     return false
   }
