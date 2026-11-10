@@ -60,6 +60,21 @@ describe("the heavy stand-in with heavy.through set", () => {
     expect(await harness.pueueLog()).toBe("")
   })
 
+  test("a heavy call under a shell script mentioning the through words still reaches the holder instead of running outside the limit", async () => {
+    const harness = track(await setupThrough(["bun"], holderRun))
+    const child = Bun.spawnSync(["sh", "-c", "winbox-heavy run -- true; bun test"], {
+      env: harness.env,
+      stdout: "pipe",
+      stderr: "pipe"
+    })
+    expect(child.exitCode).toBe(0)
+    expect(await harness.holderLog()).toBe(
+      "winbox-heavy run -- true\n" +
+      "winbox-heavy run -- " + join(harness.fake, "bun") + " test\n"
+    )
+    expect(await harness.pueueLog()).toBe("")
+  })
+
   test("a call that never queues skips the through command", async () => {
     const harness = track(await setupThrough(["bun"], holderRun))
     const result = run(harness, "bun", ["install"])

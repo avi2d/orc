@@ -8,7 +8,7 @@ import type { ChildProcessSpawner } from "effect/process"
 import { startHeavyWatch } from "../../../packages/run/src/dispatch/heavy-cli"
 import { detectWrap } from "../../../packages/run/src/dispatch/heavy-standin"
 import { readHeavySettings, writeHeavyBin } from "../../../packages/run/src/dispatch/heavy-setup"
-import { checkHeavy } from "../../../packages/run/src/dispatch/heavy-watch"
+import { checkHeavy, watchOnce } from "../../../packages/run/src/dispatch/heavy-watch"
 
 const runEffect = <A, E>(effect: Effect.Effect<A, E, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -111,8 +111,17 @@ describe("the heavy queue setup", () => {
   test("with a through command the setup and the watch start call no pueue at all", async () => {
     const home = await holderHome(["winbox-heavy", "run", "--"])
     try {
-      await withLoggingPueue(home, () => runEffect(startHeavyWatch(home, ["orc"], "orc heavy watch")))
+      const lines: Array<string> = []
+      const originalLog = console.log
+      console.log = (...args: Array<unknown>) => { lines.push(args.map(String).join(" ")) }
+      try {
+        await withLoggingPueue(home, () => runEffect(startHeavyWatch(home, ["orc"], "orc heavy watch")))
+      } finally {
+        console.log = originalLog
+      }
       expect(await pueueCalls(home)).toBe("")
+      expect(lines.join("\n")).toContain("winbox-heavy run --")
+      expect(lines.join("\n")).toContain("no watchdog is armed")
       await writeFile(join(home, "fake", "winbox-heavy"), "#!/bin/sh\necho \"winbox-heavy $*\" >> \"$FAKE_HOLDER_LOG\"\nshift 2\n\"$@\"\n", { mode: 0o755 })
       await writeFile(join(home, "fake", "bun"), "#!/bin/sh\nexit 0\n", { mode: 0o755 })
       const holderLog = join(home, "holder.log")
@@ -136,6 +145,20 @@ describe("the heavy queue setup", () => {
       const calls = await pueueCalls(home)
       expect(calls).toContain("pueue group add heavy --parallel 1")
       expect(calls).toContain("pueue add --group orc-heavy-watch-")
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  test("with a through command the watch-once fails instead of reporting slips", async () => {
+    const home = await holderHome(["winbox-heavy", "run", "--"])
+    try {
+      await mkdir(join(home, "backlog"), { recursive: true })
+      await writeFile(join(home, "backlog", "alerts.jsonl"), "")
+      const failure = await withLoggingPueue(home, () => runEffect(Effect.flip(watchOnce(home))))
+      expect(failure.detail).toContain("winbox-heavy run --")
+      expect(await pueueCalls(home)).toBe("")
+      expect(await readFile(join(home, "backlog", "alerts.jsonl"), "utf8")).toBe("")
     } finally {
       await rm(home, { recursive: true, force: true })
     }
