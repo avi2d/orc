@@ -498,14 +498,6 @@ When that machine could not be read, its line gives the reason, or says how old 
 In the top row, the alerts tab gives each alert rule, as [Read the alerts panel](#read-the-alerts-panel) tells.
 It paints again every 2 seconds.
 Each box title pins its refresh cadence at the right end, such as machines ↻ 10s, and the glance lists the intervals at the right of its first line when they fit.
-The machines box gives each machine a heavy line from its `orc heavy check --json`.
-The line counts running calls and slots, queued calls with the oldest one's age, and bypasses in the last 7 days.
-The queue box gives each machine the same heavy line.
-A machine with no heavy queue or no orc shows heavy queue not set up on its heavy line.
-A machine whose check fails for another reason shows the reason on its heavy line.
-Set `ORC_DASH_REMOTE_HEAVY` to the shell command that prints the other machine's `orc heavy check --json`, such as `ssh other-host orc heavy check --json`.
-With `ORC_DASH_REMOTE_HEAVY` unset or blank, the dashboard reads this machine's heavy check alone, with a 10 second limit.
-The standalone queues and resources panels show no heavy line.
 The ledger, quota and the GitHub reads refresh on longer cadences, and the paint never waits on them.
 The dashboard saves its last readings in `$XDG_STATE_HOME/orc-dash/dashboard`, or `~/.local/state/orc-dash/dashboard` when that is unset.
 On start, a box whose source has not answered yet shows its saved reading and says how old it is, such as saved 3m ago.
@@ -543,6 +535,14 @@ A pueue row names its machine when the box holds more than one machine name.
 A CI run belongs to no machine, so it names none.
 A pueue run started by a task carries the task's id.
 How long a CI run took comes from its jobs, so the wait for a runner is left out.
+The machines box gives each machine a heavy line from its `orc heavy check --json`.
+The line counts running calls and slots, queued calls with the oldest one's age, and bypasses in the last 7 days.
+The queue box gives each machine the same heavy line.
+A machine with no heavy queue or no orc shows heavy queue not set up on its heavy line.
+A machine whose check fails for another reason shows the reason on its heavy line.
+Set `ORC_DASH_REMOTE_HEAVY` to the shell command that prints the other machine's `orc heavy check --json`, such as `ssh other-host orc heavy check --json`.
+With `ORC_DASH_REMOTE_HEAVY` unset or blank, the dashboard reads this machine's heavy check alone, with a 10 second limit.
+The standalone queues and resources panels show no heavy line.
 Beside the machines, one projects board joins the tasks reports of both machines.
 The board works as [Run the tasks tool](#run-the-tasks-tool) tells.
 Press `t` to switch the board between today and all.
