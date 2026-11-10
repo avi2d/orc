@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { NonoProviderError } from "../../packages/run/src/host"
 import type { NonoExecOptions } from "../../packages/run/src/nono-exec"
-import { makeNonoFixtureHome } from "../lib/nono-home"
+import { makeNonoFixtureDir } from "../lib/nono-home"
 import { nonoOpenError, type NonoShellRun, runNonoShell, withNonoShell } from "../lib/nono-shell"
 
 // Nesting a nono sandbox is forbidden inside an already-sandboxed macOS session, so these run on demand:
@@ -22,7 +22,7 @@ const credentialEnv = {
   GIT_CONFIG_VALUE_0: `Authorization: ${sentinelAuthorization}`
 }
 
-const fixtureHome = await makeNonoFixtureHome(".orc-nono-home-")
+const fixtureHome = await makeNonoFixtureDir("orc-nono-home-")
 await writeFile(join(fixtureHome, ".gitconfig"), "")
 const fixtureGitEnv = { PATH: Bun.env.PATH ?? "", HOME: fixtureHome, GIT_CONFIG_GLOBAL: join(fixtureHome, ".gitconfig"), GIT_CONFIG_NOSYSTEM: "1" }
 
@@ -135,7 +135,7 @@ describe("the nono exec", () => {
       return
     }
     root = await mkdtemp(join(tmpdir(), "orc-nono-live-"))
-    outside = await mkdtemp(join(process.cwd(), ".orc-nono-outside-"))
+    outside = await makeNonoFixtureDir("orc-nono-outside-")
     copy = join(root, "copy")
     session = join(root, "session")
     remoteRoot = join(root, "remote")
@@ -190,7 +190,7 @@ describe("the nono exec", () => {
   }, 15_000)
 
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "reads none of the user's git configs, by their own path or the Data volume's"), async () => {
-    const home = await mkdtemp(join(process.cwd(), ".orc-nono-home-"))
+    const home = await makeNonoFixtureDir("orc-nono-home-")
     const configs = [join(home, ".gitconfig"), join(home, ".config", "git", "config")]
     await mkdir(join(home, ".config", "git"), { recursive: true })
     for (const config of configs) {
@@ -329,7 +329,7 @@ describe("the nono exec", () => {
   })
 
   test.skipIf(!liveSandbox)(skipReason("needs a real nono sandbox outside any sandbox (ORC_NONO_E2E=1)", "a user default profile that grants another write path does not widen the sandbox"), async () => {
-    const home = await mkdtemp(join(process.cwd(), ".orc-nono-home-"))
+    const home = await makeNonoFixtureDir("orc-nono-home-")
     await mkdir(join(home, ".config", "nono", "profiles"), { recursive: true })
     await writeFile(
       join(home, ".config", "nono", "profiles", "default.json"),

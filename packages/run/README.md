@@ -69,5 +69,6 @@ An unknown flag prints the usage text and exits 1.
 - [Merging a task's PR](https://github.com/avi2d/orc/blob/main/docs/run/merging-a-tasks-pr.md)
 - [Adding tasks from a chat](https://github.com/avi2d/orc/blob/main/docs/run/chat.md)
 - [The runner](https://github.com/avi2d/orc/blob/main/docs/run/runner.md)
+- [The heavy queue](https://github.com/avi2d/orc/blob/main/docs/run/heavy-queue.md)
 - [Move an old launcher to the run package](https://github.com/avi2d/orc/blob/main/docs/run/move-an-old-launcher.md)
 - [Where every source file is](https://github.com/avi2d/orc/blob/main/docs/run/layout.md)

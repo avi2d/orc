@@ -19,10 +19,11 @@ export const openAgentExec = (
   plan: SandboxPlan,
   folders: RunFolders,
   copyDir: string,
-  toolchain: ToolchainResolver
+  toolchain: ToolchainResolver,
+  hostEnv: Readonly<Record<string, string | undefined>>
 ): Effect.Effect<AgentExec, OrcRunError, ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path | Scope.Scope> =>
   plan.kind === "none"
-    ? Effect.succeed(hostExec(copyDir, Bun.env, {
+    ? Effect.succeed(hostExec(copyDir, hostEnv, {
       GIT_CONFIG_GLOBAL: agentGitConfig(folders),
       ...(plan.own === null ? {} : { PI_CODING_AGENT_DIR: plan.own.piAgentDir, ...plan.own.env })
     }))
@@ -32,7 +33,7 @@ export const openAgentExec = (
       sessionsDir: folders.hostSessionsDir,
       piAgentDir: folders.piAgentDir,
       modelCredential: plan.credential,
-      hostEnv: Bun.env,
+      hostEnv,
       toolchain,
       env: {}
     }).pipe(Effect.mapError((cause) => new OrcRunError({ message: "orc: the sandbox failed to start: " + cause.message })))

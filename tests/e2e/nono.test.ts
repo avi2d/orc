@@ -7,7 +7,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
 import { NonoProviderError } from "../../packages/run/src/host"
 import { buildSandboxEnv } from "../../packages/run/src/nono"
-import { makeNonoFixtureHome } from "../lib/nono-home"
+import { makeNonoFixtureDir, nonoFixtureRoot } from "../lib/nono-home"
 import { nonoOpenError } from "../lib/nono-shell"
 import { buildNonoProfile, defaultToolchainFolders, runtimeReadFiles, systemReadPaths } from "../../packages/run/src/nono-profile"
 
@@ -20,7 +20,7 @@ const roots = {
 
 const noHost = { developerDir: null, toolchainFolders: defaultToolchainFolders, runtimeDirs: [] }
 
-const fixtureHome = await makeNonoFixtureHome(".orc-nono-home-")
+const fixtureHome = await makeNonoFixtureDir("orc-nono-home-")
 await writeFile(join(fixtureHome, ".gitconfig"), "")
 const fixtureGitEnv = { PATH: Bun.env.PATH ?? "", HOME: fixtureHome, GIT_CONFIG_GLOBAL: join(fixtureHome, ".gitconfig"), GIT_CONFIG_NOSYSTEM: "1" }
 
@@ -351,11 +351,11 @@ describe("openNonoExec", () => {
     }
   })
 
-  test.skipIf(!process.cwd().startsWith(`${userInfo().homedir}/`))(
-    skipReason("needs the working directory under the user's home", "refuses a checkout whose ~user/ include carries an http extraHeader", "local"),
+  test.skipIf(!nonoFixtureRoot().startsWith(`${userInfo().homedir}/`))(
+    skipReason("needs the nono fixture root under the user's home", "refuses a checkout whose ~user/ include carries an http extraHeader", "local"),
     async () => {
       const dir = await mkdtemp(join(tmpdir(), "orc-nono-cred-"))
-      const outside = await mkdtemp(join(process.cwd(), ".orc-nono-include-"))
+      const outside = await makeNonoFixtureDir("orc-nono-include-")
       try {
         git(["init", "-q"], dir)
         const included = join(outside, "auth.inc")

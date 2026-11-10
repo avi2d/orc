@@ -10,7 +10,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/bin.ts` | The orc entry point |
 | `packages/run/src/args.ts` | The flag parsing for the orc command |
 | `packages/run/src/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
-| `packages/run/src/orc-config.ts` | The reading of `config.json`: the providers and the implementer, fixer and orchestrator models |
+| `packages/run/src/orc-config.ts` | The reading of `config.json`: the providers, the heavy queue tuning and the implementer, fixer and orchestrator models |
 | `packages/run/src/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
 | `packages/run/src/chat-tools.ts` | The chat tools and the poll that posts each closed task and each event into the chat once |
 | `packages/run/src/chat-parked.ts` | The chat's listing of parked questions, once per start and once per park |
@@ -79,10 +79,18 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/held-token.ts` | The owner-only token folder a run on another machine reads |
 | `packages/run/src/dispatch/hold.ts` | `orc runner hold`: the wait for a live token, the rerun and the folder removal |
 | `packages/run/src/dispatch/pueue-status.ts` | The pueue status shapes and the held-task lookup the runner reads |
-| `packages/run/src/dispatch/args.ts` | The flag parsing for `orc backlog`, `orc beat`, `orc runner` and `orc merge` |
-| `packages/run/src/dispatch/cli.ts` | The `orc backlog`, `orc beat`, `orc runner` and `orc merge` commands |
+| `packages/run/src/dispatch/args.ts` | The flag parsing for `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` |
+| `packages/run/src/dispatch/cli.ts` | The `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
 | `packages/run/src/dispatch/merge.ts` | The `orc merge` guard and squash-merge |
 | `packages/run/src/dispatch/merge-basis.ts` | The `captain-word` and `yolo-green` bases `orc merge` takes |
+| `packages/run/src/dispatch/heavy.ts` | The heavy settings, the stand in folder and the default heavy tool list |
+| `packages/run/src/dispatch/heavy-cli.ts` | The `orc heavy` path, check, watch and watch-once commands |
+| `packages/run/src/dispatch/heavy-setup.ts` | The reading of the heavy settings and the writing of the stand in folder |
+| `packages/run/src/dispatch/heavy-standin.ts` | The generated stand in scripts that queue heavy tool calls |
+| `packages/run/src/dispatch/heavy-standin-decide.ts` | The per tool decision of which calls queue and which targeted calls take priority |
+| `packages/run/src/dispatch/heavy-standin-runtime.ts` | The stand in runtime: the real tool lookup, the bypass event, the slot check and the queue wait |
+| `packages/run/src/dispatch/heavy-watch.ts` | The watchdog that reports stalled calls and queue slips |
+| `packages/run/src/dispatch/heavy-watch-slip.ts` | The slip search that finds heavy tool processes outside a running heavy task |
 | `tests/unit` | The in-process unit tests at the workspace root |
 | `tests/e2e` | The tests that run `packages/run/src/bin.ts`, git or nono as a process, with a live Pi run through `ORC_PI_E2E=1`, at the workspace root |
 | `tests/fixtures/runner/pueue` | The pueue 4 status JSON the runner tests read |

@@ -39,7 +39,7 @@ const fakePueue = [
   "      if [ -f \"$PUEUE_STATE/groups.json\" ]; then groups=$(cat \"$PUEUE_STATE/groups.json\");",
   "      else groups='{\"default\":{\"status\":\"Running\",\"parallel_tasks\":1},\"orc\":{\"status\":\"Running\",\"parallel_tasks\":1}}'; fi;",
   "      case \"$groups\" in *\"\\\"$3\\\"\":*) echo \"Group \\\"$3\\\" already exists\" >&2; rmdir \"$PUEUE_STATE/group-lock\"; exit 1 ;; esac;",
-  "      if [ -f \"$PUEUE_STATE/groups.json\" ]; then stripped=$(printf '%s' \"$groups\" | sed 's/}$//'); printf '%s,\"%s\":{\"status\":\"Running\",\"parallel_tasks\":1}}' \"$stripped\" \"$3\" > \"$PUEUE_STATE/groups.json\"; fi;",
+  "      stripped=$(printf '%s' \"$groups\" | sed 's/}$//'); printf '%s,\"%s\":{\"status\":\"Running\",\"parallel_tasks\":1}}' \"$stripped\" \"$3\" > \"$PUEUE_STATE/groups.json\"",
   "      rmdir \"$PUEUE_STATE/group-lock\";",
   "      if [ -f \"$PUEUE_STATE/race-add\" ]; then echo \"Group \\\"$3\\\" already exists\" >&2; exit 1; fi;",
   "      echo \"Group $3 created\";",
@@ -190,12 +190,12 @@ export const writeTwoHomeDispatches = async (homeA: string, homeB: string, machi
   }
 }
 
-export const waitForAddedTasks = async (fixture: Fixture): Promise<ReadonlyArray<string>> => {
+export const waitForAddedTasks = async (fixture: Fixture, wanted: ReadonlyArray<string>): Promise<ReadonlyArray<string>> => {
   const deadline = Date.now() + startWaitMillis
   let added: ReadonlyArray<string> = []
   while (Date.now() < deadline) {
     added = (await readFile(join(fixture.pueue, "added-tasks"), "utf8").catch(() => "")).split("\n").slice(0, -1)
-    if (added.length >= 2) {
+    if (wanted.every((label) => added.some((line) => line.startsWith(label + " ")))) {
       break
     }
     await Bun.sleep(20)

@@ -10,20 +10,31 @@ import { openTaskCopy } from "../../packages/run/src/task-copy"
 import { runAgentStep } from "../../packages/run/src/run"
 import { capturedSession, cleanFinish, commitOnBranch, git, passedWithPr, recordedNothing, providerErrorEchoingPrompt, runStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
-const refusal = (input: {
+const refusal = async (input: {
   readonly cwd: string
   readonly taskFile: string
   readonly home: string
   readonly branch?: string
   readonly agentsDir?: string
-}): Promise<string> =>
-  Effect.runPromise(
-    runAgentStep({ cwd: input.cwd, taskFile: input.taskFile, branch: input.branch, homeDir: input.home, runId: "test-run-1", agentsDir: input.agentsDir }).pipe(
-      Effect.provide(BunServices.layer),
-      Effect.as("ran"),
-      Effect.catchTag("OrcRunError", (cause) => Effect.succeed(cause.message))
+}): Promise<string> => {
+  const priorBypass = process.env["HEAVY_QUEUE_BYPASS"]
+  process.env["HEAVY_QUEUE_BYPASS"] = "e2e fixture without a pueue daemon"
+  try {
+    return await Effect.runPromise(
+      runAgentStep({ cwd: input.cwd, taskFile: input.taskFile, branch: input.branch, homeDir: input.home, runId: "test-run-1", agentsDir: input.agentsDir }).pipe(
+        Effect.provide(BunServices.layer),
+        Effect.as("ran"),
+        Effect.catchTag("OrcRunError", (cause) => Effect.succeed(cause.message))
+      )
     )
-  )
+  } finally {
+    if (priorBypass === undefined) {
+      delete process.env["HEAVY_QUEUE_BYPASS"]
+    } else {
+      process.env["HEAVY_QUEUE_BYPASS"] = priorBypass
+    }
+  }
+}
 
 describe("runAgentStep refusals", () => {
   test("a directory in no git checkout is refused", async () => {

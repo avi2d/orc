@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
 import { openDatabase, recordRun } from "../../packages/run/src/run-history"
-import { binPath, fakeQuota, isRecord, orcOk, orcThere, resultJson, RunnerRun, runnerTimeout, runOrc, waitForAddedTasks, withFixture, writeTwoHomeDispatches } from "./runner-helpers"
+import { binPath, fakeQuota, isRecord, orcOk, orcThere, resultJson, RunnerRun, runnerTimeout, runOrc, waitForAddedTasks, withFixture, writeTwoHomeDispatches, type Fixture } from "./runner-helpers"
 
 describe("orc runner result", () => {
   test("a label-less result returns without stdin closing instead of waiting on stdin to EOF", async () => {
@@ -247,44 +247,57 @@ describe("orc runner result", () => {
     })
   }, runnerTimeout)
 
+
+const prepareTwoHomes = async (fixture: Fixture, homeB: string, far: string): Promise<{ labelA: string; labelB: string }> => {
+  await mkdir(join(homeB, "backlog"), { recursive: true })
+  await mkdir(far, { recursive: true })
+  await writeFile(join(homeB, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { linux: fixture.checkout } }] }))
+  await fakeQuota(fixture)
+  const machineThroughFar = [process.execPath, binPath, "runner", "start", "--", ...orcThere(far)]
+  await writeTwoHomeDispatches(fixture.home, homeB, machineThroughFar)
+  await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
+  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+  await orcOk(fixture, ["beat"])
+  const addB = await runOrc(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"], { ORC_HOME: homeB })
+  if (addB.exitCode !== 0) {
+    throw new Error("home-b add exited " + addB.exitCode + ": " + addB.stderr)
+  }
+  const beatB = await runOrc(fixture, ["beat"], { ORC_HOME: homeB })
+  if (beatB.exitCode !== 0) {
+    throw new Error("home-b beat exited " + beatB.exitCode + ": " + beatB.stderr)
+  }
+  expect(beatB.stdout).toContain("started orc-1")
+  expect(beatB.stdout).not.toContain("already")
+  return { labelA: fixture.home + " orc-1", labelB: homeB + " orc-1" }
+}
+
+const waitForBothDispatches = async (fixture: Fixture, labelA: string, labelB: string): Promise<void> => {
+  const added = await waitForAddedTasks(fixture, [labelA + " orc", labelB + " orc"])
+  expect(added.some((line) => line.startsWith(labelA + " orc "))).toBe(true)
+  expect(added.some((line) => line.startsWith(labelB + " orc "))).toBe(true)
+}
+
+const queueBothFar = async (fixture: Fixture, far: string, labelA: string, labelB: string): Promise<{ tokenFileA: string; tokenFileB: string }> => {
+  const queueA = await runOrc(fixture, ["runner", "queue"], { ORC_HOME: far }, JSON.stringify({ task: "orc-1", checkout: fixture.checkout, provider: "acme", body: "# x\n", token: "tokenA123", expiresAt: "2027-01-01T00:00:00.000Z", label: labelA }))
+  expect(queueA.exitCode).toBe(0)
+  const queueB = await runOrc(fixture, ["runner", "queue"], { ORC_HOME: far }, JSON.stringify({ task: "orc-1", checkout: fixture.checkout, provider: "acme", body: "# x\n", token: "tokenB123", expiresAt: "2027-01-01T00:00:00.000Z", label: labelB }))
+  expect(queueB.exitCode).toBe(0)
+  expect(queueB.stdout).toContain("queued orc-1")
+  const tokenFileA = join(far, "runner", "tokens", "label-" + encodeURIComponent(labelA), "token")
+  const tokenFileB = join(far, "runner", "tokens", "label-" + encodeURIComponent(labelB), "token")
+  expect(await readFile(tokenFileA, "utf8")).toBe("tokenA123")
+  expect(await readFile(tokenFileB, "utf8")).toBe("tokenB123")
+  return { tokenFileA, tokenFileB }
+}
+
   test("two homes sharing one far runner queue separately and read their own runs instead of seeing each other's", async () => {
     await withFixture(async (fixture) => {
       const homeA = fixture.home
       const homeB = join(fixture.dir, "home-b")
       const far = join(fixture.dir, "far-home")
-      await mkdir(join(homeB, "backlog"), { recursive: true })
-      await mkdir(far, { recursive: true })
-      await writeFile(join(homeB, "backlog", "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { linux: fixture.checkout } }] }))
-      await fakeQuota(fixture)
-      const machineThroughFar = [process.execPath, binPath, "runner", "start", "--", ...orcThere(far)]
-      await writeTwoHomeDispatches(homeA, homeB, machineThroughFar)
-      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
-      await orcOk(fixture, ["beat"])
-      const addB = await runOrc(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"], { ORC_HOME: homeB })
-      if (addB.exitCode !== 0) {
-        throw new Error("home-b add exited " + addB.exitCode + ": " + addB.stderr)
-      }
-      const beatB = await runOrc(fixture, ["beat"], { ORC_HOME: homeB })
-      if (beatB.exitCode !== 0) {
-        throw new Error("home-b beat exited " + beatB.exitCode + ": " + beatB.stderr)
-      }
-      expect(beatB.stdout).toContain("started orc-1")
-      expect(beatB.stdout).not.toContain("already")
-      const added = await waitForAddedTasks(fixture)
-      const labelA = homeA + " orc-1"
-      const labelB = homeB + " orc-1"
-      expect(added.some((line) => line.startsWith(labelA + " orc "))).toBe(true)
-      expect(added.some((line) => line.startsWith(labelB + " orc "))).toBe(true)
-      const queueA = await runOrc(fixture, ["runner", "queue"], { ORC_HOME: far }, JSON.stringify({ task: "orc-1", checkout: fixture.checkout, provider: "acme", body: "# x\n", token: "tokenA123", expiresAt: "2027-01-01T00:00:00.000Z", label: labelA }))
-      expect(queueA.exitCode).toBe(0)
-      const queueB = await runOrc(fixture, ["runner", "queue"], { ORC_HOME: far }, JSON.stringify({ task: "orc-1", checkout: fixture.checkout, provider: "acme", body: "# x\n", token: "tokenB123", expiresAt: "2027-01-01T00:00:00.000Z", label: labelB }))
-      expect(queueB.exitCode).toBe(0)
-      expect(queueB.stdout).toContain("queued orc-1")
-      const tokenFileA = join(far, "runner", "tokens", "label-" + encodeURIComponent(labelA), "token")
-      const tokenFileB = join(far, "runner", "tokens", "label-" + encodeURIComponent(labelB), "token")
-      expect(await readFile(tokenFileA, "utf8")).toBe("tokenA123")
-      expect(await readFile(tokenFileB, "utf8")).toBe("tokenB123")
+      const { labelA, labelB } = await prepareTwoHomes(fixture, homeB, far)
+      await waitForBothDispatches(fixture, labelA, labelB)
+      const { tokenFileA, tokenFileB } = await queueBothFar(fixture, far, labelA, labelB)
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({
         tasks: {
           "77": { id: 77, label: labelA, group: "orc", path: fixture.checkout, status: { Running: { start: "2026-10-28T02:36:41.331824562+03:00" } } },

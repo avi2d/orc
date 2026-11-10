@@ -52,8 +52,16 @@ export type PackageProvider = typeof PackageProvider.Type
 const Provider = Schema.Union([LoginProvider, TokenFileProvider, PackageProvider])
 export type Provider = typeof Provider.Type
 
+const HeavyConfig = Schema.Struct({
+  group: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
+  commands: Schema.optional(Schema.Array(Schema.String.check(Schema.isNonEmpty()))),
+  limit: Schema.optional(Schema.Literals(["auto", "none"]))
+})
+export type HeavyConfig = typeof HeavyConfig.Type
+
 const OrcConfigFile = Schema.Struct({
   providers: Schema.Array(Provider),
+  heavy: Schema.optional(HeavyConfig),
   models: Schema.optional(Schema.Struct({
     implementer: Schema.optional(ModelRef),
     fixer: Schema.optional(ModelRef),
