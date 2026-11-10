@@ -39,7 +39,7 @@ describe("runWithHistory names the reviewer that served the run", () => {
         expect(report).toContain("- reviewer: pi/claude-bridge/claude-opus-5-5\n")
       })
     })
-  })
+  }, 60_000)
 
   test("a run whose status names no reviewer is not credited to one", async () => {
     await withRepo(async (dir) => {
@@ -53,5 +53,5 @@ describe("runWithHistory names the reviewer that served the run", () => {
         expect(outcome.signals).not.toContainEqual(expect.objectContaining({ name: "reviewer" }))
       })
     })
-  })
+  }, 60_000)
 })

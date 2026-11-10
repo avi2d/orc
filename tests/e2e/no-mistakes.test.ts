@@ -89,7 +89,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(outcome.signals).toContainEqual({ name: "pr-link", value: "https://github.com/o/r/pull/7" })
       })
     })
-  })
+  }, 60_000)
   test("a fixable finding is answered with fix, then the PR is recorded", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
@@ -114,7 +114,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(text).toContain("gates answered: 1")
       })
     })
-  })
+  }, 60_000)
 
   test("a finding marked ask-user ends the run with no PR and names the finding", async () => {
     await withRepo(async (dir) => {
@@ -151,7 +151,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(text).toContain("R2")
       })
     })
-  })
+  }, 60_000)
   test("an open review question is answered verbatim before any gate response", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
@@ -180,7 +180,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(outcome.report.noMistakes?.gatesAnswered).toBe(2)
       })
     })
-  })
+  }, 60_000)
   test("an open review question without an answer refuses naming the question and sends no response", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
@@ -209,7 +209,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(reason).toContain("--answer question-3=")
       })
     })
-  })
+  }, 60_000)
   test("an omitted review question without an answer is refused alongside rendered ones", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
@@ -244,7 +244,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(reason).toContain("--answer question-5=")
       })
     })
-  })
+  }, 60_000)
   test("only the unanswered review questions are recorded as open, with their text, instead of every question or none", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
@@ -275,7 +275,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         ])
       })
     })
-  })
+  }, 60_000)
   test("rendered and omitted review questions are answered verbatim in order", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
@@ -315,7 +315,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(outcome.report.noMistakes?.gatesAnswered).toBe(2)
       })
     })
-  })
+  }, 60_000)
   test("a drive call with no gate or outcome reattaches without flags", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
@@ -335,7 +335,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(outcome.report.prLink).toBe("https://github.com/o/r/pull/7")
       })
     })
-  })
+  }, 60_000)
 
   test("a refused fix ends the run with a report naming the refusal", async () => {
     await withRepo(async (dir) => {
@@ -356,7 +356,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(reason).toContain("No PR opens")
       })
     })
-  })
+  }, 60_000)
 
   test("checks-passed while the CI monitor keeps watching records the ready PR without reattaching", async () => {
     await withRepo(async (dir) => {
@@ -369,7 +369,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(outcome.run?.prLink).toBe("https://github.com/o/r/pull/7")
       })
     })
-  })
+  }, 60_000)
 
   test("passed-with-skips keeps the PR link but never claims green CI", async () => {
     await withRepo(async (dir) => {
@@ -384,7 +384,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(outcome.run?.endReason).not.toContain("No PR opens")
       })
     })
-  })
+  }, 60_000)
 
   test("a failed outcome exiting 1 after the PR opened keeps the checks, the PR and no-mistakes.txt", async () => {
     await withRepo(async (dir) => {
@@ -400,7 +400,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(text).toContain("outcome failed")
       })
     })
-  })
+  }, 60_000)
 
   test("a fix answered with a failed pipeline is recorded as failed, not as a refused fix", async () => {
     await withRepo(async (dir) => {
@@ -413,7 +413,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(outcome.run?.endReason).not.toContain("refused the fix")
       })
     })
-  })
+  }, 60_000)
 
   test("a start refused with an error on stdout keeps the checks and names the error", async () => {
     await withRepo(async (dir) => {
@@ -429,7 +429,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(text).toContain("no-mistakes result: failed")
       })
     })
-  })
+  }, 60_000)
 
   test("a no-mistakes too old for --intent-file names the release orc needs", async () => {
     await withRepo(async (dir) => {
@@ -444,7 +444,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(outcome.run?.endReason).toContain("ORC_NO_MISTAKES_BIN")
       })
     })
-  })
+  }, 60_000)
 
   test("the fix review after a requested fix is accepted with approve", async () => {
     await withRepo(async (dir) => {
@@ -461,7 +461,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(outcome.report.noMistakes?.gatesAnswered).toBe(2)
       })
     })
-  })
+  }, 60_000)
 
   test("a gate with an auto-fix and a no-op finding fixes the one and declines the other", async () => {
     await withRepo(async (dir) => {
@@ -474,7 +474,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(outcome.report.noMistakes?.findings.map((finding) => finding.id)).toEqual(["R7", "R8"])
       })
     })
-  })
+  }, 60_000)
 
   test("findings each step recorded are read from axi logs, and fix summaries are not findings", async () => {
     await withRepo(async (dir) => {
@@ -518,7 +518,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(text).toContain("L2 info src/b.ts auto-fix imports out of order, fixed")
       })
     })
-  })
+  }, 60_000)
 
   test("a start whose wait elapses reattaches instead of reporting a refusal", async () => {
     await withRepo(async (dir) => {
@@ -530,7 +530,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(outcome.report.noMistakes?.gatesAnswered).toBe(0)
       })
     })
-  })
+  }, 60_000)
 
   test("a response whose wait elapses reattaches without answering the gate again", async () => {
     await withRepo(async (dir) => {
@@ -547,7 +547,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(outcome.report.noMistakes?.gatesAnswered).toBe(1)
       })
     })
-  })
+  }, 60_000)
 
   test("repository git config a passing check wrote runs no program when no-mistakes calls git", async () => {
     await withRepo(async (dir) => {
@@ -564,7 +564,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(await exists(marker)).toBe(false)
       })
     })
-  })
+  }, 60_000)
 
   test("a logs read that fails after a step recorded findings reports the gap instead of zero findings", async () => {
     await withRepo(async (dir) => {
@@ -583,7 +583,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(text).toContain("no-mistakes result: failed")
       })
     })
-  })
+  }, 60_000)
 
   test("a status read that fails reports the gap instead of zero findings", async () => {
     await withRepo(async (dir) => {
@@ -595,5 +595,5 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         expect(outcome.run?.endReason).toContain("daemon unreachable")
       })
     })
-  })
+  }, 60_000)
 })

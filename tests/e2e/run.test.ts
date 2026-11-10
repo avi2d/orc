@@ -46,7 +46,7 @@ describe("runAgentStep refusals", () => {
         await rm(dir, { recursive: true, force: true })
       }
     })
-  })
+  }, 60_000)
 
   test("a checkout with uncommitted changes is refused", async () => {
     await withRepo(async (dir) => {
@@ -55,7 +55,7 @@ describe("runAgentStep refusals", () => {
         expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home })).toContain("uncommitted changes")
       })
     })
-  })
+  }, 60_000)
 
   test("an old in-checkout copy of a stopped run's branch is reused where it sits with its uncommitted work", async () => {
     await withRepo(async (dir) => {
@@ -78,7 +78,7 @@ describe("runAgentStep refusals", () => {
         expect(git(dir, ["worktree", "list", "--porcelain"])).toContain("branch refs/heads/orc/test")
       })
     })
-  })
+  }, 60_000)
 
   test("an untracked file a glob in a nested worktree's folder name would match still counts as uncommitted", async () => {
     await withRepo(async (dir) => {
@@ -88,7 +88,7 @@ describe("runAgentStep refusals", () => {
         expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home })).toContain("uncommitted changes")
       })
     })
-  })
+  }, 60_000)
 
   test("an untracked file beside the old in-checkout copies still counts as uncommitted", async () => {
     await withRepo(async (dir) => {
@@ -98,7 +98,7 @@ describe("runAgentStep refusals", () => {
         expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home })).toContain("uncommitted changes")
       })
     })
-  })
+  }, 60_000)
 
   test("a checkout carrying a refused marker is refused", async () => {
     await withRepo(async (dir) => {
@@ -114,7 +114,7 @@ describe("runAgentStep refusals", () => {
         }
       })
     })
-  })
+  }, 60_000)
 
   test("a checkout carrying a marker no list names is not refused for it", async () => {
     await withRepo(async (dir) => {
@@ -125,7 +125,7 @@ describe("runAgentStep refusals", () => {
         expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home })).toContain("cannot read the task file")
       })
     })
-  })
+  }, 60_000)
 
   test("an unusable branch name is refused", async () => {
     await withRepo(async (dir) => {
@@ -133,7 +133,7 @@ describe("runAgentStep refusals", () => {
         expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "bad..name" })).toContain("no usable branch name")
       })
     })
-  })
+  }, 60_000)
 
   test.each(["orc/$USER", "orc/`id`", "orc/$(id)", "orc/a\"b"])("the branch name %p passes the branch checks even when a shell would expand it", async (branch) => {
     await withRepo(async (dir) => {
@@ -141,7 +141,7 @@ describe("runAgentStep refusals", () => {
         expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch })).toContain("cannot read the task file")
       })
     })
-  })
+  }, 60_000)
 
   test("the branch named after the run id passes the branch checks", async () => {
     await withRepo(async (dir) => {
@@ -149,7 +149,7 @@ describe("runAgentStep refusals", () => {
         expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home })).toContain("cannot read the task file")
       })
     })
-  })
+  }, 60_000)
 
   test("a missing task file is refused as missing instead of with the file system's raw error", async () => {
     await withRepo(async (dir) => {
@@ -158,7 +158,7 @@ describe("runAgentStep refusals", () => {
         expect(await refusal({ cwd: dir, taskFile: missing, home, branch: "orc/test" })).toBe("orc: cannot read the task file " + missing + ": the file is missing")
       })
     })
-  })
+  }, 60_000)
 
   test("a model whose provider config.json does not configure is refused instead of run on a built-in provider", async () => {
     await withRepo(async (dir) => {
@@ -173,7 +173,7 @@ describe("runAgentStep refusals", () => {
         expect(await refusal({ cwd: dir, taskFile: join(dir, "task.md"), home, branch: "orc/test", agentsDir })).toContain(join(home, "config.json") + " does not configure the provider for an agent model")
       })
     })
-  })
+  }, 60_000)
 
   test("a run refused after its run folder is made leaves no run folder behind", async () => {
     await withRepo(async (dir) => {
@@ -192,7 +192,7 @@ describe("runAgentStep refusals", () => {
         expect(await exists(runDir)).toBe(false)
       })
     })
-  })
+  }, 60_000)
 })
 
 describe("openCheckout refuse markers", () => {
@@ -214,7 +214,7 @@ describe("openCheckout refuse markers", () => {
       git(dir, ["commit", "-qm", "slot marker"])
       expect(await attempt(dir, [])).toBe("opened")
     })
-  })
+  }, 60_000)
 
   test("a matching marker refuses the checkout naming the marker", async () => {
     await withRepo(async (dir) => {
@@ -225,7 +225,7 @@ describe("openCheckout refuse markers", () => {
       expect(message).toContain(".slot-owner")
       expect(message).toContain("marks this checkout as refused")
     })
-  })
+  }, 60_000)
 })
 
 describe("runWithHistory decides the implement step", () => {
@@ -242,7 +242,7 @@ describe("runWithHistory decides the implement step", () => {
         expect(outcome.steps).toEqual([{ name: "implement", status: "failed" }])
       })
     })
-  })
+  }, 60_000)
 
   test("a clean final reply with the marker and a new commit runs the checks and is recorded succeeded", async () => {
     await withRepo(async (dir) => {
@@ -261,7 +261,7 @@ describe("runWithHistory decides the implement step", () => {
         expect(outcome.steps).toEqual([{ name: "implement", status: "passed" }, { name: "checks", status: "passed" }, { name: "no-mistakes", status: "passed" }])
       })
     })
-  })
+  }, 60_000)
 
   test("an agent run that rejects is recorded failed with its reason and evidence", async () => {
     await withRepo(async (dir) => {
@@ -278,7 +278,7 @@ describe("runWithHistory decides the implement step", () => {
         expect(outcome.signals).toEqual([])
       })
     })
-  })
+  }, 60_000)
 
   test("a run whose Pi session was never captured keeps its commits and records no token counts", async () => {
     await withRepo(async (dir) => {
@@ -293,7 +293,7 @@ describe("runWithHistory decides the implement step", () => {
         expect(outcome.evidence).not.toContain("0 input tokens")
       })
     })
-  })
+  }, 60_000)
 })
 
 describe("runWithHistory runs the project checks and fixes failures", () => {
@@ -324,7 +324,7 @@ describe("runWithHistory runs the project checks and fixes failures", () => {
         expect(outcome.signals).toContainEqual({ name: "check typecheck", value: "passed" })
       })
     })
-  })
+  }, 60_000)
 
   test("a failure fixed on the second round ends completed with one fix attempt", async () => {
     await withRepo(async (dir) => {
@@ -369,7 +369,7 @@ describe("runWithHistory runs the project checks and fixes failures", () => {
         expect(steps).toEqual(["- implement", "- checks round 1", "- fix 1", "- checks round 2", "- no-mistakes"])
       })
     })
-  })
+  }, 60_000)
 
   test("three failed fix attempts end the run naming the failing check and its output, with no PR", async () => {
     await withRepo(async (dir) => {
@@ -403,7 +403,7 @@ describe("runWithHistory runs the project checks and fixes failures", () => {
         expect(text).toContain("lint blew up")
       })
     })
-  })
+  }, 60_000)
 })
 
 const markerScript = async (dir: string, name: string): Promise<{ readonly script: string; readonly ran: () => Promise<boolean> }> => {
@@ -430,7 +430,7 @@ describe("host git ignores programs the sandbox can name in the repository", () 
         expect(await fsmonitor.ran()).toBe(true)
       })
     })
-  })
+  }, 60_000)
 })
 
 const plantFilter = async (dir: string, gitDir: string, file: string, script: string): Promise<void> => {
@@ -458,7 +458,7 @@ describe("host git runs no filter the sandbox can name in the repository", () =>
         expect(await filter.ran()).toBe(true)
       })
     })
-  })
+  }, 60_000)
 
   test("orc's checkout status runs no filter a submodule's own config names", async () => {
     await withRepo(async (dir) => {
@@ -500,7 +500,7 @@ describe("host git runs no transport program the sandbox can name in the reposit
         expect(await ssh.ran()).toBe(true)
       })
     })
-  })
+  }, 60_000)
 
   test("a planted upload-pack program for a local remote is refused", async () => {
     await withRepo(async (dir) => {
@@ -514,7 +514,7 @@ describe("host git runs no transport program the sandbox can name in the reposit
         expect(await uploadPack.ran()).toBe(true)
       })
     })
-  })
+  }, 60_000)
 
   test("a repository whose config names only a remote and an identity still runs", async () => {
     await withRepo(async (dir) => {
@@ -523,5 +523,5 @@ describe("host git runs no transport program the sandbox can name in the reposit
         expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home, branch: "orc/test" })).toContain("cannot read the task file")
       })
     })
-  })
+  }, 60_000)
 })

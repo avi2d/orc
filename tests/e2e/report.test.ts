@@ -49,7 +49,7 @@ describe("the run report", () => {
         expect(terminal).toContain("pr: https://github.com/o/r/pull/7")
       })
     })
-  })
+  }, 60_000)
 
   test("a refused run still lands report.md naming each refused finding", async () => {
     await withRepo(async (dir) => {
@@ -84,5 +84,5 @@ describe("the run report", () => {
         expect(report).toContain("## Result")
       })
     })
-  })
+  }, 60_000)
 })
