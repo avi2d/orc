@@ -1,7 +1,7 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs, TaskSource } from "./args"
-import { addTask, backlogPaths, BacklogError, closeStartedTask, findTask, isTaskId, listTasks, markPosted } from "./backlog"
+import { addTask, backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted } from "./backlog"
 import { backlogPresent, noBacklog } from "./backlog-write"
 import { routeReviewQuestions } from "./attention"
 import { attentionText } from "./attention-view"
