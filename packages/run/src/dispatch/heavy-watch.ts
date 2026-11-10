@@ -88,6 +88,7 @@ import {
   slipHeld,
   slipLine,
   stripHeavyWrapper,
+  type SlipCandidate,
   type SlipTask
 } from "./heavy-watch-slip"
 
@@ -157,6 +158,41 @@ export interface WatchReport {
   readonly slips: ReadonlyArray<string>
 }
 
+const stallForOldest = (old: ReadonlyArray<OldTask>, firedRecently: boolean, machine: string, at: string): ReadonlyArray<string> => {
+  const oldest = old.reduce<OldTask | null>((latest, task) => latest === null || task.ageMinutes > latest.ageMinutes ? task : latest, null)
+  return oldest === null || firedRecently ? [] : [stallLine(machine, oldest, at)]
+}
+
+const newSlipTasks = (
+  candidates: ReadonlyArray<SlipCandidate>,
+  queuedByPid: ReadonlyMap<number, boolean>,
+  ps: string,
+  queued: ReadonlySet<string>,
+  seenSlip: Readonly<Record<string, string | undefined>>,
+  nowMs: number
+): ReadonlyArray<SlipTask> => {
+  const found = new Map<string, SlipTask>()
+  for (const candidate of candidates) {
+    if (queuedByPid.get(candidate.pid) !== true) {
+      continue
+    }
+    if (slipHeld(ps, candidate.pid, queued)) {
+      continue
+    }
+    if (!found.has(candidate.command)) {
+      found.set(candidate.command, { pid: candidate.pid, command: candidate.command })
+    }
+  }
+  return [...found.values()].sort((a, b) => a.pid - b.pid).filter((slip) => {
+    const last = seenSlip[slip.command]
+    if (last === undefined) {
+      return true
+    }
+    const firedAt = Date.parse(last)
+    return Number.isNaN(firedAt) || nowMs - firedAt > watchTtlMinutes * 60_000
+  })
+}
+
 export const watchOnce = (home: string, nowMs: number = Date.now()): Effect.Effect<WatchReport, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const settings = yield* readHeavySettings(home)
@@ -172,10 +208,9 @@ export const watchOnce = (home: string, nowMs: number = Date.now()): Effect.Effe
     )
     const lastAlert = lastAlertByMachine(fired)
     const old = oldRunningTasks(state, settings.group, nowMs, watchTtlMinutes)
-    const oldest = old.reduce<OldTask | null>((latest, task) => latest === null || task.ageMinutes > latest.ageMinutes ? task : latest, null)
     const firedRecently = staleMachines([machine], lastAlert, nowMs, watchTtlMinutes).length === 0
     const at = new Date(nowMs).toISOString()
-    const stalls = oldest === null || firedRecently ? [] : [stallLine(machine, oldest, at)]
+    const stalls = stallForOldest(old, firedRecently, machine, at)
     const ps = yield* capture(["ps", "-eo", "pid,ppid,command"], null).pipe(
       Effect.map((result) => result.stdout),
       Effect.orElseSucceed(() => "")
@@ -191,26 +226,7 @@ export const watchOnce = (home: string, nowMs: number = Date.now()): Effect.Effe
     const queued = new Set(alive.map(normalizeTaskCommand))
     const candidates = slipCandidates(ps, standinTools(settings.commands), new Set([process.pid]), heavyBinDir(home))
     const queuedByPid = yield* classifyCalls(candidates)
-    const found = new Map<string, SlipTask>()
-    for (const candidate of candidates) {
-      if (queuedByPid.get(candidate.pid) !== true) {
-        continue
-      }
-      if (slipHeld(ps, candidate.pid, queued)) {
-        continue
-      }
-      if (!found.has(candidate.command)) {
-        found.set(candidate.command, { pid: candidate.pid, command: candidate.command })
-      }
-    }
-    const slips = [...found.values()].sort((a, b) => a.pid - b.pid).filter((slip) => {
-      const last = seenSlip[slip.command]
-      if (last === undefined) {
-        return true
-      }
-      const firedAt = Date.parse(last)
-      return Number.isNaN(firedAt) || nowMs - firedAt > watchTtlMinutes * 60_000
-    })
+    const slips = newSlipTasks(candidates, queuedByPid, ps, queued, seenSlip, nowMs)
     const slipAlerts = slips.map((slip) => slipLine(machine, slip.command, at))
     yield* appendLines(alertsFile(backlog), [...stalls, ...slipAlerts])
     return { old, alerts: [...stalls, ...slipAlerts], slips: slips.map((slip) => slip.command) }
