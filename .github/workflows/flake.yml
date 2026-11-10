@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: avi2d/workflows/setup@v1
       - run: bunx checks-flake --runs 10 --report flake-report.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: flake-report
