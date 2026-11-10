@@ -1,5 +1,5 @@
 import { DateTime, Option } from "effect";
-import type { CiReport, MachineQueueView, Outcome, QueueRow, QueueRowState, Reading } from "@avi2dg/orc-schema";
+import { type CiReport, type HeavyCheck, heavySummary, type MachineQueueView, type Outcome, type QueueRow, type QueueRowState, type Reading } from "@avi2dg/orc-schema";
 import {
   type Block,
   clock,
@@ -93,9 +93,21 @@ const pueueNotes = (pueues: ReadonlyArray<{ readonly name: string; readonly pueu
   return [...reading, ...failures];
 };
 
+type NamedHeavy = { readonly name: string; readonly heavy: Option.Option<Outcome<HeavyCheck>> };
+
+const heavyLines = (heavies: ReadonlyArray<NamedHeavy>, width: number): Block =>
+  heavies.flatMap(({ name, heavy }): Block => {
+    if (Option.isNone(heavy)) return [];
+    const label = heavies.length > 1 ? `heavy ${name}` : "heavy";
+    if (heavy.value.kind !== "ok") return sourceNotes(label, heavy.value, width);
+    const gutter = widthOf(`${label} `);
+    return [[span(padEnd(label, gutter), "muted"), span(ellipsize(heavySummary(heavy.value.value), Math.max(0, width - gutter)), "foreground")]];
+  });
+
 export interface QueueBoxReadings {
   readonly queue: MachineQueueView;
   readonly pueues: ReadonlyArray<{ readonly name: string; readonly pueue: Option.Option<Outcome<unknown>> }>;
+  readonly heavies: ReadonlyArray<NamedHeavy>;
   // Undefined on a machine with no runners of its own.
   readonly ci: CiState | undefined;
 }
@@ -108,7 +120,7 @@ export const queueBoxLines = (readings: QueueBoxReadings, now: DateTime.Utc, zon
   const { queue } = readings;
   const counts = [...counted(queue.running, "running"), ...counted(queue.waiting, "waiting"), ...counted(queue.queuedInPueue, "queued in pueue")];
   const head = counts.length === 0 ? [] : wrapParts(counts, width).map((text): Line => [span(ellipsize(text, width), "foreground")]);
-  const notes = [...head, ...pueueNotes(readings.pueues, width), ...(readings.ci === undefined ? [] : ciNotes(readings.ci, width))];
+  const notes = [...head, ...heavyLines(readings.heavies, width), ...pueueNotes(readings.pueues, width), ...(readings.ci === undefined ? [] : ciNotes(readings.ci, width))];
   const machineWidth = machineWidthOf(queue.rows.map((row) => row.machine));
   const rows = queue.rows.map((row) => queueRowLine(row, now, zone, width, machineWidth));
   return rows.length > 0 || stillReading(readings)

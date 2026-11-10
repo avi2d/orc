@@ -55,6 +55,7 @@ const boxReadingsOf = (reading: QueueReading): QueueBoxReadings => {
   return {
     queue: machineQueue(entries, ci.kind === "ok" ? ci.value.runs : [], reading.now),
     pueues: view.machines.map((machine) => ({ name: machine.name, pueue: machine.pueue })),
+    heavies: view.machines.map((machine) => ({ name: machine.name, heavy: machine.heavy })),
     ci,
   };
 };

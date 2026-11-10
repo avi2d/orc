@@ -15,6 +15,7 @@ import {
   dispatchSourceLayer,
   gpuSourceLayer,
   harvestLogSourceLayer,
+  heavyMachinesLayer,
   herdrSourceLayer,
   linuxDiskSourceLayer,
   linuxHarnessProcessSourceLayer,
@@ -75,6 +76,7 @@ const recordedAnswers: ReadonlyArray<readonly [string, string]> = [
   ['sh -c set -e; printf "pagesize', fixture("linux/task-processes.txt")],
   ["systemctl --user list-timers", "[]"],
   [`sh -c ${tasksCommand}`, fixture("tasks/east.json")],
+  ["orc heavy check --json", fixture("heavy/check.json")],
   ...queueAnswers,
 ];
 
@@ -139,6 +141,7 @@ const recordedSources = (
       sessionMachinesLayer,
       resourceMachinesLayer,
       pueueMachinesLayer,
+      heavyMachinesLayer,
       actionsSourceLayer,
       localTasksLayer,
       tasksMachinesLayer,

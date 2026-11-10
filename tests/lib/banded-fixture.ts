@@ -127,8 +127,8 @@ export const bandedReadings = (local = "north"): BandedReadings => ({
   machines: Option.some(machinesView({ name: local, view: recordedResources() }, [{ name: "south", reading: ok(southResources()) }], dashboardNow)),
   queues: {
     machines: [
-      { name: local, status: Option.some(fixturePueue()) },
-      { name: "south", status: Option.some(southPueue()) },
+      { name: local, heavy: Option.none(), status: Option.some(fixturePueue()) },
+      { name: "south", heavy: Option.none(), status: Option.some(southPueue()) },
     ],
     actions: { repo: "example/shop", runs: Option.some(ok([])) },
   },

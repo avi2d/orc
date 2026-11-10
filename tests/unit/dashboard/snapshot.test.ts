@@ -420,14 +420,14 @@ describe("the dashboard says how the queues stand", () => {
 
   test("says why a machine could not be read, beside the machine it could", () => {
     const [north] = fixtureQueues().machines;
-    const southDown: QueuesView = { ...fixtureQueues(), machines: [north, { name: "south", pueue: Option.some(unreachable("sh exited 255: ssh: connect to host south.example.com port 22: Connection refused")) }] };
+    const southDown: QueuesView = { ...fixtureQueues(), machines: [north, { name: "south", heavy: Option.none(), pueue: Option.some(unreachable("sh exited 255: ssh: connect to host south.example.com port 22: Connection refused")) }] };
     expect(queueLinesOf(southDown, 200)[1]).toBe("         south ✗ unreachable: sh exited 255: ssh: connect to host south.example.com port 22: Connection refused");
   });
 
   test("says which machine and runs it is still reading, beside the machine it has read", () => {
     const queues = fixtureQueues();
     const [north] = queues.machines;
-    const reading: QueuesView = { machines: [north, { name: "south", pueue: Option.none() }], actions: { ...queues.actions, runs: Option.none() } };
+    const reading: QueuesView = { machines: [north, { name: "south", heavy: Option.none(), pueue: Option.none() }], actions: { ...queues.actions, runs: Option.none() } };
     expect(queueLinesOf(reading)).toEqual([
       "queue    north · 2 running · 2 queued · 1 paused · gpu group paused",
       "         south · reading…",

@@ -161,7 +161,7 @@ describe("the banded dashboard", () => {
         { source: "agent", outcome: ok(agents), unread: [] },
         { source: "timer", outcome: ok([timer]), unread: [] },
       ],
-      pueues: [{ name: "north", status: Option.none() }],
+      pueues: [{ name: "north", heavy: Option.none(), status: Option.none() }],
       orchestrators: [{ machine: "north", listing: unscheduled() }],
     });
     const timeAndWhat = (what: string) => {
@@ -185,7 +185,7 @@ describe("the banded dashboard", () => {
           unread: [],
         },
       ],
-      pueues: [{ name: "north", status: emptyPueue }],
+      pueues: [{ name: "north", heavy: Option.none(), status: emptyPueue }],
       orchestrators: [{ machine: "north", listing: unscheduled() }],
     });
     const text = lines.join("\n");
@@ -200,7 +200,7 @@ describe("the banded dashboard", () => {
     const timer = { kind: "timer" as const, name: "backup", next: DateTime.addDuration(readings.now, "12 minutes") };
     const lines = scheduledLines({
       schedules: [{ source: "timer", outcome: ok([timer]), unread: [] }],
-      pueues: [{ name: "north", status: emptyPueue }],
+      pueues: [{ name: "north", heavy: Option.none(), status: emptyPueue }],
       orchestrators: [{ machine: "north", listing: unscheduled() }],
     });
     const text = lines.join("\n");
@@ -209,12 +209,12 @@ describe("the banded dashboard", () => {
   });
 
   test("names the source in plain words while its schedules are still reading or have failed", () => {
-    const started = scheduledLines({ pueues: [{ name: "north", status: Option.none() }], orchestrators: [{ machine: "north", listing: { kind: "pending" } }] }).join("\n");
+    const started = scheduledLines({ pueues: [{ name: "north", heavy: Option.none(), status: Option.none() }], orchestrators: [{ machine: "north", listing: { kind: "pending" } }] }).join("\n");
     expect(started).toContain("reading the delayed jobs\u2026");
     expect(started).toContain("reading the dated items\u2026");
     const text = scheduledLines({
       schedules: [],
-      pueues: [{ name: "north", status: Option.some({ kind: "unreachable" as const, reason: "pueue down" }) }],
+      pueues: [{ name: "north", heavy: Option.none(), status: Option.some({ kind: "unreachable" as const, reason: "pueue down" }) }],
       orchestrators: [{ machine: "north", listing: { kind: "invalid" as const, issue: "bad yaml" } }],
     }).join("\n");
     expect(text).toContain("delayed jobs unreachable: pueue down");
@@ -225,8 +225,8 @@ describe("the banded dashboard", () => {
     const text = scheduledLines({
       schedules: [],
       pueues: [
-        { name: "north", status: emptyPueue },
-        { name: "south", status: Option.some({ kind: "unreachable" as const, reason: "daemon down" }) },
+        { name: "north", heavy: Option.none(), status: emptyPueue },
+        { name: "south", heavy: Option.none(), status: Option.some({ kind: "unreachable" as const, reason: "daemon down" }) },
       ],
       orchestrators: [
         { machine: "north", listing: unscheduled() },
@@ -309,7 +309,7 @@ describe("the banded dashboard", () => {
   test("says nothing ran only once pueue and the CI runs have answered", () => {
     const readings = bandedReadings();
     const queueText = (status: Option.Option<ReturnType<typeof decodePueue>>, ci: BandedReadings["ci"]): string => {
-      const queues = { machines: [{ name: "north", status }], actions: { repo: "example/shop", runs: Option.some(ok([])) } };
+      const queues = { machines: [{ name: "north", heavy: Option.none(), status }], actions: { repo: "example/shop", runs: Option.some(ok([])) } };
       return bandedDrawn(240, 60, [], { ...readings, queues, ci }).block.map(plain).join("\n");
     };
     const answered: BandedReadings["ci"] = { kind: "live", value: { ...ok({ repos: ["example/shop"], runs: [], failures: [] }), capturedAt: readings.now }, at: DateTime.toEpochMillis(readings.now) };
@@ -322,7 +322,7 @@ describe("the banded dashboard", () => {
   test("names no machine on a queue read from one machine alone", () => {
     const readings = bandedReadings();
     const queues = ({
-      machines: [{ name: "north", status: Option.some(decodePueue(fixture("pueue/status.json"))) }],
+      machines: [{ name: "north", heavy: Option.none(), status: Option.some(decodePueue(fixture("pueue/status.json"))) }],
       actions: { repo: "example/shop", runs: Option.some(ok([])) },
     });
     const text = bandedDrawn(240, 60, [], { ...readings, queues }).block.map(plain).join("\n");
@@ -332,9 +332,9 @@ describe("the banded dashboard", () => {
 
   test("keeps this machine's rows while the other machine's pueue is still reading", () => {
     const readings = bandedReadings();
-    const north = { name: "north", status: Option.some(decodePueue(fixture("pueue/status.json"))) };
+    const north = { name: "north", heavy: Option.none(), status: Option.some(decodePueue(fixture("pueue/status.json"))) };
     const queues = ({
-      machines: [north, { name: "south", status: Option.none() }],
+      machines: [north, { name: "south", heavy: Option.none(), status: Option.none() }],
       actions: { repo: "example/shop", runs: Option.some(ok([])) },
     });
     const text = bandedDrawn(240, 60, [], { ...readings, queues }).block.map(plain).join("\n");
@@ -344,10 +344,10 @@ describe("the banded dashboard", () => {
 
   test("names the machine whose pueue could not be read", () => {
     const readings = bandedReadings();
-    const north = { name: "north", status: Option.some(decodePueue(fixture("pueue/status.json"))) };
+    const north = { name: "north", heavy: Option.none(), status: Option.some(decodePueue(fixture("pueue/status.json"))) };
     const reason = "ssh: connect to host south: refused";
     const queues = ({
-      machines: [north, { name: "south", status: Option.some({ kind: "unreachable" as const, reason }) }],
+      machines: [north, { name: "south", heavy: Option.none(), status: Option.some({ kind: "unreachable" as const, reason }) }],
       actions: { repo: "example/shop", runs: Option.some(ok([])) },
     });
     const text = bandedDrawn(240, 60, [], { ...readings, queues }).block.map(plain).join("\n");
@@ -397,7 +397,7 @@ describe("the banded dashboard", () => {
       const readings = bandedReadings();
       const reason = "pueue exited 1: Error: 0: Couldn't find a pueue configuration file";
       const queues = ({
-        machines: [{ name: "north", status: Option.some({ kind: "unreachable" as const, reason }) }],
+        machines: [{ name: "north", heavy: Option.none(), status: Option.some({ kind: "unreachable" as const, reason }) }],
         actions: { repo: "example/shop", runs: Option.some(ok([])) },
       });
       const lines = bandedDrawn(columns, rows, [], { ...readings, queues }).block.map(plain);
@@ -418,7 +418,7 @@ describe("the banded dashboard", () => {
     const host = "build-runner-01.ci.production.example.internal.example.com";
     const reason = `ssh: connect to host ${host} port 22: Connection refused`;
     const queues = ({
-      machines: [{ name: "north", status: Option.some({ kind: "unreachable" as const, reason }) }],
+      machines: [{ name: "north", heavy: Option.none(), status: Option.some({ kind: "unreachable" as const, reason }) }],
       actions: { repo: "example/shop", runs: Option.some(ok([])) },
     });
     const lines = bandedDrawn(120, 40, [], { ...bandedReadings(), queues }).block.map(plain);

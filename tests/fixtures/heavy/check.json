@@ -1,0 +1,13 @@
+{
+  "group": "heavy",
+  "parallel": 1,
+  "running": [
+    { "id": 7, "command": "heavy -- cargo build --release", "ageMinutes": 12 }
+  ],
+  "queued": [
+    { "id": 8, "command": "heavy -- bun run test", "ageMinutes": 9 },
+    { "id": 9, "command": "heavy -- nix build", "ageMinutes": 4 }
+  ],
+  "bypass": 3,
+  "bypassWeek": 2
+}

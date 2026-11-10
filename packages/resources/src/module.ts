@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { type Freshness, type HostSources, machinesCadence, refreshingOf, ResourceMachines, type SavedReadings, type TaskBoard, TaskBoardFeed } from "@avi2dg/orc-schema";
+import { type Freshness, machinesCadence, refreshingOf, type TaskBoard, TaskBoardFeed } from "@avi2dg/orc-schema";
 import {
   type Block,
   boxOf,
@@ -17,7 +17,7 @@ import {
 } from "@avi2dg/orc-ui";
 import { printResourcesFrame, runResourcesPanel } from "./app";
 import { type Machines, machinesBoxLines } from "./machines-box";
-import { machinesFeed, type MachinesShown } from "./machines-feed";
+import { machinesFeed, type MachinesFeedSources, type MachinesShown } from "./machines-feed";
 import { resourcesSection } from "./sections";
 
 export interface MachinesReading {
@@ -41,7 +41,7 @@ export const machinesPlaced = (reading: () => MachinesReading): Placed => {
     const { machines, board } = reading();
     return machines.shown.kind === "pending"
       ? readingLines
-      : machinesBoxLines(machines.shown.value, machinesOf(reading()), board.byMachine, board.zone, inner);
+      : machinesBoxLines(machines.shown.value, machinesOf(reading()), board.byMachine, machines.heavy, board.zone, inner);
   };
   return {
     box: (size, look) => ({
@@ -57,7 +57,7 @@ export const machinesPlaced = (reading: () => MachinesReading): Placed => {
   };
 };
 
-type MachinesSources = HostSources | ResourceMachines | SavedReadings | TaskBoardFeed;
+type MachinesSources = MachinesFeedSources | TaskBoardFeed;
 
 const mountMachines = Effect.gen(function* () {
   const machines = yield* machinesFeed;

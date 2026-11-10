@@ -84,7 +84,7 @@ describe("the pueue groups panel, against the recorded status", () => {
     const view = fixtureQueues();
     const [north] = view.machines;
     const resetting = Option.map(north.pueue, (read) =>
-      read.kind === "ok" ? ok({ ...read.value, groups: [{ name: "gpu", status: "Reset" as const, parallel: 3 }] }) : read,
+      read.kind === "ok" ? ok({ ...read.value, groups: [{ name: "gpu", heavy: Option.none(), status: "Reset" as const, parallel: 3 }] }) : read,
     );
     expect(panelOf(printed({ ...view, machines: [{ ...north, pueue: resetting }] }), "pueue groups")).toEqual(["north gpu resetting, limit 3"]);
   });
@@ -232,7 +232,7 @@ describe("the queues at the live panel's 30 column minimum", () => {
 describe("a run that failed to spawn", () => {
   const spawned = (): QueuesView => {
     const status = fixture("pueue/status.json").replace('"result": "Success"', '"result": { "FailedToSpawn": "No such file or directory (os error 2)" }');
-    return { ...fixtureQueues(), machines: [{ name: "north", pueue: Option.some(mapOutcome(decodePueue(status), pueueView)) }] };
+    return { ...fixtureQueues(), machines: [{ name: "north", heavy: Option.none(), pueue: Option.some(mapOutcome(decodePueue(status), pueueView)) }] };
   };
 
   // pueue's TaskResult::FailedToSpawn carries the spawn error's text.

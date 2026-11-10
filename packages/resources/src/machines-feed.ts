@@ -1,6 +1,8 @@
 import { DateTime, Effect, Option, type Scope } from "effect";
 import {
   type Freshness,
+  type HeavyCheck,
+  HeavyMachines,
   type HostSources,
   machinesCadence,
   MachinesCodec,
@@ -19,10 +21,14 @@ import {
   type Stamped,
 } from "@avi2dg/orc-schema";
 
+type HeavyChecks = ReadonlyMap<string, Outcome<HeavyCheck>>;
+
+// The heavy checks stay out of the saved view, so a saved copy never shows a queue depth from hours ago.
 export interface MachinesShown {
   readonly shown: Shown<MachinesView>;
   readonly answered: boolean;
   readonly freshness: ReadonlyArray<Freshness>;
+  readonly heavy: HeavyChecks;
 }
 
 interface FreshMachines {
@@ -33,7 +39,7 @@ interface FreshMachines {
 type MachineRead = "live" | "saved" | "pending";
 
 // Each machine shows its own answer once it lands, and until then its saved copy, so a slow machine never holds another back.
-const machinesShown = (local: string, fresh: FreshMachines, saved: Option.Option<Stamped<MachinesView>>, now: DateTime.Utc): MachinesShown => {
+const machinesShown = (local: string, fresh: FreshMachines, saved: Option.Option<Stamped<MachinesView>>, now: DateTime.Utc): Omit<MachinesShown, "heavy"> => {
   const answers: ReadonlyArray<{ readonly name: string; readonly machine: Option.Option<Stamped<NamedMachine>> }> = [
     { name: local, machine: Option.map(fresh.local, ({ value: view, at }) => ({ value: { name: local, state: { kind: "ok", view } }, at })) },
     ...fresh.remotes.map(({ name, reading }) => ({
@@ -63,27 +69,34 @@ const machinesShown = (local: string, fresh: FreshMachines, saved: Option.Option
   return { shown: { kind: "live", value, at: liveAt }, answered, freshness: liveFreshness };
 };
 
-export const machinesFeed: Effect.Effect<{ readonly read: Effect.Effect<MachinesShown>; readonly refreshing: Effect.Effect<boolean> }, never, HostSources | ResourceMachines | SavedReadings | Scope.Scope> = Effect.gen(
+export type MachinesFeedSources = HostSources | ResourceMachines | HeavyMachines | SavedReadings;
+
+export const machinesFeed: Effect.Effect<{ readonly read: Effect.Effect<MachinesShown>; readonly refreshing: Effect.Effect<boolean> }, never, MachinesFeedSources | Scope.Scope> = Effect.gen(
   function* () {
     const configured = yield* ResourceMachines;
+    const heavies = yield* Effect.forEach(yield* HeavyMachines, (heavy) => Effect.map(polled(heavy.read, machinesCadence), (poll) => ({ name: heavy.name, poll })));
     const local = yield* polled(readLocalResources, machinesCadence);
     const remotes = yield* Effect.forEach(configured.remotes, (remote) => Effect.map(polled(remote.read, machinesCadence), (poll) => ({ name: remote.name, poll })));
     const slot = (yield* SavedReadings).slot("machines", MachinesCodec);
     const last = yield* Effect.cached(slot.last);
     const read = Effect.gen(function* () {
-      const fresh: FreshMachines = yield* Effect.all(
+      const { heavy, ...fresh } = yield* Effect.all(
         {
           local: local.latest,
           remotes: Effect.forEach(remotes, ({ name, poll }) => Effect.map(poll.latest, (reading) => ({ name, reading })), { concurrency: "unbounded" }),
+          heavy: Effect.forEach(heavies, ({ name, poll }) => Effect.map(poll.latest, (reading) => ({ name, reading })), { concurrency: "unbounded" }),
         },
         { concurrency: "unbounded" },
       );
       const now = yield* DateTime.now;
-      const machines = machinesShown(configured.local, fresh, yield* last, now);
+      const machines = {
+        ...machinesShown(configured.local, fresh, yield* last, now),
+        heavy: new Map(heavy.flatMap(({ name, reading }) => (Option.isSome(reading) ? [[name, reading.value.value] as const] : []))),
+      };
       // Only a view every machine answered is saved, so a saved copy never claims an age younger than one of its machines.
       if (machines.answered && machines.shown.kind === "live") yield* slot.keep(machines.shown.value, machines.shown.at);
       return machines;
     });
-    return { read, refreshing: refreshingOf([local, ...remotes.map(({ poll }) => poll)]) };
+    return { read, refreshing: refreshingOf([local, ...remotes.map(({ poll }) => poll), ...heavies.map(({ poll }) => poll)]) };
   },
 );

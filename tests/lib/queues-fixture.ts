@@ -19,7 +19,7 @@ export const queueAnswers: ReadonlyArray<readonly [string, string]> = [
 ];
 
 export const fixtureQueueReadings = (machines: ReadonlyArray<string> = ["north"]): QueueReadings => ({
-  machines: machines.map((name) => ({ name, status: Option.some(decodePueue(fixture("pueue/status.json"))) })),
+  machines: machines.map((name) => ({ name, heavy: Option.none(), status: Option.some(decodePueue(fixture("pueue/status.json"))) })),
   actions: { repo: fixtureActionsRepo, runs: Option.some(recordedRuns()) },
 });
 
