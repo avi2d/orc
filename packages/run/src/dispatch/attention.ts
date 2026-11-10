@@ -174,6 +174,26 @@ export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, 
       ? Effect.asVoid(openItem(root, itemId(action.task, "run-died"), { kind: "run-died", task: action.task, text: "the run on " + action.machine + " died: " + action.reason, asked: at, owner: "user" }))
       : Effect.void, { discard: true })
 
+const prOpenItems = (root: string, task: string): Effect.Effect<ReadonlyArray<OpenItem>, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const prefixes = [itemId(task, "check-red") + ".", itemId(task, "pr-ready") + "."]
+    const ids = (yield* readNames(attentionFolder(root)))
+      .filter((name) => name.endsWith(fileSuffix) && !name.startsWith(".") && prefixes.some((prefix) => name.startsWith(prefix)))
+      .map((name) => name.slice(0, -fileSuffix.length))
+    const read = yield* Effect.forEach(ids, (id) => readItem(root, id).pipe(Effect.map((item) => (item === null ? null : { id, item }))))
+    return read.filter((entry): entry is OpenItem => entry !== null && entry.item.state.kind === "open")
+  })
+
+const openOrReopenPrItem = (root: string, id: string, asked: Asked): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const item = yield* readItem(root, id)
+    if (item === null) {
+      yield* Effect.asVoid(openItem(root, id, asked))
+    } else if (item.state.kind === "withdrawn") {
+      yield* writeItem(root, id, { ...asked, state: { kind: "open" } })
+    }
+  })
+
 // Each head commit gets its own items, so a fix pushed after a red check opens anew.
 export const routePullRequest = (root: string, task: string, pr: string, view: PullRequestView, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
@@ -181,8 +201,7 @@ export const routePullRequest = (root: string, task: string, pr: string, view: P
     const refusals = checkRefusals(view)
     const red = redChecks(view)
     const holds = (kind: AttentionItem["kind"]): boolean => ended === null && (kind === "check-red" ? refusals.length > 0 : red.length === 0)
-    const settled = (yield* openItems(root)).filter((entry) =>
-      entry.item.task === task && (entry.item.kind === "check-red" || entry.item.kind === "pr-ready") &&
+    const settled = (yield* prOpenItems(root, task)).filter((entry) =>
       !(entry.id === itemId(task, entry.item.kind, view.headRefOid) && holds(entry.item.kind))
     )
     yield* Effect.forEach(settled, (entry) =>
@@ -193,9 +212,9 @@ export const routePullRequest = (root: string, task: string, pr: string, view: P
       return
     }
     if (red.length > 0) {
-      yield* openItem(root, itemId(task, "check-red", view.headRefOid), { kind: "check-red", task, text: pr + ": the check " + red.join(", ") + " is red", asked: at, owner: "user" })
+      yield* openOrReopenPrItem(root, itemId(task, "check-red", view.headRefOid), { kind: "check-red", task, text: pr + ": the check " + red.join(", ") + " is red", asked: at, owner: "user" })
     } else if (refusals.length === 0) {
-      yield* openItem(root, itemId(task, "pr-ready", view.headRefOid), { kind: "pr-ready", task, text: pr + " is ready to merge, checks green: " + greenChecks(view).join(", "), asked: at, owner: "user" })
+      yield* openOrReopenPrItem(root, itemId(task, "pr-ready", view.headRefOid), { kind: "pr-ready", task, text: pr + " is ready to merge, checks green: " + greenChecks(view).join(", "), asked: at, owner: "user" })
     }
   })
 

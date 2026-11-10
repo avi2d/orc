@@ -58,7 +58,7 @@ export const answerItemText = (root: string, id: string, answer: { readonly word
         return yield* new BacklogError({ detail: "the attention queue holds no " + id })
       }
       default: {
-        return yield* new BacklogError({ detail: id + " closes when its task's question is answered, so run orc backlog answer " + outcome.task })
+        return yield* new BacklogError({ detail: id + " closes when its task hold or question is answered, so run orc backlog answer " + outcome.task })
       }
     }
   })

@@ -7,7 +7,7 @@ Each item is one JSON file with its `kind`, its `task`, its `text`, the time it 
 The owner names who must answer it, `decider` or `user`.
 The state starts as `open`.
 An answer makes it `closed`, and a closed item keeps the answer words and time.
-When its task closes, or its question is no longer asked, the item turns `withdrawn` with its reason and time.
+A review question or an overdue wait turns `withdrawn` with its reason and time when its task closes or when it is no longer asked.
 Showing an item never closes it.
 An open item is overdue once more than 5 minutes have passed since it was asked.
 
