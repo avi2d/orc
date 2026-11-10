@@ -498,7 +498,8 @@ When that machine could not be read, its line gives the reason, or says how old 
 In the top row, the alerts tab gives each alert rule, as [Read the alerts panel](#read-the-alerts-panel) tells.
 It paints again every 2 seconds.
 Each box title pins its refresh cadence at the right end, such as machines ↻ 10s, and the glance lists the intervals at the right of its first line when they fit.
-The machines box gives each machine a heavy line from its `orc heavy check --json`, with the heavy group's running calls and slots, its queued calls with the oldest one's age, and the bypasses logged in the last 7 days.
+The machines box gives each machine a heavy line from its `orc heavy check --json`.
+The line counts running calls and slots, queued calls with the oldest one's age, and bypasses in the last 7 days.
 The queue box gives each machine the same heavy line.
 A machine with no heavy queue or no orc shows heavy queue not set up on its heavy line.
 A machine whose check fails for another reason shows the reason on its heavy line.
