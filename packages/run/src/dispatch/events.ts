@@ -46,6 +46,12 @@ export const eventRecorded = (root: string, key: string): Effect.Effect<boolean,
     return yield* fs.exists(eventsFolder(root) + "/" + key + fileSuffix).pipe(Effect.mapError(platformFailure("read " + key)))
   })
 
+export const mergedIds = (root: string): Effect.Effect<ReadonlySet<string>, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const names: ReadonlyArray<string> = yield* readNames(eventsFolder(root))
+    return new Set(names.filter((name) => name.endsWith(".merged.json")).map((name) => name.slice(0, -".merged.json".length)))
+  })
+
 export const markEventPosted = (root: string, key: string): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem

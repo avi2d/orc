@@ -139,6 +139,7 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
               ...(input.kind === undefined ? [] : ["--kind", input.kind]),
               ...(input.internal === true ? ["--internal"] : []),
               ...(input.machine === undefined ? [] : ["--machine", input.machine]),
+              ...(input.parent === undefined ? [] : ["--parent", input.parent]),
               ...(input.dependsOn ?? []).flatMap((id) => ["--depends-on", id])
             ], input.task)
           ),

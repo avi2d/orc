@@ -29,7 +29,7 @@ const withBacklog = async (body: (root: string) => Promise<void>): Promise<void>
   }
 }
 
-const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
+const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
 
 const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-10-27T10:01:00.000Z" }
 
@@ -102,6 +102,7 @@ describe("parseDispatchArgs", () => {
       taskKind: "ship",
       internal: false,
       machine: "mac",
+      parent: null,
       dependsOn: ["task-1", "task-2"]
     })
   })
@@ -113,6 +114,7 @@ describe("parseDispatchArgs", () => {
       taskKind: "ship",
       internal: false,
       machine: "mac",
+      parent: null,
       dependsOn: []
     })
   })
