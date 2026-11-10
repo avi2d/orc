@@ -1,0 +1,121 @@
+import { describe, expect, test } from "bun:test"
+import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { BunServices } from "@effect/platform-bun"
+import { Effect } from "effect"
+import { parseDispatchArgs } from "../../../packages/run/src/dispatch/args"
+import { openItems, routeReviewQuestions } from "../../../packages/run/src/dispatch/attention"
+import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
+import { type AskDecider, DeciderUnheard, decideReviewQuestions, type DeciderRequest } from "../../../packages/run/src/dispatch/decider"
+import { askStartedTask } from "../../../packages/run/src/dispatch/parked"
+
+const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
+  Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
+
+const intent = "# Retry the upload\nRetry a failed upload twice, then give up.\n"
+
+const spec = { title: "Retry the upload", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, dependsOn: [], created: "2026-11-02T10:00:00.000Z", body: intent }
+
+const claim = { beat: "beat-1", machine: "linux", account: "main", takenAt: "2026-11-02T10:01:00.000Z" }
+
+const asked = "2026-11-02T10:20:00.000Z"
+const decidedAt = "2026-11-02T10:21:00.000Z"
+const r2 = { id: "r2", text: "How many retries?" }
+const r3 = { id: "r3", text: "Merge the PR once it is green?" }
+const r2Item = "orc-1.r2.2026-11-02T10_20_00_000Z"
+const r3Item = "orc-1.r3.2026-11-02T10_20_00_000Z"
+
+const withAskingTask = async (body: (root: string) => Promise<void>): Promise<void> => {
+  const root = await mkdtemp(join(tmpdir(), "orc-decider-"))
+  try {
+    const record = await run(addTask(root, spec))
+    await run(claimTask(root, record.spec.id))
+    await run(writeTaken(root, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-11-02T10:02:00.000Z", log: root + "/logs/orc-1.log" } } }))
+    await run(askStartedTask(root, "orc-1", { asked, questions: [r2, r3] }))
+    await run(routeReviewQuestions(root, await run(listTasks(root)), asked))
+    await body(root)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+}
+
+const replies = (byQuestion: Readonly<Record<string, string>>, heard: Array<DeciderRequest> = []): AskDecider => (request) => {
+  heard.push(request)
+  const reply = Object.entries(byQuestion).find(([text]) => request.prompt.includes(text))?.[1]
+  return reply === undefined ? Effect.fail(new DeciderUnheard({ reason: "no reply in this test" })) : Effect.succeed(reply)
+}
+
+const answer = JSON.stringify({ decision: "answer", answer: "Two retries", reason: "the intent says twice" })
+const escalate = JSON.stringify({ decision: "escalate", reason: "only the captain merges" })
+
+const itemFile = async (root: string, id: string): Promise<unknown> => JSON.parse(await readFile(join(root, "attention", id + ".json"), "utf8"))
+
+const decide = async (root: string, ask: AskDecider) => run(decideReviewQuestions(root, await run(listTasks(root)), ask, decidedAt))
+
+describe("the decider", () => {
+  test("a review question the beat routes is owned by the decider, not handed straight to the user", async () => {
+    await withAskingTask(async (root) => {
+      expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["decider", "decider"])
+    })
+  })
+
+  test("a decider answer closes its item through the task's answer and records its reason, instead of leaving the item open", async () => {
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [r2.text]: answer, [r3.text]: escalate }))
+      const task = (await run(listTasks(root))).at(0)
+      expect(task?.parked?.questions.find((question) => question.id === "r2")?.answer).toMatchObject({ words: "Two retries", at: decidedAt })
+      expect(await itemFile(root, r2Item)).toMatchObject({
+        owner: "decider",
+        decision: { kind: "answered", reason: "the intent says twice", at: decidedAt },
+        state: { kind: "closed", answer: { words: "Two retries", at: decidedAt } }
+      })
+    })
+  })
+
+  test("an escalated question turns to the user and stays open with the decider's reason, instead of being answered", async () => {
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [r2.text]: answer, [r3.text]: escalate }))
+      expect((await run(openItems(root))).map((entry) => entry.id)).toEqual([r3Item])
+      expect(await itemFile(root, r3Item)).toMatchObject({ owner: "user", decision: { kind: "escalated", reason: "only the captain merges" }, state: { kind: "open" } })
+      expect((await run(listTasks(root))).at(0)?.parked?.questions.find((question) => question.id === "r3")?.answer).toBeNull()
+    })
+  })
+
+  test("each question gets its own call carrying the task intent and the written policy, not one call for the batch", async () => {
+    await withAskingTask(async (root) => {
+      const heard: Array<DeciderRequest> = []
+      await decide(root, replies({ [r2.text]: escalate, [r3.text]: escalate }, heard))
+      const policy = await readFile(join(import.meta.dir, "../../../packages/run/agents/decider-policy.md"), "utf8")
+      expect(heard).toHaveLength(2)
+      for (const [index, question] of [r2, r3].entries()) {
+        expect(heard[index]?.policy).toBe(policy)
+        expect(heard[index]?.prompt).toContain("Retry a failed upload twice, then give up.")
+        expect(heard[index]?.prompt).toContain(question.text)
+        expect(heard[index]?.prompt).not.toContain((index === 0 ? r3 : r2).text)
+      }
+    })
+  })
+
+  test("a question the user owns never reaches the decider, so an escalated one is not asked twice", async () => {
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [r2.text]: escalate, [r3.text]: escalate }))
+      const heard: Array<DeciderRequest> = []
+      expect(await decide(root, replies({ [r2.text]: answer }, heard))).toEqual([])
+      expect(heard).toEqual([])
+    })
+  })
+
+  test("a reply orc cannot read or a call that fails escalates to the user instead of answering", async () => {
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [r2.text]: "Sure, two retries sounds right." }))
+      expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["user", "user"])
+      expect((await run(listTasks(root))).at(0)?.parked?.questions.every((question) => question.answer === null)).toBe(true)
+    })
+  })
+
+  test("orc attention decide takes no further word", () => {
+    expect(parseDispatchArgs("attention", ["decide"])).toEqual({ kind: "DecideAttention" })
+    expect(parseDispatchArgs("attention", ["decide", "--json"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --json" })
+  })
+})

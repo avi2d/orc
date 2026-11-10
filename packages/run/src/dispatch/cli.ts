@@ -4,7 +4,7 @@ import type { DispatchArgs, TaskSource } from "./args"
 import { addTask, backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted } from "./backlog"
 import { backlogPresent, noBacklog } from "./backlog-write"
 import { routeReviewQuestions } from "./attention"
-import { attentionText } from "./attention-view"
+import { attentionNow } from "./cli-attention"
 import { holdTask } from "./backlog-hold"
 import { circularDependency, dependTask, refusedLinks } from "./backlog-depend"
 import { answerTask } from "./parked"
@@ -322,8 +322,9 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
   Effect.gen(function*() {
     switch (args.kind) {
       case "ShowBacklog":
-      case "ShowAttention": {
-        yield* Console.log(yield* (args.kind === "ShowBacklog" ? backlogText(args.json, place) : attentionText(args.json, backlogRoot(place))))
+      case "ShowAttention":
+      case "DecideAttention": {
+        yield* Console.log(yield* (args.kind === "ShowBacklog" ? backlogText(args.json, place) : attentionNow(args, backlogRoot(place), place.home)))
         break
       }
       case "AddTask": {
@@ -347,7 +348,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         break
       }
       case "Beat": {
-        const report = yield* runBeat(backlogRoot(place), place.home, liveSources())
+        const report = yield* runBeat(backlogRoot(place), place.home, liveSources(place.home))
         yield* Console.log(args.json ? JSON.stringify(beatJson(report)) : formatBeat(report))
         break
       }

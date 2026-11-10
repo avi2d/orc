@@ -10,6 +10,8 @@ import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from 
 import type { BeatAction, Progress } from "./beat-action"
 import { closeFinished } from "./beat-close"
 import { routeReviewQuestions } from "./attention"
+import { type AskDecider, decideReviewQuestions } from "./decider"
+import { askDeciderWithPi } from "./decider-ask"
 import { handAnswersToResume } from "./parked"
 import { taskLabel } from "./pueue-status"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
@@ -293,9 +295,10 @@ export interface BeatSources {
   readonly readLoad: ReadLoad
   readonly readPullRequest: ReadPullRequest
   readonly readUpstream: ReadUpstream
+  readonly askDecider: AskDecider
 }
 
-export const liveSources = (): BeatSources => ({ readLoad: readMachineLoad, readPullRequest, readUpstream })
+export const liveSources = (home: string): BeatSources => ({ readLoad: readMachineLoad, readPullRequest, readUpstream, askDecider: askDeciderWithPi(home) })
 
 export const runBeat = (
   root: string,
@@ -334,6 +337,7 @@ export const runBeat = (
     const upstream = yield* watchUpstream(root, projects, sources.readUpstream, at)
     const current = yield* listTasks(root)
     yield* routeReviewQuestions(root, current, at)
+    yield* decideReviewQuestions(root, current, sources.askDecider, at)
     const queued = current.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: current, overloaded }

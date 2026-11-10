@@ -9,6 +9,7 @@ export type Reach = { readonly kind: "here" } | { readonly kind: "through"; read
 export type DispatchArgs =
   | { readonly kind: "ShowBacklog"; readonly json: boolean }
   | { readonly kind: "ShowAttention"; readonly json: boolean }
+  | { readonly kind: "DecideAttention" }
   | {
     readonly kind: "AddTask"
     readonly project: string

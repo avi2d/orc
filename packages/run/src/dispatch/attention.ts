@@ -7,12 +7,15 @@ const overdueMillis = 5 * 60 * 1000
 
 const Answer = Schema.Struct({ words: Schema.String, at: Schema.String })
 
+const Decision = Schema.Struct({ kind: Schema.Literals(["answered", "escalated"]), reason: Schema.String, at: Schema.String })
+
 const AttentionItem = Schema.Struct({
   kind: Schema.Literals(["review-question"]),
   task: Schema.String,
   text: Schema.String,
   asked: Schema.String,
   owner: Schema.Literals(["decider", "user"]),
+  decision: Schema.optionalKey(Decision),
   state: Schema.Union([
     Schema.Struct({ kind: Schema.Literal("open") }),
     Schema.Struct({ kind: Schema.Literal("closed"), answer: Answer }),
@@ -21,8 +24,9 @@ const AttentionItem = Schema.Struct({
 })
 
 export type AttentionItem = typeof AttentionItem.Type
-export type Asked = Omit<AttentionItem, "state">
+export type Asked = Omit<AttentionItem, "state" | "decision">
 type ItemAnswer = typeof Answer.Type
+export type Decision = typeof Decision.Type
 
 const ItemFile = Schema.fromJsonString(AttentionItem)
 
@@ -45,7 +49,7 @@ const writeItem = (root: string, id: string, item: AttentionItem): Effect.Effect
   })
 
 // The same question at the same asking always names one file, so routing it again opens nothing new.
-const reviewQuestionId = (task: string, question: string, asked: string): string =>
+export const reviewQuestionId = (task: string, question: string, asked: string): string =>
   [task, question, asked].map((part) => part.replace(/[^A-Za-z0-9_-]/g, "_")).join(".")
 
 export const openItem = (root: string, id: string, asked: Asked): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
@@ -56,7 +60,7 @@ export const openItem = (root: string, id: string, asked: Asked): Effect.Effect<
     return yield* publishOnce(folder, id + fileSuffix, yield* encodeItem(id, { ...asked, state: { kind: "open" } }))
   })
 
-const readItem = (root: string, id: string): Effect.Effect<AttentionItem | null, BacklogError, FileSystem.FileSystem> =>
+export const readItem = (root: string, id: string): Effect.Effect<AttentionItem | null, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const file = itemFile(root, id)
     const text = yield* readIfPresent(file)
@@ -85,6 +89,16 @@ const settleOpenItem = (root: string, id: string, state: SettledState): Effect.E
 
 export const closeItem = (root: string, id: string, answer: ItemAnswer): Effect.Effect<CloseOutcome, BacklogError, FileSystem.FileSystem> =>
   Effect.map(settleOpenItem(root, id, { kind: "closed", answer }), (outcome) => outcome === "settled" ? "closed" : outcome)
+
+// The decider's answer reaches the item through the task's answer, so only its reason is written here.
+export const recordDecision = (root: string, id: string, decision: Decision): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const item = yield* readItem(root, id)
+    if (item === null || item.state.kind !== "open") {
+      return
+    }
+    yield* writeItem(root, id, { ...item, decision, owner: decision.kind === "escalated" ? "user" : item.owner })
+  })
 
 type WithdrawOutcome = "withdrawn" | "already closed" | "missing"
 
@@ -126,7 +140,7 @@ export const routeReviewQuestions = (root: string, tasks: ReadonlyArray<TaskReco
         }
         live.add(id)
         const asked = Number.isNaN(Date.parse(question.asked)) ? at : question.asked
-        yield* Effect.asVoid(openItem(root, id, { kind: "review-question", task: task.spec.id, text: question.text, asked, owner: "user" }))
+        yield* Effect.asVoid(openItem(root, id, { kind: "review-question", task: task.spec.id, text: question.text, asked, owner: "decider" }))
       }
     }
     const tasksById = new Map(tasks.map((task) => [task.spec.id, task] as const))

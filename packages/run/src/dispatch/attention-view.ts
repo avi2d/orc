@@ -23,6 +23,7 @@ export const attentionJson = (items: ReadonlyArray<OpenItem>, at: string): Atten
       text: item.text,
       asked: item.asked,
       owner: item.owner,
+      ...(item.decision === undefined ? {} : { decision: item.decision }),
       ageSeconds: Math.floor(ageMillis(item, nowMillis) / 1000),
       overdue: isOverdue(item, nowMillis)
     }))

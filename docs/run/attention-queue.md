@@ -11,15 +11,30 @@ When its task closes, or its question is no longer asked, the item turns `withdr
 Showing an item never closes it.
 An open item is overdue once more than 5 minutes have passed since it was asked.
 
-A review question a run asks is an item of kind `review-question`, owned by the user.
+A review question a run asks is an item of kind `review-question`, owned by the decider.
 The beat that writes the question into the task's `parked_questions`, as [Parked runs](parked-runs.md) shows, opens its item.
-Answering it with `orc backlog answer <task-id> <question-id>=<text>` closes the item.
+
+## The decider
+The same beat hands each open item the decider owns to the decider, one short Pi call per question.
+The call runs on `models.decider` in `config.json`, as [Configuring providers](configuring-providers.md) shows, with no tools.
+Its system prompt is the written policy in `packages/run/agents/decider-policy.md`, and its prompt is the task's title and body, which hold its intent, and the question.
+It answers a routine question, or escalates the question to the user.
+Its answer goes to the task as `orc backlog answer` would give it, so the item closes with the answer's words.
+An escalation hands the item to the user, and the item stays open.
+Either way the item keeps a `decision` with `answered` or `escalated`, the decider's reason and its time, so you can read the decider's answers afterwards.
+A reply orc cannot read, a call that fails or a missing `models.decider` escalates the item with that as its reason.
+To run the decider without a beat, run `orc attention decide`, which prints `answered <item>: <words> (<reason>)` or `escalated <item> to the user: <reason>` for each item, or `nothing waits on the decider`.
+
+## Answering an item
+Answering a review question with `orc backlog answer <task-id> <question-id>=<text>` closes the item.
 A question asked again with the same words keeps its item.
 A question asked again with different words opens a new item, and the old item is withdrawn.
 An answered question asked again opens a new item, and the old item keeps its answer.
 
+## Seeing the queue
 To see every open item, oldest first, run `orc attention`.
 It prints each item's id, kind, task, owner, age and text, and marks an overdue one `overdue`.
+An item the decider escalated also carries its `decision` in the JSON.
 With no open item it prints `nothing needs anyone`.
 To print the same facts as JSON, run `orc attention --json`, whose document names its version first as `orc.attention.v1`:
 

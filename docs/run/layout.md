@@ -10,7 +10,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/bin.ts` | The orc entry point |
 | `packages/run/src/args.ts` | The flag parsing for the orc command |
 | `packages/run/src/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
-| `packages/run/src/orc-config.ts` | The reading of `config.json`: the providers, the heavy queue tuning and the implementer, fixer and orchestrator models |
+| `packages/run/src/orc-config.ts` | The reading of `config.json`: the providers, the heavy queue tuning and the implementer, fixer, orchestrator and decider models |
 | `packages/run/src/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
 | `packages/run/src/chat-tools.ts` | The chat tools and the poll that posts each closed task and each event into the chat once |
 | `packages/run/src/chat-parked.ts` | The chat's listing of parked questions, once per start and once per park |
@@ -65,6 +65,9 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/stall.ts` | The stalled run flag kept in the backlog logs |
 | `packages/run/src/dispatch/attention.ts` | The attention queue under `attention/`: one file per item, its open and close and withdraw, and the review questions routed into it |
 | `packages/run/src/dispatch/attention-view.ts` | The `orc attention` table and its `orc.attention.v1` JSON |
+| `packages/run/src/dispatch/decider.ts` | The decider: one call per open review question it owns, and its answer or escalation recorded on the item |
+| `packages/run/src/dispatch/decider-ask.ts` | The decider's call, Pi on `models.decider` with the policy as its system prompt and no tools |
+| `packages/run/agents/decider-policy.md` | The written policy the decider answers under |
 | `packages/run/src/dispatch/events.ts` | The chat events under `events/`, their posted marks and the alert fires the backlog lists |
 | `packages/run/src/dispatch/task-events.ts` | The stall and PR events the beat records for every task |
 | `packages/run/src/dispatch/alert-events.ts` | The reading of each `alerts.jsonl` line as one alert fire |
