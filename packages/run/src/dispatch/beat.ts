@@ -7,8 +7,9 @@ import { type MachineRoom, type Placed, placeTask, readRoom, taskWait } from "./
 import { type QuotaReading, readQuota } from "./quota"
 import type { Claim, TaskFileError, TaskRecord } from "./task-record"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
-import type { BeatAction } from "./beat-action"
+import type { BeatAction, Progress } from "./beat-action"
 import { closeFinished } from "./beat-close"
+import { routeReviewQuestions } from "./attention"
 import { handAnswersToResume } from "./parked"
 import { taskLabel } from "./pueue-status"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
@@ -229,6 +230,24 @@ const considerTask = (
     return action
   })
 
+const settledProgress = (
+  progress: ReadonlyArray<Progress>
+): { readonly closed: ReadonlyArray<BeatAction>; readonly asking: ReadonlyArray<BeatAction> } => ({
+  closed: progress.flatMap((entry) => entry.kind === "ended" ? [entry.action] : []),
+  asking: progress.flatMap((entry) => entry.kind === "running" && entry.action !== null ? [entry.action] : [])
+})
+
+const releaseClosedSlots = (live: BeatContext["live"], closed: ReadonlyArray<BeatAction>): void => {
+  for (const action of closed) {
+    if (action.kind === "closed" || action.kind === "parked") {
+      const slot = live.find((entry) => entry.machine === action.machine)
+      if (slot !== undefined) {
+        slot.busy -= 1
+      }
+    }
+  }
+}
+
 const renewSeconds = 30
 
 const sendRenewal = (renew: Machine["renew"] & {}, stdin: string): Effect.Effect<string | null, never, ChildProcessSpawner.ChildProcessSpawner> =>
@@ -309,19 +328,12 @@ export const runBeat = (
     }
     const started = tasks.filter((task) => task.state.kind === "started")
     const progress = yield* Effect.forEach(started, (task) => closeFinished(context, task))
-    const closed = progress.flatMap((entry) => entry.kind === "ended" ? [entry.action] : [])
-    const asking = progress.flatMap((entry) => entry.kind === "running" && entry.action !== null ? [entry.action] : [])
+    const settled = settledProgress(progress)
     const stalls = yield* Effect.forEach(started, (task, index) => flagStall(root, task, progress[index] ?? { kind: "untracked" }))
-    for (const action of closed) {
-      if (action.kind === "closed" || action.kind === "parked") {
-        const slot = context.live.find((entry) => entry.machine === action.machine)
-        if (slot !== undefined) {
-          slot.busy -= 1
-        }
-      }
-    }
+    releaseClosedSlots(context.live, settled.closed)
     const upstream = yield* watchUpstream(root, projects, sources.readUpstream, at)
     const current = yield* listTasks(root)
+    yield* routeReviewQuestions(root, current, at)
     const queued = current.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: current, overloaded }
@@ -329,8 +341,8 @@ export const runBeat = (
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, task))
     const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))
     return { beat, at, quota, room: readRoom(config.machines, current), actions: [
-        ...closed,
-        ...asking,
+        ...settled.closed,
+        ...settled.asking,
         ...stalls.flatMap(Option.toArray),
         ...prs.flatMap(Option.toArray),
         ...upstream,

@@ -1,7 +1,7 @@
 import { Duration, Effect, FileSystem, Option, Result, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { addTask } from "./backlog"
-import { BacklogError, platformFailure, scratchName } from "./backlog-write"
+import { BacklogError, platformFailure, readIfPresent, scratchName } from "./backlog-write"
 import type { BeatAction } from "./beat-action"
 import { type Contribution, contributionId, type Project } from "./config"
 import { recordEvent } from "./events"
@@ -85,11 +85,7 @@ const seenFile = (root: string, project: string, contribution: Contribution): st
 
 const readSeen = (file: string): Effect.Effect<Seen | null, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const text = yield* fs.readFileString(file).pipe(
-      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)),
-      Effect.mapError(platformFailure("read " + file))
-    )
+    const text = yield* readIfPresent(file)
     if (text === null) {
       return null
     }

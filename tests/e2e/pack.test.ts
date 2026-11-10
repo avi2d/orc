@@ -38,6 +38,8 @@ const expectedFiles = [
   "src/dispatch/alert-stream.ts",
   "src/dispatch/args-runner.ts",
   "src/dispatch/args.ts",
+  "src/dispatch/attention-view.ts",
+  "src/dispatch/attention.ts",
   "src/dispatch/backlog-depend.ts",
   "src/dispatch/backlog-hold.ts",
   "src/dispatch/backlog-write.ts",
