@@ -8,7 +8,7 @@ Orc refuses any other kind, from `orc backlog add --kind` or in a task file, wit
 
 A `ship` task runs as [Running a task](running-a-task.md) shows and ends in a PR.
 A `scout` reads the checkout and changes nothing, and a `task` does what it asks and puts its evidence in the report.
-The runner queues either as `orc run <task-file> --kind <scout|task> --sandbox none`.
+The runner queues a scout or task as `orc run <task-file> --kind <scout|task> --sandbox none`.
 To run one directly, enter a clean checkout of the target project and run the same command.
 That run skips no-mistakes and the PR and creates no branch.
 It starts Pi on the host in `~/.orc/runs/<run-id>`, tells it where the task and the checkout are, and asks it to write `agent-report.md` there.

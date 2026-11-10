@@ -10,7 +10,7 @@ Its first line of output names the rules file it loaded, or says it found none, 
 The chat's Pi has six tools and no others:
 
 - `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project and the task's Markdown.
-  It may add a kind, an internal mark, a machine and the ids the task depends on.
+  It may add a kind, an internal mark, a machine, a parent and the ids the task depends on.
 - `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
 - `orc_backlog_hold` holds one new task through `orc backlog hold`, with the reason, an optional date and optional questions.
 - `orc_backlog_answer` answers a held task, a parked task, or a started task waiting at its gate through `orc backlog answer`.
