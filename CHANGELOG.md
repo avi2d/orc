@@ -2,6 +2,14 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.12.0
+
+Released 2026-11-10.
+
+### Features
+
+- **run:** route heavy stand-ins through an external queue command [#119](https://github.com/avi2d/orc/pull/119)
+
 ## 0.11.0
 
 Released 2026-11-10.
