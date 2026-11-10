@@ -8,9 +8,9 @@ import { isTaskKind, type TaskKind, unknownKind } from "../task-kind"
 import { isMergeBasis, mergeBases } from "./merge-basis"
 
 export const dispatchUsage =
-  "orc backlog [--json] | orc attention [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task>] [--internal] [--machine <name>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog stop <task-id> | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <claude-credentials.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner kill <task-id> | orc runner answer <task-id> | orc runner load | orc heavy path | orc heavy check [--json] | orc heavy watch | orc heavy watch-once"
+  "orc backlog [--json] | orc attention [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task|parent>] [--internal] [--machine <name>] [--parent <task-id>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog stop <task-id> | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <claude-credentials.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner kill <task-id> | orc runner answer <task-id> | orc runner load | orc heavy path | orc heavy check [--json] | orc heavy watch | orc heavy watch-once"
 
-const addFlags = ["--kind", "--machine", "--depends-on"] as const
+const addFlags = ["--kind", "--machine", "--parent", "--depends-on"] as const
 type AddFlag = typeof addFlags[number]
 
 const isAddFlag = (token: string): token is AddFlag => addFlags.some((flag) => flag === token)
@@ -26,7 +26,7 @@ type AddWords =
 
 const splitAdd = (rest: ReadonlyArray<string>): AddWords => {
   const kept: Array<string> = []
-  const values: Record<AddFlag, Array<string>> = { "--kind": [], "--machine": [], "--depends-on": [] }
+  const values: Record<AddFlag, Array<string>> = { "--kind": [], "--machine": [], "--parent": [], "--depends-on": [] }
   let internal = false
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index] ?? ""
@@ -72,12 +72,22 @@ const parseAdd = (rest: ReadonlyArray<string>): DispatchArgs => {
     return { kind: "UsageError", detail: "orc backlog add takes one --machine" }
   }
   const [machine = null] = split.values["--machine"]
+  const [parent = null, ...moreParents] = split.values["--parent"]
+  if (moreParents.length > 0) {
+    return { kind: "UsageError", detail: "orc backlog add takes one --parent" }
+  }
+  if (parent !== null && !isTaskId(parent)) {
+    return { kind: "UsageError", detail: "orc backlog add takes a task id after --parent, got \"" + parent + "\"" }
+  }
+  if (parent !== null && taskKind.taskKind === "parent") {
+    return { kind: "UsageError", detail: "orc backlog add takes --parent only for a child, and a parent task has no parent" }
+  }
   if (split.kept.length !== 2) {
     return { kind: "UsageError", detail: "orc backlog add takes a project and a task file" }
   }
   const [project = "", taskFile = ""] = split.kept
   const task: TaskSource = taskFile === "-" ? { kind: "stdin" } : { kind: "file", path: taskFile }
-  return { kind: "AddTask", project, task, taskKind: taskKind.taskKind, internal: split.internal, machine, dependsOn: split.values["--depends-on"] }
+  return { kind: "AddTask", project, task, taskKind: taskKind.taskKind, internal: split.internal, machine, parent, dependsOn: split.values["--depends-on"] }
 }
 
 const parseStop = (rest: ReadonlyArray<string>): DispatchArgs => {

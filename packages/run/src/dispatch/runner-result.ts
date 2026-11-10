@@ -86,6 +86,9 @@ export const endingFromResult = (result: RunnerResult, kind: TaskKind): RunEndin
   if ((result.status === "unknown" || result.status === "succeeded" || result.status === "failed") && result.run?.status === "stopped") {
     return { kind: "close", outcome: "stopped", reason: result.run.endReason ?? stoppedEndReason, pr: result.run.prLink ?? null, report: null }
   }
+  if (kind === "parent" && result.status === "failed") {
+    return { kind: "close", outcome: "failed", reason: result.run?.endReason ?? result.reason, pr: null, report: result.run?.report ?? null }
+  }
   if (kind !== "ship" && (result.status === "succeeded" || result.status === "failed")) {
     return reportEnding(result)
   }

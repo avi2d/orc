@@ -165,3 +165,20 @@ describe("orc run --kind task", () => {
     })
   }, 60_000)
 })
+
+describe("orc run --kind parent", () => {
+  test("a final check whose report does not end in verdict: pass records the run failed instead of succeeded", async () => {
+    await withReportFixture(true, async ({ repo, fakeBin, env }) => {
+      const result = await runOrc(["run", "task.md", "--kind", "parent", "--branch", "orc/task-1", "--sandbox", "none"], repo, env)
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stdout).toContain("the final check did not end its report at ")
+      const prompt = await readFile(join(fakeBin, "pi-prompt"), "utf8")
+      expect(prompt).toContain("review no code")
+      expect(prompt).toContain("verdict: pass")
+      expect(await Bun.file(join(fakeBin, "nm-calls")).exists()).toBe(false)
+      const runs: unknown = JSON.parse((await runOrc(["runs", "--json"], repo, env)).stdout)
+      expect(runs).toMatchObject({ runs: [{ branch: "orc/task-1", status: "failed" }] })
+    })
+  }, 60_000)
+})
+

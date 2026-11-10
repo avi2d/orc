@@ -371,7 +371,7 @@ describe("orc beat", () => {
       expect(await orcOk(fixture, ["backlog"])).toContain("orc-1 scout orc Do the thing")
       expect(await backlogTask(fixture, "orc-1")).toMatchObject({ kind: "scout" })
       const refused = await runOrc(fixture, ["backlog", "add", "orc", "task.md", "--kind", "deploy"])
-      expect({ exitCode: refused.exitCode, stderr: refused.stderr }).toEqual({ exitCode: 1, stderr: expect.stringContaining("the kind deploy is not ship, scout or task") })
+      expect({ exitCode: refused.exitCode, stderr: refused.stderr }).toEqual({ exitCode: 1, stderr: expect.stringContaining("the kind deploy is not ship, scout, task or parent") })
       expect((await backlogTasks(fixture)).map((task) => task.id)).toEqual(["orc-1"])
     })
   }, beatTimeout)

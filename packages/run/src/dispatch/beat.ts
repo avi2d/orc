@@ -16,6 +16,7 @@ import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
 import { flagStall } from "./stall"
 import { readPullRequest } from "./pr-view"
 import { prEvents, type ReadPullRequest } from "./task-events"
+import { mergedIds } from "./events"
 import { type ReadUpstream, readUpstream, watchUpstream } from "./upstream"
 
 export type { BeatAction } from "./beat-action"
@@ -136,6 +137,7 @@ interface BeatContext {
   readonly config: DispatchConfig
   readonly projects: ReadonlyArray<Project>
   readonly tasks: ReadonlyArray<TaskRecord>
+  readonly merged: ReadonlySet<string>
   readonly account: Account | null
   readonly live: Array<{ readonly machine: string; readonly slots: number; busy: number }>
   readonly overloaded: ReadonlyMap<string, string>
@@ -193,7 +195,7 @@ const considerTask = (
 ): Effect.Effect<BeatAction, BacklogError | TaskFileError, BeatRequirements> =>
   Effect.gen(function*() {
     const waits = (reason: string): BeatAction => ({ kind: "waits", task: task.spec.id, reason })
-    const waiting = taskWait(task, context.tasks)
+    const waiting = taskWait(task, context.tasks, context.merged)
     if (waiting !== null) {
       return waits(waiting)
     }
@@ -291,6 +293,7 @@ export const runBeat = (
     yield* ensureBacklog(root)
     const quota = yield* readQuota(config.quota)
     const tasks = yield* listTasks(root)
+    const merged = yield* mergedIds(root)
     const room = readRoom(config.machines, tasks)
     const context: BeatContext = {
       root,
@@ -299,6 +302,7 @@ export const runBeat = (
       config,
       projects,
       tasks,
+      merged,
       account: quota.kind === "read" ? (config.quota.accounts.find((account) => account.name === quota.pick) ?? null) : null,
       live: room.map((entry) => ({ ...entry })),
       overloaded: new Map(),

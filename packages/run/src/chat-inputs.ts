@@ -6,12 +6,13 @@ export const AddTaskInput = Schema.Struct({
   project: Schema.String.annotate({ description: "The project the task is for, as the backlog's project list names it" }),
   task: Schema.String.annotate({ description: "The task as markdown, whose first line is its title" }),
   kind: Schema.optionalKey(Schema.Literals(taskKinds).annotate({
-    description: "ship ends in a PR and is the default; scout and task end in a report file in the run folder instead"
+    description: "ship ends in a PR and is the default; scout and task end in a report file in the run folder instead; parent holds the done criteria and waits for its children"
   })),
   internal: Schema.optionalKey(Schema.Boolean.annotate({
     description: "Marks a ship task internal-only, so a no-mistakes-prod-only project opens its PR after checks without no-mistakes"
   })),
   machine: Schema.optionalKey(Schema.String.annotate({ description: "The one machine the task may run on" })),
+  parent: Schema.optionalKey(Schema.String.annotate({ description: "The id of the parent task this task is a child of" })),
   dependsOn: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: "The ids of the tasks that must close done before this one starts" }))
 })
 

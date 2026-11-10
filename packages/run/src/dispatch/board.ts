@@ -1,4 +1,5 @@
 import { dependencyOpen, type BeatAction, type BeatReport, type MachineRoom } from "./beat"
+import { type ChildCount, childCount } from "./beat-place"
 import type { Project } from "./config"
 import { describeQuota } from "./quota"
 import type { TaskKind } from "../task-kind"
@@ -16,6 +17,7 @@ export interface BacklogView {
   readonly events: ReadonlyArray<ChatEvent>
   readonly projects: ProjectList
   readonly room: RoomList
+  readonly merged: ReadonlySet<string>
 }
 
 type TaskStatusJson =
@@ -40,6 +42,8 @@ type TaskJson = {
   readonly project: string
   readonly kind: TaskKind
   readonly machine: string | null
+  readonly parent: string | null
+  readonly children: ChildCount | null
   readonly dependsOn: ReadonlyArray<string>
   readonly created: string
   readonly hold: Hold | null
@@ -109,6 +113,8 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     project: record.spec.project,
     kind: record.spec.kind,
     machine: record.spec.machine,
+    parent: record.spec.parent,
+    children: record.spec.kind === "parent" ? childCount(record, view.tasks, view.merged) : null,
     dependsOn: record.spec.dependsOn,
     created: record.spec.created,
     hold: record.hold,
@@ -139,13 +145,21 @@ const pinOf = (record: TaskRecord): string => record.spec.machine === null ? "" 
 
 const named = (record: TaskRecord): string => record.spec.id + (record.spec.kind === "ship" ? "" : " " + record.spec.kind) + " " + record.spec.project
 
-const newCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>): string => {
+const doneOf = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string => {
+  if (record.spec.kind !== "parent") {
+    return ""
+  }
+  const count = childCount(record, all, merged)
+  return " " + count.done + " of " + count.total + " done"
+}
+
+const newCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string => {
   const open = record.spec.dependsOn.filter((id) => dependencyOpen(all.find((candidate) => candidate.spec.id === id)))
   const waits = open.length === 0 ? "" : " waits " + open.join(",")
   const held = isHeld(record) ? " held (" + record.hold.reason + ")" : ""
   const asked = openQuestions(record)
   const parked = asked.length === 0 ? "" : " parked (" + asked.map((question) => question.id).join(",") + ")"
-  return named(record) + pinOf(record) + waits + held + parked + " " + record.spec.title
+  return named(record) + pinOf(record) + doneOf(record, all, merged) + waits + held + parked + " " + record.spec.title
 }
 
 const askedOf = (record: TaskRecord): string => {
@@ -153,17 +167,17 @@ const askedOf = (record: TaskRecord): string => {
   return asked.length === 0 ? "" : " asking (" + asked.map((question) => question.id).join(",") + ")"
 }
 
-const takenCell = (record: TaskRecord): string => {
+const takenCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string => {
   const state = record.state
   if (state.kind === "started") {
-    return named(record) + " on " + state.claim.machine + " started" + askedOf(record)
+    return named(record) + doneOf(record, all, merged) + " on " + state.claim.machine + " started" + askedOf(record)
   }
   const machine = state.kind === "taken" && state.claim !== null ? " on " + state.claim.machine : ""
-  return named(record) + machine + " taken"
+  return named(record) + doneOf(record, all, merged) + machine + " taken"
 }
 
-const closedCell = (record: TaskRecord): string =>
-  record.state.kind === "closed" ? named(record) + " " + record.state.closing.outcome : record.spec.id
+const closedCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string =>
+  record.state.kind === "closed" ? named(record) + doneOf(record, all, merged) + " " + record.state.closing.outcome : record.spec.id
 
 const projectCells = (projects: ProjectList): ReadonlyArray<string> =>
   projects.kind === "unread"
@@ -178,9 +192,9 @@ const headed = (title: string, cells: ReadonlyArray<string>): ReadonlyArray<stri
 export const formatBoard = (view: BacklogView): string => {
   const inState = (...kinds: ReadonlyArray<TaskRecord["state"]["kind"]>) => view.tasks.filter((task) => kinds.includes(task.state.kind))
   return sideBySide([
-    headed("NEW", inState("new").map((task) => newCell(task, view.tasks))),
-    headed("TAKEN", inState("taken", "started").map(takenCell)),
-    headed("CLOSED", inState("closed").map(closedCell)),
+    headed("NEW", inState("new").map((task) => newCell(task, view.tasks, view.merged))),
+    headed("TAKEN", inState("taken", "started").map((task) => takenCell(task, view.tasks, view.merged))),
+    headed("CLOSED", inState("closed").map((task) => closedCell(task, view.tasks, view.merged))),
     ["PROJECTS", ...projectCells(view.projects), "", "MACHINES", ...roomCells(view.room)]
   ])
 }

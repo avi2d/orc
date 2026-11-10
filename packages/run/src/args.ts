@@ -132,7 +132,7 @@ const valueFlags = new Set(["--kind", "--delivery", "--sandbox", "--allow", "--a
 const takeTaskKind = (rest: readonly string[], index: number, flags: RunFlags): FlagTake => {
   const word = rest[index + 1] ?? ""
   if (flags.taskKind !== undefined || word === "" || word.startsWith("--")) {
-    return { kind: "error", detail: "orc run takes --kind once, with ship, scout or task" }
+    return { kind: "error", detail: "orc run takes --kind once, with ship, scout, task or parent" }
   }
   if (!isTaskKind(word)) {
     return { kind: "error", detail: unknownKind(word) }
