@@ -246,7 +246,7 @@ const setupHome = async (alerts: string): Promise<string> => {
   await writeFile(join(home, "state.json"), JSON.stringify({ tasks: {}, groups: {} }))
   const heavyBin = heavyBinDir(home)
   await mkdir(heavyBin, { recursive: true })
-  const settings = { home, group: "heavy", wrap: "" }
+  const settings = { home, group: "heavy", wrap: "", through: null }
   await writeFile(join(heavyBin, "bun"), standinScript("bun", settings, []), { mode: 0o755 })
   await writeFile(join(heavyBin, "vitest"), standinScript("vitest", settings, []), { mode: 0o755 })
   return home

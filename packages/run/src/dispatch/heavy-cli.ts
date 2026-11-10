@@ -1,7 +1,7 @@
 import { Console, Effect, type FileSystem } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { heavyBinDir } from "./heavy"
-import { ensureHeavySetup } from "./heavy-setup"
+import { ensureHeavyQueue, ensureHeavySetup, readHeavySettings } from "./heavy-setup"
 import { checkHeavy, ensureHeavyWatch, formatCheck, watchOnce } from "./heavy-watch"
 import { type Command, type RunnerError } from "./runner"
 import type { DispatchArgs } from "./args"
@@ -9,8 +9,9 @@ import type { DispatchArgs } from "./args"
 export type HeavyVerb = Extract<DispatchArgs, { readonly kind: "HeavyPath" | "HeavyCheck" | "HeavyWatch" | "HeavyWatchOnce" }>
 
 export const startHeavyWatch = (home: string, orc: Command, command: string): Effect.Effect<void, never, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
-  ensureHeavySetup(home).pipe(
-    Effect.flatMap(() => ensureHeavyWatch(home, orc)),
+  readHeavySettings(home).pipe(
+    Effect.tap((settings) => ensureHeavyQueue(home, settings)),
+    Effect.flatMap((settings) => settings.through === null ? ensureHeavyWatch(home, orc) : Effect.succeed("heavy watch: the heavy calls queue through " + settings.through.join(" ") + ", no watchdog is armed")),
     Effect.flatMap((line) => line === null ? Effect.void : Console.log(line)),
     Effect.catchTag("RunnerError", (error) => Console.error(command + " queued no heavy watch: " + error.detail))
   )

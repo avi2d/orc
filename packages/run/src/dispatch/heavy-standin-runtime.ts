@@ -61,7 +61,7 @@ const standinUnwrapSlot = (): ReadonlyArray<string> => [
     '  heavy_cmds="$(printf "%s" "$heavy_state_json" | grep -E -o \'"command":"(\\\\.|[^"\\\\])*"\')"',
     '  if [ -z "$heavy_cmds" ]; then return 1; fi',
     '  heavy_cmds="$(printf "%s\\n" "$heavy_cmds" | while IFS= read -r heavy_cl; do heavy_unwrap "$heavy_cl"; printf "\\n"; done)"',
-    '  heavy_tree="$(ps -eo pid,ppid,command 2>/dev/null)" || return 1',
+    '  heavy_tree="$(ps -ww -eo pid,ppid,command 2>/dev/null)" || return 1',
     '  heavy_pid=$$; heavy_depth=0; heavy_selfhit=0; heavy_anchit=0; heavy_pueue=0',
     '  while :; do',
     '    heavy_acmd="$(printf "%s\\n" "$heavy_tree" | awk -v p="$heavy_pid" \'$1 == p { $1=""; $2=""; sub(/^  */, ""); print; exit }\')"',
@@ -178,7 +178,38 @@ const waiterBody =
 const waiterAdd =
   'sh -c \'' + waiterBody + '\' orc-heavy-wait $$ $heavy_wrap "$heavy_real_bin" "$@"'
 
-export const standinQueue = (): ReadonlyArray<string> => [
+const quoteThroughWord = (word: string): string => "'" + word.replaceAll("'", "'\\''") + "'"
+const throughCall = (through: ReadonlyArray<string>): ReadonlyArray<string> => [
+    '  if heavy_inside_through; then',
+    '    exec "$heavy_real_bin" "$@"',
+    '  fi',
+    '  exec sh -c \'"$@"; exit "$?"\' orc-heavy-through ' + through.map(quoteThroughWord).join(" ") + ' $heavy_wrap "$heavy_real_bin" "$@"',
+]
+
+const insideThrough = (through: ReadonlyArray<string>): ReadonlyArray<string> => {
+  const firstBase = (through[0] ?? "").split("/").pop() ?? ""
+  const rest = through.slice(1).join(" ")
+  return [
+    'heavy_inside_through() {',
+    '  heavy_tree="$(ps -ww -eo pid,ppid,command 2>/dev/null)" || return 1',
+    '  heavy_pid=$$',
+    '  heavy_t0=' + quoteThroughWord(firstBase),
+    '  heavy_trest=' + quoteThroughWord(rest),
+    '  while :; do',
+    '    heavy_acmd="$(printf "%s\\n" "$heavy_tree" | awk -v p="$heavy_pid" \'$1 == p { $1=""; $2=""; sub(/^  */, ""); print; exit }\')"',
+    '    case "$heavy_acmd" in *\' -c "$@"; exit "$?" orc-heavy-through \'*) return 0;; esac',
+    '    if awk -v cmd="$heavy_acmd" -v t0="$heavy_t0" -v rest="$heavy_trest" \'BEGIN { n = split(cmd, a, / +/); m = (rest == "" ? 0 : split(rest, r, / +/)); b = a[1]; sub(/.*\\//, "", b); if (b == t0) { ok = 1; for (i = 1; i <= m; i++) if (a[i+1] != r[i]) { ok = 0; break; } if (ok) exit 0; } w = a[1]; sub(/.*\\//, "", w); if (w != "") { j = 2; while (j <= n && a[j] ~ /^-/) { t = a[j]; if (t ~ /^-[^-]*c/) exit 1; j++; } if (j <= n) { h = a[j]; sub(/.*\\//, "", h); s = h; sub(/\\.[^.]*$/, "", s); if (h == t0 || s == t0) { ok = 1; for (i = 1; i <= m; i++) if (a[j+i] != r[i]) { ok = 0; break; } if (ok) exit 0; } } exit 1; } exit 1; }\' >/dev/null 2>&1; then return 0; fi',
+    '    heavy_ppid="$(printf "%s\\n" "$heavy_tree" | awk -v p="$heavy_pid" \'$1 == p { print $2; exit }\')"',
+    '    case "$heavy_ppid" in ""|0|"$heavy_pid") return 1;; esac',
+    '    heavy_pid="$heavy_ppid"',
+    '  done',
+    '}',
+    '',
+  ]
+}
+
+export const standinQueue = (through: ReadonlyArray<string> | null): ReadonlyArray<string> => [
+    ...(through === null ? [] : insideThrough(through)),
     'heavy_main() {',
     '  if [ -n "$HEAVY_CLASSIFY" ]; then',
     '    heavy_decide "$@"',
@@ -202,6 +233,7 @@ export const standinQueue = (): ReadonlyArray<string> => [
     '    echo "orc heavy: bypassing the $heavy_group queue: $HEAVY_QUEUE_BYPASS" >&2',
     '    exec "$heavy_real_bin" "$@"',
     '  fi',
+    ...(through === null ? [] : throughCall(through)),
     '  if heavy_inside_slot; then',
     '    exec "$heavy_real_bin" "$@"',
     '  fi',

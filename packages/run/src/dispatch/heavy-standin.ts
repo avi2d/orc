@@ -108,6 +108,7 @@ export interface StandinSettings {
   readonly home: string
   readonly group: string
   readonly wrap: string
+  readonly through: ReadonlyArray<string> | null
 }
 
 export const detectWrap = (platform: HeavyPlatform, limit: "auto" | "none"): string => {
@@ -143,7 +144,15 @@ const standinDecideFn = (decide: ReadonlyArray<string>): ReadonlyArray<string> =
 
 export const standinScript = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, timing?: StandinTiming): string => {
   const decide = defaultHeavyTools.includes(tool) ? [...decideBody(tool), ...extraSub(tool, commands)] : extraSub(tool, commands)
-  return [...standinHead(tool, settings), ...helpers, ...standinDecideFn(decide), ...standinUtils(), ...standinQueue(), ...standinWait(timing), ...standinFinish()].join("\n") + "\n"
+  return [
+    ...standinHead(tool, settings),
+    ...helpers,
+    ...standinDecideFn(decide),
+    ...standinUtils(),
+    ...standinQueue(settings.through),
+    ...standinWait(timing),
+    ...standinFinish()
+  ].join("\n") + "\n"
 }
 
 export const standinScripts = (

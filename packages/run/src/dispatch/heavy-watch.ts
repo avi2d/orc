@@ -88,6 +88,7 @@ import {
   slipHeld,
   slipLine,
   stripHeavyWrapper,
+  type SlipCandidate,
   type SlipTask
 } from "./heavy-watch-slip"
 
@@ -157,9 +158,47 @@ export interface WatchReport {
   readonly slips: ReadonlyArray<string>
 }
 
+const stallForOldest = (old: ReadonlyArray<OldTask>, firedRecently: boolean, machine: string, at: string): ReadonlyArray<string> => {
+  const oldest = old.reduce<OldTask | null>((latest, task) => latest === null || task.ageMinutes > latest.ageMinutes ? task : latest, null)
+  return oldest === null || firedRecently ? [] : [stallLine(machine, oldest, at)]
+}
+
+const newSlipTasks = (
+  candidates: ReadonlyArray<SlipCandidate>,
+  queuedByPid: ReadonlyMap<number, boolean>,
+  ps: string,
+  queued: ReadonlySet<string>,
+  seenSlip: Readonly<Record<string, string | undefined>>,
+  nowMs: number
+): ReadonlyArray<SlipTask> => {
+  const found = new Map<string, SlipTask>()
+  for (const candidate of candidates) {
+    if (queuedByPid.get(candidate.pid) !== true) {
+      continue
+    }
+    if (slipHeld(ps, candidate.pid, queued)) {
+      continue
+    }
+    if (!found.has(candidate.command)) {
+      found.set(candidate.command, { pid: candidate.pid, command: candidate.command })
+    }
+  }
+  return [...found.values()].sort((a, b) => a.pid - b.pid).filter((slip) => {
+    const last = seenSlip[slip.command]
+    if (last === undefined) {
+      return true
+    }
+    const firedAt = Date.parse(last)
+    return Number.isNaN(firedAt) || nowMs - firedAt > watchTtlMinutes * 60_000
+  })
+}
+
 export const watchOnce = (home: string, nowMs: number = Date.now()): Effect.Effect<WatchReport, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const settings = yield* readHeavySettings(home)
+    if (settings.through !== null) {
+      return yield* new RunnerError({ detail: "heavy watch: the heavy calls queue through " + settings.through.join(" ") + ", which keeps no pueue group to watch" })
+    }
     const backlog = home + "/backlog"
     const machine = hostname()
     const fs = yield* FileSystem.FileSystem
@@ -169,10 +208,9 @@ export const watchOnce = (home: string, nowMs: number = Date.now()): Effect.Effe
     )
     const lastAlert = lastAlertByMachine(fired)
     const old = oldRunningTasks(state, settings.group, nowMs, watchTtlMinutes)
-    const oldest = old.reduce<OldTask | null>((latest, task) => latest === null || task.ageMinutes > latest.ageMinutes ? task : latest, null)
     const firedRecently = staleMachines([machine], lastAlert, nowMs, watchTtlMinutes).length === 0
     const at = new Date(nowMs).toISOString()
-    const stalls = oldest === null || firedRecently ? [] : [stallLine(machine, oldest, at)]
+    const stalls = stallForOldest(old, firedRecently, machine, at)
     const ps = yield* capture(["ps", "-eo", "pid,ppid,command"], null).pipe(
       Effect.map((result) => result.stdout),
       Effect.orElseSucceed(() => "")
@@ -188,26 +226,7 @@ export const watchOnce = (home: string, nowMs: number = Date.now()): Effect.Effe
     const queued = new Set(alive.map(normalizeTaskCommand))
     const candidates = slipCandidates(ps, standinTools(settings.commands), new Set([process.pid]), heavyBinDir(home))
     const queuedByPid = yield* classifyCalls(candidates)
-    const found = new Map<string, SlipTask>()
-    for (const candidate of candidates) {
-      if (queuedByPid.get(candidate.pid) !== true) {
-        continue
-      }
-      if (slipHeld(ps, candidate.pid, queued)) {
-        continue
-      }
-      if (!found.has(candidate.command)) {
-        found.set(candidate.command, { pid: candidate.pid, command: candidate.command })
-      }
-    }
-    const slips = [...found.values()].sort((a, b) => a.pid - b.pid).filter((slip) => {
-      const last = seenSlip[slip.command]
-      if (last === undefined) {
-        return true
-      }
-      const firedAt = Date.parse(last)
-      return Number.isNaN(firedAt) || nowMs - firedAt > watchTtlMinutes * 60_000
-    })
+    const slips = newSlipTasks(candidates, queuedByPid, ps, queued, seenSlip, nowMs)
     const slipAlerts = slips.map((slip) => slipLine(machine, slip.command, at))
     yield* appendLines(alertsFile(backlog), [...stalls, ...slipAlerts])
     return { old, alerts: [...stalls, ...slipAlerts], slips: slips.map((slip) => slip.command) }
@@ -264,9 +283,8 @@ const taskAge = (iso: string, nowMs: number): number | null => {
   return Number.isNaN(seen) ? null : Math.max(0, Math.floor((nowMs - seen) / 60_000))
 }
 
-export const checkHeavy = (home: string, nowMs: number = Date.now()): Effect.Effect<HeavyCheck, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+const checkPueueGroup = (home: string, group: string, nowMs: number): Effect.Effect<HeavyCheck, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    const settings = yield* readHeavySettings(home)
     const backlog = home + "/backlog"
     const fs = yield* FileSystem.FileSystem
     const fired = yield* fs.readFileString(alertsFile(backlog)).pipe(Effect.orElseSucceed(() => ""))
@@ -276,14 +294,14 @@ export const checkHeavy = (home: string, nowMs: number = Date.now()): Effect.Eff
       Effect.mapError((error) => new RunnerError({ detail: "heavy check: pueue is unreachable: " + error.detail })),
       Effect.flatMap((text) => decodeJson(text, WatchState, "pueue status --json"))
     )
-    if (!Object.hasOwn(state.groups, settings.group)) {
-      return yield* new RunnerError({ detail: "heavy check: the " + settings.group + " group is missing, run orc heavy path to create it" })
+    if (!Object.hasOwn(state.groups, group)) {
+      return yield* new RunnerError({ detail: "heavy check: the " + group + " group is missing, run orc heavy path to create it" })
     }
-    const entry = state.groups[settings.group]
+    const entry = state.groups[group]
     const running: Array<HeavyCheckTask> = []
     const queued: Array<HeavyCheckTask> = []
     for (const task of Object.values(state.tasks)) {
-      if (task.group !== settings.group) {
+      if (task.group !== group) {
         continue
       }
       const status = decodedStatus(task.status)
@@ -301,8 +319,17 @@ export const checkHeavy = (home: string, nowMs: number = Date.now()): Effect.Eff
     }
     running.sort((a, b) => a.id - b.id)
     queued.sort((a, b) => a.id - b.id)
-    return { group: settings.group, parallel: entry.parallel_tasks, running, queued, bypass, bypassWeek }
+    return { group, parallel: entry.parallel_tasks, running, queued, bypass, bypassWeek }
   })
+
+export const checkHeavy = (home: string, nowMs: number = Date.now()): Effect.Effect<HeavyCheck, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+  readHeavySettings(home).pipe(
+    Effect.flatMap((settings) =>
+      settings.through === null
+        ? checkPueueGroup(home, settings.group, nowMs)
+        : Effect.fail(new RunnerError({ detail: "heavy check: the heavy calls queue through " + settings.through.join(" ") + ", which keeps no pueue group to read" }))
+    )
+  )
 
 export const formatCheck = (check: HeavyCheck): string => {
   const free = Math.max(0, check.parallel - check.running.length)
