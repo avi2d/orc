@@ -64,7 +64,8 @@ Its `asking` is the time the run asked, as `orc runner result --json` shows it.
 It writes them into that run's `answers.json`.
 It refuses a task whose run waits for no answer, or waits on an asking other than the one named.
 To print the five minute load average the beat compares against a load limit, run `orc runner load` on that machine.
-Its second line counts the calls queued in that machine's heavy queue and the bypasses logged in the last 7 days.
+Without `through` set, its second line counts the calls queued in that machine's heavy queue and the bypasses logged in the last 7 days.
+With `through` set, its second line reports the heavy queue as unread.
 
 ## Queue heavy calls
 `orc runner start` writes stand in scripts for heavy tools and arms the watchdog beside the alert stream unless `through` is set.
