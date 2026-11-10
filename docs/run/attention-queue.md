@@ -5,8 +5,9 @@ kind: reference
 Everything that waits on someone is one item in one queue, kept beside the backlog in `~/.orc/backlog/attention`.
 Each item is one JSON file with its `kind`, its `task`, its `text`, the time it was `asked`, its `owner` and its `state`.
 The owner names who must answer it, `decider` or `user`.
-The state is `open` until an answer closes it, and a closed item keeps the answer's words and time.
-When its task closes, or its question is no longer asked, the item closes as `withdrawn` with its reason and time.
+The state starts as `open`.
+An answer makes it `closed`, and a closed item keeps the answer words and time.
+When its task closes, or its question is no longer asked, the item turns `withdrawn` with its reason and time.
 Showing an item never closes it.
 An open item is overdue once more than 5 minutes have passed since it was asked.
 
