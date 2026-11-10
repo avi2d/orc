@@ -20,10 +20,13 @@ const fiveMinuteLoad = (): number => loadavg()[1] ?? 0
 // A machine with this many heavy calls waiting takes no new start.
 export const deepHeavyQueue = 3
 
+const heavySeconds = 5
+
 const readHeavy = (home: string): Effect.Effect<HeavyReading, never, LoadRequirements> =>
   checkHeavy(home).pipe(
     Effect.map((check): HeavyReading => ({ kind: "read", queued: check.queued.length, bypassWeek: check.bypassWeek })),
-    Effect.catchTag("RunnerError", (error) => Effect.succeed<HeavyReading>({ kind: "unread", reason: error.detail }))
+    Effect.catchTag("RunnerError", (error) => Effect.succeed<HeavyReading>({ kind: "unread", reason: error.detail })),
+    Effect.timeoutOrElse({ duration: Duration.seconds(heavySeconds), orElse: () => Effect.succeed<HeavyReading>({ kind: "unread", reason: "heavy check timed out after " + heavySeconds + " seconds" }) })
   )
 
 const heavyPattern = /^heavy queue: (\d+) queued, (\d+) bypass(?:es)? this week$/

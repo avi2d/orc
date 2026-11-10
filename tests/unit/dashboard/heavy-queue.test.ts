@@ -50,7 +50,7 @@ describe("the heavy queue on a dashboard with two machines", () => {
   test("gives each machine its own heavy line in the queue box rather than one machine's depth for both", async () => {
     const rows = rowsOf(boxText(await printedTwoMachines(), "queue | scheduled"));
     expect(rows).toContain("heavy north 1/1 running \u00b7 2 queued, oldest 9m \u00b7 2 bypasses this week");
-    expect(rows.find((row) => row.startsWith("heavy south"))).toStartWith("heavy south ✗ unreachable: sh exited 1: orc: heavy check: the heavy group is missing");
+    expect(rows.find((row) => row.startsWith("heavy south"))).toBe("heavy south queue not set up");
   }, 30_000);
 
   test("puts each machine's heavy check under that machine in the machines box rather than under the other", async () => {
@@ -58,7 +58,7 @@ describe("the heavy queue on a dashboard with two machines", () => {
     const north = rows.findIndex((row) => row.startsWith("north "));
     const south = rows.findIndex((row) => row.startsWith("south "));
     expect(rows[north + 1]).toBe("  heavy 1/1 running \u00b7 2 queued, oldest 9m \u00b7 2 bypasses this week");
-    expect(rows.slice(south + 1).join(" ").replaceAll(/\s+/gu, " ")).toContain(`heavy queue unreachable: ${southBeforeFirstRun}`);
+    expect(rows.slice(south + 1).join(" ").replaceAll(/\s+/gu, " ")).toContain("heavy queue not set up");
     expect(rows.slice(south + 1).join(" ")).not.toContain("1/1 running");
   }, 30_000);
 });

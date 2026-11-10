@@ -1,5 +1,5 @@
 import type { DateTime } from "effect";
-import { type HeavyCheck, heavySummary, type MachinesView, type Measured, type NamedMachine, type Outcome, type TaskLevels, unsetTaskLevels } from "@avi2dg/orc-schema";
+import { type HeavyCheck, heavySummary, isHeavyNotSetup, type MachinesView, type Measured, type NamedMachine, type Outcome, type TaskLevels, unsetTaskLevels } from "@avi2dg/orc-schema";
 import { type Block, ellipsize, failureLines, gib, type Line, percent, sentence, span, type Span, type Tone } from "@avi2dg/orc-ui";
 
 export interface Machines {
@@ -99,7 +99,9 @@ const resourceLines = (machine: NamedMachine, width: number): Block => {
 const heavyLines = (check: Outcome<HeavyCheck>, width: number): Block =>
   check.kind === "ok"
     ? [[span("heavy ", "muted"), span(ellipsize(heavySummary(check.value), Math.max(0, width - 6)), "foreground")]]
-    : failureLines(check, width, "heavy queue");
+    : isHeavyNotSetup(check)
+      ? sentence("heavy queue not set up", "muted", width)
+      : failureLines(check, width, "heavy queue");
 
 export const machinesBoxLines = (
   view: MachinesView,

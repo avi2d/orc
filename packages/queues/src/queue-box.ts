@@ -1,5 +1,5 @@
 import { DateTime, Option } from "effect";
-import { type CiReport, type HeavyCheck, heavySummary, type MachineQueueView, type Outcome, type QueueRow, type QueueRowState, type Reading } from "@avi2dg/orc-schema";
+import { type CiReport, type HeavyCheck, heavySummary, isHeavyNotSetup, type MachineQueueView, type Outcome, type QueueRow, type QueueRowState, type Reading } from "@avi2dg/orc-schema";
 import {
   type Block,
   clock,
@@ -99,7 +99,7 @@ const heavyLines = (heavies: ReadonlyArray<NamedHeavy>, width: number): Block =>
   heavies.flatMap(({ name, heavy }): Block => {
     if (Option.isNone(heavy)) return [];
     const label = heavies.length > 1 ? `heavy ${name}` : "heavy";
-    if (heavy.value.kind !== "ok") return sourceNotes(label, heavy.value, width);
+    if (heavy.value.kind !== "ok") return isHeavyNotSetup(heavy.value) ? sentence(`${label} queue not set up`, "muted", width) : sourceNotes(label, heavy.value, width);
     const gutter = widthOf(`${label} `);
     return [[span(padEnd(label, gutter), "muted"), span(ellipsize(heavySummary(heavy.value.value), Math.max(0, width - gutter)), "foreground")]];
   });

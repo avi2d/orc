@@ -304,7 +304,8 @@ The other machine's copies are read through the words before `pueue status` in `
 They show `unknown` when that command names pueue by its path or runs other shell commands before it.
 In a terminal too narrow for the command beside the times, the command goes on a line of its own under its run.
 Each machine's panel adds a heavy line from its `orc heavy check --json`, with the heavy group's running calls and slots, its queued calls with the oldest one's age, and the bypasses logged in the last 7 days.
-A machine whose check fails, such as one where `orc heavy path` has not yet created the group, shows the reason on its heavy line.
+A machine with no heavy queue or no orc shows heavy queue not set up on its heavy line.
+A machine whose check fails for another reason shows the reason on its heavy line.
 The groups panel lists each machine's pueue groups with whether each is running, paused or resetting, and how many tasks it runs at once.
 The actions panel lists the requested, pending, waiting, queued and in progress runs, newest first.
 It counts how many run and how many wait.

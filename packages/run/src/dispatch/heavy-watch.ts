@@ -304,7 +304,7 @@ export const checkHeavy = (home: string, nowMs: number = Date.now()): Effect.Eff
     return { group: settings.group, parallel: entry.parallel_tasks, running, queued, bypass, bypassWeek }
   })
 
-const minutesText = (minutes: number): string => minutes === 0 ? "under 1m" : String(minutes) + "m"
+const minutesText = (minutes: number): string => String(minutes) + "m"
 
 export const formatCheck = (check: HeavyCheck): string => {
   const free = Math.max(0, check.parallel - check.running.length)

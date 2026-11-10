@@ -368,7 +368,7 @@ export { type NamedOrchestrator, type NamedPueue, type NextKind, type NextReadin
 export { machineQueue, type MachineQueueView, type QueueEntry, type QueueRow, type QueueRowState, queueWindow } from "./views/machine-queue";
 export { type DispatchReading, type DispatchSnapshot, DispatchSource, dispatchSourceLayer, type DispatchTask, missingBacklog } from "./sources/dispatch";
 export { type DispatchView, dispatchView, type RoomEntry, type RunRow, type WaitRow } from "./views/dispatch";
-export { heavySummary } from "./views/heavy";
+export { heavySummary, isHeavyNotSetup } from "./views/heavy";
 export { decodeHeavyCheck, HeavyCheck, type HeavyMachine, HeavyMachines, heavyMachinesLayer } from "./sources/heavy";
 export { decodePueue, knownProjects, type PueueMachine, PueueMachines, pueueMachinesLayer, PueueStatus } from "./sources/pueue";
 export { type MachineProjects } from "./sources/project-names";

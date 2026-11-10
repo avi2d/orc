@@ -7,7 +7,6 @@ import {
   type Command,
   decodePueue,
   ok,
-  type QueueReadings,
   QueuesCodec,
   readConfig,
   ReadModeReference,
@@ -153,8 +152,8 @@ describe("a CI refresh hanging past the draw", () => {
 describe("a saved queue standing in while its sources hang", () => {
   test("shows the saved age on the box and in the glance", async () => {
     const at = Date.now() - 3 * 3_600_000;
-    const report: QueueReadings = {
-      machines: [{ name: "north", heavy: Option.none(), status: Option.some(decodePueue(fixture("pueue/status.json"))) }],
+    const report = {
+      machines: [{ name: "north", status: Option.some(decodePueue(fixture("pueue/status.json"))) }],
       actions: { repo: fixtureActionsRepo, runs: Option.some(ok([])) },
     };
     const stored: unknown = Schema.encodeSync(QueuesCodec)(report);

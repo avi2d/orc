@@ -1,8 +1,13 @@
 import type { HeavyCheck } from "../sources/heavy";
+import type { Failed } from "../reading";
 
 const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`;
 
-const minutesText = (minutes: number): string => (minutes === 0 ? "under 1m" : `${minutes}m`);
+const minutesText = (minutes: number): string => `${minutes}m`;
+
+export const isHeavyNotSetup = (failure: Failed): boolean =>
+  failure.kind === "unreachable" &&
+  (failure.reason.includes("group is missing") || failure.reason.includes("not installed on the PATH") || failure.reason.includes("not found"));
 
 export const heavySummary = (check: HeavyCheck): string => {
   const oldest = Math.max(0, ...check.queued.map((call) => call.ageMinutes));

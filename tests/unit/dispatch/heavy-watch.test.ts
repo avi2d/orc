@@ -169,11 +169,11 @@ describe("the check readout", () => {
     )
   })
 
-  test("a call queued under a minute ago reads under 1m rather than 0m", () => {
+  test("a call queued under a minute ago reads 0m", () => {
     const check = { group: "heavy", parallel: 1, running: [], queued: [{ id: 4, command: "bun test", ageMinutes: 0 }], bypass: 0, bypassWeek: 0 }
     expect(formatCheck(check)).toBe(
-      "heavy: 1 slot, 1 free, 0 running, 1 queued, oldest queued under 1m, 0 bypasses, 0 this week\n" +
-      "  queued #4 under 1m bun test"
+      "heavy: 1 slot, 1 free, 0 running, 1 queued, oldest queued 0m, 0 bypasses, 0 this week\n" +
+      "  queued #4 0m bun test"
     )
   })
 

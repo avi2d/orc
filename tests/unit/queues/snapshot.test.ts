@@ -84,7 +84,7 @@ describe("the pueue groups panel, against the recorded status", () => {
     const view = fixtureQueues();
     const [north] = view.machines;
     const resetting = Option.map(north.pueue, (read) =>
-      read.kind === "ok" ? ok({ ...read.value, groups: [{ name: "gpu", heavy: Option.none(), status: "Reset" as const, parallel: 3 }] }) : read,
+      read.kind === "ok" ? ok({ ...read.value, groups: [{ name: "gpu", status: "Reset" as const, parallel: 3 }] }) : read,
     );
     expect(panelOf(printed({ ...view, machines: [{ ...north, pueue: resetting }] }), "pueue groups")).toEqual(["north gpu resetting, limit 3"]);
   });

@@ -3,10 +3,9 @@ import { outcomeOf } from "../contract/outcome";
 import type { Reading } from "../reading";
 import { ActionRun } from "../sources/actions";
 import type { CiReport } from "../sources/ci-runs";
-import { HeavyCheck } from "../sources/heavy";
 import { PueueStatus } from "../sources/pueue";
 import { QuotaAvailability, QuotaProviderState, QuotaWindow, shownQuotaProviders } from "../sources/quota";
-import type { QueueReadings } from "../views/queues";
+
 import type { QuotaBlock } from "../views/quotas";
 import type { MachinesView } from "../views/resources";
 import type { SessionQuotaView } from "../views/session-quota";
@@ -249,8 +248,8 @@ export const MachinesCodec: Schema.Codec<MachinesView, unknown> = Schema.Struct(
   machines: Schema.TupleWithRest(Schema.Tuple([NamedMachine]), [NamedMachine]),
 });
 
-export const QueuesCodec: Schema.Codec<QueueReadings, unknown> = Schema.Struct({
-  machines: Schema.Array(Schema.Struct({ name: Schema.String, status: Schema.Option(outcomeOf(PueueStatus)), heavy: Schema.Option(outcomeOf(HeavyCheck)) })),
+export const QueuesCodec = Schema.Struct({
+  machines: Schema.Array(Schema.Struct({ name: Schema.String, status: Schema.Option(outcomeOf(PueueStatus)) })),
   actions: Schema.Struct({ repo: Schema.String, runs: Schema.Option(outcomeOf(Schema.Array(ActionRun))) }),
 });
 
