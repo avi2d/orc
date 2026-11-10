@@ -39,6 +39,27 @@ rmdir "$FAKE_HOLDER_LOCK"
 exit "$r"
 `
 
+const bunHolder = `import { appendFileSync, mkdirSync, rmdirSync } from "node:fs"
+import { spawnSync } from "node:child_process"
+const log = process.env.FAKE_HOLDER_LOG ?? ""
+const lock = process.env.FAKE_HOLDER_LOCK ?? ""
+const args = Bun.argv.slice(2)
+appendFileSync(log, "winbox-heavy " + args.join(" ") + "\\n")
+if (args[0] !== "run") process.exit(64)
+const cmd = args.slice(2)
+try {
+  mkdirSync(lock)
+} catch {
+  console.error("winbox-heavy: the slot is already held")
+  process.exit(99)
+}
+const child = spawnSync(cmd[0] ?? "", cmd.slice(1), { stdio: "inherit" })
+try {
+  rmdirSync(lock)
+} catch {}
+process.exit(child.status ?? 1)
+`
+
 const settingsOf = (home: string, through: ReadonlyArray<string> | null = null) => ({ home, group: "heavy", wrap: "", through })
 
 const staticFakes: ReadonlyArray<string> = ["pueue", "bun", "mytool", "vitest", "npm", "go", "jest", "eslint", "tsc", "npx", "xcodebuild", "xcrun"]
@@ -91,6 +112,7 @@ export const setupThrough = async (tools: ReadonlyArray<string>, through: Readon
   const { bin, fake } = await makeDirs(root)
   await writeStaticFakes(fake)
   await writeFile(join(fake, "winbox-heavy"), fakeHolder, { mode: 0o755 })
+  await writeFile(join(fake, "winbox-heavy.ts"), bunHolder, { mode: 0o755 })
   await writeToolStandins(bin, root, fake, tools, [], undefined, through)
   const env = { ...harnessEnv(root, bin, fake), FAKE_HOLDER_LOG: join(root, "holder.log"), FAKE_HOLDER_LOCK: join(root, "holder.lock") }
   return {
