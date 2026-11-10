@@ -1,5 +1,5 @@
 import type { DateTime } from "effect";
-import { type MachinesView, type Measured, type NamedMachine, type TaskLevels, unsetTaskLevels } from "@avi2dg/orc-schema";
+import { type HeavyCheck, heavySummary, isHeavyNotSetup, type MachinesView, type Measured, type NamedMachine, type Outcome, type TaskLevels, unsetTaskLevels } from "@avi2dg/orc-schema";
 import { type Block, ellipsize, failureLines, gib, type Line, percent, sentence, span, type Span, type Tone } from "@avi2dg/orc-ui";
 
 export interface Machines {
@@ -96,10 +96,18 @@ const resourceLines = (machine: NamedMachine, width: number): Block => {
   return [head, ...tail.map((line): Line => [span("  ", "foreground"), ...line])];
 };
 
+const heavyLines = (check: Outcome<HeavyCheck>, width: number): Block =>
+  check.kind === "ok"
+    ? [[span("heavy ", "muted"), span(ellipsize(heavySummary(check.value), Math.max(0, width - 6)), "foreground")]]
+    : isHeavyNotSetup(check)
+      ? sentence("heavy queue not set up", "muted", width)
+      : failureLines(check, width, "heavy queue");
+
 export const machinesBoxLines = (
   view: MachinesView,
   machines: Machines,
   levels: ReadonlyMap<string, TaskLevels>,
+  heavy: ReadonlyMap<string, Outcome<HeavyCheck>>,
   zone: DateTime.TimeZone,
   width: number,
 ): Block => {
@@ -109,6 +117,8 @@ export const machinesBoxLines = (
     const machine = view.machines.find((resource) => resource.name === name);
     if (machine === undefined) lines.push([span(ellipsize(name, width), "foreground", { bold: true })]);
     else lines.push(...resourceLines(machine, width));
+    const check = heavy.get(name);
+    if (check !== undefined) lines.push(...heavyLines(check, width - 2).map((line): Line => [span("  ", "foreground"), ...line]));
     const judged = levelsForMachine(levels, machines.local, view.now, zone, name);
     if (judged !== undefined) lines.push(...machineLimitLines(judged, width - 2).map((line): Line => [span("  ", "foreground"), ...line]));
   }

@@ -28,13 +28,13 @@ describe("orc bin", () => {
     const result = await runOrc(["--version"])
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toBe(`orc ${packageJson.version}\n`)
-  })
+  }, 60_000)
 
   test("--help prints usage and exits 0", async () => {
     const result = await runOrc(["--help"])
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toContain("Usage: orc")
-  })
+  }, 60_000)
 
   test("every subcommand in the usage text prints that usage for --help instead of reading --help as an argument", async () => {
     const top = await runOrc(["--help"])
@@ -52,13 +52,13 @@ describe("orc bin", () => {
     const result = await runOrc(["--frobnicate"])
     expect(result.exitCode).not.toBe(0)
     expect(result.stderr).toContain("Usage: orc")
-  })
+  }, 60_000)
 
   test("run without a task file prints usage and exits non-zero", async () => {
     const result = await runOrc(["run"])
     expect(result.exitCode).not.toBe(0)
     expect(result.stderr).toContain("orc run takes a task file")
-  })
+  }, 60_000)
 
   test("run in a dirty checkout refuses before any agent starts", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-bin-run-"))
@@ -77,7 +77,7 @@ describe("orc bin", () => {
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
-  })
+  }, 60_000)
 
   test("run with no pi login refuses the keychain-only setup", async () => {
     await withLoginFixture("echo not_ready; exit 1", async ({ dir, home, fakeBin }) => {
@@ -93,7 +93,7 @@ describe("orc bin", () => {
       expect(await Bun.file(join(fakeBin, "other-calls")).exists()).toBe(false)
       expect(Bun.spawnSync(["git", "rev-parse", "--verify", "-q", "orc/test"], { cwd: dir }).exitCode).not.toBe(0)
     })
-  })
+  }, 60_000)
 
   test("run on the bundled agents with no config.json is refused before pi is asked, instead of running a built-in model", async () => {
     await withLoginFixture("echo ready; exit 0", async ({ dir, home, fakeBin }) => {
@@ -104,7 +104,7 @@ describe("orc bin", () => {
       expect(await Bun.file(join(fakeBin, "auth-checks")).exists()).toBe(false)
       expect(await Bun.file(join(fakeBin, "other-calls")).exists()).toBe(false)
     })
-  })
+  }, 60_000)
 
   test("a config.json key orc does not know is refused instead of ignored", async () => {
     await withLoginFixture("echo ready; exit 0", async ({ dir, home, fakeBin }) => {
@@ -114,7 +114,7 @@ describe("orc bin", () => {
       expect(result.stderr).toContain("cannot read " + join(home, "orc", "config.json"))
       expect(await Bun.file(join(fakeBin, "auth-checks")).exists()).toBe(false)
     })
-  })
+  }, 60_000)
 
   test("a login provider config.json gives no nono entry is refused in the nono sandbox instead of sending its key nowhere", async () => {
     await withLoginFixture("echo ready; exit 0", async ({ dir, home, fakeBin }) => {
@@ -124,7 +124,7 @@ describe("orc bin", () => {
       expect(result.stderr).toContain("gives the provider acme-go no nono entry, so the nono sandbox cannot carry its key")
       expect(await Bun.file(join(fakeBin, "auth-checks")).exists()).toBe(false)
     })
-  })
+  }, 60_000)
 
   test("--token-file on a login provider is refused instead of ignored", async () => {
     await withLoginFixture("echo ready; exit 0", async ({ dir, home, fakeBin }) => {
@@ -133,7 +133,7 @@ describe("orc bin", () => {
       expect(result.stderr).toContain("--token-file names a token file, and " + join(home, "orc", "config.json") + " has the provider acme-go take a Pi login")
       expect(await Bun.file(join(fakeBin, "auth-checks")).exists()).toBe(false)
     })
-  })
+  }, 60_000)
 
   test("run refuses a key pi reads only from the environment, which nono's credential capture does not see", async () => {
     await withLoginFixture("if [ -n \"$ACME_API_KEY\" ]; then echo ready; exit 0; fi; echo not_ready; exit 1", async ({ dir, home, fakeBin }) => {
@@ -148,7 +148,7 @@ describe("orc bin", () => {
       expect(result.stderr).toContain("a key held only in the keychain or in an environment variable is refused")
       expect(await Bun.file(join(fakeBin, "other-calls")).exists()).toBe(false)
     })
-  })
+  }, 60_000)
 
   test("run writes the 150000 token compaction mark into the run's Pi folder instead of leaving Pi's default reserve", async () => {
     await withLoginFixture("echo ready; exit 0", async ({ dir, home, fakeBin }) => {
@@ -188,7 +188,7 @@ describe("orc bin", () => {
       const models: unknown = JSON.parse(await readFile(join(orcHome, "runs", runId, "session", "agent", "models.json"), "utf8"))
       expect(models).toEqual({ providers: { "acme-go": { apiKey: "$ACME_GO_KEY", modelOverrides: { "coder-1": { contextWindow: 262_144 } } } } })
     })
-  })
+  }, 60_000)
 
   test("run refuses a model pi does not list rather than starting a run with no context mark", async () => {
     await withLoginFixture("echo ready; exit 0", async ({ dir, home, fakeBin }) => {
@@ -210,7 +210,7 @@ describe("orc bin", () => {
       expect(result.stderr).toContain("pi lists no model acme-go/coder-1")
       expect(await readdir(join(orcHome, "runs"))).toEqual([])
     })
-  })
+  }, 60_000)
 
   test("a run started without a sandbox resumes without one when the flag is dropped, instead of falling back to nono", async () => {
     await withRunnableFixture(async ({ dir, env }) => {

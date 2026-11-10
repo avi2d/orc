@@ -35,11 +35,21 @@ const AlertFire = Schema.Struct({
 })
 const decodeFire = Schema.decodeUnknownOption(Schema.fromJsonString(AlertFire))
 
-const BypassFire = Schema.Struct({ rule: Schema.Literal("heavy-bypass") })
+const BypassFire = Schema.Struct({ rule: Schema.Literal("heavy-bypass"), at: Schema.optionalKey(Schema.String) })
 const decodeBypass = Schema.decodeUnknownOption(Schema.fromJsonString(BypassFire))
 
-export const countBypass = (text: string): number =>
-  text.split("\n").filter((line) => line.trim() !== "" && Option.isSome(decodeBypass(line))).length
+const bypassTimes = (text: string): ReadonlyArray<number> =>
+  text.split("\n").flatMap((line) =>
+    line.trim() === "" ? [] : Option.match(decodeBypass(line), { onNone: () => [], onSome: (fire) => [Date.parse(fire.at ?? "")] })
+  )
+
+export const countBypass = (text: string): number => bypassTimes(text).length
+
+const weekMs = 7 * 24 * 60 * 60_000
+
+// A bypass with no readable time is counted in the total but never in a week it cannot be placed in.
+export const countBypassWeek = (text: string, nowMs: number): number =>
+  bypassTimes(text).filter((at) => !Number.isNaN(at) && at <= nowMs && nowMs - at <= weekMs).length
 
 export const lastAlertByMachine = (text: string): Record<string, string> => {
   const last: Record<string, string> = {}
@@ -246,6 +256,7 @@ export interface HeavyCheck {
   readonly running: ReadonlyArray<HeavyCheckTask>
   readonly queued: ReadonlyArray<HeavyCheckTask>
   readonly bypass: number
+  readonly bypassWeek: number
 }
 
 const taskAge = (iso: string, nowMs: number): number | null => {
@@ -260,6 +271,7 @@ export const checkHeavy = (home: string, nowMs: number = Date.now()): Effect.Eff
     const fs = yield* FileSystem.FileSystem
     const fired = yield* fs.readFileString(alertsFile(backlog)).pipe(Effect.orElseSucceed(() => ""))
     const bypass = countBypass(fired)
+    const bypassWeek = countBypassWeek(fired, nowMs)
     const state = yield* pueue(["status", "--json"]).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "heavy check: pueue is unreachable: " + error.detail })),
       Effect.flatMap((text) => decodeJson(text, WatchState, "pueue status --json"))
@@ -289,17 +301,19 @@ export const checkHeavy = (home: string, nowMs: number = Date.now()): Effect.Eff
     }
     running.sort((a, b) => a.id - b.id)
     queued.sort((a, b) => a.id - b.id)
-    return { group: settings.group, parallel: entry.parallel_tasks, running, queued, bypass }
+    return { group: settings.group, parallel: entry.parallel_tasks, running, queued, bypass, bypassWeek }
   })
+
+const minutesText = (minutes: number): string => String(minutes) + "m"
 
 export const formatCheck = (check: HeavyCheck): string => {
   const free = Math.max(0, check.parallel - check.running.length)
   const oldest = check.queued.reduce((max, task) => Math.max(max, task.ageMinutes), 0)
   const head = "heavy: " + String(check.parallel) + " slot" + (check.parallel === 1 ? "" : "s") + ", " +
     String(free) + " free, " + String(check.running.length) + " running, " + String(check.queued.length) + " queued" +
-    (check.queued.length === 0 ? "" : ", oldest queued " + String(oldest) + "m") +
+    (check.queued.length === 0 ? "" : ", oldest queued " + minutesText(oldest)) +
     ", " + String(check.bypass) + " bypass" + (check.bypass === 1 ? "" : "es")
-  const lines = check.running.map((task) => "  running #" + String(task.id) + " " + String(task.ageMinutes) + "m " + task.command)
-    .concat(check.queued.map((task) => "  queued #" + String(task.id) + " " + String(task.ageMinutes) + "m " + task.command))
+  const lines = check.running.map((task) => "  running #" + String(task.id) + " " + minutesText(task.ageMinutes) + " " + task.command)
+    .concat(check.queued.map((task) => "  queued #" + String(task.id) + " " + minutesText(task.ageMinutes) + " " + task.command))
   return [head, ...lines].join("\n")
 }

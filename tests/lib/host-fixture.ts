@@ -57,7 +57,7 @@ const fixtureModules = (banded: BandedReadings = bandedReadings()): ReadonlyMap<
     ["alerts", fixed({ name: "alerts", key: "a", cadence: loopTick, reach: "none", start: alertsPlaced(() => ({ alerts: banded.alerts, now })) })],
     [
       "resources",
-      fixed({ name: "machines", cadence: machinesCadence, reach: "none", start: machinesPlaced(() => ({ machines: { shown: shownOf(banded.machines, at), answered: true, freshness: [] }, board, refreshing: false })) }),
+      fixed({ name: "machines", cadence: machinesCadence, reach: "none", start: machinesPlaced(() => ({ machines: { shown: shownOf(banded.machines, at), answered: true, freshness: [], heavy: new Map() }, board, refreshing: false })) }),
     ],
     ["queues", fixed({ name: "queue", key: "u", cadence: readsCadence, reach: "none", start: queuePlaced(() => ({ queue, ci: banded.ci, board, projects: new Map(), now, refreshing: false })) })],
     [

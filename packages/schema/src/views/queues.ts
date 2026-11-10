@@ -3,6 +3,7 @@ import { mapOutcome, type Outcome } from "../reading";
 import type { ActionRun } from "../sources/actions";
 import type { TaskEntry } from "../contract/tasks";
 import { taskOwning } from "./task-resources";
+import type { HeavyCheck } from "../sources/heavy";
 import type { PueueGroupStatus, PueueStatus, PueueTask, PueueTaskResult } from "../sources/pueue";
 import { type MachineProjects, type ProjectNames, unknownProject } from "../sources/project-names";
 
@@ -118,6 +119,7 @@ export const pueueView = (status: PueueStatus, projects?: ProjectNames): PueueVi
 export interface MachineQueue {
   readonly name: string;
   readonly pueue: Option.Option<Outcome<PueueView>>;
+  readonly heavy: Option.Option<Outcome<HeavyCheck>>;
 }
 
 export interface ActionView {
@@ -142,7 +144,11 @@ export interface QueuesView {
 }
 
 export interface QueueReadings {
-  readonly machines: ReadonlyArray<{ readonly name: string; readonly status: Option.Option<Outcome<PueueStatus>> }>;
+  readonly machines: ReadonlyArray<{
+    readonly name: string;
+    readonly status: Option.Option<Outcome<PueueStatus>>;
+    readonly heavy: Option.Option<Outcome<HeavyCheck>>;
+  }>;
   readonly actions: { readonly repo: string; readonly runs: Option.Option<Outcome<ReadonlyArray<ActionRun>>> };
 }
 
@@ -152,7 +158,11 @@ export interface QueueOutcomes {
 }
 
 export const queuesView = (readings: QueueReadings, projects?: MachineProjects): QueuesView => ({
-  machines: readings.machines.map(({ name, status }) => ({ name, pueue: Option.map(status, (read) => mapOutcome(read, (current) => pueueView(current, projects?.get(name)))) })),
+  machines: readings.machines.map(({ name, status, heavy }) => ({
+    name,
+    pueue: Option.map(status, (read) => mapOutcome(read, (current) => pueueView(current, projects?.get(name)))),
+    heavy,
+  })),
   actions: { repo: readings.actions.repo, runs: Option.map(readings.actions.runs, (read) => mapOutcome(read, actionViews)) },
 });
 

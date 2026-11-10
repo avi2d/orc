@@ -6,7 +6,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import {
-  checkHeavy, countBypass, ensureHeavyWatch, formatCheck, lastAlertByMachine, lastSlipByCommand, normalizeTaskCommand, oldRunningTasks,
+  checkHeavy, countBypass, countBypassWeek, ensureHeavyWatch, formatCheck, lastAlertByMachine, lastSlipByCommand, normalizeTaskCommand, oldRunningTasks,
   slipCandidates, slipHeld, staleMachines, stripHeavyWrapper, watchGroup, watchOnce, watchTtlMinutes
 } from "../../../packages/run/src/dispatch/heavy-watch"
 import { standinScript } from "../../../packages/run/src/dispatch/heavy-standin"
@@ -105,6 +105,21 @@ describe("the heavy watch", () => {
     ].join("\n")
     expect(countBypass(text)).toBe(2)
   })
+
+  test("the week's bypasses leave out an older, a future and an undated bypass instead of counting every one", () => {
+    const now = Date.parse("2026-01-08T12:00:00Z")
+    const bypassAt = (at: string | undefined) => JSON.stringify({ rule: "heavy-bypass", ...(at === undefined ? {} : { at }), reason: "x", command: "bun test" })
+    const text = [
+      bypassAt("2026-01-08T11:59:00Z"),
+      bypassAt("2026-01-01T12:00:00Z"),
+      bypassAt("2026-01-01T11:59:00Z"),
+      bypassAt("2026-01-08T12:01:00Z"),
+      bypassAt("yesterday"),
+      bypassAt(undefined)
+    ].join("\n")
+    expect(countBypass(text)).toBe(6)
+    expect(countBypassWeek(text, now)).toBe(2)
+  })
 })
 
 const stateOf = (tasks: Record<string, ReturnType<typeof heavyTask>>, group: string) => ({
@@ -143,7 +158,8 @@ describe("the check readout", () => {
         { id: 2, command: "bun test y", ageMinutes: 4 },
         { id: 3, command: "bun test", ageMinutes: 1 }
       ],
-      bypass: 2
+      bypass: 2,
+      bypassWeek: 1
     }
     expect(formatCheck(check)).toBe(
       "heavy: 1 slot, 0 free, 1 running, 2 queued, oldest queued 4m, 2 bypasses\n" +
@@ -153,8 +169,18 @@ describe("the check readout", () => {
     )
   })
 
+  test("a call queued under a minute ago reads 0m", () => {
+    const check = { group: "heavy", parallel: 1, running: [], queued: [{ id: 4, command: "bun test", ageMinutes: 0 }], bypass: 0, bypassWeek: 0 }
+    expect(formatCheck(check)).toBe(
+      "heavy: 1 slot, 1 free, 0 running, 1 queued, oldest queued 0m, 0 bypasses\n" +
+      "  queued #4 0m bun test"
+    )
+  })
+
   test("an empty queue reads quiet", () => {
-    expect(formatCheck({ group: "heavy", parallel: 1, running: [], queued: [], bypass: 0 })).toBe("heavy: 1 slot, 1 free, 0 running, 0 queued, 0 bypasses")
+    expect(formatCheck({ group: "heavy", parallel: 1, running: [], queued: [], bypass: 0, bypassWeek: 0 })).toBe(
+      "heavy: 1 slot, 1 free, 0 running, 0 queued, 0 bypasses"
+    )
   })
 })
 
@@ -325,7 +351,9 @@ describe("the watch loop", () => {
       await writeFile(join(home, "state.json"), JSON.stringify(heavyState({})))
       const check = await withFakePueue(home, () => runWatch(checkHeavy(home)))
       expect(check.bypass).toBe(2)
+      expect(check.bypassWeek).toBe(2)
       expect(formatCheck(check)).toContain(", 2 bypasses")
+      expect(formatCheck(check)).not.toContain("this week")
     } finally {
       await rm(home, { recursive: true, force: true })
     }

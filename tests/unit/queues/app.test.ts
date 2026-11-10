@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createTestRenderer, type TestRendererSetup } from "@opentui/core/testing";
 import { ConfigProvider, Effect, Fiber, Layer } from "effect";
-import { actionsSourceLayer, CommandRunner, pueueMachinesLayer } from "@avi2dg/orc-schema";
+import { actionsSourceLayer, HeavyMachines, CommandRunner, pueueMachinesLayer } from "@avi2dg/orc-schema";
 import { livePanel } from "@avi2dg/orc-queues";
 import { fixtureActionsRepo, queueAnswers } from "../../lib/queues-fixture";
 
@@ -9,7 +9,7 @@ const remoteLine = "ssh south.example.com pueue status --json";
 
 const recordedAnswer = (asked: string): string => queueAnswers.find(([answers]) => asked.startsWith(answers))?.[1] ?? "";
 
-const sourcesWithRemote = (remote: Effect.Effect<string>) => Layer.mergeAll(pueueMachinesLayer, actionsSourceLayer).pipe(
+const sourcesWithRemote = (remote: Effect.Effect<string>) => Layer.mergeAll(pueueMachinesLayer, actionsSourceLayer, Layer.succeed(HeavyMachines, [])).pipe(
   Layer.provide(
     Layer.succeed(CommandRunner, {
       run: (command) => (command.argv[2] === remoteLine ? remote : Effect.succeed(recordedAnswer(command.argv.join(" ")))),

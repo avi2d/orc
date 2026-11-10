@@ -5,6 +5,9 @@ import {
   ActionsSource,
   copyPathsOfStatus,
   type Freshness,
+  type HeavyCheck,
+  type HeavyMachine,
+  HeavyMachines,
   knownProjects,
   type Outcome,
   type PueueMachine,
@@ -26,13 +29,14 @@ import {
 import { type Block, livePanel as liveUiPanel, type Panel, panelWidth, printFrame, runPanel } from "@avi2dg/orc-ui";
 import { queueLines } from "./panels";
 
-export type QueueSources = PueueMachines | ActionsSource;
+export type QueueSources = PueueMachines | HeavyMachines | ActionsSource;
 
 type Polled<A> = Effect.Effect<Option.Option<Stamped<Outcome<A>>>>;
 
 interface PolledMachine {
   readonly name: string;
   readonly read: Polled<PueueStatus>;
+  readonly heavy: Polled<HeavyCheck>;
 }
 
 export interface QueueRead {
@@ -56,15 +60,21 @@ const readingsOf = (machines: ReadonlyArray<PolledMachine>, repo: string, runs: 
   Effect.map(
     Effect.all(
       [
-        Effect.forEach(machines, (machine) => Effect.map(machine.read, (status) => ({ name: machine.name, status })), {
-          concurrency: "unbounded",
-        }),
+        Effect.forEach(
+          machines,
+          (machine) =>
+            Effect.map(Effect.all([machine.read, machine.heavy], { concurrency: "unbounded" }), ([status, heavy]) => ({ name: machine.name, status, heavy })),
+          { concurrency: "unbounded" },
+        ),
         runs,
       ],
       { concurrency: "unbounded" },
     ),
     ([statuses, actions]) => {
-      const fresh = { machines: statuses.map(({ name, status }) => ({ name, status: valueOf(status) })), actions: { repo, runs: valueOf(actions) } };
+      const fresh = {
+        machines: statuses.map(({ name, status, heavy }) => ({ name, status: valueOf(status), heavy: valueOf(heavy) })),
+        actions: { repo, runs: valueOf(actions) },
+      };
       const ats = Option.all([...statuses.map(({ status }) => status), actions]);
       return {
         fresh,
@@ -77,10 +87,22 @@ const readingsOf = (machines: ReadonlyArray<PolledMachine>, repo: string, runs: 
 const readNamingCopies = (machine: PueueMachine): Effect.Effect<Reading<PueueStatus>> =>
   Effect.tap(machine.read, (reading) => (reading.kind === "ok" ? machine.projects.resolve(copyPathsOfStatus(reading.value)) : Effect.void));
 
+const heavyOf = (heavies: ReadonlyArray<HeavyMachine>, name: string): HeavyMachine | undefined => heavies.find((heavy) => heavy.name === name);
+
+const unread: Polled<HeavyCheck> = Effect.succeedNone;
+
 export const readQueueReadings: Effect.Effect<QueueRead, never, QueueSources> = Effect.gen(function* () {
   const machines = yield* PueueMachines;
+  const heavies = yield* HeavyMachines;
   const actions = yield* ActionsSource;
-  const finished = machines.map((machine) => ({ name: machine.name, read: Effect.asSome(stampedNow(readNamingCopies(machine))) }));
+  const finished = machines.map((machine) => {
+    const heavy = heavyOf(heavies, machine.name);
+    return {
+      name: machine.name,
+      read: Effect.asSome(stampedNow(readNamingCopies(machine))),
+      heavy: heavy === undefined ? unread : Effect.asSome(stampedNow(heavy.read)),
+    };
+  });
   return yield* readingsOf(finished, actions.repo, Effect.asSome(actionsStamped(actions.read)));
 });
 
@@ -114,16 +136,24 @@ export const backgroundQueueReadings = (
     const wait = tuning?.patience ?? patience;
     const options = { revalidate: tuning?.revalidate };
     const machines = yield* PueueMachines;
+    const heavies = yield* HeavyMachines;
     const actions = yield* ActionsSource;
     const polls = yield* Effect.forEach(machines, (machine) =>
       Effect.map(stampedInBackground(() => readNamingCopies(machine), wait, options), (poll) => ({ name: machine.name, poll })),
     );
+    const heavyPolls = yield* Effect.forEach(heavies, (heavy) =>
+      Effect.map(stampedInBackground(() => heavy.read, wait, options), (poll) => ({ name: heavy.name, poll })),
+    );
     const runs = yield* stampedInBackground(() => actions.read, wait, options);
-    const reads = polls.map(({ name, poll }) => ({ name, read: poll.read(undefined) }));
+    const heavyRead = (name: string): Polled<HeavyCheck> => {
+      const found = heavyPolls.find((heavy) => heavy.name === name);
+      return found === undefined ? unread : found.poll.read(undefined);
+    };
+    const reads = polls.map(({ name, poll }) => ({ name, read: poll.read(undefined), heavy: heavyRead(name) }));
     const runsAt = Effect.map(runs.read(undefined), Option.map((stamped) => ({ value: stamped.value, at: DateTime.toEpochMillis(stamped.value.capturedAt) })));
     return {
       read: readingsOf(reads, actions.repo, runsAt),
-      refreshing: refreshingOf([...polls.map(({ poll }) => poll), runs]),
+      refreshing: refreshingOf([...polls.map(({ poll }) => poll), ...heavyPolls.map(({ poll }) => poll), runs]),
     };
   });
 

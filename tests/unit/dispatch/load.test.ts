@@ -11,7 +11,7 @@ import { addTask, listTasks } from "../../../packages/run/src/dispatch/backlog"
 import { runBeat } from "../../../packages/run/src/dispatch/beat"
 import { quietSources } from "../../lib/beat-sources"
 import { readDispatchConfig } from "../../../packages/run/src/dispatch/config"
-import { type LoadReading, readMachineLoad } from "../../../packages/run/src/dispatch/load"
+import { deepHeavyQueue, type HeavyReading, type LoadReading, loadText, parseLoad, readMachineLoad } from "../../../packages/run/src/dispatch/load"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -48,9 +48,11 @@ const writeBacklog = async (root: string, machine: Record<string, unknown>): Pro
   await run(addTask(root, spec))
 }
 
-const loadOf = (fiveMinute: number) => (): Effect.Effect<LoadReading> => Effect.succeed({ kind: "read", fiveMinute })
+const shallow: HeavyReading = { kind: "read", queued: 0, bypassWeek: 0 }
 
-const beatAt = async (root: string, machine: Record<string, unknown>, readLoad: () => Effect.Effect<LoadReading>) => {
+const loadOf = (fiveMinute: number, heavy: HeavyReading = shallow) => (): Effect.Effect<LoadReading> => Effect.succeed({ kind: "read", fiveMinute, heavy })
+
+const beatAt = async (root: string, machine: Record<string, unknown>, readLoad: (machine: { readonly name: string }) => Effect.Effect<LoadReading>) => {
   await writeBacklog(root, machine)
   const report = await Effect.runPromise(runBeat(root, root, quietSources(readLoad)).pipe(Effect.provide(Layer.merge(BunServices.layer, quotaStub))))
   const states = (await run(listTasks(root))).map((task) => task.state.kind)
@@ -71,15 +73,15 @@ describe("a machine's five-minute load limit", () => {
       expect(await beatAt(root, { loadLimit: 16 }, loadOf(16))).toEqual({ actions: ["started"], states: ["started"] })
     })
   })
-  test("a machine with no limit starts the task whatever its load instead of reading one", async () => {
+  test("a machine with no limit starts the task whatever its load instead of holding it", async () => {
     await withBacklog(async (root) => {
-      const read: Array<number> = []
-      const counted = () => Effect.sync((): LoadReading => {
-        read.push(1)
-        return { kind: "read", fiveMinute: 99 }
-      })
-      expect(await beatAt(root, {}, counted)).toEqual({ actions: ["started"], states: ["started"] })
-      expect(read).toEqual([])
+      expect(await beatAt(root, {}, loadOf(99))).toEqual({ actions: ["started"], states: ["started"] })
+    })
+  })
+  test("an unread load on a machine with no limit starts the task instead of holding it", async () => {
+    await withBacklog(async (root) => {
+      const unread = () => Effect.succeed<LoadReading>({ kind: "unread", reason: "ssh ridge orc runner load exited 255: " })
+      expect(await beatAt(root, {}, unread)).toEqual({ actions: ["started"], states: ["started"] })
     })
   })
   test("an unread load leaves the task queued instead of starting blind", async () => {
@@ -101,6 +103,61 @@ describe("a machine's five-minute load limit", () => {
       await run(addTask(root, spec))
       const report = await Effect.runPromise(runBeat(root, root, quietSources(loadOf(20))).pipe(Effect.provide(Layer.merge(BunServices.layer, quotaStub))))
       expect(report.actions.map((action) => action.kind === "started" ? action.machine : action.kind)).toEqual(["mac"])
+    })
+  })
+})
+
+describe("a machine's heavy queue depth", () => {
+  test("three waiting heavy calls hold the start instead of adding a fourth agent", async () => {
+    await withBacklog(async (root) => {
+      expect(await beatAt(root, {}, loadOf(1, { kind: "read", queued: 3, bypassWeek: 0 }))).toEqual({
+        actions: ["waits: ridge's heavy queue holds 3 waiting calls, at or above its depth limit of 3"],
+        states: ["new"]
+      })
+    })
+  })
+  test("two waiting heavy calls start the task instead of holding it", async () => {
+    await withBacklog(async (root) => {
+      expect(await beatAt(root, {}, loadOf(1, { kind: "read", queued: 2, bypassWeek: 9 }))).toEqual({ actions: ["started"], states: ["started"] })
+    })
+  })
+  test("an unread heavy queue starts the task instead of holding the run that makes the queue", async () => {
+    await withBacklog(async (root) => {
+      const missing: HeavyReading = { kind: "unread", reason: "heavy check: the heavy group is missing, run orc heavy path to create it" }
+      expect(await beatAt(root, {}, loadOf(1, missing))).toEqual({ actions: ["started"], states: ["started"] })
+    })
+  })
+  test("a load over its limit names the load instead of the deep queue", async () => {
+    await withBacklog(async (root) => {
+      expect(await beatAt(root, { loadLimit: 16 }, loadOf(20, { kind: "read", queued: 5, bypassWeek: 0 }))).toEqual({
+        actions: ["waits: ridge's five-minute load is 20, above its limit of 16"],
+        states: ["new"]
+      })
+    })
+  })
+  test("a deep queue on one machine sends an unpinned task to the other instead of holding it", async () => {
+    await withBacklog(async (root) => {
+      await writeFile(join(root, "dispatch.json"), JSON.stringify({
+        machines: [{ name: "ridge", slots: 4, start: runnerStart }, { name: "mac", slots: 1, start: runnerStart }],
+        quota
+      }))
+      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { ridge: "/home/a/orc", mac: "/Users/a/orc" } }] }))
+      await run(addTask(root, spec))
+      const byMachine = (machine: { readonly name: string }) =>
+        loadOf(1, { kind: "read", queued: machine.name === "ridge" ? deepHeavyQueue : 0, bypassWeek: 0 })()
+      const report = await Effect.runPromise(runBeat(root, root, quietSources(byMachine)).pipe(Effect.provide(Layer.merge(BunServices.layer, quotaStub))))
+      expect(report.actions.map((action) => action.kind === "started" ? action.machine : action.kind)).toEqual(["mac"])
+    })
+  })
+  test("a machine whose start is not orc runner start is never read instead of read as this machine", async () => {
+    await withBacklog(async (root) => {
+      const read: Array<string> = []
+      const counted = (machine: { readonly name: string }) => Effect.sync((): LoadReading => {
+        read.push(machine.name)
+        return { kind: "read", fiveMinute: 1, heavy: { kind: "read", queued: 9, bypassWeek: 0 } }
+      })
+      expect(await beatAt(root, { start: ["my-start"] }, counted)).toEqual({ actions: ["started"], states: ["started"] })
+      expect(read).toEqual([])
     })
   })
 })
@@ -140,16 +197,40 @@ const withBacklogResult = async <A>(body: (root: string) => Promise<A>): Promise
 }
 
 describe("reading a machine's load", () => {
-  test("a machine reached through a command reads the far side's load instead of this one's", async () => {
-    const machine = { name: "ridge", slots: 2, start: ["true", "runner", "start", "--", "sh", "-c", "[ \"$0 $1\" = 'runner load' ] && echo 12.25"] } as const
-    expect(await run(readMachineLoad(machine))).toEqual({ kind: "read", fiveMinute: 12.25 })
+  test("a machine reached through a command reads the far side's load and heavy queue instead of this one's", async () => {
+    const printed = "printf '12.25\\nheavy queue: 4 queued, 1 bypass this week\\n'"
+    const machine = { name: "ridge", slots: 2, start: ["true", "runner", "start", "--", "sh", "-c", "[ \"$0 $1\" = 'runner load' ] && " + printed] } as const
+    expect(await run(readMachineLoad(machine, "/nowhere"))).toEqual({ kind: "read", fiveMinute: 12.25, heavy: { kind: "read", queued: 4, bypassWeek: 1 } })
   })
   test("a far side that prints no number leaves the load unread instead of reading zero", async () => {
     const machine = { name: "ridge", slots: 2, start: ["true", "runner", "start", "--", "sh", "-c", "echo busy"] } as const
-    expect(await run(readMachineLoad(machine))).toEqual({ kind: "unread", reason: "sh -c echo busy runner load printed no load: busy" })
+    expect(await run(readMachineLoad(machine, "/nowhere"))).toEqual({ kind: "unread", reason: "sh -c echo busy runner load printed no load: busy" })
+  })
+  test("a far side that prints a load alone leaves its heavy queue unread instead of reading it empty", async () => {
+    const machine = { name: "ridge", slots: 2, start: ["true", "runner", "start", "--", "sh", "-c", "echo 3.5"] } as const
+    expect(await run(readMachineLoad(machine, "/nowhere"))).toEqual({
+      kind: "read",
+      fiveMinute: 3.5,
+      heavy: { kind: "unread", reason: "sh -c echo 3.5 runner load printed no heavy queue" }
+    })
+  })
+  test("the printed load reads back as the same reading instead of losing the heavy queue", async () => {
+    const readings: ReadonlyArray<HeavyReading> = [
+      { kind: "read", queued: 0, bypassWeek: 0 },
+      { kind: "read", queued: 1, bypassWeek: 1 },
+      { kind: "read", queued: 7, bypassWeek: 12 },
+      { kind: "unread", reason: "heavy check: the heavy group is missing, run orc heavy path to create it" }
+    ]
+    for (const heavy of readings) {
+      expect(await run(parseLoad(loadText(0.75, heavy), "orc runner load"))).toEqual({ kind: "read", fiveMinute: 0.75, heavy })
+    }
+  })
+  test("the printed load names the queue and the week's bypasses in words", () => {
+    expect(loadText(2, { kind: "read", queued: 1, bypassWeek: 1 })).toBe("2\nheavy queue: 1 queued, 1 bypass this week")
+    expect(loadText(2, { kind: "read", queued: 0, bypassWeek: 2 })).toBe("2\nheavy queue: 0 queued, 2 bypasses this week")
   })
   test.skipIf(process.platform !== "linux")(skipReason("needs Linux's /proc/loadavg", "a machine run here reads the five-minute field of /proc/loadavg instead of another", "local"), async () => {
-    const reading = await run(readMachineLoad({ name: "here", slots: 1, start: runnerStart }))
+    const reading = await run(readMachineLoad({ name: "here", slots: 1, start: runnerStart }, "/nowhere"))
     const fiveMinute = Number((await readFile("/proc/loadavg", "utf8")).split(" ")[1])
     expect(reading.kind).toBe("read")
     expect(reading.kind === "read" ? Math.abs(reading.fiveMinute - fiveMinute) : Number.NaN).toBeLessThan(0.5)

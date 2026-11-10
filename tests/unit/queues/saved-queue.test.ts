@@ -8,6 +8,7 @@ import { TestClock } from "effect/testing";
 import {
   ActionsSource,
   decodePueue,
+  HeavyMachines,
   ok,
   type Outcome,
   PueueMachines,
@@ -51,6 +52,7 @@ const feedAt = (directory: string, pueue: Effect.Effect<Reading<PueueStatus>>) =
       Layer.succeed(PueueMachines, [
         { name: "north", read: pueue, projects: { resolve: () => Effect.void, known: Effect.succeed(new Map()) } },
       ]),
+      Layer.succeed(HeavyMachines, []),
       Layer.succeed(ActionsSource, { repo: fixtureActionsRepo, read: Effect.succeed({ ...ok([]), capturedAt: t0 }) }),
       savedReadingsLayer.pipe(
         Layer.provide(BunFileSystem.layer),

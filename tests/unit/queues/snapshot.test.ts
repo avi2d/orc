@@ -232,7 +232,7 @@ describe("the queues at the live panel's 30 column minimum", () => {
 describe("a run that failed to spawn", () => {
   const spawned = (): QueuesView => {
     const status = fixture("pueue/status.json").replace('"result": "Success"', '"result": { "FailedToSpawn": "No such file or directory (os error 2)" }');
-    return { ...fixtureQueues(), machines: [{ name: "north", pueue: Option.some(mapOutcome(decodePueue(status), pueueView)) }] };
+    return { ...fixtureQueues(), machines: [{ name: "north", heavy: Option.none(), pueue: Option.some(mapOutcome(decodePueue(status), pueueView)) }] };
   };
 
   // pueue's TaskResult::FailedToSpawn carries the spawn error's text.

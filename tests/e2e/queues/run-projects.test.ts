@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ConfigProvider, Effect, Layer } from "effect";
 import { readQueuesReport } from "@avi2dg/orc-queues";
-import { actionsSourceLayer, type Command, CommandRunner, CommandUnreachable, copyPathsOfStatus, decodePueue, pueueMachinesLayer, pueueView, type QueuesReport } from "@avi2dg/orc-schema";
+import { actionsSourceLayer, HeavyMachines, type Command, CommandRunner, CommandUnreachable, copyPathsOfStatus, decodePueue, pueueMachinesLayer, pueueView, type QueuesReport } from "@avi2dg/orc-schema";
 import { fixture } from "../../lib/fixtures";
 import { valueOf } from "../../lib/outcomes";
 
@@ -74,7 +74,7 @@ interface Shell {
 
 // Every shell line runs for real, so git reads the origins the scratch repositories were given.
 const sourcesOf = (remote: string, shell: Shell) =>
-  Layer.mergeAll(pueueMachinesLayer, actionsSourceLayer).pipe(
+  Layer.mergeAll(pueueMachinesLayer, actionsSourceLayer, Layer.succeed(HeavyMachines, [])).pipe(
     Layer.provide(
       Layer.succeed(CommandRunner, {
         run: (command: Command) => {
