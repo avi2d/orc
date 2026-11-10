@@ -18,7 +18,7 @@ import { stopNow } from "./cli-stop"
 import { formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson } from "./runner-result"
 import type { TaskFileError } from "./task-record"
 import { encodeToken, sessionToken } from "./token"
-import { markEventPosted, unpostedEvents } from "./events"
+import { markEventPosted, mergedIds, unpostedEvents } from "./events"
 import { ensureAlertStream, liveAlertStream } from "./alert-stream"
 import { runHeavy, startHeavyWatch } from "./heavy-cli"
 
@@ -52,15 +52,16 @@ const readView = (root: string): Effect.Effect<BacklogView, BacklogError | TaskF
       Effect.catchTag("ConfigError", (error) => Effect.succeed<ConfigReading>({ kind: "unread", reason: failure(error) }))
     )
     const events = yield* unpostedEvents(root)
+    const merged = yield* mergedIds(root)
     if (reading.kind === "unread") {
-      return { tasks, events, projects: reading, room: reading }
+      return { tasks, events, projects: reading, room: reading, merged }
     }
     const projects = yield* readProjects(paths.projects, reading.config.machines).pipe(
       Effect.map((list): ProjectList => ({ kind: "read", projects: list })),
       Effect.catchTag("ConfigError", (error) => Effect.succeed<ProjectList>({ kind: "unread", reason: failure(error) }))
     )
     const room: RoomList = { kind: "read", room: readRoom(reading.config.machines, tasks) }
-    return { tasks, events, projects, room }
+    return { tasks, events, projects, room, merged }
   })
 
 const titleOf = (body: string): string =>

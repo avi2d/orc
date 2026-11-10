@@ -36,7 +36,7 @@ const reportPathOf = (runDir: string): string => runDir + "/" + agentReportFileN
 const kindAsks: Record<ReportKind, string> = {
   scout: "Read the checkout and change nothing in it.",
   task: "Do what it asks; when it asks for evidence, put that evidence in the report.",
-  parent: "This is the final check of a parent task whose children have all merged. Change nothing in the checkout and review no code. " +
+  parent: "This is the final check of a parent task whose ship children have all merged and whose scout and task children have all closed done. Change nothing in the checkout and review no code. " +
     "Run the whole result once in the real place it serves, check each done criterion the task names, and put that evidence in the report. " +
     "End the report with the line verdict: pass when every criterion holds, or verdict: fail when any does not."
 }

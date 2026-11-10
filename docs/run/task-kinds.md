@@ -27,11 +27,11 @@ Add it with `orc backlog add <project> <task-file> --kind parent`, then add each
 The child's task file keeps the link as `parent`, and `orc backlog --json` gives every task a `parent` and every parent `children` as `{"done": <n>, "total": <n>}`.
 Children may wait on each other with `--depends-on`, and the beat starts the children that wait on nothing at the same time.
 Orc refuses a `--parent` the backlog does not hold, one that is not a parent, one that is no longer new, a parent given a parent, and a child that waits on a task already waiting on its parent.
-Until every child closes done, each beat prints `waits <task-id>: waits on its children, <done> of <total> done`, or `waits for its first child` while it has none.
+Until every scout and task child closes done and every ship child with a PR merges, each beat prints `waits <task-id>: waits on its children, <done> of <total> done`, or `waits for its first child` while it has none.
 A failed child keeps its parent waiting.
 `orc backlog` shows the count on the parent's line, as in `orc-1 parent orc 3 of 5 done Ship the whole feature`.
 
-When every child closed done, the beat starts the parent's final check once.
+When every scout and task child closed done and every ship child with a PR merged, the beat starts the parent's final check once.
 The runner queues it as `orc run <task-file> --kind parent --sandbox none`, which reviews no code and changes nothing in the checkout.
 Pi runs the whole result in the real place it serves, checks each done criterion, and ends `agent-report.md` with the line `verdict: pass` or `verdict: fail`.
 A report whose last line is `verdict: pass` closes the parent done with its report.
