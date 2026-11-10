@@ -303,9 +303,6 @@ It shows `unknown` until then, or when it has no origin.
 The other machine's copies are read through the words before `pueue status` in `ORC_DASH_REMOTE_PUEUE`.
 They show `unknown` when that command names pueue by its path or runs other shell commands before it.
 In a terminal too narrow for the command beside the times, the command goes on a line of its own under its run.
-Each machine's panel adds a heavy line from its `orc heavy check --json`, with the heavy group's running calls and slots, its queued calls with the oldest one's age, and the bypasses logged in the last 7 days.
-A machine with no heavy queue or no orc shows heavy queue not set up on its heavy line.
-A machine whose check fails for another reason shows the reason on its heavy line.
 The groups panel lists each machine's pueue groups with whether each is running, paused or resetting, and how many tasks it runs at once.
 The actions panel lists the requested, pending, waiting, queued and in progress runs, newest first.
 It counts how many run and how many wait.
@@ -322,15 +319,12 @@ To configure the queues, set these variables where the panel runs:
 | Variable | What it holds |
 | --- | --- |
 | `ORC_DASH_REMOTE_PUEUE` | The shell command that prints the other machine's `pueue status --json`, such as `ssh other-host pueue status --json` |
-| `ORC_DASH_REMOTE_HEAVY` | The shell command that prints the other machine's `orc heavy check --json`, such as `ssh other-host orc heavy check --json` |
 | `ORC_DASH_REMOTE_MACHINE` | The other machine's name on its panel, `remote` when unset |
 | `ORC_DASH_MACHINE` | This machine's name on its panel, `local` when unset |
 | `ORC_DASH_ACTIONS_REPO` | The repository whose runs the panel lists, such as `example/shop`. When unset, gh lists the runs of the repository the panel runs in, and the panel names it `this repository` |
 
 With `ORC_DASH_REMOTE_PUEUE` unset or blank, the panel reads this machine's pueue alone.
 The command runs through `sh -c` with a 20 second limit, beside this machine's own read.
-With `ORC_DASH_REMOTE_HEAVY` unset or blank, the panel reads this machine's heavy check alone, with a 10 second limit.
-The resources panel shows the same heavy line under each machine.
 The session quota tool reads the same two machine names.
 
 ## Run the dispatch tool
@@ -541,6 +535,14 @@ A pueue row names its machine when the box holds more than one machine name.
 A CI run belongs to no machine, so it names none.
 A pueue run started by a task carries the task's id.
 How long a CI run took comes from its jobs, so the wait for a runner is left out.
+The machines box gives each machine a heavy line from its `orc heavy check --json`.
+The line counts running calls and slots, queued calls with the oldest one's age, and bypasses in the last 7 days.
+The queue box gives each machine the same heavy line.
+A machine with no heavy queue or no orc shows heavy queue not set up on its heavy line.
+A machine whose check fails for another reason shows the reason on its heavy line.
+Set `ORC_DASH_REMOTE_HEAVY` to the shell command that prints the other machine's `orc heavy check --json`, such as `ssh other-host orc heavy check --json`.
+With `ORC_DASH_REMOTE_HEAVY` unset or blank, the dashboard reads this machine's heavy check alone, with a 10 second limit.
+The standalone queues and resources panels show no heavy line.
 Beside the machines, one projects board joins the tasks reports of both machines.
 The board works as [Run the tasks tool](#run-the-tasks-tool) tells.
 Press `t` to switch the board between today and all.
