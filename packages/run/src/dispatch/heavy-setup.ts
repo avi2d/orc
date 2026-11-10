@@ -29,7 +29,7 @@ export const writeHeavyBin = (
     const fs = yield* FileSystem.FileSystem
     const bin = heavyBinDir(home)
     const wrap = detectWrap(platform, settings.limit)
-    const standins: StandinSettings = { home, group: settings.group, wrap }
+    const standins: StandinSettings = { home, group: settings.group, wrap, through: settings.through }
     const scripts = standinScripts(standins, settings.commands)
     yield* fs.makeDirectory(bin, { recursive: true }).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "cannot write " + bin + ": " + error.message }))
@@ -61,7 +61,7 @@ export const writeHeavyBin = (
 
 export const ensureHeavyQueue = (home: string, settings: HeavySettings): Effect.Effect<ReadonlyArray<string>, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    if ((Bun.env.HEAVY_QUEUE_BYPASS ?? "").trim() === "") {
+    if (settings.through === null && (Bun.env.HEAVY_QUEUE_BYPASS ?? "").trim() === "") {
       yield* ensureHeavyGroup(settings)
     }
     return yield* writeHeavyBin(home, settings, platformOf())

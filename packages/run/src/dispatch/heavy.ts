@@ -32,10 +32,12 @@ export interface HeavySettings {
   readonly group: string
   readonly commands: ReadonlyArray<string>
   readonly limit: "auto" | "none"
+  readonly through: ReadonlyArray<string> | null
 }
 
 export const resolveHeavy = (config: HeavyConfig | undefined): HeavySettings => ({
   group: config?.group ?? heavyGroup,
   commands: config?.commands ?? [],
-  limit: config?.limit ?? "auto"
+  limit: config?.limit ?? "auto",
+  through: config?.through ?? null
 })

@@ -55,7 +55,8 @@ export type Provider = typeof Provider.Type
 const HeavyConfig = Schema.Struct({
   group: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
   commands: Schema.optional(Schema.Array(Schema.String.check(Schema.isNonEmpty()))),
-  limit: Schema.optional(Schema.Literals(["auto", "none"]))
+  limit: Schema.optional(Schema.Literals(["auto", "none"])),
+  through: Schema.optional(Schema.NonEmptyArray(Schema.String.check(Schema.isNonEmpty())))
 })
 export type HeavyConfig = typeof HeavyConfig.Type
 

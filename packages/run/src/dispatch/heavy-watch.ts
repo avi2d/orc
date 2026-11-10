@@ -264,9 +264,8 @@ const taskAge = (iso: string, nowMs: number): number | null => {
   return Number.isNaN(seen) ? null : Math.max(0, Math.floor((nowMs - seen) / 60_000))
 }
 
-export const checkHeavy = (home: string, nowMs: number = Date.now()): Effect.Effect<HeavyCheck, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+const checkPueueGroup = (home: string, group: string, nowMs: number): Effect.Effect<HeavyCheck, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    const settings = yield* readHeavySettings(home)
     const backlog = home + "/backlog"
     const fs = yield* FileSystem.FileSystem
     const fired = yield* fs.readFileString(alertsFile(backlog)).pipe(Effect.orElseSucceed(() => ""))
@@ -276,14 +275,14 @@ export const checkHeavy = (home: string, nowMs: number = Date.now()): Effect.Eff
       Effect.mapError((error) => new RunnerError({ detail: "heavy check: pueue is unreachable: " + error.detail })),
       Effect.flatMap((text) => decodeJson(text, WatchState, "pueue status --json"))
     )
-    if (!Object.hasOwn(state.groups, settings.group)) {
-      return yield* new RunnerError({ detail: "heavy check: the " + settings.group + " group is missing, run orc heavy path to create it" })
+    if (!Object.hasOwn(state.groups, group)) {
+      return yield* new RunnerError({ detail: "heavy check: the " + group + " group is missing, run orc heavy path to create it" })
     }
-    const entry = state.groups[settings.group]
+    const entry = state.groups[group]
     const running: Array<HeavyCheckTask> = []
     const queued: Array<HeavyCheckTask> = []
     for (const task of Object.values(state.tasks)) {
-      if (task.group !== settings.group) {
+      if (task.group !== group) {
         continue
       }
       const status = decodedStatus(task.status)
@@ -301,8 +300,17 @@ export const checkHeavy = (home: string, nowMs: number = Date.now()): Effect.Eff
     }
     running.sort((a, b) => a.id - b.id)
     queued.sort((a, b) => a.id - b.id)
-    return { group: settings.group, parallel: entry.parallel_tasks, running, queued, bypass, bypassWeek }
+    return { group, parallel: entry.parallel_tasks, running, queued, bypass, bypassWeek }
   })
+
+export const checkHeavy = (home: string, nowMs: number = Date.now()): Effect.Effect<HeavyCheck, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+  readHeavySettings(home).pipe(
+    Effect.flatMap((settings) =>
+      settings.through === null
+        ? checkPueueGroup(home, settings.group, nowMs)
+        : Effect.fail(new RunnerError({ detail: "heavy check: the heavy calls queue through " + settings.through.join(" ") + ", which keeps no pueue group to read" }))
+    )
+  )
 
 export const formatCheck = (check: HeavyCheck): string => {
   const free = Math.max(0, check.parallel - check.running.length)

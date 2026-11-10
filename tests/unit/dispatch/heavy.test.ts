@@ -15,6 +15,6 @@ describe("heavy queue paths", () => {
   })
 
   test("missing heavy config resolves to the default group with no commands", () => {
-    expect(resolveHeavy(undefined)).toEqual({ group: "heavy", commands: [], limit: "auto" })
+    expect(resolveHeavy(undefined)).toEqual({ group: "heavy", commands: [], limit: "auto", through: null })
   })
 })

@@ -9,7 +9,7 @@ The queue keeps two such calls from overloading the machine at the same time.
 ## How calls reach the queue
 `orc run` and `orc runner start` write stand in scripts for each heavy tool into `~/.orc/heavy/bin`.
 `orc run` puts that folder first on `PATH` for the agent it starts.
-A stand in queues the call with `pueue add` into the `heavy` group and waits for its turn, then prints the call output and exits with its exit code.
+A stand in queues the call with `pueue add` into the `heavy` group, or hands it to the `through` command when one is set, and waits for its turn, then prints the call output and exits with its exit code.
 The wait message names how many queued calls stand ahead, counting higher priority calls and earlier calls at the same priority.
 A finished call leaves the queue after the stand in reads its exit code.
 The stand in runs the real tool under a utility priority on macOS and with no wrapper on other systems.
@@ -38,6 +38,17 @@ The `heavy` key in `~/.orc/config.json` tunes the queue.
 The `group` key renames the pueue group.
 The `commands` key adds command words that count as heavy, including subcommands of the built in tools.
 The `limit` key takes `auto` or `none`, and `none` runs the real tool with no priority wrapper.
+The `through` key hands each queued call to a queue command you already run instead of pueue, as the next section says.
+
+## Queue through another command
+Set `through` to the words of a command that holds one slot and then runs the command it is given, such as `"through": ["winbox-heavy", "run", "--"]`.
+A stand in then runs `winbox-heavy run -- <real tool> <args>` in place of `pueue add`, so the calls that command already limits and the calls from the stand ins share one limit.
+On macOS under `limit` `auto` the priority wrapper sits between the through words and the real tool.
+The real tool's output reaches the caller as it prints, and the stand in exits with the through command's exit code.
+A heavy call started under a call the through command holds runs at once instead of waiting on the slot it holds.
+Calls that never queue and calls under `HEAVY_QUEUE_BYPASS` skip the through command too.
+The through command owns the wait, so the 30 minute limit under `GITHUB_ACTIONS` does not apply.
+With `through` set, orc makes no pueue group, arms no watchdog, and `orc heavy check` fails with a line naming the through command.
 
 ## Sandboxed runs
 Sandboxed runs do not use the heavy queue yet.

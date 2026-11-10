@@ -178,7 +178,31 @@ const waiterBody =
 const waiterAdd =
   'sh -c \'' + waiterBody + '\' orc-heavy-wait $$ $heavy_wrap "$heavy_real_bin" "$@"'
 
-export const standinQueue = (): ReadonlyArray<string> => [
+// A nested call finds the held slot by this wrapper's command line above it, and the trailing exit keeps sh from exec'ing the call and dropping that line.
+const throughCall = (through: string): ReadonlyArray<string> => [
+    '  if heavy_inside_through; then',
+    '    exec "$heavy_real_bin" "$@"',
+    '  fi',
+    '  exec sh -c \'"$@"; exit "$?"\' orc-heavy-through ' + through + ' $heavy_wrap "$heavy_real_bin" "$@"',
+]
+
+const insideThrough = (): ReadonlyArray<string> => [
+    'heavy_inside_through() {',
+    '  heavy_tree="$(ps -eo pid,ppid,command 2>/dev/null)" || return 1',
+    '  heavy_pid=$$',
+    '  while :; do',
+    '    heavy_acmd="$(printf "%s\\n" "$heavy_tree" | awk -v p="$heavy_pid" \'$1 == p { $1=""; $2=""; sub(/^  */, ""); print; exit }\')"',
+    '    case "$heavy_acmd" in *\' -c "$@"; exit "$?" orc-heavy-through \'*) return 0;; esac',
+    '    heavy_ppid="$(printf "%s\\n" "$heavy_tree" | awk -v p="$heavy_pid" \'$1 == p { print $2; exit }\')"',
+    '    case "$heavy_ppid" in ""|0|"$heavy_pid") return 1;; esac',
+    '    heavy_pid="$heavy_ppid"',
+    '  done',
+    '}',
+    '',
+]
+
+export const standinQueue = (through: string | null): ReadonlyArray<string> => [
+    ...(through === null ? [] : insideThrough()),
     'heavy_main() {',
     '  if [ -n "$HEAVY_CLASSIFY" ]; then',
     '    heavy_decide "$@"',
@@ -202,6 +226,7 @@ export const standinQueue = (): ReadonlyArray<string> => [
     '    echo "orc heavy: bypassing the $heavy_group queue: $HEAVY_QUEUE_BYPASS" >&2',
     '    exec "$heavy_real_bin" "$@"',
     '  fi',
+    ...(through === null ? [] : throughCall(through)),
     '  if heavy_inside_slot; then',
     '    exec "$heavy_real_bin" "$@"',
     '  fi',
