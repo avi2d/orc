@@ -160,6 +160,9 @@ export interface WatchReport {
 export const watchOnce = (home: string, nowMs: number = Date.now()): Effect.Effect<WatchReport, RunnerError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const settings = yield* readHeavySettings(home)
+    if (settings.through !== null) {
+      return yield* new RunnerError({ detail: "heavy watch: the heavy calls queue through " + settings.through.join(" ") + ", which keeps no pueue group to watch" })
+    }
     const backlog = home + "/backlog"
     const machine = hostname()
     const fs = yield* FileSystem.FileSystem

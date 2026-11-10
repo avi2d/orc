@@ -11,7 +11,7 @@ export type HeavyVerb = Extract<DispatchArgs, { readonly kind: "HeavyPath" | "He
 export const startHeavyWatch = (home: string, orc: Command, command: string): Effect.Effect<void, never, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   readHeavySettings(home).pipe(
     Effect.tap((settings) => ensureHeavyQueue(home, settings)),
-    Effect.flatMap((settings) => settings.through === null ? ensureHeavyWatch(home, orc) : Effect.succeed(null)),
+    Effect.flatMap((settings) => settings.through === null ? ensureHeavyWatch(home, orc) : Effect.succeed("heavy watch: the heavy calls queue through " + settings.through.join(" ") + ", no watchdog is armed")),
     Effect.flatMap((line) => line === null ? Effect.void : Console.log(line)),
     Effect.catchTag("RunnerError", (error) => Console.error(command + " queued no heavy watch: " + error.detail))
   )

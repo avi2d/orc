@@ -48,6 +48,18 @@ describe("the heavy stand-in with heavy.through set", () => {
     expect(await readFile(join(harness.root, "tool.log"), "utf8")).toContain("vitest run x.test.ts")
   })
 
+  test("a heavy call under a direct through holder runs at once instead of queuing a second time", async () => {
+    const harness = track(await setupThrough(["bun"], holderRun))
+    const child = Bun.spawnSync([join(harness.fake, "winbox-heavy"), "run", "--", join(harness.bin, "bun"), "test"], {
+      env: harness.env,
+      stdout: "pipe",
+      stderr: "pipe"
+    })
+    expect(child.exitCode).toBe(0)
+    expect(await harness.holderLog()).toBe("winbox-heavy run -- " + join(harness.bin, "bun") + " test\n")
+    expect(await harness.pueueLog()).toBe("")
+  })
+
   test("a call that never queues skips the through command", async () => {
     const harness = track(await setupThrough(["bun"], holderRun))
     const result = run(harness, "bun", ["install"])
@@ -65,7 +77,8 @@ describe("the heavy stand-in with heavy.through set", () => {
 
   test("a through word with a quote and a space reaches the command as one word instead of splitting", async () => {
     const harness = track(await setupThrough(["bun"], ["winbox-heavy", "run", "it's one"]))
-    run(harness, "bun", ["test"])
+    const result = run(harness, "bun", ["test"])
+    expect(result.code).toBe(0)
     expect(await harness.holderLog()).toBe("winbox-heavy run it's one " + join(harness.fake, "bun") + " test\n")
   })
 })

@@ -135,11 +135,6 @@ const standinHead = (tool: string, settings: StandinSettings): ReadonlyArray<str
   'heavy_wrap="' + settings.wrap + '"'
 ]
 
-const shellWord = (word: string): string => "'" + word.replaceAll("'", "'\\''") + "'"
-
-const throughWords = (through: ReadonlyArray<string> | null): string | null =>
-  through === null ? null : through.map(shellWord).join(" ")
-
 const standinDecideFn = (decide: ReadonlyArray<string>): ReadonlyArray<string> => [
   'heavy_decide() {',
   '  heavy_queue=0; heavy_prio=0;',
@@ -154,7 +149,7 @@ export const standinScript = (tool: string, settings: StandinSettings, commands:
     ...helpers,
     ...standinDecideFn(decide),
     ...standinUtils(),
-    ...standinQueue(throughWords(settings.through)),
+    ...standinQueue(settings.through),
     ...standinWait(timing),
     ...standinFinish()
   ].join("\n") + "\n"

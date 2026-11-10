@@ -113,7 +113,17 @@ describe("the heavy queue setup", () => {
     try {
       await withLoggingPueue(home, () => runEffect(startHeavyWatch(home, ["orc"], "orc heavy watch")))
       expect(await pueueCalls(home)).toBe("")
-      expect(await Bun.file(join(home, "heavy", "bin", "bun")).text()).toContain("'winbox-heavy' 'run' '--'")
+      await writeFile(join(home, "fake", "winbox-heavy"), "#!/bin/sh\necho \"winbox-heavy $*\" >> \"$FAKE_HOLDER_LOG\"\nshift 2\n\"$@\"\n", { mode: 0o755 })
+      await writeFile(join(home, "fake", "bun"), "#!/bin/sh\nexit 0\n", { mode: 0o755 })
+      const holderLog = join(home, "holder.log")
+      const child = Bun.spawnSync([join(home, "heavy", "bin", "bun"), "test"], {
+        env: { ...process.env, PATH: join(home, "heavy", "bin") + ":" + join(home, "fake") + ":" + (process.env.PATH ?? ""), FAKE_HOLDER_LOG: holderLog },
+        stdout: "pipe",
+        stderr: "pipe"
+      })
+      expect(child.exitCode).toBe(0)
+      expect(await readFile(holderLog, "utf8")).toBe("winbox-heavy run -- " + join(home, "fake", "bun") + " test\n")
+      expect(await pueueCalls(home)).toBe("")
     } finally {
       await rm(home, { recursive: true, force: true })
     }

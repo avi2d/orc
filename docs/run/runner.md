@@ -67,6 +67,6 @@ To print the five minute load average the beat compares against a load limit, ru
 Its second line counts the calls queued in that machine's heavy queue and the bypasses logged in the last 7 days.
 
 ## Queue heavy calls
-`orc runner start` writes stand in scripts for heavy tools and arms the watchdog beside the alert stream.
+`orc runner start` writes stand in scripts for heavy tools and arms the watchdog beside the alert stream unless `through` is set.
 `orc run` puts the stand in folder first on `PATH` for the agent it starts.
 [The heavy queue](heavy-queue.md) names the queued tools, the bypass, the check command and the tuning keys.

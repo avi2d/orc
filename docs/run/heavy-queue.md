@@ -54,7 +54,7 @@ With `through` set, orc makes no pueue group, arms no watchdog, and `orc heavy c
 Sandboxed runs do not use the heavy queue yet.
 
 ## Watch the queue
-`orc runner start` arms the watchdog beside the alert stream.
+`orc runner start` arms the watchdog beside the alert stream unless `through` is set.
 The watchdog reports only the local machine.
 A running targeted call older than 10 minutes writes a `long-task` alert, once per machine per 10 minutes.
 A heavy tool process outside a running `heavy` task writes a `heavy-slip` alert naming the command, once per command per 10 minutes.
