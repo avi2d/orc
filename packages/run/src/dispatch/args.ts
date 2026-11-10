@@ -8,7 +8,7 @@ import { isTaskKind, type TaskKind, unknownKind } from "../task-kind"
 import { isMergeBasis, mergeBases } from "./merge-basis"
 
 export const dispatchUsage =
-  "orc backlog [--json] | orc attention [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task|parent>] [--internal] [--machine <name>] [--parent <task-id>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog stop <task-id> | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <claude-credentials.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner kill <task-id> | orc runner answer <task-id> | orc runner load | orc heavy path | orc heavy check [--json] | orc heavy watch | orc heavy watch-once"
+  "orc backlog [--json] | orc attention [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task|parent>] [--internal] [--machine <name>] [--parent <task-id>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog stop <task-id> | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc backlog plan <task-id> [--drop <task-id>] | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <claude-credentials.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner kill <task-id> | orc runner answer <task-id> | orc runner load | orc heavy path | orc heavy check [--json] | orc heavy watch | orc heavy watch-once"
 
 const addFlags = ["--kind", "--machine", "--parent", "--depends-on"] as const
 type AddFlag = typeof addFlags[number]
@@ -205,6 +205,23 @@ const parseDepend = (rest: ReadonlyArray<string>): DispatchArgs => {
   return { kind: "DependTask", id, dependsOn: [...new Set(named)] }
 }
 
+const parsePlan = (rest: ReadonlyArray<string>): DispatchArgs => {
+  const [parent = "", flag = "", child = "", ...extra] = rest
+  if (!isTaskId(parent)) {
+    return { kind: "UsageError", detail: "orc backlog plan takes a parent task id, got \"" + parent + "\"" }
+  }
+  if (rest.length === 1) {
+    return { kind: "ShowPlan", parent }
+  }
+  if (flag !== "--drop") {
+    return unexpected(flag)
+  }
+  if (!isTaskId(child)) {
+    return { kind: "UsageError", detail: "orc backlog plan takes a child task id after --drop, got \"" + child + "\"" }
+  }
+  return extra.length === 0 ? { kind: "DropChild", parent, child } : unexpected(extra[0])
+}
+
 const parseMerge = (rest: ReadonlyArray<string>): DispatchArgs => {
   const [id = "", ...flags] = rest
   if (id === "") {
@@ -276,6 +293,9 @@ export const parseDispatchArgs = (command: "backlog" | "attention" | "beat" | "r
   }
   if (rest[0] === "depend") {
     return parseDepend(rest.slice(1))
+  }
+  if (rest[0] === "plan") {
+    return parsePlan(rest.slice(1))
   }
   return parseJsonFlag(rest, (json) => ({ kind: "ShowBacklog", json }))
 }

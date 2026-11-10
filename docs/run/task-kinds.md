@@ -37,3 +37,48 @@ The runner queues it as `orc run <task-file> --kind parent --sandbox none`, whic
 Pi runs the whole result in the real place it serves, checks each done criterion, and ends `agent-report.md` with the line `verdict: pass` or `verdict: fail`.
 A report whose last line is `verdict: pass` closes the parent done with its report.
 Any other report records the run failed with `the final check did not end its report at <path> with verdict: pass`, and the beat closes the parent failed with that reason and keeps the report path.
+
+### Splitting at intake
+
+When `models.planner` in `config.json` names a model, as [Configuring providers](configuring-providers.md) shows, `orc backlog add` asks it to plan each ship task added without `--parent` before the task lands.
+The budget for one task is about 300 changed lines or one area.
+A request within the budget lands as one task, and orc prints `planned as one task: <reason>` under the added line.
+A request over the budget lands as a parent with the planner's done criteria under `## Done when`, and one ship child for each vertical slice, each one PR that merges on its own.
+A child waits on the earlier children the plan names, so the next beat starts every child that waits on nothing at the same time.
+The parent's task file keeps `split: {"by": "intake", "reason": <text>}`, which `orc backlog --json` gives every task as `split`, and orc records the event `<parent-id>.split` that orc chat posts.
+A planner that fails, runs past five minutes or prints no `orc.split.v1` document leaves the request as one task, and orc prints `not planned, so it runs as one task: <why>`.
+With no `models.planner`, orc asks no model and adds the task as it is.
+
+The planner prints one JSON document:
+
+```json
+{
+  "schema": "orc.split.v1",
+  "plan": "split",
+  "reason": "it touches the record, the intake and the listing",
+  "done": ["a big request lands as a parent with children"],
+  "children": [
+    { "title": "Record the split", "body": "Add the split mark to the task record.", "after": [] },
+    { "title": "Plan at intake", "body": "Split an over-budget request when it is added.", "after": [1] }
+  ]
+}
+```
+
+A request within the budget prints `{"schema": "orc.split.v1", "plan": "whole", "reason": <text>}`.
+`after` numbers earlier children from 1, and orc refuses a plan with fewer than two children or a child that waits on a later one.
+
+### Changing a plan
+
+To see a parent's plan, run `orc backlog plan <task-id>`, which prints its count line, how it was split, and one line per child with its state and what it still waits on:
+
+```text
+orc-1 parent orc 0 of 3 done Ship task splitting
+split at intake: it touches the record, the intake and the listing
+orc-2 started on mac Record the split
+orc-3 new Show the plan
+orc-4 new waits orc-2,orc-3 Plan at intake
+```
+
+To drop a child from the plan, run `orc backlog plan <task-id> --drop <child-id>`, which removes its task file and lowers the parent's count.
+Orc refuses a child that is taken, started, closed or parked, and one another open task waits on until `orc backlog depend` changes that wait.
+To add a slice, run `orc backlog add <project> <task-file> --parent <task-id>`, and to reorder slices, run `orc backlog depend`.

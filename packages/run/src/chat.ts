@@ -6,8 +6,8 @@ import { backlogPaths } from "./dispatch/backlog"
 import { type ProjectInstructions, readProjectInstructions } from "./dispatch/config"
 import type { Command } from "./dispatch/runner"
 import { readFailure } from "./json-file"
-import { providerOf } from "./model-route"
-import { type OrcConfig, readOrcConfig } from "./orc-config"
+import { providerEnvOf } from "./model-route"
+import { readOrcConfig } from "./orc-config"
 
 export class ChatError extends Data.TaggedError("ChatError")<{
   readonly message: string
@@ -60,11 +60,6 @@ const instructionsWords = (rules: ChatRules, instructions: ReadonlyArray<Project
 
 const instructionsPrompt = (entry: LoadedInstructions): string =>
   "The instructions file for the project " + entry.project + ", " + entry.file + ":\n\n" + entry.text
-
-const providerEnvOf = (config: OrcConfig, model: string): Record<string, string> => {
-  const provider = config.providers.find((candidate) => candidate.id === providerOf(model))
-  return provider?.credential === "package" ? provider.env ?? {} : {}
-}
 
 const chatLaunch = (orcHome: string, model: string, rules: ChatRules, instructions: ReadonlyArray<LoadedInstructions>, self: Command): ChatLaunch => ({
   command: [

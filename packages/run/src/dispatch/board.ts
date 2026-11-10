@@ -4,7 +4,7 @@ import type { Project } from "./config"
 import { describeQuota } from "./quota"
 import type { TaskKind } from "../task-kind"
 import type { ChatEvent } from "./chat-event"
-import { type Claim, type Hold, isHeld, openQuestions, type Parked, type Started, type TaskRecord } from "./task-record"
+import { type Claim, type Hold, isHeld, openQuestions, type Parked, type SplitMark, type Started, type TaskRecord } from "./task-record"
 
 const BACKLOG_JSON_SCHEMA = "orc.backlog.v1" as const
 const BEAT_JSON_SCHEMA = "orc.beat.v1" as const
@@ -44,6 +44,7 @@ type TaskJson = {
   readonly machine: string | null
   readonly parent: string | null
   readonly children: ChildCount | null
+  readonly split: SplitMark | null
   readonly dependsOn: ReadonlyArray<string>
   readonly created: string
   readonly hold: Hold | null
@@ -115,6 +116,7 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     machine: record.spec.machine,
     parent: record.spec.parent,
     children: record.spec.kind === "parent" ? childCount(record, view.tasks, view.merged) : null,
+    split: record.spec.split,
     dependsOn: record.spec.dependsOn,
     created: record.spec.created,
     hold: record.hold,

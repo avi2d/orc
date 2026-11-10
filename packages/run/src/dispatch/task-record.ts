@@ -4,6 +4,14 @@ import { isTaskKind, type TaskKind, unknownKind } from "../task-kind"
 export const taskFolders = ["new", "taken", "closed"] as const
 export type TaskFolder = typeof taskFolders[number]
 
+const splitSources = ["intake"] as const
+export type SplitSource = typeof splitSources[number]
+
+export interface SplitMark {
+  readonly by: SplitSource
+  readonly reason: string
+}
+
 export interface TaskSpec {
   readonly id: string
   readonly title: string
@@ -12,6 +20,7 @@ export interface TaskSpec {
   readonly internal: boolean
   readonly machine: string | null
   readonly parent: string | null
+  readonly split: SplitMark | null
   readonly dependsOn: ReadonlyArray<string>
   readonly created: string
   readonly body: string
@@ -128,6 +137,7 @@ const Frontmatter = Schema.Struct({
   internal: Schema.optional(Schema.Boolean),
   machine: Schema.NullOr(Schema.String),
   parent: Schema.optional(Schema.String),
+  split: Schema.optional(Schema.Struct({ by: Schema.Literals(splitSources), reason: Schema.String })),
   depends_on: Schema.Array(Schema.String),
   created: Schema.String,
   hold_reason: Schema.optional(Schema.String),
@@ -319,6 +329,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
         internal: front.internal ?? false,
         machine: front.machine,
         parent: front.parent ?? null,
+        split: front.split ?? null,
         dependsOn: front.depends_on,
         created: front.created,
         body: parts.body
