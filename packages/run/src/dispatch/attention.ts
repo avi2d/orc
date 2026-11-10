@@ -68,33 +68,28 @@ const readItem = (root: string, id: string): Effect.Effect<AttentionItem | null,
 
 type CloseOutcome = "closed" | "already closed" | "missing"
 
-export const closeItem = (root: string, id: string, answer: ItemAnswer): Effect.Effect<CloseOutcome, BacklogError, FileSystem.FileSystem> =>
+type SettledState = Exclude<AttentionItem["state"], { kind: "open" }>
+
+const settleOpenItem = (root: string, id: string, state: SettledState): Effect.Effect<"settled" | "already closed" | "missing", BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const item = yield* readItem(root, id)
     if (item === null) {
-      return "missing"
+      return "missing" as const
     }
     if (item.state.kind !== "open") {
-      return "already closed"
+      return "already closed" as const
     }
-    yield* writeItem(root, id, { ...item, state: { kind: "closed", answer } })
-    return "closed"
+    yield* writeItem(root, id, { ...item, state })
+    return "settled" as const
   })
+
+export const closeItem = (root: string, id: string, answer: ItemAnswer): Effect.Effect<CloseOutcome, BacklogError, FileSystem.FileSystem> =>
+  Effect.map(settleOpenItem(root, id, { kind: "closed", answer }), (outcome) => outcome === "settled" ? "closed" : outcome)
 
 type WithdrawOutcome = "withdrawn" | "already closed" | "missing"
 
-export const withdrawItem = (root: string, id: string, reason: string, at: string): Effect.Effect<WithdrawOutcome, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const item = yield* readItem(root, id)
-    if (item === null) {
-      return "missing"
-    }
-    if (item.state.kind !== "open") {
-      return "already closed"
-    }
-    yield* writeItem(root, id, { ...item, state: { kind: "withdrawn", reason, at } })
-    return "withdrawn"
-  })
+const withdrawItem = (root: string, id: string, reason: string, at: string): Effect.Effect<WithdrawOutcome, BacklogError, FileSystem.FileSystem> =>
+  Effect.map(settleOpenItem(root, id, { kind: "withdrawn", reason, at }), (outcome) => outcome === "settled" ? "withdrawn" : outcome)
 
 export interface OpenItem {
   readonly id: string

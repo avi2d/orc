@@ -37,7 +37,7 @@ const ageText = (seconds: number): string => {
   return minutes < 60 ? minutes + "m" : Math.floor(minutes / 60) + "h" + String(minutes % 60).padStart(2, "0") + "m"
 }
 
-export const formatAttention = (items: ReadonlyArray<OpenItem>, at: string): string =>
+const formatAttention = (items: ReadonlyArray<OpenItem>, at: string): string =>
   formatTable(
     ["ITEM", "KIND", "TASK", "OWNER", "AGE", "TEXT"],
     attentionJson(items, at).items.map((item) => [item.id, item.kind, item.task, item.owner, ageText(item.ageSeconds) + (item.overdue ? " overdue" : ""), item.text]),
