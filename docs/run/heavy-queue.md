@@ -29,6 +29,8 @@ Whole suite runs queue with no priority and wait their turn.
 Run `orc heavy path` to create the stand ins and print the folder.
 Run `orc heavy check` to read slots, running calls, queued calls with their ages, and bypasses.
 Run `orc heavy check --json` for the same report as JSON.
+The check counts all logged bypasses and those logged in the last 7 days.
+Run `orc runner load` to print the load with the queued count and the week's bypasses that the beat reads.
 Run `orc heavy watch` to arm the watchdog that reports stalled calls and queue slips.
 Run `orc heavy watch-once` to run one watchdog pass and print its counts.
 

@@ -39,6 +39,8 @@ It also names the floor of room each account must keep:
 
 A machine may add `"loadLimit"`, a number above 0, and the beat starts nothing there while `orc runner load` reads its five-minute load above it.
 An unread load holds starts there too.
+On a machine whose start command runs `orc runner start`, the beat also starts nothing while `orc runner load` reads 3 or more calls queued in its heavy queue.
+An unread heavy queue does not hold starts.
 Orc refuses a load limit that is not a number above 0.
 Orc refuses a load limit on a machine whose start command does not run `orc runner start`, because the beat reads the load through that command.
 

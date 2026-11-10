@@ -6,7 +6,7 @@ import { holdTask } from "./backlog-hold"
 import { circularDependency, dependTask } from "./backlog-depend"
 import { answerTask } from "./parked"
 import { liveSources, readRoom, runBeat } from "./beat"
-import { fiveMinuteLoad } from "./load"
+import { runnerLoadText } from "./load"
 import { backlogJson, type BacklogView, beatJson, formatBeat, formatBoard, type ProjectList, type RoomList } from "./board"
 import { type ConfigError, readFailure } from "../json-file"
 import { checkoutOn, type DispatchConfig, readDispatchConfig, readProjects } from "./config"
@@ -303,7 +303,7 @@ const runnerVerbLine = (args: RunnerVerb, place: DispatchPlace) => {
       return relayAnswers(place.home, args.task, place.stdin)
     }
     case "RunnerLoad": {
-      return Effect.succeed(String(fiveMinuteLoad()))
+      return runnerLoadText(place.home)
     }
   }
 }
