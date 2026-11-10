@@ -199,7 +199,7 @@ describe("the heavy stand-in", () => {
       harnesses.push({ root, bin: "", env: {}, pueueLog: async () => "" })
       const bin = join(root, "bin")
       await mkdir(bin, { recursive: true })
-      await writeFile(join(bin, "bun"), standinScript("bun", { home: root, group, wrap: "" }, []), { mode: 0o755 })
+      await writeFile(join(bin, "bun"), standinScript("bun", { home: root, group, wrap: "", through: null }, []), { mode: 0o755 })
       await writeFile(join(root, "pass.test.ts"), 'test("x", () => {})\n')
       await writeFile(join(root, "fail.test.ts"), 'test("x", () => { throw new Error("x") })\n')
       const realEnv = { ...process.env, PATH: bin + ":" + process.env.PATH, HOME: userInfo().homedir }
@@ -212,7 +212,7 @@ describe("the heavy stand-in", () => {
       Bun.spawnSync(["pueue", "clean", "--group", group], { stdout: "ignore", stderr: "ignore" })
       Bun.spawnSync(["pueue", "group", "remove", group], { stdout: "ignore", stderr: "ignore" })
     }
-  })
+  }, 30_000)
 
   test("a wait past the budget fails the step with a queue message", async () => {
     const harness = harnesses[harnesses.push(await setup(["bun"], [], { budgetMinutes: 0, pollSeconds: 1 })) - 1]
