@@ -5,11 +5,14 @@ const plural = (count: number, one: string, many: string): string => `${count} $
 
 const minutesText = (minutes: number): string => `${minutes}m`;
 
+const zshOrcMissing = /command not found: orc(?![\w-])/;
+
 export const isHeavyNotSetup = (failure: Failed): boolean =>
   failure.kind === "unreachable" &&
   (failure.reason === heavyNotSetupReason ||
     failure.reason.includes("group is missing") ||
     failure.reason.includes("orc: command not found") ||
+    zshOrcMissing.test(failure.reason) ||
     failure.reason.includes("orc: not found"));
 
 export const heavySummary = (check: HeavyCheck): string => {
