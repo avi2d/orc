@@ -162,7 +162,7 @@ describe("the check readout", () => {
       bypassWeek: 1
     }
     expect(formatCheck(check)).toBe(
-      "heavy: 1 slot, 0 free, 1 running, 2 queued, oldest queued 4m, 2 bypasses, 1 this week\n" +
+      "heavy: 1 slot, 0 free, 1 running, 2 queued, oldest queued 4m, 2 bypasses\n" +
       "  running #1 12m bun test x\n" +
       "  queued #2 4m bun test y\n" +
       "  queued #3 1m bun test"
@@ -172,14 +172,14 @@ describe("the check readout", () => {
   test("a call queued under a minute ago reads 0m", () => {
     const check = { group: "heavy", parallel: 1, running: [], queued: [{ id: 4, command: "bun test", ageMinutes: 0 }], bypass: 0, bypassWeek: 0 }
     expect(formatCheck(check)).toBe(
-      "heavy: 1 slot, 1 free, 0 running, 1 queued, oldest queued 0m, 0 bypasses, 0 this week\n" +
+      "heavy: 1 slot, 1 free, 0 running, 1 queued, oldest queued 0m, 0 bypasses\n" +
       "  queued #4 0m bun test"
     )
   })
 
   test("an empty queue reads quiet", () => {
     expect(formatCheck({ group: "heavy", parallel: 1, running: [], queued: [], bypass: 0, bypassWeek: 0 })).toBe(
-      "heavy: 1 slot, 1 free, 0 running, 0 queued, 0 bypasses, 0 this week"
+      "heavy: 1 slot, 1 free, 0 running, 0 queued, 0 bypasses"
     )
   })
 })
@@ -352,7 +352,8 @@ describe("the watch loop", () => {
       const check = await withFakePueue(home, () => runWatch(checkHeavy(home)))
       expect(check.bypass).toBe(2)
       expect(check.bypassWeek).toBe(2)
-      expect(formatCheck(check)).toContain(", 2 bypasses, 2 this week")
+      expect(formatCheck(check)).toContain(", 2 bypasses")
+      expect(formatCheck(check)).not.toContain("this week")
     } finally {
       await rm(home, { recursive: true, force: true })
     }

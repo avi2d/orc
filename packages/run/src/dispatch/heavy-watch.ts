@@ -312,7 +312,7 @@ export const formatCheck = (check: HeavyCheck): string => {
   const head = "heavy: " + String(check.parallel) + " slot" + (check.parallel === 1 ? "" : "s") + ", " +
     String(free) + " free, " + String(check.running.length) + " running, " + String(check.queued.length) + " queued" +
     (check.queued.length === 0 ? "" : ", oldest queued " + minutesText(oldest)) +
-    ", " + String(check.bypass) + " bypass" + (check.bypass === 1 ? "" : "es") + ", " + String(check.bypassWeek) + " this week"
+    ", " + String(check.bypass) + " bypass" + (check.bypass === 1 ? "" : "es")
   const lines = check.running.map((task) => "  running #" + String(task.id) + " " + minutesText(task.ageMinutes) + " " + task.command)
     .concat(check.queued.map((task) => "  queued #" + String(task.id) + " " + minutesText(task.ageMinutes) + " " + task.command))
   return [head, ...lines].join("\n")

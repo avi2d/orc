@@ -113,21 +113,12 @@ export const readQueues: Effect.Effect<QueuesView, never, QueueSources> = Effect
 
 export const readQueuesReport: Effect.Effect<QueuesReport, never, QueueSources> = Effect.gen(function* () {
   const machines = yield* PueueMachines;
-  const heavies = yield* HeavyMachines;
   const actions = yield* ActionsSource;
   const [statuses, runs] = yield* Effect.all(
     [
-      Effect.forEach(
-        machines,
-        (machine) => {
-          const heavy = heavyOf(heavies, machine.name);
-          return Effect.map(
-            Effect.all([readNamingCopies(machine), heavy === undefined ? Effect.succeedNone : Effect.asSome(heavy.read)], { concurrency: "unbounded" }),
-            ([status, check]) => ({ name: machine.name, status, heavy: check }),
-          );
-        },
-        { concurrency: "unbounded" },
-      ),
+      Effect.forEach(machines, (machine) => Effect.map(readNamingCopies(machine), (status) => ({ name: machine.name, status })), {
+        concurrency: "unbounded",
+      }),
       actions.read,
     ],
     { concurrency: "unbounded" },

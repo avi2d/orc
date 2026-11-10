@@ -1,4 +1,4 @@
-import type { HeavyCheck } from "../sources/heavy";
+import { heavyNotSetupReason, type HeavyCheck } from "../sources/heavy";
 import type { Failed } from "../reading";
 
 const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`;
@@ -7,7 +7,10 @@ const minutesText = (minutes: number): string => `${minutes}m`;
 
 export const isHeavyNotSetup = (failure: Failed): boolean =>
   failure.kind === "unreachable" &&
-  (failure.reason.includes("group is missing") || failure.reason.includes("not installed on the PATH") || failure.reason.includes("not found"));
+  (failure.reason === heavyNotSetupReason ||
+    failure.reason.includes("group is missing") ||
+    failure.reason.includes("orc: command not found") ||
+    failure.reason.includes("orc: not found"));
 
 export const heavySummary = (check: HeavyCheck): string => {
   const oldest = Math.max(0, ...check.queued.map((call) => call.ageMinutes));

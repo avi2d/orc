@@ -1,7 +1,7 @@
 import { Config, Context, Duration, Effect, Layer, Schema } from "effect";
 import { CommandRunner } from "../command";
 import { decodeJson } from "../decode";
-import type { Reading } from "../reading";
+import { unreachable, type Outcome, type Reading } from "../reading";
 import { runDecoded, stamped } from "../source";
 import { machineNames, selector } from "./environment";
 
@@ -21,6 +21,10 @@ export const HeavyCheck = Schema.Struct({
 export type HeavyCheck = typeof HeavyCheck.Type;
 
 export const decodeHeavyCheck = decodeJson(HeavyCheck);
+
+export const heavyNotSetupReason = "heavy queue not set up";
+
+const localAbsent: Outcome<HeavyCheck> = unreachable(heavyNotSetupReason);
 
 export interface HeavyMachine {
   readonly name: string;
@@ -43,8 +47,9 @@ const machineOf = (
   argv: readonly [string, ...string[]],
   timeout: Duration.Duration,
   runner: CommandRunner["Service"],
+  whenAbsent?: Outcome<HeavyCheck>,
 ): Effect.Effect<HeavyMachine> =>
-  Effect.map(Effect.cachedWithTTL(Effect.provideService(stamped(runDecoded({ argv, timeout }, decodeHeavyCheck)), CommandRunner, runner), reuseFor), (read) => ({
+  Effect.map(Effect.cachedWithTTL(Effect.provideService(stamped(runDecoded({ argv, timeout }, decodeHeavyCheck, whenAbsent)), CommandRunner, runner), reuseFor), (read) => ({
     name,
     read,
   }));
@@ -55,7 +60,7 @@ export const heavyMachinesLayer: Layer.Layer<HeavyMachines, Config.ConfigError, 
   Effect.gen(function* () {
     const { names, command } = yield* heavyConfig;
     const runner = yield* CommandRunner;
-    const local = yield* machineOf(names.local, ["orc", "heavy", "check", "--json"], localTimeout, runner);
+    const local = yield* machineOf(names.local, ["orc", "heavy", "check", "--json"], localTimeout, runner, localAbsent);
     return command === undefined ? [local] : [local, yield* machineOf(names.remote, ["sh", "-c", command], remoteTimeout, runner)];
   }),
 );
