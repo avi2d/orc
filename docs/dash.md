@@ -497,7 +497,8 @@ A saved Claude profile read that long ago leaves its age to its rows, so its hea
 A limit with a pace marks on its bar how much of its time is left, as the quota tool does.
 Beside the share, a reserve column reads spare, over, on pace, no pace or used up.
 A projection made early in a limit reads muted, such as may run out in 2d 7h.
-Below the accounts, a flag names each agent spending over its share of a running-ahead limit that runs out before its reset.
+Below the accounts, the attention row counts the open items and the overdue ones.
+Below the attention row, a flag names each agent spending over its share of a running-ahead limit that runs out before its reset.
 The flag names the agent by its project, such as orc.
 With a second machine configured, a flag for an agent there names that machine too.
 A line says when that machine could not be checked.
@@ -538,7 +539,8 @@ Add `--width 40` for a narrow frame, or `--width 240 --height 60` for a wide one
 With the default layout, on a screen at least 120 columns wide and 36 rows tall, the dashboard lays its readings out in bands.
 The top band holds quota and notices.
 Notices holds gluttons and alerts under one shared title, opening on gluttons.
-Below the top band, the machines box gives each machine's CPU, memory, disk and GPU bars.
+Below the top band, the attention box lists each open item oldest first, with its task, its owner, its age and its kind.
+Below it, the machines box gives each machine's CPU, memory, disk and GPU bars.
 A machine with a tasks report and no resources reading gives just its name.
 Under each machine, a line says whether a task uses over a quarter of its memory or over half its cores.
 When that machine's tasks report or task usage was not read, the line says so instead.

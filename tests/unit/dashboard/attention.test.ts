@@ -3,7 +3,6 @@ import { Effect } from "effect";
 import { TestConsole } from "effect/testing";
 import { dashboardSources, printedDashboard, recordedAnswer } from "../../lib/dashboard-sources";
 
-// The dashboard reads the orc attention call's fixed answer, so the frame shows the same items the panel does.
 const printed = (width: number, height: number): Promise<string> =>
   Effect.runPromise(
     Effect.gen(function* () {
