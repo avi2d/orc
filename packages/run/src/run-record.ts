@@ -1,7 +1,7 @@
 import { Effect, type FileSystem, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "./agents"
-import type { SandboxKind } from "./args"
+import type { SandboxKind } from "./sandbox-kind"
 import { orcCompletionLine } from "./pi"
 import type { AllowWord, NoMistakesRecord, NoMistakesRunner, QuestionAnswer } from "./no-mistakes"
 import { OrcRunError } from "./run-session"

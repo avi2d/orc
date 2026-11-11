@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { bypassLine, callerTool, parseStandinCall, planWords, standinMarker, type StandinCall } from "../../../packages/run/src/dispatch/heavy-standin-runtime"
+import { bypassLine, callerTool, parseStandinCall, standinMarker, type StandinCall } from "../../../packages/run/src/dispatch/heavy-standin-runtime"
 
 const call: StandinCall = {
   tool: "cargo",
@@ -37,13 +37,6 @@ describe("bypassLine", () => {
   test("quotes, backslashes and line breaks drop out instead of breaking the JSON line", () => {
     const line = bypassLine('fix "flaky"\\ seed\n', "bun test\tx", new Date("2026-11-11T10:00:00.123Z"))
     expect(line).toBe('{"rule":"heavy-bypass","at":"2026-11-11T10:00:00Z","reason":"fix flaky seed","command":"bun testx"}')
-  })
-})
-
-describe("planWords", () => {
-  test("each plan prints as the verb the stand-in reads instead of its object shape", () => {
-    expect(planWords({ kind: "queue", real: "/r/my bun" })).toBe("queue /r/my bun")
-    expect(planWords({ kind: "exit", code: 127 })).toBe("exit 127")
   })
 })
 

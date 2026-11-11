@@ -21,6 +21,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/json-file.ts` | The JSON config file reading and its `ConfigError` |
 | `packages/run/src/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `packages/run/src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
+| `packages/run/src/sandbox-kind.ts` | The sandbox kinds a run takes |
 | `packages/run/src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
 | `packages/run/src/checkout.ts` | The checks on the checkout a run starts from: its git root, refused markers, uncommitted changes and branch name |
 | `packages/run/src/worktree-excludes.ts` | The registered worktrees inside a checkout that its clean check leaves out |
@@ -48,6 +49,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/table.ts` | The table formatter the runs and refusals listings share |
 | `packages/run/src/nono.ts` | The nono sandbox environment, its roots and the `nono why` check of a rendered profile |
 | `packages/run/src/nono-exec.ts` | The opening of the nono sandbox a run's commands go through: the runtimes, the shims and the checked profile |
+| `packages/run/src/standin-dir.ts` | The stand in folder suffix nono strips from the host path |
 | `packages/run/src/agent-exec.ts` | The one way a run starts Pi and the checks, in `nono run` or on the host, with the environment built from an allow list |
 | `packages/run/src/host.ts` | The host-side processes and tools orc runs outside nono, and the guard on host git |
 | `packages/run/src/nono-profile.ts` | The nono profile that lets a command write only the copy, its git data, the Pi session folder and the run's `sessions` folder, and routes the model credential |
@@ -96,10 +98,11 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/heavy.ts` | The heavy settings, the stand in folder and the default heavy tool list |
 | `packages/run/src/dispatch/heavy-cli.ts` | The `orc heavy` path, check, watch and watch-once commands |
 | `packages/run/src/dispatch/heavy-setup.ts` | The reading of the heavy settings and the writing of the stand in folder |
-| `packages/run/src/dispatch/heavy-standin.ts` | The generated stand in scripts that queue heavy tool calls |
+| `packages/run/src/dispatch/heavy-standin.ts` | The three line stand in launchers that start the helper for each heavy tool |
 | `packages/run/src/dispatch/heavy-classify.ts` | The per tool decision of which calls queue and which targeted calls take priority |
-| `packages/run/src/dispatch/heavy-standin-main.ts` | The program a stand in starts by the real bun path to classify, plan or queue its call |
-| `packages/run/src/dispatch/heavy-standin-runtime.ts` | The stand in runtime: the real tool lookup, the bypass event, the plan of a call and the queue wait |
+| `packages/run/src/dispatch/heavy-standin-main.ts` | The helper a stand in launcher starts by the real bun path, and the waiter a queued pueue task starts |
+| `packages/run/src/dispatch/heavy-standin-exec.ts` | The helper's run of a call: the classify probe, the real tool as a child, the through command and the queued call waiter |
+| `packages/run/src/dispatch/heavy-standin-runtime.ts` | The stand in runtime: the helper command, the real tool lookup, the bypass event, the plan of a call and the queue wait |
 | `packages/run/src/dispatch/heavy-process-tree.ts` | The process tree walk that finds a call inside a held slot or under the through command |
 | `packages/run/src/dispatch/heavy-pueue-task.ts` | The reading of pueue status and log JSON for the queue wait and the exit code |
 | `packages/run/src/dispatch/heavy-watch.ts` | The watchdog that reports stalled calls and queue slips |

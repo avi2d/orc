@@ -71,6 +71,6 @@ Without `through` set, its second line counts the calls queued in that machine's
 With `through` set, its second line reports the heavy queue as unread.
 
 ## Queue heavy calls
-`orc runner start` writes stand in scripts for heavy tools and arms the watchdog beside the alert stream unless `through` is set.
+`orc runner start` writes stand ins for heavy tools and arms the watchdog beside the alert stream unless `through` is set.
 `orc run` puts the stand in folder first on `PATH` for the agent it starts.
 [The heavy queue](heavy-queue.md) names the queued tools, the bypass, the check command and the tuning keys.

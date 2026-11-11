@@ -1,8 +1,13 @@
 import { Effect, Stream } from "effect"
 import { ChildProcess, type ChildProcessSpawner } from "effect/process"
-import type { CommandResult } from "./checks"
 import { runHostCommand } from "./host"
 import { OrcRunError } from "./run-session"
+
+export interface CommandResult {
+  readonly stdout: string
+  readonly stderr: string
+  readonly exitCode: number
+}
 
 type Spawner = ChildProcessSpawner.ChildProcessSpawner["Service"]
 

@@ -4,7 +4,7 @@ import { readOrcConfig } from "../orc-config"
 import { heavyBinDir, resolveHeavy, type HeavySettings } from "./heavy"
 import { detectWrap, standinScripts, type HeavyPlatform, type StandinSettings } from "./heavy-standin"
 import { RunnerError } from "./runner-error"
-import { ensureGroup } from "./runner"
+import { ensureGroup } from "./runner-exec"
 
 const platformOf = (): HeavyPlatform =>
   process.platform === "darwin" ? "darwin" : process.platform === "linux" ? "linux" : "other"

@@ -6,7 +6,7 @@ import type { ChatEvent } from "./chat-event"
 import { routePullRequest } from "./attention"
 import { eventRecorded, recordEvent } from "./events"
 import { checkRefusals, greenChecks, type PullRequestView } from "./pr-view"
-import type { RunnerError } from "./runner"
+import type { RunnerError } from "./runner-error"
 import type { TaskRecord } from "./task-record"
 
 export type ReadPullRequest = (url: string) => Effect.Effect<PullRequestView, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner>

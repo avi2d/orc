@@ -6,7 +6,8 @@ import { readDispatchConfig } from "./config"
 import type { ConfigError } from "../json-file"
 import type { TaskFileError } from "./task-record"
 import { ownedBySweep, throughFor } from "./machine-reach"
-import { killHeld, refuse as refuseRun, runLabel, RunnerError } from "./runner"
+import { killHeld, refuse as refuseRun, runLabel } from "./runner"
+import { RunnerError } from "./runner-error"
 import { killHeldThrough, readResult, readResultThrough } from "./runner-result"
 
 export const stopNow = (

@@ -7,15 +7,18 @@ Heavy calls are test runs, builds and browser runs through tools like `bun`, `bu
 The queue keeps two such calls from overloading the machine at the same time.
 
 ## How calls reach the queue
-`orc run` and `orc runner start` write stand in scripts for each heavy tool into `~/.orc/heavy/bin`.
+`orc run` and `orc runner start` write a stand in for each heavy tool into `~/.orc/heavy/bin`.
+A stand in is a launcher of three shell lines that starts orc's TypeScript helper through the absolute path of its bun.
 `orc run` puts that folder first on `PATH` for the agent it starts.
 A stand in queues the call with `pueue add` into the `heavy` group, or hands it to the `through` command when one is set, and waits for its turn, then prints the call output and exits with its exit code.
 Without `through` set, the wait message names how many queued calls stand ahead, counting higher priority calls and earlier calls at the same priority.
 Without `through` set, a finished call leaves the queue after the stand in reads its exit code.
 The stand in runs the real tool under a utility priority on macOS and with no wrapper on other systems.
-A stand in starts orc code through the absolute path of its bun to find the tool, queue it, wait, and never decide through itself.
+The helper finds the tool, decides whether the call queues, and runs, queues or waits for it, and never decides through itself.
+The helper stays the caller's process for the whole call, passes the tool's exit code back, and passes on a stop or hangup signal to the tool.
 It reads no `.env` or `bunfig.toml` from the caller's folder.
-If the bun or helper is gone or decision fails, it warns on stderr to rerun orc and runs the recorded tool with no queue.
+If the bun or helper is gone, the launcher warns once on stderr to rerun orc and runs the recorded tool with no queue.
+A queued call runs under the same helper in its pueue task, which stops the call once the stand in that queued it is gone.
 A stand in runs the first copy of the tool on its caller's PATH that is not an orc stand in, falls back to the absolute path recorded when orc wrote it, and refuses with exit 127 when neither exists.
 Without `through` set, a call that a queued call starts runs at once instead of queuing again.
 The stand in trusts the process tree above the call, never an exported group variable on its own.
