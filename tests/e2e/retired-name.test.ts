@@ -5,7 +5,7 @@ const syllables = ["t", "u", "i", "[-_]?", "d", "a", "s", "h"]
 const retired = new RegExp(syllables.join(""), "i")
 
 const isHistory = (file: string) => file === "CHANGELOG.md" || file.startsWith("docs/adr/")
-const flagged = (files: string[]) => files.filter((file) => !isHistory(file) && retired.test(file))
+const flagged = (files: readonly string[]) => files.filter((file) => !isHistory(file) && retired.test(file))
 
 describe("the retired dashboard name", () => {
   test("no tracked path or content keeps the retired name instead of the orc-dash name", () => {
