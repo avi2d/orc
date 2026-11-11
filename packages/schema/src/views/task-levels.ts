@@ -6,7 +6,7 @@ import { byProject } from "./project-order";
 import type { NoMistakesSnapshot } from "../contract/no-mistakes";
 import type { OrcSnapshot } from "../contract/orc";
 import { type Decoded, decoded, decodeJson, flatMapDecoded, rejected } from "../decode";
-import { type Failed, mapOutcome, type Outcome } from "../reading";
+import { type Failed, mapOutcome, type Outcome, secondsFrom } from "../reading";
 import type { PueueStatus } from "../sources/pueue";
 import type { CountedProcess, LiveProcess, ProcessSamples } from "../sources/task-processes";
 import { CountedProcessJson, LiveProcessJson, LiveTasksReport, LiveTasksJson, ProcessSamplesJson } from "../contract/task-live";
@@ -91,8 +91,6 @@ export interface TaskLevels {
 }
 
 const millis = DateTime.toEpochMillis;
-
-export const secondsFrom = (from: DateTime.Utc, to: DateTime.Utc): number => Math.max(0, (millis(to) - millis(from)) / 1000);
 
 const testSecondsOf = (run: TestRun, now: DateTime.Utc): number => secondsFrom(run.startedAt, "endedAt" in run ? run.endedAt : now);
 
