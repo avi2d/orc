@@ -4,8 +4,13 @@ import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promis
 import { spawnSync } from "node:child_process"
 import { tmpdir, userInfo } from "node:os"
 import { join } from "node:path"
-import { standinScript, standinTools } from "../../../packages/run/src/dispatch/heavy-standin"
+import { BunServices } from "@effect/platform-bun"
+import { Effect } from "effect"
+import { standinScript, standinTools, type StandinSettings } from "../../../packages/run/src/dispatch/heavy-standin"
 import { noPueue, run, setup, type Harness } from "./heavy-standin-harness"
+
+const scriptOf = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>): Promise<string> =>
+  Effect.runPromise(standinScript(tool, settings, commands).pipe(Effect.provide(BunServices.layer)))
 
 let harnesses: Array<Harness> = []
 
@@ -67,10 +72,10 @@ describe("the heavy stand-in", () => {
     const savedPath = process.env.PATH
     try {
       process.env.PATH = bin
-      await writeFile(join(other, "bun"), standinScript("bun", { home: join(root, "otherhome"), group: "heavy", wrap: "", through: null }, []), { mode: 0o755 })
+      await writeFile(join(other, "bun"), await scriptOf("bun", { home: join(root, "otherhome"), group: "heavy", wrap: "", through: null }, []), { mode: 0o755 })
       await writeFile(join(fake, "bun"), "#!/bin/sh\necho writer-real-marker\n", { mode: 0o755 })
       process.env.PATH = other + ":" + fake + ":/usr/bin:/bin"
-      await writeFile(join(bin, "bun"), standinScript("bun", { home: root, group: "heavy", wrap: "", through: null }, []), { mode: 0o755 })
+      await writeFile(join(bin, "bun"), await scriptOf("bun", { home: root, group: "heavy", wrap: "", through: null }, []), { mode: 0o755 })
     } finally {
       if (savedPath === undefined) {
         delete process.env.PATH
@@ -104,9 +109,9 @@ describe("the heavy stand-in", () => {
     const savedPath = process.env.PATH
     try {
       process.env.PATH = bin
-      await writeFile(join(other, "bun"), standinScript("bun", { home: join(root, "otherhome"), group: "heavy", wrap: "", through: null }, []), { mode: 0o755 })
+      await writeFile(join(other, "bun"), await scriptOf("bun", { home: join(root, "otherhome"), group: "heavy", wrap: "", through: null }, []), { mode: 0o755 })
       process.env.PATH = first + ":/usr/bin:/bin"
-      await writeFile(join(bin, "bun"), standinScript("bun", { home: root, group: "heavy", wrap: "", through: null }, []), { mode: 0o755 })
+      await writeFile(join(bin, "bun"), await scriptOf("bun", { home: root, group: "heavy", wrap: "", through: null }, []), { mode: 0o755 })
     } finally {
       if (savedPath === undefined) {
         delete process.env.PATH
@@ -320,7 +325,7 @@ describe("the heavy stand-in", () => {
       harnesses.push({ root, bin: "", env: {}, pueueLog: async () => "" })
       const bin = join(root, "bin")
       await mkdir(bin, { recursive: true })
-      await writeFile(join(bin, "bun"), standinScript("bun", { home: root, group, wrap: "", through: null }, []), { mode: 0o755 })
+      await writeFile(join(bin, "bun"), await scriptOf("bun", { home: root, group, wrap: "", through: null }, []), { mode: 0o755 })
       await writeFile(join(root, "pass.test.ts"), 'test("x", () => {})\n')
       await writeFile(join(root, "fail.test.ts"), 'test("x", () => { throw new Error("x") })\n')
       const realEnv = { ...process.env, PATH: bin + ":" + process.env.PATH, HOME: userInfo().homedir }

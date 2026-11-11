@@ -1,5 +1,4 @@
-import { Buffer } from "node:buffer"
-import { closeSync, openSync, readSync, statSync } from "node:fs"
+import { Effect, FileSystem, Option } from "effect"
 import { defaultHeavyTools } from "./heavy"
 import { decideBody, extraSub } from "./heavy-standin-decide"
 import {
@@ -129,59 +128,47 @@ export const standinTools = (commands: ReadonlyArray<string>): ReadonlyArray<str
   return [...new Set([...defaultHeavyTools, ...extra])]
 }
 
-const isExecutableFile = (file: string): boolean => {
-  try {
-    const info = statSync(file)
-    if (!info.isFile()) {
-      return false
-    }
-    return (info.mode & 0o111) !== 0
-  } catch {
-    return false
-  }
-}
+const isExecutableFile = (fs: FileSystem.FileSystem, file: string): Effect.Effect<boolean> =>
+  fs.stat(file).pipe(
+    Effect.map((info) => info.type === "File" && (info.mode & 0o111) !== 0),
+    Effect.orElseSucceed(() => false)
+  )
 
-const isStandinFile = (file: string): boolean => {
-  let handle = -1
-  try {
-    handle = openSync(file, "r")
-  } catch {
-    return false
-  }
-  try {
-    const area = Buffer.alloc(2048)
-    const count = readSync(handle, area, 0, 2048, 0)
-    return area.toString("utf8", 0, count).includes(standinMarker)
-  } catch {
-    return false
-  } finally {
-    try {
-      closeSync(handle)
-    } catch {
-      handle = -1
-    }
-  }
-}
+const isStandinFile = (fs: FileSystem.FileSystem, file: string): Effect.Effect<boolean> =>
+  Effect.scoped(
+    fs.open(file).pipe(
+      Effect.flatMap((handle) => handle.readAlloc(2048)),
+      Effect.map((option) =>
+        Option.match(option, {
+          onNone: () => false,
+          onSome: (bytes) => new TextDecoder().decode(bytes).includes(standinMarker)
+        })
+      ),
+      Effect.orElseSucceed(() => false)
+    )
+  )
 
-export const findRealTool = (tool: string, pathValue: string): string => {
-  if (tool.includes("/") || tool === "" || tool === "." || tool === "..") {
+const findRealTool = (tool: string, pathValue: string): Effect.Effect<string, never, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    if (tool.includes("/") || tool === "" || tool === "." || tool === "..") {
+      return ""
+    }
+    const fs = yield* FileSystem.FileSystem
+    for (const entry of pathValue.split(":")) {
+      if (!entry.startsWith("/")) {
+        continue
+      }
+      const candidate = entry === "/" ? "/" + tool : entry + "/" + tool
+      if (!(yield* isExecutableFile(fs, candidate))) {
+        continue
+      }
+      if (yield* isStandinFile(fs, candidate)) {
+        continue
+      }
+      return candidate
+    }
     return ""
-  }
-  for (const entry of pathValue.split(":")) {
-    if (!entry.startsWith("/")) {
-      continue
-    }
-    const candidate = entry === "/" ? "/" + tool : entry + "/" + tool
-    if (!isExecutableFile(candidate)) {
-      continue
-    }
-    if (isStandinFile(candidate)) {
-      continue
-    }
-    return candidate
-  }
-  return ""
-}
+  })
 
 const quoteSingle = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
 
@@ -202,23 +189,31 @@ const standinDecideFn = (decide: ReadonlyArray<string>): ReadonlyArray<string> =
   '}'
 ]
 
-export const standinScript = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, timing?: StandinTiming): string => {
-  const decide = defaultHeavyTools.includes(tool) ? [...decideBody(tool), ...extraSub(tool, commands)] : extraSub(tool, commands)
-  const resolved = findRealTool(tool, process.env.PATH ?? "")
-  return [
-    ...standinHead(tool, settings, resolved),
-    ...helpers,
-    ...standinDecideFn(decide),
-    ...standinUtils(),
-    ...standinQueue(settings.through),
-    ...standinWait(timing),
-    ...standinFinish()
-  ].join("\n") + "\n"
-}
+export const standinScript = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, timing?: StandinTiming): Effect.Effect<string, never, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const decide = defaultHeavyTools.includes(tool) ? [...decideBody(tool), ...extraSub(tool, commands)] : extraSub(tool, commands)
+    const resolved = yield* findRealTool(tool, process.env.PATH ?? "")
+    return [
+      ...standinHead(tool, settings, resolved),
+      ...helpers,
+      ...standinDecideFn(decide),
+      ...standinUtils(),
+      ...standinQueue(settings.through),
+      ...standinWait(timing),
+      ...standinFinish()
+    ].join("\n") + "\n"
+  })
 
 export const standinScripts = (
   settings: StandinSettings,
   commands: ReadonlyArray<string>,
   tools: ReadonlyArray<string> = standinTools(commands),
   timing?: StandinTiming
-): Record<string, string> => Object.fromEntries(tools.map((tool) => [tool, standinScript(tool, settings, commands, timing)]))
+): Effect.Effect<Record<string, string>, never, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const entries: Array<[string, string]> = []
+    for (const tool of tools) {
+      entries.push([tool, yield* standinScript(tool, settings, commands, timing)])
+    }
+    return Object.fromEntries(entries)
+  })

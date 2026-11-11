@@ -30,7 +30,7 @@ export const writeHeavyBin = (
     const bin = heavyBinDir(home)
     const wrap = detectWrap(platform, settings.limit)
     const standins: StandinSettings = { home, group: settings.group, wrap, through: settings.through }
-    const scripts = standinScripts(standins, settings.commands)
+    const scripts = yield* standinScripts(standins, settings.commands)
     yield* fs.makeDirectory(bin, { recursive: true }).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "cannot write " + bin + ": " + error.message }))
     )
