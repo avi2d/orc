@@ -1,8 +1,6 @@
-import { Config, Effect } from "effect"
-
 const args = Bun.argv.slice(2)
 const version = args.at(0)
-const from = args.at(1) ?? `${await Effect.runPromise(Config.String("HOME"))}/.config/herdr-app`
+const from = args.at(1) ?? `${Bun.env.HOME}/.config/herdr-app`
 if (version === undefined) {
   console.error("usage: bun scripts/copy-app-types.ts <App version> [App home]")
   process.exit(1)

@@ -103,6 +103,9 @@
     "packages/herdr-app": {
       "name": "@avi2dg/orc-herdr-app",
       "version": "0.0.0",
+      "devDependencies": {
+        "@avi2dg/checks": "0.91.0",
+      },
     },
     "packages/ledger": {
       "name": "@avi2dg/orc-ledger",

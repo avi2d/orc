@@ -13,5 +13,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && bun scripts/build.ts",
     "copy-app-types": "bun scripts/copy-app-types.ts"
+  },
+  "devDependencies": {
+    "@avi2dg/checks": "0.91.0"
   }
 }
