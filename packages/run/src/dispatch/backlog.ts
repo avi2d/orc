@@ -3,7 +3,7 @@ import { captainWait, type Parked, parseTaskFile, type TaskFileError, type TaskF
 import { renderTaskFile } from "./task-record-render"
 import { BacklogError, backlogPaths, grabbedFile, platformFailure, publishOnce, scratchName, takeFile, takenGrab } from "./backlog-write"
 
-export { BacklogError, backlogPaths } from "./backlog-write"
+export { BacklogError, backlogPaths, backlogRoot } from "./backlog-write"
 
 // A project name may hold dashes, so an id splits at its last dash.
 const idPattern = /^([A-Za-z0-9][A-Za-z0-9._-]*)-(\d+)$/

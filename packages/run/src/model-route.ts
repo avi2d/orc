@@ -8,9 +8,14 @@ export const tokenFileVar = "AGENT_TOKEN_FILE"
 // A literal key here would leave the token in the run's Pi folder.
 export const tokenFileApiKey = "!cat \"$" + tokenFileVar + "\""
 
-export const providerOf = (model: string): string => {
+const providerOf = (model: string): string => {
   const slash = model.indexOf("/")
   return slash === -1 ? model : model.slice(0, slash)
+}
+
+export const providerEnvOf = (config: OrcConfig, model: string): Record<string, string> => {
+  const provider = config.providers.find((candidate) => candidate.id === providerOf(model))
+  return provider?.credential === "package" ? provider.env ?? {} : {}
 }
 
 export const routeOfAgents = (
