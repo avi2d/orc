@@ -18,6 +18,7 @@ export {
   type PrintFrame,
 } from "./module";
 export { drawAlone, printSolo, runSolo, soloScreen } from "./solo";
+export { mountPolled, type PolledReading } from "./polled-mount";
 export { leastPanelWidth, type Panel, livePanel, panelWidth, printFrame, printFrameOf, runPanel } from "./panel";
 export { binArgsExit, colorWithoutPrintExit, printBinArgsExit, printColor, printPanelKnown, printPanelUsage, usageText } from "./bin-args";
 export { type Block, bottomEdgeRow, type Frame, panel, panelChrome, panelLine, titleEdge, titleRoom, withinRows, wrapParts } from "./layout";

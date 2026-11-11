@@ -38,6 +38,7 @@ const chainOf: ReadonlyMap<string, number> = new Map([
   ["queues", 2],
   ["schedules", 2],
   ["dispatch", 0],
+  ["attention", 1],
   ["tasks", 3],
   ["ledger", 0],
 ]);

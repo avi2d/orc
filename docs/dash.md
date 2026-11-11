@@ -3,7 +3,7 @@ kind: how-to
 ---
 # orc-dash
 Orc-dash is a set of OpenTUI terminal panels and a dashboard composed from them, held in the orc workspace.
-It holds the quota, session quota, resources, queues, schedules, dispatch, tasks, alerts and ledger panels.
+It holds the quota, session quota, resources, queues, schedules, dispatch, attention, tasks, alerts and ledger panels.
 It is built in Bun and Effect with one package per panel plus shared packages.
 Each panel opens on its own in the terminal, and the dashboard lays out the panels a config file names.
 The quota panel shows each account's quota windows, with health coloured bars, pace markers, verdicts and reset countdowns.
@@ -15,6 +15,7 @@ It flags each session spending over its fair share of a window that runs ahead o
 The queues panel shows the pueue queues of this machine and a second one.
 It also lists the GitHub Actions runs of one repository that wait or run.
 The dispatch panel shows the orc dispatcher's machines, the room on each, the taken and started claims as runs and the tasks still waiting with why.
+The attention panel shows every open item of the orc attention queue, oldest first, with who must answer it, its age and an overdue mark.
 The tasks tool walks from the registered projects to one project's tasks and to one task.
 It keeps a history of what each task used.
 The `orc-dash` command runs the dashboard, opens one panel, and prints every source's readings as one JSON snapshot for a script to read.
@@ -34,7 +35,7 @@ A panel whose tool is missing says so on its own line, and the rest of the scree
 | `herdr` 0.9.5 | Live agent sessions named by pane, from `herdr agent list` | Sessions show from their processes and logs with no pane names, and only a `herdr` that is installed but does not answer warns |
 | `pueue` 4.0.4 | The queues panel's jobs, from `pueue status --json` | The queues panel reads pueue unreachable |
 | `no-mistakes` | The stages of a `full review fix` task, from `no-mistakes axi status` | Those tasks show no stages, and the projects box says `no-mistakes` is not installed |
-| `orc` | The stages of an `orc run` task, from `orc runs --json` and `orc show <run> --json` | Those tasks show no stages, and the projects box says `orc` is not installed |
+| `orc` | The stages of an `orc run` task, from `orc runs --json` and `orc show <run> --json`, and the attention queue, from `orc attention --json` | Those tasks show no stages, the projects box says `orc` is not installed, and the attention panel says so too |
 | `gh`, signed in to an account that can read the repository | The GitHub Actions runs the queues panel lists, from `gh run list`, and the runner repositories the dashboard reads through `gh api` | The actions panel reads gh unreachable |
 
 A tasks report, a second machine and saved quota profiles each come from a shell command you set, and stay off until you set it.
@@ -335,6 +336,19 @@ It shows each machine with its busy room, the taken and started claims as runs a
 A backlog that does not exist reads as missing.
 A folder or file the panel cannot read, including dispatch.json and projects.json, is named as unread.
 To print one frame of plain text instead, run `orc-dash panel dispatch --print`.
+
+## Run the attention tool
+
+To run the live attention panel, run `orc-dash panel attention`.
+It runs alone in a plain terminal or in a Herdr pane.
+The panel reads `orc attention --json` on the machine it runs on and nothing else, and paints again every 10 seconds.
+It shows each open item oldest first, with its task, its owner, its age and its kind, and its text below.
+An overdue item starts with `!` and says `overdue` after its age.
+The head counts the open items and the overdue ones.
+With no open item, it says `nothing needs anyone`.
+Without `orc` on the `PATH`, it says `orc` is not installed.
+To print one frame of plain text instead, run `orc-dash panel attention --print`.
+The queue itself is described in [The attention queue](run/attention-queue.md).
 
 ## Run the tasks tool
 
@@ -866,6 +880,7 @@ The pull request run covers what a shared file reaches.
 | `packages/resources/` | The resources panel module, its OpenTUI rendering and JSON report |
 | `packages/queues/` | The queues panel module and its OpenTUI rendering |
 | `packages/dispatch/` | The dispatch panel module and its OpenTUI rendering |
+| `packages/attention/` | The attention panel module of the open items in the orc attention queue |
 | `packages/schedules/` | The scheduled panel module of what runs next |
 | `packages/ledger/` | The optional ledger panel module and the session-file reader that fills it |
 | `packages/dashboard/` | The dashboard host, which lays out the panel modules it is given from the layout setting |
