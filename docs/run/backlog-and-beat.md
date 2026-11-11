@@ -16,8 +16,10 @@ The quota names the provider its accounts belong to, the command that reads thei
 An account of kind `token-file` names a `tokenFile` and needs only a start command on each machine.
 An account of kind `token-command` names a `tokenCommand`, for a token that lives on the dispatching machine and rolls over, and every machine names a `renew` command beside its start command.
 An account of kind `none` names no token source, for a provider or Pi package that logs in on its own.
+An account of kind `claude-config` names a Claude config directory on each machine.
 An account written with only a `tokenFile` or only a `tokenCommand` keeps working, and reads as the matching kind.
-It also names the floor of room each account must keep:
+The optional `floorPercent` sets the least room an account must have.
+Without it, the beat applies no floor, but an account at 0% still has no room:
 
 ```json
 {
@@ -31,8 +33,7 @@ It also names the floor of room each account must keep:
     "accounts": [
       { "name": "main", "tokenFile": "/Users/me/.secrets/main-token" },
       { "name": "second", "tokenFile": "/Users/me/.secrets/second-token" }
-    ],
-    "floorPercent": 15
+    ]
   }
 }
 ```
@@ -78,8 +79,7 @@ A quota with a token command account then looks like this:
   "quota": {
     "provider": "anthropic",
     "command": ["my-quota-reader", "--json"],
-    "accounts": [{ "name": "main", "tokenCommand": ["orc", "runner", "token", "/Users/me/claude-credentials/main.json"] }],
-    "floorPercent": 15
+    "accounts": [{ "name": "main", "tokenCommand": ["orc", "runner", "token", "/Users/me/claude-credentials/main.json"] }]
   }
 }
 ```
@@ -114,8 +114,7 @@ A Pi package that logs in on its own takes this kind, as in a `claude-bridge` pa
   "quota": {
     "provider": "claude-bridge",
     "command": ["my-quota-reader", "--json"],
-    "accounts": [{ "name": "main", "kind": "none" }],
-    "floorPercent": 15
+    "accounts": [{ "name": "main", "kind": "none" }]
   }
 }
 ```
@@ -123,6 +122,21 @@ A Pi package that logs in on its own takes this kind, as in a `claude-bridge` pa
 Its `config.json` provider names the package with `credential` `package`, and its `env` points at the login the runs take, such as a `CLAUDE_CONFIG_DIR`.
 With no `CLAUDE_CONFIG_DIR` the runs take your ordinary Claude login under `~/.claude`.
 A quota that names more than one account when any of them is kind `none` is refused, and so is a kind `none` account beside a machine `renew` command.
+
+To select between Claude logins, give each account a `configDirs` entry for every machine:
+
+```json
+{
+  "accounts": [
+    { "name": "main", "kind": "claude-config", "configDirs": { "mac": "/Users/me/claude/main", "linux-box": "/home/me/claude/main" } },
+    { "name": "second", "kind": "claude-config", "configDirs": { "mac": "/Users/me/claude/second", "linux-box": "/home/me/claude/second" } }
+  ]
+}
+```
+
+The provider must use `credential: "package"`.
+The runner sets `CLAUDE_CONFIG_DIR` to the picked account's directory for the machine, overriding the provider's configured value.
+Orc sends paths, not credentials, to the runner.
 
 With one login and no tool that reads its room, name one account of kind `none` and a quota command that always reports room:
 
@@ -196,7 +210,7 @@ A task starts only once four things hold:
 2. Every task it depends on closed done, and a split child waits until each earlier child it names has merged.
 A parent task also waits for every scout and task child closed done and every ship child with a PR merged.
 3. Its project has a checkout on a machine with a free slot.
-4. An account has room at or above the floor, and the runs take the account with the most room.
+4. An account has room above 0% and at or above the floor, and the runs take the account with the most room.
 
 To keep a new task back for a decision of yours, run `orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>]`.
 Each beat then prints `waits <task-id>: held for the captain: <reason>`, with the date when the hold names one, and never starts it.
@@ -216,11 +230,12 @@ Holding the task again with the same questions keeps the hold, and orc refuses o
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
 After the claim survives a recount, the beat writes the task started before it runs the start command.
 A task marked for a machine waits for a slot on that machine and never starts on another.
-The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_DELIVERY`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT`, `ORC_TASK_TOKEN_FILE` and `ORC_TASK_INSTRUCTIONS`.
+The start command reads the task from `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_DELIVERY`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT`, `ORC_TASK_TOKEN_FILE`, `ORC_TASK_CLAUDE_CONFIG_DIR` and `ORC_TASK_INSTRUCTIONS`.
 `ORC_TASK_INSTRUCTIONS` is empty when the project names no instructions file.
 `ORC_TASK_TOKEN_FILE` is the account's token file path, never the token.
 On a token command account it is empty, and the start command reads the token as `orc.token.v1` on standard input instead.
 On a kind `none` account it is empty, and the beat sends nothing on standard input, so a custom start command must not feed it input.
+`ORC_TASK_CLAUDE_CONFIG_DIR` holds the picked `claude-config` account's directory for that machine, and is empty for every other kind.
 The beat starts it detached in its own session, never waits for it and never kills it.
 So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.

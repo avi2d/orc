@@ -40,7 +40,7 @@ const taskFields = {
 
 const QueueFileRequest = Schema.Struct({ ...taskFields, tokenFile: AbsolutePath, label: Schema.optional(LabelArg) })
 const QueueTokenRequest = Schema.Struct({ ...taskFields, ...tokenFields, label: Schema.optional(LabelArg) })
-const QueueBareRequest = Schema.Struct({ ...taskFields, label: Schema.optional(LabelArg) })
+const QueueBareRequest = Schema.Struct({ ...taskFields, claudeConfigDir: Schema.optional(AbsolutePath), label: Schema.optional(LabelArg) })
 const QueueRequest = Schema.Union([QueueFileRequest, QueueTokenRequest, QueueBareRequest])
 type QueueRequest = typeof QueueRequest.Type
 
@@ -192,7 +192,19 @@ const guardQueued = (home: string, id: string, dir: string): Effect.Effect<void,
     Effect.mapError((error) => new RunnerError({ detail: "the token guard did not start: " + error.message }))
   )
 
-// A start again after a done run resumes a parked task, so only a queued or running task stops a second run; two starts racing are not stopped here.
+const checkQueueConfig = (home: string, request: QueueRequest): Effect.Effect<void, RunnerError, FileSystem.FileSystem> =>
+  readOrcConfig(home).pipe(
+    Effect.mapError((error) => new RunnerError({ detail: error.file + ": " + error.detail })),
+    Effect.flatMap((config) =>
+      "claudeConfigDir" in request && request.claudeConfigDir !== undefined && config.providers.find((provider) => provider.id === request.provider)?.credential !== "package"
+        ? refuse("the Claude config directory requires a package provider named " + request.provider)
+        : Effect.void
+    )
+  )
+
+const bareCommand = (run: ReadonlyArray<string>, claudeConfigDir: string | undefined): ReadonlyArray<string> =>
+  claudeConfigDir === undefined ? run : ["env", "ORC_DISPATCH_CLAUDE_CONFIG_DIR=" + claudeConfigDir, ...run]
+
 const queueTask = (
   request: QueueRequest,
   self: Command,
@@ -200,9 +212,7 @@ const queueTask = (
 ): Effect.Effect<string, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
-    yield* readOrcConfig(home).pipe(
-      Effect.mapError((error) => new RunnerError({ detail: error.file + ": " + error.detail }))
-    )
+    yield* checkQueueConfig(home, request)
     yield* requireFolder(request.checkout)
     const project = yield* resolveProjectDir(request.checkout)
     yield* ensureGroup(orcGroup)
@@ -231,7 +241,7 @@ const queueTask = (
       return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
     }
     if (!("token" in request)) {
-      const id = yield* add([...run])
+      const id = yield* add(bareCommand(run, request.claudeConfigDir))
       return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
     }
     const dir = yield* holdToken(home, key, request).pipe(
@@ -316,7 +326,10 @@ const readRequest = (
     }
     const input = yield* stdin
     if (input === "") {
-      return { ...fields }
+      const claudeConfigDir = env["ORC_TASK_CLAUDE_CONFIG_DIR"]
+      return claudeConfigDir === undefined || claudeConfigDir === "" ? { ...fields } : yield* Schema.decodeEffect(QueueBareRequest)({ ...fields, claudeConfigDir }).pipe(
+        Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
+      )
     }
     const token = decodeTokenText(input)
     if (Option.isNone(token)) {
