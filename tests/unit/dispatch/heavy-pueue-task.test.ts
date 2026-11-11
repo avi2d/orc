@@ -62,7 +62,7 @@ describe("taskState", () => {
 
   test("each waiting status keeps its name instead of collapsing to unknown", () => {
     for (const name of ["Queued", "Running", "Paused", "Stashed", "Locked"] as const) {
-      expect(taskState(JSON.stringify({ 7: { status: { [name]: {} } } }), 7)).toEqual({ status: name })
+      expect(taskState(JSON.stringify({ 7: { task: task(7, 0, { [name]: {} }) } }), 7)).toEqual({ status: name })
     }
   })
 })

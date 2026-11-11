@@ -54,14 +54,13 @@ const waitingStates: ReadonlyArray<string> = ["Queued", "Running", "Paused", "St
 
 const isWaiting = (name: string): name is "Queued" | "Running" | "Paused" | "Stashed" | "Locked" => waitingStates.includes(name)
 
-// pueue 4 nests the task under "task" in log output; a bare entry carries the status itself.
 export const taskState = (logText: string, id: number): TaskState => {
   const log = parseJson(logText)
   const entry = isRecord(log) ? log[String(id)] : undefined
-  if (!isRecord(entry)) {
+  if (!isRecord(entry) || !isRecord(entry.task)) {
     return { status: "unknown" }
   }
-  const status = (isRecord(entry.task) ? entry.task : entry).status
+  const status = entry.task.status
   const name = variantName(status)
   if (name === "Done") {
     return { status: "Done", result: isRecord(status) && isRecord(status.Done) ? status.Done.result : undefined }

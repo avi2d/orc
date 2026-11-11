@@ -201,9 +201,13 @@ const workingDirectory = (): string => {
 }
 
 const stateOf = async (id: number): Promise<TaskState> => {
-  const child = Bun.spawn(["pueue", "log", "--json", String(id)], { stdout: "pipe", stderr: "ignore" })
-  const text = await new Response(child.stdout).text()
-  return (await child.exited) === 0 ? taskState(text, id) : { status: "unknown" }
+  try {
+    const child = Bun.spawn(["pueue", "log", "--json", String(id)], { stdout: "pipe", stderr: "ignore" })
+    const text = await new Response(child.stdout).text()
+    return (await child.exited) === 0 ? taskState(text, id) : { status: "unknown" }
+  } catch {
+    return { status: "unknown" }
+  }
 }
 
 const removeTask = (id: number): void => {
@@ -289,13 +293,18 @@ export const queueCall = async (call: StandinCall, real: string, args: ReadonlyA
   }
   const priority = classifyHeavyCall(call.tool, call.commands, args) === "prioritized" ? ["-o", "1"] : []
   const wrap = call.wrap.split(/\s+/).filter((word) => word !== "")
-  const added = Bun.spawnSync(
-    [
-      "pueue", "add", "--group", call.group, ...priority, "--working-directory", workingDirectory(), "--print-task-id", "--escape", "--",
-      "sh", "-c", waiterBody, "orc-heavy-wait", String(process.pid), ...wrap, real, ...args
-    ],
-    { stdout: "pipe", stderr: "pipe" }
-  )
+  let added: ReturnType<typeof Bun.spawnSync>
+  try {
+    added = Bun.spawnSync(
+      [
+        "pueue", "add", "--group", call.group, ...priority, "--working-directory", workingDirectory(), "--print-task-id", "--escape", "--",
+        "sh", "-c", waiterBody, "orc-heavy-wait", String(process.pid), ...wrap, real, ...args
+      ],
+      { stdout: "pipe", stderr: "pipe" }
+    )
+  } catch {
+    return fail("pueue refused the task; " + repairHint)
+  }
   const reply = (added.stdout.toString() + added.stderr.toString()).replace(/\n+$/, "")
   if (added.exitCode !== 0) {
     return fail("pueue refused the task; " + repairHint)
@@ -318,7 +327,11 @@ export const queueCall = async (call: StandinCall, real: string, args: ReadonlyA
   if (failed !== null) {
     return failed
   }
-  await Bun.spawn(["pueue", "follow", String(id)], { stdin: "inherit", stdout: "inherit", stderr: "ignore" }).exited
+  try {
+    await Bun.spawn(["pueue", "follow", String(id)], { stdin: "inherit", stdout: "inherit", stderr: "ignore" }).exited
+  } catch {
+    return fail("pueue is unreachable; " + repairHint)
+  }
   const result = taskState(capture(["pueue", "log", "--json", String(id)]) ?? "", id)
   quietly(["pueue", "remove", String(id)])
   return exitCodeOf(result)
