@@ -100,6 +100,13 @@
         "effect": "4.0.0",
       },
     },
+    "packages/herdr-app": {
+      "name": "@avi2dg/orc-herdr-app",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@avi2dg/checks": "0.91.0",
+      },
+    },
     "packages/ledger": {
       "name": "@avi2dg/orc-ledger",
       "version": "0.1.0",
@@ -144,7 +151,7 @@
     },
     "packages/run": {
       "name": "@avi2dg/orc",
-      "version": "0.12.0",
+      "version": "0.13.0",
       "bin": {
         "orc": "src/bin.ts",
       },
@@ -228,6 +235,8 @@
     "@avi2dg/orc-dashboard": ["@avi2dg/orc-dashboard@workspace:packages/dashboard"],
 
     "@avi2dg/orc-dispatch": ["@avi2dg/orc-dispatch@workspace:packages/dispatch"],
+
+    "@avi2dg/orc-herdr-app": ["@avi2dg/orc-herdr-app@workspace:packages/herdr-app"],
 
     "@avi2dg/orc-ledger": ["@avi2dg/orc-ledger@workspace:packages/ledger"],
 

@@ -25,7 +25,7 @@ While Pi is idle, it posts each closed task that has no `postedAt`, with its out
 It posts a task whoever added it: this chat, an earlier chat or the command line.
 It posts each close then runs `orc backlog posted <task-id>`, which writes `posted_at` into the closed task file, so a task closed while no chat ran is posted by the next chat to start, and every close is posted, with a close repeated at most when the chat stops between its post and its mark, or when two chats post the same close in the same moment.
 It posts each event the same way, then runs `orc backlog posted <event-key>`.
-The beat records an event when a task's run stalls, or when a closed task's PR turns green, merges or closes without merging.
+The beat records an event when a task's run stalls, when a closed task's PR turns green, merges or closes without merging, and when a worker split proposal lands, as [A worker split proposal](task-kinds.md#a-worker-split-proposal) shows.
 Each event file under `events/` is named for the event, so a beat records it once.
 A second stall of one task is a new event.
 `orc backlog --json` also lists each alert fire from `alerts.jsonl` in the backlog folder, and the chat posts each fire once.

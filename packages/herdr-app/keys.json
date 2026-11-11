@@ -1,0 +1,7 @@
+{
+  "layout:orc": {
+    "cmd-1": { "command": "layout.select", "args": { "stack": "orc-views", "child": "orc-board" } },
+    "cmd-2": { "command": "layout.select", "args": { "stack": "orc-views", "child": "orc-resources" } },
+    "cmd-3": { "command": "layout.select", "args": { "stack": "orc-views", "child": "orc-agents" } }
+  }
+}

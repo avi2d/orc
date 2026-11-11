@@ -6,8 +6,7 @@ import { readDispatchConfig } from "./config"
 import type { ConfigError } from "../json-file"
 import type { TaskFileError } from "./task-record"
 import { ownedBySweep, throughFor } from "./machine-reach"
-import { taskLabel } from "./pueue-status"
-import { killHeld, refuse as refuseRun, RunnerError } from "./runner"
+import { killHeld, refuse as refuseRun, runLabel, RunnerError } from "./runner"
 import { killHeldThrough, readResult, readResultThrough } from "./runner-result"
 
 export const stopNow = (
@@ -32,7 +31,7 @@ export const stopNow = (
     if (!ownedBySweep(machine)) {
       return yield* refuseRun(id + " started on " + machine.name + ", which orc cannot reach, so close it by hand with orc backlog close " + id + " failed")
     }
-    const label = taskLabel(home, id)
+    const label = runLabel(home, id, record.spec.kind)
     const line = through === null
       ? yield* killHeld(home, id, label)
       : yield* killHeldThrough(through, id, label)

@@ -2,6 +2,34 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.13.0
+
+Released 2026-11-11.
+
+### Features
+
+- **herdr-app:** add orc layout with board, resources and agents tabs [#140](https://github.com/avi2d/orc/pull/140)
+- **dispatch:** show the beat's wait reasons in the dash [#134](https://github.com/avi2d/orc/pull/134)
+- **run:** propose splits from over-budget workers [#133](https://github.com/avi2d/orc/pull/133)
+- **run:** select Claude login by dispatch quota [#130](https://github.com/avi2d/orc/pull/130)
+- **run:** expose backlog wait reasons in JSON [#129](https://github.com/avi2d/orc/pull/129)
+- decider answers routine review questions and escalates the rest [#127](https://github.com/avi2d/orc/pull/127)
+- **run:** split over budget requests into vertical slice children at intake [#126](https://github.com/avi2d/orc/pull/126)
+- **dashboard:** show the attention queue by default [#125](https://github.com/avi2d/orc/pull/125)
+- **run:** route run, check, merge, and wait events into attention queue [#124](https://github.com/avi2d/orc/pull/124)
+- **attention:** show open queue items oldest first [#123](https://github.com/avi2d/orc/pull/123)
+- **run:** add orc attention queue for review questions [#122](https://github.com/avi2d/orc/pull/122)
+- **run:** parent tasks that wait for children and close on a final check [#121](https://github.com/avi2d/orc/pull/121)
+
+### Fixes
+
+- **run:** name the decider in a parked task's waits line [#142](https://github.com/avi2d/orc/pull/142)
+- **run:** reopen withdrawn overdue waits with current hold text [#141](https://github.com/avi2d/orc/pull/141)
+- **run:** reopen withdrawn review questions and label decider owned parked questions [#139](https://github.com/avi2d/orc/pull/139)
+- **run:** keep heavy wrappers from calling themselves [#136](https://github.com/avi2d/orc/pull/136)
+- **run:** skip decider-owned questions in chat and beat asking line [#132](https://github.com/avi2d/orc/pull/132)
+- **run:** preserve host runtime directory so checks reach pueue [#128](https://github.com/avi2d/orc/pull/128)
+
 ## 0.12.0
 
 Released 2026-11-10.

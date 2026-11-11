@@ -3,7 +3,8 @@ import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs } from "./args"
 import { backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted } from "./backlog"
 import { backlogPresent, backlogRoot as backlogRootOf, noBacklog } from "./backlog-write"
-import { routeTaskItems } from "./attention"
+import { readAttention, routeTaskItems } from "./attention"
+import { deciderOwnership } from "./beat-attention"
 import { answerItemText, attentionText } from "./attention-view"
 import { holdTask } from "./backlog-hold"
 import { dropChild, planText } from "./backlog-plan"
@@ -16,8 +17,7 @@ import { type ConfigError, readFailure } from "../json-file"
 import { type DispatchConfig, readDispatchConfig, readProjects } from "./config"
 import { holdRun } from "./hold"
 import { mergeTask } from "./merge"
-import { taskLabel } from "./pueue-status"
-import { type Command, killHeld, queueFromText, renewTask, RunnerError, startTask } from "./runner"
+import { type Command, killHeld, queueFromText, renewTask, runLabel, RunnerError, startTask } from "./runner"
 import { stopNow } from "./cli-stop"
 import { formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson } from "./runner-result"
 import type { TaskFileError } from "./task-record"
@@ -58,15 +58,16 @@ const readView = (root: string): Effect.Effect<BacklogView, BacklogError | TaskF
     )
     const events = yield* unpostedEvents(root)
     const merged = yield* mergedIds(root)
+    const deciderOwns = deciderOwnership(yield* readAttention(root, tasks))
     if (reading.kind === "unread") {
-      return { tasks, events, projects: reading, room: reading, merged }
+      return { tasks, events, projects: reading, room: reading, merged, deciderOwns }
     }
     const projects = yield* readProjects(paths.projects, reading.config.machines).pipe(
       Effect.map((list): ProjectList => ({ kind: "read", projects: list })),
       Effect.catchTag("ConfigError", (error) => Effect.succeed<ProjectList>({ kind: "unread", reason: failure(error) }))
     )
     const room: RoomList = { kind: "read", room: readRoom(reading.config.machines, tasks) }
-    return { tasks, events, projects, room, merged }
+    return { tasks, events, projects, room, merged, deciderOwns }
   })
 
 const refuse = (detail: string) => Effect.fail(new BacklogError({ detail }))
@@ -122,9 +123,15 @@ const requireBacklog = (root: string) =>
     }
   })
 
+const defaultKind = (place: DispatchPlace, task: string) =>
+  findTask(backlogRoot(place), task).pipe(
+    Effect.map((record) => record.spec.kind),
+    Effect.orElseSucceed(() => undefined)
+  )
+
 const reportResult = (args: Extract<CommandArgs, { readonly kind: "RunnerResult" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
-    let label = args.label ?? taskLabel(place.home, args.task)
+    let label = runLabel(place.home, args.task, args.label === undefined ? yield* defaultKind(place, args.task) : undefined, args.label)
     // An open pipe that never closes would hang a stdin read, so only a forwarded read marked on argv reads the piped label.
     if (args.reach.kind === "here" && args.label === undefined && args.stdinLabel && !place.stdinIsTerminal) {
       label = (yield* readStdinLabel(place.stdin)) ?? label
@@ -145,7 +152,7 @@ const closeNow = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, pl
 
 const killNow = (args: Extract<CommandArgs, { readonly kind: "RunnerKill" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
-    let label = args.label ?? taskLabel(place.home, args.task)
+    let label = runLabel(place.home, args.task, args.label === undefined ? yield* defaultKind(place, args.task) : undefined, args.label)
     if (args.label === undefined && args.stdinLabel && !place.stdinIsTerminal) {
       label = (yield* readStdinLabel(place.stdin)) ?? label
     }

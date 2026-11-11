@@ -36,7 +36,7 @@ describe("the orc workspace", () => {
       names.push(manifest.name)
       expect(manifest.name).toBe(`@avi2dg/orc-${path.split("/")[1]}`)
     }
-    expect(names.length).toBe(14)
+    expect(names.length).toBe(15)
   })
 
   test("the root tooling resolves the same dependency copies the run package ships instead of loading them twice", () => {
