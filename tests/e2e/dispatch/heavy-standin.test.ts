@@ -73,6 +73,19 @@ describe("the heavy stand-in", () => {
     expect(await harness.pueueLog()).toBe("")
   })
 
+  test("a probe with a missing classifier bun reports heavy instead of confirming direct", async () => {
+    const harness = harnesses[harnesses.push(await setup(["npm"])) - 1]
+    const standin = join(harness.bin, "npm")
+    const missing = "/nonexistent-bun-for-heavy-test"
+    await writeFile(standin, (await readFile(standin, "utf8")).split(process.execPath).join(missing))
+    const probed = run(harness, "npm", ["t"], { HEAVY_CLASSIFY: "1" })
+    expect(probed.code).not.toBe(0)
+    expect(probed.stdout.trim().split(" ")[0]).not.toBe("0")
+    const direct = run(harness, "npm", ["t"])
+    expect(direct.code).toBe(0)
+    expect(await readFile(join(harness.root, "tool.log"), "utf8")).toContain("real")
+  })
+
   test("a copied stand-in in a second folder runs the real tool instead of looping into the other copy", async () => {
     const root = await mkdtemp(join(tmpdir(), "orc-heavy-writer-"))
     harnesses.push({ root, bin: "", env: {}, pueueLog: async () => "" })
