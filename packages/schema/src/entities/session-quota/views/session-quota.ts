@@ -1,5 +1,5 @@
 import { DateTime } from "effect";
-import { type Failed, failureOf, type Outcome, type Reading } from "../shared/lib";
+import { type Failed, failureOf, type Outcome, type Reading } from "../../../shared/lib";
 import { withCaptured } from "../sources/capture";
 import { type CountedCall, countedCalls, type Ledger } from "../sources/ledger";
 import { resolveSessions, type Session, sessionLabel, type UnmatchedRuns } from "../sources/live";
@@ -105,8 +105,6 @@ export interface Composition {
   readonly remotes: ReadonlyArray<RemoteMachine>;
   readonly failedAccounts: ReadonlyArray<FailedAccount>;
 }
-
-export type { HeadlessFolder, PanePresence } from "./session-pane-presence";
 
 export interface SessionQuotaView extends PresenceFields {
   readonly now: DateTime.Utc;

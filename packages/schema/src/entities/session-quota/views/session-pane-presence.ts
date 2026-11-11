@@ -1,4 +1,4 @@
-import type { Outcome } from "../shared/lib";
+import type { Outcome } from "../../../shared/lib";
 import type { LogFile } from "../sources/ledger";
 import { tieFolderOf } from "../sources/live";
 import type { HerdrPane } from "../sources/live-sessions";

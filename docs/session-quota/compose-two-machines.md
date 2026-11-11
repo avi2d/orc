@@ -51,7 +51,7 @@ A warning line beside them names the machine and the account, with the reason.
 
 To print the merged report once, run `orc-dash report session-quota-composed`.
 It prints this machine's report alone, in the composed shape, when no second machine is configured.
-`ComposedSessionQuotaReport` in `packages/schema/src/contract/composed-session-quota.ts` decodes it.
+`ComposedSessionQuotaReport` in `packages/schema/src/entities/session-quota/contract/composed-session-quota.ts` decodes it.
 Its `schemaVersion` is `2`, so a reader of the version 1 report never mistakes one for the other.
 `orc-dash report session-quota` prints this machine's version 1 report alone, and the alert stream reads this machine alone.
 
