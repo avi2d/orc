@@ -1,7 +1,7 @@
-import type { HarnessProcess, HerdrPane } from "../sources/live-sessions";
-import type { LogRoots } from "../sources/session-logs";
-import type { CountedCall, LogFile } from "../sources/ledger";
-import type { Harness } from "../sources/log-lines";
+import type { HarnessProcess, HerdrPane } from "./live-sessions";
+import type { LogRoots } from "./session-logs";
+import type { CountedCall, LogFile } from "./ledger";
+import type { Harness } from "./log-lines";
 
 export type SessionIdentity =
   | { readonly kind: "pane"; readonly pane: string; readonly status: string | undefined }
