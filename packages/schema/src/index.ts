@@ -123,7 +123,7 @@ export {
   type TaskResources,
   taskResources,
   totalSecondsOf,
-} from "./views/task-resources";
+} from "./entities/task";
 export {
   type CountedProcess,
   decodeLinuxTaskProcesses,
@@ -133,9 +133,9 @@ export {
   macTaskProcessesSourceLayer,
   type ProcessSamples,
   TaskProcessesSource,
-} from "./sources/task-processes";
+} from "./entities/task";
 export { outcomeOf } from "./shared/lib";
-export { macRusageReader } from "./sources/mac-rusage-reader";
+export { macRusageReader } from "./entities/task";
 export { ResourcesReport } from "./contract/resources";
 export { decodeResourcesReport, resourcesReport } from "./views/resources";
 export { QueuesReport } from "./contract/queues";
@@ -155,7 +155,7 @@ export { heavyLoadStart, heavyLoadStep, type MachineResources } from "./alerts/h
 export { longTaskStart, longTaskStep, type MachineTasks } from "./alerts/long-task";
 export { quotaPaceStart, quotaPaceStep } from "./alerts/quota-pace";
 export { type ConfigFile, ConfigRefused, configPath, decodeConfigText, readAlertSettings, readClaudeAccounts, readConfig, readConfigFile } from "./sources/config-file";
-export { type DashConfig, strictly } from "./contract/config";
+export { type DashConfig, strictly } from "./shared/config";
 export { type AlertRule, alertRules, AlertVerdictRecord, decodeVerdictLine, type VerdictEntry } from "./contract/alert-verdicts";
 export { alertVerdictsPath, type VerdictLog, verdictLogReaderAt } from "./sources/alert-verdicts";
 export { judgesFire, type RuleFire, type RuleRecord, ruleRecords, type RuleVerdict } from "./views/alert-rules";
@@ -173,7 +173,7 @@ export {
   tasksReport,
   type TaskState,
   type TasksView,
-} from "./contract/tasks";
+} from "./entities/task";
 export {
   encodeTaskSample,
   type SampledProcess,
@@ -207,17 +207,17 @@ export {
   projectNameOf,
 } from "./views/task-levels";
 export { mergedTaskLevels, unsetTaskLevels } from "./views/merged-task-levels";
-export { type PlannedRow, type PlannedState, plannedStateOf } from "./views/planned";
+export { type PlannedRow, type PlannedState, plannedStateOf } from "./entities/task";
 export { decodeNoMistakes, type NoMistakesRun, type NoMistakesSnapshot, type NoMistakesStep } from "./contract/no-mistakes";
 export { decodeOrcRuns, decodeOrcShow, type OrcRun, type OrcSnapshot, type OrcStage } from "./contract/orc";
 export { anchorOf, checksOf, cueMarkOf, cuePipelineOf, detailWithoutWaitsOf, donePipelineOf, fixRoundOf, fullReviewPipelineOf, kindOf, markGlyphOf, modelBadgeOf, noMistakesRunOf, orcPipelineOf, orcRunOf, type PipelineFolder, pipelineFoldersOf, type PipelineKind, pipelineKinds, type PipelineStage, rebuildStage, stageMarkNames, type StageMark, stageNamesOf, summaryOf, type TaskDerivedState, type TaskPipeline, unknownPipelineOf, waitsOnOf } from "./task-pipeline";
 export { longStageOf, type Staleness, stalenessOf } from "./views/stage-time";
 export { readableTestNameOf } from "./views/test-names";
 export { ResourceMachines, resourceMachinesLayer } from "./views/remote-resources";
-export { LocalTasks, localTasksLayer, localTasksLayerWithin, type TasksMachine, TasksMachines, tasksMachinesLayer, watchedLocalTasksLayerWithin, watchedRead } from "./sources/tasks";
+export { LocalTasks, localTasksLayer, localTasksLayerWithin, type TasksMachine, TasksMachines, tasksMachinesLayer, watchedLocalTasksLayerWithin, watchedRead } from "./entities/task";
 export { type TaskHistoryMachine, RemoteTaskHistory, remoteTaskHistoryLayer } from "./sources/remote-task-samples";
 export { type TaskLiveMachine, RemoteTaskLive, remoteTaskLiveLayer } from "./views/remote-task-live";
-export { readBeside } from "./sources/machines";
+export { readBeside } from "./shared/config";
 export { type HostSources, hostSourcesLayer, readLocalResources, readMachines } from "./views/local-resources";
 export { composedSessionQuotaOf, localSessionQuotaOf, type QuotaReadings, type QuotaReadSources, quotaReadSourcesLayer, readQuotas } from "./views/session-quota-read";
 export { sessionQuotaOf, type SessionQuotaSources, sessionQuotaSourcesLayer, type SessionSources, sessionSourcesLayer } from "./views/session-quota-read";
@@ -291,7 +291,7 @@ export {
   withCaptured,
 } from "./sources/capture";
 export { appendCaptured, ledgerReaderAt } from "./sources/capture-ledger";
-export { captureLedgerDirectory, claudeConfigDirectory, claudeLogged, dashboardCacheDirectory, machineNames, selector } from "./sources/environment";
+export { captureLedgerDirectory, claudeConfigDirectory, claudeLogged, dashboardCacheDirectory, machineNames, selector } from "./shared/config";
 export { type SourcedWindow, type WindowSource } from "./sources/window-sources";
 export { type AccountJoin } from "./sources/account-join";
 export { type ModelTokens, type SessionModels } from "./views/session-models";

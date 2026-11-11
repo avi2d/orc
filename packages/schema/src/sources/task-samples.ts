@@ -2,7 +2,7 @@ import { Context, DateTime, Effect, FileSystem, Layer, type Config, type Platfor
 import { encodeTaskSample, type TaskSampleRecord, taskSampleRecords } from "../contract/task-samples";
 import { dayFileOf, dayFiles, expiredDayFiles } from "./capture";
 import { dayFileReaderAt, prunedDayFiles } from "./capture-ledger";
-import { taskSamplesDirectory } from "./environment";
+import { taskSamplesDirectory } from "../shared/config";
 
 export const historyDays = 7;
 

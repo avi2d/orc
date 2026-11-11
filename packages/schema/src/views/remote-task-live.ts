@@ -2,7 +2,7 @@ import { Config, Context, Duration, Effect, Layer, Option } from "effect";
 import { CommandRunner } from "../shared/lib";
 import type { Outcome } from "../shared/lib";
 import { decodeLiveTasksReport, type LiveTasks } from "./task-levels";
-import { configuredMachines } from "../sources/machines";
+import { configuredMachines } from "../shared/config";
 
 export interface TaskLiveMachine {
   readonly name: string;

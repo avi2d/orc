@@ -3,7 +3,7 @@ import { CommandRunner } from "../shared/lib";
 import { decodeJson } from "../shared/lib";
 import { unreachable, type Outcome, type Reading } from "../shared/lib";
 import { runDecoded, stamped } from "../shared/lib";
-import { machineNames, selector } from "./environment";
+import { machineNames, selector } from "../shared/config";
 
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 

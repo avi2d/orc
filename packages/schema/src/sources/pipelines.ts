@@ -5,7 +5,7 @@ import { runDecoded, stamped } from "../shared/lib";
 import { decodeNoMistakes, type NoMistakesRun, type NoMistakesSnapshot } from "../contract/no-mistakes";
 import { decodeOrcRuns, decodeOrcShow, type OrcSnapshot } from "../contract/orc";
 
-import { machineNames, selector } from "./environment";
+import { machineNames, selector } from "../shared/config";
 
 export interface PipelineFolder {
   readonly folder: string;

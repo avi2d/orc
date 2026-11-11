@@ -1,7 +1,7 @@
 import { DateTime } from "effect";
-import type { TaskState } from "../contract/tasks";
+import type { TaskState } from "../entities/task";
 import type { LimitEpisode } from "./task-history";
-import type { PlannedRow } from "./planned";
+import type { PlannedRow } from "../entities/task";
 import type { TestRun } from "./queues";
 import type { TaskPipeline } from "./task-pipeline";
 import type { TaskSpend } from "./task-spend";

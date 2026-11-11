@@ -1,5 +1,5 @@
 import { Clock, type Config, Effect, FileSystem, Layer, Option, type PlatformError, Result, Schema } from "effect";
-import { dashboardCacheDirectory } from "../sources/environment";
+import { dashboardCacheDirectory } from "../config";
 import { type SavedSlot, SavedReadings, type Stamped } from "./feed";
 
 // A copy written more often than this only wears the disk, since a restart within it loses little.
