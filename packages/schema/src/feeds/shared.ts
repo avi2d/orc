@@ -6,9 +6,9 @@ import type { QueueReadings } from "../views/queues";
 import { type QuotaBlock, quotaBlocks } from "../views/quotas";
 import type { SessionQuotaView } from "../views/session-quota";
 import type { TaskLevels, TaskListing } from "../views/task-levels";
-import { readsCadence } from "./cadence";
+import { readsCadence } from "../shared/feeds";
 import { QuotaBlocksCodec, SessionsCodec } from "./codecs";
-import { type Freshness, type Polled, polled, refreshingOf, type SavedReadings, savedStandIn, type Shown } from "./feed";
+import { type Freshness, type Polled, polled, refreshingOf, type SavedReadings, savedStandIn, type Shown } from "../shared/feeds";
 
 export interface QuotaFeedShape {
   readonly readings: Polled<QuotaReadings>;

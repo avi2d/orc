@@ -4,7 +4,7 @@ import { type TaskSampleRecord, taskSampleRecords } from "../contract/task-sampl
 import { decoded, type Decoded } from "../shared/lib";
 import type { Outcome } from "../shared/lib";
 import { runDecoded } from "../shared/lib";
-import { machineNames, selector } from "./environment";
+import { machineNames, selector } from "../shared/config";
 
 export interface TaskHistoryMachine {
   readonly name: string;

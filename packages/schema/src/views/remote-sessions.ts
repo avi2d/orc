@@ -4,7 +4,7 @@ import { type Decoded, decodeJson, flatMapDecoded } from "../shared/lib";
 import { SessionQuotaReport } from "../contract/session-quota";
 import { sessionQuotaViewOf } from "./session-quota-view";
 import type { SessionQuotaView } from "./session-quota";
-import { configuredMachines, type Machines, type RemoteSource } from "../sources/machines";
+import { configuredMachines, type Machines, type RemoteSource } from "../shared/config";
 
 export type RemoteSessionSource = RemoteSource<SessionQuotaView>;
 

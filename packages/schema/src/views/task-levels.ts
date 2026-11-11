@@ -1,14 +1,14 @@
 import { DateTime, Option } from "effect";
 import type { TaskSampleRecord } from "../contract/task-samples";
-import type { ReportedTasks, TaskEntry } from "../contract/tasks";
-import { plannedRowsOf, type PlannedRow } from "./planned";
+import type { ReportedTasks, TaskEntry } from "../entities/task";
+import { plannedRowsOf, type PlannedRow } from "../entities/task";
 import { byProject } from "./project-order";
 import type { NoMistakesSnapshot } from "../contract/no-mistakes";
 import type { OrcSnapshot } from "../contract/orc";
 import { type Decoded, decoded, decodeJson, flatMapDecoded, rejected } from "../shared/lib";
 import { type Failed, mapOutcome, type Outcome, secondsFrom } from "../shared/lib";
 import type { PueueStatus } from "../sources/pueue";
-import type { CountedProcess, LiveProcess, ProcessSamples } from "../sources/task-processes";
+import type { CountedProcess, LiveProcess, ProcessSamples } from "../entities/task";
 import { CountedProcessJson, LiveProcessJson, LiveTasksReport, LiveTasksJson, ProcessSamplesJson } from "../contract/task-live";
 import { cueStageSecondsOf, orcStageSecondsOf } from "./stage-time";
 import { testsOf, type RunOwners, type TestRun } from "./queues";
@@ -30,7 +30,7 @@ import {
 import { type KeptProcess, keptCpuSeconds, type LimitEpisode, type TaskHistory, taskHistories } from "./task-history";
 import type { SessionQuotaView } from "./session-quota";
 import { treeRestsOf } from "./task-pane-assessment";
-import { ownedProcesses, totalSecondsOf, within } from "./task-resources";
+import { ownedProcesses, totalSecondsOf, within } from "../entities/task";
 import { type TaskSpend, taskSpend } from "./task-spend";
 import { isLive, projectOf, sumOf, type LiveUsage, type ProjectRow, type ShownState, type TaskRow } from "./task-projects";
 

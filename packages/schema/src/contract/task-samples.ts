@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect";
 import { recordLines } from "../shared/lib";
-import { TaskStateJson } from "./tasks";
+import { TaskStateJson } from "../entities/task";
 
 const Count = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 

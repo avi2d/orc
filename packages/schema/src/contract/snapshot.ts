@@ -3,7 +3,7 @@ import { ComposedSessionQuotaReport } from "./composed-session-quota";
 import { outcomeOf } from "../shared/lib";
 import { QueuesReport } from "./queues";
 import { ResourcesReport } from "./resources";
-import { TasksReport } from "./tasks";
+import { TasksReport } from "../entities/task";
 
 export const snapshotSources = ["quota", "resources", "queues", "tasks"] as const;
 

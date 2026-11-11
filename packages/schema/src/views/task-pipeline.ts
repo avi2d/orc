@@ -1,6 +1,6 @@
 import type { NoMistakesRun, NoMistakesSnapshot, NoMistakesStep } from "../contract/no-mistakes";
 import type { OrcRun, OrcSnapshot } from "../contract/orc";
-import type { TaskEntry, TaskState } from "../contract/tasks";
+import type { TaskEntry, TaskState } from "../entities/task";
 import type { PipelineFolder } from "../sources/pipelines";
 
 export const pipelineKinds = ["full review fix", "quick fix", "local only", "scout", "orc run"] as const;

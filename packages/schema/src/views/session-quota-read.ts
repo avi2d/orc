@@ -4,7 +4,7 @@ import { composedSessionQuota } from "./composed-session-quota";
 import { sessionLogsSince, sessionQuotaFrom, type SessionQuotaView } from "./session-quota";
 import { SavedProfilesSource, savedProfilesSourceLayer, type SavedProfiles } from "../sources/saved-profiles";
 import { HarnessProcessSource, HerdrSource, herdrSourceLayer, linuxHarnessProcessSourceLayer, macHarnessProcessSourceLayer } from "../sources/live-sessions";
-import { readBeside } from "../sources/machines";
+import { readBeside } from "../shared/config";
 import { type QuotaSource, quotaSourceLayer } from "../sources/quota";
 import { type QuotaRead, readQuota } from "../sources/quota-read";
 import { SessionMachines, sessionMachinesLayer } from "./remote-sessions";

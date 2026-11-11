@@ -1,9 +1,9 @@
 import { Clock, Config, Context, Duration, Effect, FileSystem, Layer, Option, Semaphore } from "effect";
-import { CommandRunner } from "../shared/lib";
+import { CommandRunner } from "../../../shared/lib/index";
 import { decodeTasksReport, type ReportedTasks } from "../contract/tasks";
-import type { Reading } from "../shared/lib";
-import { runDecoded, stamped } from "../shared/lib";
-import { machineNames, selector } from "./environment";
+import type { Reading } from "../../../shared/lib/index";
+import { runDecoded, stamped } from "../../../shared/lib/index";
+import { machineNames, selector } from "../../../shared/config";
 
 export interface TasksMachine {
   readonly name: string;

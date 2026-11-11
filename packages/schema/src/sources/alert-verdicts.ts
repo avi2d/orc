@@ -3,7 +3,7 @@ import { decodeVerdictLine, type VerdictEntry } from "../contract/alert-verdicts
 import type { Decoded } from "../shared/lib";
 import { ok, type Outcome, unreachable } from "../shared/lib";
 import { decodedLines, type Grown, readGrown } from "../shared/lib";
-import { selector } from "./environment";
+import { selector } from "../shared/config";
 import { nonEmptyLines } from "../shared/lib";
 
 export const alertVerdictsPath: Config.Config<string> = Config.all({

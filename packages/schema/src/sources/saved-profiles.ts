@@ -3,7 +3,7 @@ import type { CommandRunner } from "../shared/lib";
 import { type Decoded, decodeJson } from "../shared/lib";
 import { ok } from "../shared/lib";
 import { runDecoded, sourceOf, stamped, type Source } from "../shared/lib";
-import { selector } from "./environment";
+import { selector } from "../shared/config";
 
 const Instant = Schema.DateTimeUtcFromString;
 

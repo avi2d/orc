@@ -1,5 +1,5 @@
 import type { SessionQuotaView } from "./session-quota";
-import { within } from "./task-resources";
+import { within } from "../entities/task";
 
 const assessmentUnderPanes = (
   panes: ReadonlyArray<{ readonly folder: string; readonly resting: boolean }>,

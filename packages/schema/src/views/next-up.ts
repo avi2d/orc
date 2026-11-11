@@ -1,5 +1,5 @@
 import { DateTime } from "effect";
-import type { ScheduleEntry } from "../contract/tasks";
+import type { ScheduleEntry } from "../entities/task";
 import type { Failed, Outcome } from "../shared/lib";
 import type { RepoFailure } from "../sources/ci-runs";
 import type { PueueStatus } from "../sources/pueue";

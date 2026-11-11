@@ -1,7 +1,7 @@
 import { DateTime } from "effect";
 import type { SampledSpend, SampledTask, SampledTestRun, TaskSampleRecord } from "../contract/task-samples";
 import { projectOf, type TestRun } from "./queues";
-import { totalSecondsOf } from "./task-resources";
+import { totalSecondsOf } from "../entities/task";
 import type { TaskSpend } from "./task-spend";
 
 export type MachineLimit = "cores" | "memory";

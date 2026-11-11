@@ -1,6 +1,6 @@
 import { DateTime } from "effect";
 import type { LongTaskEvent, LongTaskSettings } from "../contract/alerts";
-import type { ReportedTasks, TaskEntry } from "../contract/tasks";
+import type { ReportedTasks, TaskEntry } from "../entities/task";
 import type { Outcome } from "../shared/lib";
 import type { Stepped } from "./episode";
 

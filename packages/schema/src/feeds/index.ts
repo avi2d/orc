@@ -1,6 +1,6 @@
-export { loopTick, machinesCadence, readsCadence, slowReadsCadence } from "./cadence";
+export { loopTick, machinesCadence, readsCadence, slowReadsCadence } from "../shared/feeds";
 export { CiCodec, MachinesCodec, QueuesCodec, QuotaBlocksCodec, SessionsCodec } from "./codecs";
-export { type BackgroundPoll, type BackgroundTuning, inBackground, stampedInBackground } from "./background";
+export { type BackgroundPoll, type BackgroundTuning, inBackground, stampedInBackground } from "../shared/feeds";
 export {
   type Freshness,
   freshOf,
@@ -21,8 +21,8 @@ export {
   shownValue,
   type Stamped,
   stampedNow,
-} from "./feed";
-export { noSavedReadings, savedReadingsLayer } from "./saved-readings";
+} from "../shared/feeds";
+export { noSavedReadings, savedReadingsLayer } from "../shared/feeds";
 export {
   type MachineListing,
   QuotaFeed,
