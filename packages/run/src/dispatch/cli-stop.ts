@@ -1,7 +1,7 @@
 import { DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { BacklogError, backlogPaths, closeStartedTask, listTasks } from "./backlog"
-import { routeReviewQuestions } from "./attention"
+import { routeTaskItems } from "./attention"
 import { readDispatchConfig } from "./config"
 import type { ConfigError } from "../json-file"
 import type { TaskFileError } from "./task-record"
@@ -42,6 +42,6 @@ export const stopNow = (
     const closed = after?.run ?? null
     const at = DateTime.formatIso(yield* DateTime.now)
     const ended = yield* closeStartedTask(root, id, "stopped", closed?.endReason ?? "the captain stopped " + id, { pr: closed?.prLink ?? null, report: null }, at)
-    yield* routeReviewQuestions(root, [ended], at)
+    yield* routeTaskItems(root, [ended], at)
     return line
   })

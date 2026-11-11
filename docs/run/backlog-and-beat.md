@@ -197,7 +197,7 @@ A parent task also waits for every scout and task child closed done and every sh
 
 To keep a new task back for a decision of yours, run `orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>]`.
 Each beat then prints `waits <task-id>: held for the captain: <reason>`, with the date when the hold names one, and never starts it.
-The date says when you mean to answer, and a past date releases nothing: the task stays held until you answer it.
+The date says when you mean to answer, and a past date releases nothing: the task stays held until you answer it, and its wait opens an item in the [attention queue](attention-queue.md).
 To answer, run `orc backlog answer <task-id> <words>`.
 The task file keeps your words as `answer` and the time as `answered_at`, and the next beat may start the task.
 The released run reads the task body with the reason and your words added after it.
@@ -245,4 +245,5 @@ Only a failure to spawn the log wrapper closes the task as `start-failed`.
 To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1`.
 It carries the endings as `closed`, `close-failed` and `parked` actions, and a run waiting for your answer as `asking`, `answered` or `answer-failed`.
 It carries a stall as `stalled`, a PR the beat cannot read as `pr-unread`, and an upstream contribution as `upstream-seen`, `upstream-changed` or `upstream-unread`.
+It carries each open queue item as an `attention` action, as [The attention queue](attention-queue.md) shows.
 On a token command account, each beat first sends every started task its account's current token through its machine's `renew` command, as JSON on standard input.
