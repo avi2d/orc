@@ -62,49 +62,121 @@ export const ownLogEndingOf = (startedAt: string, logAt: string | null, nowMilli
   return { kind: "close", outcome: "failed", reason: "the machine keeps its own log, and its log has not grown for 30 minutes", pr: null, report: null }
 }
 
+type ParkEnding = Extract<RunEnding, { readonly kind: "park" }>
+type SplitEnding = Extract<RunEnding, { readonly kind: "split" }>
+type CloseEnding = Extract<RunEnding, { readonly kind: "close" }>
+
+const endParked = (
+  root: string,
+  task: TaskRecord,
+  machine: string,
+  ending: ParkEnding
+): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const id = task.spec.id
+    const branch = task.parked?.branch ?? taskBranch(id)
+    const parked = yield* parkStartedTask(root, id, branch, ending.questions, yield* nowIso).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
+    return parked === null
+      ? Option.none()
+      : Option.some({ kind: "parked", task: id, machine, branch, questions: ending.questions.map((question) => question.id), decider: [] } satisfies BeatAction)
+  })
+
+const childIdsOf = (tasks: ReadonlyArray<TaskRecord>, parent: string): ReadonlyArray<string> =>
+  tasks.filter((candidate) => candidate.spec.parent === parent).map((candidate) => candidate.spec.id)
+
+const siblingIdsOf = (tasks: ReadonlyArray<TaskRecord>, parent: string, created: string): ReadonlyArray<string> =>
+  tasks.filter((candidate) => candidate.spec.parent === parent && candidate.spec.created === created).map((candidate) => candidate.spec.id)
+
+const splitFailureText = (id: string, children: ReadonlyArray<string>, detail: string): string =>
+  "split " + id + " into " + (children.length === 0 ? "no children" : children.join(", ")) + " failed: " + detail
+
+const listTasksOrEmpty = (root: string): Effect.Effect<ReadonlyArray<TaskRecord>, never, FileSystem.FileSystem> =>
+  listTasks(root).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<TaskRecord>))
+
+const endSplitParentFailure = (
+  root: string,
+  id: string,
+  machine: string,
+  detail: string
+): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const children = childIdsOf(yield* listTasksOrEmpty(root), id)
+    return Option.some({ kind: "close-failed", task: id, machine, reason: splitFailureText(id, children, detail) } satisfies BeatAction)
+  })
+
+const endSplitFailure = (
+  root: string,
+  task: TaskRecord,
+  machine: string,
+  detail: string,
+  at: string
+): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const id = task.spec.id
+    const reopened = yield* findTask(root, id).pipe(Effect.orElseSucceed(() => null))
+    if (reopened !== null && reopened.state.kind === "new" && reopened.spec.kind === "parent") {
+      return yield* endSplitParentFailure(root, id, machine, detail)
+    }
+    const parent = task.spec.parent
+    if (parent === null || reopened === null) {
+      return Option.none()
+    }
+    const created = siblingIdsOf(yield* listTasksOrEmpty(root), parent, at)
+    const reason = splitFailureText(id, created, detail)
+    const closed = yield* closeStartedTask(root, id, "failed", reason, { pr: null, report: null }, at).pipe(
+      Effect.catchTag("BacklogError", () => Effect.succeed(null))
+    )
+    return closed === null || closed.state.kind !== "closed"
+      ? Option.none()
+      : Option.some({ kind: "closed", task: id, machine, outcome: "failed", reason: closed.state.closing.reason, pr: null, report: null } satisfies BeatAction)
+  })
+
+const endSplit = (
+  root: string,
+  task: TaskRecord,
+  machine: string,
+  ending: SplitEnding
+): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const id = task.spec.id
+    const at = yield* nowIso
+    const applied = yield* applyRunSplit(root, task, ending.plan, at).pipe(
+      Effect.map((value) => ({ kind: "applied" as const, value })),
+      Effect.catchTags({
+        BacklogError: (error) => Effect.succeed({ kind: "failed" as const, detail: error.detail }),
+        TaskFileError: (error) => Effect.succeed({ kind: "failed" as const, detail: error.detail })
+      })
+    )
+    if (applied.kind === "applied") {
+      const reason = ending.plan.reason.trim()
+      yield* recordEvent(root, { key: id + ".split", at, text: splitEventText(applied.value, "run", reason) }).pipe(Effect.catchTag("BacklogError", () => Effect.void))
+      return Option.some({ kind: "split", task: id, machine, children: applied.value.children.map((child) => child.spec.id), reason } satisfies BeatAction)
+    }
+    return yield* endSplitFailure(root, task, machine, applied.detail, at)
+  })
+
+const endClosed = (
+  root: string,
+  task: TaskRecord,
+  machine: string,
+  ending: CloseEnding
+): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const closed = yield* closeStartedTask(root, task.spec.id, ending.outcome, ending.reason, { pr: ending.pr, report: ending.report }, yield* nowIso).pipe(
+      Effect.catchTag("BacklogError", () => Effect.succeed(null))
+    )
+    return closed === null
+      ? Option.none()
+      : Option.some({ kind: "closed", task: task.spec.id, machine, outcome: ending.outcome, reason: ending.reason, pr: ending.pr, report: ending.report } satisfies BeatAction)
+  })
+
 const endTask = (
   root: string,
   task: TaskRecord,
   machine: string,
   ending: RunEnding
 ): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const id = task.spec.id
-    if (ending.kind === "park") {
-      const branch = task.parked?.branch ?? taskBranch(id)
-      const parked = yield* parkStartedTask(root, id, branch, ending.questions, yield* nowIso).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
-      return parked === null
-        ? Option.none()
-        : Option.some({ kind: "parked", task: id, machine, branch, questions: ending.questions.map((question) => question.id), decider: [] } satisfies BeatAction)
-    }
-    if (ending.kind === "split") {
-      const at = yield* nowIso
-      const applied = yield* applyRunSplit(root, task, ending.plan, at).pipe(
-        Effect.map((value) => ({ kind: "applied" as const, value })),
-        Effect.catchTags({
-          BacklogError: (error) => Effect.succeed({ kind: "failed" as const, detail: error.detail }),
-          TaskFileError: (error) => Effect.succeed({ kind: "failed" as const, detail: error.detail })
-        })
-      )
-      if (applied.kind === "applied") {
-        const reason = ending.plan.reason.trim()
-        yield* recordEvent(root, { key: id + ".split", at, text: splitEventText(applied.value, "run", reason) }).pipe(Effect.catchTag("BacklogError", () => Effect.void))
-        return Option.some({ kind: "split", task: id, machine, children: applied.value.children.map((child) => child.spec.id), reason } satisfies BeatAction)
-      }
-      const reopened = yield* findTask(root, id).pipe(Effect.orElseSucceed(() => null))
-      if (reopened !== null && reopened.state.kind === "new" && reopened.spec.kind === "parent") {
-        const children = (yield* listTasks(root).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<TaskRecord>))).filter((candidate) => candidate.spec.parent === id).map((candidate) => candidate.spec.id)
-        return Option.some({ kind: "close-failed", task: id, machine, reason: "split " + id + " into " + (children.length === 0 ? "no children" : children.join(", ")) + " failed: " + applied.detail } satisfies BeatAction)
-      }
-      return Option.none()
-    }
-    const closed = yield* closeStartedTask(root, id, ending.outcome, ending.reason, { pr: ending.pr, report: ending.report }, yield* nowIso).pipe(
-      Effect.catchTag("BacklogError", () => Effect.succeed(null))
-    )
-    return closed === null
-      ? Option.none()
-      : Option.some({ kind: "closed", task: id, machine, outcome: ending.outcome, reason: ending.reason, pr: ending.pr, report: ending.report } satisfies BeatAction)
-  })
+  ending.kind === "park" ? endParked(root, task, machine, ending) : ending.kind === "split" ? endSplit(root, task, machine, ending) : endClosed(root, task, machine, ending)
 
 type Asking = NonNullable<NonNullable<Extract<RunnerResult, { readonly status: "running" | "paused" }>["run"]>["asking"]>
 
@@ -193,17 +265,6 @@ const clearUnread = (
     Effect.catchTag("PlatformError", () => Effect.succeed<number | null>(null))
   )
 
-const applicableEndingOf = (task: TaskRecord, reading: CloseReading, ending: RunEnding): RunEnding =>
-  reading.kind === "read" && ending.kind === "split" && task.spec.parent !== null
-    ? {
-      kind: "close",
-      outcome: "failed",
-      reason: reading.result.run?.endReason ?? "the run proposed a split, and a child applies no split",
-      pr: reading.result.run?.prLink ?? null,
-      report: null
-    } satisfies RunEnding
-    : ending
-
 // A finished run ends its task here, because no other beat step reads a started task after its run ends.
 export const closeFinished = (
   context: CloseContext,
@@ -249,6 +310,6 @@ export const closeFinished = (
       const action = reading.asking === null ? null : yield* serveAsking(context, task, claim.machine, reading.asking, relay)
       return { kind: "running", outputAt: reading.outputAt, action } satisfies Progress
     }
-    const ended = yield* endTask(context.root, task, claim.machine, applicableEndingOf(task, reading, ending))
+    const ended = yield* endTask(context.root, task, claim.machine, ending)
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
   })
