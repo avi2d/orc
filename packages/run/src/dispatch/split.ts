@@ -79,10 +79,6 @@ export const applySplit = (
   by: SplitSource
 ): Effect.Effect<AppliedSplit, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const wait = laterWait(plan)
-    if (wait !== null) {
-      return yield* new BacklogError({ detail: "the split cannot apply, since " + wait })
-    }
     const parent = yield* addTask(root, {
       ...request,
       kind: "parent",

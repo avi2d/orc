@@ -1,6 +1,6 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { DispatchArgs, TaskSource } from "./args"
-import { addTask, backlogPaths, BacklogError, listTasks } from "./backlog"
+import { addTask, backlogPaths, backlogRoot, BacklogError, listTasks } from "./backlog"
 import { refusedLinks } from "./backlog-depend"
 import { checkoutOn, readDispatchConfig, readProjects } from "./config"
 import { recordEvent } from "./events"
@@ -71,7 +71,8 @@ export const add = (
   place: AddPlace
 ): Effect.Effect<void, BacklogError | ConfigError | TaskFileError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
-    const paths = backlogPaths(place.home + "/backlog")
+    const root = backlogRoot(place.home)
+    const paths = backlogPaths(root)
     const config = yield* readDispatchConfig(paths.dispatchConfig)
     const project = (yield* readProjects(paths.projects, config.machines)).find((candidate) => candidate.name === args.project)
     if (project === undefined) {
@@ -80,7 +81,7 @@ export const add = (
     if (args.machine !== null && checkoutOn(project, args.machine) === null) {
       return yield* refuse("the project " + args.project + " has no checkout on " + args.machine + " in " + paths.projects)
     }
-    const links = refusedLinks(args.parent, args.dependsOn, yield* listTasks(place.home + "/backlog"))
+    const links = refusedLinks(args.parent, args.dependsOn, yield* listTasks(root))
     if (links !== null) {
       return yield* refuse(links)
     }
@@ -93,11 +94,11 @@ export const add = (
     const request: SplitRequest = { title, project: project.name, internal: args.internal, machine: args.machine, dependsOn: args.dependsOn, created, body }
     const plan = args.taskKind === "ship" && args.parent === null ? yield* planIntake(place.home, body) : { kind: "off" } satisfies IntakePlan
     if (plan.kind === "planned" && plan.plan.plan === "split") {
-      const applied = yield* applySplit(place.home + "/backlog", request, plan.plan, "intake")
-      yield* recordEvent(place.home + "/backlog", { key: applied.parent.spec.id + ".split", at: created, text: splitEventText(applied, "intake", plan.plan.reason.trim()) })
+      const applied = yield* applySplit(root, request, plan.plan, "intake")
+      yield* recordEvent(root, { key: applied.parent.spec.id + ".split", at: created, text: splitEventText(applied, "intake", plan.plan.reason.trim()) })
       yield* Console.log([applied.parent, ...applied.children].map(addedLine).join("\n"))
       return
     }
-    const record = yield* addTask(place.home + "/backlog", { ...request, kind: args.taskKind, parent: args.parent, split: null })
+    const record = yield* addTask(root, { ...request, kind: args.taskKind, parent: args.parent, split: null })
     yield* Console.log(addedLine(record) + planNote(plan))
   })

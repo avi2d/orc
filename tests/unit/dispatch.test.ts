@@ -8,6 +8,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../packages/run/src/dispatch/args"
 import { addTask, claimTask, closeStartedTask, listTasks, releaseTask, writeTaken } from "../../packages/run/src/dispatch/backlog"
 import { placeTask, runBeat } from "../../packages/run/src/dispatch/beat"
+import { taskWait } from "../../packages/run/src/dispatch/beat-place"
 import { quietSources } from "../lib/beat-sources"
 import { formatBeat } from "../../packages/run/src/dispatch/board"
 import { insertRun, openDatabase } from "../../packages/run/src/run-history"
@@ -424,6 +425,47 @@ describe("the beat", () => {
       expect(seen).toHaveLength(1)
       expect(seen[0]).toContain("started_at: ")
     })
+  })
+})
+
+describe("a split sibling wait", () => {
+  const parent: TaskRecord = {
+    spec: { ...spec, id: "orc-1", kind: "parent", parent: null, dependsOn: [], split: { by: "intake", reason: "two slices" } },
+    hold: null,
+    parked: null,
+    state: { kind: "new" }
+  }
+  const earlier: TaskRecord = {
+    spec: { ...spec, id: "orc-2", title: "Record the split", parent: "orc-1", dependsOn: [] },
+    hold: null,
+    parked: null,
+    state: {
+      kind: "closed",
+      claim,
+      closing: { outcome: "done", started: { at: "2026-10-27T10:02:00.000Z", log: "/logs/orc-2.log" }, reason: "the run opened a PR", pr: "https://example.test/orc/pull/2", report: null },
+      closedAt: "2026-10-27T11:00:00.000Z",
+      postedAt: null
+    }
+  }
+  const later: TaskRecord = {
+    spec: { ...spec, id: "orc-4", title: "Plan at intake", parent: "orc-1", dependsOn: ["orc-2"] },
+    hold: null,
+    parked: null,
+    state: { kind: "new" }
+  }
+  const tasks = [parent, earlier, later]
+  test("a later slice waits for its sibling PR to merge instead of starting on a main without it", () => {
+    expect(taskWait(later, tasks, new Set())).toBe("waits on orc-2")
+    expect(taskWait(later, tasks, new Set(["orc-2"]))).toBeNull()
+  })
+  test("an unrelated task starts once its dependency closes done instead of waiting for the merge", () => {
+    const other: TaskRecord = {
+      spec: { ...spec, id: "orc-9", title: "Unrelated", parent: null, dependsOn: ["orc-2"] },
+      hold: null,
+      parked: null,
+      state: { kind: "new" }
+    }
+    expect(taskWait(other, [...tasks, other], new Set())).toBeNull()
   })
 })
 

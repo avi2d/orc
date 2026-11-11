@@ -2,7 +2,7 @@ import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs } from "./args"
 import { backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted } from "./backlog"
-import { backlogPresent, noBacklog } from "./backlog-write"
+import { backlogPresent, backlogRoot as backlogRootOf, noBacklog } from "./backlog-write"
 import { routeReviewQuestions } from "./attention"
 import { attentionText } from "./attention-view"
 import { holdTask } from "./backlog-hold"
@@ -39,7 +39,7 @@ export interface DispatchPlace {
   readonly stdoutIsTerminal: boolean
 }
 
-const backlogRoot = (place: DispatchPlace): string => place.home + "/backlog"
+const backlogRoot = (place: DispatchPlace): string => backlogRootOf(place.home)
 
 type CliRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
 

@@ -1,4 +1,5 @@
 import { dependencyOpen, type BeatAction, type BeatReport, type MachineRoom } from "./beat"
+import { splitSiblingUnmerged } from "./beat-place"
 import { type ChildCount, childCount } from "./beat-place"
 import type { Project } from "./config"
 import { describeQuota } from "./quota"
@@ -156,7 +157,10 @@ const doneOf = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: Read
 }
 
 const newCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string => {
-  const open = record.spec.dependsOn.filter((id) => dependencyOpen(all.find((candidate) => candidate.spec.id === id)))
+  const open = record.spec.dependsOn.filter((id) => {
+    const dependency = all.find((candidate) => candidate.spec.id === id)
+    return dependency !== undefined && (dependencyOpen(dependency) || splitSiblingUnmerged(record, dependency, merged))
+  })
   const waits = open.length === 0 ? "" : " waits " + open.join(",")
   const held = isHeld(record) ? " held (" + record.hold.reason + ")" : ""
   const asked = openQuestions(record)

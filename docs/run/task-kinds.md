@@ -44,7 +44,7 @@ When `models.planner` in `config.json` names a model, as [Configuring providers]
 The budget for one task is about 300 changed lines or one area.
 A request within the budget lands as one task, and orc prints `planned as one task: <reason>` under the added line.
 A request over the budget lands as a parent with the planner's done criteria under `## Done when`, and one ship child for each vertical slice, each one PR that merges on its own.
-A child waits on the earlier children the plan names, so the next beat starts every child that waits on nothing at the same time.
+A child waits until each earlier child the plan names has merged, so the next beat starts every child that waits on nothing at the same time.
 The parent's task file keeps `split: {"by": "intake", "reason": <text>}`, which `orc backlog --json` gives every task as `split`, and orc records the event `<parent-id>.split` that orc chat posts.
 A planner that fails, runs past five minutes or prints no `orc.split.v1` document leaves the request as one task, and orc prints `not planned, so it runs as one task: <why>`.
 With no `models.planner`, orc asks no model and adds the task as it is.
