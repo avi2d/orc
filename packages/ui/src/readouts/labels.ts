@@ -1,8 +1,8 @@
 import type { Failed } from "@avi2dg/orc-schema";
-import { failureLine, failureLines } from "./format";
-import { type Block, wrapParts } from "./layout";
-import type { Tone } from "./palette";
-import { type Line, lineWidth, padEnd, span } from "./text";
+import { failureLine, failureLines } from "../text/format";
+import { type Block, wrapParts } from "../text/layout";
+import type { Tone } from "../text/palette";
+import { type Line, lineWidth, padEnd, span } from "../text/text";
 
 export const leastLabelWidth = 9;
 

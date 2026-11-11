@@ -1,8 +1,8 @@
 import type { Failed } from "@avi2dg/orc-schema";
-import { failureLines } from "./format";
-import { type Block, wrapParts } from "./layout";
-import type { Tone } from "./palette";
-import { ellipsize, type Line, padEnd, span, widthOf } from "./text";
+import { failureLines } from "../text/format";
+import { type Block, wrapParts } from "../text/layout";
+import type { Tone } from "../text/palette";
+import { ellipsize, type Line, padEnd, span, widthOf } from "../text/text";
 
 export const sentence = (text: string, tone: Tone, width: number): Block => wrapParts(text.split(" "), width, " ").map((part): Line => [span(ellipsize(part, width), tone)]);
 

@@ -1,9 +1,9 @@
 import { StyledText, TextAttributes, TextRenderable, bg, bold, fg, type TextChunk } from "@opentui/core";
 import { createTestRenderer, type TestRendererSetup } from "@opentui/core/testing";
 import { Effect } from "effect";
-import type { Block } from "./layout";
-import type { Span } from "./text";
-import { defaultTheme, rgbOfTone, type Theme, type Tone } from "./palette";
+import type { Block } from "../text/layout";
+import type { Span } from "../text/text";
+import { defaultTheme, rgbOfTone, type Theme, type Tone } from "../text/palette";
 
 export const hexOfTone = (tone: Tone, theme: Theme = defaultTheme): string => {
   const [red, green, blue] = rgbOfTone(tone, theme);

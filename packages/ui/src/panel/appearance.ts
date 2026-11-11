@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect";
 import { decodeSettings, type SettingsRefused } from "./module";
-import { type Theme, type ThemeHexes, themeOf } from "./palette";
+import { type Theme, type ThemeHexes, themeOf } from "../text/palette";
 
 const Hex = Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/u));
 

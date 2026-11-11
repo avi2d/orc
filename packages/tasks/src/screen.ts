@@ -32,8 +32,8 @@ import {
   type RemotePolls,
   type TaskPolls,
 } from "./app";
-import { drawTasks, type TasksReadings } from "./layout";
-import { moved, type Navigation, startNavigation } from "./navigation";
+import { drawTasks, type TasksReadings } from "./board/layout";
+import { moved, type Navigation, startNavigation } from "./board/navigation";
 
 export type TasksSources =
   | LocalTasks

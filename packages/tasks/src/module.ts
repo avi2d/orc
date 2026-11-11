@@ -21,8 +21,8 @@ import {
   titleEdge,
 } from "@avi2dg/orc-ui";
 import { printTasksFrame, runTasksScreen, type TasksSources } from "./screen";
-import { boxColumn, contentHeight, drawTasks, levelColumns, pickToneOf } from "./layout";
-import { levelIndex, moved, type Navigation, startNavigation } from "./navigation";
+import { boxColumn, contentHeight, drawTasks, levelColumns, pickToneOf } from "./board/layout";
+import { levelIndex, moved, type Navigation, startNavigation } from "./board/navigation";
 
 export const tasksSettings = Schema.Struct({
   remote: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),

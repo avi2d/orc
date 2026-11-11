@@ -254,10 +254,12 @@ export const closeStartedTask = (
   outcome: "done" | "failed" | "stopped",
   reason: string,
   delivered: { readonly pr: string | null; readonly report: string | null },
-  closedAt: string
+  closedAt: string,
+  reshape: (spec: TaskSpec) => TaskSpec = (spec) => spec
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   settleStarted(root, id, "closed", (fresh) => ({
     ...fresh,
+    spec: reshape(fresh.spec),
     parked: answeredOnly(fresh.parked),
     state: { kind: "closed", claim: fresh.state.claim, closing: { outcome, started: fresh.state.started, reason, ...delivered }, closedAt, postedAt: null }
   }))

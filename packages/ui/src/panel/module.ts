@@ -1,8 +1,8 @@
 import { type Config, Data, type Duration, Effect, Result, Schema, type Scope } from "effect";
 import { type Freshness, strictly } from "@avi2dg/orc-schema";
-import type { Block } from "./layout";
-import type { Drawn, Move, ScreenSize } from "./screen";
-import type { Line } from "./text";
+import type { Block } from "../text/layout";
+import type { Drawn, Move, ScreenSize } from "../terminal/screen";
+import type { Line } from "../text/text";
 
 export interface Look {
   readonly focused: boolean;

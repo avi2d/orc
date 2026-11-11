@@ -25,7 +25,7 @@ const rendered = async (color: boolean): Promise<string> => {
   return Effect.runPromise(color ? frameAnsi(document, 20, 2) : frameText(document, 20, 2));
 };
 
-// Oracle: the palette hexes in packages/ui/src/palette.ts, transcribed by hand: accent #66cfe1, foreground #d3d8e1,
+// Oracle: the palette hexes in packages/ui/src/text/palette.ts, transcribed by hand: accent #66cfe1, foreground #d3d8e1,
 // pick #2d4f7c. Rejects a print path that maps a tone to another colour, drops the background, or loses bold.
 describe("the colour print path", () => {
   test("paints each span in its own style, and the invisible padding in none", async () => {
