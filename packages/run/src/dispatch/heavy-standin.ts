@@ -1,14 +1,6 @@
 import { Effect, FileSystem, Option } from "effect"
 import { defaultHeavyTools } from "./heavy"
-import { classifyArgv } from "./heavy-classify"
-import {
-  standinFinish,
-  standinMarker,
-  standinQueue,
-  standinUtils,
-  standinWait,
-  type StandinTiming
-} from "./heavy-standin-runtime"
+import { standinMarker, type StandinCall, type StandinTiming } from "./heavy-standin-runtime"
 
 export type { StandinTiming } from "./heavy-standin-runtime"
 
@@ -80,55 +72,76 @@ const findRealTool = (tool: string, pathValue: string): Effect.Effect<string, ne
 
 const quoteSingle = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
 
-const standinHead = (tool: string, settings: StandinSettings, real: string): ReadonlyArray<string> => [
-  '#!/bin/sh',
-  '# ' + standinMarker + '. Regenerated on every run of that command.',
-  'heavy_tool="' + tool + '"',
-  'heavy_real=' + quoteSingle(real),
-  'heavy_bun=' + quoteSingle(process.execPath),
-  'heavy_main=' + quoteSingle(Bun.fileURLToPath(import.meta.resolve("./heavy-standin-main.ts"))),
-  'heavy_home="' + settings.home + '"',
-  'heavy_group="' + settings.group + '"',
-  'heavy_wrap="' + settings.wrap + '"'
-]
+const standinHead = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, real: string, timing?: StandinTiming): ReadonlyArray<string> => {
+  const call: StandinCall = {
+    tool, commands, home: settings.home, group: settings.group, wrap: settings.wrap, real, through: settings.through, timing: timing ?? null
+  }
+  return [
+    '#!/bin/sh',
+    '# ' + standinMarker + '. Regenerated on every run of that command.',
+    'heavy_tool="' + tool + '"',
+    'heavy_real=' + quoteSingle(real),
+    'heavy_bun=' + quoteSingle(process.execPath),
+    'heavy_main=' + quoteSingle(Bun.fileURLToPath(import.meta.resolve("./heavy-standin-main.ts"))),
+    'heavy_wrap="' + settings.wrap + '"',
+    'heavy_call=' + quoteSingle(JSON.stringify(call))
+  ]
+}
 
 // Bun would otherwise load the caller's .env and bunfig.toml preloads into the stand-in.
-const classifyCall = (tool: string, commands: ReadonlyArray<string>): string =>
-  ['"$heavy_bun"', "'--no-env-file'", "'--config=/dev/null'", '"$heavy_main"', ...classifyArgv({ tool, commands }).map(quoteSingle)]
-    .join(" ")
+const helper = '"$heavy_bun" --no-env-file --config=/dev/null "$heavy_main"'
 
-const standinDecideFn = (tool: string, commands: ReadonlyArray<string>): ReadonlyArray<string> => [
-  'heavy_decide() {',
+const standinDecideFn: ReadonlyArray<string> = [
+  'heavy_ready() {',
   '  if [ ! -x "$heavy_bun" ]; then',
   '    echo "orc heavy: no bun at $heavy_bun; rerun orc to rewrite the stand-ins" >&2',
-  '    if [ -n "$HEAVY_CLASSIFY" ]; then return 1; fi',
-  '    heavy_queue=0; heavy_prio=0; return 0',
+  '    return 1',
   '  fi',
   '  if [ ! -f "$heavy_main" ]; then',
   '    echo "orc heavy: no stand-in helper at $heavy_main; rerun orc to rewrite the stand-ins" >&2',
-  '    if [ -n "$HEAVY_CLASSIFY" ]; then return 1; fi',
-  '    heavy_queue=0; heavy_prio=0; return 0',
+  '    return 1',
   '  fi',
-  '  heavy_decision="$(' + classifyCall(tool, commands) + ' "$@")" || {',
+  '}',
+  '',
+  'if [ -n "$HEAVY_CLASSIFY" ]; then',
+  '  heavy_ready || exit 1',
+  '  ' + helper + ' classify "$heavy_call" "$@" || {',
   '    echo "orc heavy: cannot classify the $heavy_tool call with $heavy_bun; rerun orc to rewrite the stand-ins" >&2',
-  '    if [ -n "$HEAVY_CLASSIFY" ]; then return 1; fi',
-  '    heavy_queue=0; heavy_prio=0; return 0',
+  '    exit 1',
   '  }',
-  '  heavy_queue="${heavy_decision% *}"; heavy_prio="${heavy_decision#* }"',
-  '}'
+  '  exit 0',
+  'fi'
+]
+
+const throughExec = (through: ReadonlyArray<string> | null): ReadonlyArray<string> =>
+  through === null
+    ? []
+    : ['    "through "*) exec sh -c \'"$@"; exit "$?"\' orc-heavy-through ' + through.map(quoteSingle).join(" ") + ' $heavy_wrap "${heavy_plan#through }" "$@";;']
+
+const standinLaunch = (through: ReadonlyArray<string> | null): ReadonlyArray<string> => [
+  'if heavy_ready; then',
+  '  heavy_plan="$(' + helper + ' plan "$heavy_call" "$0" "$@")"',
+  '  case "$heavy_plan" in',
+  '    "run "*) exec "${heavy_plan#run }" "$@";;',
+  '    "bypass "*) export HEAVY_QUEUE_BYPASSED="$HEAVY_QUEUE_BYPASS"; exec "${heavy_plan#bypass }" "$@";;',
+  ...throughExec(through),
+  '    "queue "*) exec ' + helper + ' queue "$heavy_call" "${heavy_plan#queue }" "$@";;',
+  '    "exit "*) exit "${heavy_plan#exit }";;',
+  '  esac',
+  '  echo "orc heavy: cannot classify the $heavy_tool call with $heavy_bun; rerun orc to rewrite the stand-ins" >&2',
+  'fi',
+  'if [ -z "$heavy_real" ] || [ ! -x "$heavy_real" ] || [ -d "$heavy_real" ]; then',
+  '  echo "orc heavy: no $heavy_tool at $heavy_real" >&2',
+  '  exit 127',
+  'fi',
+  'exec "$heavy_real" "$@"',
+  ''
 ]
 
 export const standinScript = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, timing?: StandinTiming): Effect.Effect<string, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const resolved = yield* findRealTool(tool, Bun.env.PATH ?? "")
-    return [
-      ...standinHead(tool, settings, resolved),
-      ...standinDecideFn(tool, commands),
-      ...standinUtils(),
-      ...standinQueue(settings.through),
-      ...standinWait(timing),
-      ...standinFinish()
-    ].join("\n") + "\n"
+    return [...standinHead(tool, settings, commands, resolved, timing), ...standinDecideFn, ...standinLaunch(settings.through)].join("\n")
   })
 
 export const standinScripts = (

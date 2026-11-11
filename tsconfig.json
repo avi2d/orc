@@ -38,7 +38,10 @@
             "exclude": [
               "tests/**",
               "**/*.test.ts",
-              "**/*.test.tsx"
+              "**/*.test.tsx",
+              "packages/run/src/dispatch/heavy-process-tree.ts",
+              "packages/run/src/dispatch/heavy-pueue-task.ts",
+              "packages/run/src/dispatch/heavy-standin-runtime.ts"
             ],
             "options": {
               "diagnosticSeverity": {

@@ -213,7 +213,7 @@ describe("the heavy stand-in", () => {
         'case "$1" in\n' +
         "  group) echo '{}';;\n" +
         "  add) echo 7;;\n" +
-        "  log) printf '{\"7\":{\"status\":{\"Done\":{\"result\":\"Success\"}}}}';;\n" +
+        "  log) printf '{\"7\":{\"task\":{\"status\":{\"Done\":{\"result\":\"Success\"}}}}}';;\n" +
         "  follow) echo nested-output;;\n" +
         '  status) cat "' + join(harness.root, "fake", "status.json") + '";;\n' +
         "  remove|kill|wait) exit 0;;\n" +
@@ -317,7 +317,7 @@ describe("the heavy stand-in", () => {
 
   test("a failing queued command keeps its exit code", async () => {
     const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
-    const failing = { ...harness.env, FAKE_TOOL_EXIT: "3", FAKE_LOG_JSON: '{"7":{"status":{"Done":{"result":{"Failed":3}}}}}' }
+    const failing = { ...harness.env, FAKE_TOOL_EXIT: "3", FAKE_LOG_JSON: '{"7":{"task":{"status":{"Done":{"result":{"Failed":3}}}}}}' }
     const result = run({ ...harness, env: failing }, "bun", ["test", "x"])
     expect(result.code).toBe(3)
   })
@@ -325,7 +325,7 @@ describe("the heavy stand-in", () => {
   test("an interrupt while waiting removes the task and leaves nothing behind", async () => {
     const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
     const child = Bun.spawn([join(harness.bin, "bun"), "test", "x"], {
-      env: { ...harness.env, FAKE_LOG_JSON: '{"7":{"status":{"Running":{}}}}' },
+      env: { ...harness.env, FAKE_LOG_JSON: '{"7":{"task":{"status":{"Running":{}}}}}' },
       stdout: "ignore",
       stderr: "pipe"
     })
@@ -368,7 +368,7 @@ describe("the heavy stand-in", () => {
 
   test("a wait past the budget fails the step with a queue message", async () => {
     const harness = harnesses[harnesses.push(await setup(["bun"], [], { budgetMinutes: 0, pollSeconds: 1 })) - 1]
-    const result = run(harness, "bun", ["test", "x"], { FAKE_LOG_JSON: '{"7":{"status":{"Queued":{}}}}' })
+    const result = run(harness, "bun", ["test", "x"], { FAKE_LOG_JSON: '{"7":{"task":{"status":{"Queued":{}}}}}' })
     expect(result.code).toBe(1)
     expect(result.stderr).toContain("waited 0 min for the heavy queue")
     expect(await harness.pueueLog()).toContain("pueue remove 7")
