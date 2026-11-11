@@ -71,3 +71,27 @@ export const decodeSecret = <S extends Schema.Top & { readonly DecodingServices:
     Effect.flatMap((json) => Schema.decodeUnknownEffect(schema)(json, { onExcessProperty: "error" })),
     Effect.mapError(() => new RunnerError({ detail: refusal }))
   )
+
+const PueueGroups = Schema.Record(Schema.String, Schema.Unknown)
+
+const readGroup = (group: string): Effect.Effect<boolean, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  pueue(["group", "--json"]).pipe(
+    Effect.flatMap((text) => decodeJson(text, PueueGroups, "pueue group --json")),
+    Effect.map((groups) => Object.hasOwn(groups, group))
+  )
+
+export const ensureGroup = (group: string, options: ReadonlyArray<string> = []): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  readGroup(group).pipe(
+    Effect.flatMap((present) =>
+      present
+        ? Effect.void
+        : pueue(["group", "add", group, ...options]).pipe(
+          Effect.asVoid,
+          Effect.catch((error) =>
+            readGroup(group).pipe(
+              Effect.flatMap((now) => now ? Effect.void : Effect.fail(error))
+            )
+          )
+        )
+    )
+  )

@@ -1,7 +1,7 @@
 import { DateTime, Duration, Effect, FileSystem, Option, Path, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { Reach } from "./args"
-import { decodeJson, decodeSecret, pueue, type Command } from "./runner-exec"
+import { decodeJson, decodeSecret, ensureGroup, pueue, type Command } from "./runner-exec"
 import { AbsolutePath, readFailure } from "../json-file"
 import { ProviderId, readOrcConfig } from "../orc-config"
 import { TaskId } from "./backlog"
@@ -119,30 +119,6 @@ export const killHeld = (
     yield* markTaskRunsStopped(home, held.path, task, taskFile, started, stoppedBranch)
     return "removed pueue task " + held.id + " for " + task
   })
-
-const PueueGroups = Schema.Record(Schema.String, Schema.Unknown)
-
-const readGroup = (group: string): Effect.Effect<boolean, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  pueue(["group", "--json"]).pipe(
-    Effect.flatMap((text) => decodeJson(text, PueueGroups, "pueue group --json")),
-    Effect.map((groups) => Object.hasOwn(groups, group))
-  )
-
-export const ensureGroup = (group: string, options: ReadonlyArray<string> = []): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  readGroup(group).pipe(
-    Effect.flatMap((present) =>
-      present
-        ? Effect.void
-        : pueue(["group", "add", group, ...options]).pipe(
-          Effect.asVoid,
-          Effect.catch((error) =>
-            readGroup(group).pipe(
-              Effect.flatMap((now) => now ? Effect.void : Effect.fail(error))
-            )
-          )
-        )
-    )
-  )
 
 export const resolveProjectDir = (checkout: string): Effect.Effect<string, never, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
