@@ -126,6 +126,21 @@ describe("the attention queue", () => {
     })
   })
 
+  test("an answer to a question an overlapping beat withdrew closes with its words instead of staying withdrawn", async () => {
+    await withRoot(async (root) => {
+      const asking = parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", null), [], { kind: "new" })
+      await run(routeTaskItems(root, [asking], "2026-11-02T10:20:00.000Z"))
+      await run(routeTaskItems(root, [{ ...asking, parked: null }], "2026-11-02T10:22:00.000Z"))
+      expect(await run(openItems(root))).toEqual([])
+      const answered = parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", { words: "Keep it", at: "2026-11-02T10:25:00.000Z" }), [], { kind: "new" })
+      await run(routeTaskItems(root, [answered], "2026-11-02T10:25:00.000Z"))
+      expect(await run(openItems(root))).toEqual([])
+      expect(JSON.parse(await readFile(join(root, "attention", "orc-1.r2.2026-11-02T10_20_00_000Z.json"), "utf8"))).toMatchObject({
+        state: { kind: "closed", answer: { words: "Keep it", at: "2026-11-02T10:25:00.000Z" } }
+      })
+    })
+  })
+
   test("an answer still closes its live question instead of withdrawing it", async () => {
     await withRoot(async (root) => {
       await run(routeTaskItems(root, [parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", null), [], { kind: "new" })], "2026-11-02T10:20:00.000Z"))
