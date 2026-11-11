@@ -90,6 +90,9 @@ const siblingIdsOf = (tasks: ReadonlyArray<TaskRecord>, parent: string, created:
 const splitFailureText = (id: string, children: ReadonlyArray<string>, detail: string): string =>
   "split " + id + " into " + (children.length === 0 ? "no children" : children.join(", ")) + " failed: " + detail
 
+const listTasksOrEmpty = (root: string): Effect.Effect<ReadonlyArray<TaskRecord>, never, FileSystem.FileSystem> =>
+  listTasks(root).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<TaskRecord>))
+
 const endSplitParentFailure = (
   root: string,
   id: string,
@@ -97,31 +100,8 @@ const endSplitParentFailure = (
   detail: string
 ): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const children = childIdsOf(yield* listTasks(root).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<TaskRecord>)), id)
+    const children = childIdsOf(yield* listTasksOrEmpty(root), id)
     return Option.some({ kind: "close-failed", task: id, machine, reason: splitFailureText(id, children, detail) } satisfies BeatAction)
-  })
-
-const endSplitChildFailure = (
-  root: string,
-  task: TaskRecord,
-  machine: string,
-  detail: string,
-  at: string
-): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const id = task.spec.id
-    const parent = task.spec.parent
-    if (parent === null) {
-      return Option.none()
-    }
-    const created = siblingIdsOf(yield* listTasks(root).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<TaskRecord>)), parent, at)
-    const reason = splitFailureText(id, created, detail)
-    const closed = yield* closeStartedTask(root, id, "failed", reason, { pr: null, report: null }, at).pipe(
-      Effect.catchTag("BacklogError", () => Effect.succeed(null))
-    )
-    return closed === null || closed.state.kind !== "closed"
-      ? Option.none()
-      : Option.some({ kind: "closed", task: id, machine, outcome: "failed", reason: closed.state.closing.reason, pr: null, report: null } satisfies BeatAction)
   })
 
 const endSplitFailure = (
@@ -137,10 +117,18 @@ const endSplitFailure = (
     if (reopened !== null && reopened.state.kind === "new" && reopened.spec.kind === "parent") {
       return yield* endSplitParentFailure(root, id, machine, detail)
     }
-    if (task.spec.parent !== null && reopened !== null) {
-      return yield* endSplitChildFailure(root, task, machine, detail, at)
+    const parent = task.spec.parent
+    if (parent === null || reopened === null) {
+      return Option.none()
     }
-    return Option.none()
+    const created = siblingIdsOf(yield* listTasksOrEmpty(root), parent, at)
+    const reason = splitFailureText(id, created, detail)
+    const closed = yield* closeStartedTask(root, id, "failed", reason, { pr: null, report: null }, at).pipe(
+      Effect.catchTag("BacklogError", () => Effect.succeed(null))
+    )
+    return closed === null || closed.state.kind !== "closed"
+      ? Option.none()
+      : Option.some({ kind: "closed", task: id, machine, outcome: "failed", reason: closed.state.closing.reason, pr: null, report: null } satisfies BeatAction)
   })
 
 const endSplit = (

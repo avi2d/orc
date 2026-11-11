@@ -15,7 +15,8 @@ Orc runs only Pi, and it starts Pi itself as `pi -p --mode json` in the task cop
 - Orc stops Pi only after the idle limit passes with no output and no tool running, so a quiet test command is never cut off.
 - Orc counts the step complete only when the session’s final assistant message stopped with `stop` and holds `ORC_COMPLETE` on its own line.
 - A valid `ORC_SPLIT` proposal records the run as failed without running checks or opening a PR.
-- The beat then turns the task into a parent and starts its children, or adds them to its parent when it has one, as [A worker split proposal](task-kinds.md#a-worker-split-proposal) shows.
+- The beat then turns the task into a parent and starts its children.
+- When the task has a parent, its children join that parent instead, as [A worker split proposal](task-kinds.md#a-worker-split-proposal) shows.
 - On resume orc passes the recorded session file as `--session`, and Pi continues that session instead of starting a new one.
 - Orc sums the `usage` input and output counts each session message carries into the run's token totals.
 
