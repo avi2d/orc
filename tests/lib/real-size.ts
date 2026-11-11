@@ -79,6 +79,7 @@ const realSizeAnswers: ReadonlyArray<readonly [string, () => string]> = [
   [`sh -c ${tasksCommand}`, () => fixture("tasks/pipeline.json")],
   ["no-mistakes axi status --run ", () => fixture("no-mistakes/run.txt")],
   ["no-mistakes axi status", () => fixture("no-mistakes/overview.txt")],
+  ["orc backlog --json", () => JSON.stringify({ schema: "orc.backlog.v1", tasks: [] })],
   ["orc runs --json", () => fixture("orc/runs.json")],
   ["orc show ", () => fixture("orc/show.json")],
 ];
