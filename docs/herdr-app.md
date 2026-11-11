@@ -44,7 +44,7 @@ The mods are TypeScript in `packages/herdr-app/mods/`, checked against the App's
 The copies of those two files sit in `packages/herdr-app/app-types/`, in a folder named for the App version they came from.
 The copies hold no comments, because the comment gate in `bun run lint` refuses the App's doc blocks.
 The copy script wraps `herdr.d.ts` in an ambient module for workspace typechecking.
-An interface that extends an `import(...)` type extends a local alias because the swc parser refuses that form.
+An interface that extends an `import(...)` type extends a local alias because the dependency-cruiser parser refuses that form.
 After the App updates, run `bun scripts/copy-app-types.ts <App version>` in `packages/herdr-app` to copy the new files from `~/.config/herdr-app`.
 `bun run build` bundles each mod to one `main.js` and copies the result into `packages/run/dist/herdr-app/`, which `orc app install` reads.
 Run `herdr-app check packages/herdr-app/dist/mods/<mod>` on each mod you change.
