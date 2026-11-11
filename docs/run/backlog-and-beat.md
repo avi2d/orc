@@ -180,7 +180,7 @@ To change what a new or held task waits for later, run `orc backlog depend <task
 Orc refuses a task the backlog does not hold, a task that is taken, started or closed, a task parked for the captain's answer, and a dependency on itself or one that would make two tasks wait on each other.
 A hold stays as it was when the dependencies change.
 Add `--kind scout` or `--kind task` for a task that ends in a report instead of a PR, as [Task kinds](task-kinds.md) shows.
-To split a large task, add it with `--kind parent`, then add each part with `--parent <task-id>`, as [Parent tasks](task-kinds.md#parent-tasks) shows.
+To split a large task, add it with `--kind parent`, then add each part with `--parent <task-id>`, as [Parent tasks](task-kinds.md#parent-tasks) shows, or name a planner model so orc splits an over-budget request itself, as [Splitting at intake](task-kinds.md#splitting-at-intake) shows.
 Add `--internal` to mark a ship task internal-only, which only a `no-mistakes-prod-only` project reads.
 To see the backlog, run `orc backlog`.
 It prints the new, taken and closed tasks side by side with the project list and each machine's busy slots beside them.
@@ -190,14 +190,14 @@ Each beat runs the quota command and reads the room on each machine before it ta
 A task starts only once four things hold:
 
 1. No hold or parked question for the captain waits on it unanswered.
-2. Every task it depends on closed done.
+2. Every task it depends on closed done, and a split child waits until each earlier child it names has merged.
 A parent task also waits for every scout and task child closed done and every ship child with a PR merged.
 3. Its project has a checkout on a machine with a free slot.
 4. An account has room at or above the floor, and the runs take the account with the most room.
 
 To keep a new task back for a decision of yours, run `orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>]`.
 Each beat then prints `waits <task-id>: held for the captain: <reason>`, with the date when the hold names one, and never starts it.
-The date says when you mean to answer, and a past date releases nothing: the task stays held until you answer it.
+The date says when you mean to answer, and a past date releases nothing: the task stays held until you answer it, and its wait opens an item in the [attention queue](attention-queue.md).
 To answer, run `orc backlog answer <task-id> <words>`.
 The task file keeps your words as `answer` and the time as `answered_at`, and the next beat may start the task.
 The released run reads the task body with the reason and your words added after it.
@@ -245,4 +245,5 @@ Only a failure to spawn the log wrapper closes the task as `start-failed`.
 To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1`.
 It carries the endings as `closed`, `close-failed` and `parked` actions, and a run waiting for your answer as `asking`, `answered` or `answer-failed`.
 It carries a stall as `stalled`, a PR the beat cannot read as `pr-unread`, and an upstream contribution as `upstream-seen`, `upstream-changed` or `upstream-unread`.
+It carries each open queue item as an `attention` action, as [The attention queue](attention-queue.md) shows.
 On a token command account, each beat first sends every started task its account's current token through its machine's `renew` command, as JSON on standard input.

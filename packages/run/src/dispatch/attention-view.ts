@@ -1,7 +1,7 @@
 import { DateTime, Effect, type FileSystem } from "effect"
-import { ageMillis, type AttentionItem, type DecidedItem, isOverdue, type OpenItem, readAttention } from "./attention"
+import { ageMillis, answerItem, type AttentionItem, type DecidedItem, isOverdue, type OpenItem, readAttention } from "./attention"
 import { listTasks } from "./backlog"
-import { type BacklogError, backlogPresent, noBacklog } from "./backlog-write"
+import { BacklogError, backlogPresent, noBacklog } from "./backlog-write"
 import type { TaskFileError } from "./task-record"
 import { formatTable } from "../table"
 
@@ -72,6 +72,25 @@ const formatAttention = (items: ReadonlyArray<OpenItem>, decided: ReadonlyArray<
   const answered = view.decided.map((entry) => "answered " + entry.id + ": " + entry.answer.words + " (" + entry.decision.reason + ")")
   return answered.length > 0 ? open + "\n\nDecided:\n" + answered.join("\n") : open
 }
+
+export const answerItemText = (root: string, id: string, answer: { readonly words: string; readonly at: string }): Effect.Effect<string, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const outcome = yield* answerItem(root, id, answer)
+    switch (outcome) {
+      case "closed": {
+        return "answered " + id
+      }
+      case "already closed": {
+        return yield* new BacklogError({ detail: id + " is no longer open" })
+      }
+      case "missing": {
+        return yield* new BacklogError({ detail: "the attention queue holds no " + id })
+      }
+      default: {
+        return yield* new BacklogError({ detail: id + " closes when its task hold or question is answered, so run orc backlog answer " + outcome.task })
+      }
+    }
+  })
 
 export const attentionText = (json: boolean, root: string): Effect.Effect<string, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {

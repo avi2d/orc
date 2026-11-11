@@ -7,7 +7,7 @@ import { renderTaskFile } from "../../../packages/run/src/dispatch/task-record-r
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
 
-const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
+const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
 
 const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-10-27T10:01:00.000Z" }
 
@@ -21,7 +21,7 @@ describe("task files", () => {
     const text = "---\nid: task-7\ntitle: Fix the thing\nproject: orc\nmachine: mac\ndepends_on: [task-3]\ncreated: 2026-10-27T10:00:00.000Z\n---\n# Fix the thing\n\nDo it.\n"
     const record = await run(parseTaskFile("task-7.md", "new", text))
     expect(record).toEqual({
-      spec: { id: "task-7", title: "Fix the thing", project: "orc", kind: "ship", internal: false, machine: "mac", parent: null, dependsOn: ["task-3"], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n\nDo it.\n" },
+      spec: { id: "task-7", title: "Fix the thing", project: "orc", kind: "ship", internal: false, machine: "mac", parent: null, split: null, dependsOn: ["task-3"], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n\nDo it.\n" },
       hold: null,
       parked: null,
       state: { kind: "new" }

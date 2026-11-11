@@ -61,6 +61,8 @@ export interface BacklogPaths {
   readonly taskFile: (folder: TaskFolder, id: string) => string
 }
 
+export const backlogRoot = (home: string): string => home + "/backlog"
+
 export const backlogPaths = (root: string): BacklogPaths => ({
   root,
   ids: root + "/ids",

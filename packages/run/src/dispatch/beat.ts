@@ -9,7 +9,7 @@ import type { Claim, TaskFileError, TaskRecord } from "./task-record"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
 import type { BeatAction, Progress } from "./beat-action"
 import { closeFinished } from "./beat-close"
-import { routeReviewQuestions } from "./attention"
+import { isOverdue, openItems, openRunDeaths, routeTaskItems } from "./attention"
 import { type AskDecider, decideReviewQuestions } from "./decider"
 import { askDeciderWithPi } from "./decider-ask"
 import { handAnswersToResume } from "./parked"
@@ -23,7 +23,7 @@ import { type ReadUpstream, readUpstream, watchUpstream } from "./upstream"
 
 export type { BeatAction } from "./beat-action"
 export type { MachineRoom } from "./beat-place"
-export { dependencyOpen, placeTask, readRoom } from "./beat-place"
+export { placeTask, readRoom } from "./beat-place"
 
 export interface BeatReport {
   readonly beat: string
@@ -357,25 +357,30 @@ export const runBeat = (
     releaseClosedSlots(context.live, settled.closed)
     const upstream = yield* watchUpstream(root, projects, sources.readUpstream, at)
     const current = yield* listTasks(root)
-    yield* routeReviewQuestions(root, current, at)
-    const early: BeatContext = { ...context, tasks: current, overloaded: new Map() }
-    const renewals = yield* Effect.forEach(current, (task) => renewTask(early, task))
-    const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))
+    yield* routeTaskItems(root, current, at)
+    yield* openRunDeaths(root, settled.closed, at)
     const { latest, relayed } = yield* decideAndRelay(root, context, started, progress, current, sources.askDecider)
+    const queue = (yield* openItems(root)).map(({ id, item }): BeatAction => ({
+      kind: "attention", item: id, task: item.task, owner: item.owner, overdue: isOverdue(item, Date.parse(at)), text: item.text
+    }))
     const queued = latest.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: latest, overloaded }
+    const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, task))
+    yield* openRunDeaths(root, actions, at)
+    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at))
     return { beat, at, quota, room: readRoom(config.machines, latest), actions: [
         ...settled.closed,
         ...relayed.closed,
         ...settled.asking,
         ...relayed.asking,
         ...stalls.flatMap(Option.toArray),
-        ...prs.flatMap(Option.toArray),
         ...upstream,
+        ...queue,
         ...renewals.flatMap(Option.toArray),
-        ...actions
+        ...actions,
+        ...prs.flatMap(Option.toArray)
       ]
     }
   })

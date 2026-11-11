@@ -1,18 +1,19 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import type { DispatchArgs, TaskSource } from "./args"
-import { addTask, backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted } from "./backlog"
-import { backlogPresent, noBacklog } from "./backlog-write"
-import { routeReviewQuestions } from "./attention"
-import { attentionText } from "./attention-view"
+import type { DispatchArgs } from "./args"
+import { backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted } from "./backlog"
+import { backlogPresent, backlogRoot as backlogRootOf, noBacklog } from "./backlog-write"
+import { routeTaskItems } from "./attention"
+import { answerItemText, attentionText } from "./attention-view"
 import { holdTask } from "./backlog-hold"
+import { dropChild, planText } from "./backlog-plan"
 import { circularDependency, dependTask, refusedLinks } from "./backlog-depend"
 import { answerTask } from "./parked"
 import { liveSources, readRoom, runBeat } from "./beat"
 import { runnerLoadText } from "./load"
 import { backlogJson, type BacklogView, beatJson, formatBeat, formatBoard, type ProjectList, type RoomList } from "./board"
 import { type ConfigError, readFailure } from "../json-file"
-import { checkoutOn, type DispatchConfig, readDispatchConfig, readProjects } from "./config"
+import { type DispatchConfig, readDispatchConfig, readProjects } from "./config"
 import { holdRun } from "./hold"
 import { mergeTask } from "./merge"
 import { taskLabel } from "./pueue-status"
@@ -20,6 +21,7 @@ import { type Command, killHeld, queueFromText, renewTask, RunnerError, startTas
 import { stopNow } from "./cli-stop"
 import { formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson } from "./runner-result"
 import type { TaskFileError } from "./task-record"
+import { add } from "./cli-add"
 import { encodeToken, sessionToken } from "./token"
 import { markEventPosted, mergedIds, unpostedEvents } from "./events"
 import { ensureAlertStream, liveAlertStream } from "./alert-stream"
@@ -37,7 +39,7 @@ export interface DispatchPlace {
   readonly stdoutIsTerminal: boolean
 }
 
-const backlogRoot = (place: DispatchPlace): string => place.home + "/backlog"
+const backlogRoot = (place: DispatchPlace): string => backlogRootOf(place.home)
 
 type CliRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
 
@@ -66,9 +68,6 @@ const readView = (root: string): Effect.Effect<BacklogView, BacklogError | TaskF
     const room: RoomList = { kind: "read", room: readRoom(reading.config.machines, tasks) }
     return { tasks, events, projects, room, merged }
   })
-
-const titleOf = (body: string): string =>
-  body.split("\n").map((line) => line.replace(/^#+\s*/, "").trim()).find((line) => line !== "") ?? ""
 
 const refuse = (detail: string) => Effect.fail(new BacklogError({ detail }))
 
@@ -123,68 +122,6 @@ const requireBacklog = (root: string) =>
     }
   })
 
-interface TaskText {
-  readonly from: string
-  readonly body: string
-}
-
-const readTaskText = (source: TaskSource, place: DispatchPlace) =>
-  Effect.gen(function*() {
-    if (source.kind === "stdin") {
-      if (place.stdinIsTerminal) {
-        return yield* refuse("orc backlog add - reads the task from a pipe, and stdin is a terminal")
-      }
-      const body = yield* place.stdin.pipe(Effect.mapError((error) => new BacklogError({ detail: error.detail })))
-      return { from: "the task on stdin", body } satisfies TaskText
-    }
-    const fs = yield* FileSystem.FileSystem
-    const path = yield* Path.Path
-    const taskPath = path.resolve(place.cwd, source.path)
-    const body = yield* fs.readFileString(taskPath).pipe(
-      Effect.mapError((error) => new BacklogError({ detail: "cannot read the task file " + taskPath + ": " + readFailure(error) }))
-    )
-    return { from: "the task file " + taskPath, body } satisfies TaskText
-  })
-
-const add = (args: Extract<CommandArgs, { readonly kind: "AddTask" }>, place: DispatchPlace) =>
-  Effect.gen(function*() {
-    const paths = backlogPaths(backlogRoot(place))
-    const config = yield* readDispatchConfig(paths.dispatchConfig)
-    const project = (yield* readProjects(paths.projects, config.machines)).find((candidate) => candidate.name === args.project)
-    if (project === undefined) {
-      return yield* refuse("the project " + args.project + " is not in " + paths.projects)
-    }
-    if (args.machine !== null && checkoutOn(project, args.machine) === null) {
-      return yield* refuse("the project " + args.project + " has no checkout on " + args.machine + " in " + paths.projects)
-    }
-    const links = refusedLinks(args.parent, args.dependsOn, yield* listTasks(backlogRoot(place)))
-    if (links !== null) {
-      return yield* refuse(links)
-    }
-    const { from, body } = yield* readTaskText(args.task, place)
-    const title = titleOf(body)
-    if (title === "") {
-      return yield* refuse(from + " holds no text")
-    }
-    const created = DateTime.formatIso(yield* DateTime.now)
-    const record = yield* addTask(backlogRoot(place), {
-      title,
-      project: project.name,
-      kind: args.taskKind,
-      internal: args.internal,
-      machine: args.machine,
-      parent: args.parent,
-      dependsOn: args.dependsOn,
-      created,
-      body
-    })
-    yield* Console.log(
-      "added " + record.spec.id + " for " + project.name + (args.machine === null ? "" : " on " + args.machine) +
-        (record.spec.kind === "ship" ? "" : " as a " + record.spec.kind) + (record.spec.internal ? " marked internal" : "") +
-        (record.spec.parent === null ? "" : " as a child of " + record.spec.parent)
-    )
-  })
-
 const reportResult = (args: Extract<CommandArgs, { readonly kind: "RunnerResult" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
     let label = args.label ?? taskLabel(place.home, args.task)
@@ -202,7 +139,7 @@ const closeNow = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, pl
   Effect.gen(function*() {
     const at = DateTime.formatIso(yield* DateTime.now)
     const closed = yield* closeStartedTask(backlogRoot(place), args.id, args.outcome, args.reason, { pr: null, report: null }, at)
-    yield* routeReviewQuestions(backlogRoot(place), [closed], at)
+    yield* routeTaskItems(backlogRoot(place), [closed], at)
     return "closed " + args.id + " " + args.outcome
   })
 
@@ -237,7 +174,7 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
   Effect.gen(function*() {
     const at = DateTime.formatIso(yield* DateTime.now)
     const answered = yield* answerTask(backlogRoot(place), args.id, args.words, at)
-    yield* routeReviewQuestions(backlogRoot(place), [yield* findTask(backlogRoot(place), args.id)], at)
+    yield* routeTaskItems(backlogRoot(place), [yield* findTask(backlogRoot(place), args.id)], at)
     if (answered.kind === "hold") {
       return "answered " + args.id + ", so the beat may start it"
     }
@@ -254,10 +191,13 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
-type TaskVerb = Extract<CommandArgs, { readonly kind: "CloseTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "DependTask" | "MergeTask" }>
+type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "CloseTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "DependTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
 
 const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   switch (args.kind) {
+    case "AnswerItem": {
+      return DateTime.now.pipe(Effect.flatMap((now) => answerItemText(backlogRoot(place), args.id, { words: args.words, at: DateTime.formatIso(now) })))
+    }
     case "CloseTask": {
       return closeNow(args, place)
     }
@@ -278,6 +218,12 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
     }
     case "MergeTask": {
       return mergeTask(backlogRoot(place), args.id, args.basis)
+    }
+    case "ShowPlan": {
+      return planText(backlogRoot(place), args.parent)
+    }
+    case "DropChild": {
+      return dropChild(backlogRoot(place), args.parent, args.child)
     }
   }
 }
@@ -330,13 +276,16 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         yield* add(args, place)
         break
       }
+      case "AnswerItem":
       case "CloseTask":
       case "MarkPosted":
       case "MarkEventPosted":
       case "HoldTask":
       case "AnswerTask":
       case "DependTask":
-      case "MergeTask": {
+      case "MergeTask":
+      case "ShowPlan":
+      case "DropChild": {
         yield* requireBacklog(backlogRoot(place))
         yield* Console.log(yield* taskVerbLine(args, place))
         break

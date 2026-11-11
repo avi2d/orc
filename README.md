@@ -79,7 +79,7 @@ To open the dashboard, run `bun run dashboard` from the repository root.
 | `packages/cli` | The `orc-dash` command, which composes the panels into the dashboard |
 | `packages/dashboard` | The dashboard host, which lays out the panels it is given |
 | `packages/schema`, `packages/ui` | The dashboard's shared decoders, view models, theme and screen runner |
-| `packages/alerts`, `packages/dispatch`, `packages/ledger`, `packages/queues`, `packages/quota`, `packages/resources`, `packages/schedules`, `packages/session-quota`, `packages/tasks` | One dashboard panel each |
+| `packages/alerts`, `packages/attention`, `packages/dispatch`, `packages/ledger`, `packages/queues`, `packages/quota`, `packages/resources`, `packages/schedules`, `packages/session-quota`, `packages/tasks` | One dashboard panel each |
 | `dependency-cruiser.config.ts` | The panel border the lint holds every import to |
 | `docs/adr` | The decision records |
 

@@ -1,0 +1,19 @@
+{
+  "name": "@avi2dg/orc-attention",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The attention panel of orc-dash, listing every open item of the orc attention queue, oldest first, with its owner, its age and an overdue mark",
+  "repository": "https://github.com/avi2d/orc.git",
+  "author": "avi2d <avi2dg@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@avi2dg/orc-schema": "workspace:*",
+    "@avi2dg/orc-ui": "workspace:*",
+    "effect": "4.0.0"
+  }
+}

@@ -67,7 +67,8 @@ const OrcConfigFile = Schema.Struct({
     implementer: Schema.optional(ModelRef),
     fixer: Schema.optional(ModelRef),
     orchestrator: Schema.optional(ModelRef),
-    decider: Schema.optional(ModelRef)
+    decider: Schema.optional(ModelRef),
+    planner: Schema.optional(ModelRef)
   }))
 })
 type OrcConfigFile = typeof OrcConfigFile.Type

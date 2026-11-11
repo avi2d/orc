@@ -369,6 +369,7 @@ export { machineQueue, type MachineQueueView, type QueueEntry, type QueueRow, ty
 export { type DispatchReading, type DispatchSnapshot, DispatchSource, dispatchSourceLayer, type DispatchTask, missingBacklog } from "./sources/dispatch";
 export { type DispatchView, dispatchView, type RoomEntry, type RunRow, type WaitRow } from "./views/dispatch";
 export { heavySummary, isHeavyNotSetup } from "./views/heavy";
+export { type AttentionItem, type AttentionQueue, AttentionSource, attentionSourceLayer } from "./sources/attention";
 export { decodeHeavyCheck, HeavyCheck, type HeavyMachine, HeavyMachines, heavyMachinesLayer } from "./sources/heavy";
 export { decodePueue, knownProjects, type PueueMachine, PueueMachines, pueueMachinesLayer, PueueStatus } from "./sources/pueue";
 export { type MachineProjects } from "./sources/project-names";
