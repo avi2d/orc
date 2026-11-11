@@ -57,6 +57,14 @@ export const guardJson = <A>(text: string, guard: Guard<A>): Guarded<A> => {
   return guard(value, "")
 }
 
+const pair = <A>(record: Fields, at: string, first: string, second: string, make: (a: string, b: string) => A): Guarded<A> => {
+  const a = string(record, first, at)
+  if (a.kind === "refused") return a
+  const b = string(record, second, at)
+  if (b.kind === "refused") return b
+  return ok(make(a.value, b.value))
+}
+
 interface Task {
   readonly id: string
   readonly title: string
@@ -65,11 +73,7 @@ interface Task {
 const task: Guard<Task> = (value, at) => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
-  const id = string(record.value, "id", at)
-  if (id.kind === "refused") return id
-  const title = string(record.value, "title", at)
-  if (title.kind === "refused") return title
-  return ok({ id: id.value, title: title.value })
+  return pair(record.value, at, "id", "title", (id, title) => ({ id, title }))
 }
 
 export interface Backlog {
@@ -95,11 +99,7 @@ interface Run {
 const run: Guard<Run> = (value, at) => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
-  const id = string(record.value, "id", at)
-  if (id.kind === "refused") return id
-  const status = string(record.value, "status", at)
-  if (status.kind === "refused") return status
-  return ok({ id: id.value, status: status.value })
+  return pair(record.value, at, "id", "status", (id, status) => ({ id, status }))
 }
 
 export interface Runs {
