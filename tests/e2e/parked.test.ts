@@ -257,7 +257,7 @@ describe("a parked run", () => {
     })
   }, runnerTimeout)
 
-  test("the beat hands a waiting run's question to the decider, whose answer closes its item instead of leaving it for the user", async () => {
+  test("the beat hands the decider-owned question to the run without asking the person too", async () => {
     await withFixture(async (fixture) => {
       await startOnLinux(fixture)
       await writeFile(join(fixture.home, "config.json"), JSON.stringify({ providers: [], models: { decider: "acme/small" } }))
@@ -270,6 +270,7 @@ describe("a parked run", () => {
       expect(await openAttention(fixture)).toEqual([])
       expect(await backlogTaskOne(fixture)).toMatchObject({ parked: { questions: [{ id: "r2", answer: { words: "Keep it" } }] } })
       expect(beaten).toContain("handed r2 to the run of orc-1 on linux")
+      expect(beaten).not.toContain("asking orc-1 on linux")
       expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual({ asking: firstAsking.asked, answers: [{ question: "r2", answer: "Keep it" }] })
       expect((await readFile(join(fixture.dir, "pi-args"), "utf8")).split("\n")).toEqual(expect.arrayContaining(["--no-tools", "--model", "acme/small", "--system-prompt"]))
       expect(await readFile(join(fixture.dir, "pi-prompt"), "utf8")).toContain("Keep the old flag?")
