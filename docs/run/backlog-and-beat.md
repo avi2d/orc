@@ -185,6 +185,9 @@ Add `--internal` to mark a ship task internal-only, which only a `no-mistakes-pr
 To see the backlog, run `orc backlog`.
 It prints the new, taken and closed tasks side by side with the project list and each machine's busy slots beside them.
 To print the same facts as JSON, run `orc backlog --json`, whose document names its version first as `orc.backlog.v1`.
+`orc backlog --json` gives every new task a `wait`, either `null` or the reason the beat will not start it.
+The reason is the hold, the parked questions, the open children or the dependency it waits on, including a split sibling whose PR has not merged.
+Taken, started and closed tasks carry `null` for `wait`.
 To start what can start, run `orc beat`, from launchd or cron every few minutes.
 Each beat runs the quota command and reads the room on each machine before it takes any task.
 A task starts only once four things hold:
