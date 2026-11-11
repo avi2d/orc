@@ -1,5 +1,6 @@
 import { Array as Arr, Effect, FileSystem } from "effect"
 import type { OpenQuestion } from "../no-mistakes-gate"
+import { openReviewQuestions } from "./attention"
 import { findTask, type Rewrite, rewriteNew, rewriteTaken } from "./backlog"
 import { taskBranch } from "./runner"
 import { BacklogError, platformFailure, publishOnce, takenGrab } from "./backlog-write"
@@ -38,18 +39,20 @@ export const askStartedTask = (
   id: string,
   asking: LiveAsking
 ): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  rewriteTaken(root, id, (fresh): Effect.Effect<Rewrite<boolean>, BacklogError> => {
-    if (fresh.state.kind !== "started") {
-      return Effect.fail(new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a started task asks" }))
-    }
-    const known = fresh.parked?.questions ?? []
-    const questions = parkedQuestions(asking.questions, known, asking.asked, () => asking.asked)
-    if (sameQuestions(questions, known)) {
-      return Effect.succeed({ kind: "keep", result: false })
-    }
-    const parked: Parked = { branch: fresh.parked?.branch ?? taskBranch(id), questions }
-    return Effect.succeed({ kind: "write", record: { ...fresh, parked }, result: true })
-  })
+  rewriteTaken(root, id, (fresh): Effect.Effect<Rewrite<boolean>, BacklogError, FileSystem.FileSystem> =>
+    Effect.gen(function*() {
+      if (fresh.state.kind !== "started") {
+        return yield* new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a started task asks" })
+      }
+      const known = fresh.parked?.questions ?? []
+      const questions = parkedQuestions(asking.questions, known, asking.asked, () => asking.asked)
+      if (sameQuestions(questions, known)) {
+        return { kind: "keep", result: false } as const
+      }
+      yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null), asking.asked)
+      const parked: Parked = { branch: fresh.parked?.branch ?? taskBranch(id), questions }
+      return { kind: "write", record: { ...fresh, parked }, result: true } as const
+    }))
 
 // The resumed run gets every answer as --answer, so each is handed to the asking it answers.
 export const handAnswersToResume = (record: TaskRecord): TaskRecord =>
@@ -90,6 +93,7 @@ export const parkStartedTask = (
       }
       const lastAsking = open.find((question) => question.asked !== undefined)?.asked ?? null
       const questions = parkedQuestions(open, record.parked?.questions ?? [], lastAsking, (question) => question.asked ?? at)
+      yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null), at)
       const parked: TaskRecord = { ...record, parked: { branch, questions }, state: { kind: "new" } }
       if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(parked)))) {
         return yield* new BacklogError({ detail: "new/ already holds " + id })

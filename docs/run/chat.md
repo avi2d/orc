@@ -32,7 +32,8 @@ A second stall of one task is a new event.
 The alert stream that `orc runner start` queues writes that file, as [The runner](runner.md) shows.
 When it cannot read or mark the backlog, it posts orc's error once Pi is idle and keeps polling.
 Each time the chat starts, it posts one line per held task you have not answered, once Pi is idle, as in `orc-2 Pick the API is held for the captain: REST or gRPC, until 2026-12-01`.
-It posts one line per parked question you have not answered each time it starts, and once more when a task parks while it runs, as in `orc-3 Fix the retries is parked on orc/orc-3 for the captain's answer to question-4: Which retries are allowed?`.
+It posts one line per parked question the attention queue owns for you each time it starts, and once more when a task parks while it runs, as in `orc-3 Fix the retries is parked on orc/orc-3 for the captain's answer to question-4: Which retries are allowed?`.
+It skips a parked question the attention queue still owns for the decider.
 Questions from a run waiting at its gate post the same way, as [Parked runs](parked-runs.md) shows.
 A question the run asks again at a later wait posts again.
 A question whose line a failed read or a busy Pi kept back is posted on a later poll.
