@@ -7,7 +7,7 @@ Each item is one JSON file with its `kind`, its `task`, its `text`, the time it 
 The owner names who must answer it, `decider` or `user`.
 The state starts as `open`.
 An answer makes it `closed`, and a closed item keeps the answer words and time.
-When its task closes, or its question is no longer asked, the item turns `withdrawn` with its reason and time.
+A review question or an overdue wait turns `withdrawn` with its reason and time when its task closes or when it is no longer asked.
 Showing an item never closes it.
 An open item is overdue once more than 5 minutes have passed since it was asked.
 
@@ -17,6 +17,26 @@ Answering it with `orc backlog answer <task-id> <question-id>=<text>` closes the
 A question asked again with the same words keeps its item.
 A question asked again with different words opens a new item, and the old item is withdrawn.
 An answered question asked again opens a new item, and the old item keeps its answer.
+
+The beat opens an item for each run event, owned by the user:
+
+- A run that died opens a `run-died` item, when its task closes failed or its start fails.
+  A run that ends done or that you stop opens none.
+- A red check on a closed ship task's PR opens a `check-red` item for the PR's head commit.
+  Checks that turn green on that commit, or a new commit, withdraw it.
+  Merging the PR or closing it without merging withdraws it.
+- A closed ship task's PR with every check reporting green opens a `pr-ready` item for its head commit.
+  A red check or a new commit withdraws it.
+  Merging the PR closes it with the answer `merged`.
+  Closing the PR without merging closes it with the answer `closed without merging`.
+
+To answer one of these, run `orc attention answer <item-id> <words>`.
+It refuses a review question or an overdue wait and names the task to answer with `orc backlog answer` instead.
+
+A held task whose `--until` date has passed opens an `overdue-wait` item, owned by the user and asked at the start of the next day on the machine local clock.
+Answering the hold closes the item with the hold's answer.
+
+Each beat reads the queue before it starts a new task, and prints one `needs the <owner> <item-id>: <text>` line per open item, oldest first, with `, overdue` after the owner for an overdue one.
 
 To see every open item, oldest first, run `orc attention`.
 It prints each item's id, kind, task, owner, age and text, and marks an overdue one `overdue`.
@@ -34,4 +54,5 @@ To print the same facts as JSON, run `orc attention --json`, whose document name
 ```
 
 `at` is the time the queue was read, and each item's age and overdue flag are taken at that time.
+To watch the open items in a terminal, run `orc-dash panel attention`, as [orc-dash](../dash.md#run-the-attention-tool) shows.
 On a machine with no backlog folder, `orc attention` prints `no backlog at <path>`, and `orc attention --json` prints an empty queue.

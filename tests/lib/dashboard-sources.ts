@@ -7,6 +7,7 @@ import type { CliRenderer } from "@opentui/core";
 import { dashboardScreen, printDashboard } from "@avi2dg/orc-dashboard";
 import {
   actionsSourceLayer,
+  attentionSourceLayer,
   ciRunsLayer,
   type Command,
   CommandRunner,
@@ -77,6 +78,7 @@ const recordedAnswers: ReadonlyArray<readonly [string, string]> = [
   ["systemctl --user list-timers", "[]"],
   [`sh -c ${tasksCommand}`, fixture("tasks/east.json")],
   ["orc heavy check --json", fixture("heavy/check.json")],
+  ["orc attention --json", fixture("attention/open.json")],
   ...queueAnswers,
 ];
 
@@ -126,6 +128,7 @@ const recordedSources = (
 ) =>
   Layer.mergeAll(
     quotaSourceLayer,
+    attentionSourceLayer,
     recordedSavedProfilesLayer,
     macHostSourceLayer,
     macProcessesSourceLayer,

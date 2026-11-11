@@ -8,7 +8,7 @@ import { isTaskKind, type TaskKind, unknownKind } from "../task-kind"
 import { isMergeBasis, mergeBases } from "./merge-basis"
 
 export const dispatchUsage =
-  "orc backlog [--json] | orc attention [--json] | orc backlog add <project> <task-file|-> [--kind <ship|scout|task|parent>] [--internal] [--machine <name>] [--parent <task-id>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog stop <task-id> | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc backlog plan <task-id> [--drop <task-id>] | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <claude-credentials.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner kill <task-id> | orc runner answer <task-id> | orc runner load | orc heavy path | orc heavy check [--json] | orc heavy watch | orc heavy watch-once"
+  "orc backlog [--json] | orc attention [--json] | orc attention answer <item-id> <words> | orc backlog add <project> <task-file|-> [--kind <ship|scout|task|parent>] [--internal] [--machine <name>] [--parent <task-id>] [--depends-on <task-id>] | orc backlog close <task-id> <done|failed> [reason] | orc backlog stop <task-id> | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc backlog plan <task-id> [--drop <task-id>] | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <claude-credentials.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner kill <task-id> | orc runner answer <task-id> | orc runner load | orc heavy path | orc heavy check [--json] | orc heavy watch | orc heavy watch-once"
 
 const addFlags = ["--kind", "--machine", "--parent", "--depends-on"] as const
 type AddFlag = typeof addFlags[number]
@@ -182,6 +182,17 @@ const parseAnswer = (rest: ReadonlyArray<string>): DispatchArgs => {
   return said.trim() === "" ? { kind: "UsageError", detail: "orc backlog answer takes a task id and the captain's words" } : { kind: "AnswerTask", id, words: said }
 }
 
+const isItemId = (text: string): boolean => /^[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(text)
+
+const parseItemAnswer = (rest: ReadonlyArray<string>): DispatchArgs => {
+  const [id = "", ...words] = rest
+  if (!isItemId(id)) {
+    return { kind: "UsageError", detail: "orc attention answer takes an item id, got \"" + id + "\"" }
+  }
+  const said = words.join(" ")
+  return said.trim() === "" ? { kind: "UsageError", detail: "orc attention answer takes an item id and the answer's words" } : { kind: "AnswerItem", id, words: said }
+}
+
 const parseDepend = (rest: ReadonlyArray<string>): DispatchArgs => {
   const [id = "", flag = "", ...after] = rest
   if (!isTaskId(id)) {
@@ -259,7 +270,7 @@ const parseHeavy = (rest: ReadonlyArray<string>): DispatchArgs => {
 
 export const parseDispatchArgs = (command: "backlog" | "attention" | "beat" | "runner" | "merge" | "heavy", rest: ReadonlyArray<string>): DispatchArgs => {
   if (command === "attention") {
-    return parseJsonFlag(rest, (json) => ({ kind: "ShowAttention", json }))
+    return rest[0] === "answer" ? parseItemAnswer(rest.slice(1)) : parseJsonFlag(rest, (json) => ({ kind: "ShowAttention", json }))
   }
   if (command === "heavy") {
     return parseHeavy(rest)

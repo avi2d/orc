@@ -7,6 +7,7 @@
       "devDependencies": {
         "@avi2dg/checks": "0.91.0",
         "@avi2dg/orc-alerts": "workspace:*",
+        "@avi2dg/orc-attention": "workspace:*",
         "@avi2dg/orc-cli": "workspace:*",
         "@avi2dg/orc-dashboard": "workspace:*",
         "@avi2dg/orc-dispatch": "workspace:*",
@@ -43,6 +44,15 @@
         "effect": "4.0.0",
       },
     },
+    "packages/attention": {
+      "name": "@avi2dg/orc-attention",
+      "version": "0.1.0",
+      "dependencies": {
+        "@avi2dg/orc-schema": "workspace:*",
+        "@avi2dg/orc-ui": "workspace:*",
+        "effect": "4.0.0",
+      },
+    },
     "packages/cli": {
       "name": "@avi2dg/orc-cli",
       "version": "0.1.0",
@@ -51,6 +61,7 @@
       },
       "dependencies": {
         "@avi2dg/orc-alerts": "workspace:*",
+        "@avi2dg/orc-attention": "workspace:*",
         "@avi2dg/orc-dashboard": "workspace:*",
         "@avi2dg/orc-dispatch": "workspace:*",
         "@avi2dg/orc-ledger": "workspace:*",
@@ -209,6 +220,8 @@
     "@avi2dg/orc": ["@avi2dg/orc@workspace:packages/run"],
 
     "@avi2dg/orc-alerts": ["@avi2dg/orc-alerts@workspace:packages/alerts"],
+
+    "@avi2dg/orc-attention": ["@avi2dg/orc-attention@workspace:packages/attention"],
 
     "@avi2dg/orc-cli": ["@avi2dg/orc-cli@workspace:packages/cli"],
 

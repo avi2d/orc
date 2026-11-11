@@ -105,7 +105,7 @@ const topRow: Row = {
 
 const lowerRow = (tasksShare: number): Row => ({
   height: "fill",
-  cells: [{ stack: [{ panel: "resources" }, { tabs: ["queues", "schedules", "dispatch"] }] }, { panel: "tasks", width: tasksShare }],
+  cells: [{ stack: [{ panel: "attention" }, { panel: "resources" }, { tabs: ["queues", "schedules", "dispatch"] }] }, { panel: "tasks", width: tasksShare }],
 });
 
 export const defaultLayout: Layout = {
@@ -113,7 +113,7 @@ export const defaultLayout: Layout = {
     { atLeast: { columns: 240, rows: 36 }, rows: [topRow, lowerRow(2)] },
     { atLeast: { columns: 120, rows: 36 }, rows: [topRow, lowerRow(1)] },
   ],
-  narrow: ["quota", "session-quota", "queues", "dispatch", "resources", "alerts", "tasks"],
+  narrow: ["quota", "attention", "session-quota", "queues", "dispatch", "resources", "alerts", "tasks"],
   narrowGivesWay: ["alerts", "quota", "session-quota"],
 };
 

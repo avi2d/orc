@@ -5,6 +5,7 @@ import { dispatchSourcesLive } from "@avi2dg/orc-dispatch";
 import { conversationSourceLive } from "@avi2dg/orc-ledger";
 import { queueFeedLayer, queueSourcesLive } from "@avi2dg/orc-queues";
 import {
+  attentionSourceLayer,
   ciRunsLayer,
   savedProfilesSourceLayer,
   hostSourcesLayer,
@@ -43,6 +44,7 @@ const runnerSources = Layer.mergeAll(ciRunsLayer, machineSchedulesLayer(onMac ? 
 
 const commandSources = Layer.mergeAll(
   quotaSourceLayer,
+  attentionSourceLayer,
   savedProfilesSourceLayer,
   hostSourcesLayer,
   resourceMachinesLayer,

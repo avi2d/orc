@@ -1,0 +1,1 @@
+export { attentionModule } from "./module";

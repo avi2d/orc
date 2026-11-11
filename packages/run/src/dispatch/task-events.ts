@@ -3,6 +3,7 @@ import type { ChildProcessSpawner } from "effect/process"
 import { BacklogError } from "./backlog-write"
 import type { BeatAction, StalledAction } from "./beat-action"
 import type { ChatEvent } from "./chat-event"
+import { routePullRequest } from "./attention"
 import { eventRecorded, recordEvent } from "./events"
 import { checkRefusals, greenChecks, type PullRequestView } from "./pr-view"
 import type { RunnerError } from "./runner"
@@ -56,6 +57,7 @@ export const prEvents = (
     if (Result.isFailure(view)) {
       return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: view.failure.detail })
     }
+    yield* routePullRequest(root, id, pr, view.success, at)
     const event = prEvent(task, pr, view.success, at, yield* eventRecorded(root, id + ".pr-ready"))
     if (event !== null) {
       yield* recordEvent(root, event)
