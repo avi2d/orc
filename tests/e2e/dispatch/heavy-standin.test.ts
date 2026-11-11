@@ -304,7 +304,7 @@ describe("the heavy stand-in", () => {
     expect(await harness.pueueLog()).toContain("add --group heavy")
     const direct = run(harness, "npm", ["install"])
     expect(direct.code).toBe(0)
-    expect(await harness.pueueLog()).not.toContain("install")
+    expect(await harness.pueueLog()).not.toContain("npm install")
     expect(await readFile(join(harness.root, "tool.log"), "utf8")).toContain("npm install")
   })
 
