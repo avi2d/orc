@@ -1,6 +1,6 @@
 import { Duration, Effect, Result, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { spawnedQuiet } from "./runner-exec"
+import { spawnedQuiet } from "../shared/process/index"
 import { duplicateOf } from "../shared/config/index"
 
 type AccountReading =

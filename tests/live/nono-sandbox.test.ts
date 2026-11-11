@@ -3,8 +3,8 @@ import { chmod, mkdir, mkdtemp, realpath, rename, rm, stat, writeFile } from "no
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
-import { NonoProviderError } from "../../packages/run/src/host"
-import type { NonoExecOptions } from "../../packages/run/src/nono-exec"
+import { NonoProviderError } from "../../packages/run/src/shared/sandbox/host"
+import type { NonoExecOptions } from "../../packages/run/src/shared/sandbox/nono-exec"
 import { makeNonoFixtureDir } from "../lib/nono-home"
 import { nonoOpenError, type NonoShellRun, runNonoShell, withNonoShell } from "../lib/nono-shell"
 

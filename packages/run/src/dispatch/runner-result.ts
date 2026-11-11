@@ -11,12 +11,12 @@ import { readJsonFileIfPresent } from "../shared/config/index"
 import { runDirFor, type TaskKind } from "../task-kind"
 import { TaskId } from "./backlog"
 import { readPlanDocument, SplitDocument, type SplitPlan, splitReasonPrefix } from "./split"
-import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
+import { orcGroup, PueueResult, PueueStatus } from "../shared/process/index"
 import { LabelArg } from "./token"
-import { capture, decodeJson, type Command } from "./runner-exec"
+import { capture, decodeJson, type Command } from "../shared/process/index"
 import { parentBranch, readHeld, refuse, resolveProjectDir, type RunnerRequirements } from "./runner"
 import { taskBranch } from "./runner-label"
-import { RunnerError } from "./runner-error"
+import { RunnerError } from "../shared/process/index"
 
 const RUNNER_JSON_SCHEMA = "orc.runner.v1" as const
 

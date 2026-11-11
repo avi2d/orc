@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { hostExec } from "../../packages/run/src/agent-exec"
+import { hostExec } from "../../packages/run/src/shared/sandbox/agent-exec"
 import { installCopy } from "../../packages/run/src/run-exec"
 import { OrcRunError } from "../../packages/run/src/shared/lib/run-session"
 

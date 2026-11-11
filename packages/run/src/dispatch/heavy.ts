@@ -1,5 +1,5 @@
 import type { HeavyConfig } from "../shared/config/index"
-import { standinDirSuffix } from "../standin-dir"
+import { standinDirSuffix } from "../shared/sandbox/index"
 
 export const heavyGroup = "heavy"
 

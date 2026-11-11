@@ -13,7 +13,7 @@ import { formatBeat } from "../../packages/run/src/dispatch/board"
 import { insertRun, openDatabase } from "../../packages/run/src/run-history"
 import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/shared/config/dispatch-config"
 import { assessQuota } from "../../packages/run/src/dispatch/quota"
-import { taskLabel } from "../../packages/run/src/dispatch/pueue-status"
+import { taskLabel } from "../../packages/run/src/shared/process/pueue-status"
 import type { TaskRecord } from "../../packages/run/src/dispatch/task-record"
 import { renderTaskFile } from "../../packages/run/src/dispatch/task-record-render"
 

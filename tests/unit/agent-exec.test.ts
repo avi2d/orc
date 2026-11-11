@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { ChildProcess } from "effect/process"
-import { agentCommand, agentEnv, nonoRunArgs, pickEnv } from "../../packages/run/src/agent-exec"
+import { agentCommand, agentEnv, nonoRunArgs, pickEnv } from "../../packages/run/src/shared/sandbox/agent-exec"
 
 describe("agentEnv", () => {
   test("drops every ORC_ variable, so orc commands the agent runs never reach the operator's home", () => {

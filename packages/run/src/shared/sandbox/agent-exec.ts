@@ -1,7 +1,7 @@
 import { Effect, Stream } from "effect"
 import { ChildProcess, type ChildProcessSpawner } from "effect/process"
 import { runHostCommand } from "./host"
-import { OrcRunError } from "./shared/lib/index"
+import { OrcRunError } from "../lib/index"
 
 export interface CommandResult {
   readonly stdout: string

@@ -3,8 +3,8 @@ import type { ChildProcessSpawner } from "effect/process"
 import { heavyBinDir } from "./heavy"
 import { ensureHeavyQueue, ensureHeavySetup, readHeavySettings } from "./heavy-setup"
 import { checkHeavy, ensureHeavyWatch, formatCheck, watchOnce } from "./heavy-watch"
-import { type RunnerError } from "./runner-error"
-import { type Command } from "./runner-exec"
+import { type RunnerError } from "../shared/process/index"
+import { type Command } from "../shared/process/index"
 import type { DispatchArgs } from "./args"
 
 export type HeavyVerb = Extract<DispatchArgs, { readonly kind: "HeavyPath" | "HeavyCheck" | "HeavyWatch" | "HeavyWatchOnce" }>

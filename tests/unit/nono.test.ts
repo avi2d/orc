@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Path } from "effect"
-import { buildHostGitEnv, buildSandboxEnv } from "../../packages/run/src/nono"
-import { checksCacheReads } from "../../packages/run/src/nono-exec"
-import { buildNonoProfile, defaultToolchainFolders, defaultToolchainResolver, within, type HostRuntime, type NonoSandboxRoots } from "../../packages/run/src/nono-profile"
+import { buildHostGitEnv, buildSandboxEnv } from "../../packages/run/src/shared/sandbox/nono"
+import { checksCacheReads } from "../../packages/run/src/shared/sandbox/nono-exec"
+import { buildNonoProfile, defaultToolchainFolders, defaultToolchainResolver, within, type HostRuntime, type NonoSandboxRoots } from "../../packages/run/src/shared/sandbox/nono-profile"
 
 const roots = {
   worktree: "/tmp/orc-test/worktree",

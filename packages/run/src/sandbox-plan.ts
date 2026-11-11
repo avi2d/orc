@@ -1,10 +1,10 @@
 import { Effect, FileSystem, Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import type { SandboxKind } from "./sandbox-kind"
+import type { SandboxKind } from "./shared/sandbox/index"
 import { checkedModelWindows, contextMarkJson, type ModelProbe, readModelWindows } from "./context-mark"
 import { requireTokenFile, tokenFileApiKey, tokenFileSource, tokenFileVar } from "./shared/config/index"
-import { inheritedEnv } from "./nono"
-import { type CheckedModelWindow, type HostTools, loginCheckCommand, type ModelCredential, modelCredentialFor, piAgentModels, type ProviderKey, providerKeyOf } from "./nono-profile"
+import { inheritedEnv } from "./shared/sandbox/index"
+import { type CheckedModelWindow, type HostTools, loginCheckCommand, type ModelCredential, modelCredentialFor, piAgentModels, type ProviderKey, providerKeyOf } from "./shared/sandbox/index"
 import type { LoginProvider, OrcConfig, PackageProvider, Provider, TokenFileProvider } from "./shared/config/index"
 import { OrcRunError } from "./shared/lib/index"
 

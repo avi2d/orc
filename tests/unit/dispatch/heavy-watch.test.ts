@@ -14,7 +14,7 @@ import { standinScript } from "../../../packages/run/src/dispatch/heavy-standin"
 const scriptOf = (tool: string, settings: { home: string; group: string; wrap: string; through: null }, commands: ReadonlyArray<string>): Promise<string> =>
   Effect.runPromise(standinScript(tool, settings, commands).pipe(Effect.provide(BunServices.layer)))
 import { heavyBinDir } from "../../../packages/run/src/dispatch/heavy"
-import { taskLabel } from "../../../packages/run/src/dispatch/pueue-status"
+import { taskLabel } from "../../../packages/run/src/shared/process/pueue-status"
 
 describe("the heavy watch", () => {
   test("the latest fire per machine decides freshness", () => {

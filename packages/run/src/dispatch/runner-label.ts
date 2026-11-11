@@ -1,4 +1,4 @@
-import { parentLabel, taskLabel } from "./pueue-status"
+import { parentLabel, taskLabel } from "../shared/process/index"
 import type { TaskKind } from "../task-kind"
 
 export const taskBranch = (task: string): string => "orc/" + task

@@ -3,7 +3,7 @@ import { Data, Effect, FileSystem, Path, Schema } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { homedir } from "node:os"
 import { fileURLToPath, pathToFileURL } from "node:url"
-import { sandboxKinds, type SandboxKind } from "./sandbox-kind"
+import { sandboxKinds, type SandboxKind } from "./shared/sandbox/index"
 import { OrcRunError } from "./shared/lib/index"
 
 export const RUN_HISTORY_SCHEMA_VERSION = 3

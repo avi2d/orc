@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
-import type { NonoExecOptions } from "../../packages/run/src/nono-exec"
+import type { NonoExecOptions } from "../../packages/run/src/shared/sandbox/nono-exec"
 import { makeNonoFixtureDir } from "../lib/nono-home"
 import { runNonoShell } from "../lib/nono-shell"
 

@@ -1,7 +1,7 @@
 import { isTaskId } from "./backlog"
 import type { MergeBasis } from "./merge-basis"
 import type { AddTask } from "./cli-add"
-import type { Reach } from "./runner-exec"
+import type { Reach } from "../shared/process/index"
 
 export type DispatchArgs =
   | { readonly kind: "ShowBacklog"; readonly json: boolean }

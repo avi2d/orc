@@ -1,10 +1,10 @@
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { agentCommand, textInput } from "../../packages/run/src/agent-exec"
-import type { CommandResult } from "../../packages/run/src/agent-exec"
-import { runHostCommand } from "../../packages/run/src/host"
-import { type NonoExecOptions, openNonoExec } from "../../packages/run/src/nono-exec"
+import { agentCommand, textInput } from "../../packages/run/src/shared/sandbox/agent-exec"
+import type { CommandResult } from "../../packages/run/src/shared/sandbox/agent-exec"
+import { runHostCommand } from "../../packages/run/src/shared/sandbox/host"
+import { type NonoExecOptions, openNonoExec } from "../../packages/run/src/shared/sandbox/nono-exec"
 
 export interface NonoShellRun {
   readonly cwd?: string

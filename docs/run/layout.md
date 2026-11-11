@@ -21,7 +21,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/shared/config/json-file.ts` | The JSON config file reading and its `ConfigError` |
 | `packages/run/src/shared/config/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `packages/run/src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
-| `packages/run/src/sandbox-kind.ts` | The sandbox kinds a run takes |
+| `packages/run/src/shared/sandbox/sandbox-kind.ts` | The sandbox kinds a run takes |
 | `packages/run/src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
 | `packages/run/src/checkout.ts` | The checks on the checkout a run starts from: its git root, refused markers, uncommitted changes and branch name |
 | `packages/run/src/worktree-excludes.ts` | The registered worktrees inside a checkout that its clean check leaves out |
@@ -30,7 +30,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/run-loop.ts` | The implement, check and fix steps of one run |
 | `packages/run/src/run-resume.ts` | The prior run's session and passed steps a resume starts from |
 | `packages/run/src/checks.ts` | The check commands `.no-mistakes.yaml` names and their run in the copy |
-| `packages/run/src/git-run.ts` | The git calls orc makes on the host with the operator's git config hidden |
+| `packages/run/src/shared/process/git-run.ts` | The git calls orc makes on the host with the operator's git config hidden |
 | `packages/run/src/run-folders.ts` | A run's folders, its copy of the task file and the instructions file `--instructions` names |
 | `packages/run/src/history-write.ts` | The history checkpoints a run records as each step starts and ends |
 | `packages/run/src/report.ts` | The `report.md` shape and the signal facts it carries |
@@ -47,13 +47,13 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/run-history.ts` | The records home, the SQLite run history and `orc runs` |
 | `packages/run/src/gate-refusals.ts` | The gate and rule parse from a failed check's output, the `refusal` history signals and `orc refusals` |
 | `packages/run/src/shared/lib/table.ts` | The table formatter the runs and refusals listings share |
-| `packages/run/src/nono.ts` | The nono sandbox environment, its roots and the `nono why` check of a rendered profile |
-| `packages/run/src/nono-exec.ts` | The opening of the nono sandbox a run's commands go through: the runtimes, the shims and the checked profile |
-| `packages/run/src/standin-dir.ts` | The stand in folder suffix nono strips from the host path |
-| `packages/run/src/agent-exec.ts` | The one way a run starts Pi and the checks, in `nono run` or on the host, with the environment built from an allow list |
-| `packages/run/src/host.ts` | The host-side processes and tools orc runs outside nono, and the guard on host git |
-| `packages/run/src/nono-profile.ts` | The nono profile that lets a command write only the copy, its git data, the Pi session folder and the run's `sessions` folder, and routes the model credential |
-| `packages/run/src/git-config.ts` | The git config parsing that finds the credentials, includes and submodules a checkout carries |
+| `packages/run/src/shared/sandbox/nono.ts` | The nono sandbox environment, its roots and the `nono why` check of a rendered profile |
+| `packages/run/src/shared/sandbox/nono-exec.ts` | The opening of the nono sandbox a run's commands go through: the runtimes, the shims and the checked profile |
+| `packages/run/src/shared/sandbox/standin-dir.ts` | The stand in folder suffix nono strips from the host path |
+| `packages/run/src/shared/sandbox/agent-exec.ts` | The one way a run starts Pi and the checks, in `nono run` or on the host, with the environment built from an allow list |
+| `packages/run/src/shared/sandbox/host.ts` | The host-side processes and tools orc runs outside nono, and the guard on host git |
+| `packages/run/src/shared/sandbox/nono-profile.ts` | The nono profile that lets a command write only the copy, its git data, the Pi session folder and the run's `sessions` folder, and routes the model credential |
+| `packages/run/src/shared/sandbox/git-config.ts` | The git config parsing that finds the credentials, includes and submodules a checkout carries |
 | `packages/run/src/dispatch/backlog.ts` | The backlog folders, the id reservation and the atomic take of a task |
 | `packages/run/src/dispatch/task-record.ts` | The task file and its frontmatter |
 | `packages/run/src/dispatch/parked.ts` | Parking a run's task on its questions, and the answer to a hold or a question |
@@ -80,14 +80,14 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
 | `packages/run/src/dispatch/runner.ts` | The runner: the start, the kill and the token renewal through pueue |
 | `packages/run/src/dispatch/runner-instructions.ts` | The project instructions a start carries to the machine that queues the run |
-| `packages/run/src/dispatch/runner-error.ts` | The runner's error |
+| `packages/run/src/shared/process/runner-error.ts` | The runner's error |
 | `packages/run/src/dispatch/refresh.ts` | The fast-forward of the checkout's default branch when a run starts |
 | `packages/run/src/dispatch/runner-result.ts` | The reading of a task's result and the `orc.runner.v1` JSON |
 | `packages/run/src/dispatch/upstream.ts` | The beat's read of each project's upstream contributions and the scout task a change adds |
 | `packages/run/src/dispatch/token.ts` | The `orc.token.v1` document, the token command and the Claude credentials reading |
 | `packages/run/src/dispatch/held-token.ts` | The owner-only token folder a run on another machine reads |
 | `packages/run/src/dispatch/hold.ts` | `orc runner hold`: the wait for a live token, the rerun and the folder removal |
-| `packages/run/src/dispatch/pueue-status.ts` | The pueue status shapes and the held-task lookup the runner reads |
+| `packages/run/src/shared/process/pueue-status.ts` | The pueue status shapes and the held-task lookup the runner reads |
 | `packages/run/src/dispatch/args.ts` | The flag parsing for `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` |
 | `packages/run/src/dispatch/cli-add.ts` | The `orc backlog add` command and the intake split of an over budget request |
 | `packages/run/src/dispatch/backlog-plan.ts` | The `orc backlog plan` view of a parent plan and the drop of a new child |

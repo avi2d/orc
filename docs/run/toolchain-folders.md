@@ -14,4 +14,4 @@ To run a runtime from another install folder, such as the one Bun's own installe
 With the default sandbox, orc grants a named folder only when a runtime and the file its link points to both sit inside it.
 Orc refuses a relative entry and a folder that holds HOME, because the sandbox reads each granted folder whole.
 
-`packages/run/src/nono-profile.ts` holds the `ToolchainResolver` interface and the default layout, and `packages/run/src/nono-exec.ts` takes another resolver through its `toolchain` option.
+`packages/run/src/shared/sandbox/nono-profile.ts` holds the `ToolchainResolver` interface and the default layout, and `packages/run/src/shared/sandbox/nono-exec.ts` takes another resolver through its `toolchain` option.
