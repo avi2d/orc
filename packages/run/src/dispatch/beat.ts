@@ -44,6 +44,7 @@ type Credential =
   | { readonly kind: "file"; readonly provider: string; readonly tokenFile: string }
   | { readonly kind: "token"; readonly provider: string; readonly token: RunToken }
   | { readonly kind: "none"; readonly provider: string }
+  | { readonly kind: "claude-config"; readonly provider: string; readonly configDirs: Readonly<Record<string, string>> }
 
 // Effect's spawner takes no file for stdio, so a shell sends the start command's output to the task's log.
 const logToTaskLog = ["sh", "-c", "exec \"$@\" >> \"$ORC_TASK_LOG\" 2>&1", "orc-start"] as const
@@ -115,7 +116,8 @@ const startTask = (
       ORC_TASK_MACHINE: machine.name,
       ORC_TASK_PROVIDER: credential.provider,
       ORC_TASK_ACCOUNT: claim.account,
-      ORC_TASK_TOKEN_FILE: credential.kind === "file" ? credential.tokenFile : ""
+      ORC_TASK_TOKEN_FILE: credential.kind === "file" ? credential.tokenFile : "",
+      ORC_TASK_CLAUDE_CONFIG_DIR: credential.kind === "claude-config" ? credential.configDirs[machine.name] ?? "" : ""
     }
     const result = credential.kind === "token"
       ? yield* encodeToken(credential.token).pipe(
@@ -181,6 +183,9 @@ const credentialFor = (
     switch (account.kind) {
       case "token-file": {
         return { kind: "file", provider, tokenFile: account.tokenFile }
+      }
+      case "claude-config": {
+        return { kind: "claude-config", provider, configDirs: account.configDirs }
       }
       case "none": {
         return { kind: "none", provider }

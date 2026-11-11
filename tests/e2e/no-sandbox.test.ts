@@ -301,6 +301,17 @@ describe("orc run on a package provider", () => {
     })
   }, 60_000)
 
+  test("a dispatched package run uses the picked Claude directory instead of the provider default", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      await asPackageRun(fixture, { ...packageProvider, env: { CLAUDE_CONFIG_DIR: "/accounts/main" } })
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], fixture.repo, {
+        ...fixture.env, ORC_DISPATCH_CLAUDE_CONFIG_DIR: "/accounts/second"
+      })
+      expect(result.exitCode).toBe(0)
+      expect((await readFile(join(fixture.fakeBin, "pi-claude-config-dir"), "utf8")).trim()).toBe("/accounts/second")
+    })
+  }, 60_000)
+
   test("probes the model windows with the packages loaded and allowed to install instead of offline without extensions", async () => {
     await withNoSandboxFixture(async (fixture) => {
       await asPackageRun(fixture)
