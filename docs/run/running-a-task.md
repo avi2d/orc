@@ -69,7 +69,7 @@ On a provider that takes a Pi login, the run also needs that login in Pi, which 
 With the default sandbox, orc reads that login through Pi on the host and hands it to the sandbox.
 nono reads it with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE` and `TERM` set, and orc's check runs the same way.
 In the sandbox, Pi and the checks get those same variables beside the temp folder, git config and Pi folder orc sets for the run.
-On the host they get a short list that adds the shell, the temp folder, the proxy and the certificate variables.
+On the host they get a short list that adds the shell, the temp folder, `XDG_RUNTIME_DIR` and the proxy and the certificate variables.
 No `ORC_` variable reaches Pi or the checks in either sandbox kind.
 So a key held only in the keychain or in an environment variable is refused, and a login Pi's `/login` stores in `~/.pi/agent/auth.json` works.
 This refusal applies to `--sandbox none` as well, so write a key held only in an environment variable to the Pi auth file first.
