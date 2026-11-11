@@ -5,6 +5,8 @@ import { RunnerError } from "./runner-error"
 
 export type Command = readonly [string, ...Array<string>]
 
+export type Reach = { readonly kind: "here" } | { readonly kind: "through"; readonly command: readonly [string, ...Array<string>] }
+
 export interface Captured {
   readonly exitCode: number
   readonly stdout: string

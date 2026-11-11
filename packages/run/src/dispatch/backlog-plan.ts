@@ -1,7 +1,7 @@
 import { Effect, FileSystem } from "effect"
 import { backlogPaths, BacklogError, listTasks } from "./backlog"
 import { grabbedFile, scratchName, takeFile } from "./backlog-write"
-import { childCount, dependencyWaits } from "./beat-place"
+import { childCount, dependencyWaits } from "./task-dependency"
 import { mergedIds } from "./events"
 import { isHeld, parseTaskFile, type TaskFileError, type TaskRecord } from "./task-record"
 

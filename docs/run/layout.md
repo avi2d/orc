@@ -62,7 +62,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/beat.ts` | The beat: room, placement, take and start |
 | `packages/run/src/dispatch/beat-action.ts` | The beat actions each beat step reports |
 | `packages/run/src/dispatch/beat-close.ts` | The closing of finished runs and the running output time |
-| `packages/run/src/dispatch/beat-place.ts` | The room reading, the placement of each new task and the wait on dependencies and merged siblings |
+| `packages/run/src/dispatch/beat-place.ts` | The room reading, the placement of each new task and the wait it names |
 | `packages/run/src/dispatch/load.ts` | The five minute load reading and the overloaded machines |
 | `packages/run/src/dispatch/machine-reach.ts` | The sweep ownership check and the remote command prefix |
 | `packages/run/src/dispatch/stall.ts` | The stalled run flag kept in the backlog logs |
@@ -72,6 +72,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/decider-ask.ts` | The decider's call, Pi on `models.decider` with the policy as its system prompt and no tools |
 | `packages/run/agents/decider-policy.md` | The written policy the decider answers under |
 | `packages/run/src/dispatch/events.ts` | The chat events under `events/`, their posted marks and the alert fires the backlog lists |
+| `packages/run/src/dispatch/task-dependency.ts` | The child counts and the waits on dependencies and merged siblings |
 | `packages/run/src/dispatch/task-events.ts` | The stall and PR events the beat records for every task |
 | `packages/run/src/dispatch/alert-events.ts` | The reading of each `alerts.jsonl` line as one alert fire |
 | `packages/run/src/dispatch/alert-stream.ts` | The one alert stream `orc runner start` queues in pueue |

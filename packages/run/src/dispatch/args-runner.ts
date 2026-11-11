@@ -1,10 +1,9 @@
 import { isTaskId } from "./backlog"
 import type { MergeBasis } from "./merge-basis"
 import type { TaskKind } from "../task-kind"
+import type { Reach } from "./runner-exec"
 
 export type TaskSource = { readonly kind: "file"; readonly path: string } | { readonly kind: "stdin" }
-
-export type Reach = { readonly kind: "here" } | { readonly kind: "through"; readonly command: readonly [string, ...Array<string>] }
 
 export type DispatchArgs =
   | { readonly kind: "ShowBacklog"; readonly json: boolean }
