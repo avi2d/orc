@@ -1,4 +1,4 @@
-import type { Failed } from "../reading";
+import type { Failed } from "../shared/lib";
 import { priceRatios, type Tokens, tokenTotal } from "../contract/tokens";
 import { type Session, sessionLabel } from "../sources/live";
 import {

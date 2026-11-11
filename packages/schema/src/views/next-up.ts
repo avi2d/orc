@@ -1,6 +1,6 @@
 import { DateTime } from "effect";
 import type { ScheduleEntry } from "../contract/tasks";
-import type { Failed, Outcome } from "../reading";
+import type { Failed, Outcome } from "../shared/lib";
 import type { RepoFailure } from "../sources/ci-runs";
 import type { PueueStatus } from "../sources/pueue";
 import type { MachineSchedule, ScheduleRead, ScheduleSource } from "../sources/schedules";

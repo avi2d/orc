@@ -1,7 +1,7 @@
 import { Config, Data, Effect, FileSystem } from "effect";
 import { type AlertSettings, decodeAlertSettings } from "../contract/alerts";
 import { type ClaudeAccount, claudeAccountsOf, type DashConfig, decodeDashConfig, emptyConfig, parsedJson } from "../contract/config";
-import { type Decoded, flatMapDecoded } from "../decode";
+import { type Decoded, flatMapDecoded } from "../shared/lib";
 import { selector } from "./environment";
 
 export class ConfigRefused extends Data.TaggedError("ConfigRefused")<{ readonly reason: string }> {}

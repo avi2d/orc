@@ -1,9 +1,9 @@
 import { type Config, Context, Duration, Layer } from "effect";
-import type { CommandRunner } from "../command";
-import { type Decoded, decodeJson, flatMapDecoded } from "../decode";
+import type { CommandRunner } from "../shared/lib";
+import { type Decoded, decodeJson, flatMapDecoded } from "../shared/lib";
 import { SessionQuotaReport } from "../contract/session-quota";
 import { sessionQuotaViewOf } from "./session-quota-view";
-import type { SessionQuotaView } from "../views/session-quota";
+import type { SessionQuotaView } from "./session-quota";
 import { configuredMachines, type Machines, type RemoteSource } from "../sources/machines";
 
 export type RemoteSessionSource = RemoteSource<SessionQuotaView>;

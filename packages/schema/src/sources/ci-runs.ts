@@ -1,8 +1,8 @@
 import { Context, DateTime, Duration, Effect, Layer, Option, Schema } from "effect";
-import { CommandRunner } from "../command";
-import { type Decoded, decodeJson } from "../decode";
-import { type Failed, ok, type Outcome, type Reading } from "../reading";
-import { runDecoded, stamped } from "../source";
+import { CommandRunner } from "../shared/lib";
+import { type Decoded, decodeJson } from "../shared/lib";
+import { type Failed, ok, type Outcome, type Reading } from "../shared/lib";
+import { runDecoded, stamped } from "../shared/lib";
 import { RunnerRepos } from "./runners";
 
 const Instant = Schema.DateTimeUtcFromString;

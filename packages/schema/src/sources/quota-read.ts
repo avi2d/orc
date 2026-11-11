@@ -1,7 +1,7 @@
 import { DateTime, Effect } from "effect";
-import { failureOf, type Reading } from "../reading";
-import type { AccountCaptured } from "../sources/capture";
-import { type HarvestedReading, harvestedReadings } from "../sources/harvest";
+import { failureOf, type Reading } from "../shared/lib";
+import type { AccountCaptured } from "./capture";
+import { type HarvestedReading, harvestedReadings } from "./harvest";
 import { type AccountJoin, nativeKeys } from "./account-join";
 import {
   harvestedWindow,

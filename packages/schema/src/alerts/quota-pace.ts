@@ -1,7 +1,7 @@
 import { DateTime } from "effect";
 import type { QuotaPaceEvent } from "../contract/alerts";
 import type { ComposedSessionQuotaReport } from "../contract/composed-session-quota";
-import type { Outcome } from "../reading";
+import type { Outcome } from "../shared/lib";
 import { type Episode, episodeStep, type Stepped } from "./episode";
 
 export type QuotaPaceState = ReadonlyMap<string, Episode>;

@@ -1,8 +1,8 @@
 import { type CliRenderer, createCliRenderer, type KeyEvent, type MouseEvent, TextRenderable } from "@opentui/core";
 import { Console, Deferred, Effect, Schedule } from "effect";
-import type { Block } from "./layout";
+import type { Block } from "../text/layout";
 import { blockDocument, frameAnsi, frameText } from "./opentui";
-import { Appearance } from "./palette";
+import { Appearance } from "../text/palette";
 
 export interface Target<S> {
   readonly row: number;

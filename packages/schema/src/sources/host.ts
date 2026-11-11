@@ -1,8 +1,8 @@
 import { Effect, Schema } from "effect";
-import type { Command, CommandRunner } from "../command";
-import { type Failed, failureOf, ok, type Outcome } from "../reading";
-import { runDecoded, sourceOf, stamped, type Source } from "../source";
-import { AmountText } from "./numerals";
+import type { Command, CommandRunner } from "../shared/lib";
+import { type Failed, failureOf, ok, type Outcome } from "../shared/lib";
+import { runDecoded, sourceOf, stamped, type Source } from "../shared/lib";
+import { AmountText } from "../shared/lib";
 
 export const LoadAverage = Schema.Tuple([AmountText, AmountText, AmountText]);
 

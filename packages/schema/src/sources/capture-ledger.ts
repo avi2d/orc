@@ -11,8 +11,8 @@ import {
   type LedgerFile,
   lastReadingOf,
   sameReading,
-} from "../sources/capture";
-import { bytesBetween, decodedLines, type Grown, grownRecords, wholeLines } from "./append-only";
+} from "./capture";
+import { bytesBetween, decodedLines, type Grown, grownRecords, wholeLines } from "../shared/lib";
 
 const listedLedger = (fs: FileSystem.FileSystem, directory: string) =>
   fs.readDirectory(directory).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));

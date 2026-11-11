@@ -1,8 +1,8 @@
 import { Clock, Config, Context, Duration, Effect, FileSystem, Layer, Option, Semaphore } from "effect";
-import { CommandRunner } from "../command";
+import { CommandRunner } from "../shared/lib";
 import { decodeTasksReport, type ReportedTasks } from "../contract/tasks";
-import type { Reading } from "../reading";
-import { runDecoded, stamped } from "../source";
+import type { Reading } from "../shared/lib";
+import { runDecoded, stamped } from "../shared/lib";
 import { machineNames, selector } from "./environment";
 
 export interface TasksMachine {

@@ -1,7 +1,7 @@
 import type { QuotaWindow } from "@avi2dg/orc-schema";
-import { leftHealth } from "./format";
-import type { Tone } from "./palette";
-import { ellipsize, type Line, span, widthOf } from "./text";
+import { leftHealth } from "../text/format";
+import type { Tone } from "../text/palette";
+import { ellipsize, type Line, span, widthOf } from "../text/text";
 
 const hourSeconds = 3600;
 
