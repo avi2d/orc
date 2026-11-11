@@ -95,7 +95,7 @@ const settleOpenItem = (root: string, id: string, state: SettledState): Effect.E
     }
     const { deciding: _claim, ...rest } = item
     const replaced = yield* replaceItem(root, id, before, yield* encodeItem(id, { ...rest, state }))
-    return (replaced ? "settled" : "already closed") as const
+    return replaced ? "settled" : "already closed"
   })
 
 export const closeItem = (root: string, id: string, answer: ItemAnswer): Effect.Effect<CloseOutcome, BacklogError, FileSystem.FileSystem> =>
