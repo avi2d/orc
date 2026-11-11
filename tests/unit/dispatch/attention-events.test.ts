@@ -245,6 +245,28 @@ describe("overdue waits in the attention queue", () => {
       }
     }
   })
+
+  test("an overdue wait an overlapping beat withdrew closes with its answer instead of staying withdrawn", async () => {
+    const previous = process.env.TZ
+    process.env.TZ = "UTC"
+    try {
+      await withBacklog(async (root) => {
+        await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-02T00:01:00.000Z"))
+        const unheld: TaskRecord = { spec: { ...spec, id: "orc-2", title: "Pick the API" }, hold: null, parked: null, state: { kind: "new" } }
+        await run(routeTaskItems(root, [unheld], "2026-12-02T00:02:00.000Z"))
+        expect(await run(openItems(root))).toEqual([])
+        await run(routeTaskItems(root, [heldTask("2026-12-01", { words: "REST", at: "2026-12-02T09:00:00.000Z" })], "2026-12-02T09:00:00.000Z"))
+        expect(await run(openItems(root))).toEqual([])
+        expect(await itemFiles(root)).toMatchObject([{ kind: "overdue-wait", state: { kind: "closed", answer: { words: "REST", at: "2026-12-02T09:00:00.000Z" } } }])
+      })
+    } finally {
+      if (previous === undefined) {
+        delete process.env.TZ
+      } else {
+        process.env.TZ = previous
+      }
+    }
+  })
 })
 
 describe("the beat and the attention queue", () => {

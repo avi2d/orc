@@ -257,10 +257,10 @@ const openOrReopenTaskItem = (root: string, id: string, asked: Asked): Effect.Ef
     }
   })
 
-const closeOrCloseReopenedTaskItem = (root: string, id: string, asked: Asked | null, answer: ItemAnswer): Effect.Effect<CloseOutcome, BacklogError, FileSystem.FileSystem> =>
+const closeOrCloseReopenedTaskItem = (root: string, id: string, answer: ItemAnswer): Effect.Effect<CloseOutcome, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const outcome = yield* closeItem(root, id, answer)
-    if (outcome !== "already closed" || asked?.kind !== "review-question") {
+    if (outcome !== "already closed") {
       return outcome
     }
     const existing = yield* readExistingItem(root, id)
@@ -274,7 +274,7 @@ const closeOrCloseReopenedTaskItem = (root: string, id: string, asked: Asked | n
 
 const routeOne = (root: string, id: string, asked: Asked | null, answer: ItemAnswer | null): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> => {
   if (answer !== null) {
-    return Effect.as(closeOrCloseReopenedTaskItem(root, id, asked, answer), false)
+    return Effect.as(closeOrCloseReopenedTaskItem(root, id, answer), false)
   }
   return asked === null ? Effect.succeed(false) : Effect.as(openOrReopenTaskItem(root, id, asked), true)
 }
