@@ -1,5 +1,6 @@
 commands:
   prepare: bun install --frozen-lockfile
+  build: bun run build
   lint: bun run lint
   typecheck: bun run typecheck
   test: bunx checks-test --changed --parallel=3

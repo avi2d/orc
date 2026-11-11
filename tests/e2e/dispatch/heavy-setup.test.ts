@@ -28,7 +28,7 @@ const holderHome = async (through: ReadonlyArray<string> | null): Promise<string
   await mkdir(join(home, "fake"), { recursive: true })
   await writeFile(join(home, "fake", "pueue"), loggingPueue, { mode: 0o755 })
   const heavy = through === null ? {} : { through }
-  await writeFile(join(home, "config.json"), JSON.stringify({ providers: [], heavy }))
+  await writeFile(join(home, "config.json"), JSON.stringify({ providers: [], heavy: { ...heavy, limit: "none" } }))
   return home
 }
 

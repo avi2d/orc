@@ -3,7 +3,7 @@ kind: reference
 ---
 # Configuring providers
 Orc ships with no provider and no model, so a run needs `config.json` in `$ORC_HOME`, default `~/.orc/config.json`.
-It names each provider orc may run and, under `models`, the implementer, fixer, orchestrator and planner models.
+It names each provider orc may run and, under `models`, the implementer, fixer, orchestrator, planner and decider models.
 This example names opencode-go through a Pi login, anthropic through a token file and claude-bridge through its Pi package:
 
 ```json
@@ -22,7 +22,8 @@ This example names opencode-go through a Pi login, anthropic through a token fil
     "implementer": "claude-bridge/claude-opus-5-5",
     "fixer": "claude-bridge/claude-opus-5-5",
     "orchestrator": "claude-bridge/claude-sonnet-5-5",
-    "planner": "claude-bridge/claude-sonnet-5-5"
+    "planner": "claude-bridge/claude-sonnet-5-5",
+    "decider": "claude-bridge/claude-haiku-5-5"
   }
 }
 ```
@@ -45,7 +46,7 @@ Each provider names its Pi provider `id`, the part of a model name before the `/
   Orc writes them into the run's Pi folder, `session/agent/settings.json`, so the run's Pi loads the package your Pi loads.
   Pi installs an `npm:` or `git:` source into the run's folder on the first model list, so each run fetches it again.
   An absolute path to a package already on the machine, such as one under `~/.pi/agent/git`, loads without the fetch.
-  `env` names variables orc sets for the run's Pi over your environment, for the chat's Pi when `models.orchestrator` names this provider, and for the planner's Pi when `models.planner` does, such as the `CLAUDE_CONFIG_DIR` of the account a Claude Code package runs on.
+  `env` names variables orc sets for the run's Pi over your environment, for the chat's Pi when `models.orchestrator` names this provider, for the planner's Pi when `models.planner` does, and for the decider's Pi when `models.decider` does, such as the `CLAUDE_CONFIG_DIR` of the account a Claude Code package runs on.
   The nono sandbox carries only a Pi login, so a package provider runs only with `--sandbox none`.
 
 Orc refuses a `config.json` key it does not know, so a misspelled key never drops a provider unnoticed.

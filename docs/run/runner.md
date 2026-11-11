@@ -24,6 +24,7 @@ That runs `orc runner queue` on the far side and sends it the task as JSON on st
 SSH can drop once pueue holds the run, since pueue on that machine owns it.
 Pueue runs the task with the environment of the command that queued it.
 So the command after `--` must give orc the `PATH` its runs need on that machine.
+Unsandboxed agents and checks keep that machine's `XDG_RUNTIME_DIR`, when set, so their pueue clients reach its user service socket.
 The queue records the resolved absolute `ORC_HOME` with the task.
 
 A task that comes with a token instead of a token file keeps it in `~/.orc/runner/tokens/<task-id>/token`, readable only by its owner, beside the expiry in `expires-at`.

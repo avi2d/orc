@@ -4,7 +4,7 @@ This repository holds the orc command and the orc-dash panels it ships beside, a
 
 ## Checks
 
-- Run `bun run build`, `bun run lint`, `bun run typecheck` and `bunx checks-test --changed` before a change is done. `.no-mistakes.yaml` runs the tests the change reaches and [Contribute](docs/contribute.md) lists the full `bun run test` kept for PRs.
+- Before a change is done, a worker runs only the test files it added or changed. Build, lint, typecheck and the tests the change reaches are left to validation. `.no-mistakes.yaml` runs the tests the change reaches and [Contribute](docs/contribute.md) lists the full `bun run test` kept for PRs.
 - `bun run lint` needs the private secrets pack, as [Contribute](docs/contribute.md) says, and fails on a machine without it.
 - A panel package imports another package only through `packages/schema` and `packages/ui`, which `dependency-cruiser.config.ts` holds.
 - Tests sit by level under `tests/unit`, `tests/e2e` and `tests/live`.

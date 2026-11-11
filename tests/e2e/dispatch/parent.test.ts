@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { Schema } from "effect"
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -100,6 +101,36 @@ describe("orc backlog add --parent", () => {
       await orcOk(fixture, ["beat"])
       expect(await startsAfter(fixture, 4)).toEqual(["orc-1", "orc-2", "orc-3", "orc-4"])
       expect(await listLine(fixture, "orc-1")).toContain("orc-1 parent orc 3 of 3 done")
+    })
+  }, beatTimeout)
+
+  test("backlog JSON keeps the next sibling and parent waiting until the earlier sibling merges", async () => {
+    await withFixture(async (fixture) => {
+      await orcOk(fixture, ["backlog", "add", "orc", "parent.md", "--kind", "parent"])
+      await addChild(fixture)
+      await addChild(fixture, ["--depends-on", "orc-2"])
+      await orcOk(fixture, ["beat"])
+      await orcOk(fixture, ["backlog", "close", "orc-2", "done"])
+      const closedFile = join(fixture.dir, "home", "backlog", "closed", "orc-2.md")
+      const text = await readFile(closedFile, "utf8")
+      const at = text.lastIndexOf("\n---")
+      await writeFile(closedFile, text.slice(0, at) + '\npr: "https://github.com/example/repo/pull/1"' + text.slice(at))
+      const waits = async (): Promise<ReadonlyArray<readonly [string, string | null]>> => {
+        const report = Schema.decodeSync(Schema.fromJsonString(Schema.Struct({ tasks: Schema.Array(Schema.Struct({ id: Schema.String, wait: Schema.NullOr(Schema.String) })) })))(await orcOk(fixture, ["backlog", "--json"]))
+        return report.tasks.map((task) => [task.id, task.wait])
+      }
+      expect(await waits()).toEqual([
+        ["orc-1", "waits on its children, 0 of 2 done"],
+        ["orc-2", null],
+        ["orc-3", "waits on orc-2"]
+      ])
+      await mkdir(join(fixture.dir, "home", "backlog", "events"), { recursive: true })
+      await writeFile(join(fixture.dir, "home", "backlog", "events", "orc-2.merged.json"), JSON.stringify({ at: "2026-01-01T00:00:00Z", text: "merged" }))
+      expect(await waits()).toEqual([
+        ["orc-1", "waits on its children, 1 of 2 done"],
+        ["orc-2", null],
+        ["orc-3", null]
+      ])
     })
   }, beatTimeout)
 
