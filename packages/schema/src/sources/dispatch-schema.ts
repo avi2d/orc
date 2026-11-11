@@ -18,6 +18,7 @@ const Machine = Schema.Struct({
 const Account = Schema.Union([
   Schema.Struct({ name: Name, kind: Schema.Literal("token-file"), tokenFile: AbsolutePath, tokenCommand: Schema.optionalKey(Schema.Never) }),
   Schema.Struct({ name: Name, kind: Schema.Literal("token-command"), tokenCommand: Command, tokenFile: Schema.optionalKey(Schema.Never) }),
+  Schema.Struct({ name: Name, kind: Schema.Literal("claude-config"), configDirs: Schema.Record(Name, AbsolutePath) }),
   Schema.Struct({ name: Name, kind: Schema.Literal("none"), tokenFile: Schema.optionalKey(Schema.Never), tokenCommand: Schema.optionalKey(Schema.Never) }),
   Schema.Struct({ name: Name, tokenFile: AbsolutePath, tokenCommand: Schema.optionalKey(Schema.Never), kind: Schema.optionalKey(Schema.Never) }),
   Schema.Struct({ name: Name, tokenCommand: Command, tokenFile: Schema.optionalKey(Schema.Never), kind: Schema.optionalKey(Schema.Never) }),
@@ -29,7 +30,7 @@ export const MachinesFile = Schema.Struct({
     provider: Schema.String.check(Schema.isPattern(namePattern)),
     command: Command,
     accounts: Schema.NonEmptyArray(Account),
-    floorPercent: Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 })),
+    floorPercent: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 }))),
   }),
 });
 

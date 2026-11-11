@@ -254,6 +254,26 @@ const readTasks = (
     return { tasks: orderedTasks(tasks), unread };
   });
 
+const claudeConfigProblem = (accounts: typeof MachinesFile.Type["quota"]["accounts"], machines: ReadonlyArray<DispatchMachine>): string | null => {
+  for (const account of accounts) {
+    if (!("kind" in account) || account.kind !== "claude-config") continue;
+    for (const machine of machines) {
+      if (!Object.hasOwn(account.configDirs, machine.name)) {
+        return "the account " + account.name + " names no Claude config directory for " + machine.name;
+      }
+    }
+  }
+  for (const machine of machines) {
+    const dirs = accounts.flatMap((account) =>
+      "kind" in account && account.kind === "claude-config" ? [account.configDirs[machine.name]] : []
+    );
+    if (duplicateOf(dirs) !== null) {
+      return "the machine " + machine.name + " uses the same Claude config directory for more than one account";
+    }
+  }
+  return null;
+};
+
 const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<DispatchSnapshot> =>
   Effect.gen(function* () {
     const present = yield* fs.exists(root).pipe(Effect.catchTag("PlatformError", () => Effect.succeed<boolean | null>(null)));
@@ -295,6 +315,8 @@ const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<Di
       if (machine !== null) return unreachable(machinesFile + ": the machine " + machine + " is named twice");
       const account = duplicateOf(decodedMachines.value.quota.accounts.map((entry) => entry.name));
       if (account !== null) return unreachable(machinesFile + ": the account " + account + " is named twice");
+      const claudeProblem = claudeConfigProblem(decodedMachines.value.quota.accounts, decodedMachines.value.machines);
+      if (claudeProblem !== null) return unreachable(machinesFile + ": " + claudeProblem);
       const commandAccount = decodedMachines.value.quota.accounts.find((entry) => "tokenCommand" in entry);
       const unrenewed = decodedMachines.value.machines.find((entry) => entry.renew === undefined);
       if (commandAccount !== undefined && unrenewed !== undefined) {

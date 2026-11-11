@@ -43,6 +43,12 @@ describe("the dispatch panel reader", () => {
     expect(machines.kind).toBe("ok");
     if (machines.kind === "ok") expect(machines.value).toEqual([{ ...machine }]);
   });
+  test("refuses a Claude account missing a machine directory instead of reporting room", async () => {
+    const machines = await machinesAt(backlogWith({ machines: [machine], quota: { ...quota, accounts: [
+      { name: "main", kind: "claude-config", configDirs: {} }
+    ] } }));
+    expect(machines.kind).toBe("unreachable");
+  });
   test("keeps a legacy token file account instead of reporting it unread", async () => {
     const machines = await machinesAt(backlogWith({ machines: [machine], quota: { ...quota, accounts: [{ name: "main", tokenFile: "/secrets/main-token" }] } }));
     expect(machines.kind).toBe("ok");

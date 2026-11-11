@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { binPath, fakeQuota, type Fixture, type OrcResult, orcOk, queuedArgs, runnerTimeout, runOrc, withFixture } from "./runner-helpers"
+import { binPath, fakeQuota, type Fixture, type OrcResult, orcOk, orcThere, queuedArgs, runnerTimeout, runOrc, withFixture } from "./runner-helpers"
 
 const queueWith = (fixture: Fixture, request: object, env: Record<string, string> = {}): Promise<OrcResult> =>
   runOrc(fixture, ["runner", "queue"], env, JSON.stringify(request))
@@ -14,6 +14,55 @@ describe("orc runner queue for a kind none account", () => {
     process.execPath, binPath, "run", join(fixture.home, "runner", task + ".md"), "--branch", "orc/" + task,
     "--sandbox", "none", "--provider", provider
   ]
+
+  test("a beat passes the highest quota account directory to the queued worker instead of the default login", async () => {
+    await withFixture(async (fixture) => {
+      await writeFile(join(fixture.home, "config.json"), JSON.stringify({ providers: [{ id: "acme", credential: "package", packages: ["npm:example"] }] }))
+      const quota = { schema: "orc.quota.v1", accounts: [{ name: "main", remainingPercent: 8 }, { name: "second", remainingPercent: 68 }] }
+      await writeFile(join(fixture.dir, "bin", "orc-quota"), "#!/bin/sh\nprintf '%s\\n' '" + JSON.stringify(quota) + "'\n", { mode: 0o755 })
+      await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify({
+        machines: [{ name: "linux", slots: 1, start: [process.execPath, binPath, "runner", "start"] }],
+        quota: { provider: "acme", command: ["orc-quota"], accounts: [
+          { name: "main", kind: "claude-config", configDirs: { linux: "/accounts/main" } },
+          { name: "second", kind: "claude-config", configDirs: { linux: "/accounts/second" } }
+        ] }
+      }))
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+      await orcOk(fixture, ["beat"])
+      expect(await queuedArgs(fixture)).toEqual(expect.arrayContaining(["ORC_DISPATCH_CLAUDE_CONFIG_DIR=/accounts/second"]))
+    })
+  }, runnerTimeout)
+
+  test("a remote start queues the target machine's chosen Claude directory instead of the dispatcher's path", async () => {
+    await withFixture(async (fixture) => {
+      await writeFile(join(fixture.home, "config.json"), JSON.stringify({ providers: [{ id: "acme", credential: "package", packages: ["npm:example"] }] }))
+      const quota = { schema: "orc.quota.v1", accounts: [{ name: "main", remainingPercent: 8 }, { name: "second", remainingPercent: 68 }] }
+      await writeFile(join(fixture.dir, "bin", "orc-quota"), "#!/bin/sh\nprintf '%s\\n' '" + JSON.stringify(quota) + "'\n", { mode: 0o755 })
+      await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify({
+        machines: [{ name: "linux", slots: 1, start: [process.execPath, binPath, "runner", "start", "--", ...orcThere(fixture.home)] }],
+        quota: { provider: "acme", command: ["orc-quota"], accounts: [
+          { name: "main", kind: "claude-config", configDirs: { linux: "/accounts/main" } },
+          { name: "second", kind: "claude-config", configDirs: { linux: "/accounts/second" } }
+        ] }
+      }))
+      await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+      await orcOk(fixture, ["beat"])
+      expect(await queuedArgs(fixture)).toEqual(expect.arrayContaining(["ORC_DISPATCH_CLAUDE_CONFIG_DIR=/accounts/second"]))
+    })
+  }, runnerTimeout)
+
+  test("refuses a Claude directory for a non-package provider instead of ignoring the chosen login", async () => {
+    await withFixture(async (fixture) => {
+      await writeFile(join(fixture.home, "config.json"), JSON.stringify({
+        providers: [{ id: "acme", credential: "pi-login" }]
+      }))
+      const result = await queueWith(fixture, { task: "orc-9", checkout: fixture.checkout, provider: "acme", body: "# x\n", claudeConfigDir: "/accounts/second" })
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toContain("package")
+    })
+  }, runnerTimeout)
 
   test("queues a request with no token and no --token-file instead of holding a token", async () => {
     await withFixture(async (fixture) => {
