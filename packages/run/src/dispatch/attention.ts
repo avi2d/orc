@@ -107,15 +107,19 @@ export const openReviewQuestions = (
     return Effect.asVoid(openItem(root, item.id, item.asked))
   }, { discard: true })
 
-const readItem = (root: string, id: string): Effect.Effect<AttentionItem | null, BacklogError, FileSystem.FileSystem> =>
+const readExistingItem = (root: string, id: string): Effect.Effect<{ readonly before: string; readonly item: AttentionItem } | null, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const file = itemFile(root, id)
-    const text = yield* readIfPresent(file)
-    if (text === null) {
+    const before = yield* readIfPresent(file)
+    if (before === null) {
       return null
     }
-    return yield* Schema.decodeEffect(ItemFile)(text).pipe(Effect.mapError((error) => new BacklogError({ detail: file + " holds no item orc reads: " + error.message })))
+    const item = yield* Schema.decodeEffect(ItemFile)(before).pipe(Effect.mapError((error) => new BacklogError({ detail: file + " holds no item orc reads: " + error.message })))
+    return { before, item }
   })
+
+const readItem = (root: string, id: string): Effect.Effect<AttentionItem | null, BacklogError, FileSystem.FileSystem> =>
+  Effect.map(readExistingItem(root, id), (existing) => existing?.item ?? null)
 
 type CloseOutcome = "closed" | "already closed" | "missing"
 
@@ -123,12 +127,11 @@ type SettledState = Exclude<AttentionItem["state"], { kind: "open" }>
 
 const settleOpenItem = (root: string, id: string, state: SettledState): Effect.Effect<"settled" | "already closed" | "missing", BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const file = itemFile(root, id)
-    const before = yield* readIfPresent(file)
-    if (before === null) {
+    const stored = yield* readExistingItem(root, id)
+    if (stored === null) {
       return "missing" as const
     }
-    const item = yield* Schema.decodeEffect(ItemFile)(before).pipe(Effect.mapError((error) => new BacklogError({ detail: file + " holds no item orc reads: " + error.message })))
+    const { before, item } = stored
     if (item.state.kind !== "open") {
       return "already closed" as const
     }
@@ -143,12 +146,11 @@ export const closeItem = (root: string, id: string, answer: ItemAnswer): Effect.
 // The decider's answer reaches the item through the task's answer, so only its reason is written here.
 export const recordDecision = (root: string, id: string, decision: Decision): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const file = itemFile(root, id)
-    const before = yield* readIfPresent(file)
-    if (before === null) {
+    const existing = yield* readExistingItem(root, id)
+    if (existing === null) {
       return
     }
-    const item = yield* Schema.decodeEffect(ItemFile)(before).pipe(Effect.mapError((error) => new BacklogError({ detail: file + " holds no item orc reads: " + error.message })))
+    const { before, item } = existing
     if (item.state.kind === "closed") {
       return
     }
@@ -160,12 +162,11 @@ export const recordDecision = (root: string, id: string, decision: Decision): Ef
 
 export const claimDeciding = (root: string, id: string, at: string): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const file = itemFile(root, id)
-    const before = yield* readIfPresent(file)
-    if (before === null) {
+    const current = yield* readExistingItem(root, id)
+    if (current === null) {
       return false
     }
-    const item = yield* Schema.decodeEffect(ItemFile)(before).pipe(Effect.mapError((error) => new BacklogError({ detail: file + " holds no item orc reads: " + error.message })))
+    const { before, item } = current
     if (item.state.kind !== "open") {
       return false
     }
@@ -254,14 +255,9 @@ const openOrReopenTaskItem = (root: string, id: string, asked: Asked): Effect.Ef
     if (yield* openItem(root, id, asked)) {
       return
     }
-    const file = itemFile(root, id)
-    const before = yield* readIfPresent(file)
-    if (before === null) {
-      return
-    }
-    const item = yield* Schema.decodeEffect(ItemFile)(before).pipe(Effect.mapError((error) => new BacklogError({ detail: file + " holds no item orc reads: " + error.message })))
-    if (item.state.kind === "withdrawn") {
-      yield* replaceItem(root, id, before, yield* encodeItem(id, { ...item, state: { kind: "open" } }))
+    const existing = yield* readExistingItem(root, id)
+    if (existing !== null && existing.item.state.kind === "withdrawn") {
+      yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...existing.item, state: { kind: "open" } }))
     }
   })
 
@@ -271,17 +267,12 @@ const closeOrCloseReopenedTaskItem = (root: string, id: string, asked: Asked | n
     if (outcome !== "already closed" || asked?.kind !== "review-question") {
       return outcome
     }
-    const file = itemFile(root, id)
-    const before = yield* readIfPresent(file)
-    if (before === null) {
+    const existing = yield* readExistingItem(root, id)
+    if (existing === null || existing.item.state.kind !== "withdrawn") {
       return outcome
     }
-    const item = yield* Schema.decodeEffect(ItemFile)(before).pipe(Effect.mapError((error) => new BacklogError({ detail: file + " holds no item orc reads: " + error.message })))
-    if (item.state.kind !== "withdrawn") {
-      return outcome
-    }
-    const { deciding: _claim, ...rest } = item
-    const replaced = yield* replaceItem(root, id, before, yield* encodeItem(id, { ...rest, state: { kind: "closed", answer } }))
+    const { deciding: _claim, ...rest } = existing.item
+    const replaced = yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...rest, state: { kind: "closed", answer } }))
     return replaced ? "closed" : "already closed"
   })
 
