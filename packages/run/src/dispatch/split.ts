@@ -89,7 +89,7 @@ export const applySplit = (
     })
     const children: Array<TaskRecord> = []
     for (const child of plan.children) {
-      const after = child.after.flatMap((number) => children[number - 1]?.spec.id ?? [])
+      const after = [...new Set(child.after)].flatMap((number) => children[number - 1]?.spec.id ?? [])
       children.push(yield* addTask(root, {
         ...request,
         title: child.title.trim(),

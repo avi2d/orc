@@ -18,7 +18,7 @@ const parentIn = (tasks: ReadonlyArray<TaskRecord>, id: string): Effect.Effect<T
 }
 
 const shipState = (child: TaskRecord, merged: ReadonlySet<string>): string => {
-  const pr = child.spec.kind === "ship" && child.state.kind === "closed" && child.state.closing.outcome !== "start-failed" ? child.state.closing.pr : null
+  const pr = child.spec.kind === "ship" && child.state.kind === "closed" && child.state.closing.outcome === "done" ? child.state.closing.pr : null
   return pr === null ? "" : merged.has(child.spec.id) ? " merged" : " waits for its PR to merge"
 }
 
