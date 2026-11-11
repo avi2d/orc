@@ -1,7 +1,15 @@
-import { describe, expect, test } from "bun:test"
+import { beforeAll, describe, expect, test } from "bun:test"
 import runManifest from "../../packages/run/package.json" with { type: "json" }
 
 const packageDir = new URL("../../packages/run/", import.meta.url).pathname
+const repoRoot = new URL("../../", import.meta.url).pathname
+
+beforeAll(() => {
+  const result = Bun.spawnSync([process.execPath, "run", "build"], { cwd: repoRoot })
+  if (result.exitCode !== 0) {
+    throw new Error("bun run build failed: " + result.stdout.toString() + result.stderr.toString())
+  }
+}, 120_000)
 
 const expectedFiles = [
   "CHANGELOG.md",
