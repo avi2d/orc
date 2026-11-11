@@ -8,8 +8,7 @@ import type { DispatchConfig } from "./config"
 import { ownedBySweep, throughFor } from "./machine-reach"
 import { logWrittenAt, stallMillis } from "./stall"
 import { answersFor, askStartedTask, markAnswersRelayed, parkStartedTask } from "./parked"
-import { taskLabel } from "./pueue-status"
-import { type Command, type RunnerError, type RunnerRequirements, taskBranch } from "./runner"
+import { type Command, type RunnerError, type RunnerRequirements, runLabel, taskBranch } from "./runner"
 import { endingFromResult, type Relay, relayAnswers, relayAnswersThrough, type RunEnding, readResult, readResultThrough, type RunnerResult } from "./runner-result"
 import type { TaskFileError, TaskRecord } from "./task-record"
 
@@ -92,11 +91,20 @@ const endTask = (
         return Option.some({ kind: "split", task: id, machine, children: applied.value.children.map((child) => child.spec.id), reason } satisfies BeatAction)
       }
       const reopened = yield* findTask(root, id).pipe(Effect.orElseSucceed(() => null))
-      if (reopened === null || reopened.state.kind !== "new" || reopened.spec.kind !== "parent") {
-        return Option.none()
+      if (reopened !== null && reopened.state.kind === "new" && reopened.spec.kind === "parent") {
+        const children = (yield* listTasks(root).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<TaskRecord>))).filter((candidate) => candidate.spec.parent === id).map((candidate) => candidate.spec.id)
+        return Option.some({ kind: "close-failed", task: id, machine, reason: "split " + id + " into " + (children.length === 0 ? "no children" : children.join(", ")) + " failed: " + applied.detail } satisfies BeatAction)
       }
-      const children = (yield* listTasks(root).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<TaskRecord>))).filter((candidate) => candidate.spec.parent === id).map((candidate) => candidate.spec.id)
-      return Option.some({ kind: "close-failed", task: id, machine, reason: "split " + id + " into " + (children.length === 0 ? "no children" : children.join(", ")) + " failed: " + applied.detail } satisfies BeatAction)
+      if (task.spec.parent !== null && reopened !== null) {
+        const names = ending.plan.children.map((child) => child.title.trim()).join(", ")
+        const closed = yield* closeStartedTask(root, id, "failed", "split " + id + " into " + names + " failed: " + applied.detail, { pr: null, report: null }, at).pipe(
+          Effect.catchTag("BacklogError", () => Effect.succeed(null))
+        )
+        return closed === null || closed.state.kind !== "closed"
+          ? Option.none()
+          : Option.some({ kind: "close-failed", task: id, machine, reason: closed.state.closing.reason } satisfies BeatAction)
+      }
+      return Option.none()
     }
     const closed = yield* closeStartedTask(root, id, ending.outcome, ending.reason, { pr: ending.pr, report: ending.report }, yield* nowIso).pipe(
       Effect.catchTag("BacklogError", () => Effect.succeed(null))
@@ -204,7 +212,7 @@ export const closeFinished = (
     }
     const claim = task.state.claim
     const started = task.state.started
-    const label = taskLabel(context.home, task.spec.id)
+    const label = runLabel(context.home, task.spec.id, task.spec.kind)
     const machine = context.config.machines.find((entry) => entry.name === claim.machine)
     if (machine === undefined) {
       return { kind: "untracked" } satisfies Progress

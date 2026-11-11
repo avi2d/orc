@@ -45,12 +45,14 @@ A renewal for a task pueue no longer runs for that home is refused and removes t
 
 To stop a run yourself, run `orc runner kill <task-id>` on its machine.
 It kills the running pueue task that carries the label, or removes one still queued, and marks the running orc runs on `orc/<task-id>` and `orc/<task-id>-parent` stopped.
-Removing a queued task records a stopped run when no run of either branch is still running, since the run never started.
+A parent task’s final check runs under its own label, so killing it never touches the worker run it replaced.
+Removing a queued task records a stopped run on the branch its label runs on when no run of either branch is still running, since the run never started.
 The next beat then closes the task stopped with the run's end reason.
 A kill for a task pueue never queued is refused, as a kill for a task already done is.
 
 To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh linux-box orc` from another.
-The forwarded read defaults to that home's label, and `orc runner result <task-id> --label <label>` reads another home's run instead.
+The forwarded read defaults to that home’s label, and `orc runner result <task-id> --label <label>` reads another home’s run instead.
+For a parent task the default label is the parent’s own, so the read names its final check instead of the worker run it replaced.
 The forwarded read carries the label as JSON on standard input, past any remote shell the reach uses, and marks the far command with `--stdin-label` so only a marked read waits on standard input.
 A plain `orc runner result <task-id>` never reads standard input, so a pipe that never closes cannot hang it.
 Piping that document into `orc runner result <task-id> --stdin-label` yourself reads that home's run.
