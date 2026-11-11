@@ -245,19 +245,15 @@ const overdueWait = (task: TaskRecord, at: string): { readonly id: string; reado
   return { id, asked, answer: hold.answer }
 }
 
-// A beat that read the task before its question was written withdraws the item, so a task still asking it reopens it as it was.
+// openItem publishes once and cannot rewrite a withdrawn item, so this rewrites it open with the text the task asks now.
 const openOrReopenTaskItem = (root: string, id: string, asked: Asked): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    if (asked.kind !== "review-question") {
-      yield* Effect.asVoid(openItem(root, id, asked))
-      return
-    }
     if (yield* openItem(root, id, asked)) {
       return
     }
     const existing = yield* readExistingItem(root, id)
     if (existing !== null && existing.item.state.kind === "withdrawn") {
-      yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...existing.item, state: { kind: "open" } }))
+      yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...existing.item, text: asked.text, state: { kind: "open" } }))
     }
   })
 
