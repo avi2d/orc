@@ -230,6 +230,9 @@ const actionLine = (action: BeatAction): string => {
       return "closed " + action.task + " " + action.outcome + " on " + action.machine + ": " + action.reason + (action.pr === null ? "" : ", PR " + action.pr) +
         (action.report === null ? "" : ", report " + action.report)
     }
+    case "split": {
+      return "split " + action.task + " on " + action.machine + " into " + action.children.join(", ") + ": " + action.reason
+    }
     case "close-failed": {
       return "close failed " + action.task + " on " + action.machine + ": " + action.reason
     }

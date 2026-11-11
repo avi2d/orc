@@ -73,7 +73,10 @@ A request within the budget prints `{"schema": "orc.split.v1", "plan": "whole", 
 A ship worker that finds the change over the budget can stop and propose a split using the same `orc.split.v1` document.
 Orc records the run as failed without running checks or opening a PR.
 `orc runner result <task-id> --json` returns the validated document as `result.run.split`, and the text result prints it in the run reason.
-The beat closes the task failed with that reason and does not create the proposed children.
+The beat turns the task into a parent instead of closing it, with the proposal's done criteria under `## Done when` and `split: {"by": "run", "reason": <text>}`.
+It adds one ship child for each slice, linked and waiting as [Splitting at intake](#splitting-at-intake) adds them, and starts every child that waits on nothing in the same beat.
+The beat prints `split <task-id> on <machine> into <child-ids>: <reason>` and records the event `<task-id>.split` that orc chat posts, as in `orc-1 Ship task splitting split at run into orc-2 Record the split, orc-3 Show the plan: <reason>`.
+A run whose proposal orc refused ends as `invalid split proposal: <why>`, and the beat closes that task failed with no children.
 
 ### Changing a plan
 

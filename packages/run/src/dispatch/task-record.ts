@@ -4,7 +4,7 @@ import { isTaskKind, type TaskKind, unknownKind } from "../task-kind"
 export const taskFolders = ["new", "taken", "closed"] as const
 export type TaskFolder = typeof taskFolders[number]
 
-const splitSources = ["intake"] as const
+const splitSources = ["intake", "run"] as const
 export type SplitSource = typeof splitSources[number]
 
 export interface SplitMark {

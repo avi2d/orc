@@ -1,6 +1,8 @@
 import { Array as Arr, DateTime, Duration, Effect, FileSystem, Option, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { backlogPaths, closeStartedTask } from "./backlog"
+import { recordEvent } from "./events"
+import { applyRunSplit, splitEventText } from "./split"
 import type { BeatAction, Progress } from "./beat-action"
 import type { DispatchConfig } from "./config"
 import { ownedBySweep, throughFor } from "./machine-reach"
@@ -74,6 +76,16 @@ const endTask = (
       return parked === null
         ? Option.none()
         : Option.some({ kind: "parked", task: id, machine, branch, questions: ending.questions.map((question) => question.id) } satisfies BeatAction)
+    }
+    if (ending.kind === "split") {
+      const at = yield* nowIso
+      const applied = yield* applyRunSplit(root, task, ending.plan, at).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
+      if (applied === null) {
+        return Option.none()
+      }
+      const reason = ending.plan.reason.trim()
+      yield* recordEvent(root, { key: id + ".split", at, text: splitEventText(applied, "run", reason) }).pipe(Effect.catchTag("BacklogError", () => Effect.void))
+      return Option.some({ kind: "split", task: id, machine, children: applied.children.map((child) => child.spec.id), reason } satisfies BeatAction)
     }
     const closed = yield* closeStartedTask(root, id, ending.outcome, ending.reason, { pr: ending.pr, report: ending.report }, yield* nowIso).pipe(
       Effect.catchTag("BacklogError", () => Effect.succeed(null))

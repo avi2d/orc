@@ -11,7 +11,7 @@ import type { QuestionAnswer } from "../no-mistakes-gate"
 import { readJsonFileIfPresent } from "../json-file"
 import { runDirFor, type TaskKind } from "../task-kind"
 import { TaskId } from "./backlog"
-import { readPlanDocument, SplitDocument, splitReasonPrefix } from "./split"
+import { readPlanDocument, SplitDocument, type SplitPlan, splitReasonPrefix } from "./split"
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
 import { LabelArg } from "./token"
 import { capture, decodeJson } from "./runner-exec"
@@ -71,6 +71,7 @@ const failureReason = (result: typeof PueueResult.Type): string | null => {
 export type RunEnding =
   | { readonly kind: "close"; readonly outcome: "done" | "failed" | "stopped"; readonly reason: string; readonly pr: string | null; readonly report: string | null }
   | { readonly kind: "park"; readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion> }
+  | { readonly kind: "split"; readonly plan: SplitPlan }
 
 type FinishedResult = Extract<RunnerResult, { readonly status: "succeeded" | "failed" }>
 
@@ -99,6 +100,9 @@ export const endingFromResult = (result: RunnerResult, kind: TaskKind): RunEndin
   }
   if (result.status !== "failed") {
     return null
+  }
+  if (result.run?.split !== undefined) {
+    return { kind: "split", plan: result.run.split }
   }
   const questions = result.run?.openQuestions ?? []
   return Arr.isReadonlyArrayNonEmpty(questions)
