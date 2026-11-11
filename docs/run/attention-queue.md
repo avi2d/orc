@@ -34,9 +34,9 @@ An answered question asked again opens a new item, and the old item keeps its an
 To see every open item, oldest first, run `orc attention`.
 It prints each item's id, kind, task, owner, age and text, and marks an overdue one `overdue`.
 It then prints each item the decider answered under a `Decided:` heading as `answered <id>: <words> (<reason>)`.
-An item the decider escalated also carries its `decision` in the JSON.
+An item the decider escalated carries its `decision` in `items`.
 An item the decider answered stays visible under `decided` with its answer and its `decision` in the JSON.
-An answered item leaves the list once its task closes.
+An answered item leaves `decided` once its task closes.
 With no open item it prints `nothing needs anyone`.
 To print the same facts as JSON, run `orc attention --json`, whose document names its version first as `orc.attention.v1`:
 
@@ -45,7 +45,7 @@ To print the same facts as JSON, run `orc attention --json`, whose document name
   "schema": "orc.attention.v1",
   "at": "2026-11-02T10:10:00.000Z",
   "items": [
-    { "id": "orc-1.r2.2026-11-02T10_00_00_000Z", "kind": "review-question", "task": "orc-1", "text": "Keep the old flag?", "asked": "2026-11-02T10:00:00.000Z", "owner": "user", "ageSeconds": 600, "overdue": true }
+    { "id": "orc-1.r2.2026-11-02T10_00_00_000Z", "kind": "review-question", "task": "orc-1", "text": "Keep the old flag?", "asked": "2026-11-02T10:00:00.000Z", "owner": "decider", "ageSeconds": 600, "overdue": true }
   ],
   "decided": [
     { "id": "orc-1.r3.2026-11-02T09_50_00_000Z", "kind": "review-question", "task": "orc-1", "text": "Keep the old flag?", "asked": "2026-11-02T09:50:00.000Z", "owner": "decider", "decision": { "kind": "answered", "reason": "the intent keeps the old flag", "at": "2026-11-02T10:00:00.000Z" }, "answer": { "words": "Keep it", "at": "2026-11-02T10:00:00.000Z" } }
