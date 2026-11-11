@@ -337,14 +337,15 @@ export const runBeat = (
     const upstream = yield* watchUpstream(root, projects, sources.readUpstream, at)
     const current = yield* listTasks(root)
     yield* routeReviewQuestions(root, current, at)
-    yield* decideReviewQuestions(root, current, sources.askDecider, at)
-    const queued = current.filter((task) => task.state.kind === "new")
+    const decided = yield* decideReviewQuestions(root, current, sources.askDecider, at)
+    const latest = decided.some((entry) => entry.verdict.kind === "answered") ? yield* listTasks(root) : current
+    const queued = latest.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
-    const fresh: BeatContext = { ...context, tasks: current, overloaded }
-    const renewals = yield* Effect.forEach(current, (task) => renewTask(fresh, task))
+    const fresh: BeatContext = { ...context, tasks: latest, overloaded }
+    const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, task))
-    const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))
-    return { beat, at, quota, room: readRoom(config.machines, current), actions: [
+    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at))
+    return { beat, at, quota, room: readRoom(config.machines, latest), actions: [
         ...settled.closed,
         ...settled.asking,
         ...stalls.flatMap(Option.toArray),

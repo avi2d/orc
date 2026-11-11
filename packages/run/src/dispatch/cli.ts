@@ -322,9 +322,8 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
   Effect.gen(function*() {
     switch (args.kind) {
       case "ShowBacklog":
-      case "ShowAttention":
-      case "DecideAttention": {
-        yield* Console.log(yield* (args.kind === "ShowBacklog" ? backlogText(args.json, place) : attentionNow(args, backlogRoot(place), place.home)))
+      case "ShowAttention": {
+        yield* Console.log(yield* (args.kind === "ShowBacklog" ? backlogText(args.json, place) : attentionNow(args, backlogRoot(place))))
         break
       }
       case "AddTask": {

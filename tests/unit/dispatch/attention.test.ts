@@ -154,6 +154,7 @@ describe("the attention queue", () => {
       expect(attentionJson(await run(openItems(root)), "2026-11-02T10:10:00.000Z")).toEqual({
         schema: "orc.attention.v1",
         at: "2026-11-02T10:10:00.000Z",
+        decided: [],
         items: [
           { id: "late", kind: "review-question", task: "orc-1", text: "Keep the old flag?", asked: "2026-11-02T10:00:00.000Z", owner: "user", ageSeconds: 600, overdue: true },
           { id: "fresh", kind: "review-question", task: "orc-2", text: "Keep the old flag?", asked: "2026-11-02T10:08:00.000Z", owner: "user", ageSeconds: 120, overdue: false }
@@ -166,5 +167,6 @@ describe("the attention queue", () => {
     expect(parseDispatchArgs("attention", [])).toEqual({ kind: "ShowAttention", json: false })
     expect(parseDispatchArgs("attention", ["--json"])).toEqual({ kind: "ShowAttention", json: true })
     expect(parseDispatchArgs("attention", ["--all"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --all" })
+    expect(parseDispatchArgs("attention", ["decide"])).toEqual({ kind: "UsageError", detail: "unexpected argument: decide" })
   })
 })

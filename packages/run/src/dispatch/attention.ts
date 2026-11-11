@@ -93,11 +93,24 @@ export const closeItem = (root: string, id: string, answer: ItemAnswer): Effect.
 // The decider's answer reaches the item through the task's answer, so only its reason is written here.
 export const recordDecision = (root: string, id: string, decision: Decision): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const item = yield* readItem(root, id)
-    if (item === null || item.state.kind !== "open") {
+    const file = itemFile(root, id)
+    const before = yield* readIfPresent(file)
+    if (before === null) {
       return
     }
-    yield* writeItem(root, id, { ...item, decision, owner: decision.kind === "escalated" ? "user" : item.owner })
+    const item = yield* Schema.decodeEffect(ItemFile)(before).pipe(Effect.mapError((error) => new BacklogError({ detail: file + " holds no item orc reads: " + error.message })))
+    if (item.state.kind !== "open") {
+      return
+    }
+    const next: AttentionItem = { ...item, decision, owner: decision.kind === "escalated" ? "user" : item.owner }
+    const encoded = yield* encodeItem(id, next)
+    if ((yield* readIfPresent(file)) !== before) {
+      return
+    }
+    const fs = yield* FileSystem.FileSystem
+    const scratch = scratchName(attentionFolder(root), id)
+    yield* fs.writeFileString(scratch, encoded).pipe(Effect.mapError(platformFailure("write " + scratch)))
+    yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
   })
 
 type WithdrawOutcome = "withdrawn" | "already closed" | "missing"
@@ -118,6 +131,22 @@ export const openItems = (root: string): Effect.Effect<ReadonlyArray<OpenItem>, 
     const read = yield* Effect.forEach(ids, (id) => readItem(root, id).pipe(Effect.map((item) => (item === null ? null : { id, item }))))
     return read
       .filter((entry): entry is OpenItem => entry !== null && entry.item.state.kind === "open")
+      .toSorted((left, right) => Date.parse(left.item.asked) - Date.parse(right.item.asked) || left.id.localeCompare(right.id))
+  })
+
+export interface DecidedItem {
+  readonly id: string
+  readonly item: AttentionItem
+}
+
+export const decidedItems = (root: string): Effect.Effect<ReadonlyArray<DecidedItem>, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const ids = (yield* readNames(attentionFolder(root)))
+      .filter((name) => name.endsWith(fileSuffix) && !name.startsWith("."))
+      .map((name) => name.slice(0, -fileSuffix.length))
+    const read = yield* Effect.forEach(ids, (id) => readItem(root, id).pipe(Effect.map((item) => (item === null ? null : { id, item }))))
+    return read
+      .filter((entry): entry is DecidedItem => entry !== null && entry.item.state.kind === "closed" && entry.item.decision?.kind === "answered")
       .toSorted((left, right) => Date.parse(left.item.asked) - Date.parse(right.item.asked) || left.id.localeCompare(right.id))
   })
 

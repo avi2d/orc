@@ -280,7 +280,6 @@ describe("a parked run", () => {
       await askWhileRunning(fixture)
       await orcOk(fixture, ["beat"])
       expect(await openAttention(fixture)).toMatchObject([{ owner: "user", decision: { kind: "escalated", reason: expect.stringContaining("names no models.decider") } }])
-      expect(await orcOk(fixture, ["attention", "decide"])).toBe("nothing waits on the decider\n")
     })
   }, runnerTimeout)
 

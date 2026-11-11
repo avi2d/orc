@@ -21,9 +21,8 @@ Its system prompt is the written policy in `packages/run/agents/decider-policy.m
 It answers a routine question, or escalates the question to the user.
 Its answer goes to the task as `orc backlog answer` would give it, so the item closes with the answer's words.
 An escalation hands the item to the user, and the item stays open.
-Either way the item keeps a `decision` with `answered` or `escalated`, the decider's reason and its time, so you can read the decider's answers afterwards.
+Either way the item keeps a `decision` with `answered` or `escalated`, the decider's reason and its time, so `orc attention` shows the decider's answers afterwards.
 A reply orc cannot read, a call that fails or a missing `models.decider` escalates the item with that as its reason.
-To run the decider without a beat, run `orc attention decide`, which prints `answered <item>: <words> (<reason>)` or `escalated <item> to the user: <reason>` for each item, or `nothing waits on the decider`.
 
 ## Answering an item
 Answering a review question with `orc backlog answer <task-id> <question-id>=<text>` closes the item.
@@ -34,8 +33,10 @@ An answered question asked again opens a new item, and the old item keeps its an
 ## Seeing the queue
 To see every open item, oldest first, run `orc attention`.
 It prints each item's id, kind, task, owner, age and text, and marks an overdue one `overdue`.
+It then prints each item the decider answered as `answered <id>: <words> (<reason>)`.
 An item the decider escalated also carries its `decision` in the JSON.
-With no open item it prints `nothing needs anyone`.
+An item the decider answered stays visible under `decided` with its answer and its `decision` in the JSON.
+With no open item and no answered item it prints `nothing needs anyone`.
 To print the same facts as JSON, run `orc attention --json`, whose document names its version first as `orc.attention.v1`:
 
 ```json
@@ -44,6 +45,9 @@ To print the same facts as JSON, run `orc attention --json`, whose document name
   "at": "2026-11-02T10:10:00.000Z",
   "items": [
     { "id": "orc-1.r2.2026-11-02T10_00_00_000Z", "kind": "review-question", "task": "orc-1", "text": "Keep the old flag?", "asked": "2026-11-02T10:00:00.000Z", "owner": "user", "ageSeconds": 600, "overdue": true }
+  ],
+  "decided": [
+    { "id": "orc-1.r3.2026-11-02T09_50_00_000Z", "kind": "review-question", "task": "orc-1", "text": "Keep the old flag?", "asked": "2026-11-02T09:50:00.000Z", "owner": "decider", "decision": { "kind": "answered", "reason": "the intent keeps the old flag", "at": "2026-11-02T10:00:00.000Z" }, "answer": { "words": "Keep it", "at": "2026-11-02T10:00:00.000Z" }, "ageSeconds": 1200, "overdue": false }
   ]
 }
 ```

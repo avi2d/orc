@@ -1,7 +1,7 @@
 import { Data, Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { bundledAgentsDir } from "../agents"
-import { readItem, recordDecision, reviewQuestionId, routeReviewQuestions } from "./attention"
+import { openItems, readItem, recordDecision, reviewQuestionId, routeReviewQuestions } from "./attention"
 import { findTask } from "./backlog"
 import type { BacklogError } from "./backlog-write"
 import { answerTask } from "./parked"
@@ -65,14 +65,25 @@ const settle = (root: string, task: TaskRecord, question: ParkedQuestion, item: 
       Effect.as(null),
       Effect.catchTags({ BacklogError: (error) => Effect.succeed(error.detail), TaskFileError: (error) => Effect.succeed(error.detail) })
     )
-    if (refused !== null) {
-      const escalated: Verdict = { kind: "escalated", reason: "the decider's answer did not reach the task: " + refused }
-      yield* recordDecision(root, item, { kind: "escalated", reason: escalated.reason, at })
-      return escalated
+    if (refused === null) {
+      yield* recordDecision(root, item, { kind: "answered", reason: verdict.reason, at })
+      yield* routeReviewQuestions(root, [yield* findTask(root, task.spec.id)], at)
+      return verdict
     }
-    yield* recordDecision(root, item, { kind: "answered", reason: verdict.reason, at })
-    yield* routeReviewQuestions(root, [yield* findTask(root, task.spec.id)], at)
-    return verdict
+    const fresh = yield* findTask(root, task.spec.id)
+    const stored = fresh.parked?.questions.find((candidate) => candidate.id === question.id)?.answer
+    if (stored !== null && stored !== undefined) {
+      yield* recordDecision(root, item, { kind: "answered", reason: verdict.reason, at })
+      yield* routeReviewQuestions(root, [fresh], at)
+      return { kind: "answered", words: stored.words, reason: verdict.reason } satisfies Verdict
+    }
+    const reread = yield* readItem(root, item)
+    if (reread !== null && reread.state.kind === "closed") {
+      return { kind: "answered", words: reread.state.answer.words, reason: verdict.reason } satisfies Verdict
+    }
+    const escalated: Verdict = { kind: "escalated", reason: "the decider's answer did not reach the task: " + refused }
+    yield* recordDecision(root, item, { kind: "escalated", reason: escalated.reason, at })
+    return escalated
   })
 
 // Each open question the decider owns gets its own call, so one question's reply never answers another.
@@ -86,27 +97,24 @@ export const decideReviewQuestions = (
     const fs = yield* FileSystem.FileSystem
     const decided: Array<Decided> = []
     let policy: string | null = null
-    for (const task of tasks) {
-      if (task.state.kind === "closed") {
+    const byId = new Map(tasks.map((task) => [task.spec.id, task] as const))
+    for (const entry of yield* openItems(root)) {
+      if (entry.item.owner !== "decider") {
         continue
       }
-      for (const question of task.parked?.questions ?? []) {
-        const item = reviewQuestionId(task.spec.id, question.id, question.asked)
-        const read = question.answer === null ? yield* readItem(root, item) : null
-        if (read === null || read.state.kind !== "open" || read.owner !== "decider") {
-          continue
-        }
-        policy ??= yield* fs.readFileString(deciderPolicyFile()).pipe(Effect.orElseSucceed(() => ""))
-        const verdict = policy === ""
-          ? { kind: "escalated" as const, reason: "orc cannot read the decider policy at " + deciderPolicyFile() }
-          : yield* askOne(ask, policy, task, question)
-        decided.push({ item, task: task.spec.id, verdict: yield* settle(root, task, question, item, verdict, at) })
+      const task = byId.get(entry.item.task)
+      if (task === undefined || task.state.kind === "closed") {
+        continue
       }
+      const question = task.parked?.questions.find((candidate) => reviewQuestionId(task.spec.id, candidate.id, candidate.asked) === entry.id)
+      if (question === undefined || question.answer !== null) {
+        continue
+      }
+      policy ??= yield* fs.readFileString(deciderPolicyFile()).pipe(Effect.orElseSucceed(() => ""))
+      const verdict = policy === ""
+        ? { kind: "escalated" as const, reason: "orc cannot read the decider policy at " + deciderPolicyFile() }
+        : yield* askOne(ask, policy, task, question)
+      decided.push({ item: entry.id, task: task.spec.id, verdict: yield* settle(root, task, question, entry.id, verdict, at) })
     }
     return decided
   })
-
-export const decidedLine = (entry: Decided): string =>
-  entry.verdict.kind === "answered"
-    ? "answered " + entry.item + ": " + entry.verdict.words + " (" + entry.verdict.reason + ")"
-    : "escalated " + entry.item + " to the user: " + entry.verdict.reason

@@ -4,7 +4,6 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { parseDispatchArgs } from "../../../packages/run/src/dispatch/args"
 import { openItems, routeReviewQuestions } from "../../../packages/run/src/dispatch/attention"
 import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
 import { type AskDecider, DeciderUnheard, decideReviewQuestions, type DeciderRequest } from "../../../packages/run/src/dispatch/decider"
@@ -114,8 +113,4 @@ describe("the decider", () => {
     })
   })
 
-  test("orc attention decide takes no further word", () => {
-    expect(parseDispatchArgs("attention", ["decide"])).toEqual({ kind: "DecideAttention" })
-    expect(parseDispatchArgs("attention", ["decide", "--json"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --json" })
-  })
 })

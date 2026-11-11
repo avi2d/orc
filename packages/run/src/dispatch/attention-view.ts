@@ -1,17 +1,31 @@
 import { DateTime, Effect, type FileSystem } from "effect"
-import { ageMillis, type AttentionItem, isOverdue, type OpenItem, openItems } from "./attention"
+import { ageMillis, type AttentionItem, type DecidedItem, decidedItems, isOverdue, type OpenItem, openItems } from "./attention"
 import { type BacklogError, backlogPresent, noBacklog } from "./backlog-write"
 import { formatTable } from "../table"
 
 const ATTENTION_JSON_SCHEMA = "orc.attention.v1"
 
+interface DecidedJson {
+  readonly id: string
+  readonly kind: AttentionItem["kind"]
+  readonly task: string
+  readonly text: string
+  readonly asked: string
+  readonly owner: AttentionItem["owner"]
+  readonly decision: NonNullable<AttentionItem["decision"]>
+  readonly answer: { readonly words: string; readonly at: string }
+  readonly ageSeconds: number
+  readonly overdue: boolean
+}
+
 interface AttentionJson {
   readonly schema: typeof ATTENTION_JSON_SCHEMA
   readonly at: string
   readonly items: ReadonlyArray<Omit<AttentionItem, "state"> & { readonly id: string; readonly ageSeconds: number; readonly overdue: boolean }>
+  readonly decided: ReadonlyArray<DecidedJson>
 }
 
-export const attentionJson = (items: ReadonlyArray<OpenItem>, at: string): AttentionJson => {
+export const attentionJson = (items: ReadonlyArray<OpenItem>, at: string, decided: ReadonlyArray<DecidedItem> = []): AttentionJson => {
   const nowMillis = Date.parse(at)
   return {
     schema: ATTENTION_JSON_SCHEMA,
@@ -26,7 +40,19 @@ export const attentionJson = (items: ReadonlyArray<OpenItem>, at: string): Atten
       ...(item.decision === undefined ? {} : { decision: item.decision }),
       ageSeconds: Math.floor(ageMillis(item, nowMillis) / 1000),
       overdue: isOverdue(item, nowMillis)
-    }))
+    })),
+    decided: decided.flatMap(({ id, item }) => item.state.kind === "closed" && item.decision !== undefined ? [{
+      id,
+      kind: item.kind,
+      task: item.task,
+      text: item.text,
+      asked: item.asked,
+      owner: item.owner,
+      decision: item.decision,
+      answer: item.state.answer,
+      ageSeconds: Math.floor(ageMillis(item, nowMillis) / 1000),
+      overdue: isOverdue(item, nowMillis)
+    }] : [])
   }
 }
 
@@ -38,12 +64,21 @@ const ageText = (seconds: number): string => {
   return minutes < 60 ? minutes + "m" : Math.floor(minutes / 60) + "h" + String(minutes % 60).padStart(2, "0") + "m"
 }
 
-const formatAttention = (items: ReadonlyArray<OpenItem>, at: string): string =>
-  formatTable(
-    ["ITEM", "KIND", "TASK", "OWNER", "AGE", "TEXT"],
-    attentionJson(items, at).items.map((item) => [item.id, item.kind, item.task, item.owner, ageText(item.ageSeconds) + (item.overdue ? " overdue" : ""), item.text]),
-    "nothing needs anyone"
-  )
+const formatAttention = (items: ReadonlyArray<OpenItem>, decided: ReadonlyArray<DecidedItem>, at: string): string => {
+  const view = attentionJson(items, at, decided)
+  const parts: Array<string> = []
+  if (view.items.length > 0) {
+    parts.push(formatTable(
+      ["ITEM", "KIND", "TASK", "OWNER", "AGE", "TEXT"],
+      view.items.map((item) => [item.id, item.kind, item.task, item.owner, ageText(item.ageSeconds) + (item.overdue ? " overdue" : ""), item.text]),
+      "nothing needs anyone"
+    ))
+  }
+  for (const entry of view.decided) {
+    parts.push("answered " + entry.id + ": " + entry.answer.words + " (" + entry.decision.reason + ")")
+  }
+  return parts.length > 0 ? parts.join("\n") : "nothing needs anyone"
+}
 
 export const attentionText = (json: boolean, root: string): Effect.Effect<string, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
@@ -51,6 +86,7 @@ export const attentionText = (json: boolean, root: string): Effect.Effect<string
       return noBacklog(root)
     }
     const items = yield* openItems(root)
+    const decided = yield* decidedItems(root)
     const at = DateTime.formatIso(yield* DateTime.now)
-    return json ? JSON.stringify(attentionJson(items, at)) : formatAttention(items, at)
+    return json ? JSON.stringify(attentionJson(items, at, decided)) : formatAttention(items, decided, at)
   })
