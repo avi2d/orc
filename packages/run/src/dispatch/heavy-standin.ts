@@ -192,7 +192,7 @@ const standinDecideFn = (decide: ReadonlyArray<string>): ReadonlyArray<string> =
 export const standinScript = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, timing?: StandinTiming): Effect.Effect<string, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const decide = defaultHeavyTools.includes(tool) ? [...decideBody(tool), ...extraSub(tool, commands)] : extraSub(tool, commands)
-    const resolved = yield* findRealTool(tool, process.env.PATH ?? "")
+    const resolved = yield* findRealTool(tool, Bun.env.PATH ?? "")
     return [
       ...standinHead(tool, settings, resolved),
       ...helpers,
