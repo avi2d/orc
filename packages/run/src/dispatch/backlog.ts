@@ -1,5 +1,5 @@
 import { Array as Arr, Effect, FileSystem, Schema } from "effect"
-import { captainWait, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
+import { answerWait, type DeciderOwns, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 import { renderTaskFile } from "./task-record-render"
 import { BacklogError, backlogPaths, grabbedFile, platformFailure, publishOnce, scratchName, takeFile, takenGrab } from "./backlog-write"
 
@@ -135,13 +135,13 @@ type Claimed =
   | { readonly kind: "held"; readonly reason: string }
 
 // A hold can land after a beat listed the task, so the file the claim took is read again and a held or parked one goes back to new.
-export const claimUnheld = (root: string, id: string): Effect.Effect<Claimed, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+export const claimUnheld = (root: string, id: string, deciderOwns: DeciderOwns): Effect.Effect<Claimed, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const record = (yield* claimTask(root, id)) ? yield* readTask(root, "taken", id) : null
     if (record === null) {
       return { kind: "lost" } satisfies Claimed
     }
-    const reason = captainWait(record)
+    const reason = answerWait(record, deciderOwns)
     if (reason === null) {
       return { kind: "claimed", record } satisfies Claimed
     }
@@ -217,13 +217,13 @@ const missedClose = (
     return yield* new BacklogError({ detail: id + " moved while orc read it, so run the command again" })
   })
 
-export const closeStartedTask = (
+type StartedRecord = TaskRecord & { readonly state: Extract<TaskRecord["state"], { readonly kind: "started" }> }
+
+const settleStarted = (
   root: string,
   id: string,
-  outcome: "done" | "failed" | "stopped",
-  reason: string,
-  delivered: { readonly pr: string | null; readonly report: string | null },
-  closedAt: string
+  folder: "new" | "closed",
+  settle: (fresh: StartedRecord) => TaskRecord
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const { fs, paths, file, grabbed, putBack, read } = yield* takenGrab(root, id, missedClose(root, id))
@@ -235,22 +235,39 @@ export const closeStartedTask = (
       yield* putBack
       return yield* new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a started task closes" })
     }
-    const closed: TaskRecord = {
-      ...fresh,
-      parked: answeredOnly(fresh.parked),
-      state: { kind: "closed", claim: fresh.state.claim, closing: { outcome, started: fresh.state.started, reason, ...delivered }, closedAt, postedAt: null }
-    }
-    const published = yield* publishOnce(paths.folder("closed"), id + ".md", renderTaskFile(closed)).pipe(
+    const settled = settle({ ...fresh, state: fresh.state })
+    const published = yield* publishOnce(paths.folder(folder), id + ".md", renderTaskFile(settled)).pipe(
       Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error))))
     )
     if (!published) {
       yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
-      return yield* new BacklogError({ detail: id + " was closed by another command" })
+      return yield* new BacklogError({ detail: id + " was " + (folder === "closed" ? "closed" : "given back") + " by another command" })
     }
     yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
     yield* fs.remove(paths.unreadFile(id), { force: true }).pipe(Effect.orElseSucceed(() => undefined))
-    return closed
+    return settled
   })
+
+export const closeStartedTask = (
+  root: string,
+  id: string,
+  outcome: "done" | "failed" | "stopped",
+  reason: string,
+  delivered: { readonly pr: string | null; readonly report: string | null },
+  closedAt: string
+): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  settleStarted(root, id, "closed", (fresh) => ({
+    ...fresh,
+    parked: answeredOnly(fresh.parked),
+    state: { kind: "closed", claim: fresh.state.claim, closing: { outcome, started: fresh.state.started, reason, ...delivered }, closedAt, postedAt: null }
+  }))
+
+export const reopenStartedTask = (
+  root: string,
+  id: string,
+  reshape: (spec: TaskSpec) => TaskSpec
+): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  settleStarted(root, id, "new", (fresh) => ({ ...fresh, spec: reshape(fresh.spec), parked: null, state: { kind: "new" } }))
 
 const readTask = (
   root: string,

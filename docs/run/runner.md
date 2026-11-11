@@ -4,7 +4,7 @@ kind: reference
 # The runner
 `orc runner start` is the start command that hands a task to pueue on its machine.
 The run then outlives the beat, the dispatcher and any SSH link to it.
-It reads the task from the beat's `ORC_TASK_*` variables and queues `orc run` in the checkout on branch `orc/<task-id>`, in the pueue group `orc`.
+It reads the task from the beat's `ORC_TASK_*` variables and queues `orc run` in the checkout on branch `orc/<task-id>`, or `orc/<task-id>-parent` for a parent task, in the pueue group `orc`.
 The run takes `--sandbox none --provider <provider> --token-file <path>` when the account holds a token file or token, and `--sandbox none --provider <provider>` with no token file when the account is kind `none`, so it runs on the picked account and refuses an implementer on any other provider.
 When the run starts, it fast-forwards the checkout's default branch from its remote, or says in its output why not.
 The refresh needs Git 2.48 or later.
@@ -44,17 +44,19 @@ Add `--` and the command that runs orc on another machine to send it there, as w
 A renewal for a task pueue no longer runs for that home is refused and removes that task's token folder.
 
 To stop a run yourself, run `orc runner kill <task-id>` on its machine.
-It kills the running pueue task that carries the label, or removes one still queued, and marks the orc run on `orc/<task-id>` stopped.
-Removing a queued task records a stopped run when no run of the branch is still running, since the run never started.
+It kills the running pueue task that carries the label, or removes one still queued, and marks the running orc runs on `orc/<task-id>` and `orc/<task-id>-parent` stopped.
+A parent task’s final check runs under its own label, so killing it never touches the worker run it replaced.
+Removing a queued task records a stopped run on the branch its label runs on when no run of either branch is still running, since the run never started.
 The next beat then closes the task stopped with the run's end reason.
 A kill for a task pueue never queued is refused, as a kill for a task already done is.
 
 To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh linux-box orc` from another.
-The forwarded read defaults to that home's label, and `orc runner result <task-id> --label <label>` reads another home's run instead.
+The forwarded read defaults to that home’s label, and `orc runner result <task-id> --label <label>` reads another home’s run instead.
+For a parent task the default label is the parent’s own, so the read names its final check instead of the worker run it replaced.
 The forwarded read carries the label as JSON on standard input, past any remote shell the reach uses, and marks the far command with `--stdin-label` so only a marked read waits on standard input.
 A plain `orc runner result <task-id>` never reads standard input, so a pipe that never closes cannot hang it.
 Piping that document into `orc runner result <task-id> --stdin-label` yourself reads that home's run.
-It names pueue's state for the task and the orc run on `orc/<task-id>` with its PR.
+It names pueue's state for the task and the latest orc run on `orc/<task-id>` or `orc/<task-id>-parent` with its PR.
 A task is queued, stashed, running, paused, succeeded or failed, or unknown when no pueue task in group `orc` carries that home's label.
 An unknown task with a stopped run still names that run with its end reason.
 To print the same facts as JSON, add `--json`, whose document names its version first as `orc.runner.v1`.

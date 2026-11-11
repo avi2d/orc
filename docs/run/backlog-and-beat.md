@@ -240,7 +240,7 @@ The beat starts it detached in its own session, never waits for it and never kil
 So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
 From then on, each beat ends the finished runs on a machine whose start runs `orc runner start`.
-It reads `orc runner result` on that machine and closes the task done, failed or stopped, or parks it on your open questions.
+It reads `orc runner result` on that machine and closes the task done, failed or stopped, parks it on your open questions, or turns it into a parent on a worker split proposal, as [A worker split proposal](task-kinds.md#a-worker-split-proposal) shows.
 A run marked stopped closes its task stopped with the run's end reason.
 A run still waiting at its gate for your answer stays started, and the beat relays your answers to it, as [Parked runs](parked-runs.md) shows.
 Either way the task frees its slot in the same beat.
@@ -261,7 +261,7 @@ A PR the beat cannot read for the chat prints `cannot read the PR of <task-id> f
 A missing start command exits 127 into its log, and the task stays started until the 10 minute no-record grace or the 30 minute quiet-log grace closes it.
 Only a failure to spawn the log wrapper closes the task as `start-failed`.
 To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1`.
-It carries the endings as `closed`, `close-failed` and `parked` actions, and a run waiting for your answer as `asking`, `answered` or `answer-failed`.
+It carries the endings as `closed`, `close-failed`, `parked` and `split` actions, and a run waiting for your answer as `asking`, `answered` or `answer-failed`.
 An `asking` action names only the questions the attention queue owns for you.
 A `parked` action names those in `questions` and the ones the decider owns in `decider`.
 It carries a stall as `stalled`, a PR the beat cannot read as `pr-unread`, and an upstream contribution as `upstream-seen`, `upstream-changed` or `upstream-unread`.

@@ -1,6 +1,6 @@
 import { Effect, type FileSystem, Result, Schema } from "effect"
-import { addTask, BacklogError } from "./backlog"
-import type { SplitSource, TaskRecord, TaskSpec } from "./task-record"
+import { addTask, BacklogError, reopenStartedTask } from "./backlog"
+import type { SplitSource, TaskFileError, TaskRecord, TaskSpec } from "./task-record"
 
 export const splitDocumentSchema = "orc.split.v1"
 export const childBudget = "about 300 changed lines or one area"
@@ -106,6 +106,29 @@ const childBody = (child: SplitPlan["children"][number], parent: TaskRecord): st
   "# " + child.title.trim() + "\n\n" + child.body.trim() + "\n\nThis is one slice of " + parent.spec.id + ", " + parent.spec.title +
   ", and it merges to main on its own.\n"
 
+const addChildren = (
+  root: string,
+  request: SplitRequest,
+  parent: TaskRecord,
+  plan: SplitPlan
+): Effect.Effect<AppliedSplit, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const children: Array<TaskRecord> = []
+    for (const child of plan.children) {
+      const after = [...new Set(child.after)].flatMap((number) => children[number - 1]?.spec.id ?? [])
+      children.push(yield* addTask(root, {
+        ...request,
+        title: child.title.trim(),
+        kind: "ship",
+        parent: parent.spec.id,
+        split: null,
+        dependsOn: [...request.dependsOn, ...after],
+        body: childBody(child, parent)
+      }))
+    }
+    return { parent, children }
+  })
+
 export const applySplit = (
   root: string,
   request: SplitRequest,
@@ -121,20 +144,25 @@ export const applySplit = (
       split: { by, reason: plan.reason.trim() },
       body: parentBody(request, plan.done)
     })
-    const children: Array<TaskRecord> = []
-    for (const child of plan.children) {
-      const after = [...new Set(child.after)].flatMap((number) => children[number - 1]?.spec.id ?? [])
-      children.push(yield* addTask(root, {
-        ...request,
-        title: child.title.trim(),
-        kind: "ship",
-        parent: parent.spec.id,
-        split: null,
-        dependsOn: [...request.dependsOn, ...after],
-        body: childBody(child, parent)
-      }))
-    }
-    return { parent, children }
+    return yield* addChildren(root, request, parent, plan)
+  })
+
+export const applyRunSplit = (
+  root: string,
+  task: TaskRecord,
+  plan: SplitPlan,
+  created: string
+): Effect.Effect<AppliedSplit, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const { title, project, internal, machine, dependsOn, body } = task.spec
+    const reopened = yield* reopenStartedTask(root, task.spec.id, (spec) => ({
+      ...spec,
+      kind: "parent",
+      internal: false,
+      split: { by: "run", reason: plan.reason.trim() },
+      body: parentBody(spec, plan.done)
+    }))
+    return yield* addChildren(root, { title, project, internal, machine, dependsOn, created, body }, reopened, plan)
   })
 
 export const splitEventText = (applied: AppliedSplit, by: SplitSource, reason: string): string =>

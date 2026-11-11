@@ -1,21 +1,30 @@
 import { Effect, type FileSystem } from "effect"
-import { isOverdue, readAttention, reviewQuestionId } from "./attention"
+import { type AttentionSnapshot, isOverdue, readAttention, reviewQuestionId } from "./attention"
 import type { BeatAction } from "./beat-action"
 import type { BacklogError } from "./backlog-write"
-import type { TaskRecord } from "./task-record"
+import type { DeciderOwns, TaskRecord } from "./task-record"
+
+export const deciderOwnership = (attention: AttentionSnapshot): DeciderOwns => {
+  const owned = new Set([...attention.open, ...attention.decided].filter(({ item }) => item.owner === "decider").map(({ id }) => id))
+  return (task, question) => owned.has(reviewQuestionId(task, question.id, question.asked))
+}
 
 export const attentionActions = (
   root: string,
   tasks: ReadonlyArray<TaskRecord>,
   actions: ReadonlyArray<BeatAction>,
   at: string
-): Effect.Effect<{ readonly reported: ReadonlyArray<BeatAction>; readonly queue: ReadonlyArray<BeatAction> }, BacklogError, FileSystem.FileSystem> =>
+): Effect.Effect<
+  { readonly reported: ReadonlyArray<BeatAction>; readonly queue: ReadonlyArray<BeatAction>; readonly deciderOwns: DeciderOwns },
+  BacklogError,
+  FileSystem.FileSystem
+> =>
   Effect.gen(function*() {
     const attention = yield* readAttention(root, tasks)
-    const deciderOwned = new Set([...attention.open, ...attention.decided].filter(({ item }) => item.owner === "decider").map(({ id }) => id))
+    const deciderOwns = deciderOwnership(attention)
     const ownedByDecider = (task: string) => (id: string): boolean => {
       const question = tasks.find((entry) => entry.spec.id === task)?.parked?.questions.find((entry) => entry.id === id)
-      return question !== undefined && deciderOwned.has(reviewQuestionId(task, id, question.asked))
+      return question !== undefined && deciderOwns(task, question)
     }
     const reported = actions.flatMap((action): ReadonlyArray<BeatAction> => {
       if (action.kind === "parked") {
@@ -32,5 +41,5 @@ export const attentionActions = (
     const queue = attention.open.map(({ id, item }): BeatAction => ({
       kind: "attention", item: id, task: item.task, owner: item.owner, overdue: isOverdue(item, Date.parse(at)), text: item.text
     }))
-    return { reported, queue }
+    return { reported, queue, deciderOwns }
   })

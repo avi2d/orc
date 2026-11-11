@@ -33,7 +33,8 @@ A failed child keeps its parent waiting.
 `orc backlog` shows the count on the parent's line, as in `orc-1 parent orc 3 of 5 done Ship the whole feature`.
 
 When every scout and task child closed done and every ship child with a PR merged, the beat starts the parent's final check once.
-The runner queues it as `orc run <task-file> --kind parent --sandbox none`, which reviews no code and changes nothing in the checkout.
+The runner queues it as `orc run <task-file> --branch orc/<task-id>-parent --kind parent --sandbox none`, which reviews no code and changes nothing in the checkout.
+It starts fresh there and never resumes the worker's failed run, whose partial work stays on `orc/<task-id>`.
 Pi runs the whole result in the real place it serves, checks each done criterion, and ends `agent-report.md` with the line `verdict: pass` or `verdict: fail`.
 A report whose last line is `verdict: pass` closes the parent done with its report.
 Any other report records the run failed with `the final check did not end its report at <path> with verdict: pass`, and the beat closes the parent failed with that reason and keeps the report path.
@@ -73,7 +74,12 @@ A request within the budget prints `{"schema": "orc.split.v1", "plan": "whole", 
 A ship worker that finds the change over the budget can stop and propose a split using the same `orc.split.v1` document.
 Orc records the run as failed without running checks or opening a PR.
 `orc runner result <task-id> --json` returns the validated document as `result.run.split`, and the text result prints it in the run reason.
-The beat closes the task failed with that reason and does not create the proposed children.
+The beat turns the task into a parent instead of closing it, with the proposal's done criteria under `## Done when` and `split: {"by": "run", "reason": <text>}`.
+It adds one ship child for each slice, linked and waiting as [Splitting at intake](#splitting-at-intake) adds them, and starts every child that waits on nothing in the same beat.
+The beat applies a worker’s split only to a task with no parent.
+A child’s proposal closes it failed with its run reason, and adds no children.
+The beat prints `split <task-id> on <machine> into <child-ids>: <reason>` and records the event `<task-id>.split` that orc chat posts, as in `orc-1 Ship task splitting split at run into orc-2 Record the split, orc-3 Show the plan: <reason>`.
+A run whose proposal orc refused ends as `invalid split proposal: <why>`, and the beat closes that task failed with no children.
 
 ### Changing a plan
 

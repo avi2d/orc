@@ -1,13 +1,15 @@
 import { Array as Arr, DateTime, Duration, Effect, FileSystem, Option, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { backlogPaths, closeStartedTask } from "./backlog"
+import { backlogPaths, closeStartedTask, findTask, listTasks } from "./backlog"
+import { recordEvent } from "./events"
+import { applyRunSplit, splitEventText } from "./split"
 import type { BeatAction, Progress } from "./beat-action"
 import type { DispatchConfig } from "./config"
 import { ownedBySweep, throughFor } from "./machine-reach"
 import { logWrittenAt, stallMillis } from "./stall"
 import { answersFor, askStartedTask, markAnswersRelayed, parkStartedTask } from "./parked"
-import { taskLabel } from "./pueue-status"
-import { type Command, type RunnerError, type RunnerRequirements, taskBranch } from "./runner"
+import { type Command, type RunnerError, type RunnerRequirements } from "./runner"
+import { runLabel, taskBranch } from "./runner-label"
 import { endingFromResult, type Relay, relayAnswers, relayAnswersThrough, type RunEnding, readResult, readResultThrough, type RunnerResult } from "./runner-result"
 import type { TaskFileError, TaskRecord } from "./task-record"
 
@@ -74,6 +76,27 @@ const endTask = (
       return parked === null
         ? Option.none()
         : Option.some({ kind: "parked", task: id, machine, branch, questions: ending.questions.map((question) => question.id), decider: [] } satisfies BeatAction)
+    }
+    if (ending.kind === "split") {
+      const at = yield* nowIso
+      const applied = yield* applyRunSplit(root, task, ending.plan, at).pipe(
+        Effect.map((value) => ({ kind: "applied" as const, value })),
+        Effect.catchTags({
+          BacklogError: (error) => Effect.succeed({ kind: "failed" as const, detail: error.detail }),
+          TaskFileError: (error) => Effect.succeed({ kind: "failed" as const, detail: error.detail })
+        })
+      )
+      if (applied.kind === "applied") {
+        const reason = ending.plan.reason.trim()
+        yield* recordEvent(root, { key: id + ".split", at, text: splitEventText(applied.value, "run", reason) }).pipe(Effect.catchTag("BacklogError", () => Effect.void))
+        return Option.some({ kind: "split", task: id, machine, children: applied.value.children.map((child) => child.spec.id), reason } satisfies BeatAction)
+      }
+      const reopened = yield* findTask(root, id).pipe(Effect.orElseSucceed(() => null))
+      if (reopened !== null && reopened.state.kind === "new" && reopened.spec.kind === "parent") {
+        const children = (yield* listTasks(root).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<TaskRecord>))).filter((candidate) => candidate.spec.parent === id).map((candidate) => candidate.spec.id)
+        return Option.some({ kind: "close-failed", task: id, machine, reason: "split " + id + " into " + (children.length === 0 ? "no children" : children.join(", ")) + " failed: " + applied.detail } satisfies BeatAction)
+      }
+      return Option.none()
     }
     const closed = yield* closeStartedTask(root, id, ending.outcome, ending.reason, { pr: ending.pr, report: ending.report }, yield* nowIso).pipe(
       Effect.catchTag("BacklogError", () => Effect.succeed(null))
@@ -170,6 +193,17 @@ const clearUnread = (
     Effect.catchTag("PlatformError", () => Effect.succeed<number | null>(null))
   )
 
+const applicableEndingOf = (task: TaskRecord, reading: CloseReading, ending: RunEnding): RunEnding =>
+  reading.kind === "read" && ending.kind === "split" && task.spec.parent !== null
+    ? {
+      kind: "close",
+      outcome: "failed",
+      reason: reading.result.run?.endReason ?? "the run proposed a split, and a child applies no split",
+      pr: reading.result.run?.prLink ?? null,
+      report: null
+    } satisfies RunEnding
+    : ending
+
 // A finished run ends its task here, because no other beat step reads a started task after its run ends.
 export const closeFinished = (
   context: CloseContext,
@@ -181,7 +215,7 @@ export const closeFinished = (
     }
     const claim = task.state.claim
     const started = task.state.started
-    const label = taskLabel(context.home, task.spec.id)
+    const label = runLabel(context.home, task.spec.id, task.spec.kind)
     const machine = context.config.machines.find((entry) => entry.name === claim.machine)
     if (machine === undefined) {
       return { kind: "untracked" } satisfies Progress
@@ -215,6 +249,6 @@ export const closeFinished = (
       const action = reading.asking === null ? null : yield* serveAsking(context, task, claim.machine, reading.asking, relay)
       return { kind: "running", outputAt: reading.outputAt, action } satisfies Progress
     }
-    const ended = yield* endTask(context.root, task, claim.machine, ending)
+    const ended = yield* endTask(context.root, task, claim.machine, applicableEndingOf(task, reading, ending))
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
   })

@@ -2,7 +2,7 @@
 Orc keeps a backlog of agent tasks and starts each on a machine with room.
 You say a task in `orc chat` to Pi on the orchestrator model, or add one with `orc backlog add`.
 Each `orc beat` starts the tasks that can start, and `orc runner start` queues each run in pueue on its machine.
-The beat later closes the task done, failed or stopped, with the PR link when its run opened one.
+The beat later closes the task done, failed or stopped, with the PR link when its run opened one, or turns a task with no parent into a parent on a worker split proposal, as [Task kinds](https://github.com/avi2d/orc/blob/main/docs/run/task-kinds.md#a-worker-split-proposal) shows.
 
 ## Before you begin
 
