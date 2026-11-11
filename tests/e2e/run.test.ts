@@ -246,7 +246,7 @@ describe("runWithHistory decides the implement step", () => {
     })
   }, 60_000)
 
-  test("a split from a Pi process that exited nonzero is not accepted as a proposal", async () => {
+  test("a split that stopped cleanly is accepted even when Pi exited nonzero instead of rejecting on the exit code", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const proposal = { schema: "orc.split.v1", plan: "split", reason: "two areas", done: ["both work"], children: [
@@ -255,9 +255,8 @@ describe("runWithHistory decides the implement step", () => {
         const sha = await commitOnBranch(dir, "orc/test")
         await capturedSession(home, sessionEnding({ role: "assistant", content: [{ type: "text", text: "ORC_SPLIT\n" + JSON.stringify(proposal) + "\nORC_COMPLETE" }], stopReason: "stop" }))
         const outcome = await runStep(dir, home, async (_run, sessionsDir) => ({ sessionId: "split", sessionFile: join(sessionsDir, "2026-10-19T10-00-00-000Z_0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b.jsonl"), commits: [{ sha }], exitCode: 1 }))
-        expect(outcome.run?.endReason).not.toStartWith("split proposal: ")
+        expect(outcome.run?.endReason).toBe("split proposal: " + JSON.stringify(proposal))
         expect(outcome.report.checksRounds).toBeNull()
-        expect(outcome.evidence).toContain("Pi exited with code 1")
         expect(outcome.report.prLink).toBeNull()
       })
     })

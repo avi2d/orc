@@ -1,6 +1,6 @@
 import { Option, Schema } from "effect"
 import type { AgentFile } from "./agents"
-import { buildImplementPrompt } from "./pi"
+import { implementInstructions } from "./pi"
 import { assistantContent } from "./pi-run"
 
 const longSessionTurnLimit = 300
@@ -162,5 +162,5 @@ export const handoverImplementPrompt = (agent: AgentFile, taskFile: string, note
     "",
     note.trimEnd(),
     "",
-    buildImplementPrompt({ ...agent, body: "" }, taskFile)
+    implementInstructions(taskFile, "what the note leaves undone")
   ].join("\n")
