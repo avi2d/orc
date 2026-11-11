@@ -1,6 +1,5 @@
 import { type BeatAction, type BeatReport, type MachineRoom } from "./beat"
-import { dependencyWaits } from "./beat-place"
-import { type ChildCount, childCount } from "./beat-place"
+import { type ChildCount, childCount, dependencyWaits, taskWait } from "./beat-place"
 import type { Project } from "./config"
 import { describeQuota } from "./quota"
 import type { TaskKind } from "../task-kind"
@@ -45,6 +44,7 @@ type TaskJson = {
   readonly machine: string | null
   readonly parent: string | null
   readonly children: ChildCount | null
+  readonly wait: string | null
   readonly split: SplitMark | null
   readonly dependsOn: ReadonlyArray<string>
   readonly created: string
@@ -117,6 +117,7 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     machine: record.spec.machine,
     parent: record.spec.parent,
     children: record.spec.kind === "parent" ? childCount(record, view.tasks, view.merged) : null,
+    wait: record.state.kind === "new" ? taskWait(record, view.tasks, view.merged) : null,
     split: record.spec.split,
     dependsOn: record.spec.dependsOn,
     created: record.spec.created,

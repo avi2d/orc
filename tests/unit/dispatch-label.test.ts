@@ -119,7 +119,7 @@ describe("the board", () => {
   test("the JSON names its schema version so a reader can refuse a newer one", () => {
     const json = backlogJson({ tasks: [newTask("mac")], events: [], projects: { kind: "read", projects }, room: { kind: "unread", reason: "no dispatch.json" }, merged: new Set() })
     expect(json.schema).toBe("orc.backlog.v1")
-    expect(json.tasks[0]).toEqual({ id: "task-1", title: "Fix the thing", project: "orc", kind: "ship", machine: "mac", parent: null, children: null, split: null, dependsOn: [], created: spec.created, hold: null, parked: null, status: "new" })
+    expect(json.tasks[0]).toEqual({ id: "task-1", title: "Fix the thing", project: "orc", kind: "ship", machine: "mac", parent: null, children: null, wait: null, split: null, dependsOn: [], created: spec.created, hold: null, parked: null, status: "new" })
     expect(json.room).toBeNull()
   })
   test("the project list sits beside the backlog instead of under it", () => {
