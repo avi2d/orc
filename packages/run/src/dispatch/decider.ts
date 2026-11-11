@@ -1,7 +1,7 @@
 import { Data, Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { bundledAgentsDir } from "../agents"
-import { openItems, readItem, recordDecision, reviewQuestionId, routeReviewQuestions } from "./attention"
+import { claimDeciding, openItems, readItem, recordDecision, reviewQuestionId, routeReviewQuestions } from "./attention"
 import { findTask } from "./backlog"
 import type { BacklogError } from "./backlog-write"
 import { answerTask } from "./parked"
@@ -108,6 +108,9 @@ export const decideReviewQuestions = (
       }
       const question = task.parked?.questions.find((candidate) => reviewQuestionId(task.spec.id, candidate.id, candidate.asked) === entry.id)
       if (question === undefined || question.answer !== null) {
+        continue
+      }
+      if (!(yield* claimDeciding(root, entry.id, at))) {
         continue
       }
       policy ??= yield* fs.readFileString(deciderPolicyFile()).pipe(Effect.orElseSucceed(() => ""))

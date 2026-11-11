@@ -4,9 +4,8 @@ import type { Argv } from "../agent-exec"
 import { textInput } from "../agent-exec"
 import { providerEnvOf } from "../model-route"
 import { readOrcConfig } from "../orc-config"
+import { deciderTimeoutMillis } from "./attention"
 import { type AskDecider, DeciderUnheard } from "./decider"
-
-const deciderSeconds = 180
 
 // The policy replaces Pi's coding prompt and the call gets no tools, so the decider only reads the question and replies.
 const deciderArgv = (model: string, policy: string): Argv => [
@@ -36,6 +35,6 @@ export const askDeciderWithPi = (home: string): AskDecider => (request) =>
     return stdout
   }).pipe(
     Effect.scoped,
-    Effect.timeoutOrElse({ duration: Duration.seconds(deciderSeconds), orElse: () => Effect.fail(new DeciderUnheard({ reason: "pi gave no reply in " + deciderSeconds + " seconds" })) }),
+    Effect.timeoutOrElse({ duration: Duration.millis(deciderTimeoutMillis), orElse: () => Effect.fail(new DeciderUnheard({ reason: "pi gave no reply in " + deciderTimeoutMillis / 1000 + " seconds" })) }),
     Effect.catchTag("PlatformError", (error) => Effect.fail(new DeciderUnheard({ reason: "pi did not run: " + error.message })))
   )

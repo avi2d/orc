@@ -4,10 +4,11 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { openItems, routeReviewQuestions } from "../../../packages/run/src/dispatch/attention"
-import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
+import { attentionJson, attentionText } from "../../../packages/run/src/dispatch/attention-view"
+import { claimDeciding, decidedItems, openItems, routeReviewQuestions } from "../../../packages/run/src/dispatch/attention"
+import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
 import { type AskDecider, DeciderUnheard, decideReviewQuestions, type DeciderRequest } from "../../../packages/run/src/dispatch/decider"
-import { askStartedTask } from "../../../packages/run/src/dispatch/parked"
+import { answerTask, askStartedTask } from "../../../packages/run/src/dispatch/parked"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -102,6 +103,58 @@ describe("the decider", () => {
       const heard: Array<DeciderRequest> = []
       expect(await decide(root, replies({ [r2.text]: answer }, heard))).toEqual([])
       expect(heard).toEqual([])
+    })
+  })
+
+  test("a decider answer lists under decided with its words, and leaves the list once its task closes, while a user answer never lists there", async () => {
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [r2.text]: answer, [r3.text]: escalate }))
+      await run(answerTask(root, "orc-1", "r3=Keep the old flag", "2026-11-02T10:22:00.000Z"))
+      await run(routeReviewQuestions(root, await run(listTasks(root)), "2026-11-02T10:22:00.000Z"))
+      const decided = await run(decidedItems(root, await run(listTasks(root))))
+      expect(decided.map((entry) => entry.id)).toEqual([r2Item])
+      expect(attentionJson(await run(openItems(root)), "2026-11-02T10:30:00.000Z", decided)).toEqual({
+        schema: "orc.attention.v1",
+        at: "2026-11-02T10:30:00.000Z",
+        items: [],
+        decided: [{
+          id: r2Item,
+          kind: "review-question",
+          task: "orc-1",
+          text: r2.text,
+          asked,
+          owner: "decider",
+          decision: { kind: "answered", reason: "the intent says twice", at: decidedAt },
+          answer: { words: "Two retries", at: decidedAt }
+        }]
+      })
+      expect(await run(attentionText(false, root))).toContain("Decided:\nanswered " + r2Item + ": Two retries (the intent says twice)")
+      await run(closeStartedTask(root, "orc-1", "done", "the upload retries", { pr: null, report: null }, "2026-11-02T10:40:00.000Z"))
+      expect(await run(decidedItems(root, await run(listTasks(root))))).toEqual([])
+    })
+  })
+
+  test("a beat skips an item another beat is deciding instead of asking the model twice", async () => {
+    await withAskingTask(async (root) => {
+      expect(await run(claimDeciding(root, r2Item, decidedAt))).toBe(true)
+      const heard: Array<DeciderRequest> = []
+      await decide(root, replies({ [r2.text]: answer, [r3.text]: escalate }, heard))
+      expect(heard).toHaveLength(1)
+      expect((await run(openItems(root))).map((entry) => entry.id)).toEqual([r2Item, r3Item])
+      expect(await itemFile(root, r2Item)).toMatchObject({ owner: "decider", deciding: { at: decidedAt }, state: { kind: "open" } })
+    })
+  })
+
+  test("a deciding mark older than the decider timeout is retaken instead of stalling the question", async () => {
+    await withAskingTask(async (root) => {
+      expect(await run(claimDeciding(root, r2Item, "2026-11-02T10:17:00.000Z"))).toBe(true)
+      const heard: Array<DeciderRequest> = []
+      await decide(root, replies({ [r2.text]: answer, [r3.text]: escalate }, heard))
+      expect(heard).toHaveLength(2)
+      expect(await itemFile(root, r2Item)).toMatchObject({
+        decision: { kind: "answered", reason: "the intent says twice", at: decidedAt },
+        state: { kind: "closed", answer: { words: "Two retries", at: decidedAt } }
+      })
     })
   })
 

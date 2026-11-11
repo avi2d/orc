@@ -240,12 +240,9 @@ const parseHeavy = (rest: ReadonlyArray<string>): DispatchArgs => {
   return { kind: "UsageError", detail: "orc heavy takes path, check [--json], watch or watch-once, got \"" + verb + "\"" }
 }
 
-const parseAttention = (rest: ReadonlyArray<string>): DispatchArgs =>
-  parseJsonFlag(rest, (json) => ({ kind: "ShowAttention", json }))
-
 export const parseDispatchArgs = (command: "backlog" | "attention" | "beat" | "runner" | "merge" | "heavy", rest: ReadonlyArray<string>): DispatchArgs => {
   if (command === "attention") {
-    return parseAttention(rest)
+    return parseJsonFlag(rest, (json) => ({ kind: "ShowAttention", json }))
   }
   if (command === "heavy") {
     return parseHeavy(rest)

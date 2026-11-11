@@ -4,7 +4,7 @@ import type { DispatchArgs, TaskSource } from "./args"
 import { addTask, backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted } from "./backlog"
 import { backlogPresent, noBacklog } from "./backlog-write"
 import { routeReviewQuestions } from "./attention"
-import { attentionNow } from "./cli-attention"
+import { attentionText } from "./attention-view"
 import { holdTask } from "./backlog-hold"
 import { circularDependency, dependTask, refusedLinks } from "./backlog-depend"
 import { answerTask } from "./parked"
@@ -323,7 +323,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
     switch (args.kind) {
       case "ShowBacklog":
       case "ShowAttention": {
-        yield* Console.log(yield* (args.kind === "ShowBacklog" ? backlogText(args.json, place) : attentionNow(args, backlogRoot(place))))
+        yield* Console.log(yield* (args.kind === "ShowBacklog" ? backlogText(args.json, place) : attentionText(args.json, backlogRoot(place))))
         break
       }
       case "AddTask": {

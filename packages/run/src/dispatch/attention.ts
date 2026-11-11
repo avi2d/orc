@@ -5,6 +5,8 @@ import type { TaskRecord } from "./task-record"
 
 const overdueMillis = 5 * 60 * 1000
 
+export const deciderTimeoutMillis = 180 * 1000
+
 const Answer = Schema.Struct({ words: Schema.String, at: Schema.String })
 
 const Decision = Schema.Struct({ kind: Schema.Literals(["answered", "escalated"]), reason: Schema.String, at: Schema.String })
@@ -16,6 +18,7 @@ const AttentionItem = Schema.Struct({
   asked: Schema.String,
   owner: Schema.Literals(["decider", "user"]),
   decision: Schema.optionalKey(Decision),
+  deciding: Schema.optionalKey(Schema.Struct({ at: Schema.String })),
   state: Schema.Union([
     Schema.Struct({ kind: Schema.Literal("open") }),
     Schema.Struct({ kind: Schema.Literal("closed"), answer: Answer }),
@@ -24,7 +27,7 @@ const AttentionItem = Schema.Struct({
 })
 
 export type AttentionItem = typeof AttentionItem.Type
-export type Asked = Omit<AttentionItem, "state" | "decision">
+export type Asked = Omit<AttentionItem, "state" | "decision" | "deciding">
 type ItemAnswer = typeof Answer.Type
 export type Decision = typeof Decision.Type
 
@@ -39,13 +42,29 @@ const itemFile = (root: string, id: string): string => attentionFolder(root) + "
 const encodeItem = (id: string, item: AttentionItem): Effect.Effect<string, BacklogError> =>
   Schema.encodeEffect(ItemFile)(item).pipe(Effect.mapError((error) => new BacklogError({ detail: "cannot write the item " + id + ": " + error.message })))
 
-const writeItem = (root: string, id: string, item: AttentionItem): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+const replaceItem = (root: string, id: string, before: string, encoded: string): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
+    if ((yield* readIfPresent(itemFile(root, id))) !== before) {
+      return false
+    }
     const fs = yield* FileSystem.FileSystem
     const scratch = scratchName(attentionFolder(root), id)
     const file = itemFile(root, id)
-    yield* fs.writeFileString(scratch, yield* encodeItem(id, item)).pipe(Effect.mapError(platformFailure("write " + scratch)))
+    yield* fs.writeFileString(scratch, encoded).pipe(Effect.mapError(platformFailure("write " + scratch)))
     yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
+    return true
+  })
+
+const writeItem = (root: string, id: string, item: AttentionItem): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const file = itemFile(root, id)
+    const before = yield* readIfPresent(file)
+    if (before === null) {
+      return
+    }
+    if (!(yield* replaceItem(root, id, before, yield* encodeItem(id, item)))) {
+      return
+    }
   })
 
 // The same question at the same asking always names one file, so routing it again opens nothing new.
@@ -83,7 +102,7 @@ const settleOpenItem = (root: string, id: string, state: SettledState): Effect.E
     if (item.state.kind !== "open") {
       return "already closed" as const
     }
-    yield* writeItem(root, id, { ...item, state })
+    yield* writeItem(root, id, { ...item, deciding: undefined, state })
     return "settled" as const
   })
 
@@ -102,15 +121,27 @@ export const recordDecision = (root: string, id: string, decision: Decision): Ef
     if (item.state.kind !== "open") {
       return
     }
-    const next: AttentionItem = { ...item, decision, owner: decision.kind === "escalated" ? "user" : item.owner }
+    const next: AttentionItem = { ...item, deciding: undefined, decision, owner: decision.kind === "escalated" ? "user" : item.owner }
     const encoded = yield* encodeItem(id, next)
-    if ((yield* readIfPresent(file)) !== before) {
-      return
+    yield* replaceItem(root, id, before, encoded).pipe(Effect.asVoid)
+  })
+
+export const claimDeciding = (root: string, id: string, at: string): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const file = itemFile(root, id)
+    const before = yield* readIfPresent(file)
+    if (before === null) {
+      return false
     }
-    const fs = yield* FileSystem.FileSystem
-    const scratch = scratchName(attentionFolder(root), id)
-    yield* fs.writeFileString(scratch, encoded).pipe(Effect.mapError(platformFailure("write " + scratch)))
-    yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
+    const item = yield* Schema.decodeEffect(ItemFile)(before).pipe(Effect.mapError((error) => new BacklogError({ detail: file + " holds no item orc reads: " + error.message })))
+    if (item.state.kind !== "open") {
+      return false
+    }
+    const since = item.deciding === undefined ? Number.NaN : Date.parse(item.deciding.at)
+    if (!Number.isNaN(since) && Date.parse(at) - since < deciderTimeoutMillis) {
+      return false
+    }
+    return yield* replaceItem(root, id, before, yield* encodeItem(id, { ...item, deciding: { at } }))
   })
 
 type WithdrawOutcome = "withdrawn" | "already closed" | "missing"
@@ -139,14 +170,15 @@ export interface DecidedItem {
   readonly item: AttentionItem
 }
 
-export const decidedItems = (root: string): Effect.Effect<ReadonlyArray<DecidedItem>, BacklogError, FileSystem.FileSystem> =>
+export const decidedItems = (root: string, tasks: ReadonlyArray<TaskRecord>): Effect.Effect<ReadonlyArray<DecidedItem>, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
+    const closedTasks = new Set(tasks.filter((task) => task.state.kind === "closed").map((task) => task.spec.id))
     const ids = (yield* readNames(attentionFolder(root)))
       .filter((name) => name.endsWith(fileSuffix) && !name.startsWith("."))
       .map((name) => name.slice(0, -fileSuffix.length))
     const read = yield* Effect.forEach(ids, (id) => readItem(root, id).pipe(Effect.map((item) => (item === null ? null : { id, item }))))
     return read
-      .filter((entry): entry is DecidedItem => entry !== null && entry.item.state.kind === "closed" && entry.item.decision?.kind === "answered")
+      .filter((entry): entry is DecidedItem => entry !== null && entry.item.state.kind === "closed" && entry.item.decision?.kind === "answered" && !closedTasks.has(entry.item.task))
       .toSorted((left, right) => Date.parse(left.item.asked) - Date.parse(right.item.asked) || left.id.localeCompare(right.id))
   })
 

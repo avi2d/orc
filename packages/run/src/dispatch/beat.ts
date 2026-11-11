@@ -337,17 +337,26 @@ export const runBeat = (
     const upstream = yield* watchUpstream(root, projects, sources.readUpstream, at)
     const current = yield* listTasks(root)
     yield* routeReviewQuestions(root, current, at)
+    const early: BeatContext = { ...context, tasks: current, overloaded: new Map() }
+    const renewals = yield* Effect.forEach(current, (task) => renewTask(early, task))
+    const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))
     const decided = yield* decideReviewQuestions(root, current, sources.askDecider, at)
     const latest = decided.some((entry) => entry.verdict.kind === "answered") ? yield* listTasks(root) : current
+    const answeredTasks = new Set(decided.flatMap((entry) => entry.verdict.kind === "answered" ? [entry.task] : []))
+    const relayProgress = answeredTasks.size === 0
+      ? []
+      : yield* Effect.forEach(latest.filter((task) => task.state.kind === "started" && answeredTasks.has(task.spec.id)), (task) => closeFinished(context, task))
+    const relayed = settledProgress(relayProgress)
+    releaseClosedSlots(context.live, relayed.closed)
     const queued = latest.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: latest, overloaded }
-    const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, task))
-    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at))
     return { beat, at, quota, room: readRoom(config.machines, latest), actions: [
         ...settled.closed,
+        ...relayed.closed,
         ...settled.asking,
+        ...relayed.asking,
         ...stalls.flatMap(Option.toArray),
         ...prs.flatMap(Option.toArray),
         ...upstream,

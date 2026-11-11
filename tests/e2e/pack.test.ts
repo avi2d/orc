@@ -51,7 +51,6 @@ const expectedFiles = [
   "src/dispatch/beat.ts",
   "src/dispatch/board.ts",
   "src/dispatch/chat-event.ts",
-  "src/dispatch/cli-attention.ts",
   "src/dispatch/cli-stop.ts",
   "src/dispatch/cli.ts",
   "src/dispatch/config.ts",

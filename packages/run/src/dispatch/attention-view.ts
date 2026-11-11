@@ -1,6 +1,8 @@
 import { DateTime, Effect, type FileSystem } from "effect"
 import { ageMillis, type AttentionItem, type DecidedItem, decidedItems, isOverdue, type OpenItem, openItems } from "./attention"
+import { listTasks } from "./backlog"
 import { type BacklogError, backlogPresent, noBacklog } from "./backlog-write"
+import type { TaskFileError } from "./task-record"
 import { formatTable } from "../table"
 
 const ATTENTION_JSON_SCHEMA = "orc.attention.v1"
@@ -14,8 +16,6 @@ interface DecidedJson {
   readonly owner: AttentionItem["owner"]
   readonly decision: NonNullable<AttentionItem["decision"]>
   readonly answer: { readonly words: string; readonly at: string }
-  readonly ageSeconds: number
-  readonly overdue: boolean
 }
 
 interface AttentionJson {
@@ -49,9 +49,7 @@ export const attentionJson = (items: ReadonlyArray<OpenItem>, at: string, decide
       asked: item.asked,
       owner: item.owner,
       decision: item.decision,
-      answer: item.state.answer,
-      ageSeconds: Math.floor(ageMillis(item, nowMillis) / 1000),
-      overdue: isOverdue(item, nowMillis)
+      answer: item.state.answer
     }] : [])
   }
 }
@@ -66,27 +64,24 @@ const ageText = (seconds: number): string => {
 
 const formatAttention = (items: ReadonlyArray<OpenItem>, decided: ReadonlyArray<DecidedItem>, at: string): string => {
   const view = attentionJson(items, at, decided)
-  const parts: Array<string> = []
-  if (view.items.length > 0) {
-    parts.push(formatTable(
+  const open = view.items.length > 0
+    ? formatTable(
       ["ITEM", "KIND", "TASK", "OWNER", "AGE", "TEXT"],
       view.items.map((item) => [item.id, item.kind, item.task, item.owner, ageText(item.ageSeconds) + (item.overdue ? " overdue" : ""), item.text]),
       "nothing needs anyone"
-    ))
-  }
-  for (const entry of view.decided) {
-    parts.push("answered " + entry.id + ": " + entry.answer.words + " (" + entry.decision.reason + ")")
-  }
-  return parts.length > 0 ? parts.join("\n") : "nothing needs anyone"
+    )
+    : "nothing needs anyone"
+  const answered = view.decided.map((entry) => "answered " + entry.id + ": " + entry.answer.words + " (" + entry.decision.reason + ")")
+  return answered.length > 0 ? open + "\n\nDecided:\n" + answered.join("\n") : open
 }
 
-export const attentionText = (json: boolean, root: string): Effect.Effect<string, BacklogError, FileSystem.FileSystem> =>
+export const attentionText = (json: boolean, root: string): Effect.Effect<string, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     if (!json && !(yield* backlogPresent(root))) {
       return noBacklog(root)
     }
     const items = yield* openItems(root)
-    const decided = yield* decidedItems(root)
+    const decided = yield* decidedItems(root, yield* listTasks(root))
     const at = DateTime.formatIso(yield* DateTime.now)
     return json ? JSON.stringify(attentionJson(items, at, decided)) : formatAttention(items, decided, at)
   })
