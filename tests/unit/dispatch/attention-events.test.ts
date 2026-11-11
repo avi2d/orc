@@ -180,12 +180,81 @@ describe("overdue waits in the attention queue", () => {
     }
   })
 
+  test("an overdue wait an overlapping beat withdrew opens again on the next beat instead of staying withdrawn", async () => {
+    const previous = process.env.TZ
+    process.env.TZ = "UTC"
+    try {
+      await withBacklog(async (root) => {
+        await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-02T00:01:00.000Z"))
+        expect((await run(openItems(root))).map(({ id }) => id)).toEqual(["orc-2.overdue-wait.2026-12-01"])
+        const unheld: TaskRecord = { spec: { ...spec, id: "orc-2", title: "Pick the API" }, hold: null, parked: null, state: { kind: "new" } }
+        await run(routeTaskItems(root, [unheld], "2026-12-02T00:02:00.000Z"))
+        expect(await run(openItems(root))).toEqual([])
+        await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-02T00:03:00.000Z"))
+        expect((await run(openItems(root))).map(({ id }) => id)).toEqual(["orc-2.overdue-wait.2026-12-01"])
+        expect(await itemFiles(root)).toMatchObject([{ kind: "overdue-wait", state: { kind: "open" } }])
+      })
+    } finally {
+      if (previous === undefined) {
+        delete process.env.TZ
+      } else {
+        process.env.TZ = previous
+      }
+    }
+  })
+
+  test("an overdue wait reopened after an overlapping beat withdrew it shows the hold reason the task has now instead of the one it had", async () => {
+    const previous = process.env.TZ
+    process.env.TZ = "UTC"
+    try {
+      await withBacklog(async (root) => {
+        await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-02T00:01:00.000Z"))
+        const unheld: TaskRecord = { spec: { ...spec, id: "orc-2", title: "Pick the API" }, hold: null, parked: null, state: { kind: "new" } }
+        await run(routeTaskItems(root, [unheld], "2026-12-02T00:02:00.000Z"))
+        const relabelled: TaskRecord = { ...heldTask("2026-12-01", null), hold: { reason: "waiting on legal review", until: "2026-12-01", questions: [], answer: null } }
+        await run(routeTaskItems(root, [relabelled], "2026-12-02T00:03:00.000Z"))
+        const open = await run(openItems(root))
+        expect(open.map(({ id }) => id)).toEqual(["orc-2.overdue-wait.2026-12-01"])
+        expect(open[0]?.item.text).toContain("waiting on legal review")
+        expect(open[0]?.item.text).not.toContain("REST or gRPC")
+      })
+    } finally {
+      if (previous === undefined) {
+        delete process.env.TZ
+      } else {
+        process.env.TZ = previous
+      }
+    }
+  })
+
   test("answering the hold closes its overdue item with the answer instead of withdrawing it", async () => {
     const previous = process.env.TZ
     process.env.TZ = "UTC"
     try {
       await withBacklog(async (root) => {
         await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-02T00:01:00.000Z"))
+        await run(routeTaskItems(root, [heldTask("2026-12-01", { words: "REST", at: "2026-12-02T09:00:00.000Z" })], "2026-12-02T09:00:00.000Z"))
+        expect(await run(openItems(root))).toEqual([])
+        expect(await itemFiles(root)).toMatchObject([{ kind: "overdue-wait", state: { kind: "closed", answer: { words: "REST", at: "2026-12-02T09:00:00.000Z" } } }])
+      })
+    } finally {
+      if (previous === undefined) {
+        delete process.env.TZ
+      } else {
+        process.env.TZ = previous
+      }
+    }
+  })
+
+  test("an overdue wait an overlapping beat withdrew closes with its answer instead of staying withdrawn", async () => {
+    const previous = process.env.TZ
+    process.env.TZ = "UTC"
+    try {
+      await withBacklog(async (root) => {
+        await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-02T00:01:00.000Z"))
+        const unheld: TaskRecord = { spec: { ...spec, id: "orc-2", title: "Pick the API" }, hold: null, parked: null, state: { kind: "new" } }
+        await run(routeTaskItems(root, [unheld], "2026-12-02T00:02:00.000Z"))
+        expect(await run(openItems(root))).toEqual([])
         await run(routeTaskItems(root, [heldTask("2026-12-01", { words: "REST", at: "2026-12-02T09:00:00.000Z" })], "2026-12-02T09:00:00.000Z"))
         expect(await run(openItems(root))).toEqual([])
         expect(await itemFiles(root)).toMatchObject([{ kind: "overdue-wait", state: { kind: "closed", answer: { words: "REST", at: "2026-12-02T09:00:00.000Z" } } }])

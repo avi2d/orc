@@ -3,7 +3,8 @@ import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs } from "./args"
 import { backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted } from "./backlog"
 import { backlogPresent, backlogRoot as backlogRootOf, noBacklog } from "./backlog-write"
-import { routeTaskItems } from "./attention"
+import { readAttention, routeTaskItems } from "./attention"
+import { deciderOwnership } from "./beat-attention"
 import { answerItemText, attentionText } from "./attention-view"
 import { holdTask } from "./backlog-hold"
 import { dropChild, planText } from "./backlog-plan"
@@ -57,15 +58,16 @@ const readView = (root: string): Effect.Effect<BacklogView, BacklogError | TaskF
     )
     const events = yield* unpostedEvents(root)
     const merged = yield* mergedIds(root)
+    const deciderOwns = deciderOwnership(yield* readAttention(root, tasks))
     if (reading.kind === "unread") {
-      return { tasks, events, projects: reading, room: reading, merged }
+      return { tasks, events, projects: reading, room: reading, merged, deciderOwns }
     }
     const projects = yield* readProjects(paths.projects, reading.config.machines).pipe(
       Effect.map((list): ProjectList => ({ kind: "read", projects: list })),
       Effect.catchTag("ConfigError", (error) => Effect.succeed<ProjectList>({ kind: "unread", reason: failure(error) }))
     )
     const room: RoomList = { kind: "read", room: readRoom(reading.config.machines, tasks) }
-    return { tasks, events, projects, room, merged }
+    return { tasks, events, projects, room, merged, deciderOwns }
   })
 
 const refuse = (detail: string) => Effect.fail(new BacklogError({ detail }))

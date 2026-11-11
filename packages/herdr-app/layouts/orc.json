@@ -1,0 +1,12 @@
+{
+  "id": "orc-views",
+  "type": "stack",
+  "preview": "layouts/orc.svg",
+  "active": "orc-board",
+  "header": { "content": { "mod": "orc-tabs" }, "height": 40 },
+  "children": [
+    { "id": "orc-board", "type": "block", "content": { "mod": "orc-board" } },
+    { "id": "orc-resources", "type": "block", "content": { "mod": "orc-resources" } },
+    { "id": "orc-agents", "type": "block", "content": { "mod": "orc-agents" } }
+  ]
+}

@@ -1,6 +1,8 @@
-import { Config, Context, DateTime, Effect, FileSystem, Layer, Result, Schema } from "effect";
+import { Config, Context, DateTime, Duration, Effect, FileSystem, Layer, Result, Schema } from "effect";
+import { CommandRunner } from "../command";
 import { decodeJson, decodeValue } from "../decode";
 import { mapOutcome, ok, type Outcome, unreachable } from "../reading";
+import { runDecoded } from "../source";
 import { selector } from "./environment";
 import { duplicateOf, MachinesFile, ProjectsFile, rawAccounts, strictAccount } from "./dispatch-schema";
 
@@ -49,6 +51,7 @@ export interface DispatchSnapshot {
   readonly machines: Outcome<ReadonlyArray<DispatchMachine>>;
   readonly projects: Outcome<ReadonlyArray<DispatchProject>>;
   readonly tasks: ReadonlyArray<DispatchTask>;
+  readonly waits: Outcome<BeatWaits>;
   readonly unread: ReadonlyArray<string>;
 }
 
@@ -77,6 +80,25 @@ const TaskFields = Schema.Struct({
 });
 
 type TaskFields = typeof TaskFields.Type;
+
+// Only orc knows which split sibling has merged, so each new task's wait comes from orc rather than from the task files.
+const BacklogWaits = Schema.Struct({
+  schema: Schema.Literal("orc.backlog.v1"),
+  tasks: Schema.Array(Schema.Struct({ id: Schema.String, wait: Schema.NullOr(Schema.String) })),
+});
+
+// A task id absent from the map has nothing the beat waits on.
+type BeatWaits = ReadonlyMap<string, string>;
+
+const beatWaitsOf = (backlog: typeof BacklogWaits.Type): BeatWaits =>
+  new Map(backlog.tasks.flatMap((task) => (task.wait === null ? [] : [[task.id, task.wait] as const])));
+
+const backlogTimeout = Duration.seconds(15);
+
+const readBeatWaits: Effect.Effect<Outcome<BeatWaits>, never, CommandRunner> = Effect.map(
+  runDecoded({ argv: ["orc", "backlog", "--json"], timeout: backlogTimeout }, decodeJson(BacklogWaits)),
+  (outcome) => mapOutcome(outcome, beatWaitsOf),
+);
 
 type TaskFolder = "new" | "taken" | "closed";
 
@@ -254,7 +276,7 @@ const readTasks = (
     return { tasks: orderedTasks(tasks), unread };
   });
 
-const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<DispatchSnapshot> =>
+const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<DispatchSnapshot, never, CommandRunner> =>
   Effect.gen(function* () {
     const present = yield* fs.exists(root).pipe(Effect.catchTag("PlatformError", () => Effect.succeed<boolean | null>(null)));
     if (present === null) {
@@ -265,6 +287,7 @@ const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<Di
         machines: unreachable(reason),
         projects: unreachable(reason),
         tasks: [],
+        waits: unreachable(reason),
         unread: [reason],
       };
     }
@@ -275,6 +298,7 @@ const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<Di
         machines: unreachable(missingBacklog(root)),
         projects: unreachable(missingBacklog(root)),
         tasks: [],
+        waits: unreachable(missingBacklog(root)),
         unread: [],
       };
     }
@@ -341,7 +365,8 @@ const readSnapshot = (fs: FileSystem.FileSystem, root: string): Effect.Effect<Di
       return outcome.kind === "unreachable" ? outcome.reason : file + ": " + outcome.issue;
     };
     const failed = [diagnostic(machinesFile, machines), diagnostic(projectsFile, projects)].filter((reason) => reason !== undefined);
-    return { root, missing: false, machines, projects, tasks, unread: [...unread, ...failed] };
+    const waits = yield* readBeatWaits;
+    return { root, missing: false, machines, projects, tasks, waits, unread: [...unread, ...failed] };
   });
 
 export interface DispatchReader {
@@ -351,15 +376,16 @@ export interface DispatchReader {
 
 export class DispatchSource extends Context.Service<DispatchSource, DispatchReader>()("orc-dash/DispatchSource") {}
 
-export const dispatchSourceLayer: Layer.Layer<DispatchSource, Config.ConfigError, FileSystem.FileSystem> = Layer.effect(
+export const dispatchSourceLayer: Layer.Layer<DispatchSource, Config.ConfigError, FileSystem.FileSystem | CommandRunner> = Layer.effect(
   DispatchSource,
   Effect.gen(function* () {
     const root = yield* backlogRoot;
     const fs = yield* FileSystem.FileSystem;
+    const runner = yield* CommandRunner;
     return {
       root,
       read: Effect.gen(function* () {
-        const snapshot = yield* readSnapshot(fs, root);
+        const snapshot = yield* Effect.provideService(readSnapshot(fs, root), CommandRunner, runner);
         const capturedAt = yield* DateTime.now;
         return { snapshot, capturedAt };
       }),

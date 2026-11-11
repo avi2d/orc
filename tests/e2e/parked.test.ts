@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
@@ -112,6 +112,42 @@ describe("a parked run", () => {
       })
       expect(await orcOk(fixture, ["beat"])).toContain("waits orc-1: parked on orc/orc-1 for the captain's answer to question-4, question-5")
       expect(await queuedSince(fixture)).toBeNull()
+    })
+  }, runnerTimeout)
+
+  test("a parked line names the decider's questions as the decider's, not the captain's", async () => {
+    await withFixture(async (fixture) => {
+      await startOnLinux(fixture)
+      await writeFile(join(fixture.home, "config.json"), JSON.stringify({ providers: [], models: { decider: "acme/small" } }))
+      const pi = join(fixture.dir, "bin", "pi")
+      const answer = JSON.stringify({ decision: "answer", answer: "Two retries", reason: "the intent says twice" })
+      const escalate = JSON.stringify({ decision: "escalate", reason: "only the captain knows" })
+      await writeFile(pi, "#!/bin/sh\nif grep -q 'Which retries' ; then printf '%s\\n' '" + answer + "' ; else printf '%s\\n' '" + escalate + "' ; fi\n")
+      await chmod(pi, 0o755)
+      await refuseOnQuestions(fixture)
+      expect(await orcOk(fixture, ["beat"])).toContain("parked orc-1 on orc/orc-1 for the captain's answer to question-5 and the decider's answer to question-4")
+    })
+  }, runnerTimeout)
+
+  test("a later beat's waits line names a question the decider is still deciding as the decider's, not the captain's", async () => {
+    await withFixture(async (fixture) => {
+      await startOnLinux(fixture)
+      await refuseOnQuestions(fixture)
+      await orcOk(fixture, ["beat"])
+      const folder = join(fixture.home, "backlog", "attention")
+      const name = (await readdir(folder)).find((entry) => entry.startsWith("orc-1.question-4."))
+      if (name === undefined) {
+        throw new Error("no attention item holds question-4")
+      }
+      const item: unknown = JSON.parse(await readFile(join(folder, name), "utf8"))
+      if (!isRecord(item)) {
+        throw new Error(name + " holds no item")
+      }
+      const { decision: _decision, ...rest } = item
+      await writeFile(join(folder, name), JSON.stringify({ ...rest, owner: "decider", deciding: { at: new Date().toISOString() } }))
+      const beat = await orcOk(fixture, ["beat"])
+      expect(beat).toContain("waits orc-1: parked on orc/orc-1 for the captain's answer to question-5 and the decider's answer to question-4")
+      expect(await backlogTaskOne(fixture)).toMatchObject({ wait: "parked on orc/orc-1 for the captain's answer to question-5 and the decider's answer to question-4" })
     })
   }, runnerTimeout)
 

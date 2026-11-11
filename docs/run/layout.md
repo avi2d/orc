@@ -9,6 +9,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/bin.ts` | The orc entry point |
 | `packages/run/src/args.ts` | The flag parsing for the orc command |
+| `packages/run/src/app-install.ts` | The `orc app install` copy of the built Herdr App mods, layout and keys merge |
 | `packages/run/src/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
 | `packages/run/src/orc-config.ts` | The reading of `config.json`: the providers, the heavy queue tuning and the implementer, fixer, orchestrator, planner and decider models |
 | `packages/run/src/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |

@@ -100,14 +100,25 @@ const heldReason = (task: TaskRecord): string | null =>
 export const openQuestions = (task: TaskRecord): ReadonlyArray<ParkedQuestion> =>
   task.parked?.questions.filter((question) => question.answer === null) ?? []
 
-const parkedReason = (task: TaskRecord): string | null => {
+export type DeciderOwns = (task: string, question: ParkedQuestion) => boolean
+
+export const answersAwaited = (captain: ReadonlyArray<string>, decider: ReadonlyArray<string>): string =>
+  [
+    ...(captain.length === 0 ? [] : ["the captain's answer to " + captain.join(", ")]),
+    ...(decider.length === 0 ? [] : ["the decider's answer to " + decider.join(", ")])
+  ].join(" and ")
+
+const parkedReason = (task: TaskRecord, deciderOwns: DeciderOwns): string | null => {
   const open = openQuestions(task)
-  return task.parked === null || open.length === 0
-    ? null
-    : "parked on " + task.parked.branch + " for the captain's answer to " + open.map((question) => question.id).join(", ")
+  if (task.parked === null || open.length === 0) {
+    return null
+  }
+  const owned = (question: ParkedQuestion): boolean => deciderOwns(task.spec.id, question)
+  const ids = (questions: ReadonlyArray<ParkedQuestion>): ReadonlyArray<string> => questions.map((question) => question.id)
+  return "parked on " + task.parked.branch + " for " + answersAwaited(ids(open.filter((question) => !owned(question))), ids(open.filter(owned)))
 }
 
-export const captainWait = (task: TaskRecord): string | null => heldReason(task) ?? parkedReason(task)
+export const answerWait = (task: TaskRecord, deciderOwns: DeciderOwns): string | null => heldReason(task) ?? parkedReason(task, deciderOwns)
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/
 

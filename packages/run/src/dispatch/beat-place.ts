@@ -1,6 +1,6 @@
 import { deliveryFor, type RunDelivery } from "../delivery"
 import { checkoutOn, type DispatchConfig, type Machine, modeOf, type Project } from "./config"
-import { captainWait, type TaskRecord } from "./task-record"
+import { answerWait, type DeciderOwns, type TaskRecord } from "./task-record"
 
 export interface MachineRoom {
   readonly machine: string
@@ -68,8 +68,8 @@ const splitSiblingUnmerged = (task: TaskRecord, dependency: TaskRecord, merged: 
   return pr !== null && !merged.has(dependency.spec.id)
 }
 
-export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string | null => {
-  const held = captainWait(task)
+export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>, deciderOwns: DeciderOwns): string | null => {
+  const held = answerWait(task, deciderOwns)
   if (held !== null) {
     return held
   }

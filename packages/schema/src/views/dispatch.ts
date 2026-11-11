@@ -42,21 +42,19 @@ const claimedMachine = (task: DispatchTask): string | undefined => {
 const busyOf = (machine: string, tasks: ReadonlyArray<DispatchTask>): number =>
   tasks.filter((task) => (task.state.kind === "taken" || task.state.kind === "started") && claimedMachine(task) === machine).length;
 
-// A task the backlog does not hold blocks forever, so it reads as waiting on the missing id.
-const dependencyWait = (task: DispatchTask, tasks: ReadonlyArray<DispatchTask>): string | undefined => {
-  for (const id of task.dependsOn) {
-    const dependency = tasks.find((candidate) => candidate.id === id);
-    if (dependency === undefined) return "waits on " + id + ", which the backlog does not hold";
-    if (dependency.state.kind !== "closed" || dependency.state.closing.outcome !== "done") return "waits on " + id;
-  }
-  return undefined;
+const beatWaitsUnread = "orc backlog --json is unread";
+
+const beatWaitsNote = (waits: DispatchSnapshot["waits"]): ReadonlyArray<string> => {
+  if (waits.kind === "ok") return [];
+  return [beatWaitsUnread + ": " + (waits.kind === "unreachable" ? waits.reason : waits.issue)];
 };
 
 const waitOf = (task: DispatchTask, snapshot: DispatchSnapshot): WaitRow => {
   const waiting = (reason: string): WaitRow => ({ id: task.id, title: task.title, project: task.project, reason });
   if (snapshot.unread.length > 0) return waiting("the beat cannot read the backlog");
-  const blocked = dependencyWait(task, snapshot.tasks);
-  if (blocked !== undefined) return waiting(blocked);
+  if (snapshot.waits.kind !== "ok") return waiting(beatWaitsUnread);
+  const held = snapshot.waits.value.get(task.id);
+  if (held !== undefined) return waiting(held);
   if (snapshot.projects.kind !== "ok") return waiting("the project list is unread");
   const project = snapshot.projects.value.find((candidate) => candidate.name === task.project);
   if (project === undefined) return waiting("the project " + task.project + " is not in the project list");
@@ -98,5 +96,7 @@ export const dispatchView = (snapshot: DispatchSnapshot): DispatchView => {
       value: snapshot.machines.value.map((machine) => ({ machine: machine.name, slots: machine.slots, busy: busyOf(machine.name, snapshot.tasks) })),
     }
     : snapshot.machines;
-  return { root: snapshot.root, missing: snapshot.missing, machines, runs, waiting, unread: snapshot.unread };
+  // Every new task already waits on the unread backlog, which orc backlog --json mostly fails on too, so its note would only repeat it.
+  const unread = snapshot.missing || snapshot.unread.length > 0 ? snapshot.unread : beatWaitsNote(snapshot.waits);
+  return { root: snapshot.root, missing: snapshot.missing, machines, runs, waiting, unread };
 };

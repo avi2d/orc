@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
 import { ConfigProvider, Effect, Layer } from "effect";
 import { DispatchSource, dispatchSourceLayer } from "@avi2dg/orc-schema";
+import { emptyBacklogStdout, orcBacklogPrinting } from "../../lib/dispatch-fixture";
 
 const root = mkdtempSync(join(tmpdir(), "orc-dash-dispatch-"));
 
@@ -31,6 +32,7 @@ const machinesAt = (backlog: string) =>
       Effect.provide(
         dispatchSourceLayer.pipe(
           Layer.provide(BunFileSystem.layer),
+          Layer.provide(orcBacklogPrinting(emptyBacklogStdout)),
           Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ ORC_HOME: backlog, HOME: root }))),
         ),
       ),

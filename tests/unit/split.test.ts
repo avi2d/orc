@@ -33,8 +33,8 @@ describe("a split sibling wait", () => {
   }
   const tasks = [parent, earlier, later]
   test("a later slice waits for its sibling PR to merge instead of starting on a main without it", () => {
-    expect(taskWait(later, tasks, new Set())).toBe("waits on orc-2")
-    expect(taskWait(later, tasks, new Set(["orc-2"]))).toBeNull()
+    expect(taskWait(later, tasks, new Set(), () => false)).toBe("waits on orc-2")
+    expect(taskWait(later, tasks, new Set(["orc-2"]), () => false)).toBeNull()
   })
   test("an unrelated task starts once its dependency closes done instead of waiting for the merge", () => {
     const other: TaskRecord = {
@@ -43,6 +43,6 @@ describe("a split sibling wait", () => {
       parked: null,
       state: { kind: "new" }
     }
-    expect(taskWait(other, [...tasks, other], new Set())).toBeNull()
+    expect(taskWait(other, [...tasks, other], new Set(), () => false)).toBeNull()
   })
 })

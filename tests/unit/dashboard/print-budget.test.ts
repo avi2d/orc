@@ -1,9 +1,13 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Effect } from "effect";
 import { TestConsole } from "effect/testing";
 import { modules } from "@avi2dg/orc-cli";
 import { flowLimitMillis, slowReadMillis } from "../../lib/budgets";
 import { dashboardSources, printedDashboard, printedPanel, tasksCommand } from "../../lib/dashboard-sources";
+import { writeDispatchBacklog } from "../../lib/dispatch-fixture";
 import { realSizeAnswer } from "../../lib/real-size";
 import { spentOn } from "../../lib/spent";
 
@@ -12,21 +16,27 @@ const frame = { width: 120, height: 40, color: false };
 type Sources = ReturnType<typeof dashboardSources>;
 
 const millisOf = async <E>(printed: (sources: Sources) => Effect.Effect<void, E>): Promise<number> => {
-  const spent = await spentOn((fileSystem) =>
-    Effect.provide(
-      Effect.orDie(
-        printed(
-          dashboardSources({
-            env: { ORC_DASH_TASKS: tasksCommand },
-            run: (command) => Effect.delay(Effect.sync(() => realSizeAnswer(command)), slowReadMillis),
-            fileSystem,
-          }),
+  const root = await mkdtemp(join(tmpdir(), "orc-print-budget-"));
+  try {
+    await writeDispatchBacklog(join(root, "backlog"));
+    const spent = await spentOn((fileSystem) =>
+      Effect.provide(
+        Effect.orDie(
+          printed(
+            dashboardSources({
+              env: { ORC_DASH_TASKS: tasksCommand, ORC_HOME: root },
+              run: (command) => Effect.delay(Effect.sync(() => realSizeAnswer(command)), slowReadMillis),
+              fileSystem,
+            }),
+          ),
         ),
+        TestConsole.layer,
       ),
-      TestConsole.layer,
-    ),
-  );
-  return spent.waitedMillis + spent.workedMillis;
+    );
+    return spent.waitedMillis + spent.workedMillis;
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 };
 
 // Flow limit from Nielsen (1993).
@@ -37,7 +47,7 @@ const chainOf: ReadonlyMap<string, number> = new Map([
   ["resources", 1],
   ["queues", 2],
   ["schedules", 2],
-  ["dispatch", 0],
+  ["dispatch", 1],
   ["attention", 1],
   ["tasks", 3],
   ["ledger", 0],
