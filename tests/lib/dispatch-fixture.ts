@@ -1,5 +1,21 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { Effect, Layer } from "effect";
+import { type Command, CommandRunner, CommandUnreachable } from "@avi2dg/orc-schema";
+
+export type BeatWait = readonly [id: string, wait: string];
+
+export const fixtureBeatWaits: ReadonlyArray<BeatWait> = [["task-2", "waits on task-9, which the backlog does not hold"]];
+
+const isBacklogJson = (command: Command): boolean => command.argv.join(" ") === "orc backlog --json";
+
+export const orcBacklogAnswering = (waits: ReadonlyArray<BeatWait> = fixtureBeatWaits): Layer.Layer<CommandRunner> =>
+  Layer.succeed(CommandRunner, {
+    run: (command) =>
+      isBacklogJson(command)
+        ? Effect.succeed(JSON.stringify({ schema: "orc.backlog.v1", tasks: waits.map(([id, wait]) => ({ id, wait })) }))
+        : Effect.fail(new CommandUnreachable({ reason: command.argv.join(" ") + " is not orc backlog --json" })),
+  });
 
 const front = (fields: ReadonlyArray<readonly [string, string]>): string =>
   ["---", ...fields.map(([key, value]) => key + ": " + value), "---", ""].join(String.fromCharCode(10));

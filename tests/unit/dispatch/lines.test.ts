@@ -7,14 +7,14 @@ import { ConfigProvider, Effect, Layer } from "effect";
 import { DispatchSource, dispatchSourceLayer, type DispatchView, dispatchView } from "@avi2dg/orc-schema";
 import { dispatchLines, dispatchSection } from "@avi2dg/orc-dispatch";
 import { plain } from "@avi2dg/orc-ui";
-import { writeDispatchBacklog } from "../../lib/dispatch-fixture";
+import { orcBacklogAnswering, writeDispatchBacklog } from "../../lib/dispatch-fixture";
 
 const width = 84;
 
 const viewOf = (home: string): Promise<DispatchView> =>
   Effect.runPromise(
     Effect.map(Effect.flatMap(DispatchSource, (source) => source.read), (reading) => dispatchView(reading.snapshot)).pipe(
-      Effect.provide(dispatchSourceLayer.pipe(Layer.provide(BunFileSystem.layer), Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: home, ORC_HOME: home }))))),
+      Effect.provide(dispatchSourceLayer.pipe(Layer.provide(BunFileSystem.layer), Layer.provide(orcBacklogAnswering()), Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: home, ORC_HOME: home }))))),
     ),
   );
 

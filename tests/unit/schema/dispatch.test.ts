@@ -5,20 +5,24 @@ import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
 import { ConfigProvider, Effect, Layer } from "effect";
 import {
+  CommandAbsent,
+  CommandRunner,
   type DispatchReading,
   type DispatchSnapshot,
   DispatchSource,
   dispatchSourceLayer,
   dispatchView,
 } from "@avi2dg/orc-schema";
-import { writeDispatchBacklog } from "../../lib/dispatch-fixture";
+import { type BeatWait, orcBacklogAnswering, writeDispatchBacklog } from "../../lib/dispatch-fixture";
 
-const readBacklog = (home: string): Promise<DispatchReading> =>
+const readBacklogWith = (home: string, orc: Layer.Layer<CommandRunner>): Promise<DispatchReading> =>
   Effect.runPromise(
     Effect.flatMap(DispatchSource, (source) => source.read).pipe(
-      Effect.provide(dispatchSourceLayer.pipe(Layer.provide(BunFileSystem.layer), Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: home, ORC_HOME: home }))))),
+      Effect.provide(dispatchSourceLayer.pipe(Layer.provide(BunFileSystem.layer), Layer.provide(orc), Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: home, ORC_HOME: home }))))),
     ),
   );
+
+const readBacklog = (home: string, waits?: ReadonlyArray<BeatWait>): Promise<DispatchReading> => readBacklogWith(home, orcBacklogAnswering(waits));
 
 const withBacklog = async (body: (root: string) => Promise<void>): Promise<void> => {
   const root = await mkdtemp(join(tmpdir(), "orc-dispatch-"));
@@ -122,6 +126,44 @@ describe("the dispatch view", () => {
       const view = dispatchView(snapshotOf(await readBacklog(root)));
       expect(view.waiting.find((row) => row.id === "task-2")?.reason).toBe("waits on task-9, which the backlog does not hold");
       expect(view.waiting.find((row) => row.id === "task-1")?.reason).toBe("unclaimed");
+    });
+  });
+
+  test("a split child held by its unmerged sibling and its parent read as waiting instead of unclaimed", async () => {
+    await withBacklog(async (root) => {
+      const file = (id: string, title: string, dependsOn: ReadonlyArray<string>, extra: ReadonlyArray<string> = []): string =>
+        ["---", 'id: "' + id + '"', 'title: "' + title + '"', 'project: "orc"', "machine: null", "depends_on: " + JSON.stringify(dependsOn), 'created: "2026-10-27T10:00:00.000Z"', ...extra, "---", "# " + title, ""].join("\n");
+      await writeFile(join(root, "backlog", "new", "orc-1.md"), file("orc-1", "Whole feature", [], ['kind: "parent"']));
+      await writeFile(join(root, "backlog", "new", "orc-3.md"), file("orc-3", "Second part", ["orc-2"], ['parent: "orc-1"']));
+      await writeFile(
+        join(root, "backlog", "closed", "orc-2.md"),
+        file("orc-2", "First part", [], [
+          'parent: "orc-1"',
+          'beat: "beat-1"',
+          'taken_for: "linux"',
+          'account: "main"',
+          'taken_at: "2026-10-27T10:01:00.000Z"',
+          'started_at: "2026-10-27T10:02:00.000Z"',
+          'start_log: "/tmp/orc-2.log"',
+          'outcome: "done"',
+          'closed_at: "2026-10-27T11:00:00.000Z"',
+          'reason: ""',
+          'pr: "https://github.com/example/repo/pull/1"',
+        ]),
+      );
+      const waits: ReadonlyArray<BeatWait> = [["orc-1", "waits on its children, 0 of 2 done"], ["orc-3", "waits on orc-2"]];
+      const reasons = new Map(dispatchView(snapshotOf(await readBacklog(root, waits))).waiting.map((row) => [row.id, row.reason]));
+      expect(reasons.get("orc-1")).toBe("waits on its children, 0 of 2 done");
+      expect(reasons.get("orc-3")).toBe("waits on orc-2");
+    });
+  });
+
+  test("an orc backlog --json that cannot run is named instead of every new task reading as unclaimed", async () => {
+    await withBacklog(async (root) => {
+      const absent = Layer.succeed(CommandRunner, { run: () => Effect.fail(new CommandAbsent({ reason: "orc is not on the PATH" })) });
+      const view = dispatchView(snapshotOf(await readBacklogWith(root, absent)));
+      expect(view.waiting.find((row) => row.id === "task-1")?.reason).toBe("orc backlog --json is unread");
+      expect(view.unread).toEqual(["orc backlog --json is unread: orc is not on the PATH"]);
     });
   });
 

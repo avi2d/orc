@@ -8,7 +8,7 @@ import { TestConsole } from "effect/testing";
 import { dispatchSourceLayer } from "@avi2dg/orc-schema";
 import { mountDispatch } from "@avi2dg/orc-dispatch";
 import { printSolo } from "@avi2dg/orc-ui";
-import { writeDispatchBacklog } from "../../lib/dispatch-fixture";
+import { orcBacklogAnswering, writeDispatchBacklog } from "../../lib/dispatch-fixture";
 import { stripSgr } from "../../e2e/lib/print-color";
 
 const printed = (root: string, height: number, color: boolean): Promise<string> =>
@@ -21,6 +21,7 @@ const printed = (root: string, height: number, color: boolean): Promise<string> 
         Layer.mergeAll(
           dispatchSourceLayer.pipe(
             Layer.provide(BunFileSystem.layer),
+            Layer.provide(orcBacklogAnswering()),
             Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: root, ORC_HOME: root }))),
           ),
           TestConsole.layer,
