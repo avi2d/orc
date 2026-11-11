@@ -1,360 +1,325 @@
+import { accessSync, appendFileSync, closeSync, constants, mkdirSync, openSync, readSync, statSync } from "node:fs"
+import { classifyHeavyCall } from "./heavy-classify"
+import { ancestry, insideSlot, insideThrough, parseProcessTable } from "./heavy-process-tree"
+import { exitCodeOf, queuedAhead, slotTasks, taskState, type TaskState } from "./heavy-pueue-task"
+
 export const standinMarker = "Written by orc heavy path"
-
-const standinMarkerShell = standinMarker.replaceAll(" ", "\\ ")
-
-const standinBypassEvent = (): ReadonlyArray<string> => [
-    'heavy_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }',
-    '',
-    'heavy_jsonesc() {',
-    '  printf "%s" "$1" | tr -d \'\\n\\r\\t"\\\\\'',
-    '}',
-    '',
-    'heavy_bypass_event() {',
-    '  heavy_reason="$1"; shift',
-    '  heavy_esc_reason="$(heavy_jsonesc "$heavy_reason")"',
-    '  heavy_esc_command="$(heavy_jsonesc "$heavy_tool $*")"',
-    '  mkdir -p "$heavy_home/backlog" 2>/dev/null || true',
-    '  heavy_line=\'{"rule":"heavy-bypass","at":"\'$(heavy_now)\'","reason":"\'"$heavy_esc_reason"\'","command":"\'"$heavy_esc_command"\'"}\'',
-    '  if ! printf "%s\n" "$heavy_line" >> "$heavy_home/backlog/alerts.jsonl" 2>/dev/null; then',
-    '    echo "orc heavy: cannot write the bypass log at $heavy_home/backlog/alerts.jsonl" >&2',
-    '  fi',
-    '}',
-    '',
-    'heavy_task_status() {',
-    '  pueue log --json "$1" 2>/dev/null | grep -o \'"status":{"[A-Za-z]*\' | head -1 | cut -d\\" -f4',
-    '}',
-    '',
-]
-
-const standinUnwrapSlot = (): ReadonlyArray<string> => [
-    'heavy_unwrap() {',
-    '  heavy_u="$1"',
-    '  case "$heavy_u" in *orc-heavy-wait\\ *)',
-    '    heavy_u="${heavy_u#*orc-heavy-wait }"; heavy_u="${heavy_u#* }";;',
-    '  esac',
-    '  case "$heavy_u" in "taskpolicy -c utility "*) heavy_u="${heavy_u#taskpolicy -c utility }";; esac',
-    '  printf "%s" "$heavy_u"',
-    '}',
-    '',
-    'heavy_inside_slot() {',
-    '  heavy_state_json="$(pueue status --json -g "$heavy_group" 2>/dev/null)" || return 1',
-    '  heavy_cmds="$(printf "%s" "$heavy_state_json" | grep -E -o \'"command":"(\\\\.|[^"\\\\])*"\')"',
-    '  if [ -z "$heavy_cmds" ]; then return 1; fi',
-    '  heavy_cmds="$(printf "%s\\n" "$heavy_cmds" | while IFS= read -r heavy_cl; do heavy_unwrap "$heavy_cl"; printf "\\n"; done)"',
-    '  heavy_tree="$(ps -ww -eo pid,ppid,command 2>/dev/null)" || return 1',
-    '  heavy_pid=$$; heavy_depth=0; heavy_selfhit=0; heavy_anchit=0; heavy_pueue=0',
-    '  while :; do',
-    '    heavy_acmd="$(printf "%s\\n" "$heavy_tree" | awk -v p="$heavy_pid" \'$1 == p { $1=""; $2=""; sub(/^  */, ""); print; exit }\')"',
-    '    heavy_acmd="$(heavy_unwrap "$heavy_acmd")"',
-    '    if [ -z "$heavy_acmd" ]; then return 1; fi',
-    '    if [ "$heavy_depth" = 0 ]; then heavy_selfv=1; else heavy_selfv=0; fi',
-    '    heavy_abin="$(printf "%s" "$heavy_acmd" | awk \'{ print $1; exit }\')"',
-    '    heavy_abin="${heavy_abin##*/}"',
-    '    case "$heavy_abin" in pueue|pueued) heavy_pueue=1;; esac',
-    '    heavy_amatch="$heavy_acmd"',
-    '    case "$heavy_amatch" in sh\\ -c\\ *|bash\\ -c\\ *|dash\\ -c\\ *|zsh\\ -c\\ *|*/sh\\ -c\\ *|*/bash\\ -c\\ *) heavy_amatch="${heavy_amatch#* -c }";; esac',
-    '    if printf "%s\\n" "$heavy_cmds" | awk -v a="$heavy_acmd" -v s="$heavy_amatch" -v self="$heavy_selfv" \'',
-    '      function heavy_norm(x) { gsub(/["\\047\\\\]/, "", x); gsub(/  +/, " ", x); sub(/^ /, "", x); return x }',
-    '      BEGIN { a = heavy_norm(a); s = heavy_norm(s) }',
-    '      { c = heavy_norm($0);',
-    '        if (c != "" && (self ? (index(a, c) > 0 || index(c, a) > 0) : (c == a || c == s))) { found = 1; exit } }',
-    '      END { exit found ? 0 : 1 }\'; then',
-    '      if [ "$heavy_depth" = 0 ]; then heavy_selfhit=1; else heavy_anchit=1; fi',
-    '    fi',
-    '    heavy_ppid="$(printf "%s\\n" "$heavy_tree" | awk -v p="$heavy_pid" \'$1 == p { print $2; exit }\')"',
-    '    case "$heavy_ppid" in ""|0) break;; esac',
-    '    heavy_pid="$heavy_ppid"; heavy_depth=$((heavy_depth + 1))',
-    '  done',
-    '  if [ "$heavy_anchit" = 1 ]; then return 0; fi',
-    '  if [ "$heavy_selfhit" = 1 ] && [ "$heavy_pueue" = 1 ]; then return 0; fi',
-    '  return 1',
-    '}',
-    '',
-]
-
-const standinQueueStatus = (): ReadonlyArray<string> => [
-    'heavy_queued_ahead() {',
-    '  pueue status --json -g "$heavy_group" 2>/dev/null | awk -v mine="$1" \'',
-    '    function save(text,   id, prio, st) {',
-    '      if (!match(text, /"id":[0-9]+/)) return;',
-    '      id = substr(text, RSTART + 5, RLENGTH - 5);',
-    '      prio = 0;',
-    '      if (match(text, /"priority":-?[0-9]+/)) prio = substr(text, RSTART + 11, RLENGTH - 11);',
-    '      st = "?";',
-    '      if (match(text, /"status":{"[A-Za-z]+/)) st = substr(text, RSTART + 11, RLENGTH - 11);',
-    '      ids[n] = id; prios[n] = prio; sts[n] = st; n++;',
-    '    }',
-    '    {',
-    '      line = $0;',
-    '      for (i = 1; i <= length(line); i++) {',
-    '        c = substr(line, i, 1);',
-    '        if (in_str) {',
-    '          if (esc) esc = 0;',
-    '          else if (c == "\\\\") esc = 1;',
-    '          else if (c == "\\"") in_str = 0;',
-    '          if (depth >= 2) chunk = chunk c; else if (depth == 1) prefix = prefix c;',
-    '        } else if (c == "\\"") { if (depth == 2 && intask && chunk != "") { save(chunk); chunk = ""; } in_str = 1; if (depth >= 2) chunk = chunk c; else if (depth == 1) prefix = prefix c; }',
-    '        else if (c == "{") {',
-    '          depth++;',
-    '          if (depth == 2) {',
-    '            if (prefix ~ /"tasks"[ \\t]*:[ \\t]*$/) { chunk = ""; intask = 1; }',
-    '            else intask = 0;',
-    '          } else if (depth > 2) chunk = chunk c;',
-    '          prefix = "";',
-    '        } else if (c == "}") {',
-    '          depth--;',
-    '          if (depth == 1) { if (intask && chunk != "") save(chunk); intask = 0; chunk = ""; }',
-    '          else if (depth >= 2) chunk = chunk c;',
-    '          prefix = "";',
-    '        } else {',
-    '          if (depth >= 2) chunk = chunk c;',
-    '          else if (depth == 1) prefix = prefix c;',
-    '        }',
-    '      }',
-    '    }',
-    '    END {',
-    '      myprio = 0;',
-    '      for (i = 0; i < n; i++) if (ids[i] == mine) myprio = prios[i] + 0;',
-    '      ahead = 0;',
-    '      for (i = 0; i < n; i++) {',
-    '        if (sts[i] != "Queued") continue;',
-    '        if (prios[i] + 0 > myprio || (prios[i] + 0 == myprio && ids[i] + 0 < mine + 0)) ahead++;',
-    '      }',
-    '      print ahead + 0;',
-    '    }\'',
-    '}',
-    '',
-    'heavy_place() {',
-    '  heavy_placestate="$(heavy_task_status "$1")"',
-    '  case "$heavy_placestate" in',
-    '    Queued) echo "orc heavy: waiting $2s for the $heavy_group queue, $(heavy_queued_ahead "$1") queued ahead in $heavy_group" >&2;;',
-    '    Running) echo "orc heavy: running $2s in the $heavy_group queue" >&2;;',
-    '    Paused|Stashed|Locked)',
-    '      heavy_placeword="$(printf "%s" "$heavy_placestate" | tr "A-Z" "a-z")"',
-    '      echo "orc heavy: $heavy_placeword $2s in the $heavy_group queue" >&2;;',
-    '  esac',
-    '}',
-    '',
-    'heavy_remove() {',
-    '  case "$(heavy_task_status "$1")" in',
-    '    Running) pueue kill "$1" >/dev/null 2>&1; pueue wait -q "$1" >/dev/null 2>&1; pueue remove "$1" >/dev/null 2>&1;;',
-    '    *) pueue remove "$1" >/dev/null 2>&1;;',
-    '  esac',
-    '}',
-]
-
-export const standinUtils = (): ReadonlyArray<string> => [
-  ...standinBypassEvent(),
-  ...standinUnwrapSlot(),
-  ...standinQueueStatus()
-]
-
-const waiterBody =
-  'o=$1; shift; "$@" & c=$!; ' +
-  '(while kill -0 "$o" 2>/dev/null && kill -0 "$c" 2>/dev/null; do sleep 5; done; kill "$c" 2>/dev/null) & k=$!; ' +
-  'trap "kill $c 2>/dev/null; kill $k 2>/dev/null" TERM INT; wait "$c"; r=$?; kill "$k" 2>/dev/null; wait "$k" 2>/dev/null; exit "$r"'
-
-const waiterAdd =
-  'sh -c \'' + waiterBody + '\' orc-heavy-wait $$ $heavy_wrap "$heavy_real_bin" "$@"'
-
-const quoteThroughWord = (word: string): string => "'" + word.replaceAll("'", "'\\''") + "'"
-const throughCall = (through: ReadonlyArray<string>): ReadonlyArray<string> => [
-    '  if heavy_inside_through; then',
-    '    exec "$heavy_real_bin" "$@"',
-    '  fi',
-    '  exec sh -c \'"$@"; exit "$?"\' orc-heavy-through ' + through.map(quoteThroughWord).join(" ") + ' $heavy_wrap "$heavy_real_bin" "$@"',
-]
-
-const insideThrough = (through: ReadonlyArray<string>): ReadonlyArray<string> => {
-  const firstBase = (through[0] ?? "").split("/").pop() ?? ""
-  const rest = through.slice(1).join(" ")
-  return [
-    'heavy_inside_through() {',
-    '  heavy_tree="$(ps -ww -eo pid,ppid,command 2>/dev/null)" || return 1',
-    '  heavy_pid=$$',
-    '  heavy_t0=' + quoteThroughWord(firstBase),
-    '  heavy_trest=' + quoteThroughWord(rest),
-    '  while :; do',
-    '    heavy_acmd="$(printf "%s\\n" "$heavy_tree" | awk -v p="$heavy_pid" \'$1 == p { $1=""; $2=""; sub(/^  */, ""); print; exit }\')"',
-    '    case "$heavy_acmd" in *\' -c "$@"; exit "$?" orc-heavy-through \'*) return 0;; esac',
-    '    if awk -v cmd="$heavy_acmd" -v t0="$heavy_t0" -v rest="$heavy_trest" \'BEGIN { n = split(cmd, a, / +/); m = (rest == "" ? 0 : split(rest, r, / +/)); b = a[1]; sub(/.*\\//, "", b); if (b == t0) { ok = 1; for (i = 1; i <= m; i++) if (a[i+1] != r[i]) { ok = 0; break; } if (ok) exit 0; } w = a[1]; sub(/.*\\//, "", w); if (w != "") { j = 2; while (j <= n && a[j] ~ /^-/) { t = a[j]; if (t ~ /^-[^-]*c/) exit 1; j++; } if (j <= n) { h = a[j]; sub(/.*\\//, "", h); s = h; sub(/\\.[^.]*$/, "", s); if (h == t0 || s == t0) { ok = 1; for (i = 1; i <= m; i++) if (a[j+i] != r[i]) { ok = 0; break; } if (ok) exit 0; } } exit 1; } exit 1; }\' >/dev/null 2>&1; then return 0; fi',
-    '    heavy_ppid="$(printf "%s\\n" "$heavy_tree" | awk -v p="$heavy_pid" \'$1 == p { print $2; exit }\')"',
-    '    case "$heavy_ppid" in ""|0|"$heavy_pid") return 1;; esac',
-    '    heavy_pid="$heavy_ppid"',
-    '  done',
-    '}',
-    '',
-  ]
-}
-
-export const standinQueue = (through: ReadonlyArray<string> | null): ReadonlyArray<string> => [
-    ...(through === null ? [] : insideThrough(through)),
-    'heavy_is_standin() {',
-    '  heavy_probe="$1"',
-    '  heavy_s1=""; heavy_s2=""',
-    '  { IFS= read -r heavy_s1; IFS= read -r heavy_s2; } < "$heavy_probe" 2>/dev/null || true',
-    '  case "$heavy_s1 $heavy_s2" in *' + standinMarkerShell + '*) return 0;; esac',
-    '  return 1',
-    '}',
-    '',
-    'heavy_caller_tool() {',
-    '  heavy_ct_ifs="$IFS"; IFS=:',
-    '  heavy_ct_found=""',
-    '  for heavy_ct_d in $PATH; do',
-    '    if [ -z "$heavy_ct_d" ]; then heavy_ct_d=.; fi',
-    '    heavy_ct_c="$heavy_ct_d/$heavy_tool"',
-    '    if [ "$heavy_ct_c" -ef "$0" ] 2>/dev/null; then continue; fi',
-    '    if [ -x "$heavy_ct_c" ] && [ ! -d "$heavy_ct_c" ]; then',
-    '      if heavy_is_standin "$heavy_ct_c"; then continue; fi',
-    '      heavy_ct_found="$heavy_ct_c"',
-    '      break',
-    '    fi',
-    '  done',
-    '  IFS="$heavy_ct_ifs"',
-    '  printf "%s" "$heavy_ct_found"',
-    '}',
-    '',
-    'heavy_main() {',
-    '  if [ -n "$HEAVY_CLASSIFY" ]; then',
-    '    heavy_decide "$@" || return 1',
-    '    echo "$heavy_queue $heavy_prio"',
-    '    return 0',
-    '  fi',
-    '  heavy_real_bin="$(heavy_caller_tool)"',
-    '  if [ -z "$heavy_real_bin" ]; then',
-    '    heavy_real_bin="$heavy_real"',
-    '  fi',
-    '  if [ -z "$heavy_real_bin" ]; then',
-    '    echo "orc heavy: no $heavy_tool found when the stand-in was written" >&2',
-    '    return 127',
-    '  fi',
-    '  if [ ! -x "$heavy_real_bin" ] || [ -d "$heavy_real_bin" ] || [ "$heavy_real_bin" -ef "$0" ]; then',
-    '    echo "orc heavy: no $heavy_tool at $heavy_real_bin" >&2',
-    '    return 127',
-    '  fi',
-    '  heavy_decide "$@"',
-    '  if [ "$heavy_queue" = 0 ]; then',
-    '    exec "$heavy_real_bin" "$@"',
-    '  fi',
-    '  if [ -n "$HEAVY_QUEUE_BYPASS" ]; then',
-    '    if [ "$HEAVY_QUEUE_BYPASSED" != "$HEAVY_QUEUE_BYPASS" ]; then',
-    '      heavy_bypass_event "$HEAVY_QUEUE_BYPASS" "$@"',
-    '    fi',
-    '    export HEAVY_QUEUE_BYPASSED="$HEAVY_QUEUE_BYPASS"',
-    '    echo "orc heavy: bypassing the $heavy_group queue: $HEAVY_QUEUE_BYPASS" >&2',
-    '    exec "$heavy_real_bin" "$@"',
-    '  fi',
-    ...(through === null ? [] : throughCall(through)),
-    '  if heavy_inside_slot; then',
-    '    exec "$heavy_real_bin" "$@"',
-    '  fi',
-    '  if ! pueue group --json >/dev/null 2>&1; then',
-    '    echo "orc heavy: pueue is unreachable; repair pueue (pueue status) or bypass once with HEAVY_QUEUE_BYPASS=<reason>" >&2',
-    '    return 1',
-    '  fi',
-    '  if [ "$heavy_prio" = 1 ]; then',
-    '    heavy_id="$(pueue add --group "$heavy_group" -o 1 --working-directory "$PWD" --print-task-id --escape -- ' + waiterAdd + ' 2>&1)" || {',
-    '      echo "orc heavy: pueue refused the task; repair pueue (pueue status) or bypass once with HEAVY_QUEUE_BYPASS=<reason>" >&2',
-    '      return 1',
-    '    }',
-    '  else',
-    '    heavy_id="$(pueue add --group "$heavy_group" --working-directory "$PWD" --print-task-id --escape -- ' + waiterAdd + ' 2>&1)" || {',
-    '      echo "orc heavy: pueue refused the task; repair pueue (pueue status) or bypass once with HEAVY_QUEUE_BYPASS=<reason>" >&2',
-    '      return 1',
-    '    }',
-    '  fi',
-    '  case "$heavy_id" in \'\'|*[!0-9]*) echo "orc heavy: pueue refused the task: $heavy_id" >&2; return 1;; esac',
-]
-
-export const standinFinish = (): ReadonlyArray<string> => [
-    '  trap - INT TERM HUP',
-    '  pueue follow "$heavy_id" 2>/dev/null || true',
-    '  heavy_result="$(pueue log --json "$heavy_id" 2>/dev/null)"',
-'  pueue remove "$heavy_id" >/dev/null 2>&1 || true',
-    '  case "$heavy_result" in',
-    '    *\'"result":"Success"\'*) return 0;;',
-    '    *\'"FailedToSpawn"\'*) return 127;;',
-    '    *\'"Killed"\'*|*\'"Errored"\'*|*\'"DependencyFailed"\'*) return 1;;',
-    '    *\'"Failed":\'*)',
-    '      heavy_code="$(printf "%s" "$heavy_result" | grep -o \'"Failed":[0-9]*\' | head -1 | cut -d: -f2)"',
-    '      case "$heavy_code" in \'\'|*[!0-9]*) return 1;; *) return "$heavy_code";; esac;;',
-    '    *) return 1;;',
-    '  esac',
-    '}',
-    '',
-    'heavy_main "$@"',
-    ''
-]
 
 export interface StandinTiming {
   readonly budgetMinutes: number | null
   readonly pollSeconds: number
 }
 
-export const standinWait = (timing?: StandinTiming): ReadonlyArray<string> => [
-    '  heavy_on_signal() {',
-    '    heavy_remove "$heavy_id"',
-    '    exit 130',
-    '  }',
-    '  trap heavy_on_signal INT TERM HUP',
-    ...(timing === undefined
-      ? [
-        '  if [ "$GITHUB_ACTIONS" = "true" ]; then',
-        '    heavy_budget=30',
-        '  else',
-        '    heavy_budget=""',
-        '  fi',
-        '  heavy_poll=60'
-      ]
-      : [
-        '  heavy_budget=' + (timing.budgetMinutes === null ? '""' : String(timing.budgetMinutes)),
-        '  heavy_poll=' + String(timing.pollSeconds)
-      ]),
-    '  case "$heavy_poll" in ""|*[!0-9]*|0) heavy_poll=60;; esac',
-    '  heavy_elapsed=0',
-    '  heavy_polls=0',
-    '  heavy_ticks=0',
-    '  heavy_misses=0',
-    '  while :; do',
-    '    heavy_state="$(pueue log --json "$heavy_id" 2>/dev/null)" || heavy_state=""',
-    '    case "$heavy_state" in',
-    '      *\'"status":{"Done"\'*) break;;',
-    '      *\'"status":{"Queued"\'*|*\'"status":{"Running"\'*|*\'"status":{"Paused"\'*|*\'"status":{"Stashed"\'*|*\'"status":{"Locked"\'*) heavy_misses=0;;',
-    '      *)',
-    '        heavy_misses=$((heavy_misses + 1))',
-    '        if [ "$heavy_misses" -ge 3 ]; then',
-    '          heavy_remove "$heavy_id"',
-    '          echo "orc heavy: pueue lost the queued task; repair pueue (pueue status) or bypass once with HEAVY_QUEUE_BYPASS=<reason>" >&2',
-    '          return 1',
-    '        fi;;',
-    '    esac',
-    '    sleep 1 2>/dev/null || break',
-    '    heavy_elapsed=$((heavy_elapsed + 1))',
-    '    heavy_polls=$((heavy_polls + 1))',
-    '    if [ "$heavy_polls" -ge "$heavy_poll" ]; then',
-    '      heavy_polls=0',
-    '      heavy_ticks=$((heavy_ticks + 1))',
-    '      case "$heavy_budget" in',
-    '        ""|*[!0-9]*) ;;',
-    '        *)',
-    '          if [ "$heavy_elapsed" -ge $((heavy_budget * 60)) ]; then',
-    '            case "$(heavy_task_status "$heavy_id")" in',
-    '              Queued)',
-    '                heavy_ahead=$(heavy_queued_ahead "$heavy_id")',
-    '                heavy_remove "$heavy_id"',
-    '                echo "orc heavy: waited $heavy_budget min for the heavy queue, $heavy_ahead ahead in $heavy_group" >&2',
-    '                exit 1;;',
-    '            esac',
-    '          fi;;',
-    '      esac',
-    '      if [ "$heavy_ticks" -ge 3 ]; then',
-    '        heavy_ticks=0',
-    '        case "$(heavy_task_status "$heavy_id")" in',
-    '          Queued|Running|Paused|Stashed|Locked) heavy_place "$heavy_id" "$heavy_elapsed";;',
-    '        esac',
-    '      fi',
-    '    fi',
-    '  done',
-    '  trap - INT TERM HUP',
-]
+export interface StandinCall {
+  readonly tool: string
+  readonly commands: ReadonlyArray<string>
+  readonly home: string
+  readonly group: string
+  readonly wrap: string
+  readonly real: string
+  readonly through: ReadonlyArray<string> | null
+  readonly timing: StandinTiming | null
+}
 
+const isStrings = (value: unknown): value is ReadonlyArray<string> =>
+  Array.isArray(value) && value.every((item) => typeof item === "string")
+
+const isTiming = (value: unknown): value is StandinTiming =>
+  typeof value === "object" && value !== null && "budgetMinutes" in value && "pollSeconds" in value &&
+  (value.budgetMinutes === null || typeof value.budgetMinutes === "number") && typeof value.pollSeconds === "number"
+
+export const parseStandinCall = (text: string): StandinCall | null => {
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  } catch {
+    return null
+  }
+  if (
+    typeof value !== "object" || value === null || !("tool" in value) || !("commands" in value) || !("home" in value) ||
+    !("group" in value) || !("wrap" in value) || !("real" in value) || !("through" in value) || !("timing" in value)
+  ) {
+    return null
+  }
+  const { tool, commands, home, group, wrap, real, through, timing } = value
+  if (
+    typeof tool !== "string" || !isStrings(commands) || typeof home !== "string" || typeof group !== "string" ||
+    typeof wrap !== "string" || typeof real !== "string" || !(through === null || isStrings(through)) ||
+    !(timing === null || isTiming(timing))
+  ) {
+    return null
+  }
+  return { tool, commands, home, group, wrap, real, through, timing }
+}
+
+const sameFile = (left: string, right: string): boolean => {
+  try {
+    const a = statSync(left)
+    const b = statSync(right)
+    return a.dev === b.dev && a.ino === b.ino
+  } catch {
+    return false
+  }
+}
+
+const isExecutableFile = (path: string): boolean => {
+  try {
+    accessSync(path, constants.X_OK)
+    return !statSync(path).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+const isStandin = (path: string): boolean => {
+  try {
+    const handle = openSync(path, "r")
+    const head = Buffer.alloc(4096)
+    const read = readSync(handle, head, 0, head.length, 0)
+    closeSync(handle)
+    return head.subarray(0, read).toString("utf8").split("\n").slice(0, 2).join(" ").includes(standinMarker)
+  } catch {
+    return false
+  }
+}
+
+// The shell's field split on ":" keeps empty inner fields as "." and drops a trailing empty field.
+export const callerTool = (tool: string, pathValue: string, standin: string): string => {
+  const entries = pathValue.split(":")
+  if (entries.at(-1) === "") {
+    entries.pop()
+  }
+  for (const entry of entries) {
+    const candidate = (entry === "" ? "." : entry) + "/" + tool
+    if (!sameFile(candidate, standin) && isExecutableFile(candidate) && !isStandin(candidate)) {
+      return candidate
+    }
+  }
+  return ""
+}
+
+const unloggable = /[\n\r\t"\\]/g
+
+export const bypassLine = (reason: string, command: string, at: Date): string =>
+  JSON.stringify({
+    rule: "heavy-bypass",
+    at: at.toISOString().replace(/\.\d{3}Z$/, "Z"),
+    reason: reason.replaceAll(unloggable, ""),
+    command: command.replaceAll(unloggable, "")
+  })
+
+const logBypass = (call: StandinCall, reason: string, args: ReadonlyArray<string>): void => {
+  const alerts = call.home + "/backlog/alerts.jsonl"
+  try {
+    mkdirSync(call.home + "/backlog", { recursive: true })
+  } catch {}
+  try {
+    appendFileSync(alerts, bypassLine(reason, [call.tool, ...args].join(" "), new Date()) + "\n")
+  } catch {
+    process.stderr.write("orc heavy: cannot write the bypass log at " + alerts + "\n")
+  }
+}
+
+const capture = (argv: ReadonlyArray<string>): string | null => {
+  try {
+    const child = Bun.spawnSync([...argv], { stdout: "pipe", stderr: "ignore" })
+    return child.exitCode === 0 ? child.stdout.toString() : null
+  } catch {
+    return null
+  }
+}
+
+const quietly = (argv: ReadonlyArray<string>): void => {
+  capture(argv)
+}
+
+const processChain = (): ReadonlyArray<string> | null => {
+  const table = capture(["ps", "-ww", "-eo", "pid,ppid,command"])
+  return table === null ? null : ancestry(parseProcessTable(table), process.ppid)
+}
+
+const callInsideSlot = (group: string): boolean => {
+  const status = capture(["pueue", "status", "--json", "-g", group])
+  const commands = status === null ? [] : slotTasks(status).map((task) => task.command)
+  const chain = commands.length === 0 ? null : processChain()
+  return chain !== null && insideSlot(commands, chain)
+}
+
+export type StandinPlan =
+  | { readonly kind: "run" | "bypass" | "through" | "queue"; readonly real: string }
+  | { readonly kind: "exit"; readonly code: number }
+
+const refuse = (message: string): StandinPlan => {
+  process.stderr.write("orc heavy: " + message + "\n")
+  return { kind: "exit", code: 127 }
+}
+
+export const planCall = (call: StandinCall, standin: string, args: ReadonlyArray<string>): StandinPlan => {
+  const real = callerTool(call.tool, Bun.env.PATH ?? "", standin) || call.real
+  if (real === "") {
+    return refuse("no " + call.tool + " found when the stand-in was written")
+  }
+  if (!isExecutableFile(real) || sameFile(real, standin)) {
+    return refuse("no " + call.tool + " at " + real)
+  }
+  if (classifyHeavyCall(call.tool, call.commands, args) === "direct") {
+    return { kind: "run", real }
+  }
+  const bypass = Bun.env.HEAVY_QUEUE_BYPASS ?? ""
+  if (bypass !== "") {
+    if (Bun.env.HEAVY_QUEUE_BYPASSED !== bypass) {
+      logBypass(call, bypass, args)
+    }
+    process.stderr.write("orc heavy: bypassing the " + call.group + " queue: " + bypass + "\n")
+    return { kind: "bypass", real }
+  }
+  if (call.through !== null) {
+    const chain = processChain()
+    return { kind: chain !== null && insideThrough(call.through, chain) ? "run" : "through", real }
+  }
+  return { kind: callInsideSlot(call.group) ? "run" : "queue", real }
+}
+
+export const planWords = (plan: StandinPlan): string => (plan.kind === "exit" ? "exit " + String(plan.code) : plan.kind + " " + plan.real)
+
+const waiterBody =
+  'o=$1; shift; "$@" & c=$!; ' +
+  '(while kill -0 "$o" 2>/dev/null && kill -0 "$c" 2>/dev/null; do sleep 5; done; kill "$c" 2>/dev/null) & k=$!; ' +
+  'trap "kill $c 2>/dev/null; kill $k 2>/dev/null" TERM INT; wait "$c"; r=$?; kill "$k" 2>/dev/null; wait "$k" 2>/dev/null; exit "$r"'
+
+const repairHint = "repair pueue (pueue status) or bypass once with HEAVY_QUEUE_BYPASS=<reason>"
+
+const fail = (message: string): number => {
+  process.stderr.write("orc heavy: " + message + "\n")
+  return 1
+}
+
+// sh keeps an inherited PWD only while it still names the working directory.
+const workingDirectory = (): string => {
+  const logical = Bun.env.PWD ?? ""
+  return logical.startsWith("/") && sameFile(logical, ".") ? logical : process.cwd()
+}
+
+const stateOf = async (id: number): Promise<TaskState> => {
+  const child = Bun.spawn(["pueue", "log", "--json", String(id)], { stdout: "pipe", stderr: "ignore" })
+  const text = await new Response(child.stdout).text()
+  return (await child.exited) === 0 ? taskState(text, id) : { status: "unknown" }
+}
+
+const removeTask = (id: number): void => {
+  const status = capture(["pueue", "log", "--json", String(id)])
+  if (status !== null && taskState(status, id).status === "Running") {
+    quietly(["pueue", "kill", String(id)])
+    quietly(["pueue", "wait", "-q", String(id)])
+  }
+  quietly(["pueue", "remove", String(id)])
+}
+
+const aheadOf = (group: string, id: number): number => queuedAhead(slotTasks(capture(["pueue", "status", "--json", "-g", group]) ?? ""), id)
+
+const placeLine = (group: string, id: number, state: TaskState, elapsed: number): string | null => {
+  switch (state.status) {
+    case "Queued":
+      return "waiting " + String(elapsed) + "s for the " + group + " queue, " + String(aheadOf(group, id)) + " queued ahead in " + group
+    case "Running":
+      return "running " + String(elapsed) + "s in the " + group + " queue"
+    case "Paused":
+    case "Stashed":
+    case "Locked":
+      return state.status.toLowerCase() + " " + String(elapsed) + "s in the " + group + " queue"
+    case "Done":
+    case "unknown":
+      return null
+  }
+}
+
+const defaultTiming = (): StandinTiming => ({ budgetMinutes: Bun.env.GITHUB_ACTIONS === "true" ? 30 : null, pollSeconds: 60 })
+
+const outOfBudget = (call: StandinCall, budgetMinutes: number | null, id: number, elapsed: number, now: TaskState): number | null => {
+  if (budgetMinutes === null || elapsed < budgetMinutes * 60 || now.status !== "Queued") {
+    return null
+  }
+  const ahead = aheadOf(call.group, id)
+  removeTask(id)
+  return fail("waited " + String(budgetMinutes) + " min for the heavy queue, " + String(ahead) + " ahead in " + call.group)
+}
+
+const pollTurn = (call: StandinCall, budgetMinutes: number | null, id: number, elapsed: number, report: boolean): number | null => {
+  const now = taskState(capture(["pueue", "log", "--json", String(id)]) ?? "", id)
+  const spent = outOfBudget(call, budgetMinutes, id, elapsed, now)
+  const place = spent === null && report ? placeLine(call.group, id, now, elapsed) : null
+  if (place !== null) {
+    process.stderr.write("orc heavy: " + place + "\n")
+  }
+  return spent
+}
+
+const waitForTurn = async (call: StandinCall, id: number): Promise<number | null> => {
+  const timing = call.timing ?? defaultTiming()
+  const poll = Number.isInteger(timing.pollSeconds) && timing.pollSeconds > 0 ? timing.pollSeconds : 60
+  let elapsed = 0
+  let misses = 0
+  for (;;) {
+    const state = await stateOf(id)
+    if (state.status === "Done") {
+      return null
+    }
+    misses = state.status === "unknown" ? misses + 1 : 0
+    if (misses >= 3) {
+      removeTask(id)
+      return fail("pueue lost the queued task; " + repairHint)
+    }
+    await Bun.sleep(1000)
+    elapsed += 1
+    if (elapsed % poll !== 0) {
+      continue
+    }
+    const spent = pollTurn(call, timing.budgetMinutes, id, elapsed, elapsed % (poll * 3) === 0)
+    if (spent !== null) {
+      return spent
+    }
+  }
+}
+
+const interrupts: ReadonlyArray<NodeJS.Signals> = ["SIGINT", "SIGTERM", "SIGHUP"]
+
+export const queueCall = async (call: StandinCall, real: string, args: ReadonlyArray<string>): Promise<number> => {
+  if (capture(["pueue", "group", "--json"]) === null) {
+    return fail("pueue is unreachable; " + repairHint)
+  }
+  const priority = classifyHeavyCall(call.tool, call.commands, args) === "prioritized" ? ["-o", "1"] : []
+  const wrap = call.wrap.split(/\s+/).filter((word) => word !== "")
+  const added = Bun.spawnSync(
+    [
+      "pueue", "add", "--group", call.group, ...priority, "--working-directory", workingDirectory(), "--print-task-id", "--escape", "--",
+      "sh", "-c", waiterBody, "orc-heavy-wait", String(process.pid), ...wrap, real, ...args
+    ],
+    { stdout: "pipe", stderr: "pipe" }
+  )
+  const reply = (added.stdout.toString() + added.stderr.toString()).replace(/\n+$/, "")
+  if (added.exitCode !== 0) {
+    return fail("pueue refused the task; " + repairHint)
+  }
+  if (!/^\d+$/.test(reply)) {
+    return fail("pueue refused the task: " + reply)
+  }
+  const id = Number(reply)
+  const interrupted = (): void => {
+    removeTask(id)
+    process.exit(130)
+  }
+  for (const signal of interrupts) {
+    process.on(signal, interrupted)
+  }
+  const failed = await waitForTurn(call, id)
+  for (const signal of interrupts) {
+    process.off(signal, interrupted)
+  }
+  if (failed !== null) {
+    return failed
+  }
+  await Bun.spawn(["pueue", "follow", String(id)], { stdin: "inherit", stdout: "inherit", stderr: "ignore" }).exited
+  const result = taskState(capture(["pueue", "log", "--json", String(id)]) ?? "", id)
+  quietly(["pueue", "remove", String(id)])
+  return exitCodeOf(result)
+}
