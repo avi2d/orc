@@ -1,7 +1,8 @@
 import { isTaskId } from "./backlog"
-import { parseJsonFlag, parseRunner, unexpected, type DispatchArgs, type TaskSource } from "./args-runner"
+import { parseJsonFlag, parseRunner, unexpected, type DispatchArgs } from "./args-runner"
+import type { TaskSource } from "./cli-add"
 
-export type { DispatchArgs, TaskSource }
+export type { DispatchArgs }
 import { isEventKey } from "./events"
 import { isCalendarDate } from "./task-record"
 import { isTaskKind, type TaskKind, unknownKind } from "../task-kind"

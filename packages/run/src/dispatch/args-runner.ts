@@ -1,24 +1,13 @@
 import { isTaskId } from "./backlog"
 import type { MergeBasis } from "./merge-basis"
-import type { TaskKind } from "../task-kind"
+import type { AddTask } from "./cli-add"
 import type { Reach } from "./runner-exec"
-
-export type TaskSource = { readonly kind: "file"; readonly path: string } | { readonly kind: "stdin" }
 
 export type DispatchArgs =
   | { readonly kind: "ShowBacklog"; readonly json: boolean }
   | { readonly kind: "ShowAttention"; readonly json: boolean }
   | { readonly kind: "AnswerItem"; readonly id: string; readonly words: string }
-  | {
-    readonly kind: "AddTask"
-    readonly project: string
-    readonly task: TaskSource
-    readonly taskKind: TaskKind
-    readonly internal: boolean
-    readonly machine: string | null
-    readonly parent: string | null
-    readonly dependsOn: ReadonlyArray<string>
-  }
+  | AddTask
   | { readonly kind: "CloseTask"; readonly id: string; readonly outcome: "done" | "failed"; readonly reason: string }
   | { readonly kind: "StopTask"; readonly id: string }
   | { readonly kind: "MarkPosted"; readonly id: string }
