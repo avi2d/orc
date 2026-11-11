@@ -3,8 +3,8 @@ import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs, TaskSource } from "./args"
 import { addTask, backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted } from "./backlog"
 import { backlogPresent, noBacklog } from "./backlog-write"
-import { routeReviewQuestions } from "./attention"
-import { attentionText } from "./attention-view"
+import { routeTaskItems } from "./attention"
+import { answerItemText, attentionText } from "./attention-view"
 import { holdTask } from "./backlog-hold"
 import { circularDependency, dependTask, refusedLinks } from "./backlog-depend"
 import { answerTask } from "./parked"
@@ -202,7 +202,7 @@ const closeNow = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, pl
   Effect.gen(function*() {
     const at = DateTime.formatIso(yield* DateTime.now)
     const closed = yield* closeStartedTask(backlogRoot(place), args.id, args.outcome, args.reason, { pr: null, report: null }, at)
-    yield* routeReviewQuestions(backlogRoot(place), [closed], at)
+    yield* routeTaskItems(backlogRoot(place), [closed], at)
     return "closed " + args.id + " " + args.outcome
   })
 
@@ -237,7 +237,7 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
   Effect.gen(function*() {
     const at = DateTime.formatIso(yield* DateTime.now)
     const answered = yield* answerTask(backlogRoot(place), args.id, args.words, at)
-    yield* routeReviewQuestions(backlogRoot(place), [yield* findTask(backlogRoot(place), args.id)], at)
+    yield* routeTaskItems(backlogRoot(place), [yield* findTask(backlogRoot(place), args.id)], at)
     if (answered.kind === "hold") {
       return "answered " + args.id + ", so the beat may start it"
     }
@@ -254,10 +254,13 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
-type TaskVerb = Extract<CommandArgs, { readonly kind: "CloseTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "DependTask" | "MergeTask" }>
+type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "CloseTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "DependTask" | "MergeTask" }>
 
 const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   switch (args.kind) {
+    case "AnswerItem": {
+      return DateTime.now.pipe(Effect.flatMap((now) => answerItemText(backlogRoot(place), args.id, { words: args.words, at: DateTime.formatIso(now) })))
+    }
     case "CloseTask": {
       return closeNow(args, place)
     }
@@ -330,6 +333,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         yield* add(args, place)
         break
       }
+      case "AnswerItem":
       case "CloseTask":
       case "MarkPosted":
       case "MarkEventPosted":

@@ -9,7 +9,7 @@ import type { Claim, TaskFileError, TaskRecord } from "./task-record"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
 import type { BeatAction, Progress } from "./beat-action"
 import { closeFinished } from "./beat-close"
-import { routeReviewQuestions } from "./attention"
+import { isOverdue, openItems, openRunDeaths, routeTaskItems } from "./attention"
 import { handAnswersToResume } from "./parked"
 import { taskLabel } from "./pueue-status"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
@@ -333,21 +333,27 @@ export const runBeat = (
     releaseClosedSlots(context.live, settled.closed)
     const upstream = yield* watchUpstream(root, projects, sources.readUpstream, at)
     const current = yield* listTasks(root)
-    yield* routeReviewQuestions(root, current, at)
+    yield* routeTaskItems(root, current, at)
+    yield* openRunDeaths(root, settled.closed, at)
+    const queue = (yield* openItems(root)).map(({ id, item }): BeatAction => ({
+      kind: "attention", item: id, task: item.task, owner: item.owner, overdue: isOverdue(item, Date.parse(at)), text: item.text
+    }))
     const queued = current.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: current, overloaded }
     const renewals = yield* Effect.forEach(current, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, task))
+    yield* openRunDeaths(root, actions, at)
     const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))
     return { beat, at, quota, room: readRoom(config.machines, current), actions: [
         ...settled.closed,
         ...settled.asking,
         ...stalls.flatMap(Option.toArray),
-        ...prs.flatMap(Option.toArray),
         ...upstream,
+        ...queue,
         ...renewals.flatMap(Option.toArray),
-        ...actions
+        ...actions,
+        ...prs.flatMap(Option.toArray)
       ]
     }
   })

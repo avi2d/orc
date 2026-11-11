@@ -69,6 +69,8 @@ const namesWith = (verdicts: ReadonlyArray<NamedVerdict>, verdict: CheckVerdict)
 
 export const greenChecks = (view: PullRequestView): ReadonlyArray<string> => namesWith(checkVerdicts(view), "green")
 
+export const redChecks = (view: PullRequestView): ReadonlyArray<string> => namesWith(checkVerdicts(view), "red")
+
 export const checkRefusals = (view: PullRequestView): ReadonlyArray<string> => {
   const verdicts = checkVerdicts(view)
   if (verdicts.length === 0) {

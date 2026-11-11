@@ -539,7 +539,7 @@ describe("the beat's closing sweep", () => {
       const beat = await beatAfterRun(root, { Failed: 3 })
       expect(beat.states).toEqual(["orc-1:closed", "orc-2:started"])
       expect(beat.reasons).toEqual(["failed:orc exited 3"])
-      expect(beat.actions).toEqual(["closed:orc-1", "started:orc-2"])
+      expect(beat.actions).toEqual(["closed:orc-1", "attention:orc-1", "started:orc-2"])
     })
   })
   test("a task waiting on a just-finished task starts in the same beat instead of waiting one more beat", async () => {
