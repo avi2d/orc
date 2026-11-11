@@ -238,7 +238,7 @@ const readStoppedRun = (home: string, task: string): Effect.Effect<RunSummary | 
   withRunDatabase(home, (db) =>
     Effect.gen(function*() {
       const latests = yield* Effect.forEach([taskBranch(task), parentBranch(task)], (branch) => latestRunForBranchName(db, branch))
-      const latest = latests.filter((run) => run !== null && run.status === "stopped").toSorted((left, right) => Date.parse(right.started) - Date.parse(left.started))[0] ?? null
+      const latest = latests.filter((run): run is RunRecord => run !== null && run.status === "stopped").toSorted((left, right) => Date.parse(right.started) - Date.parse(left.started))[0] ?? null
       if (latest === null) {
         return null
       }
