@@ -28,6 +28,11 @@ describe("the layout setting", () => {
     expect(layout.narrow).toEqual(["tasks"]);
   });
 
+  test("the shipped layout shows the attention queue on every wide screen and in the narrow glance, so a default dashboard that leaves it out misses what needs someone", () => {
+    for (const wide of defaultLayout.wide) expect(layoutPanels({ wide: [wide], narrow: [] })).toContain("attention");
+    expect(defaultLayout.narrow).toContain("attention");
+  });
+
   test("an optional panel joins the dashboard by being named in the layout", async () => {
     const layout = await Effect.runPromise(decodeLayout({ ...oneCell({ tabs: ["ledger", "tasks"] }), narrow: ["ledger"] }, known));
     expect(layoutPanels(layout)).toEqual(["ledger", "tasks"]);
