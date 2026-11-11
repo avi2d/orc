@@ -1,5 +1,6 @@
 import { Effect, Option, Result, Schema, Stream } from "effect"
 import { ChildProcess, type ChildProcessSpawner } from "effect/process"
+import { collectOutput } from "./git-run"
 import { inheritedEnv } from "./nono"
 import type { CheckedModelWindow, HostTools } from "./nono-profile"
 import { OrcRunError } from "./run-session"
@@ -64,11 +65,7 @@ export const readModelWindows = (
       extendEnv: false,
       stdin: Stream.fromIterable([new TextEncoder().encode(modelListRequest)])
     }))
-    const [stdout, stderr] = yield* Effect.all([
-      handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
-      handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
-      handle.exitCode
-    ], { concurrency: "unbounded" })
+    const { stdout, stderr } = yield* collectOutput(handle)
     const windows = parseModelWindows(stdout)
     if (Option.isNone(windows)) {
       return yield* new OrcRunError({ message: "orc: pi listed no models, so orc cannot place the context mark: " + stderr.trim() })
