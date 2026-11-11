@@ -1,9 +1,9 @@
 import type { Duration } from "effect";
-import { everyText } from "./cadence";
-import { type Block, type Frame, panelChrome, panelLine, titleRoom, withinRows } from "./layout";
+import { everyText } from "../lib/cadence";
+import { type Block, type Frame, panelChrome, panelLine, titleRoom, withinRows } from "../text/layout";
 import type { Look, Placed } from "./module";
-import type { ScreenSize } from "./screen";
-import { ellipsize, fit, keyedName, type Line, rightSpan, span, truncate, widthOf } from "./text";
+import type { ScreenSize } from "../terminal/screen";
+import { ellipsize, fit, keyedName, type Line, rightSpan, span, truncate, widthOf } from "../text/text";
 
 export const frameRows = 2;
 
