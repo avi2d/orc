@@ -3,7 +3,6 @@ import { defineConfig } from "@avi2dg/checks/knip";
 export default defineConfig({
   entry: [
     "packages/run/src/bin.ts",
-    "packages/run/src/dispatch/heavy-standin-main.ts",
     "packages/schema/src/index.ts",
     "packages/ui/src/index.ts",
     "packages/quota/src/index.ts",
