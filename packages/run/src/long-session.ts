@@ -1,6 +1,6 @@
 import { Option, Schema } from "effect"
 import type { AgentFile } from "./agents"
-import { orcCompletionLine } from "./pi"
+import { implementInstructions } from "./pi"
 import { assistantContent } from "./pi-run"
 
 const longSessionTurnLimit = 300
@@ -162,5 +162,5 @@ export const handoverImplementPrompt = (agent: AgentFile, taskFile: string, note
     "",
     note.trimEnd(),
     "",
-    "The task sits in " + taskFile + ". Read that file and implement what the note leaves undone. When the work is committed on this branch, print " + orcCompletionLine + " on its own line and stop."
+    implementInstructions(taskFile, "what the note leaves undone")
   ].join("\n")

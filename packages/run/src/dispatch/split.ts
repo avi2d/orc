@@ -3,15 +3,16 @@ import { addTask, BacklogError } from "./backlog"
 import type { SplitSource, TaskRecord, TaskSpec } from "./task-record"
 
 export const splitDocumentSchema = "orc.split.v1"
+export const childBudget = "about 300 changed lines or one area"
 
 const Words = Schema.String.check(Schema.makeFilter((value) => value.trim() !== ""))
 
-const Line = Schema.String.check(Schema.isPattern(/^[^\n]*\S[^\n]*$/))
+const Line = Schema.String.check(Schema.isPattern(/^[^\n]*\S[^\n]*$/)).annotate({ description: "A nonblank single-line title." })
 
 const SplitChild = Schema.Struct({
   title: Line,
   body: Words,
-  after: Schema.Array(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)))
+  after: Schema.Array(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))).annotate({ description: "Numbers of earlier children needed, starting at 1. Use an empty array for an independent child." })
 })
 
 const WholeDocument = Schema.Struct({
@@ -20,17 +21,19 @@ const WholeDocument = Schema.Struct({
   reason: Words
 })
 
-const SplitDocument = Schema.Struct({
+export const SplitDocument = Schema.Struct({
   schema: Schema.Literal(splitDocumentSchema),
   plan: Schema.Literal("split"),
   reason: Words,
-  done: Schema.Array(Words).check(Schema.isMinLength(1)),
-  children: Schema.Array(SplitChild).check(Schema.isMinLength(2))
+  done: Schema.Array(Words).check(Schema.isMinLength(1)).annotate({ description: "Done criteria for the whole task, each a nonblank string." }),
+  children: Schema.Array(SplitChild).check(Schema.isMinLength(2)).annotate({ description: "Vertical slices that merge to main independently." })
 })
 
 const PlanDocument = Schema.Union([WholeDocument, SplitDocument])
+export const splitJsonSchema = JSON.stringify(Schema.toJsonSchemaDocument(SplitDocument).schema)
 export type PlanDocument = typeof PlanDocument.Type
 export type SplitPlan = typeof SplitDocument.Type
+export const splitReasonPrefix = "split proposal: "
 
 const decodePlan = Schema.decodeUnknownResult(Schema.fromJsonString(PlanDocument))
 
@@ -44,13 +47,44 @@ const laterWait = (plan: SplitPlan): string | null => {
   return null
 }
 
-export const readPlanDocument = (text: string): Result.Result<PlanDocument, string> => {
+const balancedDocument = (text: string): string | null => {
   const start = text.indexOf("{")
-  const end = text.lastIndexOf("}")
-  if (start === -1 || end < start) {
+  if (start === -1) {
+    return null
+  }
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index]
+    if (inString) {
+      if (escaped) {
+        escaped = false
+      } else if (char === "\\") {
+        escaped = true
+      } else if (char === "\"") {
+        inString = false
+      }
+    } else if (char === "\"") {
+      inString = true
+    } else if (char === "{") {
+      depth += 1
+    } else if (char === "}") {
+      depth -= 1
+      if (depth === 0) {
+        return text.slice(start, index + 1)
+      }
+    }
+  }
+  return null
+}
+
+export const readPlanDocument = (text: string): Result.Result<PlanDocument, string> => {
+  const document = balancedDocument(text)
+  if (document === null) {
     return Result.fail("printed no " + splitDocumentSchema + " document")
   }
-  const decoded = decodePlan(text.slice(start, end + 1))
+  const decoded = decodePlan(document)
   if (Result.isFailure(decoded)) {
     return Result.fail("printed no " + splitDocumentSchema + " document: " + decoded.failure.message)
   }

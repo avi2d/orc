@@ -68,6 +68,13 @@ The planner prints one JSON document:
 A request within the budget prints `{"schema": "orc.split.v1", "plan": "whole", "reason": <text>}`.
 `after` numbers earlier children from 1, and orc refuses a plan with fewer than two children or a child that waits on a later one.
 
+### A worker split proposal
+
+A ship worker that finds the change over the budget can stop and propose a split using the same `orc.split.v1` document.
+Orc records the run as failed without running checks or opening a PR.
+`orc runner result <task-id> --json` returns the validated document as `result.run.split`, and the text result prints it in the run reason.
+The beat closes the task failed with that reason and does not create the proposed children.
+
 ### Changing a plan
 
 To see a parent's plan, run `orc backlog plan <task-id>`, which prints its count line, how it was split, and one line per child with its state and what it still waits on:
