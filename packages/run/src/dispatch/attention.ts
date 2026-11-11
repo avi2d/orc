@@ -80,7 +80,7 @@ export const openItem = (root: string, id: string, asked: Asked): Effect.Effect<
     return yield* publishOnce(folder, id + fileSuffix, yield* encodeItem(id, { ...asked, state: { kind: "open" } }))
   })
 
-export const reviewQuestionItem = (
+const reviewQuestionItem = (
   task: string,
   question: { readonly id: string; readonly text: string; readonly asked: string },
   at: string

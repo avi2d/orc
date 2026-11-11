@@ -1,3 +1,4 @@
+import { strict as assert } from "node:assert"
 import { describe, expect, test } from "bun:test"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -85,7 +86,7 @@ describe("the decider", () => {
       await run(claimTask(blocked, record.spec.id))
       await run(writeTaken(blocked, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-11-02T10:02:00.000Z", log: blocked + "/logs/orc-1.log" } } }))
       await writeFile(join(blocked, "attention"), "blocked")
-      await expect(run(askStartedTask(blocked, "orc-1", { asked, questions: [r2] }))).rejects.toThrow()
+      await assert.rejects(run(askStartedTask(blocked, "orc-1", { asked, questions: [r2] })))
       expect((await run(listTasks(blocked))).at(0)?.parked).toBeNull()
     } finally {
       await rm(blocked, { recursive: true, force: true })
@@ -110,7 +111,7 @@ describe("the decider", () => {
       await run(claimTask(blocked, record.spec.id))
       await run(writeTaken(blocked, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-11-02T10:02:00.000Z", log: blocked + "/logs/orc-1.log" } } }))
       await writeFile(join(blocked, "attention"), "blocked")
-      await expect(run(parkStartedTask(blocked, "orc-1", "orc/orc-1", [{ id: "r2", text: "How many retries?" }], "2026-11-02T10:35:00.000Z"))).rejects.toThrow()
+      await assert.rejects(run(parkStartedTask(blocked, "orc-1", "orc/orc-1", [{ id: "r2", text: "How many retries?" }], "2026-11-02T10:35:00.000Z")))
       const task = (await run(listTasks(blocked))).at(0)
       expect(task?.state.kind).toBe("started")
       expect(task?.parked).toBeNull()
