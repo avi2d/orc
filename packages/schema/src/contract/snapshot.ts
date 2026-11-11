@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { ComposedSessionQuotaReport } from "./composed-session-quota";
+import { ComposedSessionQuotaReport } from "../entities/session-quota/contract/composed-session-quota";
 import { outcomeOf } from "../shared/lib";
 import { QueuesReport } from "./queues";
 import { ResourcesReport } from "./resources";

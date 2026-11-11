@@ -1,4 +1,4 @@
-import type { SessionQuotaView } from "./session-quota";
+import type { SessionQuotaView } from "../entities/session-quota/views/session-quota";
 import { within } from "../entities/task";
 
 const assessmentUnderPanes = (

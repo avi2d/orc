@@ -33,7 +33,7 @@ export {
   type SavedProfiles,
   savedProfilesSourceLayer,
   decodeSavedProfiles,
-} from "./sources/saved-profiles";
+} from "./entities/session-quota";
 export {
   decodeQuota,
   QuotaAvailability,
@@ -46,8 +46,8 @@ export {
   QuotaWindow,
   quotaSourceLayer,
   shownQuotaProviders,
-} from "./sources/quota";
-export { logFreshMillis, type QuotaRead, readQuota, savedAgeSeconds, staleSavedAgeSeconds, staleSourceAgeSeconds } from "./sources/quota-read";
+} from "./entities/session-quota";
+export { logFreshMillis, type QuotaRead, readQuota, savedAgeSeconds, staleSavedAgeSeconds, staleSourceAgeSeconds } from "./entities/session-quota";
 export {
   decodeLinuxProcesses,
   decodeProcesses,
@@ -219,22 +219,22 @@ export { type TaskHistoryMachine, RemoteTaskHistory, remoteTaskHistoryLayer } fr
 export { type TaskLiveMachine, RemoteTaskLive, remoteTaskLiveLayer } from "./views/remote-task-live";
 export { readBeside } from "./shared/config";
 export { type HostSources, hostSourcesLayer, readLocalResources, readMachines } from "./views/local-resources";
-export { composedSessionQuotaOf, localSessionQuotaOf, type QuotaReadings, type QuotaReadSources, quotaReadSourcesLayer, readQuotas } from "./views/session-quota-read";
-export { sessionQuotaOf, type SessionQuotaSources, sessionQuotaSourcesLayer, type SessionSources, sessionSourcesLayer } from "./views/session-quota-read";
-export { ComposedSessionQuotaReport } from "./contract/composed-session-quota";
-export { composedSessionQuotaReport } from "./views/composed-session-quota";
-export { sessionQuotaViewOf } from "./views/session-quota-view";
-export { decodeRemoteSessionQuota, type RemoteSessionSource, SessionMachines, sessionMachinesLayer } from "./views/remote-sessions";
-export { composedSessionQuota, type RemoteReading } from "./views/composed-session-quota";
-export { type Estimate } from "./views/estimate";
+export { composedSessionQuotaOf, localSessionQuotaOf, type QuotaReadings, type QuotaReadSources, quotaReadSourcesLayer, readQuotas } from "./entities/session-quota";
+export { sessionQuotaOf, type SessionQuotaSources, sessionQuotaSourcesLayer, type SessionSources, sessionSourcesLayer } from "./entities/session-quota";
+export { ComposedSessionQuotaReport } from "./entities/session-quota";
+export { composedSessionQuotaReport } from "./entities/session-quota";
+export { sessionQuotaViewOf } from "./entities/session-quota";
+export { decodeRemoteSessionQuota, type RemoteSessionSource, SessionMachines, sessionMachinesLayer } from "./entities/session-quota";
+export { composedSessionQuota, type RemoteReading } from "./entities/session-quota";
+export { type Estimate } from "./entities/session-quota";
 export {
   SessionQuotaAlert,
   sessionQuotaAlerts,
   type SessionQuotaFlag,
   SessionQuotaReport,
-} from "./contract/session-quota";
-export { sessionQuotaFlags, sessionQuotaReport } from "./views/session-quota-report";
-export { type Harness, type LogRecord, logRecords, markedLogRecords } from "./sources/log-lines";
+} from "./entities/session-quota";
+export { sessionQuotaFlags, sessionQuotaReport } from "./entities/session-quota";
+export { type Harness, type LogRecord, logRecords, markedLogRecords } from "./entities/session-quota";
 export {
   decodeHerdrPanes,
   decodeLinuxHarnessProcesses,
@@ -246,7 +246,7 @@ export {
   herdrSourceLayer,
   linuxHarnessProcessSourceLayer,
   macHarnessProcessSourceLayer,
-} from "./sources/live-sessions";
+} from "./entities/session-quota";
 export {
   HarvestLogSource,
   harvestLogSourceLayer,
@@ -257,8 +257,8 @@ export {
   sessionLogSourceAt,
   sessionLogSourceLayer,
   type SinceByHarness,
-} from "./sources/session-logs";
-export { type CountedCall, countedCalls, type Ledger, type LogFile } from "./sources/ledger";
+} from "./entities/session-quota";
+export { type CountedCall, countedCalls, type Ledger, type LogFile } from "./entities/session-quota";
 export {
   type LiveContext,
   placeOf,
@@ -270,8 +270,8 @@ export {
   sessionSuffix,
   tieFolderOf,
   type UnmatchedRuns,
-} from "./sources/live";
-export { type HarvestedReading, harvestedReadings, type HarvestHarness, type HarvestOrigin } from "./sources/harvest";
+} from "./entities/session-quota";
+export { type HarvestedReading, harvestedReadings, type HarvestHarness, type HarvestOrigin } from "./entities/session-quota";
 export {
   type Captured,
   type CapturedCall,
@@ -289,12 +289,12 @@ export {
   retainedDays,
   statuslineRecord,
   withCaptured,
-} from "./sources/capture";
-export { appendCaptured, ledgerReaderAt } from "./sources/capture-ledger";
+} from "./entities/session-quota";
+export { appendCaptured, ledgerReaderAt } from "./entities/session-quota";
 export { captureLedgerDirectory, claudeConfigDirectory, claudeLogged, dashboardCacheDirectory, machineNames, selector } from "./shared/config";
-export { type SourcedWindow, type WindowSource } from "./sources/window-sources";
-export { type AccountJoin } from "./sources/account-join";
-export { type ModelTokens, type SessionModels } from "./views/session-models";
+export { type SourcedWindow, type WindowSource } from "./entities/session-quota";
+export { type AccountJoin } from "./entities/session-quota";
+export { type ModelTokens, type SessionModels } from "./entities/session-quota";
 export { type FairShare, type TaskSpend, taskSpend } from "./views/task-spend";
 export {
   type AccountView,
@@ -313,7 +313,7 @@ export {
   sessionQuotaView,
   type Unmetered,
   type WindowView,
-} from "./views/session-quota";
+} from "./entities/session-quota";
 export {
   addTokens,
   noTokens,
@@ -323,7 +323,7 @@ export {
   tokenTotal,
   type Weighting,
   weightings,
-} from "./contract/tokens";
+} from "./entities/session-quota";
 export {
   ActionRun,
   ActionsSource,
@@ -366,10 +366,10 @@ export {
 export { type CalendarPattern, cronPattern, everyValue, nextMatch } from "./sources/calendar";
 export { type NamedOrchestrator, type NamedPueue, type NextKind, type NextReadings, type NextRow, type NextSource, type NextSourceState, type NextUp, nextUp, type OrchestratorRead } from "./views/next-up";
 export { machineQueue, type MachineQueueView, type QueueEntry, type QueueRow, type QueueRowState, queueWindow } from "./views/machine-queue";
-export { type DispatchReading, type DispatchSnapshot, DispatchSource, dispatchSourceLayer, type DispatchTask, missingBacklog } from "./sources/dispatch";
-export { type DispatchView, dispatchView, type RoomEntry, type RunRow, type WaitRow } from "./views/dispatch";
+export { type DispatchReading, type DispatchSnapshot, DispatchSource, dispatchSourceLayer, type DispatchTask, missingBacklog } from "./entities/dispatch";
+export { type DispatchView, dispatchView, type RoomEntry, type RunRow, type WaitRow } from "./entities/dispatch";
 export { heavySummary, isHeavyNotSetup } from "./views/heavy";
-export { type AttentionItem, type AttentionQueue, AttentionSource, attentionSourceLayer } from "./sources/attention";
+export { type AttentionItem, type AttentionQueue, AttentionSource, attentionSourceLayer } from "./entities/dispatch";
 export { decodeHeavyCheck, HeavyCheck, type HeavyMachine, HeavyMachines, heavyMachinesLayer } from "./sources/heavy";
 export { decodePueue, knownProjects, type PueueMachine, PueueMachines, pueueMachinesLayer, PueueStatus } from "./sources/pueue";
 export { type MachineProjects } from "./sources/project-names";
@@ -395,5 +395,5 @@ export {
   type RunOwners,
   type TestRun,
 } from "./views/queues";
-export { quotaBlocks, type QuotaBlock, type QuotaBlockBody, type SavedAge, type SavedWindow } from "./views/quotas";
+export { quotaBlocks, type QuotaBlock, type QuotaBlockBody, type SavedAge, type SavedWindow } from "./entities/session-quota";
 export * from "./feeds";

@@ -1,7 +1,7 @@
 import { Context, DateTime, Effect, FileSystem, Layer, type Config, type PlatformError, type Schema } from "effect";
 import { encodeTaskSample, type TaskSampleRecord, taskSampleRecords } from "../contract/task-samples";
-import { dayFileOf, dayFiles, expiredDayFiles } from "./capture";
-import { dayFileReaderAt, prunedDayFiles } from "./capture-ledger";
+import { dayFileOf, dayFiles, expiredDayFiles } from "../entities/session-quota/sources/capture";
+import { dayFileReaderAt, prunedDayFiles } from "../entities/session-quota/sources/capture-ledger";
 import { taskSamplesDirectory } from "../shared/config";
 
 export const historyDays = 7;

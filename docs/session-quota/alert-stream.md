@@ -5,7 +5,7 @@ kind: reference
 To stream alerts, run `orc-dash report session-quota-alerts`.
 The stream reads again every 30 seconds and prints one JSON object per line, only when a flag rises or clears.
 Its first read prints a `flagged` line for each flag already up.
-`SessionQuotaAlert` in `packages/schema/src/contract/session-quota.ts` decodes each line.
+`SessionQuotaAlert` in `packages/schema/src/entities/session-quota/contract/session-quota.ts` decodes each line.
 
 | Field | What it holds |
 | --- | --- |
