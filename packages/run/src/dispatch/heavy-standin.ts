@@ -1,4 +1,5 @@
-import { readFileSync, statSync } from "node:fs"
+import { Buffer } from "node:buffer"
+import { closeSync, openSync, readSync, statSync } from "node:fs"
 import { defaultHeavyTools, heavyBinDir } from "./heavy"
 import { decideBody, extraSub } from "./heavy-standin-decide"
 import {
@@ -148,10 +149,24 @@ const isExecutableFile = (file: string): boolean => {
 }
 
 const isStandinFile = (file: string): boolean => {
+  let handle = -1
   try {
-    return readFileSync(file, "utf8").slice(0, 2048).includes("Written by orc heavy path")
+    handle = openSync(file, "r")
   } catch {
     return false
+  }
+  try {
+    const area = Buffer.alloc(2048)
+    const count = readSync(handle, area, 0, 2048, 0)
+    return area.toString("utf8", 0, count).includes("Written by orc heavy path")
+  } catch {
+    return false
+  } finally {
+    try {
+      closeSync(handle)
+    } catch {
+      handle = -1
+    }
   }
 }
 
