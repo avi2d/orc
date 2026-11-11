@@ -28,7 +28,7 @@ import {
   withDetailCue,
 } from "./task-pipeline";
 import { type KeptProcess, keptCpuSeconds, type LimitEpisode, type TaskHistory, taskHistories } from "./task-history";
-import type { SessionQuotaView } from "./session-quota";
+import type { SessionQuotaView } from "../entities/session-quota";
 import { treeRestsOf } from "./task-pane-assessment";
 import { ownedProcesses, totalSecondsOf, within } from "../entities/task";
 import { type TaskSpend, taskSpend } from "./task-spend";

@@ -1,9 +1,9 @@
 import { Config, Context, DateTime, Duration, Effect, FileSystem, Layer, Result, Schema } from "effect";
-import { CommandRunner } from "../shared/lib";
-import { decodeJson, decodeValue } from "../shared/lib";
-import { mapOutcome, ok, type Outcome, unreachable } from "../shared/lib";
-import { runDecoded } from "../shared/lib";
-import { selector } from "../shared/config";
+import { CommandRunner } from "../../../shared/lib";
+import { decodeJson, decodeValue } from "../../../shared/lib";
+import { mapOutcome, ok, type Outcome, unreachable } from "../../../shared/lib";
+import { runDecoded } from "../../../shared/lib";
+import { selector } from "../../../shared/config";
 import { duplicateOf, MachinesFile, ProjectsFile, rawAccounts, strictAccount } from "./dispatch-schema";
 
 type DispatchMachine = typeof MachinesFile.Type["machines"][number];

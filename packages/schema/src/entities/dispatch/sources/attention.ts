@@ -1,8 +1,8 @@
 import { Context, Duration, Effect, Layer, Schema } from "effect";
-import { CommandRunner } from "../shared/lib";
-import { decodeJson } from "../shared/lib";
-import type { Outcome } from "../shared/lib";
-import { runDecoded } from "../shared/lib";
+import { CommandRunner } from "../../../shared/lib";
+import { decodeJson } from "../../../shared/lib";
+import type { Outcome } from "../../../shared/lib";
+import { runDecoded } from "../../../shared/lib";
 
 const AttentionItem = Schema.Struct({
   id: Schema.String,

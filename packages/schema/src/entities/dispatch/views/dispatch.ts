@@ -1,4 +1,4 @@
-import type { Outcome } from "../shared/lib";
+import type { Outcome } from "../../../shared/lib";
 import type { DispatchSnapshot, DispatchTask } from "../sources/dispatch";
 
 export interface RoomEntry {
