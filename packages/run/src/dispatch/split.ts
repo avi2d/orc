@@ -1,5 +1,5 @@
 import { Effect, type FileSystem, Result, Schema } from "effect"
-import { addTask, BacklogError, closeStartedTask, findTask, reopenStartedTask } from "./backlog"
+import { addTask, BacklogError, reopenStartedTask } from "./backlog"
 import type { SplitSource, TaskFileError, TaskRecord, TaskSpec } from "./task-record"
 
 export const splitDocumentSchema = "orc.split.v1"
@@ -154,20 +154,7 @@ export const applyRunSplit = (
   created: string
 ): Effect.Effect<AppliedSplit, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const { title, project, internal, machine, dependsOn, body, parent } = task.spec
-    if (parent !== null) {
-      const grandparent = yield* findTask(root, parent)
-      const siblings = yield* addChildren(root, { title, project, internal, machine, dependsOn, created, body }, grandparent, plan)
-      const closed = yield* closeStartedTask(
-        root,
-        task.spec.id,
-        "done",
-        "split into " + siblings.children.map((child) => child.spec.id).join(", ") + ": " + plan.reason.trim(),
-        { pr: null, report: null },
-        created
-      )
-      return { parent: closed, children: siblings.children }
-    }
+    const { title, project, internal, machine, dependsOn, body } = task.spec
     const reopened = yield* reopenStartedTask(root, task.spec.id, (spec) => ({
       ...spec,
       kind: "parent",

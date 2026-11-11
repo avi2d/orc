@@ -87,6 +87,35 @@ const closeChildrenAndStartParent = async (root: string): Promise<ReadonlyArray<
   return formatBeat(second).split("\n")
 }
 
+const beatAfterChildSplit = async (body: (root: string, lines: ReadonlyArray<string>) => Promise<void>): Promise<void> => {
+  const root = await mkdtemp(join(tmpdir(), "orc-run-split-"))
+  try {
+    await writeFile(join(root, "dispatch.json"), JSON.stringify({ machines: [{ name: "mac", slots: 4, start: ["sh", "-c", "true", "runner", "start"] }], quota }))
+    await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: "/checkout" } }] }))
+    const grandparent = { title: "Big feature", project: "orc", kind: "parent" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], created: "2026-11-11T10:00:00.000Z", body: "# Big feature\n" }
+    const child = { title: "Second slice", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: "orc-1", split: null, dependsOn: [], created: "2026-11-11T10:00:00.000Z", body: "# Second slice\n" }
+    await run(addTask(root, grandparent))
+    await run(addTask(root, child))
+    await run(addTask(root, { ...child, title: "Third slice", body: "# Third slice\n", dependsOn: ["orc-2"] }))
+    await run(claimTask(root, "orc-2"))
+    await run(writeTaken(root, { spec: { ...child, id: "orc-2" }, hold: null, parked: null, state: { kind: "started", claim, started } }))
+    const workerTaskFile = join(root, "run-2-task.md")
+    await writeFile(workerTaskFile, child.body)
+    await run(Effect.acquireUseRelease(
+      openDatabase(root),
+      (db) => Effect.sync(() => {
+        insertRun(db, { id: "run-2", project: "/checkout", branch: "orc/orc-2", taskFile: workerTaskFile, status: "failed", started: started.at, prLink: null, endReason: "split proposal: " + JSON.stringify(proposal) })
+        insertStep(db, { runId: "run-2", name: "implement", attempt: 1, status: "failed", started: started.at, ended: "2026-11-11T10:04:00.000Z" })
+      }),
+      (db) => Effect.sync(() => db.close())
+    ))
+    const report = await Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueFailed(root, "orc-2")))))
+    await body(root, formatBeat(report).split("\n"))
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+}
+
 describe("the beat applying a worker's split proposal", () => {
   test("a valid proposal turns the task into a parent and starts its free child instead of closing the task failed", async () => {
     await beatAfterRun("split proposal: " + JSON.stringify(proposal), async (root, lines) => {
@@ -142,50 +171,19 @@ describe("the beat applying a worker's split proposal", () => {
     })
   })
 
-  test("a split from a child lands as siblings under the grandparent instead of nesting a parent", async () => {
-    const root = await mkdtemp(join(tmpdir(), "orc-run-split-"))
-    try {
-      await writeFile(join(root, "dispatch.json"), JSON.stringify({ machines: [{ name: "mac", slots: 4, start: ["sh", "-c", "true", "runner", "start"] }], quota }))
-      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: "/checkout" } }] }))
-      const grandparent = { title: "Big feature", project: "orc", kind: "parent" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], created: "2026-11-11T10:00:00.000Z", body: "# Big feature\n" }
-      const child = { title: "Second slice", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: "orc-1", split: null, dependsOn: [], created: "2026-11-11T10:00:00.000Z", body: "# Second slice\n" }
-      await run(addTask(root, grandparent))
-      await run(addTask(root, child))
-      await run(addTask(root, { ...child, title: "Third slice", body: "# Third slice\n", dependsOn: ["orc-2"] }))
-      await run(claimTask(root, "orc-2"))
-      await run(writeTaken(root, { spec: { ...child, id: "orc-2" }, hold: null, parked: null, state: { kind: "started", claim, started } }))
-      const workerTaskFile = join(root, "run-2-task.md")
-      await writeFile(workerTaskFile, child.body)
-      await run(Effect.acquireUseRelease(
-        openDatabase(root),
-        (db) => Effect.sync(() => {
-          insertRun(db, { id: "run-2", project: "/checkout", branch: "orc/orc-2", taskFile: workerTaskFile, status: "failed", started: started.at, prLink: null, endReason: "split proposal: " + JSON.stringify(proposal) })
-          insertStep(db, { runId: "run-2", name: "implement", attempt: 1, status: "failed", started: started.at, ended: "2026-11-11T10:04:00.000Z" })
-        }),
-        (db) => Effect.sync(() => db.close())
-      ))
-      const report = await Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueFailed(root, "orc-2")))))
-      const lines = formatBeat(report).split("\n")
+  test("a split from a child closes failed instead of nesting a parent", async () => {
+    await beatAfterChildSplit(async (root, lines) => {
       const tasks = await run(listTasks(root))
-      const proposer = tasks.find((task) => task.spec.id === "orc-2")
-      expect(proposer?.spec.kind).toBe("ship")
-      expect(proposer?.spec.parent).toBe("orc-1")
-      expect(proposer?.state.kind === "closed" ? proposer.state.closing.outcome + ":" + proposer.state.closing.reason : "")
-        .toBe("done:split into orc-4, orc-5: " + proposal.reason)
-      const siblings = tasks.filter((task) => task.spec.parent === "orc-1")
-      expect(siblings.map((task) => [task.spec.id, task.spec.kind, task.spec.title, task.spec.dependsOn, task.state.kind])).toEqual([
-        ["orc-2", "ship", "Second slice", [], "closed"],
-        ["orc-3", "ship", "Third slice", ["orc-2"], "started"],
-        ["orc-4", "ship", "Record the split", [], "started"],
-        ["orc-5", "ship", "Show the plan", ["orc-4"], "new"]
+      expect(tasks.map((task) => [task.spec.id, task.spec.kind, task.spec.parent, task.state.kind])).toEqual([
+        ["orc-1", "parent", null, "new"],
+        ["orc-2", "ship", "orc-1", "closed"],
+        ["orc-3", "ship", "orc-1", "new"]
       ])
-      expect(tasks.find((task) => task.spec.id === "orc-4")?.spec.body).toContain("This is one slice of orc-1, Big feature")
-      expect(lines).toContain("split orc-2 on mac into orc-4, orc-5: " + proposal.reason)
-      const event = await readFile(join(root, "events", "orc-2.split.json"), "utf8")
-      expect(JSON.parse(event)).toMatchObject({ text: "orc-2 Second slice split at run into orc-4 Record the split, orc-5 Show the plan: " + proposal.reason })
-    } finally {
-      await rm(root, { recursive: true, force: true })
-    }
+      const proposer = tasks.find((task) => task.spec.id === "orc-2")
+      expect(proposer?.state.kind === "closed" ? proposer.state.closing.outcome + ":" + proposer.state.closing.reason : "")
+        .toBe("failed:split proposal: " + JSON.stringify(proposal))
+      expect(lines).toContain("closed orc-2 failed on mac: split proposal: " + JSON.stringify(proposal))
+    })
   })
 
   test("killing a parent with an earlier worker run closes stopped instead of closing failed on the stale run", async () => {
