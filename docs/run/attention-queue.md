@@ -22,10 +22,10 @@ The beat opens an item for each run event, owned by the user:
 
 - A run that died opens a `run-died` item, when its task closes failed or its start fails.
   A run that ends done or that you stop opens none.
-- A red check on a closed task's PR opens a `check-red` item for the PR's head commit.
+- A red check on a closed ship task's PR opens a `check-red` item for the PR's head commit.
   Checks that turn green on that commit, or a new commit, withdraw it.
   Merging the PR or closing it without merging withdraws it.
-- A PR whose checks are all green opens a `pr-ready` item for its head commit.
+- A closed ship task's PR with every check reporting green opens a `pr-ready` item for its head commit.
   A red check or a new commit withdraws it.
   Merging the PR closes it with the answer `merged`.
   Closing the PR without merging closes it with the answer `closed without merging`.
