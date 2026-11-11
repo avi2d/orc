@@ -92,7 +92,8 @@ const settleOpenItem = (root: string, id: string, state: SettledState): Effect.E
     if (item.state.kind !== "open") {
       return "already closed" as const
     }
-    const replaced = yield* replaceItem(root, id, before, yield* encodeItem(id, { ...item, deciding: undefined, state }))
+    const { deciding: _claim, ...rest } = item
+    const replaced = yield* replaceItem(root, id, before, yield* encodeItem(id, { ...rest, state }))
     return (replaced ? "settled" : "already closed") as const
   })
 
@@ -111,7 +112,8 @@ export const recordDecision = (root: string, id: string, decision: Decision): Ef
     if (item.state.kind !== "open") {
       return
     }
-    const next: AttentionItem = { ...item, deciding: undefined, decision, owner: decision.kind === "escalated" ? "user" : item.owner }
+    const { deciding: _claim, ...rest } = item
+    const next: AttentionItem = { ...rest, decision, owner: decision.kind === "escalated" ? "user" : item.owner }
     const encoded = yield* encodeItem(id, next)
     yield* replaceItem(root, id, before, encoded).pipe(Effect.asVoid)
   })
