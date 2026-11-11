@@ -1,8 +1,8 @@
 import { type Config, Context, Duration, Layer } from "effect";
-import type { CommandRunner } from "../shared/lib";
+import type { CommandRunner } from "../../../shared/lib";
 import { decodeResourcesReport } from "./resources";
 import type { ReportedResources } from "./resources";
-import { configuredMachines, type Machines } from "../shared/config";
+import { configuredMachines, type Machines } from "../../../shared/config";
 
 export class ResourceMachines extends Context.Service<ResourceMachines, Machines<ReportedResources>>()(
   "orc-dash/ResourceMachines",

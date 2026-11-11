@@ -3,16 +3,16 @@ import type { TaskSampleRecord } from "../contract/task-samples";
 import type { ReportedTasks, TaskEntry } from "../entities/task";
 import { plannedRowsOf, type PlannedRow } from "../entities/task";
 import { byProject } from "./project-order";
-import type { NoMistakesSnapshot } from "../contract/no-mistakes";
-import type { OrcSnapshot } from "../contract/orc";
+import type { NoMistakesSnapshot } from "../entities/task-pipeline";
+import type { OrcSnapshot } from "../entities/task-pipeline";
 import { type Decoded, decoded, decodeJson, flatMapDecoded, rejected } from "../shared/lib";
 import { type Failed, mapOutcome, type Outcome, secondsFrom } from "../shared/lib";
-import type { PueueStatus } from "../sources/pueue";
+import type { PueueStatus } from "../entities/queues";
 import type { CountedProcess, LiveProcess, ProcessSamples } from "../entities/task";
 import { CountedProcessJson, LiveProcessJson, LiveTasksReport, LiveTasksJson, ProcessSamplesJson } from "../contract/task-live";
 import { cueStageSecondsOf, orcStageSecondsOf } from "./stage-time";
-import { testsOf, type RunOwners, type TestRun } from "./queues";
-import { orcPipelineOf } from "./orc-pipeline";
+import { testsOf, type RunOwners, type TestRun } from "../entities/queues";
+import { orcPipelineOf } from "../entities/task-pipeline";
 import {
   anchorOf,
   cuePipelineOf,
@@ -26,7 +26,7 @@ import {
   type TaskPipeline,
   withAnchorSeconds,
   withDetailCue,
-} from "./task-pipeline";
+} from "../entities/task-pipeline";
 import { type KeptProcess, keptCpuSeconds, type LimitEpisode, type TaskHistory, taskHistories } from "./task-history";
 import type { SessionQuotaView } from "../entities/session-quota";
 import { treeRestsOf } from "./task-pane-assessment";

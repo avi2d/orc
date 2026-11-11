@@ -1,11 +1,11 @@
 import { Config, Context, Duration, Effect, Layer } from "effect";
-import { CommandRunner } from "../shared/lib";
-import { mapOutcome, ok, type Outcome, type Reading } from "../shared/lib";
-import { runDecoded, stamped } from "../shared/lib";
+import { CommandRunner } from "../../../shared/lib";
+import { mapOutcome, ok, type Outcome, type Reading } from "../../../shared/lib";
+import { runDecoded, stamped } from "../../../shared/lib";
 import { decodeNoMistakes, type NoMistakesRun, type NoMistakesSnapshot } from "../contract/no-mistakes";
 import { decodeOrcRuns, decodeOrcShow, type OrcSnapshot } from "../contract/orc";
 
-import { machineNames, selector } from "../shared/config";
+import { machineNames, selector } from "../../../shared/config";
 
 export interface PipelineFolder {
   readonly folder: string;

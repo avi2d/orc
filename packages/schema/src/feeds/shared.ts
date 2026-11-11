@@ -2,7 +2,7 @@ import { Context, DateTime, Effect, Layer, Option } from "effect";
 import { SavedProfilesSource } from "../entities/session-quota";
 import { readQuota } from "../entities/session-quota";
 import { type QuotaReadings, type QuotaReadSources, sessionQuotaOf, type SessionSources } from "../entities/session-quota";
-import type { QueueReadings } from "../views/queues";
+import type { QueueReadings } from "../entities/queues";
 import { type QuotaBlock, quotaBlocks } from "../entities/session-quota";
 import type { SessionQuotaView } from "../entities/session-quota";
 import type { TaskLevels, TaskListing } from "../views/task-levels";

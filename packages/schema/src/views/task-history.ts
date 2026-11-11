@@ -1,6 +1,6 @@
 import { DateTime } from "effect";
 import type { SampledSpend, SampledTask, SampledTestRun, TaskSampleRecord } from "../contract/task-samples";
-import { projectOf, type TestRun } from "./queues";
+import { projectOf, type TestRun } from "../entities/queues";
 import { totalSecondsOf } from "../entities/task";
 import type { TaskSpend } from "./task-spend";
 

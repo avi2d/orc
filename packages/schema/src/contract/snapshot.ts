@@ -1,8 +1,8 @@
 import { Schema } from "effect";
 import { ComposedSessionQuotaReport } from "../entities/session-quota";
 import { outcomeOf } from "../shared/lib";
-import { QueuesReport } from "./queues";
-import { ResourcesReport } from "./resources";
+import { QueuesReport } from "../entities/queues";
+import { ResourcesReport } from "../entities/resources";
 import { TasksReport } from "../entities/task";
 
 export const snapshotSources = ["quota", "resources", "queues", "tasks"] as const;

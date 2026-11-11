@@ -1,8 +1,8 @@
 import { DateTime, Option } from "effect";
 import type { AlertProcess, HeavyLoadEvent, HeavyLoadSettings, MachineLimits, MemoryLimit } from "../contract/alerts";
-import type { ResourcesReport } from "../contract/resources";
+import type { ResourcesReport } from "../entities/resources";
 import type { Outcome } from "../shared/lib";
-import { isFreshResources } from "../views/resources";
+import { isFreshResources } from "../entities/resources";
 import { type Episode, episodeStep, type Level, type Stepped } from "./episode";
 
 export type HeavyLoadState = ReadonlyMap<string, Episode>;

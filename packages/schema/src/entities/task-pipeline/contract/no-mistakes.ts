@@ -1,4 +1,4 @@
-import { decoded, type Decoded } from "../shared/lib";
+import { decoded, type Decoded } from "../../../shared/lib";
 
 interface ActiveStep {
   readonly seconds: number | undefined;

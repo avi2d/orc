@@ -1,8 +1,8 @@
 import { DateTime, Option } from "effect";
-import { mapOutcome, type Outcome } from "../shared/lib";
+import { mapOutcome, type Outcome } from "../../../shared/lib";
 import type { ActionRun } from "../sources/actions";
-import type { TaskEntry } from "../entities/task";
-import { taskOwning } from "../entities/task";
+import type { TaskEntry } from "../../task";
+import { taskOwning } from "../../task";
 import type { HeavyCheck } from "../sources/heavy";
 import type { PueueGroupStatus, PueueStatus, PueueTask, PueueTaskResult } from "../sources/pueue";
 import { type MachineProjects, type ProjectNames, unknownProject } from "../sources/project-names";

@@ -4,8 +4,8 @@ import { type Decoded, decoded, decodeJson, decodeValue, flatMapDecoded, recordL
 import { mapOutcome, ok, type Outcome } from "../shared/lib";
 import { runDecoded } from "../shared/lib";
 import { type CalendarPattern, cronPattern, everyValue } from "./calendar";
-import type { RepoFailure } from "./ci-runs";
-import { RunnerRepos } from "./runners";
+import type { RepoFailure } from "../entities/queues";
+import { RunnerRepos } from "../entities/queues";
 
 export interface TimerSchedule {
   readonly kind: "timer";

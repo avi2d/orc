@@ -1,14 +1,14 @@
 import { DateTime, Option } from "effect";
-import { type Failed, mapOutcome, type Outcome, type Reading, zipOutcomes } from "../shared/lib";
+import { type Failed, mapOutcome, type Outcome, type Reading, zipOutcomes } from "../../../shared/lib";
 import type { DiskUsage } from "../sources/disk";
 import type { ComputeApp, GpuMetric, GpuReading } from "../sources/gpu";
 import type { LinuxHost } from "../sources/linux-host";
 import type { MacHost } from "../sources/mac-host";
 import type { ProcessRow } from "../sources/processes";
-import type { ProcessSamples } from "../entities/task";
-import type { ReportedTasks } from "../entities/task";
-import { type TaskResources, taskResources } from "../entities/task";
-import { type Decoded, decodeJson, decoded, flatMapDecoded, rejected } from "../shared/lib";
+import type { ProcessSamples } from "../../task";
+import type { ReportedTasks } from "../../task";
+import { type TaskResources, taskResources } from "../../task";
+import { type Decoded, decodeJson, decoded, flatMapDecoded, rejected } from "../../../shared/lib";
 import { GpuAppJson, ResourcesReport } from "../contract/resources";
 
 export interface ProcessView {

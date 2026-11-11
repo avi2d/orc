@@ -4,7 +4,7 @@ import { LinuxDiskSource, linuxDiskSourceLayer, MacDiskSource, macDiskSourceLaye
 import { GpuSource, gpuSourceLayer } from "../sources/gpu";
 import { LinuxHostSource, linuxHostSourceLayer } from "../sources/linux-host";
 import { MacHostSource, macHostSourceLayer } from "../sources/mac-host";
-import { readBeside } from "../shared/config";
+import { readBeside } from "../../../shared/config";
 import { LinuxProcessesSource, linuxProcessesSourceLayer, MacProcessesSource, macProcessesSourceLayer } from "../sources/processes";
 import { ResourceMachines } from "./remote-resources";
 

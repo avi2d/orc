@@ -1,7 +1,7 @@
 import { Effect, Result, Schema } from "effect";
 import { type Decoded, decoded, rejected } from "../shared/lib";
 import { strictly } from "../shared/config";
-import { ProcessJson } from "./resources";
+import { ProcessJson } from "../entities/resources/contract/resources";
 import { AccountRef, FlagJson } from "../entities/session-quota";
 import { TaskStateJson } from "../entities/task";
 

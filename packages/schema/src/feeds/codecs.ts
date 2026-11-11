@@ -1,13 +1,13 @@
 import { Schema } from "effect";
 import { outcomeOf } from "../shared/lib";
 import type { Reading } from "../shared/lib";
-import { ActionRun } from "../sources/actions";
-import type { CiReport } from "../sources/ci-runs";
-import { PueueStatus } from "../sources/pueue";
+import { ActionRun } from "../entities/queues";
+import type { CiReport } from "../entities/queues";
+import { PueueStatus } from "../entities/queues";
 import { QuotaAvailability, QuotaProviderState, QuotaWindow, shownQuotaProviders } from "../entities/session-quota";
 
 import type { QuotaBlock } from "../entities/session-quota";
-import type { MachinesView } from "../views/resources";
+import type { MachinesView } from "../entities/resources";
 import type { SessionQuotaView } from "../entities/session-quota";
 
 const Failed = Schema.Union([

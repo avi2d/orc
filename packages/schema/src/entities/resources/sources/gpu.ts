@@ -1,10 +1,10 @@
 import { Context, Duration, Effect, Layer, Schema } from "effect";
-import type { Command, CommandRunner } from "../shared/lib";
-import { type Decoded, decodeValue, flatMapDecoded } from "../shared/lib";
-import { mapOutcome, type Outcome } from "../shared/lib";
-import { runDecoded, sourceOf, stamped, type Source } from "../shared/lib";
-import { nonEmptyLines, splitEach } from "../shared/lib";
-import { AmountText, CountText } from "../shared/lib";
+import type { Command, CommandRunner } from "../../../shared/lib";
+import { type Decoded, decodeValue, flatMapDecoded } from "../../../shared/lib";
+import { mapOutcome, type Outcome } from "../../../shared/lib";
+import { runDecoded, sourceOf, stamped, type Source } from "../../../shared/lib";
+import { nonEmptyLines, splitEach } from "../../../shared/lib";
+import { AmountText, CountText } from "../../../shared/lib";
 
 const NotReported = Schema.Literals(["[N/A]", "[Not Supported]"]);
 

@@ -1,6 +1,6 @@
 import { DateTime } from "effect";
 import type { StageCue } from "./task-history";
-import { anchorOf, type CueKind, cuePipelineOf, type OpenTaskState } from "./task-pipeline";
+import { anchorOf, type CueKind, cuePipelineOf, type OpenTaskState } from "../entities/task-pipeline";
 
 const staleYellowMs = 5 * 60 * 1000;
 

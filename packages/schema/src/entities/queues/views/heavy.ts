@@ -1,5 +1,5 @@
 import { heavyNotSetupReason, type HeavyCheck } from "../sources/heavy";
-import type { Failed } from "../shared/lib";
+import type { Failed } from "../../../shared/lib";
 
 const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`;
 
