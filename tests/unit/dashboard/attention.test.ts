@@ -22,8 +22,7 @@ describe("the dashboard's attention queue", () => {
 
   test("shows the open and overdue counts in the narrow glance by default", async () => {
     const frame = await printed(84, 24);
-    expect(frame).toContain("attention");
-    expect(frame).toContain("3 open");
+    expect(frame).toContain("attention 3 open");
     expect(frame).toContain("1 overdue");
   });
 });
