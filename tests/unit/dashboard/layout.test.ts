@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Effect } from "effect";
 import { decodeLayout, defaultLayout, layoutPanels } from "@avi2dg/orc-dashboard";
 
-const known = ["quota", "session-quota", "alerts", "resources", "queues", "schedules", "dispatch", "tasks", "ledger"];
+const known = ["quota", "session-quota", "alerts", "resources", "queues", "schedules", "dispatch", "attention", "tasks", "ledger"];
 
 const refusalOf = (raw: unknown): Promise<string> =>
   Effect.runPromise(Effect.match(decodeLayout(raw, known), { onFailure: (error) => error.reason, onSuccess: () => "decoded" }));
@@ -26,6 +26,11 @@ describe("the layout setting", () => {
   test("a layout leaving out the give-way order decodes against modules that order does not name", async () => {
     const layout = await Effect.runPromise(decodeLayout({ ...oneCell({ panel: "tasks" }), narrow: ["tasks"] }, ["tasks"]));
     expect(layout.narrow).toEqual(["tasks"]);
+  });
+
+  test("the shipped layout shows the attention queue on every wide screen and in the narrow glance, so a default dashboard that leaves it out misses what needs someone", () => {
+    for (const wide of defaultLayout.wide) expect(layoutPanels({ wide: [wide], narrow: [] })).toContain("attention");
+    expect(defaultLayout.narrow).toContain("attention");
   });
 
   test("an optional panel joins the dashboard by being named in the layout", async () => {

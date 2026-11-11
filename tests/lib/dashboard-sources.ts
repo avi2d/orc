@@ -78,6 +78,7 @@ const recordedAnswers: ReadonlyArray<readonly [string, string]> = [
   ["systemctl --user list-timers", "[]"],
   [`sh -c ${tasksCommand}`, fixture("tasks/east.json")],
   ["orc heavy check --json", fixture("heavy/check.json")],
+  ["orc attention --json", fixture("attention/open.json")],
   ...queueAnswers,
 ];
 

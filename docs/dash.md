@@ -342,6 +342,7 @@ To print one frame of plain text instead, run `orc-dash panel dispatch --print`.
 To run the live attention panel, run `orc-dash panel attention`.
 It runs alone in a plain terminal or in a Herdr pane.
 The panel reads `orc attention --json` on the machine it runs on and nothing else, and paints again every 10 seconds.
+The dashboard shows it by default, above the resources panel in a wide layout and second in the narrow glance, as [Lay out the dashboard](#lay-out-the-dashboard) shows.
 It shows each open item oldest first, with its task, its owner, its age and its kind, and its text below.
 An overdue item starts with `!` and says `overdue` after its age.
 The head counts the open items and the overdue ones.
@@ -496,7 +497,8 @@ A saved Claude profile read that long ago leaves its age to its rows, so its hea
 A limit with a pace marks on its bar how much of its time is left, as the quota tool does.
 Beside the share, a reserve column reads spare, over, on pace, no pace or used up.
 A projection made early in a limit reads muted, such as may run out in 2d 7h.
-Below the accounts, a flag names each agent spending over its share of a running-ahead limit that runs out before its reset.
+Below the accounts, the attention row counts the open items and the overdue ones.
+Below the attention row, a flag names each agent spending over its share of a running-ahead limit that runs out before its reset.
 The flag names the agent by its project, such as orc.
 With a second machine configured, a flag for an agent there names that machine too.
 A line says when that machine could not be checked.
@@ -537,7 +539,8 @@ Add `--width 40` for a narrow frame, or `--width 240 --height 60` for a wide one
 With the default layout, on a screen at least 120 columns wide and 36 rows tall, the dashboard lays its readings out in bands.
 The top band holds quota and notices.
 Notices holds gluttons and alerts under one shared title, opening on gluttons.
-Below the top band, the machines box gives each machine's CPU, memory, disk and GPU bars.
+Below the top band, the attention box lists each open item oldest first, with its task, its owner, its age and its kind.
+Below it, the machines box gives each machine's CPU, memory, disk and GPU bars.
 A machine with a tasks report and no resources reading gives just its name.
 Under each machine, a line says whether a task uses over a quarter of its memory or over half its cores.
 When that machine's tasks report or task usage was not read, the line says so instead.
@@ -682,18 +685,18 @@ The default layout is this one.
         "atLeast": { "columns": 240, "rows": 36 },
         "rows": [
           { "height": "auto", "atMost": 0.55, "least": 8, "cells": [{ "panel": "quota" }, { "tabs": ["session-quota", "alerts"] }] },
-          { "height": "fill", "cells": [{ "stack": [{ "panel": "resources" }, { "tabs": ["queues", "schedules", "dispatch"] }] }, { "panel": "tasks", "width": 2 }] }
+          { "height": "fill", "cells": [{ "stack": [{ "panel": "attention" }, { "panel": "resources" }, { "tabs": ["queues", "schedules", "dispatch"] }] }, { "panel": "tasks", "width": 2 }] }
         ]
       },
       {
         "atLeast": { "columns": 120, "rows": 36 },
         "rows": [
           { "height": "auto", "atMost": 0.55, "least": 8, "cells": [{ "panel": "quota" }, { "tabs": ["session-quota", "alerts"] }] },
-          { "height": "fill", "cells": [{ "stack": [{ "panel": "resources" }, { "tabs": ["queues", "schedules", "dispatch"] }] }, { "panel": "tasks", "width": 1 }] }
+          { "height": "fill", "cells": [{ "stack": [{ "panel": "attention" }, { "panel": "resources" }, { "tabs": ["queues", "schedules", "dispatch"] }] }, { "panel": "tasks", "width": 1 }] }
         ]
       }
     ],
-    "narrow": ["quota", "session-quota", "queues", "dispatch", "resources", "alerts", "tasks"],
+    "narrow": ["quota", "attention", "session-quota", "queues", "dispatch", "resources", "alerts", "tasks"],
     "narrowGivesWay": ["alerts", "quota", "session-quota"]
   }
 }
