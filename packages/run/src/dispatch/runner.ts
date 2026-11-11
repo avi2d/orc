@@ -8,7 +8,8 @@ import { TaskId } from "./backlog"
 import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldToken } from "./held-token"
 import { heldTask, orcGroup, parentLabel, PueueState, PueueStatus, taskLabel, type PueueTask } from "./pueue-status"
 import { parseTaskFile } from "./task-record"
-import { reportKinds, type TaskKind } from "../task-kind"
+import { reportKinds } from "../task-kind"
+import { fileKeyOf, labelOf, parentBranch, runLabel, taskBranch } from "./runner-label"
 import { readInstructions, TaskInstructions, writeInstructions } from "./runner-instructions"
 import { RunnerError } from "./runner-error"
 import { runsForBranch } from "../history-resume"
@@ -46,9 +47,7 @@ type QueueRequest = typeof QueueRequest.Type
 
 export type RunnerRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
 
-export const taskBranch = (task: string): string => "orc/" + task
-
-export const parentBranch = (task: string): string => taskBranch(task) + "-parent"
+export { fileKeyOf, labelOf, parentBranch, runLabel, taskBranch } from "./runner-label"
 
 export const refuse = (detail: string): Effect.Effect<never, RunnerError> => Effect.fail(new RunnerError({ detail }))
 
@@ -120,13 +119,6 @@ export const killHeld = (
     yield* markTaskRunsStopped(home, held.path, task, taskFile, started, stoppedBranch)
     return "removed pueue task " + held.id + " for " + task
   })
-
-export const labelOf = (home: string, task: string, label?: string | null): string => label ?? taskLabel(home, task)
-
-export const runLabel = (home: string, task: string, kind: TaskKind | undefined, label?: string | null): string =>
-  label ?? (kind === "parent" ? parentLabel(home, task) : taskLabel(home, task))
-
-export const fileKeyOf = (home: string, task: string, label: string): string => label === taskLabel(home, task) ? task : "label-" + encodeURIComponent(label)
 
 const PueueGroups = Schema.Record(Schema.String, Schema.Unknown)
 

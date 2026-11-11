@@ -8,7 +8,8 @@ import type { DispatchConfig } from "./config"
 import { ownedBySweep, throughFor } from "./machine-reach"
 import { logWrittenAt, stallMillis } from "./stall"
 import { answersFor, askStartedTask, markAnswersRelayed, parkStartedTask } from "./parked"
-import { type Command, type RunnerError, type RunnerRequirements, runLabel, taskBranch } from "./runner"
+import { type Command, type RunnerError, type RunnerRequirements } from "./runner"
+import { runLabel, taskBranch } from "./runner-label"
 import { endingFromResult, type Relay, relayAnswers, relayAnswersThrough, type RunEnding, readResult, readResultThrough, type RunnerResult } from "./runner-result"
 import type { TaskFileError, TaskRecord } from "./task-record"
 
@@ -192,6 +193,17 @@ const clearUnread = (
     Effect.catchTag("PlatformError", () => Effect.succeed<number | null>(null))
   )
 
+const applicableEndingOf = (task: TaskRecord, reading: CloseReading, ending: RunEnding): RunEnding =>
+  reading.kind === "read" && ending.kind === "split" && task.spec.parent !== null
+    ? {
+      kind: "close",
+      outcome: "failed",
+      reason: reading.result.run?.endReason ?? "the run proposed a split, and a child applies no split",
+      pr: reading.result.run?.prLink ?? null,
+      report: null
+    } satisfies RunEnding
+    : ending
+
 // A finished run ends its task here, because no other beat step reads a started task after its run ends.
 export const closeFinished = (
   context: CloseContext,
@@ -237,15 +249,6 @@ export const closeFinished = (
       const action = reading.asking === null ? null : yield* serveAsking(context, task, claim.machine, reading.asking, relay)
       return { kind: "running", outputAt: reading.outputAt, action } satisfies Progress
     }
-    const applicable = reading.kind === "read" && ending.kind === "split" && task.spec.parent !== null
-      ? {
-        kind: "close",
-        outcome: "failed",
-        reason: reading.result.run?.endReason ?? "the run proposed a split, and a child applies no split",
-        pr: reading.result.run?.prLink ?? null,
-        report: null
-      } satisfies RunEnding
-      : ending
-    const ended = yield* endTask(context.root, task, claim.machine, applicable)
+    const ended = yield* endTask(context.root, task, claim.machine, applicableEndingOf(task, reading, ending))
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
   })

@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, FileSystem, Layer } from "effect"
+import { Effect, FileSystem, Layer, Schema } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
 import { runBeat } from "../../../packages/run/src/dispatch/beat"
@@ -145,7 +145,7 @@ describe("the beat applying a worker's split proposal", () => {
       expect(parent?.state.kind).toBe("started")
       const captured = join(root, "forwarded.json")
       await Effect.runPromise(startTask({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: join(root, "taken", "orc-1.md"), ORC_TASK_CHECKOUT: "/checkout", ORC_TASK_PROVIDER: "test" }, Effect.succeed(""), { kind: "through", command: ["sh", "-c", "cat > " + captured] as const }, ["orc"] as const, root).pipe(Effect.provide(BunServices.layer)))
-      const forwarded = JSON.parse(await readFile(captured, "utf8")) as { readonly branch?: string }
+      const forwarded = Schema.decodeUnknownSync(Schema.Struct({ branch: Schema.optional(Schema.String) }))(JSON.parse(await readFile(captured, "utf8")))
       const parentPath = join(root, "parent.md")
       await writeFile(parentPath, parent?.spec.body ?? "")
       await run(Effect.acquireUseRelease(
