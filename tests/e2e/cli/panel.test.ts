@@ -26,7 +26,7 @@ const run = async (args: ReadonlyArray<string>, config = join(home, "absent.json
   return { code, stdout, stderr };
 };
 
-const panels = ["quota", "session-quota", "alerts", "resources", "queues", "schedules", "dispatch", "tasks", "ledger"];
+const panels = ["quota", "session-quota", "alerts", "resources", "queues", "schedules", "dispatch", "attention", "tasks", "ledger"];
 
 describe("orc-dash panel", () => {
   test("--list names every panel with what it shows", async () => {

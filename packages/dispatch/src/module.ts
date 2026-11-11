@@ -1,25 +1,17 @@
 import { Effect, Option, type Scope } from "effect";
-import {
-  DispatchSource,
-  dispatchView,
-  type DispatchReading as SnapshotReading,
-  type DispatchView,
-  freshOfStamped,
-  polled,
-  readsCadence,
-  type Stamped,
-} from "@avi2dg/orc-schema";
+import { DispatchSource, dispatchView, type DispatchReading as SnapshotReading, type DispatchView, readsCadence } from "@avi2dg/orc-schema";
 import {
   labelledReadings,
   leastLabelWidth,
   listPlaced,
-  mountedOf,
   type Mounted,
+  mountPolled,
   noSettings,
   type NoSettings,
   panelModule,
   type PanelModule,
   type Placed,
+  type PolledReading,
   printSolo,
   reading as makeReading,
   runSolo,
@@ -32,10 +24,7 @@ import { dispatchSection } from "./sections";
 
 export type DispatchSources = DispatchSource;
 
-export interface DispatchReading {
-  readonly latest: Option.Option<Stamped<SnapshotReading>>;
-  readonly refreshing: boolean;
-}
+export type DispatchReading = PolledReading<SnapshotReading>;
 
 const viewOf = (reading: DispatchReading): DispatchView | undefined =>
   Option.isNone(reading.latest) ? undefined : dispatchView(reading.latest.value.value.snapshot);
@@ -63,22 +52,8 @@ export const dispatchPlaced = (reading: () => DispatchReading): Placed =>
   });
 
 export const mountDispatch: Effect.Effect<Mounted, never, DispatchSources | Scope.Scope> = Effect.gen(function* () {
-  const poll = yield* polled((yield* DispatchSource).read, readsCadence);
-  return yield* mountedOf({
-    name: "dispatch",
-    key: "d",
-    cadence: readsCadence,
-    reach: "none",
-    read: Effect.gen(function* () {
-      const latest = yield* poll.latest;
-      yield* Effect.yieldNow;
-      return { latest, refreshing: yield* poll.refreshing };
-    }),
-    pending: (reading) => Option.isNone(reading.latest),
-    refreshing: (reading) => reading.refreshing,
-    freshness: (reading) => freshOfStamped(Option.getOrUndefined(reading.latest)),
-    placed: dispatchPlaced,
-  });
+  const source = yield* DispatchSource;
+  return yield* mountPolled({ name: "dispatch", key: "d", cadence: readsCadence, read: source.read, placed: dispatchPlaced });
 });
 
 export const dispatchModule: PanelModule<DispatchSources> = panelModule<NoSettings, DispatchSources>({

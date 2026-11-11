@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 const root = join(import.meta.dir, "..", "..", "..");
 
@@ -40,11 +40,17 @@ const readOr = async (path: string, fallback: string): Promise<string> => {
 const childrenOf = async (pid: number): Promise<ReadonlyArray<number>> =>
   (await readOr(`/proc/${pid}/task/${pid}/children`, "")).split(" ").filter((field) => field !== "").map(Number);
 
+// A bun wrapper on PATH execs the real binary by its full path, so argv[0] is matched by its basename.
+const runsDashboard = (cmdline: string): boolean => {
+  const [program, script, ...rest] = cmdline.split("\0");
+  return basename(program) === "bun" && script === command && rest.join("") === "";
+};
+
 // Matching the command line machine-wide picks up dashboards that parallel tests started, so only this terminal's descendants count.
 const dashboardUnder = async (terminal: number): Promise<number | undefined> => {
   const pending = [...(await childrenOf(terminal))];
   for (let pid = pending.shift(); pid !== undefined; pid = pending.shift()) {
-    if ((await readOr(`/proc/${pid}/cmdline`, "")) === `bun\0${command}\0`) return pid;
+    if (runsDashboard(await readOr(`/proc/${pid}/cmdline`, ""))) return pid;
     pending.push(...(await childrenOf(pid)));
   }
   return undefined;
