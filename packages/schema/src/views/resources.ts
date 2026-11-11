@@ -5,9 +5,9 @@ import type { ComputeApp, GpuMetric, GpuReading } from "../sources/gpu";
 import type { LinuxHost } from "../sources/linux-host";
 import type { MacHost } from "../sources/mac-host";
 import type { ProcessRow } from "../sources/processes";
-import type { ProcessSamples } from "../sources/task-processes";
-import type { ReportedTasks } from "../contract/tasks";
-import { type TaskResources, taskResources } from "./task-resources";
+import type { ProcessSamples } from "../entities/task";
+import type { ReportedTasks } from "../entities/task";
+import { type TaskResources, taskResources } from "../entities/task";
 import { type Decoded, decodeJson, decoded, flatMapDecoded, rejected } from "../shared/lib";
 import { GpuAppJson, ResourcesReport } from "../contract/resources";
 

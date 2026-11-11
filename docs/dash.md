@@ -245,7 +245,7 @@ On the Mac a process this user may not read counts its own time from `ps` and no
 
 ## Read the tasks report
 
-The report is one JSON object on one line, and `TasksReport` in `packages/schema/src/contract/tasks.ts` decodes it.
+The report is one JSON object on one line, and `TasksReport` in `packages/schema/src/entities/task/contract/tasks.ts` decodes it.
 A reader checks `schemaVersion` first, and version 1 is the only version.
 Each instant parses to a timestamp, and a line the parser cannot read is an `invalid` reading with an `issue`.
 A task relaunched since its first launch keeps that first start in `firstStartedAt`, so a reading from before the relaunch still belongs to it.

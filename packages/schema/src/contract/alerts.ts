@@ -1,9 +1,9 @@
 import { Effect, Result, Schema } from "effect";
 import { type Decoded, decoded, rejected } from "../shared/lib";
-import { strictly } from "./config";
+import { strictly } from "../shared/config";
 import { ProcessJson } from "./resources";
 import { AccountRef, FlagJson } from "./session-quota";
-import { TaskStateJson } from "./tasks";
+import { TaskStateJson } from "../entities/task";
 
 const Positive = Schema.Finite.check(Schema.isGreaterThan(0));
 
