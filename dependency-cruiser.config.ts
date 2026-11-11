@@ -73,7 +73,7 @@ export default defineConfig({
       severity: "error",
       comment: "The app layer enters a slice through its index.ts.",
       from: { path: pkg + "(app/[^/]+|bin|index)\\.ts$" },
-      to: { path: own + "(widgets|features|entities|shared)/[^/]+/", pathNot: "/index\\.ts$" },
+      to: { path: own + "(widgets|features|entities|shared)/[^/]+/", pathNot: own + "(widgets|features|entities|shared)/[^/]+/index\\.ts$" },
     },
     {
       name: "layered-imports-unlayered",

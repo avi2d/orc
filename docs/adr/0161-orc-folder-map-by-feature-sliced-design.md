@@ -12,7 +12,7 @@ Accepted. The eight first lint rules are in `dependency-cruiser.config.ts`, and 
 
 ## Context
 
-orc is 16 packages, mostly command-line and library code. Its two largest, `run` with 122 source files and `schema` with 110, have no layering, and every folder in them is a flat list. The captain asked for the Feature-Sliced Design folder map, adapted to orc, before any backlog work. The scout measured every number below on e07e908, the head of main on 2026-11-11.
+orc is 16 packages, mostly command-line and library code. Its two largest, `run` with 122 source files and `schema` with 110, have no layering, and every folder in them is a flat list. The captain asked for the Feature-Sliced Design folder map, adapted to orc, before any backlog work. The scout measured every number below on e07e908, the head of main when the scout measured; main is now a376c40.
 
 ## The captain's words
 
@@ -28,7 +28,7 @@ The mapping of Feature-Sliced Design onto orc holds as follows.
 2. Entry. A slice is entered only through its `index.ts`. Between packages this already holds through `exports` in each `package.json` and the preset rule `no-deep-imports`.
 3. No import between slices of one layer. No feature imports another feature, and no widget imports another widget.
 4. Entity slices may import each other through their `index.ts`, and `no-folder-cycle` keeps those imports free of cycles. Feature-Sliced Design forbids the import and adds one extra `@x` file per pair; orc does not.
-5. `shared` holds segments, not slices: `shared/lib`, `shared/config`, `shared/process`, `shared/sandbox` and `shared/feeds`. A segment reaches another segment only through that segment's `index.ts`.
+5. `shared` holds segments, not slices: `shared/lib`, `shared/config`, `shared/process`, `shared/sandbox` and `shared/feeds`. A segment may import another segment in either direction, only through that segment's `index.ts`.
 6. Segments inside a slice. `schema` slices keep the folders `contract`, `sources` and `views`. `run` slices stay flat, since they hold 1 to 13 files each.
 7. The `app` layer keeps argument parsing and command dispatch in `packages/run/src/app/`. The entry files stay where `package.json`, the build script and `knip.config.ts` name them: `packages/run/src/bin.ts` and `packages/schema/src/index.ts`.
 8. `widgets` has one slice, `widgets/beat`, the one place that joins several features in a single pass.
