@@ -216,7 +216,7 @@ export const standinQueue = (through: ReadonlyArray<string> | null): ReadonlyArr
     '',
     'heavy_main() {',
     '  if [ -n "$HEAVY_CLASSIFY" ]; then',
-    '    heavy_decide "$@"',
+    '    heavy_decide "$@" || return 1',
     '    echo "$heavy_queue $heavy_prio"',
     '    return 0',
     '  fi',
