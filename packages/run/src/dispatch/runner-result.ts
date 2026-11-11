@@ -1,4 +1,4 @@
-import { Array as Arr, Effect, FileSystem, Option, Schema } from "effect"
+import { Array as Arr, Effect, FileSystem, Option, Result, Schema } from "effect"
 import type { Database } from "bun:sqlite"
 import type { ChildProcessSpawner } from "effect/process"
 import { latestRunForBranchName, openQuestionsForRun, runsForBranch } from "../history-resume"
@@ -11,6 +11,7 @@ import type { QuestionAnswer } from "../no-mistakes-gate"
 import { readJsonFileIfPresent } from "../json-file"
 import { runDirFor, type TaskKind } from "../task-kind"
 import { TaskId } from "./backlog"
+import { readPlanDocument, SplitDocument, splitReasonPrefix } from "./split"
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
 import { LabelArg } from "./token"
 import { capture, decodeJson } from "./runner-exec"
@@ -25,7 +26,8 @@ const RunSummary = Schema.Struct({
   endReason: Schema.NullOr(Schema.String),
   openQuestions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String, asked: Schema.optional(Schema.String) })),
   report: Schema.optional(Schema.String),
-  asking: Schema.optional(Asking)
+  asking: Schema.optional(Asking),
+  split: Schema.optional(SplitDocument)
 })
 type RunSummary = typeof RunSummary.Type
 
@@ -164,15 +166,25 @@ const assessHeld = (
   return { ...held, status: "Stashed" in status ? "stashed" : "queued" }
 }
 
-const toSummary = (run: RunRecord, openQuestions: ReadonlyArray<OpenQuestion>, report: string | null, asking: typeof Asking.Type | null): RunSummary => ({
-  id: run.id,
-  status: run.status,
-  prLink: run.prLink,
-  endReason: run.endReason,
-  openQuestions,
-  ...(report === null ? {} : { report }),
-  ...(asking === null ? {} : { asking })
-})
+const splitOf = (reason: string | null) => {
+  if (reason === null || !reason.startsWith(splitReasonPrefix)) return null
+  const parsed = readPlanDocument(reason.slice(splitReasonPrefix.length))
+  return Result.isSuccess(parsed) && parsed.success.plan === "split" ? parsed.success : null
+}
+
+const toSummary = (run: RunRecord, openQuestions: ReadonlyArray<OpenQuestion>, report: string | null, asking: typeof Asking.Type | null): RunSummary => {
+  const split = splitOf(run.endReason)
+  return {
+    id: run.id,
+    status: run.status,
+    prLink: run.prLink,
+    endReason: run.endReason,
+    openQuestions,
+    ...(report === null ? {} : { report }),
+    ...(asking === null ? {} : { asking }),
+    ...(split === null ? {} : { split })
+  }
+}
 
 const withRunDatabase = <A, E>(home: string, use: (db: Database) => Effect.Effect<A, E, RunnerRequirements>): Effect.Effect<A, RunnerError, RunnerRequirements> =>
   Effect.acquireUseRelease(openDatabase(home), use, (db) => Effect.sync(() => db.close())).pipe(

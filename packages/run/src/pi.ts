@@ -1,7 +1,9 @@
 import { Option, Schema } from "effect"
 import type { AgentFile } from "./agents"
+import { childBudget, splitJsonSchema } from "./dispatch/split"
 
 export const orcCompletionLine = "ORC_COMPLETE"
+export const orcSplitLine = "ORC_SPLIT"
 
 const UsageTotals = Schema.Struct({ input: Schema.Finite, output: Schema.Finite })
 
@@ -48,6 +50,11 @@ export const sessionPrintedSignal = (jsonl: string, signal: string): boolean => 
     final.content.some((block) => block.type === "text" && printsOnOwnLine(block.text ?? "", signal))
 }
 
+export const finalReplyText = (jsonl: string): string | null => {
+  const final = finalAssistantMessage(jsonl)
+  return final?.stopReason === "stop" ? final.content.filter((block) => block.type === "text").map((block) => block.text ?? "").join("\n") : null
+}
+
 export const finalReplyError = (jsonl: string): string | null => {
   const final = finalAssistantMessage(jsonl)
   if (final === undefined || final.stopReason !== "error") {
@@ -71,6 +78,9 @@ export const buildImplementPrompt = (agent: AgentFile, taskFile: string): string
   [
     agent.body,
     "",
-    "The task sits in " + taskFile + ". Read that file and implement what it asks. When the work is committed on this branch, print " + orcCompletionLine + " on its own line and stop."
+    "The task sits in " + taskFile + ". Read that file and implement what it asks. When the work is committed on this branch, print " + orcCompletionLine + " on its own line and stop.",
+    "The budget is " + childBudget + ". If the change outgrows it, stop without opening a PR. Print " + orcSplitLine + " on its own line followed by a JSON document matching this schema.",
+    "Split JSON schema: " + splitJsonSchema,
+    "Each vertical slice must be useful, testable and observable alone, with one small PR merging to main on its own."
   ].join("\n")
 

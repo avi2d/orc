@@ -1,10 +1,11 @@
-import { Effect, FileSystem } from "effect"
+import { Effect, FileSystem, Result } from "effect"
 import { waitForAnswers } from "./answer-wait"
 import type { AgentFile } from "./agents"
 import { buildFixPrompt, type CommandResult, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
 import { distinctRefusals } from "./gate-refusals"
 import { branchCommits, runGit } from "./git-run"
-import { buildImplementPrompt, finalReplyError, orcCompletionLine, sessionPrintedSignal, sumPiUsage, type PiTokenUse } from "./pi"
+import { buildImplementPrompt, finalReplyError, finalReplyText, orcCompletionLine, orcSplitLine, sessionPrintedSignal, sumPiUsage, type PiTokenUse } from "./pi"
+import { readPlanDocument, splitReasonPrefix } from "./dispatch/split"
 import { idleSpan, type PiEnd, type PiRun } from "./pi-run"
 import { OrcRunError } from "./run-session"
 import { driveNoMistakes, type AllowWord, type NoMistakesRecord, type QuestionAnswer } from "./no-mistakes"
@@ -148,6 +149,14 @@ const replyErrorNote = (jsonl: string | null): string => {
   return error === null ? "" : " It ended in an error: " + error
 }
 
+const splitProposalReason = (jsonl: string | null, end: PiEnd): string | null => {
+  if (jsonl === null || !sessionPrintedSignal(jsonl, orcSplitLine)) return null
+  if (end.kind !== "exited" || end.exitCode !== 0) return "invalid split proposal: Pi did not exit successfully." + exitNote(end)
+  const split = readPlanDocument(finalReplyText(jsonl) ?? "")
+  if (Result.isFailure(split)) return "invalid split proposal: " + split.failure
+  return split.success.plan !== "split" ? "invalid split proposal: expected a split" : splitReasonPrefix + JSON.stringify(split.success)
+}
+
 const implement = (
   run: HistoryRun,
   runAgent: SandboxOps["runAgent"],
@@ -162,8 +171,9 @@ const implement = (
     const prior = plan.implementSessionId === null && plan.handover === null ? [] : yield* resumedCommits(run)
     const seen = new Set(session.commits.map((commit) => commit.sha))
     const commits = [...session.commits, ...prior.filter((commit) => !seen.has(commit.sha))]
-    const completed = verified && commits.length > 0
-    const endReason = session.failure ?? (!verified
+    const splitReason = splitProposalReason(session.jsonl, result.end)
+    const completed = splitReason === null && verified && commits.length > 0
+    const endReason = session.failure ?? splitReason ?? (!verified
       ? "Pi's final reply did not stop cleanly with " + orcCompletionLine + " on its own line." + replyErrorNote(session.jsonl) + exitNote(result.end)
       : (commits.length > 0
         ? "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + "."
