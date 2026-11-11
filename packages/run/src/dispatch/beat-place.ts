@@ -51,7 +51,10 @@ const childrenWait = (parent: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merg
   return count.done < count.total ? "waits on its children, " + count.done + " of " + count.total + " done" : null
 }
 
-export const splitSiblingUnmerged = (task: TaskRecord, dependency: TaskRecord, merged: ReadonlySet<string>): boolean => {
+export const dependencyWaits = (task: TaskRecord, dependency: TaskRecord | undefined, merged: ReadonlySet<string>): boolean =>
+  dependencyOpen(dependency) || (dependency !== undefined && splitSiblingUnmerged(task, dependency, merged))
+
+const splitSiblingUnmerged = (task: TaskRecord, dependency: TaskRecord, merged: ReadonlySet<string>): boolean => {
   if (task.spec.parent === null || task.spec.parent !== dependency.spec.parent) {
     return false
   }
@@ -79,7 +82,7 @@ export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>, mer
     if (dependency === undefined) {
       return "waits on " + id + ", which the backlog does not hold"
     }
-    if (dependencyOpen(dependency) || splitSiblingUnmerged(task, dependency, merged)) {
+    if (dependencyWaits(task, dependency, merged)) {
       return "waits on " + id
     }
   }

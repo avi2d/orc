@@ -1,7 +1,7 @@
 import { Effect, FileSystem } from "effect"
 import { backlogPaths, BacklogError, listTasks } from "./backlog"
 import { grabbedFile, scratchName, takeFile } from "./backlog-write"
-import { childCount, dependencyOpen, splitSiblingUnmerged } from "./beat-place"
+import { childCount, dependencyWaits } from "./beat-place"
 import { mergedIds } from "./events"
 import { isHeld, parseTaskFile, type TaskFileError, type TaskRecord } from "./task-record"
 
@@ -25,10 +25,7 @@ const shipState = (child: TaskRecord, merged: ReadonlySet<string>): string => {
 const childState = (child: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string => {
   switch (child.state.kind) {
     case "new": {
-      const open = child.spec.dependsOn.filter((id) => {
-        const dependency = tasks.find((task) => task.spec.id === id)
-        return dependency !== undefined && (dependencyOpen(dependency) || splitSiblingUnmerged(child, dependency, merged))
-      })
+      const open = child.spec.dependsOn.filter((id) => dependencyWaits(child, tasks.find((task) => task.spec.id === id), merged))
       return "new" + (open.length === 0 ? "" : " waits " + open.join(",")) + (isHeld(child) ? " held" : "")
     }
     case "taken": {
