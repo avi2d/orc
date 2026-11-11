@@ -160,7 +160,7 @@ export const classifyCalls = (
 ): Effect.Effect<ReadonlyMap<number, boolean>, never, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.forEach(candidates, (candidate) =>
     capture([candidate.script, ...candidate.args], null, { HEAVY_CLASSIFY: "1" }).pipe(
-      Effect.map((result) => [candidate.pid, result.stdout.trim().split(" ")[0] === "1"] as const),
+      Effect.map((result) => [candidate.pid, result.exitCode !== 0 || result.stdout.trim().split(" ")[0] === "1"] as const),
       Effect.orElseSucceed(() => [candidate.pid, true] as const)
     )
   ).pipe(Effect.map((entries) => new Map(entries)))
