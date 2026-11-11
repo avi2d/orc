@@ -1,8 +1,8 @@
 import { Config, Context, Duration, Effect, Layer, Schema } from "effect";
-import { CommandRunner } from "../command";
-import { decodeJson } from "../decode";
-import { unreachable, type Outcome, type Reading } from "../reading";
-import { runDecoded, stamped } from "../source";
+import { CommandRunner } from "../shared/lib";
+import { decodeJson } from "../shared/lib";
+import { unreachable, type Outcome, type Reading } from "../shared/lib";
+import { runDecoded, stamped } from "../shared/lib";
 import { machineNames, selector } from "./environment";
 
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));

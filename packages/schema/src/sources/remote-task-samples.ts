@@ -1,9 +1,9 @@
 import { Config, Context, Duration, Effect, Layer, Option } from "effect";
-import { CommandRunner } from "../command";
+import { CommandRunner } from "../shared/lib";
 import { type TaskSampleRecord, taskSampleRecords } from "../contract/task-samples";
-import { decoded, type Decoded } from "../decode";
-import type { Outcome } from "../reading";
-import { runDecoded } from "../source";
+import { decoded, type Decoded } from "../shared/lib";
+import type { Outcome } from "../shared/lib";
+import { runDecoded } from "../shared/lib";
 import { machineNames, selector } from "./environment";
 
 export interface TaskHistoryMachine {

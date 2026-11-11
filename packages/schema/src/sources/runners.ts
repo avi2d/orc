@@ -1,8 +1,8 @@
 import { Config, Context, Duration, Effect, Layer, Option, Result, Schema } from "effect";
-import { CommandRunner } from "../command";
-import { type Decoded, decoded, decodeValue, rejected } from "../decode";
-import type { Reading } from "../reading";
-import { runDecoded, stamped } from "../source";
+import { CommandRunner } from "../shared/lib";
+import { type Decoded, decoded, decodeValue, rejected } from "../shared/lib";
+import type { Reading } from "../shared/lib";
+import { runDecoded, stamped } from "../shared/lib";
 import { selector } from "./environment";
 
 const RunnerFile = Schema.Struct({ agentName: Schema.String, gitHubUrl: Schema.String });

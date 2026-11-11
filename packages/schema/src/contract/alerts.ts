@@ -1,5 +1,5 @@
 import { Effect, Result, Schema } from "effect";
-import { type Decoded, decoded, rejected } from "../decode";
+import { type Decoded, decoded, rejected } from "../shared/lib";
 import { strictly } from "./config";
 import { ProcessJson } from "./resources";
 import { AccountRef, FlagJson } from "./session-quota";
