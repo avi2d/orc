@@ -88,7 +88,7 @@ const BacklogWaits = Schema.Struct({
 });
 
 // A task id absent from the map has nothing the beat waits on.
-export type BeatWaits = ReadonlyMap<string, string>;
+type BeatWaits = ReadonlyMap<string, string>;
 
 const beatWaitsOf = (backlog: typeof BacklogWaits.Type): BeatWaits =>
   new Map(backlog.tasks.flatMap((task) => (task.wait === null ? [] : [[task.id, task.wait] as const])));
