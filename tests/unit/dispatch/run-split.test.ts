@@ -11,7 +11,7 @@ import { formatBeat } from "../../../packages/run/src/dispatch/board"
 import { taskLabel } from "../../../packages/run/src/dispatch/pueue-status"
 import { startTask } from "../../../packages/run/src/dispatch/runner"
 import { resolveTaskFile } from "../../../packages/run/src/run-resume"
-import { insertRun, openDatabase } from "../../../packages/run/src/run-history"
+import { insertRun, insertStep, openDatabase } from "../../../packages/run/src/run-history"
 import { quietSources } from "../../lib/beat-sources"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
@@ -55,9 +55,14 @@ const beatAfterRun = async (endReason: string, body: (root: string, lines: Reado
     await run(addTask(root, spec))
     await run(claimTask(root, "orc-1"))
     await run(writeTaken(root, { spec: { ...spec, id: "orc-1" }, hold: null, parked: null, state: { kind: "started", claim, started } }))
+    const workerTaskFile = join(root, "run-1-task.md")
+    await writeFile(workerTaskFile, spec.body)
     await run(Effect.acquireUseRelease(
       openDatabase(root),
-      (db) => Effect.sync(() => insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "failed", started: started.at, prLink: null, endReason })),
+      (db) => Effect.sync(() => {
+        insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/orc-1", taskFile: workerTaskFile, status: "failed", started: started.at, prLink: null, endReason })
+        insertStep(db, { runId: "run-1", name: "implement", attempt: 1, status: "failed", started: started.at, ended: "2026-11-11T10:04:00.000Z" })
+      }),
       (db) => Effect.sync(() => db.close())
     ))
     const report = await Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueFailed(root)))))
@@ -89,19 +94,7 @@ describe("the beat applying a worker's split proposal", () => {
   })
 
   test("a run-split parent starts its final check on its own branch with no prior run", async () => {
-    const root = await mkdtemp(join(tmpdir(), "orc-run-split-parent-"))
-    try {
-      await writeFile(join(root, "dispatch.json"), JSON.stringify({ machines: [{ name: "mac", slots: 4, start: ["sh", "-c", "true", "runner", "start"] }], quota }))
-      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: "/checkout" } }] }))
-      await run(addTask(root, spec))
-      await run(claimTask(root, "orc-1"))
-      await run(writeTaken(root, { spec: { ...spec, id: "orc-1" }, hold: null, parked: null, state: { kind: "started", claim, started } }))
-      await run(Effect.acquireUseRelease(
-        openDatabase(root),
-        (db) => Effect.sync(() => insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "failed", started: started.at, prLink: null, endReason: "split proposal: " + JSON.stringify(proposal) })),
-        (db) => Effect.sync(() => db.close())
-      ))
-      await Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueFailed(root)))))
+    await beatAfterRun("split proposal: " + JSON.stringify(proposal), async (root) => {
       await run(closeStartedTask(root, "orc-2", "done", "child done", { pr: null, report: null }, "2026-11-11T10:06:00.000Z"))
       await run(claimTask(root, "orc-3"))
       const orc3 = (await run(listTasks(root))).find((task) => task.spec.id === "orc-3")
@@ -118,19 +111,20 @@ describe("the beat applying a worker's split proposal", () => {
       const captured = join(root, "forwarded.json")
       await Effect.runPromise(startTask({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: join(root, "taken", "orc-1.md"), ORC_TASK_CHECKOUT: "/checkout", ORC_TASK_PROVIDER: "test" }, Effect.succeed(""), { kind: "through", command: ["sh", "-c", "cat > " + captured] as const }, ["orc"] as const, root).pipe(Effect.provide(BunServices.layer)))
       const forwarded = JSON.parse(await readFile(captured, "utf8")) as { readonly branch?: string }
-      const supplied = parent?.spec.body ?? ""
+      const parentPath = join(root, "parent.md")
+      await writeFile(parentPath, parent?.spec.body ?? "")
       await run(Effect.acquireUseRelease(
         openDatabase(root),
         (db) => Effect.gen(function*() {
           const fs = yield* FileSystem.FileSystem
-          expect(yield* resolveTaskFile(db, fs, forwarded.branch ?? "", "/checkout", supplied)).toBe(supplied)
+          expect(yield* resolveTaskFile(db, fs, forwarded.branch ?? "", "/checkout", parentPath)).toBe(parentPath)
+          const refused = yield* resolveTaskFile(db, fs, "orc/orc-1", "/checkout", parentPath).pipe(Effect.flip)
+          expect(refused.message).toContain("recorded progress")
         }),
         (db) => Effect.sync(() => db.close())
       ))
       expect(forwarded.branch).toBe("orc/orc-1-parent")
-    } finally {
-      await rm(root, { recursive: true, force: true })
-    }
+    })
   })
 
   test("an invalid proposal closes the task failed instead of creating children", async () => {
