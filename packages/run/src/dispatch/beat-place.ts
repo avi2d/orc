@@ -1,6 +1,7 @@
 import { deliveryFor, type RunDelivery } from "../delivery"
 import { checkoutOn, type DispatchConfig, type Machine, modeOf, type Project } from "./config"
 import { answerWait, type DeciderOwns, type TaskRecord } from "./task-record"
+import { childCount, dependencyWaits } from "./task-dependency"
 
 export interface MachineRoom {
   readonly machine: string
@@ -19,53 +20,12 @@ export const readRoom = (machines: ReadonlyArray<Machine>, tasks: ReadonlyArray<
 
 const freeRoom = (room: MachineRoom): number => Math.max(0, room.slots - room.busy)
 
-const dependencyOpen = (dependency: TaskRecord | undefined): boolean =>
-  dependency === undefined || dependency.state.kind !== "closed" || dependency.state.closing.outcome !== "done"
-
-export interface ChildCount {
-  readonly done: number
-  readonly total: number
-}
-
-const childDone = (child: TaskRecord, merged: ReadonlySet<string>): boolean => {
-  if (dependencyOpen(child)) {
-    return false
-  }
-  if (child.spec.kind !== "ship") {
-    return true
-  }
-  const pr = child.state.kind === "closed" && child.state.closing.outcome !== "start-failed" ? child.state.closing.pr : null
-  return pr === null || merged.has(child.spec.id)
-}
-
-export const childCount = (parent: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): ChildCount => {
-  const children = tasks.filter((task) => task.spec.parent === parent.spec.id)
-  return { done: children.filter((child) => childDone(child, merged)).length, total: children.length }
-}
-
 const childrenWait = (parent: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string | null => {
   const count = childCount(parent, tasks, merged)
   if (count.total === 0) {
     return "waits for its first child"
   }
   return count.done < count.total ? "waits on its children, " + count.done + " of " + count.total + " done" : null
-}
-
-export const dependencyWaits = (task: TaskRecord, dependency: TaskRecord | undefined, merged: ReadonlySet<string>): boolean =>
-  dependencyOpen(dependency) || (dependency !== undefined && splitSiblingUnmerged(task, dependency, merged))
-
-const splitSiblingUnmerged = (task: TaskRecord, dependency: TaskRecord, merged: ReadonlySet<string>): boolean => {
-  if (task.spec.parent === null || task.spec.parent !== dependency.spec.parent) {
-    return false
-  }
-  if (task.spec.kind !== "ship" || dependency.spec.kind !== "ship") {
-    return false
-  }
-  if (dependency.state.kind !== "closed" || dependency.state.closing.outcome === "start-failed") {
-    return false
-  }
-  const pr = dependency.state.closing.pr
-  return pr !== null && !merged.has(dependency.spec.id)
 }
 
 export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>, deciderOwns: DeciderOwns): string | null => {

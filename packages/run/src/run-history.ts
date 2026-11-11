@@ -4,6 +4,7 @@ import type { PlatformError } from "effect/PlatformError"
 import { homedir } from "node:os"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { sandboxKinds, type SandboxKind } from "./sandbox-kind"
+import { OrcRunError } from "./run-session"
 
 export const RUN_HISTORY_SCHEMA_VERSION = 3
 export const RUNS_JSON_SCHEMA = "orc.runs.v1" as const
@@ -375,4 +376,13 @@ export const sessionIdFromFile = (file: string | null): string | null => {
 
 export const toFileUrl = (path: string): string => pathToFileURL(path).href
 
+export const markRunStopped = (db: Database, runId: string, ended: string, endReason: string): Effect.Effect<void, OrcRunError> =>
+  Effect.gen(function*() {
+    const prior = yield* runById(db, runId).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
+    yield* updateRun(db, runId, { status: "stopped", ended, prLink: prior?.prLink ?? null, endReason }).pipe(
+      Effect.mapError((cause) => historyFailure("record the run in", cause))
+    )
+  })
 
+export const historyFailure = (action: string, cause: unknown): OrcRunError =>
+  new OrcRunError({ message: "orc: cannot " + action + " the run history: " + formatHistoryError(cause) })

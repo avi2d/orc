@@ -1,9 +1,11 @@
+import { Effect, FileSystem } from "effect"
 import type { GateRefusal } from "./gate-refusals"
 import type { OrcRunCommit } from "./git-run"
 import type { PiTokenUse } from "./pi"
 import { longSessionSignal, type LongSessionCounts } from "./long-session"
 import type { NoMistakesFinding, NoMistakesRecord } from "./no-mistakes"
 import { toFileUrl } from "./run-history"
+import { agentReportFileName } from "./task-kind"
 
 export const reportFileName = "report.md"
 
@@ -212,3 +214,13 @@ export const runStatus = (report: OrcRunReport): string => {
   }
   return "no-mistakes " + (report.noMistakes?.status ?? "never ran") + (report.prLink === null ? ", no PR" : ", PR open")
 }
+
+export const reportPathOf = (runDir: string): string => runDir + "/" + agentReportFileName
+
+export const writtenReport = (runDir: string): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const file = reportPathOf(runDir)
+    const info = yield* fs.stat(file).pipe(Effect.orElseSucceed(() => null))
+    return info?.type === "File" ? file : null
+  })

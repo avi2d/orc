@@ -4,12 +4,12 @@ import { ChildProcessSpawner } from "effect/process"
 import type { AgentExec } from "./agent-exec"
 import type { AgentFile } from "./agents"
 import type { SandboxKind } from "./sandbox-kind"
-import { historyFailure } from "./history-write"
 import { orcCompletionLine } from "./pi"
 import { idleSpan, type PiPacing, runPi } from "./pi-run"
-import { recordRun, updateRun } from "./run-history"
+import { historyFailure, recordRun, updateRun } from "./run-history"
 import type { OrcRunError } from "./run-session"
-import { agentReportFileName, type ReportKind } from "./task-kind"
+import { reportPathOf, writtenReport } from "./report"
+import type { ReportKind } from "./task-kind"
 
 export interface ReportRun {
   readonly kind: ReportKind
@@ -30,8 +30,6 @@ export interface ReportRun {
 export type ReportOutcome =
   | { readonly kind: "reported"; readonly runId: string; readonly report: string }
   | { readonly kind: "unreported"; readonly runId: string; readonly reason: string }
-
-const reportPathOf = (runDir: string): string => runDir + "/" + agentReportFileName
 
 const kindAsks: Record<ReportKind, string> = {
   scout: "Read the checkout and change nothing in it.",
@@ -68,14 +66,6 @@ const runReportPi = (run: ReportRun): Effect.Effect<number | string, OrcRunError
       onSession: () => Effect.void
     }, run.pacing)
     return pi.end.kind === "exited" ? pi.end.exitCode : "orc stopped pi, idle for " + idleSpan(pi.end.idleSeconds) + " with no tool running"
-  })
-
-export const writtenReport = (runDir: string): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const file = reportPathOf(runDir)
-    const info = yield* fs.stat(file).pipe(Effect.orElseSucceed(() => null))
-    return info?.type === "File" ? file : null
   })
 
 const outcomeOf = (run: ReportRun, report: { readonly path: string; readonly text: string } | null, piExit: number | string): ReportOutcome => {

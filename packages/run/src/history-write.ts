@@ -6,7 +6,7 @@ import { noMistakesFile, prBodyFileName, type HistoryRun } from "./run-record"
 import { refusalSignalName, refusalValue } from "./gate-refusals"
 import type { ChecksRoundSummary, OrcRunReport, RecordedFixAttempt } from "./report"
 import { OrcRunError } from "./run-session"
-import { formatHistoryError, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, runById, stepIdFor, updateRun, updateStep } from "./run-history"
+import { historyFailure, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, stepIdFor, updateRun, updateStep } from "./run-history"
 import type { EvidenceInput, SignalInput, StepInput } from "./run-history"
 import { measuredSignals, noMistakesSignals } from "./report"
 import type { ResumePlan } from "./run-loop"
@@ -147,14 +147,6 @@ export const finishRun = (db: Database, runId: string, report: OrcRunReport, end
     Effect.mapError((cause) => historyFailure("record the run in", cause))
   )
 
-export const markRunStopped = (db: Database, runId: string, ended: string, endReason: string): Effect.Effect<void, OrcRunError> =>
-  Effect.gen(function*() {
-    const prior = yield* runById(db, runId).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
-    yield* updateRun(db, runId, { status: "stopped", ended, prLink: prior?.prLink ?? null, endReason }).pipe(
-      Effect.mapError((cause) => historyFailure("record the run in", cause))
-    )
-  })
-
 export const recordImplementStart = (db: Database, run: HistoryRun, started: string, piSessionFile?: string | null): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
     const known = yield* stepIdFor(db, run.runId, "implement", 1).pipe(Effect.mapError((cause) => historyFailure("read the step in", cause)))
@@ -293,6 +285,3 @@ export const recordPullRequestDone = (db: Database, run: HistoryRun, record: Dir
       yield* recordSignal(db, { stepId, name: "pr-link", value: record.prLink }).pipe(Effect.mapError(failed("record the pr signals in")))
     }
   })
-
-export const historyFailure = (action: string, cause: unknown): OrcRunError =>
-  new OrcRunError({ message: "orc: cannot " + action + " the run history: " + formatHistoryError(cause) })
