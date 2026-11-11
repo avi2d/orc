@@ -1,9 +1,10 @@
 import { Buffer } from "node:buffer"
 import { closeSync, openSync, readSync, statSync } from "node:fs"
-import { defaultHeavyTools, heavyBinDir } from "./heavy"
+import { defaultHeavyTools } from "./heavy"
 import { decideBody, extraSub } from "./heavy-standin-decide"
 import {
   standinFinish,
+  standinMarker,
   standinQueue,
   standinUtils,
   standinWait,
@@ -128,14 +129,6 @@ export const standinTools = (commands: ReadonlyArray<string>): ReadonlyArray<str
   return [...new Set([...defaultHeavyTools, ...extra])]
 }
 
-const normalizeDir = (dir: string): string => {
-  const collapsed = dir.replace(/\/+/g, "/")
-  if (collapsed.length > 1 && collapsed.endsWith("/")) {
-    return collapsed.slice(0, -1)
-  }
-  return collapsed
-}
-
 const isExecutableFile = (file: string): boolean => {
   try {
     const info = statSync(file)
@@ -158,7 +151,7 @@ const isStandinFile = (file: string): boolean => {
   try {
     const area = Buffer.alloc(2048)
     const count = readSync(handle, area, 0, 2048, 0)
-    return area.toString("utf8", 0, count).includes("Written by orc heavy path")
+    return area.toString("utf8", 0, count).includes(standinMarker)
   } catch {
     return false
   } finally {
@@ -170,20 +163,15 @@ const isStandinFile = (file: string): boolean => {
   }
 }
 
-export const findRealTool = (tool: string, binDir: string, pathValue: string): string => {
+export const findRealTool = (tool: string, pathValue: string): string => {
   if (tool.includes("/") || tool === "" || tool === "." || tool === "..") {
     return ""
   }
-  const bin = normalizeDir(binDir)
   for (const entry of pathValue.split(":")) {
     if (!entry.startsWith("/")) {
       continue
     }
-    const dir = normalizeDir(entry)
-    if (dir === bin) {
-      continue
-    }
-    const candidate = dir === "/" ? "/" + tool : dir + "/" + tool
+    const candidate = entry === "/" ? "/" + tool : entry + "/" + tool
     if (!isExecutableFile(candidate)) {
       continue
     }
@@ -199,7 +187,7 @@ const quoteSingle = (value: string): string => "'" + value.replaceAll("'", "'\\'
 
 const standinHead = (tool: string, settings: StandinSettings, real: string): ReadonlyArray<string> => [
   '#!/bin/sh',
-  '# Written by orc heavy path. Regenerated on every run of that command.',
+  '# ' + standinMarker + '. Regenerated on every run of that command.',
   'heavy_tool="' + tool + '"',
   'heavy_real=' + quoteSingle(real),
   'heavy_home="' + settings.home + '"',
@@ -214,9 +202,9 @@ const standinDecideFn = (decide: ReadonlyArray<string>): ReadonlyArray<string> =
   '}'
 ]
 
-export const standinScript = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, timing?: StandinTiming, real?: string): string => {
+export const standinScript = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, timing?: StandinTiming): string => {
   const decide = defaultHeavyTools.includes(tool) ? [...decideBody(tool), ...extraSub(tool, commands)] : extraSub(tool, commands)
-  const resolved = real ?? findRealTool(tool, heavyBinDir(settings.home), process.env.PATH ?? "")
+  const resolved = findRealTool(tool, process.env.PATH ?? "")
   return [
     ...standinHead(tool, settings, resolved),
     ...helpers,

@@ -1,3 +1,7 @@
+export const standinMarker = "Written by orc heavy path"
+
+const standinMarkerShell = standinMarker.replaceAll(" ", "\\ ")
+
 const standinBypassEvent = (): ReadonlyArray<string> => [
     'heavy_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }',
     '',
@@ -189,7 +193,7 @@ export const standinQueue = (through: ReadonlyArray<string> | null): ReadonlyArr
     '  heavy_probe="$1"',
     '  heavy_s1=""; heavy_s2=""',
     '  { IFS= read -r heavy_s1; IFS= read -r heavy_s2; } < "$heavy_probe" 2>/dev/null || true',
-    '  case "$heavy_s1 $heavy_s2" in *Written\\ by\\ orc\\ heavy\\ path*) return 0;; esac',
+    '  case "$heavy_s1 $heavy_s2" in *' + standinMarkerShell + '*) return 0;; esac',
     '  return 1',
     '}',
     '',

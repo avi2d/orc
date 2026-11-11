@@ -79,9 +79,19 @@ const writeStaticFakes = async (fake: string): Promise<void> => {
 }
 
 const writeToolStandins = async (bin: string, root: string, fake: string, tools: ReadonlyArray<string>, commands: ReadonlyArray<string>, timing?: StandinTiming, through: ReadonlyArray<string> | null = null): Promise<void> => {
-  for (const tool of tools) {
-    await writeFile(join(fake, tool), fakeTool, { mode: 0o755 })
-    await writeFile(join(bin, tool), standinScript(tool, settingsOf(root, through), commands, timing, join(fake, tool)), { mode: 0o755 })
+  const savedPath = process.env.PATH
+  try {
+    process.env.PATH = fake + ":" + (savedPath ?? "")
+    for (const tool of tools) {
+      await writeFile(join(fake, tool), fakeTool, { mode: 0o755 })
+      await writeFile(join(bin, tool), standinScript(tool, settingsOf(root, through), commands, timing), { mode: 0o755 })
+    }
+  } finally {
+    if (savedPath === undefined) {
+      delete process.env.PATH
+    } else {
+      process.env.PATH = savedPath
+    }
   }
 }
 

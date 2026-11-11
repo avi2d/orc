@@ -64,10 +64,11 @@ describe("the heavy stand-in", () => {
     await mkdir(other, { recursive: true })
     await mkdir(fake, { recursive: true })
     await mkdir(bin, { recursive: true })
-    await writeFile(join(other, "bun"), standinScript("bun", { home: join(root, "otherhome"), group: "heavy", wrap: "", through: null }, [], undefined, ""), { mode: 0o755 })
-    await writeFile(join(fake, "bun"), "#!/bin/sh\necho writer-real-marker\n", { mode: 0o755 })
     const savedPath = process.env.PATH
     try {
+      process.env.PATH = bin
+      await writeFile(join(other, "bun"), standinScript("bun", { home: join(root, "otherhome"), group: "heavy", wrap: "", through: null }, []), { mode: 0o755 })
+      await writeFile(join(fake, "bun"), "#!/bin/sh\necho writer-real-marker\n", { mode: 0o755 })
       process.env.PATH = other + ":" + fake + ":/usr/bin:/bin"
       await writeFile(join(bin, "bun"), standinScript("bun", { home: root, group: "heavy", wrap: "", through: null }, []), { mode: 0o755 })
     } finally {
@@ -100,9 +101,10 @@ describe("the heavy stand-in", () => {
     await mkdir(bin, { recursive: true })
     await writeFile(join(first, "bun"), "#!/bin/sh\necho previous-run-tool\n", { mode: 0o755 })
     await writeFile(join(second, "bun"), "#!/bin/sh\necho caller-tool\n", { mode: 0o755 })
-    await writeFile(join(other, "bun"), standinScript("bun", { home: join(root, "otherhome"), group: "heavy", wrap: "", through: null }, [], undefined, ""), { mode: 0o755 })
     const savedPath = process.env.PATH
     try {
+      process.env.PATH = bin
+      await writeFile(join(other, "bun"), standinScript("bun", { home: join(root, "otherhome"), group: "heavy", wrap: "", through: null }, []), { mode: 0o755 })
       process.env.PATH = first + ":/usr/bin:/bin"
       await writeFile(join(bin, "bun"), standinScript("bun", { home: root, group: "heavy", wrap: "", through: null }, []), { mode: 0o755 })
     } finally {

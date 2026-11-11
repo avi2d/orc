@@ -13,7 +13,7 @@ A stand in queues the call with `pueue add` into the `heavy` group, or hands it 
 Without `through` set, the wait message names how many queued calls stand ahead, counting higher priority calls and earlier calls at the same priority.
 Without `through` set, a finished call leaves the queue after the stand in reads its exit code.
 The stand in runs the real tool under a utility priority on macOS and with no wrapper on other systems.
-A stand-in first looks the tool up on its caller's own PATH outside its own folder, and only without another copy there it runs the absolute path recorded when orc wrote it, refusing with exit 127 when neither exists.
+A stand in runs the first copy of the tool on its caller's PATH that is not an orc stand in, falls back to the absolute path recorded when orc wrote it, and refuses with exit 127 when neither exists.
 Without `through` set, a call that a queued call starts runs at once instead of queuing again.
 The stand in trusts the process tree above the call, never an exported group variable on its own.
 Set `HEAVY_QUEUE_BYPASS` to a reason to skip the queue for one command, and the reason is logged to the alerts file and counted by the check command.
