@@ -71,8 +71,8 @@ export const mergeKeys = (
 
 const fail = (detail: string) => (cause: PlatformError) => new AppInstallError({ detail: `${detail}: ${cause.message}` })
 
-const keepInstallError = (detail: string) => (cause: unknown) =>
-  cause instanceof AppInstallError ? cause : fail(detail)(cause as PlatformError)
+const keepInstallError = (detail: string) => (cause: PlatformError | AppInstallError) =>
+  cause instanceof AppInstallError ? cause : fail(detail)(cause)
 
 const readKeysText = (fs: FileSystem.FileSystem, file: string, missingDetail: string): Effect.Effect<Readonly<Record<string, unknown>>, AppInstallError> =>
   fs.readFileString(file).pipe(

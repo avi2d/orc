@@ -256,6 +256,14 @@ const asksForHelp = (rest: readonly string[]): boolean => {
   return (end === -1 ? words : words.slice(0, end)).some((word) => helpFlags.has(word))
 }
 const subcommands = new Set(["app", "runs", "refusals", "show", "score", "run", "chat", "backlog", "attention", "beat", "runner", "merge", "heavy"])
+const dispatchSubcommands = new Set(["backlog", "attention", "beat", "runner", "merge", "heavy"])
+const parseDispatchCommand = (first: string, rest: readonly string[]): OrcArgs | null => {
+  if (!dispatchSubcommands.has(first)) {
+    return null
+  }
+  const dispatch = parseDispatchArgs(first, rest)
+  return dispatch.kind === "UsageError" ? dispatch : { kind: "Dispatch", args: dispatch }
+}
 const parseWords = (args: readonly string[]): OrcArgs => {
   if (args.length === 0) {
     return { kind: "UsageError", detail: "orc takes one flag" }
@@ -282,9 +290,9 @@ const parseWords = (args: readonly string[]): OrcArgs => {
   if (first === "chat") {
     return rest.length === 0 ? { kind: "Chat" } : { kind: "UsageError", detail: `orc chat takes no argument: ${rest[0]}` }
   }
-  if (first === "backlog" || first === "attention" || first === "beat" || first === "runner" || first === "merge" || first === "heavy") {
-    const dispatch = parseDispatchArgs(first, rest)
-    return dispatch.kind === "UsageError" ? dispatch : { kind: "Dispatch", args: dispatch }
+  const dispatchCommand = parseDispatchCommand(first, rest)
+  if (dispatchCommand !== null) {
+    return dispatchCommand
   }
   if (rest.length > 0) {
     return { kind: "UsageError", detail: `unexpected argument: ${rest[0]}` }

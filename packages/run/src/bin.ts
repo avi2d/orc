@@ -121,6 +121,49 @@ const reportStep = (args: Extract<OrcArgs, { readonly kind: "RunAgent" }>, kind:
     }
   })
 
+const printRuns = (args: Extract<OrcArgs, { readonly kind: "ListRuns" }>) =>
+  Effect.gen(function*() {
+    const runs = yield* readHistory((db) => listRuns(db))
+    if (args.json) {
+      yield* Console.log(yield* encodeRunsJson(runs))
+    } else {
+      yield* Console.log(formatRunsTable(runs))
+    }
+  })
+
+const printRefusals = (args: Extract<OrcArgs, { readonly kind: "ListRefusals" }>) =>
+  Effect.gen(function*() {
+    const counts = yield* readHistory((db) => readRefusals(db))
+    if (args.json) {
+      yield* Console.log(yield* encodeRefusalsJson(counts))
+    } else {
+      yield* Console.log(formatRefusalsTable(counts))
+    }
+  })
+
+const printShow = (args: Extract<OrcArgs, { readonly kind: "ShowRun" }>) =>
+  Effect.gen(function*() {
+    const document = yield* readHistory((db) => readShow(db, args.id))
+    if (document === null) {
+      yield* Console.error("orc: unknown run " + args.id)
+      return yield* Effect.fail("run history unavailable")
+    }
+    if (args.json) {
+      yield* Console.log(yield* encodeShowJson(document))
+    } else {
+      yield* Console.log(formatShow(document))
+    }
+  })
+
+const runInstallApp = Effect.gen(function*() {
+  const home = yield* Config.String("HOME")
+  const result = yield* installApp(bundledAppDir(), appHomeDir(home)).pipe(
+    Effect.provide(BunServices.layer),
+    Effect.catchTag("AppInstallError", (error) => Console.error("orc app install: " + error.detail).pipe(Effect.andThen(Effect.fail("orc app install refused"))))
+  )
+  yield* Console.log(formatAppInstall(result))
+})
+
 const program = Effect.gen(function*() {
   const args = parseArgs(Bun.argv.slice(2))
   switch (args.kind) {
@@ -133,35 +176,13 @@ const program = Effect.gen(function*() {
       break
     }
     case "ListRuns": {
-      const runs = yield* readHistory((db) => listRuns(db))
-      if (args.json) {
-        yield* Console.log(yield* encodeRunsJson(runs))
-      } else {
-        yield* Console.log(formatRunsTable(runs))
-      }
-      break
+      return yield* printRuns(args)
     }
     case "ListRefusals": {
-      const counts = yield* readHistory((db) => readRefusals(db))
-      if (args.json) {
-        yield* Console.log(yield* encodeRefusalsJson(counts))
-      } else {
-        yield* Console.log(formatRefusalsTable(counts))
-      }
-      break
+      return yield* printRefusals(args)
     }
     case "ShowRun": {
-      const document = yield* readHistory((db) => readShow(db, args.id))
-      if (document === null) {
-        yield* Console.error("orc: unknown run " + args.id)
-        return yield* Effect.fail("run history unavailable")
-      }
-      if (args.json) {
-        yield* Console.log(yield* encodeShowJson(document))
-      } else {
-        yield* Console.log(formatShow(document))
-      }
-      break
+      return yield* printShow(args)
     }
     case "ScoreStep": {
       return yield* scoreStep(args)
@@ -173,13 +194,7 @@ const program = Effect.gen(function*() {
       return yield* dispatch(args.args)
     }
     case "InstallApp": {
-      const home = yield* Config.String("HOME")
-      const result = yield* installApp(bundledAppDir(), appHomeDir(home)).pipe(
-        Effect.provide(BunServices.layer),
-        Effect.catchTag("AppInstallError", (error) => Console.error("orc app install: " + error.detail).pipe(Effect.andThen(Effect.fail("orc app install refused"))))
-      )
-      yield* Console.log(formatAppInstall(result))
-      break
+      return yield* runInstallApp
     }
     case "Chat": {
       return yield* chat
