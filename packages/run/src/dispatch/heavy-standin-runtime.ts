@@ -1,19 +1,3 @@
-const standinDirReal = (): ReadonlyArray<string> => [
-    'heavy_real() {',
-    '  heavy_oldifs="$IFS"; IFS=:',
-    '  for heavy_d in $PATH; do',
-    '    if [ -z "$heavy_d" ]; then heavy_d=.; fi',
-    '    if [ "$heavy_d/$heavy_tool" -ef "$0" ]; then continue; fi',
-    '    if [ -x "$heavy_d/$heavy_tool" ] && [ ! -d "$heavy_d/$heavy_tool" ]; then',
-    '      printf "%s" "$heavy_d/$heavy_tool"',
-    '      break',
-    '    fi',
-    '  done',
-    '  IFS="$heavy_oldifs"',
-    '}',
-    '',
-]
-
 const standinBypassEvent = (): ReadonlyArray<string> => [
     'heavy_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }',
     '',
@@ -156,7 +140,6 @@ const standinQueueStatus = (): ReadonlyArray<string> => [
 ]
 
 export const standinUtils = (): ReadonlyArray<string> => [
-  ...standinDirReal(),
   ...standinBypassEvent(),
   ...standinUnwrapSlot(),
   ...standinQueueStatus()
@@ -208,9 +191,13 @@ export const standinQueue = (through: ReadonlyArray<string> | null): ReadonlyArr
     '    echo "$heavy_queue $heavy_prio"',
     '    return 0',
     '  fi',
-    '  heavy_real_bin="$(heavy_real)"',
+    '  heavy_real_bin="$heavy_real"',
     '  if [ -z "$heavy_real_bin" ]; then',
-    '    echo "orc heavy: no $heavy_tool beyond the stand-in folder on PATH" >&2',
+    '    echo "orc heavy: no $heavy_tool found when the stand-in was written" >&2',
+    '    return 127',
+    '  fi',
+    '  if [ ! -x "$heavy_real_bin" ] || [ -d "$heavy_real_bin" ] || [ "$heavy_real_bin" -ef "$0" ]; then',
+    '    echo "orc heavy: no $heavy_tool at $heavy_real_bin" >&2',
     '    return 127',
     '  fi',
     '  heavy_decide "$@"',

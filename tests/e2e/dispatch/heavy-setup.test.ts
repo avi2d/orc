@@ -111,6 +111,8 @@ describe("the heavy queue setup", () => {
   test("with a through command the setup and the watch start call no pueue at all", async () => {
     const home = await holderHome(["winbox-heavy", "run", "--"])
     try {
+      await writeFile(join(home, "fake", "winbox-heavy"), "#!/bin/sh\necho \"winbox-heavy $*\" >> \"$FAKE_HOLDER_LOG\"\nshift 2\n\"$@\"\n", { mode: 0o755 })
+      await writeFile(join(home, "fake", "bun"), "#!/bin/sh\nexit 0\n", { mode: 0o755 })
       const lines: Array<string> = []
       const originalLog = console.log
       console.log = (...args: Array<unknown>) => { lines.push(args.map(String).join(" ")) }
@@ -122,8 +124,6 @@ describe("the heavy queue setup", () => {
       expect(await pueueCalls(home)).toBe("")
       expect(lines.join("\n")).toContain("winbox-heavy run --")
       expect(lines.join("\n")).toContain("no watchdog is armed")
-      await writeFile(join(home, "fake", "winbox-heavy"), "#!/bin/sh\necho \"winbox-heavy $*\" >> \"$FAKE_HOLDER_LOG\"\nshift 2\n\"$@\"\n", { mode: 0o755 })
-      await writeFile(join(home, "fake", "bun"), "#!/bin/sh\nexit 0\n", { mode: 0o755 })
       const holderLog = join(home, "holder.log")
       const child = Bun.spawnSync([join(home, "heavy", "bin", "bun"), "test"], {
         env: { ...process.env, PATH: join(home, "heavy", "bin") + ":" + join(home, "fake") + ":" + (process.env.PATH ?? ""), FAKE_HOLDER_LOG: holderLog },

@@ -17,12 +17,31 @@ afterEach(async () => {
 })
 
 describe("the heavy stand-in", () => {
-  test("a symlinked stand-in alone on PATH refuses instead of calling itself for every tool", async () => {
+  test("a symlinked stand-in alone on PATH runs the baked real tool instead of refusing", async () => {
     const tools = standinTools(["custom-tool test"])
     const harness = harnesses[harnesses.push(await setup(tools)) - 1]
     const isolated = join(harness.root, "isolated")
     await mkdir(isolated)
     for (const tool of tools) {
+      await symlink(join(harness.bin, tool), join(isolated, tool))
+      const child = spawnSync(join(isolated, tool), ["--version"], {
+        env: { PATH: isolated, FAKE_TOOL_LOG: join(harness.root, "tool.log") },
+        encoding: "utf8",
+        timeout: 1000
+      })
+      expect(child.error).toBeUndefined()
+      expect(child.status).toBe(0)
+    }
+    expect(await readFile(join(harness.root, "tool.log"), "utf8")).toContain("real ")
+  })
+
+  test("a stand-in whose baked real tool is gone refuses instead of calling itself", async () => {
+    const tools = standinTools(["custom-tool test"])
+    const harness = harnesses[harnesses.push(await setup(tools)) - 1]
+    const isolated = join(harness.root, "isolated")
+    await mkdir(isolated)
+    for (const tool of tools) {
+      await rm(join(harness.root, "fake", tool), { force: true })
       await symlink(join(harness.bin, tool), join(isolated, tool))
       const child = spawnSync(join(isolated, tool), ["--version"], {
         env: { PATH: isolated },
@@ -32,7 +51,24 @@ describe("the heavy stand-in", () => {
       expect(child.error).toBeUndefined()
       expect(child.status).toBe(127)
       expect(child.stderr).toContain("orc heavy: no " + tool)
+      expect(child.stderr).toContain(join(harness.root, "fake", tool))
     }
+  })
+
+  test("a copied stand-in in a second folder runs the real tool instead of looping into the other copy", async () => {
+    const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
+    const second = join(harness.root, "second")
+    await mkdir(second)
+    await writeFile(join(second, "bun"), await readFile(join(harness.bin, "bun"), "utf8"), { mode: 0o755 })
+    const fake = join(harness.root, "fake")
+    const child = spawnSync(join(harness.bin, "bun"), ["--version"], {
+      env: { ...harness.env, PATH: second + ":" + harness.bin + ":" + fake + ":/usr/bin:/bin" },
+      encoding: "utf8",
+      timeout: 3000
+    })
+    expect(child.error).toBeUndefined()
+    expect(child.status).toBe(0)
+    expect(await readFile(join(harness.root, "tool.log"), "utf8")).toContain("bun --version")
   })
 
   test("bun test on a named test file becomes a pueue task in the heavy group with priority", async () => {
