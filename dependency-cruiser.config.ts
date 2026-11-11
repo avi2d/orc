@@ -1,5 +1,15 @@
 import { defineConfig, DEV_ONLY } from "@avi2dg/checks/dependency-cruiser";
 
+const pkg = "^packages/([^/]+)/src/";
+const own = "^packages/$1/src/";
+const below = (layer: string, above: string) => ({
+  name: layer + "-imports-higher-layer",
+  severity: "error" as const,
+  comment: "A layer imports only the layers under it, in the order app, widgets, features, entities, shared.",
+  from: { path: pkg + layer + "/" },
+  to: { path: own + "(" + above + ")(/|\\.ts$)" },
+});
+
 export default defineConfig({
   devOnly: [...DEV_ONLY, "^scripts/", "^packages/herdr-app/scripts/"],
   orphans: ["^packages/herdr-app/scripts/"],
@@ -39,6 +49,38 @@ export default defineConfig({
       comment: "Root tests import a library package by name. Only the run application, which publishes no entry, is reached by path.",
       from: { path: "^tests/" },
       to: { path: "^packages/", pathNot: "^packages/(run|herdr-app)/", dependencyTypes: ["local"], dependencyTypesNot: ["aliased-workspace"] },
+    },
+    below("shared", "app|widgets|features|entities|bin|index"),
+    below("entities", "app|widgets|features|bin|index"),
+    below("features", "app|widgets|bin|index"),
+    below("widgets", "app|bin|index"),
+    {
+      name: "slice-imports-sibling",
+      severity: "error",
+      comment: "A widget or feature slice imports no other slice on its own layer.",
+      from: { path: pkg + "(widgets|features)/([^/]+)/" },
+      to: { path: own + "$2/", pathNot: own + "$2/$3/" },
+    },
+    {
+      name: "slice-internals",
+      severity: "error",
+      comment: "A slice is entered through its index.ts.",
+      from: { path: pkg + "(app|widgets|features|entities|shared)/([^/]+)/" },
+      to: { path: own + "(app|widgets|features|entities|shared)/[^/]+/", pathNot: [own + "$2/$3/", own + "(app|widgets|features|entities|shared)/[^/]+/index\\.ts$"] },
+    },
+    {
+      name: "app-imports-slice-internals",
+      severity: "error",
+      comment: "The app layer enters a slice through its index.ts.",
+      from: { path: pkg + "(app/[^/]+|bin|index)\\.ts$" },
+      to: { path: own + "(widgets|features|entities|shared)/[^/]+/", pathNot: own + "(widgets|features|entities|shared)/[^/]+/index\\.ts$" },
+    },
+    {
+      name: "layered-imports-unlayered",
+      severity: "error",
+      comment: "A file inside a layer folder imports no file of its package left outside the layers.",
+      from: { path: pkg + "(app|widgets|features|entities|shared)/" },
+      to: { path: own, pathNot: own + "(app|widgets|features|entities|shared)/" },
     },
   ],
 });
