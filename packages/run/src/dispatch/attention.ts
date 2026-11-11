@@ -126,7 +126,7 @@ const overdueWait = (task: TaskRecord, at: string): { readonly id: string; reado
   }
   const parts = hold.until.split("-").map(Number)
   const passed = parts.length === 3 && parts.every((part) => Number.isInteger(part))
-    ? new Date(parts[0] as number, (parts[1] as number) - 1, (parts[2] as number) + 1).getTime()
+    ? new Date(parts[0], parts[1] - 1, parts[2] + 1).getTime()
     : Number.NaN
   const id = itemId(task.spec.id, "overdue-wait", hold.until)
   const text = "held for the captain: " + hold.reason + ", until " + hold.until + " passed"
