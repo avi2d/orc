@@ -234,7 +234,11 @@ const actionLine = (action: BeatAction): string => {
       return "close failed " + action.task + " on " + action.machine + ": " + action.reason
     }
     case "parked": {
-      return "parked " + action.task + " on " + action.branch + " for the captain's answer to " + action.questions.join(", ")
+      const answers = [
+        ...(action.questions.length === 0 ? [] : ["the captain's answer to " + action.questions.join(", ")]),
+        ...(action.decider.length === 0 ? [] : ["the decider's answer to " + action.decider.join(", ")])
+      ]
+      return "parked " + action.task + " on " + action.branch + " for " + answers.join(" and ")
     }
     case "asking": {
       return "asking " + action.task + " on " + action.machine + ": the run waits until " + action.until + " for the captain's answer to " + action.questions.join(", ")
