@@ -80,6 +80,20 @@ export const openItem = (root: string, id: string, asked: Asked): Effect.Effect<
     return yield* publishOnce(folder, id + fileSuffix, yield* encodeItem(id, { ...asked, state: { kind: "open" } }))
   })
 
+export const openReviewQuestions = (
+  root: string,
+  task: string,
+  questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly asked: string }>
+): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.forEach(questions, (question) =>
+    Effect.asVoid(openItem(root, reviewQuestionId(task, question.id, question.asked), {
+      kind: "review-question",
+      task,
+      text: question.text,
+      asked: question.asked,
+      owner: "decider"
+    })), { discard: true })
+
 const readItem = (root: string, id: string): Effect.Effect<AttentionItem | null, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const file = itemFile(root, id)

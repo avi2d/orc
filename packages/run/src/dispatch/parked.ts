@@ -1,8 +1,9 @@
 import { Array as Arr, Effect, FileSystem } from "effect"
 import type { OpenQuestion } from "../no-mistakes-gate"
+import { openReviewQuestions } from "./attention"
 import { findTask, type Rewrite, rewriteNew, rewriteTaken } from "./backlog"
 import { taskBranch } from "./runner"
-import { BacklogError, platformFailure, publishOnce, takenGrab } from "./backlog-write"
+import { BacklogError, platformFailure, publishOnce, scratchName, takenGrab } from "./backlog-write"
 import { type Hold, type HoldQuestion, isHeld, openQuestions, type Parked, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord } from "./task-record"
 import { renderTaskFile } from "./task-record-render"
 
@@ -38,17 +39,39 @@ export const askStartedTask = (
   id: string,
   asking: LiveAsking
 ): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  rewriteTaken(root, id, (fresh): Effect.Effect<Rewrite<boolean>, BacklogError> => {
-    if (fresh.state.kind !== "started") {
-      return Effect.fail(new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a started task asks" }))
+  Effect.gen(function*() {
+    const { fs, paths, file, grabbed, putBack, read } = yield* takenGrab(root, id, Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" })))
+    const ask = Effect.gen(function*() {
+      const record = yield* parseTaskFile(file, "taken", yield* read)
+      if (record.state.kind !== "started") {
+        return yield* new BacklogError({ detail: id + " is " + record.state.kind + ", and only a started task asks" })
+      }
+      const known = record.parked?.questions ?? []
+      const questions = parkedQuestions(asking.questions, known, asking.asked, () => asking.asked)
+      if (sameQuestions(questions, known)) {
+        return { keep: true as const, record, questions }
+      }
+      yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null))
+      return { keep: false as const, record, questions }
+    })
+    const settled = yield* ask.pipe(Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error)))))
+    if (settled.keep) {
+      yield* putBack
+      return false
     }
-    const known = fresh.parked?.questions ?? []
-    const questions = parkedQuestions(asking.questions, known, asking.asked, () => asking.asked)
-    if (sameQuestions(questions, known)) {
-      return Effect.succeed({ kind: "keep", result: false })
-    }
-    const parked: Parked = { branch: fresh.parked?.branch ?? taskBranch(id), questions }
-    return Effect.succeed({ kind: "write", record: { ...fresh, parked }, result: true })
+    const parked: Parked = { branch: settled.record.parked?.branch ?? taskBranch(id), questions: settled.questions }
+    const replacement = scratchName(paths.folder("taken"), id)
+    const discardReplacement = fs.remove(replacement).pipe(Effect.orElseSucceed(() => undefined))
+    yield* fs.writeFileString(replacement, renderTaskFile({ ...settled.record, parked })).pipe(
+      Effect.mapError(platformFailure("write " + replacement)),
+      Effect.catch((error) => discardReplacement.pipe(Effect.andThen(putBack), Effect.andThen(Effect.fail(error))))
+    )
+    yield* fs.rename(replacement, file).pipe(
+      Effect.mapError(platformFailure("write " + file)),
+      Effect.catch((error) => discardReplacement.pipe(Effect.andThen(putBack), Effect.andThen(Effect.fail(error))))
+    )
+    yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
+    return true
   })
 
 // The resumed run gets every answer as --answer, so each is handed to the asking it answers.
@@ -90,6 +113,7 @@ export const parkStartedTask = (
       }
       const lastAsking = open.find((question) => question.asked !== undefined)?.asked ?? null
       const questions = parkedQuestions(open, record.parked?.questions ?? [], lastAsking, (question) => question.asked ?? at)
+      yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null))
       const parked: TaskRecord = { ...record, parked: { branch, questions }, state: { kind: "new" } }
       if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(parked)))) {
         return yield* new BacklogError({ detail: "new/ already holds " + id })

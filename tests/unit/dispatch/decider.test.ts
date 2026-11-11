@@ -8,7 +8,7 @@ import { attentionJson, attentionText } from "../../../packages/run/src/dispatch
 import { claimDeciding, openItems, readAttention, routeTaskItems } from "../../../packages/run/src/dispatch/attention"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
 import { type AskDecider, DeciderUnheard, decideReviewQuestions, type DeciderRequest } from "../../../packages/run/src/dispatch/decider"
-import { answerTask, askStartedTask } from "../../../packages/run/src/dispatch/parked"
+import { answerTask, askStartedTask, parkStartedTask } from "../../../packages/run/src/dispatch/parked"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -66,6 +66,32 @@ const filedAt = (filed: unknown, ...path: ReadonlyArray<string>): string | undef
 const decide = async (root: string, ask: AskDecider) => run(decideReviewQuestions(root, await run(listTasks(root)), ask))
 
 describe("the decider", () => {
+  test("a written question already has its decider item before routing instead of reaching the backlog alone", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-decider-early-"))
+    try {
+      const record = await run(addTask(root, spec))
+      await run(claimTask(root, record.spec.id))
+      await run(writeTaken(root, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-11-02T10:02:00.000Z", log: root + "/logs/orc-1.log" } } }))
+      await run(askStartedTask(root, "orc-1", { asked, questions: [r2] }))
+      expect((await run(listTasks(root))).at(0)?.parked?.questions.map((question) => question.id)).toEqual(["r2"])
+      expect((await run(openItems(root))).map((entry) => entry.id)).toEqual([r2Item])
+      expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["decider"])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+    const parked = await mkdtemp(join(tmpdir(), "orc-decider-parked-"))
+    try {
+      const record = await run(addTask(parked, spec))
+      await run(claimTask(parked, record.spec.id))
+      await run(writeTaken(parked, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-11-02T10:02:00.000Z", log: parked + "/logs/orc-1.log" } } }))
+      await run(parkStartedTask(parked, "orc-1", "orc/orc-1", [{ id: "r2", text: "How many retries?" }], "2026-11-02T10:35:00.000Z"))
+      expect((await run(listTasks(parked))).at(0)?.parked?.questions.map((question) => question.id)).toEqual(["r2"])
+      expect((await run(openItems(parked))).map((entry) => entry.id)).toEqual(["orc-1.r2.2026-11-02T10_35_00_000Z"])
+      expect((await run(openItems(parked))).map((entry) => entry.item.owner)).toEqual(["decider"])
+    } finally {
+      await rm(parked, { recursive: true, force: true })
+    }
+  })
   test("a review question the beat routes is owned by the decider, not handed straight to the user", async () => {
     await withAskingTask(async (root) => {
       expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["decider", "decider"])
