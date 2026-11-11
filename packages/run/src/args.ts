@@ -2,8 +2,7 @@ import { type DispatchArgs, parseDispatchArgs } from "./dispatch/args"
 import { askUserWord, type QuestionAnswer } from "./no-mistakes"
 import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
 import { isRunDelivery, type RunDelivery, runDeliveries } from "./delivery"
-export const sandboxKinds = ["nono", "none"] as const
-export type SandboxKind = typeof sandboxKinds[number]
+import { sandboxKinds, type SandboxKind } from "./sandbox-kind"
 export const defaultSandbox: SandboxKind = "nono"
 export type OrcArgs =
   | { readonly kind: "PrintVersion" }

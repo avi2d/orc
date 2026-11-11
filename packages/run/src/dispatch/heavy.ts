@@ -1,8 +1,7 @@
 import type { HeavyConfig } from "../orc-config"
+import { standinDirSuffix } from "../standin-dir"
 
 export const heavyGroup = "heavy"
-
-export const standinDirSuffix = "/heavy/bin"
 
 export const heavyBinDir = (home: string): string => home + standinDirSuffix
 
