@@ -97,13 +97,16 @@ const endTask = (
         return Option.some({ kind: "close-failed", task: id, machine, reason: "split " + id + " into " + (children.length === 0 ? "no children" : children.join(", ")) + " failed: " + applied.detail } satisfies BeatAction)
       }
       if (task.spec.parent !== null && reopened !== null) {
-        const names = ending.plan.children.map((child) => child.title.trim()).join(", ")
-        const closed = yield* closeStartedTask(root, id, "failed", "split " + id + " into " + names + " failed: " + applied.detail, { pr: null, report: null }, at).pipe(
+        const created = (yield* listTasks(root).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<TaskRecord>)))
+          .filter((candidate) => candidate.spec.parent === task.spec.parent && candidate.spec.created === at)
+          .map((candidate) => candidate.spec.id)
+        const reason = "split " + id + " into " + (created.length === 0 ? "no children" : created.join(", ")) + " failed: " + applied.detail
+        const closed = yield* closeStartedTask(root, id, "failed", reason, { pr: null, report: null }, at).pipe(
           Effect.catchTag("BacklogError", () => Effect.succeed(null))
         )
         return closed === null || closed.state.kind !== "closed"
           ? Option.none()
-          : Option.some({ kind: "close-failed", task: id, machine, reason: closed.state.closing.reason } satisfies BeatAction)
+          : Option.some({ kind: "closed", task: id, machine, outcome: "failed", reason: closed.state.closing.reason, pr: null, report: null } satisfies BeatAction)
       }
       return Option.none()
     }

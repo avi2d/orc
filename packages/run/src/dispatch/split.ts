@@ -164,6 +164,13 @@ const handOverDependents = (
     }
   })
 
+const childSplitDone = (body: string, taskId: string, done: ReadonlyArray<string>): string => {
+  const lines = done.map((criterion) => "- from " + taskId + " split: " + criterion.trim()).join("\n")
+  return body.includes("## Done when")
+    ? body.trimEnd() + "\n" + lines + "\n"
+    : body.trimEnd() + "\n\n## Done when\n\n" + lines + "\n"
+}
+
 export const applyRunSplit = (
   root: string,
   task: TaskRecord,
@@ -174,6 +181,12 @@ export const applyRunSplit = (
     const { title, project, internal, machine, dependsOn, body, parent } = task.spec
     if (parent !== null) {
       const grandparent = yield* findTask(root, parent)
+      yield* rewriteNew(root, grandparent.spec.id, (fresh) =>
+        Effect.succeed({
+          kind: "write",
+          record: { ...fresh, spec: { ...fresh.spec, body: childSplitDone(fresh.spec.body, task.spec.id, plan.done) } },
+          result: undefined
+        } satisfies Rewrite<void>))
       const siblings = yield* addChildren(root, { title, project, internal, machine, dependsOn, created, body }, grandparent, plan)
       // A proposer closed done with no PR frees its dependents, so they must wait on the slices before it closes.
       yield* handOverDependents(root, task.spec.id, siblings.children.map((child) => child.spec.id))

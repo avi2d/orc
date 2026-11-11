@@ -77,6 +77,7 @@ Orc records the run as failed without running checks or opening a PR.
 The beat turns the task into a parent instead of closing it, with the proposal's done criteria under `## Done when` and `split: {"by": "run", "reason": <text>}`.
 It adds one ship child for each slice, linked and waiting as [Splitting at intake](#splitting-at-intake) adds them, and starts every child that waits on nothing in the same beat.
 When the task that proposes the split already has a parent, the slices join that parent as children instead, since orc refuses a parent given a parent.
+The proposal's done criteria join that parent under `## Done when` as lines naming the split task, so the final check verifies them with the rest.
 The task then leaves that parent and closes done with the reason `split into <child-ids>: <reason>`, and every task that waited on it waits on all of the slices instead.
 The beat prints `split <task-id> on <machine> into <child-ids>: <reason>` and records the event `<task-id>.split` that orc chat posts, as in `orc-1 Ship task splitting split at run into orc-2 Record the split, orc-3 Show the plan: <reason>`.
 A run whose proposal orc refused ends as `invalid split proposal: <why>`, and the beat closes that task failed with no children.

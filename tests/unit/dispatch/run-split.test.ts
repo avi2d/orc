@@ -192,6 +192,14 @@ describe("the beat applying a worker's split proposal", () => {
     })
   })
 
+  test("a child split keeps its done criteria on the parent instead of dropping them", async () => {
+    await beatAfterChildSplit(async (root) => {
+      const parent = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
+      expect(parent?.spec.body).toContain("## Done when")
+      expect(parent?.spec.body).toContain("- from orc-2 split: " + proposal.done[0])
+    })
+  })
+
   test("a task waiting on a child that splits waits on the slices instead of starting at once", async () => {
     await beatAfterChildSplit(async (root) => {
       const waiter = (await run(listTasks(root))).find((task) => task.spec.id === "orc-3")
