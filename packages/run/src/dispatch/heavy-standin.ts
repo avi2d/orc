@@ -1,6 +1,6 @@
 import { Effect, FileSystem, Option } from "effect"
 import { defaultHeavyTools } from "./heavy"
-import { decideBody, extraSub } from "./heavy-standin-decide"
+import { classifyArgv } from "./heavy-classify"
 import {
   standinFinish,
   standinMarker,
@@ -11,98 +11,6 @@ import {
 } from "./heavy-standin-runtime"
 
 export type { StandinTiming } from "./heavy-standin-runtime"
-
-const helpers: ReadonlyArray<string> = [
-  'heavy_version() {',
-  '  for heavy_a in "$@"; do',
-  '    case "$heavy_a" in --version|-v|--help|-h) return 0;; esac',
-  '  done',
-  '  return 1',
-  '}',
-  '',
-  'heavy_watchflag() {',
-  '  for heavy_a in "$@"; do',
-  '    case "$heavy_a" in --watch|--watchAll|--watch-all|--interactive|--ui) return 0;; esac',
-  '  done',
-  '  return 1',
-  '}',
-  '',
-  'heavy_valueflag() {',
-  '  case "$1" in',
-  '    --timeout|--reporter|--maxWorkers|--max-workers|--project|--config|--output|--outDir|--outdir|--manifest-path|--target|-p|-c|-o) return 0;;',
-  '  esac',
-  '  return 1',
-  '}',
-  '',
-  'heavy_targeted() {',
-  '  while [ $# -gt 0 ]; do',
-  '    case "$1" in',
-  '      --changed|-t|--test-name-pattern|-g|--grep|-k|-run) return 0;;',
-  '      *.test.*|*.spec.*|*_test.go|test_*.py|*_test.py|*/test_*.py) return 0;;',
-  '    esac',
-  '    if heavy_valueflag "$1"; then shift; if [ $# -eq 0 ]; then break; fi; shift; if [ $# -eq 0 ]; then break; fi; continue; fi',
-  '    case "$1" in',
-  '      -*) ;;',
-  '      ./...|.) ;;',
-  '      */*) return 0;;',
-  '    esac',
-  '    shift',
-  '  done',
-  '  return 1',
-  '}',
-  '',
-  'heavy_targeted_bare() {',
-  '  while [ $# -gt 0 ]; do',
-  '    case "$1" in',
-  '      --changed|-t|--test-name-pattern|-g|--grep|-k|-run) return 0;;',
-  '    esac',
-  '    if heavy_valueflag "$1"; then shift; if [ $# -eq 0 ]; then break; fi; shift; if [ $# -eq 0 ]; then break; fi; continue; fi',
-  '    case "$1" in',
-  '      -*) ;;',
-  '      ./...|.) ;;',
-  '      *) return 0;;',
-  '    esac',
-  '    shift',
-  '  done',
-  '  return 1',
-  '}',
-  '',
-  'heavy_exec_tool() {',
-  '  case "$1" in -*) return;; esac',
-  '  case "$1" in',
-  '    checks-*)',
-  '      shift; heavy_queue=1; if heavy_targeted "$@"; then heavy_prio=1; fi;;',
-  '    vitest)',
-  '      shift; case "${1:-}" in watch|dev) return;; esac',
-  '      for heavy_a in "$@"; do case "$heavy_a" in -w) return;; esac; done',
-  '      if [ "${1:-}" = "run" ]; then shift; fi',
-  '      heavy_queue=1; if heavy_targeted_bare "$@"; then heavy_prio=1; fi;;',
-  '    jest)',
-  '      shift; heavy_queue=1; if heavy_targeted_bare "$@"; then heavy_prio=1; fi;;',
-  '    tsc)',
-  '      shift; for heavy_a in "$@"; do case "$heavy_a" in -w) return;; esac; done',
-  '      heavy_queue=1; if heavy_targeted "$@"; then heavy_prio=1; fi;;',
-  '    playwright|eslint|oxlint)',
-  '      shift; heavy_queue=1; if heavy_targeted "$@"; then heavy_prio=1; fi;;',
-  '  esac',
-  '}',
-  '',
-  'heavy_run_script() {',
-  '  while [ $# -gt 0 ]; do',
-  '    case "$1" in',
-  '      --filter|--cwd|-w|--workspace|--prefix) shift; if [ $# -eq 0 ]; then break; fi; shift; if [ $# -eq 0 ]; then break; fi;;',
-  '      -*) shift;;',
-  '      *) break;;',
-  '    esac',
-  '  done',
-  '  case "${1:-}" in',
-  '    ""|dev|start|serve|preview|watch|storybook|*:watch|*:ui|*:dev) return;;',
-  '    test|tests|lint|typecheck|build|check|checks|e2e|coverage|mutation|checks-*|test:*|build:*|lint:*|typecheck:*|vitest|jest|tsc|eslint|oxlint|playwright)',
-  '      shift; if heavy_watchflag "$@"; then return; fi',
-  '      heavy_queue=1; if heavy_targeted "$@"; then heavy_prio=1; fi;;',
-  '  esac',
-  '}'
-]
 
 export type HeavyPlatform = "darwin" | "linux" | "other"
 
@@ -182,21 +90,28 @@ const standinHead = (tool: string, settings: StandinSettings, real: string): Rea
   'heavy_wrap="' + settings.wrap + '"'
 ]
 
-const standinDecideFn = (decide: ReadonlyArray<string>): ReadonlyArray<string> => [
+// Bun would otherwise load the caller's .env and bunfig.toml preloads into the stand-in.
+const classifyCall = (tool: string, commands: ReadonlyArray<string>): string =>
+  [process.execPath, "--no-env-file", "--config=/dev/null", import.meta.dir + "/heavy-standin-main.ts", ...classifyArgv({ tool, commands })]
+    .map(quoteSingle)
+    .join(" ")
+
+const standinDecideFn = (tool: string, commands: ReadonlyArray<string>): ReadonlyArray<string> => [
   'heavy_decide() {',
-  '  heavy_queue=0; heavy_prio=0;',
-  ...decide,
+  '  heavy_decision="$(' + classifyCall(tool, commands) + ' "$@")" || {',
+  '    echo "orc heavy: cannot classify the $heavy_tool call; rerun orc to rewrite the stand-in" >&2',
+  '    exit 1',
+  '  }',
+  '  heavy_queue="${heavy_decision% *}"; heavy_prio="${heavy_decision#* }"',
   '}'
 ]
 
 export const standinScript = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>, timing?: StandinTiming): Effect.Effect<string, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const decide = defaultHeavyTools.includes(tool) ? [...decideBody(tool), ...extraSub(tool, commands)] : extraSub(tool, commands)
     const resolved = yield* findRealTool(tool, Bun.env.PATH ?? "")
     return [
       ...standinHead(tool, settings, resolved),
-      ...helpers,
-      ...standinDecideFn(decide),
+      ...standinDecideFn(tool, commands),
       ...standinUtils(),
       ...standinQueue(settings.through),
       ...standinWait(timing),
