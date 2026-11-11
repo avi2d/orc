@@ -240,7 +240,7 @@ The beat starts it detached in its own session, never waits for it and never kil
 So the start command and what it leaves running outlive the beat, even when launchd or cron ends the beat's process group.
 Its output goes to `~/.orc/backlog/logs/<task-id>.log`, which `ORC_TASK_LOG` names.
 From then on, each beat ends the finished runs on a machine whose start runs `orc runner start`.
-It reads `orc runner result` on that machine and closes the task done, failed or stopped, parks it on your open questions, or turns it into a parent on a worker split proposal, as [A worker split proposal](task-kinds.md#a-worker-split-proposal) shows.
+It reads `orc runner result` on that machine and closes the task done, failed or stopped, parks it on your open questions, or applies a worker split proposal, as [A worker split proposal](task-kinds.md#a-worker-split-proposal) shows.
 A run marked stopped closes its task stopped with the run's end reason.
 A run still waiting at its gate for your answer stays started, and the beat relays your answers to it, as [Parked runs](parked-runs.md) shows.
 Either way the task frees its slot in the same beat.
