@@ -342,6 +342,7 @@ To print one frame of plain text instead, run `orc-dash panel dispatch --print`.
 To run the live attention panel, run `orc-dash panel attention`.
 It runs alone in a plain terminal or in a Herdr pane.
 The panel reads `orc attention --json` on the machine it runs on and nothing else, and paints again every 10 seconds.
+The dashboard shows it by default, above the resources panel in a wide layout and second in the narrow glance, as [Lay out the dashboard](#lay-out-the-dashboard) shows.
 It shows each open item oldest first, with its task, its owner, its age and its kind, and its text below.
 An overdue item starts with `!` and says `overdue` after its age.
 The head counts the open items and the overdue ones.
@@ -682,18 +683,18 @@ The default layout is this one.
         "atLeast": { "columns": 240, "rows": 36 },
         "rows": [
           { "height": "auto", "atMost": 0.55, "least": 8, "cells": [{ "panel": "quota" }, { "tabs": ["session-quota", "alerts"] }] },
-          { "height": "fill", "cells": [{ "stack": [{ "panel": "resources" }, { "tabs": ["queues", "schedules", "dispatch"] }] }, { "panel": "tasks", "width": 2 }] }
+          { "height": "fill", "cells": [{ "stack": [{ "panel": "attention" }, { "panel": "resources" }, { "tabs": ["queues", "schedules", "dispatch"] }] }, { "panel": "tasks", "width": 2 }] }
         ]
       },
       {
         "atLeast": { "columns": 120, "rows": 36 },
         "rows": [
           { "height": "auto", "atMost": 0.55, "least": 8, "cells": [{ "panel": "quota" }, { "tabs": ["session-quota", "alerts"] }] },
-          { "height": "fill", "cells": [{ "stack": [{ "panel": "resources" }, { "tabs": ["queues", "schedules", "dispatch"] }] }, { "panel": "tasks", "width": 1 }] }
+          { "height": "fill", "cells": [{ "stack": [{ "panel": "attention" }, { "panel": "resources" }, { "tabs": ["queues", "schedules", "dispatch"] }] }, { "panel": "tasks", "width": 1 }] }
         ]
       }
     ],
-    "narrow": ["quota", "session-quota", "queues", "dispatch", "resources", "alerts", "tasks"],
+    "narrow": ["quota", "attention", "session-quota", "queues", "dispatch", "resources", "alerts", "tasks"],
     "narrowGivesWay": ["alerts", "quota", "session-quota"]
   }
 }
