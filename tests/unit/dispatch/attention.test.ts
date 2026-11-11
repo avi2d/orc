@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Array as Arr, Effect } from "effect"
 import { parseDispatchArgs } from "../../../packages/run/src/dispatch/args"
-import { type Asked, closeItem, isOverdue, openItem, openItems, recordDecision, routeTaskItems } from "../../../packages/run/src/dispatch/attention"
+import { type Asked, closeItem, isOverdue, openItem, openItems, readAttention, recordDecision, routeTaskItems } from "../../../packages/run/src/dispatch/attention"
 import { attentionJson, attentionText } from "../../../packages/run/src/dispatch/attention-view"
 import type { ParkedQuestion, TaskRecord } from "../../../packages/run/src/dispatch/task-record"
 
@@ -137,6 +137,29 @@ describe("the attention queue", () => {
       expect(await run(openItems(root))).toEqual([])
       expect(JSON.parse(await readFile(join(root, "attention", "orc-1.r2.2026-11-02T10_20_00_000Z.json"), "utf8"))).toMatchObject({
         state: { kind: "closed", answer: { words: "Keep it", at: "2026-11-02T10:25:00.000Z" } }
+      })
+    })
+  })
+
+  test("a decision written after an overlapping beat withdrew the question still closes with its answer instead of losing the decision", async () => {
+    await withRoot(async (root) => {
+      const asking = parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", null), [], { kind: "new" })
+      const id = "orc-1.r2.2026-11-02T10_20_00_000Z"
+      await run(routeTaskItems(root, [asking], "2026-11-02T10:20:00.000Z"))
+      await run(routeTaskItems(root, [{ ...asking, parked: null }], "2026-11-02T10:22:00.000Z"))
+      expect(await run(openItems(root))).toEqual([])
+      await run(recordDecision(root, id, { kind: "answered", reason: "the flag stays", at: "2026-11-02T10:24:00.000Z" }))
+      const answered = parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", { words: "Keep it", at: "2026-11-02T10:25:00.000Z" }), [], { kind: "new" })
+      await run(routeTaskItems(root, [answered], "2026-11-02T10:25:00.000Z"))
+      expect(await run(openItems(root))).toEqual([])
+      expect(JSON.parse(await readFile(join(root, "attention", id + ".json"), "utf8"))).toMatchObject({
+        decision: { kind: "answered", reason: "the flag stays" },
+        state: { kind: "closed", answer: { words: "Keep it", at: "2026-11-02T10:25:00.000Z" } }
+      })
+      expect((await run(readAttention(root, [answered]))).decided.map((entry) => entry.id)).toEqual([id])
+      await run(recordDecision(root, id, { kind: "escalated", reason: "only the captain merges", at: "2026-11-02T10:26:00.000Z" }))
+      expect(JSON.parse(await readFile(join(root, "attention", id + ".json"), "utf8"))).toMatchObject({
+        decision: { kind: "answered", reason: "the flag stays" }
       })
     })
   })

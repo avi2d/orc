@@ -149,7 +149,7 @@ export const recordDecision = (root: string, id: string, decision: Decision): Ef
       return
     }
     const item = yield* Schema.decodeEffect(ItemFile)(before).pipe(Effect.mapError((error) => new BacklogError({ detail: file + " holds no item orc reads: " + error.message })))
-    if (item.state.kind !== "open") {
+    if (item.state.kind === "closed") {
       return
     }
     const { deciding: _claim, ...rest } = item
