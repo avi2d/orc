@@ -366,7 +366,7 @@ export const runBeat = (
     yield* routeTaskItems(root, current, at)
     yield* openRunDeaths(root, settled.closed, at)
     const { latest, relayed } = yield* decideAndRelay(root, context, started, progress, current, sources.askDecider)
-    const { asking, queue } = yield* attentionActions(root, latest, [...settled.asking, ...relayed.asking], at)
+    const { reported, queue } = yield* attentionActions(root, latest, [...settled.closed, ...relayed.closed, ...settled.asking, ...relayed.asking], at)
     const queued = latest.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: latest, overloaded }
@@ -375,9 +375,7 @@ export const runBeat = (
     yield* openRunDeaths(root, actions, at)
     const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at))
     return { beat, at, quota, room: readRoom(config.machines, latest), actions: [
-        ...settled.closed,
-        ...relayed.closed,
-        ...asking,
+        ...reported,
         ...stalls.flatMap(Option.toArray),
         ...upstream,
         ...queue,

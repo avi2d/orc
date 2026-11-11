@@ -73,7 +73,7 @@ const endTask = (
       const parked = yield* parkStartedTask(root, id, branch, ending.questions, yield* nowIso).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
       return parked === null
         ? Option.none()
-        : Option.some({ kind: "parked", task: id, machine, branch, questions: ending.questions.map((question) => question.id) } satisfies BeatAction)
+        : Option.some({ kind: "parked", task: id, machine, branch, questions: ending.questions.map((question) => question.id), decider: [] } satisfies BeatAction)
     }
     const closed = yield* closeStartedTask(root, id, ending.outcome, ending.reason, { pr: ending.pr, report: ending.report }, yield* nowIso).pipe(
       Effect.catchTag("BacklogError", () => Effect.succeed(null))
