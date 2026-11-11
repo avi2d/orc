@@ -3,7 +3,7 @@ commands:
   build: bun run build
   lint: bun run lint
   typecheck: bun run typecheck
-  test: bunx checks-test --changed --parallel=3
+  test: bun run build && bunx checks-test --changed --parallel=3
 review:
   path_instructions:
     - path: "packages/run/**"
