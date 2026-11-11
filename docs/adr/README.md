@@ -13,5 +13,6 @@
 | [0127](0127-history-span-pick-ruling.md) | Levels 2 and 3 of the orchestration view reach back the last 7 days | Accepted | `packages/tasks` |
 | [0128](0128-orc-merge-green-reviewed-ruling.md) | Firstmate merges green reviewed orc PRs itself | Accepted | `docs/merge-a-pr.md` |
 | [0136](0136-alerting-ruling.md) | Alerting lives in tui-dash with a headless command | Accepted | `packages/alerts` |
+| [0160](0160-orc-dash-name-ruling.md) | The dashboard is orc-dash and lives in orc | Accepted | `packages/cli`, `packages/dashboard` |
 
 <!-- end generated adr-index -->

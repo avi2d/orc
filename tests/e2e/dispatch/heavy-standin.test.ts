@@ -1,10 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
+import { spawnSync } from "node:child_process"
 import { tmpdir, userInfo } from "node:os"
 import { dirname, join } from "node:path"
-import { standinScript } from "../../../packages/run/src/dispatch/heavy-standin"
+import { BunServices } from "@effect/platform-bun"
+import { Effect } from "effect"
+import { standinScript, standinTools, type StandinSettings } from "../../../packages/run/src/dispatch/heavy-standin"
 import { noPueue, run, setup, type Harness } from "./heavy-standin-harness"
+
+const scriptOf = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>): Promise<string> =>
+  Effect.runPromise(standinScript(tool, settings, commands).pipe(Effect.provide(BunServices.layer)))
 
 let harnesses: Array<Harness> = []
 
@@ -16,6 +22,126 @@ afterEach(async () => {
 })
 
 describe("the heavy stand-in", () => {
+  test("a symlinked stand-in alone on PATH runs the baked real tool instead of refusing", async () => {
+    const tools = standinTools(["custom-tool test"])
+    const harness = harnesses[harnesses.push(await setup(tools)) - 1]
+    const isolated = join(harness.root, "isolated")
+    await mkdir(isolated)
+    for (const tool of tools) {
+      await symlink(join(harness.bin, tool), join(isolated, tool))
+      const child = spawnSync(join(isolated, tool), ["--version"], {
+        env: { PATH: isolated, FAKE_TOOL_LOG: join(harness.root, "tool.log") },
+        encoding: "utf8",
+        timeout: 1000
+      })
+      expect(child.error).toBeUndefined()
+      expect(child.status).toBe(0)
+    }
+    expect(await readFile(join(harness.root, "tool.log"), "utf8")).toContain("real ")
+  })
+
+  test("a stand-in whose baked real tool is gone refuses instead of calling itself", async () => {
+    const tools = standinTools(["custom-tool test"])
+    const harness = harnesses[harnesses.push(await setup(tools)) - 1]
+    const isolated = join(harness.root, "isolated")
+    await mkdir(isolated)
+    for (const tool of tools) {
+      await rm(join(harness.root, "fake", tool), { force: true })
+      await symlink(join(harness.bin, tool), join(isolated, tool))
+      const child = spawnSync(join(isolated, tool), ["--version"], {
+        env: { PATH: isolated },
+        encoding: "utf8",
+        timeout: 1000
+      })
+      expect(child.error).toBeUndefined()
+      expect(child.status).toBe(127)
+      expect(child.stderr).toContain("orc heavy: no " + tool)
+      expect(child.stderr).toContain(join(harness.root, "fake", tool))
+    }
+  })
+
+  test("a copied stand-in in a second folder runs the real tool instead of looping into the other copy", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-heavy-writer-"))
+    harnesses.push({ root, bin: "", env: {}, pueueLog: async () => "" })
+    const other = join(root, "other")
+    const fake = join(root, "fake")
+    const bin = join(root, "bin")
+    await mkdir(other, { recursive: true })
+    await mkdir(fake, { recursive: true })
+    await mkdir(bin, { recursive: true })
+    const savedPath = process.env.PATH
+    try {
+      process.env.PATH = bin
+      await writeFile(join(other, "bun"), await scriptOf("bun", { home: join(root, "otherhome"), group: "heavy", wrap: "", through: null }, []), { mode: 0o755 })
+      await writeFile(join(fake, "bun"), "#!/bin/sh\necho writer-real-marker\n", { mode: 0o755 })
+      process.env.PATH = other + ":" + fake + ":/usr/bin:/bin"
+      await writeFile(join(bin, "bun"), await scriptOf("bun", { home: root, group: "heavy", wrap: "", through: null }, []), { mode: 0o755 })
+    } finally {
+      if (savedPath === undefined) {
+        delete process.env.PATH
+      } else {
+        process.env.PATH = savedPath
+      }
+    }
+    const child = spawnSync(join(bin, "bun"), ["--version"], {
+      env: { PATH: bin },
+      encoding: "utf8",
+      timeout: 3000
+    })
+    expect(child.error).toBeUndefined()
+    expect(child.status).toBe(0)
+    expect(child.stdout).toContain("writer-real-marker")
+  })
+
+  test("a rewritten stand-in still runs the caller's own tool instead of the previous run's tool", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-heavy-rewrite-"))
+    harnesses.push({ root, bin: "", env: {}, pueueLog: async () => "" })
+    const first = join(root, "first")
+    const second = join(root, "second")
+    const other = join(root, "other")
+    const bin = join(root, "bin")
+    await mkdir(first, { recursive: true })
+    await mkdir(second, { recursive: true })
+    await mkdir(other, { recursive: true })
+    await mkdir(bin, { recursive: true })
+    await writeFile(join(first, "bun"), "#!/bin/sh\necho previous-run-tool\n", { mode: 0o755 })
+    await writeFile(join(second, "bun"), "#!/bin/sh\necho caller-tool\n", { mode: 0o755 })
+    const savedPath = process.env.PATH
+    try {
+      process.env.PATH = bin
+      await writeFile(join(other, "bun"), await scriptOf("bun", { home: join(root, "otherhome"), group: "heavy", wrap: "", through: null }, []), { mode: 0o755 })
+      process.env.PATH = first + ":/usr/bin:/bin"
+      await writeFile(join(bin, "bun"), await scriptOf("bun", { home: root, group: "heavy", wrap: "", through: null }, []), { mode: 0o755 })
+    } finally {
+      if (savedPath === undefined) {
+        delete process.env.PATH
+      } else {
+        process.env.PATH = savedPath
+      }
+    }
+    const child = spawnSync(join(bin, "bun"), ["--version"], {
+      env: { PATH: bin + ":" + other + ":" + second + ":/usr/bin:/bin" },
+      encoding: "utf8",
+      timeout: 3000
+    })
+    expect(child.error).toBeUndefined()
+    expect(child.status).toBe(0)
+    expect(child.stdout).toContain("caller-tool")
+    expect(child.stdout).not.toContain("previous-run-tool")
+  })
+
+  test("a stand-in whose folder appears twice on PATH runs the real tool instead of itself", async () => {
+    const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
+    const child = spawnSync(join(harness.bin, "bun"), ["--version"], {
+      env: { ...harness.env, PATH: harness.bin + ":" + harness.bin + ":" + join(harness.root, "fake") + ":/usr/bin:/bin" },
+      encoding: "utf8",
+      timeout: 3000
+    })
+    expect(child.error).toBeUndefined()
+    expect(child.status).toBe(0)
+    expect(await readFile(join(harness.root, "tool.log"), "utf8")).toContain("bun --version")
+  })
+
   test("bun test on a named test file becomes a pueue task in the heavy group with priority", async () => {
     const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
     const result = run(harness, "bun", ["test", "login.test.ts"])
@@ -199,7 +325,7 @@ describe("the heavy stand-in", () => {
       harnesses.push({ root, bin: "", env: {}, pueueLog: async () => "" })
       const bin = join(root, "bin")
       await mkdir(bin, { recursive: true })
-      await writeFile(join(bin, "bun"), standinScript("bun", { home: root, group, wrap: "", through: null }, []), { mode: 0o755 })
+      await writeFile(join(bin, "bun"), await scriptOf("bun", { home: root, group, wrap: "", through: null }, []), { mode: 0o755 })
       await writeFile(join(root, "pass.test.ts"), 'test("x", () => {})\n')
       await writeFile(join(root, "fail.test.ts"), 'test("x", () => { throw new Error("x") })\n')
       const realEnv = { ...process.env, PATH: bin + ":" + dirname(process.execPath) + ":" + process.env.PATH, HOME: userInfo().homedir }
