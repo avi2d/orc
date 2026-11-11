@@ -244,11 +244,28 @@ const overdueWait = (task: TaskRecord, at: string): { readonly id: string; reado
   return { id, asked, answer: hold.answer }
 }
 
+// A beat that read the task before its question was written withdraws the item, so a task still asking it reopens it as it was.
+const openOrReopenTaskItem = (root: string, id: string, asked: Asked): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    if (yield* openItem(root, id, asked)) {
+      return
+    }
+    const file = itemFile(root, id)
+    const before = yield* readIfPresent(file)
+    if (before === null) {
+      return
+    }
+    const item = yield* Schema.decodeEffect(ItemFile)(before).pipe(Effect.mapError((error) => new BacklogError({ detail: file + " holds no item orc reads: " + error.message })))
+    if (item.state.kind === "withdrawn") {
+      yield* replaceItem(root, id, before, yield* encodeItem(id, { ...item, state: { kind: "open" } }))
+    }
+  })
+
 const routeOne = (root: string, id: string, asked: Asked | null, answer: ItemAnswer | null): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> => {
   if (answer !== null) {
     return Effect.as(closeItem(root, id, answer), false)
   }
-  return asked === null ? Effect.succeed(false) : Effect.as(openItem(root, id, asked), true)
+  return asked === null ? Effect.succeed(false) : Effect.as(openOrReopenTaskItem(root, id, asked), true)
 }
 
 export const routeTaskItems = (root: string, tasks: ReadonlyArray<TaskRecord>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>

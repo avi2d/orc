@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Array as Arr, Effect } from "effect"
 import { parseDispatchArgs } from "../../../packages/run/src/dispatch/args"
-import { type Asked, closeItem, isOverdue, openItem, openItems, routeTaskItems } from "../../../packages/run/src/dispatch/attention"
+import { type Asked, closeItem, isOverdue, openItem, openItems, recordDecision, routeTaskItems } from "../../../packages/run/src/dispatch/attention"
 import { attentionJson, attentionText } from "../../../packages/run/src/dispatch/attention-view"
 import type { ParkedQuestion, TaskRecord } from "../../../packages/run/src/dispatch/task-record"
 
@@ -108,6 +108,21 @@ describe("the attention queue", () => {
       expect(JSON.parse(await readFile(join(root, "attention", "orc-1.r2.2026-11-02T10_20_00_000Z.json"), "utf8"))).toMatchObject({
         state: { kind: "withdrawn", reason: "question no longer asked" }
       })
+    })
+  })
+
+  test("a question an overlapping beat withdrew while the task still asks it opens again with its escalation, instead of staying withdrawn", async () => {
+    await withRoot(async (root) => {
+      const asking = parkedTask("orc-1", question("r2", "Keep the old flag?", "2026-11-02T10:20:00.000Z", null), [], { kind: "new" })
+      const id = "orc-1.r2.2026-11-02T10_20_00_000Z"
+      await run(routeTaskItems(root, [asking], "2026-11-02T10:20:00.000Z"))
+      await run(recordDecision(root, id, { kind: "escalated", reason: "only the captain merges", at: "2026-11-02T10:21:00.000Z" }))
+      await run(routeTaskItems(root, [{ ...asking, parked: null }], "2026-11-02T10:22:00.000Z"))
+      expect(await run(openItems(root))).toEqual([])
+      await run(routeTaskItems(root, [asking], "2026-11-02T10:23:00.000Z"))
+      expect((await run(openItems(root))).map((entry) => ({ id: entry.id, owner: entry.item.owner, decision: entry.item.decision?.kind }))).toEqual([
+        { id, owner: "user", decision: "escalated" }
+      ])
     })
   })
 
