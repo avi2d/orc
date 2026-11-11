@@ -14,5 +14,6 @@
 | [0128](0128-orc-merge-green-reviewed-ruling.md) | Firstmate merges green reviewed orc PRs itself | Accepted | `docs/merge-a-pr.md` |
 | [0136](0136-alerting-ruling.md) | Alerting lives in tui-dash with a headless command | Accepted | `packages/alerts` |
 | [0160](0160-orc-dash-name-ruling.md) | The dashboard is orc-dash and lives in orc | Accepted | `packages/cli`, `packages/dashboard` |
+| [0161](0161-orc-folder-map-by-feature-sliced-design.md) | orc lays out its packages by Feature-Sliced Design, adapted to a command-line tool | Accepted | `packages/run`, `packages/schema`, `packages/ui`, `packages/tasks`, `dependency-cruiser.config.ts` |
 
 <!-- end generated adr-index -->
