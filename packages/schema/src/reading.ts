@@ -1,4 +1,4 @@
-import type { DateTime } from "effect";
+import { DateTime } from "effect";
 
 export type Outcome<A> =
   | { readonly kind: "ok"; readonly value: A }
@@ -8,6 +8,9 @@ export type Outcome<A> =
 export type Failed = Exclude<Outcome<never>, { readonly kind: "ok" }>;
 
 export type Reading<A> = Outcome<A> & { readonly capturedAt: DateTime.Utc };
+
+export const secondsFrom = (from: DateTime.Utc, to: DateTime.Utc): number =>
+  Math.max(0, (DateTime.toEpochMillis(to) - DateTime.toEpochMillis(from)) / 1000);
 
 export const ok = <A>(value: A): Outcome<A> => ({ kind: "ok", value });
 
