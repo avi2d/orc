@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { attentionJson, attentionText } from "../../../packages/run/src/dispatch/attention-view"
-import { claimDeciding, openItems, readAttention, routeReviewQuestions } from "../../../packages/run/src/dispatch/attention"
+import { claimDeciding, openItems, readAttention, routeTaskItems } from "../../../packages/run/src/dispatch/attention"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
 import { type AskDecider, DeciderUnheard, decideReviewQuestions, type DeciderRequest } from "../../../packages/run/src/dispatch/decider"
 import { answerTask, askStartedTask } from "../../../packages/run/src/dispatch/parked"
@@ -32,7 +32,7 @@ const withAskingTask = async (body: (root: string) => Promise<void>): Promise<vo
     await run(claimTask(root, record.spec.id))
     await run(writeTaken(root, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-11-02T10:02:00.000Z", log: root + "/logs/orc-1.log" } } }))
     await run(askStartedTask(root, "orc-1", { asked, questions: [r2, r3] }))
-    await run(routeReviewQuestions(root, await run(listTasks(root)), asked))
+    await run(routeTaskItems(root, await run(listTasks(root)), asked))
     await body(root)
   } finally {
     await rm(root, { recursive: true, force: true })
@@ -131,7 +131,7 @@ describe("the decider", () => {
       await decide(root, replies({ [r2.text]: answer, [r3.text]: escalate }))
       const after = new Date().toISOString()
       await run(answerTask(root, "orc-1", "r3=Keep the old flag", "2026-11-02T10:22:00.000Z"))
-      await run(routeReviewQuestions(root, await run(listTasks(root)), "2026-11-02T10:22:00.000Z"))
+      await run(routeTaskItems(root, await run(listTasks(root)), "2026-11-02T10:22:00.000Z"))
       const decided = (await run(readAttention(root, await run(listTasks(root))))).decided
       expect(decided.map((entry) => entry.id)).toEqual([r2Item])
       const view = attentionJson(await run(openItems(root)), "2026-11-02T10:30:00.000Z", decided)

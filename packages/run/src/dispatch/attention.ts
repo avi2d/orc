@@ -224,29 +224,6 @@ const routeOne = (root: string, id: string, asked: Asked | null, answer: ItemAns
   return asked === null ? Effect.succeed(false) : Effect.as(openItem(root, id, asked), true)
 }
 
-export const routeReviewQuestions = (root: string, tasks: ReadonlyArray<TaskRecord>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const live = new Set<string>()
-    for (const task of tasks) {
-      if (task.state.kind === "closed") {
-        continue
-      }
-      for (const question of task.parked?.questions ?? []) {
-        const id = reviewQuestionId(task.spec.id, question.id, question.asked)
-        const asked = Number.isNaN(Date.parse(question.asked)) ? at : question.asked
-        if (yield* routeOne(root, id, { kind: "review-question", task: task.spec.id, text: question.text, asked, owner: "decider" }, question.answer)) {
-          live.add(id)
-        }
-      }
-    }
-    const tasksById = new Map(tasks.map((task) => [task.spec.id, task] as const))
-    const stale = (yield* openItems(root)).filter((entry) => entry.item.kind === "review-question" && tasksById.has(entry.item.task) && !live.has(entry.id))
-    yield* Effect.forEach(stale, (entry) => {
-      const reason = tasksById.get(entry.item.task)?.state.kind === "closed" ? "task closed" : "question no longer asked"
-      return Effect.asVoid(withdrawItem(root, entry.id, reason, at))
-    }, { discard: true })
-  })
-
 export const routeTaskItems = (root: string, tasks: ReadonlyArray<TaskRecord>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const live = new Set<string>()

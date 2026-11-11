@@ -1,7 +1,7 @@
 import { Data, DateTime, Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { bundledAgentsDir } from "../agents"
-import { claimDeciding, openItems, recordDecision, reviewQuestionId, routeReviewQuestions } from "./attention"
+import { claimDeciding, openItems, recordDecision, reviewQuestionId, routeTaskItems } from "./attention"
 import { findTask } from "./backlog"
 import type { BacklogError } from "./backlog-write"
 import { answerTask } from "./parked"
@@ -67,13 +67,13 @@ const settle = (root: string, task: TaskRecord, question: ParkedQuestion, item: 
       Effect.catchTags({ BacklogError: (error) => Effect.succeed(error.detail), TaskFileError: (error) => Effect.succeed(error.detail) })
     )
     if (refused === null) {
-      yield* routeReviewQuestions(root, [yield* findTask(root, task.spec.id)], at)
+      yield* routeTaskItems(root, [yield* findTask(root, task.spec.id)], at)
       return verdict
     }
     const fresh = yield* findTask(root, task.spec.id)
     const stored = fresh.parked?.questions.find((candidate) => candidate.id === question.id)?.answer
     if (stored !== null && stored !== undefined) {
-      yield* routeReviewQuestions(root, [fresh], at)
+      yield* routeTaskItems(root, [fresh], at)
       return { kind: "answered", words: stored.words, reason: verdict.reason } satisfies Verdict
     }
     const escalated: Verdict = { kind: "escalated", reason: "the decider's answer did not reach the task: " + refused }
