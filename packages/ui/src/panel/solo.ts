@@ -2,8 +2,8 @@ import { Effect, type Scope } from "effect";
 import { loopTick } from "@avi2dg/orc-schema";
 import type { Look, Mounted, PanelError, Placed, PrintFrame } from "./module";
 import { panelWidth } from "./panel";
-import { withinRows } from "./layout";
-import { type Drawn, printBlock, runScreen, type Screen, type ScreenSize } from "./screen";
+import { withinRows } from "../text/layout";
+import { type Drawn, printBlock, runScreen, type Screen, type ScreenSize } from "../terminal/screen";
 
 const aloneLook: Look = { focused: true, title: undefined, below: [], alone: true };
 

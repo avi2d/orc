@@ -1,5 +1,5 @@
-export { liveCommandRunner } from "./runner";
-export { themeOfSettings } from "./appearance";
+export { liveCommandRunner } from "./lib/runner";
+export { themeOfSettings } from "./panel/appearance";
 export {
   decodeSettings,
   type FocusReach,
@@ -16,15 +16,15 @@ export {
   panelModule,
   type Placed,
   type PrintFrame,
-} from "./module";
-export { drawAlone, printSolo, runSolo, soloScreen } from "./solo";
-export { mountPolled, type PolledReading } from "./polled-mount";
-export { leastPanelWidth, type Panel, livePanel, panelWidth, printFrame, printFrameOf, runPanel } from "./panel";
+} from "./panel/module";
+export { drawAlone, printSolo, runSolo, soloScreen } from "./panel/solo";
+export { mountPolled, type PolledReading } from "./panel/polled-mount";
+export { leastPanelWidth, type Panel, livePanel, panelWidth, printFrame, printFrameOf, runPanel } from "./panel/panel";
 export { binArgsExit, colorWithoutPrintExit, printBinArgsExit, printColor, printPanelKnown, printPanelUsage, usageText } from "./bin-args";
-export { type Block, bottomEdgeRow, type Frame, panel, panelChrome, panelLine, titleEdge, titleRoom, withinRows, wrapParts } from "./layout";
-export { type Drawn, liveScreen, type Move, printBlock, printScreen, runScreen, type Screen, type ScreenSize, type Target, targetAt } from "./screen";
-export { blockDocument, frameAnsi, frameText, hexOfTone } from "./opentui";
-export { agoWords, joinWords, sourceWords } from "./sources";
+export { type Block, bottomEdgeRow, type Frame, panel, panelChrome, panelLine, titleEdge, titleRoom, withinRows, wrapParts } from "./text/layout";
+export { type Drawn, liveScreen, type Move, printBlock, printScreen, runScreen, type Screen, type ScreenSize, type Target, targetAt } from "./terminal/screen";
+export { blockDocument, frameAnsi, frameText, hexOfTone } from "./terminal/opentui";
+export { agoWords, joinWords, sourceWords } from "./readouts/sources";
 export {
   Appearance,
   defaultTheme,
@@ -41,11 +41,11 @@ export {
   tintedProviders,
   tintOfProvider,
   type Tone,
-} from "./palette";
-export { cycleName, quotaBar, shortLabel } from "./quota";
-export { savedName, windowName } from "./window-names";
-export { failureRows, failureText, type Label, labelled, labelledReadings, leastLabelWidth, machineLabel, reading } from "./labels";
-export { machineWidthOf, sentence, sourceNotes, withinRoom } from "./notes";
+} from "./text/palette";
+export { cycleName, quotaBar, shortLabel } from "./readouts/quota";
+export { savedName, windowName } from "./readouts/window-names";
+export { failureRows, failureText, type Label, labelled, labelledReadings, leastLabelWidth, machineLabel, reading } from "./readouts/labels";
+export { machineWidthOf, sentence, sourceNotes, withinRoom } from "./readouts/notes";
 export {
   boxOf,
   type ListBox,
@@ -64,8 +64,8 @@ export {
   sideBySide,
   singleTitle,
   splitWidth,
-} from "./box";
-export { ageText, everyText, oldest, savedText } from "./cadence";
+} from "./panel/box";
+export { ageText, everyText, oldest, savedText } from "./lib/cadence";
 export {
   clock,
   countdown,
@@ -77,7 +77,7 @@ export {
   percent,
   secondsBetween,
   usedOfTotal,
-} from "./format";
+} from "./text/format";
 export {
   behind,
   ellipsize,
@@ -95,4 +95,4 @@ export {
   type Style,
   truncate,
   widthOf,
-} from "./text";
+} from "./text/text";
