@@ -7,6 +7,39 @@ import { parkedListing } from "../../packages/run/src/chat-parked"
 import { chatSession, orcCommandVar } from "../../packages/run/src/chat-tools"
 
 describe("the parked-question listing", () => {
+  test("polling does not post a decider-owned question while posting a user-owned question", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "orc-chat-owner-"))
+    try {
+      const backlog = join(dir, "backlog.json")
+      const attention = join(dir, "attention.json")
+      const asked = "2026-11-02T10:20:00.000Z"
+      await writeFile(backlog, JSON.stringify({ tasks: [{
+        id: "task-1", title: "Pick the API", status: "new", hold: null,
+        parked: { branch: "orc/task-1", questions: [
+          { id: "question-1", text: "Routine?", asked, answer: null },
+          { id: "question-2", text: "Choice?", asked, answer: null }
+        ] }
+      }], events: [] }))
+      await writeFile(attention, JSON.stringify({ items: [
+        { id: "task-1.question-1.2026-11-02T10_20_00_000Z", kind: "review-question", task: "task-1", text: "Routine?", asked, owner: "decider" },
+        { id: "task-1.question-2.2026-11-02T10_20_00_000Z", kind: "review-question", task: "task-1", text: "Choice?", asked, owner: "user" }
+      ], decided: [] }))
+      const env = { [orcCommandVar]: JSON.stringify(["sh", "-c", 'case "$3" in attention) cat "$2";; *) cat "$1";; esac', "sh", backlog, attention]) }
+      const posted: Array<string> = []
+      const session = chatSession(env, () => true, (text) => { posted.push(text) })
+      await session.postParked()
+      expect(posted).toEqual(["task-1 Pick the API is parked on orc/task-1 for the captain's answer to question-2: Choice?"])
+      await writeFile(attention, JSON.stringify({ items: [], decided: [
+        { id: "task-1.question-1.2026-11-02T10_20_00_000Z", owner: "decider" }
+      ] }))
+      session.listParkedAgain()
+      posted.length = 0
+      await session.postParked()
+      expect(posted).toEqual(["task-1 Pick the API is parked on orc/task-1 for the captain's answer to question-2: Choice?"])
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
   test("a failed read or a busy Pi lists the parked question on a later poll instead of counting it shown", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-chat-parked-"))
     try {
@@ -30,7 +63,7 @@ describe("the parked-question listing", () => {
         }],
         events: []
       }))
-      env[orcCommandVar] = JSON.stringify(["sh", "-c", "cat " + fixture])
+      env[orcCommandVar] = JSON.stringify(["sh", "-c", 'case "$2" in attention) echo \'{"items":[],"decided":[]}\';; *) cat "$1";; esac', "sh", fixture])
       open = false
       await session.postParked()
       expect(posted).toHaveLength(1)
@@ -50,7 +83,7 @@ describe("the parked-question listing", () => {
     })
     let asked = "2026-11-02T10:20:00.000Z"
     const delivered: Array<string> = []
-    const listing = parkedListing(Effect.sync(() => [task(asked)]), (text) => {
+    const listing = parkedListing(Effect.sync(() => ({ tasks: [task(asked)], deciderOwned: new Set<string>() })), (text) => {
       delivered.push(text)
       return true
     })
