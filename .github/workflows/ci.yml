@@ -17,12 +17,9 @@ jobs:
           fetch-depth: 0
       - run: bun run build
       - run: git diff --exit-code
-      - name: write the private pack
-        env:
-          PACK: ${{ secrets.CHECKS_SECRETS_PACK }}
-        run: |
-          printf '%s' "$PACK" > "$RUNNER_TEMP/secrets-pack.json"
-          echo "CHECKS_SECRETS_PACK=$RUNNER_TEMP/secrets-pack.json" >> "$GITHUB_ENV"
+      - uses: avi2d/workflows/actions/secrets-pack@v2
+        with:
+          pack: ${{ secrets.CHECKS_SECRETS_PACK }}
       - run: bun run lint
       - run: bun run typecheck
       - run: bun run test
