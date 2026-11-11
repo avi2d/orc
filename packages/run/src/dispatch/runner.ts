@@ -6,9 +6,10 @@ import { AbsolutePath, readFailure } from "../json-file"
 import { ProviderId, readOrcConfig } from "../orc-config"
 import { TaskId } from "./backlog"
 import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldToken } from "./held-token"
-import { heldTask, orcGroup, PueueState, PueueStatus, taskLabel, type PueueTask } from "./pueue-status"
+import { heldTask, orcGroup, parentLabel, PueueState, PueueStatus, taskLabel, type PueueTask } from "./pueue-status"
 import { parseTaskFile } from "./task-record"
 import { reportKinds } from "../task-kind"
+import { fileKeyOf, labelOf, parentBranch, runLabel, taskBranch } from "./runner-label"
 import { readInstructions, TaskInstructions, writeInstructions } from "./runner-instructions"
 import { RunnerError } from "./runner-error"
 import { runsForBranch } from "../history-resume"
@@ -46,7 +47,7 @@ type QueueRequest = typeof QueueRequest.Type
 
 export type RunnerRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
 
-export const taskBranch = (task: string): string => "orc/" + task
+export { fileKeyOf, labelOf, parentBranch, runLabel, taskBranch } from "./runner-label"
 
 export const refuse = (detail: string): Effect.Effect<never, RunnerError> => Effect.fail(new RunnerError({ detail }))
 
@@ -65,19 +66,21 @@ export const readHeld = (home: string, task: string, label?: string | null): Eff
     Effect.map((state) => heldTask(state.tasks, home, task, label))
   )
 
-const markBranchRunsStopped = (home: string, project: string, branch: string, taskFile: string, started: string): Effect.Effect<void, RunnerError, RunnerRequirements> =>
+const markTaskRunsStopped = (home: string, project: string, task: string, taskFile: string, started: string, stoppedBranch: string): Effect.Effect<void, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const ended = DateTime.formatIso(yield* DateTime.now)
     yield* Effect.acquireUseRelease(
       openDatabase(home),
       (db) =>
         Effect.gen(function*() {
-          const runs = yield* runsForBranch(db, project, branch)
-          if (!runs.some((run) => run.status === "running")) {
-            yield* recordRun(db, { id: newRunId(), project, branch, taskFile, status: "stopped", started, ended, endReason: stoppedEndReason })
+          const branches = [taskBranch(task), parentBranch(task)]
+          const grouped = yield* Effect.forEach(branches, (branch) => runsForBranch(db, project, branch))
+          const running = grouped.flat().filter((run) => run.status === "running")
+          if (running.length === 0) {
+            yield* recordRun(db, { id: newRunId(), project, branch: stoppedBranch, taskFile, status: "stopped", started, ended, endReason: stoppedEndReason })
             return
           }
-          yield* Effect.forEach(runs.filter((run) => run.status === "running"), (run) => markRunStopped(db, run.id, ended, stoppedEndReason), { discard: true })
+          yield* Effect.forEach(running, (run) => markRunStopped(db, run.id, ended, stoppedEndReason), { discard: true })
         }),
       (db) => Effect.sync(() => db.close())
     )
@@ -103,22 +106,19 @@ export const killHeld = (
       Effect.catchTag("RunnerError", () => Effect.succeed(false))
     )
     const taskFile = home + "/runner/" + fileKeyOf(home, task, labelOf(home, task, label)) + ".md"
+    const stoppedBranch = labelOf(home, task, label) === parentLabel(home, task) ? parentBranch(task) : taskBranch(task)
     const started = Option.match(Schema.decodeUnknownOption(PueueStatus)(held.status), {
       onNone: () => null,
       onSome: (status) => "Running" in status ? status.Running.start : "Paused" in status ? status.Paused.start : null
     }) ?? DateTime.formatIso(yield* DateTime.now)
     if (killed) {
-      yield* markBranchRunsStopped(home, held.path, taskBranch(task), taskFile, started)
+      yield* markTaskRunsStopped(home, held.path, task, taskFile, started, stoppedBranch)
       return "killed pueue task " + held.id + " for " + task
     }
     yield* pueue(["remove", String(held.id)])
-    yield* markBranchRunsStopped(home, held.path, taskBranch(task), taskFile, started)
+    yield* markTaskRunsStopped(home, held.path, task, taskFile, started, stoppedBranch)
     return "removed pueue task " + held.id + " for " + task
   })
-
-export const labelOf = (home: string, task: string, label?: string | null): string => label ?? taskLabel(home, task)
-
-export const fileKeyOf = (home: string, task: string, label: string): string => label === taskLabel(home, task) ? task : "label-" + encodeURIComponent(label)
 
 const PueueGroups = Schema.Record(Schema.String, Schema.Unknown)
 
@@ -216,7 +216,7 @@ const queueTask = (
     yield* requireFolder(request.checkout)
     const project = yield* resolveProjectDir(request.checkout)
     yield* ensureGroup(orcGroup)
-    const label = labelOf(home, request.task, request.label)
+    const label = runLabel(home, request.task, request.kind, request.label)
     const key = fileKeyOf(home, request.task, label)
     const held = yield* readHeld(home, request.task, label)
     if (held !== null && !pueueDone(held)) {
@@ -303,7 +303,7 @@ const readRequest = (
       ? record.spec.body + "\n\nHeld for the captain: " + hold.reason + "\nThe captain answered: " + hold.answer.words
       : record.spec.body
     const resume = record.parked === null
-      ? {}
+      ? (record.spec.kind === "parent" ? { branch: parentBranch(task) } : {})
       : {
         branch: record.parked.branch,
         answers: record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ question: question.id, answer: question.answer.words }])
@@ -374,7 +374,7 @@ export const startTask = (
     if (reach.kind === "here") {
       return yield* queueTask(request, self, home)
     }
-    const label = taskLabel(home, request.task)
+    const label = runLabel(home, request.task, request.kind)
     yield* handThrough(reach.command, "queue", yield* encodeQueueRequest({ ...request, label }))
     return null
   })

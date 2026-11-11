@@ -95,6 +95,7 @@ const expectedFiles = [
   "src/dispatch/runner-error.ts",
   "src/dispatch/runner-exec.ts",
   "src/dispatch/runner-instructions.ts",
+  "src/dispatch/runner-label.ts",
   "src/dispatch/runner-result.ts",
   "src/dispatch/runner.ts",
   "src/dispatch/split.ts",

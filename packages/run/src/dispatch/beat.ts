@@ -14,7 +14,7 @@ import { attentionActions } from "./beat-attention"
 import { type AskDecider, decideReviewQuestions } from "./decider"
 import { askDeciderWithPi } from "./decider-ask"
 import { handAnswersToResume } from "./parked"
-import { taskLabel } from "./pueue-status"
+import { runLabel } from "./runner"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
 import { flagStall } from "./stall"
 import { readPullRequest } from "./pr-view"
@@ -248,7 +248,7 @@ const settledProgress = (
 
 const releaseClosedSlots = (live: BeatContext["live"], closed: ReadonlyArray<BeatAction>): void => {
   for (const action of closed) {
-    if (action.kind === "closed" || action.kind === "parked") {
+    if (action.kind === "closed" || action.kind === "parked" || action.kind === "split") {
       const slot = live.find((entry) => entry.machine === action.machine)
       if (slot !== undefined) {
         slot.busy -= 1
@@ -291,7 +291,7 @@ const renewTask = (context: BeatContext, task: TaskRecord): Effect.Effect<Option
       return Option.some(failed(check.reason))
     }
     const renew = machine.renew
-    const refused = yield* encodeRenewal({ task: task.spec.id, ...check.token, label: taskLabel(context.home, task.spec.id) }).pipe(
+    const refused = yield* encodeRenewal({ task: task.spec.id, ...check.token, label: runLabel(context.home, task.spec.id, task.spec.kind) }).pipe(
       Effect.flatMap((renewal) => sendRenewal(renew, renewal)),
       Effect.catchTag("TokenEncodeError", (error) => Effect.succeed("the " + error.what + " would not encode"))
     )
