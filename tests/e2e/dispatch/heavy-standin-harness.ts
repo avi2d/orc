@@ -1,6 +1,8 @@
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { BunServices } from "@effect/platform-bun"
+import { Effect } from "effect"
 import { standinScript, type StandinTiming } from "../../../packages/run/src/dispatch/heavy-standin"
 
 const fakePueue = `#!/bin/sh
@@ -79,9 +81,20 @@ const writeStaticFakes = async (fake: string): Promise<void> => {
 }
 
 const writeToolStandins = async (bin: string, root: string, fake: string, tools: ReadonlyArray<string>, commands: ReadonlyArray<string>, timing?: StandinTiming, through: ReadonlyArray<string> | null = null): Promise<void> => {
-  for (const tool of tools) {
-    await writeFile(join(fake, tool), fakeTool, { mode: 0o755 })
-    await writeFile(join(bin, tool), standinScript(tool, settingsOf(root, through), commands, timing), { mode: 0o755 })
+  const savedPath = process.env.PATH
+  try {
+    process.env.PATH = fake + ":" + (savedPath ?? "")
+    for (const tool of tools) {
+      await writeFile(join(fake, tool), fakeTool, { mode: 0o755 })
+      const script = await Effect.runPromise(standinScript(tool, settingsOf(root, through), commands, timing).pipe(Effect.provide(BunServices.layer)))
+      await writeFile(join(bin, tool), script, { mode: 0o755 })
+    }
+  } finally {
+    if (savedPath === undefined) {
+      delete process.env.PATH
+    } else {
+      process.env.PATH = savedPath
+    }
   }
 }
 

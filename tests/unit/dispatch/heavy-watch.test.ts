@@ -10,6 +10,9 @@ import {
   slipCandidates, slipHeld, staleMachines, stripHeavyWrapper, watchGroup, watchOnce, watchTtlMinutes
 } from "../../../packages/run/src/dispatch/heavy-watch"
 import { standinScript } from "../../../packages/run/src/dispatch/heavy-standin"
+
+const scriptOf = (tool: string, settings: { home: string; group: string; wrap: string; through: null }, commands: ReadonlyArray<string>): Promise<string> =>
+  Effect.runPromise(standinScript(tool, settings, commands).pipe(Effect.provide(BunServices.layer)))
 import { heavyBinDir } from "../../../packages/run/src/dispatch/heavy"
 import { taskLabel } from "../../../packages/run/src/dispatch/pueue-status"
 
@@ -247,8 +250,8 @@ const setupHome = async (alerts: string): Promise<string> => {
   const heavyBin = heavyBinDir(home)
   await mkdir(heavyBin, { recursive: true })
   const settings = { home, group: "heavy", wrap: "", through: null }
-  await writeFile(join(heavyBin, "bun"), standinScript("bun", settings, []), { mode: 0o755 })
-  await writeFile(join(heavyBin, "vitest"), standinScript("vitest", settings, []), { mode: 0o755 })
+  await writeFile(join(heavyBin, "bun"), await scriptOf("bun", settings, []), { mode: 0o755 })
+  await writeFile(join(heavyBin, "vitest"), await scriptOf("vitest", settings, []), { mode: 0o755 })
   return home
 }
 
