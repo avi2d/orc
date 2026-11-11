@@ -7,8 +7,7 @@ export class AppInstallError extends Data.TaggedError("AppInstallError")<{
 
 export const bundledAppDir = (): string => import.meta.dir + "/../dist/herdr-app"
 
-export const appHomeDir = (override: string | undefined, home: string): string =>
-  override === undefined || override === "" ? home + "/.config/herdr-app" : override
+export const appHomeDir = (home: string): string => home + "/.config/herdr-app"
 
 const KeysFile = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown))
 const KeysSection = Schema.Record(Schema.String, Schema.Unknown)
@@ -72,17 +71,23 @@ export const mergeKeys = (
 
 const fail = (detail: string) => (cause: PlatformError) => new AppInstallError({ detail: `${detail}: ${cause.message}` })
 
-const readKeys = (fs: FileSystem.FileSystem, file: string): Effect.Effect<Readonly<Record<string, unknown>>, AppInstallError> =>
+const keepInstallError = (detail: string) => (cause: unknown) =>
+  cause instanceof AppInstallError ? cause : fail(detail)(cause as PlatformError)
+
+const readKeysText = (fs: FileSystem.FileSystem, file: string, missingDetail: string): Effect.Effect<Readonly<Record<string, unknown>>, AppInstallError> =>
   fs.readFileString(file).pipe(
-    Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed("{}")),
-    Effect.mapError(fail(`cannot read ${file}`)),
+    Effect.catchReason("PlatformError", "NotFound", () => Effect.fail(new AppInstallError({ detail: missingDetail }))),
+    Effect.mapError(keepInstallError(`cannot read ${file}`)),
     Effect.flatMap((text) => Schema.decodeEffect(KeysFile)(text).pipe(
       Effect.mapError(() => new AppInstallError({ detail: `${file} holds no JSON object, so fix it by hand first` }))
     ))
   )
 
+const readUserKeys = (fs: FileSystem.FileSystem, file: string): Effect.Effect<Readonly<Record<string, unknown>>, AppInstallError> =>
+  readKeysText(fs, file, `cannot read ${file}, so run the Herdr App once first`)
+
 const readBundledKeys = (fs: FileSystem.FileSystem, file: string): Effect.Effect<Keys, AppInstallError> =>
-  readKeys(fs, file).pipe(
+  readKeysText(fs, file, `cannot read the built Herdr App keys at ${file}, so run bun run build first`).pipe(
     Effect.flatMap((keys) => Effect.forEach(Object.keys(keys), (section) => sectionOf(keys, section).pipe(Effect.map((bindings) => [section, bindings] as const)))),
     Effect.map((sections) => Object.fromEntries(sections))
   )
@@ -104,6 +109,13 @@ const replace = (fs: FileSystem.FileSystem, from: string, to: string): Effect.Ef
     Effect.mapError(fail(`cannot copy ${from} to ${to}`))
   )
 
+const requireHome = (fs: FileSystem.FileSystem, home: string): Effect.Effect<void, AppInstallError> =>
+  fs.stat(home).pipe(
+    Effect.asVoid,
+    Effect.catchReason("PlatformError", "NotFound", () => Effect.fail(new AppInstallError({ detail: `cannot read ${home}, so run the Herdr App once first` }))),
+    Effect.mapError(keepInstallError(`cannot read ${home}`))
+  )
+
 export const installApp = (source: string, home: string): Effect.Effect<AppInstall, AppInstallError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
@@ -112,7 +124,8 @@ export const installApp = (source: string, home: string): Effect.Effect<AppInsta
     const layouts = yield* orcEntries(fs, path.join(source, "layouts"))
     const ours = yield* readBundledKeys(fs, path.join(source, "keys.json"))
     const keysFile = path.join(home, "keys.json")
-    const merge = yield* mergeKeys(yield* readKeys(fs, keysFile), ours)
+    const merge = yield* mergeKeys(yield* readUserKeys(fs, keysFile), ours)
+    yield* requireHome(fs, home)
     for (const dir of ["mods", "layouts"]) {
       yield* fs.makeDirectory(path.join(home, dir), { recursive: true }).pipe(Effect.mapError(fail(`cannot create ${path.join(home, dir)}`)))
     }

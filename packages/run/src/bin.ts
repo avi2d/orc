@@ -174,7 +174,7 @@ const program = Effect.gen(function*() {
     }
     case "InstallApp": {
       const home = yield* Config.String("HOME")
-      const result = yield* installApp(bundledAppDir(), appHomeDir(Bun.env.HERDR_APP_HOME, home)).pipe(
+      const result = yield* installApp(bundledAppDir(), appHomeDir(home)).pipe(
         Effect.provide(BunServices.layer),
         Effect.catchTag("AppInstallError", (error) => Console.error("orc app install: " + error.detail).pipe(Effect.andThen(Effect.fail("orc app install refused"))))
       )

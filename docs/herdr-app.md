@@ -25,7 +25,6 @@ It copies `orc.json` and its preview `orc.svg` into `~/.config/herdr-app/layouts
 It adds `cmd-1`, `cmd-2` and `cmd-3` to the `layout:orc` section of `~/.config/herdr-app/keys.json`.
 A key you already set in that section stays, and the command prints it as skipped.
 The command writes only names that start with `orc`, so Herdr's own mods and layouts stay as they are.
-With `HERDR_APP_HOME` set, it installs there instead of `~/.config/herdr-app`.
 
 ## Read the tabs
 
