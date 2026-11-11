@@ -13,9 +13,9 @@ A stand in queues the call with `pueue add` into the `heavy` group, or hands it 
 Without `through` set, the wait message names how many queued calls stand ahead, counting higher priority calls and earlier calls at the same priority.
 Without `through` set, a finished call leaves the queue after the stand in reads its exit code.
 The stand in runs the real tool under a utility priority on macOS and with no wrapper on other systems.
-A stand in starts orc's own code with the bun that wrote it, by that bun's absolute path, to find the real tool, decide whether the call queues and wait its turn, so the stand in never runs itself to decide.
+A stand in starts orc code through the absolute path of its bun to find the tool, queue it, wait, and never decide through itself.
 It reads no `.env` or `bunfig.toml` from the caller's folder.
-When that bun or helper is gone, or the decision fails, it warns on stderr asking to rerun orc and runs the real tool recorded when orc wrote it at once with no queue.
+If the bun or helper is gone or decision fails, it warns on stderr to rerun orc and runs the recorded tool with no queue.
 A stand in runs the first copy of the tool on its caller's PATH that is not an orc stand in, falls back to the absolute path recorded when orc wrote it, and refuses with exit 127 when neither exists.
 Without `through` set, a call that a queued call starts runs at once instead of queuing again.
 The stand in trusts the process tree above the call, never an exported group variable on its own.

@@ -1,4 +1,4 @@
-export interface ProcessRow {
+interface ProcessRow {
   readonly ppid: number
   readonly command: string
 }
