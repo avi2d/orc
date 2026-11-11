@@ -1,5 +1,5 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
-import type { DispatchArgs, TaskSource } from "./args"
+import type { TaskKind } from "../task-kind"
 import { addTask, backlogPaths, backlogRoot, BacklogError, listTasks } from "./backlog"
 import { refusedLinks } from "./backlog-depend"
 import { checkoutOn, readDispatchConfig, readProjects } from "./config"
@@ -10,6 +10,19 @@ import type { ChildProcessSpawner } from "effect/process"
 import type { RunnerError } from "./runner-error"
 import { applySplit, splitEventText, type SplitRequest } from "./split"
 import type { TaskFileError, TaskRecord } from "./task-record"
+
+export type TaskSource = { readonly kind: "file"; readonly path: string } | { readonly kind: "stdin" }
+
+export type AddTask = {
+  readonly kind: "AddTask"
+  readonly project: string
+  readonly task: TaskSource
+  readonly taskKind: TaskKind
+  readonly internal: boolean
+  readonly machine: string | null
+  readonly parent: string | null
+  readonly dependsOn: ReadonlyArray<string>
+}
 
 export interface AddPlace {
   readonly home: string
@@ -67,7 +80,7 @@ const planNote = (plan: IntakePlan): string => {
 }
 
 export const add = (
-  args: Extract<DispatchArgs, { readonly kind: "AddTask" }>,
+  args: AddTask,
   place: AddPlace
 ): Effect.Effect<void, BacklogError | ConfigError | TaskFileError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {

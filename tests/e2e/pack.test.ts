@@ -112,6 +112,7 @@ const expectedFiles = [
   "src/dispatch/runner.ts",
   "src/dispatch/split.ts",
   "src/dispatch/stall.ts",
+  "src/dispatch/task-dependency.ts",
   "src/dispatch/task-events.ts",
   "src/dispatch/task-record-render.ts",
   "src/dispatch/task-record.ts",
