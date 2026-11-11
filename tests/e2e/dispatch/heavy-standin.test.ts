@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
+import { spawnSync } from "node:child_process"
 import { tmpdir, userInfo } from "node:os"
 import { join } from "node:path"
-import { standinScript } from "../../../packages/run/src/dispatch/heavy-standin"
+import { standinScript, standinTools } from "../../../packages/run/src/dispatch/heavy-standin"
 import { noPueue, run, setup, type Harness } from "./heavy-standin-harness"
 
 let harnesses: Array<Harness> = []
@@ -16,6 +17,24 @@ afterEach(async () => {
 })
 
 describe("the heavy stand-in", () => {
+  test("a symlinked stand-in alone on PATH refuses instead of calling itself for every tool", async () => {
+    const tools = standinTools(["custom-tool test"])
+    const harness = harnesses[harnesses.push(await setup(tools)) - 1]
+    const isolated = join(harness.root, "isolated")
+    await mkdir(isolated)
+    for (const tool of tools) {
+      await symlink(join(harness.bin, tool), join(isolated, tool))
+      const child = spawnSync(join(isolated, tool), ["--version"], {
+        env: { PATH: isolated },
+        encoding: "utf8",
+        timeout: 1000
+      })
+      expect(child.error).toBeUndefined()
+      expect(child.status).toBe(127)
+      expect(child.stderr).toContain("orc heavy: no " + tool)
+    }
+  })
+
   test("bun test on a named test file becomes a pueue task in the heavy group with priority", async () => {
     const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
     const result = run(harness, "bun", ["test", "login.test.ts"])
