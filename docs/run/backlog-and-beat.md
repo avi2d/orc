@@ -136,7 +136,6 @@ To select between Claude logins, give each account a `configDirs` entry for ever
 
 The provider must use `credential: "package"`.
 The runner sets `CLAUDE_CONFIG_DIR` to the picked account's directory for the machine, overriding the provider's configured value.
-Each machine must have a different directory for each account.
 Orc sends paths, not credentials, to the runner.
 
 With one login and no tool that reads its room, name one account of kind `none` and a quota command that always reports room:
