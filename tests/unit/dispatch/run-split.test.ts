@@ -171,18 +171,32 @@ describe("the beat applying a worker's split proposal", () => {
     })
   })
 
-  test("a split from a child closes failed instead of nesting a parent", async () => {
+  test("a split from a child gives its parent the slices as children instead of nesting a parent", async () => {
     await beatAfterChildSplit(async (root, lines) => {
       const tasks = await run(listTasks(root))
-      expect(tasks.map((task) => [task.spec.id, task.spec.kind, task.spec.parent, task.state.kind])).toEqual([
-        ["orc-1", "parent", null, "new"],
-        ["orc-2", "ship", "orc-1", "closed"],
-        ["orc-3", "ship", "orc-1", "new"]
+      expect(tasks.filter((task) => task.spec.parent === "orc-1").map((task) => [task.spec.id, task.spec.kind, task.spec.title])).toEqual([
+        ["orc-3", "ship", "Third slice"],
+        ["orc-4", "ship", "Record the split"],
+        ["orc-5", "ship", "Show the plan"]
       ])
+      const parents = new Set(tasks.filter((task) => task.spec.kind === "parent").map((task) => task.spec.id))
+      expect(tasks.filter((task) => task.spec.parent !== null && parents.has(task.spec.id))).toEqual([])
       const proposer = tasks.find((task) => task.spec.id === "orc-2")
+      expect(proposer?.spec.kind).toBe("ship")
       expect(proposer?.state.kind === "closed" ? proposer.state.closing.outcome + ":" + proposer.state.closing.reason : "")
-        .toBe("failed:split proposal: " + JSON.stringify(proposal))
-      expect(lines).toContain("closed orc-2 failed on mac: split proposal: " + JSON.stringify(proposal))
+        .toBe("done:split into orc-4, orc-5: " + proposal.reason)
+      expect(tasks.find((task) => task.spec.id === "orc-4")?.spec.body).toContain("This is one slice of orc-1, Big feature")
+      expect(lines).toContain("split orc-2 on mac into orc-4, orc-5: " + proposal.reason)
+      const event = await readFile(join(root, "events", "orc-2.split.json"), "utf8")
+      expect(JSON.parse(event)).toMatchObject({ text: "orc-2 Second slice split at run into orc-4 Record the split, orc-5 Show the plan: " + proposal.reason })
+    })
+  })
+
+  test("a task waiting on a child that splits waits on the slices instead of starting at once", async () => {
+    await beatAfterChildSplit(async (root) => {
+      const waiter = (await run(listTasks(root))).find((task) => task.spec.id === "orc-3")
+      expect(waiter?.state.kind).toBe("new")
+      expect(waiter?.spec.dependsOn).toEqual(["orc-4", "orc-5"])
     })
   })
 

@@ -1,5 +1,5 @@
 import { Effect, type FileSystem, Result, Schema } from "effect"
-import { addTask, BacklogError, reopenStartedTask } from "./backlog"
+import { addTask, BacklogError, closeStartedTask, findTask, listTasks, reopenStartedTask, type Rewrite, rewriteNew } from "./backlog"
 import type { SplitSource, TaskFileError, TaskRecord, TaskSpec } from "./task-record"
 
 export const splitDocumentSchema = "orc.split.v1"
@@ -147,6 +147,23 @@ export const applySplit = (
     return yield* addChildren(root, request, parent, plan)
   })
 
+const handOverDependents = (
+  root: string,
+  from: string,
+  to: ReadonlyArray<string>
+): Effect.Effect<void, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const handedOver = (fresh: TaskRecord): Effect.Effect<Rewrite<void>, BacklogError> =>
+      Effect.succeed(fresh.spec.dependsOn.includes(from)
+        ? { kind: "write", record: { ...fresh, spec: { ...fresh.spec, dependsOn: fresh.spec.dependsOn.flatMap((id) => id === from ? to : [id]) } }, result: undefined }
+        : { kind: "keep", result: undefined })
+    for (const dependent of yield* listTasks(root)) {
+      if (dependent.state.kind === "new" && dependent.spec.dependsOn.includes(from)) {
+        yield* rewriteNew(root, dependent.spec.id, handedOver)
+      }
+    }
+  })
+
 export const applyRunSplit = (
   root: string,
   task: TaskRecord,
@@ -154,7 +171,23 @@ export const applyRunSplit = (
   created: string
 ): Effect.Effect<AppliedSplit, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const { title, project, internal, machine, dependsOn, body } = task.spec
+    const { title, project, internal, machine, dependsOn, body, parent } = task.spec
+    if (parent !== null) {
+      const grandparent = yield* findTask(root, parent)
+      const siblings = yield* addChildren(root, { title, project, internal, machine, dependsOn, created, body }, grandparent, plan)
+      // A proposer closed done with no PR frees its dependents, so they must wait on the slices before it closes.
+      yield* handOverDependents(root, task.spec.id, siblings.children.map((child) => child.spec.id))
+      const closed = yield* closeStartedTask(
+        root,
+        task.spec.id,
+        "done",
+        "split into " + siblings.children.map((child) => child.spec.id).join(", ") + ": " + plan.reason.trim(),
+        { pr: null, report: null },
+        created,
+        (spec) => ({ ...spec, parent: null })
+      )
+      return { parent: closed, children: siblings.children }
+    }
     const reopened = yield* reopenStartedTask(root, task.spec.id, (spec) => ({
       ...spec,
       kind: "parent",

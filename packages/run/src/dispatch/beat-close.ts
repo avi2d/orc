@@ -96,6 +96,15 @@ const endTask = (
         const children = (yield* listTasks(root).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<TaskRecord>))).filter((candidate) => candidate.spec.parent === id).map((candidate) => candidate.spec.id)
         return Option.some({ kind: "close-failed", task: id, machine, reason: "split " + id + " into " + (children.length === 0 ? "no children" : children.join(", ")) + " failed: " + applied.detail } satisfies BeatAction)
       }
+      if (task.spec.parent !== null && reopened !== null) {
+        const names = ending.plan.children.map((child) => child.title.trim()).join(", ")
+        const closed = yield* closeStartedTask(root, id, "failed", "split " + id + " into " + names + " failed: " + applied.detail, { pr: null, report: null }, at).pipe(
+          Effect.catchTag("BacklogError", () => Effect.succeed(null))
+        )
+        return closed === null || closed.state.kind !== "closed"
+          ? Option.none()
+          : Option.some({ kind: "close-failed", task: id, machine, reason: closed.state.closing.reason } satisfies BeatAction)
+      }
       return Option.none()
     }
     const closed = yield* closeStartedTask(root, id, ending.outcome, ending.reason, { pr: ending.pr, report: ending.report }, yield* nowIso).pipe(
@@ -193,17 +202,6 @@ const clearUnread = (
     Effect.catchTag("PlatformError", () => Effect.succeed<number | null>(null))
   )
 
-const applicableEndingOf = (task: TaskRecord, reading: CloseReading, ending: RunEnding): RunEnding =>
-  reading.kind === "read" && ending.kind === "split" && task.spec.parent !== null
-    ? {
-      kind: "close",
-      outcome: "failed",
-      reason: reading.result.run?.endReason ?? "the run proposed a split, and a child applies no split",
-      pr: reading.result.run?.prLink ?? null,
-      report: null
-    } satisfies RunEnding
-    : ending
-
 // A finished run ends its task here, because no other beat step reads a started task after its run ends.
 export const closeFinished = (
   context: CloseContext,
@@ -249,6 +247,6 @@ export const closeFinished = (
       const action = reading.asking === null ? null : yield* serveAsking(context, task, claim.machine, reading.asking, relay)
       return { kind: "running", outputAt: reading.outputAt, action } satisfies Progress
     }
-    const ended = yield* endTask(context.root, task, claim.machine, applicableEndingOf(task, reading, ending))
+    const ended = yield* endTask(context.root, task, claim.machine, ending)
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
   })
