@@ -2,9 +2,9 @@ import { Effect } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { alertsFile } from "./events"
 import { PueueState, taskLabel } from "./pueue-status"
-import { type Command, pueueDone, type RunnerError } from "./runner"
-import { ensureGroup } from "./runner-exec"
-import { decodeJson, pueue } from "./runner-exec"
+import { pueueDone } from "./runner"
+import { type RunnerError } from "./runner-error"
+import { type Command, ensureGroup, decodeJson, pueue } from "./runner-exec"
 
 export const liveAlertStream = (): Command | null => {
   const dash = Bun.which("orc-dash")

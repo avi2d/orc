@@ -16,13 +16,10 @@ import { runsForBranch } from "../history-resume"
 import { markRunStopped } from "../history-write"
 import { formatHistoryError, openDatabase, recordRun, stoppedEndReason } from "../run-history"
 
-export { RunnerError } from "./runner-error"
 import { newRunId } from "../run-id"
 import { isRunDelivery } from "../delivery"
 import { decodeTokenText, encodeRenewal, encodeSecretJson, LabelArg, RenewRequest, type TokenEncodeError, tokenDocumentNote, tokenFields } from "./token"
 
-
-export type { Command }
 
 const taskFields = {
   task: TaskId,
@@ -47,7 +44,7 @@ type QueueRequest = typeof QueueRequest.Type
 
 export type RunnerRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
 
-export { fileKeyOf, labelOf, parentBranch, runLabel, taskBranch } from "./runner-label"
+export { fileKeyOf, labelOf, parentBranch, runLabel } from "./runner-label"
 
 export const refuse = (detail: string): Effect.Effect<never, RunnerError> => Effect.fail(new RunnerError({ detail }))
 

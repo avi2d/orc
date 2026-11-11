@@ -4,7 +4,8 @@ import type { ChildProcessSpawner } from "effect/process"
 import type { Machine } from "./config"
 import { checkHeavy } from "./heavy-watch"
 import { ownedBySweep, throughFor } from "./machine-reach"
-import { refuse, type RunnerError } from "./runner"
+import { refuse } from "./runner"
+import { type RunnerError } from "./runner-error"
 import { capture } from "./runner-exec"
 
 export type HeavyReading = { readonly kind: "read"; readonly queued: number; readonly bypassWeek: number } | { readonly kind: "unread"; readonly reason: string }

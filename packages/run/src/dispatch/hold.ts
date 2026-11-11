@@ -1,7 +1,9 @@
 import { Console, DateTime, Duration, Effect, FileSystem, Option } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { heldExpiry, heldTokenDir, releaseHeldToken } from "./held-token"
-import { fileKeyOf, labelOf, type Command, RunnerError } from "./runner"
+import { fileKeyOf, labelOf } from "./runner"
+import { RunnerError } from "./runner-error"
+import { type Command } from "./runner-exec"
 import { tokenLive } from "./token"
 
 const pollSeconds = 5

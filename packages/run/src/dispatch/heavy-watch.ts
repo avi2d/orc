@@ -6,10 +6,8 @@ import { heavyBinDir } from "./heavy"
 import { readHeavySettings } from "./heavy-setup"
 import { standinTools } from "./heavy-standin"
 import { PueueStatus, taskLabel } from "./pueue-status"
-import { type Command } from "./runner"
-import { ensureGroup } from "./runner-exec"
+import { type Command, ensureGroup, capture, decodeJson, pueue } from "./runner-exec"
 import { RunnerError } from "./runner-error"
-import { capture, decodeJson, pueue } from "./runner-exec"
 
 export const watchTtlMinutes = 10
 const watchIntervalSeconds = watchTtlMinutes * 60
