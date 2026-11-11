@@ -21,6 +21,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/json-file.ts` | The JSON config file reading and its `ConfigError` |
 | `packages/run/src/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `packages/run/src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
+| `packages/run/src/sandbox-kind.ts` | The sandbox kinds a run takes |
 | `packages/run/src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
 | `packages/run/src/checkout.ts` | The checks on the checkout a run starts from: its git root, refused markers, uncommitted changes and branch name |
 | `packages/run/src/worktree-excludes.ts` | The registered worktrees inside a checkout that its clean check leaves out |
@@ -48,6 +49,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/table.ts` | The table formatter the runs and refusals listings share |
 | `packages/run/src/nono.ts` | The nono sandbox environment, its roots and the `nono why` check of a rendered profile |
 | `packages/run/src/nono-exec.ts` | The opening of the nono sandbox a run's commands go through: the runtimes, the shims and the checked profile |
+| `packages/run/src/standin-dir.ts` | The stand in folder suffix nono strips from the host path |
 | `packages/run/src/agent-exec.ts` | The one way a run starts Pi and the checks, in `nono run` or on the host, with the environment built from an allow list |
 | `packages/run/src/host.ts` | The host-side processes and tools orc runs outside nono, and the guard on host git |
 | `packages/run/src/nono-profile.ts` | The nono profile that lets a command write only the copy, its git data, the Pi session folder and the run's `sessions` folder, and routes the model credential |

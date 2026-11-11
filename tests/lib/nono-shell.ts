@@ -2,7 +2,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { agentCommand, textInput } from "../../packages/run/src/agent-exec"
-import type { CommandResult } from "../../packages/run/src/checks"
+import type { CommandResult } from "../../packages/run/src/agent-exec"
 import { runHostCommand } from "../../packages/run/src/host"
 import { type NonoExecOptions, openNonoExec } from "../../packages/run/src/nono-exec"
 

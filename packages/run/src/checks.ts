@@ -2,6 +2,7 @@ import { Data, Effect, FileSystem, type Path } from "effect"
 import { refusalsIn, type GateRefusal } from "./gate-refusals"
 import type { AgentFile } from "./agents"
 import { orcCompletionLine } from "./pi"
+import type { CommandResult } from "./agent-exec"
 
 export class ChecksError extends Data.TaggedError("ChecksError")<{
   readonly message: string
@@ -24,12 +25,6 @@ export interface ChecksRound {
   readonly round: number
   readonly file: string
   readonly outcomes: ReadonlyArray<CheckOutcome>
-}
-
-export interface CommandResult {
-  readonly stdout: string
-  readonly stderr: string
-  readonly exitCode: number
 }
 
 export const maxFixAttempts = 3

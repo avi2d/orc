@@ -1,6 +1,6 @@
 import { Effect, FileSystem, Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import type { SandboxKind } from "./args"
+import type { SandboxKind } from "./sandbox-kind"
 import { checkedModelWindows, contextMarkJson, type ModelProbe, readModelWindows } from "./context-mark"
 import { requireTokenFile, tokenFileApiKey, tokenFileSource, tokenFileVar } from "./model-route"
 import { inheritedEnv } from "./nono"

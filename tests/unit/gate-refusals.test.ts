@@ -12,7 +12,8 @@ import { recordChecksDone, recordResumePublish } from "../../packages/run/src/hi
 import { buildResumePlan } from "../../packages/run/src/run-resume"
 import { subprocessNoMistakesRunner } from "../../packages/run/src/no-mistakes"
 import type { HistoryRun } from "../../packages/run/src/run-record"
-import { runChecksRound, type CommandResult } from "../../packages/run/src/checks"
+import { runChecksRound } from "../../packages/run/src/checks"
+import { type CommandResult } from "../../packages/run/src/agent-exec"
 import {
   decodeRefusalsJson,
   refusalsJson,
