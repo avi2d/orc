@@ -9,7 +9,7 @@ The state starts as `open`.
 An answer makes it `closed`, and a closed item keeps the answer words and time.
 A review question or an overdue wait turns `withdrawn` with its reason and time when its task closes or when it is no longer asked.
 A review question or an overdue wait that a beat reads as still asked opens again, with its current text, and a review question keeps the owner and decision it had.
-An answer to that question closes it with the answer words and time.
+An answer to that item closes it with the answer words and time.
 Showing an item never closes it.
 An open item is overdue once more than 5 minutes have passed since it was asked.
 
