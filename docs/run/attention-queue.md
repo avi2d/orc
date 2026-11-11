@@ -8,7 +8,8 @@ The owner names who must answer it, `decider` or `user`.
 The state starts as `open`.
 An answer makes it `closed`, and a closed item keeps the answer words and time.
 A review question or an overdue wait turns `withdrawn` with its reason and time when its task closes or when it is no longer asked.
-A beat that reads the task while the question is still asked opens that item again, with the owner and decision it had.
+A review question that a beat reads as still asked opens again, with the owner and decision it had.
+An answer to that question closes it with the answer words and time.
 Showing an item never closes it.
 An open item is overdue once more than 5 minutes have passed since it was asked.
 
