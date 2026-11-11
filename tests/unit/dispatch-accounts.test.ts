@@ -33,6 +33,20 @@ const configProblem = async (root: string, quota: object): Promise<string | null
 }
 
 describe("readDispatchConfig", () => {
+  test("accepts a quota without a floor instead of requiring a percentage", async () => {
+    await withBacklog(async (root) => {
+      const file = join(root, "dispatch.json")
+      const { floorPercent: _, ...quota } = config.quota
+      await writeFile(file, JSON.stringify({ machines: config.machines, quota }))
+      expect((await run(readDispatchConfig(file))).quota.floorPercent).toBe(0)
+    })
+  })
+  test("refuses a Claude account missing a machine directory instead of choosing an unspecified login", async () => {
+    await withBacklog(async (root) => {
+      const problem = await configProblem(root, { accounts: [{ name: "main", kind: "claude-config", configDirs: { mac: "/accounts/main" } }] })
+      expect(problem).toContain("names no Claude config directory for linux")
+    })
+  })
   test("reads a legacy token file account as kind token-file instead of refusing it", async () => {
     await withBacklog(async (root) => {
       const file = join(root, "dispatch.json")

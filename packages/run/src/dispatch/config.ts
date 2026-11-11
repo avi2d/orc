@@ -44,6 +44,11 @@ const TokenCommandAccount = Schema.Struct({
   kind: Schema.Literal("token-command"),
   tokenCommand: Command
 })
+const ClaudeConfigAccount = Schema.Struct({
+  name: Name,
+  kind: Schema.Literal("claude-config"),
+  configDirs: Schema.Record(Name, AbsolutePath)
+})
 const NoneAccount = Schema.Struct({
   name: Name,
   kind: Schema.Literal("none")
@@ -57,9 +62,9 @@ const LegacyTokenCommandAccount = Schema.Struct({
   tokenCommand: Command
 })
 
-const AnyAccount = Schema.Union([TokenFileAccount, TokenCommandAccount, NoneAccount, LegacyTokenFileAccount, LegacyTokenCommandAccount])
+const AnyAccount = Schema.Union([TokenFileAccount, TokenCommandAccount, ClaudeConfigAccount, NoneAccount, LegacyTokenFileAccount, LegacyTokenCommandAccount])
 type RawAccount = typeof AnyAccount.Type
-export type Account = Extract<RawAccount, { readonly kind: "token-file" | "token-command" | "none" }>
+export type Account = Extract<RawAccount, { readonly kind: "token-file" | "token-command" | "claude-config" | "none" }>
 
 const tagAccount = (account: RawAccount): Account =>
   "kind" in account
@@ -74,13 +79,14 @@ const DispatchEnvelope = Schema.Struct({
     provider: ProviderId,
     command: Command,
     accounts: Schema.Array(Schema.Unknown),
-    floorPercent: Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 }))
+    floorPercent: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 })))
   })
 })
 
 export type DispatchConfig = Omit<typeof DispatchEnvelope.Type, "machines" | "quota"> & {
   readonly machines: ReadonlyArray<Machine>
-  readonly quota: Omit<typeof DispatchEnvelope.Type["quota"], "accounts"> & {
+  readonly quota: Omit<typeof DispatchEnvelope.Type["quota"], "accounts" | "floorPercent"> & {
+    readonly floorPercent: number
     readonly accounts: ReadonlyArray<Account>
   }
 }
@@ -220,6 +226,18 @@ const readAccount = (file: string, entry: unknown): Effect.Effect<Account, Confi
     Effect.map(tagAccount)
   )
 
+const claudeConfigProblem = (accounts: ReadonlyArray<Account>, machines: ReadonlyArray<Machine>): string | null => {
+  for (const account of accounts) {
+    if (account.kind !== "claude-config") continue
+    for (const machine of machines) {
+      if (!Object.hasOwn(account.configDirs, machine.name)) {
+        return "the account " + account.name + " names no Claude config directory for " + machine.name
+      }
+    }
+  }
+  return null
+}
+
 export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, ConfigError, FileSystem.FileSystem> =>
   readJsonFile(file, DispatchEnvelope).pipe(
     Effect.flatMap((config) =>
@@ -245,6 +263,8 @@ export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, 
           return yield* new ConfigError({ file, detail: "the account " + duplicate + " is named twice" })
         }
         const accounts = yield* Effect.forEach(config.quota.accounts, (entry) => readAccount(file, entry))
+        const claudeProblem = claudeConfigProblem(accounts, machines)
+        if (claudeProblem !== null) return yield* new ConfigError({ file, detail: claudeProblem })
         const single = accounts.find((entry) => entry.kind === "none")
         if (single !== undefined && accounts.length > 1) {
           return yield* new ConfigError({ file, detail: "the account " + single.name + " takes kind none and names no login, so the quota names no other account beside it" })
@@ -258,7 +278,7 @@ export const readDispatchConfig = (file: string): Effect.Effect<DispatchConfig, 
         if (single !== undefined && renewed !== undefined) {
           return yield* new ConfigError({ file, detail: "the account " + single.name + " takes kind none and holds no token, so the machine " + renewed.name + " names a renew command it never takes" })
         }
-        return { machines, quota: { ...config.quota, accounts } }
+        return { machines, quota: { ...config.quota, floorPercent: config.quota.floorPercent ?? 0, accounts } }
       })
     )
   )
