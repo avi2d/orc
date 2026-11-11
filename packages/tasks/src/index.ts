@@ -31,8 +31,8 @@ export {
   type PickRow,
   type TasksReadings,
   topLine,
-} from "./layout";
-export { type Level, levelIndex, moved, type Navigation, pickedProject, pickedTask, startNavigation } from "./navigation";
+} from "./board/layout";
+export { type Level, levelIndex, moved, type Navigation, pickedProject, pickedTask, startNavigation } from "./board/navigation";
 export {
   type MachineFigures,
   runSampler,
@@ -42,11 +42,11 @@ export {
   type SamplerSources,
   type WrittenLine,
   writtenOf,
-} from "./sampler";
+} from "./sampler/sampler";
 export { tasksSourcesLive } from "./live/layer";
-export { listedDisplayIdOf, listedIdOf, type ListedRow, listedRows } from "./listed";
-export { spendLines } from "./levels";
-export { markToneOf } from "./pipeline";
-export { effortOf, pillLines, ticketLines, tintOfModel } from "./ticket";
+export { listedDisplayIdOf, listedIdOf, type ListedRow, listedRows } from "./board/listed";
+export { spendLines } from "./board/levels";
+export { markToneOf } from "./board/pipeline";
+export { effortOf, pillLines, ticketLines, tintOfModel } from "./board/ticket";
 export { taskBoardFeedLayer } from "./board-feed";
 export { boardLevels, tasksModule, tasksPlaced, tasksSettings, type TasksSettings } from "./module";

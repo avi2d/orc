@@ -1,8 +1,8 @@
 import { Effect, type Schedule } from "effect";
 import type { CliRenderer } from "@opentui/core";
-import { type Block } from "./layout";
+import { type Block } from "../text/layout";
 import type { PrintFrame } from "./module";
-import { liveScreen, printBlock, runScreen, type Screen } from "./screen";
+import { liveScreen, printBlock, runScreen, type Screen } from "../terminal/screen";
 
 const defaultWidth = 84;
 

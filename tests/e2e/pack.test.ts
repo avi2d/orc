@@ -75,6 +75,8 @@ const expectedFiles = [
   "src/dispatch/heavy-cli.ts",
   "src/dispatch/heavy-setup.ts",
   "src/dispatch/heavy-classify.ts",
+  "src/dispatch/heavy-process-tree.ts",
+  "src/dispatch/heavy-pueue-task.ts",
   "src/dispatch/heavy-standin-main.ts",
   "src/dispatch/heavy-standin-runtime.ts",
   "src/dispatch/heavy-standin.ts",

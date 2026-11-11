@@ -102,7 +102,7 @@ const harnessEnv = (root: string, bin: string, fake: string): Record<string, str
   PATH: bin + ":" + fake + ":/usr/bin:/bin",
   FAKE_PUEUE_LOG: join(root, "pueue.log"),
   FAKE_TOOL_LOG: join(root, "tool.log"),
-  FAKE_LOG_JSON: '{"7":{"status":{"Done":{"result":"Success"}}}}',
+  FAKE_LOG_JSON: '{"7":{"task":{"status":{"Done":{"result":"Success"}}}}}',
   FAKE_FOLLOW_OUTPUT: ""
 })
 
