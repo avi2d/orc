@@ -109,13 +109,6 @@ const replace = (fs: FileSystem.FileSystem, from: string, to: string): Effect.Ef
     Effect.mapError(fail(`cannot copy ${from} to ${to}`))
   )
 
-const requireHome = (fs: FileSystem.FileSystem, home: string): Effect.Effect<void, AppInstallError> =>
-  fs.stat(home).pipe(
-    Effect.asVoid,
-    Effect.catchReason("PlatformError", "NotFound", () => Effect.fail(new AppInstallError({ detail: `cannot read ${home}, so run the Herdr App once first` }))),
-    Effect.mapError(keepInstallError(`cannot read ${home}`))
-  )
-
 export const installApp = (source: string, home: string): Effect.Effect<AppInstall, AppInstallError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
@@ -125,7 +118,6 @@ export const installApp = (source: string, home: string): Effect.Effect<AppInsta
     const ours = yield* readBundledKeys(fs, path.join(source, "keys.json"))
     const keysFile = path.join(home, "keys.json")
     const merge = yield* mergeKeys(yield* readUserKeys(fs, keysFile), ours)
-    yield* requireHome(fs, home)
     for (const dir of ["mods", "layouts"]) {
       yield* fs.makeDirectory(path.join(home, dir), { recursive: true }).pipe(Effect.mapError(fail(`cannot create ${path.join(home, dir)}`)))
     }
