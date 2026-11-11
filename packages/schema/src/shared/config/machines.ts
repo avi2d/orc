@@ -1,7 +1,7 @@
 import { Config, type Duration, Effect } from "effect";
-import { CommandRunner } from "../lib/index";
-import type { Outcome } from "../lib/index";
-import { runDecoded } from "../lib/index";
+import { CommandRunner } from "../lib";
+import type { Outcome } from "../lib";
+import { runDecoded } from "../lib";
 import { machineNames, selector } from "./environment";
 
 export interface RemoteSource<A> {

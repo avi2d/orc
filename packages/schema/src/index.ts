@@ -58,7 +58,7 @@ export {
 export { outcomeOf } from "./shared/lib";
 export { macRusageReader } from "./entities/task";
 export * from "./entities/queues";
-export { type SnapshotFields, SnapshotReport, type SnapshotSource, snapshotSources } from "./contract/snapshot";
+export { type SnapshotFields, SnapshotReport, type SnapshotSource, snapshotSources } from "./features/snapshot";
 export {
   AlertEvent,
   AlertSettings,
@@ -68,15 +68,15 @@ export {
   type LongTaskSettings,
   type MachineLimits,
   type MemoryLimit,
-} from "./contract/alerts";
-export { heavyLoadStart, heavyLoadStep, type MachineResources } from "./alerts/heavy-load";
-export { longTaskStart, longTaskStep, type MachineTasks } from "./alerts/long-task";
-export { quotaPaceStart, quotaPaceStep } from "./alerts/quota-pace";
-export { type ConfigFile, ConfigRefused, configPath, decodeConfigText, readAlertSettings, readClaudeAccounts, readConfig, readConfigFile } from "./sources/config-file";
+} from "./entities/alerts";
+export { heavyLoadStart, heavyLoadStep, type MachineResources } from "./entities/alerts";
+export { longTaskStart, longTaskStep, type MachineTasks } from "./entities/alerts";
+export { quotaPaceStart, quotaPaceStep } from "./entities/alerts";
+export { type ConfigFile, ConfigRefused, configPath, decodeConfigText, readAlertSettings, readClaudeAccounts, readConfig, readConfigFile } from "./entities/alerts";
 export { type DashConfig, strictly } from "./shared/config";
-export { type AlertRule, alertRules, AlertVerdictRecord, decodeVerdictLine, type VerdictEntry } from "./contract/alert-verdicts";
-export { alertVerdictsPath, type VerdictLog, verdictLogReaderAt } from "./sources/alert-verdicts";
-export { judgesFire, type RuleFire, type RuleRecord, ruleRecords, type RuleVerdict } from "./views/alert-rules";
+export { type AlertRule, alertRules, AlertVerdictRecord, decodeVerdictLine, type VerdictEntry } from "./entities/alerts";
+export { alertVerdictsPath, type VerdictLog, verdictLogReaderAt } from "./entities/alerts";
+export { judgesFire, type RuleFire, type RuleRecord, ruleRecords, type RuleVerdict } from "./entities/alerts";
 export {
   decodeTasksReport,
   type Hold,
@@ -101,12 +101,12 @@ export {
   TaskSampleRecord,
   taskSampleRecords,
   type TaskUsage,
-} from "./contract/task-samples";
-export { LiveTasksReport } from "./contract/task-live";
+} from "./entities/task-board";
+export { LiveTasksReport } from "./entities/task-board";
 export { type GateHold, gateHoldOf } from "./entities/task-pipeline";
-export { decodeLiveTasksReport, liveTasksReport } from "./views/task-levels";
-export { historyDays, type TaskSamples, TaskSamplesSource, taskSamplesAt, taskSamplesSourceLayer } from "./sources/task-samples";
-export { type KeptProcess, keptCpuSeconds, type LimitEpisode, type MachineLimit, type ResolvedDetail, resolvedOf, type TaskHistory, taskHistories } from "./views/task-history";
+export { decodeLiveTasksReport, liveTasksReport } from "./entities/task-board";
+export { historyDays, type TaskSamples, TaskSamplesSource, taskSamplesAt, taskSamplesSourceLayer } from "./entities/task-board";
+export { type KeptProcess, keptCpuSeconds, type LimitEpisode, type MachineLimit, type ResolvedDetail, resolvedOf, type TaskHistory, taskHistories } from "./entities/task-board";
 export {
   atInterval, doneNewestFirst, type Interval,
   isLive,
@@ -123,17 +123,17 @@ export {
   type TaskProcessRow,
   type TaskRow,
   projectNameOf,
-} from "./views/task-levels";
-export { mergedTaskLevels, unsetTaskLevels } from "./views/merged-task-levels";
+} from "./entities/task-board";
+export { mergedTaskLevels, unsetTaskLevels } from "./entities/task-board";
 export { type PlannedRow, type PlannedState, plannedStateOf } from "./entities/task";
 export { decodeNoMistakes, type NoMistakesRun, type NoMistakesSnapshot, type NoMistakesStep } from "./entities/task-pipeline";
 export { decodeOrcRuns, decodeOrcShow, type OrcRun, type OrcSnapshot, type OrcStage } from "./entities/task-pipeline";
 export { anchorOf, checksOf, cueMarkOf, cuePipelineOf, detailWithoutWaitsOf, donePipelineOf, fixRoundOf, fullReviewPipelineOf, kindOf, markGlyphOf, modelBadgeOf, noMistakesRunOf, orcPipelineOf, orcRunOf, type PipelineFolder, pipelineFoldersOf, type PipelineKind, pipelineKinds, type PipelineStage, rebuildStage, stageMarkNames, type StageMark, stageNamesOf, summaryOf, type TaskDerivedState, type TaskPipeline, unknownPipelineOf, waitsOnOf } from "./entities/task-pipeline";
-export { longStageOf, type Staleness, stalenessOf } from "./views/stage-time";
+export { longStageOf, type Staleness, stalenessOf } from "./entities/task-board";
 
 export { LocalTasks, localTasksLayer, localTasksLayerWithin, type TasksMachine, TasksMachines, tasksMachinesLayer, watchedLocalTasksLayerWithin, watchedRead } from "./entities/task";
-export { type TaskHistoryMachine, RemoteTaskHistory, remoteTaskHistoryLayer } from "./sources/remote-task-samples";
-export { type TaskLiveMachine, RemoteTaskLive, remoteTaskLiveLayer } from "./views/remote-task-live";
+export { type TaskHistoryMachine, RemoteTaskHistory, remoteTaskHistoryLayer } from "./entities/task-board";
+export { type TaskLiveMachine, RemoteTaskLive, remoteTaskLiveLayer } from "./entities/task-board";
 export { readBeside } from "./shared/config";
 
 export { composedSessionQuotaOf, localSessionQuotaOf, type QuotaReadings, type QuotaReadSources, quotaReadSourcesLayer, readQuotas } from "./entities/session-quota";
@@ -212,7 +212,7 @@ export { captureLedgerDirectory, claudeConfigDirectory, claudeLogged, dashboardC
 export { type SourcedWindow, type WindowSource } from "./entities/session-quota";
 export { type AccountJoin } from "./entities/session-quota";
 export { type ModelTokens, type SessionModels } from "./entities/session-quota";
-export { type FairShare, type TaskSpend, taskSpend } from "./views/task-spend";
+export { type FairShare, type TaskSpend, taskSpend } from "./entities/task-board";
 export {
   type AccountView,
   type Composition,
@@ -259,9 +259,9 @@ export {
   type ScheduleRead,
   type ScheduleSource,
   type TimerSchedule,
-} from "./sources/schedules";
-export { type CalendarPattern, cronPattern, everyValue, nextMatch } from "./sources/calendar";
-export { type NamedOrchestrator, type NamedPueue, type NextKind, type NextReadings, type NextRow, type NextSource, type NextSourceState, type NextUp, nextUp, type OrchestratorRead } from "./views/next-up";
+} from "./entities/schedules";
+export { type CalendarPattern, cronPattern, everyValue, nextMatch } from "./entities/schedules";
+export { type NamedOrchestrator, type NamedPueue, type NextKind, type NextReadings, type NextRow, type NextSource, type NextSourceState, type NextUp, nextUp, type OrchestratorRead } from "./entities/schedules";
 
 export { type DispatchReading, type DispatchSnapshot, DispatchSource, dispatchSourceLayer, type DispatchTask, missingBacklog } from "./entities/dispatch";
 export { type DispatchView, dispatchView, type RoomEntry, type RunRow, type WaitRow } from "./entities/dispatch";
@@ -271,4 +271,4 @@ export { type AttentionItem, type AttentionQueue, AttentionSource, attentionSour
 export { type NoMistakesMachine, NoMistakesMachines, noMistakesMachinesLayer, type OrcMachine, OrcMachines, orcMachinesLayer } from "./entities/task-pipeline";
 
 export { quotaBlocks, type QuotaBlock, type QuotaBlockBody, type SavedAge, type SavedWindow } from "./entities/session-quota";
-export * from "./feeds";
+export * from "./features/panel-feeds";

@@ -736,7 +736,7 @@ The quota source reads a week of agent logs and takes the longest, so leave it o
 
 ### Read the snapshot
 
-The snapshot is one JSON object on one line, and `SnapshotReport` in `packages/schema/src/contract/snapshot.ts` decodes it.
+The snapshot is one JSON object on one line, and `SnapshotReport` in `packages/schema/src/features/snapshot/snapshot.ts` decodes it.
 A reader checks `schemaVersion` first, and version 1 is the only version.
 `sources` holds a key for each source the command read, and none for a source `--only` left out.
 Each source is `status` `ok` with its fields, or `failed` with an `error`.
@@ -812,7 +812,7 @@ A list in the file replaces the default list whole.
 
 ### Read the alert events
 
-`AlertEvent` in `packages/schema/src/contract/alerts.ts` decodes each line.
+`AlertEvent` in `packages/schema/src/entities/alerts/contract/alerts.ts` decodes each line.
 A reader checks `schemaVersion` first, and version 1 is the only version.
 Every event carries `rule` and `at`, the ISO instant of the sample that fired it.
 
@@ -827,7 +827,7 @@ Every event carries `rule` and `at`, the ISO instant of the sample that fired it
 A listener records what it made of each event in the verdict log, so the alerts panel can show it.
 The log lives at `ORC_DASH_ALERTS_VERDICTS`, or else at `~/.local/state/orc-dash/alerts-verdicts.jsonl`.
 It holds one JSON object per line, and a listener only ever appends to it.
-`AlertVerdictRecord` in `packages/schema/src/contract/alert-verdicts.ts` decodes each line.
+`AlertVerdictRecord` in `packages/schema/src/entities/alerts/contract/alert-verdicts.ts` decodes each line.
 When an event arrives, the listener appends it with `verdict` `null`.
 Once it has judged the event, it appends the same event again with its verdict.
 A reader checks `schemaVersion` first, and version 1 is the only version.

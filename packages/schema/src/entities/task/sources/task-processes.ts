@@ -1,9 +1,9 @@
 import { Context, DateTime, Duration, Layer, Option, Schema } from "effect";
-import { type Decoded, decoded, decodeValue, flatMapDecoded, rejected } from "../../../shared/lib/index";
-import { runDecoded, sourceOf, stamped, type Source } from "../../../shared/lib/index";
-import { nonEmptyLines } from "../../../shared/lib/index";
+import { type Decoded, decoded, decodeValue, flatMapDecoded, rejected } from "../../../shared/lib";
+import { runDecoded, sourceOf, stamped, type Source } from "../../../shared/lib";
+import { nonEmptyLines } from "../../../shared/lib";
 import { macRusageReader } from "./mac-rusage-reader";
-import { AmountText, CountText } from "../../../shared/lib/index";
+import { AmountText, CountText } from "../../../shared/lib";
 
 export interface CountedProcess {
   // The same for one process in every sample of it, and never shared with another process.

@@ -83,3 +83,4 @@ export { ResourcesReport } from "./contract/resources";
 export { decodeResourcesReport, resourcesReport } from "./views/resources";
 export { ResourceMachines, resourceMachinesLayer } from "./views/remote-resources";
 export { type HostSources, hostSourcesLayer, readLocalResources, readMachines } from "./views/local-resources";
+export { ProcessJson } from "./contract/resources";
