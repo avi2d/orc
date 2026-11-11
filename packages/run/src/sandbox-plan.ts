@@ -166,7 +166,8 @@ const planPackage = (
     if (sandboxKind === "nono") {
       return yield* refuse("orc: the implementer runs on model " + models.agent + ", whose provider " + provider.id + " reaches its service through its Pi packages, and the nono sandbox carries only a Pi login, so run it with --sandbox none")
     }
-    const env = provider.env ?? {}
+    const selectedClaudeConfig = Bun.env["ORC_DISPATCH_CLAUDE_CONFIG_DIR"]
+    const env = selectedClaudeConfig === undefined ? provider.env ?? {} : { ...provider.env, CLAUDE_CONFIG_DIR: selectedClaudeConfig }
     // Pi installs the packages into the folder it reads and lists their models only after, so they go in before the windows are read.
     yield* writeAgentDir(fs, path, dirs.piAgentDir, null, [], provider.packages)
     const checked = yield* checkedAgentWindows(spawner, host, dirs.runDir, models, { kind: "agent-dir", agentDir: dirs.piAgentDir, packages: true }, env)
