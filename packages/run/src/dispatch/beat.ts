@@ -10,6 +10,8 @@ import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from 
 import type { BeatAction, Progress } from "./beat-action"
 import { closeFinished } from "./beat-close"
 import { isOverdue, openItems, openRunDeaths, routeTaskItems } from "./attention"
+import { type AskDecider, decideReviewQuestions } from "./decider"
+import { askDeciderWithPi } from "./decider-ask"
 import { handAnswersToResume } from "./parked"
 import { taskLabel } from "./pueue-status"
 import { readMachineLoad, readOverloaded, type ReadLoad } from "./load"
@@ -21,7 +23,7 @@ import { type ReadUpstream, readUpstream, watchUpstream } from "./upstream"
 
 export type { BeatAction } from "./beat-action"
 export type { MachineRoom } from "./beat-place"
-export { dependencyOpen, placeTask, readRoom } from "./beat-place"
+export { placeTask, readRoom } from "./beat-place"
 
 export interface BeatReport {
   readonly beat: string
@@ -298,9 +300,31 @@ export interface BeatSources {
   readonly readLoad: ReadLoad
   readonly readPullRequest: ReadPullRequest
   readonly readUpstream: ReadUpstream
+  readonly askDecider: AskDecider
 }
 
-export const liveSources = (): BeatSources => ({ readLoad: readMachineLoad, readPullRequest, readUpstream })
+export const liveSources = (home: string): BeatSources => ({ readLoad: readMachineLoad, readPullRequest, readUpstream, askDecider: askDeciderWithPi(home) })
+
+const decideAndRelay = (
+  root: string,
+  context: BeatContext,
+  started: ReadonlyArray<TaskRecord>,
+  progress: ReadonlyArray<Progress>,
+  current: ReadonlyArray<TaskRecord>,
+  askDecider: AskDecider
+): Effect.Effect<{ readonly latest: ReadonlyArray<TaskRecord>; readonly relayed: ReturnType<typeof settledProgress> }, BacklogError | TaskFileError, BeatRequirements> =>
+  Effect.gen(function*() {
+    const decided = yield* decideReviewQuestions(root, current, askDecider)
+    const latest = decided.some((entry) => entry.verdict.kind === "answered") ? yield* listTasks(root) : current
+    const answeredTasks = new Set(decided.flatMap((entry) => entry.verdict.kind === "answered" ? [entry.task] : []))
+    const firstRunning = new Set(started.flatMap((task, index) => progress[index]?.kind === "running" ? [task.spec.id] : []))
+    const relayProgress = answeredTasks.size === 0
+      ? []
+      : yield* Effect.forEach(latest.filter((task) => task.state.kind === "started" && answeredTasks.has(task.spec.id) && firstRunning.has(task.spec.id)), (task) => closeFinished(context, task))
+    const relayed = settledProgress(relayProgress)
+    releaseClosedSlots(context.live, relayed.closed)
+    return { latest, relayed }
+  })
 
 export const runBeat = (
   root: string,
@@ -340,19 +364,22 @@ export const runBeat = (
     const current = yield* listTasks(root)
     yield* routeTaskItems(root, current, at)
     yield* openRunDeaths(root, settled.closed, at)
+    const { latest, relayed } = yield* decideAndRelay(root, context, started, progress, current, sources.askDecider)
     const queue = (yield* openItems(root)).map(({ id, item }): BeatAction => ({
       kind: "attention", item: id, task: item.task, owner: item.owner, overdue: isOverdue(item, Date.parse(at)), text: item.text
     }))
-    const queued = current.filter((task) => task.state.kind === "new")
+    const queued = latest.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
-    const fresh: BeatContext = { ...context, tasks: current, overloaded }
-    const renewals = yield* Effect.forEach(current, (task) => renewTask(fresh, task))
+    const fresh: BeatContext = { ...context, tasks: latest, overloaded }
+    const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, task))
     yield* openRunDeaths(root, actions, at)
-    const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))
-    return { beat, at, quota, room: readRoom(config.machines, current), actions: [
+    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at))
+    return { beat, at, quota, room: readRoom(config.machines, latest), actions: [
         ...settled.closed,
+        ...relayed.closed,
         ...settled.asking,
+        ...relayed.asking,
         ...stalls.flatMap(Option.toArray),
         ...upstream,
         ...queue,

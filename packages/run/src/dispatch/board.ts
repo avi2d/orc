@@ -1,10 +1,11 @@
-import { dependencyOpen, type BeatAction, type BeatReport, type MachineRoom } from "./beat"
+import { type BeatAction, type BeatReport, type MachineRoom } from "./beat"
+import { dependencyWaits } from "./beat-place"
 import { type ChildCount, childCount } from "./beat-place"
 import type { Project } from "./config"
 import { describeQuota } from "./quota"
 import type { TaskKind } from "../task-kind"
 import type { ChatEvent } from "./chat-event"
-import { type Claim, type Hold, isHeld, openQuestions, type Parked, type Started, type TaskRecord } from "./task-record"
+import { type Claim, type Hold, isHeld, openQuestions, type Parked, type SplitMark, type Started, type TaskRecord } from "./task-record"
 
 const BACKLOG_JSON_SCHEMA = "orc.backlog.v1" as const
 const BEAT_JSON_SCHEMA = "orc.beat.v1" as const
@@ -44,6 +45,7 @@ type TaskJson = {
   readonly machine: string | null
   readonly parent: string | null
   readonly children: ChildCount | null
+  readonly split: SplitMark | null
   readonly dependsOn: ReadonlyArray<string>
   readonly created: string
   readonly hold: Hold | null
@@ -115,6 +117,7 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     machine: record.spec.machine,
     parent: record.spec.parent,
     children: record.spec.kind === "parent" ? childCount(record, view.tasks, view.merged) : null,
+    split: record.spec.split,
     dependsOn: record.spec.dependsOn,
     created: record.spec.created,
     hold: record.hold,
@@ -154,7 +157,7 @@ const doneOf = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: Read
 }
 
 const newCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string => {
-  const open = record.spec.dependsOn.filter((id) => dependencyOpen(all.find((candidate) => candidate.spec.id === id)))
+  const open = record.spec.dependsOn.filter((id) => dependencyWaits(record, all.find((candidate) => candidate.spec.id === id), merged))
   const waits = open.length === 0 ? "" : " waits " + open.join(",")
   const held = isHeld(record) ? " held (" + record.hold.reason + ")" : ""
   const asked = openQuestions(record)
