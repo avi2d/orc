@@ -140,15 +140,20 @@ const quietly = (argv: ReadonlyArray<string>): void => {
   capture(argv)
 }
 
-const processChain = (): ReadonlyArray<string> | null => {
+const processChain = (standin: string, args: ReadonlyArray<string>): ReadonlyArray<string> | null => {
   const table = capture(["ps", "-ww", "-eo", "pid,ppid,command"])
-  return table === null ? null : ancestry(parseProcessTable(table), process.pid)
+  if (table === null) {
+    return null
+  }
+  const chain = [...ancestry(parseProcessTable(table), process.pid)]
+  chain[0] = [standin, ...args].join(" ")
+  return chain
 }
 
-const callInsideSlot = (group: string): boolean => {
+const callInsideSlot = (group: string, standin: string, args: ReadonlyArray<string>): boolean => {
   const status = capture(["pueue", "status", "--json", "-g", group])
   const commands = status === null ? [] : slotTasks(status).map((task) => task.command)
-  const chain = commands.length === 0 ? null : processChain()
+  const chain = commands.length === 0 ? null : processChain(standin, args)
   return chain !== null && insideSlot(commands, chain)
 }
 
@@ -182,10 +187,10 @@ export const planCall = (call: StandinCall, standin: string, args: ReadonlyArray
     return { kind: "bypass", real, reason: bypass }
   }
   if (call.through !== null) {
-    const chain = processChain()
+    const chain = processChain(standin, args)
     return { kind: chain !== null && insideThrough(call.through, chain) ? "run" : "through", real }
   }
-  return { kind: callInsideSlot(call.group) ? "run" : "queue", real }
+  return { kind: callInsideSlot(call.group, standin, args) ? "run" : "queue", real }
 }
 
 

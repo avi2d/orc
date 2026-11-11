@@ -16,9 +16,9 @@ const spawned = (argv: ReadonlyArray<string>, stdin: "inherit" | "ignore", env: 
   }
 }
 
-// A terminal sends INT and QUIT to the whole foreground group, so the child already has them; a second copy would force-quit tools that stop gracefully on the first.
 const reraise: ReadonlySet<NodeJS.Signals> = new Set(["SIGTERM", "SIGHUP", "SIGINT", "SIGPIPE", "SIGKILL", "SIGUSR1", "SIGUSR2", "SIGALRM"])
 const forwarded: ReadonlyArray<NodeJS.Signals> = ["SIGTERM", "SIGHUP"]
+// A terminal sends INT and QUIT to the whole foreground group, so the child already has them; a second copy would force-quit tools that stop gracefully on the first.
 const groupWide: ReadonlyArray<NodeJS.Signals> = ["SIGINT", "SIGQUIT"]
 
 export const runTool = async (argv: ReadonlyArray<string>, env: Env = process.env): Promise<number> => {
