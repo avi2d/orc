@@ -2,7 +2,7 @@ import { Data, DateTime, Duration, Effect, Option, type Redacted, Schema } from 
 import { ChildProcessSpawner } from "effect/process"
 import { spawnedQuiet } from "./runner-exec"
 import { TaskId } from "./backlog"
-import type { Command } from "./config"
+import type { Command } from "../shared/config/index"
 
 const TOKEN_JSON_SCHEMA = "orc.token.v1" as const
 

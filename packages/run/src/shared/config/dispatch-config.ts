@@ -1,7 +1,7 @@
 import { Effect, FileSystem, Path, Result, Schema } from "effect"
-import { AbsolutePath, ConfigError, duplicateOf, readJsonFile, readJsonFileIfPresent } from "../json-file"
-import { ProviderId } from "../orc-config"
-import { type DeliveryMode, isDeliveryMode, unknownMode } from "../delivery"
+import { AbsolutePath, ConfigError, duplicateOf, readJsonFile, readJsonFileIfPresent } from "./json-file"
+import { ProviderId } from "./orc-config"
+import { type DeliveryMode, isDeliveryMode, unknownMode } from "./delivery"
 import { ownedBySweep } from "./machine-reach"
 
 const namePattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/

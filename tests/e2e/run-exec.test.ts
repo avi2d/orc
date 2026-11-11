@@ -7,7 +7,7 @@ import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { hostExec } from "../../packages/run/src/agent-exec"
 import { installCopy } from "../../packages/run/src/run-exec"
-import { OrcRunError } from "../../packages/run/src/run-session"
+import { OrcRunError } from "../../packages/run/src/shared/lib/run-session"
 
 const runInstall = (copyDir: string, logFile: string): Promise<void> =>
   Effect.runPromise(

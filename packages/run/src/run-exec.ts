@@ -8,7 +8,7 @@ import type { ToolchainResolver } from "./nono-profile"
 import { runPi, type PiPacing } from "./pi-run"
 import type { RunFolders } from "./run-folders"
 import type { SandboxOps } from "./run-loop"
-import { OrcRunError } from "./run-session"
+import { OrcRunError } from "./shared/lib/index"
 import type { SandboxPlan } from "./sandbox-plan"
 
 type Spawner = ChildProcessSpawner.ChildProcessSpawner["Service"]

@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect"
 import { RunStatusSchema, RUNS_JSON_SCHEMA, type RunRecord } from "./run-history"
-import { formatTable } from "./table"
+import { formatTable } from "./shared/lib/index"
 
 const RunJsonEntrySchema = Schema.Struct({
   id: Schema.String,

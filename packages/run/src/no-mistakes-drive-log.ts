@@ -1,5 +1,5 @@
 import { missingReason, parseRun, type NoMistakesFinding, type OpenQuestion, type ParkedGate, type ParsedRun } from "./no-mistakes-gate"
-import { scalar } from "./toon"
+import { scalar } from "./shared/lib/index"
 
 type NoMistakesStatus = "passed" | "refused" | "failed"
 

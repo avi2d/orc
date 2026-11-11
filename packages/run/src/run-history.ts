@@ -4,7 +4,7 @@ import type { PlatformError } from "effect/PlatformError"
 import { homedir } from "node:os"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { sandboxKinds, type SandboxKind } from "./sandbox-kind"
-import { OrcRunError } from "./run-session"
+import { OrcRunError } from "./shared/lib/index"
 
 export const RUN_HISTORY_SCHEMA_VERSION = 3
 export const RUNS_JSON_SCHEMA = "orc.runs.v1" as const

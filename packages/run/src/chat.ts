@@ -3,11 +3,11 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { boardsVar } from "./chat-board"
 import { chatToolNames, orcCommandVar } from "./chat-tools"
 import { backlogPaths } from "./dispatch/backlog"
-import { type ProjectInstructions, readProjectInstructions } from "./dispatch/config"
+import { type ProjectInstructions, readProjectInstructions } from "./shared/config/index"
 import type { Command } from "./dispatch/runner-exec"
-import { readFailure } from "./json-file"
-import { providerEnvOf } from "./model-route"
-import { readOrcConfig } from "./orc-config"
+import { readFailure } from "./shared/config/index"
+import { providerEnvOf } from "./shared/config/index"
+import { readOrcConfig } from "./shared/config/index"
 
 export class ChatError extends Data.TaggedError("ChatError")<{
   readonly message: string

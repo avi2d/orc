@@ -1,4 +1,4 @@
-import type { RunDelivery } from "./delivery"
+import type { RunDelivery } from "./shared/config/index"
 import { subprocessPullRequestOpener } from "./direct-pr"
 import { subprocessNoMistakesRunner, type SubprocessRunnerOptions } from "./no-mistakes"
 import type { RunDeliverer } from "./run-record"

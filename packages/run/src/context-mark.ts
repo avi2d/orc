@@ -3,7 +3,7 @@ import { ChildProcess, type ChildProcessSpawner } from "effect/process"
 import { collectOutput } from "./git-run"
 import { inheritedEnv } from "./nono"
 import type { CheckedModelWindow, HostTools } from "./nono-profile"
-import { OrcRunError } from "./run-session"
+import { OrcRunError } from "./shared/lib/index"
 
 const contextMarkTokens = 150_000
 

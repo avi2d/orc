@@ -22,7 +22,7 @@ import {
   type QuestionAnswer
 } from "./no-mistakes-gate"
 import { openDriveLog, type DriveLog, type Ending, type NoMistakesRecord } from "./no-mistakes-drive-log"
-import { hasTable, scalar } from "./toon"
+import { hasTable, scalar } from "./shared/lib/index"
 export { answerArgsFor, answerForGate, askUserWord, omittedQuestionIds, parseRun } from "./no-mistakes-gate"
 export type { AllowWord, NoMistakesFinding, QuestionAnswer } from "./no-mistakes-gate"
 export type { NoMistakesRecord } from "./no-mistakes-drive-log"

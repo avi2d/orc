@@ -7,7 +7,7 @@ import { formatHistoryError, openDatabase, stoppedEndReason, type RunRecord, Run
 import { writtenReport } from "../report"
 import { gateLogFileName } from "../no-mistakes"
 import { Asking, askingFileName, AnswersFile, answersFileName, writeWhole } from "../answer-wait"
-import { readJsonFileIfPresent } from "../json-file"
+import { readJsonFileIfPresent } from "../shared/config/index"
 import { runDirFor, type TaskKind } from "../task-kind"
 import { TaskId } from "./backlog"
 import { readPlanDocument, SplitDocument, type SplitPlan, splitReasonPrefix } from "./split"

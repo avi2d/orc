@@ -11,15 +11,15 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/args.ts` | The flag parsing for the orc command |
 | `packages/run/src/app-install.ts` | The `orc app install` copy of the built Herdr App mods, layout and keys merge |
 | `packages/run/src/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
-| `packages/run/src/orc-config.ts` | The reading of `config.json`: the providers, the heavy queue tuning and the implementer, fixer, orchestrator, planner and decider models |
+| `packages/run/src/shared/config/orc-config.ts` | The reading of `config.json`: the providers, the heavy queue tuning and the implementer, fixer, orchestrator, planner and decider models |
 | `packages/run/src/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
 | `packages/run/src/chat-tools.ts` | The chat tools and the poll that posts each closed task and each event into the chat once |
 | `packages/run/src/chat-parked.ts` | The chat's listing of parked questions, once per start and once per park |
 | `packages/run/src/chat-board.ts` | The chat's decision boards: the cards, the answers they record and the listing at each start |
 | `packages/run/src/chat-board-page.ts` | The decision board page and the record of its cards |
 | `packages/run/src/chat-lavish.ts` | The `lavish-axi` launcher that opens, reads and ends a board's session |
-| `packages/run/src/json-file.ts` | The JSON config file reading and its `ConfigError` |
-| `packages/run/src/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
+| `packages/run/src/shared/config/json-file.ts` | The JSON config file reading and its `ConfigError` |
+| `packages/run/src/shared/config/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `packages/run/src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
 | `packages/run/src/sandbox-kind.ts` | The sandbox kinds a run takes |
 | `packages/run/src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
@@ -35,7 +35,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/history-write.ts` | The history checkpoints a run records as each step starts and ends |
 | `packages/run/src/report.ts` | The `report.md` shape and the signal facts it carries |
 | `packages/run/src/show.ts` | The `orc show` reading of one run from the history |
-| `packages/run/src/run-session.ts` | The `OrcRunError` a run fails with |
+| `packages/run/src/shared/lib/run-session.ts` | The `OrcRunError` a run fails with |
 | `packages/run/src/pi.ts` | The Pi prompt and the check of its final reply |
 | `packages/run/src/pi-run.ts` | The Pi process in JSON mode: its event lines, the agent log, the session file and the idle stop |
 | `packages/run/src/agents.ts` | The agent file parsing and lookup |
@@ -43,10 +43,10 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/agents` | The bundled agent files |
 | `packages/run/src/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
 | `packages/run/src/answer-wait.ts` | The wait at a no-mistakes gate for the captain's answers in the run folder |
-| `packages/run/src/toon.ts` | The reading of the TOON output no-mistakes prints |
+| `packages/run/src/shared/lib/toon.ts` | The reading of the TOON output no-mistakes prints |
 | `packages/run/src/run-history.ts` | The records home, the SQLite run history and `orc runs` |
 | `packages/run/src/gate-refusals.ts` | The gate and rule parse from a failed check's output, the `refusal` history signals and `orc refusals` |
-| `packages/run/src/table.ts` | The table formatter the runs and refusals listings share |
+| `packages/run/src/shared/lib/table.ts` | The table formatter the runs and refusals listings share |
 | `packages/run/src/nono.ts` | The nono sandbox environment, its roots and the `nono why` check of a rendered profile |
 | `packages/run/src/nono-exec.ts` | The opening of the nono sandbox a run's commands go through: the runtimes, the shims and the checked profile |
 | `packages/run/src/standin-dir.ts` | The stand in folder suffix nono strips from the host path |
@@ -57,14 +57,14 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/backlog.ts` | The backlog folders, the id reservation and the atomic take of a task |
 | `packages/run/src/dispatch/task-record.ts` | The task file and its frontmatter |
 | `packages/run/src/dispatch/parked.ts` | Parking a run's task on its questions, and the answer to a hold or a question |
-| `packages/run/src/dispatch/config.ts` | The reading of `dispatch.json` and `projects.json` |
+| `packages/run/src/shared/config/dispatch-config.ts` | The reading of `dispatch.json` and `projects.json` |
 | `packages/run/src/dispatch/quota.ts` | The quota reading from the configured command and the pick of an account |
 | `packages/run/src/dispatch/beat.ts` | The beat: room, placement, take and start |
 | `packages/run/src/dispatch/beat-action.ts` | The beat actions each beat step reports |
 | `packages/run/src/dispatch/beat-close.ts` | The closing of finished runs and the running output time |
 | `packages/run/src/dispatch/beat-place.ts` | The room reading, the placement of each new task and the wait it names |
 | `packages/run/src/dispatch/load.ts` | The five minute load reading and the overloaded machines |
-| `packages/run/src/dispatch/machine-reach.ts` | The sweep ownership check and the remote command prefix |
+| `packages/run/src/shared/config/machine-reach.ts` | The sweep ownership check and the remote command prefix |
 | `packages/run/src/dispatch/stall.ts` | The stalled run flag kept in the backlog logs |
 | `packages/run/src/dispatch/attention.ts` | The attention queue under `attention/`: one file per item, its open and close and withdraw, and the review questions, run events and overdue waits routed into it |
 | `packages/run/src/dispatch/attention-view.ts` | The `orc attention` table and its `orc.attention.v1` JSON |

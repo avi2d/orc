@@ -2,11 +2,11 @@ import { Effect, FileSystem, Path, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { SandboxKind } from "./sandbox-kind"
 import { checkedModelWindows, contextMarkJson, type ModelProbe, readModelWindows } from "./context-mark"
-import { requireTokenFile, tokenFileApiKey, tokenFileSource, tokenFileVar } from "./model-route"
+import { requireTokenFile, tokenFileApiKey, tokenFileSource, tokenFileVar } from "./shared/config/index"
 import { inheritedEnv } from "./nono"
 import { type CheckedModelWindow, type HostTools, loginCheckCommand, type ModelCredential, modelCredentialFor, piAgentModels, type ProviderKey, providerKeyOf } from "./nono-profile"
-import type { LoginProvider, OrcConfig, PackageProvider, Provider, TokenFileProvider } from "./orc-config"
-import { OrcRunError } from "./run-session"
+import type { LoginProvider, OrcConfig, PackageProvider, Provider, TokenFileProvider } from "./shared/config/index"
+import { OrcRunError } from "./shared/lib/index"
 
 interface OwnAgentDir {
   readonly piAgentDir: string

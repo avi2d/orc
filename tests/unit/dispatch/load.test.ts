@@ -10,7 +10,7 @@ import { parseDispatchArgs } from "../../../packages/run/src/dispatch/args"
 import { addTask, listTasks } from "../../../packages/run/src/dispatch/backlog"
 import { runBeat } from "../../../packages/run/src/dispatch/beat"
 import { quietSources } from "../../lib/beat-sources"
-import { readDispatchConfig } from "../../../packages/run/src/dispatch/config"
+import { readDispatchConfig } from "../../../packages/run/src/shared/config/dispatch-config"
 import { deepHeavyQueue, type HeavyReading, type LoadReading, loadText, parseLoad, readMachineLoad } from "../../../packages/run/src/dispatch/load"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>

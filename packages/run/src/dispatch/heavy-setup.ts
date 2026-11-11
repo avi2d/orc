@@ -1,6 +1,6 @@
 import { Effect, FileSystem } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { readOrcConfig } from "../orc-config"
+import { readOrcConfig } from "../shared/config/index"
 import { heavyBinDir, resolveHeavy, type HeavySettings } from "./heavy"
 import { detectWrap, standinScripts, type HeavyPlatform, type StandinSettings } from "./heavy-standin"
 import { RunnerError } from "./runner-error"

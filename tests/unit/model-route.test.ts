@@ -4,8 +4,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Result } from "effect"
-import { requireTokenFile, routeOfAgents, type TokenFileSource, tokenFileSource } from "../../packages/run/src/model-route"
-import type { OrcConfig } from "../../packages/run/src/orc-config"
+import { requireTokenFile, routeOfAgents, type TokenFileSource, tokenFileSource } from "../../packages/run/src/shared/config/model-route"
+import type { OrcConfig } from "../../packages/run/src/shared/config/orc-config"
 
 const model = "acme/coder-large"
 

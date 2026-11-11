@@ -20,7 +20,7 @@ import type { HistoryRun } from "../../../packages/run/src/run-record"
 import { subprocessNoMistakesRunner } from "../../../packages/run/src/no-mistakes"
 import { insertRun, openDatabase, recordStep, runById, stoppedEndReason } from "../../../packages/run/src/run-history"
 import { runsForBranch, stepsForRun } from "../../../packages/run/src/history-resume"
-import type { DispatchConfig, Project } from "../../../packages/run/src/dispatch/config"
+import type { DispatchConfig, Project } from "../../../packages/run/src/shared/config/dispatch-config"
 import { quietSources } from "../../lib/beat-sources"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>

@@ -1,7 +1,7 @@
 import { Effect, FileSystem, Result } from "effect"
 import { readFailure } from "./json-file"
 import type { OrcConfig, Provider, TokenFileLocation } from "./orc-config"
-import { OrcRunError } from "./run-session"
+import { OrcRunError } from "../lib/index"
 
 export const tokenFileVar = "AGENT_TOKEN_FILE"
 

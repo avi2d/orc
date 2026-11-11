@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite"
 import { Effect, Schema } from "effect"
 import { sqlite, type SqliteFailure } from "./run-history"
-import { formatTable } from "./table"
+import { formatTable } from "./shared/lib/index"
 
 export const GateRefusalSchema = Schema.Struct({ gate: Schema.String, rule: Schema.NullOr(Schema.String) })
 

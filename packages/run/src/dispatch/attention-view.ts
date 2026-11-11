@@ -3,7 +3,7 @@ import { ageMillis, answerItem, type AttentionItem, type DecidedItem, isOverdue,
 import { listTasks } from "./backlog"
 import { BacklogError, backlogPresent, noBacklog } from "./backlog-write"
 import type { TaskFileError } from "./task-record"
-import { formatTable } from "../table"
+import { formatTable } from "../shared/lib/index"
 
 const ATTENTION_JSON_SCHEMA = "orc.attention.v1"
 

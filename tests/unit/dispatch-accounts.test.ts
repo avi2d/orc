@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { type DispatchConfig, readDispatchConfig } from "../../packages/run/src/dispatch/config"
+import { type DispatchConfig, readDispatchConfig } from "../../packages/run/src/shared/config/dispatch-config"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))

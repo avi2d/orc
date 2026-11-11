@@ -1,7 +1,7 @@
 import { type BeatAction, type BeatReport, type MachineRoom } from "./beat"
 import { taskWait } from "./beat-place"
 import { type ChildCount, childCount, dependencyWaits } from "./task-dependency"
-import type { Project } from "./config"
+import type { Project } from "../shared/config/index"
 import { describeQuota } from "./quota"
 import type { TaskKind } from "../task-kind"
 import type { ChatEvent } from "./chat-event"
