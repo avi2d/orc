@@ -19,6 +19,7 @@ A question the run asks again at a later wait is open again, and the chat posts 
 A run whose wait ends with a question unanswered parks its task instead of closing it failed.
 The beat moves the task back to `new` with `parked_branch` and `parked_questions` in its file, each question with its id, its text and the time it was asked.
 It prints `parked <task-id> on <branch> for the captain's answer to <question-ids>`.
+A question the attention queue owns for the decider shows as `the decider's answer to <question-ids>` instead, after an `and` when you answer the others.
 Each later beat prints `waits <task-id>: parked on <branch> for the captain's answer to <question-ids>` and never starts it.
 To answer one question, run `orc backlog answer <task-id> <question-id>=<text>`.
 The task file keeps your text and its time on that question, and the other questions stay parked.

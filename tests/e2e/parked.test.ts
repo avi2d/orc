@@ -115,6 +115,20 @@ describe("a parked run", () => {
     })
   }, runnerTimeout)
 
+  test("a parked line names the decider's questions as the decider's, not the captain's", async () => {
+    await withFixture(async (fixture) => {
+      await startOnLinux(fixture)
+      await writeFile(join(fixture.home, "config.json"), JSON.stringify({ providers: [], models: { decider: "acme/small" } }))
+      const pi = join(fixture.dir, "bin", "pi")
+      const answer = JSON.stringify({ decision: "answer", answer: "Two retries", reason: "the intent says twice" })
+      const escalate = JSON.stringify({ decision: "escalate", reason: "only the captain knows" })
+      await writeFile(pi, "#!/bin/sh\nif grep -q 'Which retries' ; then printf '%s\\n' '" + answer + "' ; else printf '%s\\n' '" + escalate + "' ; fi\n")
+      await chmod(pi, 0o755)
+      await refuseOnQuestions(fixture)
+      expect(await orcOk(fixture, ["beat"])).toContain("parked orc-1 on orc/orc-1 for the captain's answer to question-5 and the decider's answer to question-4")
+    })
+  }, runnerTimeout)
+
   test("a partial answer keeps the rest parked, and the full answer resumes the same branch with every --answer instead of a fresh run", async () => {
     await withFixture(async (fixture) => {
       await startOnLinux(fixture)

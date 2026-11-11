@@ -263,6 +263,7 @@ Only a failure to spawn the log wrapper closes the task as `start-failed`.
 To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1`.
 It carries the endings as `closed`, `close-failed` and `parked` actions, and a run waiting for your answer as `asking`, `answered` or `answer-failed`.
 An `asking` action names only the questions the attention queue owns for you.
+A `parked` action names those in `questions` and the ones the decider owns in `decider`.
 It carries a stall as `stalled`, a PR the beat cannot read as `pr-unread`, and an upstream contribution as `upstream-seen`, `upstream-changed` or `upstream-unread`.
 It carries each open queue item as an `attention` action, as [The attention queue](attention-queue.md) shows.
 On a token command account, each beat first sends every started task its account's current token through its machine's `renew` command, as JSON on standard input.
