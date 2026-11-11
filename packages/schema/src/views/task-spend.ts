@@ -1,9 +1,9 @@
 import { DateTime } from "effect";
-import type { Session } from "../entities/session-quota/sources/live";
-import type { QuotaProviderId } from "../entities/session-quota/sources/quota";
-import { sumTokens, tokenTotal } from "../entities/session-quota/contract/tokens";
-import type { ModelTokens } from "../entities/session-quota/views/session-models";
-import type { SessionQuotaView } from "../entities/session-quota/views/session-quota";
+import type { Session } from "../entities/session-quota";
+import type { QuotaProviderId } from "../entities/session-quota";
+import { sumTokens, tokenTotal } from "../entities/session-quota";
+import type { ModelTokens } from "../entities/session-quota";
+import type { SessionQuotaView } from "../entities/session-quota";
 import { type TaskFolders, taskOwning } from "../entities/task";
 
 export interface FairShare {

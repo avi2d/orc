@@ -4,11 +4,11 @@ import type { Reading } from "../shared/lib";
 import { ActionRun } from "../sources/actions";
 import type { CiReport } from "../sources/ci-runs";
 import { PueueStatus } from "../sources/pueue";
-import { QuotaAvailability, QuotaProviderState, QuotaWindow, shownQuotaProviders } from "../entities/session-quota/sources/quota";
+import { QuotaAvailability, QuotaProviderState, QuotaWindow, shownQuotaProviders } from "../entities/session-quota";
 
-import type { QuotaBlock } from "../entities/session-quota/views/quotas";
+import type { QuotaBlock } from "../entities/session-quota";
 import type { MachinesView } from "../views/resources";
-import type { SessionQuotaView } from "../entities/session-quota/views/session-quota";
+import type { SessionQuotaView } from "../entities/session-quota";
 
 const Failed = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("unreachable"), reason: Schema.String }),

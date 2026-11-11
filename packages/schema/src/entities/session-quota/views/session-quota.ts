@@ -106,8 +106,6 @@ export interface Composition {
   readonly failedAccounts: ReadonlyArray<FailedAccount>;
 }
 
-export type { HeadlessFolder, PanePresence } from "./session-pane-presence";
-
 export interface SessionQuotaView extends PresenceFields {
   readonly now: DateTime.Utc;
   readonly quota: Failed | undefined;

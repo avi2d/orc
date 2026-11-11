@@ -1,25 +1,12 @@
-export { ComposedSessionQuotaReport, type MachineJson } from "./contract/composed-session-quota";
 export {
-  TokensJson,
-  EstimateJson,
-  SourceStatus,
-  SessionJson,
-  UnmatchedRunsJson,
-  PanePresenceJson,
+  ComposedSessionQuotaReport,
+} from "./contract/composed-session-quota";
+export {
   AccountRef,
-  WindowSourceJson,
-  AccountJson,
-  WindowSessionJson,
-  WindowJson,
   FlagJson,
-  PriceRatiosJson,
-  SourcesJson,
-  LedgerJson,
-  UnmeteredJson,
   SessionQuotaReport,
   type SessionQuotaFlag,
   SessionQuotaAlert,
-  instant,
   sessionQuotaAlerts,
 } from "./contract/session-quota";
 export {
@@ -34,15 +21,8 @@ export {
 } from "./contract/tokens";
 export {
   type AccountJoin,
-  keysOf,
-  nativeKeys,
-  credentialKeyOf,
-  callJoin,
-  readingJoin,
-  sameJoin,
 } from "./sources/account-join";
 export {
-  type DayFile,
   dayFileReaderAt,
   ledgerReaderAt,
   prunedDayFiles,
@@ -50,11 +30,9 @@ export {
 } from "./sources/capture-ledger";
 export {
   CaptureRecord,
-  type ClaudeCodeReadingRecord,
   type ClaudeHeadlessReadingRecord,
   PiCallInput,
   ClaudeStatuslineInput,
-  encodeCaptureRecord,
   piCallRecord,
   statuslineRecord,
   captureRecords,
@@ -62,14 +40,10 @@ export {
   dayFileOf,
   expiredDayFiles,
   dayFiles,
-  currentAndPreviousDayFiles,
   type CapturedCall,
-  type AccountCaptured,
   type Captured,
   nothingCaptured,
   type LedgerFile,
-  lastReadingOf,
-  sameReading,
   capturedOf,
   withCaptured,
 } from "./sources/capture";
@@ -77,15 +51,12 @@ export {
   type HarvestHarness,
   type HarvestOrigin,
   type HarvestedReading,
-  claudeCycles,
   harvestedReadings,
 } from "./sources/harvest";
 export {
   type LogFile,
   type CountedCall,
   type Ledger,
-  nativeCodexKey,
-  usageKey,
   countedCalls,
 } from "./sources/ledger";
 export {
@@ -112,17 +83,15 @@ export {
   type ResolvedSessions,
   resolveSessions,
 } from "./sources/live";
-export { type LogRead, type LogKeeper, fileLogKeeper } from "./sources/log-keeper";
+
 export {
   type Harness,
   type SinceByHarness,
-  type CodexLimitWindow,
   LogRecord,
   logRecords,
   markedLogRecords,
 } from "./sources/log-lines";
 export {
-  type AccountRead,
   type QuotaRead,
   logFreshMillis,
   type SavedAge,
@@ -130,7 +99,6 @@ export {
   savedAgeSeconds,
   staleSavedAgeSeconds,
   readQuota,
-  sourcedEntries,
 } from "./sources/quota-read";
 export {
   shownQuotaProviders,
@@ -139,7 +107,6 @@ export {
   QuotaAvailability,
   QuotaProviderState,
   type QuotaProvider,
-  type FailedQuotaEntry,
   type QuotaProviderEntry,
   type QuotaReport,
   decodeQuota,
@@ -166,13 +133,6 @@ export {
 export {
   type WindowSource,
   type SourcedWindow,
-  type SourcedProvider,
-  type SourcedEntry,
-  type JoinedReading,
-  joinedReadings,
-  type WindowShape,
-  harvestedWindow,
-  sourcedProvider,
 } from "./sources/window-sources";
 export {
   type RemoteReading,
@@ -180,21 +140,12 @@ export {
   composedSessionQuotaReport,
 } from "./views/composed-session-quota";
 export {
-  hourMillis,
   type Estimate,
-  type Weighed,
-  weighed,
-  estimate,
-  rateSpanHours,
-  spendGate,
-  verdictBeforeReset,
-  byPricedShare,
 } from "./views/estimate";
 export {
   type SavedWindow,
   type QuotaBlockBody,
   type QuotaBlock,
-  accountTitle,
   quotaBlocks,
 } from "./views/quotas";
 export {
@@ -206,15 +157,10 @@ export {
 export {
   type ModelTokens,
   type SessionModels,
-  localMidnight,
-  sessionModelsSinceMidnight,
 } from "./views/session-models";
 export {
   type PanePresence,
   type HeadlessFolder,
-  type PresenceFields,
-  presenceFieldsOf,
-  presenceOf,
 } from "./views/session-pane-presence";
 export {
   type SessionSources,
@@ -230,21 +176,12 @@ export {
   readQuotas,
 } from "./views/session-quota-read";
 export {
-  statusOf,
-  sessionJson,
-  modelsSinceMidnightOf,
-  accountRef,
-  windowSessionJson,
-  windowJson,
-  windowsOf,
-  type FlaggedRow,
-  flaggedRows,
   sessionQuotaFlags,
-  accountJson,
-  unmeteredJson,
   sessionQuotaReport,
 } from "./views/session-quota-report";
-export { sessionQuotaViewOf } from "./views/session-quota-view";
+export {
+  sessionQuotaViewOf,
+} from "./views/session-quota-view";
 export {
   type SessionShare,
   type WindowView,

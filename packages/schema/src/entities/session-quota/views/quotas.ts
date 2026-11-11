@@ -5,8 +5,6 @@ import type { QuotaAvailability, QuotaProvider, QuotaProviderId } from "../sourc
 import { type AccountRead, type QuotaRead, type SavedAge, sourcedEntries } from "../sources/quota-read";
 import type { SourcedEntry, SourcedProvider, SourcedWindow } from "../sources/window-sources";
 
-export type { SavedAge };
-
 export interface SavedWindow {
   readonly label: string;
   readonly percentLeft: number;
