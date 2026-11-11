@@ -80,6 +80,7 @@ To open the dashboard, run `bun run dashboard` from the repository root.
 | `packages/dashboard` | The dashboard host, which lays out the panels it is given |
 | `packages/schema`, `packages/ui` | The dashboard's shared decoders, view models, theme and screen runner |
 | `packages/alerts`, `packages/attention`, `packages/dispatch`, `packages/ledger`, `packages/queues`, `packages/quota`, `packages/resources`, `packages/schedules`, `packages/session-quota`, `packages/tasks` | One dashboard panel each |
+| `packages/herdr-app` | The Herdr App mods and layout, which `orc app install` copies into the App |
 | `dependency-cruiser.config.ts` | The panel border the lint holds every import to |
 | `docs/adr` | The decision records |
 
@@ -95,3 +96,4 @@ To open the dashboard, run `bun run dashboard` from the repository root.
 - [Contribute](docs/contribute.md)
 - [The orc command in depth](packages/run/README.md)
 - [The orc-dash dashboard](docs/dash.md)
+- [Show orc in the Herdr App](docs/herdr-app.md)

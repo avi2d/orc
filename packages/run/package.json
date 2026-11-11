@@ -13,6 +13,7 @@
     "CHANGELOG.md",
     "README.md",
     "agents/",
+    "dist/herdr-app/",
     "scripts/patch-knip-jiti.ts",
     "src/"
   ],
