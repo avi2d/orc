@@ -38,7 +38,7 @@ import {
   stampedInBackground,
   stampedNow,
 } from "@avi2dg/orc-schema";
-import type { TasksReadings } from "./layout";
+import type { TasksReadings } from "./board/layout";
 
 export interface TaskPolls {
   readonly machine: string;
