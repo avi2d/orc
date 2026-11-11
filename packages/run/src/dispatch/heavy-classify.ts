@@ -251,28 +251,3 @@ export const decisionWords = (decision: HeavyDecision): string => {
       return "1 1"
   }
 }
-
-export interface ClassifyRequest {
-  readonly tool: string
-  readonly commands: ReadonlyArray<string>
-}
-
-export interface ClassifyCall {
-  readonly request: ClassifyRequest
-  readonly args: ReadonlyArray<string>
-}
-
-export const classifyArgv = (request: ClassifyRequest): ReadonlyArray<string> => [
-  request.tool,
-  String(request.commands.length),
-  ...request.commands
-]
-
-export const parseClassifyArgv = (argv: ReadonlyArray<string>): ClassifyCall | null => {
-  const [tool = "", countWord = "", ...rest] = argv
-  const count = Number(countWord)
-  if (argv.length < 2 || !/^\d+$/.test(countWord) || count > rest.length) {
-    return null
-  }
-  return { request: { tool, commands: rest.slice(0, count) }, args: rest.slice(count) }
-}

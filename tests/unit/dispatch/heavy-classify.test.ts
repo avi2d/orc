@@ -1,9 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import {
   classifyHeavyCall,
-  classifyArgv,
   decisionWords,
-  parseClassifyArgv,
   type HeavyDecision
 } from "../../../packages/run/src/dispatch/heavy-classify"
 
@@ -113,19 +111,4 @@ describe("decisionWords", () => {
     expect(decisionWords("queued")).toBe("1 0")
     expect(decisionWords("prioritized")).toBe("1 1")
   })
-})
-
-describe("parseClassifyArgv", () => {
-  test("written settings read back whole instead of losing the commands or the call", () => {
-    const request = { tool: "cargo", commands: ["cargo nextest", "make"] }
-    expect(parseClassifyArgv([...classifyArgv(request), "nextest", "run"])).toEqual({ request, args: ["nextest", "run"] })
-    expect(parseClassifyArgv(classifyArgv({ tool: "bun", commands: [] }))).toEqual({ request: { tool: "bun", commands: [] }, args: [] })
-  })
-
-  test.each([[[]], [["bun"]], [["bun", ""]], [["bun", "x"]], [["bun", "-1"]], [["bun", "1.5", "a", "b"]], [["bun", "2", "only-one"]]])(
-    "%p reads as no call instead of a partial one",
-    (argv) => {
-      expect(parseClassifyArgv(argv)).toBeNull()
-    }
-  )
 })
