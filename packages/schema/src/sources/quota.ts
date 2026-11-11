@@ -1,8 +1,8 @@
 import { Context, Duration, Effect, Layer, Schema } from "effect";
-import { CommandRunner } from "../command";
-import { type Decoded, decodeJson, decodeValue, decoded, flatMapDecoded, rejected } from "../decode";
-import type { Failed, Reading } from "../reading";
-import { runDecoded, stamped } from "../source";
+import { CommandRunner } from "../shared/lib/command";
+import { type Decoded, decodeJson, decodeValue, decoded, flatMapDecoded, rejected } from "../shared/lib/decode";
+import type { Failed, Reading } from "../shared/lib/reading";
+import { runDecoded, stamped } from "../shared/lib/source";
 
 const Instant = Schema.DateTimeUtcFromString;
 const Confidence = Schema.Literals(["early", "established"]);

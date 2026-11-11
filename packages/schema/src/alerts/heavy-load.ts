@@ -1,7 +1,7 @@
 import { DateTime, Option } from "effect";
 import type { AlertProcess, HeavyLoadEvent, HeavyLoadSettings, MachineLimits, MemoryLimit } from "../contract/alerts";
 import type { ResourcesReport } from "../contract/resources";
-import type { Outcome } from "../reading";
+import type { Outcome } from "../shared/lib/reading";
 import { isFreshResources } from "../views/resources";
 import { type Episode, episodeStep, type Level, type Stepped } from "./episode";
 

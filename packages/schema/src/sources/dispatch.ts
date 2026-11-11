@@ -1,8 +1,8 @@
 import { Config, Context, DateTime, Duration, Effect, FileSystem, Layer, Result, Schema } from "effect";
-import { CommandRunner } from "../command";
-import { decodeJson, decodeValue } from "../decode";
-import { mapOutcome, ok, type Outcome, unreachable } from "../reading";
-import { runDecoded } from "../source";
+import { CommandRunner } from "../shared/lib/command";
+import { decodeJson, decodeValue } from "../shared/lib/decode";
+import { mapOutcome, ok, type Outcome, unreachable } from "../shared/lib/reading";
+import { runDecoded } from "../shared/lib/source";
 import { selector } from "./environment";
 import { duplicateOf, MachinesFile, ProjectsFile, rawAccounts, strictAccount } from "./dispatch-schema";
 

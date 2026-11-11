@@ -1,9 +1,9 @@
 import { Context, Duration, Effect, Layer, Schema } from "effect";
-import { type Decoded, decoded, decodeValue, flatMapDecoded, rejected } from "../decode";
-import type { Source } from "../source";
+import { type Decoded, decoded, decodeValue, flatMapDecoded, rejected } from "../shared/lib/decode";
+import type { Source } from "../shared/lib/source";
 import { hostSource, LoadAverage, probe } from "./host";
-import { nonEmptyLines, splitEach } from "./lines";
-import { AmountText, CountText } from "./numerals";
+import { nonEmptyLines, splitEach } from "../shared/lib/lines";
+import { AmountText, CountText } from "../shared/lib/numerals";
 
 const Sysctl = Schema.Struct({ cpuCount: CountText, memoryBytes: CountText, load: LoadAverage });
 

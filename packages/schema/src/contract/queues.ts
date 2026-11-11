@@ -4,7 +4,7 @@ import { Schema } from "effect";
 
 
 
-import { outcomeOf } from "./outcome";
+import { outcomeOf } from "../shared/lib/outcome";
 
 // In the order a run moves through them, so a later status is the more advanced one.
 export const activeRunStatuses = ["requested", "pending", "waiting", "queued", "in_progress"] as const;

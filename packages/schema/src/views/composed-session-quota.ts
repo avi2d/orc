@@ -1,5 +1,5 @@
 import { DateTime } from "effect";
-import type { Failed, Outcome } from "../reading";
+import type { Failed, Outcome } from "../shared/lib/reading";
 import type { Session } from "../sources/live";
 import { addTokens, priceRatios, sumTokens, type Tokens, type Weighting, weightings } from "../contract/tokens";
 import { byPricedShare, estimate, rateSpanHours, spendGate } from "./estimate";

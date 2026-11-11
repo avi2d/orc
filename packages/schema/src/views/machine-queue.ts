@@ -1,7 +1,7 @@
 import { DateTime, Duration } from "effect";
 import type { CiRun } from "../sources/ci-runs";
 import type { EndedRow, PueueView, RunOwners, RunningRow } from "./queues";
-import { secondsFrom } from "../reading";
+import { secondsFrom } from "../shared/lib/reading";
 
 export type QueueRowState = "running" | "waiting" | "success" | "failure" | "cancelled" | "skipped";
 

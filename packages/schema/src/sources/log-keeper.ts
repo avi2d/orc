@@ -1,6 +1,6 @@
 import { Effect, type FileSystem, Option, Result, Schema } from "effect";
 import { LogRecord } from "./log-lines";
-import type { Grown } from "./append-only";
+import type { Grown } from "../shared/lib/append-only";
 
 export type LogRead = Grown<LogRecord>;
 

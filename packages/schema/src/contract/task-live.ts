@@ -3,7 +3,7 @@ import { Schema } from "effect";
 
 
 
-import { outcomeOf } from "./outcome";
+import { outcomeOf } from "../shared/lib/outcome";
 
 const Count = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 

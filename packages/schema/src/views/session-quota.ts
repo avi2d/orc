@@ -1,5 +1,5 @@
 import { DateTime } from "effect";
-import { type Failed, failureOf, type Outcome, type Reading } from "../reading";
+import { type Failed, failureOf, type Outcome, type Reading } from "../shared/lib/reading";
 import { withCaptured } from "../sources/capture";
 import { type CountedCall, countedCalls, type Ledger } from "../sources/ledger";
 import { resolveSessions, type Session, sessionLabel, type UnmatchedRuns } from "../sources/live";

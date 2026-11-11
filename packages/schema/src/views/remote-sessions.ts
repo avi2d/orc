@@ -1,6 +1,6 @@
 import { type Config, Context, Duration, Layer } from "effect";
-import type { CommandRunner } from "../command";
-import { type Decoded, decodeJson, flatMapDecoded } from "../decode";
+import type { CommandRunner } from "../shared/lib/command";
+import { type Decoded, decodeJson, flatMapDecoded } from "../shared/lib/decode";
 import { SessionQuotaReport } from "../contract/session-quota";
 import { sessionQuotaViewOf } from "./session-quota-view";
 import type { SessionQuotaView } from "./session-quota";
