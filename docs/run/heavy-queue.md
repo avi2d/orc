@@ -14,7 +14,8 @@ Without `through` set, the wait message names how many queued calls stand ahead,
 Without `through` set, a finished call leaves the queue after the stand in reads its exit code.
 The stand in runs the real tool under a utility priority on macOS and with no wrapper on other systems.
 A stand in decides whether a call queues by starting orc's own code with the bun that wrote it, by that bun's absolute path, so the stand in never runs itself to decide.
-It reads no `.env` or `bunfig.toml` from the caller's folder, and when that bun is gone it fails with a line asking to rerun orc.
+It reads no `.env` or `bunfig.toml` from the caller's folder.
+When that bun or the stand in helper is gone it warns on stderr asking to rerun orc and runs the real tool at once with no queue.
 A stand in runs the first copy of the tool on its caller's PATH that is not an orc stand in, falls back to the absolute path recorded when orc wrote it, and refuses with exit 127 when neither exists.
 Without `through` set, a call that a queued call starts runs at once instead of queuing again.
 The stand in trusts the process tree above the call, never an exported group variable on its own.

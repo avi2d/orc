@@ -85,6 +85,8 @@ const standinHead = (tool: string, settings: StandinSettings, real: string): Rea
   '# ' + standinMarker + '. Regenerated on every run of that command.',
   'heavy_tool="' + tool + '"',
   'heavy_real=' + quoteSingle(real),
+  'heavy_bun=' + quoteSingle(process.execPath),
+  'heavy_main=' + quoteSingle(import.meta.dir + "/heavy-standin-main.ts"),
   'heavy_home="' + settings.home + '"',
   'heavy_group="' + settings.group + '"',
   'heavy_wrap="' + settings.wrap + '"'
@@ -92,15 +94,22 @@ const standinHead = (tool: string, settings: StandinSettings, real: string): Rea
 
 // Bun would otherwise load the caller's .env and bunfig.toml preloads into the stand-in.
 const classifyCall = (tool: string, commands: ReadonlyArray<string>): string =>
-  [process.execPath, "--no-env-file", "--config=/dev/null", import.meta.dir + "/heavy-standin-main.ts", ...classifyArgv({ tool, commands })]
-    .map(quoteSingle)
+  ['"$heavy_bun"', "'--no-env-file'", "'--config=/dev/null'", '"$heavy_main"', ...classifyArgv({ tool, commands }).map(quoteSingle)]
     .join(" ")
 
 const standinDecideFn = (tool: string, commands: ReadonlyArray<string>): ReadonlyArray<string> => [
   'heavy_decide() {',
+  '  if [ ! -x "$heavy_bun" ]; then',
+  '    echo "orc heavy: no bun at $heavy_bun; rerun orc to rewrite the stand-ins" >&2',
+  '    heavy_queue=0; heavy_prio=0; return 0',
+  '  fi',
+  '  if [ ! -f "$heavy_main" ]; then',
+  '    echo "orc heavy: no stand-in helper at $heavy_main; rerun orc to rewrite the stand-ins" >&2',
+  '    heavy_queue=0; heavy_prio=0; return 0',
+  '  fi',
   '  heavy_decision="$(' + classifyCall(tool, commands) + ' "$@")" || {',
-  '    echo "orc heavy: cannot classify the $heavy_tool call; rerun orc to rewrite the stand-in" >&2',
-  '    exit 1',
+  '    echo "orc heavy: cannot classify the $heavy_tool call with $heavy_bun; rerun orc to rewrite the stand-ins" >&2',
+  '    heavy_queue=0; heavy_prio=0; return 0',
   '  }',
   '  heavy_queue="${heavy_decision% *}"; heavy_prio="${heavy_decision#* }"',
   '}'
