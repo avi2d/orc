@@ -20,6 +20,7 @@ const hostEnvNames: ReadonlyArray<string> = [
   ...sandboxedEnvNames,
   "SHELL",
   "TMPDIR",
+  "XDG_RUNTIME_DIR",
   "PI_CODING_AGENT_DIR",
   "SSL_CERT_FILE",
   "NODE_EXTRA_CA_CERTS",

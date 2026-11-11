@@ -23,12 +23,12 @@ esac
 exit 0
 `
 
-const holderHome = async (through: ReadonlyArray<string> | null, limit: "auto" | "none" = "auto"): Promise<string> => {
+const holderHome = async (through: ReadonlyArray<string> | null, limit: "auto" | "none" = "none"): Promise<string> => {
   const home = await mkdtemp(join(tmpdir(), "orc-heavy-through-home-"))
   await mkdir(join(home, "fake"), { recursive: true })
   await writeFile(join(home, "fake", "pueue"), loggingPueue, { mode: 0o755 })
-  const heavy = through === null ? {} : { through, limit }
-  await writeFile(join(home, "config.json"), JSON.stringify({ providers: [], heavy }))
+  const heavy = through === null ? {} : { through }
+  await writeFile(join(home, "config.json"), JSON.stringify({ providers: [], heavy: { ...heavy, limit } }))
   return home
 }
 
