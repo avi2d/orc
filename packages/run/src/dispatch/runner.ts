@@ -236,7 +236,7 @@ const queueTask = (
     const kind = request.kind === undefined ? [] : ["--kind", request.kind]
     const delivery = request.delivery === undefined ? [] : ["--delivery", request.delivery]
     const instructions = request.instructions === undefined ? [] : ["--instructions", yield* writeInstructions(folder + "/" + key + ".instructions", request.instructions)]
-    const run = [...self, "run", taskFile, "--branch", request.branch ?? (request.kind === "parent" ? parentBranch(request.task) : taskBranch(request.task)), "--sandbox", "none", "--provider", request.provider, ...kind, ...delivery, ...instructions, ...answers]
+    const run = [...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...kind, ...delivery, ...instructions, ...answers]
     const add = (command: ReadonlyArray<string>) =>
       pueue(["add", "--group", orcGroup, "--label", label, "--working-directory", project, "--print-task-id", "--escape", "--", ...command], { ORC_HOME: home })
     const holdArgs: ReadonlyArray<string> = label === taskLabel(home, request.task) ? [request.task] : [request.task, "--label", label]

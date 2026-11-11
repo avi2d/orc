@@ -374,7 +374,7 @@ const headLine = (result: RunnerResult): string => {
 
 const runLine = (task: string, run: RunSummary | null): string =>
   run === null
-    ? "orc holds no run on " + taskBranch(task)
+    ? "orc holds no run on " + taskBranch(task) + " or " + parentBranch(task)
     : "orc run " + run.id + " " + run.status + (run.prLink === null ? "" : ", PR " + run.prLink) + (run.report === undefined ? "" : ", report " + run.report) +
       (run.endReason === null ? "" : ": " + run.endReason) +
       (run.asking === undefined ? "" : ", waiting until " + run.asking.until + " for the captain's answer to " + run.asking.questions.map((question) => question.id).join(", "))

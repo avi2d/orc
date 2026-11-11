@@ -33,7 +33,8 @@ A failed child keeps its parent waiting.
 `orc backlog` shows the count on the parent's line, as in `orc-1 parent orc 3 of 5 done Ship the whole feature`.
 
 When every scout and task child closed done and every ship child with a PR merged, the beat starts the parent's final check once.
-The runner queues it as `orc run <task-file> --kind parent --sandbox none`, which reviews no code and changes nothing in the checkout.
+The runner queues it as `orc run <task-file> --branch orc/<task-id>-parent --kind parent --sandbox none`, which reviews no code and changes nothing in the checkout.
+It starts fresh there and never resumes the worker's failed run, whose partial work stays on `orc/<task-id>`.
 Pi runs the whole result in the real place it serves, checks each done criterion, and ends `agent-report.md` with the line `verdict: pass` or `verdict: fail`.
 A report whose last line is `verdict: pass` closes the parent done with its report.
 Any other report records the run failed with `the final check did not end its report at <path> with verdict: pass`, and the beat closes the parent failed with that reason and keeps the report path.
