@@ -309,6 +309,11 @@ describe("assessQuota", () => {
     const reading = assessQuota(document([{ name: "main", remainingPercent: 10 }]), settings("main"))
     expect(reading.kind === "read" ? reading.pick : "unread").toBeNull()
   })
+  test("accounts at 0% wait for room instead of starting on an empty login", () => {
+    const noFloor = { command: ["orc-quota"] as const, accounts: [{ name: "main" }, { name: "second" }], floorPercent: 0 }
+    const reading = assessQuota(document([{ name: "main", remainingPercent: 0 }, { name: "second", remainingPercent: 0 }]), noFloor)
+    expect(reading.kind === "read" ? reading.pick : "unread").toBeNull()
+  })
   test("an account the command calls unusable keeps the command's reason instead of being picked", () => {
     const reading = assessQuota(document([{ name: "main", unusable: "the login expired" }]), settings("main"))
     expect(reading).toEqual({ kind: "read", floorPercent: 15, accounts: [{ account: "main", kind: "unusable", reason: "the login expired" }], pick: null })
