@@ -11,6 +11,7 @@ Each task has a kind, and the kind decides how its run ends:
 
 To pick one, add `--kind scout`, `--kind task` or `--kind parent` to `orc backlog add` or `orc run`, or say it in the chat.
 To split a large task, add a parent and its children, as [Parent tasks](run/task-kinds.md#parent-tasks) shows.
+To split an over budget request at intake, name a planner model, as [Splitting at intake](run/task-kinds.md#splitting-at-intake) shows.
 A scout or task run skips no-mistakes and the pull request.
 Pi works in the run folder and writes `agent-report.md` there.
 A scout or task closes done with the report's path, or closes failed when no report exists.

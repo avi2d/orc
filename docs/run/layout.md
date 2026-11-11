@@ -10,7 +10,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/bin.ts` | The orc entry point |
 | `packages/run/src/args.ts` | The flag parsing for the orc command |
 | `packages/run/src/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
-| `packages/run/src/orc-config.ts` | The reading of `config.json`: the providers, the heavy queue tuning and the implementer, fixer and orchestrator models |
+| `packages/run/src/orc-config.ts` | The reading of `config.json`: the providers, the heavy queue tuning and the implementer, fixer, orchestrator and planner models |
 | `packages/run/src/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
 | `packages/run/src/chat-tools.ts` | The chat tools and the poll that posts each closed task and each event into the chat once |
 | `packages/run/src/chat-parked.ts` | The chat's listing of parked questions, once per start and once per park |
@@ -59,7 +59,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/beat.ts` | The beat: room, placement, take and start |
 | `packages/run/src/dispatch/beat-action.ts` | The beat actions each beat step reports |
 | `packages/run/src/dispatch/beat-close.ts` | The closing of finished runs and the running output time |
-| `packages/run/src/dispatch/beat-place.ts` | The room reading and the placement of each new task |
+| `packages/run/src/dispatch/beat-place.ts` | The room reading, the placement of each new task and the wait on dependencies and merged siblings |
 | `packages/run/src/dispatch/load.ts` | The five minute load reading and the overloaded machines |
 | `packages/run/src/dispatch/machine-reach.ts` | The sweep ownership check and the remote command prefix |
 | `packages/run/src/dispatch/stall.ts` | The stalled run flag kept in the backlog logs |
@@ -82,6 +82,10 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/hold.ts` | `orc runner hold`: the wait for a live token, the rerun and the folder removal |
 | `packages/run/src/dispatch/pueue-status.ts` | The pueue status shapes and the held-task lookup the runner reads |
 | `packages/run/src/dispatch/args.ts` | The flag parsing for `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` |
+| `packages/run/src/dispatch/cli-add.ts` | The `orc backlog add` command and the intake split of an over budget request |
+| `packages/run/src/dispatch/backlog-plan.ts` | The `orc backlog plan` view of a parent plan and the drop of a new child |
+| `packages/run/src/dispatch/intake-plan.ts` | The planner model ask at intake and its five minute limit |
+| `packages/run/src/dispatch/split.ts` | The `orc.split.v1` planner document and the parent with vertical slice children it applies |
 | `packages/run/src/dispatch/cli.ts` | The `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
 | `packages/run/src/dispatch/merge.ts` | The `orc merge` guard and squash-merge |
 | `packages/run/src/dispatch/merge-basis.ts` | The `captain-word` and `yolo-green` bases `orc merge` takes |
