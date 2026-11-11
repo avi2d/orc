@@ -1,8 +1,8 @@
 import { Config, Context, Duration, Effect, Layer, Schema } from "effect";
-import { CommandRunner } from "../shared/lib/command";
-import { type Decoded, decodeJson } from "../shared/lib/decode";
-import type { Reading } from "../shared/lib/reading";
-import { runDecoded, stamped } from "../shared/lib/source";
+import { CommandRunner } from "../shared/lib";
+import { type Decoded, decodeJson } from "../shared/lib";
+import type { Reading } from "../shared/lib";
+import { runDecoded, stamped } from "../shared/lib";
 import { machineNames, selector } from "./environment";
 import { localProjects, type MachineProjects, type ProjectResolver, remoteProjects } from "./project-names";
 

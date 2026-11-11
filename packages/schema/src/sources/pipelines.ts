@@ -1,7 +1,7 @@
 import { Config, Context, Duration, Effect, Layer } from "effect";
-import { CommandRunner } from "../shared/lib/command";
-import { mapOutcome, ok, type Outcome, type Reading } from "../shared/lib/reading";
-import { runDecoded, stamped } from "../shared/lib/source";
+import { CommandRunner } from "../shared/lib";
+import { mapOutcome, ok, type Outcome, type Reading } from "../shared/lib";
+import { runDecoded, stamped } from "../shared/lib";
 import { decodeNoMistakes, type NoMistakesRun, type NoMistakesSnapshot } from "../contract/no-mistakes";
 import { decodeOrcRuns, decodeOrcShow, type OrcSnapshot } from "../contract/orc";
 

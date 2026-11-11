@@ -12,7 +12,7 @@ import {
   lastReadingOf,
   sameReading,
 } from "./capture";
-import { bytesBetween, decodedLines, type Grown, grownRecords, wholeLines } from "../shared/lib/append-only";
+import { bytesBetween, decodedLines, type Grown, grownRecords, wholeLines } from "../shared/lib";
 
 const listedLedger = (fs: FileSystem.FileSystem, directory: string) =>
   fs.readDirectory(directory).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));

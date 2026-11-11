@@ -1,8 +1,8 @@
 import { Context, Duration, Layer, Schema } from "effect";
-import { type Decoded, decoded, decodeValue, flatMapDecoded, rejected } from "../shared/lib/decode";
-import { runDecoded, sourceOf, stamped, type Source } from "../shared/lib/source";
-import { nonEmptyLines, splitEach } from "../shared/lib/lines";
-import { AmountText, CountText } from "../shared/lib/numerals";
+import { type Decoded, decoded, decodeValue, flatMapDecoded, rejected } from "../shared/lib";
+import { runDecoded, sourceOf, stamped, type Source } from "../shared/lib";
+import { nonEmptyLines, splitEach } from "../shared/lib";
+import { AmountText, CountText } from "../shared/lib";
 import { cpuFieldsOf, CpuSample, cpuUsageBetween } from "./linux-host";
 
 const ProcessRow = Schema.Struct({

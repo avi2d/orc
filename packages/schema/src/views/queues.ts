@@ -1,5 +1,5 @@
 import { DateTime, Option } from "effect";
-import { mapOutcome, type Outcome } from "../shared/lib/reading";
+import { mapOutcome, type Outcome } from "../shared/lib";
 import type { ActionRun } from "../sources/actions";
 import type { TaskEntry } from "../contract/tasks";
 import { taskOwning } from "./task-resources";

@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import { recordLines } from "../shared/lib/decode";
+import { recordLines } from "../shared/lib";
 import { TaskStateJson } from "./tasks";
 
 const Count = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));

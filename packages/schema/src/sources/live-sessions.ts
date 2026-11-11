@@ -1,9 +1,9 @@
 import { Context, Duration, Layer, Schema } from "effect";
-import { type Decoded, decodeJson, decodeValue, flatMapDecoded } from "../shared/lib/decode";
-import { ok } from "../shared/lib/reading";
-import { runDecoded, sourceOf, stamped, type Source } from "../shared/lib/source";
-import { nonEmptyLines, splitEach } from "../shared/lib/lines";
-import { CountText } from "../shared/lib/numerals";
+import { type Decoded, decodeJson, decodeValue, flatMapDecoded } from "../shared/lib";
+import { ok } from "../shared/lib";
+import { runDecoded, sourceOf, stamped, type Source } from "../shared/lib";
+import { nonEmptyLines, splitEach } from "../shared/lib";
+import { CountText } from "../shared/lib";
 
 const HerdrPane = Schema.Struct({
   pane_id: Schema.String,

@@ -1,8 +1,8 @@
 import { type Config, Context, Duration, Effect, Layer, Schema } from "effect";
-import type { CommandRunner } from "../shared/lib/command";
-import { type Decoded, decodeJson } from "../shared/lib/decode";
-import { ok } from "../shared/lib/reading";
-import { runDecoded, sourceOf, stamped, type Source } from "../shared/lib/source";
+import type { CommandRunner } from "../shared/lib";
+import { type Decoded, decodeJson } from "../shared/lib";
+import { ok } from "../shared/lib";
+import { runDecoded, sourceOf, stamped, type Source } from "../shared/lib";
 import { selector } from "./environment";
 
 const Instant = Schema.DateTimeUtcFromString;

@@ -3,7 +3,7 @@ import type { ClaudeAccount } from "../contract/config";
 import { type Captured, capturedOf } from "./capture";
 import type { LogFile } from "./ledger";
 import { type Harness, markedLogRecords, type SinceByHarness } from "./log-lines";
-import { grownRecords, type Listed as ListedFile } from "../shared/lib/append-only";
+import { grownRecords, type Listed as ListedFile } from "../shared/lib";
 import { ledgerReaderAt } from "./capture-ledger";
 import { captureLedgerDirectory, claudeConfigDirectory, claudeLogged, selector, sessionLogsCacheDirectory } from "./environment";
 import { fileLogKeeper, type LogKeeper, type LogRead } from "./log-keeper";

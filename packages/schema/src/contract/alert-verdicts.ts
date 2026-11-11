@@ -1,5 +1,5 @@
 import { DateTime, Option, Schema } from "effect";
-import { type Decoded, decodeJson, decoded, flatMapDecoded, rejected } from "../shared/lib/decode";
+import { type Decoded, decodeJson, decoded, flatMapDecoded, rejected } from "../shared/lib";
 import { AlertEvent } from "./alerts";
 
 export type AlertRule = AlertEvent["rule"];

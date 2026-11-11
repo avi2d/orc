@@ -1,9 +1,9 @@
 import { Context, Duration, Effect, Layer, Schema } from "effect";
-import { type Decoded, decoded, decodeValue, flatMapDecoded, rejected } from "../shared/lib/decode";
-import { runDecoded, type Source } from "../shared/lib/source";
+import { type Decoded, decoded, decodeValue, flatMapDecoded, rejected } from "../shared/lib";
+import { runDecoded, type Source } from "../shared/lib";
 import { hostSource, LoadAverage, probe } from "./host";
-import { nonEmptyLines, splitEach } from "../shared/lib/lines";
-import { CountText } from "../shared/lib/numerals";
+import { nonEmptyLines, splitEach } from "../shared/lib";
+import { CountText } from "../shared/lib";
 
 const CpuCount = CountText.check(Schema.isGreaterThan(0));
 

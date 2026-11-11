@@ -1,5 +1,5 @@
 import { type Config, Context, Duration, Layer } from "effect";
-import type { CommandRunner } from "../shared/lib/command";
+import type { CommandRunner } from "../shared/lib";
 import { decodeResourcesReport } from "./resources";
 import type { ReportedResources } from "./resources";
 import { configuredMachines, type Machines } from "../sources/machines";

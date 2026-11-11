@@ -1,6 +1,6 @@
 import { Schema } from "effect";
-import { outcomeOf } from "../shared/lib/outcome";
-import type { Reading } from "../shared/lib/reading";
+import { outcomeOf } from "../shared/lib";
+import type { Reading } from "../shared/lib";
 import { ActionRun } from "../sources/actions";
 import type { CiReport } from "../sources/ci-runs";
 import { PueueStatus } from "../sources/pueue";

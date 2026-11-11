@@ -1,6 +1,6 @@
 import { Config, Context, Duration, Effect, Layer, Option } from "effect";
-import { CommandRunner } from "../shared/lib/command";
-import type { Outcome } from "../shared/lib/reading";
+import { CommandRunner } from "../shared/lib";
+import type { Outcome } from "../shared/lib";
 import { decodeLiveTasksReport, type LiveTasks } from "./task-levels";
 import { configuredMachines } from "../sources/machines";
 

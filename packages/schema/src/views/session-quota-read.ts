@@ -1,5 +1,5 @@
 import { DateTime, Effect, Layer } from "effect";
-import type { Reading } from "../shared/lib/reading";
+import type { Reading } from "../shared/lib";
 import { composedSessionQuota } from "./composed-session-quota";
 import { sessionLogsSince, sessionQuotaFrom, type SessionQuotaView } from "./session-quota";
 import { SavedProfilesSource, savedProfilesSourceLayer, type SavedProfiles } from "../sources/saved-profiles";
