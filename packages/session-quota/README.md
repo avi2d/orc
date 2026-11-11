@@ -29,18 +29,18 @@ To print one frame of plain text instead, run `orc-dash panel session-quota --pr
 | --- | --- |
 | `packages/session-quota/src/sessions.ts` | The panel rows |
 | `packages/session-quota/src/app.ts` | The live panel, the printed frame, the JSON report and the alert stream |
-| `packages/schema/src/sources/ledger.ts` | The count of model calls with every dedupe rule |
-| `packages/schema/src/sources/live.ts` | Session identity from Herdr panes, processes and ended logs |
-| `packages/schema/src/views/session-quota.ts` | Shares, pace, fair share and the flag gate |
-| `packages/schema/src/contract/session-quota.ts` | The report and alert schemas |
-| `packages/schema/src/contract/composed-session-quota.ts` | The composed report schema |
-| `packages/schema/src/views/session-quota-view.ts` | A machine's report read back as a view |
-| `packages/schema/src/views/composed-session-quota.ts` | The merge of two machines' views |
-| `packages/schema/src/views/remote-sessions.ts` | The configured command that reads the other machine's report |
+| `packages/schema/src/entities/session-quota/sources/ledger.ts` | The count of model calls with every dedupe rule |
+| `packages/schema/src/entities/session-quota/sources/live.ts` | Session identity from Herdr panes, processes and ended logs |
+| `packages/schema/src/entities/session-quota/views/session-quota.ts` | Shares, pace, fair share and the flag gate |
+| `packages/schema/src/entities/session-quota/contract/session-quota.ts` | The report and alert schemas |
+| `packages/schema/src/entities/session-quota/contract/composed-session-quota.ts` | The composed report schema |
+| `packages/schema/src/entities/session-quota/views/session-quota-view.ts` | A machine's report read back as a view |
+| `packages/schema/src/entities/session-quota/views/composed-session-quota.ts` | The merge of two machines' views |
+| `packages/schema/src/entities/session-quota/views/remote-sessions.ts` | The configured command that reads the other machine's report |
 | `packages/session-quota/src/notes.ts` | The warning notes, the other machine's among them |
 | `packages/session-quota/src/capture.ts` | The writer the hooks call |
-| `packages/schema/src/sources/capture.ts` | The ledger's records, their reading back and the merge with the logs |
-| `packages/schema/src/sources/capture-ledger.ts` | The ledger's day files, appended and read |
+| `packages/schema/src/entities/session-quota/sources/capture.ts` | The ledger's records, their reading back and the merge with the logs |
+| `packages/schema/src/entities/session-quota/sources/capture-ledger.ts` | The ledger's day files, appended and read |
 
 ## Related topics
 
