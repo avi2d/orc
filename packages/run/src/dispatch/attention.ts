@@ -68,7 +68,7 @@ export const openItem = (root: string, id: string, asked: Asked): Effect.Effect<
     return yield* publishOnce(folder, id + fileSuffix, yield* encodeItem(id, { ...asked, state: { kind: "open" } }))
   })
 
-export const readItem = (root: string, id: string): Effect.Effect<AttentionItem | null, BacklogError, FileSystem.FileSystem> =>
+const readItem = (root: string, id: string): Effect.Effect<AttentionItem | null, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const file = itemFile(root, id)
     const text = yield* readIfPresent(file)
@@ -180,9 +180,6 @@ export const readAttention = (root: string, tasks: ReadonlyArray<TaskRecord>): E
       decided: entries.filter((entry): entry is DecidedItem => entry.item.state.kind === "closed" && entry.item.decision?.kind === "answered" && !closedTasks.has(entry.item.task))
     }
   })
-
-export const decidedItems = (root: string, tasks: ReadonlyArray<TaskRecord>): Effect.Effect<ReadonlyArray<DecidedItem>, BacklogError, FileSystem.FileSystem> =>
-  Effect.map(readAttention(root, tasks), (snapshot) => snapshot.decided)
 
 export const ageMillis = (item: AttentionItem, nowMillis: number): number => Math.max(0, nowMillis - Date.parse(item.asked))
 

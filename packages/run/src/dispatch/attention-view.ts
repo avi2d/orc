@@ -25,7 +25,7 @@ interface AttentionJson {
   readonly decided: ReadonlyArray<DecidedJson>
 }
 
-export const attentionJson = (items: ReadonlyArray<OpenItem>, at: string, decided: ReadonlyArray<DecidedItem> = []): AttentionJson => {
+export const attentionJson = (items: ReadonlyArray<OpenItem>, at: string, decided: ReadonlyArray<DecidedItem>): AttentionJson => {
   const nowMillis = Date.parse(at)
   return {
     schema: ATTENTION_JSON_SCHEMA,

@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { attentionJson, attentionText } from "../../../packages/run/src/dispatch/attention-view"
-import { claimDeciding, decidedItems, openItems, routeReviewQuestions } from "../../../packages/run/src/dispatch/attention"
+import { claimDeciding, openItems, readAttention, routeReviewQuestions } from "../../../packages/run/src/dispatch/attention"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
 import { type AskDecider, DeciderUnheard, decideReviewQuestions, type DeciderRequest } from "../../../packages/run/src/dispatch/decider"
 import { answerTask, askStartedTask } from "../../../packages/run/src/dispatch/parked"
@@ -119,7 +119,7 @@ describe("the decider", () => {
       const after = new Date().toISOString()
       await run(answerTask(root, "orc-1", "r3=Keep the old flag", "2026-11-02T10:22:00.000Z"))
       await run(routeReviewQuestions(root, await run(listTasks(root)), "2026-11-02T10:22:00.000Z"))
-      const decided = await run(decidedItems(root, await run(listTasks(root))))
+      const decided = (await run(readAttention(root, await run(listTasks(root))))).decided
       expect(decided.map((entry) => entry.id)).toEqual([r2Item])
       const view = attentionJson(await run(openItems(root)), "2026-11-02T10:30:00.000Z", decided)
       expect(view.items).toEqual([])
@@ -140,7 +140,7 @@ describe("the decider", () => {
       }
       expect(await run(attentionText(false, root))).toContain("Decided:\nanswered " + r2Item + ": Two retries (the intent says twice)")
       await run(closeStartedTask(root, "orc-1", "done", "the upload retries", { pr: null, report: null }, "2026-11-02T10:40:00.000Z"))
-      expect(await run(decidedItems(root, await run(listTasks(root))))).toEqual([])
+      expect((await run(readAttention(root, await run(listTasks(root))))).decided).toEqual([])
     })
   })
 

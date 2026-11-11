@@ -84,7 +84,7 @@ describe("the attention queue", () => {
       await run(routeReviewQuestions(root, [parkedTask("orc-1", question("r2", "Keep the old flag?", "", null), [], { kind: "new" })], "2026-11-02T10:20:00.000Z"))
       const items = await run(openItems(root))
       expect(items.map((entry) => entry.item.asked)).toEqual(["2026-11-02T10:20:00.000Z"])
-      expect(attentionJson(items, "2026-11-02T10:30:00.000Z").items[0]).toMatchObject({ ageSeconds: 600, overdue: true })
+      expect(attentionJson(items, "2026-11-02T10:30:00.000Z", []).items[0]).toMatchObject({ ageSeconds: 600, overdue: true })
     })
   })
 
@@ -151,7 +151,7 @@ describe("the attention queue", () => {
     await withRoot(async (root) => {
       await run(openItem(root, "late", asked("2026-11-02T10:00:00.000Z", "orc-1")))
       await run(openItem(root, "fresh", asked("2026-11-02T10:08:00.000Z", "orc-2")))
-      expect(attentionJson(await run(openItems(root)), "2026-11-02T10:10:00.000Z")).toEqual({
+      expect(attentionJson(await run(openItems(root)), "2026-11-02T10:10:00.000Z", [])).toEqual({
         schema: "orc.attention.v1",
         at: "2026-11-02T10:10:00.000Z",
         decided: [],
