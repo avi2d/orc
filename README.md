@@ -95,3 +95,4 @@ To open the dashboard, run `bun run dashboard` from the repository root.
 - [Contribute](docs/contribute.md)
 - [The orc command in depth](packages/run/README.md)
 - [The orc-dash dashboard](docs/dash.md)
+- [Show orc in the Herdr App](docs/herdr-app.md)

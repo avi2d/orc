@@ -1,0 +1,17 @@
+{
+  "name": "@avi2dg/orc-herdr-app",
+  "version": "0.0.0",
+  "private": true,
+  "description": "orc's mods and layout for the Herdr App, typed against the App's gpui-kit.d.ts and herdr.d.ts",
+  "type": "module",
+  "exports": {
+    "./orc-tabs": "./mods/orc-tabs/main.ts",
+    "./orc-board": "./mods/orc-board/main.ts",
+    "./orc-resources": "./mods/orc-resources/main.ts",
+    "./orc-agents": "./mods/orc-agents/main.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && bun scripts/build.ts",
+    "copy-app-types": "bun scripts/copy-app-types.ts"
+  }
+}

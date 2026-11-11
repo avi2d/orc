@@ -3,8 +3,9 @@ import type { Database } from "bun:sqlite"
 import { runMain } from "@effect/platform-bun/BunRuntime"
 import { BunServices } from "@effect/platform-bun"
 import { isatty } from "node:tty"
-import { Console, Effect } from "effect"
+import { Config, Console, Effect } from "effect"
 import packageJson from "../package.json" with { type: "json" }
+import { appHomeDir, bundledAppDir, formatAppInstall, installApp } from "./app-install"
 import { type OrcArgs, parseArgs } from "./args"
 import { runChat } from "./chat"
 import { dispatchUsage } from "./dispatch/args"
@@ -20,7 +21,7 @@ import { encodeRunsJson, formatRunsTable } from "./run-history-view"
 import { recordStepScore } from "./run-scores"
 import { encodeShowJson, formatShow, readShow } from "./show"
 
-const usage = "Usage: orc [--version] [--help] | orc chat | orc runs [--json] | orc refusals [--json] | orc show <run> [--json] | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--kind ship|scout|task|parent] [--delivery no-mistakes|direct-PR] [--branch <name>] [--sandbox nono|none] [--token-file <path>] [--provider <id>] [--instructions <path>] [--allow ask-user] [--answer <question-or-finding-id>=\"<text>\"] | " + dispatchUsage
+const usage = "Usage: orc [--version] [--help] | orc app install | orc chat | orc runs [--json] | orc refusals [--json] | orc show <run> [--json] | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--kind ship|scout|task|parent] [--delivery no-mistakes|direct-PR] [--branch <name>] [--sandbox nono|none] [--token-file <path>] [--provider <id>] [--instructions <path>] [--allow ask-user] [--answer <question-or-finding-id>=\"<text>\"] | " + dispatchUsage
 
 const readFailure = (error: unknown): string =>
   typeof error === "string" ? error : "orc: cannot read the run history: " + formatHistoryError(error)
@@ -170,6 +171,15 @@ const program = Effect.gen(function*() {
     }
     case "Dispatch": {
       return yield* dispatch(args.args)
+    }
+    case "InstallApp": {
+      const home = yield* Config.String("HOME")
+      const result = yield* installApp(bundledAppDir(), appHomeDir(Bun.env.HERDR_APP_HOME, home)).pipe(
+        Effect.provide(BunServices.layer),
+        Effect.catchTag("AppInstallError", (error) => Console.error("orc app install: " + error.detail).pipe(Effect.andThen(Effect.fail("orc app install refused"))))
+      )
+      yield* Console.log(formatAppInstall(result))
+      break
     }
     case "Chat": {
       return yield* chat

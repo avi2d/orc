@@ -15,6 +15,7 @@ export type OrcArgs =
   | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly taskKind: TaskKind; readonly delivery: RunDelivery; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly instructions: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
   | { readonly kind: "Dispatch"; readonly args: Exclude<DispatchArgs, { readonly kind: "UsageError" }> }
   | { readonly kind: "Chat" }
+  | { readonly kind: "InstallApp" }
   | { readonly kind: "UsageError"; readonly detail: string }
 const parseShowArgs = (rest: readonly string[]): OrcArgs => {
   if (rest.length === 0) {
@@ -254,7 +255,7 @@ const asksForHelp = (rest: readonly string[]): boolean => {
   const end = words.indexOf("--")
   return (end === -1 ? words : words.slice(0, end)).some((word) => helpFlags.has(word))
 }
-const subcommands = new Set(["runs", "refusals", "show", "score", "run", "chat", "backlog", "attention", "beat", "runner", "merge", "heavy"])
+const subcommands = new Set(["app", "runs", "refusals", "show", "score", "run", "chat", "backlog", "attention", "beat", "runner", "merge", "heavy"])
 const parseWords = (args: readonly string[]): OrcArgs => {
   if (args.length === 0) {
     return { kind: "UsageError", detail: "orc takes one flag" }
@@ -274,6 +275,9 @@ const parseWords = (args: readonly string[]): OrcArgs => {
   }
   if (first === "run") {
     return parseRunArgs(rest)
+  }
+  if (first === "app") {
+    return rest.length === 1 && rest[0] === "install" ? { kind: "InstallApp" } : { kind: "UsageError", detail: "orc app takes install" }
   }
   if (first === "chat") {
     return rest.length === 0 ? { kind: "Chat" } : { kind: "UsageError", detail: `orc chat takes no argument: ${rest[0]}` }
