@@ -204,7 +204,7 @@ describe("the heavy stand-in", () => {
   test("a heavy call inside a queued task runs directly instead of queueing behind the slot it holds", async () => {
     const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
     const realBun = join(harness.root, "fake", "bun")
-    const waiter = "sh -c 'o=$1; shift; \"$@\" & c=$!; wait \"$c\"' orc-heavy-wait 99 " + realBun + " test x"
+    const waiter = "bun --no-env-file --config=/dev/null heavy-standin-main.ts orc-heavy-wait 99 " + realBun + " test x"
     await writeFile(join(harness.root, "fake", "status.json"), JSON.stringify({ tasks: { 9: { id: 9, command: waiter, status: { Running: {} } } } }))
     await writeFile(
       join(harness.root, "fake", "pueue"),
@@ -231,7 +231,7 @@ describe("the heavy stand-in", () => {
         'printf \'%s %s /bin/sh ' + join(harness.bin, "bun") + ' test x\\n\' "$p" "$w"\n' +
         'if [ "$q" != "$p" ]; then printf \'%s %s /bin/sh ' + join(harness.bin, "bun") + ' test x\\n\' "$q" "$w"; fi\n' +
         "printf '%s %s " + realBun + " test x\\n' \"$w\" \"$b\"\n" +
-        "printf '%s %s sh -c o=$1; shift; waiter-body orc-heavy-wait 99 " + realBun + " test x\\n' \"$b\" \"$d\"\n" +
+        "printf '%s %s bun --no-env-file --config=/dev/null heavy-standin-main.ts orc-heavy-wait 99 " + realBun + " test x\\n' \"$b\" \"$d\"\n" +
         "printf '%s 1 pueued\\n' \"$d\"\n" +
         "printf '1 0 init\\n'\n",
       { mode: 0o755 }
@@ -240,6 +240,48 @@ describe("the heavy stand-in", () => {
     expect(result.code).toBe(0)
     expect(await harness.pueueLog()).not.toContain("add --group heavy")
     expect(await readFile(join(harness.root, "tool.log"), "utf8")).toContain("bun test x")
+  })
+
+  test("a sibling agent's queued bare call still queues instead of running beside it", async () => {
+    const harness = harnesses[harnesses.push(await setup(["pytest"])) - 1]
+    const realPytest = join(harness.root, "fake", "pytest")
+    const waiter = "bun --no-env-file --config=/dev/null heavy-standin-main.ts orc-heavy-wait 99 " + realPytest
+    await writeFile(join(harness.root, "fake", "status.json"), JSON.stringify({ tasks: { 9: { id: 9, command: waiter, status: { Running: {} } } } }))
+    await writeFile(
+      join(harness.root, "fake", "pueue"),
+      "#!/bin/sh\n" +
+        'echo "pueue $*" >> "' + join(harness.root, "pueue.log") + '"\n' +
+        'case "$1" in\n' +
+        "  group) echo '{}';;\n" +
+        "  add) echo 7;;\n" +
+        "  log) printf '{\"7\":{\"task\":{\"status\":{\"Done\":{\"result\":\"Success\"}}}}}';;\n" +
+        "  follow) echo nested-output;;\n" +
+        '  status) cat "' + join(harness.root, "fake", "status.json") + '";;\n' +
+        "  remove|kill|wait) exit 0;;\n" +
+        "esac\nexit 0\n",
+      { mode: 0o755 }
+    )
+    const settings = JSON.stringify({ tool: "pytest", commands: [], home: harness.root, group: "heavy", wrap: "", real: realPytest, through: null, timing: null })
+    const standin = join(harness.bin, "pytest")
+    await writeFile(
+      join(harness.root, "fake", "ps"),
+      "#!/bin/sh\n" +
+        'p="$PPID"\n' +
+        'q="$(/bin/ps -o ppid= -p "$p" 2>/dev/null | tr -d \' \')"\n' +
+        'case "$q" in ""|*[!0-9]*) q="$p";; esac\n' +
+        "w=$((q + 1000)); d=$((q + 2000))\n" +
+        "s='" + settings + "'\n" +
+        "printf 'PID PPID COMMAND\\n'\n" +
+        'printf \'%s %s bun --no-env-file --config=/dev/null heavy-standin-main.ts %s ' + standin + ' tests/test_x.py\\n\' "$p" "$w" "$s"\n' +
+        'if [ "$q" != "$p" ]; then printf \'%s %s bash\\n\' "$q" "$w"; fi\n' +
+        "printf '%s %s bash\\n' \"$w\" \"$d\"\n" +
+        "printf '%s 1 pueued\\n' \"$d\"\n" +
+        "printf '1 0 init\\n'\n",
+      { mode: 0o755 }
+    )
+    const result = run(harness, "pytest", ["tests/test_x.py"])
+    expect(result.code).toBe(0)
+    expect(await harness.pueueLog()).toContain("add --group heavy")
   })
 
   test("a stand-in folder spelled with a trailing slash or doubled slashes runs the real tool instead of itself", async () => {
@@ -304,7 +346,7 @@ describe("the heavy stand-in", () => {
     expect(await harness.pueueLog()).toContain("add --group heavy")
     const direct = run(harness, "npm", ["install"])
     expect(direct.code).toBe(0)
-    expect(await harness.pueueLog()).not.toContain("install")
+    expect(await harness.pueueLog()).not.toContain("npm install")
     expect(await readFile(join(harness.root, "tool.log"), "utf8")).toContain("npm install")
   })
 

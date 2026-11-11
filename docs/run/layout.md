@@ -98,10 +98,11 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/heavy.ts` | The heavy settings, the stand in folder and the default heavy tool list |
 | `packages/run/src/dispatch/heavy-cli.ts` | The `orc heavy` path, check, watch and watch-once commands |
 | `packages/run/src/dispatch/heavy-setup.ts` | The reading of the heavy settings and the writing of the stand in folder |
-| `packages/run/src/dispatch/heavy-standin.ts` | The generated stand in scripts that queue heavy tool calls |
+| `packages/run/src/dispatch/heavy-standin.ts` | The three line stand in launchers that start the helper for each heavy tool |
 | `packages/run/src/dispatch/heavy-classify.ts` | The per tool decision of which calls queue and which targeted calls take priority |
-| `packages/run/src/dispatch/heavy-standin-main.ts` | The program a stand in starts by the real bun path to classify, plan or queue its call |
-| `packages/run/src/dispatch/heavy-standin-runtime.ts` | The stand in runtime: the real tool lookup, the bypass event, the plan of a call and the queue wait |
+| `packages/run/src/dispatch/heavy-standin-main.ts` | The helper a stand in launcher starts by the real bun path, and the waiter a queued pueue task starts |
+| `packages/run/src/dispatch/heavy-standin-exec.ts` | The helper's run of a call: the classify probe, the real tool as a child, the through command and the queued call waiter |
+| `packages/run/src/dispatch/heavy-standin-runtime.ts` | The stand in runtime: the helper command, the real tool lookup, the bypass event, the plan of a call and the queue wait |
 | `packages/run/src/dispatch/heavy-process-tree.ts` | The process tree walk that finds a call inside a held slot or under the through command |
 | `packages/run/src/dispatch/heavy-pueue-task.ts` | The reading of pueue status and log JSON for the queue wait and the exit code |
 | `packages/run/src/dispatch/heavy-watch.ts` | The watchdog that reports stalled calls and queue slips |

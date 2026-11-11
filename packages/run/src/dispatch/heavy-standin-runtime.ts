@@ -5,6 +5,13 @@ import { exitCodeOf, queuedAhead, slotTasks, taskState, type TaskState } from ".
 
 export const standinMarker = "Written by orc heavy path"
 
+// Bun would otherwise load the caller's .env and bunfig.toml preloads into the stand-in.
+export const helperCommand: ReadonlyArray<string> = [
+  process.execPath, "--no-env-file", "--config=/dev/null", Bun.fileURLToPath(import.meta.resolve("./heavy-standin-main.ts"))
+]
+
+export const waiterWord = "orc-heavy-wait"
+
 export interface StandinTiming {
   readonly budgetMinutes: number | null
   readonly pollSeconds: number
@@ -133,20 +140,26 @@ const quietly = (argv: ReadonlyArray<string>): void => {
   capture(argv)
 }
 
-const processChain = (): ReadonlyArray<string> | null => {
+const processChain = (standin: string, args: ReadonlyArray<string>): ReadonlyArray<string> | null => {
   const table = capture(["ps", "-ww", "-eo", "pid,ppid,command"])
-  return table === null ? null : ancestry(parseProcessTable(table), process.ppid)
+  if (table === null) {
+    return null
+  }
+  const chain = [...ancestry(parseProcessTable(table), process.pid)]
+  chain[0] = [standin, ...args].join(" ")
+  return chain
 }
 
-const callInsideSlot = (group: string): boolean => {
+const callInsideSlot = (group: string, standin: string, args: ReadonlyArray<string>): boolean => {
   const status = capture(["pueue", "status", "--json", "-g", group])
   const commands = status === null ? [] : slotTasks(status).map((task) => task.command)
-  const chain = commands.length === 0 ? null : processChain()
+  const chain = commands.length === 0 ? null : processChain(standin, args)
   return chain !== null && insideSlot(commands, chain)
 }
 
 export type StandinPlan =
-  | { readonly kind: "run" | "bypass" | "through" | "queue"; readonly real: string }
+  | { readonly kind: "run" | "through" | "queue"; readonly real: string }
+  | { readonly kind: "bypass"; readonly real: string; readonly reason: string }
   | { readonly kind: "exit"; readonly code: number }
 
 const refuse = (message: string): StandinPlan => {
@@ -171,21 +184,15 @@ export const planCall = (call: StandinCall, standin: string, args: ReadonlyArray
       logBypass(call, bypass, args)
     }
     process.stderr.write("orc heavy: bypassing the " + call.group + " queue: " + bypass + "\n")
-    return { kind: "bypass", real }
+    return { kind: "bypass", real, reason: bypass }
   }
   if (call.through !== null) {
-    const chain = processChain()
+    const chain = processChain(standin, args)
     return { kind: chain !== null && insideThrough(call.through, chain) ? "run" : "through", real }
   }
-  return { kind: callInsideSlot(call.group) ? "run" : "queue", real }
+  return { kind: callInsideSlot(call.group, standin, args) ? "run" : "queue", real }
 }
 
-export const planWords = (plan: StandinPlan): string => (plan.kind === "exit" ? "exit " + String(plan.code) : plan.kind + " " + plan.real)
-
-const waiterBody =
-  'o=$1; shift; "$@" & c=$!; ' +
-  '(while kill -0 "$o" 2>/dev/null && kill -0 "$c" 2>/dev/null; do sleep 5; done; kill "$c" 2>/dev/null) & k=$!; ' +
-  'trap "kill $c 2>/dev/null; kill $k 2>/dev/null" TERM INT; wait "$c"; r=$?; kill "$k" 2>/dev/null; wait "$k" 2>/dev/null; exit "$r"'
 
 const repairHint = "repair pueue (pueue status) or bypass once with HEAVY_QUEUE_BYPASS=<reason>"
 
@@ -298,7 +305,7 @@ export const queueCall = async (call: StandinCall, real: string, args: ReadonlyA
     added = Bun.spawnSync(
       [
         "pueue", "add", "--group", call.group, ...priority, "--working-directory", workingDirectory(), "--print-task-id", "--escape", "--",
-        "sh", "-c", waiterBody, "orc-heavy-wait", String(process.pid), ...wrap, real, ...args
+        ...helperCommand, waiterWord, String(process.pid), ...wrap, real, ...args
       ],
       { stdout: "pipe", stderr: "pipe" }
     )

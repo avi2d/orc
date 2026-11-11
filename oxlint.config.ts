@@ -6,6 +6,7 @@ export default defineConfig({
     excludeFiles: [
       "packages/run/src/dispatch/heavy-process-tree.ts",
       "packages/run/src/dispatch/heavy-pueue-task.ts",
+      "packages/run/src/dispatch/heavy-standin-exec.ts",
       "packages/run/src/dispatch/heavy-standin-runtime.ts"
     ]
   }
