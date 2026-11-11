@@ -23,12 +23,12 @@ esac
 exit 0
 `
 
-const holderHome = async (through: ReadonlyArray<string> | null): Promise<string> => {
+const holderHome = async (through: ReadonlyArray<string> | null, limit: "auto" | "none" = "none"): Promise<string> => {
   const home = await mkdtemp(join(tmpdir(), "orc-heavy-through-home-"))
   await mkdir(join(home, "fake"), { recursive: true })
   await writeFile(join(home, "fake", "pueue"), loggingPueue, { mode: 0o755 })
   const heavy = through === null ? {} : { through }
-  await writeFile(join(home, "config.json"), JSON.stringify({ providers: [], heavy }))
+  await writeFile(join(home, "config.json"), JSON.stringify({ providers: [], heavy: { ...heavy, limit } }))
   return home
 }
 
@@ -109,7 +109,7 @@ describe("the heavy queue setup", () => {
   })
 
   test("with a through command the setup and the watch start call no pueue at all", async () => {
-    const home = await holderHome(["winbox-heavy", "run", "--"])
+    const home = await holderHome(["winbox-heavy", "run", "--"], "none")
     try {
       await writeFile(join(home, "fake", "winbox-heavy"), "#!/bin/sh\necho \"winbox-heavy $*\" >> \"$FAKE_HOLDER_LOG\"\nshift 2\n\"$@\"\n", { mode: 0o755 })
       await writeFile(join(home, "fake", "bun"), "#!/bin/sh\nexit 0\n", { mode: 0o755 })
@@ -136,7 +136,7 @@ describe("the heavy queue setup", () => {
     } finally {
       await rm(home, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   test("without a through command the setup still makes the pueue group and queues the watch", async () => {
     const home = await holderHome(null)

@@ -9,7 +9,8 @@ import type { Claim, TaskFileError, TaskRecord } from "./task-record"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
 import type { BeatAction, Progress } from "./beat-action"
 import { closeFinished } from "./beat-close"
-import { isOverdue, openItems, openRunDeaths, routeTaskItems } from "./attention"
+import { openRunDeaths, routeTaskItems } from "./attention"
+import { attentionActions } from "./beat-attention"
 import { type AskDecider, decideReviewQuestions } from "./decider"
 import { askDeciderWithPi } from "./decider-ask"
 import { handAnswersToResume } from "./parked"
@@ -43,6 +44,7 @@ type Credential =
   | { readonly kind: "file"; readonly provider: string; readonly tokenFile: string }
   | { readonly kind: "token"; readonly provider: string; readonly token: RunToken }
   | { readonly kind: "none"; readonly provider: string }
+  | { readonly kind: "claude-config"; readonly provider: string; readonly configDirs: Readonly<Record<string, string>> }
 
 // Effect's spawner takes no file for stdio, so a shell sends the start command's output to the task's log.
 const logToTaskLog = ["sh", "-c", "exec \"$@\" >> \"$ORC_TASK_LOG\" 2>&1", "orc-start"] as const
@@ -114,7 +116,8 @@ const startTask = (
       ORC_TASK_MACHINE: machine.name,
       ORC_TASK_PROVIDER: credential.provider,
       ORC_TASK_ACCOUNT: claim.account,
-      ORC_TASK_TOKEN_FILE: credential.kind === "file" ? credential.tokenFile : ""
+      ORC_TASK_TOKEN_FILE: credential.kind === "file" ? credential.tokenFile : "",
+      ORC_TASK_CLAUDE_CONFIG_DIR: credential.kind === "claude-config" ? credential.configDirs[machine.name] ?? "" : ""
     }
     const result = credential.kind === "token"
       ? yield* encodeToken(credential.token).pipe(
@@ -180,6 +183,9 @@ const credentialFor = (
     switch (account.kind) {
       case "token-file": {
         return { kind: "file", provider, tokenFile: account.tokenFile }
+      }
+      case "claude-config": {
+        return { kind: "claude-config", provider, configDirs: account.configDirs }
       }
       case "none": {
         return { kind: "none", provider }
@@ -360,9 +366,7 @@ export const runBeat = (
     yield* routeTaskItems(root, current, at)
     yield* openRunDeaths(root, settled.closed, at)
     const { latest, relayed } = yield* decideAndRelay(root, context, started, progress, current, sources.askDecider)
-    const queue = (yield* openItems(root)).map(({ id, item }): BeatAction => ({
-      kind: "attention", item: id, task: item.task, owner: item.owner, overdue: isOverdue(item, Date.parse(at)), text: item.text
-    }))
+    const { asking, queue } = yield* attentionActions(root, latest, [...settled.asking, ...relayed.asking], at)
     const queued = latest.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: latest, overloaded }
@@ -373,8 +377,7 @@ export const runBeat = (
     return { beat, at, quota, room: readRoom(config.machines, latest), actions: [
         ...settled.closed,
         ...relayed.closed,
-        ...settled.asking,
-        ...relayed.asking,
+        ...asking,
         ...stalls.flatMap(Option.toArray),
         ...upstream,
         ...queue,

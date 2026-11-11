@@ -94,6 +94,19 @@ describe("finalReplyError", () => {
 })
 
 describe("buildImplementPrompt", () => {
+  test("the worker receives required split fields and nonempty done criteria instead of an incomplete template", () => {
+    const prompt = buildImplementPrompt(agent(["read"]), "/runs/abc/task.md")
+    const schemaLine = prompt.split("\n").find((value) => value.startsWith("Split JSON schema: ")) ?? ""
+    const schema: unknown = JSON.parse(schemaLine.slice("Split JSON schema: ".length))
+    expect(schema).toMatchObject({
+      required: ["schema", "plan", "reason", "done", "children"],
+      properties: {
+        done: { minItems: 1 },
+        children: { minItems: 2, items: { required: ["title", "body", "after"] } }
+      }
+    })
+  })
+
   test("carries the instructions, the task file and the completion line", () => {
     const prompt = buildImplementPrompt(agent(["read"]), "/runs/abc/task.md")
     expect(prompt).toContain("Do the task.")

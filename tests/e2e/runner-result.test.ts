@@ -7,6 +7,22 @@ import { openDatabase, recordRun } from "../../packages/run/src/run-history"
 import { binPath, fakeQuota, isRecord, orcOk, orcThere, resultJson, RunnerRun, runnerTimeout, runOrc, waitForAddedTasks, withFixture, writeTwoHomeDispatches, type Fixture } from "./runner-helpers"
 
 describe("orc runner result", () => {
+  test("a failed over-budget run returns the validated split as data instead of burying it in the reason", async () => {
+    await withFixture(async (fixture) => {
+      const proposal = { schema: "orc.split.v1", plan: "split", reason: "two areas", done: ["both work"], children: [
+        { title: "First", body: "Ship the first area.", after: [] },
+        { title: "Second", body: "Ship the second area.", after: [1] }
+      ] }
+      const db = await Effect.runPromise(openDatabase(fixture.home).pipe(Effect.provide(BunServices.layer)))
+      try {
+        Effect.runSync(recordRun(db, { id: "run-split", project: "/checkout", branch: "orc/task-2", taskFile: "task.md", status: "failed",
+          started: "2026-10-27T23:36:39.600Z", ended: "2026-10-27T23:36:39.700Z", endReason: "split proposal: " + JSON.stringify(proposal) }))
+      } finally { db.close() }
+      const result = await resultJson(fixture, "task-2")
+      expect(result).toMatchObject({ result: { status: "failed", run: { split: proposal, prLink: null } } })
+    })
+  }, runnerTimeout)
+
   test("a label-less result returns without stdin closing instead of waiting on stdin to EOF", async () => {
     await withFixture(async (fixture) => {
       const proc = Bun.spawn([process.execPath, binPath, "runner", "result", "task-7", "--json"], {

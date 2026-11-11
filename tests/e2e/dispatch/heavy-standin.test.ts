@@ -3,7 +3,7 @@ import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { spawnSync } from "node:child_process"
 import { tmpdir, userInfo } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { standinScript, standinTools, type StandinSettings } from "../../../packages/run/src/dispatch/heavy-standin"
@@ -328,7 +328,7 @@ describe("the heavy stand-in", () => {
       await writeFile(join(bin, "bun"), await scriptOf("bun", { home: root, group, wrap: "", through: null }, []), { mode: 0o755 })
       await writeFile(join(root, "pass.test.ts"), 'test("x", () => {})\n')
       await writeFile(join(root, "fail.test.ts"), 'test("x", () => { throw new Error("x") })\n')
-      const realEnv = { ...process.env, PATH: bin + ":" + process.env.PATH, HOME: userInfo().homedir }
+      const realEnv = { ...process.env, PATH: bin + ":" + dirname(process.execPath) + ":" + process.env.PATH, HOME: userInfo().homedir }
       const passed = Bun.spawnSync([join(bin, "bun"), "test", "pass.test.ts"], { cwd: root, env: realEnv, stdout: "ignore", stderr: "ignore" })
       expect(passed.exitCode).toBe(0)
       const failed = Bun.spawnSync([join(bin, "bun"), "test", "fail.test.ts"], { cwd: root, env: realEnv, stdout: "ignore", stderr: "ignore" })

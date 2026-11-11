@@ -126,7 +126,7 @@ describe("the nono credential proxy", () => {
       const stubPi = join(dir, "pi")
       await writeFile(stubPi, "#!/bin/sh\nif [ \"$1\" = auth ]; then echo \"" + fixtureKey + "\"; exit 0; fi\nexit 2\n", { mode: 0o755 })
       const credential = modelCredentialFor({ id: "acme-vault", upstream, injectHeader: "X-Api-Key", credentialFormat: "{}" }, { piBinary: stubPi, nodeBinary: "/bin/sh", homeDir: fixtureHome })
-      const result = await runNonoShell(sandboxFor({ worktree, session, piAgentDir: agentDir, modelCredential: credential }), "curl -s --max-time 10 '" + upstream + "/probe'")
+      const result = await runNonoShell(sandboxFor({ worktree, session, piAgentDir: agentDir, modelCredential: credential }), "curl -s --max-time 10 -H \"X-Api-Key: $ACME_VAULT_KEY\" \"$ACME_VAULT_BASE_URL/probe\"")
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toContain("proxy-ok")
       expect(seen["x-api-key"]).toBe(fixtureKey)

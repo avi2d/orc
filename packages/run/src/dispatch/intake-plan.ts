@@ -3,9 +3,7 @@ import type { ChildProcessSpawner } from "effect/process"
 import { providerEnvOf } from "../model-route"
 import { readOrcConfig } from "../orc-config"
 import { capture } from "./runner-exec"
-import { type PlanDocument, readPlanDocument, splitDocumentSchema } from "./split"
-
-const childBudget = "about 300 changed lines or one area"
+import { childBudget, type PlanDocument, readPlanDocument, splitDocumentSchema } from "./split"
 
 const planSeconds = 300
 
