@@ -50,6 +50,19 @@ const escalate = JSON.stringify({ decision: "escalate", reason: "only the captai
 
 const itemFile = async (root: string, id: string): Promise<unknown> => JSON.parse(await readFile(join(root, "attention", id + ".json"), "utf8"))
 
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null
+
+const filedAt = (filed: unknown, ...path: ReadonlyArray<string>): string | undefined => {
+  let current: unknown = filed
+  for (const key of path) {
+    if (!isRecord(current)) {
+      return undefined
+    }
+    current = current[key]
+  }
+  return typeof current === "string" ? current : undefined
+}
+
 const decide = async (root: string, ask: AskDecider) => run(decideReviewQuestions(root, await run(listTasks(root)), ask))
 
 describe("the decider", () => {
@@ -72,8 +85,8 @@ describe("the decider", () => {
         decision: { kind: "answered", reason: "the intent says twice" },
         state: { kind: "closed", answer: { words: "Two retries" } }
       })
-      const filed = (await itemFile(root, r2Item)) as { decision: { at: string }; state: { answer: { at: string } } }
-      for (const at of [stored?.at, filed.decision.at, filed.state.answer.at]) {
+      const filed = await itemFile(root, r2Item)
+      for (const at of [stored?.at, filedAt(filed, "decision", "at"), filedAt(filed, "state", "answer", "at")]) {
         expect(at !== undefined && at >= before && at <= after).toBe(true)
       }
     })
@@ -168,8 +181,8 @@ describe("the decider", () => {
         decision: { kind: "answered", reason: "the intent says twice" },
         state: { kind: "closed", answer: { words: "Two retries" } }
       })
-      const filed = (await itemFile(root, r2Item)) as { decision: { at: string }; state: { answer: { at: string } } }
-      for (const at of [filed.decision.at, filed.state.answer.at]) {
+      const filed = await itemFile(root, r2Item)
+      for (const at of [filedAt(filed, "decision", "at"), filedAt(filed, "state", "answer", "at")]) {
         expect(at >= before && at <= after).toBe(true)
       }
     })

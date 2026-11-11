@@ -1,6 +1,7 @@
-import { Duration, Effect, Stream } from "effect"
+import { Duration, Effect } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { Argv } from "../agent-exec"
+import { collectOutput } from "../git-run"
 import { textInput } from "../agent-exec"
 import { providerEnvOf } from "../model-route"
 import { readOrcConfig } from "../orc-config"
@@ -24,11 +25,7 @@ export const askDeciderWithPi = (home: string): AskDecider => (request) =>
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     // extendEnv lays this over the shell's environment, so the provider's env wins over an exported variable.
     const handle = yield* spawner.spawn(ChildProcess.make(program, args, { cwd: home, env: providerEnvOf(config, model), extendEnv: true, stdin: textInput(request.prompt) }))
-    const [stdout, stderr, exitCode] = yield* Effect.all([
-      handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
-      handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
-      handle.exitCode
-    ], { concurrency: "unbounded" })
+    const { stdout, stderr, exitCode } = yield* collectOutput(handle)
     if (exitCode !== 0) {
       return yield* new DeciderUnheard({ reason: "pi exited " + exitCode + ": " + stderr.trim().slice(-200) })
     }

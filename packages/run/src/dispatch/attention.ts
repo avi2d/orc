@@ -6,7 +6,7 @@ import type { TaskRecord } from "./task-record"
 const overdueMillis = 5 * 60 * 1000
 
 export const deciderTimeoutMillis = 180 * 1000
-export const deciderClaimMillis = deciderTimeoutMillis + 60 * 1000
+const deciderClaimMillis = deciderTimeoutMillis + 60 * 1000
 
 const Answer = Schema.Struct({ words: Schema.String, at: Schema.String })
 

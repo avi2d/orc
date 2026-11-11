@@ -300,6 +300,27 @@ export interface BeatSources {
 
 export const liveSources = (home: string): BeatSources => ({ readLoad: readMachineLoad, readPullRequest, readUpstream, askDecider: askDeciderWithPi(home) })
 
+const decideAndRelay = (
+  root: string,
+  context: BeatContext,
+  started: ReadonlyArray<TaskRecord>,
+  progress: ReadonlyArray<Progress>,
+  current: ReadonlyArray<TaskRecord>,
+  askDecider: AskDecider
+): Effect.Effect<{ readonly latest: ReadonlyArray<TaskRecord>; readonly relayed: ReturnType<typeof settledProgress> }, BacklogError | TaskFileError, BeatRequirements> =>
+  Effect.gen(function*() {
+    const decided = yield* decideReviewQuestions(root, current, askDecider)
+    const latest = decided.some((entry) => entry.verdict.kind === "answered") ? yield* listTasks(root) : current
+    const answeredTasks = new Set(decided.flatMap((entry) => entry.verdict.kind === "answered" ? [entry.task] : []))
+    const firstRunning = new Set(started.flatMap((task, index) => progress[index]?.kind === "running" ? [task.spec.id] : []))
+    const relayProgress = answeredTasks.size === 0
+      ? []
+      : yield* Effect.forEach(latest.filter((task) => task.state.kind === "started" && answeredTasks.has(task.spec.id) && firstRunning.has(task.spec.id)), (task) => closeFinished(context, task))
+    const relayed = settledProgress(relayProgress)
+    releaseClosedSlots(context.live, relayed.closed)
+    return { latest, relayed }
+  })
+
 export const runBeat = (
   root: string,
   home: string,
@@ -340,15 +361,7 @@ export const runBeat = (
     const early: BeatContext = { ...context, tasks: current, overloaded: new Map() }
     const renewals = yield* Effect.forEach(current, (task) => renewTask(early, task))
     const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))
-    const decided = yield* decideReviewQuestions(root, current, sources.askDecider)
-    const latest = decided.some((entry) => entry.verdict.kind === "answered") ? yield* listTasks(root) : current
-    const answeredTasks = new Set(decided.flatMap((entry) => entry.verdict.kind === "answered" ? [entry.task] : []))
-    const firstRunning = new Set(started.flatMap((task, index) => progress[index]?.kind === "running" ? [task.spec.id] : []))
-    const relayProgress = answeredTasks.size === 0
-      ? []
-      : yield* Effect.forEach(latest.filter((task) => task.state.kind === "started" && answeredTasks.has(task.spec.id) && firstRunning.has(task.spec.id)), (task) => closeFinished(context, task))
-    const relayed = settledProgress(relayProgress)
-    releaseClosedSlots(context.live, relayed.closed)
+    const { latest, relayed } = yield* decideAndRelay(root, context, started, progress, current, sources.askDecider)
     const queued = latest.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: latest, overloaded }
