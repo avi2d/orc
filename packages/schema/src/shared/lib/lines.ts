@@ -1,4 +1,4 @@
-import { type Decoded, decoded, rejected } from "../decode";
+import { type Decoded, decoded, rejected } from "./decode";
 
 export const nonEmptyLines = (text: string): ReadonlyArray<string> =>
   text.split("\n").filter((line) => line.trim() !== "");

@@ -1,5 +1,5 @@
-export { acceptsExit, type Command, CommandAbsent, CommandRunner, CommandUnreachable } from "./command";
-export { decodeJson, decodeValue, type Decoded, decoded, flatMapDecoded, rejected } from "./decode";
+export { acceptsExit, type Command, CommandAbsent, CommandRunner, CommandUnreachable } from "./shared/lib";
+export { decodeJson, decodeValue, type Decoded, decoded, flatMapDecoded, rejected } from "./shared/lib";
 export {
   failureOf,
   type Failed,
@@ -9,8 +9,8 @@ export {
   type Reading,
   unreachable,
   zipOutcomes,
-} from "./reading";
-export { runDecoded, sourceOf, stamped, type Source } from "./source";
+} from "./shared/lib";
+export { runDecoded, sourceOf, stamped, type Source } from "./shared/lib";
 export { hostSource, LoadAverage, probe } from "./sources/host";
 export {
   decodeArcStats,
@@ -134,7 +134,7 @@ export {
   type ProcessSamples,
   TaskProcessesSource,
 } from "./sources/task-processes";
-export { outcomeOf } from "./contract/outcome";
+export { outcomeOf } from "./shared/lib";
 export { macRusageReader } from "./sources/mac-rusage-reader";
 export { ResourcesReport } from "./contract/resources";
 export { decodeResourcesReport, resourcesReport } from "./views/resources";

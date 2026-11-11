@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-import { outcomeOf } from "./outcome";
+import { outcomeOf } from "../shared/lib";
 
 const Figure = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 

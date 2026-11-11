@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { decodeJson, type Decoded } from "../decode";
+import { decodeJson, type Decoded } from "../shared/lib";
 
 export interface OrcStage {
   readonly name: string;

@@ -1,7 +1,7 @@
 import { DateTime } from "effect";
 import type { LongTaskEvent, LongTaskSettings } from "../contract/alerts";
 import type { ReportedTasks, TaskEntry } from "../contract/tasks";
-import type { Outcome } from "../reading";
+import type { Outcome } from "../shared/lib";
 import type { Stepped } from "./episode";
 
 export interface MachineTasks {
