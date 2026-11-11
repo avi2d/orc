@@ -2,7 +2,7 @@ import { Effect, Schema } from "effect"
 import { networkInterfaces } from "node:os"
 import { type Env, runCommand } from "./chat-command"
 import { ChatToolError } from "./chat-error"
-import { scalar, table } from "./toon"
+import { scalar, table } from "./shared/lib/index"
 
 export interface BoardPrompt {
   readonly tag: string

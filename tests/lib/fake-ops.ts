@@ -3,7 +3,7 @@ import { join } from "node:path"
 import { Effect } from "effect"
 import type { CommandResult } from "../../packages/run/src/agent-exec"
 import type { AgentRun, SandboxOps } from "../../packages/run/src/run-loop"
-import { OrcRunError } from "../../packages/run/src/run-session"
+import { OrcRunError } from "../../packages/run/src/shared/lib/run-session"
 
 export interface FakeAgentResult {
   readonly sessionId?: string

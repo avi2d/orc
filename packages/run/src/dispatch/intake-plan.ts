@@ -1,7 +1,7 @@
 import { Duration, Effect, type FileSystem, Result } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { providerEnvOf } from "../model-route"
-import { readOrcConfig } from "../orc-config"
+import { providerEnvOf } from "../shared/config/index"
+import { readOrcConfig } from "../shared/config/index"
 import { capture } from "./runner-exec"
 import { childBudget, type PlanDocument, readPlanDocument, splitDocumentSchema } from "./split"
 

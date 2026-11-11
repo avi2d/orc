@@ -1,5 +1,5 @@
-import { deliveryFor, type RunDelivery } from "../delivery"
-import { checkoutOn, type DispatchConfig, type Machine, modeOf, type Project } from "./config"
+import { deliveryFor, type RunDelivery } from "../shared/config/index"
+import { checkoutOn, type DispatchConfig, type Machine, modeOf, type Project } from "../shared/config/index"
 import { answerWait, type DeciderOwns, type TaskRecord } from "./task-record"
 import { childCount, dependencyWaits } from "./task-dependency"
 

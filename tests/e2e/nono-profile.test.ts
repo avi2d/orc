@@ -5,9 +5,9 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path, Result } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { routeOfAgents } from "../../packages/run/src/model-route"
+import { routeOfAgents } from "../../packages/run/src/shared/config/model-route"
 import { buildAgentNonoProfile } from "../../packages/run/src/nono-profile"
-import { readOrcConfig } from "../../packages/run/src/orc-config"
+import { readOrcConfig } from "../../packages/run/src/shared/config/orc-config"
 import { planSandbox } from "../../packages/run/src/sandbox-plan"
 
 describe("configured credential injection", () => {

@@ -1,4 +1,4 @@
-import { scalar, splitRow, table, trimmedLines } from "./toon"
+import { scalar, splitRow, table, trimmedLines } from "./shared/lib/index"
 
 export const askUserWord = "ask-user"
 export type AllowWord = typeof askUserWord

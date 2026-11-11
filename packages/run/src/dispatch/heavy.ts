@@ -1,4 +1,4 @@
-import type { HeavyConfig } from "../orc-config"
+import type { HeavyConfig } from "../shared/config/index"
 import { standinDirSuffix } from "../standin-dir"
 
 export const heavyGroup = "heavy"

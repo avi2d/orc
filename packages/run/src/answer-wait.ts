@@ -1,6 +1,6 @@
 import { Console, Duration, Effect, FileSystem, Schema } from "effect"
-import { readJsonFileIfPresent } from "./json-file"
-import { OrcRunError } from "./run-session"
+import { readJsonFileIfPresent } from "./shared/config/index"
+import { OrcRunError } from "./shared/lib/index"
 import type { NoMistakesFinding, OpenQuestion, QuestionAnswer } from "./no-mistakes-gate"
 
 export const askingFileName = "asking.json"

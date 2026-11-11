@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { Schema } from "effect"
-import { tokenFileApiKey, tokenFileVar } from "../../packages/run/src/model-route"
+import { tokenFileApiKey, tokenFileVar } from "../../packages/run/src/shared/config/model-route"
 import { piAgentModels } from "../../packages/run/src/nono-profile"
 
 const noPi = Bun.which("pi") === null

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { type Machine, type Project, readProjects } from "../../../packages/run/src/dispatch/config"
+import { type Machine, type Project, readProjects } from "../../../packages/run/src/shared/config/dispatch-config"
 
 const machines: ReadonlyArray<Machine> = [{ name: "mac", slots: 1, start: ["true"] }, { name: "linux", slots: 2, start: ["true"] }]
 

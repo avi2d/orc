@@ -1,5 +1,5 @@
 import { Effect, FileSystem, Path, Schema } from "effect"
-import { readFailure } from "../json-file"
+import { readFailure } from "../shared/config/index"
 import { RunnerError } from "./runner-error"
 
 export const TaskInstructions = Schema.Struct({

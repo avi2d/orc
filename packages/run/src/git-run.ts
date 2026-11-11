@@ -1,7 +1,7 @@
 import { Effect, type PlatformError, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { hostGitRefusalExit, hostGitSafetyEnv } from "./host"
-import { OrcRunError } from "./run-session"
+import { OrcRunError } from "./shared/lib/index"
 
 export interface OrcRunCommit {
   readonly sha: string
