@@ -1,9 +1,9 @@
 import { Config, Context, Duration, Effect, Layer, Option, Result, Schema } from "effect";
-import { CommandRunner } from "../shared/lib";
-import { type Decoded, decoded, decodeValue, rejected } from "../shared/lib";
-import type { Reading } from "../shared/lib";
-import { runDecoded, stamped } from "../shared/lib";
-import { selector } from "../shared/config";
+import { CommandRunner } from "../../../shared/lib";
+import { type Decoded, decoded, decodeValue, rejected } from "../../../shared/lib";
+import type { Reading } from "../../../shared/lib";
+import { runDecoded, stamped } from "../../../shared/lib";
+import { selector } from "../../../shared/config";
 
 const RunnerFile = Schema.Struct({ agentName: Schema.String, gitHubUrl: Schema.String });
 

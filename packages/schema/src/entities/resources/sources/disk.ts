@@ -1,9 +1,9 @@
 import { Context, Duration, Layer, Schema } from "effect";
-import { type Decoded, decoded, decodeValue, flatMapDecoded, rejected } from "../shared/lib";
-import type { Source } from "../shared/lib";
+import { type Decoded, decoded, decodeValue, flatMapDecoded, rejected } from "../../../shared/lib";
+import type { Source } from "../../../shared/lib";
 import { hostSource, probe } from "./host";
-import { nonEmptyLines } from "../shared/lib";
-import { CountText } from "../shared/lib";
+import { nonEmptyLines } from "../../../shared/lib";
+import { CountText } from "../../../shared/lib";
 
 export interface DiskUsage {
   readonly usedBytes: number;

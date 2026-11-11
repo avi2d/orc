@@ -11,7 +11,7 @@ export {
   zipOutcomes,
 } from "./shared/lib";
 export { runDecoded, sourceOf, stamped, type Source } from "./shared/lib";
-export { hostSource, LoadAverage, probe } from "./sources/host";
+export { hostSource, LoadAverage, probe } from "./entities/resources";
 export {
   decodeArcStats,
   decodeLoadavg,
@@ -26,7 +26,7 @@ export {
   type LinuxMemInfo,
   LinuxHostSource,
   linuxHostSourceLayer,
-} from "./sources/linux-host";
+} from "./entities/resources";
 export {
   type SavedProfile,
   SavedProfilesSource,
@@ -57,7 +57,7 @@ export {
   macProcessesSourceLayer,
   linuxProcessesCommand,
   type ProcessRow,
-} from "./sources/processes";
+} from "./entities/resources";
 export {
   decodeComputeApps,
   decodeGpus,
@@ -67,7 +67,7 @@ export {
   type GpuRow,
   GpuSource,
   gpuSourceLayer,
-} from "./sources/gpu";
+} from "./entities/resources";
 export {
   decodeDf,
   type DiskUsage,
@@ -75,7 +75,7 @@ export {
   linuxDiskSourceLayer,
   MacDiskSource,
   macDiskSourceLayer,
-} from "./sources/disk";
+} from "./entities/resources";
 export {
   decodeSysctl,
   decodeTopCpu,
@@ -86,7 +86,7 @@ export {
   type MacSysctl,
   type MacTopCpu,
   type MacVmStat,
-} from "./sources/mac-host";
+} from "./entities/resources";
 export {
   type CpuView,
   type DiskView,
@@ -112,7 +112,7 @@ export {
   machineTaskResources,
   resourcesView,
   type ResourcesView,
-} from "./views/resources";
+} from "./entities/resources";
 export {
   type MachineSize,
   type OwnedProcess,
@@ -136,10 +136,10 @@ export {
 } from "./entities/task";
 export { outcomeOf } from "./shared/lib";
 export { macRusageReader } from "./entities/task";
-export { ResourcesReport } from "./contract/resources";
-export { decodeResourcesReport, resourcesReport } from "./views/resources";
-export { QueuesReport } from "./contract/queues";
-export { queuesReport } from "./views/queues";
+export { ResourcesReport } from "./entities/resources";
+export { decodeResourcesReport, resourcesReport } from "./entities/resources";
+export { QueuesReport } from "./entities/queues";
+export { queuesReport } from "./entities/queues";
 export { type SnapshotFields, SnapshotReport, type SnapshotSource, snapshotSources } from "./contract/snapshot";
 export {
   AlertEvent,
@@ -185,7 +185,7 @@ export {
   type TaskUsage,
 } from "./contract/task-samples";
 export { LiveTasksReport } from "./contract/task-live";
-export { type GateHold, gateHoldOf } from "./views/task-gates";
+export { type GateHold, gateHoldOf } from "./entities/task-pipeline";
 export { decodeLiveTasksReport, liveTasksReport } from "./views/task-levels";
 export { historyDays, type TaskSamples, TaskSamplesSource, taskSamplesAt, taskSamplesSourceLayer } from "./sources/task-samples";
 export { type KeptProcess, keptCpuSeconds, type LimitEpisode, type MachineLimit, type ResolvedDetail, resolvedOf, type TaskHistory, taskHistories } from "./views/task-history";
@@ -208,17 +208,17 @@ export {
 } from "./views/task-levels";
 export { mergedTaskLevels, unsetTaskLevels } from "./views/merged-task-levels";
 export { type PlannedRow, type PlannedState, plannedStateOf } from "./entities/task";
-export { decodeNoMistakes, type NoMistakesRun, type NoMistakesSnapshot, type NoMistakesStep } from "./contract/no-mistakes";
-export { decodeOrcRuns, decodeOrcShow, type OrcRun, type OrcSnapshot, type OrcStage } from "./contract/orc";
-export { anchorOf, checksOf, cueMarkOf, cuePipelineOf, detailWithoutWaitsOf, donePipelineOf, fixRoundOf, fullReviewPipelineOf, kindOf, markGlyphOf, modelBadgeOf, noMistakesRunOf, orcPipelineOf, orcRunOf, type PipelineFolder, pipelineFoldersOf, type PipelineKind, pipelineKinds, type PipelineStage, rebuildStage, stageMarkNames, type StageMark, stageNamesOf, summaryOf, type TaskDerivedState, type TaskPipeline, unknownPipelineOf, waitsOnOf } from "./task-pipeline";
+export { decodeNoMistakes, type NoMistakesRun, type NoMistakesSnapshot, type NoMistakesStep } from "./entities/task-pipeline";
+export { decodeOrcRuns, decodeOrcShow, type OrcRun, type OrcSnapshot, type OrcStage } from "./entities/task-pipeline";
+export { anchorOf, checksOf, cueMarkOf, cuePipelineOf, detailWithoutWaitsOf, donePipelineOf, fixRoundOf, fullReviewPipelineOf, kindOf, markGlyphOf, modelBadgeOf, noMistakesRunOf, orcPipelineOf, orcRunOf, type PipelineFolder, pipelineFoldersOf, type PipelineKind, pipelineKinds, type PipelineStage, rebuildStage, stageMarkNames, type StageMark, stageNamesOf, summaryOf, type TaskDerivedState, type TaskPipeline, unknownPipelineOf, waitsOnOf } from "./entities/task-pipeline";
 export { longStageOf, type Staleness, stalenessOf } from "./views/stage-time";
-export { readableTestNameOf } from "./views/test-names";
-export { ResourceMachines, resourceMachinesLayer } from "./views/remote-resources";
+export { readableTestNameOf } from "./entities/queues";
+export { ResourceMachines, resourceMachinesLayer } from "./entities/resources";
 export { LocalTasks, localTasksLayer, localTasksLayerWithin, type TasksMachine, TasksMachines, tasksMachinesLayer, watchedLocalTasksLayerWithin, watchedRead } from "./entities/task";
 export { type TaskHistoryMachine, RemoteTaskHistory, remoteTaskHistoryLayer } from "./sources/remote-task-samples";
 export { type TaskLiveMachine, RemoteTaskLive, remoteTaskLiveLayer } from "./views/remote-task-live";
 export { readBeside } from "./shared/config";
-export { type HostSources, hostSourcesLayer, readLocalResources, readMachines } from "./views/local-resources";
+export { type HostSources, hostSourcesLayer, readLocalResources, readMachines } from "./entities/resources";
 export { composedSessionQuotaOf, localSessionQuotaOf, type QuotaReadings, type QuotaReadSources, quotaReadSourcesLayer, readQuotas } from "./entities/session-quota";
 export { sessionQuotaOf, type SessionQuotaSources, sessionQuotaSourcesLayer, type SessionSources, sessionSourcesLayer } from "./entities/session-quota";
 export { ComposedSessionQuotaReport } from "./entities/session-quota";
@@ -330,8 +330,8 @@ export {
   actionsSourceLayer,
   activeRuns,
   decodeActions,
-} from "./sources/actions";
-export { decodeRunnerRepos, jsonObjects, RunnerRepos, runnerReposLayer, type RunnerReposReading } from "./sources/runners";
+} from "./entities/queues";
+export { decodeRunnerRepos, jsonObjects, RunnerRepos, runnerReposLayer, type RunnerReposReading } from "./entities/queues";
 export {
   type CiReport,
   type CiRun,
@@ -344,7 +344,7 @@ export {
   jobSpan,
   type JobSpan,
   type RepoFailure,
-} from "./sources/ci-runs";
+} from "./entities/queues";
 export {
   type AgentSchedule,
   type CronSchedule,
@@ -365,15 +365,15 @@ export {
 } from "./sources/schedules";
 export { type CalendarPattern, cronPattern, everyValue, nextMatch } from "./sources/calendar";
 export { type NamedOrchestrator, type NamedPueue, type NextKind, type NextReadings, type NextRow, type NextSource, type NextSourceState, type NextUp, nextUp, type OrchestratorRead } from "./views/next-up";
-export { machineQueue, type MachineQueueView, type QueueEntry, type QueueRow, type QueueRowState, queueWindow } from "./views/machine-queue";
+export { machineQueue, type MachineQueueView, type QueueEntry, type QueueRow, type QueueRowState, queueWindow } from "./entities/queues";
 export { type DispatchReading, type DispatchSnapshot, DispatchSource, dispatchSourceLayer, type DispatchTask, missingBacklog } from "./entities/dispatch";
 export { type DispatchView, dispatchView, type RoomEntry, type RunRow, type WaitRow } from "./entities/dispatch";
-export { heavySummary, isHeavyNotSetup } from "./views/heavy";
+export { heavySummary, isHeavyNotSetup } from "./entities/queues";
 export { type AttentionItem, type AttentionQueue, AttentionSource, attentionSourceLayer } from "./entities/dispatch";
-export { decodeHeavyCheck, HeavyCheck, type HeavyMachine, HeavyMachines, heavyMachinesLayer } from "./sources/heavy";
-export { decodePueue, knownProjects, type PueueMachine, PueueMachines, pueueMachinesLayer, PueueStatus } from "./sources/pueue";
-export { type MachineProjects } from "./sources/project-names";
-export { type NoMistakesMachine, NoMistakesMachines, noMistakesMachinesLayer, type OrcMachine, OrcMachines, orcMachinesLayer } from "./sources/pipelines";
+export { decodeHeavyCheck, HeavyCheck, type HeavyMachine, HeavyMachines, heavyMachinesLayer } from "./entities/queues";
+export { decodePueue, knownProjects, type PueueMachine, PueueMachines, pueueMachinesLayer, PueueStatus } from "./entities/queues";
+export { type MachineProjects } from "./entities/queues";
+export { type NoMistakesMachine, NoMistakesMachines, noMistakesMachinesLayer, type OrcMachine, OrcMachines, orcMachinesLayer } from "./entities/task-pipeline";
 export {
   type ActionsView,
   type ActionView,
@@ -394,6 +394,6 @@ export {
   type RunningRow,
   type RunOwners,
   type TestRun,
-} from "./views/queues";
+} from "./entities/queues";
 export { quotaBlocks, type QuotaBlock, type QuotaBlockBody, type SavedAge, type SavedWindow } from "./entities/session-quota";
 export * from "./feeds";

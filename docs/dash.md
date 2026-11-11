@@ -187,7 +187,7 @@ A report generated more than a minute before this machine's read is left out, an
 
 ### Read the resources report
 
-The report is one JSON object on one line, and `ResourcesReport` in `packages/schema/src/contract/resources.ts` decodes it.
+The report is one JSON object on one line, and `ResourcesReport` in `packages/schema/src/entities/resources/contract/resources.ts` decodes it.
 A reader checks `schemaVersion` first, and version 1 is the only version.
 Each reading is `kind` `ok` with its `value`, `unreachable` with a `reason`, or `invalid` with an `issue`.
 

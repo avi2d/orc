@@ -1,11 +1,11 @@
 import { DateTime } from "effect";
 import type { ScheduleEntry } from "../entities/task";
 import type { Failed, Outcome } from "../shared/lib";
-import type { RepoFailure } from "../sources/ci-runs";
-import type { PueueStatus } from "../sources/pueue";
+import type { RepoFailure } from "../entities/queues";
+import type { PueueStatus } from "../entities/queues";
 import type { MachineSchedule, ScheduleRead, ScheduleSource } from "../sources/schedules";
 import { nextMatch } from "../sources/calendar";
-import { projectOf } from "./queues";
+import { projectOf } from "../entities/queues";
 
 export type NextKind = ScheduleSource | "pueue" | "task";
 

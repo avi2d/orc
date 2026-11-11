@@ -1,5 +1,5 @@
 import { Duration, Effect } from "effect";
-import type { CommandRunner } from "../shared/lib";
+import type { CommandRunner } from "../../../shared/lib";
 
 export type ProjectNames = ReadonlyMap<string, string>;
 
