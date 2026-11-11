@@ -1,6 +1,6 @@
 import { Array as Arr, DateTime, Duration, Effect, FileSystem, Option, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { backlogPaths, closeStartedTask } from "./backlog"
+import { backlogPaths, closeStartedTask, findTask, listTasks } from "./backlog"
 import { recordEvent } from "./events"
 import { applyRunSplit, splitEventText } from "./split"
 import type { BeatAction, Progress } from "./beat-action"
@@ -79,13 +79,24 @@ const endTask = (
     }
     if (ending.kind === "split") {
       const at = yield* nowIso
-      const applied = yield* applyRunSplit(root, task, ending.plan, at).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
-      if (applied === null) {
+      const applied = yield* applyRunSplit(root, task, ending.plan, at).pipe(
+        Effect.map((value) => ({ kind: "applied" as const, value })),
+        Effect.catchTags({
+          BacklogError: (error) => Effect.succeed({ kind: "failed" as const, detail: error.detail }),
+          TaskFileError: (error) => Effect.succeed({ kind: "failed" as const, detail: error.detail })
+        })
+      )
+      if (applied.kind === "applied") {
+        const reason = ending.plan.reason.trim()
+        yield* recordEvent(root, { key: id + ".split", at, text: splitEventText(applied.value, "run", reason) }).pipe(Effect.catchTag("BacklogError", () => Effect.void))
+        return Option.some({ kind: "split", task: id, machine, children: applied.value.children.map((child) => child.spec.id), reason } satisfies BeatAction)
+      }
+      const reopened = yield* findTask(root, id).pipe(Effect.orElseSucceed(() => null))
+      if (reopened === null || reopened.state.kind !== "new" || reopened.spec.kind !== "parent") {
         return Option.none()
       }
-      const reason = ending.plan.reason.trim()
-      yield* recordEvent(root, { key: id + ".split", at, text: splitEventText(applied, "run", reason) }).pipe(Effect.catchTag("BacklogError", () => Effect.void))
-      return Option.some({ kind: "split", task: id, machine, children: applied.children.map((child) => child.spec.id), reason } satisfies BeatAction)
+      const children = (yield* listTasks(root).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<TaskRecord>))).filter((candidate) => candidate.spec.parent === id).map((candidate) => candidate.spec.id)
+      return Option.some({ kind: "close-failed", task: id, machine, reason: "split " + id + " into " + (children.length === 0 ? "no children" : children.join(", ")) + " failed: " + applied.detail } satisfies BeatAction)
     }
     const closed = yield* closeStartedTask(root, id, ending.outcome, ending.reason, { pr: ending.pr, report: ending.report }, yield* nowIso).pipe(
       Effect.catchTag("BacklogError", () => Effect.succeed(null))

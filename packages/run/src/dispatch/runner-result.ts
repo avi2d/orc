@@ -15,7 +15,7 @@ import { readPlanDocument, SplitDocument, type SplitPlan, splitReasonPrefix } fr
 import { orcGroup, PueueResult, PueueStatus } from "./pueue-status"
 import { LabelArg } from "./token"
 import { capture, decodeJson } from "./runner-exec"
-import { type Command, readHeld, refuse, resolveProjectDir, RunnerError, type RunnerRequirements, taskBranch } from "./runner"
+import { type Command, parentBranch, readHeld, refuse, resolveProjectDir, RunnerError, type RunnerRequirements, taskBranch } from "./runner"
 
 const RUNNER_JSON_SCHEMA = "orc.runner.v1" as const
 
@@ -205,7 +205,8 @@ const readRun = (home: string, checkout: string, task: string, interval: PueueIn
     const project = yield* resolveProjectDir(checkout)
     return yield* withRunDatabase(home, (db) =>
       Effect.gen(function*() {
-        const runs = yield* runsForBranch(db, project, taskBranch(task))
+        const grouped = yield* Effect.forEach([taskBranch(task), parentBranch(task)], (branch) => runsForBranch(db, project, branch))
+        const runs = grouped.flat().toSorted((left, right) => Date.parse(right.started) - Date.parse(left.started) || (right.id < left.id ? -1 : 1))
         const run = runs.find((candidate) => interval === null || startsWithin(candidate.started, interval)) ?? null
         return run === null
             ? null
@@ -236,8 +237,9 @@ const runLogAt = (home: string, runId: string): Effect.Effect<string | null, nev
 const readStoppedRun = (home: string, task: string): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
   withRunDatabase(home, (db) =>
     Effect.gen(function*() {
-      const latest = yield* latestRunForBranchName(db, taskBranch(task))
-      if (latest === null || latest.status !== "stopped") {
+      const latests = yield* Effect.forEach([taskBranch(task), parentBranch(task)], (branch) => latestRunForBranchName(db, branch))
+      const latest = latests.filter((run) => run !== null && run.status === "stopped").toSorted((left, right) => Date.parse(right.started) - Date.parse(left.started))[0] ?? null
+      if (latest === null) {
         return null
       }
       return toSummary(latest, yield* openQuestionsForRun(db, latest.id), yield* writtenReport(runDirFor(home, latest.id)), null)

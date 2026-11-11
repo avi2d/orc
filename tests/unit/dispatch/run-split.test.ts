@@ -5,10 +5,12 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Layer } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
+import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
 import { runBeat } from "../../../packages/run/src/dispatch/beat"
 import { formatBeat } from "../../../packages/run/src/dispatch/board"
 import { taskLabel } from "../../../packages/run/src/dispatch/pueue-status"
+import { startTask } from "../../../packages/run/src/dispatch/runner"
+import { resumePriorRun } from "../../../packages/run/src/history-resume"
 import { insertRun, openDatabase } from "../../../packages/run/src/run-history"
 import { quietSources } from "../../lib/beat-sources"
 
@@ -84,6 +86,52 @@ describe("the beat applying a worker's split proposal", () => {
       const event = await readFile(join(root, "events", "orc-1.split.json"), "utf8")
       expect(JSON.parse(event)).toMatchObject({ text: "orc-1 Ship task splitting split at run into orc-2 Record the split, orc-3 Show the plan: " + proposal.reason })
     })
+  })
+
+  test("a run-split parent starts its final check on its own branch with no prior run", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-run-split-parent-"))
+    try {
+      await writeFile(join(root, "dispatch.json"), JSON.stringify({ machines: [{ name: "mac", slots: 4, start: ["sh", "-c", "true", "runner", "start"] }], quota }))
+      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: "/checkout" } }] }))
+      await run(addTask(root, spec))
+      await run(claimTask(root, "orc-1"))
+      await run(writeTaken(root, { spec: { ...spec, id: "orc-1" }, hold: null, parked: null, state: { kind: "started", claim, started } }))
+      await run(Effect.acquireUseRelease(
+        openDatabase(root),
+        (db) => Effect.sync(() => insertRun(db, { id: "run-1", project: "/checkout", branch: "orc/orc-1", taskFile: "orc-1.md", status: "failed", started: started.at, prLink: null, endReason: "split proposal: " + JSON.stringify(proposal) })),
+        (db) => Effect.sync(() => db.close())
+      ))
+      await Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueFailed(root)))))
+      await run(closeStartedTask(root, "orc-2", "done", "child done", { pr: null, report: null }, "2026-11-11T10:06:00.000Z"))
+      await run(claimTask(root, "orc-3"))
+      const orc3 = (await run(listTasks(root))).find((task) => task.spec.id === "orc-3")
+      if (orc3 === undefined) {
+        throw new Error("orc-3 is missing after the split")
+      }
+      await run(writeTaken(root, { ...orc3, state: { kind: "started", claim, started } }))
+      await run(closeStartedTask(root, "orc-3", "done", "child done", { pr: null, report: null }, "2026-11-11T10:07:00.000Z"))
+      const second = await Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, pueueFailed(root)))))
+      const lines = formatBeat(second).split("\n")
+      expect(lines.some((line) => line.startsWith("started orc-1 on mac"))).toBe(true)
+      const parent = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
+      expect(parent?.state.kind).toBe("started")
+      const captured = join(root, "forwarded.json")
+      await Effect.runPromise(startTask({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: join(root, "taken", "orc-1.md"), ORC_TASK_CHECKOUT: "/checkout", ORC_TASK_PROVIDER: "test" }, Effect.succeed(""), { kind: "through", command: ["sh", "-c", "cat > " + captured] as const }, ["orc"] as const, root).pipe(Effect.provide(BunServices.layer)))
+      const forwarded = JSON.parse(await readFile(captured, "utf8")) as { readonly branch?: string }
+      expect(forwarded.branch).toBe("orc/orc-1-parent")
+      await run(Effect.acquireUseRelease(
+        openDatabase(root),
+        (db) => Effect.gen(function*() {
+          const prior = yield* resumePriorRun(db, "/checkout", "orc/orc-1-parent")
+          expect(prior).toBeNull()
+          const abandoned = yield* resumePriorRun(db, "/checkout", "orc/orc-1")
+          expect(abandoned?.id).toBe("run-1")
+        }),
+        (db) => Effect.sync(() => db.close())
+      ))
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   test("an invalid proposal closes the task failed instead of creating children", async () => {

@@ -48,6 +48,8 @@ export type RunnerRequirements = FileSystem.FileSystem | Path.Path | ChildProces
 
 export const taskBranch = (task: string): string => "orc/" + task
 
+export const parentBranch = (task: string): string => taskBranch(task) + "-parent"
+
 export const refuse = (detail: string): Effect.Effect<never, RunnerError> => Effect.fail(new RunnerError({ detail }))
 
 const queueRefusal = "the queue request on stdin is no task, checkout, provider and body with an optional tokenFile or an optional token and expiresAt"
@@ -65,19 +67,21 @@ export const readHeld = (home: string, task: string, label?: string | null): Eff
     Effect.map((state) => heldTask(state.tasks, home, task, label))
   )
 
-const markBranchRunsStopped = (home: string, project: string, branch: string, taskFile: string, started: string): Effect.Effect<void, RunnerError, RunnerRequirements> =>
+const markTaskRunsStopped = (home: string, project: string, task: string, taskFile: string, started: string): Effect.Effect<void, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
     const ended = DateTime.formatIso(yield* DateTime.now)
     yield* Effect.acquireUseRelease(
       openDatabase(home),
       (db) =>
         Effect.gen(function*() {
-          const runs = yield* runsForBranch(db, project, branch)
-          if (!runs.some((run) => run.status === "running")) {
-            yield* recordRun(db, { id: newRunId(), project, branch, taskFile, status: "stopped", started, ended, endReason: stoppedEndReason })
+          const branches = [taskBranch(task), parentBranch(task)]
+          const grouped = yield* Effect.forEach(branches, (branch) => runsForBranch(db, project, branch))
+          const running = grouped.flat().filter((run) => run.status === "running")
+          if (running.length === 0) {
+            yield* recordRun(db, { id: newRunId(), project, branch: taskBranch(task), taskFile, status: "stopped", started, ended, endReason: stoppedEndReason })
             return
           }
-          yield* Effect.forEach(runs.filter((run) => run.status === "running"), (run) => markRunStopped(db, run.id, ended, stoppedEndReason), { discard: true })
+          yield* Effect.forEach(running, (run) => markRunStopped(db, run.id, ended, stoppedEndReason), { discard: true })
         }),
       (db) => Effect.sync(() => db.close())
     )
@@ -108,11 +112,11 @@ export const killHeld = (
       onSome: (status) => "Running" in status ? status.Running.start : "Paused" in status ? status.Paused.start : null
     }) ?? DateTime.formatIso(yield* DateTime.now)
     if (killed) {
-      yield* markBranchRunsStopped(home, held.path, taskBranch(task), taskFile, started)
+      yield* markTaskRunsStopped(home, held.path, task, taskFile, started)
       return "killed pueue task " + held.id + " for " + task
     }
     yield* pueue(["remove", String(held.id)])
-    yield* markBranchRunsStopped(home, held.path, taskBranch(task), taskFile, started)
+    yield* markTaskRunsStopped(home, held.path, task, taskFile, started)
     return "removed pueue task " + held.id + " for " + task
   })
 
@@ -232,7 +236,7 @@ const queueTask = (
     const kind = request.kind === undefined ? [] : ["--kind", request.kind]
     const delivery = request.delivery === undefined ? [] : ["--delivery", request.delivery]
     const instructions = request.instructions === undefined ? [] : ["--instructions", yield* writeInstructions(folder + "/" + key + ".instructions", request.instructions)]
-    const run = [...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...kind, ...delivery, ...instructions, ...answers]
+    const run = [...self, "run", taskFile, "--branch", request.branch ?? (request.kind === "parent" ? parentBranch(request.task) : taskBranch(request.task)), "--sandbox", "none", "--provider", request.provider, ...kind, ...delivery, ...instructions, ...answers]
     const add = (command: ReadonlyArray<string>) =>
       pueue(["add", "--group", orcGroup, "--label", label, "--working-directory", project, "--print-task-id", "--escape", "--", ...command], { ORC_HOME: home })
     const holdArgs: ReadonlyArray<string> = label === taskLabel(home, request.task) ? [request.task] : [request.task, "--label", label]
@@ -303,7 +307,7 @@ const readRequest = (
       ? record.spec.body + "\n\nHeld for the captain: " + hold.reason + "\nThe captain answered: " + hold.answer.words
       : record.spec.body
     const resume = record.parked === null
-      ? {}
+      ? (record.spec.kind === "parent" ? { branch: parentBranch(task) } : {})
       : {
         branch: record.parked.branch,
         answers: record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ question: question.id, answer: question.answer.words }])
