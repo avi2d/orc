@@ -27,7 +27,6 @@ jobs:
       id-token: write
     uses: avi2d/workflows/.github/workflows/release.yml@v2
     with:
-      package-path: ./packages/run/package.json
       preflight-command: ./node_modules/.bin/checks-release-preflight release.yml
       tree-guard-command: bun scripts/tested-tree.ts
       build-command: bun run build
