@@ -300,7 +300,7 @@ export type Rewrite<A> = { readonly kind: "write"; readonly record: TaskRecord; 
 const rewriteIn = (folder: "new" | "taken") => <A>(
   root: string,
   id: string,
-  decide: (fresh: TaskRecord) => Effect.Effect<Rewrite<A>, BacklogError>
+  decide: (fresh: TaskRecord) => Effect.Effect<Rewrite<A>, BacklogError, FileSystem.FileSystem>
 ): Effect.Effect<A, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem

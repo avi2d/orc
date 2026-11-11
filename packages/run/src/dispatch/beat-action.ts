@@ -24,7 +24,14 @@ export type BeatAction =
     readonly report: string | null
   }
   | { readonly kind: "close-failed"; readonly task: string; readonly machine: string; readonly reason: string }
-  | { readonly kind: "parked"; readonly task: string; readonly machine: string; readonly branch: string; readonly questions: ReadonlyArray<string> }
+  | {
+    readonly kind: "parked"
+    readonly task: string
+    readonly machine: string
+    readonly branch: string
+    readonly questions: ReadonlyArray<string>
+    readonly decider: ReadonlyArray<string>
+  }
   | { readonly kind: "asking"; readonly task: string; readonly machine: string; readonly until: string; readonly questions: ReadonlyArray<string> }
   | { readonly kind: "answered"; readonly task: string; readonly machine: string; readonly questions: ReadonlyArray<string> }
   | { readonly kind: "answer-failed"; readonly task: string; readonly machine: string; readonly reason: string }

@@ -229,6 +229,39 @@ describe("openCheckout refuse markers", () => {
 })
 
 describe("runWithHistory decides the implement step", () => {
+  test("an over-budget worker returns its split instead of running checks or opening a PR", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const proposal = { schema: "orc.split.v1", plan: "split", reason: "two areas", done: ["both work"], children: [
+          { title: "First", body: "Ship the first area.", after: [] },
+          { title: "Second", body: "Ship the second area.", after: [1] }
+        ] }
+        await capturedSession(home, sessionEnding({ role: "assistant", content: [{ type: "text", text: "ORC_SPLIT\n" + JSON.stringify(proposal) }], stopReason: "stop" }))
+        const outcome = await runStep(dir, home, async (_run, sessionsDir) => ({ sessionId: "split", sessionFile: join(sessionsDir, "2026-10-19T10-00-00-000Z_0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b.jsonl"), commits: [] }))
+        expect(outcome.run?.endReason).toBe("split proposal: " + JSON.stringify(proposal))
+        expect(outcome.report.prLink).toBeNull()
+        expect(outcome.report.checksRounds).toBeNull()
+        expect(outcome.nmCalls).toBe("")
+      })
+    })
+  }, 60_000)
+
+  test("a split that stopped cleanly is accepted even when Pi exited nonzero instead of rejecting on the exit code", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const proposal = { schema: "orc.split.v1", plan: "split", reason: "two areas", done: ["both work"], children: [
+          { title: "First", body: "First area.", after: [] }, { title: "Second", body: "Second area.", after: [] }
+        ] }
+        const sha = await commitOnBranch(dir, "orc/test")
+        await capturedSession(home, sessionEnding({ role: "assistant", content: [{ type: "text", text: "ORC_SPLIT\n" + JSON.stringify(proposal) + "\nORC_COMPLETE" }], stopReason: "stop" }))
+        const outcome = await runStep(dir, home, async (_run, sessionsDir) => ({ sessionId: "split", sessionFile: join(sessionsDir, "2026-10-19T10-00-00-000Z_0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b.jsonl"), commits: [{ sha }], exitCode: 1 }))
+        expect(outcome.run?.endReason).toBe("split proposal: " + JSON.stringify(proposal))
+        expect(outcome.report.checksRounds).toBeNull()
+        expect(outcome.report.prLink).toBeNull()
+      })
+    })
+  }, 60_000)
+
   test("a provider error echoing the prompt is recorded failed even with a new commit", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {

@@ -9,7 +9,8 @@ import type { Claim, TaskFileError, TaskRecord } from "./task-record"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
 import type { BeatAction, Progress } from "./beat-action"
 import { closeFinished } from "./beat-close"
-import { isOverdue, openItems, openRunDeaths, routeTaskItems } from "./attention"
+import { openRunDeaths, routeTaskItems } from "./attention"
+import { attentionActions } from "./beat-attention"
 import { type AskDecider, decideReviewQuestions } from "./decider"
 import { askDeciderWithPi } from "./decider-ask"
 import { handAnswersToResume } from "./parked"
@@ -365,9 +366,7 @@ export const runBeat = (
     yield* routeTaskItems(root, current, at)
     yield* openRunDeaths(root, settled.closed, at)
     const { latest, relayed } = yield* decideAndRelay(root, context, started, progress, current, sources.askDecider)
-    const queue = (yield* openItems(root)).map(({ id, item }): BeatAction => ({
-      kind: "attention", item: id, task: item.task, owner: item.owner, overdue: isOverdue(item, Date.parse(at)), text: item.text
-    }))
+    const { reported, queue } = yield* attentionActions(root, latest, [...settled.closed, ...relayed.closed, ...settled.asking, ...relayed.asking], at)
     const queued = latest.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: latest, overloaded }
@@ -376,10 +375,7 @@ export const runBeat = (
     yield* openRunDeaths(root, actions, at)
     const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at))
     return { beat, at, quota, room: readRoom(config.machines, latest), actions: [
-        ...settled.closed,
-        ...relayed.closed,
-        ...settled.asking,
-        ...relayed.asking,
+        ...reported,
         ...stalls.flatMap(Option.toArray),
         ...upstream,
         ...queue,

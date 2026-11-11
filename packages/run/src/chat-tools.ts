@@ -6,7 +6,7 @@ import { ChatToolError } from "./chat-error"
 import { type Deliver, postUnposted, type PostState, readBacklog } from "./chat-posts"
 import { AddTaskInput, AnswerInput, BoardInput, HoldInput, MergeInput } from "./chat-inputs"
 import { lavishLauncher } from "./chat-lavish"
-import { parkedListing } from "./chat-parked"
+import { AttentionJson, parkedListing } from "./chat-parked"
 
 export const orcCommandVar = "ORC_CHAT_ORC"
 
@@ -234,7 +234,14 @@ export const chatSession = (
   const tools = chatTools(env, boards)
   const postClosed = postUnposted((args, stdin) => runOrc(env, args, stdin), isOpen, deliverAs, state)
   const postHeld = postOpenHeld(env, deliverAs("held"), state)
-  const parked = parkedListing(readBacklog((args, stdin) => runOrc(env, args, stdin)).pipe(Effect.map((backlog) => backlog.tasks)), deliverAs("parked"))
+  const parked = parkedListing(Effect.gen(function*() {
+    const backlog = yield* readBacklog((args, stdin) => runOrc(env, args, stdin))
+    const text = yield* runOrc(env, ["attention", "--json"], null)
+    const attention = yield* Schema.decodeEffect(AttentionJson)(text).pipe(
+      Effect.mapError((error) => new ChatToolError({ message: "orc attention --json printed no attention queue orc chat reads: " + error.message }))
+    )
+    return { tasks: backlog.tasks, deciderOwned: new Set([...attention.items, ...attention.decided].filter((item) => item.owner === "decider").map((item) => item.id)) }
+  }), deliverAs("parked"))
   const postParked = () => Effect.runPromise(parked.post)
   return {
     tools,

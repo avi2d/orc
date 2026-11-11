@@ -1,5 +1,40 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { BunFileSystem } from "@effect/platform-bun";
+import { Effect, Layer } from "effect";
+import { type Command, CommandRunner, CommandUnreachable } from "@avi2dg/orc-schema";
+import { listTasks } from "../../packages/run/src/dispatch/backlog";
+import { backlogJson } from "../../packages/run/src/dispatch/board";
+import { mergedIds } from "../../packages/run/src/dispatch/events";
+
+const isBacklogJson = (command: Command): boolean => command.argv.join(" ") === "orc backlog --json";
+
+export const emptyBacklogStdout = JSON.stringify({ schema: "orc.backlog.v1", tasks: [] });
+
+export const orcBacklogPrinting = (stdout: string): Layer.Layer<CommandRunner> =>
+  Layer.succeed(CommandRunner, {
+    run: (command) =>
+      isBacklogJson(command)
+        ? Effect.succeed(stdout)
+        : Effect.fail(new CommandUnreachable({ reason: command.argv.join(" ") + " is not orc backlog --json" })),
+  });
+
+export const realBacklogStdout = (backlog: string): Promise<string> =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const tasks = yield* listTasks(backlog);
+      const merged = yield* mergedIds(backlog);
+      return JSON.stringify(
+        backlogJson({
+          tasks,
+          events: [],
+          projects: { kind: "read", projects: [] },
+          room: { kind: "read", room: [] },
+          merged,
+        }),
+      );
+    }).pipe(Effect.provide(BunFileSystem.layer)),
+  );
 
 const front = (fields: ReadonlyArray<readonly [string, string]>): string =>
   ["---", ...fields.map(([key, value]) => key + ": " + value), "---", ""].join(String.fromCharCode(10));
