@@ -1,7 +1,7 @@
 import { Data, DateTime, Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { bundledAgentsDir } from "../agents"
-import { claimDeciding, openItems, readItem, recordDecision, reviewQuestionId, routeReviewQuestions } from "./attention"
+import { claimDeciding, openItems, recordDecision, reviewQuestionId, routeReviewQuestions } from "./attention"
 import { findTask } from "./backlog"
 import type { BacklogError } from "./backlog-write"
 import { answerTask } from "./parked"
@@ -73,13 +73,8 @@ const settle = (root: string, task: TaskRecord, question: ParkedQuestion, item: 
     const fresh = yield* findTask(root, task.spec.id)
     const stored = fresh.parked?.questions.find((candidate) => candidate.id === question.id)?.answer
     if (stored !== null && stored !== undefined) {
-      yield* recordDecision(root, item, { kind: "answered", reason: verdict.reason, at })
       yield* routeReviewQuestions(root, [fresh], at)
       return { kind: "answered", words: stored.words, reason: verdict.reason } satisfies Verdict
-    }
-    const reread = yield* readItem(root, item)
-    if (reread !== null && reread.state.kind === "closed") {
-      return { kind: "answered", words: reread.state.answer.words, reason: verdict.reason } satisfies Verdict
     }
     const escalated: Verdict = { kind: "escalated", reason: "the decider's answer did not reach the task: " + refused }
     yield* recordDecision(root, item, { kind: "escalated", reason: escalated.reason, at })
