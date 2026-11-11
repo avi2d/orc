@@ -6,6 +6,7 @@ import type { TaskRecord } from "./task-record"
 const overdueMillis = 5 * 60 * 1000
 
 export const deciderTimeoutMillis = 180 * 1000
+export const deciderClaimMillis = deciderTimeoutMillis + 60 * 1000
 
 const Answer = Schema.Struct({ words: Schema.String, at: Schema.String })
 
@@ -130,7 +131,7 @@ export const claimDeciding = (root: string, id: string, at: string): Effect.Effe
       return false
     }
     const since = item.deciding === undefined ? Number.NaN : Date.parse(item.deciding.at)
-    if (!Number.isNaN(since) && Date.parse(at) - since < deciderTimeoutMillis) {
+    if (!Number.isNaN(since) && Date.parse(at) - since < deciderClaimMillis) {
       return false
     }
     return yield* replaceItem(root, id, before, yield* encodeItem(id, { ...item, deciding: { at } }))
@@ -146,33 +147,42 @@ export interface OpenItem {
   readonly item: AttentionItem
 }
 
-export const openItems = (root: string): Effect.Effect<ReadonlyArray<OpenItem>, BacklogError, FileSystem.FileSystem> =>
+const readAllItems = (root: string): Effect.Effect<ReadonlyArray<OpenItem>, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const ids = (yield* readNames(attentionFolder(root)))
       .filter((name) => name.endsWith(fileSuffix) && !name.startsWith("."))
       .map((name) => name.slice(0, -fileSuffix.length))
     const read = yield* Effect.forEach(ids, (id) => readItem(root, id).pipe(Effect.map((item) => (item === null ? null : { id, item }))))
     return read
-      .filter((entry): entry is OpenItem => entry !== null && entry.item.state.kind === "open")
+      .filter((entry): entry is OpenItem => entry !== null)
       .toSorted((left, right) => Date.parse(left.item.asked) - Date.parse(right.item.asked) || left.id.localeCompare(right.id))
   })
+
+export const openItems = (root: string): Effect.Effect<ReadonlyArray<OpenItem>, BacklogError, FileSystem.FileSystem> =>
+  Effect.map(readAllItems(root), (entries) => entries.filter((entry) => entry.item.state.kind === "open"))
 
 export interface DecidedItem {
   readonly id: string
   readonly item: AttentionItem
 }
 
-export const decidedItems = (root: string, tasks: ReadonlyArray<TaskRecord>): Effect.Effect<ReadonlyArray<DecidedItem>, BacklogError, FileSystem.FileSystem> =>
+export interface AttentionSnapshot {
+  readonly open: ReadonlyArray<OpenItem>
+  readonly decided: ReadonlyArray<DecidedItem>
+}
+
+export const readAttention = (root: string, tasks: ReadonlyArray<TaskRecord>): Effect.Effect<AttentionSnapshot, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const closedTasks = new Set(tasks.filter((task) => task.state.kind === "closed").map((task) => task.spec.id))
-    const ids = (yield* readNames(attentionFolder(root)))
-      .filter((name) => name.endsWith(fileSuffix) && !name.startsWith("."))
-      .map((name) => name.slice(0, -fileSuffix.length))
-    const read = yield* Effect.forEach(ids, (id) => readItem(root, id).pipe(Effect.map((item) => (item === null ? null : { id, item }))))
-    return read
-      .filter((entry): entry is DecidedItem => entry !== null && entry.item.state.kind === "closed" && entry.item.decision?.kind === "answered" && !closedTasks.has(entry.item.task))
-      .toSorted((left, right) => Date.parse(left.item.asked) - Date.parse(right.item.asked) || left.id.localeCompare(right.id))
+    const entries = yield* readAllItems(root)
+    return {
+      open: entries.filter((entry) => entry.item.state.kind === "open"),
+      decided: entries.filter((entry): entry is DecidedItem => entry.item.state.kind === "closed" && entry.item.decision?.kind === "answered" && !closedTasks.has(entry.item.task))
+    }
   })
+
+export const decidedItems = (root: string, tasks: ReadonlyArray<TaskRecord>): Effect.Effect<ReadonlyArray<DecidedItem>, BacklogError, FileSystem.FileSystem> =>
+  Effect.map(readAttention(root, tasks), (snapshot) => snapshot.decided)
 
 export const ageMillis = (item: AttentionItem, nowMillis: number): number => Math.max(0, nowMillis - Date.parse(item.asked))
 

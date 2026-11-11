@@ -343,9 +343,10 @@ export const runBeat = (
     const decided = yield* decideReviewQuestions(root, current, sources.askDecider)
     const latest = decided.some((entry) => entry.verdict.kind === "answered") ? yield* listTasks(root) : current
     const answeredTasks = new Set(decided.flatMap((entry) => entry.verdict.kind === "answered" ? [entry.task] : []))
+    const firstRunning = new Set(started.flatMap((task, index) => progress[index]?.kind === "running" ? [task.spec.id] : []))
     const relayProgress = answeredTasks.size === 0
       ? []
-      : yield* Effect.forEach(latest.filter((task) => task.state.kind === "started" && answeredTasks.has(task.spec.id)), (task) => closeFinished(context, task))
+      : yield* Effect.forEach(latest.filter((task) => task.state.kind === "started" && answeredTasks.has(task.spec.id) && firstRunning.has(task.spec.id)), (task) => closeFinished(context, task))
     const relayed = settledProgress(relayProgress)
     releaseClosedSlots(context.live, relayed.closed)
     const queued = latest.filter((task) => task.state.kind === "new")

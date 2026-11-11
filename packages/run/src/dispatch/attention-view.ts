@@ -1,5 +1,5 @@
 import { DateTime, Effect, type FileSystem } from "effect"
-import { ageMillis, type AttentionItem, type DecidedItem, decidedItems, isOverdue, type OpenItem, openItems } from "./attention"
+import { ageMillis, type AttentionItem, type DecidedItem, isOverdue, type OpenItem, readAttention } from "./attention"
 import { listTasks } from "./backlog"
 import { type BacklogError, backlogPresent, noBacklog } from "./backlog-write"
 import type { TaskFileError } from "./task-record"
@@ -64,13 +64,11 @@ const ageText = (seconds: number): string => {
 
 const formatAttention = (items: ReadonlyArray<OpenItem>, decided: ReadonlyArray<DecidedItem>, at: string): string => {
   const view = attentionJson(items, at, decided)
-  const open = view.items.length > 0
-    ? formatTable(
-      ["ITEM", "KIND", "TASK", "OWNER", "AGE", "TEXT"],
-      view.items.map((item) => [item.id, item.kind, item.task, item.owner, ageText(item.ageSeconds) + (item.overdue ? " overdue" : ""), item.text]),
-      "nothing needs anyone"
-    )
-    : "nothing needs anyone"
+  const open = formatTable(
+    ["ITEM", "KIND", "TASK", "OWNER", "AGE", "TEXT"],
+    view.items.map((item) => [item.id, item.kind, item.task, item.owner, ageText(item.ageSeconds) + (item.overdue ? " overdue" : ""), item.text]),
+    "nothing needs anyone"
+  )
   const answered = view.decided.map((entry) => "answered " + entry.id + ": " + entry.answer.words + " (" + entry.decision.reason + ")")
   return answered.length > 0 ? open + "\n\nDecided:\n" + answered.join("\n") : open
 }
@@ -80,8 +78,7 @@ export const attentionText = (json: boolean, root: string): Effect.Effect<string
     if (!json && !(yield* backlogPresent(root))) {
       return noBacklog(root)
     }
-    const items = yield* openItems(root)
-    const decided = yield* decidedItems(root, yield* listTasks(root))
+    const snapshot = yield* readAttention(root, yield* listTasks(root))
     const at = DateTime.formatIso(yield* DateTime.now)
-    return json ? JSON.stringify(attentionJson(items, at, decided)) : formatAttention(items, decided, at)
+    return json ? JSON.stringify(attentionJson(snapshot.open, at, snapshot.decided)) : formatAttention(snapshot.open, snapshot.decided, at)
   })
