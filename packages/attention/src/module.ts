@@ -5,7 +5,6 @@ import {
   failureRows,
   type Label,
   labelledReadings,
-  leastLabelWidth,
   listPlaced,
   type Mounted,
   mountPolled,
@@ -24,7 +23,10 @@ import { attentionLines, nothingOpen } from "./lines";
 
 type AttentionReading = PolledReading<Outcome<AttentionQueue>>;
 
-const label: Label = { text: "attention", width: leastLabelWidth };
+const name = "attention";
+
+// The name is as wide as the shortest label column, so it takes one space of its own.
+const label: Label = { text: name, width: name.length + 1 };
 
 const glanceOf = (queue: Outcome<AttentionQueue>, width: number): Block => {
   if (queue.kind !== "ok") return failureRows(label, queue, width);
