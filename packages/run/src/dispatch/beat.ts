@@ -5,7 +5,7 @@ import type { ConfigError } from "../json-file"
 import { type Account, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "./config"
 import { type MachineRoom, type Placed, placeTask, readRoom, taskWait } from "./beat-place"
 import { type QuotaReading, readQuota } from "./quota"
-import type { Claim, TaskFileError, TaskRecord } from "./task-record"
+import type { Claim, DeciderOwns, TaskFileError, TaskRecord } from "./task-record"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "./token"
 import type { BeatAction, Progress } from "./beat-action"
 import { closeFinished } from "./beat-close"
@@ -199,11 +199,12 @@ const credentialFor = (
 
 const considerTask = (
   context: BeatContext,
+  deciderOwns: DeciderOwns,
   task: TaskRecord
 ): Effect.Effect<BeatAction, BacklogError | TaskFileError, BeatRequirements> =>
   Effect.gen(function*() {
     const waits = (reason: string): BeatAction => ({ kind: "waits", task: task.spec.id, reason })
-    const waiting = taskWait(task, context.tasks, context.merged)
+    const waiting = taskWait(task, context.tasks, context.merged, deciderOwns)
     if (waiting !== null) {
       return waits(waiting)
     }
@@ -218,7 +219,7 @@ const considerTask = (
     if (credential.kind === "waits") {
       return waits(credential.reason)
     }
-    const claimed = yield* claimUnheld(context.root, task.spec.id)
+    const claimed = yield* claimUnheld(context.root, task.spec.id, deciderOwns)
     if (claimed.kind !== "claimed") {
       return claimed.kind === "lost" ? { kind: "lost", task: task.spec.id } satisfies BeatAction : waits(claimed.reason)
     }
@@ -366,12 +367,12 @@ export const runBeat = (
     yield* routeTaskItems(root, current, at)
     yield* openRunDeaths(root, settled.closed, at)
     const { latest, relayed } = yield* decideAndRelay(root, context, started, progress, current, sources.askDecider)
-    const { reported, queue } = yield* attentionActions(root, latest, [...settled.closed, ...relayed.closed, ...settled.asking, ...relayed.asking], at)
+    const { reported, queue, deciderOwns } = yield* attentionActions(root, latest, [...settled.closed, ...relayed.closed, ...settled.asking, ...relayed.asking], at)
     const queued = latest.filter((task) => task.state.kind === "new")
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: latest, overloaded }
     const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))
-    const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, task))
+    const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, deciderOwns, task))
     yield* openRunDeaths(root, actions, at)
     const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at))
     return { beat, at, quota, room: readRoom(config.machines, latest), actions: [

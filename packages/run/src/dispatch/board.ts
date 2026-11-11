@@ -4,7 +4,7 @@ import type { Project } from "./config"
 import { describeQuota } from "./quota"
 import type { TaskKind } from "../task-kind"
 import type { ChatEvent } from "./chat-event"
-import { type Claim, type Hold, isHeld, openQuestions, type Parked, type SplitMark, type Started, type TaskRecord } from "./task-record"
+import { answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, type SplitMark, type Started, type TaskRecord } from "./task-record"
 
 const BACKLOG_JSON_SCHEMA = "orc.backlog.v1" as const
 const BEAT_JSON_SCHEMA = "orc.beat.v1" as const
@@ -18,6 +18,7 @@ export interface BacklogView {
   readonly projects: ProjectList
   readonly room: RoomList
   readonly merged: ReadonlySet<string>
+  readonly deciderOwns: DeciderOwns
 }
 
 type TaskStatusJson =
@@ -117,7 +118,7 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     machine: record.spec.machine,
     parent: record.spec.parent,
     children: record.spec.kind === "parent" ? childCount(record, view.tasks, view.merged) : null,
-    wait: record.state.kind === "new" ? taskWait(record, view.tasks, view.merged) : null,
+    wait: record.state.kind === "new" ? taskWait(record, view.tasks, view.merged, view.deciderOwns) : null,
     split: record.spec.split,
     dependsOn: record.spec.dependsOn,
     created: record.spec.created,
@@ -234,11 +235,7 @@ const actionLine = (action: BeatAction): string => {
       return "close failed " + action.task + " on " + action.machine + ": " + action.reason
     }
     case "parked": {
-      const answers = [
-        ...(action.questions.length === 0 ? [] : ["the captain's answer to " + action.questions.join(", ")]),
-        ...(action.decider.length === 0 ? [] : ["the decider's answer to " + action.decider.join(", ")])
-      ]
-      return "parked " + action.task + " on " + action.branch + " for " + answers.join(" and ")
+      return "parked " + action.task + " on " + action.branch + " for " + answersAwaited(action.questions, action.decider)
     }
     case "asking": {
       return "asking " + action.task + " on " + action.machine + ": the run waits until " + action.until + " for the captain's answer to " + action.questions.join(", ")

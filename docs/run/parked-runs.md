@@ -21,6 +21,7 @@ The beat moves the task back to `new` with `parked_branch` and `parked_questions
 It prints `parked <task-id> on <branch> for the captain's answer to <question-ids>`.
 A question the attention queue owns for the decider shows as `the decider's answer to <question-ids>` instead, after an `and` when you answer the others.
 Each later beat prints `waits <task-id>: parked on <branch> for the captain's answer to <question-ids>` and never starts it.
+That line names a question the attention queue owns for the decider the same way, as `the decider's answer to <question-ids>`, and so does the `wait` that `orc backlog --json` gives the task.
 To answer one question, run `orc backlog answer <task-id> <question-id>=<text>`.
 The task file keeps your text and its time on that question, and the other questions stay parked.
 Once every question has an answer, the next beat starts the task again on the same branch with `--answer <question-id>=<text>` for each one.

@@ -1,5 +1,5 @@
 import { Array as Arr, Effect, FileSystem, Schema } from "effect"
-import { captainWait, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
+import { answerWait, type DeciderOwns, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 import { renderTaskFile } from "./task-record-render"
 import { BacklogError, backlogPaths, grabbedFile, platformFailure, publishOnce, scratchName, takeFile, takenGrab } from "./backlog-write"
 
@@ -135,13 +135,13 @@ type Claimed =
   | { readonly kind: "held"; readonly reason: string }
 
 // A hold can land after a beat listed the task, so the file the claim took is read again and a held or parked one goes back to new.
-export const claimUnheld = (root: string, id: string): Effect.Effect<Claimed, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+export const claimUnheld = (root: string, id: string, deciderOwns: DeciderOwns): Effect.Effect<Claimed, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const record = (yield* claimTask(root, id)) ? yield* readTask(root, "taken", id) : null
     if (record === null) {
       return { kind: "lost" } satisfies Claimed
     }
-    const reason = captainWait(record)
+    const reason = answerWait(record, deciderOwns)
     if (reason === null) {
       return { kind: "claimed", record } satisfies Claimed
     }
