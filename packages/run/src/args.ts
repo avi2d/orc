@@ -264,6 +264,31 @@ const parseDispatchCommand = (first: string, rest: readonly string[]): OrcArgs |
   const dispatch = parseDispatchArgs(first, rest)
   return dispatch.kind === "UsageError" ? dispatch : { kind: "Dispatch", args: dispatch }
 }
+const parseAppArgs = (rest: readonly string[]): OrcArgs =>
+  rest.length === 1 && rest[0] === "install" ? { kind: "InstallApp" } : { kind: "UsageError", detail: "orc app takes install" }
+const parseChatArgs = (rest: readonly string[]): OrcArgs =>
+  rest.length === 0 ? { kind: "Chat" } : { kind: "UsageError", detail: `orc chat takes no argument: ${rest[0]}` }
+const parseFlagArgs = (first: string, rest: readonly string[]): OrcArgs => {
+  const dispatchCommand = parseDispatchCommand(first, rest)
+  if (dispatchCommand !== null) {
+    return dispatchCommand
+  }
+  if (rest.length > 0) {
+    return { kind: "UsageError", detail: `unexpected argument: ${rest[0]}` }
+  }
+  switch (first) {
+    case "--version": {
+      return { kind: "PrintVersion" }
+    }
+    case "--help":
+    case "-h": {
+      return { kind: "PrintHelp" }
+    }
+    default: {
+      return { kind: "UsageError", detail: `unknown flag: ${first}` }
+    }
+  }
+}
 const parseWords = (args: readonly string[]): OrcArgs => {
   if (args.length === 0) {
     return { kind: "UsageError", detail: "orc takes one flag" }
@@ -285,30 +310,12 @@ const parseWords = (args: readonly string[]): OrcArgs => {
     return parseRunArgs(rest)
   }
   if (first === "app") {
-    return rest.length === 1 && rest[0] === "install" ? { kind: "InstallApp" } : { kind: "UsageError", detail: "orc app takes install" }
+    return parseAppArgs(rest)
   }
   if (first === "chat") {
-    return rest.length === 0 ? { kind: "Chat" } : { kind: "UsageError", detail: `orc chat takes no argument: ${rest[0]}` }
+    return parseChatArgs(rest)
   }
-  const dispatchCommand = parseDispatchCommand(first, rest)
-  if (dispatchCommand !== null) {
-    return dispatchCommand
-  }
-  if (rest.length > 0) {
-    return { kind: "UsageError", detail: `unexpected argument: ${rest[0]}` }
-  }
-  switch (first) {
-    case "--version": {
-      return { kind: "PrintVersion" }
-    }
-    case "--help":
-    case "-h": {
-      return { kind: "PrintHelp" }
-    }
-    default: {
-      return { kind: "UsageError", detail: `unknown flag: ${first}` }
-    }
-  }
+  return parseFlagArgs(first, rest)
 }
 export const parseArgs = (args: readonly string[]): OrcArgs =>
   subcommands.has(args[0] ?? "") && asksForHelp(args.slice(1)) ? { kind: "PrintHelp" } : parseWords(args)
