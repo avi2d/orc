@@ -256,9 +256,11 @@ const asksForHelp = (rest: readonly string[]): boolean => {
   return (end === -1 ? words : words.slice(0, end)).some((word) => helpFlags.has(word))
 }
 const subcommands = new Set(["app", "runs", "refusals", "show", "score", "run", "chat", "backlog", "attention", "beat", "runner", "merge", "heavy"])
-const dispatchSubcommands = new Set(["backlog", "attention", "beat", "runner", "merge", "heavy"])
+const dispatchSubcommands = ["backlog", "attention", "beat", "runner", "merge", "heavy"] as const
+type DispatchSubcommand = typeof dispatchSubcommands[number]
+const isDispatchSubcommand = (word: string): word is DispatchSubcommand => (dispatchSubcommands as ReadonlyArray<string>).includes(word)
 const parseDispatchCommand = (first: string, rest: readonly string[]): OrcArgs | null => {
-  if (!dispatchSubcommands.has(first)) {
+  if (!isDispatchSubcommand(first)) {
     return null
   }
   const dispatch = parseDispatchArgs(first, rest)
