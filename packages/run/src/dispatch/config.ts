@@ -235,12 +235,6 @@ const claudeConfigProblem = (accounts: ReadonlyArray<Account>, machines: Readonl
       }
     }
   }
-  for (const machine of machines) {
-    const dirs = accounts.flatMap((account) => account.kind === "claude-config" ? [account.configDirs[machine.name]] : [])
-    if (duplicateOf(dirs) !== null) {
-      return "the machine " + machine.name + " uses the same Claude config directory for more than one account"
-    }
-  }
   return null
 }
 

@@ -56,7 +56,7 @@ export const assessQuota = (document: unknown, settings: QuotaSettings): QuotaRe
   const accounts = settings.accounts.map(({ name }) => readAccount(decoded.success.accounts.find((entry) => entry.name === name), name))
   let pick: { readonly account: string; readonly remainingPercent: number } | null = null
   for (const reading of accounts) {
-    if (reading.kind === "usable" && reading.remainingPercent >= settings.floorPercent && reading.remainingPercent > (pick?.remainingPercent ?? -1)) {
+    if (reading.kind === "usable" && reading.remainingPercent > 0 && reading.remainingPercent >= settings.floorPercent && reading.remainingPercent > (pick?.remainingPercent ?? -1)) {
       pick = reading
     }
   }
@@ -94,6 +94,6 @@ export const describeQuota = (reading: QuotaReading): string => {
   const accounts = reading.accounts.map((account) =>
     account.kind === "usable" ? account.account + " " + account.remainingPercent + "% left" : account.account + " unusable, " + account.reason
   )
-  const verdict = reading.pick === null ? "no account is at or above the floor" : "runs use " + reading.pick
+  const verdict = reading.pick === null ? "no account has room at or above the floor" : "runs use " + reading.pick
   return "quota: " + accounts.join(", ") + ", floor " + reading.floorPercent + "%: " + verdict
 }

@@ -42,8 +42,8 @@ describe("orc runner queue for a kind none account", () => {
       await writeFile(join(fixture.home, "backlog", "dispatch.json"), JSON.stringify({
         machines: [{ name: "linux", slots: 1, start: [process.execPath, binPath, "runner", "start", "--", ...orcThere(fixture.home)] }],
         quota: { provider: "acme", command: ["orc-quota"], accounts: [
-          { name: "main", kind: "claude-config", configDirs: { linux: "/accounts/main" } },
-          { name: "second", kind: "claude-config", configDirs: { linux: "/accounts/second" } }
+          { name: "main", kind: "claude-config", configDirs: { linux: "/accounts/main", mac: "/accounts/mac-main" } },
+          { name: "second", kind: "claude-config", configDirs: { linux: "/accounts/second", mac: "/accounts/mac-second" } }
         ] }
       }))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))

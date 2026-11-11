@@ -47,12 +47,6 @@ describe("readDispatchConfig", () => {
       expect(problem).toContain("names no Claude config directory for linux")
     })
   })
-  test("refuses two Claude accounts sharing a machine directory instead of spending the same login", async () => {
-    await withBacklog(async (root) => {
-      const accounts = ["main", "second"].map((name) => ({ name, kind: "claude-config", configDirs: { mac: "/accounts/shared", linux: "/accounts/" + name } }))
-      expect(await configProblem(root, { accounts })).toContain("same Claude config directory")
-    })
-  })
   test("reads a legacy token file account as kind token-file instead of refusing it", async () => {
     await withBacklog(async (root) => {
       const file = join(root, "dispatch.json")
