@@ -305,7 +305,7 @@ export const queueCall = async (call: StandinCall, real: string, args: ReadonlyA
   } catch {
     return fail("pueue refused the task; " + repairHint)
   }
-  const reply = (added.stdout.toString() + added.stderr.toString()).replace(/\n+$/, "")
+  const reply = ((added.stdout?.toString() ?? "") + (added.stderr?.toString() ?? "")).replace(/\n+$/, "")
   if (added.exitCode !== 0) {
     return fail("pueue refused the task; " + repairHint)
   }
