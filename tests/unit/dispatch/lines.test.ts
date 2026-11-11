@@ -7,16 +7,18 @@ import { ConfigProvider, Effect, Layer } from "effect";
 import { DispatchSource, dispatchSourceLayer, type DispatchView, dispatchView } from "@avi2dg/orc-schema";
 import { dispatchLines, dispatchSection } from "@avi2dg/orc-dispatch";
 import { plain } from "@avi2dg/orc-ui";
-import { orcBacklogAnswering, writeDispatchBacklog } from "../../lib/dispatch-fixture";
+import { emptyBacklogStdout, orcBacklogPrinting, realBacklogStdout, writeDispatchBacklog } from "../../lib/dispatch-fixture";
 
 const width = 84;
 
-const viewOf = (home: string): Promise<DispatchView> =>
+const viewOfWith = (home: string, stdout: string): Promise<DispatchView> =>
   Effect.runPromise(
     Effect.map(Effect.flatMap(DispatchSource, (source) => source.read), (reading) => dispatchView(reading.snapshot)).pipe(
-      Effect.provide(dispatchSourceLayer.pipe(Layer.provide(BunFileSystem.layer), Layer.provide(orcBacklogAnswering()), Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: home, ORC_HOME: home }))))),
+      Effect.provide(dispatchSourceLayer.pipe(Layer.provide(BunFileSystem.layer), Layer.provide(orcBacklogPrinting(stdout)), Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: home, ORC_HOME: home }))))),
     ),
   );
+
+const viewOf = (home: string): Promise<DispatchView> => realBacklogStdout(join(home, "backlog")).then((stdout) => viewOfWith(home, stdout));
 
 const withView = async (body: (view: DispatchView) => void): Promise<void> => {
   const root = await mkdtemp(join(tmpdir(), "orc-dispatch-"));
@@ -73,7 +75,7 @@ describe("the dispatch panel, against the recorded backlog", () => {
     try {
       await writeDispatchBacklog(join(root, "backlog"));
       await writeFile(join(root, "backlog", "new", "task-11.md"), "no frontmatter here" + String.fromCharCode(10));
-      expect(printed(await viewOf(root)).some((line) => line.includes("task-11.md"))).toBe(true);
+      expect(printed(await viewOfWith(root, emptyBacklogStdout)).some((line) => line.includes("task-11.md"))).toBe(true);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -90,7 +92,7 @@ describe("the dispatch panel, against the recorded backlog", () => {
     try {
       await writeDispatchBacklog(join(root, "backlog"));
       await writeFile(join(root, "backlog", "new", "task-11.md"), "no frontmatter here" + String.fromCharCode(10));
-      expect(glance(await viewOf(root))).toContain("1 unread");
+      expect(glance(await viewOfWith(root, emptyBacklogStdout))).toContain("1 unread");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

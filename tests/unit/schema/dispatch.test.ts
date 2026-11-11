@@ -7,17 +7,13 @@ import { ConfigProvider, Effect, Layer } from "effect";
 import {
   CommandAbsent,
   CommandRunner,
-  CommandUnreachable,
   type DispatchReading,
   type DispatchSnapshot,
   DispatchSource,
   dispatchSourceLayer,
   dispatchView,
 } from "@avi2dg/orc-schema";
-import { type BeatWait, orcBacklogAnswering, writeDispatchBacklog } from "../../lib/dispatch-fixture";
-import { listTasks } from "../../../packages/run/src/dispatch/backlog";
-import { backlogJson } from "../../../packages/run/src/dispatch/board";
-import { mergedIds } from "../../../packages/run/src/dispatch/events";
+import { emptyBacklogStdout, orcBacklogPrinting, realBacklogStdout, writeDispatchBacklog } from "../../lib/dispatch-fixture";
 
 const readBacklogWith = (home: string, orc: Layer.Layer<CommandRunner>): Promise<DispatchReading> =>
   Effect.runPromise(
@@ -26,24 +22,8 @@ const readBacklogWith = (home: string, orc: Layer.Layer<CommandRunner>): Promise
     ),
   );
 
-const readBacklog = (home: string, waits?: ReadonlyArray<BeatWait>): Promise<DispatchReading> => readBacklogWith(home, orcBacklogAnswering(waits));
-
-const realBacklogStdout = (backlog: string): Promise<string> =>
-  Effect.runPromise(
-    Effect.gen(function* () {
-      const tasks = yield* listTasks(backlog);
-      const merged = yield* mergedIds(backlog);
-      return JSON.stringify(
-        backlogJson({
-          tasks,
-          events: [],
-          projects: { kind: "read", projects: [] },
-          room: { kind: "read", room: [] },
-          merged,
-        }),
-      );
-    }).pipe(Effect.provide(BunFileSystem.layer)),
-  );
+const readBacklog = async (home: string): Promise<DispatchReading> =>
+  readBacklogWith(home, orcBacklogPrinting(await realBacklogStdout(join(home, "backlog"))));
 
 const withBacklog = async (body: (root: string) => Promise<void>): Promise<void> => {
   const root = await mkdtemp(join(tmpdir(), "orc-dispatch-"));
@@ -91,7 +71,7 @@ describe("the dispatcher source", () => {
   test("lists a broken task file as unread instead of failing the read", async () => {
     await withBacklog(async (root) => {
       await writeFile(join(root, "backlog", "new", "task-11.md"), "no frontmatter here" + String.fromCharCode(10));
-      const snapshot = snapshotOf(await readBacklog(root));
+      const snapshot = snapshotOf(await readBacklogWith(root, orcBacklogPrinting(emptyBacklogStdout)));
       expect(snapshot.unread).toHaveLength(1);
       expect(snapshot.unread[0]).toContain("task-11.md");
     });
@@ -100,7 +80,7 @@ describe("the dispatcher source", () => {
   test("says the beat cannot place a task while a file is unread instead of naming the next beat", async () => {
     await withBacklog(async (root) => {
       await writeFile(join(root, "backlog", "new", "task-11.md"), "no frontmatter here" + String.fromCharCode(10));
-      const view = dispatchView(snapshotOf(await readBacklog(root)));
+      const view = dispatchView(snapshotOf(await readBacklogWith(root, orcBacklogPrinting(emptyBacklogStdout))));
       expect(view.waiting.find((row) => row.id === "task-1")?.reason).toBe("the beat cannot read the backlog");
       expect(view.waiting.find((row) => row.id === "task-2")?.reason).toBe("the beat cannot read the backlog");
     });
@@ -144,14 +124,7 @@ describe("the dispatch view", () => {
 
   test("a blocked task waits on its missing dependency instead of the next beat", async () => {
     await withBacklog(async (root) => {
-      const stdout = await realBacklogStdout(join(root, "backlog"));
-      const orc = Layer.succeed(CommandRunner, {
-        run: (command) =>
-          command.argv.join(" ") === "orc backlog --json"
-            ? Effect.succeed(stdout)
-            : Effect.fail(new CommandUnreachable({ reason: command.argv.join(" ") + " is not orc backlog --json" })),
-      });
-      const view = dispatchView(snapshotOf(await readBacklogWith(root, orc)));
+      const view = dispatchView(snapshotOf(await readBacklog(root)));
       expect(view.waiting.find((row) => row.id === "task-2")?.reason).toBe("waits on task-9, which the backlog does not hold");
       expect(view.waiting.find((row) => row.id === "task-1")?.reason).toBe("unclaimed");
     });
@@ -179,14 +152,7 @@ describe("the dispatch view", () => {
           'pr: "https://github.com/example/repo/pull/1"',
         ]),
       );
-      const stdout = await realBacklogStdout(join(root, "backlog"));
-      const orc = Layer.succeed(CommandRunner, {
-        run: (command) =>
-          command.argv.join(" ") === "orc backlog --json"
-            ? Effect.succeed(stdout)
-            : Effect.fail(new CommandUnreachable({ reason: command.argv.join(" ") + " is not orc backlog --json" })),
-      });
-      const reasons = new Map(dispatchView(snapshotOf(await readBacklogWith(root, orc))).waiting.map((row) => [row.id, row.reason]));
+      const reasons = new Map(dispatchView(snapshotOf(await readBacklog(root))).waiting.map((row) => [row.id, row.reason]));
       expect(reasons.get("orc-1")).toBe("waits on its children, 0 of 2 done");
       expect(reasons.get("orc-3")).toBe("waits on orc-2");
     });

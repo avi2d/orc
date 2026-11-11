@@ -8,11 +8,12 @@ import { TestConsole } from "effect/testing";
 import { dispatchSourceLayer } from "@avi2dg/orc-schema";
 import { mountDispatch } from "@avi2dg/orc-dispatch";
 import { printSolo } from "@avi2dg/orc-ui";
-import { orcBacklogAnswering, writeDispatchBacklog } from "../../lib/dispatch-fixture";
+import { orcBacklogPrinting, realBacklogStdout, writeDispatchBacklog } from "../../lib/dispatch-fixture";
 import { stripSgr } from "../../e2e/lib/print-color";
 
-const printed = (root: string, height: number, color: boolean): Promise<string> =>
-  Effect.runPromise(
+const printed = async (root: string, height: number, color: boolean): Promise<string> => {
+  const stdout = await realBacklogStdout(join(root, "backlog"));
+  return Effect.runPromise(
     Effect.gen(function* () {
       yield* printSolo(mountDispatch, { width: 84, height, color });
       return (yield* TestConsole.logLines).map(String).join("\n");
@@ -21,7 +22,7 @@ const printed = (root: string, height: number, color: boolean): Promise<string> 
         Layer.mergeAll(
           dispatchSourceLayer.pipe(
             Layer.provide(BunFileSystem.layer),
-            Layer.provide(orcBacklogAnswering()),
+            Layer.provide(orcBacklogPrinting(stdout)),
             Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnvRecord({ HOME: root, ORC_HOME: root }))),
           ),
           TestConsole.layer,
@@ -29,6 +30,7 @@ const printed = (root: string, height: number, color: boolean): Promise<string> 
       ),
     ),
   );
+};
 
 const withPrinted = async (body: (frame: string) => void, color = false, height = Number.POSITIVE_INFINITY): Promise<void> => {
   const root = await mkdtemp(join(tmpdir(), "orc-dispatch-"));
