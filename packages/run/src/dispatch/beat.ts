@@ -340,7 +340,7 @@ export const runBeat = (
     const early: BeatContext = { ...context, tasks: current, overloaded: new Map() }
     const renewals = yield* Effect.forEach(current, (task) => renewTask(early, task))
     const prs = yield* Effect.forEach(current, (task) => prEvents(root, task, sources.readPullRequest, at))
-    const decided = yield* decideReviewQuestions(root, current, sources.askDecider, at)
+    const decided = yield* decideReviewQuestions(root, current, sources.askDecider)
     const latest = decided.some((entry) => entry.verdict.kind === "answered") ? yield* listTasks(root) : current
     const answeredTasks = new Set(decided.flatMap((entry) => entry.verdict.kind === "answered" ? [entry.task] : []))
     const relayProgress = answeredTasks.size === 0

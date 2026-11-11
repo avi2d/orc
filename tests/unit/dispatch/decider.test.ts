@@ -20,7 +20,6 @@ const spec = { title: "Retry the upload", project: "orc", kind: "ship" as const,
 const claim = { beat: "beat-1", machine: "linux", account: "main", takenAt: "2026-11-02T10:01:00.000Z" }
 
 const asked = "2026-11-02T10:20:00.000Z"
-const decidedAt = "2026-11-02T10:21:00.000Z"
 const r2 = { id: "r2", text: "How many retries?" }
 const r3 = { id: "r3", text: "Merge the PR once it is green?" }
 const r2Item = "orc-1.r2.2026-11-02T10_20_00_000Z"
@@ -51,7 +50,7 @@ const escalate = JSON.stringify({ decision: "escalate", reason: "only the captai
 
 const itemFile = async (root: string, id: string): Promise<unknown> => JSON.parse(await readFile(join(root, "attention", id + ".json"), "utf8"))
 
-const decide = async (root: string, ask: AskDecider) => run(decideReviewQuestions(root, await run(listTasks(root)), ask, decidedAt))
+const decide = async (root: string, ask: AskDecider) => run(decideReviewQuestions(root, await run(listTasks(root)), ask))
 
 describe("the decider", () => {
   test("a review question the beat routes is owned by the decider, not handed straight to the user", async () => {
@@ -62,14 +61,21 @@ describe("the decider", () => {
 
   test("a decider answer closes its item through the task's answer and records its reason, instead of leaving the item open", async () => {
     await withAskingTask(async (root) => {
+      const before = new Date().toISOString()
       await decide(root, replies({ [r2.text]: answer, [r3.text]: escalate }))
+      const after = new Date().toISOString()
       const task = (await run(listTasks(root))).at(0)
-      expect(task?.parked?.questions.find((question) => question.id === "r2")?.answer).toMatchObject({ words: "Two retries", at: decidedAt })
+      const stored = task?.parked?.questions.find((question) => question.id === "r2")?.answer
+      expect(stored).toMatchObject({ words: "Two retries" })
       expect(await itemFile(root, r2Item)).toMatchObject({
         owner: "decider",
-        decision: { kind: "answered", reason: "the intent says twice", at: decidedAt },
-        state: { kind: "closed", answer: { words: "Two retries", at: decidedAt } }
+        decision: { kind: "answered", reason: "the intent says twice" },
+        state: { kind: "closed", answer: { words: "Two retries" } }
       })
+      const filed = (await itemFile(root, r2Item)) as { decision: { at: string }; state: { answer: { at: string } } }
+      for (const at of [stored?.at, filed.decision.at, filed.state.answer.at]) {
+        expect(at !== undefined && at >= before && at <= after).toBe(true)
+      }
     })
   })
 
@@ -108,26 +114,30 @@ describe("the decider", () => {
 
   test("a decider answer lists under decided with its words, and leaves the list once its task closes, while a user answer never lists there", async () => {
     await withAskingTask(async (root) => {
+      const before = new Date().toISOString()
       await decide(root, replies({ [r2.text]: answer, [r3.text]: escalate }))
+      const after = new Date().toISOString()
       await run(answerTask(root, "orc-1", "r3=Keep the old flag", "2026-11-02T10:22:00.000Z"))
       await run(routeReviewQuestions(root, await run(listTasks(root)), "2026-11-02T10:22:00.000Z"))
       const decided = await run(decidedItems(root, await run(listTasks(root))))
       expect(decided.map((entry) => entry.id)).toEqual([r2Item])
-      expect(attentionJson(await run(openItems(root)), "2026-11-02T10:30:00.000Z", decided)).toEqual({
-        schema: "orc.attention.v1",
-        at: "2026-11-02T10:30:00.000Z",
-        items: [],
-        decided: [{
-          id: r2Item,
-          kind: "review-question",
-          task: "orc-1",
-          text: r2.text,
-          asked,
-          owner: "decider",
-          decision: { kind: "answered", reason: "the intent says twice", at: decidedAt },
-          answer: { words: "Two retries", at: decidedAt }
-        }]
+      const view = attentionJson(await run(openItems(root)), "2026-11-02T10:30:00.000Z", decided)
+      expect(view.items).toEqual([])
+      expect(view.decided).toHaveLength(1)
+      const entry = view.decided.at(0)
+      expect(entry).toMatchObject({
+        id: r2Item,
+        kind: "review-question",
+        task: "orc-1",
+        text: r2.text,
+        asked,
+        owner: "decider",
+        decision: { kind: "answered", reason: "the intent says twice" },
+        answer: { words: "Two retries" }
       })
+      for (const at of [entry?.decision.at, entry?.answer.at]) {
+        expect(at !== undefined && at >= before && at <= after).toBe(true)
+      }
       expect(await run(attentionText(false, root))).toContain("Decided:\nanswered " + r2Item + ": Two retries (the intent says twice)")
       await run(closeStartedTask(root, "orc-1", "done", "the upload retries", { pr: null, report: null }, "2026-11-02T10:40:00.000Z"))
       expect(await run(decidedItems(root, await run(listTasks(root))))).toEqual([])
@@ -136,12 +146,13 @@ describe("the decider", () => {
 
   test("a beat skips an item another beat is deciding instead of asking the model twice", async () => {
     await withAskingTask(async (root) => {
-      expect(await run(claimDeciding(root, r2Item, decidedAt))).toBe(true)
+      const claimedAt = new Date().toISOString()
+      expect(await run(claimDeciding(root, r2Item, claimedAt))).toBe(true)
       const heard: Array<DeciderRequest> = []
       await decide(root, replies({ [r2.text]: answer, [r3.text]: escalate }, heard))
       expect(heard).toHaveLength(1)
       expect((await run(openItems(root))).map((entry) => entry.id)).toEqual([r2Item, r3Item])
-      expect(await itemFile(root, r2Item)).toMatchObject({ owner: "decider", deciding: { at: decidedAt }, state: { kind: "open" } })
+      expect(await itemFile(root, r2Item)).toMatchObject({ owner: "decider", deciding: { at: claimedAt }, state: { kind: "open" } })
     })
   })
 
@@ -149,12 +160,18 @@ describe("the decider", () => {
     await withAskingTask(async (root) => {
       expect(await run(claimDeciding(root, r2Item, "2026-11-02T10:17:00.000Z"))).toBe(true)
       const heard: Array<DeciderRequest> = []
+      const before = new Date().toISOString()
       await decide(root, replies({ [r2.text]: answer, [r3.text]: escalate }, heard))
+      const after = new Date().toISOString()
       expect(heard).toHaveLength(2)
       expect(await itemFile(root, r2Item)).toMatchObject({
-        decision: { kind: "answered", reason: "the intent says twice", at: decidedAt },
-        state: { kind: "closed", answer: { words: "Two retries", at: decidedAt } }
+        decision: { kind: "answered", reason: "the intent says twice" },
+        state: { kind: "closed", answer: { words: "Two retries" } }
       })
+      const filed = (await itemFile(root, r2Item)) as { decision: { at: string }; state: { answer: { at: string } } }
+      for (const at of [filed.decision.at, filed.state.answer.at]) {
+        expect(at >= before && at <= after).toBe(true)
+      }
     })
   })
 

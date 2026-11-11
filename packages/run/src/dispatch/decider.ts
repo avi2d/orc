@@ -1,4 +1,4 @@
-import { Data, Effect, FileSystem, Option, Schema } from "effect"
+import { Data, DateTime, Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { bundledAgentsDir } from "../agents"
 import { claimDeciding, openItems, readItem, recordDecision, reviewQuestionId, routeReviewQuestions } from "./attention"
@@ -61,12 +61,12 @@ const settle = (root: string, task: TaskRecord, question: ParkedQuestion, item: 
       yield* recordDecision(root, item, { kind: "escalated", reason: verdict.reason, at })
       return verdict
     }
+    yield* recordDecision(root, item, { kind: "answered", reason: verdict.reason, at })
     const refused = yield* answerTask(root, task.spec.id, question.id + "=" + verdict.words, at).pipe(
       Effect.as(null),
       Effect.catchTags({ BacklogError: (error) => Effect.succeed(error.detail), TaskFileError: (error) => Effect.succeed(error.detail) })
     )
     if (refused === null) {
-      yield* recordDecision(root, item, { kind: "answered", reason: verdict.reason, at })
       yield* routeReviewQuestions(root, [yield* findTask(root, task.spec.id)], at)
       return verdict
     }
@@ -90,8 +90,7 @@ const settle = (root: string, task: TaskRecord, question: ParkedQuestion, item: 
 export const decideReviewQuestions = (
   root: string,
   tasks: ReadonlyArray<TaskRecord>,
-  ask: AskDecider,
-  at: string
+  ask: AskDecider
 ): Effect.Effect<ReadonlyArray<Decided>, BacklogError | TaskFileError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
@@ -110,14 +109,14 @@ export const decideReviewQuestions = (
       if (question === undefined || question.answer !== null) {
         continue
       }
-      if (!(yield* claimDeciding(root, entry.id, at))) {
+      if (!(yield* claimDeciding(root, entry.id, DateTime.formatIso(yield* DateTime.now)))) {
         continue
       }
       policy ??= yield* fs.readFileString(deciderPolicyFile()).pipe(Effect.orElseSucceed(() => ""))
       const verdict = policy === ""
         ? { kind: "escalated" as const, reason: "orc cannot read the decider policy at " + deciderPolicyFile() }
         : yield* askOne(ask, policy, task, question)
-      decided.push({ item: entry.id, task: task.spec.id, verdict: yield* settle(root, task, question, entry.id, verdict, at) })
+      decided.push({ item: entry.id, task: task.spec.id, verdict: yield* settle(root, task, question, entry.id, verdict, DateTime.formatIso(yield* DateTime.now)) })
     }
     return decided
   })

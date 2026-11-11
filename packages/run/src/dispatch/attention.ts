@@ -55,18 +55,6 @@ const replaceItem = (root: string, id: string, before: string, encoded: string):
     return true
   })
 
-const writeItem = (root: string, id: string, item: AttentionItem): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const file = itemFile(root, id)
-    const before = yield* readIfPresent(file)
-    if (before === null) {
-      return
-    }
-    if (!(yield* replaceItem(root, id, before, yield* encodeItem(id, item)))) {
-      return
-    }
-  })
-
 // The same question at the same asking always names one file, so routing it again opens nothing new.
 export const reviewQuestionId = (task: string, question: string, asked: string): string =>
   [task, question, asked].map((part) => part.replace(/[^A-Za-z0-9_-]/g, "_")).join(".")
@@ -95,15 +83,17 @@ type SettledState = Exclude<AttentionItem["state"], { kind: "open" }>
 
 const settleOpenItem = (root: string, id: string, state: SettledState): Effect.Effect<"settled" | "already closed" | "missing", BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const item = yield* readItem(root, id)
-    if (item === null) {
+    const file = itemFile(root, id)
+    const before = yield* readIfPresent(file)
+    if (before === null) {
       return "missing" as const
     }
+    const item = yield* Schema.decodeEffect(ItemFile)(before).pipe(Effect.mapError((error) => new BacklogError({ detail: file + " holds no item orc reads: " + error.message })))
     if (item.state.kind !== "open") {
       return "already closed" as const
     }
-    yield* writeItem(root, id, { ...item, deciding: undefined, state })
-    return "settled" as const
+    const replaced = yield* replaceItem(root, id, before, yield* encodeItem(id, { ...item, deciding: undefined, state }))
+    return (replaced ? "settled" : "already closed") as const
   })
 
 export const closeItem = (root: string, id: string, answer: ItemAnswer): Effect.Effect<CloseOutcome, BacklogError, FileSystem.FileSystem> =>
