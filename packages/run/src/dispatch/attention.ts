@@ -118,15 +118,16 @@ type TaskItemKind = Extract<AttentionItem["kind"], "review-question" | "overdue-
 
 const taskItemKinds: ReadonlySet<AttentionItem["kind"]> = new Set<TaskItemKind>(["review-question", "overdue-wait"])
 
-const dayMillis = 24 * 60 * 60 * 1000
-
 // A hold names the day it is answered by, so its wait passes once that whole day has.
 const overdueWait = (task: TaskRecord, at: string): { readonly id: string; readonly asked: Asked | null; readonly answer: ItemAnswer | null } | null => {
   const hold = task.hold
   if (hold === null || hold.until === null) {
     return null
   }
-  const passed = Date.parse(hold.until) + dayMillis
+  const parts = hold.until.split("-").map(Number)
+  const passed = parts.length === 3 && parts.every((part) => Number.isInteger(part))
+    ? new Date(parts[0] as number, (parts[1] as number) - 1, (parts[2] as number) + 1).getTime()
+    : Number.NaN
   const id = itemId(task.spec.id, "overdue-wait", hold.until)
   const text = "held for the captain: " + hold.reason + ", until " + hold.until + " passed"
   const asked: Asked | null = Date.parse(at) >= passed ? { kind: "overdue-wait", task: task.spec.id, text, asked: new Date(passed).toISOString(), owner: "user" } : null
@@ -181,6 +182,8 @@ const openOrReopenPrItem = (root: string, id: string, asked: Asked): Effect.Effe
       yield* Effect.asVoid(openItem(root, id, asked))
     } else if (item.state.kind === "withdrawn") {
       yield* writeItem(root, id, { ...asked, state: { kind: "open" } })
+    } else if (item.state.kind === "open" && item.text !== asked.text) {
+      yield* writeItem(root, id, { ...asked, asked: item.asked, state: { kind: "open" } })
     }
   })
 

@@ -104,6 +104,18 @@ describe("run events in the attention queue", () => {
     })
   })
 
+  test("a ready PR reopens its item after a red check clears instead of staying withdrawn", async () => {
+    await withBacklog(async (root) => {
+      await closeWithPr(root)
+      await beat(root, "2026-10-27T12:00:00.000Z", checked("SUCCESS"))
+      await beat(root, "2026-10-27T12:01:00.000Z", checked("FAILURE"))
+      expect((await run(openItems(root))).map(({ item }) => item.kind)).toEqual(["check-red"])
+      await beat(root, "2026-10-27T12:02:00.000Z", checked("SUCCESS"))
+      expect((await run(openItems(root))).map(({ item }) => [item.kind, item.asked])).toEqual([["pr-ready", "2026-10-27T12:02:00.000Z"]])
+      expect(await itemFiles(root)).toMatchObject([{ kind: "check-red", state: { kind: "withdrawn" } }, { kind: "pr-ready", state: { kind: "open" } }])
+    })
+  })
+
   test("a merged PR closes its ready item with the merge as its answer, instead of leaving it open", async () => {
     await withBacklog(async (root) => {
       await closeWithPr(root)
@@ -129,23 +141,62 @@ describe("run events in the attention queue", () => {
 
 describe("overdue waits in the attention queue", () => {
   test("a hold whose until date passed opens an item, while one still within its date opens none", async () => {
-    await withBacklog(async (root) => {
-      await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-01T23:59:00.000Z"))
-      expect(await run(openItems(root))).toEqual([])
-      await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-02T00:01:00.000Z"))
-      expect((await run(openItems(root))).map(({ item }) => item)).toEqual([{
-        kind: "overdue-wait", task: "orc-2", text: "held for the captain: REST or gRPC, until 2026-12-01 passed", asked: "2026-12-02T00:00:00.000Z", owner: "user", state: { kind: "open" }
-      }])
-    })
+    const previous = process.env.TZ
+    process.env.TZ = "UTC"
+    try {
+      await withBacklog(async (root) => {
+        await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-01T23:59:00.000Z"))
+        expect(await run(openItems(root))).toEqual([])
+        await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-02T00:01:00.000Z"))
+        expect((await run(openItems(root))).map(({ item }) => item)).toEqual([{
+          kind: "overdue-wait", task: "orc-2", text: "held for the captain: REST or gRPC, until 2026-12-01 passed", asked: "2026-12-02T00:00:00.000Z", owner: "user", state: { kind: "open" }
+        }])
+      })
+    } finally {
+      if (previous === undefined) {
+        delete process.env.TZ
+      } else {
+        process.env.TZ = previous
+      }
+    }
+  })
+
+  test("an until date covers its whole local day instead of ending at UTC midnight", async () => {
+    const previous = process.env.TZ
+    process.env.TZ = "America/Los_Angeles"
+    try {
+      await withBacklog(async (root) => {
+        await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-02T07:59:00.000Z"))
+        expect(await run(openItems(root))).toEqual([])
+        await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-02T08:00:00.000Z"))
+        expect((await run(openItems(root))).map(({ item }) => item.asked)).toEqual(["2026-12-02T08:00:00.000Z"])
+      })
+    } finally {
+      if (previous === undefined) {
+        delete process.env.TZ
+      } else {
+        process.env.TZ = previous
+      }
+    }
   })
 
   test("answering the hold closes its overdue item with the answer instead of withdrawing it", async () => {
-    await withBacklog(async (root) => {
-      await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-02T00:01:00.000Z"))
-      await run(routeTaskItems(root, [heldTask("2026-12-01", { words: "REST", at: "2026-12-02T09:00:00.000Z" })], "2026-12-02T09:00:00.000Z"))
-      expect(await run(openItems(root))).toEqual([])
-      expect(await itemFiles(root)).toMatchObject([{ kind: "overdue-wait", state: { kind: "closed", answer: { words: "REST", at: "2026-12-02T09:00:00.000Z" } } }])
-    })
+    const previous = process.env.TZ
+    process.env.TZ = "UTC"
+    try {
+      await withBacklog(async (root) => {
+        await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-02T00:01:00.000Z"))
+        await run(routeTaskItems(root, [heldTask("2026-12-01", { words: "REST", at: "2026-12-02T09:00:00.000Z" })], "2026-12-02T09:00:00.000Z"))
+        expect(await run(openItems(root))).toEqual([])
+        expect(await itemFiles(root)).toMatchObject([{ kind: "overdue-wait", state: { kind: "closed", answer: { words: "REST", at: "2026-12-02T09:00:00.000Z" } } }])
+      })
+    } finally {
+      if (previous === undefined) {
+        delete process.env.TZ
+      } else {
+        process.env.TZ = previous
+      }
+    }
   })
 })
 

@@ -33,7 +33,7 @@ The beat opens an item for each run event, owned by the user:
 To answer one of these, run `orc attention answer <item-id> <words>`.
 It refuses a review question or an overdue wait and names the task to answer with `orc backlog answer` instead.
 
-A held task whose `--until` date has passed opens an `overdue-wait` item, owned by the user and asked at the end of that date.
+A held task whose `--until` date has passed opens an `overdue-wait` item, owned by the user and asked at the start of the next day on the machine local clock.
 Answering the hold closes the item with the hold's answer.
 
 Each beat reads the queue before it starts a new task, and prints one `needs the <owner> <item-id>: <text>` line per open item, oldest first, with `, overdue` after the owner for an overdue one.
