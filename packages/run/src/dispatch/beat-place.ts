@@ -19,7 +19,7 @@ export const readRoom = (machines: ReadonlyArray<Machine>, tasks: ReadonlyArray<
 
 const freeRoom = (room: MachineRoom): number => Math.max(0, room.slots - room.busy)
 
-export const dependencyOpen = (dependency: TaskRecord | undefined): boolean =>
+const dependencyOpen = (dependency: TaskRecord | undefined): boolean =>
   dependency === undefined || dependency.state.kind !== "closed" || dependency.state.closing.outcome !== "done"
 
 export interface ChildCount {

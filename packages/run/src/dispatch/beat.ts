@@ -21,7 +21,7 @@ import { type ReadUpstream, readUpstream, watchUpstream } from "./upstream"
 
 export type { BeatAction } from "./beat-action"
 export type { MachineRoom } from "./beat-place"
-export { dependencyOpen, placeTask, readRoom } from "./beat-place"
+export { placeTask, readRoom } from "./beat-place"
 
 export interface BeatReport {
   readonly beat: string
