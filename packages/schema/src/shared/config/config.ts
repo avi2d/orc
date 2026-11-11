@@ -1,5 +1,5 @@
 import { Effect, Result, Schema } from "effect";
-import { type Decoded, decoded, rejected } from "../lib/index";
+import { type Decoded, decoded, rejected } from "../lib";
 
 const accountNamePattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
 

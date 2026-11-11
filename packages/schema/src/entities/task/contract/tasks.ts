@@ -1,5 +1,5 @@
 import { DateTime, Option, Schema } from "effect";
-import { type Decoded, decoded, decodeJson, flatMapDecoded, rejected } from "../../../shared/lib/index";
+import { type Decoded, decoded, decodeJson, flatMapDecoded, rejected } from "../../../shared/lib";
 
 export const TaskStateJson = Schema.Literals(["working", "waiting", "parked", "blocked", "done"]);
 
