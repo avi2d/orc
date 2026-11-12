@@ -5,9 +5,9 @@ import { prepareCommandOf, readChecksCommands } from "./checks"
 import { commitsSince, headOf } from "../../shared/process/index"
 import { openNonoExec } from "../../shared/sandbox/index"
 import type { ToolchainResolver } from "../../shared/sandbox/index"
-import { runPi, type PiPacing } from "../../entities/agent/index"
+import { failingFileName, runPi, type PiPacing } from "../../entities/agent/index"
 import type { RunFolders } from "./run-folders"
-import type { SandboxOps } from "./run-loop"
+import type { SandboxOps } from "./run-ops"
 import { OrcRunError } from "../../shared/lib/index"
 import type { SandboxPlan } from "./sandbox-plan"
 
@@ -85,6 +85,7 @@ export const agentOps = (
         sessionDir: folders.hostSessionsDir,
         resumeSession: agentRun.resumeSession,
         logFile: run.path.join(folders.runDir, agentRun.logFile),
+        failingFile: run.path.join(folders.runDir, failingFileName),
         onSession: agentRun.onSession
       }, pacing)
       const commits = yield* commitsSince(run.spawner, run.git, exec.cwd, base)

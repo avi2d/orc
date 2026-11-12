@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Database } from "bun:sqlite"
@@ -7,7 +7,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, Exit, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
-import { listRuns, openDatabase, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
+import { listRuns, openDatabase, openQuestionsForRun, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
 import { stepsForRun } from "../../packages/run/src/entities/run-history/index"
 import {
   recordChecksDone,
@@ -16,6 +16,7 @@ import {
   recordFixStart,
   recordImplementDone,
   recordImplementStart,
+  recordLoopQuestion,
   recordNoMistakesDone,
   recordNoMistakesStart,
   recordPullRequestDone,
@@ -26,7 +27,8 @@ import {
 import { buildResumePlan } from "../../packages/run/src/features/running-a-task/run-resume"
 import { subprocessNoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
 import type { HistoryRun } from "../../packages/run/src/features/running-a-task/run-record"
-import { runFull, type RunCheckpoints } from "../../packages/run/src/features/running-a-task/run-loop"
+import { runFull } from "../../packages/run/src/features/running-a-task/run-loop"
+import type { AgentRun, RunCheckpoints } from "../../packages/run/src/features/running-a-task/run-ops"
 import { fakeOps } from "../lib/fake-ops"
 
 const implementer: AgentFile = {
@@ -139,7 +141,8 @@ const runLoopCheckpoints = (db: Database, run: HistoryRun): RunCheckpoints => ({
   noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
   noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
   pullRequestStart: (started) => recordPullRequestStart(db, run.runId, started),
-  pullRequestDone: (record) => recordPullRequestDone(db, run, record)
+  pullRequestDone: (record) => recordPullRequestDone(db, run, record),
+  loopAsked: (step, question) => recordLoopQuestion(db, run.runId, step, question)
 })
 
 const seedRefusedPrior = async (db: Database, priorDir: string, project: string): Promise<void> => {
@@ -251,6 +254,120 @@ describe("resumed runs publish inherited progress atomically", () => {
         } finally {
           db.close()
         }
+    })
+  })
+})
+
+const freshPlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow: [], answers: [], inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null }
+
+const looping = { kind: "looping", label: "bun run test" } as const
+
+const withLoopRun = async (answerWaitSeconds: number, use: (db: Database, run: HistoryRun) => Promise<void>): Promise<void> => {
+  await withHome(async (home) => {
+    const db = await openDb(home)
+    try {
+      const project = join(home, "project")
+      await mkdir(project, { recursive: true })
+      const git = await stubGit(home)
+      const base = await Effect.runPromise(historyFor("loop-1", home, project, "2026-10-19T10:00:00.000Z", git, ""))
+      const run: HistoryRun = { ...base, answerWaitSeconds }
+      await mkdir(run.runDir, { recursive: true })
+      await Effect.runPromise(recordRun(db, { id: run.runId, project, branch: run.branch, taskFile: run.taskPath, status: "running", started: run.started }).pipe(Effect.asVoid))
+      await use(db, run)
+    } finally {
+      db.close()
+    }
+  })
+}
+
+const answerOnceAsked = async (runDir: string, answer: string): Promise<void> => {
+  for (;;) {
+    const text = await readFile(join(runDir, "asking.json"), "utf8").catch(() => null)
+    if (text !== null) {
+      const asking: unknown = JSON.parse(text)
+      if (typeof asking === "object" && asking !== null && "asked" in asking) {
+        await writeFile(join(runDir, "answers.json"), JSON.stringify({ asking: asking.asked, answers: [{ question: "looping", answer }] }))
+        return
+      }
+    }
+    await Bun.sleep(10)
+  }
+}
+
+describe("a run Pi loops in", () => {
+  test("asks the captain on the step and ends unfinished when no answer comes, instead of reading the stop as done", async () => {
+    await withLoopRun(0, async (db, run) => {
+      let calls = 0
+      const ops = fakeOps({
+        runAgent: async () => {
+          calls += 1
+          return { end: looping, commits: [] }
+        },
+        execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 })
+      }, run.hostSessionsDir)
+      const report = await Effect.runPromise(runFull(run, ops, freshPlan, runLoopCheckpoints(db, run)))
+      expect(calls).toBe(1)
+      expect(report.implementPassed).toBe(false)
+      expect(report.checksRounds).toBeNull()
+      const asked = await Effect.runPromise(openQuestionsForRun(db, run.runId))
+      expect(asked).toMatchObject([{ id: "looping", text: expect.stringContaining("Pi failed bun run test 6 times in a row") }])
+    })
+  })
+
+  test("resumes the same Pi session with the captain's guidance on continue, instead of starting Pi afresh", async () => {
+    await withLoopRun(30, async (db, run) => {
+      const runs: Array<AgentRun> = []
+      const ops = fakeOps({
+        runAgent: async (agentRun) => {
+          runs.push(agentRun)
+          if (runs.length === 1) {
+            void answerOnceAsked(run.runDir, "Continue, run one test file at a time")
+            return { end: looping, sessionFile: "/sessions/first.jsonl", commits: [{ sha: "a1" }] }
+          }
+          return { commits: [{ sha: "b2" }] }
+        },
+        execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 })
+      }, run.hostSessionsDir)
+      await Effect.runPromiseExit(runFull(run, ops, freshPlan, runLoopCheckpoints(db, run)))
+      expect(runs.length).toBe(2)
+      expect(runs[1]?.resumeSession).toBe("/sessions/first.jsonl")
+      expect(runs[1]?.prompt).toContain("the captain answered: Continue, run one test file at a time")
+      expect(await Effect.runPromise(openQuestionsForRun(db, run.runId))).toEqual([])
+    })
+  }, 20_000)
+
+  test("ends the run as stopped on a stop answer, instead of running Pi again", async () => {
+    await withLoopRun(30, async (db, run) => {
+      let calls = 0
+      const ops = fakeOps({
+        runAgent: async () => {
+          calls += 1
+          void answerOnceAsked(run.runDir, "stop")
+          return { end: looping, commits: [] }
+        },
+        execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 })
+      }, run.hostSessionsDir)
+      const exit = await Effect.runPromiseExit(runFull(run, ops, freshPlan, runLoopCheckpoints(db, run)))
+      expect(calls).toBe(1)
+      expect(exit).toMatchObject({ _tag: "Failure" })
+      expect(JSON.stringify(exit)).toContain("RunStopped")
+    })
+  }, 20_000)
+
+  test("a parked run answered stop ends before Pi runs, instead of resuming the loop", async () => {
+    await withLoopRun(0, async (db, run) => {
+      let calls = 0
+      const ops = fakeOps({
+        runAgent: async () => {
+          calls += 1
+          return { commits: [] }
+        },
+        execCheck: async () => ({ stdout: "", stderr: "", exitCode: 0 })
+      }, run.hostSessionsDir)
+      const plan = { ...freshPlan, implementSessionFile: "/sessions/first.jsonl", answers: [{ question: "looping", answer: "stop" }] }
+      const exit = await Effect.runPromiseExit(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
+      expect(calls).toBe(0)
+      expect(JSON.stringify(exit)).toContain("RunStopped")
     })
   })
 })

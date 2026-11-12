@@ -8,7 +8,7 @@ import { type QuotaReading, readQuota } from "./quota"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "../../entities/token/index"
 import type { BeatAction, Progress } from "../../entities/attention/index"
 import { closeFinished } from "./beat-close"
-import { openRunDeaths, routeTaskItems } from "../../entities/attention/index"
+import { type FailingRead, openRunDeaths, routeFailingCommands, routeTaskItems } from "../../entities/attention/index"
 import { attentionActions } from "./beat-attention"
 import { type AskDecider, askDeciderWithPi, decideReviewQuestions } from "../../features/decider/index"
 import { handAnswersToResume } from "../../entities/parked-runs/index"
@@ -243,6 +243,21 @@ const settledProgress = (
   asking: progress.flatMap((entry) => entry.kind === "running" && entry.action !== null ? [entry.action] : [])
 })
 
+const failingReads = (started: ReadonlyArray<TaskRecord>, progress: ReadonlyArray<Progress>): ReadonlyArray<FailingRead> =>
+  started.flatMap((task, index): ReadonlyArray<FailingRead> => {
+    const entry = progress[index]
+    if (entry.kind === "running") {
+      return [{ task: task.spec.id, failing: entry.failing }]
+    }
+    if (entry.kind === "ended" && (entry.action.kind === "closed" || entry.action.kind === "parked" || entry.action.kind === "split")) {
+      return [{ task: task.spec.id, failing: null }]
+    }
+    return []
+  })
+
+const routeRunItems = (root: string, started: ReadonlyArray<TaskRecord>, progress: ReadonlyArray<Progress>, closed: ReadonlyArray<BeatAction>, at: string) =>
+  openRunDeaths(root, closed, at).pipe(Effect.andThen(routeFailingCommands(root, failingReads(started, progress), at)))
+
 const releaseClosedSlots = (live: BeatContext["live"], closed: ReadonlyArray<BeatAction>): void => {
   for (const action of closed) {
     if (action.kind === "closed" || action.kind === "parked" || action.kind === "split") {
@@ -362,7 +377,7 @@ export const runBeat = (
     const upstream = yield* watchUpstream(root, projects, sources.readUpstream, at)
     const current = yield* listTasks(root)
     yield* routeTaskItems(root, current, at)
-    yield* openRunDeaths(root, settled.closed, at)
+    yield* routeRunItems(root, started, progress, settled.closed, at)
     const { latest, relayed } = yield* decideAndRelay(root, context, started, progress, current, sources.askDecider)
     const { reported, queue, deciderOwns } = yield* attentionActions(root, latest, [...settled.closed, ...relayed.closed, ...settled.asking, ...relayed.asking], at)
     const queued = latest.filter((task) => task.state.kind === "new")

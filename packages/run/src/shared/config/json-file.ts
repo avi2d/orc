@@ -50,6 +50,18 @@ export const readJsonFile = <S extends Schema.Top>(
       : decodeJsonText(file, text, schema, options))
   )
 
+// rename(2) replaces the file whole, so a reader never sees half of it.
+export const writeWhole = (file: string, text: string): Effect.Effect<boolean, never, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const scratch = file + "." + crypto.randomUUID().slice(0, 8) + ".tmp"
+    return yield* fs.writeFileString(scratch, text).pipe(
+      Effect.andThen(fs.rename(scratch, file)),
+      Effect.as(true),
+      Effect.catchTag("PlatformError", () => fs.remove(scratch, { force: true }).pipe(Effect.orElseSucceed(() => undefined), Effect.as(false)))
+    )
+  })
+
 export const readJsonFileIfPresent = <S extends Schema.Top>(
   file: string,
   schema: S,

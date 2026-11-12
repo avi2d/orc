@@ -119,7 +119,8 @@ The branch holds at least one new commit.
 The project's checks pass.
 no-mistakes opened the PR and reported CI green.
 A `direct-PR` run succeeds once the first three facts hold and its pull request opens, as [Delivery modes](delivery-modes.md) shows.
-Otherwise orc records the run as failed with the reason and exits 1.
+A run the captain stops at its looping question records the run stopped with the answer as the reason and exits 1.
+Any other run that misses those facts records the run failed with the reason and exits 1.
 Each run keeps its task, evidence, agent log and Pi session in `$ORC_HOME/runs/<run-id>`, default `~/.orc/runs/<run-id>` when `ORC_HOME` is unset or empty.
 On a `no-mistakes` run, its `no-mistakes.txt` and the run history hold the no-mistakes findings, their count, the gates orc answered, the final result and the PR link.
 They also name the reviewer that served the review, as `axi status` gives it in `reviewer_agent`, or say no-mistakes named none.

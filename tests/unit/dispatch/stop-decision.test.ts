@@ -62,7 +62,7 @@ describe("a stopped run", () => {
 })
 
 describe("the stale close decision", () => {
-  const unknownReading = { kind: "read" as const, result: { task: "orc-1", status: "unknown" as const }, ending: null, outputAt: null, asking: null }
+  const unknownReading = { kind: "read" as const, result: { task: "orc-1", status: "unknown" as const }, ending: null, outputAt: null, asking: null, failing: null }
   test("an unseen runner record closes the task failed once the start outgrows the queue delay instead of waiting forever", () => {
     expect(staleEndingOf(oldStart, Date.parse("2026-11-07T10:00:00.000Z"), unknownReading, null)).toEqual({
       kind: "close",

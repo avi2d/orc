@@ -111,7 +111,7 @@ const reportStep = (args: Extract<OrcArgs, { readonly kind: "RunAgent" }>, kind:
       Effect.catchTag("OrcRunError", (error) => Console.error(error.message).pipe(Effect.andThen(Effect.fail("report step refused"))))
     )
     yield* Console.log(formatReportOutcome(kind, outcome))
-    if (outcome.kind === "unreported") {
+    if (outcome.kind !== "reported") {
       return yield* Effect.fail("report step failed")
     }
   })

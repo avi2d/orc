@@ -1,5 +1,5 @@
 import { Console, Duration, Effect, FileSystem, Schema } from "effect"
-import { readJsonFileIfPresent } from "../../shared/config/index"
+import { readJsonFileIfPresent, writeWhole } from "../../shared/config/index"
 import { OrcRunError } from "../../shared/lib/index"
 import type { NoMistakesFinding, OpenQuestion, QuestionAnswer } from "./no-mistakes-gate"
 
@@ -35,18 +35,6 @@ export const answerWaitFromEnv = (value: string | undefined): Effect.Effect<numb
     : Effect.fail(new OrcRunError({ message: "orc: ORC_ANSWER_WAIT_SECONDS is " + text + ", which is not a whole number of seconds" }))
 }
 
-// rename(2) replaces the file whole, so a reader never sees half of it.
-export const writeWhole = (file: string, text: string): Effect.Effect<boolean, never, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const scratch = file + "." + crypto.randomUUID().slice(0, 8) + ".tmp"
-    return yield* fs.writeFileString(scratch, text).pipe(
-      Effect.andThen(fs.rename(scratch, file)),
-      Effect.as(true),
-      Effect.catchTag("PlatformError", () => fs.remove(scratch, { force: true }).pipe(Effect.orElseSucceed(() => undefined), Effect.as(false)))
-    )
-  })
-
 // A relay that lands after a wait ended names the old asking, so the next wait does not take it.
 const readRelayed = (file: string, asked: string): Effect.Effect<ReadonlyArray<QuestionAnswer>, never, FileSystem.FileSystem> =>
   readJsonFileIfPresent(file, AnswersFile).pipe(
@@ -55,7 +43,7 @@ const readRelayed = (file: string, asked: string): Effect.Effect<ReadonlyArray<Q
   )
 
 // answers.json counts only while asking.json stands, and the wait removes both as it ends.
-export const waitForAnswers = (runDir: string, waitSeconds: number) =>
+export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: string) =>
   (missing: ReadonlyArray<Pick<NoMistakesFinding, "id" | "description">>): Effect.Effect<WaitResult, never, FileSystem.FileSystem> =>
     Effect.gen(function*() {
       const fs = yield* FileSystem.FileSystem
@@ -68,7 +56,7 @@ export const waitForAnswers = (runDir: string, waitSeconds: number) =>
       if (waitSeconds === 0 || !(yield* writeWhole(asking, JSON.stringify({ asked, until, questions })))) {
         return { asked: null, answers: [] }
       }
-      yield* Console.log("orc: no-mistakes waits until " + until + " for the captain's answer to " + questions.map((question) => question.id).join(", ") + ", read from " + relayed)
+      yield* Console.log("orc: " + waiter + " waits until " + until + " for the captain's answer to " + questions.map((question) => question.id).join(", ") + ", read from " + relayed)
       const answeredOf = (answers: ReadonlyArray<QuestionAnswer>) => answers.filter((entry) => missing.some((finding) => finding.id === entry.question))
       let answered = answeredOf(yield* readRelayed(relayed, asked))
       while (answered.length < missing.length && Date.now() < deadline) {

@@ -1,6 +1,8 @@
+import type { FailingMark } from "../agent/index"
+
 export type Progress =
   | { readonly kind: "ended"; readonly action: BeatAction }
-  | { readonly kind: "running"; readonly outputAt: string | null; readonly action: BeatAction | null }
+  | { readonly kind: "running"; readonly outputAt: string | null; readonly action: BeatAction | null; readonly failing: FailingMark | null }
   | { readonly kind: "own-log" }
   | { readonly kind: "untracked" }
 

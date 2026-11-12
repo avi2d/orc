@@ -2,13 +2,15 @@ import { readdir } from "node:fs/promises"
 import { join } from "node:path"
 import { Effect } from "effect"
 import type { CommandResult } from "../../packages/run/src/shared/sandbox/agent-exec"
-import type { AgentRun, SandboxOps } from "../../packages/run/src/features/running-a-task/run-loop"
+import type { AgentRun, SandboxOps } from "../../packages/run/src/features/running-a-task/run-ops"
+import type { PiEnd } from "../../packages/run/src/entities/agent/index"
 import { OrcRunError } from "../../packages/run/src/shared/lib/run-session"
 
 export interface FakeAgentResult {
   readonly sessionId?: string
   readonly sessionFile?: string
   readonly exitCode?: number
+  readonly end?: PiEnd
   readonly commits: ReadonlyArray<{ readonly sha: string }>
 }
 
@@ -27,7 +29,7 @@ const sessionFileFor = async (sessionsDir: string, sessionId: string): Promise<s
 const settle = async (result: FakeAgentResult, sessionsDir: string) => ({
   sessionId: result.sessionId ?? null,
   sessionFile: result.sessionFile ?? (result.sessionId === undefined ? null : await sessionFileFor(sessionsDir, result.sessionId)),
-  end: { kind: "exited", exitCode: result.exitCode ?? 0 } as const,
+  end: result.end ?? { kind: "exited", exitCode: result.exitCode ?? 0 },
   commits: result.commits
 })
 

@@ -1,6 +1,6 @@
 import { Effect } from "effect"
 import type { Database } from "bun:sqlite"
-import type { NoMistakesRecord } from "../../entities/review-gate/index"
+import type { NoMistakesRecord, OpenQuestion } from "../../entities/review-gate/index"
 import type { DirectPrRecord } from "../../entities/pull-request/index"
 import { noMistakesFile, prBodyFileName, type HistoryRun } from "./run-record"
 import { refusalSignalName, refusalValue } from "../../entities/run-history/index"
@@ -8,8 +8,8 @@ import type { ChecksRoundSummary, OrcRunReport, RecordedFixAttempt } from "../..
 import { OrcRunError } from "../../shared/lib/index"
 import { historyFailure, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, stepIdFor, updateRun, updateStep } from "../../entities/run-history/index"
 import type { EvidenceInput, SignalInput, StepInput } from "../../entities/run-history/index"
-import { measuredSignals, noMistakesSignals } from "../../entities/run-history/index"
-import type { ResumePlan } from "./run-loop"
+import { measuredSignals, noMistakesSignals, openQuestionSignal } from "../../entities/run-history/index"
+import type { AgentStep, ResumePlan } from "./run-ops"
 
 type EvidenceRow = Omit<EvidenceInput, "stepId">
 
@@ -162,6 +162,18 @@ export const recordStepSession = (db: Database, runId: string, name: "implement"
     Effect.asVoid,
     Effect.mapError((cause) => historyFailure("record the session file in", cause))
   )
+
+export const recordLoopQuestion = (db: Database, runId: string, step: AgentStep, question: OpenQuestion): Effect.Effect<void, OrcRunError> =>
+  Effect.gen(function*() {
+    const stepId = yield* stepIdFor(db, runId, step.name, step.attempt).pipe(Effect.mapError((cause) => historyFailure("read the step in", cause)))
+    if (stepId === null) {
+      return yield* new OrcRunError({ message: "orc: the run history holds no " + step.name + " step " + step.attempt.toString() + " of run " + runId + " to ask " + question.id + " on" })
+    }
+    yield* recordSignal(db, { stepId, name: openQuestionSignal, value: JSON.stringify(question) }).pipe(
+      Effect.asVoid,
+      Effect.mapError((cause) => historyFailure("record the question in", cause))
+    )
+  })
 
 export const recordHandoverEvidence = (db: Database, runId: string, path: string): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {

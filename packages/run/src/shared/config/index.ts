@@ -1,4 +1,4 @@
-export { ConfigError, AbsolutePath, readFailure, duplicateOf, readJsonFileIfPresent } from "./json-file"
+export { ConfigError, AbsolutePath, readFailure, duplicateOf, readJsonFileIfPresent, writeWhole } from "./json-file"
 export { ProviderId, readOrcConfig } from "./orc-config"
 export type { LoginProvider, TokenFileProvider, PackageProvider, Provider, HeavyConfig, OrcConfig } from "./orc-config"
 export { modeOf, isYolo, contributionId, checkoutOn, readDispatchConfig, readProjects, readProjectInstructions } from "./dispatch-config"

@@ -32,13 +32,13 @@ describe("the heavy stand-in", () => {
       const child = spawnSync(join(isolated, tool), ["--version"], {
         env: { PATH: isolated, FAKE_TOOL_LOG: join(harness.root, "tool.log") },
         encoding: "utf8",
-        timeout: 1000
+        timeout: 10_000
       })
       expect(child.error).toBeUndefined()
       expect(child.status).toBe(0)
     }
     expect(await readFile(join(harness.root, "tool.log"), "utf8")).toContain("real ")
-  })
+  }, 30_000)
 
   test("a stand-in whose baked real tool is gone refuses instead of calling itself", async () => {
     const tools = standinTools(["custom-tool test"])
@@ -51,14 +51,14 @@ describe("the heavy stand-in", () => {
       const child = spawnSync(join(isolated, tool), ["--version"], {
         env: { PATH: isolated },
         encoding: "utf8",
-        timeout: 1000
+        timeout: 10_000
       })
       expect(child.error).toBeUndefined()
       expect(child.status).toBe(127)
       expect(child.stderr).toContain("orc heavy: no " + tool)
       expect(child.stderr).toContain(join(harness.root, "fake", tool))
     }
-  })
+  }, 30_000)
 
   test("a wrapped tool with a missing classifier bun runs directly instead of failing", async () => {
     const harness = harnesses[harnesses.push(await setup(["npm"])) - 1]

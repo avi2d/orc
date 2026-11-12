@@ -30,3 +30,13 @@ If the resumed run stops on new questions, the task parks again with those, and 
 An answer given after the beat last read the waiting run is kept too.
 So a task whose every question has an answer starts again at once.
 `orc backlog` shows a parked task as `parked (<question-ids>)`, and `orc backlog --json` gives every task a `parked`, either `null` or the branch and the questions with the time each was asked and their answers.
+
+## A looping run
+A run whose Pi fails one command 6 times in a row stops Pi and asks the question `looping`, as [How orc runs Pi](how-orc-runs-pi.md) shows.
+It waits for your answer the way a run waits at its gate, with the same `asking.json`, wait and hand-off.
+The attention queue owns that question for you, so the decider never answers it.
+An answer that opens with `continue` resumes the same Pi session, and the rest of the answer reaches Pi as your guidance.
+Any other answer stops the run, and it ends `stopped` with your answer in its end reason.
+A ship run whose wait ends unanswered parks its task on its branch like any other question.
+Answer it with `orc backlog answer <task-id> looping=continue <guidance>` to resume the paused step's session on that branch, or `looping=stop` to end the task's run before Pi starts again.
+A report run has no branch to park on, so a wait that ends unanswered ends it failed.

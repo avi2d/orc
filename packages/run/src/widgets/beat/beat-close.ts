@@ -3,6 +3,7 @@ import type { ChildProcessSpawner } from "effect/process"
 import { backlogPaths, closeStartedTask, findTask, listTasks, applyRunSplit, splitEventText, runLabel, taskBranch, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
 import { recordEvent } from "../../entities/events/index"
 import type { BeatAction, Progress } from "../../entities/attention/index"
+import type { FailingMark } from "../../entities/agent/index"
 import type { DispatchConfig } from "../../shared/config/index"
 import { ownedBySweep, throughFor } from "../../shared/config/index"
 import { logWrittenAt, stallMillis } from "./stall"
@@ -26,7 +27,7 @@ const closeSeconds = 30
 const missingRunnerGraceMillis = 10 * 60 * 1000
 
 type CloseReading =
-  | { readonly kind: "read"; readonly result: RunnerResult; readonly ending: RunEnding | null; readonly outputAt: string | null; readonly asking: Asking | null }
+  | { readonly kind: "read"; readonly result: RunnerResult; readonly ending: RunEnding | null; readonly outputAt: string | null; readonly asking: Asking | null; readonly failing: FailingMark | null }
   | { readonly kind: "unread"; readonly reason: string }
 
 // A close read that stays unread past the queue delay releases the machine, measured from its first unread beat.
@@ -182,6 +183,9 @@ type Asking = NonNullable<NonNullable<Extract<RunnerResult, { readonly status: "
 const askingOf = (result: RunnerResult): Asking | null =>
   (result.status === "running" || result.status === "paused") && result.run?.asking !== undefined ? result.run.asking : null
 
+const failingOf = (result: RunnerResult): FailingMark | null =>
+  (result.status === "running" || result.status === "paused") && result.run?.failing !== undefined ? result.run.failing : null
+
 // A run waiting on the captain writes no output, and that silence is no stall.
 const outputAtOf = (result: RunnerResult): string | null =>
   (result.status === "running" || result.status === "paused") && result.outputAt !== undefined && askingOf(result) === null ? result.outputAt : null
@@ -229,7 +233,7 @@ const readClose = (
   through: Command | null
 ): Effect.Effect<CloseReading, never, RunnerRequirements> =>
   (through === null ? readResult(task.spec.id, home, label) : readResultThrough(through, task.spec.id, label)).pipe(
-    Effect.map((result) => ({ kind: "read" as const, result, ending: endingFromResult(result, task.spec.kind), outputAt: outputAtOf(result), asking: askingOf(result) })),
+    Effect.map((result) => ({ kind: "read" as const, result, ending: endingFromResult(result, task.spec.kind), outputAt: outputAtOf(result), asking: askingOf(result), failing: failingOf(result) })),
     Effect.catchTag("RunnerError", (error) => Effect.succeed({ kind: "unread" as const, reason: error.detail })),
     Effect.timeoutOrElse({
       duration: Duration.seconds(closeSeconds),
@@ -307,7 +311,7 @@ export const closeFinished = (
           ? relayAnswers(context.home, task.spec.id, Effect.succeed(JSON.stringify({ label, asking: handed.asking, answers: handed.answers })))
           : relayAnswersThrough(through, task.spec.id, label, handed)
       const action = reading.asking === null ? null : yield* serveAsking(context, task, claim.machine, reading.asking, relay)
-      return { kind: "running", outputAt: reading.outputAt, action } satisfies Progress
+      return { kind: "running", outputAt: reading.outputAt, action, failing: reading.failing } satisfies Progress
     }
     const ended = yield* endTask(context.root, task, claim.machine, ending)
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })

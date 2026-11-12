@@ -37,10 +37,15 @@ describe("readPiLine", () => {
   })
 
   test("labels a bash tool by its command's first line and any other tool by its name", () => {
-    expect(readPiLine(JSON.stringify({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: { command: "bun run test" } }), "/s")).toEqual({ kind: "tool-start", id: "c1", label: "bun run test" })
+    expect(readPiLine(JSON.stringify({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: { command: "bun run test" } }), "/s")).toEqual({ kind: "tool-start", id: "c1", label: "bun run test", command: "bun run test" })
     expect(toolLabel("bash", { command: "cd a\nbun run lint" })).toBe("cd a …")
     expect(toolLabel("read", { path: "/x" })).toBe("read")
-    expect(readPiLine(JSON.stringify({ type: "tool_execution_end", toolCallId: "c1", toolName: "bash", isError: false }), "/s")).toEqual({ kind: "tool-end", id: "c1" })
+    expect(readPiLine(JSON.stringify({ type: "tool_execution_end", toolCallId: "c1", toolName: "bash", isError: false }), "/s")).toEqual({ kind: "tool-end", id: "c1", failed: false })
+  })
+
+  test("reads a tool end Pi marks isError as failed, instead of every tool end as a success", () => {
+    expect(readPiLine(JSON.stringify({ type: "tool_execution_end", toolCallId: "c1", toolName: "bash", isError: true }), "/s")).toEqual({ kind: "tool-end", id: "c1", failed: true })
+    expect(readPiLine(JSON.stringify({ type: "tool_execution_start", toolCallId: "c2", toolName: "read", args: { path: "/x" } }), "/s")).toEqual({ kind: "tool-start", id: "c2", label: "read", command: null })
   })
 
   test("reads a line that is not Pi JSON as other instead of failing the run", () => {

@@ -49,7 +49,7 @@ const askingOnceWritten = async (dir: string): Promise<typeof Asking.Type> => {
 describe("waitForAnswers", () => {
   test("an answer written during the wait comes back and both files are gone instead of left for the next gate", async () => {
     await inTemp(async (dir) => {
-      const waiting = Effect.runPromise(waitForAnswers(dir, 30)([finding("r2", "changes product behavior")]).pipe(Effect.provide(BunServices.layer)))
+      const waiting = Effect.runPromise(waitForAnswers(dir, 30, "no-mistakes")([finding("r2", "changes product behavior")]).pipe(Effect.provide(BunServices.layer)))
       const asking = await askingOnceWritten(dir)
       expect(asking).toMatchObject({ questions: [{ id: "r2", text: "changes product behavior" }] })
       const answers = [{ question: "other", answer: "ignored" }, { question: "r2", answer: "Keep it" }]
@@ -61,7 +61,7 @@ describe("waitForAnswers", () => {
 
   test("answers relayed to another asking are not taken as answers to this one", async () => {
     await inTemp(async (dir) => {
-      const waiting = Effect.runPromise(waitForAnswers(dir, 2)([finding("r2", "changes product behavior")]).pipe(Effect.provide(BunServices.layer)))
+      const waiting = Effect.runPromise(waitForAnswers(dir, 2, "no-mistakes")([finding("r2", "changes product behavior")]).pipe(Effect.provide(BunServices.layer)))
       const asking = await askingOnceWritten(dir)
       await writeFile(join(dir, "answers.json"), JSON.stringify({ asking: "2026-11-02T10:00:00.000Z", answers: [{ question: "r2", answer: "Stale" }] }))
       expect(await waiting).toEqual({ asked: asking.asked, answers: [] })
@@ -71,7 +71,7 @@ describe("waitForAnswers", () => {
   test("a wait that runs out returns no answer instead of waiting on", async () => {
     await inTemp(async (dir) => {
       const started = Date.now()
-      const answers = await Effect.runPromise(waitForAnswers(dir, 1)([finding("r2", "x")]).pipe(Effect.provide(BunServices.layer)))
+      const answers = await Effect.runPromise(waitForAnswers(dir, 1, "no-mistakes")([finding("r2", "x")]).pipe(Effect.provide(BunServices.layer)))
       expect(answers.answers).toEqual([])
       expect(Date.now() - started).toBeLessThan(5000)
       expect(await readdir(dir)).toEqual([])

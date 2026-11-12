@@ -35,6 +35,15 @@ export type {
   PiRun,
 } from "./pi-run"
 export {
+  askAfterFailures,
+  pauseAfterFailures,
+  nextStreak,
+  failingFileName,
+  loopQuestionId,
+  FailingMark,
+  failingText,
+} from "./failure-streak"
+export {
   orcCompletionLine,
   orcSplitLine,
   sessionPrintedSignal,
