@@ -6,7 +6,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Array as Arr, Effect } from "effect"
 import { parseDispatchArgs } from "../../../packages/run/src/dispatch/args"
 import { type Asked, closeItem, isOverdue, openItem, openItems, readAttention, recordDecision, routeTaskItems } from "../../../packages/run/src/entities/attention/attention"
-import { attentionJson, attentionText } from "../../../packages/run/src/dispatch/attention-view"
+import { attentionJson, attentionText } from "../../../packages/run/src/features/attention-list/index"
 import type { ParkedQuestion, TaskRecord } from "../../../packages/run/src/entities/backlog/index"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>

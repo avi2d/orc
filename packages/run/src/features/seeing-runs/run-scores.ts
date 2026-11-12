@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite"
 import { Data, Effect, Schema } from "effect"
-import { ScoreValueSchema, recordScore, sqlite, type SqliteFailure } from "./entities/run-history/index"
+import { ScoreValueSchema, recordScore, sqlite, type SqliteFailure } from "../../entities/run-history/index"
 
 export class UnknownRun extends Data.TaggedError("UnknownRun")<{
   readonly runId: string

@@ -18,7 +18,7 @@ import {
   recordStep,
   type RunRecord,
 } from "../../packages/run/src/entities/run-history/index"
-import { formatRunsTable, runsJson } from "../../packages/run/src/run-history-view"
+import { formatRunsTable, runsJson } from "../../packages/run/src/features/seeing-runs/index"
 
 const withHome = async (use: (home: string) => Promise<void>): Promise<void> => {
   const home = await mkdtemp(join(tmpdir(), "orc-home-"))

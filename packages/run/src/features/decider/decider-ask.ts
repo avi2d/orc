@@ -1,11 +1,11 @@
 import { Duration, Effect } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import type { Argv } from "../shared/sandbox/index"
-import { collectOutput } from "../shared/process/index"
-import { textInput } from "../shared/sandbox/index"
-import { providerEnvOf } from "../shared/config/index"
-import { readOrcConfig } from "../shared/config/index"
-import { deciderTimeoutMillis } from "../entities/attention/index"
+import type { Argv } from "../../shared/sandbox/index"
+import { collectOutput } from "../../shared/process/index"
+import { textInput } from "../../shared/sandbox/index"
+import { providerEnvOf } from "../../shared/config/index"
+import { readOrcConfig } from "../../shared/config/index"
+import { deciderTimeoutMillis } from "../../entities/attention/index"
 import { type AskDecider, DeciderUnheard } from "./decider"
 
 // The policy replaces Pi's coding prompt and the call gets no tools, so the decider only reads the question and replies.
