@@ -8,7 +8,7 @@ Date: 2026-11-11
 
 ## Status
 
-Accepted. The eight first lint rules are in `dependency-cruiser.config.ts`, and the ninth, `unlayered-file`, lands with the last move.
+Accepted. The eight first lint rules are in `dependency-cruiser.config.ts`, and the ninth, `unlayered-file`, and the tenth, `unlayered-file-imports`, land with the last move.
 
 ## Context
 
@@ -36,7 +36,7 @@ The mapping of Feature-Sliced Design onto orc holds as follows.
 10. Layering between packages stays as it is. `schema` sits under `ui`, both sit under the panels, and `cli` and `dashboard` sit on top. The five package rules already in `dependency-cruiser.config.ts` hold this and stay.
 11. A package under about 12 source files is one slice, with its `src/index.ts` as its public file, and gets no layer folders. It gets purpose folders once it passes about 12 files, and layers only when it holds more than one user-facing purpose. Twelve packages stay one slice each: `cli` (11 files), `session-quota` (10), `queues` (9), `resources` (8), `ledger` (7), `dashboard` (6), `alerts`, `dispatch` and `quota` (5 each), `herdr-app` (5), and `attention` and `schedules` (3 each).
 12. `ui` gets five purpose folders and no layers, since the whole package is the shared drawing library and is one layer already. `tasks` gets two purpose folders, `board` and `sampler`, and no layers.
-13. Lint. dependency-cruiser carries every rule, in the existing `dependency-cruiser.config.ts`. No new tool is added, and oxlint and knip do not change. The eight first rules are `shared-imports-higher-layer`, `entities-imports-higher-layer`, `features-imports-higher-layer`, `widgets-imports-higher-layer`, `slice-imports-sibling`, `slice-internals`, `app-imports-slice-internals` and `layered-imports-unlayered`. The ninth, `unlayered-file`, forbids a flat file in `run` or `schema`, and lands with the last move, since while flat files remain it reports violations.
+13. Lint. dependency-cruiser carries every rule, in the existing `dependency-cruiser.config.ts`. No new tool is added, and oxlint and knip do not change. The eight first rules are `shared-imports-higher-layer`, `entities-imports-higher-layer`, `features-imports-higher-layer`, `widgets-imports-higher-layer`, `slice-imports-sibling`, `slice-internals`, `app-imports-slice-internals` and `layered-imports-unlayered`. The ninth, `unlayered-file`, forbids a flat file in `run` or `schema`, and the tenth, `unlayered-file-imports`, forbids a flat file from importing, and both land with the last move, since while flat files remain they report violations.
 14. Order of work. Layers move from the bottom up: `shared` first, then `entities`, `features`, `widgets` and `app`. `layered-imports-unlayered` forbids a moved file from importing one not yet moved, which holds that order.
 
 ## Consequences

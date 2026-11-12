@@ -2,6 +2,14 @@ import { defineConfig, DEV_ONLY } from "@avi2dg/checks/dependency-cruiser";
 
 const pkg = "^packages/([^/]+)/src/";
 const own = "^packages/$1/src/";
+const unlayered = {
+  path: "^packages/(run|schema)/src/",
+  pathNot: [
+    "^packages/(run|schema)/src/(app|widgets|features|entities|shared)/",
+    "^packages/run/src/bin\\.ts$",
+    "^packages/schema/src/index\\.ts$",
+  ],
+};
 const below = (layer: string, above: string) => ({
   name: layer + "-imports-higher-layer",
   severity: "error" as const,
@@ -74,6 +82,20 @@ export default defineConfig({
       comment: "The app layer enters a slice through its index.ts.",
       from: { path: pkg + "(app/[^/]+|bin|index)\\.ts$" },
       to: { path: own + "(widgets|features|entities|shared)/[^/]+/", pathNot: own + "(widgets|features|entities|shared)/[^/]+/index\\.ts$" },
+    },
+    {
+      name: "unlayered-file",
+      severity: "error",
+      comment: "Every source file of a layered package sits in a layer folder, beside the one entry file.",
+      from: {},
+      to: unlayered,
+    },
+    {
+      name: "unlayered-file-imports",
+      severity: "error",
+      comment: "A file outside the layer folders imports nothing.",
+      from: unlayered,
+      to: {},
     },
     {
       name: "layered-imports-unlayered",
