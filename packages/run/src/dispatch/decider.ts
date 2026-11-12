@@ -1,6 +1,6 @@
 import { Data, DateTime, Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { bundledAgentsDir } from "../agents"
+import { bundledAgentsDir } from "../entities/agent/index"
 import { claimDeciding, openItems, recordDecision, reviewQuestionId, routeTaskItems } from "./attention"
 import { findTask, type BacklogError, type ParkedQuestion, type TaskFileError, type TaskRecord } from "../entities/backlog/index"
 import { answerTask } from "./parked"

@@ -4,10 +4,10 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
-import type { AgentFile } from "../../packages/run/src/agents"
+import type { AgentFile } from "../../packages/run/src/entities/agent/index"
 import { buildFixPrompt, checksFileName, maxFixAttempts, readChecksCommands, runChecksRound } from "../../packages/run/src/checks"
 import { type CommandResult } from "../../packages/run/src/shared/sandbox/agent-exec"
-import { orcCompletionLine } from "../../packages/run/src/pi"
+import { orcCompletionLine } from "../../packages/run/src/entities/agent/index"
 
 type Deps = FileSystem.FileSystem | Path.Path
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Effect, Result } from "effect"
-import { parseRefuseMarkers } from "../../packages/run/src/checkout"
+import { parseRefuseMarkers } from "../../packages/run/src/entities/task-copy/index"
 import { idleTimeoutFromEnv, toolchainFromEnv } from "../../packages/run/src/run"
 
 describe("parseRefuseMarkers", () => {

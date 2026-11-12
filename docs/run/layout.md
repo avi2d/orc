@@ -23,9 +23,9 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
 | `packages/run/src/shared/sandbox/sandbox-kind.ts` | The sandbox kinds a run takes |
 | `packages/run/src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
-| `packages/run/src/checkout.ts` | The checks on the checkout a run starts from: its git root, refused markers, uncommitted changes and branch name |
-| `packages/run/src/worktree-excludes.ts` | The registered worktrees inside a checkout that its clean check leaves out |
-| `packages/run/src/task-copy.ts` | The task copy under `$ORC_HOME/worktrees`, keyed by the project folder's name, a hash of its real path and the branch, its reuse and removal, and the agent's git identity |
+| `packages/run/src/entities/task-copy/checkout.ts` | The checks on the checkout a run starts from: its git root, refused markers, uncommitted changes and branch name |
+| `packages/run/src/entities/task-copy/worktree-excludes.ts` | The registered worktrees inside a checkout that its clean check leaves out |
+| `packages/run/src/entities/task-copy/task-copy.ts` | The task copy under `$ORC_HOME/worktrees`, keyed by the project folder's name, a hash of its real path and the branch, its reuse and removal, and the agent's git identity |
 | `packages/run/src/run-exec.ts` | The sandbox a run opens, the install that prepares the copy and the steps that run in it |
 | `packages/run/src/run-loop.ts` | The implement, check and fix steps of one run |
 | `packages/run/src/run-resume.ts` | The prior run's session and passed steps a resume starts from |
@@ -36,9 +36,9 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/report.ts` | The `report.md` shape and the signal facts it carries |
 | `packages/run/src/show.ts` | The `orc show` reading of one run from the history |
 | `packages/run/src/shared/lib/run-session.ts` | The `OrcRunError` a run fails with |
-| `packages/run/src/pi.ts` | The Pi prompt and the check of its final reply |
-| `packages/run/src/pi-run.ts` | The Pi process in JSON mode: its event lines, the agent log, the session file and the idle stop |
-| `packages/run/src/agents.ts` | The agent file parsing and lookup |
+| `packages/run/src/entities/agent/pi.ts` | The Pi prompt and the check of its final reply |
+| `packages/run/src/entities/agent/pi-run.ts` | The Pi process in JSON mode: its event lines, the agent log, the session file and the idle stop |
+| `packages/run/src/entities/agent/agents.ts` | The agent file parsing and lookup |
 | `packages/run/src/context-mark.ts` | The 150 thousand token compaction mark orc writes into the run's Pi folder |
 | `packages/run/agents` | The bundled agent files |
 | `packages/run/src/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
@@ -71,21 +71,21 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/decider.ts` | The decider: one call per open review question it owns, and its answer or escalation recorded on the item |
 | `packages/run/src/dispatch/decider-ask.ts` | The decider's call, Pi on `models.decider` with the policy as its system prompt and no tools |
 | `packages/run/agents/decider-policy.md` | The written policy the decider answers under |
-| `packages/run/src/dispatch/events.ts` | The chat events under `events/`, their posted marks and the alert fires the backlog lists |
+| `packages/run/src/entities/events/events.ts` | The chat events under `events/`, their posted marks and the alert fires the backlog lists |
 | `packages/run/src/entities/backlog/task-dependency.ts` | The child counts and the waits on dependencies and merged siblings |
 | `packages/run/src/dispatch/task-events.ts` | The stall and PR events the beat records for every task |
-| `packages/run/src/dispatch/alert-events.ts` | The reading of each `alerts.jsonl` line as one alert fire |
+| `packages/run/src/entities/events/alert-events.ts` | The reading of each `alerts.jsonl` line as one alert fire |
 | `packages/run/src/dispatch/alert-stream.ts` | The one alert stream `orc runner start` queues in pueue |
 | `packages/run/src/dispatch/pr-view.ts` | The `gh pr view` reading of a task's PR and its check verdicts |
 | `packages/run/src/dispatch/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
 | `packages/run/src/dispatch/runner.ts` | The runner: the start, the kill and the token renewal through pueue |
 | `packages/run/src/dispatch/runner-instructions.ts` | The project instructions a start carries to the machine that queues the run |
 | `packages/run/src/shared/process/runner-error.ts` | The runner's error |
-| `packages/run/src/dispatch/refresh.ts` | The fast-forward of the checkout's default branch when a run starts |
+| `packages/run/src/entities/task-copy/refresh.ts` | The fast-forward of the checkout's default branch when a run starts |
 | `packages/run/src/dispatch/runner-result.ts` | The reading of a task's result and the `orc.runner.v1` JSON |
 | `packages/run/src/dispatch/upstream.ts` | The beat's read of each project's upstream contributions and the scout task a change adds |
-| `packages/run/src/dispatch/token.ts` | The `orc.token.v1` document, the token command and the Claude credentials reading |
-| `packages/run/src/dispatch/held-token.ts` | The owner-only token folder a run on another machine reads |
+| `packages/run/src/entities/token/token.ts` | The `orc.token.v1` document, the token command and the Claude credentials reading |
+| `packages/run/src/entities/token/held-token.ts` | The owner-only token folder a run on another machine reads |
 | `packages/run/src/dispatch/hold.ts` | `orc runner hold`: the wait for a live token, the rerun and the folder removal |
 | `packages/run/src/shared/process/pueue-status.ts` | The pueue status shapes and the held-task lookup the runner reads |
 | `packages/run/src/dispatch/args.ts` | The flag parsing for `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` |

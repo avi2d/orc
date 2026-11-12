@@ -3,7 +3,7 @@ import { taskWait } from "./beat-place"
 import { type ChildCount, childCount, dependencyWaits, type TaskKind, answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, type SplitMark, type Started, type TaskRecord } from "../entities/backlog/index"
 import type { Project } from "../shared/config/index"
 import { describeQuota } from "./quota"
-import type { ChatEvent } from "./chat-event"
+import type { ChatEvent } from "../entities/events/index"
 
 const BACKLOG_JSON_SCHEMA = "orc.backlog.v1" as const
 const BEAT_JSON_SCHEMA = "orc.beat.v1" as const

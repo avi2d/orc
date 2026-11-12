@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { DateTime, Option, Redacted } from "effect"
-import { decodeTokenText, tokenLive } from "../../../packages/run/src/dispatch/token"
+import { decodeTokenText, tokenLive } from "../../../packages/run/src/entities/token/index"
 
 describe("the token document", () => {
   const placeholder = "orc-test-placeholder-not-a-token"

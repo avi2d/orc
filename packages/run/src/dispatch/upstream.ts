@@ -3,7 +3,7 @@ import type { ChildProcessSpawner } from "effect/process"
 import { addTask, BacklogError, platformFailure, readIfPresent, scratchName } from "../entities/backlog/index"
 import type { BeatAction } from "./beat-action"
 import { type Contribution, contributionId, type Project } from "../shared/config/index"
-import { recordEvent } from "./events"
+import { recordEvent } from "../entities/events/index"
 import { gh } from "./pr-view"
 import type { RunnerError } from "../shared/process/index"
 

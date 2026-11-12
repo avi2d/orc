@@ -3,7 +3,7 @@ import { parseJsonFlag, parseRunner, unexpected, type DispatchArgs } from "./arg
 import type { TaskSource } from "./cli-add"
 
 export type { DispatchArgs }
-import { isEventKey } from "./events"
+import { isEventKey } from "../entities/events/index"
 import { isMergeBasis, mergeBases } from "./merge-basis"
 
 export const dispatchUsage =

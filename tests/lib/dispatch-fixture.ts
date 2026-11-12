@@ -5,7 +5,7 @@ import { Effect, Layer } from "effect";
 import { type Command, CommandRunner, CommandUnreachable } from "@avi2dg/orc-schema";
 import { listTasks } from "../../packages/run/src/entities/backlog/index";
 import { backlogJson } from "../../packages/run/src/dispatch/board";
-import { mergedIds } from "../../packages/run/src/dispatch/events";
+import { mergedIds } from "../../packages/run/src/entities/events/index";
 
 const isBacklogJson = (command: Command): boolean => command.argv.join(" ") === "orc backlog --json";
 

@@ -1,9 +1,9 @@
 import { Duration, Effect, FileSystem, Path } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { hostGitRefusalExit, hostGitSafetyEnv, hostGitShim } from "../shared/sandbox/index"
-import { parseRefuseMarkers } from "../checkout"
-import { nestedWorktreeExcludes } from "../worktree-excludes"
-import { collectedOutput } from "../shared/process/index"
+import { hostGitRefusalExit, hostGitSafetyEnv, hostGitShim } from "../../shared/sandbox/index"
+import { parseRefuseMarkers } from "./checkout"
+import { nestedWorktreeExcludes } from "./worktree-excludes"
+import { collectedOutput } from "../../shared/process/index"
 
 export type Refresh =
   | { readonly kind: "fast-forwarded"; readonly branch: string; readonly remote: string; readonly from: string; readonly to: string }

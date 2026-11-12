@@ -10,7 +10,7 @@ import { listTasks, BacklogError } from "../../../packages/run/src/entities/back
 import { runBeat } from "../../../packages/run/src/dispatch/beat"
 import { formatBeat } from "../../../packages/run/src/dispatch/board"
 import type { LoadReading } from "../../../packages/run/src/dispatch/load"
-import { unpostedEvents } from "../../../packages/run/src/dispatch/events"
+import { unpostedEvents } from "../../../packages/run/src/entities/events/index"
 import { changesOf, type ReadUpstream, readUpstream, type UpstreamState } from "../../../packages/run/src/dispatch/upstream"
 import { quietSources } from "../../lib/beat-sources"
 
