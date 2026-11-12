@@ -6,7 +6,7 @@ import { basename, join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { closeTaskCopy, openTaskCopy, type TaskCopy } from "../../packages/run/src/task-copy"
+import { closeTaskCopy, openTaskCopy, type TaskCopy } from "../../packages/run/src/entities/task-copy/index"
 import { git, seedRepo, withHome, withRepo } from "./run-helpers"
 
 const gitBin = Bun.which("git") ?? "git"

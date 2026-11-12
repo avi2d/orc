@@ -1,7 +1,7 @@
 import { hostname } from "node:os"
 import { Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { alertsFile } from "./events"
+import { alertsFile } from "../entities/events/index"
 import { heavyBinDir } from "./heavy"
 import { readHeavySettings } from "./heavy-setup"
 import { standinTools } from "./heavy-standin"

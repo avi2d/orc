@@ -10,7 +10,7 @@ import { Asking, askingFileName, AnswersFile, answersFileName, writeWhole } from
 import { readJsonFileIfPresent } from "../shared/config/index"
 import { runDirFor, type TaskKind, TaskId, readPlanDocument, SplitDocument, type SplitPlan, splitReasonPrefix, parentBranch, taskBranch } from "../entities/backlog/index"
 import { orcGroup, PueueResult, PueueStatus } from "../shared/process/index"
-import { LabelArg } from "./token"
+import { LabelArg } from "../entities/token/index"
 import { capture, decodeJson, type Command } from "../shared/process/index"
 import { readHeld, refuse, resolveProjectDir, type RunnerRequirements } from "./runner"
 import { RunnerError } from "../shared/process/index"

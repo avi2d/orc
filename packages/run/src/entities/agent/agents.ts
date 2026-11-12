@@ -132,7 +132,7 @@ const readIfPresent = (
     )
   )
 
-export const bundledAgentsDir = (): string => import.meta.dir + "/../agents"
+export const bundledAgentsDir = (): string => import.meta.dir + "/../../../agents"
 
 export const agentFileCandidates = (
   path: Path.Path,

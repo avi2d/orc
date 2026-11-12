@@ -6,7 +6,7 @@ import { Database } from "bun:sqlite"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import type { AgentFile } from "../../packages/run/src/agents"
+import type { AgentFile } from "../../packages/run/src/entities/agent/index"
 import { buildResumePlan } from "../../packages/run/src/run-resume"
 import { readShow } from "../../packages/run/src/show"
 import { openDatabase } from "../../packages/run/src/run-history"
@@ -22,7 +22,7 @@ import {
   lastAssistantReply,
   longSessionSignal,
   longSessionWarning
-} from "../../packages/run/src/long-session"
+} from "../../packages/run/src/entities/agent/index"
 import { fixture } from "../lib/fixtures"
 import { fakeOps } from "../lib/fake-ops"
 

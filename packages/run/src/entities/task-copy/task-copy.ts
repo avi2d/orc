@@ -1,7 +1,7 @@
 import { Console, Effect, type FileSystem, type Path } from "effect"
 import { ChildProcess, type ChildProcessSpawner } from "effect/process"
-import { collectOutput, runGit } from "./shared/process/index"
-import { OrcRunError } from "./shared/lib/index"
+import { collectOutput, runGit } from "../../shared/process/index"
+import { OrcRunError } from "../../shared/lib/index"
 
 type Spawner = ChildProcessSpawner.ChildProcessSpawner["Service"]
 

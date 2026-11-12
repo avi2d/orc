@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import type { AgentFile } from "../../packages/run/src/agents"
-import { buildImplementPrompt, finalReplyError, orcCompletionLine, sessionPrintedSignal, sumPiUsage } from "../../packages/run/src/pi"
+import type { AgentFile } from "../../packages/run/src/entities/agent/index"
+import { buildImplementPrompt, finalReplyError, orcCompletionLine, sessionPrintedSignal, sumPiUsage } from "../../packages/run/src/entities/agent/index"
 
 const agent = (tools: ReadonlyArray<string>): AgentFile => ({
   kind: "implementer",

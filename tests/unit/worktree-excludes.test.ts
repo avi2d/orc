@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem } from "effect"
-import { nestedWorktreeExcludes } from "../../packages/run/src/worktree-excludes"
+import { nestedWorktreeExcludes } from "../../packages/run/src/entities/task-copy/index"
 
 const excludesFor = (projectDir: string, porcelain: string): Promise<ReadonlyArray<string>> =>
   Effect.runPromise(

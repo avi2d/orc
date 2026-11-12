@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import type { AgentFile } from "../../packages/run/src/agents"
-import { piArgv, readPiLine, sessionFileName, stillRunningLines, toolLabel } from "../../packages/run/src/pi-run"
+import type { AgentFile } from "../../packages/run/src/entities/agent/index"
+import { piArgv, readPiLine, sessionFileName, stillRunningLines, toolLabel } from "../../packages/run/src/entities/agent/index"
 
 const agent: AgentFile = { kind: "implementer", model: "acme/coder", thinking: "high", tools: ["read", "bash"], body: "", path: "a.md", source: "bundled" }
 

@@ -1,7 +1,7 @@
 import { Effect, type FileSystem, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { runGit } from "./shared/process/index"
-import { OrcRunError } from "./shared/lib/index"
+import { runGit } from "../../shared/process/index"
+import { OrcRunError } from "../../shared/lib/index"
 import { nestedWorktreeExcludes } from "./worktree-excludes"
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))

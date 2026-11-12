@@ -7,7 +7,7 @@ import { historyFailure, sessionIdFromFile, type RunRecord } from "./run-history
 import { resumePriorRun, stepsForRun } from "./history-resume"
 import type { HistoryRun } from "./run-record"
 import type { ResumePlan } from "./run-loop"
-import { handoverFileName, inheritedHandoverFileName } from "./long-session"
+import { handoverFileName, inheritedHandoverFileName } from "./entities/agent/index"
 import { OrcRunError } from "./shared/lib/index"
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))

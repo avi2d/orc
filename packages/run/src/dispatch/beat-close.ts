@@ -1,7 +1,7 @@
 import { Array as Arr, DateTime, Duration, Effect, FileSystem, Option, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { backlogPaths, closeStartedTask, findTask, listTasks, applyRunSplit, splitEventText, runLabel, taskBranch, type TaskFileError, type TaskRecord } from "../entities/backlog/index"
-import { recordEvent } from "./events"
+import { recordEvent } from "../entities/events/index"
 import type { BeatAction, Progress } from "./beat-action"
 import type { DispatchConfig } from "../shared/config/index"
 import { ownedBySweep, throughFor } from "../shared/config/index"

@@ -1,7 +1,7 @@
 import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { orcCompletionLine } from "../../packages/run/src/pi"
+import { orcCompletionLine } from "../../packages/run/src/entities/agent/index"
 
 export const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
 

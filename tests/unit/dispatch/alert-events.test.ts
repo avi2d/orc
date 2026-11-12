@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { alertFires } from "../../../packages/run/src/dispatch/alert-events"
+import { alertFires } from "../../../packages/run/src/entities/events/index"
 
 describe("the bypass alert", () => {
   test("a bypass line reads as a fire naming the reason", () => {

@@ -9,7 +9,7 @@ import {
   bundledAgentsDir,
   parseAgentFile,
   resolveAgentFile,
-} from "../../packages/run/src/agents"
+} from "../../packages/run/src/entities/agent/index"
 
 const good = [
   "---",

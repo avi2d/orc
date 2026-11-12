@@ -1,6 +1,6 @@
 import { Effect } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { alertsFile } from "./events"
+import { alertsFile } from "../entities/events/index"
 import { PueueState, taskLabel } from "../shared/process/index"
 import { pueueDone } from "./runner"
 import { type RunnerError } from "../shared/process/index"

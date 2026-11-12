@@ -1,7 +1,7 @@
 import { Data, Effect, FileSystem, type Path } from "effect"
 import { refusalsIn, type GateRefusal } from "./gate-refusals"
-import type { AgentFile } from "./agents"
-import { orcCompletionLine } from "./pi"
+import type { AgentFile } from "./entities/agent/index"
+import { orcCompletionLine } from "./entities/agent/index"
 import type { CommandResult } from "./shared/sandbox/index"
 
 export class ChecksError extends Data.TaggedError("ChecksError")<{

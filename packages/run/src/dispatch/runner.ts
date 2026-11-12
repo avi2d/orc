@@ -4,7 +4,7 @@ import { decodeJson, decodeSecret, ensureGroup, pueue, type Command, type Reach 
 import { AbsolutePath, readFailure } from "../shared/config/index"
 import { ProviderId, readOrcConfig } from "../shared/config/index"
 import { TaskId, parseTaskFile, reportKinds, fileKeyOf, labelOf, parentBranch, runLabel, taskBranch } from "../entities/backlog/index"
-import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldToken } from "./held-token"
+import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldToken } from "../entities/token/index"
 import { heldTask, orcGroup, parentLabel, PueueState, PueueStatus, taskLabel, type PueueTask } from "../shared/process/index"
 import { readInstructions, TaskInstructions, writeInstructions } from "./runner-instructions"
 import { RunnerError } from "../shared/process/index"
@@ -13,7 +13,7 @@ import { formatHistoryError, markRunStopped, openDatabase, recordRun, stoppedEnd
 
 import { newRunId } from "../shared/lib/index"
 import { isRunDelivery } from "../shared/config/index"
-import { decodeTokenText, encodeRenewal, encodeSecretJson, LabelArg, RenewRequest, type TokenEncodeError, tokenDocumentNote, tokenFields } from "./token"
+import { decodeTokenText, encodeRenewal, encodeSecretJson, LabelArg, RenewRequest, type TokenEncodeError, tokenDocumentNote, tokenFields } from "../entities/token/index"
 
 
 const taskFields = {
