@@ -8,7 +8,7 @@ import type { ChildProcessSpawner } from "effect/process"
 import {
   checkHeavy, countBypass, countBypassWeek, ensureHeavyWatch, formatCheck, lastAlertByMachine, lastSlipByCommand, normalizeTaskCommand, oldRunningTasks,
   slipCandidates, slipHeld, staleMachines, stripHeavyWrapper, watchGroup, watchOnce, watchTtlMinutes
-} from "../../../packages/run/src/dispatch/heavy-watch"
+} from "../../../packages/run/src/features/heavy-commands/heavy-watch"
 import { standinScript } from "../../../packages/run/src/entities/heavy-queue/heavy-standin"
 
 const scriptOf = (tool: string, settings: { home: string; group: string; wrap: string; through: null }, commands: ReadonlyArray<string>): Promise<string> =>

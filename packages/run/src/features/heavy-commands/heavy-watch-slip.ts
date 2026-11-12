@@ -1,6 +1,6 @@
 import { Effect, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { capture } from "../shared/process/index"
+import { capture } from "../../shared/process/index"
 
 export interface SlipTask {
   readonly pid: number

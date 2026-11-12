@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test"
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { Schema } from "effect"
-import { chatExtension, chatSession, type ChatTool } from "../../packages/run/src/chat-tools"
+import { chatExtension, chatSession, type ChatTool } from "../../packages/run/src/features/chat/chat-tools"
 import { binPath, chatEnv, closeTask, type Fixture, orchestratorConfig, ranClosing, runOrc, sessionFor, withFixture } from "./chat-helpers"
 
-const chatToolsPath = new URL("../../packages/run/src/chat-tools.ts", import.meta.url).pathname
+const chatToolsPath = new URL("../../packages/run/src/features/chat/chat-tools.ts", import.meta.url).pathname
 
 const BacklogJson = Schema.fromJsonString(Schema.Struct({
   tasks: Schema.Array(Schema.Struct({

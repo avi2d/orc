@@ -5,10 +5,10 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { startHeavyWatch } from "../../../packages/run/src/dispatch/heavy-cli"
+import { startHeavyWatch } from "../../../packages/run/src/features/heavy-commands/heavy-cli"
 import { detectWrap } from "../../../packages/run/src/entities/heavy-queue/heavy-standin"
 import { readHeavySettings, writeHeavyBin } from "../../../packages/run/src/entities/heavy-queue/heavy-setup"
-import { checkHeavy, watchOnce } from "../../../packages/run/src/dispatch/heavy-watch"
+import { checkHeavy, watchOnce } from "../../../packages/run/src/features/heavy-commands/heavy-watch"
 
 const runEffect = <A, E>(effect: Effect.Effect<A, E, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))

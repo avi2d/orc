@@ -2,12 +2,9 @@ import { Console, Data, Effect, FileSystem, type Path } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { boardsVar } from "./chat-board"
 import { chatToolNames, orcCommandVar } from "./chat-tools"
-import { backlogPaths } from "./entities/backlog/index"
-import { type ProjectInstructions, readProjectInstructions } from "./shared/config/index"
-import type { Command } from "./shared/process/index"
-import { readFailure } from "./shared/config/index"
-import { providerEnvOf } from "./shared/config/index"
-import { readOrcConfig } from "./shared/config/index"
+import { backlogPaths } from "../../entities/backlog/index"
+import { type ProjectInstructions, readProjectInstructions, readFailure, providerEnvOf, readOrcConfig } from "../../shared/config/index"
+import type { Command } from "../../shared/process/index"
 
 export class ChatError extends Data.TaggedError("ChatError")<{
   readonly message: string

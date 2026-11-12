@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Layer } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { runChat } from "../../packages/run/src/chat"
+import { runChat } from "../../packages/run/src/features/chat/chat"
 
 const probeVar = "ORC_TEST_PROBE"
 

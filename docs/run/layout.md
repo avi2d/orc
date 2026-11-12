@@ -12,12 +12,12 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/app-install.ts` | The `orc app install` copy of the built Herdr App mods, layout and keys merge |
 | `packages/run/src/features/running-a-task/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
 | `packages/run/src/shared/config/orc-config.ts` | The reading of `config.json`: the providers, the heavy queue tuning and the implementer, fixer, orchestrator, planner and decider models |
-| `packages/run/src/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
-| `packages/run/src/chat-tools.ts` | The chat tools and the poll that posts each closed task and each event into the chat once |
-| `packages/run/src/chat-parked.ts` | The chat's listing of parked questions, once per start and once per park |
-| `packages/run/src/chat-board.ts` | The chat's decision boards: the cards, the answers they record and the listing at each start |
-| `packages/run/src/chat-board-page.ts` | The decision board page and the record of its cards |
-| `packages/run/src/chat-lavish.ts` | The `lavish-axi` launcher that opens, reads and ends a board's session |
+| `packages/run/src/features/chat/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
+| `packages/run/src/features/chat/chat-tools.ts` | The chat tools and the poll that posts each closed task and each event into the chat once |
+| `packages/run/src/features/chat/chat-parked.ts` | The chat's listing of parked questions, once per start and once per park |
+| `packages/run/src/features/chat/chat-board.ts` | The chat's decision boards: the cards, the answers they record and the listing at each start |
+| `packages/run/src/features/chat/chat-board-page.ts` | The decision board page and the record of its cards |
+| `packages/run/src/features/chat/chat-lavish.ts` | The `lavish-axi` launcher that opens, reads and ends a board's session |
 | `packages/run/src/shared/config/json-file.ts` | The JSON config file reading and its `ConfigError` |
 | `packages/run/src/shared/config/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `packages/run/src/features/running-a-task/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
@@ -89,15 +89,15 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/queueing-a-task/hold.ts` | `orc runner hold`: the wait for a live token, the rerun and the folder removal |
 | `packages/run/src/shared/process/pueue-status.ts` | The pueue status shapes and the held-task lookup the runner reads |
 | `packages/run/src/dispatch/args.ts` | The flag parsing for `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` |
-| `packages/run/src/dispatch/cli-add.ts` | The `orc backlog add` command and the intake split of an over budget request |
-| `packages/run/src/dispatch/backlog-plan.ts` | The `orc backlog plan` view of a parent plan and the drop of a new child |
-| `packages/run/src/dispatch/intake-plan.ts` | The planner model ask at intake and its five minute limit |
+| `packages/run/src/features/backlog-planning/cli-add.ts` | The `orc backlog add` command and the intake split of an over budget request |
+| `packages/run/src/features/backlog-planning/backlog-plan.ts` | The `orc backlog plan` view of a parent plan and the drop of a new child |
+| `packages/run/src/features/backlog-planning/intake-plan.ts` | The planner model ask at intake and its five minute limit |
 | `packages/run/src/entities/backlog/split.ts` | The `orc.split.v1` planner document and the parent with vertical slice children it applies |
 | `packages/run/src/dispatch/cli.ts` | The `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
 | `packages/run/src/dispatch/merge.ts` | The `orc merge` guard and squash-merge |
 | `packages/run/src/entities/pull-request/merge-basis.ts` | The `captain-word` and `yolo-green` bases `orc merge` takes |
 | `packages/run/src/entities/heavy-queue/heavy.ts` | The heavy settings, the stand in folder and the default heavy tool list |
-| `packages/run/src/dispatch/heavy-cli.ts` | The `orc heavy` path, check, watch and watch-once commands |
+| `packages/run/src/features/heavy-commands/heavy-cli.ts` | The `orc heavy` path, check, watch and watch-once commands |
 | `packages/run/src/entities/heavy-queue/heavy-setup.ts` | The reading of the heavy settings and the writing of the stand in folder |
 | `packages/run/src/entities/heavy-queue/heavy-standin.ts` | The three line stand in launchers that start the helper for each heavy tool |
 | `packages/run/src/entities/heavy-queue/heavy-classify.ts` | The per tool decision of which calls queue and which targeted calls take priority |
@@ -106,8 +106,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts` | The stand in runtime: the helper command, the real tool lookup, the bypass event, the plan of a call and the queue wait |
 | `packages/run/src/entities/heavy-queue/heavy-process-tree.ts` | The process tree walk that finds a call inside a held slot or under the through command |
 | `packages/run/src/entities/heavy-queue/heavy-pueue-task.ts` | The reading of pueue status and log JSON for the queue wait and the exit code |
-| `packages/run/src/dispatch/heavy-watch.ts` | The watchdog that reports stalled calls and queue slips |
-| `packages/run/src/dispatch/heavy-watch-slip.ts` | The slip search that finds heavy tool processes outside a running heavy task |
+| `packages/run/src/features/heavy-commands/heavy-watch.ts` | The watchdog that reports stalled calls and queue slips |
+| `packages/run/src/features/heavy-commands/heavy-watch-slip.ts` | The slip search that finds heavy tool processes outside a running heavy task |
 | `tests/unit` | The in-process unit tests at the workspace root |
 | `tests/e2e` | The tests that run `packages/run/src/bin.ts`, git or nono as a process, with a live Pi run through `ORC_PI_E2E=1`, at the workspace root |
 | `tests/fixtures/runner/pueue` | The pueue 4 status JSON the runner tests read |

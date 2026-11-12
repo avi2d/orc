@@ -7,7 +7,7 @@ import { Config, Console, Effect } from "effect"
 import packageJson from "../package.json" with { type: "json" }
 import { appHomeDir, bundledAppDir, formatAppInstall, installApp } from "./app-install"
 import { type OrcArgs, parseArgs } from "./args"
-import { runChat } from "./chat"
+import { runChat } from "./features/chat/index"
 import { dispatchUsage } from "./dispatch/args"
 import { runDispatch } from "./dispatch/cli"
 import { RunnerError } from "./shared/process/index"

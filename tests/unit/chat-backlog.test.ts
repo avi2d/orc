@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Schema } from "effect"
-import { BacklogTasks } from "../../packages/run/src/chat-backlog"
+import { BacklogTasks } from "../../packages/run/src/features/chat/chat-backlog"
 
 describe("chat backlog decoding", () => {
   test("a closed task keeps its answered hold instead of dropping it", () => {

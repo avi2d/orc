@@ -1,13 +1,9 @@
 import { hostname } from "node:os"
 import { Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { alertsFile } from "../entities/events/index"
-import { heavyBinDir } from "../entities/heavy-queue/index"
-import { readHeavySettings } from "../entities/heavy-queue/index"
-import { standinTools } from "../entities/heavy-queue/index"
-import { PueueStatus, taskLabel } from "../shared/process/index"
-import { type Command, ensureGroup, capture, decodeJson, pueue } from "../shared/process/index"
-import { RunnerError } from "../shared/process/index"
+import { alertsFile } from "../../entities/events/index"
+import { heavyBinDir, readHeavySettings, standinTools } from "../../entities/heavy-queue/index"
+import { PueueStatus, taskLabel, type Command, ensureGroup, capture, decodeJson, pueue, RunnerError } from "../../shared/process/index"
 
 export const watchTtlMinutes = 10
 const watchIntervalSeconds = watchTtlMinutes * 60

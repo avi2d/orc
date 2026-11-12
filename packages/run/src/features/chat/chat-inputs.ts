@@ -1,6 +1,6 @@
 import { Schema } from "effect"
-import { mergeBases } from "./entities/pull-request/index"
-import { taskKinds } from "./entities/backlog/index"
+import { mergeBases } from "../../entities/pull-request/index"
+import { taskKinds } from "../../entities/backlog/index"
 
 export const AddTaskInput = Schema.Struct({
   project: Schema.String.annotate({ description: "The project the task is for, as the backlog's project list names it" }),
