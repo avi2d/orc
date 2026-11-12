@@ -1,5 +1,4 @@
 export {
-  AgentFileError,
   parseAgentFile,
   bundledAgentsDir,
   agentFileCandidates,
