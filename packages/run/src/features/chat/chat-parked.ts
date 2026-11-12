@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect"
-import { reviewQuestionId } from "./entities/attention/index"
+import { reviewQuestionId } from "../../entities/attention/index"
 
 export const QuestionJson = Schema.Struct({ id: Schema.String, text: Schema.String, answer: Schema.NullOr(Schema.Struct({ words: Schema.String, at: Schema.String })) })
 

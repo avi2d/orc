@@ -1,13 +1,14 @@
 import { Console, Effect, type FileSystem } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { heavyBinDir } from "../entities/heavy-queue/index"
-import { ensureHeavyQueue, ensureHeavySetup, readHeavySettings } from "../entities/heavy-queue/index"
+import { heavyBinDir, ensureHeavyQueue, ensureHeavySetup, readHeavySettings } from "../../entities/heavy-queue/index"
 import { checkHeavy, ensureHeavyWatch, formatCheck, watchOnce } from "./heavy-watch"
-import { type RunnerError } from "../shared/process/index"
-import { type Command } from "../shared/process/index"
-import type { DispatchArgs } from "./args"
+import { type RunnerError, type Command } from "../../shared/process/index"
 
-export type HeavyVerb = Extract<DispatchArgs, { readonly kind: "HeavyPath" | "HeavyCheck" | "HeavyWatch" | "HeavyWatchOnce" }>
+export type HeavyVerb =
+  | { readonly kind: "HeavyPath" }
+  | { readonly kind: "HeavyCheck"; readonly json: boolean }
+  | { readonly kind: "HeavyWatch" }
+  | { readonly kind: "HeavyWatchOnce" }
 
 export const startHeavyWatch = (home: string, orc: Command, command: string): Effect.Effect<void, never, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
   readHeavySettings(home).pipe(

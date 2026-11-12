@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs"
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { Effect, Schema } from "effect"
-import { chatSession } from "../../packages/run/src/chat-tools"
-import type { BoardLauncher, BoardPoll } from "../../packages/run/src/chat-lavish"
+import { chatSession } from "../../packages/run/src/features/chat/chat-tools"
+import type { BoardLauncher, BoardPoll } from "../../packages/run/src/features/chat/chat-lavish"
 import { chatEnv, type Fixture, withFixture } from "./chat-helpers"
 
 const SavedBoard = Schema.fromJsonString(Schema.Struct({ board: Schema.String }))

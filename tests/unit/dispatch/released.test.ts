@@ -6,7 +6,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, Layer, Schema } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { addTask, claimTask } from "../../../packages/run/src/entities/backlog/index"
-import { holdTask } from "../../../packages/run/src/dispatch/backlog-hold"
+import { holdTask } from "../../../packages/run/src/features/backlog-planning/backlog-hold"
 import { answerTask } from "../../../packages/run/src/entities/parked-runs/index"
 import { startTask } from "../../../packages/run/src/features/queueing-a-task/index"
 

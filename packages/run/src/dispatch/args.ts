@@ -1,6 +1,6 @@
 import { isTaskId, isCalendarDate, isTaskKind, type TaskKind, unknownKind } from "../entities/backlog/index"
 import { parseJsonFlag, parseRunner, unexpected, type DispatchArgs } from "./args-runner"
-import type { TaskSource } from "./cli-add"
+import type { TaskSource } from "../features/backlog-planning/index"
 
 export type { DispatchArgs }
 import { isEventKey } from "../entities/events/index"

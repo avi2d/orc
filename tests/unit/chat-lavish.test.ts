@@ -3,7 +3,7 @@ import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect } from "effect"
-import { boardHostAddress, lavishLauncher, pickBoardHost } from "../../packages/run/src/chat-lavish"
+import { boardHostAddress, lavishLauncher, pickBoardHost } from "../../packages/run/src/features/chat/chat-lavish"
 
 const feedback = [
   "session:",

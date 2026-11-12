@@ -3,8 +3,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect } from "effect"
-import { parkedListing } from "../../packages/run/src/chat-parked"
-import { chatSession, orcCommandVar } from "../../packages/run/src/chat-tools"
+import { parkedListing } from "../../packages/run/src/features/chat/chat-parked"
+import { chatSession, orcCommandVar } from "../../packages/run/src/features/chat/chat-tools"
 
 describe("the parked-question listing", () => {
   test("polling does not post a decider-owned question while posting a user-owned question", async () => {

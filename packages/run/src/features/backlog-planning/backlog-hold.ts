@@ -1,5 +1,5 @@
 import { Effect, FileSystem } from "effect"
-import { findTask, type Rewrite, rewriteNew, type Hold, type HoldQuestion, type TaskFileError, type TaskRecord, BacklogError } from "../entities/backlog/index"
+import { findTask, type Rewrite, rewriteNew, type Hold, type HoldQuestion, type TaskFileError, type TaskRecord, BacklogError } from "../../entities/backlog/index"
 
 export type HoldOutcome = { readonly kind: "held" | "already held"; readonly hold: Hold }
 

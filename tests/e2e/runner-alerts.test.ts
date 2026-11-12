@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { type Fixture, mainToken, type OrcResult, runnerTimeout, runOrc, withFixture } from "./runner-helpers"
-import { watchGroup } from "../../packages/run/src/dispatch/heavy-watch"
+import { watchGroup } from "../../packages/run/src/features/heavy-commands/heavy-watch"
 
 const startTask = async (fixture: Fixture, home: string = fixture.home): Promise<OrcResult> => {
   await mkdir(join(home, "backlog", "taken"), { recursive: true })

@@ -1,9 +1,8 @@
 import { Duration, Effect, type FileSystem, Result } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { providerEnvOf } from "../shared/config/index"
-import { readOrcConfig } from "../shared/config/index"
-import { capture } from "../shared/process/index"
-import { childBudget, type PlanDocument, readPlanDocument, splitDocumentSchema } from "../entities/backlog/index"
+import { providerEnvOf, readOrcConfig } from "../../shared/config/index"
+import { capture } from "../../shared/process/index"
+import { childBudget, type PlanDocument, readPlanDocument, splitDocumentSchema } from "../../entities/backlog/index"
 
 const planSeconds = 300
 

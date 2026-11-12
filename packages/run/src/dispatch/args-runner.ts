@@ -1,6 +1,7 @@
 import { isTaskId } from "../entities/backlog/index"
 import type { MergeBasis } from "../entities/pull-request/index"
-import type { AddTask } from "./cli-add"
+import type { AddTask } from "../features/backlog-planning/index"
+import type { HeavyVerb } from "../features/heavy-commands/index"
 import type { Reach } from "../shared/process/index"
 
 export type DispatchArgs =
@@ -28,10 +29,7 @@ export type DispatchArgs =
   | { readonly kind: "RunnerResult"; readonly task: string; readonly label?: string; readonly json: boolean; readonly reach: Reach; readonly stdinLabel: boolean }
   | { readonly kind: "RunnerKill"; readonly task: string; readonly label?: string; readonly stdinLabel: boolean }
   | { readonly kind: "RunnerAnswer"; readonly task: string }
-  | { readonly kind: "HeavyPath" }
-  | { readonly kind: "HeavyCheck"; readonly json: boolean }
-  | { readonly kind: "HeavyWatch" }
-  | { readonly kind: "HeavyWatchOnce" }
+  | HeavyVerb
   | { readonly kind: "UsageError"; readonly detail: string }
 
 export const parseJsonFlag = (rest: ReadonlyArray<string>, json: (json: boolean) => DispatchArgs): DispatchArgs => {
