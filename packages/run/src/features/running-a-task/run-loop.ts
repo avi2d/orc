@@ -174,11 +174,14 @@ const fixOnce = (
   evidenceFile: string,
   attempt: number,
   resumed: { readonly session: string; readonly guidance: string | null } | null,
-  checkpoints: Pick<RunCheckpoints, "fixSession" | "loopAsked">
+  checkpoints: Pick<RunCheckpoints, "fixSession" | "loopAsked">,
+  continuationWords: string | null = null
 ): Effect.Effect<{ readonly fix: RecordedFixAttempt; readonly commits: ReadonlyArray<OrcRunCommit>; readonly paused: string | null }, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
     const started = new Date().toISOString()
-    const prompt = buildFixPrompt(run.fixer, evidenceFile) + (resumed?.guidance == null ? "" : "\n" + resumed.guidance)
+    const prompt = resumed !== null && continuationWords !== null
+      ? loopContinuePrompt(continuationWords)
+      : buildFixPrompt(run.fixer, evidenceFile) + (resumed?.guidance == null ? "" : "\n" + resumed.guidance)
     const first: AgentRun = { agent: run.fixer, prompt, logFile: "fix-" + attempt.toString() + ".log", resumeSession: resumed?.session ?? null, onSession: (file) => checkpoints.fixSession(attempt, file) }
     const result = yield* runSettled(run, runAgent, first, { name: "fix", attempt }, checkpoints.loopAsked)
     const session = yield* sessionOf(run, result)
@@ -281,11 +284,12 @@ const runChecksFixLoop = (
 ): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
     const pending = resumedFix(plan)
+    const loop = loopAnswerOf(plan.answers)
     const prior = fixes.length > 0 ? fixes[fixes.length - 1] : undefined
-    if (prior !== undefined && prior.status === "failed" && loopAnswerOf(plan.answers)?.kind === "continue") {
+    if (prior !== undefined && prior.status === "failed" && loop?.kind === "continue" && pending !== null) {
       fixes.pop()
       yield* checkpoints.fixStart(prior.attempt, new Date().toISOString())
-      const retried = yield* fixOnce(run, ops.runAgent, prior.evidenceIn, prior.attempt, pending, checkpoints)
+      const retried = yield* fixOnce(run, ops.runAgent, prior.evidenceIn, prior.attempt, pending, checkpoints, loop.words)
       fixes.push(retried.fix)
       yield* checkpoints.fixDone(retried.fix)
       commits.push(...retried.commits)
