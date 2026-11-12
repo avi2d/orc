@@ -1,8 +1,8 @@
-import { type DispatchArgs, parseDispatchArgs } from "./dispatch/args"
-import { askUserWord, type QuestionAnswer } from "./entities/review-gate/index"
-import { isTaskKind, type TaskKind, unknownKind } from "./entities/backlog/index"
-import { isRunDelivery, type RunDelivery, runDeliveries } from "./shared/config/index"
-import { sandboxKinds, type SandboxKind } from "./shared/sandbox/index"
+import { type DispatchArgs, parseDispatchArgs } from "./dispatch-args"
+import { askUserWord, type QuestionAnswer } from "../entities/review-gate/index"
+import { isTaskKind, type TaskKind, unknownKind } from "../entities/backlog/index"
+import { isRunDelivery, type RunDelivery, runDeliveries } from "../shared/config/index"
+import { sandboxKinds, type SandboxKind } from "../shared/sandbox/index"
 export type OrcArgs =
   | { readonly kind: "PrintVersion" }
   | { readonly kind: "PrintHelp" }

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { endingFromResult } from "../../../packages/run/src/features/queueing-a-task/index"
-import { ownLogEndingOf, staleEndingOf } from "../../../packages/run/src/dispatch/beat-close"
+import { ownLogEndingOf, staleEndingOf } from "../../../packages/run/src/widgets/beat/beat-close"
 
 const oldStart = "2026-10-27T10:02:00.000Z"
 

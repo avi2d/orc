@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { parseDispatchArgs } from "../../../packages/run/src/dispatch/args"
+import { parseDispatchArgs } from "../../../packages/run/src/app/dispatch-args"
 import { addTask, claimTask, closeStartedTask, listTasks, markPosted, writeTaken } from "../../../packages/run/src/entities/backlog/index"
 import { markEventPosted, recordEvent, unpostedEvents } from "../../../packages/run/src/entities/events/index"
 

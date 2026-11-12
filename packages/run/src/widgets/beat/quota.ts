@@ -1,7 +1,7 @@
 import { Duration, Effect, Result, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { spawnedQuiet } from "../shared/process/index"
-import { duplicateOf } from "../shared/config/index"
+import { spawnedQuiet } from "../../shared/process/index"
+import { duplicateOf } from "../../shared/config/index"
 
 type AccountReading =
   | { readonly account: string; readonly kind: "usable"; readonly remainingPercent: number }

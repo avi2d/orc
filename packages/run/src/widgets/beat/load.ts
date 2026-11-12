@@ -1,11 +1,11 @@
 import { loadavg } from "node:os"
 import { Duration, Effect, type FileSystem } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import type { Machine } from "../shared/config/index"
-import { checkHeavy } from "../features/heavy-commands/index"
-import { ownedBySweep, throughFor } from "../shared/config/index"
-import { refuse } from "../features/queueing-a-task/index"
-import { type RunnerError, capture } from "../shared/process/index"
+import type { Machine } from "../../shared/config/index"
+import { checkHeavy } from "../../features/heavy-commands/index"
+import { ownedBySweep, throughFor } from "../../shared/config/index"
+import { refuse } from "../../features/queueing-a-task/index"
+import { type RunnerError, capture } from "../../shared/process/index"
 
 export type HeavyReading = { readonly kind: "read"; readonly queued: number; readonly bypassWeek: number } | { readonly kind: "unread"; readonly reason: string }
 
