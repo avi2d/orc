@@ -2,10 +2,8 @@ import { Data, DateTime, Effect, FileSystem, Option, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { bundledAgentsDir } from "../agents"
 import { claimDeciding, openItems, recordDecision, reviewQuestionId, routeTaskItems } from "./attention"
-import { findTask } from "../entities/backlog/index"
-import type { BacklogError } from "../entities/backlog/index"
+import { findTask, type BacklogError, type ParkedQuestion, type TaskFileError, type TaskRecord } from "../entities/backlog/index"
 import { answerTask } from "./parked"
-import type { ParkedQuestion, TaskFileError, TaskRecord } from "../entities/backlog/index"
 
 export class DeciderUnheard extends Data.TaggedError("DeciderUnheard")<{
   readonly reason: string

@@ -12,9 +12,7 @@ export {
   grabbedFile,
   takenGrab,
 } from "./backlog-write"
-export type {
-  BacklogPaths,
-} from "./backlog-write"
+
 export {
   isTaskId,
   TaskId,
@@ -28,7 +26,6 @@ export {
   writeTaken,
   publishClosed,
   closeStartedTask,
-  reopenStartedTask,
   markPosted,
   rewriteNew,
   rewriteTaken,
@@ -59,13 +56,11 @@ export type {
   PlanDocument,
   SplitPlan,
   SplitRequest,
-  AppliedSplit,
 } from "./split"
 export {
   renderTaskFile,
 } from "./task-record-render"
 export {
-  taskFolders,
   isHeld,
   openQuestions,
   answersAwaited,
@@ -77,9 +72,7 @@ export {
 } from "./task-record"
 export type {
   TaskFolder,
-  SplitSource,
   SplitMark,
-  TaskSpec,
   Claim,
   Started,
   ParkedAnswer,

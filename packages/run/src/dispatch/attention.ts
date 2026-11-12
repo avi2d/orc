@@ -1,9 +1,7 @@
 import { Effect, FileSystem, Schema } from "effect"
-import { readNames } from "../entities/backlog/index"
-import { BacklogError, platformFailure, publishOnce, readIfPresent, scratchName } from "../entities/backlog/index"
+import { readNames, BacklogError, platformFailure, publishOnce, readIfPresent, scratchName, type TaskRecord } from "../entities/backlog/index"
 import type { BeatAction } from "./beat-action"
 import { checkRefusals, greenChecks, type PullRequestView, redChecks } from "./pr-view"
-import type { TaskRecord } from "../entities/backlog/index"
 
 const overdueMillis = 5 * 60 * 1000
 

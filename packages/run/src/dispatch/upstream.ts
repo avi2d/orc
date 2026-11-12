@@ -1,7 +1,6 @@
 import { Duration, Effect, FileSystem, Option, Result, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { addTask } from "../entities/backlog/index"
-import { BacklogError, platformFailure, readIfPresent, scratchName } from "../entities/backlog/index"
+import { addTask, BacklogError, platformFailure, readIfPresent, scratchName } from "../entities/backlog/index"
 import type { BeatAction } from "./beat-action"
 import { type Contribution, contributionId, type Project } from "../shared/config/index"
 import { recordEvent } from "./events"

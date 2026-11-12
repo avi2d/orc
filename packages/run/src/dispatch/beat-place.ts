@@ -1,7 +1,6 @@
 import { deliveryFor, type RunDelivery } from "../shared/config/index"
 import { checkoutOn, type DispatchConfig, type Machine, modeOf, type Project } from "../shared/config/index"
-import { answerWait, type DeciderOwns, type TaskRecord } from "../entities/backlog/index"
-import { childCount, dependencyWaits } from "../entities/backlog/index"
+import { answerWait, type DeciderOwns, type TaskRecord, childCount, dependencyWaits } from "../entities/backlog/index"
 
 export interface MachineRoom {
   readonly machine: string

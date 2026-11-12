@@ -1,13 +1,12 @@
 import { Duration, Effect, type FileSystem, Option, Result } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { BacklogError } from "../entities/backlog/index"
+import { BacklogError, type TaskRecord } from "../entities/backlog/index"
 import type { BeatAction, StalledAction } from "./beat-action"
 import type { ChatEvent } from "./chat-event"
 import { routePullRequest } from "./attention"
 import { eventRecorded, recordEvent } from "./events"
 import { checkRefusals, greenChecks, type PullRequestView } from "./pr-view"
 import type { RunnerError } from "../shared/process/index"
-import type { TaskRecord } from "../entities/backlog/index"
 
 export type ReadPullRequest = (url: string) => Effect.Effect<PullRequestView, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner>
 

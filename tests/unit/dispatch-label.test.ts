@@ -9,9 +9,9 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogJson, formatBoard } from "../../packages/run/src/dispatch/board"
 import type { Project } from "../../packages/run/src/shared/config/dispatch-config"
 import { heldTask, taskLabel } from "../../packages/run/src/shared/process/pueue-status"
-import { fileKeyOf, queueFromText, renewTask } from "../../packages/run/src/dispatch/runner"
+import { queueFromText, renewTask } from "../../packages/run/src/dispatch/runner"
+import { fileKeyOf, type TaskRecord } from "../../packages/run/src/entities/backlog/index"
 import { readStdinLabel } from "../../packages/run/src/dispatch/runner-result"
-import type { TaskRecord } from "../../packages/run/src/entities/backlog/index"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))

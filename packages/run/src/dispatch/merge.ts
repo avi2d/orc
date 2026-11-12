@@ -1,10 +1,9 @@
 import { Effect, type FileSystem, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { BacklogError, backlogPaths, findTask } from "../entities/backlog/index"
+import { BacklogError, backlogPaths, findTask, type TaskFileError } from "../entities/backlog/index"
 import { isYolo, readDispatchConfig, readProjects } from "../shared/config/index"
 import type { ConfigError } from "../shared/config/index"
 import type { RunnerError } from "../shared/process/index"
-import type { TaskFileError } from "../entities/backlog/index"
 import type { MergeBasis } from "./merge-basis"
 import { checkRefusals, gh, prPattern, type PullRequestView, readPullRequest } from "./pr-view"
 
