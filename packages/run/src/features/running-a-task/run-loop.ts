@@ -272,6 +272,21 @@ const resumedFix = (plan: Pick<ResumePlan, "fixSessionFile" | "answers">): { rea
   return { session: plan.fixSessionFile, guidance: loop?.kind === "continue" ? loopGuidance(loop.words) : null }
 }
 
+const retryParkedFix = (run: HistoryRun, ops: SandboxOps, base: ImplementBase, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, commits: Array<OrcRunCommit>, plan: ResumePlan, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport | null, OrcRunError | RunStopped> =>
+  Effect.gen(function*() {
+    const pending = resumedFix(plan)
+    const loop = loopAnswerOf(plan.answers)
+    const prior = fixes.length > 0 ? fixes[fixes.length - 1] : undefined
+    if (prior === undefined || prior.status !== "failed" || loop?.kind !== "continue" || pending === null) return null
+    fixes.pop()
+    yield* checkpoints.fixStart(prior.attempt, new Date().toISOString())
+    const retried = yield* fixOnce(run, ops.runAgent, prior.evidenceIn, prior.attempt, pending, checkpoints, loop.words)
+    fixes.push(retried.fix)
+    yield* checkpoints.fixDone(retried.fix)
+    commits.push(...retried.commits)
+    return retried.paused === null ? null : { ...base, commits, completed: false, checksRounds: rounds, fixes, fixAttempts: fixes.length, endReason: retried.paused }
+  })
+
 const runChecksFixLoop = (
   run: HistoryRun,
   ops: SandboxOps,
@@ -283,19 +298,9 @@ const runChecksFixLoop = (
   checkpoints: RunCheckpoints
 ): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
-    const pending = resumedFix(plan)
-    const loop = loopAnswerOf(plan.answers)
-    const prior = fixes.length > 0 ? fixes[fixes.length - 1] : undefined
-    if (prior !== undefined && prior.status === "failed" && loop?.kind === "continue" && pending !== null) {
-      fixes.pop()
-      yield* checkpoints.fixStart(prior.attempt, new Date().toISOString())
-      const retried = yield* fixOnce(run, ops.runAgent, prior.evidenceIn, prior.attempt, pending, checkpoints, loop.words)
-      fixes.push(retried.fix)
-      yield* checkpoints.fixDone(retried.fix)
-      commits.push(...retried.commits)
-      if (retried.paused !== null) {
-        return { ...base, commits, completed: false, checksRounds: rounds, fixes, fixAttempts: fixes.length, endReason: retried.paused }
-      }
+    const resumed = yield* retryParkedFix(run, ops, base, rounds, fixes, commits, plan, checkpoints)
+    if (resumed !== null) {
+      return resumed
     }
     for (let round = 1; round <= maxFixAttempts + 1; round += 1) {
       const started = new Date().toISOString()
