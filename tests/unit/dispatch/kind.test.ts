@@ -11,7 +11,7 @@ import { quietSources } from "../../lib/beat-sources"
 import { formatBeat } from "../../../packages/run/src/dispatch/board"
 import type { DispatchConfig, Project } from "../../../packages/run/src/shared/config/dispatch-config"
 import { taskLabel } from "../../../packages/run/src/shared/process/pueue-status"
-import { insertRun, openDatabase } from "../../../packages/run/src/run-history"
+import { insertRun, openDatabase } from "../../../packages/run/src/entities/run-history/index"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))

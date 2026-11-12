@@ -3,7 +3,7 @@ import { rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { insertSignal, insertStep, openDatabase, recordRun } from "../../packages/run/src/run-history"
+import { insertSignal, insertStep, openDatabase, recordRun } from "../../packages/run/src/entities/run-history/index"
 import { binPath, fakeQuota, mainToken, orcOk, queuedArgs, runnerTimeout, withFixture, type Fixture } from "./runner-helpers"
 
 describe("an ask-user finding parks as a question", () => {

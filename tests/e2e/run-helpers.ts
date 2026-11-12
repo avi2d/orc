@@ -11,7 +11,7 @@ import { hostGitShim } from "../../packages/run/src/shared/sandbox/host"
 import { orcCompletionLine } from "../../packages/run/src/entities/agent/index"
 import { runWithHistory } from "../../packages/run/src/run"
 import type { OrcRunReport, RunDeliverer } from "../../packages/run/src/run-record"
-import { listRuns, openDatabase, type RunRecord } from "../../packages/run/src/run-history"
+import { listRuns, openDatabase, type RunRecord } from "../../packages/run/src/entities/run-history/index"
 import { type FakeAgent, type FakeCheck, fakeOps } from "../lib/fake-ops"
 
 export const git = (dir: string, args: ReadonlyArray<string>): string => {

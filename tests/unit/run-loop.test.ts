@@ -7,8 +7,8 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, Exit, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
-import { listRuns, openDatabase, recordRun, recordStep } from "../../packages/run/src/run-history"
-import { stepsForRun } from "../../packages/run/src/history-resume"
+import { listRuns, openDatabase, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
+import { stepsForRun } from "../../packages/run/src/entities/run-history/index"
 import {
   recordChecksDone,
   recordChecksStart,

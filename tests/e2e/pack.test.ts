@@ -105,7 +105,7 @@ const expectedFiles = [
   "src/shared/config/machine-reach.ts",
   "src/entities/pull-request/merge-basis.ts",
   "src/dispatch/merge.ts",
-  "src/dispatch/parked.ts",
+  "src/entities/parked-runs/parked.ts",
   "src/entities/pull-request/pr-view.ts",
   "src/shared/process/pueue-status.ts",
   "src/dispatch/quota.ts",
@@ -124,10 +124,10 @@ const expectedFiles = [
   "src/entities/backlog/task-record.ts",
   "src/entities/token/token.ts",
   "src/dispatch/upstream.ts",
-  "src/gate-refusals.ts",
+  "src/entities/run-history/gate-refusals.ts",
   "src/shared/sandbox/git-config.ts",
   "src/shared/process/git-run.ts",
-  "src/history-resume.ts",
+  "src/entities/run-history/history-resume.ts",
   "src/history-write.ts",
   "src/shared/sandbox/host.ts",
   "src/shared/config/json-file.ts",
@@ -143,12 +143,12 @@ const expectedFiles = [
   "src/entities/agent/pi-run.ts",
   "src/entities/agent/pi.ts",
   "src/report-run.ts",
-  "src/report.ts",
+  "src/entities/run-history/report.ts",
   "src/run-deliverer.ts",
   "src/run-exec.ts",
   "src/run-folders.ts",
   "src/run-history-view.ts",
-  "src/run-history.ts",
+  "src/entities/run-history/run-history.ts",
   "src/shared/lib/run-id.ts",
   "src/run-loop.ts",
   "src/run-record.ts",
@@ -171,7 +171,9 @@ const expectedFiles = [
   "src/entities/heavy-queue/index.ts",
   "src/entities/review-gate/index.ts",
   "src/entities/pull-request/index.ts",
-  "src/entities/attention/index.ts"
+  "src/entities/attention/index.ts",
+  "src/entities/run-history/index.ts",
+  "src/entities/parked-runs/index.ts"
 ]
 
 const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => {

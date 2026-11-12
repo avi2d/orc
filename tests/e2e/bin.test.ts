@@ -6,7 +6,7 @@ import type { Database } from "bun:sqlite"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
 import packageJson from "../../package.json" with { type: "json" }
-import { openDatabase } from "../../packages/run/src/run-history"
+import { openDatabase } from "../../packages/run/src/entities/run-history/index"
 
 const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
 

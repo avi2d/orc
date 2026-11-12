@@ -10,8 +10,8 @@ import {
   StepStatusSchema,
   toFileUrl,
   type SqliteFailure
-} from "./run-history"
-import { reportFileName } from "./report"
+} from "./entities/run-history/index"
+import { reportFileName } from "./entities/run-history/index"
 
 const ShowSignalSchema = Schema.Struct({
   name: Schema.String,

@@ -10,7 +10,7 @@ import { addTask, claimTask, closeStartedTask, listTasks, releaseTask, writeTake
 import { placeTask, runBeat } from "../../packages/run/src/dispatch/beat"
 import { quietSources } from "../lib/beat-sources"
 import { formatBeat } from "../../packages/run/src/dispatch/board"
-import { insertRun, openDatabase } from "../../packages/run/src/run-history"
+import { insertRun, openDatabase } from "../../packages/run/src/entities/run-history/index"
 import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/shared/config/dispatch-config"
 import { assessQuota } from "../../packages/run/src/dispatch/quota"
 import { taskLabel } from "../../packages/run/src/shared/process/pueue-status"

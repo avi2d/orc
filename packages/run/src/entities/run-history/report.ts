@@ -1,15 +1,15 @@
 import { Effect, FileSystem } from "effect"
 import type { GateRefusal } from "./gate-refusals"
-import type { OrcRunCommit } from "./shared/process/index"
-import type { PiTokenUse } from "./entities/agent/index"
-import { longSessionSignal, type LongSessionCounts } from "./entities/agent/index"
-import type { NoMistakesFinding, NoMistakesRecord } from "./entities/review-gate/index"
+import type { OrcRunCommit } from "../../shared/process/index"
+import type { PiTokenUse } from "../agent/index"
+import { longSessionSignal, type LongSessionCounts } from "../agent/index"
+import type { NoMistakesFinding, NoMistakesRecord } from "../review-gate/index"
 import { toFileUrl } from "./run-history"
-import { agentReportFileName } from "./entities/backlog/index"
+import { agentReportFileName } from "../backlog/index"
 
 export const reportFileName = "report.md"
 
-export type { OrcRunCommit } from "./shared/process/index"
+export type { OrcRunCommit } from "../../shared/process/index"
 
 export interface ChecksRoundSummary {
   readonly round: number

@@ -1,5 +1,5 @@
 import { Data, Effect, FileSystem, type Path } from "effect"
-import { refusalsIn, type GateRefusal } from "./gate-refusals"
+import { refusalsIn, type GateRefusal } from "./entities/run-history/index"
 import type { AgentFile } from "./entities/agent/index"
 import { orcCompletionLine } from "./entities/agent/index"
 import type { CommandResult } from "./shared/sandbox/index"

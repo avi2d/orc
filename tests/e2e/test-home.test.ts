@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { tmpdir, userInfo } from "node:os"
 import { dirname, join } from "node:path"
 import { realpathSync } from "node:fs"
-import { orcHomeDir } from "../../packages/run/src/run-history"
+import { orcHomeDir } from "../../packages/run/src/entities/run-history/index"
 
 const accountOrc = join(userInfo().homedir, ".orc")
 

@@ -7,7 +7,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
-import { openDatabase, recordRun, recordSignal, recordStep } from "../../packages/run/src/run-history"
+import { openDatabase, recordRun, recordSignal, recordStep } from "../../packages/run/src/entities/run-history/index"
 import { recordChecksDone, recordResumePublish } from "../../packages/run/src/history-write"
 import { buildResumePlan } from "../../packages/run/src/run-resume"
 import { subprocessNoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
@@ -23,7 +23,7 @@ import {
   refusalsIn,
   refusalValue,
   type GateRefusal,
-} from "../../packages/run/src/gate-refusals"
+} from "../../packages/run/src/entities/run-history/index"
 
 const lintOutput = [
   "comment-gate: 1 violation(s):",

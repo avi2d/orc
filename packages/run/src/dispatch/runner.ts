@@ -8,8 +8,8 @@ import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldT
 import { heldTask, orcGroup, parentLabel, PueueState, PueueStatus, taskLabel, type PueueTask } from "../shared/process/index"
 import { readInstructions, TaskInstructions, writeInstructions } from "./runner-instructions"
 import { RunnerError } from "../shared/process/index"
-import { runsForBranch } from "../history-resume"
-import { formatHistoryError, markRunStopped, openDatabase, recordRun, stoppedEndReason } from "../run-history"
+import { runsForBranch } from "../entities/run-history/index"
+import { formatHistoryError, markRunStopped, openDatabase, recordRun, stoppedEndReason } from "../entities/run-history/index"
 
 import { newRunId } from "../shared/lib/index"
 import { isRunDelivery } from "../shared/config/index"

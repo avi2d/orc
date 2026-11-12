@@ -6,7 +6,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Array as Arr, Effect, Result } from "effect"
 import { addTask, claimTask, listTasks, writeTaken, parseTaskFile, type TaskRecord, renderTaskFile } from "../../../packages/run/src/entities/backlog/index"
 import { holdTask } from "../../../packages/run/src/dispatch/backlog-hold"
-import { parkStartedTask } from "../../../packages/run/src/dispatch/parked"
+import { parkStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
