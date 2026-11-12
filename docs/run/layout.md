@@ -9,7 +9,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/bin.ts` | The orc entry point |
 | `packages/run/src/args.ts` | The flag parsing for the orc command |
-| `packages/run/src/app-install.ts` | The `orc app install` copy of the built Herdr App mods, layout and keys merge |
+| `packages/run/src/features/installing-the-app/app-install.ts` | The `orc app install` copy of the built Herdr App mods, layout and keys merge |
 | `packages/run/src/features/running-a-task/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
 | `packages/run/src/shared/config/orc-config.ts` | The reading of `config.json`: the providers, the heavy queue tuning and the implementer, fixer, orchestrator, planner and decider models |
 | `packages/run/src/features/chat/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
@@ -34,7 +34,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/running-a-task/run-folders.ts` | A run's folders, its copy of the task file and the instructions file `--instructions` names |
 | `packages/run/src/features/running-a-task/history-write.ts` | The history checkpoints a run records as each step starts and ends |
 | `packages/run/src/entities/run-history/report.ts` | The `report.md` shape and the signal facts it carries |
-| `packages/run/src/show.ts` | The `orc show` reading of one run from the history |
+| `packages/run/src/features/seeing-runs/show.ts` | The `orc show` reading of one run from the history |
 | `packages/run/src/shared/lib/run-session.ts` | The `OrcRunError` a run fails with |
 | `packages/run/src/entities/agent/pi.ts` | The Pi prompt and the check of its final reply |
 | `packages/run/src/entities/agent/pi-run.ts` | The Pi process in JSON mode: its event lines, the agent log, the session file and the idle stop |
@@ -67,9 +67,9 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/shared/config/machine-reach.ts` | The sweep ownership check and the remote command prefix |
 | `packages/run/src/dispatch/stall.ts` | The stalled run flag kept in the backlog logs |
 | `packages/run/src/entities/attention/attention.ts` | The attention queue under `attention/`: one file per item, its open and close and withdraw, and the review questions, run events and overdue waits routed into it |
-| `packages/run/src/dispatch/attention-view.ts` | The `orc attention` table and its `orc.attention.v1` JSON |
-| `packages/run/src/dispatch/decider.ts` | The decider: one call per open review question it owns, and its answer or escalation recorded on the item |
-| `packages/run/src/dispatch/decider-ask.ts` | The decider's call, Pi on `models.decider` with the policy as its system prompt and no tools |
+| `packages/run/src/features/attention-list/attention-view.ts` | The `orc attention` table and its `orc.attention.v1` JSON |
+| `packages/run/src/features/decider/decider.ts` | The decider: one call per open review question it owns, and its answer or escalation recorded on the item |
+| `packages/run/src/features/decider/decider-ask.ts` | The decider's call, Pi on `models.decider` with the policy as its system prompt and no tools |
 | `packages/run/agents/decider-policy.md` | The written policy the decider answers under |
 | `packages/run/src/entities/events/events.ts` | The chat events under `events/`, their posted marks and the alert fires the backlog lists |
 | `packages/run/src/entities/backlog/task-dependency.ts` | The child counts and the waits on dependencies and merged siblings |
@@ -94,7 +94,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/backlog-planning/intake-plan.ts` | The planner model ask at intake and its five minute limit |
 | `packages/run/src/entities/backlog/split.ts` | The `orc.split.v1` planner document and the parent with vertical slice children it applies |
 | `packages/run/src/dispatch/cli.ts` | The `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
-| `packages/run/src/dispatch/merge.ts` | The `orc merge` guard and squash-merge |
+| `packages/run/src/features/merging-a-pr/merge.ts` | The `orc merge` guard and squash-merge |
 | `packages/run/src/entities/pull-request/merge-basis.ts` | The `captain-word` and `yolo-green` bases `orc merge` takes |
 | `packages/run/src/entities/heavy-queue/heavy.ts` | The heavy settings, the stand in folder and the default heavy tool list |
 | `packages/run/src/features/heavy-commands/heavy-cli.ts` | The `orc heavy` path, check, watch and watch-once commands |

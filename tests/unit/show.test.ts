@@ -14,9 +14,7 @@ import {
   recordSignal,
   recordStep
 } from "../../packages/run/src/entities/run-history/index"
-import { decodeRunsJson, encodeRunsJson } from "../../packages/run/src/run-history-view"
-import { InvalidScore, recordStepScore, UnknownRun, UnknownStep } from "../../packages/run/src/run-scores"
-import { decodeShowJson, encodeShowJson, formatShow, readShow } from "../../packages/run/src/show"
+import { decodeRunsJson, decodeShowJson, encodeRunsJson, encodeShowJson, formatShow, InvalidScore, readShow, recordStepScore, UnknownRun, UnknownStep } from "../../packages/run/src/features/seeing-runs/index"
 
 const withHome = async (use: (home: string) => Promise<void>): Promise<void> => {
   const home = await mkdtemp(join(tmpdir(), "orc-show-"))

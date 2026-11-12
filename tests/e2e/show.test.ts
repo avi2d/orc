@@ -6,7 +6,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import type { Database } from "bun:sqlite"
 import { openDatabase, recordEvidence, recordRun, recordScore, recordSignal, recordStep } from "../../packages/run/src/entities/run-history/index"
-import { decodeShowJson } from "../../packages/run/src/show"
+import { decodeShowJson } from "../../packages/run/src/features/seeing-runs/index"
 
 interface OrcResult {
   readonly exitCode: number

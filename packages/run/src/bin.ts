@@ -5,7 +5,7 @@ import { BunServices } from "@effect/platform-bun"
 import { isatty } from "node:tty"
 import { Config, Console, Effect } from "effect"
 import packageJson from "../package.json" with { type: "json" }
-import { appHomeDir, bundledAppDir, formatAppInstall, installApp } from "./app-install"
+import { appHomeDir, bundledAppDir, formatAppInstall, installApp } from "./features/installing-the-app/index"
 import { type OrcArgs, parseArgs } from "./args"
 import { runChat } from "./features/chat/index"
 import { dispatchUsage } from "./dispatch/args"
@@ -14,9 +14,7 @@ import { RunnerError } from "./shared/process/index"
 import { formatReport, formatReportOutcome, runAgentStep, runReportStep } from "./features/running-a-task/index"
 import type { ReportKind } from "./entities/backlog/index"
 import { encodeRefusalsJson, formatHistoryError, formatRefusalsTable, listRuns, openDatabase, orcHomeDir, readRefusals } from "./entities/run-history/index"
-import { encodeRunsJson, formatRunsTable } from "./run-history-view"
-import { recordStepScore } from "./run-scores"
-import { encodeShowJson, formatShow, readShow } from "./show"
+import { encodeRunsJson, encodeShowJson, formatRunsTable, formatShow, readShow, recordStepScore } from "./features/seeing-runs/index"
 
 const usage = "Usage: orc [--version] [--help] | orc app install | orc chat | orc runs [--json] | orc refusals [--json] | orc show <run> [--json] | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--kind ship|scout|task|parent] [--delivery no-mistakes|direct-PR] [--branch <name>] [--sandbox nono|none] [--token-file <path>] [--provider <id>] [--instructions <path>] [--allow ask-user] [--answer <question-or-finding-id>=\"<text>\"] | " + dispatchUsage
 

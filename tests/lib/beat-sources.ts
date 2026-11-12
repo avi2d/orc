@@ -5,7 +5,7 @@ import { type ReadLoad, readMachineLoad } from "../../packages/run/src/dispatch/
 import type { PullRequestView } from "../../packages/run/src/entities/pull-request/pr-view"
 import type { ReadPullRequest } from "../../packages/run/src/dispatch/task-events"
 import type { ReadUpstream } from "../../packages/run/src/dispatch/upstream"
-import type { AskDecider } from "../../packages/run/src/dispatch/decider"
+import type { AskDecider } from "../../packages/run/src/features/decider/index"
 
 export const uncheckedOpen: PullRequestView = { state: "OPEN", headRefOid: "0".repeat(40), baseRefName: "main", statusCheckRollup: [] }
 

@@ -5,7 +5,7 @@ export class AppInstallError extends Data.TaggedError("AppInstallError")<{
   readonly detail: string
 }> {}
 
-export const bundledAppDir = (): string => import.meta.dir + "/../dist/herdr-app"
+export const bundledAppDir = (): string => import.meta.dir + "/../../../dist/herdr-app"
 
 export const appHomeDir = (home: string): string => home + "/.config/herdr-app"
 

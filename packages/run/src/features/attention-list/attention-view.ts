@@ -1,7 +1,7 @@
 import { DateTime, Effect, type FileSystem } from "effect"
-import { ageMillis, answerItem, type AttentionItem, type DecidedItem, isOverdue, type OpenItem, readAttention } from "../entities/attention/index"
-import { listTasks, BacklogError, backlogPresent, noBacklog, type TaskFileError } from "../entities/backlog/index"
-import { formatTable } from "../shared/lib/index"
+import { ageMillis, answerItem, type AttentionItem, type DecidedItem, isOverdue, type OpenItem, readAttention } from "../../entities/attention/index"
+import { listTasks, BacklogError, backlogPresent, noBacklog, type TaskFileError } from "../../entities/backlog/index"
+import { formatTable } from "../../shared/lib/index"
 
 const ATTENTION_JSON_SCHEMA = "orc.attention.v1"
 

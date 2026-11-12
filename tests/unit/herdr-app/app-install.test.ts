@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { installApp, mergeKeys } from "../../../packages/run/src/app-install"
+import { installApp, mergeKeys } from "../../../packages/run/src/features/installing-the-app/index"
 
 test("adds missing keys without replacing a person's binding", async () => {
   const ours = { "layout:orc": { "cmd-1": "orc-tabs.select:orc-board", "cmd-2": "orc-tabs.select:orc-resources" } }
