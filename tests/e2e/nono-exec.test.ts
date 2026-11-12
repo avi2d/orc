@@ -6,8 +6,8 @@ import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { shellInAgent } from "../../packages/run/src/agent-exec"
-import { openNonoExec } from "../../packages/run/src/nono-exec"
+import { shellInAgent } from "../../packages/run/src/shared/sandbox/agent-exec"
+import { openNonoExec } from "../../packages/run/src/shared/sandbox/nono-exec"
 import { makeNonoFixtureDir } from "../lib/nono-home"
 
 const git = (cwd: string, args: ReadonlyArray<string>): void => {

@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { hostExec } from "../../packages/run/src/agent-exec"
+import { hostExec } from "../../packages/run/src/shared/sandbox/agent-exec"
 import type { AgentFile } from "../../packages/run/src/agents"
 import { type PiRun, runPi } from "../../packages/run/src/pi-run"
 

@@ -3,8 +3,8 @@ import type { ChildProcessSpawner } from "effect/process"
 import { readOrcConfig } from "../shared/config/index"
 import { heavyBinDir, resolveHeavy, type HeavySettings } from "./heavy"
 import { detectWrap, standinScripts, type HeavyPlatform, type StandinSettings } from "./heavy-standin"
-import { RunnerError } from "./runner-error"
-import { ensureGroup } from "./runner-exec"
+import { RunnerError } from "../shared/process/index"
+import { ensureGroup } from "../shared/process/index"
 
 const platformOf = (): HeavyPlatform =>
   process.platform === "darwin" ? "darwin" : process.platform === "linux" ? "linux" : "other"

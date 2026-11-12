@@ -6,7 +6,7 @@ import type { BeatAction } from "./beat-action"
 import { type Contribution, contributionId, type Project } from "../shared/config/index"
 import { recordEvent } from "./events"
 import { gh } from "./pr-view"
-import type { RunnerError } from "./runner-error"
+import type { RunnerError } from "../shared/process/index"
 
 const IssueState = Schema.Struct({
   kind: Schema.Literal("issue"),

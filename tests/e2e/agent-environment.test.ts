@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { hostExec, shellInAgent } from "../../packages/run/src/agent-exec"
+import { hostExec, shellInAgent } from "../../packages/run/src/shared/sandbox/agent-exec"
 
 test("host checks keep the executing machine's runtime directory instead of losing its service sockets", async () => {
   const exec = hostExec(process.cwd(), {

@@ -1,8 +1,8 @@
 import { Effect, FileSystem } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { WaitResult } from "./answer-wait"
-import { collectOutput } from "./git-run"
-import { hostGitSafetyEnv } from "./host"
+import { collectOutput } from "./shared/process/index"
+import { hostGitSafetyEnv } from "./shared/sandbox/index"
 import {
   answerArgsFor,
   answerForGate,

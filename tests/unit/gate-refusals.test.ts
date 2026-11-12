@@ -13,7 +13,7 @@ import { buildResumePlan } from "../../packages/run/src/run-resume"
 import { subprocessNoMistakesRunner } from "../../packages/run/src/no-mistakes"
 import type { HistoryRun } from "../../packages/run/src/run-record"
 import { runChecksRound } from "../../packages/run/src/checks"
-import { type CommandResult } from "../../packages/run/src/agent-exec"
+import { type CommandResult } from "../../packages/run/src/shared/sandbox/agent-exec"
 import {
   decodeRefusalsJson,
   refusalsJson,

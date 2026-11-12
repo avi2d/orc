@@ -7,7 +7,7 @@ import { recordEvent } from "./events"
 import { type IntakePlan, planIntake } from "./intake-plan"
 import { type ConfigError, readFailure } from "../shared/config/index"
 import type { ChildProcessSpawner } from "effect/process"
-import type { RunnerError } from "./runner-error"
+import type { RunnerError } from "../shared/process/index"
 import { applySplit, splitEventText, type SplitRequest } from "./split"
 import type { TaskFileError, TaskRecord } from "./task-record"
 

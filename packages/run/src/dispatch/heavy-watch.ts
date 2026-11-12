@@ -5,9 +5,9 @@ import { alertsFile } from "./events"
 import { heavyBinDir } from "./heavy"
 import { readHeavySettings } from "./heavy-setup"
 import { standinTools } from "./heavy-standin"
-import { PueueStatus, taskLabel } from "./pueue-status"
-import { type Command, ensureGroup, capture, decodeJson, pueue } from "./runner-exec"
-import { RunnerError } from "./runner-error"
+import { PueueStatus, taskLabel } from "../shared/process/index"
+import { type Command, ensureGroup, capture, decodeJson, pueue } from "../shared/process/index"
+import { RunnerError } from "../shared/process/index"
 
 export const watchTtlMinutes = 10
 const watchIntervalSeconds = watchTtlMinutes * 60

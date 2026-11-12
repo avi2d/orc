@@ -1,6 +1,6 @@
 import { Effect, type FileSystem, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { runGit } from "./git-run"
+import { runGit } from "./shared/process/index"
 import { OrcRunError } from "./shared/lib/index"
 import { nestedWorktreeExcludes } from "./worktree-excludes"
 

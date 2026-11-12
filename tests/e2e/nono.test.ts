@@ -5,11 +5,11 @@ import { basename, join, relative } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
-import { NonoProviderError } from "../../packages/run/src/host"
-import { buildSandboxEnv } from "../../packages/run/src/nono"
+import { NonoProviderError } from "../../packages/run/src/shared/sandbox/host"
+import { buildSandboxEnv } from "../../packages/run/src/shared/sandbox/nono"
 import { makeNonoFixtureDir, nonoFixtureRoot } from "../lib/nono-home"
 import { nonoOpenError } from "../lib/nono-shell"
-import { buildNonoProfile, defaultToolchainFolders, runtimeReadFiles, systemReadPaths } from "../../packages/run/src/nono-profile"
+import { buildNonoProfile, defaultToolchainFolders, runtimeReadFiles, systemReadPaths } from "../../packages/run/src/shared/sandbox/nono-profile"
 
 const roots = {
   worktree: "/tmp/orc-test/worktree",

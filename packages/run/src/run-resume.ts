@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite"
 import { Effect, FileSystem, Option, Schema } from "effect"
 import { defaultSandbox } from "./args"
-import { type SandboxKind } from "./sandbox-kind"
+import { type SandboxKind } from "./shared/sandbox/index"
 import { checksRoundsForRun, fixesForRun, type StoredFix } from "./history-resume"
 import { historyFailure, sessionIdFromFile, type RunRecord } from "./run-history"
 import { resumePriorRun, stepsForRun } from "./history-resume"

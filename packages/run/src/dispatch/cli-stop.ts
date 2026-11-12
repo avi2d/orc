@@ -7,7 +7,7 @@ import type { ConfigError } from "../shared/config/index"
 import type { TaskFileError } from "./task-record"
 import { ownedBySweep, throughFor } from "../shared/config/index"
 import { killHeld, refuse as refuseRun, runLabel } from "./runner"
-import { RunnerError } from "./runner-error"
+import { RunnerError } from "../shared/process/index"
 import { killHeldThrough, readResult, readResultThrough } from "./runner-result"
 
 export const stopNow = (

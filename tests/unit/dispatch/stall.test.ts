@@ -14,7 +14,7 @@ import { runBeat } from "../../../packages/run/src/dispatch/beat"
 import { quietSources } from "../../lib/beat-sources"
 import { formatBeat } from "../../../packages/run/src/dispatch/board"
 import type { LoadReading } from "../../../packages/run/src/dispatch/load"
-import { taskLabel } from "../../../packages/run/src/dispatch/pueue-status"
+import { taskLabel } from "../../../packages/run/src/shared/process/pueue-status"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))

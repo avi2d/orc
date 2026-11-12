@@ -1,6 +1,6 @@
 import { Effect, Fiber, type FileSystem, Option, type Path, Schema, Stream } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { agentCommand, type AgentExec, type Argv, textInput } from "./agent-exec"
+import { agentCommand, type AgentExec, type Argv, textInput } from "./shared/sandbox/index"
 import type { AgentFile } from "./agents"
 import { OrcRunError } from "./shared/lib/index"
 

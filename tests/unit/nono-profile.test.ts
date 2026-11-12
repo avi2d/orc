@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Result } from "effect"
 import { checkedModelWindows } from "../../packages/run/src/context-mark"
-import { buildAgentNonoProfile, buildNonoProfile, defaultToolchainFolders, loginCheckCommand, modelCredentialFor, piAgentModels, providerKeyOf } from "../../packages/run/src/nono-profile"
+import { buildAgentNonoProfile, buildNonoProfile, defaultToolchainFolders, loginCheckCommand, modelCredentialFor, piAgentModels, providerKeyOf } from "../../packages/run/src/shared/sandbox/nono-profile"
 
 const credential = {
   provider: "acme-go",

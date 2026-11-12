@@ -1,6 +1,6 @@
 import { Effect, FileSystem } from "effect"
 import type { GateRefusal } from "./gate-refusals"
-import type { OrcRunCommit } from "./git-run"
+import type { OrcRunCommit } from "./shared/process/index"
 import type { PiTokenUse } from "./pi"
 import { longSessionSignal, type LongSessionCounts } from "./long-session"
 import type { NoMistakesFinding, NoMistakesRecord } from "./no-mistakes"
@@ -9,7 +9,7 @@ import { agentReportFileName } from "./task-kind"
 
 export const reportFileName = "report.md"
 
-export type { OrcRunCommit } from "./git-run"
+export type { OrcRunCommit } from "./shared/process/index"
 
 export interface ChecksRoundSummary {
   readonly round: number

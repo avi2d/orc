@@ -6,7 +6,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path, Result } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { routeOfAgents } from "../../packages/run/src/shared/config/model-route"
-import { buildAgentNonoProfile } from "../../packages/run/src/nono-profile"
+import { buildAgentNonoProfile } from "../../packages/run/src/shared/sandbox/nono-profile"
 import { readOrcConfig } from "../../packages/run/src/shared/config/orc-config"
 import { planSandbox } from "../../packages/run/src/sandbox-plan"
 
