@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { endingFromResult } from "../../../packages/run/src/dispatch/runner-result"
+import { endingFromResult } from "../../../packages/run/src/features/queueing-a-task/index"
 import { checkPassed } from "../../../packages/run/src/report-run"
 
 const at = "2026-10-27T10:02:00.000Z"

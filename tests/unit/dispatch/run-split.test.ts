@@ -9,7 +9,7 @@ import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../
 import { runBeat } from "../../../packages/run/src/dispatch/beat"
 import { formatBeat } from "../../../packages/run/src/dispatch/board"
 import { parentLabel, taskLabel } from "../../../packages/run/src/shared/process/pueue-status"
-import { killHeld, startTask } from "../../../packages/run/src/dispatch/runner"
+import { killHeld, startTask } from "../../../packages/run/src/features/queueing-a-task/index"
 import { resolveTaskFile } from "../../../packages/run/src/run-resume"
 import { runsForBranch } from "../../../packages/run/src/entities/run-history/index"
 import { insertRun, insertStep, openDatabase, stoppedEndReason } from "../../../packages/run/src/entities/run-history/index"

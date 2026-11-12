@@ -7,10 +7,10 @@ import type { DispatchConfig } from "../shared/config/index"
 import { ownedBySweep, throughFor } from "../shared/config/index"
 import { logWrittenAt, stallMillis } from "./stall"
 import { answersFor, askStartedTask, markAnswersRelayed, parkStartedTask } from "../entities/parked-runs/index"
-import { type RunnerRequirements } from "./runner"
+import { type RunnerRequirements } from "../features/queueing-a-task/index"
 import { type RunnerError } from "../shared/process/index"
 import { type Command } from "../shared/process/index"
-import { endingFromResult, type Relay, relayAnswers, relayAnswersThrough, type RunEnding, readResult, readResultThrough, type RunnerResult } from "./runner-result"
+import { endingFromResult, type Relay, relayAnswers, relayAnswersThrough, type RunEnding, readResult, readResultThrough, type RunnerResult } from "../features/queueing-a-task/index"
 
 export interface CloseContext {
   readonly root: string

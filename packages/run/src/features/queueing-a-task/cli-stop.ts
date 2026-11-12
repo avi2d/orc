@@ -1,12 +1,12 @@
 import { DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { BacklogError, backlogPaths, closeStartedTask, listTasks, runLabel, type TaskFileError } from "../entities/backlog/index"
-import { routeTaskItems } from "../entities/attention/index"
-import { readDispatchConfig } from "../shared/config/index"
-import type { ConfigError } from "../shared/config/index"
-import { ownedBySweep, throughFor } from "../shared/config/index"
+import { BacklogError, backlogPaths, closeStartedTask, listTasks, runLabel, type TaskFileError } from "../../entities/backlog/index"
+import { routeTaskItems } from "../../entities/attention/index"
+import { readDispatchConfig } from "../../shared/config/index"
+import type { ConfigError } from "../../shared/config/index"
+import { ownedBySweep, throughFor } from "../../shared/config/index"
 import { killHeld, refuse as refuseRun } from "./runner"
-import { RunnerError } from "../shared/process/index"
+import { RunnerError } from "../../shared/process/index"
 import { killHeldThrough, readResult, readResultThrough } from "./runner-result"
 
 export const stopNow = (

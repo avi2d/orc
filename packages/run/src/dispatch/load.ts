@@ -4,7 +4,7 @@ import type { ChildProcessSpawner } from "effect/process"
 import type { Machine } from "../shared/config/index"
 import { checkHeavy } from "./heavy-watch"
 import { ownedBySweep, throughFor } from "../shared/config/index"
-import { refuse } from "./runner"
+import { refuse } from "../features/queueing-a-task/index"
 import { type RunnerError } from "../shared/process/index"
 import { capture } from "../shared/process/index"
 

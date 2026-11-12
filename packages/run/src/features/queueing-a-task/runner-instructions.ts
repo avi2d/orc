@@ -1,6 +1,6 @@
 import { Effect, FileSystem, Path, Schema } from "effect"
-import { readFailure } from "../shared/config/index"
-import { RunnerError } from "../shared/process/index"
+import { readFailure } from "../../shared/config/index"
+import { RunnerError } from "../../shared/process/index"
 
 export const TaskInstructions = Schema.Struct({
   name: Schema.String.check(Schema.isPattern(/^(?!\.\.?$)[^/]+$/)),

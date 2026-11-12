@@ -57,7 +57,7 @@ const expectedFiles = [
   "src/shared/config/index.ts",
   "src/entities/pull-request/direct-pr.ts",
   "src/entities/events/alert-events.ts",
-  "src/dispatch/alert-stream.ts",
+  "src/features/queueing-a-task/alert-stream.ts",
   "src/dispatch/args-runner.ts",
   "src/dispatch/args.ts",
   "src/dispatch/attention-view.ts",
@@ -80,7 +80,7 @@ const expectedFiles = [
   "src/dispatch/board.ts",
   "src/entities/events/chat-event.ts",
   "src/dispatch/cli-add.ts",
-  "src/dispatch/cli-stop.ts",
+  "src/features/queueing-a-task/cli-stop.ts",
   "src/dispatch/cli.ts",
   "src/shared/config/dispatch-config.ts",
   "src/dispatch/decider-ask.ts",
@@ -99,7 +99,7 @@ const expectedFiles = [
   "src/dispatch/heavy-watch.ts",
   "src/entities/heavy-queue/heavy.ts",
   "src/entities/token/held-token.ts",
-  "src/dispatch/hold.ts",
+  "src/features/queueing-a-task/hold.ts",
   "src/dispatch/intake-plan.ts",
   "src/dispatch/load.ts",
   "src/shared/config/machine-reach.ts",
@@ -112,10 +112,10 @@ const expectedFiles = [
   "src/entities/task-copy/refresh.ts",
   "src/shared/process/runner-error.ts",
   "src/shared/process/runner-exec.ts",
-  "src/dispatch/runner-instructions.ts",
+  "src/features/queueing-a-task/runner-instructions.ts",
   "src/entities/backlog/runner-label.ts",
-  "src/dispatch/runner-result.ts",
-  "src/dispatch/runner.ts",
+  "src/features/queueing-a-task/runner-result.ts",
+  "src/features/queueing-a-task/runner.ts",
   "src/entities/backlog/split.ts",
   "src/dispatch/stall.ts",
   "src/entities/backlog/task-dependency.ts",
@@ -173,7 +173,8 @@ const expectedFiles = [
   "src/entities/pull-request/index.ts",
   "src/entities/attention/index.ts",
   "src/entities/run-history/index.ts",
-  "src/entities/parked-runs/index.ts"
+  "src/entities/parked-runs/index.ts",
+  "src/features/queueing-a-task/index.ts"
 ]
 
 const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => {
