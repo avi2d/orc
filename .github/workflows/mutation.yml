@@ -1,0 +1,11 @@
+name: mutation
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+jobs:
+  mutation:
+    uses: avi2d/workflows/.github/workflows/mutation.yml@v2
+    permissions: { contents: read, actions: write, pull-requests: write }
