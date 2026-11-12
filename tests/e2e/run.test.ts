@@ -7,7 +7,7 @@ import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { openCheckout } from "../../packages/run/src/entities/task-copy/index"
 import { openTaskCopy } from "../../packages/run/src/entities/task-copy/index"
-import { runAgentStep } from "../../packages/run/src/run"
+import { runAgentStep } from "../../packages/run/src/features/running-a-task/run"
 import { capturedSession, cleanFinish, commitOnBranch, git, passedWithPr, recordedNothing, providerErrorEchoingPrompt, runStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
 const refusal = async (input: {

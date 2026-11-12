@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
-import { formatReport } from "../../packages/run/src/run-record"
+import { formatReport } from "../../packages/run/src/features/running-a-task/run-record"
 import { passedWithPr, readyToCheck, recordedNothing, runStep, sandboxResult, withHome, withRepo, type NoMistakesReply } from "./run-helpers"
 
 const lintPasses = async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 })

@@ -8,11 +8,11 @@ import { Effect, FileSystem, Path, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
 import { openDatabase, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
-import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "../../packages/run/src/run-resume"
+import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "../../packages/run/src/features/running-a-task/run-resume"
 import type { SandboxKind } from "../../packages/run/src/shared/sandbox/sandbox-kind"
-import { recordResumePublish } from "../../packages/run/src/history-write"
+import { recordResumePublish } from "../../packages/run/src/features/running-a-task/history-write"
 import { subprocessNoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
-import type { HistoryRun } from "../../packages/run/src/run-record"
+import type { HistoryRun } from "../../packages/run/src/features/running-a-task/run-record"
 
 const implementer: AgentFile = {
   kind: "implementer",

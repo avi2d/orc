@@ -10,7 +10,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/bin.ts` | The orc entry point |
 | `packages/run/src/args.ts` | The flag parsing for the orc command |
 | `packages/run/src/app-install.ts` | The `orc app install` copy of the built Herdr App mods, layout and keys merge |
-| `packages/run/src/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
+| `packages/run/src/features/running-a-task/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
 | `packages/run/src/shared/config/orc-config.ts` | The reading of `config.json`: the providers, the heavy queue tuning and the implementer, fixer, orchestrator, planner and decider models |
 | `packages/run/src/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
 | `packages/run/src/chat-tools.ts` | The chat tools and the poll that posts each closed task and each event into the chat once |
@@ -20,26 +20,26 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/chat-lavish.ts` | The `lavish-axi` launcher that opens, reads and ends a board's session |
 | `packages/run/src/shared/config/json-file.ts` | The JSON config file reading and its `ConfigError` |
 | `packages/run/src/shared/config/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
-| `packages/run/src/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
+| `packages/run/src/features/running-a-task/sandbox-plan.ts` | The per-provider preflight: the Pi login check, the model windows and the run's Pi folder |
 | `packages/run/src/shared/sandbox/sandbox-kind.ts` | The sandbox kinds a run takes |
-| `packages/run/src/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
+| `packages/run/src/features/running-a-task/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
 | `packages/run/src/entities/task-copy/checkout.ts` | The checks on the checkout a run starts from: its git root, refused markers, uncommitted changes and branch name |
 | `packages/run/src/entities/task-copy/worktree-excludes.ts` | The registered worktrees inside a checkout that its clean check leaves out |
 | `packages/run/src/entities/task-copy/task-copy.ts` | The task copy under `$ORC_HOME/worktrees`, keyed by the project folder's name, a hash of its real path and the branch, its reuse and removal, and the agent's git identity |
-| `packages/run/src/run-exec.ts` | The sandbox a run opens, the install that prepares the copy and the steps that run in it |
-| `packages/run/src/run-loop.ts` | The implement, check and fix steps of one run |
-| `packages/run/src/run-resume.ts` | The prior run's session and passed steps a resume starts from |
-| `packages/run/src/checks.ts` | The check commands `.no-mistakes.yaml` names and their run in the copy |
+| `packages/run/src/features/running-a-task/run-exec.ts` | The sandbox a run opens, the install that prepares the copy and the steps that run in it |
+| `packages/run/src/features/running-a-task/run-loop.ts` | The implement, check and fix steps of one run |
+| `packages/run/src/features/running-a-task/run-resume.ts` | The prior run's session and passed steps a resume starts from |
+| `packages/run/src/features/running-a-task/checks.ts` | The check commands `.no-mistakes.yaml` names and their run in the copy |
 | `packages/run/src/shared/process/git-run.ts` | The git calls orc makes on the host with the operator's git config hidden |
-| `packages/run/src/run-folders.ts` | A run's folders, its copy of the task file and the instructions file `--instructions` names |
-| `packages/run/src/history-write.ts` | The history checkpoints a run records as each step starts and ends |
+| `packages/run/src/features/running-a-task/run-folders.ts` | A run's folders, its copy of the task file and the instructions file `--instructions` names |
+| `packages/run/src/features/running-a-task/history-write.ts` | The history checkpoints a run records as each step starts and ends |
 | `packages/run/src/entities/run-history/report.ts` | The `report.md` shape and the signal facts it carries |
 | `packages/run/src/show.ts` | The `orc show` reading of one run from the history |
 | `packages/run/src/shared/lib/run-session.ts` | The `OrcRunError` a run fails with |
 | `packages/run/src/entities/agent/pi.ts` | The Pi prompt and the check of its final reply |
 | `packages/run/src/entities/agent/pi-run.ts` | The Pi process in JSON mode: its event lines, the agent log, the session file and the idle stop |
 | `packages/run/src/entities/agent/agents.ts` | The agent file parsing and lookup |
-| `packages/run/src/context-mark.ts` | The 150 thousand token compaction mark orc writes into the run's Pi folder |
+| `packages/run/src/features/running-a-task/context-mark.ts` | The 150 thousand token compaction mark orc writes into the run's Pi folder |
 | `packages/run/agents` | The bundled agent files |
 | `packages/run/src/entities/review-gate/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
 | `packages/run/src/entities/review-gate/answer-wait.ts` | The wait at a no-mistakes gate for the captain's answers in the run folder |

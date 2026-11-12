@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { runAgentStep } from "../../packages/run/src/run"
+import { runAgentStep } from "../../packages/run/src/features/running-a-task/run"
 import { listRuns, openDatabase } from "../../packages/run/src/entities/run-history/index"
 
 const git = (dir: string, args: ReadonlyArray<string>): void => {

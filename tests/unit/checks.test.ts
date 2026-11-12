@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
-import { buildFixPrompt, checksFileName, maxFixAttempts, readChecksCommands, runChecksRound } from "../../packages/run/src/checks"
+import { buildFixPrompt, checksFileName, maxFixAttempts, readChecksCommands, runChecksRound } from "../../packages/run/src/features/running-a-task/checks"
 import { type CommandResult } from "../../packages/run/src/shared/sandbox/agent-exec"
 import { orcCompletionLine } from "../../packages/run/src/entities/agent/index"
 

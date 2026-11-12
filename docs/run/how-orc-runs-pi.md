@@ -20,4 +20,4 @@ Orc runs only Pi, and it starts Pi itself as `pi -p --mode json` in the task cop
 - On resume orc passes the recorded session file as `--session`, and Pi continues that session instead of starting a new one.
 - Orc sums the `usage` input and output counts each session message carries into the run's token totals.
 
-`packages/run/src/entities/agent/pi-run.ts` starts Pi and reads its lines, `packages/run/src/entities/agent/pi.ts` checks the final reply, and `packages/run/src/run-loop.ts` reads the session after each step.
+`packages/run/src/entities/agent/pi-run.ts` starts Pi and reads its lines, `packages/run/src/entities/agent/pi.ts` checks the final reply, and `packages/run/src/features/running-a-task/run-loop.ts` reads the session after each step.

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Effect, Result } from "effect"
 import { parseRefuseMarkers } from "../../packages/run/src/entities/task-copy/index"
-import { idleTimeoutFromEnv, toolchainFromEnv } from "../../packages/run/src/run"
+import { idleTimeoutFromEnv, toolchainFromEnv } from "../../packages/run/src/features/running-a-task/run"
 
 describe("parseRefuseMarkers", () => {
   test("no value names no marker", () => {

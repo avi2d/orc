@@ -1,6 +1,6 @@
 import { Console, Effect, type FileSystem, type Path } from "effect"
-import { readFailure } from "./shared/config/index"
-import { OrcRunError } from "./shared/lib/index"
+import { readFailure } from "../../shared/config/index"
+import { OrcRunError } from "../../shared/lib/index"
 
 export const runInstructions = (fs: FileSystem.FileSystem, path: Path.Path, cwd: string, named: string | undefined): Effect.Effect<string | null, OrcRunError> =>
   Effect.gen(function*() {

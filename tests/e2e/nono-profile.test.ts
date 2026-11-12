@@ -8,7 +8,7 @@ import { ChildProcessSpawner } from "effect/process"
 import { routeOfAgents } from "../../packages/run/src/shared/config/model-route"
 import { buildAgentNonoProfile } from "../../packages/run/src/shared/sandbox/nono-profile"
 import { readOrcConfig } from "../../packages/run/src/shared/config/orc-config"
-import { planSandbox } from "../../packages/run/src/sandbox-plan"
+import { planSandbox } from "../../packages/run/src/features/running-a-task/sandbox-plan"
 
 describe("configured credential injection", () => {
   test("falls back to Authorization Bearer instead of the configured X-Api-Key injection", async () => {

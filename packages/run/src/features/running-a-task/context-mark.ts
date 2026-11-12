@@ -1,9 +1,9 @@
 import { Effect, Option, Result, Schema, Stream } from "effect"
 import { ChildProcess, type ChildProcessSpawner } from "effect/process"
-import { collectOutput } from "./shared/process/index"
-import { inheritedEnv } from "./shared/sandbox/index"
-import type { CheckedModelWindow, HostTools } from "./shared/sandbox/index"
-import { OrcRunError } from "./shared/lib/index"
+import { collectOutput } from "../../shared/process/index"
+import { inheritedEnv } from "../../shared/sandbox/index"
+import type { CheckedModelWindow, HostTools } from "../../shared/sandbox/index"
+import { OrcRunError } from "../../shared/lib/index"
 
 const contextMarkTokens = 150_000
 
