@@ -67,11 +67,9 @@ export {
   answerWait,
   isCalendarDate,
   TaskFileError,
-  fence,
   parseTaskFile,
 } from "./task-record"
 export type {
-  TaskFolder,
   SplitMark,
   Claim,
   Started,
