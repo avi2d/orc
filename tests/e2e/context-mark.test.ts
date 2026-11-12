@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { modelListCommand } from "../../packages/run/src/context-mark"
+import { modelListCommand } from "../../packages/run/src/features/running-a-task/context-mark"
 
 describe("modelListCommand", () => {
   test("rejects a probe that reads the run folder's Pi or installs packages", async () => {

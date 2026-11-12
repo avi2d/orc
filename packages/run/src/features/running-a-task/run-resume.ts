@@ -1,14 +1,14 @@
 import type { Database } from "bun:sqlite"
 import { Effect, FileSystem, Option, Schema } from "effect"
-import { defaultSandbox } from "./args"
-import { type SandboxKind } from "./shared/sandbox/index"
-import { checksRoundsForRun, fixesForRun, type StoredFix } from "./entities/run-history/index"
-import { historyFailure, sessionIdFromFile, type RunRecord } from "./entities/run-history/index"
-import { resumePriorRun, stepsForRun } from "./entities/run-history/index"
+import { defaultSandbox } from "../../shared/sandbox/index"
+import { type SandboxKind } from "../../shared/sandbox/index"
+import { checksRoundsForRun, fixesForRun, type StoredFix } from "../../entities/run-history/index"
+import { historyFailure, sessionIdFromFile, type RunRecord } from "../../entities/run-history/index"
+import { resumePriorRun, stepsForRun } from "../../entities/run-history/index"
 import type { HistoryRun } from "./run-record"
 import type { ResumePlan } from "./run-loop"
-import { handoverFileName, inheritedHandoverFileName } from "./entities/agent/index"
-import { OrcRunError } from "./shared/lib/index"
+import { handoverFileName, inheritedHandoverFileName } from "../../entities/agent/index"
+import { OrcRunError } from "../../shared/lib/index"
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
 

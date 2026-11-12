@@ -42,7 +42,7 @@ An unknown flag prints the usage text and exits 1.
 | Path | What it holds |
 | --- | --- |
 | `src/bin.ts` | The orc entry point |
-| `src/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
+| `src/features/running-a-task/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
 | `src/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
 | `src/entities/review-gate/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
 | `src/dispatch/beat.ts` | The beat: room, placement, take and start |

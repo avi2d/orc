@@ -2,7 +2,7 @@ import { readdir } from "node:fs/promises"
 import { join } from "node:path"
 import { Effect } from "effect"
 import type { CommandResult } from "../../packages/run/src/shared/sandbox/agent-exec"
-import type { AgentRun, SandboxOps } from "../../packages/run/src/run-loop"
+import type { AgentRun, SandboxOps } from "../../packages/run/src/features/running-a-task/run-loop"
 import { OrcRunError } from "../../packages/run/src/shared/lib/run-session"
 
 export interface FakeAgentResult {

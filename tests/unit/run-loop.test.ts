@@ -22,11 +22,11 @@ import {
   recordPullRequestStart,
   recordResumePublish,
   recordStepSession
-} from "../../packages/run/src/history-write"
-import { buildResumePlan } from "../../packages/run/src/run-resume"
+} from "../../packages/run/src/features/running-a-task/history-write"
+import { buildResumePlan } from "../../packages/run/src/features/running-a-task/run-resume"
 import { subprocessNoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
-import type { HistoryRun } from "../../packages/run/src/run-record"
-import { runFull, type RunCheckpoints } from "../../packages/run/src/run-loop"
+import type { HistoryRun } from "../../packages/run/src/features/running-a-task/run-record"
+import { runFull, type RunCheckpoints } from "../../packages/run/src/features/running-a-task/run-loop"
 import { fakeOps } from "../lib/fake-ops"
 
 const implementer: AgentFile = {

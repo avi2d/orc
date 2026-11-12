@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Option, Result } from "effect"
-import { checkedModelWindows, contextMarkJson, modelListRequest, parseModelWindows, type ModelWindows } from "../../packages/run/src/context-mark"
+import { checkedModelWindows, contextMarkJson, modelListRequest, parseModelWindows, type ModelWindows } from "../../packages/run/src/features/running-a-task/context-mark"
 
 const listReply = (models: ReadonlyArray<{ readonly provider: string; readonly id: string; readonly contextWindow: number }>): string =>
   JSON.stringify({ id: "orc-models", type: "response", command: "get_available_models", success: true, data: { models } })
