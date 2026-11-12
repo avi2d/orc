@@ -20,6 +20,3 @@ export {
   refreshCheckout,
   formatRefresh,
 } from "./refresh"
-export type {
-  Refresh,
-} from "./refresh"

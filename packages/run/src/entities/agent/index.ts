@@ -6,10 +6,7 @@ export {
   resolveAgentFile,
 } from "./agents"
 export type {
-  AgentKind,
   AgentFile,
-  AgentFileLocation,
-  ParsedAgentFile,
 } from "./agents"
 export {
   handoverFileName,
@@ -27,7 +24,6 @@ export type {
 export {
   idleSpan,
   piArgv,
-  assistantContent,
   sessionFileName,
   toolLabel,
   readPiLine,
@@ -35,7 +31,6 @@ export {
   runPi,
 } from "./pi-run"
 export type {
-  PiRequest,
   PiPacing,
   PiEnd,
   PiRun,
@@ -48,7 +43,6 @@ export {
   finalReplyText,
   finalReplyError,
   sumPiUsage,
-  implementInstructions,
   buildImplementPrompt,
   textAfterSignal,
 } from "./pi"
