@@ -77,8 +77,12 @@ type FinishedResult = Extract<RunnerResult, { readonly status: "succeeded" | "fa
 
 const reportEnding = (result: FinishedResult): RunEnding => {
   const report = result.run?.report ?? null
-  if (report !== null) {
+  const failed = result.status === "failed" || result.run?.status === "failed"
+  if (report !== null && !failed) {
     return { kind: "close", outcome: "done", reason: "the run wrote its report", pr: null, report }
+  }
+  if (report !== null) {
+    return { kind: "close", outcome: "failed", reason: result.run?.endReason ?? result.reason, pr: null, report }
   }
   const why = result.status === "failed" ? (result.run?.endReason ?? result.reason) : result.run?.endReason ?? "pueue task " + result.pueueTask + " succeeded"
   return { kind: "close", outcome: "failed", reason: "the run wrote no report: " + why, pr: null, report: null }

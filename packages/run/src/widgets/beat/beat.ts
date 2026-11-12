@@ -249,7 +249,10 @@ const failingReads = (started: ReadonlyArray<TaskRecord>, progress: ReadonlyArra
     if (entry.kind === "running") {
       return [{ task: task.spec.id, failing: entry.failing }]
     }
-    return entry.kind === "ended" ? [{ task: task.spec.id, failing: null }] : []
+    if (entry.kind === "ended" && (entry.action.kind === "closed" || entry.action.kind === "parked" || entry.action.kind === "split")) {
+      return [{ task: task.spec.id, failing: null }]
+    }
+    return []
   })
 
 const routeRunItems = (root: string, started: ReadonlyArray<TaskRecord>, progress: ReadonlyArray<Progress>, closed: ReadonlyArray<BeatAction>, at: string) =>

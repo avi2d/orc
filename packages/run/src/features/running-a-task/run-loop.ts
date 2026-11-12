@@ -113,12 +113,13 @@ const resumedOutcome = (run: HistoryRun, sessionId: string | null, sessionFile: 
   })
 
 const implementPrompt = (run: HistoryRun, plan: Pick<ResumePlan, "handover" | "implementSessionFile" | "answers">): string => {
-  const resumed = plan.implementSessionFile === null ? null : loopAnswerOf(plan.answers)
-  if (resumed?.kind === "continue") {
-    return loopContinuePrompt(resumed.words)
+  const loop = loopAnswerOf(plan.answers)
+  if (loop?.kind === "continue" && plan.implementSessionFile !== null) {
+    return loopContinuePrompt(loop.words)
   }
   const taskFile = run.path.join(run.piSessionDir, "task.md")
-  return plan.handover === null ? buildImplementPrompt(run.agent, taskFile) : handoverImplementPrompt(run.agent, taskFile, plan.handover)
+  const base = plan.handover === null ? buildImplementPrompt(run.agent, taskFile) : handoverImplementPrompt(run.agent, taskFile, plan.handover)
+  return loop?.kind === "continue" ? base + "\n" + loopGuidance(loop.words) : base
 }
 
 const replyErrorNote = (jsonl: string | null): string => {
@@ -279,6 +280,12 @@ const runChecksFixLoop = (
   checkpoints: RunCheckpoints
 ): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
+    const pending = resumedFix(plan)
+    const retriedPaused = pending !== null && loopAnswerOf(plan.answers)?.kind === "continue" && fixes.length > 0
+    if (retriedPaused) {
+      fixes.pop()
+    }
+    const resumedCount = fixes.length
     for (let round = 1; round <= maxFixAttempts + 1; round += 1) {
       const started = new Date().toISOString()
       yield* checkpoints.checksRoundStart(round, started)
@@ -316,7 +323,7 @@ const runChecksFixLoop = (
       }
       const attempt = fixes.length + 1
       yield* checkpoints.fixStart(attempt, new Date().toISOString())
-      const fixed = yield* fixOnce(run, ops.runAgent, outcome.file, attempt, attempt === 1 ? resumedFix(plan) : null, checkpoints)
+      const fixed = yield* fixOnce(run, ops.runAgent, outcome.file, attempt, fixes.length === resumedCount && (retriedPaused || attempt === 1) ? pending : null, checkpoints)
       fixes.push(fixed.fix)
       yield* checkpoints.fixDone(fixed.fix)
       commits.push(...fixed.commits)

@@ -303,6 +303,9 @@ export const routeTaskItems = (root: string, tasks: ReadonlyArray<TaskRecord>, a
       const reason = tasksById.get(entry.item.task)?.state.kind === "closed" ? "task closed" : ended
       return Effect.asVoid(withdrawItem(root, entry.id, reason, at))
     }, { discard: true })
+    const closedTasks = new Set(tasks.filter((task) => task.state.kind === "closed").map((task) => task.spec.id))
+    const staleFailing = (yield* openItems(root)).filter((entry) => entry.item.kind === "failing-command" && closedTasks.has(entry.item.task))
+    yield* Effect.forEach(staleFailing, (entry) => Effect.asVoid(withdrawItem(root, entry.id, "task closed", at)), { discard: true })
   })
 
 export interface FailingRead {
