@@ -14,6 +14,9 @@ Showing an item never closes it.
 An open item is overdue once more than 5 minutes have passed since it was asked.
 
 A review question a run asks is an item of kind `review-question`, owned by the decider.
+The `looping` question a run asks when Pi fails one command 6 times in a row is owned by you, as [A looping run](parked-runs.md#a-looping-run) shows.
+A running run whose Pi has failed one command 3 times in a row opens an item of kind `failing-command` for you, which only tells you.
+It is withdrawn once a beat reads the run with that command no longer failing, or the run ends.
 The beat that writes the question into the task's `parked_questions`, as [Parked runs](parked-runs.md) shows, opens its item.
 
 ## The decider

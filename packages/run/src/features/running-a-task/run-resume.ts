@@ -6,7 +6,7 @@ import { checksRoundsForRun, fixesForRun, type StoredFix } from "../../entities/
 import { historyFailure, sessionIdFromFile, type RunRecord } from "../../entities/run-history/index"
 import { resumePriorRun, stepsForRun } from "../../entities/run-history/index"
 import type { HistoryRun } from "./run-record"
-import type { ResumePlan } from "./run-loop"
+import type { ResumePlan } from "./run-ops"
 import { handoverFileName, inheritedHandoverFileName } from "../../entities/agent/index"
 import { OrcRunError } from "../../shared/lib/index"
 

@@ -2,6 +2,7 @@ import { Effect, FileSystem, Schema } from "effect"
 import { readNames, BacklogError, platformFailure, publishOnce, readIfPresent, scratchName, type TaskRecord } from "../backlog/index"
 import type { BeatAction } from "./beat-action"
 import { checkRefusals, greenChecks, type PullRequestView, redChecks } from "../pull-request/index"
+import { type FailingMark, failingText, loopQuestionId, pauseAfterFailures } from "../agent/index"
 
 const overdueMillis = 5 * 60 * 1000
 
@@ -13,7 +14,7 @@ const Answer = Schema.Struct({ words: Schema.String, at: Schema.String })
 const Decision = Schema.Struct({ kind: Schema.Literals(["answered", "escalated"]), reason: Schema.String, at: Schema.String })
 
 const AttentionItem = Schema.Struct({
-  kind: Schema.Literals(["review-question", "run-died", "check-red", "pr-ready", "overdue-wait"]),
+  kind: Schema.Literals(["review-question", "run-died", "check-red", "pr-ready", "overdue-wait", "failing-command"]),
   task: Schema.String,
   text: Schema.String,
   asked: Schema.String,
@@ -89,7 +90,7 @@ const reviewQuestionItem = (
     task,
     text: question.text,
     asked: Number.isNaN(Date.parse(question.asked)) ? at : question.asked,
-    owner: "decider"
+    owner: question.id === loopQuestionId ? "user" : "decider"
   }
   return { id, asked }
 }
@@ -302,6 +303,30 @@ export const routeTaskItems = (root: string, tasks: ReadonlyArray<TaskRecord>, a
       const reason = tasksById.get(entry.item.task)?.state.kind === "closed" ? "task closed" : ended
       return Effect.asVoid(withdrawItem(root, entry.id, reason, at))
     }, { discard: true })
+  })
+
+export interface FailingRead {
+  readonly task: string
+  readonly failing: FailingMark | null
+}
+
+const failingCommandText = (mark: FailingMark): string =>
+  failingText(mark) + ". The run carries on, and orc pauses it to ask continue or stop if the same command fails " + pauseAfterFailures.toString() + " times in a row."
+
+// Only a task whose run was read this beat settles its item, so a run the beat could not reach keeps the item it had.
+export const routeFailingCommands = (root: string, reads: ReadonlyArray<FailingRead>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const live = new Set<string>()
+    for (const read of reads) {
+      if (read.failing !== null) {
+        const id = itemId(read.task, "failing-command", read.failing.since)
+        live.add(id)
+        yield* openItem(root, id, { kind: "failing-command", task: read.task, text: failingCommandText(read.failing), asked: read.failing.since, owner: "user" })
+      }
+    }
+    const readTasks = new Set(reads.map((read) => read.task))
+    const stale = (yield* openItems(root)).filter((entry) => entry.item.kind === "failing-command" && readTasks.has(entry.item.task) && !live.has(entry.id))
+    yield* Effect.forEach(stale, (entry) => Effect.asVoid(withdrawItem(root, entry.id, "the command stopped failing", at)), { discard: true })
   })
 
 export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>

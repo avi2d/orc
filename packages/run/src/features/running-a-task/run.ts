@@ -16,10 +16,11 @@ import { OrcRunError } from "../../shared/lib/index"
 import { historyFailure, markRunStopped, openDatabase, orcHomeDir, stoppedEndReason, updateStep } from "../../entities/run-history/index"
 import { stepsForRun } from "../../entities/run-history/index"
 import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "./run-resume"
-import { finishRun, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordPullRequestDone, recordPullRequestStart, recordResumePublish, recordStepSession } from "./history-write"
+import { finishRun, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordLoopQuestion, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordPullRequestDone, recordPullRequestStart, recordResumePublish, recordStepSession } from "./history-write"
 import { failedReport, writeEvidence, writeHandover, writeReport, type HistoryRun, type OrcRunCommit, type OrcRunReport } from "./run-record"
 import { longSessionWarning, type LongSessionCounts } from "../../entities/agent/index"
-import { runFull, type RunCheckpoints, type SandboxOps } from "./run-loop"
+import { runFull } from "./run-loop"
+import type { RunCheckpoints, SandboxOps } from "./run-ops"
 import { type ReportOutcome, type ReportRun, runReport } from "./report-run"
 import { runDirFor, type ReportKind } from "../../entities/backlog/index"
 import { noMistakesBinary, noMistakesVersionProblem, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "../../entities/review-gate/index"
@@ -222,6 +223,7 @@ export const runReportStep = (
   Effect.scoped(Effect.gen(function*() {
     const toolchain = yield* toolchainFromEnv(Bun.env.ORC_TOOLCHAIN_DIRS, homedir())
     const idleTimeoutSeconds = yield* idleTimeoutFromEnv(Bun.env.ORC_IDLE_TIMEOUT_SECONDS)
+    const answerWaitSeconds = yield* answerWaitFromEnv(Bun.env.ORC_ANSWER_WAIT_SECONDS)
     const opened = yield* openRun(request)
     if (opened.sandboxKind !== "none") {
       return yield* refuse("orc: a " + kind + " run starts Pi on the host in its run folder, so it takes --sandbox none and refuses --sandbox " + opened.sandboxKind)
@@ -231,7 +233,7 @@ export const runReportStep = (
     const run: ReportRun = {
       kind, runId: opened.runId, runDir: folders.runDir, projectDir: opened.checkout.projectDir, branch: opened.checkout.branch, sandbox: opened.sandboxKind,
       taskPath: folders.taskPath, instructions: folders.instructionsPath, hostSessionsDir: folders.hostSessionsDir, agent, started: new Date().toISOString(),
-      exec, pacing: piPacing(idleTimeoutSeconds)
+      exec, pacing: piPacing(idleTimeoutSeconds), answerWaitSeconds
     }
     return yield* Effect.acquireUseRelease(
       openDatabase(opened.home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
@@ -279,6 +281,11 @@ export const runAgentStep = (
     )
   }))
 
+interface RunEnd {
+  readonly report: OrcRunReport
+  readonly stopped: string | null
+}
+
 export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
     const resume = yield* buildResumePlan(db, run)
@@ -324,31 +331,37 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
       noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
       pullRequestStart: (started) => recordPullRequestStart(db, run.runId, started),
-      pullRequestDone: (record) => recordPullRequestDone(db, run, record)
+      pullRequestDone: (record) => recordPullRequestDone(db, run, record),
+      loopAsked: (step, question) => recordLoopQuestion(db, run.runId, step, question)
     }
-    const report = yield* runFull(run, ops, resume, checkpoints).pipe(
-      Effect.catchTag("OrcRunError", (error) =>
-        Effect.gen(function*() {
-          const existing = yield* stepsForRun(db, run.runId).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<{ readonly name: string; readonly status: string; readonly attempt: number }>))
-          const now = new Date().toISOString()
-          for (const step of existing) {
-            if (step.status === "running") {
-              yield* updateStep(db, run.runId, step.name, step.attempt, { status: "failed", ended: now }).pipe(Effect.orElseSucceed(() => false))
-            }
+    const endFailed = (reason: string) =>
+      Effect.gen(function*() {
+        const existing = yield* stepsForRun(db, run.runId).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<{ readonly name: string; readonly status: string; readonly attempt: number }>))
+        const now = new Date().toISOString()
+        for (const step of existing) {
+          if (step.status === "running") {
+            yield* updateStep(db, run.runId, step.name, step.attempt, { status: "failed", ended: now }).pipe(Effect.orElseSucceed(() => false))
           }
-          if (!existing.some((step) => step.name === "implement")) {
-            yield* recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: null, tokens: null, commits: null, sessionSize: null, implementPassed: false }, run.started, now).pipe(Effect.orElseSucceed(() => undefined))
-          }
-          const baseFailed = failedReport(run, error.message)
-          const failed = implementLong === null ? baseFailed : { ...baseFailed, sessionSize: implementLong.counts, commits: implementLong.commits, sessionFile: implementLong.sessionFile }
-          yield* writeEvidence(run, failed).pipe(Effect.orElseSucceed(() => undefined))
-          yield* writeReport(run, failed).pipe(Effect.orElseSucceed(() => undefined))
-          yield* finishRun(db, run.runId, failed, new Date().toISOString()).pipe(Effect.orElseSucceed(() => undefined))
-          return failed
-        })
-      ),
+        }
+        if (!existing.some((step) => step.name === "implement")) {
+          yield* recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: null, tokens: null, commits: null, sessionSize: null, implementPassed: false }, run.started, now).pipe(Effect.orElseSucceed(() => undefined))
+        }
+        const baseFailed = failedReport(run, reason)
+        const failed = implementLong === null ? baseFailed : { ...baseFailed, sessionSize: implementLong.counts, commits: implementLong.commits, sessionFile: implementLong.sessionFile }
+        yield* writeEvidence(run, failed).pipe(Effect.orElseSucceed(() => undefined))
+        yield* writeReport(run, failed).pipe(Effect.orElseSucceed(() => undefined))
+        yield* finishRun(db, run.runId, failed, new Date().toISOString()).pipe(Effect.orElseSucceed(() => undefined))
+        return failed
+      })
+    const ended = yield* runFull(run, ops, resume, checkpoints).pipe(
+      Effect.map((report): RunEnd => ({ report, stopped: null })),
+      Effect.catchTags({
+        OrcRunError: (error) => endFailed(error.message).pipe(Effect.map((report): RunEnd => ({ report, stopped: null }))),
+        RunStopped: (stopped) => endFailed(stopped.reason).pipe(Effect.map((report): RunEnd => ({ report, stopped: stopped.reason })))
+      }),
       Effect.onInterrupt(() => markRunStopped(db, run.runId, new Date().toISOString(), stoppedEndReason))
     )
+    const report = ended.report
     yield* writeEvidence(run, report)
     yield* writeReport(run, report)
     const handover = yield* writeHandover(run, report)
@@ -356,5 +369,8 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       yield* recordHandoverEvidence(db, run.runId, handover).pipe(Effect.orElseSucceed(() => undefined))
     }
     yield* finishRun(db, run.runId, report, new Date().toISOString())
+    if (ended.stopped !== null) {
+      yield* markRunStopped(db, run.runId, new Date().toISOString(), ended.stopped)
+    }
     return report
   })

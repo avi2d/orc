@@ -6,8 +6,9 @@ import type { OpenQuestion, QuestionAnswer } from "../../entities/review-gate/in
 import { formatHistoryError, openDatabase, stoppedEndReason, type RunRecord, RunStatusSchema } from "../../entities/run-history/index"
 import { writtenReport } from "../../entities/run-history/index"
 import { gateLogFileName } from "../../entities/review-gate/index"
-import { Asking, askingFileName, AnswersFile, answersFileName, writeWhole } from "../../entities/review-gate/index"
-import { readJsonFileIfPresent } from "../../shared/config/index"
+import { Asking, askingFileName, AnswersFile, answersFileName } from "../../entities/review-gate/index"
+import { readJsonFileIfPresent, writeWhole } from "../../shared/config/index"
+import { FailingMark, failingFileName, failingText } from "../../entities/agent/index"
 import { runDirFor, type TaskKind, TaskId, readPlanDocument, SplitDocument, type SplitPlan, splitReasonPrefix, parentBranch, taskBranch } from "../../entities/backlog/index"
 import { orcGroup, PueueResult, PueueStatus } from "../../shared/process/index"
 import { LabelArg } from "../../entities/token/index"
@@ -25,6 +26,7 @@ const RunSummary = Schema.Struct({
   openQuestions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String, asked: Schema.optional(Schema.String) })),
   report: Schema.optional(Schema.String),
   asking: Schema.optional(Asking),
+  failing: Schema.optional(FailingMark),
   split: Schema.optional(SplitDocument)
 })
 type RunSummary = typeof RunSummary.Type
@@ -174,7 +176,12 @@ const splitOf = (reason: string | null) => {
   return Result.isSuccess(parsed) && parsed.success.plan === "split" ? parsed.success : null
 }
 
-const toSummary = (run: RunRecord, openQuestions: ReadonlyArray<OpenQuestion>, report: string | null, asking: typeof Asking.Type | null): RunSummary => {
+interface LiveFiles {
+  readonly asking: typeof Asking.Type | null
+  readonly failing: FailingMark | null
+}
+
+const toSummary = (run: RunRecord, openQuestions: ReadonlyArray<OpenQuestion>, report: string | null, live: LiveFiles): RunSummary => {
   const split = splitOf(run.endReason)
   return {
     id: run.id,
@@ -183,7 +190,8 @@ const toSummary = (run: RunRecord, openQuestions: ReadonlyArray<OpenQuestion>, r
     endReason: run.endReason,
     openQuestions,
     ...(report === null ? {} : { report }),
-    ...(asking === null ? {} : { asking }),
+    ...(live.asking === null ? {} : { asking: live.asking }),
+    ...(live.failing === null ? {} : { failing: live.failing }),
     ...(split === null ? {} : { split })
   }
 }
@@ -193,10 +201,13 @@ const withRunDatabase = <A, E>(home: string, use: (db: Database) => Effect.Effec
     Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot read the run history: " + formatHistoryError(error) }))
   )
 
-const askingOf = (run: RunRecord, home: string): Effect.Effect<typeof Asking.Type | null, never, FileSystem.FileSystem> =>
+const liveFilesOf = (run: RunRecord, home: string): Effect.Effect<LiveFiles, never, FileSystem.FileSystem> =>
   run.status === "running"
-    ? readJsonFileIfPresent(runDirFor(home, run.id) + "/" + askingFileName, Asking).pipe(Effect.orElseSucceed(() => null))
-    : Effect.succeed(null)
+    ? Effect.all({
+      asking: readJsonFileIfPresent(runDirFor(home, run.id) + "/" + askingFileName, Asking).pipe(Effect.orElseSucceed(() => null)),
+      failing: readJsonFileIfPresent(runDirFor(home, run.id) + "/" + failingFileName, FailingMark).pipe(Effect.orElseSucceed(() => null))
+    })
+    : Effect.succeed({ asking: null, failing: null })
 
 const readRun = (home: string, checkout: string, task: string, interval: PueueInterval | null): Effect.Effect<RunSummary | null, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
@@ -208,7 +219,7 @@ const readRun = (home: string, checkout: string, task: string, interval: PueueIn
         const run = runs.find((candidate) => interval === null || startsWithin(candidate.started, interval)) ?? null
         return run === null
             ? null
-            : toSummary(run, yield* openQuestionsForRun(db, run.id), yield* writtenReport(runDirFor(home, run.id)), yield* askingOf(run, home))
+            : toSummary(run, yield* openQuestionsForRun(db, run.id), yield* writtenReport(runDirFor(home, run.id)), yield* liveFilesOf(run, home))
       })
     )
   })
@@ -240,7 +251,7 @@ const readStoppedRun = (home: string, task: string): Effect.Effect<RunSummary | 
       if (latest === null) {
         return null
       }
-      return toSummary(latest, yield* openQuestionsForRun(db, latest.id), yield* writtenReport(runDirFor(home, latest.id)), null)
+      return toSummary(latest, yield* openQuestionsForRun(db, latest.id), yield* writtenReport(runDirFor(home, latest.id)), { asking: null, failing: null })
     })
   )
 
@@ -375,7 +386,8 @@ const runLine = (task: string, run: RunSummary | null): string =>
     ? "orc holds no run on " + taskBranch(task) + " or " + parentBranch(task)
     : "orc run " + run.id + " " + run.status + (run.prLink === null ? "" : ", PR " + run.prLink) + (run.report === undefined ? "" : ", report " + run.report) +
       (run.endReason === null ? "" : ": " + run.endReason) +
-      (run.asking === undefined ? "" : ", waiting until " + run.asking.until + " for the captain's answer to " + run.asking.questions.map((question) => question.id).join(", "))
+      (run.asking === undefined ? "" : ", waiting until " + run.asking.until + " for the captain's answer to " + run.asking.questions.map((question) => question.id).join(", ")) +
+      (run.failing === undefined ? "" : ", " + failingText(run.failing) + " since " + run.failing.since)
 
 export const formatResult = (result: RunnerResult): string => {
   if (result.status === "unknown" && result.run == null) {

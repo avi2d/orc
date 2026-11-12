@@ -236,7 +236,7 @@ describe("a failed close read", () => {
       if (task === null || task.state.kind !== "started") {
         throw new Error("task-1 is not started")
       }
-      const active = { kind: "running", outputAt: "2026-10-27T11:00:00.000Z", action: null } as const
+      const active = { kind: "running", outputAt: "2026-10-27T11:00:00.000Z", action: null, failing: null } as const
       const failed = { kind: "ended", action: { kind: "close-failed", task: "task-1", machine: "mac", reason: "the close read timed out" } } as const
       const flagAt = (progress: typeof active | typeof failed, now: number) =>
         Effect.runPromise(Effect.gen(function*() {

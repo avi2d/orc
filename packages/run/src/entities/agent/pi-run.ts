@@ -1,8 +1,10 @@
-import { Effect, Fiber, type FileSystem, Option, type Path, Schema, Stream } from "effect"
+import { Effect, Fiber, FileSystem, Option, type Path, Schema, Stream } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { agentCommand, type AgentExec, type Argv, textInput } from "../../shared/sandbox/index"
 import type { AgentFile } from "./agents"
 import { OrcRunError } from "../../shared/lib/index"
+import { writeWhole } from "../../shared/config/index"
+import { askAfterFailures, type FailingMark, type FailureStreak, nextStreak, pauseAfterFailures } from "./failure-streak"
 
 export interface PiRequest {
   readonly agent: AgentFile
@@ -11,6 +13,7 @@ export interface PiRequest {
   readonly sessionDir: string
   readonly resumeSession: string | null
   readonly logFile: string
+  readonly failingFile: string
   readonly onSession: (file: string) => Effect.Effect<void, OrcRunError>
 }
 
@@ -23,6 +26,7 @@ export interface PiPacing {
 export type PiEnd =
   | { readonly kind: "exited"; readonly exitCode: number }
   | { readonly kind: "idle"; readonly idleSeconds: number }
+  | { readonly kind: "looping"; readonly label: string }
 
 export interface PiRun {
   readonly sessionId: string | null
@@ -33,12 +37,13 @@ export interface PiRun {
 export type PiLine =
   | { readonly kind: "session"; readonly id: string; readonly file: string }
   | { readonly kind: "reply"; readonly text: string }
-  | { readonly kind: "tool-start"; readonly id: string; readonly label: string }
-  | { readonly kind: "tool-end"; readonly id: string }
+  | { readonly kind: "tool-start"; readonly id: string; readonly label: string; readonly command: string | null }
+  | { readonly kind: "tool-end"; readonly id: string; readonly failed: boolean }
   | { readonly kind: "other" }
 
 interface RunningTool {
   readonly label: string
+  readonly command: string | null
   readonly since: number
 }
 
@@ -71,7 +76,7 @@ const ReplyEnd = Schema.Struct({
 
 const ToolStart = Schema.Struct({ type: Schema.Literal("tool_execution_start"), toolCallId: Schema.String, toolName: Schema.String, args: Schema.optional(Schema.Unknown) })
 
-const ToolEnd = Schema.Struct({ type: Schema.Literal("tool_execution_end"), toolCallId: Schema.String })
+const ToolEnd = Schema.Struct({ type: Schema.Literal("tool_execution_end"), toolCallId: Schema.String, isError: Schema.optional(Schema.Boolean) })
 
 const decodeEvent = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Union([SessionHeader, ReplyEnd, ToolStart, ToolEnd])))
 
@@ -97,14 +102,14 @@ export const readPiLine = (line: string, sessionDir: string): PiLine =>
         case "message_end":
           return { kind: "reply", text: event.message.content.flatMap((block) => block.type === "text" && block.text !== undefined ? [block.text] : []).join("\n").trim() }
         case "tool_execution_start":
-          return { kind: "tool-start", id: event.toolCallId, label: toolLabel(event.toolName, event.args) }
+          return { kind: "tool-start", id: event.toolCallId, label: toolLabel(event.toolName, event.args), command: commandOf(event.args) }
         case "tool_execution_end":
-          return { kind: "tool-end", id: event.toolCallId }
+          return { kind: "tool-end", id: event.toolCallId, failed: event.isError === true }
       }
     }
   })
 
-export const stillRunningLines = (running: Iterable<RunningTool>, now: number, minuteMillis: number = defaultMinuteMillis): ReadonlyArray<string> =>
+export const stillRunningLines = (running: Iterable<Pick<RunningTool, "label" | "since">>, now: number, minuteMillis: number = defaultMinuteMillis): ReadonlyArray<string> =>
   [...running].flatMap((tool) => {
     const minutes = Math.floor((now - tool.since) / minuteMillis)
     return minutes < 1 ? [] : ["still running " + tool.label + " (" + minutes.toString() + " min)"]
@@ -118,6 +123,42 @@ const findSessionFile = (fs: FileSystem.FileSystem, path: Path.Path, sessionDir:
     const files = yield* fs.readDirectory(sessionDir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
     const found = files.find((file) => file.endsWith("_" + id + ".jsonl"))
     return found === undefined ? null : path.join(sessionDir, found)
+  })
+
+interface FailureWatch {
+  streak: FailureStreak | null
+  looping: string | null
+}
+
+interface FailureSink {
+  readonly fs: FileSystem.FileSystem
+  readonly failingFile: string
+  readonly log: (text: string) => Effect.Effect<void, OrcRunError>
+  readonly stop: Effect.Effect<void, OrcRunError>
+}
+
+const clearFailing = (fs: FileSystem.FileSystem, failingFile: string): Effect.Effect<void> =>
+  fs.remove(failingFile, { force: true }).pipe(Effect.orElseSucceed(() => undefined))
+
+const countFailure = (watch: FailureWatch, sink: FailureSink, tool: { readonly label: string; readonly command: string }, failed: boolean): Effect.Effect<void, OrcRunError> =>
+  Effect.gen(function*() {
+    const before = watch.streak
+    const after = nextStreak(before, tool.command, failed)
+    watch.streak = after
+    if ((before?.failures ?? 0) >= askAfterFailures && (after?.failures ?? 0) < askAfterFailures) {
+      yield* clearFailing(sink.fs, sink.failingFile)
+    }
+    if (after?.failures === askAfterFailures) {
+      const mark: FailingMark = { label: tool.label, since: new Date().toISOString() }
+      yield* sink.log("orc: pi failed " + tool.label + " " + askAfterFailures.toString() + " times in a row")
+      yield* writeWhole(sink.failingFile, JSON.stringify(mark)).pipe(Effect.provideService(FileSystem.FileSystem, sink.fs))
+    }
+    if (after?.failures === pauseAfterFailures) {
+      watch.looping = tool.label
+      yield* sink.log("orc: stopped pi, it failed " + tool.label + " " + pauseAfterFailures.toString() + " times in a row")
+      yield* clearFailing(sink.fs, sink.failingFile)
+      yield* sink.stop
+    }
   })
 
 // Pi prints nothing while a tool runs, so silence alone never stops it: a quiet test run is work, not a hang.
@@ -146,6 +187,8 @@ export const runPi = (
       session: null,
       idleSeconds: null
     }
+    const watch: FailureWatch = { streak: null, looping: null }
+    const sink: FailureSink = { fs, failingFile: request.failingFile, log, stop: handle.kill().pipe(Effect.catch((cause) => log("orc: cannot stop pi: " + String(cause)))) }
     const onLine = (line: string): Effect.Effect<void, OrcRunError> =>
       Effect.gen(function*() {
         state.lastOutput = Date.now()
@@ -157,10 +200,14 @@ export const runPi = (
         } else if (read.kind === "reply" && read.text !== "") {
           yield* log(read.text)
         } else if (read.kind === "tool-start") {
-          running.set(read.id, { label: read.label, since: state.lastOutput })
+          running.set(read.id, { label: read.label, command: read.command, since: state.lastOutput })
           yield* log("> " + read.label)
         } else if (read.kind === "tool-end") {
+          const tool = running.get(read.id)
           running.delete(read.id)
+          if (tool !== undefined && tool.command !== null && watch.looping === null) {
+            yield* countFailure(watch, sink, { label: tool.label, command: tool.command }, read.failed)
+          }
         }
       })
     const report = Effect.suspend(() => Effect.forEach(stillRunningLines(running.values(), Date.now(), pacing.minuteMillis ?? defaultMinuteMillis), (line) => log("orc: " + line))).pipe(
@@ -200,6 +247,8 @@ export const runPi = (
     yield* Fiber.interruptAll(watchers)
     const session = state.session
     const found = session === null ? null : yield* findSessionFile(fs, path, request.sessionDir, session.id, session.file)
-    const end: PiEnd = state.idleSeconds === null ? { kind: "exited", exitCode } : { kind: "idle", idleSeconds: state.idleSeconds }
+    const end: PiEnd = watch.looping !== null
+      ? { kind: "looping", label: watch.looping }
+      : state.idleSeconds === null ? { kind: "exited", exitCode } : { kind: "idle", idleSeconds: state.idleSeconds }
     return { sessionId: session?.id ?? null, sessionFile: found, end }
-  }))
+  })).pipe(Effect.ensuring(clearFailing(fs, request.failingFile)))

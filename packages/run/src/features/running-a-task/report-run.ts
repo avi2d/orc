@@ -5,7 +5,8 @@ import type { AgentExec } from "../../shared/sandbox/index"
 import type { AgentFile } from "../../entities/agent/index"
 import type { SandboxKind } from "../../shared/sandbox/index"
 import { orcCompletionLine } from "../../entities/agent/index"
-import { idleSpan, type PiPacing, runPi } from "../../entities/agent/index"
+import { failingFileName, idleSpan, type PiPacing, runPi } from "../../entities/agent/index"
+import { askOnLoop, loopContinuePrompt, loopingNote } from "./loop-pause"
 import { historyFailure, recordRun, updateRun } from "../../entities/run-history/index"
 import type { OrcRunError } from "../../shared/lib/index"
 import { reportPathOf, writtenReport } from "../../entities/run-history/index"
@@ -25,6 +26,7 @@ export interface ReportRun {
   readonly started: string
   readonly exec: AgentExec
   readonly pacing: PiPacing
+  readonly answerWaitSeconds: number
 }
 
 export type ReportOutcome =
@@ -56,16 +58,33 @@ const runReportPi = (run: ReportRun): Effect.Effect<number | string, OrcRunError
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const pi = yield* runPi(spawner, fs, path, run.exec, {
-      agent: run.agent,
-      prompt: buildReportPrompt(run),
-      instructions: run.instructions,
-      sessionDir: run.hostSessionsDir,
-      resumeSession: null,
-      logFile: run.runDir + "/agent.log",
-      onSession: () => Effect.void
-    }, run.pacing)
-    return pi.end.kind === "exited" ? pi.end.exitCode : "orc stopped pi, idle for " + idleSpan(pi.end.idleSeconds) + " with no tool running"
+    let next: { readonly prompt: string; readonly resumeSession: string | null } = { prompt: buildReportPrompt(run), resumeSession: null }
+    for (;;) {
+      const pi = yield* runPi(spawner, fs, path, run.exec, {
+        agent: run.agent,
+        prompt: next.prompt,
+        instructions: run.instructions,
+        sessionDir: run.hostSessionsDir,
+        resumeSession: next.resumeSession,
+        logFile: run.runDir + "/agent.log",
+        failingFile: run.runDir + "/" + failingFileName,
+        onSession: () => Effect.void
+      }, run.pacing)
+      if (pi.end.kind === "exited") {
+        return pi.end.exitCode
+      }
+      if (pi.end.kind === "idle") {
+        return "orc stopped pi, idle for " + idleSpan(pi.end.idleSeconds) + " with no tool running"
+      }
+      const verdict = yield* askOnLoop(run.runDir, run.answerWaitSeconds, pi.end)
+      if (verdict.kind === "stop") {
+        return verdict.reason
+      }
+      if (verdict.kind === "unanswered") {
+        return loopingNote(pi.end)
+      }
+      next = { prompt: loopContinuePrompt(verdict.words), resumeSession: pi.sessionFile ?? next.resumeSession }
+    }
   })
 
 const outcomeOf = (run: ReportRun, report: { readonly path: string; readonly text: string } | null, piExit: number | string): ReportOutcome => {

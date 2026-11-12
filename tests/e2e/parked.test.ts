@@ -19,7 +19,11 @@ const startOnLinux = async (fixture: Fixture): Promise<void> => {
   await rm(join(fixture.pueue, "add-args"))
 }
 
-const refuseOnQuestions = async (fixture: Fixture): Promise<void> => {
+const reviewQuestions = [{ id: "question-4", text: "Which retries are allowed?" }, { id: "question-5", text: "" }]
+
+const loopQuestion = { id: "looping", text: "Pi failed bun run test 6 times in a row, so orc paused the run. Answer continue, with any guidance for Pi after it, to resume Pi, or stop to end the run." }
+
+const refuseOnQuestions = async (fixture: Fixture, questions: ReadonlyArray<{ readonly id: string; readonly text: string }> = reviewQuestions, stepName = "no-mistakes"): Promise<void> => {
   await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({
     tasks: {
       "77": {
@@ -44,9 +48,10 @@ const refuseOnQuestions = async (fixture: Fixture): Promise<void> => {
       ended: "2026-11-02T10:29:00.000Z",
       prLink: null
     }))
-    const step = insertStep(db, { runId: "run-1", name: "no-mistakes", attempt: 1, status: "failed", started: "2026-11-02T10:20:00.000Z", ended: "2026-11-02T10:29:00.000Z", agentFile: null, piSessionFile: null })
-    insertSignal(db, { stepId: step, name: "open-question", value: JSON.stringify({ id: "question-4", text: "Which retries are allowed?" }) })
-    insertSignal(db, { stepId: step, name: "open-question", value: JSON.stringify({ id: "question-5", text: "" }) })
+    const step = insertStep(db, { runId: "run-1", name: stepName, attempt: 1, status: "failed", started: "2026-11-02T10:20:00.000Z", ended: "2026-11-02T10:29:00.000Z", agentFile: null, piSessionFile: null })
+    for (const question of questions) {
+      insertSignal(db, { stepId: step, name: "open-question", value: JSON.stringify(question) })
+    }
   } finally {
     db.close()
   }
@@ -343,6 +348,47 @@ describe("a parked run", () => {
       await writeFile(join(runDir, "asking.json"), JSON.stringify({ ...firstAsking, asked: "2026-11-02T11:20:00.000Z", until: "2026-11-02T11:50:00.000Z" }))
       await orcOk(fixture, ["beat"])
       expect(await openAttention(fixture)).toMatchObject([{ task: "orc-1", asked: "2026-11-02T11:20:00.000Z" }])
+    })
+  }, runnerTimeout)
+
+  test("a run paused on a looping command parks for the captain's continue or stop, without handing it to the decider", async () => {
+    await withFixture(async (fixture) => {
+      await startOnLinux(fixture)
+      await writeFile(join(fixture.home, "config.json"), JSON.stringify({ providers: [], models: { decider: "acme/small" } }))
+      const pi = join(fixture.dir, "bin", "pi")
+      await writeFile(pi, "#!/bin/sh\ntouch " + join(fixture.dir, "decider-asked") + "\nprintf '%s\\n' '" + JSON.stringify({ decision: "answer", answer: "continue", reason: "keep going" }) + "'\n")
+      await chmod(pi, 0o755)
+      await refuseOnQuestions(fixture, [loopQuestion], "implement")
+      expect(await orcOk(fixture, ["beat"])).toContain("parked orc-1 on orc/orc-1 for the captain's answer to looping")
+      expect(await openAttention(fixture)).toMatchObject([{ kind: "review-question", task: "orc-1", text: loopQuestion.text, owner: "user" }])
+      expect(await readFile(join(fixture.dir, "decider-asked"), "utf8").catch(() => null)).toBeNull()
+      expect(await orcOk(fixture, ["backlog", "answer", "orc-1", "looping=continue, run one test file at a time"])).toBe("answered looping on orc-1, so the beat resumes it on orc/orc-1\n")
+      expect(await orcOk(fixture, ["beat"])).toContain("started orc-1")
+      const added = await queuedArgs(fixture)
+      expect(added).toEqual(expect.arrayContaining(["--answer", "looping=continue, run one test file at a time"]))
+    })
+  }, runnerTimeout)
+
+  test("a running run's third failure of one command asks the person in orc attention, and the item leaves once the command stops failing", async () => {
+    await withFixture(async (fixture) => {
+      await startOnLinux(fixture)
+      const runDir = await askWhileRunning(fixture)
+      await rm(join(runDir, "asking.json"))
+      await writeFile(join(runDir, "failing.json"), JSON.stringify({ label: "bun run test", since: "2026-11-02T10:10:00.000Z" }))
+      await orcOk(fixture, ["beat"])
+      expect(await openAttention(fixture)).toEqual([expect.objectContaining({
+        kind: "failing-command",
+        task: "orc-1",
+        text: expect.stringContaining("Pi failed bun run test 3 times in a row"),
+        asked: "2026-11-02T10:10:00.000Z",
+        owner: "user"
+      })])
+      expect(await orcOk(fixture, ["attention"])).toContain("Pi failed bun run test 3 times in a row")
+      await orcOk(fixture, ["beat"])
+      expect(await openAttention(fixture)).toHaveLength(1)
+      await rm(join(runDir, "failing.json"))
+      await orcOk(fixture, ["beat"])
+      expect(await openAttention(fixture)).toEqual([])
     })
   }, runnerTimeout)
 
