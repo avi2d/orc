@@ -13,8 +13,12 @@ To run one directly, enter a clean checkout of the target project and run the sa
 That run skips no-mistakes and the PR and creates no branch.
 It starts Pi on the host in `~/.orc/runs/<run-id>`, tells it where the task and the checkout are, and asks it to write `agent-report.md` there.
 Orc refuses a scout or task run without `--sandbox none`, and refuses `--allow` and `--answer` on one.
-It prints `orc: <kind> run <run-id> wrote its report to <path>` and records the run succeeded, or prints why it wrote none, records the run failed and exits non-zero.
+It prints `orc: <kind> run <run-id> wrote its report to <path>` and records the run succeeded.
+A run the captain stops at its looping question prints `orc: <kind> run <run-id> stopped: <reason>` and records the run stopped.
+Any other run that does not report prints why it failed, records the run failed and exits non-zero.
 The beat closes the task done with the reason `the run wrote its report` and keeps the path as `report` in the task file and in `orc backlog --json`.
+A run that wrote a report and still failed closes the task failed with the run reason and keeps the path as `report`.
+A run the captain stops closes the task stopped with the run reason.
 When no report exists, it closes the task failed with `the run wrote no report` and the run's reason, even when pueue says the run succeeded.
 The beat prints the report path in its `closed` line.
 The chat posts it where a shipped task posts its PR, as in `orc-1 Map the parser closed done: the run wrote its report, report /home/me/.orc/runs/<run-id>/agent-report.md`.
