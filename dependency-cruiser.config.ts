@@ -80,7 +80,28 @@ export default defineConfig({
       severity: "error",
       comment: "Every source file of a layered package sits in a layer folder, beside the one entry file.",
       from: {},
-      to: { path: "^packages/(run|schema)/src/", pathNot: "^packages/(run|schema)/src/((app|widgets|features|entities|shared)/|(bin|index)\\.ts$)" },
+      to: {
+        path: "^packages/(run|schema)/src/",
+        pathNot: [
+          "^packages/(run|schema)/src/(app|widgets|features|entities|shared)/",
+          "^packages/run/src/bin\\.ts$",
+          "^packages/schema/src/index\\.ts$",
+        ],
+      },
+    },
+    {
+      name: "unlayered-file-imports",
+      severity: "error",
+      comment: "Every source file of a layered package sits in a layer folder, beside the one entry file.",
+      from: {
+        path: "^packages/(run|schema)/src/",
+        pathNot: [
+          "^packages/(run|schema)/src/(app|widgets|features|entities|shared)/",
+          "^packages/run/src/bin\\.ts$",
+          "^packages/schema/src/index\\.ts$",
+        ],
+      },
+      to: {},
     },
     {
       name: "layered-imports-unlayered",
