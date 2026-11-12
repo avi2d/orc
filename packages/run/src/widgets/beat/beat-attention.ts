@@ -1,7 +1,7 @@
 import { Effect, type FileSystem } from "effect"
-import { type AttentionSnapshot, isOverdue, readAttention, reviewQuestionId } from "../entities/attention/index"
-import type { BeatAction } from "../entities/attention/index"
-import type { BacklogError, DeciderOwns, TaskRecord } from "../entities/backlog/index"
+import { type AttentionSnapshot, isOverdue, readAttention, reviewQuestionId } from "../../entities/attention/index"
+import type { BeatAction } from "../../entities/attention/index"
+import type { BacklogError, DeciderOwns, TaskRecord } from "../../entities/backlog/index"
 
 export const deciderOwnership = (attention: AttentionSnapshot): DeciderOwns => {
   const owned = new Set([...attention.open, ...attention.decided].filter(({ item }) => item.owner === "decider").map(({ id }) => id))

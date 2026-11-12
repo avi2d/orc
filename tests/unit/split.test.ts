@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { taskWait } from "../../packages/run/src/dispatch/beat-place"
+import { taskWait } from "../../packages/run/src/widgets/beat/beat-place"
 import type { TaskRecord } from "../../packages/run/src/entities/backlog/index"
 
 const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }

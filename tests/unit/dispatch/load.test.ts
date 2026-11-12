@@ -6,12 +6,12 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Layer, Result } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { parseDispatchArgs } from "../../../packages/run/src/dispatch/args"
+import { parseDispatchArgs } from "../../../packages/run/src/app/dispatch-args"
 import { addTask, listTasks } from "../../../packages/run/src/entities/backlog/index"
-import { runBeat } from "../../../packages/run/src/dispatch/beat"
+import { runBeat } from "../../../packages/run/src/widgets/beat/beat"
 import { quietSources } from "../../lib/beat-sources"
 import { readDispatchConfig } from "../../../packages/run/src/shared/config/dispatch-config"
-import { deepHeavyQueue, type HeavyReading, type LoadReading, loadText, parseLoad, readMachineLoad } from "../../../packages/run/src/dispatch/load"
+import { deepHeavyQueue, type HeavyReading, type LoadReading, loadText, parseLoad, readMachineLoad } from "../../../packages/run/src/widgets/beat/load"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))

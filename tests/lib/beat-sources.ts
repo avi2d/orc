@@ -1,10 +1,10 @@
 import { Effect } from "effect"
-import type { BeatSources } from "../../packages/run/src/dispatch/beat"
+import type { BeatSources } from "../../packages/run/src/widgets/beat/beat"
 import { BacklogError } from "../../packages/run/src/entities/backlog/index"
-import { type ReadLoad, readMachineLoad } from "../../packages/run/src/dispatch/load"
+import { type ReadLoad, readMachineLoad } from "../../packages/run/src/widgets/beat/load"
 import type { PullRequestView } from "../../packages/run/src/entities/pull-request/pr-view"
-import type { ReadPullRequest } from "../../packages/run/src/dispatch/task-events"
-import type { ReadUpstream } from "../../packages/run/src/dispatch/upstream"
+import type { ReadPullRequest } from "../../packages/run/src/widgets/beat/task-events"
+import type { ReadUpstream } from "../../packages/run/src/widgets/beat/upstream"
 import type { AskDecider } from "../../packages/run/src/features/decider/index"
 
 export const uncheckedOpen: PullRequestView = { state: "OPEN", headRefOid: "0".repeat(40), baseRefName: "main", statusCheckRollup: [] }

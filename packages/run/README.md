@@ -45,9 +45,9 @@ An unknown flag prints the usage text and exits 1.
 | `src/features/running-a-task/run.ts` | The `orc run` agent step: checkout checks, agent files and the Pi run in the selected sandbox |
 | `src/features/chat/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
 | `src/entities/review-gate/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
-| `src/dispatch/beat.ts` | The beat: room, placement, take and start |
+| `src/widgets/beat/beat.ts` | The beat: room, placement, take and start |
 | `src/features/queueing-a-task/runner.ts` | The runner: the start, the kill and the token renewal through pueue |
-| `src/dispatch/cli.ts` | The `orc backlog`, `orc beat`, `orc runner` and `orc merge` commands |
+| `src/app/dispatch-cli.ts` | The `orc backlog`, `orc beat`, `orc runner` and `orc merge` commands |
 | `agents` | The bundled agent files |
 
 [Where every source file is](https://github.com/avi2d/orc/blob/main/docs/run/layout.md) maps the rest of the package and the tests.
