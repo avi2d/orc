@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite"
 import { Effect, Schema } from "effect"
 import { GateRefusalSchema, refusalSignalName, type GateRefusal } from "./gate-refusals"
-import type { OpenQuestion } from "./no-mistakes-gate"
+import type { OpenQuestion } from "./entities/review-gate/index"
 import { openQuestionSignal } from "./report"
 import { decodedRunRow, RunSqlRowSchema, runRecordOf, sqlite, type RunRecord, type SqliteFailure } from "./run-history"
 

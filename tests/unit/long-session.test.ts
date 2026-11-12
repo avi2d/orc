@@ -12,7 +12,7 @@ import { readShow } from "../../packages/run/src/show"
 import { openDatabase } from "../../packages/run/src/run-history"
 import { runWithHistory } from "../../packages/run/src/run"
 import type { HistoryRun } from "../../packages/run/src/run-record"
-import { subprocessNoMistakesRunner } from "../../packages/run/src/no-mistakes"
+import { subprocessNoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
 import {
   countSessionSize,
   handoverFileName,

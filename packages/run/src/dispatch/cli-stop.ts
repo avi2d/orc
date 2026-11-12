@@ -1,7 +1,7 @@
 import { DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { BacklogError, backlogPaths, closeStartedTask, listTasks, runLabel, type TaskFileError } from "../entities/backlog/index"
-import { routeTaskItems } from "./attention"
+import { routeTaskItems } from "../entities/attention/index"
 import { readDispatchConfig } from "../shared/config/index"
 import type { ConfigError } from "../shared/config/index"
 import { ownedBySweep, throughFor } from "../shared/config/index"

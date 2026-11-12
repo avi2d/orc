@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { standinScript, type StandinTiming } from "../../../packages/run/src/dispatch/heavy-standin"
+import { standinScript, type StandinTiming } from "../../../packages/run/src/entities/heavy-queue/heavy-standin"
 
 const fakePueue = `#!/bin/sh
 echo "pueue $*" >> "$FAKE_PUEUE_LOG"

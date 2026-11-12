@@ -1,6 +1,6 @@
 import { Effect, type FileSystem } from "effect"
-import { type AttentionSnapshot, isOverdue, readAttention, reviewQuestionId } from "./attention"
-import type { BeatAction } from "./beat-action"
+import { type AttentionSnapshot, isOverdue, readAttention, reviewQuestionId } from "../entities/attention/index"
+import type { BeatAction } from "../entities/attention/index"
 import type { BacklogError, DeciderOwns, TaskRecord } from "../entities/backlog/index"
 
 export const deciderOwnership = (attention: AttentionSnapshot): DeciderOwns => {

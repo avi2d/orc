@@ -7,11 +7,11 @@ import { Effect, Layer } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { TestClock } from "effect/testing"
 import { parseDispatchArgs } from "../../../packages/run/src/dispatch/args"
-import { answerItem, openItem, openItems, openRunDeaths, routeTaskItems } from "../../../packages/run/src/dispatch/attention"
+import { answerItem, openItem, openItems, openRunDeaths, routeTaskItems } from "../../../packages/run/src/entities/attention/attention"
 import { addTask, claimTask, closeStartedTask, writeTaken, type TaskRecord } from "../../../packages/run/src/entities/backlog/index"
 import { runBeat } from "../../../packages/run/src/dispatch/beat"
 import { formatBeat } from "../../../packages/run/src/dispatch/board"
-import type { PullRequestView } from "../../../packages/run/src/dispatch/pr-view"
+import type { PullRequestView } from "../../../packages/run/src/entities/pull-request/pr-view"
 import { quietSources, uncheckedOpen } from "../../lib/beat-sources"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>

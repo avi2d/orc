@@ -5,7 +5,7 @@ import {
   insideThrough,
   parseProcessTable,
   unwrapSlotCommand
-} from "../../../packages/run/src/dispatch/heavy-process-tree"
+} from "../../../packages/run/src/entities/heavy-queue/heavy-process-tree"
 
 const waiter = (pid: number, call: string): string =>
   "sh -c 'o=$1; shift; \"$@\" & c=$!; wait \"$c\"' orc-heavy-wait " + String(pid) + " " + call

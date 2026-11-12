@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
-import { Asking, answerWaitFromEnv, waitForAnswers } from "../../packages/run/src/answer-wait"
+import { Asking, answerWaitFromEnv, waitForAnswers } from "../../packages/run/src/entities/review-gate/answer-wait"
 
 const finding = (id: string, description: string) => ({ id, severity: "error", file: "", action: "ask-user", description })
 

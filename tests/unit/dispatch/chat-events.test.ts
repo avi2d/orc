@@ -11,7 +11,7 @@ import { runBeat } from "../../../packages/run/src/dispatch/beat"
 import { formatBeat } from "../../../packages/run/src/dispatch/board"
 import { markEventPosted, unpostedEvents } from "../../../packages/run/src/entities/events/index"
 import type { LoadReading } from "../../../packages/run/src/dispatch/load"
-import type { PullRequestView } from "../../../packages/run/src/dispatch/pr-view"
+import type { PullRequestView } from "../../../packages/run/src/entities/pull-request/pr-view"
 import { quietSources, uncheckedOpen } from "../../lib/beat-sources"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
