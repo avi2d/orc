@@ -1,10 +1,10 @@
 import { Console, DateTime, Duration, Effect, FileSystem, Option } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { heldExpiry, heldTokenDir, releaseHeldToken } from "../entities/token/index"
-import { fileKeyOf, labelOf } from "../entities/backlog/index"
-import { RunnerError } from "../shared/process/index"
-import { type Command } from "../shared/process/index"
-import { tokenLive } from "../entities/token/index"
+import { heldExpiry, heldTokenDir, releaseHeldToken } from "../../entities/token/index"
+import { fileKeyOf, labelOf } from "../../entities/backlog/index"
+import { RunnerError } from "../../shared/process/index"
+import { type Command } from "../../shared/process/index"
+import { tokenLive } from "../../entities/token/index"
 
 const pollSeconds = 5
 

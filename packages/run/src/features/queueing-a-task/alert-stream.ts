@@ -1,10 +1,10 @@
 import { Effect } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { alertsFile } from "../entities/events/index"
-import { PueueState, taskLabel } from "../shared/process/index"
+import { alertsFile } from "../../entities/events/index"
+import { PueueState, taskLabel } from "../../shared/process/index"
 import { pueueDone } from "./runner"
-import { type RunnerError } from "../shared/process/index"
-import { type Command, ensureGroup, decodeJson, pueue } from "../shared/process/index"
+import { type RunnerError } from "../../shared/process/index"
+import { type Command, ensureGroup, decodeJson, pueue } from "../../shared/process/index"
 
 export const liveAlertStream = (): Command | null => {
   const dash = Bun.which("orc-dash")
