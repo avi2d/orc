@@ -1,8 +1,8 @@
 import { Effect, FileSystem } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { WaitResult } from "./answer-wait"
-import { collectOutput } from "./shared/process/index"
-import { hostGitSafetyEnv } from "./shared/sandbox/index"
+import { collectOutput } from "../../shared/process/index"
+import { hostGitSafetyEnv } from "../../shared/sandbox/index"
 import {
   answerArgsFor,
   answerForGate,
@@ -22,7 +22,7 @@ import {
   type QuestionAnswer
 } from "./no-mistakes-gate"
 import { openDriveLog, type DriveLog, type Ending, type NoMistakesRecord } from "./no-mistakes-drive-log"
-import { hasTable, scalar } from "./shared/lib/index"
+import { hasTable, scalar } from "../../shared/lib/index"
 export { answerArgsFor, answerForGate, askUserWord, omittedQuestionIds, parseRun } from "./no-mistakes-gate"
 export type { AllowWord, NoMistakesFinding, QuestionAnswer } from "./no-mistakes-gate"
 export type { NoMistakesRecord } from "./no-mistakes-drive-log"

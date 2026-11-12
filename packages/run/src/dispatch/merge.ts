@@ -4,8 +4,8 @@ import { BacklogError, backlogPaths, findTask, type TaskFileError } from "../ent
 import { isYolo, readDispatchConfig, readProjects } from "../shared/config/index"
 import type { ConfigError } from "../shared/config/index"
 import type { RunnerError } from "../shared/process/index"
-import type { MergeBasis } from "./merge-basis"
-import { checkRefusals, gh, prPattern, type PullRequestView, readPullRequest } from "./pr-view"
+import type { MergeBasis } from "../entities/pull-request/index"
+import { checkRefusals, gh, prPattern, type PullRequestView, readPullRequest } from "../entities/pull-request/index"
 
 const refuse = (detail: string) => Effect.fail(new BacklogError({ detail }))
 

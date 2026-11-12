@@ -3,7 +3,7 @@ import {
   classifyHeavyCall,
   decisionWords,
   type HeavyDecision
-} from "../../../packages/run/src/dispatch/heavy-classify"
+} from "../../../packages/run/src/entities/heavy-queue/heavy-classify"
 
 const decide = (call: string, commands: ReadonlyArray<string> = []): HeavyDecision => {
   const [tool = "", ...args] = call.split(" ").filter((word) => word !== "")

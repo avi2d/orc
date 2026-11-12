@@ -6,7 +6,7 @@ import { tmpdir, userInfo } from "node:os"
 import { dirname, join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { standinScript, standinTools, type StandinSettings } from "../../../packages/run/src/dispatch/heavy-standin"
+import { standinScript, standinTools, type StandinSettings } from "../../../packages/run/src/entities/heavy-queue/heavy-standin"
 import { noPueue, run, setup, type Harness } from "./heavy-standin-harness"
 
 const scriptOf = (tool: string, settings: StandinSettings, commands: ReadonlyArray<string>): Promise<string> =>

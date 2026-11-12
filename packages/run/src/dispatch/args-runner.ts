@@ -1,5 +1,5 @@
 import { isTaskId } from "../entities/backlog/index"
-import type { MergeBasis } from "./merge-basis"
+import type { MergeBasis } from "../entities/pull-request/index"
 import type { AddTask } from "./cli-add"
 import type { Reach } from "../shared/process/index"
 

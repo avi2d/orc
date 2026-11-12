@@ -1,7 +1,7 @@
 import { Effect } from "effect"
 import { ChildProcess, type ChildProcessSpawner } from "effect/process"
-import { collectOutput } from "./shared/process/index"
-import { hostGitSafetyEnv } from "./shared/sandbox/index"
+import { collectOutput } from "../../shared/process/index"
+import { hostGitSafetyEnv } from "../../shared/sandbox/index"
 
 export interface CommandReply {
   readonly stdout: string

@@ -9,11 +9,11 @@ import {
   checkHeavy, countBypass, countBypassWeek, ensureHeavyWatch, formatCheck, lastAlertByMachine, lastSlipByCommand, normalizeTaskCommand, oldRunningTasks,
   slipCandidates, slipHeld, staleMachines, stripHeavyWrapper, watchGroup, watchOnce, watchTtlMinutes
 } from "../../../packages/run/src/dispatch/heavy-watch"
-import { standinScript } from "../../../packages/run/src/dispatch/heavy-standin"
+import { standinScript } from "../../../packages/run/src/entities/heavy-queue/heavy-standin"
 
 const scriptOf = (tool: string, settings: { home: string; group: string; wrap: string; through: null }, commands: ReadonlyArray<string>): Promise<string> =>
   Effect.runPromise(standinScript(tool, settings, commands).pipe(Effect.provide(BunServices.layer)))
-import { heavyBinDir } from "../../../packages/run/src/dispatch/heavy"
+import { heavyBinDir } from "../../../packages/run/src/entities/heavy-queue/heavy"
 import { taskLabel } from "../../../packages/run/src/shared/process/pueue-status"
 
 describe("the heavy watch", () => {

@@ -4,10 +4,10 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { respondArgs, type GateResponse, type QuestionAnswer } from "../../packages/run/src/no-mistakes-gate"
-import { answerArgsFor, answerForGate, askUserWord, driveNoMistakes, noMistakesBinary, omittedQuestionIds, parseRun, type AllowWord, type NoMistakesFinding, type NoMistakesRecord, type NoMistakesRunner } from "../../packages/run/src/no-mistakes"
+import { respondArgs, type GateResponse, type QuestionAnswer } from "../../packages/run/src/entities/review-gate/no-mistakes-gate"
+import { answerArgsFor, answerForGate, askUserWord, driveNoMistakes, noMistakesBinary, omittedQuestionIds, parseRun, type AllowWord, type NoMistakesFinding, type NoMistakesRecord, type NoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
 import { formatReport, type OrcRunReport } from "../../packages/run/src/run-record"
-import type { WaitResult } from "../../packages/run/src/answer-wait"
+import type { WaitResult } from "../../packages/run/src/entities/review-gate/answer-wait"
 
 const approvalGate = { step: "review", stage: "approval" } as const
 const fixReview = { step: "review", stage: "fix-review" } as const

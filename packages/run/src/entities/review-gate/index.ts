@@ -1,0 +1,6 @@
+export { askUserWord } from "./no-mistakes-gate"
+export type { QuestionAnswer, OpenQuestion, NoMistakesFinding, AllowWord } from "./no-mistakes-gate"
+export { gateLogFileName, subprocessNoMistakesRunner, driveNoMistakes, noMistakesBinary, noMistakesVersionProblem } from "./no-mistakes"
+export { Asking, askingFileName, AnswersFile, answersFileName, writeWhole, waitForAnswers, answerWaitFromEnv } from "./answer-wait"
+export type { NoMistakesRecord } from "./no-mistakes-drive-log"
+export type { SubprocessRunnerOptions, NoMistakesRunner, NoMistakesHost } from "./no-mistakes"

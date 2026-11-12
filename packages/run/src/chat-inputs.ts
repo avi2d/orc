@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { mergeBases } from "./dispatch/merge-basis"
+import { mergeBases } from "./entities/pull-request/index"
 import { taskKinds } from "./entities/backlog/index"
 
 export const AddTaskInput = Schema.Struct({

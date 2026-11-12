@@ -24,7 +24,7 @@ import {
   recordStepSession
 } from "../../packages/run/src/history-write"
 import { buildResumePlan } from "../../packages/run/src/run-resume"
-import { subprocessNoMistakesRunner } from "../../packages/run/src/no-mistakes"
+import { subprocessNoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
 import type { HistoryRun } from "../../packages/run/src/run-record"
 import { runFull, type RunCheckpoints } from "../../packages/run/src/run-loop"
 import { fakeOps } from "../lib/fake-ops"

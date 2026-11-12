@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { bypassLine, callerTool, parseStandinCall, standinMarker, type StandinCall } from "../../../packages/run/src/dispatch/heavy-standin-runtime"
+import { bypassLine, callerTool, parseStandinCall, standinMarker, type StandinCall } from "../../../packages/run/src/entities/heavy-queue/heavy-standin-runtime"
 
 const call: StandinCall = {
   tool: "cargo",

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { heavyBinDir, heavyGroup, resolveHeavy, withHeavyPath } from "../../../packages/run/src/dispatch/heavy"
+import { heavyBinDir, heavyGroup, resolveHeavy, withHeavyPath } from "../../../packages/run/src/entities/heavy-queue/heavy"
 
 describe("heavy queue paths", () => {
   test("the group is heavy", () => {

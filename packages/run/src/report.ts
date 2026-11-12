@@ -3,7 +3,7 @@ import type { GateRefusal } from "./gate-refusals"
 import type { OrcRunCommit } from "./shared/process/index"
 import type { PiTokenUse } from "./entities/agent/index"
 import { longSessionSignal, type LongSessionCounts } from "./entities/agent/index"
-import type { NoMistakesFinding, NoMistakesRecord } from "./no-mistakes"
+import type { NoMistakesFinding, NoMistakesRecord } from "./entities/review-gate/index"
 import { toFileUrl } from "./run-history"
 import { agentReportFileName } from "./entities/backlog/index"
 

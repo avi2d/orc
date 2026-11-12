@@ -11,7 +11,7 @@ import { openDatabase, recordRun, recordStep } from "../../packages/run/src/run-
 import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "../../packages/run/src/run-resume"
 import type { SandboxKind } from "../../packages/run/src/shared/sandbox/sandbox-kind"
 import { recordResumePublish } from "../../packages/run/src/history-write"
-import { subprocessNoMistakesRunner } from "../../packages/run/src/no-mistakes"
+import { subprocessNoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
 import type { HistoryRun } from "../../packages/run/src/run-record"
 
 const implementer: AgentFile = {

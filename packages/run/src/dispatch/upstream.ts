@@ -1,10 +1,10 @@
 import { Duration, Effect, FileSystem, Option, Result, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { addTask, BacklogError, platformFailure, readIfPresent, scratchName } from "../entities/backlog/index"
-import type { BeatAction } from "./beat-action"
+import type { BeatAction } from "../entities/attention/index"
 import { type Contribution, contributionId, type Project } from "../shared/config/index"
 import { recordEvent } from "../entities/events/index"
-import { gh } from "./pr-view"
+import { gh } from "../entities/pull-request/index"
 import type { RunnerError } from "../shared/process/index"
 
 const IssueState = Schema.Struct({

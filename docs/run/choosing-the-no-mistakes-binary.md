@@ -12,4 +12,4 @@ Orc refuses a binary whose `--version` fails, naming the binary and where to ins
 Orc refuses a release older than v1.90.0, naming its version and the minimum.
 Orc refuses a binary that prints no version.
 A no-mistakes call that fails on an unknown flag or command names v1.90.0 in the run's result.
-`packages/run/src/no-mistakes.ts` drives no-mistakes through the `NoMistakesRunner` interface, and `subprocessNoMistakesRunner` is the runner `packages/run/src/run.ts` builds.
+`packages/run/src/entities/review-gate/no-mistakes.ts` drives no-mistakes through the `NoMistakesRunner` interface, and `subprocessNoMistakesRunner` is the runner `packages/run/src/run.ts` builds.

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { exitCodeOf, queuedAhead, slotTasks, taskState } from "../../../packages/run/src/dispatch/heavy-pueue-task"
+import { exitCodeOf, queuedAhead, slotTasks, taskState } from "../../../packages/run/src/entities/heavy-queue/heavy-pueue-task"
 
 const task = (id: number, priority: number, status: unknown, command = "cmd " + String(id)) => ({
   id, created_at: "2026-11-11T10:00:00+00:00", original_command: command, command, path: "/w", envs: {}, group: "heavy",
