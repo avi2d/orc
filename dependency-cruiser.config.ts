@@ -76,6 +76,13 @@ export default defineConfig({
       to: { path: own + "(widgets|features|entities|shared)/[^/]+/", pathNot: own + "(widgets|features|entities|shared)/[^/]+/index\\.ts$" },
     },
     {
+      name: "unlayered-file",
+      severity: "error",
+      comment: "Every source file of a layered package sits in a layer folder, beside the one entry file.",
+      from: {},
+      to: { path: "^packages/(run|schema)/src/", pathNot: "^packages/(run|schema)/src/((app|widgets|features|entities|shared)/|(bin|index)\\.ts$)" },
+    },
+    {
       name: "layered-imports-unlayered",
       severity: "error",
       comment: "A file inside a layer folder imports no file of its package left outside the layers.",
