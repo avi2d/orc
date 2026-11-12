@@ -34,7 +34,6 @@ export type {
   PiPacing,
   PiEnd,
   PiRun,
-  PiLine,
 } from "./pi-run"
 export {
   orcCompletionLine,
