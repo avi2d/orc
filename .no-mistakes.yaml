@@ -10,6 +10,7 @@ review:
       instructions: |
         The run package ships the orc command.
         dependency-cruiser.config.ts holds it to the panel border, so it reaches another package only through @avi2dg/orc-schema and @avi2dg/orc-ui.
+        Its source sits in the layer folders app, widgets, features, entities and shared, beside bin.ts. A layer imports only the layers below it, and a slice is entered through its index.ts.
     - path: "packages/alerts/**"
       instructions: |
         alerts is a dashboard panel package.
@@ -49,6 +50,7 @@ review:
     - path: "packages/schema/**"
       instructions: |
         Every dashboard package reads its data through the schema package, so it imports no other package.
+        Its source sits in the layer folders app, widgets, features, entities and shared, beside index.ts. A layer imports only the layers below it, and a slice is entered through its index.ts.
     - path: "packages/ui/**"
       instructions: |
         The ui package draws for every panel, so it imports no package but @avi2dg/orc-schema.
