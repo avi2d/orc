@@ -12,6 +12,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/app/args.ts` | The flag parsing for the orc command |
 | `packages/run/src/app/dispatch-args.ts` | The flag parsing for `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` |
 | `packages/run/src/app/dispatch-cli.ts` | The `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
+| `packages/run/src/app/dispatch-args-runner.ts` | The `orc runner` verb parsing and the shared `--json` flag and reach split |
 
 ## widgets/beat
 
@@ -25,7 +26,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/widgets/beat/stall.ts` | The stalled run flag kept in the backlog logs |
 | `packages/run/src/widgets/beat/task-events.ts` | The stall and PR events the beat records for every task |
 | `packages/run/src/widgets/beat/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
-| `packages/run/src/widgets/beat/upstream.ts` | The beat's read of each project's upstream contributions and the scout task a change adds |
+| `packages/run/src/widgets/beat/upstream.ts` | The beat’s read of each project’s upstream contributions and the scout task a change adds |
+| `packages/run/src/widgets/beat/beat-attention.ts` | The beat attention pass: the actions it reports and queues and the questions the decider owns |
 
 ## features/attention-list
 
@@ -40,6 +42,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/backlog-planning/cli-add.ts` | The `orc backlog add` command and the intake split of an over budget request |
 | `packages/run/src/features/backlog-planning/backlog-plan.ts` | The `orc backlog plan` view of a parent plan and the drop of a new child |
 | `packages/run/src/features/backlog-planning/intake-plan.ts` | The planner model ask at intake and its five minute limit |
+| `packages/run/src/features/backlog-planning/backlog-depend.ts` | The task dependency writes and the refusal when a wait would cycle |
+| `packages/run/src/features/backlog-planning/backlog-hold.ts` | The task hold writes and the refusal when a task is already held |
 
 ## features/chat
 
@@ -50,7 +54,14 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/chat/chat-parked.ts` | The chat's listing of parked questions, once per start and once per park |
 | `packages/run/src/features/chat/chat-board.ts` | The chat's decision boards: the cards, the answers they record and the listing at each start |
 | `packages/run/src/features/chat/chat-board-page.ts` | The decision board page and the record of its cards |
-| `packages/run/src/features/chat/chat-lavish.ts` | The `lavish-axi` launcher that opens, reads and ends a board's session |
+| `packages/run/src/features/chat/chat-lavish.ts` | The `lavish-axi` launcher that opens, reads and ends a board’s session |
+| `packages/run/src/features/chat/chat-backlog.ts` | The chat view of the backlog: the open and closed task shapes and the held or parked decision a task waits on |
+| `packages/run/src/features/chat/chat-board-bind.ts` | The binding of waiting decisions to board records and the words a finished card posts |
+| `packages/run/src/features/chat/chat-closed.ts` | The closed task shape and the line the chat posts for it |
+| `packages/run/src/features/chat/chat-command.ts` | The shell a chat tool runs through the shared Bun layers |
+| `packages/run/src/features/chat/chat-error.ts` | The error a chat tool fails with |
+| `packages/run/src/features/chat/chat-inputs.ts` | The chat tool input shapes for add, hold, answer, board and merge |
+| `packages/run/src/features/chat/chat-posts.ts` | The backlog read and the walk that delivers each closed task and event once |
 
 ## features/decider
 
@@ -88,6 +99,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/queueing-a-task/runner-instructions.ts` | The project instructions a start carries to the machine that queues the run |
 | `packages/run/src/features/queueing-a-task/runner-result.ts` | The reading of a task's result and the `orc.runner.v1` JSON |
 | `packages/run/src/features/queueing-a-task/hold.ts` | `orc runner hold`: the wait for a live token, the rerun and the folder removal |
+| `packages/run/src/features/queueing-a-task/cli-stop.ts` | The stop of a started task: the kill, the result read and the close as stopped |
 
 ## features/running-a-task
 
@@ -102,13 +114,17 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/running-a-task/checks.ts` | The check commands `.no-mistakes.yaml` names and their run in the copy |
 | `packages/run/src/features/running-a-task/run-folders.ts` | A run's folders, its copy of the task file and the instructions file `--instructions` names |
 | `packages/run/src/features/running-a-task/history-write.ts` | The history checkpoints a run records as each step starts and ends |
-| `packages/run/src/features/running-a-task/context-mark.ts` | The 150 thousand token compaction mark orc writes into the run's Pi folder |
+| `packages/run/src/features/running-a-task/context-mark.ts` | The 150 thousand token compaction mark orc writes into the run’s Pi folder |
+| `packages/run/src/features/running-a-task/report-run.ts` | The report run: the Pi run that writes a report file instead of opening a PR |
+| `packages/run/src/features/running-a-task/run-deliverer.ts` | The deliverer a run takes: the direct PR opener or the no-mistakes runner |
 
 ## features/seeing-runs
 
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/features/seeing-runs/show.ts` | The `orc show` reading of one run from the history |
+| `packages/run/src/features/seeing-runs/run-history-view.ts` | The `orc runs` table and its `orc.runs.v1` JSON |
+| `packages/run/src/features/seeing-runs/run-scores.ts` | The `orc score` step score writes: the 1 to 5 check, the note and the unknown run and step errors |
 
 ## entities/agent
 
@@ -117,6 +133,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/agent/pi.ts` | The Pi prompt and the check of its final reply |
 | `packages/run/src/entities/agent/pi-run.ts` | The Pi process in JSON mode: its event lines, the agent log, the session file and the idle stop |
 | `packages/run/src/entities/agent/agents.ts` | The agent file parsing and lookup |
+| `packages/run/src/entities/agent/long-session.ts` | The long session watch: the turn and compaction counts, the handover note and the handover prompt |
 
 ## entities/attention
 
@@ -133,6 +150,10 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/backlog/task-record.ts` | The task file and its frontmatter |
 | `packages/run/src/entities/backlog/task-dependency.ts` | The child counts and the waits on dependencies and merged siblings |
 | `packages/run/src/entities/backlog/split.ts` | The `orc.split.v1` planner document and the parent with vertical slice children it applies |
+| `packages/run/src/entities/backlog/backlog-write.ts` | The backlog file helpers: the error, the scratch publish, the folder paths and the file take |
+| `packages/run/src/entities/backlog/runner-label.ts` | The task branch names, the run labels and the file keys the runner files use |
+| `packages/run/src/entities/backlog/task-kind.ts` | The task kinds `ship`, `scout`, `task` and `parent`, the agent report file name and the run folder |
+| `packages/run/src/entities/backlog/task-record-render.ts` | The task file rendering from a task record |
 
 ## entities/events
 
@@ -140,6 +161,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/entities/events/events.ts` | The chat events under `events/`, their posted marks and the alert fires the backlog lists |
 | `packages/run/src/entities/events/alert-events.ts` | The reading of each `alerts.jsonl` line as one alert fire |
+| `packages/run/src/entities/events/chat-event.ts` | The chat event shape: its key, time and text |
 
 ## entities/heavy-queue
 
@@ -167,13 +189,16 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/entities/pull-request/pr-view.ts` | The `gh pr view` reading of a task's PR and its check verdicts |
 | `packages/run/src/entities/pull-request/merge-basis.ts` | The `captain-word` and `yolo-green` bases `orc merge` takes |
+| `packages/run/src/entities/pull-request/direct-pr.ts` | The direct PR opener: the push, the existing check and the create, and the opened or failed record |
 
 ## entities/review-gate
 
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/entities/review-gate/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
-| `packages/run/src/entities/review-gate/answer-wait.ts` | The wait at a no-mistakes gate for the captain's answers in the run folder |
+| `packages/run/src/entities/review-gate/answer-wait.ts` | The wait at a no-mistakes gate for the captain’s answers in the run folder |
+| `packages/run/src/entities/review-gate/no-mistakes-drive-log.ts` | The no-mistakes drive log: the run record it keeps and the ending it reports |
+| `packages/run/src/entities/review-gate/no-mistakes-gate.ts` | The no-mistakes gate output parsing: the findings, the open questions, the gate answers and the respond arguments |
 
 ## entities/run-history
 
@@ -181,7 +206,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/entities/run-history/report.ts` | The `report.md` shape and the signal facts it carries |
 | `packages/run/src/entities/run-history/run-history.ts` | The records home, the SQLite run history and `orc runs` |
-| `packages/run/src/entities/run-history/gate-refusals.ts` | The gate and rule parse from a failed check's output, the `refusal` history signals and `orc refusals` |
+| `packages/run/src/entities/run-history/gate-refusals.ts` | The gate and rule parse from a failed check’s output, the `refusal` history signals and `orc refusals` |
+| `packages/run/src/entities/run-history/history-resume.ts` | The resume reads from the run history: the latest run for a branch, its steps, its check rounds and its fixes |
 
 ## entities/task-copy
 
@@ -208,6 +234,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/shared/config/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `packages/run/src/shared/config/dispatch-config.ts` | The reading of `dispatch.json` and `projects.json` |
 | `packages/run/src/shared/config/machine-reach.ts` | The sweep ownership check and the remote command prefix |
+| `packages/run/src/shared/config/delivery.ts` | The delivery modes and the run delivery a project and its tasks take |
 
 ## shared/lib
 
@@ -216,6 +243,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/shared/lib/run-session.ts` | The `OrcRunError` a run fails with |
 | `packages/run/src/shared/lib/toon.ts` | The reading of the TOON output no-mistakes prints |
 | `packages/run/src/shared/lib/table.ts` | The table formatter the runs and refusals listings share |
+| `packages/run/src/shared/lib/run-id.ts` | The new run id from the timestamp and a random part |
 
 ## shared/process
 
@@ -224,6 +252,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/shared/process/git-run.ts` | The git calls orc makes on the host with the operator's git config hidden |
 | `packages/run/src/shared/process/runner-error.ts` | The runner's error |
 | `packages/run/src/shared/process/pueue-status.ts` | The pueue status shapes and the held-task lookup the runner reads |
+| `packages/run/src/shared/process/runner-exec.ts` | The process running helpers: the quiet spawn, the output capture, the pueue call, the JSON reads and the group setup |
 
 ## shared/sandbox
 
