@@ -1,7 +1,7 @@
 import { Console, DateTime, Duration, Effect, FileSystem, Option } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { heldExpiry, heldTokenDir, releaseHeldToken } from "./held-token"
-import { fileKeyOf, labelOf } from "./runner"
+import { fileKeyOf, labelOf } from "../entities/backlog/index"
 import { RunnerError } from "../shared/process/index"
 import { type Command } from "../shared/process/index"
 import { tokenLive } from "./token"

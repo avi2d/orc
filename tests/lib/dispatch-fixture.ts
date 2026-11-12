@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { BunFileSystem } from "@effect/platform-bun";
 import { Effect, Layer } from "effect";
 import { type Command, CommandRunner, CommandUnreachable } from "@avi2dg/orc-schema";
-import { listTasks } from "../../packages/run/src/dispatch/backlog";
+import { listTasks } from "../../packages/run/src/entities/backlog/index";
 import { backlogJson } from "../../packages/run/src/dispatch/board";
 import { mergedIds } from "../../packages/run/src/dispatch/events";
 

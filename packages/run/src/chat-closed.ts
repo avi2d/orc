@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { HoldJson, ParkedJson } from "./chat-parked"
-import { taskKinds } from "./task-kind"
+import { taskKinds } from "./entities/backlog/index"
 
 export const ClosedTask = Schema.Struct({
   id: Schema.String,

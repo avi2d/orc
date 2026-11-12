@@ -3,7 +3,7 @@ import type { ChildProcessSpawner } from "effect/process"
 import { providerEnvOf } from "../shared/config/index"
 import { readOrcConfig } from "../shared/config/index"
 import { capture } from "../shared/process/index"
-import { childBudget, type PlanDocument, readPlanDocument, splitDocumentSchema } from "./split"
+import { childBudget, type PlanDocument, readPlanDocument, splitDocumentSchema } from "../entities/backlog/index"
 
 const planSeconds = 300
 

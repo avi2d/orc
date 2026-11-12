@@ -1,6 +1,6 @@
 import { Option, Schema } from "effect"
 import type { AgentFile } from "./agents"
-import { childBudget, splitJsonSchema } from "./dispatch/split"
+import { childBudget, splitJsonSchema } from "./entities/backlog/index"
 
 export const orcCompletionLine = "ORC_COMPLETE"
 export const orcSplitLine = "ORC_SPLIT"

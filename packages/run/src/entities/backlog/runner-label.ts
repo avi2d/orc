@@ -1,5 +1,5 @@
-import { parentLabel, taskLabel } from "../shared/process/index"
-import type { TaskKind } from "../task-kind"
+import { parentLabel, taskLabel } from "../../shared/process/index"
+import type { TaskKind } from "./task-kind"
 
 export const taskBranch = (task: string): string => "orc/" + task
 

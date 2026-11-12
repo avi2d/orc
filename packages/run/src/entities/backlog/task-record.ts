@@ -1,5 +1,5 @@
 import { Array as Arr, Data, Effect, Schema } from "effect"
-import { isTaskKind, type TaskKind, unknownKind } from "../task-kind"
+import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
 
 export const taskFolders = ["new", "taken", "closed"] as const
 export type TaskFolder = typeof taskFolders[number]

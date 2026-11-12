@@ -5,15 +5,13 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Layer } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
+import { addTask, claimTask, listTasks, writeTaken, type TaskRecord, type TaskKind } from "../../../packages/run/src/entities/backlog/index"
 import { placeTask, runBeat } from "../../../packages/run/src/dispatch/beat"
 import { quietSources } from "../../lib/beat-sources"
 import { formatBeat } from "../../../packages/run/src/dispatch/board"
 import type { DispatchConfig, Project } from "../../../packages/run/src/shared/config/dispatch-config"
 import { taskLabel } from "../../../packages/run/src/shared/process/pueue-status"
-import type { TaskRecord } from "../../../packages/run/src/dispatch/task-record"
 import { insertRun, openDatabase } from "../../../packages/run/src/run-history"
-import type { TaskKind } from "../../../packages/run/src/task-kind"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))

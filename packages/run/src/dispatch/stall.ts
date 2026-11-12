@@ -1,10 +1,8 @@
 import { DateTime, Effect, FileSystem, Option } from "effect"
-import { backlogPaths, type BacklogError } from "./backlog"
+import { backlogPaths, type BacklogError, platformFailure, type TaskRecord } from "../entities/backlog/index"
 import type { StalledAction } from "./beat-action"
 import { stallEvent } from "./task-events"
 import type { Progress } from "./beat-action"
-import { platformFailure } from "./backlog-write"
-import type { TaskRecord } from "./task-record"
 
 export const stallMillis = 30 * 60 * 1000
 

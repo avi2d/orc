@@ -54,8 +54,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/shared/sandbox/host.ts` | The host-side processes and tools orc runs outside nono, and the guard on host git |
 | `packages/run/src/shared/sandbox/nono-profile.ts` | The nono profile that lets a command write only the copy, its git data, the Pi session folder and the run's `sessions` folder, and routes the model credential |
 | `packages/run/src/shared/sandbox/git-config.ts` | The git config parsing that finds the credentials, includes and submodules a checkout carries |
-| `packages/run/src/dispatch/backlog.ts` | The backlog folders, the id reservation and the atomic take of a task |
-| `packages/run/src/dispatch/task-record.ts` | The task file and its frontmatter |
+| `packages/run/src/entities/backlog/backlog.ts` | The backlog folders, the id reservation and the atomic take of a task |
+| `packages/run/src/entities/backlog/task-record.ts` | The task file and its frontmatter |
 | `packages/run/src/dispatch/parked.ts` | Parking a run's task on its questions, and the answer to a hold or a question |
 | `packages/run/src/shared/config/dispatch-config.ts` | The reading of `dispatch.json` and `projects.json` |
 | `packages/run/src/dispatch/quota.ts` | The quota reading from the configured command and the pick of an account |
@@ -72,7 +72,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/decider-ask.ts` | The decider's call, Pi on `models.decider` with the policy as its system prompt and no tools |
 | `packages/run/agents/decider-policy.md` | The written policy the decider answers under |
 | `packages/run/src/dispatch/events.ts` | The chat events under `events/`, their posted marks and the alert fires the backlog lists |
-| `packages/run/src/dispatch/task-dependency.ts` | The child counts and the waits on dependencies and merged siblings |
+| `packages/run/src/entities/backlog/task-dependency.ts` | The child counts and the waits on dependencies and merged siblings |
 | `packages/run/src/dispatch/task-events.ts` | The stall and PR events the beat records for every task |
 | `packages/run/src/dispatch/alert-events.ts` | The reading of each `alerts.jsonl` line as one alert fire |
 | `packages/run/src/dispatch/alert-stream.ts` | The one alert stream `orc runner start` queues in pueue |
@@ -92,7 +92,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/dispatch/cli-add.ts` | The `orc backlog add` command and the intake split of an over budget request |
 | `packages/run/src/dispatch/backlog-plan.ts` | The `orc backlog plan` view of a parent plan and the drop of a new child |
 | `packages/run/src/dispatch/intake-plan.ts` | The planner model ask at intake and its five minute limit |
-| `packages/run/src/dispatch/split.ts` | The `orc.split.v1` planner document and the parent with vertical slice children it applies |
+| `packages/run/src/entities/backlog/split.ts` | The `orc.split.v1` planner document and the parent with vertical slice children it applies |
 | `packages/run/src/dispatch/cli.ts` | The `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
 | `packages/run/src/dispatch/merge.ts` | The `orc merge` guard and squash-merge |
 | `packages/run/src/dispatch/merge-basis.ts` | The `captain-word` and `yolo-green` bases `orc merge` takes |

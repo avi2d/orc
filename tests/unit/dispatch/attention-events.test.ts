@@ -8,11 +8,10 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { TestClock } from "effect/testing"
 import { parseDispatchArgs } from "../../../packages/run/src/dispatch/args"
 import { answerItem, openItem, openItems, openRunDeaths, routeTaskItems } from "../../../packages/run/src/dispatch/attention"
-import { addTask, claimTask, closeStartedTask, writeTaken } from "../../../packages/run/src/dispatch/backlog"
+import { addTask, claimTask, closeStartedTask, writeTaken, type TaskRecord } from "../../../packages/run/src/entities/backlog/index"
 import { runBeat } from "../../../packages/run/src/dispatch/beat"
 import { formatBeat } from "../../../packages/run/src/dispatch/board"
 import type { PullRequestView } from "../../../packages/run/src/dispatch/pr-view"
-import type { TaskRecord } from "../../../packages/run/src/dispatch/task-record"
 import { quietSources, uncheckedOpen } from "../../lib/beat-sources"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>

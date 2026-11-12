@@ -1,6 +1,6 @@
 import { Effect } from "effect"
 import type { BeatSources } from "../../packages/run/src/dispatch/beat"
-import { BacklogError } from "../../packages/run/src/dispatch/backlog-write"
+import { BacklogError } from "../../packages/run/src/entities/backlog/index"
 import { type ReadLoad, readMachineLoad } from "../../packages/run/src/dispatch/load"
 import type { PullRequestView } from "../../packages/run/src/dispatch/pr-view"
 import type { ReadPullRequest } from "../../packages/run/src/dispatch/task-events"

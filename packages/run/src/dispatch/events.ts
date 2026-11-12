@@ -1,7 +1,6 @@
 import { Effect, FileSystem, Schema } from "effect"
 import { alertFires } from "./alert-events"
-import { BacklogError, platformFailure, publishOnce } from "./backlog-write"
-import { readNames } from "./backlog"
+import { BacklogError, platformFailure, publishOnce, readNames } from "../entities/backlog/index"
 import type { ChatEvent } from "./chat-event"
 
 const keyPattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
