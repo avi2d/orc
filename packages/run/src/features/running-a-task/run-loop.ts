@@ -281,11 +281,18 @@ const runChecksFixLoop = (
 ): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
     const pending = resumedFix(plan)
-    const retriedPaused = pending !== null && loopAnswerOf(plan.answers)?.kind === "continue" && fixes.length > 0
-    if (retriedPaused) {
+    const prior = fixes.length > 0 ? fixes[fixes.length - 1] : undefined
+    if (prior !== undefined && prior.status === "failed" && loopAnswerOf(plan.answers)?.kind === "continue") {
       fixes.pop()
+      yield* checkpoints.fixStart(prior.attempt, new Date().toISOString())
+      const retried = yield* fixOnce(run, ops.runAgent, prior.evidenceIn, prior.attempt, pending, checkpoints)
+      fixes.push(retried.fix)
+      yield* checkpoints.fixDone(retried.fix)
+      commits.push(...retried.commits)
+      if (retried.paused !== null) {
+        return { ...base, commits, completed: false, checksRounds: rounds, fixes, fixAttempts: fixes.length, endReason: retried.paused }
+      }
     }
-    const resumedCount = fixes.length
     for (let round = 1; round <= maxFixAttempts + 1; round += 1) {
       const started = new Date().toISOString()
       yield* checkpoints.checksRoundStart(round, started)
@@ -323,7 +330,7 @@ const runChecksFixLoop = (
       }
       const attempt = fixes.length + 1
       yield* checkpoints.fixStart(attempt, new Date().toISOString())
-      const fixed = yield* fixOnce(run, ops.runAgent, outcome.file, attempt, fixes.length === resumedCount && (retriedPaused || attempt === 1) ? pending : null, checkpoints)
+      const fixed = yield* fixOnce(run, ops.runAgent, outcome.file, attempt, attempt === 1 ? resumedFix(plan) : null, checkpoints)
       fixes.push(fixed.fix)
       yield* checkpoints.fixDone(fixed.fix)
       commits.push(...fixed.commits)

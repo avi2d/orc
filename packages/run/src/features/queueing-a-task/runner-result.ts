@@ -82,7 +82,7 @@ const reportEnding = (result: FinishedResult): RunEnding => {
     return { kind: "close", outcome: "done", reason: "the run wrote its report", pr: null, report }
   }
   if (report !== null) {
-    return { kind: "close", outcome: "failed", reason: result.run?.endReason ?? result.reason, pr: null, report }
+    return { kind: "close", outcome: "failed", reason: result.run?.endReason ?? (result.status === "failed" ? result.reason : "the run failed"), pr: null, report }
   }
   const why = result.status === "failed" ? (result.run?.endReason ?? result.reason) : result.run?.endReason ?? "pueue task " + result.pueueTask + " succeeded"
   return { kind: "close", outcome: "failed", reason: "the run wrote no report: " + why, pr: null, report: null }

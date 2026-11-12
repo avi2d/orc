@@ -46,7 +46,7 @@ export const askOnLoop = (runDir: string, waitSeconds: number, end: Looping): Ef
 export const loopGuidance = (words: string): string =>
   [
     "orc paused you because one command failed " + pauseAfterFailures.toString() + " times in a row, and the captain answered: " + words,
-    "Do not run that command again unchanged. Find out why it fails, or reach the task another way."
+    "Find out why it fails, or reach the task another way."
   ].join("\n")
 
 export const loopContinuePrompt = (words: string): string =>
