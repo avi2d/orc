@@ -2,6 +2,14 @@ import { defineConfig, DEV_ONLY } from "@avi2dg/checks/dependency-cruiser";
 
 const pkg = "^packages/([^/]+)/src/";
 const own = "^packages/$1/src/";
+const unlayered = {
+  path: "^packages/(run|schema)/src/",
+  pathNot: [
+    "^packages/(run|schema)/src/(app|widgets|features|entities|shared)/",
+    "^packages/run/src/bin\\.ts$",
+    "^packages/schema/src/index\\.ts$",
+  ],
+};
 const below = (layer: string, above: string) => ({
   name: layer + "-imports-higher-layer",
   severity: "error" as const,
@@ -80,27 +88,13 @@ export default defineConfig({
       severity: "error",
       comment: "Every source file of a layered package sits in a layer folder, beside the one entry file.",
       from: {},
-      to: {
-        path: "^packages/(run|schema)/src/",
-        pathNot: [
-          "^packages/(run|schema)/src/(app|widgets|features|entities|shared)/",
-          "^packages/run/src/bin\\.ts$",
-          "^packages/schema/src/index\\.ts$",
-        ],
-      },
+      to: unlayered,
     },
     {
       name: "unlayered-file-imports",
       severity: "error",
-      comment: "Every source file of a layered package sits in a layer folder, beside the one entry file.",
-      from: {
-        path: "^packages/(run|schema)/src/",
-        pathNot: [
-          "^packages/(run|schema)/src/(app|widgets|features|entities|shared)/",
-          "^packages/run/src/bin\\.ts$",
-          "^packages/schema/src/index\\.ts$",
-        ],
-      },
+      comment: "A file outside the layer folders imports nothing.",
+      from: unlayered,
       to: {},
     },
     {
