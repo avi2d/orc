@@ -36,7 +36,9 @@
     ]
   },
   "devDependencies": {
-    "@avi2dg/checks": "0.93.0",
+    "@stryker-mutator/core": "10.0.0",
+    "@hughescr/stryker-bun-runner": "1.4.0",
+    "@avi2dg/checks": "0.94.0",
     "@effect/platform-bun": "4.0.0",
     "@effect/tsgo": "0.45.0",
     "effect": "4.0.0",
