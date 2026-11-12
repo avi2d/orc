@@ -1,6 +1,6 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
-import type { TaskKind } from "../task-kind"
-import { addTask, backlogPaths, backlogRoot, BacklogError, listTasks } from "./backlog"
+import type { TaskKind } from "../entities/backlog/index"
+import { addTask, backlogPaths, backlogRoot, BacklogError, listTasks } from "../entities/backlog/index"
 import { refusedLinks } from "./backlog-depend"
 import { checkoutOn, readDispatchConfig, readProjects } from "../shared/config/index"
 import { recordEvent } from "./events"
@@ -8,8 +8,8 @@ import { type IntakePlan, planIntake } from "./intake-plan"
 import { type ConfigError, readFailure } from "../shared/config/index"
 import type { ChildProcessSpawner } from "effect/process"
 import type { RunnerError } from "../shared/process/index"
-import { applySplit, splitEventText, type SplitRequest } from "./split"
-import type { TaskFileError, TaskRecord } from "./task-record"
+import { applySplit, splitEventText, type SplitRequest } from "../entities/backlog/index"
+import type { TaskFileError, TaskRecord } from "../entities/backlog/index"
 
 export type TaskSource = { readonly kind: "file"; readonly path: string } | { readonly kind: "stdin" }
 

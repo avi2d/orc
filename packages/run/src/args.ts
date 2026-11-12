@@ -1,6 +1,6 @@
 import { type DispatchArgs, parseDispatchArgs } from "./dispatch/args"
 import { askUserWord, type QuestionAnswer } from "./no-mistakes"
-import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
+import { isTaskKind, type TaskKind, unknownKind } from "./entities/backlog/index"
 import { isRunDelivery, type RunDelivery, runDeliveries } from "./shared/config/index"
 import { sandboxKinds, type SandboxKind } from "./shared/sandbox/index"
 export const defaultSandbox: SandboxKind = "nono"

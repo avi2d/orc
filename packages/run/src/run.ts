@@ -21,7 +21,7 @@ import { failedReport, writeEvidence, writeHandover, writeReport, type HistoryRu
 import { longSessionWarning, type LongSessionCounts } from "./long-session"
 import { runFull, type RunCheckpoints, type SandboxOps } from "./run-loop"
 import { type ReportOutcome, type ReportRun, runReport } from "./report-run"
-import { runDirFor, type ReportKind } from "./task-kind"
+import { runDirFor, type ReportKind } from "./entities/backlog/index"
 import { noMistakesBinary, noMistakesVersionProblem, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "./no-mistakes"
 import { newRunId } from "./shared/lib/index"
 import { prepareRunFolders, type RunFolders, runInstructions } from "./run-folders"

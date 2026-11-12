@@ -9,7 +9,7 @@ import { idleSpan, type PiPacing, runPi } from "./pi-run"
 import { historyFailure, recordRun, updateRun } from "./run-history"
 import type { OrcRunError } from "./shared/lib/index"
 import { reportPathOf, writtenReport } from "./report"
-import type { ReportKind } from "./task-kind"
+import type { ReportKind } from "./entities/backlog/index"
 
 export interface ReportRun {
   readonly kind: ReportKind

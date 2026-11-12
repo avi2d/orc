@@ -1,6 +1,6 @@
 import { Effect, FileSystem } from "effect"
-import { BacklogError, findTask, isTaskId, type Rewrite, rewriteNew } from "./backlog"
-import { openQuestions, type TaskFileError, type TaskRecord } from "./task-record"
+import { BacklogError, findTask, isTaskId, type Rewrite, rewriteNew } from "../entities/backlog/index"
+import { openQuestions, type TaskFileError, type TaskRecord } from "../entities/backlog/index"
 
 const waitsFor = (id: string, tasks: ReadonlyArray<TaskRecord>): ReadonlyArray<string> => [
   ...(tasks.find((task) => task.spec.id === id)?.spec.dependsOn ?? []),

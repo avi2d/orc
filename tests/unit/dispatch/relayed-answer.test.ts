@@ -4,9 +4,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run/src/dispatch/backlog"
+import { addTask, claimTask, listTasks, writeTaken } from "../../../packages/run/src/entities/backlog/index"
 import { answersFor, answerTask, askStartedTask, handAnswersToResume, markAnswersRelayed, parkStartedTask } from "../../../packages/run/src/dispatch/parked"
-import type { TaskRecord } from "../../../packages/run/src/dispatch/task-record"
+import type { TaskRecord } from "../../../packages/run/src/entities/backlog/index"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))

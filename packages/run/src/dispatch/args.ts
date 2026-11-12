@@ -1,11 +1,11 @@
-import { isTaskId } from "./backlog"
+import { isTaskId } from "../entities/backlog/index"
 import { parseJsonFlag, parseRunner, unexpected, type DispatchArgs } from "./args-runner"
 import type { TaskSource } from "./cli-add"
 
 export type { DispatchArgs }
 import { isEventKey } from "./events"
-import { isCalendarDate } from "./task-record"
-import { isTaskKind, type TaskKind, unknownKind } from "../task-kind"
+import { isCalendarDate } from "../entities/backlog/index"
+import { isTaskKind, type TaskKind, unknownKind } from "../entities/backlog/index"
 import { isMergeBasis, mergeBases } from "./merge-basis"
 
 export const dispatchUsage =

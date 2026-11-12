@@ -1,9 +1,9 @@
 import { Effect, FileSystem } from "effect"
-import { backlogPaths, BacklogError, listTasks } from "./backlog"
-import { grabbedFile, scratchName, takeFile } from "./backlog-write"
-import { childCount, dependencyWaits } from "./task-dependency"
+import { backlogPaths, BacklogError, listTasks } from "../entities/backlog/index"
+import { grabbedFile, scratchName, takeFile } from "../entities/backlog/index"
+import { childCount, dependencyWaits } from "../entities/backlog/index"
 import { mergedIds } from "./events"
-import { isHeld, parseTaskFile, type TaskFileError, type TaskRecord } from "./task-record"
+import { isHeld, parseTaskFile, type TaskFileError, type TaskRecord } from "../entities/backlog/index"
 
 type Requirements = FileSystem.FileSystem
 

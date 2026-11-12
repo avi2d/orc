@@ -1,11 +1,11 @@
 import { type BeatAction, type BeatReport, type MachineRoom } from "./beat"
 import { taskWait } from "./beat-place"
-import { type ChildCount, childCount, dependencyWaits } from "./task-dependency"
+import { type ChildCount, childCount, dependencyWaits } from "../entities/backlog/index"
 import type { Project } from "../shared/config/index"
 import { describeQuota } from "./quota"
-import type { TaskKind } from "../task-kind"
+import type { TaskKind } from "../entities/backlog/index"
 import type { ChatEvent } from "./chat-event"
-import { answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, type SplitMark, type Started, type TaskRecord } from "./task-record"
+import { answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, type SplitMark, type Started, type TaskRecord } from "../entities/backlog/index"
 
 const BACKLOG_JSON_SCHEMA = "orc.backlog.v1" as const
 const BEAT_JSON_SCHEMA = "orc.beat.v1" as const

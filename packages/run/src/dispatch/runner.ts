@@ -3,12 +3,12 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { decodeJson, decodeSecret, ensureGroup, pueue, type Command, type Reach } from "../shared/process/index"
 import { AbsolutePath, readFailure } from "../shared/config/index"
 import { ProviderId, readOrcConfig } from "../shared/config/index"
-import { TaskId } from "./backlog"
+import { TaskId } from "../entities/backlog/index"
 import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldToken } from "./held-token"
 import { heldTask, orcGroup, parentLabel, PueueState, PueueStatus, taskLabel, type PueueTask } from "../shared/process/index"
-import { parseTaskFile } from "./task-record"
-import { reportKinds } from "../task-kind"
-import { fileKeyOf, labelOf, parentBranch, runLabel, taskBranch } from "./runner-label"
+import { parseTaskFile } from "../entities/backlog/index"
+import { reportKinds } from "../entities/backlog/index"
+import { fileKeyOf, labelOf, parentBranch, runLabel, taskBranch } from "../entities/backlog/index"
 import { readInstructions, TaskInstructions, writeInstructions } from "./runner-instructions"
 import { RunnerError } from "../shared/process/index"
 import { runsForBranch } from "../history-resume"
@@ -42,7 +42,7 @@ type QueueRequest = typeof QueueRequest.Type
 
 export type RunnerRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
 
-export { fileKeyOf, labelOf, parentBranch, runLabel } from "./runner-label"
+export { fileKeyOf, labelOf, parentBranch, runLabel } from "../entities/backlog/index"
 
 export const refuse = (detail: string): Effect.Effect<never, RunnerError> => Effect.fail(new RunnerError({ detail }))
 

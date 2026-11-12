@@ -5,7 +5,7 @@ import type { PiTokenUse } from "./pi"
 import { longSessionSignal, type LongSessionCounts } from "./long-session"
 import type { NoMistakesFinding, NoMistakesRecord } from "./no-mistakes"
 import { toFileUrl } from "./run-history"
-import { agentReportFileName } from "./task-kind"
+import { agentReportFileName } from "./entities/backlog/index"
 
 export const reportFileName = "report.md"
 
