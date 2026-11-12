@@ -3,7 +3,7 @@ import { mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
-import { openDatabase, recordRun } from "../../packages/run/src/run-history"
+import { openDatabase, recordRun } from "../../packages/run/src/entities/run-history/index"
 import { binPath, fakeQuota, type Fixture, mainToken, type OrcResult, orcOk, orcThere, queuedArgs, queuedEnv, resultJson, RunnerRun, runnerTimeout, runOrc, startWaitMillis, withFixture } from "./runner-helpers"
 
 const queueWith = (fixture: Fixture, request: object, env: Record<string, string> = {}): Promise<OrcResult> =>

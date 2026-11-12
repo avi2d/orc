@@ -7,7 +7,7 @@ import { Effect, Layer, Schema } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { addTask, claimTask } from "../../../packages/run/src/entities/backlog/index"
 import { holdTask } from "../../../packages/run/src/dispatch/backlog-hold"
-import { answerTask } from "../../../packages/run/src/dispatch/parked"
+import { answerTask } from "../../../packages/run/src/entities/parked-runs/index"
 import { startTask } from "../../../packages/run/src/dispatch/runner"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>

@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
 import type { Database } from "bun:sqlite"
-import { openDatabase, recordRun } from "../../packages/run/src/run-history"
+import { openDatabase, recordRun } from "../../packages/run/src/entities/run-history/index"
 
 interface OrcResult {
   readonly exitCode: number

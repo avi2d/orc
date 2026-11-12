@@ -17,7 +17,7 @@ import {
   recordSignal,
   recordStep,
   type RunRecord,
-} from "../../packages/run/src/run-history"
+} from "../../packages/run/src/entities/run-history/index"
 import { formatRunsTable, runsJson } from "../../packages/run/src/run-history-view"
 
 const withHome = async (use: (home: string) => Promise<void>): Promise<void> => {

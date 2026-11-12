@@ -13,7 +13,7 @@ import {
   recordScore,
   recordSignal,
   recordStep
-} from "../../packages/run/src/run-history"
+} from "../../packages/run/src/entities/run-history/index"
 import { decodeRunsJson, encodeRunsJson } from "../../packages/run/src/run-history-view"
 import { InvalidScore, recordStepScore, UnknownRun, UnknownStep } from "../../packages/run/src/run-scores"
 import { decodeShowJson, encodeShowJson, formatShow, readShow } from "../../packages/run/src/show"

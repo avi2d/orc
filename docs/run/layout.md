@@ -33,7 +33,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/shared/process/git-run.ts` | The git calls orc makes on the host with the operator's git config hidden |
 | `packages/run/src/run-folders.ts` | A run's folders, its copy of the task file and the instructions file `--instructions` names |
 | `packages/run/src/history-write.ts` | The history checkpoints a run records as each step starts and ends |
-| `packages/run/src/report.ts` | The `report.md` shape and the signal facts it carries |
+| `packages/run/src/entities/run-history/report.ts` | The `report.md` shape and the signal facts it carries |
 | `packages/run/src/show.ts` | The `orc show` reading of one run from the history |
 | `packages/run/src/shared/lib/run-session.ts` | The `OrcRunError` a run fails with |
 | `packages/run/src/entities/agent/pi.ts` | The Pi prompt and the check of its final reply |
@@ -44,8 +44,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/review-gate/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
 | `packages/run/src/entities/review-gate/answer-wait.ts` | The wait at a no-mistakes gate for the captain's answers in the run folder |
 | `packages/run/src/shared/lib/toon.ts` | The reading of the TOON output no-mistakes prints |
-| `packages/run/src/run-history.ts` | The records home, the SQLite run history and `orc runs` |
-| `packages/run/src/gate-refusals.ts` | The gate and rule parse from a failed check's output, the `refusal` history signals and `orc refusals` |
+| `packages/run/src/entities/run-history/run-history.ts` | The records home, the SQLite run history and `orc runs` |
+| `packages/run/src/entities/run-history/gate-refusals.ts` | The gate and rule parse from a failed check's output, the `refusal` history signals and `orc refusals` |
 | `packages/run/src/shared/lib/table.ts` | The table formatter the runs and refusals listings share |
 | `packages/run/src/shared/sandbox/nono.ts` | The nono sandbox environment, its roots and the `nono why` check of a rendered profile |
 | `packages/run/src/shared/sandbox/nono-exec.ts` | The opening of the nono sandbox a run's commands go through: the runtimes, the shims and the checked profile |
@@ -56,7 +56,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/shared/sandbox/git-config.ts` | The git config parsing that finds the credentials, includes and submodules a checkout carries |
 | `packages/run/src/entities/backlog/backlog.ts` | The backlog folders, the id reservation and the atomic take of a task |
 | `packages/run/src/entities/backlog/task-record.ts` | The task file and its frontmatter |
-| `packages/run/src/dispatch/parked.ts` | Parking a run's task on its questions, and the answer to a hold or a question |
+| `packages/run/src/entities/parked-runs/parked.ts` | Parking a run's task on its questions, and the answer to a hold or a question |
 | `packages/run/src/shared/config/dispatch-config.ts` | The reading of `dispatch.json` and `projects.json` |
 | `packages/run/src/dispatch/quota.ts` | The quota reading from the configured command and the pick of an account |
 | `packages/run/src/dispatch/beat.ts` | The beat: room, placement, take and start |

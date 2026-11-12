@@ -3,7 +3,7 @@ import { chmod, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { insertSignal, insertStep, openDatabase, recordRun } from "../../packages/run/src/run-history"
+import { insertSignal, insertStep, openDatabase, recordRun } from "../../packages/run/src/entities/run-history/index"
 import { binPath, fakeQuota, type Fixture, isRecord, mainToken, orcOk, queuedArgs, runnerTimeout, runOrc, withFixture } from "./runner-helpers"
 
 const startOnLinux = async (fixture: Fixture): Promise<void> => {

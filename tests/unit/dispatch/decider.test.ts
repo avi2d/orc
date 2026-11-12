@@ -9,7 +9,7 @@ import { attentionJson, attentionText } from "../../../packages/run/src/dispatch
 import { claimDeciding, openItems, readAttention, routeTaskItems } from "../../../packages/run/src/entities/attention/attention"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/entities/backlog/index"
 import { type AskDecider, DeciderUnheard, decideReviewQuestions, type DeciderRequest } from "../../../packages/run/src/dispatch/decider"
-import { answerTask, askStartedTask, parkStartedTask } from "../../../packages/run/src/dispatch/parked"
+import { answerTask, askStartedTask, parkStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))

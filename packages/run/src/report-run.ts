@@ -6,9 +6,9 @@ import type { AgentFile } from "./entities/agent/index"
 import type { SandboxKind } from "./shared/sandbox/index"
 import { orcCompletionLine } from "./entities/agent/index"
 import { idleSpan, type PiPacing, runPi } from "./entities/agent/index"
-import { historyFailure, recordRun, updateRun } from "./run-history"
+import { historyFailure, recordRun, updateRun } from "./entities/run-history/index"
 import type { OrcRunError } from "./shared/lib/index"
-import { reportPathOf, writtenReport } from "./report"
+import { reportPathOf, writtenReport } from "./entities/run-history/index"
 import type { ReportKind } from "./entities/backlog/index"
 
 export interface ReportRun {

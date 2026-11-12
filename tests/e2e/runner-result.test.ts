@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
-import { openDatabase, recordRun } from "../../packages/run/src/run-history"
+import { openDatabase, recordRun } from "../../packages/run/src/entities/run-history/index"
 import { binPath, fakeQuota, isRecord, orcOk, orcThere, resultJson, RunnerRun, runnerTimeout, runOrc, waitForAddedTasks, withFixture, writeTwoHomeDispatches, type Fixture } from "./runner-helpers"
 
 describe("orc runner result", () => {
