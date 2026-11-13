@@ -58,6 +58,15 @@ Select a project to filter the lanes, or select All to show every project.
 Select a card to mark it.
 Each lane lists its tasks oldest first.
 
+## Recapture the Board screenshot
+
+The committed shot is the proof of the two-line clip.
+The garden-6 title wraps to three lines and shows exactly two, with no word cut.
+To recapture it, run `packages/herdr-app/scripts/capture-board.sh <fixture-dir> <output-png>` with a scratch `HOME` and an `HC_SESSION` starting with `fm-lab-`.
+Use `tests/fixtures/herdr-board` as the fixture folder.
+The script refuses the login `HOME`, keeps the scratch App off the live core, and quits only the App it started.
+The live core's processes and terminals read the same before and after.
+
 ## Follow a run in the Agents tab
 
 The Agents tab lists one card for each run, and one for each task still to start.
