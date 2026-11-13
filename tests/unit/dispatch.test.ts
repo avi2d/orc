@@ -3,7 +3,8 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, FileSystem, Layer, Result } from "effect"
+import { Effect, Fiber, FileSystem, Layer, Result } from "effect"
+import { TestClock } from "effect/testing"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../packages/run/src/app/dispatch-args"
 import { addTask, claimTask, closeStartedTask, listTasks, releaseTask, writeTaken, type TaskRecord, renderTaskFile } from "../../packages/run/src/entities/backlog/index"
@@ -472,6 +473,16 @@ const pueueInstead = (onPueue: ReturnType<typeof ChildProcessSpawner.ChildProces
 const beatWith = (root: string, spawner: BeatSpawner) =>
   Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
 
+const beatWithTestClock = (root: string, spawner: BeatSpawner) =>
+  Effect.runPromise(
+    Effect.gen(function*() {
+      yield* TestClock.setTime(Date.now())
+      const fiber = yield* Effect.forkScoped(runBeat(root, root, quietSources()))
+      yield* Effect.forkScoped(Effect.forever(TestClock.adjust("1 second")))
+      return yield* Fiber.join(fiber)
+    }).pipe(Effect.provide(Layer.mergeAll(BunServices.layer, spawner, TestClock.layer())), Effect.scoped)
+  )
+
 const backlogStates = async (root: string): Promise<ReadonlyArray<string>> =>
   (await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)
 
@@ -566,17 +577,17 @@ describe("the beat's closing sweep", () => {
   test("a close read that never answers reports close-failed after 30 seconds and closes only once unread past the grace instead of closing on the first timeout", async () => {
     await withBacklog(async (root) => {
       await startTaskOne(root, orcStart, null)
-      const first = await beatWith(root, pueueInstead(() => Effect.never))
+      const first = await beatWithTestClock(root, pueueInstead(() => Effect.never))
       expect(await backlogStates(root)).toEqual(["orc-1:started"])
       expect(first.actions.flatMap((action) => action.kind === "close-failed" ? [action.task + ":" + action.reason] : []))
         .toEqual(["orc-1:the close read timed out after 30 seconds"])
       await writeFile(join(root, "logs", "orc-1.unread"), "2026-10-27T10:02:00.000Z")
-      const report = await beatWith(root, pueueInstead(() => Effect.never))
+      const report = await beatWithTestClock(root, pueueInstead(() => Effect.never))
       expect(await backlogStates(root)).toEqual(["orc-1:closed"])
       expect(report.actions.flatMap((action) => action.kind === "closed" ? [action.task + ":" + action.reason] : []))
         .toEqual(["orc-1:the close read timed out after 30 seconds"])
     })
-  }, 180_000)
+  })
 })
 
 

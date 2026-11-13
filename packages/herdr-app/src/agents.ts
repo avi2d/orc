@@ -3,6 +3,11 @@ import type { Backlog, Run, Runs, Step, Task } from "./guard"
 export const cardStatuses = ["Awaiting you", "Running", "Queued", "Failed", "Done"] as const
 export type CardStatus = typeof cardStatuses[number]
 
+export const railLabel = (card: Pick<Card, "id" | "runId">): string => {
+  const id = card.runId ?? card.id
+  return id.length > 10 ? id.slice(-6) : id
+}
+
 export type Standing =
   | { readonly status: "Awaiting you"; readonly waiting: { readonly on: "answer" } | { readonly on: "approval"; readonly pr: string } }
   | { readonly status: Exclude<CardStatus, "Awaiting you"> }
