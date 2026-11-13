@@ -98,36 +98,40 @@ export default class OrcAgents extends View {
     )
   }
 
-  async readAll(): Promise<void> {
-    const [runsReading, backlogReading] = await Promise.all([
+  readAll(): Promise<void> {
+    return Promise.all([
       readJson("orc", ["runs", "--json"], runs),
       readJson("orc", ["backlog", "--json"], backlog)
-    ])
-    this.cards = runsReading.kind !== "ok"
-      ? runsReading
-      : backlogReading.kind !== "ok"
-      ? backlogReading
-      : { kind: "ok", value: buildCards(runsReading.value, backlogReading.value) }
-    const runId = this.selectedCard()?.runId ?? null
-    if (runId === null) {
-      this.steps = null
-      this.log = null
-      return
-    }
-    this.steps = { of: runId, reading: await readJson("orc", ["show", runId, "--json"], show) }
-    const stepId = this.stepShown()
-    if (stepId === null) {
-      this.log = null
-      return
-    }
-    const reading = await readText("orc", ["log", runId, stepId.toString()])
-    const of = `${runId}/${stepId}`
-    const lines = reading.kind === "ok" ? logLines(reading.value).length : 0
-    if (this.log?.of !== of || lines !== this.shownLines) {
-      this.shownLines = lines
-      this.logScroll.scroll_to_item(Math.max(lines - 1, 0))
-    }
-    this.log = { of, reading }
+    ]).then(([runsReading, backlogReading]) => {
+      this.cards = runsReading.kind !== "ok"
+        ? runsReading
+        : backlogReading.kind !== "ok"
+        ? backlogReading
+        : { kind: "ok", value: buildCards(runsReading.value, backlogReading.value) }
+      const runId = this.selectedCard()?.runId ?? null
+      if (runId === null) {
+        this.steps = null
+        this.log = null
+        return
+      }
+      return readJson("orc", ["show", runId, "--json"], show).then((showReading) => {
+        this.steps = { of: runId, reading: showReading }
+        const stepId = this.stepShown()
+        if (stepId === null) {
+          this.log = null
+          return
+        }
+        return readText("orc", ["log", runId, stepId.toString()]).then((reading) => {
+          const of = `${runId}/${stepId}`
+          const lines = reading.kind === "ok" ? logLines(reading.value).length : 0
+          if (this.log?.of !== of || lines !== this.shownLines) {
+            this.shownLines = lines
+            this.logScroll.scroll_to_item(Math.max(lines - 1, 0))
+          }
+          this.log = { of, reading }
+        })
+      })
+    })
   }
 
   visibleCards(): ReadonlyArray<Card> {

@@ -389,7 +389,9 @@ describe("formatRunsTable", () => {
         ended: null,
         prLink: null,
         endReason: null,
-        sandbox: "nono"
+        sandbox: "nono",
+        kind: null,
+        delivery: null
       }
     ])
     const [header, row] = table.split("\n")
@@ -413,7 +415,9 @@ describe("formatRunsTable", () => {
       ended: null,
       prLink: null,
       endReason: null,
-      sandbox: "nono"
+      sandbox: "nono",
+      kind: null,
+      delivery: null
     }
     const table = formatRunsTable([run, { ...run, id: "run-2", prLink: "https://github.com/avi2d/orc/pull/1" }])
     expect(table.split("\n")).toEqual([

@@ -56,11 +56,9 @@ export const readStepLog = (
     }
     const fs = yield* FileSystem.FileSystem
     return yield* fs.readFileString(file).pipe(
-      Effect.catchTag("PlatformError", (cause) => {
-        if (cause.reason["_tag"] !== "NotFound") {
-          return Effect.fail(cause)
-        }
-        return step.status === "running" ? Effect.succeed("") : Effect.fail(new NoStepLog({ runId, stepId }))
-      })
+      Effect.catchIf(
+        (cause) => cause.reason["_tag"] === "NotFound",
+        () => step.status === "running" ? Effect.succeed("") : Effect.fail(new NoStepLog({ runId, stepId }))
+      )
     )
   })
