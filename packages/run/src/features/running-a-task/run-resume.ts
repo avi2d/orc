@@ -220,7 +220,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
   Effect.gen(function*() {
     const allow = run.allow ?? []
     const answers = run.answers ?? []
-    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow, answers, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null }
+    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow, answers, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null, priorDir: null }
     const prior = yield* resumePriorRun(db, run.projectDir, run.branch).pipe(
       Effect.mapError((cause) => historyFailure("read", cause))
     )
@@ -262,6 +262,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       fixSessionId: carriedFix?.id ?? null,
       fixSessionFile: carriedFix?.file ?? null,
       fixRunning: progress.fixRunning,
-      handover
+      handover,
+      priorDir
     }
   })

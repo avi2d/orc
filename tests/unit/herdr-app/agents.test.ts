@@ -43,12 +43,21 @@ describe("the runs list", () => {
     expect(cards.map((card) => [card.id, card.kind])).toEqual([["orc-7", "scout"]])
   })
 
-  test("a failed run with an open follow up task stays Failed with its run id, not Queued", () => {
+  test("a failed run with an open follow up task stays Failed while the task queues its resumption", () => {
     const cards = buildCards(
       runs([run("20261113-090000-aaaaaa", { status: "failed", branch: "orc/orc-7", endReason: "old", questions: 0 })]),
       backlog([task("orc-7", { status: "new" })])
     )
-    expect(cards.map((card) => [card.id, card.runId, card.standing.status])).toEqual([["orc-7", "20261113-090000-aaaaaa", "Failed"]])
+    expect(cards.map((card) => [card.id, card.runId, card.standing.status])).toEqual([["orc-7", null, "Queued"], ["orc-7", "20261113-090000-aaaaaa", "Failed"]])
+  })
+
+  test("a parked task with an open question keeps its own card beside its failed run", () => {
+    const cards = buildCards(
+      runs([run("20261113-090000-aaaaaa", { status: "failed", branch: "orc/orc-7", endReason: "old" })]),
+      backlog([task("orc-7", { status: "new", hold: 1 })])
+    )
+    expect(cards.map((card) => [card.id, card.runId, card.standing.status])).toEqual([["orc-7", null, "Awaiting you"], ["orc-7", "20261113-090000-aaaaaa", "Failed"]])
+    expect(filterCards(cards, { project: null, status: "Awaiting you" }).map((card) => card.where)).toEqual(["Question 1"])
   })
 
   test("a merged PR's run is Done, not still awaiting approval", () => {
@@ -116,14 +125,28 @@ describe("the selected run's steps", () => {
     expect(stepRows({ status: "Queued" }, [], "scout", null).map((row) => row.label)).toEqual(["Agent"])
   })
 
-  test("duplicate checks attempts still predict the next round as max plus one, not count plus one", () => {
+  test("a restarted checks round predicts the next round from the restart, not the inherited maximum", () => {
     const rows = stepRows({ status: "Running" }, [
       { id: 1, name: "implement", attempt: 1, status: "passed" },
-      { id: 2, name: "checks", attempt: 1, status: "passed" },
-      { id: 3, name: "fix", attempt: 1, status: "passed" },
-      { id: 4, name: "checks", attempt: 1, status: "failed" },
-      { id: 5, name: "fix", attempt: 2, status: "running" }
+      { id: 2, name: "checks", attempt: 1, status: "failed" },
+      { id: 3, name: "checks", attempt: 2, status: "failed" },
+      { id: 4, name: "fix", attempt: 1, status: "passed" },
+      { id: 5, name: "fix", attempt: 2, status: "passed" },
+      { id: 6, name: "checks", attempt: 1, status: "failed" },
+      { id: 7, name: "fix", attempt: 3, status: "running" }
     ], "ship", null)
-    expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["\u2713 Agent", "\u2713 Checks 1", "\u2713 Fix 1", "\u2717 Checks 1", "\u25cf Fix 2", "\u25cb Checks 2", "\u25cb No mistakes"])
+    expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["\u2713 Agent", "\u2717 Checks 1", "\u2717 Checks 2", "\u2713 Fix 1", "\u2713 Fix 2", "\u2717 Checks 1", "\u25cf Fix 3", "\u25cb Checks 2", "\u25cb No mistakes"])
+  })
+
+  test("a restarted failed checks round numbers its fix after the inherited fixes", () => {
+    const rows = stepRows({ status: "Running" }, [
+      { id: 1, name: "implement", attempt: 1, status: "passed" },
+      { id: 2, name: "checks", attempt: 1, status: "failed" },
+      { id: 3, name: "checks", attempt: 2, status: "failed" },
+      { id: 4, name: "fix", attempt: 1, status: "passed" },
+      { id: 5, name: "fix", attempt: 2, status: "passed" },
+      { id: 6, name: "checks", attempt: 1, status: "failed" }
+    ], "ship", null)
+    expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["\u2713 Agent", "\u2717 Checks 1", "\u2717 Checks 2", "\u2713 Fix 1", "\u2713 Fix 2", "\u2717 Checks 1", "\u25cb Fix 3", "\u25cb Checks 2", "\u25cb No mistakes"])
   })
 })

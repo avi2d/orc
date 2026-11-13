@@ -118,7 +118,8 @@ export const recordResumePublish = (db: Database, run: HistoryRun, resume: Resum
           insertPlannedStep(db, planned.step, [
             planned.taskEvidence,
             planned.evidenceFile,
-            ...(planned.sessionEvidence === null ? [] : [planned.sessionEvidence])
+            ...(planned.sessionEvidence === null ? [] : [planned.sessionEvidence]),
+            ...(resume.priorDir === null ? [] : [{ direction: "out" as const, path: run.path.join(resume.priorDir, "agent.log"), kind: "log" }])
           ], planned.signals)
         } else {
           insertStep(db, { runId: run.runId, name: "implement", attempt: 1, status: "running", started: run.started, agentFile: run.agent.path, piSessionFile: resume.implementSessionFile })
@@ -134,7 +135,8 @@ export const recordResumePublish = (db: Database, run: HistoryRun, resume: Resum
           const planned = planFixDone(run.runId, fix)
           insertPlannedStep(db, planned.step, [
             planned.evidenceIn,
-            ...(planned.sessionEvidence === null ? [] : [planned.sessionEvidence])
+            ...(planned.sessionEvidence === null ? [] : [planned.sessionEvidence]),
+            ...(resume.priorDir === null ? [] : [{ direction: "out" as const, path: run.path.join(resume.priorDir, "fix-" + fix.attempt.toString() + ".log"), kind: "log" }])
           ], [planned.commitSignal, ...planned.tokenSignals])
         }
       })

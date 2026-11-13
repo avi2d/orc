@@ -15,13 +15,13 @@ export type LoggedStep = typeof StepRowSchema.Type & { readonly out: typeof OutR
 // An agent step appends to its log as Pi writes, while its session file holds the turns as JSON.
 export const stepLogFile = (runDir: string, step: LoggedStep): string | null => {
   if (step.name === "implement") {
-    return runDir + "/agent.log"
+    return step.out.filter((item) => item.kind === "log").at(-1)?.path ?? runDir + "/agent.log"
   }
   if (step.name === "fix") {
-    return runDir + "/fix-" + step.attempt.toString() + ".log"
+    return step.out.filter((item) => item.kind === "log").at(-1)?.path ?? runDir + "/fix-" + step.attempt.toString() + ".log"
   }
   if (step.name === "checks") {
-    return step.out.filter((item) => item.kind !== "session").at(-1)?.path ?? runDir + "/checks-" + step.attempt.toString() + ".txt"
+    return step.out.filter((item) => item.kind === "checks").at(-1)?.path ?? runDir + "/session/checks-" + step.attempt.toString() + ".txt"
   }
   return step.out.filter((item) => item.kind !== "session").at(-1)?.path ?? null
 }
@@ -55,22 +55,12 @@ export const readStepLog = (
       return yield* new NoStepLog({ runId, stepId })
     }
     const fs = yield* FileSystem.FileSystem
-    const candidates = [file, ...out.map((item) => item.path)].filter((path, index, all) => all.indexOf(path) === index)
-    for (const path of candidates) {
-      const attempt = yield* fs.readFileString(path).pipe(
-        Effect.map((text) => ({ found: true as const, text })),
-        Effect.catchTag("PlatformError", (cause) =>
-          (cause as { readonly reason?: { readonly _tag?: string } }).reason?._tag === "NotFound"
-            ? Effect.succeed({ found: false as const, text: "" })
-            : Effect.fail(cause)
-        )
-      )
-      if (attempt.found) {
-        return attempt.text
-      }
-    }
-    if (step.status === "running") {
-      return ""
-    }
-    return yield* new NoStepLog({ runId, stepId })
+    return yield* fs.readFileString(file).pipe(
+      Effect.catchTag("PlatformError", (cause) => {
+        if ((cause as { readonly reason?: { readonly _tag?: string } }).reason?._tag !== "NotFound") {
+          return Effect.fail(cause)
+        }
+        return step.status === "running" ? Effect.succeed("") : Effect.fail(new NoStepLog({ runId, stepId }))
+      })
+    )
   })

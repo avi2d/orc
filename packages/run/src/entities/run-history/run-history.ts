@@ -403,9 +403,6 @@ export const markRunStopped = (db: Database, runId: string, ended: string, endRe
     yield* updateRun(db, runId, { status: "stopped", ended, prLink: prior?.prLink ?? null, endReason }).pipe(
       Effect.mapError((cause) => historyFailure("record the run in", cause))
     )
-    yield* sqlite(() => {
-      db.query("UPDATE steps SET status = 'failed', ended = ? WHERE run_id = ? AND status = 'running'").run(ended, runId)
-    }).pipe(Effect.mapError((cause) => historyFailure("record the stopped steps in", cause)))
   })
 
 export const historyFailure = (action: string, cause: unknown): OrcRunError =>

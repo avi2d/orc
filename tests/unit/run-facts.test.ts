@@ -100,6 +100,18 @@ describe("stepLogFile", () => {
   test("a checks step reads the file it wrote, not a session beside it", () => {
     expect(stepLogFile("/r", { name: "checks", attempt: 3, status: "failed", out: [{ kind: "checks", path: "/r/session/checks-3.txt" }, { kind: "session", path: "/r/s.jsonl" }] })).toBe("/r/session/checks-3.txt")
   })
+
+  test("an inherited implement step reads the prior run log recorded as evidence", () => {
+    expect(stepLogFile("/new", { name: "implement", attempt: 1, status: "passed", out: [{ kind: "evidence", path: "/new/implement-1.md" }, { kind: "session", path: "/new/s.jsonl" }, { kind: "log", path: "/prior/agent.log" }] })).toBe("/prior/agent.log")
+  })
+
+  test("an inherited fix step reads its prior log, not the session beside it", () => {
+    expect(stepLogFile("/new", { name: "fix", attempt: 2, status: "failed", out: [{ kind: "session", path: "/prior/s.jsonl" }, { kind: "log", path: "/prior/fix-2.log" }] })).toBe("/prior/fix-2.log")
+  })
+
+  test("a running checks step with no evidence reads the live session checks file", () => {
+    expect(stepLogFile("/r", { name: "checks", attempt: 1, status: "running", out: [] })).toBe("/r/session/checks-1.txt")
+  })
 })
 
 describe("readStepLog", () => {
@@ -130,6 +142,41 @@ describe("readStepLog", () => {
       const stepId = await Effect.runPromise(recordStep(db, { runId: "run-i", name: "implement", attempt: 1, status: "running", started: "2026-11-13T10:02:00.000Z" }))
       const error = await Effect.runPromise(Effect.flip(readStepLog(db, "run-h", stepId).pipe(Effect.provide(BunServices.layer))))
       expect(error._tag).toBe("UnknownStep")
+    })
+  })
+
+  test("a resumed implement step shows the prior run log, not the session", async () => {
+    await withDb(async (home, db) => {
+      await run(db, home, "run-j", "running", "# Agent\n")
+      const priorDir = join(home, "runs", "prior-1")
+      await mkdir(priorDir, { recursive: true })
+      await writeFile(join(priorDir, "agent.log"), "prior output\n")
+      await writeFile(join(priorDir, "s.jsonl"), "{\"type\":\"session\"}\n")
+      const stepId = await Effect.runPromise(recordStep(db, { runId: "run-j", name: "implement", attempt: 1, status: "passed", started: "2026-11-13T10:02:00.000Z" }))
+      await Effect.runPromise(recordEvidence(db, { stepId, direction: "out", path: join(priorDir, "s.jsonl"), kind: "session" }))
+      await Effect.runPromise(recordEvidence(db, { stepId, direction: "out", path: join(priorDir, "agent.log"), kind: "log" }))
+      const text = await Effect.runPromise(readStepLog(db, "run-j", stepId).pipe(Effect.provide(BunServices.layer)))
+      expect(text).toBe("prior output\n")
+    })
+  })
+
+  test("a passed step with no log anywhere is refused instead of reading empty", async () => {
+    await withDb(async (home, db) => {
+      await run(db, home, "run-k", "failed", "# Agent\n")
+      const stepId = await Effect.runPromise(recordStep(db, { runId: "run-k", name: "implement", attempt: 1, status: "failed", started: "2026-11-13T10:02:00.000Z" }))
+      const error = await Effect.runPromise(Effect.flip(readStepLog(db, "run-k", stepId).pipe(Effect.provide(BunServices.layer))))
+      expect(error._tag).toBe("NoStepLog")
+    })
+  })
+
+  test("a running checks step reads the live session checks file", async () => {
+    await withDb(async (home, db) => {
+      const runDir = await run(db, home, "run-l", "running", "# Checks\n")
+      const stepId = await Effect.runPromise(recordStep(db, { runId: "run-l", name: "checks", attempt: 1, status: "running", started: "2026-11-13T10:02:00.000Z" }))
+      await mkdir(join(runDir, "session"), { recursive: true })
+      await writeFile(join(runDir, "session", "checks-1.txt"), "check a: running\n")
+      const text = await Effect.runPromise(readStepLog(db, "run-l", stepId).pipe(Effect.provide(BunServices.layer)))
+      expect(text).toBe("check a: running\n")
     })
   })
 })

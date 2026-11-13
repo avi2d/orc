@@ -94,14 +94,14 @@ const runPlace = (run: Run, task: Task | undefined, merged: ReadonlySet<string>)
 export const buildCards = (runs: Runs, backlog: Backlog): ReadonlyArray<Card> => {
   const byBranch = new Map(backlog.tasks.flatMap((task) => taskBranches(task).map((branch) => [branch, task] as const)))
   const merged = new Set(backlog.merged)
-  const seen = new Set(runs.runs.flatMap((run) => {
-    const task = byBranch.get(run.branch)
-    return task === undefined ? [] : [task.id]
-  }))
+  const active = new Set<string>()
   const cards: Array<Card> = []
   for (const run of runs.runs) {
     const task = byBranch.get(run.branch)
     const place = runPlace(run, task, merged)
+    if (task !== undefined && (place.standing.status === "Running" || place.standing.status === "Awaiting you")) {
+      active.add(task.id)
+    }
     cards.push({
       key: run.id,
       id: task?.id ?? run.id,
@@ -114,7 +114,7 @@ export const buildCards = (runs: Runs, backlog: Backlog): ReadonlyArray<Card> =>
     })
   }
   for (const task of backlog.tasks) {
-    if (seen.has(task.id) || task.status === "closed") {
+    if (active.has(task.id) || task.status === "closed") {
       continue
     }
     const questions = openQuestions(task)
@@ -157,7 +157,7 @@ const stepsToCome = (steps: ReadonlyArray<Step>, kind: string | null, delivery: 
     return steps.length === 0 ? ["Agent"] : []
   }
   const last = steps.at(-1)
-  const rounds = steps.reduce((max, step) => step.name === "checks" ? Math.max(max, step.attempt) : max, 0)
+  const rounds = steps.filter((step) => step.name === "checks").at(-1)?.attempt ?? 0
   const fixes = steps.reduce((max, step) => step.name === "fix" ? Math.max(max, step.attempt) : max, 0)
   const finalStep = delivery === "direct-PR" ? "PR" : "No mistakes"
   if (last === undefined) {
