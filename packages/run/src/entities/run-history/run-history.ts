@@ -356,7 +356,7 @@ export const updateRun = (db: Database, id: string, patch: { readonly status: Ru
 const StepIdRowSchema = Schema.Struct({ id: Schema.Finite })
 
 export const stepIdFor = (db: Database, runId: string, name: string, attempt: number): Effect.Effect<number | null, Schema.SchemaError | SqliteFailure> =>
-  sqlite(() => db.query("SELECT id FROM steps WHERE run_id = ? AND name = ? AND attempt = ? ORDER BY id ASC LIMIT 1").get(runId, name, attempt)).pipe(
+  sqlite(() => db.query("SELECT id FROM steps WHERE run_id = ? AND name = ? AND attempt = ? ORDER BY id DESC LIMIT 1").get(runId, name, attempt)).pipe(
     Effect.flatMap((row) =>
       row === null || row === undefined
         ? Effect.succeed(null)
@@ -368,7 +368,7 @@ const StepUpdateResultSchema = Schema.Struct({ changes: Schema.Union([Schema.Fin
 
 export const updateStep = (db: Database, runId: string, name: string, attempt: number, patch: { readonly status: StepStatus; readonly ended: string | null; readonly piSessionFile?: string | null | undefined }): Effect.Effect<boolean, Schema.SchemaError | SqliteFailure> =>
   sqlite(() =>
-    db.query("UPDATE steps SET status = ?, ended = ?, pi_session_file = COALESCE(?, pi_session_file) WHERE run_id = ? AND name = ? AND attempt = ?").run(patch.status, patch.ended, patch.piSessionFile ?? null, runId, name, attempt)
+    db.query("UPDATE steps SET status = ?, ended = ?, pi_session_file = COALESCE(?, pi_session_file) WHERE id = (SELECT id FROM steps WHERE run_id = ? AND name = ? AND attempt = ? ORDER BY id DESC LIMIT 1)").run(patch.status, patch.ended, patch.piSessionFile ?? null, runId, name, attempt)
   ).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(StepUpdateResultSchema)),
     Effect.map((decoded) => Number(decoded.changes) > 0)

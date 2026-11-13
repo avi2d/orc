@@ -1,7 +1,7 @@
 import { $ } from "bun"
 
 const root = `${import.meta.dir}/..`
-const out = `${root}/dist`
+const out = process.argv[2] ?? `${root}/dist`
 const appModules = ["gpui-kit", "gpui-base", "herdr"]
 
 await $`rm -rf ${out}`

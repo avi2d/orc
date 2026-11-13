@@ -60,7 +60,8 @@ const AnsweredHold = Schema.Struct({
   reason: Schema.String,
   until: Schema.NullOr(Schema.String),
   questions: Schema.Array(HoldQuestion),
-  answer: Answer
+  answer: Answer,
+  at: Schema.optional(Schema.String)
 })
 
 export interface Hold {
@@ -68,6 +69,7 @@ export interface Hold {
   readonly until: string | null
   readonly questions: ReadonlyArray<HoldQuestion>
   readonly answer: Answer | null
+  readonly at: string | null
   readonly history?: ReadonlyArray<typeof AnsweredHold.Type>
 }
 
@@ -162,6 +164,7 @@ const Frontmatter = Schema.Struct({
   created: Schema.String,
   hold_reason: Schema.optional(Schema.String),
   hold_until: Schema.optional(Schema.String),
+  held_at: Schema.optional(Schema.String),
   hold_questions: Schema.optional(Schema.Array(QuestionFront)),
   hold_history: Schema.optional(Schema.Array(AnsweredHold)),
   answer: Schema.optional(Schema.String),
@@ -257,7 +260,7 @@ const holdOf = (front: Frontmatter): Hold | null | string => {
     return answer
   }
   if (front.hold_reason === undefined) {
-    return front.hold_until === undefined && front.hold_questions === undefined && front.hold_history === undefined && answer === null ? null : "a hold names no reason"
+    return front.hold_until === undefined && front.held_at === undefined && front.hold_questions === undefined && front.hold_history === undefined && answer === null ? null : "a hold names no reason"
   }
   if (front.hold_reason.trim() === "") {
     return "a hold names no reason"
@@ -272,7 +275,7 @@ const holdOf = (front: Frontmatter): Hold | null | string => {
   if (answer === null && questions.length > 0 && questions.every((question) => question.answer !== null)) {
     return "a hold answers every question and names no answer"
   }
-  return { reason: front.hold_reason, until: front.hold_until ?? null, questions, answer, ...(front.hold_history === undefined ? {} : { history: front.hold_history }) }
+  return { reason: front.hold_reason, until: front.hold_until ?? null, questions, answer, at: front.held_at ?? null, ...(front.hold_history === undefined ? {} : { history: front.hold_history }) }
 }
 
 const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => {

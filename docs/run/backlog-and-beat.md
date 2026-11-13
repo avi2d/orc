@@ -214,6 +214,8 @@ A parent task also waits for every scout and task child closed done and every sh
 4. An account has room above 0% and at or above the floor, and the runs take the account with the most room.
 
 To keep a new task back for a decision of yours, run `orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>]`.
+The task file keeps the time you placed the hold as `held_at`.
+A hold written before orc recorded that time has no `held_at`, and orc reads its time as `null`.
 Each beat then prints `waits <task-id>: held for the captain: <reason>`, with the date when the hold names one, and never starts it.
 The date says when you mean to answer, and a past date releases nothing: the task stays held until you answer it, and its wait opens an item in the [attention queue](attention-queue.md).
 To answer, run `orc backlog answer <task-id> <words>`.
@@ -223,13 +225,20 @@ Orc refuses to hold a task that is taken, started, closed or parked.
 It refuses to answer a task with no open question for you.
 Holding a held task again keeps the first reason.
 After you answer a hold, you can place a new hold on the task before it starts.
-The task keeps the earlier reason, date, questions, and answers in `hold_history`.
+The task keeps the earlier reason, date, questions, answers and `held_at` time in `hold_history`, where each entry names that time as `at`.
 `orc backlog --json` exposes them as `hold.history`.
 To hold a task on several decisions at once, add one `--question <text>` for each, and orc names them `question-1` onward.
 Answer each one with `orc backlog answer <task-id> <question-id>=<words>`, and the task stays held until every question has an answer.
 The last answer also writes each question with its answer into `answer`, which the released run reads.
 Holding the task again with the same questions keeps the hold, and orc refuses other questions until you answer the open ones.
-`orc backlog` shows a held task as `held (<reason>)`, and `orc backlog --json` gives every task a `hold`, either `null` or the reason, the date, the questions with their answers and the answer.
+`orc backlog` shows a held task as `held (<reason>)`, and `orc backlog --json` gives every task a `hold`, either `null` or the reason, the date, the questions with their answers, the answer and the time it was placed as `at`.
+
+To leave a note on a task, run `orc backlog note <task-id> <words>`.
+Orc appends the note as one JSON line with `at`, `who` and `text` to `~/.orc/backlog/notes/<task-id>.jsonl`, and `who` is `captain` for this command.
+Each note goes out in one append write with a byte count check, so two notes written at once never mix their lines.
+A short write fails the note instead of writing the rest.
+A note takes any task the backlog holds, a closed one too, and orc refuses a task id the backlog does not hold.
+A note holds nothing and answers nothing, so it never changes when the beat starts the task.
 
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
 After the claim survives a recount, the beat writes the task started before it runs the start command.

@@ -6,7 +6,7 @@ import { noMistakesFile, prBodyFileName, type HistoryRun } from "./run-record"
 import { refusalSignalName, refusalValue } from "../../entities/run-history/index"
 import type { ChecksRoundSummary, OrcRunReport, RecordedFixAttempt } from "../../entities/run-history/index"
 import { OrcRunError } from "../../shared/lib/index"
-import { historyFailure, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, stepIdFor, updateRun, updateStep } from "../../entities/run-history/index"
+import { historyFailure, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, sqlite, stepIdFor, updateRun, updateStep } from "../../entities/run-history/index"
 import type { EvidenceInput, SignalInput, StepInput } from "../../entities/run-history/index"
 import { measuredSignals, noMistakesSignals, openQuestionSignal } from "../../entities/run-history/index"
 import type { AgentStep, ResumePlan } from "./run-ops"
@@ -100,6 +100,15 @@ const insertPlannedStep = (
   }
 }
 
+const inheritedLog = (db: Database, run: HistoryRun, priorDir: string, name: "implement" | "fix", attempt: number): string => {
+  const row = db.query("SELECT evidence.path FROM steps JOIN evidence ON evidence.step_id = steps.id WHERE steps.run_id = ? AND steps.name = ? AND steps.attempt = ? AND evidence.direction = 'out' AND evidence.kind = 'log' ORDER BY steps.id DESC, evidence.id DESC LIMIT 1")
+    .get(run.path.basename(priorDir), name, attempt)
+  if (typeof row === "object" && row !== null && "path" in row && typeof row.path === "string") {
+    return row.path
+  }
+  return run.path.join(priorDir, name === "implement" ? "agent.log" : "fix-" + attempt.toString() + ".log")
+}
+
 export const recordResumePublish = (db: Database, run: HistoryRun, resume: ResumePlan): Effect.Effect<void, OrcRunError> =>
   Effect.try({
     try: () => {
@@ -119,7 +128,7 @@ export const recordResumePublish = (db: Database, run: HistoryRun, resume: Resum
             planned.taskEvidence,
             planned.evidenceFile,
             ...(planned.sessionEvidence === null ? [] : [planned.sessionEvidence]),
-            ...(resume.priorDir === null ? [] : [{ direction: "out" as const, path: run.path.join(resume.priorDir, "agent.log"), kind: "log" }])
+            ...(resume.priorDir === null ? [] : [{ direction: "out" as const, path: inheritedLog(db, run, resume.priorDir, "implement", 1), kind: "log" }])
           ], planned.signals)
         } else {
           insertStep(db, { runId: run.runId, name: "implement", attempt: 1, status: "running", started: run.started, agentFile: run.agent.path, piSessionFile: resume.implementSessionFile })
@@ -136,7 +145,7 @@ export const recordResumePublish = (db: Database, run: HistoryRun, resume: Resum
           insertPlannedStep(db, planned.step, [
             planned.evidenceIn,
             ...(planned.sessionEvidence === null ? [] : [planned.sessionEvidence]),
-            ...(resume.priorDir === null ? [] : [{ direction: "out" as const, path: run.path.join(resume.priorDir, "fix-" + fix.attempt.toString() + ".log"), kind: "log" }])
+            ...(resume.priorDir === null ? [] : [{ direction: "out" as const, path: inheritedLog(db, run, resume.priorDir, "fix", fix.attempt), kind: "log" }])
           ], [planned.commitSignal, ...planned.tokenSignals])
         }
       })
@@ -200,6 +209,7 @@ export const recordFixStart = (db: Database, runId: string, attempt: number, age
     const known = yield* stepIdFor(db, runId, "fix", attempt).pipe(Effect.mapError((cause) => historyFailure("read the fix step in", cause)))
     if (known !== null) {
       yield* updateStep(db, runId, "fix", attempt, { status: "running", ended: null, piSessionFile: piSessionFile ?? undefined }).pipe(Effect.mapError((cause) => historyFailure("record the fix step in", cause)))
+      yield* sqlite(() => db.query("DELETE FROM evidence WHERE step_id = ? AND direction = ? AND kind = ?").run(known, "out", "log")).pipe(Effect.mapError((cause) => historyFailure("reset the fix log in", cause)))
       return
     }
     yield* recordStep(db, { runId, name: "fix", attempt, status: "running", started, agentFile, piSessionFile: piSessionFile ?? null }).pipe(Effect.asVoid, Effect.mapError((cause) => historyFailure("record the fix step in", cause)))

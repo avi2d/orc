@@ -13,6 +13,7 @@ import { mergeTask } from "../features/merging-a-pr/index"
 import { RunnerError, type Command } from "../shared/process/index"
 import { encodeToken, sessionToken } from "../entities/token/index"
 import { markEventPosted, mergedIds, readPrState, unpostedEvents } from "../entities/events/index"
+import { noteTask } from "../features/task-thread/index"
 import { runHeavy, startHeavyWatch } from "../features/heavy-commands/index"
 
 type CommandArgs = Exclude<DispatchArgs, { readonly kind: "UsageError" }>
@@ -190,7 +191,7 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
-type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "CloseTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "DependTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
+type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "CloseTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "NoteTask" | "DependTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
 
 const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   switch (args.kind) {
@@ -211,6 +212,9 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
     }
     case "AnswerTask": {
       return answerNow(args, place)
+    }
+    case "NoteTask": {
+      return DateTime.now.pipe(Effect.flatMap((now) => noteTask(backlogRoot(place), args.id, args.words, DateTime.formatIso(now))))
     }
     case "DependTask": {
       return dependNow(args, place)
@@ -281,6 +285,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       case "MarkEventPosted":
       case "HoldTask":
       case "AnswerTask":
+      case "NoteTask":
       case "DependTask":
       case "MergeTask":
       case "ShowPlan":
