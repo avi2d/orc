@@ -94,6 +94,10 @@ export type {
   TaskKind,
 } from "./task-kind"
 export {
+  appendNote,
+  readNotes,
+} from "./notes"
+export {
   childCount,
   dependencyWaits,
 } from "./task-dependency"

@@ -233,6 +233,13 @@ The last answer also writes each question with its answer into `answer`, which t
 Holding the task again with the same questions keeps the hold, and orc refuses other questions until you answer the open ones.
 `orc backlog` shows a held task as `held (<reason>)`, and `orc backlog --json` gives every task a `hold`, either `null` or the reason, the date, the questions with their answers, the answer and the time it was placed as `at`.
 
+To leave a note on a task, run `orc backlog note <task-id> <words>`.
+Orc appends the note as one JSON line with `at`, `who` and `text` to `~/.orc/backlog/notes/<task-id>.jsonl`, and `who` is `captain` for this command.
+Each note goes out in one append write with a byte count check, so two notes written at once never mix their lines.
+A short write fails the note instead of writing the rest.
+A note takes any task the backlog holds, a closed one too, and orc refuses a task id the backlog does not hold.
+A note holds nothing and answers nothing, so it never changes when the beat starts the task.
+
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
 After the claim survives a recount, the beat writes the task started before it runs the start command.
 A task marked for a machine waits for a slot on that machine and never starts on another.
