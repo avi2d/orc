@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { buildCards, filterCards, stepRows } from "../../../packages/herdr-app/src/agents"
+import { along, buildCards, filterCards, stepRows } from "../../../packages/herdr-app/src/agents"
 import type { Backlog, Run, Runs, Task } from "../../../packages/herdr-app/src/guard"
 
 const run = (id: string, fields: Partial<Run>): Run => ({
@@ -31,6 +31,16 @@ describe("the runs list", () => {
 
   test("says where each run is now rather than its raw status", () => {
     expect(board.map((card) => card.where)).toEqual(["Approve PR #48", "Question 1", "Fix 1", "Waiting to start", "orc exited 1", "PR #12"])
+  })
+
+  test("a run started outside the backlog carries no kind rather than a made-up one", () => {
+    const cards = buildCards(runs([run("20261113-090000-aaaaaa", { status: "failed", branch: "orc/20261113-090000-aaaaaa" })]), backlog([]))
+    expect(cards.map((card) => [card.id, card.kind])).toEqual([["20261113-090000-aaaaaa", null]])
+  })
+
+  test("a backlog task's run carries the task's kind, not the run's", () => {
+    const cards = buildCards(runs([run("20261113-090000-aaaaaa", { branch: "orc/orc-7" })]), backlog([task("orc-7", { kind: "scout", status: "claimed" })]))
+    expect(cards.map((card) => [card.id, card.kind])).toEqual([["orc-7", "scout"]])
   })
 
   test("a merged PR's run is Done, not still awaiting approval", () => {
@@ -87,5 +97,27 @@ describe("the selected run's steps", () => {
   test("a failed run lists no steps to come after the one that failed", () => {
     const rows = stepRows({ status: "Failed" }, [{ id: 1, name: "implement", attempt: 1, status: "failed" }])
     expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["✗ Agent"])
+  })
+})
+
+describe("moving through a list by key", () => {
+  test("stops at the last item instead of wrapping to the first", () => {
+    expect(along(["a", "b", "c"], "c", 1)).toBe("c")
+  })
+
+  test("stops at the first item instead of wrapping to the last", () => {
+    expect(along(["a", "b", "c"], "a", -1)).toBe("a")
+  })
+
+  test("steps to the neighbour on either side", () => {
+    expect([along(["a", "b", "c"], "b", 1), along(["a", "b", "c"], "b", -1)]).toEqual(["c", "a"])
+  })
+
+  test("enters a list from its start going down and from its end going up when nothing is chosen", () => {
+    expect([along(["a", "b", "c"], null, 1), along(["a", "b", "c"], null, -1)]).toEqual(["a", "c"])
+  })
+
+  test("gives nothing for an empty list rather than an undefined item", () => {
+    expect(along([], null, 1)).toBeNull()
   })
 })

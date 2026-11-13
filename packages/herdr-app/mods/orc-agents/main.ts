@@ -1,7 +1,7 @@
 import { type AsyncContext, type Color, type Context, type Element, View, div } from "gpui-kit"
 import { ScrollHandle, h_flex, v_flex } from "gpui-base"
-import { layout, settings } from "herdr"
-import { type Card, type CardStatus, type Filter, type Mark, type StepRow, buildCards, cardStatuses, filterCards, projectsOf, stepRows } from "../../src/agents"
+import { layout, nextCommand, settings } from "herdr"
+import { type Card, type CardStatus, type Filter, type Mark, type StepRow, along, buildCards, cardStatuses, filterCards, projectsOf, stepRows } from "../../src/agents"
 import { backlog, runs, show, type Show } from "../../src/guard"
 import { type Reading, readJson, readText } from "../../src/orc-read"
 import { palette } from "../../src/palette"
@@ -84,6 +84,39 @@ export default class OrcAgents extends View {
         this.refresh(tick)
       }
     })
+    cx.spawn(async (task) => {
+      for (;;) {
+        this.command(task, await nextCommand())
+      }
+    })
+  }
+
+  command(cx: Context, name: string): void {
+    switch (name) {
+      case "fold":
+        this.folded = !this.folded
+        cx.notify()
+        return
+      case "run-next":
+      case "run-prev": {
+        const key = along(this.visibleCards().map((card) => card.key), this.selectedCard()?.key ?? null, name === "run-next" ? 1 : -1)
+        if (key !== null) {
+          this.select(cx, key)
+        }
+        return
+      }
+      case "step-next":
+      case "step-prev": {
+        const card = this.selectedCard()
+        const steps = card === null ? null : this.currentSteps(card)
+        const ids = steps?.kind === "ok" ? steps.value.steps.map((step) => step.id) : []
+        const stepId = along(ids, this.stepShown(), name === "step-next" ? 1 : -1)
+        if (stepId !== null) {
+          this.chooseStep(cx, stepId)
+        }
+        return
+      }
+    }
   }
 
   refresh(cx: Context): void {
@@ -240,7 +273,7 @@ export default class OrcAgents extends View {
       .child(h_flex().justify_between().gap(8)
         .child(h_flex().gap(6).min_w_0()
           .child(div().font_semibold().truncate().child(card.id))
-          .child(div().text_color(t.dim).flex_shrink_0().child(card.type)))
+          .children(card.kind === null ? [] : [div().text_color(t.dim).flex_shrink_0().child(card.kind)]))
         .child(div().flex_shrink_0().text_size(12).text_color(color).child(card.standing.status)))
       .child(div().truncate().child(card.title))
       .child(div().truncate().text_color(t.muted).child(card.where))
@@ -309,8 +342,12 @@ export default class OrcAgents extends View {
     }
     const runId = card.runId
     const stepId = this.stepShown()
-    if (runId === null || stepId === null) {
-      return pane.child(div().p(16).text_color(t.muted).child("No step has started yet"))
+    if (runId === null) {
+      return pane.child(div().p(16).text_color(t.muted).child("The task has not started a run yet"))
+    }
+    if (stepId === null) {
+      const settled = card.standing.status === "Failed" || card.standing.status === "Done"
+      return pane.child(div().p(16).text_color(t.muted).child(settled ? "This run ended before it recorded a step" : "No step has started yet"))
     }
     const reading = this.log?.of === `${runId}/${stepId}` ? this.log.reading : { kind: "reading" as const }
     const header = h_flex().px(16).h(40).flex_shrink_0().items_center().justify_between().border_b(1).border_color(t.border)

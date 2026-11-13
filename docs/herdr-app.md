@@ -17,12 +17,12 @@ Install it once, and again after each orc upgrade to pick up the new mods.
 To install the layout:
 
 1. Run `orc app install`.
-1. Run `herdr-app do layout.switch '{"name":"orc"}'`, or press the `layout.switch` key until the `orc` layout shows.
+1. Run `herdr-app do layout.switch --name orc`, or press the `layout.switch` key until the `orc` layout shows.
    Check `keys.json` for your `layout.switch` binding.
 
 `orc app install` copies the mods `orc-tabs`, `orc-board`, `orc-resources` and `orc-agents` into `~/.config/herdr-app/mods/`.
 It copies `orc.json` and its preview `orc.svg` into `~/.config/herdr-app/layouts/`.
-It adds `cmd-1`, `cmd-2` and `cmd-3` to the `layout:orc` section of `~/.config/herdr-app/keys.json`.
+It adds `cmd-1`, `cmd-2`, `cmd-3` and the Agents keys to the `layout:orc` section of `~/.config/herdr-app/keys.json`.
 A key you already set in that section stays, and the command prints it as skipped.
 The command writes only names that start with `orc`, so Herdr's own mods and layouts stay as they are.
 
@@ -42,7 +42,7 @@ When a command fails or prints a document the tab cannot read, the tab shows the
 ## Follow a run in the Agents tab
 
 The Agents tab lists one card for each task's newest run, one for each run started outside the backlog, and one for each task still to start.
-A card gives the task id and kind, the title, and where the run is now, such as `Fix 1`, `Question 1`, `Approve PR #48` or `orc exited 1`.
+A card gives the task id and kind, or the run id for a run started outside the backlog, the title, and where the run is now, such as `Fix 1`, `Question 1`, `Approve PR #48` or `orc exited 1`.
 The cards sort by status in this order: Awaiting you, Running, Queued, Failed and Done.
 
 | Status | When |
@@ -53,6 +53,8 @@ The cards sort by status in this order: Awaiting you, Running, Queued, Failed an
 | Failed | The run failed or was stopped |
 | Done | The run succeeded, and its PR merged or it opened none |
 
+A run started outside the backlog has no task to record its merge, so it shows Done with its PR number once it succeeds.
+
 To narrow the list, pick a project in the Project row or a status in the Status row.
 To fold the list to a rail of ids coloured by status, select «, and select » to open it again.
 
@@ -60,6 +62,17 @@ The middle column lists the selected run's steps, those done and those still to 
 A step shows ✓ when it passed, ✗ when it failed, ● while it runs, ◆ while it waits for you, and ○ when it has not started.
 Select a step to show its output on the right: the Agent and Fix steps show what Pi writes as it works, and a Checks step shows the checks' output.
 The output shows the last 400 lines and follows new lines as they are written.
+
+The keys move through the tab while it shows:
+
+| Key | Command | What it does |
+| --- | --- | --- |
+| `alt-down`, `alt-up` | `orc-agents.run-next`, `orc-agents.run-prev` | Selects the next or the previous card |
+| `alt-shift-down`, `alt-shift-up` | `orc-agents.step-next`, `orc-agents.step-prev` | Shows the next or the previous step's output |
+| none | `orc-agents.fold` | Folds the list to the rail, or opens it again |
+
+To give the fold a key, add it to the `layout:orc` section of `keys.json`, such as `"ctrl-shift-f": "orc-agents.fold"`.
+To run one from a terminal, run `herdr-app do orc-agents.fold`.
 Use your `layout.switch` key to go back to your own layout.
 
 ## Change the mods

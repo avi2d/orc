@@ -10,7 +10,7 @@ export type Standing =
 export interface Card {
   readonly key: string
   readonly id: string
-  readonly type: string
+  readonly kind: string | null
   readonly title: string
   readonly project: string
   readonly standing: Standing
@@ -109,7 +109,7 @@ export const buildCards = (runs: Runs, backlog: Backlog): ReadonlyArray<Card> =>
     cards.push({
       key: run.id,
       id: task?.id ?? run.id,
-      type: task?.kind ?? "run",
+      kind: task?.kind ?? null,
       title: run.title ?? task?.title ?? run.branch,
       project: task?.project ?? lastSegment(run.project),
       ...place,
@@ -122,7 +122,7 @@ export const buildCards = (runs: Runs, backlog: Backlog): ReadonlyArray<Card> =>
     }
     const questions = openQuestions(task)
     const place = questions > 0 ? awaitingAnswer(questions) : { standing: { status: "Queued" } as const, where: queuedWhere(task) }
-    cards.push({ key: task.id, id: task.id, type: task.kind, title: task.title, project: task.project, ...place, runId: null })
+    cards.push({ key: task.id, id: task.id, kind: task.kind, title: task.title, project: task.project, ...place, runId: null })
   }
   return sortCards(cards)
 }
@@ -181,4 +181,12 @@ export const stepRows = (standing: Standing, steps: ReadonlyArray<Step>): Readon
     ? [{ key: "approve", label: `Approve ${standing.waiting.pr}`, mark: "◆" as const, stepId: null }]
     : []
   return [...recorded, ...toCome, ...approval]
+}
+
+export const along = <A>(items: ReadonlyArray<A>, current: A | null, by: 1 | -1): A | null => {
+  const at = current === null ? -1 : items.indexOf(current)
+  if (at === -1) {
+    return (by === 1 ? items[0] : items.at(-1)) ?? null
+  }
+  return items[Math.min(Math.max(at + by, 0), items.length - 1)] ?? null
 }
