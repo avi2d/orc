@@ -2,6 +2,14 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.14.1
+
+Released 2026-11-13.
+
+### Fixes
+
+- **run:** resume parked runs in place, gate ship merges, and allow re-hold [#180](https://github.com/avi2d/orc/pull/180)
+
 ## 0.14.0
 
 Released 2026-11-13.
