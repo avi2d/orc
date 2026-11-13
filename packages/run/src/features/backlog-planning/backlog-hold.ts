@@ -1,4 +1,4 @@
-import { Effect, FileSystem } from "effect"
+import { DateTime, Effect, FileSystem } from "effect"
 import { findTask, type Rewrite, rewriteNew, type Hold, type HoldQuestion, type TaskFileError, type TaskRecord, BacklogError } from "../../entities/backlog/index"
 
 export type HoldOutcome = { readonly kind: "held" | "already held"; readonly hold: Hold }
@@ -25,7 +25,7 @@ const holdAgain = (id: string, held: Hold, ask: HoldAsk): Effect.Effect<Rewrite<
   return Effect.fail(new BacklogError({ detail: id + " is already held: " + held.reason + ", so answer it first" }))
 }
 
-const holdOn = (id: string, ask: HoldAsk) => (fresh: TaskRecord): Effect.Effect<Rewrite<HoldOutcome>, BacklogError> => {
+const holdOn = (id: string, ask: HoldAsk, at: string) => (fresh: TaskRecord): Effect.Effect<Rewrite<HoldOutcome>, BacklogError> => {
   if (fresh.state.kind !== "new") {
     return Effect.fail(new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a new task is held" }))
   }
@@ -38,10 +38,10 @@ const holdOn = (id: string, ask: HoldAsk) => (fresh: TaskRecord): Effect.Effect<
   const previous = fresh.hold
   const history = previous === null || previous.answer === null ? [] : [
     ...previous.history ?? [],
-    { reason: previous.reason, until: previous.until, questions: previous.questions, answer: previous.answer }
+    { reason: previous.reason, until: previous.until, questions: previous.questions, answer: previous.answer, ...(previous.at === null ? {} : { at: previous.at }) }
   ]
   const held: Hold = {
-    reason: ask.reason, until: ask.until, questions: askedQuestions(ask.questions), answer: null,
+    reason: ask.reason, until: ask.until, questions: askedQuestions(ask.questions), answer: null, at,
     ...(history.length === 0 ? {} : { history })
   }
   return Effect.succeed({ kind: "write", record: { ...fresh, hold: held }, result: { kind: "held", hold: held } })
@@ -55,7 +55,7 @@ export const holdTask = (
 ): Effect.Effect<HoldOutcome, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const record = yield* findTask(root, id)
-    const decide = holdOn(id, ask)
+    const decide = holdOn(id, ask, DateTime.formatIso(yield* DateTime.now))
     if (record.state.kind !== "new") {
       const refused = yield* decide(record)
       return refused.result
