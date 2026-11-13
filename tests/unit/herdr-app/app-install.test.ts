@@ -76,9 +76,14 @@ test("does not refuse a fresh checkout that has the sources but no build", async
     ])
     expect((await readdir(join(home, "mods"))).sort()).toEqual(["orc-agents", "orc-board", "orc-resources", "orc-tabs"])
     expect((await readdir(join(home, "layouts"))).sort()).toEqual(["orc.json", "orc.svg"])
-    const keys = JSON.parse(await readFile(join(home, "keys.json"), "utf8"))
-    expect(keys["layout:orc"]["cmd-1"]).toEqual({ command: "layout.select", args: { stack: "orc-views", child: "orc-board" } })
-    expect(Object.keys(keys["layout:orc"]).sort()).toEqual(["cmd-1", "cmd-2", "cmd-3"])
+    const keys: unknown = JSON.parse(await readFile(join(home, "keys.json"), "utf8"))
+    expect(keys).toEqual({
+      "layout:orc": {
+        "cmd-1": { command: "layout.select", args: { stack: "orc-views", child: "orc-board" } },
+        "cmd-2": { command: "layout.select", args: { stack: "orc-views", child: "orc-resources" } },
+        "cmd-3": { command: "layout.select", args: { stack: "orc-views", child: "orc-agents" } }
+      }
+    })
   } finally {
     await rm(root, { recursive: true, force: true })
   }
