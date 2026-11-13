@@ -8,18 +8,24 @@ export type Reading<A> =
 
 const firstLine = (text: string): string => text.trim().split("\n")[0] ?? ""
 
-export const readJson = <A>(command: string, args: ReadonlyArray<string>, guard: Guard<A>): Promise<Reading<A>> => {
+export const readText = (command: string, args: ReadonlyArray<string>): Promise<Reading<string>> => {
   const line = [command, ...args].join(" ")
   return exec(command, [...args]).then(
-    (result): Reading<A> => {
-      if (result.code !== 0) {
-        return { kind: "failed", reason: `${line} exited ${result.code}: ${firstLine(result.stderr) || firstLine(result.stdout)}` }
-      }
-      const guarded = guardJson(result.stdout, guard)
-      return guarded.kind === "ok"
-        ? { kind: "ok", value: guarded.value }
-        : { kind: "failed", reason: `${line} printed a document this view cannot read: ${guarded.reason}` }
-    },
-    (): Reading<A> => ({ kind: "failed", reason: `Could not start ${command}. Check that it is on PATH.` })
+    (result): Reading<string> =>
+      result.code === 0
+        ? { kind: "ok", value: result.stdout }
+        : { kind: "failed", reason: `${line} exited ${result.code}: ${firstLine(result.stderr) || firstLine(result.stdout)}` },
+    (): Reading<string> => ({ kind: "failed", reason: `Could not start ${command}. Check that it is on PATH.` })
   )
 }
+
+export const readJson = <A>(command: string, args: ReadonlyArray<string>, guard: Guard<A>): Promise<Reading<A>> =>
+  readText(command, args).then((reading): Reading<A> => {
+    if (reading.kind !== "ok") {
+      return reading
+    }
+    const guarded = guardJson(reading.value, guard)
+    return guarded.kind === "ok"
+      ? { kind: "ok", value: guarded.value }
+      : { kind: "failed", reason: `${[command, ...args].join(" ")} printed a document this view cannot read: ${guarded.reason}` }
+  })

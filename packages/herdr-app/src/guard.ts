@@ -28,6 +28,23 @@ const string = (record: Fields, name: string, at: string): Guarded<string> => {
   return typeof value === "string" ? ok(value) : refused(child(at, name), "a string", value)
 }
 
+const number = (record: Fields, name: string, at: string): Guarded<number> => {
+  const value = record[name]
+  return typeof value === "number" && Number.isFinite(value) ? ok(value) : refused(child(at, name), "a number", value)
+}
+
+const nullableString = (record: Fields, name: string, at: string): Guarded<string | null> =>
+  record[name] === null ? ok(null) : string(record, name, at)
+
+const absentOrString = (record: Fields, name: string, at: string): Guarded<string | null> =>
+  record[name] === undefined ? ok(null) : nullableString(record, name, at)
+
+const oneOf = <L extends string>(record: Fields, name: string, at: string, wanted: ReadonlyArray<L>): Guarded<L> => {
+  const value = record[name]
+  const found = wanted.find((entry) => entry === value)
+  return found === undefined ? refused(child(at, name), wanted.map((entry) => JSON.stringify(entry)).join(" or "), value) : ok(found)
+}
+
 const literal = <L extends string | number>(record: Fields, name: string, at: string, wanted: L): Guarded<L> =>
   record[name] === wanted ? ok(wanted) : refused(child(at, name), JSON.stringify(wanted), record[name])
 
@@ -65,20 +82,59 @@ const pair = <A>(record: Fields, at: string, first: string, second: string, make
   return ok(make(a.value, b.value))
 }
 
-interface Task {
+const question: Guard<string> = (value, at) => {
+  const record = fields(value, at)
+  if (record.kind === "refused") return record
+  return string(record.value, "id", at)
+}
+
+const questionCount = (record: Fields, name: string, at: string): Guarded<number | null> => {
+  if (record[name] === null) return ok(null)
+  const holder = fields(record[name], child(at, name))
+  if (holder.kind === "refused") return holder
+  if (name === "hold" && holder.value["answer"] !== null && holder.value["answer"] !== undefined) return ok(null)
+  const questions = arrayOf(holder.value, "questions", child(at, name), question)
+  if (questions.kind === "refused") return questions
+  const raw = holder.value["questions"]
+  const open = Array.isArray(raw) ? raw.filter((entry) => !isFields(entry) || entry["answer"] === null || entry["answer"] === undefined).length : questions.value.length
+  return ok(open)
+}
+
+export interface Task {
   readonly id: string
   readonly title: string
+  readonly project: string
+  readonly kind: string
+  readonly status: string
+  readonly hold: number | null
+  readonly parked: number | null
+  readonly reason: string | null
 }
 
 const task: Guard<Task> = (value, at) => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
-  return pair(record.value, at, "id", "title", (id, title) => ({ id, title }))
+  const named = pair(record.value, at, "id", "title", (id, title) => ({ id, title }))
+  if (named.kind === "refused") return named
+  const project = string(record.value, "project", at)
+  if (project.kind === "refused") return project
+  const kind = string(record.value, "kind", at)
+  if (kind.kind === "refused") return kind
+  const status = string(record.value, "status", at)
+  if (status.kind === "refused") return status
+  const hold = questionCount(record.value, "hold", at)
+  if (hold.kind === "refused") return hold
+  const parked = questionCount(record.value, "parked", at)
+  if (parked.kind === "refused") return parked
+  const reason = absentOrString(record.value, "reason", at)
+  if (reason.kind === "refused") return reason
+  return ok({ ...named.value, project: project.value, kind: kind.value, status: status.value, hold: hold.value, parked: parked.value, reason: reason.value })
 }
 
 export interface Backlog {
   readonly schema: "orc.backlog.v1"
   readonly tasks: ReadonlyArray<Task>
+  readonly merged: ReadonlyArray<string>
 }
 
 export const backlog: Guard<Backlog> = (value, at) => {
@@ -88,23 +144,100 @@ export const backlog: Guard<Backlog> = (value, at) => {
   if (schema.kind === "refused") return schema
   const tasks = arrayOf(record.value, "tasks", at, task)
   if (tasks.kind === "refused") return tasks
-  return ok({ schema: schema.value, tasks: tasks.value })
+  const mergedRaw = record.value["merged"]
+  if (mergedRaw === undefined) return ok({ schema: schema.value, tasks: tasks.value, merged: [] })
+  if (!Array.isArray(mergedRaw)) return refused(child(at, "merged"), "an array", mergedRaw)
+  const merged: Array<string> = []
+  for (const [index, entry] of mergedRaw.entries()) {
+    if (typeof entry !== "string") return refused(child(at, "merged") + "[" + index.toString() + "]", "a string", entry)
+    merged.push(entry)
+  }
+  return ok({ schema: schema.value, tasks: tasks.value, merged })
 }
 
-interface Run {
+const stepStatuses = ["running", "passed", "failed", "skipped"] as const
+
+export interface Step {
+  readonly id: number
+  readonly name: string
+  readonly attempt: number
+  readonly status: typeof stepStatuses[number]
+}
+
+const step: Guard<Step> = (value, at) => {
+  const record = fields(value, at)
+  if (record.kind === "refused") return record
+  const id = number(record.value, "id", at)
+  if (id.kind === "refused") return id
+  const name = string(record.value, "name", at)
+  if (name.kind === "refused") return name
+  const attempt = number(record.value, "attempt", at)
+  if (attempt.kind === "refused") return attempt
+  const status = oneOf(record.value, "status", at, stepStatuses)
+  if (status.kind === "refused") return status
+  return ok({ id: id.value, name: name.value, attempt: attempt.value, status: status.value })
+}
+
+const runStatuses = ["running", "succeeded", "failed", "stopped"] as const
+
+export interface Run {
   readonly id: string
-  readonly status: string
+  readonly project: string
+  readonly branch: string
+  readonly status: typeof runStatuses[number]
+  readonly prLink: string | null
+  readonly title: string | null
+  readonly step: Step | null
+  readonly questions: number
+  readonly endReason: string | null
+  readonly kind: string | null
+  readonly delivery: string | null
 }
 
 const run: Guard<Run> = (value, at) => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
-  return pair(record.value, at, "id", "status", (id, status) => ({ id, status }))
+  const placed = pair(record.value, at, "id", "project", (id, project) => ({ id, project }))
+  if (placed.kind === "refused") return placed
+  const branch = string(record.value, "branch", at)
+  if (branch.kind === "refused") return branch
+  const status = oneOf(record.value, "status", at, runStatuses)
+  if (status.kind === "refused") return status
+  const prLink = nullableString(record.value, "prLink", at)
+  if (prLink.kind === "refused") return prLink
+  const title = nullableString(record.value, "title", at)
+  if (title.kind === "refused") return title
+  const latest = record.value["step"] === null ? ok(null) : step(record.value["step"], child(at, "step"))
+  if (latest.kind === "refused") return latest
+  const questions = number(record.value, "questions", at)
+  if (questions.kind === "refused") return questions
+  const endReason = nullableString(record.value, "endReason", at)
+  if (endReason.kind === "refused") return endReason
+  const kind = record.value["kind"] === undefined ? ok(null) : nullableString(record.value, "kind", at)
+  if (kind.kind === "refused") return kind
+  const delivery = record.value["delivery"] === undefined ? ok(null) : nullableString(record.value, "delivery", at)
+  if (delivery.kind === "refused") return delivery
+  return ok({ ...placed.value, branch: branch.value, status: status.value, prLink: prLink.value, title: title.value, step: latest.value, questions: questions.value, endReason: endReason.value, kind: kind.value, delivery: delivery.value })
 }
 
 export interface Runs {
   readonly schema: "orc.runs.v1"
   readonly runs: ReadonlyArray<Run>
+}
+
+export interface Show {
+  readonly schema: "orc.show.v1"
+  readonly steps: ReadonlyArray<Step>
+}
+
+export const show: Guard<Show> = (value, at) => {
+  const record = fields(value, at)
+  if (record.kind === "refused") return record
+  const schema = literal(record.value, "schema", at, "orc.show.v1")
+  if (schema.kind === "refused") return schema
+  const steps = arrayOf(record.value, "steps", at, step)
+  if (steps.kind === "refused") return steps
+  return ok({ schema: schema.value, steps: steps.value })
 }
 
 export const runs: Guard<Runs> = (value, at) => {

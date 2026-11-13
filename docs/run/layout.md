@@ -124,6 +124,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/features/seeing-runs/show.ts` | The `orc show` reading of one run from the history |
 | `packages/run/src/features/seeing-runs/run-history-view.ts` | The `orc runs` table and its `orc.runs.v1` JSON |
+| `packages/run/src/features/seeing-runs/run-facts.ts` | The facts `orc runs --json` reads beside each run: its title, latest step and open questions |
+| `packages/run/src/features/seeing-runs/step-log.ts` | The `orc log` reading of one step's output file |
 | `packages/run/src/features/seeing-runs/run-scores.ts` | The `orc score` step score writes: the 1 to 5 check, the note and the unknown run and step errors |
 
 ## entities/agent
