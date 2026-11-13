@@ -3,7 +3,7 @@ import { taskWait } from "./beat-place"
 import { type ChildCount, childCount, dependencyWaits, type TaskKind, answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, type SplitMark, type Started, type TaskRecord } from "../../entities/backlog/index"
 import type { Project } from "../../shared/config/index"
 import { describeQuota } from "./quota"
-import type { ChatEvent } from "../../entities/events/index"
+import type { ChatEvent, PrState } from "../../entities/events/index"
 
 const BACKLOG_JSON_SCHEMA = "orc.backlog.v1" as const
 const BEAT_JSON_SCHEMA = "orc.beat.v1" as const
@@ -17,6 +17,7 @@ export interface BacklogView {
   readonly projects: ProjectList
   readonly room: RoomList
   readonly merged: ReadonlySet<string>
+  readonly prStates: ReadonlyMap<string, PrState | null>
   readonly deciderOwns: DeciderOwns
 }
 
@@ -48,6 +49,7 @@ type TaskJson = {
   readonly split: SplitMark | null
   readonly dependsOn: ReadonlyArray<string>
   readonly created: string
+  readonly prState: PrState | null
   readonly hold: Hold | null
   readonly parked: ParkedJson | null
 } & TaskStatusJson
@@ -124,6 +126,7 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     split: record.spec.split,
     dependsOn: record.spec.dependsOn,
     created: record.spec.created,
+    prState: view.prStates.get(record.spec.id) ?? null,
     hold: record.hold,
     parked: record.parked === null ? null : parkedJson(record.parked),
     ...claimJson(record)

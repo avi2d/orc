@@ -12,7 +12,7 @@ import { holdRun, killHeld, queueFromText, renewTask, startTask, stopNow, format
 import { mergeTask } from "../features/merging-a-pr/index"
 import { RunnerError, type Command } from "../shared/process/index"
 import { encodeToken, sessionToken } from "../entities/token/index"
-import { markEventPosted, mergedIds, unpostedEvents } from "../entities/events/index"
+import { markEventPosted, mergedIds, readPrState, unpostedEvents } from "../entities/events/index"
 import { runHeavy, startHeavyWatch } from "../features/heavy-commands/index"
 
 type CommandArgs = Exclude<DispatchArgs, { readonly kind: "UsageError" }>
@@ -46,16 +46,21 @@ const readView = (root: string): Effect.Effect<BacklogView, BacklogError | TaskF
     )
     const events = yield* unpostedEvents(root)
     const merged = yield* mergedIds(root)
+    const prStates = new Map(yield* Effect.forEach(tasks, (task) => {
+      const state = task.state
+      const pr = state.kind === "closed" && state.closing.outcome !== "start-failed" ? state.closing.pr : null
+      return pr === null ? Effect.succeed([task.spec.id, null] as const) : Effect.map(readPrState(root, task.spec.id, pr), (value) => [task.spec.id, value] as const)
+    }))
     const deciderOwns = deciderOwnership(yield* readAttention(root, tasks))
     if (reading.kind === "unread") {
-      return { tasks, events, projects: reading, room: reading, merged, deciderOwns }
+      return { tasks, events, projects: reading, room: reading, merged, prStates, deciderOwns }
     }
     const projects = yield* readProjects(paths.projects, reading.config.machines).pipe(
       Effect.map((list): ProjectList => ({ kind: "read", projects: list })),
       Effect.catchTag("ConfigError", (error) => Effect.succeed<ProjectList>({ kind: "unread", reason: failure(error) }))
     )
     const room: RoomList = { kind: "read", room: readRoom(reading.config.machines, tasks) }
-    return { tasks, events, projects, room, merged, deciderOwns }
+    return { tasks, events, projects, room, merged, prStates, deciderOwns }
   })
 
 const refuse = (detail: string) => Effect.fail(new BacklogError({ detail }))
