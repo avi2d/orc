@@ -331,28 +331,34 @@ describe("runsJson", () => {
     }
   ]
 
+  const facts = listed.map((run) => ({ run, title: "Fix the gate", step: { id: 4, name: "checks", attempt: 2, status: "failed" as const }, questions: 0 }))
+
   test("names the schema version first, then the runs", () => {
-    const document = runsJson(listed)
+    const document = runsJson(facts)
     expect(Object.keys(document)).toEqual(["schema", "runs"])
     expect(document.schema).toBe(RUNS_JSON_SCHEMA)
     expect(document.schema).toBe("orc.runs.v1")
   })
 
   test("carries the listed facts for every run", () => {
-    const document = runsJson(listed)
+    const document = runsJson(facts)
     expect(document.runs).toHaveLength(1)
-    expect(Object.keys(document.runs[0] ?? {})).toEqual(["id", "project", "branch", "status", "prLink"])
+    expect(Object.keys(document.runs[0] ?? {})).toEqual(["id", "project", "branch", "status", "prLink", "title", "step", "questions", "endReason"])
     expect(document.runs[0]).toEqual({
       id: "run-1",
       project: "orc",
       branch: "orc/x",
       status: "succeeded",
-      prLink: "https://github.com/avi2d/orc/pull/1"
+      prLink: "https://github.com/avi2d/orc/pull/1",
+      title: "Fix the gate",
+      step: { id: 4, name: "checks", attempt: 2, status: "failed" },
+      questions: 0,
+      endReason: null
     })
   })
 
   test("a JSON round trip keeps the version first", () => {
-    const text = JSON.stringify(runsJson(listed))
+    const text = JSON.stringify(runsJson(facts))
     expect(text.startsWith('{"schema":"orc.runs.v1"')).toBe(true)
     const document = Schema.decodeUnknownSync(Schema.Struct({ schema: Schema.String }))(JSON.parse(text))
     expect(Object.keys(document)[0]).toBe("schema")

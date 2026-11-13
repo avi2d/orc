@@ -7,10 +7,17 @@ Orc keeps its records in `~/.orc`, outside every project repo.
 Set `ORC_HOME` to keep them somewhere else.
 To print the same facts as JSON, run `orc runs --json`.
 Every JSON document names its version first as `schema`, starting at `orc.runs.v1`.
+Each run in it also gives `title`, the first line of its task file, and `endReason`, the reason it ended.
+Its `step` is the step running now, else the step that started last, as an id, name, attempt and status, and `null` before the first step.
+Its `questions` counts the questions a running run waits on you to answer, and is 0 otherwise.
 To see one run step by step, run `orc show <run-id>`.
 It lists each step with its agent, session, signals, latest score and evidence, every file as a full link.
 To print the same facts as JSON, run `orc show <run-id> --json`.
 Its JSON document names its version first as `schema`, starting at `orc.show.v1`.
+To print one step's output, run `orc log <run-id> <step-id>` with the step's `id` from that JSON.
+An implement step prints `agent.log` and a fix step its `fix-<attempt>.log`, which Pi appends to as it works.
+A checks or no-mistakes step prints the file it wrote.
+A step whose output is not written yet prints nothing.
 To score a step, run `orc score <run-id> <step> <1 to 5> [note]`.
 Use fix#1 to score the first fix attempt and plain fix scores the latest attempt in execution order.
 Use the step id from orc show JSON to score one resumed checks row when an attempt ran twice.

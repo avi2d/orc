@@ -12,6 +12,7 @@ import {
   type SqliteFailure
 } from "../../entities/run-history/index"
 import { reportFileName } from "../../entities/run-history/index"
+import { runDirOf } from "./run-facts"
 
 const ShowSignalSchema = Schema.Struct({
   name: Schema.String,
@@ -156,9 +157,7 @@ export const readShow = (
             }))
           })
         }
-        const separator = runRow.task_file.lastIndexOf("/")
-        const runDir = separator < 0 ? "." : runRow.task_file.slice(0, separator)
-        const report = reportPathForRunDir(runDir)
+        const report = reportPathForRunDir(runDirOf(runRow.task_file))
         return yield* Schema.decodeEffect(ShowJsonSchema)({
           schema: SHOW_JSON_SCHEMA,
           run: {

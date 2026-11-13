@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Schema } from "effect"
 import type { Database } from "bun:sqlite"
-import { openDatabase, recordRun } from "../../packages/run/src/entities/run-history/index"
+import { openDatabase, recordEvidence, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
 
 interface OrcResult {
   readonly exitCode: number
@@ -134,7 +134,8 @@ describe("orc runs", () => {
       expect(Object.keys(document)[0]).toBe("schema")
       expect(document.schema).toBe("orc.runs.v1")
       expect(document.runs).toHaveLength(1)
-      expect(Object.keys(document.runs[0] ?? {}).sort()).toEqual(["branch", "id", "prLink", "project", "status"])
+      const printed = Schema.decodeUnknownSync(Schema.Struct({ runs: Schema.Array(Schema.Record(Schema.String, Schema.Unknown)) }))(JSON.parse(result.stdout))
+      expect(Object.keys(printed.runs[0] ?? {}).sort()).toEqual(["branch", "endReason", "id", "prLink", "project", "questions", "status", "step", "title"])
       expect(document.runs[0]).toMatchObject({ id: "run-1", project: "orc", branch: "orc/x", status: "running" })
     })
   })
@@ -148,6 +149,37 @@ describe("orc runs", () => {
       expect(Object.keys(document)[0]).toBe("schema")
       expect(document.schema).toBe("orc.runs.v1")
       expect(document.runs).toEqual([])
+    })
+  })
+
+  test("orc log prints a failed checks round's output as written, not its session file", async () => {
+    await withHome(async (home) => {
+      const runDir = join(home, ".orc", "runs", "run-1")
+      await mkdir(runDir, { recursive: true })
+      await writeFile(join(runDir, "checks-1.txt"), "lint: 2 errors\n")
+      await writeFile(join(runDir, "session.jsonl"), "{}\n")
+      const db = await openDb(home)
+      let stepId = 0
+      try {
+        Effect.runSync(recordRun(db, { id: "run-1", project: "orc", branch: "orc/x", taskFile: join(runDir, "task.md"), status: "running", started: "2026-10-18T10:00:00.000Z" }))
+        stepId = Effect.runSync(recordStep(db, { runId: "run-1", name: "checks", attempt: 1, status: "failed", started: "2026-10-18T10:01:00.000Z" }))
+        Effect.runSync(recordEvidence(db, { stepId, direction: "out", path: join(runDir, "checks-1.txt"), kind: "checks" }))
+        Effect.runSync(recordEvidence(db, { stepId, direction: "out", path: join(runDir, "session.jsonl"), kind: "session" }))
+      } finally {
+        db.close()
+      }
+      const result = await runOrc(["log", "run-1", stepId.toString()], home)
+      expect(result.stderr).toBe("")
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toBe("lint: 2 errors\n")
+    })
+  })
+
+  test("orc log names an unknown run on stderr instead of printing nothing", async () => {
+    await withHome(async (home) => {
+      const result = await runOrc(["log", "nope", "1"], home)
+      expect(result.exitCode).not.toBe(0)
+      expect(result.stderr).toBe("orc: unknown run nope\n")
     })
   })
 

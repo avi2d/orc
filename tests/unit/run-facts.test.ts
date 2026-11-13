@@ -1,0 +1,135 @@
+import { describe, expect, test } from "bun:test"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import type { Database } from "bun:sqlite"
+import { BunServices } from "@effect/platform-bun"
+import { Effect } from "effect"
+import { listRuns, openDatabase, recordEvidence, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
+import { readListedRuns, readStepLog, stepLogFile, titleOf } from "../../packages/run/src/features/seeing-runs/index"
+
+const withDb = async (use: (home: string, db: Database) => Promise<void>): Promise<void> => {
+  const home = await mkdtemp(join(tmpdir(), "orc-run-facts-"))
+  const db = await Effect.runPromise(openDatabase(home).pipe(Effect.provide(BunServices.layer)))
+  try {
+    await use(home, db)
+  } finally {
+    db.close()
+    await rm(home, { recursive: true, force: true })
+  }
+}
+
+const run = async (db: Database, home: string, id: string, status: "running" | "failed", task: string): Promise<string> => {
+  const runDir = join(home, "runs", id)
+  await mkdir(runDir, { recursive: true })
+  await writeFile(join(runDir, "task.md"), task)
+  await Effect.runPromise(recordRun(db, { id, project: "/p/orc", branch: "orc/task-1", taskFile: join(runDir, "task.md"), status, started: "2026-11-13T10:00:00.000Z" }))
+  return runDir
+}
+
+const listed = (db: Database) =>
+  Effect.runPromise(listRuns(db).pipe(Effect.flatMap((runs) => readListedRuns(db, runs)), Effect.provide(BunServices.layer)))
+
+const asking = (count: number): string =>
+  JSON.stringify({ asked: "2026-11-13T10:01:00.000Z", until: "2026-11-13T10:31:00.000Z", questions: Array.from({ length: count }, (_, index) => ({ id: "q" + index.toString(), text: "which one?" })) })
+
+describe("titleOf", () => {
+  test("a task file's markdown heading gives its words, not the hashes", () => {
+    expect(titleOf("# Fix the gate\n\nThe gate stops.")).toBe("Fix the gate")
+  })
+
+  test("a task file that opens with blank lines takes its first written line, not an empty title", () => {
+    expect(titleOf("\n\nWhy runs fail\nmore")).toBe("Why runs fail")
+  })
+
+  test("an empty task file has no title rather than an empty one", () => {
+    expect(titleOf("\n  \n")).toBeNull()
+  })
+})
+
+describe("readListedRuns", () => {
+  test("a running run counts the questions asking.json holds instead of reading none", async () => {
+    await withDb(async (home, db) => {
+      const runDir = await run(db, home, "run-a", "running", "# Ask twice\n")
+      await writeFile(join(runDir, "asking.json"), asking(2))
+      const [entry] = await listed(db)
+      expect(entry?.questions).toBe(2)
+      expect(entry?.title).toBe("Ask twice")
+    })
+  })
+
+  test("a failed run with a leftover asking.json waits on nobody", async () => {
+    await withDb(async (home, db) => {
+      const runDir = await run(db, home, "run-b", "failed", "# Ended\n")
+      await writeFile(join(runDir, "asking.json"), asking(1))
+      const [entry] = await listed(db)
+      expect(entry?.questions).toBe(0)
+    })
+  })
+
+  test("the running step is where the run is now, not a step that started later and ended", async () => {
+    await withDb(async (home, db) => {
+      await run(db, home, "run-c", "running", "# Steps\n")
+      await Effect.runPromise(recordStep(db, { runId: "run-c", name: "fix", attempt: 1, status: "running", started: "2026-11-13T10:02:00.000Z" }))
+      await Effect.runPromise(recordStep(db, { runId: "run-c", name: "checks", attempt: 1, status: "failed", started: "2026-11-13T10:03:00.000Z", ended: "2026-11-13T10:04:00.000Z" }))
+      const [entry] = await listed(db)
+      expect(entry?.step).toMatchObject({ name: "fix", attempt: 1, status: "running" })
+    })
+  })
+
+  test("a run with no steps yet says so instead of borrowing another run's step", async () => {
+    await withDb(async (home, db) => {
+      await run(db, home, "run-d", "running", "# Fresh\n")
+      await run(db, home, "run-e", "failed", "# Other\n")
+      await Effect.runPromise(recordStep(db, { runId: "run-e", name: "implement", attempt: 1, status: "failed", started: "2026-11-13T10:02:00.000Z" }))
+      const entries = await listed(db)
+      expect(entries.find((entry) => entry.run.id === "run-d")?.step).toBeNull()
+    })
+  })
+})
+
+describe("stepLogFile", () => {
+  test("the implement step reads agent.log, not its JSON session file", () => {
+    expect(stepLogFile("/r", { name: "implement", attempt: 1, out: [{ kind: "session", path: "/r/sessions/s.jsonl" }] })).toBe("/r/agent.log")
+  })
+
+  test("a fix step reads its own attempt's log, not the first fix's", () => {
+    expect(stepLogFile("/r", { name: "fix", attempt: 2, out: [] })).toBe("/r/fix-2.log")
+  })
+
+  test("a checks step reads the file it wrote, not a session beside it", () => {
+    expect(stepLogFile("/r", { name: "checks", attempt: 3, out: [{ kind: "checks", path: "/r/session/checks-3.txt" }, { kind: "session", path: "/r/s.jsonl" }] })).toBe("/r/session/checks-3.txt")
+  })
+})
+
+describe("readStepLog", () => {
+  test("prints a failed checks round's output as written", async () => {
+    await withDb(async (home, db) => {
+      const runDir = await run(db, home, "run-f", "running", "# Checks\n")
+      const stepId = await Effect.runPromise(recordStep(db, { runId: "run-f", name: "checks", attempt: 1, status: "failed", started: "2026-11-13T10:02:00.000Z" }))
+      await writeFile(join(runDir, "checks-1.txt"), "test: 1 failed\nexpected 2, got 3\n")
+      await Effect.runPromise(recordEvidence(db, { stepId, direction: "out", path: join(runDir, "checks-1.txt"), kind: "checks" }))
+      const text = await Effect.runPromise(readStepLog(db, "run-f", stepId).pipe(Effect.provide(BunServices.layer)))
+      expect(text).toBe("test: 1 failed\nexpected 2, got 3\n")
+    })
+  })
+
+  test("an agent step whose log is not written yet reads empty instead of failing", async () => {
+    await withDb(async (home, db) => {
+      await run(db, home, "run-g", "running", "# Agent\n")
+      const stepId = await Effect.runPromise(recordStep(db, { runId: "run-g", name: "implement", attempt: 1, status: "running", started: "2026-11-13T10:02:00.000Z" }))
+      const text = await Effect.runPromise(readStepLog(db, "run-g", stepId).pipe(Effect.provide(BunServices.layer)))
+      expect(text).toBe("")
+    })
+  })
+
+  test("a step of another run is refused rather than read", async () => {
+    await withDb(async (home, db) => {
+      await run(db, home, "run-h", "running", "# One\n")
+      await run(db, home, "run-i", "running", "# Two\n")
+      const stepId = await Effect.runPromise(recordStep(db, { runId: "run-i", name: "implement", attempt: 1, status: "running", started: "2026-11-13T10:02:00.000Z" }))
+      const error = await Effect.runPromise(Effect.flip(readStepLog(db, "run-h", stepId).pipe(Effect.provide(BunServices.layer))))
+      expect(error._tag).toBe("UnknownStep")
+    })
+  })
+})
