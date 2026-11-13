@@ -9,6 +9,7 @@ export type OrcArgs =
   | { readonly kind: "ListRuns"; readonly json: boolean }
   | { readonly kind: "ListRefusals"; readonly json: boolean }
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
+  | { readonly kind: "ShowStepLog"; readonly runId: string; readonly stepId: number }
   | { readonly kind: "ScoreStep"; readonly runId: string; readonly step: string; readonly score: number; readonly note: string }
   | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly taskKind: TaskKind; readonly delivery: RunDelivery; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly instructions: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
   | { readonly kind: "Dispatch"; readonly args: Exclude<DispatchArgs, { readonly kind: "UsageError" }> }
@@ -31,6 +32,16 @@ const parseShowArgs = (rest: readonly string[]): OrcArgs => {
     return { kind: "UsageError", detail: `unexpected argument: ${extra[0]}` }
   }
   return { kind: "ShowRun", id, json: true }
+}
+const parseLogArgs = (rest: readonly string[]): OrcArgs => {
+  if (rest.length !== 2) {
+    return { kind: "UsageError", detail: "orc log takes a run id and a step id from orc show --json" }
+  }
+  const [runId, stepText] = rest
+  if (!/^[1-9][0-9]*$/.test(stepText)) {
+    return { kind: "UsageError", detail: `orc log takes a step id from orc show --json, got "${stepText}"` }
+  }
+  return { kind: "ShowStepLog", runId, stepId: Number(stepText) }
 }
 const parseScoreArgs = (rest: readonly string[]): OrcArgs => {
   if (rest.length < 3) {
@@ -253,7 +264,7 @@ const asksForHelp = (rest: readonly string[]): boolean => {
   const end = words.indexOf("--")
   return (end === -1 ? words : words.slice(0, end)).some((word) => helpFlags.has(word))
 }
-const subcommands = new Set(["app", "runs", "refusals", "show", "score", "run", "chat", "backlog", "attention", "beat", "runner", "merge", "heavy"])
+const subcommands = new Set(["app", "runs", "refusals", "show", "log", "score", "run", "chat", "backlog", "attention", "beat", "runner", "merge", "heavy"])
 const dispatchSubcommands = ["backlog", "attention", "beat", "runner", "merge", "heavy"] as const
 type DispatchSubcommand = typeof dispatchSubcommands[number]
 const isDispatchSubcommand = (word: string): word is DispatchSubcommand => (dispatchSubcommands as ReadonlyArray<string>).includes(word)
@@ -302,6 +313,9 @@ const parseWords = (args: readonly string[]): OrcArgs => {
   }
   if (first === "show") {
     return parseShowArgs(rest)
+  }
+  if (first === "log") {
+    return parseLogArgs(rest)
   }
   if (first === "score") {
     return parseScoreArgs(rest)
