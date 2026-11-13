@@ -118,6 +118,7 @@ const expectedFiles = [
   "src/features/queueing-a-task/runner-instructions.ts",
   "src/features/queueing-a-task/runner-request.ts",
   "src/entities/backlog/runner-label.ts",
+  "src/entities/backlog/notes.ts",
   "src/features/queueing-a-task/runner-result.ts",
   "src/features/queueing-a-task/runner.ts",
   "src/entities/backlog/split.ts",
@@ -190,7 +191,9 @@ const expectedFiles = [
   "src/features/attention-list/index.ts",
   "src/features/decider/index.ts",
   "src/features/merging-a-pr/index.ts",
-  "src/features/seeing-runs/index.ts"
+  "src/features/seeing-runs/index.ts",
+  "src/features/task-thread/index.ts",
+  "src/features/task-thread/note.ts"
 ]
 
 const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => {
