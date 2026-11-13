@@ -211,9 +211,7 @@ const migrate = (db: Database): Effect.Effect<void, HistoryError> =>
     )
   })
 
-export const openDatabase = (
-  homeDir: string
-): Effect.Effect<Database, HistoryError, FileSystem.FileSystem | Path.Path> =>
+export const openDatabase = (homeDir: string): Effect.Effect<Database, HistoryError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
@@ -335,24 +333,16 @@ export const stoppedEndReason = "the run was stopped"
 
 const runColumns = "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox, kind, delivery FROM runs"
 
-export const runById = (
-  db: Database,
-  id: string
-): Effect.Effect<RunRecord | null, Schema.SchemaError | SqliteFailure> =>
+export const runById = (db: Database, id: string): Effect.Effect<RunRecord | null, Schema.SchemaError | SqliteFailure> =>
   sqlite(() => db.query(runColumns + " WHERE id = ?").get(id)).pipe(Effect.flatMap(decodedRunRow))
 
-export const listRuns = (
-  db: Database,
-  limit = 20
-): Effect.Effect<ReadonlyArray<RunRecord>, Schema.SchemaError | SqliteFailure> =>
+export const listRuns = (db: Database, limit = 20): Effect.Effect<ReadonlyArray<RunRecord>, Schema.SchemaError | SqliteFailure> =>
   sqlite(() => db.query(runColumns + " ORDER BY started DESC, id ASC LIMIT ?").all(limit)).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(RunSqlRowSchema))),
     Effect.map((rows) => rows.map(runRecordOf))
   )
 
-export const listAllRuns = (
-  db: Database
-): Effect.Effect<ReadonlyArray<RunRecord>, Schema.SchemaError | SqliteFailure> =>
+export const listAllRuns = (db: Database): Effect.Effect<ReadonlyArray<RunRecord>, Schema.SchemaError | SqliteFailure> =>
   sqlite(() => db.query(runColumns + " ORDER BY started DESC, id ASC").all()).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(RunSqlRowSchema))),
     Effect.map((rows) => rows.map(runRecordOf))
@@ -405,5 +395,4 @@ export const markRunStopped = (db: Database, runId: string, ended: string, endRe
     )
   })
 
-export const historyFailure = (action: string, cause: unknown): OrcRunError =>
-  new OrcRunError({ message: "orc: cannot " + action + " the run history: " + formatHistoryError(cause) })
+export const historyFailure = (action: string, cause: unknown): OrcRunError => new OrcRunError({ message: "orc: cannot " + action + " the run history: " + formatHistoryError(cause) })

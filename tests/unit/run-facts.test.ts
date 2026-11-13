@@ -53,8 +53,8 @@ describe("readListedRuns", () => {
       const runDir = await run(db, home, "run-a", "running", "# Ask twice\n")
       await writeFile(join(runDir, "asking.json"), asking(2))
       const [entry] = await listed(db)
-      expect(entry?.questions).toBe(2)
-      expect(entry?.title).toBe("Ask twice")
+      expect(entry.questions).toBe(2)
+      expect(entry.title).toBe("Ask twice")
     })
   })
 
@@ -63,7 +63,7 @@ describe("readListedRuns", () => {
       const runDir = await run(db, home, "run-b", "failed", "# Ended\n")
       await writeFile(join(runDir, "asking.json"), asking(1))
       const [entry] = await listed(db)
-      expect(entry?.questions).toBe(0)
+      expect(entry.questions).toBe(0)
     })
   })
 
@@ -73,7 +73,7 @@ describe("readListedRuns", () => {
       await Effect.runPromise(recordStep(db, { runId: "run-c", name: "fix", attempt: 1, status: "running", started: "2026-11-13T10:02:00.000Z" }))
       await Effect.runPromise(recordStep(db, { runId: "run-c", name: "checks", attempt: 1, status: "failed", started: "2026-11-13T10:03:00.000Z", ended: "2026-11-13T10:04:00.000Z" }))
       const [entry] = await listed(db)
-      expect(entry?.step).toMatchObject({ name: "fix", attempt: 1, status: "running" })
+      expect(entry.step).toMatchObject({ name: "fix", attempt: 1, status: "running" })
     })
   })
 
@@ -141,7 +141,7 @@ describe("readStepLog", () => {
       await run(db, home, "run-i", "running", "# Two\n")
       const stepId = await Effect.runPromise(recordStep(db, { runId: "run-i", name: "implement", attempt: 1, status: "running", started: "2026-11-13T10:02:00.000Z" }))
       const error = await Effect.runPromise(Effect.flip(readStepLog(db, "run-h", stepId).pipe(Effect.provide(BunServices.layer))))
-      expect(error._tag).toBe("UnknownStep")
+      expect(error["_tag"]).toBe("UnknownStep")
     })
   })
 
@@ -165,7 +165,7 @@ describe("readStepLog", () => {
       await run(db, home, "run-k", "failed", "# Agent\n")
       const stepId = await Effect.runPromise(recordStep(db, { runId: "run-k", name: "implement", attempt: 1, status: "failed", started: "2026-11-13T10:02:00.000Z" }))
       const error = await Effect.runPromise(Effect.flip(readStepLog(db, "run-k", stepId).pipe(Effect.provide(BunServices.layer))))
-      expect(error._tag).toBe("NoStepLog")
+      expect(error["_tag"]).toBe("NoStepLog")
     })
   })
 

@@ -136,7 +136,7 @@ export default class OrcAgents extends View {
 
   selectedCard(): Card | null {
     const cards = this.visibleCards()
-    return cards.find((card) => card.key === this.selectedKey) ?? cards[0] ?? null
+    return cards.find((card) => card.key === this.selectedKey) ?? cards.at(0) ?? null
   }
 
   currentSteps(card: Card): Reading<Show> | null {

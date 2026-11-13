@@ -1,5 +1,5 @@
 export { decodeRunsJson, encodeRunsJson, formatRunsTable, runsJson } from "./run-history-view"
-export { type ListedRun, readListedRuns, runDirOf, titleOf } from "./run-facts"
+export { readListedRuns, titleOf } from "./run-facts"
 export { InvalidScore, recordStepScore, UnknownRun, UnknownStep } from "./run-scores"
 export { decodeShowJson, encodeShowJson, formatShow, readShow } from "./show"
-export { NoStepLog, readStepLog, stepLogFile } from "./step-log"
+export { readStepLog, stepLogFile } from "./step-log"

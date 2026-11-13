@@ -96,7 +96,7 @@ const questionCount = (record: Fields, name: string, at: string): Guarded<number
   const questions = arrayOf(holder.value, "questions", child(at, name), question)
   if (questions.kind === "refused") return questions
   const raw = holder.value["questions"]
-  const open = Array.isArray(raw) ? raw.filter((entry) => entry === null || typeof entry !== "object" || (entry as Fields)["answer"] === null || (entry as Fields)["answer"] === undefined).length : questions.value.length
+  const open = Array.isArray(raw) ? raw.filter((entry) => !isFields(entry) || entry["answer"] === null || entry["answer"] === undefined).length : questions.value.length
   return ok(open)
 }
 

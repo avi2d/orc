@@ -44,7 +44,7 @@ const prNumber = (link: string): string => {
 
 const questionsLabel = (count: number): string => count === 1 ? "Question 1" : `Questions 1-${count}`
 
-export const stepLabel = (step: Pick<Step, "name" | "attempt">): string => {
+const stepLabel = (step: Pick<Step, "name" | "attempt">): string => {
   switch (step.name) {
     case "implement":
       return "Agent"
@@ -124,7 +124,7 @@ export const buildCards = (runs: Runs, backlog: Backlog): ReadonlyArray<Card> =>
   return sortCards(cards)
 }
 
-export const sortCards = (cards: ReadonlyArray<Card>): ReadonlyArray<Card> =>
+const sortCards = (cards: ReadonlyArray<Card>): ReadonlyArray<Card> =>
   cardStatuses.flatMap((status) => cards.filter((card) => card.standing.status === status))
 
 export const filterCards = (cards: ReadonlyArray<Card>, filter: Filter): ReadonlyArray<Card> =>
