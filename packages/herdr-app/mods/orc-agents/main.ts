@@ -94,8 +94,7 @@ export default class OrcAgents extends View {
   command(cx: Context, name: string): void {
     switch (name) {
       case "fold":
-        this.folded = !this.folded
-        cx.notify()
+        this.toggleFold(cx)
         return
       case "run-next":
       case "run-prev": {
@@ -203,6 +202,11 @@ export default class OrcAgents extends View {
     cx.notify()
   }
 
+  toggleFold(cx: Context): void {
+    this.folded = !this.folded
+    cx.notify()
+  }
+
   setFilter(cx: Context, filter: Filter): void {
     this.filter = filter
     this.chosenStep = null
@@ -282,10 +286,7 @@ export default class OrcAgents extends View {
   foldButton(t: Palette, id: string, label: string): Element {
     return div().id(id).px(8).py(2).rounded(4).cursor_pointer().text_size(15).text_color(t.muted)
       .hover((style) => style.bg(t.hover))
-      .on_click((_event, cx) => {
-        this.folded = !this.folded
-        cx.notify()
-      })
+      .on_click((_event, cx) => this.toggleFold(cx))
       .child(label)
   }
 
