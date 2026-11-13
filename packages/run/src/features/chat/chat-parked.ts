@@ -8,11 +8,19 @@ export const ParkedJson = Schema.Struct({
   questions: Schema.Array(Schema.Struct({ ...QuestionJson.fields, asked: Schema.String }))
 })
 
+const HoldHistoryEntry = Schema.Struct({
+  reason: Schema.String,
+  until: Schema.NullOr(Schema.String),
+  questions: Schema.Array(QuestionJson),
+  answer: Schema.Struct({ words: Schema.String, at: Schema.String })
+})
+
 export const HoldJson = Schema.Struct({
   reason: Schema.String,
   until: Schema.NullOr(Schema.String),
   questions: Schema.Array(QuestionJson),
-  answer: Schema.NullOr(Schema.Struct({ words: Schema.String, at: Schema.String }))
+  answer: Schema.NullOr(Schema.Struct({ words: Schema.String, at: Schema.String })),
+  history: Schema.optional(Schema.Array(HoldHistoryEntry))
 })
 export type HoldJson = typeof HoldJson.Type
 

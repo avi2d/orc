@@ -13,15 +13,15 @@ import { runDispatch } from "./app/dispatch-cli"
 import { RunnerError } from "./shared/process/index"
 import { formatReport, formatReportOutcome, runAgentStep, runReportStep } from "./features/running-a-task/index"
 import type { ReportKind } from "./entities/backlog/index"
-import { encodeRefusalsJson, formatHistoryError, formatRefusalsTable, listRuns, openDatabase, orcHomeDir, readRefusals } from "./entities/run-history/index"
-import { encodeRunsJson, encodeShowJson, formatRunsTable, formatShow, readShow, recordStepScore } from "./features/seeing-runs/index"
+import { encodeRefusalsJson, formatHistoryError, formatRefusalsTable, listAllRuns, listRuns, openDatabase, orcHomeDir, readRefusals } from "./entities/run-history/index"
+import { encodeRunsJson, encodeShowJson, formatRunsTable, formatShow, readListedRuns, readShow, readStepLog, recordStepScore } from "./features/seeing-runs/index"
 
-const usage = "Usage: orc [--version] [--help] | orc app install | orc chat | orc runs [--json] | orc refusals [--json] | orc show <run> [--json] | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--kind ship|scout|task|parent] [--delivery no-mistakes|direct-PR] [--branch <name>] [--sandbox nono|none] [--token-file <path>] [--provider <id>] [--instructions <path>] [--allow ask-user] [--answer <question-or-finding-id>=\"<text>\"] | " + dispatchUsage
+const usage = "Usage: orc [--version] [--help] | orc app install | orc chat | orc runs [--json] | orc refusals [--json] | orc show <run> [--json] | orc log <run> <step-id> | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--kind ship|scout|task|parent] [--delivery no-mistakes|direct-PR] [--branch <name>] [--sandbox nono|none] [--token-file <path>] [--provider <id>] [--instructions <path>] [--allow ask-user] [--answer <question-or-finding-id>=\"<text>\"] | " + dispatchUsage
 
 const readFailure = (error: unknown): string =>
   typeof error === "string" ? error : "orc: cannot read the run history: " + formatHistoryError(error)
 
-const readHistory = <A, E>(use: (db: Database) => Effect.Effect<A, E>) =>
+const readHistory = <A, E, R extends BunServices.BunServices>(use: (db: Database) => Effect.Effect<A, E, R>) =>
   Effect.acquireUseRelease(
     openDatabase(orcHomeDir(Bun.env.ORC_HOME)),
     use,
@@ -92,7 +92,7 @@ const chat = runChat(orcHomeDir(Bun.env.ORC_HOME), [process.execPath, Bun.main])
 
 const shipStep = (args: Extract<OrcArgs, { readonly kind: "RunAgent" }>) =>
   Effect.gen(function*() {
-    const report = yield* runAgentStep({ cwd: process.cwd(), taskFile: args.taskFile, delivery: args.delivery, branch: args.branch, sandbox: args.sandbox, tokenFile: args.tokenFile, provider: args.provider, instructions: args.instructions, allow: args.allow, answers: args.answers }).pipe(
+    const report = yield* runAgentStep({ cwd: process.cwd(), taskFile: args.taskFile, delivery: args.delivery, branch: args.branch, sandbox: args.sandbox, tokenFile: args.tokenFile, provider: args.provider, instructions: args.instructions, allow: args.allow, answers: args.answers, resumeRun: Bun.env.ORC_DISPATCH_RESUME_RUN, runId: Bun.env.ORC_DISPATCH_RUN_ID }).pipe(
       Effect.provide(BunServices.layer),
       Effect.catchTag("OrcRunError", (error) =>
         Console.error(error.message).pipe(Effect.andThen(Effect.fail("agent step refused")))
@@ -118,11 +118,11 @@ const reportStep = (args: Extract<OrcArgs, { readonly kind: "RunAgent" }>, kind:
 
 const printRuns = (args: Extract<OrcArgs, { readonly kind: "ListRuns" }>) =>
   Effect.gen(function*() {
-    const runs = yield* readHistory((db) => listRuns(db))
     if (args.json) {
-      yield* Console.log(yield* encodeRunsJson(runs))
+      const listed = yield* readHistory((db) => listAllRuns(db).pipe(Effect.flatMap((runs) => readListedRuns(db, runs))))
+      yield* Console.log(yield* encodeRunsJson(listed))
     } else {
-      yield* Console.log(formatRunsTable(runs))
+      yield* Console.log(formatRunsTable(yield* readHistory((db) => listRuns(db))))
     }
   })
 
@@ -148,6 +148,20 @@ const printShow = (args: Extract<OrcArgs, { readonly kind: "ShowRun" }>) =>
     } else {
       yield* Console.log(formatShow(document))
     }
+  })
+
+const printStepLog = (args: Extract<OrcArgs, { readonly kind: "ShowStepLog" }>) =>
+  Effect.gen(function*() {
+    const text = yield* readHistory((db) =>
+      readStepLog(db, args.runId, args.stepId).pipe(
+        Effect.catchTags({
+          UnknownRun: () => Effect.fail("orc: unknown run " + args.runId),
+          UnknownStep: () => Effect.fail("orc: run " + args.runId + " has no step " + args.stepId.toString()),
+          NoStepLog: () => Effect.fail("orc: step " + args.stepId.toString() + " of run " + args.runId + " keeps no log")
+        })
+      )
+    )
+    yield* Effect.promise(() => Bun.write(Bun.stdout, text))
   })
 
 const runInstallApp = Effect.gen(function*() {
@@ -179,6 +193,9 @@ const program = Effect.gen(function*() {
     }
     case "ShowRun": {
       return yield* printShow(args)
+    }
+    case "ShowStepLog": {
+      return yield* printStepLog(args)
     }
     case "ScoreStep": {
       return yield* scoreStep(args)

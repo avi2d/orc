@@ -36,6 +36,7 @@ export interface ResumePlan {
   readonly fixSessionFile: string | null
   readonly fixRunning: boolean
   readonly handover: string | null
+  readonly priorDir: string | null
 }
 
 export interface AgentOutcome {

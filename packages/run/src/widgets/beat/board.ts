@@ -53,11 +53,13 @@ type TaskJson = {
 } & TaskStatusJson
 
 interface ParkedJson {
+  readonly origin?: Parked["origin"]
   readonly branch: string
   readonly questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly asked: string; readonly answer: { readonly words: string; readonly at: string } | null }>
 }
 
 const parkedJson = (parked: Parked): ParkedJson => ({
+  ...(parked.origin === undefined ? {} : { origin: parked.origin }),
   branch: parked.branch,
   questions: parked.questions.map((question) => ({
     id: question.id,
@@ -71,6 +73,7 @@ interface BacklogJson {
   readonly schema: typeof BACKLOG_JSON_SCHEMA
   readonly tasks: ReadonlyArray<TaskJson>
   readonly events: ReadonlyArray<ChatEvent>
+  readonly merged: ReadonlyArray<string>
   readonly projects: ReadonlyArray<Project> | null
   readonly room: ReadonlyArray<MachineRoom> | null
 }
@@ -126,6 +129,7 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     ...claimJson(record)
   })),
   events: view.events,
+  merged: [...view.merged],
   projects: view.projects.kind === "read" ? view.projects.projects : null,
   room: view.room.kind === "read" ? view.room.room : null
 })

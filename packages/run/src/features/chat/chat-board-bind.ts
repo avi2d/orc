@@ -2,7 +2,7 @@ import { type BacklogTask, type Decision, parkedReason } from "./chat-backlog"
 import type { BoardCardRecord, BoardRecord } from "./chat-board-page"
 
 export const matchesRecord = (task: Decision, record: BoardRecord): boolean => {
-  if (task.waits !== record.waits || task.reason !== record.reason) {
+  if (task.waits !== record.waits || task.reason !== record.reason || task.generation !== (record.generation ?? 0)) {
     return false
   }
   const covers = record.cards.every((card) => {
@@ -25,7 +25,7 @@ export const completedWords = (record: BoardRecord, task: BacklogTask) => (card:
     return null
   }
   if (record.waits === "held") {
-    if (task.hold === null || task.hold.reason !== record.reason) {
+    if (task.hold === null || task.hold.reason !== record.reason || (task.hold.history?.length ?? 0) !== (record.generation ?? 0)) {
       return null
     }
     const target = card.target

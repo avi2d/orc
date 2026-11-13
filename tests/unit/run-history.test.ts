@@ -83,7 +83,9 @@ describe("openDatabase", () => {
         "ended",
         "pr_link",
         "end_reason",
-        "sandbox"
+        "sandbox",
+        "kind",
+        "delivery"
       ])
       expect(columnNames(db, "steps")).toEqual([
         "id",
@@ -120,8 +122,8 @@ describe("openDatabase", () => {
       v1.close()
       const db = await openDb(home)
       try {
-        expect((await readRuns(db)).map((run) => [run.id, run.sandbox])).toEqual([["old-run", null]])
-        expect(columnNames(db, "runs").at(-1)).toBe("sandbox")
+        expect((await readRuns(db)).map((run) => [run.id, run.sandbox, run.kind, run.delivery])).toEqual([["old-run", null, null, null]])
+        expect(columnNames(db, "runs").slice(-3)).toEqual(["sandbox", "kind", "delivery"])
       } finally {
         db.close()
       }
@@ -327,32 +329,42 @@ describe("runsJson", () => {
       ended: "2026-10-18T10:05:00.000Z",
       prLink: "https://github.com/avi2d/orc/pull/1",
       endReason: null,
-      sandbox: "nono"
+      sandbox: "nono",
+      kind: "ship",
+      delivery: null
     }
   ]
 
+  const facts = listed.map((run) => ({ run, title: "Fix the gate", step: { id: 4, name: "checks", attempt: 2, status: "failed" as const }, questions: 0 }))
+
   test("names the schema version first, then the runs", () => {
-    const document = runsJson(listed)
+    const document = runsJson(facts)
     expect(Object.keys(document)).toEqual(["schema", "runs"])
     expect(document.schema).toBe(RUNS_JSON_SCHEMA)
     expect(document.schema).toBe("orc.runs.v1")
   })
 
   test("carries the listed facts for every run", () => {
-    const document = runsJson(listed)
+    const document = runsJson(facts)
     expect(document.runs).toHaveLength(1)
-    expect(Object.keys(document.runs[0] ?? {})).toEqual(["id", "project", "branch", "status", "prLink"])
+    expect(Object.keys(document.runs[0] ?? {})).toEqual(["id", "project", "branch", "status", "prLink", "title", "step", "questions", "endReason", "kind", "delivery"])
     expect(document.runs[0]).toEqual({
       id: "run-1",
       project: "orc",
       branch: "orc/x",
       status: "succeeded",
-      prLink: "https://github.com/avi2d/orc/pull/1"
+      prLink: "https://github.com/avi2d/orc/pull/1",
+      title: "Fix the gate",
+      step: { id: 4, name: "checks", attempt: 2, status: "failed" },
+      questions: 0,
+      endReason: null,
+      kind: "ship",
+      delivery: null
     })
   })
 
   test("a JSON round trip keeps the version first", () => {
-    const text = JSON.stringify(runsJson(listed))
+    const text = JSON.stringify(runsJson(facts))
     expect(text.startsWith('{"schema":"orc.runs.v1"')).toBe(true)
     const document = Schema.decodeUnknownSync(Schema.Struct({ schema: Schema.String }))(JSON.parse(text))
     expect(Object.keys(document)[0]).toBe("schema")
@@ -377,7 +389,9 @@ describe("formatRunsTable", () => {
         ended: null,
         prLink: null,
         endReason: null,
-        sandbox: "nono"
+        sandbox: "nono",
+        kind: null,
+        delivery: null
       }
     ])
     const [header, row] = table.split("\n")
@@ -401,7 +415,9 @@ describe("formatRunsTable", () => {
       ended: null,
       prLink: null,
       endReason: null,
-      sandbox: "nono"
+      sandbox: "nono",
+      kind: null,
+      delivery: null
     }
     const table = formatRunsTable([run, { ...run, id: "run-2", prLink: "https://github.com/avi2d/orc/pull/1" }])
     expect(table.split("\n")).toEqual([

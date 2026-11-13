@@ -36,13 +36,23 @@ describe("a split sibling wait", () => {
     expect(taskWait(later, tasks, new Set(), () => false)).toBe("waits on orc-2")
     expect(taskWait(later, tasks, new Set(["orc-2"]), () => false)).toBeNull()
   })
-  test("an unrelated task starts once its dependency closes done instead of waiting for the merge", () => {
+  test("an unrelated ship task waits for its dependency PR to merge instead of starting on done", () => {
     const other: TaskRecord = {
       spec: { ...spec, id: "orc-9", title: "Unrelated", parent: null, dependsOn: ["orc-2"] },
       hold: null,
       parked: null,
       state: { kind: "new" }
     }
-    expect(taskWait(other, [...tasks, other], new Set(), () => false)).toBeNull()
+    expect(taskWait(other, [...tasks, other], new Set(), () => false)).toBe("waits on orc-2")
+    expect(taskWait(other, [...tasks, other], new Set(["orc-2"]), () => false)).toBeNull()
+  })
+  test("an unrelated scout task starts once its ship dependency closes done instead of waiting for the merge", () => {
+    const scout: TaskRecord = {
+      spec: { ...spec, id: "orc-9", title: "Unrelated", kind: "scout", parent: null, dependsOn: ["orc-2"] },
+      hold: null,
+      parked: null,
+      state: { kind: "new" }
+    }
+    expect(taskWait(scout, [...tasks, scout], new Set(), () => false)).toBeNull()
   })
 })

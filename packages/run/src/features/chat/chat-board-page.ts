@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import type { ExpectedDecision } from "../../entities/parked-runs/index"
 
 const CardTarget = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("question"), id: Schema.String }),
@@ -21,7 +22,8 @@ export const BoardRecord = Schema.Struct({
   reason: Schema.String,
   openedAt: Schema.String,
   board: Schema.String,
-  cards: Schema.NonEmptyArray(BoardCardRecord)
+  cards: Schema.NonEmptyArray(BoardCardRecord),
+  generation: Schema.optional(Schema.Number)
 })
 export type BoardRecord = typeof BoardRecord.Type
 
@@ -35,8 +37,15 @@ export const cardKey = (target: CardTarget): string => target.kind === "question
 export const answerWords = (answer: BoardAnswer): string =>
   answer.words === undefined || answer.words.trim() === "" ? answer.answer : answer.answer + " — " + answer.words
 
-export const answerArgs = (task: string, target: CardTarget, words: string): ReadonlyArray<string> =>
-  ["backlog", "answer", task, target.kind === "question" ? target.id + "=" + words : words]
+export const answerArgs = (task: string, target: CardTarget, words: string, expected?: ExpectedDecision): ReadonlyArray<string> => {
+  const asked = target.kind === "question" ? target.id + "=" + words : words
+  if (expected === undefined) {
+    return ["backlog", "answer", task, asked]
+  }
+  return expected.kind === "parked"
+    ? ["backlog", "answer", task, "--expect", "parked", asked]
+    : ["backlog", "answer", task, "--expect", "held", "--generation", String(expected.generation), asked]
+}
 
 const escapeHtml = (text: string): string =>
   text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\"", "&quot;").replaceAll("'", "&#39;")
