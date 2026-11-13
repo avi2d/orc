@@ -2,6 +2,20 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.14.0
+
+Released 2026-11-13.
+
+### Features
+
+- **run:** ask on a repeated failing command and pause a looping run [#177](https://github.com/avi2d/orc/pull/177)
+- **run:** split an overflowing child into siblings under its parent [#147](https://github.com/avi2d/orc/pull/147)
+- **run:** apply worker split proposal and start children [#144](https://github.com/avi2d/orc/pull/144)
+
+### Fixes
+
+- **run:** decide heavy stand in calls in TypeScript with fail open classifier [#146](https://github.com/avi2d/orc/pull/146)
+
 ## 0.13.0
 
 Released 2026-11-11.
