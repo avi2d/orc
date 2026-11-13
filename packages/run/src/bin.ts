@@ -5,7 +5,7 @@ import { BunServices } from "@effect/platform-bun"
 import { isatty } from "node:tty"
 import { Config, Console, Effect } from "effect"
 import packageJson from "../package.json" with { type: "json" }
-import { appHomeDir, bundledAppDir, formatAppInstall, installApp } from "./features/installing-the-app/index"
+import { appHomeDir, bundledAppDir, formatAppInstall, herdrAppSourceDir, installApp, readyBundledApp } from "./features/installing-the-app/index"
 import { type OrcArgs, parseArgs } from "./app/args"
 import { runChat } from "./features/chat/index"
 import { dispatchUsage } from "./app/dispatch-args"
@@ -152,7 +152,8 @@ const printShow = (args: Extract<OrcArgs, { readonly kind: "ShowRun" }>) =>
 
 const runInstallApp = Effect.gen(function*() {
   const home = yield* Config.String("HOME")
-  const result = yield* installApp(bundledAppDir(), appHomeDir(home)).pipe(
+  const result = yield* readyBundledApp(herdrAppSourceDir(), bundledAppDir()).pipe(
+    Effect.andThen((source) => installApp(source, appHomeDir(home))),
     Effect.provide(BunServices.layer),
     Effect.catchTag("AppInstallError", (error) => Console.error("orc app install: " + error.detail).pipe(Effect.andThen(Effect.fail("orc app install refused"))))
   )
