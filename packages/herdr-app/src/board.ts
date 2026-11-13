@@ -14,15 +14,6 @@ export interface BoardTask {
 }
 
 export const titleLines = 2
-export const titleWidth = 30
-
-export const cardTitle = (title: string): ReadonlyArray<string> => {
-  const rows: Array<string> = []
-  for (let at = 0; at < title.length && rows.length < titleLines; at += titleWidth) {
-    rows.push(title.slice(at, at + titleWidth))
-  }
-  return rows
-}
 
 export const laneFor = (task: BoardTask, attention: ReadonlySet<string>): Lane => {
   if (task.held || task.parked || attention.has(task.id) || (task.status === "closed" && task.prState === "open")) return "Awaiting you"

@@ -1,7 +1,7 @@
 import { type AsyncContext, type Context, type Element, View, div } from "gpui-kit"
 import { h_flex, v_flex } from "gpui-base"
 import { layout } from "herdr"
-import { type BoardTask, cardTitle, type Lane, lanes, tasksInLane, titleLines } from "../../src/board"
+import { type BoardTask, type Lane, lanes, tasksInLane, titleLines } from "../../src/board"
 import { type BoardAttention, type BoardBacklog, boardAttention, boardBacklog } from "../../src/guard"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
@@ -112,6 +112,6 @@ export default class OrcBoard extends View {
       .hover((style) => style.bg(selected ? t.selected : t.hover))
       .on_click((_event, cx) => { this.selected = task.id; cx.notify() })
       .child(h_flex().gap(8).child(div().font_semibold().child(task.id)).child(div().text_color(t.dim).child(kindLabel(task.kind))))
-      .child(div().h(titleLines * 18).line_height("18px").overflow_hidden().children(cardTitle(task.title).map((line) => div().child(line))))
+      .child(div().h(titleLines * 18).line_height("18px").overflow_hidden().child(task.title))
   }
 }
