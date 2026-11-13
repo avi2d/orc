@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test"
-import { clipTitle } from "../../../packages/herdr-app/src/board"
+import { cardTitle } from "../../../packages/herdr-app/src/board"
 
-test("a three-line title shows two lines instead of all three", () => {
-  expect(clipTitle("first\nsecond\nthird")).toBe("first\nsecond")
+test("a title wrapping to three lines shows two instead of all three", () => {
+  expect(cardTitle("0123456789".repeat(7))).toEqual(["012345678901234567890123456789", "012345678901234567890123456789"])
 })
 
-test("a two-line title keeps both lines instead of dropping one", () => {
-  expect(clipTitle("first\nsecond")).toBe("first\nsecond")
+test("a short title stays whole instead of being split", () => {
+  expect(cardTitle("Fix the login page")).toEqual(["Fix the login page"])
 })

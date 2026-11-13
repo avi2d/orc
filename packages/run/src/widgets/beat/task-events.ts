@@ -63,12 +63,16 @@ export const prEvents = (
     if (state !== "OPEN" && state !== "CLOSED" && state !== "MERGED") {
       return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: "unknown PR state " + state })
     }
-    yield* writePrState(root, id, pr, state === "OPEN" ? "open" : state === "CLOSED" ? "closed" : "merged")
-    if (task.spec.kind !== "ship") return Option.none()
+    const prState = state === "OPEN" ? "open" : state === "CLOSED" ? "closed" : "merged"
+    if (task.spec.kind !== "ship") {
+      yield* writePrState(root, id, pr, prState)
+      return Option.none()
+    }
     yield* routePullRequest(root, id, pr, view.success, at)
     const event = prEvent(task, pr, view.success, at, yield* eventRecorded(root, id + ".pr-ready"))
     if (event !== null) {
       yield* recordEvent(root, event)
     }
+    yield* writePrState(root, id, pr, prState)
     return Option.none()
   })
