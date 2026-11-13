@@ -62,8 +62,6 @@ A ship run shows Agent, Checks, Fix when checks fail, and No mistakes for the st
 A step shows ✓ when it passed, ✗ when it failed, ● while it runs, ◆ while it waits for you, and ○ when it has not started.
 Select a step to show its output on the right: the Agent and Fix steps show what Pi writes as it works, and a Checks step shows the checks' output.
 The output shows the full log and follows new lines as they are written.
-
-The tab folds the list to a rail of ids when you select «, and opens it again when you select ».
 Use your `layout.switch` key to go back to your own layout.
 
 ## Change the mods
