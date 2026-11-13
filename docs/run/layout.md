@@ -46,6 +46,12 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/backlog-planning/backlog-hold.ts` | The task hold writes and the refusal when a task is already held |
 | `packages/run/src/features/backlog-planning/backlog-edit.ts` | The `orc backlog edit` rewrite of a new task's title and body |
 
+## features/task-thread
+
+| Path | What it holds |
+| --- | --- |
+| `packages/run/src/features/task-thread/note.ts` | The `orc backlog note` command and its refusal of a task id the backlog does not hold |
+
 ## features/chat
 
 | Path | What it holds |
@@ -157,6 +163,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/backlog/runner-label.ts` | The task branch names, the run labels and the file keys the runner files use |
 | `packages/run/src/entities/backlog/task-kind.ts` | The task kinds `ship`, `scout`, `task` and `parent`, the agent report file name and the run folder |
 | `packages/run/src/entities/backlog/task-record-render.ts` | The task file rendering from a task record |
+| `packages/run/src/entities/backlog/notes.ts` | The task notes under `notes/`: one `<task-id>.jsonl` file per task, each note one appended line with its time, writer and text |
 
 ## entities/events
 

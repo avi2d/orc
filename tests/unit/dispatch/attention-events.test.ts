@@ -74,7 +74,7 @@ const itemFiles = async (root: string): Promise<ReadonlyArray<unknown>> => {
 
 const heldTask = (until: string, answer: { words: string; at: string } | null): TaskRecord => ({
   spec: { ...spec, id: "orc-2", title: "Pick the API" },
-  hold: { reason: "REST or gRPC", until, questions: [], answer },
+  hold: { reason: "REST or gRPC", until, questions: [], answer, at: null },
   parked: null,
   state: { kind: "new" }
 })
@@ -210,7 +210,7 @@ describe("overdue waits in the attention queue", () => {
         await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-02T00:01:00.000Z"))
         const unheld: TaskRecord = { spec: { ...spec, id: "orc-2", title: "Pick the API" }, hold: null, parked: null, state: { kind: "new" } }
         await run(routeTaskItems(root, [unheld], "2026-12-02T00:02:00.000Z"))
-        const relabelled: TaskRecord = { ...heldTask("2026-12-01", null), hold: { reason: "waiting on legal review", until: "2026-12-01", questions: [], answer: null } }
+        const relabelled: TaskRecord = { ...heldTask("2026-12-01", null), hold: { reason: "waiting on legal review", until: "2026-12-01", questions: [], answer: null, at: null } }
         await run(routeTaskItems(root, [relabelled], "2026-12-02T00:03:00.000Z"))
         const open = await run(openItems(root))
         expect(open.map(({ id }) => id)).toEqual(["orc-2.overdue-wait.2026-12-01"])
