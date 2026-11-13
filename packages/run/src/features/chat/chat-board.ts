@@ -196,7 +196,7 @@ const recordPrompt = (host: BoardHost, record: BoardRecord, prompt: BoardPrompt)
       return refusal
     }
     const words = answerWords(answer)
-    const said = yield* host.orc(answerArgs(record.task, card.target, words)).pipe(
+    const said = yield* host.orc(answerArgs(record.task, card.target, words, record.generation ?? 0)).pipe(
       Effect.catchTag("ChatToolError", (error) => Effect.succeed("orc recorded nothing: " + error.message))
     )
     host.say("From " + record.task + "'s decision board, " + card.text + " " + words + ": " + said)

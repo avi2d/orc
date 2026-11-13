@@ -36,8 +36,12 @@ export const cardKey = (target: CardTarget): string => target.kind === "question
 export const answerWords = (answer: BoardAnswer): string =>
   answer.words === undefined || answer.words.trim() === "" ? answer.answer : answer.answer + " — " + answer.words
 
-export const answerArgs = (task: string, target: CardTarget, words: string): ReadonlyArray<string> =>
-  ["backlog", "answer", task, target.kind === "question" ? target.id + "=" + words : words]
+export const answerArgs = (task: string, target: CardTarget, words: string, generation?: number): ReadonlyArray<string> => {
+  const asked = target.kind === "question" ? target.id + "=" + words : words
+  return generation === undefined
+    ? ["backlog", "answer", task, asked]
+    : ["backlog", "answer", task, "--generation", String(generation), asked]
+}
 
 const escapeHtml = (text: string): string =>
   text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\"", "&quot;").replaceAll("'", "&#39;")

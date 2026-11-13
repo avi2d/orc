@@ -150,23 +150,39 @@ const answerQuestionOn = (id: string, words: string, at: string, fresh: TaskReco
 const releasedWords = (questions: ReadonlyArray<HoldQuestion>): string =>
   questions.map((question) => question.text + ": " + (question.answer?.words ?? "")).join("\n")
 
-const answerHeldQuestionOn = (id: string, words: string, at: string, fresh: TaskRecord & { readonly hold: Hold }): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> =>
-  answerOneOf(id, words, at, fresh.hold.questions, "held", fresh).pipe(Effect.map(({ asked, answer }) => {
+const heldGenerationOf = (hold: Hold): number => hold.history?.length ?? 0
+
+const staleHold = (id: string, fresh: TaskRecord & { readonly hold: Hold }, expected: number | undefined): BacklogError | null =>
+  expected !== undefined && heldGenerationOf(fresh.hold) !== expected
+    ? new BacklogError({ detail: id + " was reheld while orc read it, so run the command again" })
+    : null
+
+const answerHeldQuestionOn = (id: string, words: string, at: string, fresh: TaskRecord & { readonly hold: Hold }, expected?: number): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
+  const stale = staleHold(id, fresh, expected)
+  if (stale !== null) {
+    return Effect.fail(stale)
+  }
+  return answerOneOf(id, words, at, fresh.hold.questions, "held", fresh).pipe(Effect.map(({ asked, answer }) => {
     const questions = fresh.hold.questions.map((candidate): HoldQuestion => candidate === asked ? { ...asked, answer } : candidate)
     const open = unanswered(questions)
     const hold: Hold = { ...fresh.hold, questions, answer: open.length === 0 ? { words: releasedWords(questions), at } : null }
     return { kind: "write", record: { ...fresh, hold }, result: { kind: "held question", question: asked.id, open } }
   }))
+}
 
-const answerOn = (id: string, words: string, at: string) => (fresh: TaskRecord): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
+const answerOn = (id: string, words: string, at: string, expected?: number) => (fresh: TaskRecord): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
   if (fresh.parked !== null) {
     return answerQuestionOn(id, words, at, { ...fresh, parked: fresh.parked })
   }
   if (!isHeld(fresh)) {
     return Effect.fail(new BacklogError({ detail: id + " is not held" + (fresh.hold?.answer == null ? "" : ": its hold was answered") }))
   }
+  const stale = staleHold(id, fresh, expected)
+  if (stale !== null) {
+    return Effect.fail(stale)
+  }
   if (fresh.hold.questions.length > 0) {
-    return answerHeldQuestionOn(id, words, at, fresh)
+    return answerHeldQuestionOn(id, words, at, fresh, expected)
   }
   if (fresh.state.kind !== "new") {
     return Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" }))
@@ -198,11 +214,12 @@ export const answerTask = (
   root: string,
   id: string,
   words: string,
-  at: string
+  at: string,
+  expected?: number
 ): Effect.Effect<AnswerOutcome, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const record = yield* findTask(root, id)
-    const decide = answerOn(id, words, at)
+    const decide = answerOn(id, words, at, expected)
     if (record.state.kind === "started" && openQuestions(record).length > 0) {
       return yield* rewriteTaken(root, id, decide)
     }

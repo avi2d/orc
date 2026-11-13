@@ -173,12 +173,16 @@ const parseHold = (rest: ReadonlyArray<string>): DispatchArgs => {
 }
 
 const parseAnswer = (rest: ReadonlyArray<string>): DispatchArgs => {
-  const [id = "", ...words] = rest
+  const [id = "", ...after] = rest
   if (!isTaskId(id)) {
     return { kind: "UsageError", detail: "orc backlog answer takes a task id, got \"" + id + "\"" }
   }
+  const [generation, ...words] = after[0] === "--generation" && after.length >= 3 ? [after[1], ...after.slice(2)] : [undefined, ...after]
+  if (generation !== undefined && !/^\d+$/.test(generation)) {
+    return { kind: "UsageError", detail: "orc backlog answer takes a hold generation after --generation, got \"" + generation + "\"" }
+  }
   const said = words.join(" ")
-  return said.trim() === "" ? { kind: "UsageError", detail: "orc backlog answer takes a task id and the captain's words" } : { kind: "AnswerTask", id, words: said }
+  return said.trim() === "" ? { kind: "UsageError", detail: "orc backlog answer takes a task id and the captain's words" } : { kind: "AnswerTask", id, words: said, ...(generation === undefined ? {} : { generation: Number(generation) }) }
 }
 
 const isItemId = (text: string): boolean => /^[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(text)

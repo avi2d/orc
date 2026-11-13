@@ -14,7 +14,7 @@ export type DispatchArgs =
   | { readonly kind: "MarkPosted"; readonly id: string }
   | { readonly kind: "MarkEventPosted"; readonly key: string }
   | { readonly kind: "HoldTask"; readonly id: string; readonly reason: string; readonly until: string | null; readonly questions: ReadonlyArray<string> }
-  | { readonly kind: "AnswerTask"; readonly id: string; readonly words: string }
+  | { readonly kind: "AnswerTask"; readonly id: string; readonly words: string; readonly generation?: number }
   | { readonly kind: "DependTask"; readonly id: string; readonly dependsOn: ReadonlyArray<string> }
   | { readonly kind: "ShowPlan"; readonly parent: string }
   | { readonly kind: "DropChild"; readonly parent: string; readonly child: string }
