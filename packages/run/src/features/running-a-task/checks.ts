@@ -81,13 +81,10 @@ const sectionOf = (outcome: CheckOutcome, stdout: string, stderr: string): strin
 
 // The section reads as the check's trimmed output between its header and exit lines, so leading whitespace is dropped and trailing whitespace is held until more output follows it.
 const sectionWriter = (append: (text: string) => Effect.Effect<void, ChecksError>) => {
-  let received = false
   let started = false
   let held = ""
   return {
-    received: (): boolean => received,
     output: (text: string): Effect.Effect<void, ChecksError> => {
-      received = true
       const kept = started ? held + text : text.replace(/^\s+/, "")
       const body = kept.replace(/\s+$/, "")
       held = kept.slice(body.length)
@@ -97,9 +94,7 @@ const sectionWriter = (append: (text: string) => Effect.Effect<void, ChecksError
       const prefix = started ? "" : "\n"
       started = true
       return append(prefix + body)
-    },
-    exit: (outcome: CheckOutcome): Effect.Effect<void, ChecksError> =>
-      append((started ? "" : "\n(no output)") + "\nexit " + outcome.exitCode + ": " + (outcome.passed ? "passed" : "failed"))
+    }
   }
 }
 
@@ -113,38 +108,28 @@ export const runChecksRound = (
 ): Effect.Effect<ChecksRound, ChecksError> =>
   Effect.gen(function*() {
     const file = path.join(runDir, checksFileName(round))
+    const writeFailed = (cause: unknown): ChecksError => new ChecksError({ message: "orc: cannot write the checks evidence file: " + String(cause) })
     yield* fs.makeDirectory(path.dirname(file), { recursive: true }).pipe(
       Effect.andThen(() => fs.writeFileString(file, "")),
-      Effect.mapError((cause) => new ChecksError({ message: "orc: cannot write the checks evidence file: " + String(cause) }))
+      Effect.mapError(writeFailed)
     )
     const append = (text: string): Effect.Effect<void, ChecksError> =>
-      fs.writeFileString(file, text, { flag: "a" }).pipe(
-        Effect.mapError((cause) => new ChecksError({ message: "orc: cannot write the checks evidence file: " + String(cause) }))
-      )
+      fs.writeFileString(file, text, { flag: "a" }).pipe(Effect.mapError(writeFailed))
     const outcomes: Array<CheckOutcome> = []
     const finished: Array<string> = []
     const rewrite = (): Effect.Effect<void, ChecksError> =>
-      fs.writeFileString(file, finished.join("\n\n")).pipe(
-        Effect.mapError((cause) => new ChecksError({ message: "orc: cannot write the checks evidence file: " + String(cause) }))
-      )
+      fs.writeFileString(file, finished.join("\n\n")).pipe(Effect.mapError(writeFailed))
     for (const check of commands) {
       yield* append((outcomes.length === 0 ? "" : "\n\n") + "check " + check.name + ": " + check.command)
       const section = sectionWriter(append)
       const result = yield* runCommand(check.command, section.output).pipe(
         Effect.mapError((cause) => cause instanceof ChecksError ? cause : new ChecksError({ message: "orc: the " + check.name + " check failed to run: " + cause.message }))
       )
-      if (!section.received()) {
-        yield* section.output(result.stdout + result.stderr)
-      }
       const passed = result.exitCode === 0
       const outcome: CheckOutcome = { name: check.name, command: check.command, exitCode: result.exitCode, passed, refusals: passed ? [] : refusalsIn(result.stdout + "\n" + result.stderr, check.name) }
       outcomes.push(outcome)
       finished.push(sectionOf(outcome, result.stdout, result.stderr))
-      if (section.received()) {
-        yield* rewrite()
-      } else {
-        yield* section.exit(outcome)
-      }
+      yield* rewrite()
     }
     yield* append("\n")
     return { round, file, outcomes }
