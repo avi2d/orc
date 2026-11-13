@@ -13,14 +13,11 @@ export interface EditText {
   readonly body: string
 }
 
-export type EditOutcome = "edited" | "unchanged"
+export type EditOutcome = "edited"
 
 const editOn = (id: string, text: EditText) => (fresh: TaskRecord): Effect.Effect<Rewrite<EditOutcome>, BacklogError> => {
   if (fresh.state.kind !== "new") {
     return Effect.fail(new BacklogError({ detail: id + " is " + fresh.state.kind + ", and a run has read its text, so only a new task is edited" }))
-  }
-  if (fresh.spec.title === text.title && fresh.spec.body === text.body) {
-    return Effect.succeed({ kind: "keep", result: "unchanged" })
   }
   return Effect.succeed({ kind: "write", record: { ...fresh, spec: { ...fresh.spec, title: text.title, body: text.body } }, result: "edited" })
 }
@@ -51,6 +48,6 @@ export const edit = (
     if (title === "") {
       return yield* new BacklogError({ detail: from + " holds no title" })
     }
-    const outcome = yield* editTask(root, args.id, { title, body })
-    return (outcome === "edited" ? "edited " : "kept the same text of ") + args.id + ": " + title
+    yield* editTask(root, args.id, { title, body })
+    return "edited " + args.id + ": " + title
   })

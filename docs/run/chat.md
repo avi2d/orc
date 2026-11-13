@@ -7,7 +7,7 @@ It starts Pi on the model `models.orchestrator` names in `config.json`, and refu
 When `<ORC_HOME>/orchestrator.md` exists, the chat adds it to Pi's system prompt as the orchestrator's rules.
 It also adds the instructions file of each project in `projects.json` that names one, labelled with the project's name.
 Its first line of output names the rules file it loaded, or says it found none, and then names each instructions file.
-The chat's Pi has six tools and no others:
+The chat's Pi has seven tools and no others:
 
 - `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project and the task's Markdown.
   It may add a kind, an internal mark, a machine, a parent and the ids the task depends on.
