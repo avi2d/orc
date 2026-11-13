@@ -18,7 +18,7 @@ const board = buildCards(
     run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" }),
     run("20261113-080000-bbbbbb", { status: "failed", endReason: "orc exited 1" }),
     run("20261113-070000-cccccc", { status: "running", step: { id: 4, name: "fix", attempt: 1, status: "running" } }),
-    run("20261113-060000-dddddd", { status: "running", questions: 1, project: "/work/tui-dash" }),
+    run("20261113-060000-dddddd", { status: "running", questions: 1, project: "/work/herdr" }),
     run("20261113-050000-eeeeee", { status: "succeeded", prLink: "https://github.com/o/r/pull/12" })
   ]),
   backlog([task("orc-48", { status: "closed" }), task("orc-50", {})])
@@ -85,11 +85,11 @@ describe("the runs list", () => {
   })
 
   test("the Project filter keeps one project's runs, not every project's", () => {
-    expect(filterCards(board, { project: "tui-dash", status: null }).map((card) => card.where)).toEqual(["Question 1"])
+    expect(filterCards(board, { project: "herdr", status: null }).map((card) => card.where)).toEqual(["Question 1"])
   })
 
   test("both filters together keep runs that match both, not either", () => {
-    expect(filterCards(board, { project: "tui-dash", status: "Running" })).toEqual([])
+    expect(filterCards(board, { project: "herdr", status: "Running" })).toEqual([])
   })
 })
 
