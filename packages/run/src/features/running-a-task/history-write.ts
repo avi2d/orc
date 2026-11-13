@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect"
+import { Effect } from "effect"
 import type { Database } from "bun:sqlite"
 import type { NoMistakesRecord, OpenQuestion } from "../../entities/review-gate/index"
 import type { DirectPrRecord } from "../../entities/pull-request/index"
@@ -103,8 +103,10 @@ const insertPlannedStep = (
 const inheritedLog = (db: Database, run: HistoryRun, priorDir: string, name: "implement" | "fix", attempt: number): string => {
   const row = db.query("SELECT evidence.path FROM steps JOIN evidence ON evidence.step_id = steps.id WHERE steps.run_id = ? AND steps.name = ? AND steps.attempt = ? AND evidence.direction = 'out' AND evidence.kind = 'log' ORDER BY steps.id DESC, evidence.id DESC LIMIT 1")
     .get(run.path.basename(priorDir), name, attempt)
-  const path = Schema.decodeUnknownSync(Schema.NullOr(Schema.Struct({ path: Schema.String })))(row)
-  return path?.path ?? run.path.join(priorDir, name === "implement" ? "agent.log" : "fix-" + attempt.toString() + ".log")
+  if (typeof row === "object" && row !== null && "path" in row && typeof row.path === "string") {
+    return row.path
+  }
+  return run.path.join(priorDir, name === "implement" ? "agent.log" : "fix-" + attempt.toString() + ".log")
 }
 
 export const recordResumePublish = (db: Database, run: HistoryRun, resume: ResumePlan): Effect.Effect<void, OrcRunError> =>
