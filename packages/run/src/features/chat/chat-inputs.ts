@@ -25,6 +25,11 @@ export const HoldInput = Schema.Struct({
   }))
 })
 
+export const EditInput = Schema.Struct({
+  id: Schema.String.annotate({ description: "The id of the new task whose text changes" }),
+  task: Schema.String.annotate({ description: "The task's whole new text as markdown, whose first line is its title" })
+})
+
 export const AnswerInput = Schema.Struct({
   id: Schema.String.annotate({ description: "The id of the held or parked task" }),
   question: Schema.optionalKey(Schema.String.annotate({

@@ -193,6 +193,12 @@ Add `--machine <name>` to run the task on that machine only, and `--depends-on <
 To change what a new or held task waits for later, run `orc backlog depend <task-id> --on <task-id>,<task-id>`, which replaces its whole list, or `orc backlog depend <task-id> --clear` to empty it.
 Orc refuses a task the backlog does not hold, a task that is taken, started or closed, a task parked for the captain's answer, and a dependency on itself or one that would make two tasks wait on each other.
 A hold stays as it was when the dependencies change.
+To change the text of a new task, run `orc backlog edit <task-id> <task-file>`, or give `-` to pipe the text in as `orc backlog add` takes it.
+It replaces the title and the body and keeps the id, kind, machine, parent, split mark, dependencies, hold with its history and parked questions.
+It works on a held, parked or parent task, and the final check of a parent reads the `## Done when` list of the new text.
+Orc refuses a text with no title, a task the backlog does not hold, and a task that is taken, started or closed, since a run has already read its text.
+It never asks the planner and never splits the task.
+The edit takes the task file by rename the way `orc backlog hold` does, so an edit and a beat taking the task at the same moment never both win.
 Add `--kind scout` or `--kind task` for a task that ends in a report instead of a PR, as [Task kinds](task-kinds.md) shows.
 To split a large task, add it with `--kind parent`, then add each part with `--parent <task-id>`, as [Parent tasks](task-kinds.md#parent-tasks) shows, or name a planner model so orc splits an over-budget request itself, as [Splitting at intake](task-kinds.md#splitting-at-intake) shows.
 Add `--internal` to mark a ship task internal-only, which only a `no-mistakes-prod-only` project reads.

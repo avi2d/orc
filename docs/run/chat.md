@@ -14,6 +14,7 @@ The chat's Pi has six tools and no others:
   When `models.planner` names a model and a ship add names no parent, an over budget request lands as a parent with one child per slice, as [Splitting at intake](task-kinds.md#splitting-at-intake) shows.
 - `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
 - `orc_backlog_hold` holds one new task through `orc backlog hold`, with the reason, an optional date and optional questions.
+- `orc_backlog_edit` replaces the title and the body of one new task through `orc backlog edit <task-id> -`, and keeps its hold, dependencies and parked questions.
 - `orc_backlog_answer` answers a held task, a parked task, or a started task waiting at its gate through `orc backlog answer`.
   It passes your words as you said them, or answers one open question when it names the question's id.
 - `merge_task` lands a closed task's PR through `orc merge <task-id> --basis <basis>`, as [Merging a task's PR](merging-a-tasks-pr.md) shows.
