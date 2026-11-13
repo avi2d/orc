@@ -72,10 +72,13 @@ export const prepareCommandOf = (commands: ReadonlyArray<ChecksCommand>): string
 
 // The section reads as the check's trimmed output between its header and exit lines, so leading whitespace is dropped and trailing whitespace is held until more output follows it.
 const sectionWriter = (append: (text: string) => Effect.Effect<void, ChecksError>) => {
+  let received = false
   let started = false
   let held = ""
   return {
+    received: (): boolean => received,
     output: (text: string): Effect.Effect<void, ChecksError> => {
+      received = true
       const kept = started ? held + text : text.replace(/^\s+/, "")
       const body = kept.replace(/\s+$/, "")
       held = kept.slice(body.length)
@@ -113,15 +116,11 @@ export const runChecksRound = (
     for (const check of commands) {
       yield* append((outcomes.length === 0 ? "" : "\n\n") + "check " + check.name + ": " + check.command)
       const section = sectionWriter(append)
-      let streamed = false
-      const result = yield* runCommand(check.command, (text) => {
-        streamed = true
-        return section.output(text)
-      }).pipe(
+      const result = yield* runCommand(check.command, section.output).pipe(
         Effect.mapError((cause) => cause instanceof ChecksError ? cause : new ChecksError({ message: "orc: the " + check.name + " check failed to run: " + cause.message }))
       )
       // A runner that does not stream hands the whole output back only in its result.
-      if (!streamed) {
+      if (!section.received()) {
         yield* section.output(result.stdout + result.stderr)
       }
       const passed = result.exitCode === 0
