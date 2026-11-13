@@ -4,7 +4,8 @@ kind: how-to
 # Show orc in the Herdr App
 
 The `orc` layout gives orc a window in the Herdr App, with a Board, a Resources and an Agents tab.
-Install it once, and again after each orc upgrade to pick up the new mods.
+Install it once, and run `orc app install` again after each orc upgrade to pick up the new mods.
+That is the only step after an upgrade: `orc app install` builds the mods from the checkout itself, so `bun run build` is not needed.
 
 ## Before you begin
 
@@ -72,8 +73,10 @@ The copies hold no comments, because the comment gate in `bun run lint` refuses 
 The copy script wraps `herdr.d.ts` in an ambient module for workspace typechecking.
 An interface that extends an `import(...)` type extends a local alias because the dependency-cruiser parser refuses that form.
 After the App updates, run `bun scripts/copy-app-types.ts <App version>` in `packages/herdr-app` to copy the new files from `~/.config/herdr-app`.
-`bun run build` bundles each mod to one `main.js` and copies the result into `packages/run/dist/herdr-app/`, which `orc app install` reads.
-Run `herdr-app check packages/herdr-app/dist/mods/<mod>` on each mod you change.
+`bun run build` bundles each mod to one `main.js` and copies the result into `packages/run/dist/herdr-app/`.
+`orc app install` writes that same folder before it copies from it, when the checkout has the sources, so changing a mod needs only `orc app install`.
+A package install ships the built folder and no sources, so `orc app install` copies that folder as it is.
+Run `herdr-app check packages/run/dist/herdr-app/mods/<mod>` on each mod you change.
 
 ## Related topics
 

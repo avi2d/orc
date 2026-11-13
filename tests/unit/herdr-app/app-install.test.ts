@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { installApp, mergeKeys } from "../../../packages/run/src/features/installing-the-app/index"
+import { installApp, mergeKeys, readyBundledApp } from "../../../packages/run/src/features/installing-the-app/index"
 
 test("adds missing keys without replacing a person's binding", async () => {
   const ours = { "layout:orc": { "cmd-1": "orc-tabs.select:orc-board", "cmd-2": "orc-tabs.select:orc-resources" } }
@@ -53,6 +53,21 @@ test("refuses a foreign mod instead of overwriting the person's mod", async () =
     const result = await Effect.runPromise(installApp(source, home).pipe(Effect.flip, Effect.provide(BunServices.layer)))
     expect(result.detail).toContain("agents")
     expect(await readFile(join(home, "mods", "agents", "main.js"), "utf8")).toBe("personal")
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test("does not report an install when there is neither a build nor sources", async () => {
+  const root = await mkdtemp(join(tmpdir(), "orc-app-test-"))
+  try {
+    const home = join(root, "home")
+    await mkdir(home, { recursive: true })
+    await writeFile(join(home, "keys.json"), "{}")
+    const ready = await Effect.runPromise(readyBundledApp(join(root, "no-sources"), join(root, "no-build")).pipe(Effect.provide(BunServices.layer)))
+    const error = await Effect.runPromise(installApp(ready, home).pipe(Effect.flip, Effect.provide(BunServices.layer)))
+    expect(error.detail).toContain("cannot read the built Herdr App files")
+    expect(await readdir(home)).toEqual(["keys.json"])
   } finally {
     await rm(root, { recursive: true, force: true })
   }

@@ -1,11 +1,15 @@
 import { Data, Effect, FileSystem, Path, Schema } from "effect"
 import type { PlatformError } from "effect/PlatformError"
+import type { ChildProcessSpawner } from "effect/process"
+import { capture } from "../../shared/process/index"
 
 export class AppInstallError extends Data.TaggedError("AppInstallError")<{
   readonly detail: string
 }> {}
 
 export const bundledAppDir = (): string => import.meta.dir + "/../../../dist/herdr-app"
+
+export const herdrAppSourceDir = (): string => import.meta.dir + "/../../../../herdr-app"
 
 export const appHomeDir = (home: string): string => home + "/.config/herdr-app"
 
@@ -108,6 +112,24 @@ const replace = (fs: FileSystem.FileSystem, from: string, to: string): Effect.Ef
     Effect.andThen(fs.copy(from, to)),
     Effect.mapError(fail(`cannot copy ${from} to ${to}`))
   )
+
+// Rebuilt on every install when the sources are present, so a build left by an older checkout is never copied.
+export const readyBundledApp = (source: string, bundled: string): Effect.Effect<string, AppInstallError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const hasSources = yield* fs.exists(path.join(source, "mods")).pipe(Effect.orElseSucceed(() => false))
+    if (!hasSources) {
+      return bundled
+    }
+    const built = yield* capture([process.execPath, path.join(source, "scripts", "build.ts"), bundled], null).pipe(
+      Effect.mapError((error) => new AppInstallError({ detail: `cannot build the Herdr App files from ${source}: ${error.detail}` }))
+    )
+    if (built.exitCode !== 0) {
+      return yield* Effect.fail(new AppInstallError({ detail: `cannot build the Herdr App files from ${source}: ${built.stderr.trim()}` }))
+    }
+    return bundled
+  })
 
 export const installApp = (source: string, home: string): Effect.Effect<AppInstall, AppInstallError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
