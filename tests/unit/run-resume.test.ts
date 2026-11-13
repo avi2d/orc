@@ -10,7 +10,8 @@ import type { AgentFile } from "../../packages/run/src/entities/agent/index"
 import { openDatabase, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
 import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "../../packages/run/src/features/running-a-task/run-resume"
 import type { SandboxKind } from "../../packages/run/src/shared/sandbox/sandbox-kind"
-import { recordResumePublish } from "../../packages/run/src/features/running-a-task/history-write"
+import { recordChecksDone, recordChecksStart, recordFixStart, recordResumePublish } from "../../packages/run/src/features/running-a-task/history-write"
+import { readStepLog } from "../../packages/run/src/features/seeing-runs/step-log"
 import { subprocessNoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
 import type { HistoryRun } from "../../packages/run/src/features/running-a-task/run-record"
 
@@ -324,6 +325,74 @@ describe("resume binds task selection to the saved intent", () => {
   })
 
 describe("reinterrupted continuations survive every handover", () => {
+  test("restarted Checks evidence does not land on the inherited row", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const run = await Effect.runPromise(historyFor("b", home, join(home, "repo"), "2026-10-19T10:00:00.000Z"))
+        await seedRun(db, "b", run.projectDir, run.taskPath, "failed", run.started)
+        const old = { round: 1, file: "/old.txt", started: run.started, ended: run.started, passed: false, failed: [], checks: [], refusals: [] }
+        await Effect.runPromise(recordChecksDone(db, "b", old))
+        await Effect.runPromise(recordChecksStart(db, "b", 1, run.started))
+        await Effect.runPromise(recordChecksDone(db, "b", { ...old, file: "/new.txt", passed: true }))
+        const rows = Schema.decodeUnknownSync(Schema.Array(Schema.Struct({ status: Schema.String, path: Schema.String })))(db.query("SELECT steps.status, evidence.path FROM steps JOIN evidence ON evidence.step_id = steps.id WHERE steps.run_id = ? ORDER BY steps.id, evidence.id").all("b"))
+        expect(rows).toEqual([{ status: "failed", path: "/old.txt" }, { status: "passed", path: "/new.txt" }])
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a retried inherited Fix does not show the inherited log", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "repo")
+        const run = await Effect.runPromise(historyFor("b", home, project, "2026-10-19T10:00:00.000Z"))
+        await mkdir(run.runDir, { recursive: true })
+        await writeFile(join(run.runDir, "fix-1.log"), "new output")
+        const old = join(home, "old.log")
+        await writeFile(old, "inherited output")
+        await seedRun(db, "b", project, run.taskPath, "failed", run.started)
+        await seedStep(db, "b", "fix", "failed", run.started, null)
+        const row = Schema.decodeUnknownSync(Schema.Struct({ id: Schema.Finite }))(db.query("SELECT id FROM steps WHERE run_id = ?").get("b"))
+        db.query("INSERT INTO evidence (step_id, direction, path, kind) VALUES (?, ?, ?, ?)").run(row.id, "out", old, "log")
+        await Effect.runPromise(recordFixStart(db, "b", 1, fixer.path, run.started))
+        expect(await Effect.runPromise(readStepLog(db, "b", row.id).pipe(Effect.provide(BunServices.layer)))).toBe("new output")
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a twice-skipped step does not point at a log that was never written", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "repo")
+        const a = await Effect.runPromise(historyFor("a", home, project, "2026-10-19T09:00:00.000Z"))
+        await mkdir(a.runDir, { recursive: true })
+        await writeFile(join(a.runDir, "agent.log"), "original agent")
+        await writeFile(join(a.runDir, "fix-1.log"), "original fix")
+        await seedRun(db, "a", project, a.taskPath, "failed", a.started)
+        await seedStep(db, "a", "implement", "passed", a.started, null)
+        await seedStep(db, "a", "fix", "passed", a.started, null)
+        const idRow = Schema.Struct({ id: Schema.Finite })
+        const fix = Schema.decodeUnknownSync(idRow)(db.query("SELECT id FROM steps WHERE run_id = ? AND name = ?").get("a", "fix"))
+        db.query("INSERT INTO evidence (step_id, direction, path, kind) VALUES (?, ?, ?, ?)").run(fix.id, "in", "/checks.txt", "checks")
+        for (const [id, started] of [["b", "2026-10-19T10:00:00.000Z"], ["c", "2026-10-19T11:00:00.000Z"]] as const) {
+          const run = await Effect.runPromise(historyFor(id, home, project, started))
+          const plan = await Effect.runPromise(buildResumePlan(db, run))
+          await Effect.runPromise(recordResumePublish(db, run, plan))
+        }
+        const steps = Schema.decodeUnknownSync(Schema.Array(idRow))(db.query("SELECT id FROM steps WHERE run_id = ? AND name IN ('implement', 'fix') ORDER BY id").all("c"))
+        expect(await Promise.all(steps.map((step) => Effect.runPromise(readStepLog(db, "c", step.id).pipe(Effect.provide(BunServices.layer)))))).toEqual(["original agent", "original fix"])
+      } finally {
+        db.close()
+      }
+    })
+  })
+
   test("a second interruption keeps the recovered implementation and its intent", async () => {
     await withHome(async (home) => {
       const db = await openDb(home)

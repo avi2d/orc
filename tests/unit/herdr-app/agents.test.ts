@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { buildCards, filterCards, stepRows } from "../../../packages/herdr-app/src/agents"
+import { buildCards, filterCards, railLabel, stepRows } from "../../../packages/herdr-app/src/agents"
 import type { Backlog, Run, Runs, Task } from "../../../packages/herdr-app/src/guard"
 
 const run = (id: string, fields: Partial<Run>): Run => ({
@@ -25,6 +25,14 @@ const board = buildCards(
 )
 
 describe("the runs list", () => {
+  test("two runs of one task do not share a rail label", () => {
+    const cards = buildCards(
+      runs([run("20261113-090000-aaaaaa", { branch: "orc/orc-7", status: "failed" }), run("20261113-080000-bbbbbb", { branch: "orc/orc-7", status: "failed" })]),
+      backlog([task("orc-7", { status: "new" })])
+    )
+    expect(cards.map(railLabel).sort()).toEqual(["aaaaaa", "bbbbbb", "orc-7"])
+  })
+
   test("sorts Awaiting you, Running, Queued, Failed, Done instead of newest first", () => {
     expect(board.map((card) => card.standing.status)).toEqual(["Awaiting you", "Awaiting you", "Running", "Queued", "Failed", "Done"])
   })
