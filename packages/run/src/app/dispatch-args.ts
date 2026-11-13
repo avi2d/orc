@@ -328,6 +328,18 @@ const parseHeavy = (rest: ReadonlyArray<string>): DispatchArgs => {
   return { kind: "UsageError", detail: "orc heavy takes path, check [--json], watch or watch-once, got \"" + verb + "\"" }
 }
 
+const backlogSubcommands: ReadonlyMap<string, (rest: ReadonlyArray<string>) => DispatchArgs> = new Map([
+  ["add", parseAdd],
+  ["close", parseClose],
+  ["stop", parseStop],
+  ["posted", parsePosted],
+  ["hold", parseHold],
+  ["answer", parseAnswer],
+  ["note", parseNote],
+  ["depend", parseDepend],
+  ["plan", parsePlan],
+])
+
 export const parseDispatchArgs = (command: "backlog" | "attention" | "beat" | "runner" | "merge" | "heavy", rest: ReadonlyArray<string>): DispatchArgs => {
   if (command === "attention") {
     return rest[0] === "answer" ? parseItemAnswer(rest.slice(1)) : parseJsonFlag(rest, (json) => ({ kind: "ShowAttention", json }))
@@ -344,32 +356,9 @@ export const parseDispatchArgs = (command: "backlog" | "attention" | "beat" | "r
   if (command === "beat") {
     return parseJsonFlag(rest, (json) => ({ kind: "Beat", json }))
   }
-  if (rest[0] === "add") {
-    return parseAdd(rest.slice(1))
-  }
-  if (rest[0] === "close") {
-    return parseClose(rest.slice(1))
-  }
-  if (rest[0] === "stop") {
-    return parseStop(rest.slice(1))
-  }
-  if (rest[0] === "posted") {
-    return parsePosted(rest.slice(1))
-  }
-  if (rest[0] === "hold") {
-    return parseHold(rest.slice(1))
-  }
-  if (rest[0] === "answer") {
-    return parseAnswer(rest.slice(1))
-  }
-  if (rest[0] === "note") {
-    return parseNote(rest.slice(1))
-  }
-  if (rest[0] === "depend") {
-    return parseDepend(rest.slice(1))
-  }
-  if (rest[0] === "plan") {
-    return parsePlan(rest.slice(1))
+  const parseSubcommand = backlogSubcommands.get(rest[0] ?? "")
+  if (parseSubcommand !== undefined) {
+    return parseSubcommand(rest.slice(1))
   }
   return parseJsonFlag(rest, (json) => ({ kind: "ShowBacklog", json }))
 }

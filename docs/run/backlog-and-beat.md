@@ -235,7 +235,7 @@ To leave a note on a task, run `orc backlog note <task-id> <words>`.
 Orc appends the note as one JSON line with `at`, `who` and `text` to `~/.orc/backlog/notes/<task-id>.jsonl`, and `who` is `captain` for this command.
 Each note goes out in a single append write, so two notes written at once never mix their lines.
 A note takes any task the backlog holds, a closed one too, and orc refuses a task id the backlog does not hold.
-A note holds nothing and answers nothing, so the beat starts the task as before.
+A note holds nothing and answers nothing, so it never changes when the beat starts the task.
 
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
 After the claim survives a recount, the beat writes the task started before it runs the start command.

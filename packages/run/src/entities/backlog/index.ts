@@ -97,9 +97,6 @@ export {
   appendNote,
   readNotes,
 } from "./notes"
-export type {
-  TaskNote,
-} from "./notes"
 export {
   childCount,
   dependencyWaits,
