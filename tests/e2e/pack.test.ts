@@ -77,6 +77,7 @@ const expectedFiles = [
   "src/widgets/beat/beat-attention.ts",
   "src/widgets/beat/beat-close.ts",
   "src/widgets/beat/beat-place.ts",
+  "src/widgets/beat/beat-resume.ts",
   "src/widgets/beat/beat.ts",
   "src/widgets/beat/board.ts",
   "src/entities/events/chat-event.ts",
