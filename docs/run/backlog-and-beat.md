@@ -233,7 +233,8 @@ Holding the task again with the same questions keeps the hold, and orc refuses o
 
 To leave a note on a task, run `orc backlog note <task-id> <words>`.
 Orc appends the note as one JSON line with `at`, `who` and `text` to `~/.orc/backlog/notes/<task-id>.jsonl`, and `who` is `captain` for this command.
-Each note goes out in a single append write, so two notes written at once never mix their lines.
+Each note goes out in one append write with a byte count check, so two notes written at once never mix their lines.
+A short write fails the note instead of writing the rest.
 A note takes any task the backlog holds, a closed one too, and orc refuses a task id the backlog does not hold.
 A note holds nothing and answers nothing, so it never changes when the beat starts the task.
 

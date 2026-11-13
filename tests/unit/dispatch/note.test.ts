@@ -46,7 +46,7 @@ describe("orc backlog note", () => {
       expect(notes.map((note) => note.text.length)).toEqual([long.length + 1, long.length + 1])
     }))
 
-  test("a short append write fails instead of writing the rest", () =>
+  test("short write is refused instead of retried", () =>
     withBacklog(async (root) => {
       const failed = await run(Effect.gen(function*() {
         const fs = yield* FileSystem.FileSystem
