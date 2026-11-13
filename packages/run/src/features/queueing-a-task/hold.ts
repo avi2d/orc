@@ -2,7 +2,8 @@ import { Console, DateTime, Duration, Effect, FileSystem, Option, type Path } fr
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { heldExpiry, heldTokenDir, releaseHeldToken } from "../../entities/token/index"
 import { fileKeyOf, labelOf } from "../../entities/backlog/index"
-import { openDatabase, runById, runsForBranch, type RunRecord } from "../../entities/run-history/index"
+import { openDatabase, runById } from "../../entities/run-history/index"
+import { newRunId } from "../../shared/lib/index"
 import { RunnerError } from "../../shared/process/index"
 import { type Command } from "../../shared/process/index"
 import { tokenLive } from "../../entities/token/index"
@@ -53,55 +54,37 @@ const withResumePin = (run: Command, pin: string): Command => {
   return [first, ...rest]
 }
 
-const taskFileOf = (run: Command): string | null => {
-  const at = run.findIndex((entry) => entry === "run")
-  const file = at === -1 ? undefined : run[at + 1]
-  return file === undefined || file === "" || file.startsWith("-") ? null : file
-}
+const attemptEnvPrefix = "ORC_DISPATCH_RUN_ID="
 
-const ownAttemptId = (
-  runs: ReadonlyArray<RunRecord>,
-  pin: string
-): RunRecord | null => {
-  const latest = runs[0]
-  if (latest === undefined || latest.id === pin || !runs.some((run) => run.id === pin)) {
-    return null
+const withAttemptId = (run: Command, attempt: string): Command => {
+  if (resumePinOf(run) === null) {
+    return run
   }
-  return latest
+  const replaced = run.map((entry) => entry.startsWith(attemptEnvPrefix) ? attemptEnvPrefix + attempt : entry)
+  if (replaced.some((entry) => entry.startsWith(attemptEnvPrefix))) {
+    const [first = "", ...rest] = replaced
+    return [first, ...rest]
+  }
+  const [first = "", ...rest] = run
+  return first === "env" ? [first, attemptEnvPrefix + attempt, ...rest] : [first, ...rest]
 }
 
 const advancedPin = (
   home: string,
   run: Command,
-  holderStartMillis: number
+  attempt: string
 ): Effect.Effect<Command, never, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
     const pin = resumePinOf(run)
-    const file = taskFileOf(run)
-    if (pin === null || pin === "" || file === null) {
+    if (pin === null || pin === "" || attempt === "") {
       return run
     }
-    const next = yield* Effect.acquireUseRelease(
+    const recorded = yield* Effect.acquireUseRelease(
       openDatabase(home),
-      (db) =>
-        Effect.gen(function*() {
-          const expected = yield* runById(db, pin).pipe(Effect.orElseSucceed(() => null))
-          if (expected === null) {
-            return null
-          }
-          const runs = yield* runsForBranch(db, expected.project, expected.branch).pipe(Effect.orElseSucceed((): ReadonlyArray<RunRecord> => []))
-          const latest = ownAttemptId(runs, pin)
-          if (latest === null || Number.isNaN(Date.parse(latest.started)) || Date.parse(latest.started) < holderStartMillis) {
-            return null
-          }
-          const fs = yield* FileSystem.FileSystem
-          const holderText = yield* fs.readFileString(file).pipe(Effect.orElseSucceed(() => null))
-          const latestText = holderText === null ? null : yield* fs.readFileString(latest.taskFile).pipe(Effect.orElseSucceed(() => null))
-          return holderText !== null && holderText === latestText ? latest.id : null
-        }),
+      (db) => runById(db, attempt).pipe(Effect.orElseSucceed(() => null)),
       (db) => Effect.sync(() => db.close())
     ).pipe(Effect.orElseSucceed(() => null))
-    return next === null ? run : withResumePin(run, next)
+    return recorded === null ? run : withResumePin(run, recorded.id)
   })
 
 // Pi reads the token once per process, so a run whose token ran out fails, and only a fresh process takes the renewed one.
@@ -112,19 +95,19 @@ export const holdRun = (
   label?: string | null
 ): Effect.Effect<string, RunnerError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> => {
   const key = fileKeyOf(home, task, labelOf(home, task, label))
-  const holderStartMillis = Date.now()
   return Effect.gen(function*() {
     let current = run
     while (true) {
+      const attempt = newRunId()
       const startedWith = yield* waitForLiveToken(home, task, label)
-      const exitCode = yield* runOnce(current)
+      const exitCode = yield* runOnce(withAttemptId(current, attempt))
       if (exitCode === 0) {
         return "the run of " + task + " finished"
       }
       if (tokenLive(startedWith, yield* DateTime.now)) {
         return yield* new RunnerError({ detail: "the run of " + task + " exited " + exitCode })
       }
-      current = yield* advancedPin(home, current, holderStartMillis)
+      current = yield* advancedPin(home, current, attempt)
       yield* Console.log("the run of " + task + " exited " + exitCode + " as its token ran out at " + DateTime.formatIso(startedWith) + ", so it resumes on a fresh one")
     }
   }).pipe(Effect.ensuring(releaseHeldToken(home, key)))

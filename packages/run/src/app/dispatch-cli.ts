@@ -168,7 +168,7 @@ const holdNow = (args: Extract<CommandArgs, { readonly kind: "HoldTask" }>, plac
 const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
     const at = DateTime.formatIso(yield* DateTime.now)
-    const answered = yield* answerTask(backlogRoot(place), args.id, args.words, at, args.generation)
+    const answered = yield* answerTask(backlogRoot(place), args.id, args.words, at, args.expect)
     yield* routeTaskItems(backlogRoot(place), [yield* findTask(backlogRoot(place), args.id)], at)
     if (answered.kind === "hold") {
       return "answered " + args.id + ", so the beat may start it"

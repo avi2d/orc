@@ -177,12 +177,40 @@ const parseAnswer = (rest: ReadonlyArray<string>): DispatchArgs => {
   if (!isTaskId(id)) {
     return { kind: "UsageError", detail: "orc backlog answer takes a task id, got \"" + id + "\"" }
   }
-  const [generation, ...words] = after[0] === "--generation" && after.length >= 3 ? [after[1], ...after.slice(2)] : [undefined, ...after]
-  if (generation !== undefined && !/^\d+$/.test(generation)) {
-    return { kind: "UsageError", detail: "orc backlog answer takes a hold generation after --generation, got \"" + generation + "\"" }
+  let expect: "held" | "parked" | undefined
+  let generation: string | undefined
+  let cursor = after
+  while (cursor[0] === "--expect" || cursor[0] === "--generation") {
+    const flag = cursor[0]
+    const value = cursor[1]
+    if (value === undefined) {
+      return { kind: "UsageError", detail: "orc backlog answer takes a decision kind after --expect and a hold generation after --generation" }
+    }
+    if (flag === "--expect") {
+      if (value !== "held" && value !== "parked") {
+        return { kind: "UsageError", detail: "orc backlog answer takes held or parked after --expect, got \"" + value + "\"" }
+      }
+      expect = value
+    } else if (!/^\d+$/.test(value)) {
+      return { kind: "UsageError", detail: "orc backlog answer takes a hold generation after --generation, got \"" + value + "\"" }
+    } else {
+      generation = value
+    }
+    cursor = cursor.slice(2)
   }
-  const said = words.join(" ")
-  return said.trim() === "" ? { kind: "UsageError", detail: "orc backlog answer takes a task id and the captain's words" } : { kind: "AnswerTask", id, words: said, ...(generation === undefined ? {} : { generation: Number(generation) }) }
+  if (expect === "held" && generation === undefined) {
+    return { kind: "UsageError", detail: "orc backlog answer takes a hold generation after --generation for a held decision" }
+  }
+  if (expect === "parked" && generation !== undefined) {
+    return { kind: "UsageError", detail: "orc backlog answer takes no hold generation for a parked decision" }
+  }
+  const said = cursor.join(" ")
+  if (said.trim() === "") {
+    return { kind: "UsageError", detail: "orc backlog answer takes a task id and the captain's words" }
+  }
+  return expect === undefined && generation === undefined
+    ? { kind: "AnswerTask", id, words: said }
+    : { kind: "AnswerTask", id, words: said, expect: expect === "parked" ? { kind: "parked" } : { kind: "held", generation: Number(generation) } }
 }
 
 const isItemId = (text: string): boolean => /^[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(text)

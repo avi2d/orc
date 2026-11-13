@@ -92,7 +92,7 @@ const chat = runChat(orcHomeDir(Bun.env.ORC_HOME), [process.execPath, Bun.main])
 
 const shipStep = (args: Extract<OrcArgs, { readonly kind: "RunAgent" }>) =>
   Effect.gen(function*() {
-    const report = yield* runAgentStep({ cwd: process.cwd(), taskFile: args.taskFile, delivery: args.delivery, branch: args.branch, sandbox: args.sandbox, tokenFile: args.tokenFile, provider: args.provider, instructions: args.instructions, allow: args.allow, answers: args.answers, resumeRun: Bun.env.ORC_DISPATCH_RESUME_RUN }).pipe(
+    const report = yield* runAgentStep({ cwd: process.cwd(), taskFile: args.taskFile, delivery: args.delivery, branch: args.branch, sandbox: args.sandbox, tokenFile: args.tokenFile, provider: args.provider, instructions: args.instructions, allow: args.allow, answers: args.answers, resumeRun: Bun.env.ORC_DISPATCH_RESUME_RUN, runId: Bun.env.ORC_DISPATCH_RUN_ID }).pipe(
       Effect.provide(BunServices.layer),
       Effect.catchTag("OrcRunError", (error) =>
         Console.error(error.message).pipe(Effect.andThen(Effect.fail("agent step refused")))

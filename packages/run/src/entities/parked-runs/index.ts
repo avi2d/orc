@@ -1,1 +1,1 @@
-export { answersFor, answerTask, askStartedTask, handAnswersToResume, markAnswersRelayed, parkStartedTask } from "./parked"
+export { answersFor, answerTask, askStartedTask, handAnswersToResume, markAnswersRelayed, parkStartedTask, type ExpectedDecision } from "./parked"

@@ -1,5 +1,6 @@
 import { isTaskId } from "../entities/backlog/index"
 import type { MergeBasis } from "../entities/pull-request/index"
+import type { ExpectedDecision } from "../entities/parked-runs/index"
 import type { AddTask } from "../features/backlog-planning/index"
 import type { HeavyVerb } from "../features/heavy-commands/index"
 import type { Reach } from "../shared/process/index"
@@ -14,7 +15,7 @@ export type DispatchArgs =
   | { readonly kind: "MarkPosted"; readonly id: string }
   | { readonly kind: "MarkEventPosted"; readonly key: string }
   | { readonly kind: "HoldTask"; readonly id: string; readonly reason: string; readonly until: string | null; readonly questions: ReadonlyArray<string> }
-  | { readonly kind: "AnswerTask"; readonly id: string; readonly words: string; readonly generation?: number }
+  | { readonly kind: "AnswerTask"; readonly id: string; readonly words: string; readonly expect?: ExpectedDecision }
   | { readonly kind: "DependTask"; readonly id: string; readonly dependsOn: ReadonlyArray<string> }
   | { readonly kind: "ShowPlan"; readonly parent: string }
   | { readonly kind: "DropChild"; readonly parent: string; readonly child: string }

@@ -24,7 +24,7 @@ import type { RunCheckpoints, SandboxOps } from "./run-ops"
 import { type ReportOutcome, type ReportRun, runReport } from "./report-run"
 import { runDirFor, type ReportKind } from "../../entities/backlog/index"
 import { noMistakesBinary, noMistakesVersionProblem, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "../../entities/review-gate/index"
-import { newRunId } from "../../shared/lib/index"
+import { isRunId, newRunId } from "../../shared/lib/index"
 import { prepareRunFolders, type RunFolders, runInstructions } from "./run-folders"
 import { subprocessDeliverer } from "./run-deliverer"
 import type { RunDelivery } from "../../shared/config/index"
@@ -196,7 +196,7 @@ const openRun = (
     const home = orcHomeDir(request.homeDir ?? Bun.env.ORC_HOME)
     const heavySettings = yield* readHeavySettings(home).pipe(Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read " + cause.detail })))
     yield* ensureHeavyQueue(home, heavySettings).pipe(Effect.mapError((cause) => new OrcRunError({ message: "orc: the heavy queue failed to start: " + cause.detail })))
-    const runId = request.runId ?? newRunId()
+    const runId = request.runId !== undefined && isRunId(request.runId) ? request.runId : newRunId()
     const instructionsFile = yield* runInstructions(fs, path, request.cwd, request.instructions)
     const git = yield* openHostGit(fs, path)
     const checkout = yield* openCheckout(fs, path, spawner, git, request.cwd, request.branch, runId, parseRefuseMarkers(Bun.env.ORC_REFUSE_MARKERS))

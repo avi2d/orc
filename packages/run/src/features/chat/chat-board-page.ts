@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import type { ExpectedDecision } from "../../entities/parked-runs/index"
 
 const CardTarget = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("question"), id: Schema.String }),
@@ -36,11 +37,14 @@ export const cardKey = (target: CardTarget): string => target.kind === "question
 export const answerWords = (answer: BoardAnswer): string =>
   answer.words === undefined || answer.words.trim() === "" ? answer.answer : answer.answer + " — " + answer.words
 
-export const answerArgs = (task: string, target: CardTarget, words: string, generation?: number): ReadonlyArray<string> => {
+export const answerArgs = (task: string, target: CardTarget, words: string, expected?: ExpectedDecision): ReadonlyArray<string> => {
   const asked = target.kind === "question" ? target.id + "=" + words : words
-  return generation === undefined
-    ? ["backlog", "answer", task, asked]
-    : ["backlog", "answer", task, "--generation", String(generation), asked]
+  if (expected === undefined) {
+    return ["backlog", "answer", task, asked]
+  }
+  return expected.kind === "parked"
+    ? ["backlog", "answer", task, "--expect", "parked", asked]
+    : ["backlog", "answer", task, "--expect", "held", "--generation", String(expected.generation), asked]
 }
 
 const escapeHtml = (text: string): string =>

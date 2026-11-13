@@ -1,7 +1,9 @@
 import { expect, test } from "bun:test"
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { Schema } from "effect"
+import { BunServices } from "@effect/platform-bun"
+import { Effect, Schema } from "effect"
+import { parkStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
 import { fakeQuota, orcOk, runOrc, runnerTimeout, withFixture, type Fixture } from "../runner-helpers"
 
 const dispatched = async (fixture: Fixture): Promise<void> => {
@@ -57,6 +59,25 @@ test("a board without a saved generation still answers the first hold", async ()
     await orcOk(fixture, ["backlog", "hold", "orc-1", "--reason", "Choose the format"])
     await orcOk(fixture, ["backlog", "answer", "orc-1", "--generation", "0", "JSON"])
     expect(await orcOk(fixture, ["beat"])).toContain("started orc-1")
+  })
+}, runnerTimeout)
+
+test("a held board answer does not settle a parked question that reused its id", async () => {
+  await withFixture(async (fixture) => {
+    await dispatched(fixture)
+    await orcOk(fixture, ["backlog", "hold", "orc-1", "--reason", "Pick one", "--question", "Which format?"])
+    await orcOk(fixture, ["backlog", "answer", "orc-1", "question-1=JSON"])
+    expect(await orcOk(fixture, ["beat"])).toContain("started orc-1")
+    await Effect.runPromise(parkStartedTask(join(fixture.home, "backlog"), "orc-1", "orc/orc-1", [{ id: "question-1", text: "Which color?" }], "2026-11-02T10:30:00.000Z").pipe(
+      Effect.provide(BunServices.layer)
+    ))
+    const stale = await runOrc(fixture, ["backlog", "answer", "orc-1", "--expect", "held", "--generation", "0", "question-1=stale"])
+    expect(stale.exitCode).toBe(1)
+    expect(stale.stderr).toContain("moved while orc read it")
+    expect(JSON.parse(await orcOk(fixture, ["backlog", "--json"]))).toMatchObject({
+      tasks: [{ id: "orc-1", parked: { questions: [{ id: "question-1", text: "Which color?", answer: null }] } }]
+    })
+    expect(await orcOk(fixture, ["backlog", "answer", "orc-1", "--expect", "parked", "question-1=Blue"])).toContain("answered question-1 on orc-1")
   })
 }, runnerTimeout)
 
