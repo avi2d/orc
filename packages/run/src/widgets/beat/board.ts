@@ -53,11 +53,13 @@ type TaskJson = {
 } & TaskStatusJson
 
 interface ParkedJson {
+  readonly origin?: Parked["origin"]
   readonly branch: string
   readonly questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly asked: string; readonly answer: { readonly words: string; readonly at: string } | null }>
 }
 
 const parkedJson = (parked: Parked): ParkedJson => ({
+  ...(parked.origin === undefined ? {} : { origin: parked.origin }),
   branch: parked.branch,
   questions: parked.questions.map((question) => ({
     id: question.id,

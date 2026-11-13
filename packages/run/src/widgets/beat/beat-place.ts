@@ -27,8 +27,13 @@ const childrenWait = (parent: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merg
   return count.done < count.total ? "waits on its children, " + count.done + " of " + count.total + " done" : null
 }
 
+const parkedOriginWait = (task: TaskRecord): string | null =>
+  task.parked !== null && task.parked.origin === undefined
+    ? "the parked task has no recorded machine and run; recover its origin before resuming"
+    : null
+
 export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>, deciderOwns: DeciderOwns): string | null => {
-  const held = answerWait(task, deciderOwns)
+  const held = answerWait(task, deciderOwns) ?? parkedOriginWait(task)
   if (held !== null) {
     return held
   }
@@ -94,7 +99,11 @@ export const placeTask = (
   if (project === undefined) {
     return { kind: "waits", reason: "the project " + task.spec.project + " is not in the project list" }
   }
-  const pinned = task.spec.machine
+  const originWait = parkedOriginWait(task)
+  if (originWait !== null) {
+    return { kind: "waits", reason: originWait }
+  }
+  const pinned = task.parked?.origin?.machine ?? task.spec.machine
   if (pinned !== null && !config.machines.some((machine) => machine.name === pinned)) {
     return { kind: "waits", reason: "the machine " + pinned + " is not in dispatch.json" }
   }

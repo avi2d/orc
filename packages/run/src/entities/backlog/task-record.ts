@@ -38,10 +38,8 @@ export interface Started {
   readonly log: string
 }
 
-interface Answer {
-  readonly words: string
-  readonly at: string
-}
+const Answer = Schema.Struct({ words: Schema.String, at: Schema.String })
+type Answer = typeof Answer.Type
 
 // relayedTo names the asking the answer was handed to, and null means no run has it yet.
 export interface ParkedAnswer extends Answer {
@@ -55,20 +53,28 @@ export interface ParkedQuestion {
   readonly answer: ParkedAnswer | null
 }
 
-export interface HoldQuestion {
-  readonly id: string
-  readonly text: string
-  readonly answer: Answer | null
-}
+const HoldQuestion = Schema.Struct({ id: Schema.String, text: Schema.String, answer: Schema.NullOr(Answer) })
+export type HoldQuestion = typeof HoldQuestion.Type
+
+const AnsweredHold = Schema.Struct({
+  reason: Schema.String,
+  until: Schema.NullOr(Schema.String),
+  questions: Schema.Array(HoldQuestion),
+  answer: Answer
+})
 
 export interface Hold {
   readonly reason: string
   readonly until: string | null
   readonly questions: ReadonlyArray<HoldQuestion>
   readonly answer: Answer | null
+  readonly history?: ReadonlyArray<typeof AnsweredHold.Type>
 }
 
+const ParkedOrigin = Schema.Struct({ machine: Schema.String.check(Schema.isNonEmpty()), run: Schema.String.check(Schema.isNonEmpty()) })
+
 export interface Parked {
+  readonly origin?: typeof ParkedOrigin.Type
   readonly branch: string
   readonly questions: Arr.NonEmptyReadonlyArray<ParkedQuestion>
 }
@@ -154,9 +160,11 @@ const Frontmatter = Schema.Struct({
   hold_reason: Schema.optional(Schema.String),
   hold_until: Schema.optional(Schema.String),
   hold_questions: Schema.optional(Schema.Array(QuestionFront)),
+  hold_history: Schema.optional(Schema.Array(AnsweredHold)),
   answer: Schema.optional(Schema.String),
   answered_at: Schema.optional(Schema.String),
   parked_branch: Schema.optional(Schema.String),
+  parked_origin: Schema.optional(ParkedOrigin),
   parked_questions: Schema.optional(Schema.Array(QuestionFront)),
   beat: Schema.optional(Schema.String),
   taken_for: Schema.optional(Schema.String),
@@ -225,7 +233,7 @@ const holdQuestionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what:
   checkedQuestions(fronts, what, (question, answer) => ({ id: question.id, text: question.text, answer }))
 
 const parkedOf = (front: Frontmatter): Parked | null | string => {
-  if (front.parked_branch === undefined && front.parked_questions === undefined) {
+  if (front.parked_branch === undefined && front.parked_questions === undefined && front.parked_origin === undefined) {
     return null
   }
   if (front.parked_branch === undefined || front.parked_branch === "") {
@@ -235,7 +243,9 @@ const parkedOf = (front: Frontmatter): Parked | null | string => {
   if (typeof questions === "string") {
     return questions
   }
-  return Arr.isReadonlyArrayNonEmpty(questions) ? { branch: front.parked_branch, questions } : "a parked task names no question"
+  return Arr.isReadonlyArrayNonEmpty(questions)
+    ? { branch: front.parked_branch, questions, ...(front.parked_origin === undefined ? {} : { origin: front.parked_origin }) }
+    : "a parked task names no question"
 }
 
 const holdOf = (front: Frontmatter): Hold | null | string => {
@@ -244,7 +254,7 @@ const holdOf = (front: Frontmatter): Hold | null | string => {
     return answer
   }
   if (front.hold_reason === undefined) {
-    return front.hold_until === undefined && front.hold_questions === undefined && answer === null ? null : "a hold names no reason"
+    return front.hold_until === undefined && front.hold_questions === undefined && front.hold_history === undefined && answer === null ? null : "a hold names no reason"
   }
   if (front.hold_reason.trim() === "") {
     return "a hold names no reason"
@@ -259,7 +269,7 @@ const holdOf = (front: Frontmatter): Hold | null | string => {
   if (answer === null && questions.length > 0 && questions.every((question) => question.answer !== null)) {
     return "a hold answers every question and names no answer"
   }
-  return { reason: front.hold_reason, until: front.hold_until ?? null, questions, answer }
+  return { reason: front.hold_reason, until: front.hold_until ?? null, questions, answer, ...(front.hold_history === undefined ? {} : { history: front.hold_history }) }
 }
 
 const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => {
