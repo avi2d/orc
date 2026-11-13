@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
@@ -57,19 +57,36 @@ describe("runChecksRound streams each check into the evidence file", () => {
   test("rejects a real shell check whose first line waits for the command to exit", async () => {
     const dir = await scratch()
     const file = join(dir, "checks-1.txt")
+    const release = join(dir, "release")
+    const quoted = "'" + release.replace(/'/g, "'\\''") + "'"
     const exec = hostExec(dir, process.env, {})
-    let midway = ""
     const runner: Runner = (command, onOutput) =>
       Effect.gen(function*() {
         const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-        return yield* streamShellInAgent(spawner, exec, command, (text) =>
-          onOutput(text).pipe(Effect.andThen(Effect.promise(async () => {
-            midway = midway === "" ? await readFile(file, "utf8") : midway
-          }))))
+        return yield* streamShellInAgent(spawner, exec, command, onOutput)
       }).pipe(Effect.provide(BunServices.layer))
-    const text = await runRound(dir, runner, [{ name: "slow", command: "echo first; sleep 1; echo second" }])
-    expect(midway).toBe("check slow: echo first; sleep 1; echo second\nfirst")
-    expect(text).toBe("check slow: echo first; sleep 1; echo second\nfirst\nsecond\nexit 0: passed\n")
+    const command = "echo first; i=0; while [ ! -e " + quoted + " ]; do sleep 0.05; i=$((i + 1)); if [ \"$i\" -gt 200 ]; then exit 1; fi; done; echo second"
+    const done = runRound(dir, runner, [{ name: "slow", command }])
+    let midway = ""
+    const deadline = Date.now() + 10000
+    while (true) {
+      try {
+        midway = await readFile(file, "utf8")
+      } catch {
+        midway = ""
+      }
+      if (midway.includes("first")) {
+        break
+      }
+      if (Date.now() > deadline) {
+        break
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    expect(midway).toBe("check slow: " + command + "\nfirst")
+    await writeFile(release, "")
+    const text = await done
+    expect(text).toBe("check slow: " + command + "\nfirst\nsecond\nexit 0: passed\n")
   })
 
   test("rejects a finished file that differs from the whole-output format for a passing, a failing and a silent check", async () => {
@@ -93,6 +110,18 @@ describe("runChecksRound streams each check into the evidence file", () => {
       "check typecheck: typecheck\ntype error\n\non line 3\nexit 2: failed",
       "check quiet: quiet\n(no output)\nexit 0: passed"
     ].join("\n\n") + "\n")
+  })
+
+  test("rejects a finished file that interleaves stdout and stderr in arrival order", async () => {
+    const dir = await scratch()
+    const runner: Runner = (_command, onOutput) =>
+      Effect.gen(function*() {
+        yield* onOutput("err\n")
+        yield* onOutput("out\n")
+        return { stdout: "out\n", stderr: "err\n", exitCode: 0 }
+      })
+    const text = await runRound(dir, runner, [{ name: "mix", command: "mix" }])
+    expect(text).toBe("check mix: mix\nout\nerr\nexit 0: passed\n")
   })
 
   test("rejects a file that loses the output of a runner that returns it whole without streaming", async () => {

@@ -70,6 +70,15 @@ export const readChecksCommands = (
 export const prepareCommandOf = (commands: ReadonlyArray<ChecksCommand>): string | null =>
   commands.find((check) => check.name === "prepare")?.command ?? null
 
+const sectionOf = (outcome: CheckOutcome, stdout: string, stderr: string): string => {
+  const output = (stdout + stderr).trim()
+  return [
+    "check " + outcome.name + ": " + outcome.command,
+    output === "" ? "(no output)" : output,
+    "exit " + outcome.exitCode + ": " + (outcome.passed ? "passed" : "failed")
+  ].join("\n")
+}
+
 // The section reads as the check's trimmed output between its header and exit lines, so leading whitespace is dropped and trailing whitespace is held until more output follows it.
 const sectionWriter = (append: (text: string) => Effect.Effect<void, ChecksError>) => {
   let received = false
@@ -113,20 +122,29 @@ export const runChecksRound = (
         Effect.mapError((cause) => new ChecksError({ message: "orc: cannot write the checks evidence file: " + String(cause) }))
       )
     const outcomes: Array<CheckOutcome> = []
+    const finished: Array<string> = []
+    const rewrite = (): Effect.Effect<void, ChecksError> =>
+      fs.writeFileString(file, finished.join("\n\n")).pipe(
+        Effect.mapError((cause) => new ChecksError({ message: "orc: cannot write the checks evidence file: " + String(cause) }))
+      )
     for (const check of commands) {
       yield* append((outcomes.length === 0 ? "" : "\n\n") + "check " + check.name + ": " + check.command)
       const section = sectionWriter(append)
       const result = yield* runCommand(check.command, section.output).pipe(
         Effect.mapError((cause) => cause instanceof ChecksError ? cause : new ChecksError({ message: "orc: the " + check.name + " check failed to run: " + cause.message }))
       )
-      // A runner that does not stream hands the whole output back only in its result.
       if (!section.received()) {
         yield* section.output(result.stdout + result.stderr)
       }
       const passed = result.exitCode === 0
       const outcome: CheckOutcome = { name: check.name, command: check.command, exitCode: result.exitCode, passed, refusals: passed ? [] : refusalsIn(result.stdout + "\n" + result.stderr, check.name) }
       outcomes.push(outcome)
-      yield* section.exit(outcome)
+      finished.push(sectionOf(outcome, result.stdout, result.stderr))
+      if (section.received()) {
+        yield* rewrite()
+      } else {
+        yield* section.exit(outcome)
+      }
     }
     yield* append("\n")
     return { round, file, outcomes }
