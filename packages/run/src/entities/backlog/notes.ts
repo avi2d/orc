@@ -19,7 +19,18 @@ export const appendNote = (root: string, id: string, note: TaskNote): Effect.Eff
     const line = yield* Schema.encodeEffect(NoteLine)(note).pipe(
       Effect.mapError((error) => new BacklogError({ detail: "cannot write a note on " + id + ": " + error.message }))
     )
-    yield* fs.writeFileString(file, line + "\n", { flag: "a" }).pipe(Effect.mapError(platformFailure("append to " + file)))
+    const bytes = new TextEncoder().encode(line + "\n")
+    yield* Effect.scoped(
+      Effect.gen(function*() {
+        const handle = yield* fs.open(file, { flag: "a" }).pipe(Effect.mapError(platformFailure("append to " + file)))
+        const written = yield* handle.write(bytes).pipe(Effect.mapError(platformFailure("append to " + file)))
+        if (written !== bytes.length) {
+          return yield* Effect.fail(
+            new BacklogError({ detail: "cannot append to " + file + ": wrote " + String(written) + " of " + String(bytes.length) + " bytes" })
+          )
+        }
+      })
+    )
   })
 
 export const readNotes = (root: string, id: string): Effect.Effect<ReadonlyArray<TaskNote>, BacklogError, FileSystem.FileSystem> =>

@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect } from "effect"
+import { Effect, FileSystem } from "effect"
 import { parseDispatchArgs } from "../../../packages/run/src/app/dispatch-args"
 import { addTask, appendNote, claimTask, closeStartedTask, readNotes, writeTaken } from "../../../packages/run/src/entities/backlog/index"
 import { noteTask } from "../../../packages/run/src/features/task-thread/index"
@@ -44,6 +44,27 @@ describe("orc backlog note", () => {
       const notes = await run(readNotes(root, "orc-1"))
       expect(notes.map((note) => note.who).sort()).toEqual(["captain", "decider"])
       expect(notes.map((note) => note.text.length)).toEqual([long.length + 1, long.length + 1])
+    }))
+
+  test("a short append write fails instead of writing the rest", () =>
+    withBacklog(async (root) => {
+      const failed = await run(Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const short: FileSystem.FileSystem = {
+          ...fs,
+          open: (path, options) =>
+            Effect.map(
+              fs.open(path, options),
+              (handle) => ({ ...handle, write: (buffer: Uint8Array) => handle.write(buffer.subarray(0, 1)) })
+            )
+        }
+        return yield* appendNote(root, "orc-1", { at: "2026-10-27T10:00:00.000Z", who: "captain", text: "hello" }).pipe(
+          Effect.provideService(FileSystem.FileSystem, short),
+          Effect.flip
+        )
+      }))
+      expect(failed.detail).toContain("wrote 1 of")
+      expect(await readFile(join(root, "notes", "orc-1.jsonl"))).toHaveLength(1)
     }))
 
   test("refuses a task id the backlog does not hold", () =>
