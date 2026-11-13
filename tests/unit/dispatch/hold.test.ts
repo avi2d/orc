@@ -17,7 +17,7 @@ describe("held task files", () => {
   test("a held and answered task survives a write and a read with its words intact instead of losing the hold", async () => {
     const record: TaskRecord = {
       spec: { ...spec, id: "task-4", body: "# Fix the thing\n" },
-      hold: { reason: "which API: REST or \"gRPC\"?", until: "2026-12-01", questions: [], answer: { words: "REST,\n  and keep v1 — for now", at: "2026-11-02T12:00:00.000Z" } },
+      hold: { reason: "which API: REST or \"gRPC\"?", until: "2026-12-01", questions: [], answer: { words: "REST,\n  and keep v1 — for now", at: "2026-11-02T12:00:00.000Z" }, at: "2026-11-01T09:00:00.000Z" },
       parked: null,
       state: { kind: "new" }
     }
@@ -33,12 +33,45 @@ describe("held task files", () => {
           { id: "question-1", text: "REST or \"gRPC\"?", answer: { words: "gRPC, for now", at: "2026-11-02T12:00:00.000Z" } },
           { id: "question-2", text: "Which region?", answer: null }
         ],
-        answer: null
+        answer: null,
+        at: null
       },
       parked: null,
       state: { kind: "new" }
     }
     expect(await run(parseTaskFile("task-4.md", "new", renderTaskFile(record)))).toEqual(record)
+  })
+  test("a new hold carries the time it was placed instead of no time", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-hold-at-"))
+    try {
+      await run(addTask(root, spec))
+      const before = Date.now()
+      const outcome = await run(holdTask(root, "orc-1", { reason: "wait for budget", until: null, questions: [] }))
+      const at = Date.parse(outcome.hold.at ?? "")
+      expect(at >= before && at <= Date.now()).toBe(true)
+      expect((await run(listTasks(root)))[0]?.hold?.at).toBe(outcome.hold.at)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+  test("the first hold keeps its time in hold_history after a second hold instead of losing it", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-hold-history-at-"))
+    try {
+      await run(addTask(root, spec))
+      const first = await run(holdTask(root, "orc-1", { reason: "wait for budget", until: null, questions: [] }))
+      const file = join(root, "new", "orc-1.md")
+      const answered = (await readFile(file, "utf8")).replace("\n---\n", "\nanswer: \"approved\"\nanswered_at: \"2026-11-02T12:00:00.000Z\"\n---\n")
+      await Bun.write(file, answered)
+      const second = await run(holdTask(root, "orc-1", { reason: "wait for the merge", until: null, questions: [] }))
+      expect(second.hold.history?.map((entry) => entry.at)).toEqual([first.hold.at ?? ""])
+      expect((await run(listTasks(root)))[0]?.hold?.history?.[0]?.at).toBe(first.hold.at ?? "")
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+  test("a hold written with no held_at still parses with a null time instead of being refused", async () => {
+    const text = ["---", "id: task-6", "title: Fix the thing", "project: orc", "machine: null", "depends_on: []", "created: 2026-10-27T10:00:00.000Z", "hold_reason: wait for budget", "---", "# Fix the thing", ""].join("\n")
+    expect((await run(parseTaskFile("task-6.md", "new", text))).hold?.at).toBeNull()
   })
   test("asking a held task the same questions again keeps it, and asking others is refused instead of replacing the open ones", async () => {
     const root = await mkdtemp(join(tmpdir(), "orc-hold-questions-"))
