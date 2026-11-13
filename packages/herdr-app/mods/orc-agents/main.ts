@@ -1,7 +1,7 @@
 import { type AsyncContext, type Color, type Context, type Element, View, div } from "gpui-kit"
 import { ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { layout, settings } from "herdr"
-import { type Card, type CardStatus, type Filter, type Mark, type StepRow, buildCards, cardStatuses, filterCards, projectsOf, stepRows } from "../../src/agents"
+import { type Card, type CardStatus, type Filter, type Mark, type StepRow, buildCards, cardStatuses, filterCards, projectsOf, railLabel, stepRows } from "../../src/agents"
 import { backlog, runs, show, type Show } from "../../src/guard"
 import { type Reading, readJson, readText } from "../../src/orc-read"
 import { palette } from "../../src/palette"
@@ -51,8 +51,6 @@ const escapeSequence = new RegExp(String.fromCharCode(27) + "\\[[0-9;?]*[A-Za-z]
 
 const logLines = (text: string): ReadonlyArray<string> =>
   text.replace(escapeSequence, "").replace(/\n$/, "").split("\n")
-
-const shortId = (id: string): string => id.length > 10 ? id.slice(-6) : id
 
 const monospace = (): string => {
   const family = settings()["font_family"]
@@ -271,7 +269,7 @@ export default class OrcAgents extends View {
             .bg(card.key === selected?.key ? t.selected : t.chrome)
             .hover((style) => style.bg(t.hover))
             .on_click((_event, cx) => this.select(cx, card.key))
-            .child(shortId(card.id)))))
+            .child(railLabel(card)))))
   }
 
   stepsColumn(t: Palette, card: Card | null): Element {
