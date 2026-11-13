@@ -106,6 +106,9 @@ const heldReason = (task: TaskRecord): string | null =>
 export const openQuestions = (task: TaskRecord): ReadonlyArray<ParkedQuestion> =>
   task.parked?.questions.filter((question) => question.answer === null) ?? []
 
+export const taskPr = (task: TaskRecord): string | null =>
+  task.state.kind === "closed" && task.state.closing.outcome !== "start-failed" ? task.state.closing.pr : null
+
 export type DeciderOwns = (task: string, question: ParkedQuestion) => boolean
 
 export const answersAwaited = (captain: ReadonlyArray<string>, decider: ReadonlyArray<string>): string =>

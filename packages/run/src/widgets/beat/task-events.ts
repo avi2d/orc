@@ -1,6 +1,6 @@
 import { Duration, Effect, type FileSystem, Option, Result } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { BacklogError, type TaskRecord } from "../../entities/backlog/index"
+import { BacklogError, taskPr, type TaskRecord } from "../../entities/backlog/index"
 import type { BeatAction, StalledAction } from "../../entities/attention/index"
 import type { ChatEvent } from "../../entities/events/index"
 import { routePullRequest } from "../../entities/attention/index"
@@ -23,8 +23,6 @@ export const stallEvent = (root: string, task: TaskRecord, stall: StalledAction,
     text: named(task) + " stalled on " + stall.machine + ": no output since " + stall.since
   })
 
-const openPr = (task: TaskRecord): string | null =>
-  task.state.kind === "closed" && task.state.closing.outcome !== "start-failed" ? task.state.closing.pr : null
 
 const prEvent = (task: TaskRecord, pr: string, view: PullRequestView, at: string, readyPosted: boolean): ChatEvent | null => {
   if (view.state === "MERGED") {
@@ -46,7 +44,7 @@ export const prEvents = (
   at: string
 ): Effect.Effect<Option.Option<BeatAction>, BacklogError, Requirements> =>
   Effect.gen(function*() {
-    const pr = openPr(task)
+    const pr = taskPr(task)
     const id = task.spec.id
     if (pr === null) {
       return Option.none()

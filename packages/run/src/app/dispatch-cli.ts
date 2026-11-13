@@ -1,7 +1,7 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs } from "./dispatch-args"
-import { backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted, runLabel, backlogPresent, backlogRoot as backlogRootOf, noBacklog, type TaskFileError } from "../entities/backlog/index"
+import { backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted, runLabel, backlogPresent, backlogRoot as backlogRootOf, noBacklog, taskPr, type TaskFileError } from "../entities/backlog/index"
 import { readAttention, routeTaskItems } from "../entities/attention/index"
 import { backlogJson, type BacklogView, beatJson, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readRoom, type RoomList, runBeat, runnerLoadText } from "../widgets/beat/index"
 import { answerItemText, attentionText } from "../features/attention-list/index"
@@ -47,8 +47,7 @@ const readView = (root: string): Effect.Effect<BacklogView, BacklogError | TaskF
     const events = yield* unpostedEvents(root)
     const merged = yield* mergedIds(root)
     const prStates = new Map(yield* Effect.forEach(tasks, (task) => {
-      const state = task.state
-      const pr = state.kind === "closed" && state.closing.outcome !== "start-failed" ? state.closing.pr : null
+      const pr = taskPr(task)
       return pr === null ? Effect.succeed([task.spec.id, null] as const) : Effect.map(readPrState(root, task.spec.id, pr), (value) => [task.spec.id, value] as const)
     }))
     const deciderOwns = deciderOwnership(yield* readAttention(root, tasks))
