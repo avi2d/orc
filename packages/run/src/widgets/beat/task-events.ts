@@ -4,7 +4,7 @@ import { BacklogError, type TaskRecord } from "../../entities/backlog/index"
 import type { BeatAction, StalledAction } from "../../entities/attention/index"
 import type { ChatEvent } from "../../entities/events/index"
 import { routePullRequest } from "../../entities/attention/index"
-import { eventRecorded, recordEvent, writePrState } from "../../entities/events/index"
+import { eventRecorded, readPrState, recordEvent, writePrState } from "../../entities/events/index"
 import { checkRefusals, greenChecks, type PullRequestView } from "../../entities/pull-request/index"
 import type { RunnerError } from "../../shared/process/index"
 
@@ -49,6 +49,10 @@ export const prEvents = (
     const pr = openPr(task)
     const id = task.spec.id
     if (pr === null) {
+      return Option.none()
+    }
+    const recorded = yield* readPrState(root, id, pr)
+    if (recorded === "merged" || recorded === "closed") {
       return Option.none()
     }
     const view = yield* read(pr).pipe(Effect.result, Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed(Result.fail(new BacklogError({ detail: "cannot read " + pr + ": the read timed out after " + prSeconds + " seconds" }))) }))

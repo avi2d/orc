@@ -13,6 +13,13 @@ export interface BoardTask {
   readonly prState: "open" | "closed" | "merged" | null
 }
 
+export const titleLines = 2
+
+export const clipTitle = (title: string): string => {
+  const lines = title.split("\n")
+  return lines.length > titleLines ? lines.slice(0, titleLines).join("\n") : title
+}
+
 export const laneFor = (task: BoardTask, attention: ReadonlySet<string>): Lane => {
   if (task.held || task.parked || attention.has(task.id) || (task.status === "closed" && task.prState === "open")) return "Awaiting you"
   if (task.status === "taken" || task.status === "started") return "Running"
