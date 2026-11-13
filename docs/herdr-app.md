@@ -50,7 +50,7 @@ After the App updates, run `bun scripts/copy-app-types.ts <App version>` in `pac
 `bun run build` bundles each mod to one `main.js` and copies the result into `packages/run/dist/herdr-app/`.
 `orc app install` writes that same folder before it copies from it, when the checkout has the sources, so changing a mod needs only `orc app install`.
 A package install ships the built folder and no sources, so `orc app install` copies that folder as it is.
-Run `herdr-app check packages/herdr-app/dist/mods/<mod>` on each mod you change.
+Run `herdr-app check packages/run/dist/herdr-app/mods/<mod>` on each mod you change.
 
 ## Related topics
 
