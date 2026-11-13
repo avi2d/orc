@@ -7,11 +7,11 @@ const run = (id: string, fields: Partial<Run>): Run => ({
 })
 
 const task = (id: string, fields: Partial<Task>): Task => ({
-  id, title: `task ${id}`, project: "orc", kind: "ship", status: "new", hold: null, parked: null, reason: null, pr: null, ...fields
+  id, title: `task ${id}`, project: "orc", kind: "ship", status: "new", hold: null, parked: null, reason: null, ...fields
 })
 
 const runs = (list: ReadonlyArray<Run>): Runs => ({ schema: "orc.runs.v1", runs: list })
-const backlog = (tasks: ReadonlyArray<Task>, events: ReadonlyArray<string> = [], merged: ReadonlyArray<string> = []): Backlog => ({ schema: "orc.backlog.v1", tasks, events, merged })
+const backlog = (tasks: ReadonlyArray<Task>, merged: ReadonlyArray<string> = []): Backlog => ({ schema: "orc.backlog.v1", tasks, merged })
 
 const board = buildCards(
   runs([
@@ -21,7 +21,7 @@ const board = buildCards(
     run("20261113-060000-dddddd", { status: "running", questions: 1, project: "/work/tui-dash" }),
     run("20261113-050000-eeeeee", { status: "succeeded", prLink: "https://github.com/o/r/pull/12" })
   ]),
-  backlog([task("orc-48", { status: "closed", pr: "https://github.com/o/r/pull/48" }), task("orc-50", {})])
+  backlog([task("orc-48", { status: "closed" }), task("orc-50", {})])
 )
 
 describe("the runs list", () => {
@@ -43,10 +43,18 @@ describe("the runs list", () => {
     expect(cards.map((card) => [card.id, card.kind])).toEqual([["orc-7", "scout"]])
   })
 
+  test("a failed run with an open follow up task stays Failed with its run id, not Queued", () => {
+    const cards = buildCards(
+      runs([run("20261113-090000-aaaaaa", { status: "failed", branch: "orc/orc-7", endReason: "old", questions: 0 })]),
+      backlog([task("orc-7", { status: "new" })])
+    )
+    expect(cards.map((card) => [card.id, card.runId, card.standing.status])).toEqual([["orc-7", "20261113-090000-aaaaaa", "Failed"]])
+  })
+
   test("a merged PR's run is Done, not still awaiting approval", () => {
     const cards = buildCards(
       runs([run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" })]),
-      backlog([task("orc-48", { status: "closed" })], [], ["orc-48"])
+      backlog([task("orc-48", { status: "closed" })], ["orc-48"])
     )
     expect(cards.map((card) => [card.standing.status, card.where])).toEqual([["Done", "Merged PR #48"]])
   })
@@ -106,5 +114,16 @@ describe("the selected run's steps", () => {
 
   test("a scout run shows only its Agent step, not Checks and PR", () => {
     expect(stepRows({ status: "Queued" }, [], "scout", null).map((row) => row.label)).toEqual(["Agent"])
+  })
+
+  test("duplicate checks attempts still predict the next round as max plus one, not count plus one", () => {
+    const rows = stepRows({ status: "Running" }, [
+      { id: 1, name: "implement", attempt: 1, status: "passed" },
+      { id: 2, name: "checks", attempt: 1, status: "passed" },
+      { id: 3, name: "fix", attempt: 1, status: "passed" },
+      { id: 4, name: "checks", attempt: 1, status: "failed" },
+      { id: 5, name: "fix", attempt: 2, status: "running" }
+    ], "ship", null)
+    expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["\u2713 Agent", "\u2713 Checks 1", "\u2713 Fix 1", "\u2717 Checks 1", "\u25cf Fix 2", "\u25cb Checks 2", "\u25cb No mistakes"])
   })
 })

@@ -22,7 +22,7 @@ To install the layout:
 
 `orc app install` copies the mods `orc-tabs`, `orc-board`, `orc-resources` and `orc-agents` into `~/.config/herdr-app/mods/`.
 It copies `orc.json` and its preview `orc.svg` into `~/.config/herdr-app/layouts/`.
-It adds `cmd-1`, `cmd-2`, `cmd-3` and the Agents keys to the `layout:orc` section of `~/.config/herdr-app/keys.json`.
+It adds `cmd-1`, `cmd-2` and `cmd-3` to the `layout:orc` section of `~/.config/herdr-app/keys.json`.
 A key you already set in that section stays, and the command prints it as skipped.
 The command writes only names that start with `orc`, so Herdr's own mods and layouts stay as they are.
 
@@ -64,8 +64,6 @@ Select a step to show its output on the right: the Agent and Fix steps show what
 The output shows the full log and follows new lines as they are written.
 
 The tab folds the list to a rail of ids when you select «, and opens it again when you select ».
-To give the fold a key, add `orc-agents.fold` to the `layout:orc` section of `keys.json`, such as `"ctrl-shift-f": "orc-agents.fold"`.
-To run it from a terminal, run `herdr-app do orc-agents.fold`.
 Use your `layout.switch` key to go back to your own layout.
 
 ## Change the mods

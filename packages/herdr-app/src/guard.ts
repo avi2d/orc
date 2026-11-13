@@ -109,7 +109,6 @@ export interface Task {
   readonly hold: number | null
   readonly parked: number | null
   readonly reason: string | null
-  readonly pr: string | null
 }
 
 const task: Guard<Task> = (value, at) => {
@@ -129,21 +128,12 @@ const task: Guard<Task> = (value, at) => {
   if (parked.kind === "refused") return parked
   const reason = absentOrString(record.value, "reason", at)
   if (reason.kind === "refused") return reason
-  const pr = absentOrString(record.value, "pr", at)
-  if (pr.kind === "refused") return pr
-  return ok({ ...named.value, project: project.value, kind: kind.value, status: status.value, hold: hold.value, parked: parked.value, reason: reason.value, pr: pr.value })
-}
-
-const eventKey: Guard<string> = (value, at) => {
-  const record = fields(value, at)
-  if (record.kind === "refused") return record
-  return string(record.value, "key", at)
+  return ok({ ...named.value, project: project.value, kind: kind.value, status: status.value, hold: hold.value, parked: parked.value, reason: reason.value })
 }
 
 export interface Backlog {
   readonly schema: "orc.backlog.v1"
   readonly tasks: ReadonlyArray<Task>
-  readonly events: ReadonlyArray<string>
   readonly merged: ReadonlyArray<string>
 }
 
@@ -154,17 +144,15 @@ export const backlog: Guard<Backlog> = (value, at) => {
   if (schema.kind === "refused") return schema
   const tasks = arrayOf(record.value, "tasks", at, task)
   if (tasks.kind === "refused") return tasks
-  const events = arrayOf(record.value, "events", at, eventKey)
-  if (events.kind === "refused") return events
   const mergedRaw = record.value["merged"]
-  if (mergedRaw === undefined) return ok({ schema: schema.value, tasks: tasks.value, events: events.value, merged: [] })
+  if (mergedRaw === undefined) return ok({ schema: schema.value, tasks: tasks.value, merged: [] })
   if (!Array.isArray(mergedRaw)) return refused(child(at, "merged"), "an array", mergedRaw)
   const merged: Array<string> = []
   for (const [index, entry] of mergedRaw.entries()) {
     if (typeof entry !== "string") return refused(child(at, "merged") + "[" + index.toString() + "]", "a string", entry)
     merged.push(entry)
   }
-  return ok({ schema: schema.value, tasks: tasks.value, events: events.value, merged })
+  return ok({ schema: schema.value, tasks: tasks.value, merged })
 }
 
 const stepStatuses = ["running", "passed", "failed", "skipped"] as const

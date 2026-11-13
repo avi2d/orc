@@ -90,15 +90,15 @@ describe("readListedRuns", () => {
 
 describe("stepLogFile", () => {
   test("the implement step reads agent.log, not its JSON session file", () => {
-    expect(stepLogFile("/r", { name: "implement", attempt: 1, out: [{ kind: "session", path: "/r/sessions/s.jsonl" }] })).toBe("/r/agent.log")
+    expect(stepLogFile("/r", { name: "implement", attempt: 1, status: "running", out: [{ kind: "session", path: "/r/sessions/s.jsonl" }] })).toBe("/r/agent.log")
   })
 
   test("a fix step reads its own attempt's log, not the first fix's", () => {
-    expect(stepLogFile("/r", { name: "fix", attempt: 2, out: [] })).toBe("/r/fix-2.log")
+    expect(stepLogFile("/r", { name: "fix", attempt: 2, status: "running", out: [] })).toBe("/r/fix-2.log")
   })
 
   test("a checks step reads the file it wrote, not a session beside it", () => {
-    expect(stepLogFile("/r", { name: "checks", attempt: 3, out: [{ kind: "checks", path: "/r/session/checks-3.txt" }, { kind: "session", path: "/r/s.jsonl" }] })).toBe("/r/session/checks-3.txt")
+    expect(stepLogFile("/r", { name: "checks", attempt: 3, status: "failed", out: [{ kind: "checks", path: "/r/session/checks-3.txt" }, { kind: "session", path: "/r/s.jsonl" }] })).toBe("/r/session/checks-3.txt")
   })
 })
 

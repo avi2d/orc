@@ -3,10 +3,11 @@ import { Data, Effect, FileSystem, Schema } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { sqlite, type SqliteFailure } from "../../entities/run-history/index"
 import { runDirOf } from "./run-facts"
+import { StepStatusSchema } from "../../entities/run-history/index"
 import { UnknownRun, UnknownStep } from "./run-scores"
 
 const RunRowSchema = Schema.Struct({ task_file: Schema.String })
-const StepRowSchema = Schema.Struct({ name: Schema.String, attempt: Schema.Finite })
+const StepRowSchema = Schema.Struct({ name: Schema.String, attempt: Schema.Finite, status: StepStatusSchema })
 const OutRowsSchema = Schema.Array(Schema.Struct({ kind: Schema.String, path: Schema.String }))
 
 export type LoggedStep = typeof StepRowSchema.Type & { readonly out: typeof OutRowsSchema.Type }
@@ -18,6 +19,9 @@ export const stepLogFile = (runDir: string, step: LoggedStep): string | null => 
   }
   if (step.name === "fix") {
     return runDir + "/fix-" + step.attempt.toString() + ".log"
+  }
+  if (step.name === "checks") {
+    return step.out.filter((item) => item.kind !== "session").at(-1)?.path ?? runDir + "/checks-" + step.attempt.toString() + ".txt"
   }
   return step.out.filter((item) => item.kind !== "session").at(-1)?.path ?? null
 }
@@ -38,7 +42,7 @@ export const readStepLog = (
       return yield* new UnknownRun({ runId })
     }
     const run = yield* Schema.decodeUnknownEffect(RunRowSchema)(runRow)
-    const stepRow = yield* sqlite(() => db.query("SELECT name, attempt FROM steps WHERE run_id = ? AND id = ?").get(runId, stepId))
+    const stepRow = yield* sqlite(() => db.query("SELECT name, attempt, status FROM steps WHERE run_id = ? AND id = ?").get(runId, stepId))
     if (stepRow === null || stepRow === undefined) {
       return yield* new UnknownStep({ runId, step: stepId.toString() })
     }
@@ -51,5 +55,22 @@ export const readStepLog = (
       return yield* new NoStepLog({ runId, stepId })
     }
     const fs = yield* FileSystem.FileSystem
-    return yield* fs.readFileString(file).pipe(Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed("")))
+    const candidates = [file, ...out.map((item) => item.path)].filter((path, index, all) => all.indexOf(path) === index)
+    for (const path of candidates) {
+      const attempt = yield* fs.readFileString(path).pipe(
+        Effect.map((text) => ({ found: true as const, text })),
+        Effect.catchTag("PlatformError", (cause) =>
+          (cause as { readonly reason?: { readonly _tag?: string } }).reason?._tag === "NotFound"
+            ? Effect.succeed({ found: false as const, text: "" })
+            : Effect.fail(cause)
+        )
+      )
+      if (attempt.found) {
+        return attempt.text
+      }
+    }
+    if (step.status === "running") {
+      return ""
+    }
+    return yield* new NoStepLog({ runId, stepId })
   })

@@ -71,15 +71,12 @@ const awaitingAnswer = (count: number): { readonly standing: Standing; readonly 
   ({ standing: { status: "Awaiting you", waiting: { on: "answer" } }, where: questionsLabel(count) })
 
 const runPlace = (run: Run, task: Task | undefined, merged: ReadonlySet<string>): { readonly standing: Standing; readonly where: string } => {
-  const questions = run.status === "running" ? run.questions : task === undefined ? 0 : openQuestions(task)
+  const questions = run.status === "running" ? run.questions : 0
   if (questions > 0) {
     return awaitingAnswer(questions)
   }
   if (run.status === "running") {
     return { standing: { status: "Running" }, where: run.step === null ? "Starting" : stepLabel(run.step) }
-  }
-  if (task !== undefined && task.status !== "closed") {
-    return { standing: { status: "Queued" }, where: queuedWhere(task) }
   }
   if (run.status === "succeeded") {
     if (run.prLink === null) {
@@ -160,8 +157,8 @@ const stepsToCome = (steps: ReadonlyArray<Step>, kind: string | null, delivery: 
     return steps.length === 0 ? ["Agent"] : []
   }
   const last = steps.at(-1)
-  const rounds = steps.filter((step) => step.name === "checks").length
-  const fixes = steps.filter((step) => step.name === "fix").length
+  const rounds = steps.reduce((max, step) => step.name === "checks" ? Math.max(max, step.attempt) : max, 0)
+  const fixes = steps.reduce((max, step) => step.name === "fix" ? Math.max(max, step.attempt) : max, 0)
   const finalStep = delivery === "direct-PR" ? "PR" : "No mistakes"
   if (last === undefined) {
     return ["Agent", "Checks 1", finalStep]
