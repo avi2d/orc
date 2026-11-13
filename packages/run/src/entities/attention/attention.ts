@@ -238,7 +238,8 @@ const overdueWait = (task: TaskRecord, at: string): { readonly id: string; reado
   const passed = parts.length === 3 && parts.every((part) => Number.isInteger(part))
     ? new Date(parts[0], parts[1] - 1, parts[2] + 1).getTime()
     : Number.NaN
-  const id = itemId(task.spec.id, "overdue-wait", hold.until)
+  const generation = hold.history?.length ?? 0
+  const id = generation === 0 ? itemId(task.spec.id, "overdue-wait", hold.until) : itemId(task.spec.id, "overdue-wait", hold.until, String(generation))
   const text = "held for the captain: " + hold.reason + ", until " + hold.until + " passed"
   const asked: Asked | null = Date.parse(at) >= passed ? { kind: "overdue-wait", task: task.spec.id, text, asked: new Date(passed).toISOString(), owner: "user" } : null
   return { id, asked, answer: hold.answer }

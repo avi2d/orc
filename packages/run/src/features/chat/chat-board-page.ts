@@ -21,7 +21,8 @@ export const BoardRecord = Schema.Struct({
   reason: Schema.String,
   openedAt: Schema.String,
   board: Schema.String,
-  cards: Schema.NonEmptyArray(BoardCardRecord)
+  cards: Schema.NonEmptyArray(BoardCardRecord),
+  generation: Schema.optional(Schema.Number)
 })
 export type BoardRecord = typeof BoardRecord.Type
 

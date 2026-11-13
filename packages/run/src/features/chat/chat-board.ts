@@ -355,7 +355,7 @@ export const decisionBoards = (host: BoardHost): Boards => {
         return yield* refuse(input.id + " is neither held nor parked for the captain, so it takes no decision board")
       }
       const cards = yield* cardsFor(task, input.cards)
-      const record: BoardRecord = { task: task.id, title: task.title, waits: task.waits, reason: task.reason, openedAt: host.now().toISOString(), board: crypto.randomUUID(), cards }
+      const record: BoardRecord = { task: task.id, title: task.title, waits: task.waits, reason: task.reason, openedAt: host.now().toISOString(), board: crypto.randomUUID(), cards, generation: task.generation }
       const sem = fibers.get(task.id)?.sem ?? Semaphore.makeUnsafe(1)
       const session = yield* sem.withPermits(1)(Effect.gen(function*() {
         yield* writeBoard(dir, record, task)
