@@ -25,12 +25,9 @@ export const childCount = (parent: TaskRecord, tasks: ReadonlyArray<TaskRecord>,
 }
 
 export const dependencyWaits = (task: TaskRecord, dependency: TaskRecord | undefined, merged: ReadonlySet<string>): boolean =>
-  dependencyOpen(dependency) || (dependency !== undefined && splitSiblingUnmerged(task, dependency, merged))
+  dependencyOpen(dependency) || (dependency !== undefined && shipPrerequisiteUnmerged(task, dependency, merged))
 
-const splitSiblingUnmerged = (task: TaskRecord, dependency: TaskRecord, merged: ReadonlySet<string>): boolean => {
-  if (task.spec.parent === null || task.spec.parent !== dependency.spec.parent) {
-    return false
-  }
+const shipPrerequisiteUnmerged = (task: TaskRecord, dependency: TaskRecord, merged: ReadonlySet<string>): boolean => {
   if (task.spec.kind !== "ship" || dependency.spec.kind !== "ship") {
     return false
   }

@@ -27,6 +27,7 @@ export interface HistoryRun {
   readonly git: string
   readonly projectDir: string
   readonly runId: string
+  readonly resumeRun?: string | undefined
   readonly runDir: string
   readonly piSessionDir: string
   readonly hostSessionsDir: string

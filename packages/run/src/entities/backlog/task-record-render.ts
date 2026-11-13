@@ -30,6 +30,7 @@ const holdFields = (hold: Hold | null): ReadonlyArray<string> =>
     ? []
     : [
       field("hold_reason", hold.reason),
+      ...(hold.history === undefined ? [] : [field("hold_history", hold.history)]),
       ...(hold.until === null ? [] : [field("hold_until", hold.until)]),
       ...(hold.questions.length === 0 ? [] : [field("hold_questions", holdQuestionFronts(hold.questions))]),
       ...(hold.answer === null ? [] : [field("answer", hold.answer.words), field("answered_at", hold.answer.at)])
@@ -38,7 +39,7 @@ const holdFields = (hold: Hold | null): ReadonlyArray<string> =>
 const parkedFields = (parked: Parked | null): ReadonlyArray<string> =>
   parked === null
     ? []
-    : [field("parked_branch", parked.branch), field("parked_questions", questionFronts(parked.questions))]
+    : [field("parked_branch", parked.branch), field("parked_questions", questionFronts(parked.questions)), ...(parked.origin === undefined ? [] : [field("parked_origin", parked.origin)])]
 
 const stateFields = (state: TaskRecord["state"]): ReadonlyArray<string> => {
   switch (state.kind) {

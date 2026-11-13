@@ -196,7 +196,7 @@ const recordPrompt = (host: BoardHost, record: BoardRecord, prompt: BoardPrompt)
       return refusal
     }
     const words = answerWords(answer)
-    const said = yield* host.orc(answerArgs(record.task, card.target, words)).pipe(
+    const said = yield* host.orc(answerArgs(record.task, card.target, words, record.waits === "held" ? { kind: "held", generation: record.generation ?? 0 } : { kind: "parked" })).pipe(
       Effect.catchTag("ChatToolError", (error) => Effect.succeed("orc recorded nothing: " + error.message))
     )
     host.say("From " + record.task + "'s decision board, " + card.text + " " + words + ": " + said)
@@ -355,7 +355,7 @@ export const decisionBoards = (host: BoardHost): Boards => {
         return yield* refuse(input.id + " is neither held nor parked for the captain, so it takes no decision board")
       }
       const cards = yield* cardsFor(task, input.cards)
-      const record: BoardRecord = { task: task.id, title: task.title, waits: task.waits, reason: task.reason, openedAt: host.now().toISOString(), board: crypto.randomUUID(), cards }
+      const record: BoardRecord = { task: task.id, title: task.title, waits: task.waits, reason: task.reason, openedAt: host.now().toISOString(), board: crypto.randomUUID(), cards, generation: task.generation }
       const sem = fibers.get(task.id)?.sem ?? Semaphore.makeUnsafe(1)
       const session = yield* sem.withPermits(1)(Effect.gen(function*() {
         yield* writeBoard(dir, record, task)

@@ -15,7 +15,7 @@ const askedQuestions = (texts: ReadonlyArray<string>): ReadonlyArray<HoldQuestio
 const asksTheSame = (held: ReadonlyArray<HoldQuestion>, texts: ReadonlyArray<string>): boolean =>
   held.length === texts.length && held.every((question, index) => question.text === texts[index])
 
-const holdAgain = (id: string, fresh: TaskRecord, held: Hold, ask: HoldAsk): Effect.Effect<Rewrite<HoldOutcome>, BacklogError> => {
+const holdAgain = (id: string, held: Hold, ask: HoldAsk): Effect.Effect<Rewrite<HoldOutcome>, BacklogError> => {
   if (ask.questions.length === 0 || asksTheSame(held.questions, ask.questions)) {
     return Effect.succeed({ kind: "keep", result: { kind: "already held", hold: held } })
   }
@@ -32,13 +32,18 @@ const holdOn = (id: string, ask: HoldAsk) => (fresh: TaskRecord): Effect.Effect<
   if (fresh.parked !== null) {
     return Effect.fail(new BacklogError({ detail: id + " is parked for the captain's answer, so it cannot be held" }))
   }
-  if (fresh.hold?.answer != null) {
-    return Effect.fail(new BacklogError({ detail: id + " was held and answered: " + fresh.hold.answer.words }))
+  if (fresh.hold !== null && fresh.hold.answer === null) {
+    return holdAgain(id, fresh.hold, ask)
   }
-  if (fresh.hold !== null) {
-    return holdAgain(id, fresh, fresh.hold, ask)
+  const previous = fresh.hold
+  const history = previous === null || previous.answer === null ? [] : [
+    ...previous.history ?? [],
+    { reason: previous.reason, until: previous.until, questions: previous.questions, answer: previous.answer }
+  ]
+  const held: Hold = {
+    reason: ask.reason, until: ask.until, questions: askedQuestions(ask.questions), answer: null,
+    ...(history.length === 0 ? {} : { history })
   }
-  const held: Hold = { reason: ask.reason, until: ask.until, questions: askedQuestions(ask.questions), answer: null }
   return Effect.succeed({ kind: "write", record: { ...fresh, hold: held }, result: { kind: "held", hold: held } })
 }
 

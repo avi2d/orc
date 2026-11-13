@@ -1,45 +1,24 @@
 import { DateTime, Duration, Effect, FileSystem, Option, Path, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { decodeJson, decodeSecret, ensureGroup, pueue, type Command, type Reach } from "../../shared/process/index"
-import { AbsolutePath, readFailure } from "../../shared/config/index"
-import { ProviderId, readOrcConfig } from "../../shared/config/index"
-import { TaskId, parseTaskFile, reportKinds, fileKeyOf, labelOf, parentBranch, runLabel, taskBranch } from "../../entities/backlog/index"
+import { readOrcConfig } from "../../shared/config/index"
+import { fileKeyOf, labelOf, parentBranch, runLabel, taskBranch } from "../../entities/backlog/index"
 import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldToken } from "../../entities/token/index"
 import { heldTask, orcGroup, parentLabel, PueueState, PueueStatus, taskLabel, type PueueTask } from "../../shared/process/index"
-import { readInstructions, TaskInstructions, writeInstructions } from "./runner-instructions"
+import { writeInstructions } from "./runner-instructions"
 import { RunnerError } from "../../shared/process/index"
-import { runsForBranch } from "../../entities/run-history/index"
+import { resumePriorRun, runsForBranch } from "../../entities/run-history/index"
 import { formatHistoryError, markRunStopped, openDatabase, recordRun, stoppedEndReason } from "../../entities/run-history/index"
+import { QueueRequest, QueueTokenRequest, readRequest, refuse } from "./runner-request"
+
+export { refuse }
+
+type QueueToken = typeof QueueTokenRequest.Type
 
 import { newRunId } from "../../shared/lib/index"
-import { isRunDelivery } from "../../shared/config/index"
-import { decodeTokenText, encodeRenewal, encodeSecretJson, LabelArg, RenewRequest, type TokenEncodeError, tokenDocumentNote, tokenFields } from "../../entities/token/index"
-
-
-const taskFields = {
-  task: TaskId,
-  checkout: AbsolutePath,
-  provider: ProviderId,
-  body: Schema.String,
-  kind: Schema.optional(Schema.Literals(reportKinds)),
-  delivery: Schema.optional(Schema.Literal("direct-PR")),
-  branch: Schema.optional(Schema.String.check(Schema.isPattern(/^[A-Za-z0-9._/-]+$/))),
-  answers: Schema.optional(Schema.Array(Schema.Struct({
-    question: Schema.String.check(Schema.isPattern(/^[^\s=]+$/)),
-    answer: Schema.String.check(Schema.isNonEmpty())
-  }))),
-  instructions: Schema.optional(TaskInstructions)
-}
-
-const QueueFileRequest = Schema.Struct({ ...taskFields, tokenFile: AbsolutePath, label: Schema.optional(LabelArg) })
-const QueueTokenRequest = Schema.Struct({ ...taskFields, ...tokenFields, label: Schema.optional(LabelArg) })
-const QueueBareRequest = Schema.Struct({ ...taskFields, claudeConfigDir: Schema.optional(AbsolutePath), label: Schema.optional(LabelArg) })
-const QueueRequest = Schema.Union([QueueFileRequest, QueueTokenRequest, QueueBareRequest])
-type QueueRequest = typeof QueueRequest.Type
+import { encodeRenewal, encodeSecretJson, RenewRequest, type TokenEncodeError } from "../../entities/token/index"
 
 export type RunnerRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
-
-export const refuse = (detail: string): Effect.Effect<never, RunnerError> => Effect.fail(new RunnerError({ detail }))
 
 const queueRefusal = "the queue request on stdin is no task, checkout, provider and body with an optional tokenFile or an optional token and expiresAt"
 
@@ -171,16 +150,74 @@ const checkQueueConfig = (home: string, request: QueueRequest): Effect.Effect<vo
 const bareCommand = (run: ReadonlyArray<string>, claudeConfigDir: string | undefined): ReadonlyArray<string> =>
   claudeConfigDir === undefined ? run : ["env", "ORC_DISPATCH_CLAUDE_CONFIG_DIR=" + claudeConfigDir, ...run]
 
+const requireResumeRun = (home: string, project: string, branch: string, expected: string | undefined) =>
+  expected === undefined ? Effect.void : Effect.acquireUseRelease(
+    openDatabase(home),
+    (db) => resumePriorRun(db, project, branch).pipe(Effect.flatMap((prior) =>
+      prior?.id === expected ? Effect.void : refuse("cannot resume " + expected + " on " + branch + ": " + (prior === null ? "no previous run is available" : "the latest resumable run is " + prior.id))
+    )),
+    (db) => Effect.sync(() => db.close())
+  ).pipe(Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot check parked run " + expected + ": " + formatHistoryError(error) })))
+
+const writeTaskFile = (home: string, key: string, body: string): Effect.Effect<string, RunnerError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const folder = home + "/runner"
+    const taskFile = folder + "/" + key + ".md"
+    yield* fs.makeDirectory(folder, { recursive: true }).pipe(
+      Effect.andThen(fs.writeFileString(taskFile, body)),
+      Effect.mapError((error) => new RunnerError({ detail: "cannot write " + taskFile + ": " + error.message })))
+    return taskFile
+  })
+
+const buildRun = (
+  request: QueueRequest,
+  self: Command,
+  home: string,
+  key: string,
+  taskFile: string
+): Effect.Effect<ReadonlyArray<string>, RunnerError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const folder = home + "/runner"
+    const answers = (request.answers ?? []).flatMap((entry) => ["--answer", entry.question + "=" + entry.answer])
+    const kind = request.kind === undefined ? [] : ["--kind", request.kind]
+    const delivery = request.delivery === undefined ? [] : ["--delivery", request.delivery]
+    const instructions = request.instructions === undefined ? [] : ["--instructions", yield* writeInstructions(folder + "/" + key + ".instructions", request.instructions)]
+    const resume = request.resumeRun === undefined ? [] : ["env", "ORC_DISPATCH_RESUME_RUN=" + request.resumeRun]
+    return [...resume, ...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...kind, ...delivery, ...instructions, ...answers]
+  })
+
+const enqueueHeld = (
+  home: string,
+  request: QueueToken,
+  key: string,
+  self: Command,
+  run: ReadonlyArray<string>,
+  add: (command: ReadonlyArray<string>) => Effect.Effect<string, RunnerError, RunnerRequirements>,
+  holdArgs: ReadonlyArray<string>
+): Effect.Effect<string, RunnerError, RunnerRequirements> =>
+  Effect.gen(function*() {
+    const dir = yield* holdToken(home, key, request).pipe(
+      Effect.mapError((error) => new RunnerError({ detail: "cannot hold the token for " + request.task + ": " + error.message })),
+      Effect.tapError(() => releaseHeldToken(home, key))
+    )
+    const id = yield* add([...self, "runner", "hold", ...holdArgs, "--", ...run, "--token-file", heldTokenFile(dir)]).pipe(
+      Effect.tapError(() => releaseHeldToken(home, key))
+    )
+    yield* guardQueued(home, id.trim(), dir).pipe(Effect.tapError(() => releaseHeldToken(home, key)))
+    return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
+  })
+
 const queueTask = (
   request: QueueRequest,
   self: Command,
   home: string
 ): Effect.Effect<string, RunnerError, RunnerRequirements> =>
   Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
     yield* checkQueueConfig(home, request)
     yield* requireFolder(request.checkout)
     const project = yield* resolveProjectDir(request.checkout)
+    yield* requireResumeRun(home, project, request.branch ?? taskBranch(request.task), request.resumeRun)
     yield* ensureGroup(orcGroup)
     const label = runLabel(home, request.task, request.kind, request.label)
     const key = fileKeyOf(home, request.task, label)
@@ -188,17 +225,8 @@ const queueTask = (
     if (held !== null && !pueueDone(held)) {
       return request.task + " is already pueue task " + held.id + " in group " + orcGroup
     }
-    const folder = home + "/runner"
-    const taskFile = folder + "/" + key + ".md"
-    yield* fs.makeDirectory(folder, { recursive: true }).pipe(
-      Effect.andThen(fs.writeFileString(taskFile, request.body)),
-      Effect.mapError((error) => new RunnerError({ detail: "cannot write " + taskFile + ": " + error.message }))
-    )
-    const answers = (request.answers ?? []).flatMap((entry) => ["--answer", entry.question + "=" + entry.answer])
-    const kind = request.kind === undefined ? [] : ["--kind", request.kind]
-    const delivery = request.delivery === undefined ? [] : ["--delivery", request.delivery]
-    const instructions = request.instructions === undefined ? [] : ["--instructions", yield* writeInstructions(folder + "/" + key + ".instructions", request.instructions)]
-    const run = [...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...kind, ...delivery, ...instructions, ...answers]
+    const taskFile = yield* writeTaskFile(home, key, request.body)
+    const run = yield* buildRun(request, self, home, key, taskFile)
     const add = (command: ReadonlyArray<string>) =>
       pueue(["add", "--group", orcGroup, "--label", label, "--working-directory", project, "--print-task-id", "--escape", "--", ...command], { ORC_HOME: home })
     const holdArgs: ReadonlyArray<string> = label === taskLabel(home, request.task) ? [request.task] : [request.task, "--label", label]
@@ -210,15 +238,7 @@ const queueTask = (
       const id = yield* add(bareCommand(run, request.claudeConfigDir))
       return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
     }
-    const dir = yield* holdToken(home, key, request).pipe(
-      Effect.mapError((error) => new RunnerError({ detail: "cannot hold the token for " + request.task + ": " + error.message })),
-      Effect.tapError(() => releaseHeldToken(home, key))
-    )
-    const id = yield* add([...self, "runner", "hold", ...holdArgs, "--", ...run, "--token-file", heldTokenFile(dir)]).pipe(
-      Effect.tapError(() => releaseHeldToken(home, key))
-    )
-    yield* guardQueued(home, id.trim(), dir).pipe(Effect.tapError(() => releaseHeldToken(home, key)))
-    return "queued " + request.task + " as pueue task " + id.trim() + " in group " + orcGroup
+    return yield* enqueueHeld(home, request, key, self, run, add, holdArgs)
   })
 
 export const queueFromText = (text: string, self: Command, home: string): Effect.Effect<string, RunnerError, RunnerRequirements> =>
@@ -241,67 +261,6 @@ const renewHere = (request: RenewRequest, home: string): Effect.Effect<string, R
       return yield* refuse(request.task + " holds no token here, so the renewal is dropped")
     }
     return "renewed the token for " + request.task + " until " + DateTime.formatIso(request.expiresAt)
-  })
-
-const requiredEnv = (env: Readonly<Record<string, string | undefined>>, name: string): Effect.Effect<string, RunnerError> => {
-  const value = env[name] ?? ""
-  return value === "" ? refuse("orc runner start reads " + name + ", which the beat sets") : Effect.succeed(value)
-}
-
-const readRequest = (
-  env: Readonly<Record<string, string | undefined>>,
-  stdin: Effect.Effect<string, RunnerError>
-): Effect.Effect<QueueRequest, RunnerError, FileSystem.FileSystem | Path.Path> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const task = yield* requiredEnv(env, "ORC_TASK_ID")
-    const file = yield* requiredEnv(env, "ORC_TASK_FILE")
-    const checkout = yield* requiredEnv(env, "ORC_TASK_CHECKOUT")
-    const provider = yield* requiredEnv(env, "ORC_TASK_PROVIDER")
-    const text = yield* fs.readFileString(file).pipe(
-      Effect.mapError((error) => new RunnerError({ detail: "cannot read the task file " + file + ": " + readFailure(error) }))
-    )
-    const record = yield* parseTaskFile(file, "taken", text).pipe(
-      Effect.mapError((error) => new RunnerError({ detail: error.file + ": " + error.detail }))
-    )
-    const hold = record.hold
-    const body = hold !== null && hold.answer !== null
-      ? record.spec.body + "\n\nHeld for the captain: " + hold.reason + "\nThe captain answered: " + hold.answer.words
-      : record.spec.body
-    const resume = record.parked === null
-      ? (record.spec.kind === "parent" ? { branch: parentBranch(task) } : {})
-      : {
-        branch: record.parked.branch,
-        answers: record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ question: question.id, answer: question.answer.words }])
-      }
-    const deliveryWord = env["ORC_TASK_DELIVERY"] ?? "no-mistakes"
-    if (!isRunDelivery(deliveryWord)) {
-      return yield* refuse("orc runner start reads ORC_TASK_DELIVERY as no-mistakes or direct-PR, not " + deliveryWord)
-    }
-    const instructions = yield* readInstructions(env["ORC_TASK_INSTRUCTIONS"] ?? "")
-    const kind = record.spec.kind === "ship" ? {} : { kind: record.spec.kind }
-    const delivery = record.spec.kind === "ship" && deliveryWord === "direct-PR" ? { delivery: deliveryWord } : {}
-    const fields = yield* Schema.decodeEffect(Schema.Struct(taskFields))({ task, checkout, provider, body, ...kind, ...delivery, ...instructions, ...resume }).pipe(
-      Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
-    )
-    const tokenFile = env["ORC_TASK_TOKEN_FILE"] ?? ""
-    if (tokenFile !== "") {
-      return yield* Schema.decodeEffect(QueueFileRequest)({ ...fields, tokenFile }).pipe(
-        Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
-      )
-    }
-    const input = yield* stdin
-    if (input === "") {
-      const claudeConfigDir = env["ORC_TASK_CLAUDE_CONFIG_DIR"]
-      return claudeConfigDir === undefined || claudeConfigDir === "" ? { ...fields } : yield* Schema.decodeEffect(QueueBareRequest)({ ...fields, claudeConfigDir }).pipe(
-        Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
-      )
-    }
-    const token = decodeTokenText(input)
-    if (Option.isNone(token)) {
-      return yield* refuse("orc runner start reads ORC_TASK_TOKEN_FILE or " + tokenDocumentNote + " on stdin, one of which the beat sends")
-    }
-    return { ...fields, ...token.value }
   })
 
 const forwardSeconds = 30
