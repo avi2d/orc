@@ -4,14 +4,14 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { Database } from "bun:sqlite"
 import { BunServices } from "@effect/platform-bun"
-import { DateTime, Duration, Effect, FileSystem, Layer, Redacted, type PlatformError } from "effect"
+import { Cause, DateTime, Duration, Effect, FileSystem, Layer, Redacted, type PlatformError } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { TestClock } from "effect/testing"
 import { fileKeyOf, labelOf } from "../../packages/run/src/entities/backlog/index"
 import { insertRun, openDatabase, runById } from "../../packages/run/src/entities/run-history/index"
 import { holdToken } from "../../packages/run/src/entities/token/index"
 import { holdRun } from "../../packages/run/src/features/queueing-a-task/hold"
-import type { Command } from "../../packages/run/src/shared/process/index"
+import type { Command, RunnerError } from "../../packages/run/src/shared/process/index"
 
 const project = "linux-orc"
 const branch = "orc/task"
@@ -64,8 +64,8 @@ const runHold = (
   home: string,
   command: Command,
   seen: Array<ReadonlyArray<string>>,
-  first: (attempt: string | null) => Effect.Effect<void, PlatformError.PlatformError, FileSystem.FileSystem>
-): Effect.Effect<string, unknown, BunServices.BunServices> =>
+  first: (attempt: string | null) => Effect.Effect<void, PlatformError.PlatformError | Cause.UnknownError, FileSystem.FileSystem>
+): Effect.Effect<string, RunnerError | PlatformError.PlatformError | Cause.UnknownError, BunServices.BunServices> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const fake = Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
@@ -75,7 +75,7 @@ const runHold = (
           seen.push(ChildProcess.isStandardCommand(spawned) ? [...spawned.args] : [])
           if (seen.length === 1) {
             yield* TestClock.adjust(Duration.seconds(61))
-            yield* first(valueOf(seen[0] ?? [], attemptPrefix))
+            yield* first(valueOf(seen[0] ?? [], attemptPrefix)).pipe(Effect.orDie)
             return yield* real.spawn(ChildProcess.make("sh", ["-c", "exit 1"]))
           }
           return yield* real.spawn(ChildProcess.make("sh", ["-c", "exit 0"]))
@@ -83,12 +83,11 @@ const runHold = (
           Effect.provideService(FileSystem.FileSystem, fs)
         ))
     }))
+    const live = fake.pipe(Layer.provideMerge(Layer.mergeAll(BunServices.layer, TestClock.layer())))
     return yield* Effect.gen(function*() {
       yield* TestClock.setTime(Date.now())
       return yield* holdRun("orc-1", command, home)
-    }).pipe(
-      Effect.provide(Layer.mergeAll(BunServices.layer, TestClock.layer(), fake))
-    )
+    }).pipe(Effect.provide(live))
   })
 
 const holdCommand = (pin: string, holderFile: string): Command =>
