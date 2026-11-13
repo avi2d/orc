@@ -218,10 +218,13 @@ Each beat then prints `waits <task-id>: held for the captain: <reason>`, with th
 The date says when you mean to answer, and a past date releases nothing: the task stays held until you answer it, and its wait opens an item in the [attention queue](attention-queue.md).
 To answer, run `orc backlog answer <task-id> <words>`.
 The task file keeps your words as `answer` and the time as `answered_at`, and the next beat may start the task.
-The released run reads the task body with the reason and your words added after it.
+The released run reads the task body with each hold's reason and your answers added after it, oldest first.
 Orc refuses to hold a task that is taken, started, closed or parked.
 It refuses to answer a task with no open question for you.
 Holding a held task again keeps the first reason.
+After you answer a hold, you can place a new hold on the task before it starts.
+The task keeps the earlier reason, date, questions, and answers in `hold_history`.
+`orc backlog --json` exposes them as `hold.history`.
 To hold a task on several decisions at once, add one `--question <text>` for each, and orc names them `question-1` onward.
 Answer each one with `orc backlog answer <task-id> <question-id>=<words>`, and the task stays held until every question has an answer.
 The last answer also writes each question with its answer into `answer`, which the released run reads.

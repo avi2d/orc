@@ -265,9 +265,10 @@ const readRequest = (
       Effect.mapError((error) => new RunnerError({ detail: error.file + ": " + error.detail }))
     )
     const hold = record.hold
-    const body = hold !== null && hold.answer !== null
-      ? record.spec.body + "\n\nHeld for the captain: " + hold.reason + "\nThe captain answered: " + hold.answer.words
-      : record.spec.body
+    const decisions = hold === null ? [] : [...hold.history ?? [], hold]
+    const body = record.spec.body + decisions.flatMap((decision) => decision.answer === null ? [] : [
+      "\n\nHeld for the captain: " + decision.reason + "\nThe captain answered: " + decision.answer.words
+    ]).join("")
     const resume = record.parked === null
       ? (record.spec.kind === "parent" ? { branch: parentBranch(task) } : {})
       : {
