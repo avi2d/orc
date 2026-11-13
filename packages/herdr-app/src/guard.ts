@@ -92,9 +92,12 @@ const questionCount = (record: Fields, name: string, at: string): Guarded<number
   if (record[name] === null) return ok(null)
   const holder = fields(record[name], child(at, name))
   if (holder.kind === "refused") return holder
+  if (name === "hold" && holder.value["answer"] !== null && holder.value["answer"] !== undefined) return ok(null)
   const questions = arrayOf(holder.value, "questions", child(at, name), question)
   if (questions.kind === "refused") return questions
-  return ok(questions.value.length)
+  const raw = holder.value["questions"]
+  const open = Array.isArray(raw) ? raw.filter((entry) => entry === null || typeof entry !== "object" || (entry as Fields)["answer"] === null || (entry as Fields)["answer"] === undefined).length : questions.value.length
+  return ok(open)
 }
 
 export interface Task {
@@ -141,6 +144,7 @@ export interface Backlog {
   readonly schema: "orc.backlog.v1"
   readonly tasks: ReadonlyArray<Task>
   readonly events: ReadonlyArray<string>
+  readonly merged: ReadonlyArray<string>
 }
 
 export const backlog: Guard<Backlog> = (value, at) => {
@@ -152,7 +156,15 @@ export const backlog: Guard<Backlog> = (value, at) => {
   if (tasks.kind === "refused") return tasks
   const events = arrayOf(record.value, "events", at, eventKey)
   if (events.kind === "refused") return events
-  return ok({ schema: schema.value, tasks: tasks.value, events: events.value })
+  const mergedRaw = record.value["merged"]
+  if (mergedRaw === undefined) return ok({ schema: schema.value, tasks: tasks.value, events: events.value, merged: [] })
+  if (!Array.isArray(mergedRaw)) return refused(child(at, "merged"), "an array", mergedRaw)
+  const merged: Array<string> = []
+  for (const [index, entry] of mergedRaw.entries()) {
+    if (typeof entry !== "string") return refused(child(at, "merged") + "[" + index.toString() + "]", "a string", entry)
+    merged.push(entry)
+  }
+  return ok({ schema: schema.value, tasks: tasks.value, events: events.value, merged })
 }
 
 const stepStatuses = ["running", "passed", "failed", "skipped"] as const
@@ -190,6 +202,8 @@ export interface Run {
   readonly step: Step | null
   readonly questions: number
   readonly endReason: string | null
+  readonly kind: string | null
+  readonly delivery: string | null
 }
 
 const run: Guard<Run> = (value, at) => {
@@ -211,7 +225,11 @@ const run: Guard<Run> = (value, at) => {
   if (questions.kind === "refused") return questions
   const endReason = nullableString(record.value, "endReason", at)
   if (endReason.kind === "refused") return endReason
-  return ok({ ...placed.value, branch: branch.value, status: status.value, prLink: prLink.value, title: title.value, step: latest.value, questions: questions.value, endReason: endReason.value })
+  const kind = record.value["kind"] === undefined ? ok(null) : nullableString(record.value, "kind", at)
+  if (kind.kind === "refused") return kind
+  const delivery = record.value["delivery"] === undefined ? ok(null) : nullableString(record.value, "delivery", at)
+  if (delivery.kind === "refused") return delivery
+  return ok({ ...placed.value, branch: branch.value, status: status.value, prLink: prLink.value, title: title.value, step: latest.value, questions: questions.value, endReason: endReason.value, kind: kind.value, delivery: delivery.value })
 }
 
 export interface Runs {

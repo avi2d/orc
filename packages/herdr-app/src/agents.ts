@@ -11,6 +11,7 @@ export interface Card {
   readonly key: string
   readonly id: string
   readonly kind: string | null
+  readonly delivery: string | null
   readonly title: string
   readonly project: string
   readonly standing: Standing
@@ -53,6 +54,8 @@ export const stepLabel = (step: Pick<Step, "name" | "attempt">): string => {
       return `Fix ${step.attempt}`
     case "pr":
       return "PR"
+    case "no-mistakes":
+      return "No mistakes"
     default:
       return step.name
   }
@@ -93,23 +96,20 @@ const runPlace = (run: Run, task: Task | undefined, merged: ReadonlySet<string>)
 
 export const buildCards = (runs: Runs, backlog: Backlog): ReadonlyArray<Card> => {
   const byBranch = new Map(backlog.tasks.flatMap((task) => taskBranches(task).map((branch) => [branch, task] as const)))
-  const merged = new Set(backlog.events.filter((key) => key.endsWith(".merged")).map((key) => key.slice(0, -".merged".length)))
-  const shown = new Set<string>()
-  const cards: Array<Card> = []
-  const newestFirst = [...runs.runs].sort((a, b) => b.id.localeCompare(a.id))
-  for (const run of newestFirst) {
+  const merged = new Set(backlog.merged)
+  const seen = new Set(runs.runs.flatMap((run) => {
     const task = byBranch.get(run.branch)
-    if (task !== undefined && shown.has(task.id)) {
-      continue
-    }
-    if (task !== undefined) {
-      shown.add(task.id)
-    }
+    return task === undefined ? [] : [task.id]
+  }))
+  const cards: Array<Card> = []
+  for (const run of runs.runs) {
+    const task = byBranch.get(run.branch)
     const place = runPlace(run, task, merged)
     cards.push({
       key: run.id,
       id: task?.id ?? run.id,
-      kind: task?.kind ?? null,
+      kind: run.kind ?? task?.kind ?? null,
+      delivery: run.delivery,
       title: run.title ?? task?.title ?? run.branch,
       project: task?.project ?? lastSegment(run.project),
       ...place,
@@ -117,12 +117,12 @@ export const buildCards = (runs: Runs, backlog: Backlog): ReadonlyArray<Card> =>
     })
   }
   for (const task of backlog.tasks) {
-    if (shown.has(task.id) || task.status === "closed") {
+    if (seen.has(task.id) || task.status === "closed") {
       continue
     }
     const questions = openQuestions(task)
     const place = questions > 0 ? awaitingAnswer(questions) : { standing: { status: "Queued" } as const, where: queuedWhere(task) }
-    cards.push({ key: task.id, id: task.id, kind: task.kind, title: task.title, project: task.project, ...place, runId: null })
+    cards.push({ key: task.id, id: task.id, kind: task.kind, delivery: null, title: task.title, project: task.project, ...place, runId: null })
   }
   return sortCards(cards)
 }
@@ -147,46 +147,44 @@ const recordedMark = (step: Step, standing: Standing): Mark => {
     case "skipped":
       return "○"
     case "running":
-      return standing.status === "Awaiting you" && standing.waiting.on === "answer" ? "◆" : "●"
+      if (standing.status === "Awaiting you" && standing.waiting.on === "answer") return "◆"
+      if (standing.status === "Failed" || standing.status === "Done") return "✗"
+      return "●"
   }
 }
 
 const delivers = (step: Step): boolean => step.name === "pr" || step.name === "no-mistakes"
 
-const stepsToCome = (steps: ReadonlyArray<Step>): ReadonlyArray<string> => {
+const stepsToCome = (steps: ReadonlyArray<Step>, kind: string | null, delivery: string | null): ReadonlyArray<string> => {
+  if (kind !== null && kind !== "ship") {
+    return steps.length === 0 ? ["Agent"] : []
+  }
   const last = steps.at(-1)
   const rounds = steps.filter((step) => step.name === "checks").length
   const fixes = steps.filter((step) => step.name === "fix").length
+  const finalStep = delivery === "direct-PR" ? "PR" : "No mistakes"
   if (last === undefined) {
-    return ["Agent", "Checks 1", "PR"]
+    return ["Agent", "Checks 1", finalStep]
   }
   if (steps.some(delivers)) {
     return []
   }
   if (last.name === "checks") {
-    return last.status === "failed" ? [`Fix ${fixes + 1}`, `Checks ${rounds + 1}`, "PR"] : ["PR"]
+    return last.status === "failed" ? [`Fix ${fixes + 1}`, `Checks ${rounds + 1}`, finalStep] : [finalStep]
   }
-  return [`Checks ${rounds + 1}`, "PR"]
+  return [`Checks ${rounds + 1}`, finalStep]
 }
 
 const goesOn = (standing: Standing): boolean =>
   standing.status === "Running" || standing.status === "Queued" || (standing.status === "Awaiting you" && standing.waiting.on === "answer")
 
-export const stepRows = (standing: Standing, steps: ReadonlyArray<Step>): ReadonlyArray<StepRow> => {
+export const stepRows = (standing: Standing, steps: ReadonlyArray<Step>, kind: string | null = null, delivery: string | null = null): ReadonlyArray<StepRow> => {
   const recorded = steps.map((step): StepRow => ({ key: `step-${step.id}`, label: stepLabel(step), mark: recordedMark(step, standing), stepId: step.id }))
   const toCome = goesOn(standing)
-    ? stepsToCome(steps).map((label): StepRow => ({ key: `next-${label}`, label, mark: "○", stepId: null }))
+    ? stepsToCome(steps, kind, delivery).map((label): StepRow => ({ key: `next-${label}`, label, mark: "○", stepId: null }))
     : []
   const approval = standing.status === "Awaiting you" && standing.waiting.on === "approval"
     ? [{ key: "approve", label: `Approve ${standing.waiting.pr}`, mark: "◆" as const, stepId: null }]
     : []
   return [...recorded, ...toCome, ...approval]
-}
-
-export const along = <A>(items: ReadonlyArray<A>, current: A | null, by: 1 | -1): A | null => {
-  const at = current === null ? -1 : items.indexOf(current)
-  if (at === -1) {
-    return (by === 1 ? items[0] : items.at(-1)) ?? null
-  }
-  return items[Math.min(Math.max(at + by, 0), items.length - 1)] ?? null
 }

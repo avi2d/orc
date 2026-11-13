@@ -71,6 +71,7 @@ interface BacklogJson {
   readonly schema: typeof BACKLOG_JSON_SCHEMA
   readonly tasks: ReadonlyArray<TaskJson>
   readonly events: ReadonlyArray<ChatEvent>
+  readonly merged: ReadonlyArray<string>
   readonly projects: ReadonlyArray<Project> | null
   readonly room: ReadonlyArray<MachineRoom> | null
 }
@@ -126,6 +127,7 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     ...claimJson(record)
   })),
   events: view.events,
+  merged: [...view.merged],
   projects: view.projects.kind === "read" ? view.projects.projects : null,
   room: view.room.kind === "read" ? view.room.room : null
 })

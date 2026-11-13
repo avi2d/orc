@@ -7,7 +7,7 @@ import type { SandboxKind } from "../../shared/sandbox/index"
 import { orcCompletionLine } from "../../entities/agent/index"
 import { failingFileName, idleSpan, type PiPacing, runPi } from "../../entities/agent/index"
 import { askOnLoop, loopContinuePrompt, loopingNote } from "./loop-pause"
-import { historyFailure, recordRun, updateRun } from "../../entities/run-history/index"
+import { historyFailure, recordRun, recordStep, updateRun, updateStep } from "../../entities/run-history/index"
 import type { OrcRunError } from "../../shared/lib/index"
 import { reportPathOf, writtenReport } from "../../entities/run-history/index"
 import type { ReportKind } from "../../entities/backlog/index"
@@ -117,13 +117,16 @@ export const runReport = (
 ): Effect.Effect<ReportOutcome, OrcRunError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     yield* recordRun(db, {
-      id: run.runId, project: run.projectDir, branch: run.branch, taskFile: run.taskPath, status: "running", started: run.started, sandbox: run.sandbox
+      id: run.runId, project: run.projectDir, branch: run.branch, taskFile: run.taskPath, status: "running", started: run.started, sandbox: run.sandbox,
+      kind: run.kind, delivery: null
     }).pipe(Effect.mapError((cause) => historyFailure("record the run in", cause)))
+    yield* recordStep(db, { runId: run.runId, name: "implement", attempt: 1, status: "running", started: run.started, agentFile: run.agent.path, piSessionFile: null }).pipe(Effect.asVoid, Effect.mapError((cause) => historyFailure("record the step in", cause)))
     const piEnd = yield* runReportPi(run).pipe(Effect.catchTag("OrcRunError", (error) => Effect.succeed({ kind: "ended", reason: error.message } as const)))
     const written = yield* writtenReport(run.runDir)
     const fs = yield* FileSystem.FileSystem
     const report = written === null ? null : { path: written, text: yield* fs.readFileString(written).pipe(Effect.orElseSucceed(() => "")) }
     const outcome = outcomeOf(run, report, piEnd)
+    yield* updateStep(db, run.runId, "implement", 1, { status: outcome.kind === "reported" ? "passed" : "failed", ended: new Date().toISOString() }).pipe(Effect.asVoid, Effect.mapError((cause) => historyFailure("record the step in", cause)))
     yield* updateRun(db, run.runId, {
       status: outcome.kind === "reported" ? "succeeded" : outcome.kind === "stopped" ? "stopped" : "failed",
       ended: new Date().toISOString(),

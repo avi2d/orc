@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { sandboxKinds, type SandboxKind } from "../../shared/sandbox/index"
 import { OrcRunError } from "../../shared/lib/index"
 
-export const RUN_HISTORY_SCHEMA_VERSION = 3
+export const RUN_HISTORY_SCHEMA_VERSION = 4
 export const RUNS_JSON_SCHEMA = "orc.runs.v1" as const
 export const SHOW_JSON_SCHEMA = "orc.show.v1" as const
 
@@ -42,6 +42,8 @@ export interface RunInput {
   readonly prLink?: string | null | undefined
   readonly endReason?: string | null | undefined
   readonly sandbox?: SandboxKind | null | undefined
+  readonly kind?: string | null | undefined
+  readonly delivery?: string | null | undefined
 }
 
 export interface RunRecord {
@@ -55,6 +57,8 @@ export interface RunRecord {
   readonly prLink: string | null
   readonly endReason: string | null
   readonly sandbox: SandboxKind | null
+  readonly kind: string | null
+  readonly delivery: string | null
 }
 
 export interface StepInput {
@@ -116,7 +120,9 @@ const runsColumns =
   "ended TEXT, " +
   "pr_link TEXT, " +
   "end_reason TEXT, " +
-  sandboxColumn
+  sandboxColumn + ", " +
+  "kind TEXT, " +
+  "delivery TEXT"
 
 const rebuildRunsForStopped: ReadonlyArray<string> = [
   "CREATE TABLE runs_new (" + runsColumns + ")",
@@ -172,7 +178,8 @@ const busyTimeoutMillis = 5000
 const upgrades: ReadonlyMap<number, ReadonlyArray<string>> = new Map([
   [0, schemaStatements],
   [1, ["ALTER TABLE runs ADD COLUMN " + sandboxColumn, ...rebuildRunsForStopped]],
-  [2, rebuildRunsForStopped]
+  [2, rebuildRunsForStopped],
+  [3, ["ALTER TABLE runs ADD COLUMN kind TEXT", "ALTER TABLE runs ADD COLUMN delivery TEXT"]]
 ])
 
 const readSchemaVersion = (db: Database): Effect.Effect<number, HistoryError> =>
@@ -221,7 +228,7 @@ export const openDatabase = (
 
 export const insertRun = (db: Database, input: RunInput): void => {
   db.query(
-    "INSERT INTO runs (id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO runs (id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox, kind, delivery) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   ).run(
       input.id,
       input.project,
@@ -232,7 +239,9 @@ export const insertRun = (db: Database, input: RunInput): void => {
       input.ended ?? null,
       input.prLink ?? null,
       input.endReason ?? null,
-      input.sandbox ?? null
+      input.sandbox ?? null,
+      input.kind ?? null,
+      input.delivery ?? null
     )
 }
 
@@ -297,7 +306,9 @@ export const RunSqlRowSchema = Schema.Struct({
   ended: Schema.NullOr(Schema.String),
   pr_link: Schema.NullOr(Schema.String),
   end_reason: Schema.NullOr(Schema.String),
-  sandbox: Schema.NullOr(Schema.Literals(sandboxKinds))
+  sandbox: Schema.NullOr(Schema.Literals(sandboxKinds)),
+  kind: Schema.NullOr(Schema.String),
+  delivery: Schema.NullOr(Schema.String)
 })
 
 export const runRecordOf = (row: typeof RunSqlRowSchema.Type): RunRecord => ({
@@ -310,7 +321,9 @@ export const runRecordOf = (row: typeof RunSqlRowSchema.Type): RunRecord => ({
   ended: row.ended,
   prLink: row.pr_link,
   endReason: row.end_reason,
-  sandbox: row.sandbox
+  sandbox: row.sandbox,
+  kind: row.kind,
+  delivery: row.delivery
 })
 
 export const decodedRunRow = (row: unknown): Effect.Effect<RunRecord | null, Schema.SchemaError> =>
@@ -320,7 +333,7 @@ export const decodedRunRow = (row: unknown): Effect.Effect<RunRecord | null, Sch
 
 export const stoppedEndReason = "the run was stopped"
 
-const runColumns = "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox FROM runs"
+const runColumns = "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox, kind, delivery FROM runs"
 
 export const runById = (
   db: Database,
@@ -333,6 +346,14 @@ export const listRuns = (
   limit = 20
 ): Effect.Effect<ReadonlyArray<RunRecord>, Schema.SchemaError | SqliteFailure> =>
   sqlite(() => db.query(runColumns + " ORDER BY started DESC, id ASC LIMIT ?").all(limit)).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(RunSqlRowSchema))),
+    Effect.map((rows) => rows.map(runRecordOf))
+  )
+
+export const listAllRuns = (
+  db: Database
+): Effect.Effect<ReadonlyArray<RunRecord>, Schema.SchemaError | SqliteFailure> =>
+  sqlite(() => db.query(runColumns + " ORDER BY started DESC, id ASC").all()).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(RunSqlRowSchema))),
     Effect.map((rows) => rows.map(runRecordOf))
   )
@@ -382,6 +403,9 @@ export const markRunStopped = (db: Database, runId: string, ended: string, endRe
     yield* updateRun(db, runId, { status: "stopped", ended, prLink: prior?.prLink ?? null, endReason }).pipe(
       Effect.mapError((cause) => historyFailure("record the run in", cause))
     )
+    yield* sqlite(() => {
+      db.query("UPDATE steps SET status = 'failed', ended = ? WHERE run_id = ? AND status = 'running'").run(ended, runId)
+    }).pipe(Effect.mapError((cause) => historyFailure("record the stopped steps in", cause)))
   })
 
 export const historyFailure = (action: string, cause: unknown): OrcRunError =>

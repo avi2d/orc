@@ -1,7 +1,7 @@
 import { type AsyncContext, type Color, type Context, type Element, View, div } from "gpui-kit"
 import { ScrollHandle, h_flex, v_flex } from "gpui-base"
-import { layout, nextCommand, settings } from "herdr"
-import { type Card, type CardStatus, type Filter, type Mark, type StepRow, along, buildCards, cardStatuses, filterCards, projectsOf, stepRows } from "../../src/agents"
+import { layout, settings } from "herdr"
+import { type Card, type CardStatus, type Filter, type Mark, type StepRow, buildCards, cardStatuses, filterCards, projectsOf, stepRows } from "../../src/agents"
 import { backlog, runs, show, type Show } from "../../src/guard"
 import { type Reading, readJson, readText } from "../../src/orc-read"
 import { palette } from "../../src/palette"
@@ -15,7 +15,6 @@ interface Keyed<A> {
 type Palette = ReturnType<typeof palette>
 
 const everyMs = 4000
-const logLinesShown = 400
 const thisView = "orc-agents"
 
 const statusColor = (t: Palette, status: CardStatus): Color => {
@@ -51,7 +50,7 @@ const markColor = (t: Palette, mark: Mark): Color => {
 const escapeSequence = new RegExp(String.fromCharCode(27) + "\\[[0-9;?]*[A-Za-z]", "g")
 
 const logLines = (text: string): ReadonlyArray<string> =>
-  text.replace(escapeSequence, "").replace(/\n$/, "").split("\n").slice(-logLinesShown)
+  text.replace(escapeSequence, "").replace(/\n$/, "").split("\n")
 
 const shortId = (id: string): string => id.length > 10 ? id.slice(-6) : id
 
@@ -84,38 +83,6 @@ export default class OrcAgents extends View {
         this.refresh(tick)
       }
     })
-    cx.spawn(async (task) => {
-      for (;;) {
-        this.command(task, await nextCommand())
-      }
-    })
-  }
-
-  command(cx: Context, name: string): void {
-    switch (name) {
-      case "fold":
-        this.toggleFold(cx)
-        return
-      case "run-next":
-      case "run-prev": {
-        const key = along(this.visibleCards().map((card) => card.key), this.selectedCard()?.key ?? null, name === "run-next" ? 1 : -1)
-        if (key !== null) {
-          this.select(cx, key)
-        }
-        return
-      }
-      case "step-next":
-      case "step-prev": {
-        const card = this.selectedCard()
-        const steps = card === null ? null : this.currentSteps(card)
-        const ids = steps?.kind === "ok" ? steps.value.steps.map((step) => step.id) : []
-        const stepId = along(ids, this.stepShown(), name === "step-next" ? 1 : -1)
-        if (stepId !== null) {
-          this.chooseStep(cx, stepId)
-        }
-        return
-      }
-    }
   }
 
   refresh(cx: Context): void {
@@ -319,7 +286,7 @@ export default class OrcAgents extends View {
       return column.child(header).child(div().p(12).text_color(t.muted).child("Reading its steps"))
     }
     const shownStep = this.stepShown()
-    const rows = stepRows(card.standing, reading?.value.steps ?? [])
+    const rows = stepRows(card.standing, reading?.value.steps ?? [], card.kind, card.delivery)
     return column.child(header)
       .child(v_flex().id("steps").flex_1().overflow_y_scrollbar().p(6).gap(2)
         .children(rows.map((row) => this.rowView(t, row, row.stepId !== null && row.stepId === shownStep))))
@@ -368,7 +335,7 @@ export default class OrcAgents extends View {
 
   stepTitle(card: Card, stepId: number): string {
     const steps = this.currentSteps(card)
-    const row = steps?.kind === "ok" ? stepRows(card.standing, steps.value.steps).find((entry) => entry.stepId === stepId) : undefined
+    const row = steps?.kind === "ok" ? stepRows(card.standing, steps.value.steps, card.kind, card.delivery).find((entry) => entry.stepId === stepId) : undefined
     return row?.label ?? "Step"
   }
 }

@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
-import { along, buildCards, filterCards, stepRows } from "../../../packages/herdr-app/src/agents"
+import { buildCards, filterCards, stepRows } from "../../../packages/herdr-app/src/agents"
 import type { Backlog, Run, Runs, Task } from "../../../packages/herdr-app/src/guard"
 
 const run = (id: string, fields: Partial<Run>): Run => ({
-  id, project: "/work/orc", branch: `orc/x-${id}`, status: "running", prLink: null, title: `run ${id}`, step: null, questions: 0, endReason: null, ...fields
+  id, project: "/work/orc", branch: `orc/x-${id}`, status: "running", prLink: null, title: `run ${id}`, step: null, questions: 0, endReason: null, kind: null, delivery: null, ...fields
 })
 
 const task = (id: string, fields: Partial<Task>): Task => ({
@@ -11,7 +11,7 @@ const task = (id: string, fields: Partial<Task>): Task => ({
 })
 
 const runs = (list: ReadonlyArray<Run>): Runs => ({ schema: "orc.runs.v1", runs: list })
-const backlog = (tasks: ReadonlyArray<Task>, events: ReadonlyArray<string> = []): Backlog => ({ schema: "orc.backlog.v1", tasks, events })
+const backlog = (tasks: ReadonlyArray<Task>, events: ReadonlyArray<string> = [], merged: ReadonlyArray<string> = []): Backlog => ({ schema: "orc.backlog.v1", tasks, events, merged })
 
 const board = buildCards(
   runs([
@@ -46,12 +46,12 @@ describe("the runs list", () => {
   test("a merged PR's run is Done, not still awaiting approval", () => {
     const cards = buildCards(
       runs([run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" })]),
-      backlog([task("orc-48", { status: "closed" })], ["orc-48.merged"])
+      backlog([task("orc-48", { status: "closed" })], [], ["orc-48"])
     )
     expect(cards.map((card) => [card.standing.status, card.where])).toEqual([["Done", "Merged PR #48"]])
   })
 
-  test("a task rerun three times shows its newest run once, not one card per run", () => {
+  test("a task rerun three times shows every run, not only its newest run", () => {
     const cards = buildCards(
       runs([
         run("20261113-070000-cccccc", { status: "failed", branch: "orc/orc-7", endReason: "old" }),
@@ -60,7 +60,7 @@ describe("the runs list", () => {
       ]),
       backlog([task("orc-7", { status: "closed" })])
     )
-    expect(cards.map((card) => [card.id, card.runId])).toEqual([["orc-7", "20261113-090000-aaaaaa"]])
+    expect(cards.map((card) => [card.id, card.runId])).toEqual([["orc-7", "20261113-090000-aaaaaa"], ["orc-7", "20261113-070000-cccccc"], ["orc-7", "20261113-080000-bbbbbb"]])
   })
 
   test("the Status filter keeps only Failed runs, not the Done ones beside them", () => {
@@ -81,43 +81,30 @@ describe("the selected run's steps", () => {
     const rows = stepRows({ status: "Running" }, [
       { id: 1, name: "implement", attempt: 1, status: "passed" },
       { id: 2, name: "checks", attempt: 1, status: "failed" }
-    ])
-    expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["✓ Agent", "✗ Checks 1", "○ Fix 1", "○ Checks 2", "○ PR"])
+    ], "ship", null)
+    expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["✓ Agent", "✗ Checks 1", "○ Fix 1", "○ Checks 2", "○ No mistakes"])
   })
 
   test("a running step that waits on an answer is ◆, not ●", () => {
-    const rows = stepRows({ status: "Awaiting you", waiting: { on: "answer" } }, [{ id: 1, name: "implement", attempt: 1, status: "running" }])
+    const rows = stepRows({ status: "Awaiting you", waiting: { on: "answer" } }, [{ id: 1, name: "implement", attempt: 1, status: "running" }], "ship", null)
     expect(rows.map((row) => row.mark)).toEqual(["◆", "○", "○"])
   })
 
   test("a run not yet started lists every step as not started, not an empty list", () => {
-    expect(stepRows({ status: "Queued" }, []).map((row) => `${row.mark} ${row.label}`)).toEqual(["○ Agent", "○ Checks 1", "○ PR"])
+    expect(stepRows({ status: "Queued" }, [], "ship", null).map((row) => `${row.mark} ${row.label}`)).toEqual(["○ Agent", "○ Checks 1", "○ No mistakes"])
   })
 
   test("a failed run lists no steps to come after the one that failed", () => {
     const rows = stepRows({ status: "Failed" }, [{ id: 1, name: "implement", attempt: 1, status: "failed" }])
     expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["✗ Agent"])
   })
-})
 
-describe("moving through a list by key", () => {
-  test("stops at the last item instead of wrapping to the first", () => {
-    expect(along(["a", "b", "c"], "c", 1)).toBe("c")
+  test("a stopped run marks its running step ✗, not ●", () => {
+    const rows = stepRows({ status: "Failed" }, [{ id: 1, name: "implement", attempt: 1, status: "running" }], "ship", null)
+    expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["✗ Agent"])
   })
 
-  test("stops at the first item instead of wrapping to the last", () => {
-    expect(along(["a", "b", "c"], "a", -1)).toBe("a")
-  })
-
-  test("steps to the neighbour on either side", () => {
-    expect([along(["a", "b", "c"], "b", 1), along(["a", "b", "c"], "b", -1)]).toEqual(["c", "a"])
-  })
-
-  test("enters a list from its start going down and from its end going up when nothing is chosen", () => {
-    expect([along(["a", "b", "c"], null, 1), along(["a", "b", "c"], null, -1)]).toEqual(["a", "c"])
-  })
-
-  test("gives nothing for an empty list rather than an undefined item", () => {
-    expect(along([], null, 1)).toBeNull()
+  test("a scout run shows only its Agent step, not Checks and PR", () => {
+    expect(stepRows({ status: "Queued" }, [], "scout", null).map((row) => row.label)).toEqual(["Agent"])
   })
 })

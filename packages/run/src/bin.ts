@@ -13,7 +13,7 @@ import { runDispatch } from "./app/dispatch-cli"
 import { RunnerError } from "./shared/process/index"
 import { formatReport, formatReportOutcome, runAgentStep, runReportStep } from "./features/running-a-task/index"
 import type { ReportKind } from "./entities/backlog/index"
-import { encodeRefusalsJson, formatHistoryError, formatRefusalsTable, listRuns, openDatabase, orcHomeDir, readRefusals } from "./entities/run-history/index"
+import { encodeRefusalsJson, formatHistoryError, formatRefusalsTable, listAllRuns, listRuns, openDatabase, orcHomeDir, readRefusals } from "./entities/run-history/index"
 import { encodeRunsJson, encodeShowJson, formatRunsTable, formatShow, readListedRuns, readShow, readStepLog, recordStepScore } from "./features/seeing-runs/index"
 
 const usage = "Usage: orc [--version] [--help] | orc app install | orc chat | orc runs [--json] | orc refusals [--json] | orc show <run> [--json] | orc log <run> <step-id> | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--kind ship|scout|task|parent] [--delivery no-mistakes|direct-PR] [--branch <name>] [--sandbox nono|none] [--token-file <path>] [--provider <id>] [--instructions <path>] [--allow ask-user] [--answer <question-or-finding-id>=\"<text>\"] | " + dispatchUsage
@@ -119,7 +119,7 @@ const reportStep = (args: Extract<OrcArgs, { readonly kind: "RunAgent" }>, kind:
 const printRuns = (args: Extract<OrcArgs, { readonly kind: "ListRuns" }>) =>
   Effect.gen(function*() {
     if (args.json) {
-      const listed = yield* readHistory((db) => listRuns(db).pipe(Effect.flatMap((runs) => readListedRuns(db, runs))))
+      const listed = yield* readHistory((db) => listAllRuns(db).pipe(Effect.flatMap((runs) => readListedRuns(db, runs))))
       yield* Console.log(yield* encodeRunsJson(listed))
     } else {
       yield* Console.log(formatRunsTable(yield* readHistory((db) => listRuns(db))))
