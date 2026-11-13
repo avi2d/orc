@@ -70,17 +70,29 @@ export const readChecksCommands = (
 export const prepareCommandOf = (commands: ReadonlyArray<ChecksCommand>): string | null =>
   commands.find((check) => check.name === "prepare")?.command ?? null
 
-const sectionOf = (outcome: CheckOutcome, stdout: string, stderr: string): string => {
-  const output = (stdout + stderr).trim()
-  return [
-    "check " + outcome.name + ": " + outcome.command,
-    output === "" ? "(no output)" : output,
-    "exit " + outcome.exitCode + ": " + (outcome.passed ? "passed" : "failed")
-  ].join("\n")
+// The section reads as the check's trimmed output between its header and exit lines, so leading whitespace is dropped and trailing whitespace is held until more output follows it.
+const sectionWriter = (append: (text: string) => Effect.Effect<void, ChecksError>) => {
+  let started = false
+  let held = ""
+  return {
+    output: (text: string): Effect.Effect<void, ChecksError> => {
+      const kept = started ? held + text : text.replace(/^\s+/, "")
+      const body = kept.replace(/\s+$/, "")
+      held = kept.slice(body.length)
+      if (body === "") {
+        return Effect.void
+      }
+      const prefix = started ? "" : "\n"
+      started = true
+      return append(prefix + body)
+    },
+    exit: (outcome: CheckOutcome): Effect.Effect<void, ChecksError> =>
+      append((started ? "" : "\n(no output)") + "\nexit " + outcome.exitCode + ": " + (outcome.passed ? "passed" : "failed"))
+  }
 }
 
 export const runChecksRound = (
-  runCommand: (command: string) => Effect.Effect<CommandResult, { readonly message: string }>,
+  runCommand: (command: string, onOutput: (text: string) => Effect.Effect<void, ChecksError>) => Effect.Effect<CommandResult, { readonly message: string }>,
   fs: FileSystem.FileSystem,
   path: Path.Path,
   runDir: string,
@@ -93,23 +105,31 @@ export const runChecksRound = (
       Effect.andThen(() => fs.writeFileString(file, "")),
       Effect.mapError((cause) => new ChecksError({ message: "orc: cannot write the checks evidence file: " + String(cause) }))
     )
-    const outcomes: Array<CheckOutcome> = []
-    let first = true
-    for (const check of commands) {
-      const result = yield* runCommand(check.command).pipe(
-        Effect.mapError((cause) => new ChecksError({ message: "orc: the " + check.name + " check failed to run: " + cause.message }))
+    const append = (text: string): Effect.Effect<void, ChecksError> =>
+      fs.writeFileString(file, text, { flag: "a" }).pipe(
+        Effect.mapError((cause) => new ChecksError({ message: "orc: cannot write the checks evidence file: " + String(cause) }))
       )
+    const outcomes: Array<CheckOutcome> = []
+    for (const check of commands) {
+      yield* append((outcomes.length === 0 ? "" : "\n\n") + "check " + check.name + ": " + check.command)
+      const section = sectionWriter(append)
+      let streamed = false
+      const result = yield* runCommand(check.command, (text) => {
+        streamed = true
+        return section.output(text)
+      }).pipe(
+        Effect.mapError((cause) => cause instanceof ChecksError ? cause : new ChecksError({ message: "orc: the " + check.name + " check failed to run: " + cause.message }))
+      )
+      // A runner that does not stream hands the whole output back only in its result.
+      if (!streamed) {
+        yield* section.output(result.stdout + result.stderr)
+      }
       const passed = result.exitCode === 0
       const outcome: CheckOutcome = { name: check.name, command: check.command, exitCode: result.exitCode, passed, refusals: passed ? [] : refusalsIn(result.stdout + "\n" + result.stderr, check.name) }
       outcomes.push(outcome)
-      yield* fs.writeFileString(file, (first ? "" : "\n\n") + sectionOf(outcome, result.stdout, result.stderr), first ? undefined : { flag: "a" }).pipe(
-        Effect.mapError((cause) => new ChecksError({ message: "orc: cannot write the checks evidence file: " + String(cause) }))
-      )
-      first = false
+      yield* section.exit(outcome)
     }
-    yield* fs.writeFileString(file, "\n", { flag: "a" }).pipe(
-      Effect.mapError((cause) => new ChecksError({ message: "orc: cannot write the checks evidence file: " + String(cause) }))
-    )
+    yield* append("\n")
     return { round, file, outcomes }
   })
 

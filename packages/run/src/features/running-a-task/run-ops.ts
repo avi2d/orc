@@ -20,7 +20,7 @@ export interface AgentRunResult extends PiRun {
 
 export interface SandboxOps {
   readonly runAgent: (run: AgentRun) => Effect.Effect<AgentRunResult, OrcRunError>
-  readonly execCheck: (command: string) => Effect.Effect<CommandResult, OrcRunError>
+  readonly execCheck: <E>(command: string, onOutput: (text: string) => Effect.Effect<void, E>) => Effect.Effect<CommandResult, OrcRunError | E>
 }
 
 export interface ResumePlan {

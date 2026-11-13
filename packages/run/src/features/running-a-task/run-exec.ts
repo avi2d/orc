@@ -1,6 +1,6 @@
 import { Console, Effect, type FileSystem, type Path, type Scope } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { type AgentExec, hostExec, shellInAgent } from "../../shared/sandbox/index"
+import { type AgentExec, hostExec, shellInAgent, streamShellInAgent } from "../../shared/sandbox/index"
 import { prepareCommandOf, readChecksCommands } from "./checks"
 import { commitsSince, headOf } from "../../shared/process/index"
 import { openNonoExec } from "../../shared/sandbox/index"
@@ -91,5 +91,5 @@ export const agentOps = (
       const commits = yield* commitsSince(run.spawner, run.git, exec.cwd, base)
       return { ...pi, commits }
     }),
-  execCheck: (command) => shellInAgent(run.spawner, exec, command)
+  execCheck: (command, onOutput) => streamShellInAgent(run.spawner, exec, command, onOutput)
 })
