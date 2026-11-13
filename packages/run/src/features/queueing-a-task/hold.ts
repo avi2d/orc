@@ -50,8 +50,8 @@ const resumePinOf = (run: Command): string | null => {
 }
 
 const withResumePin = (run: Command, pin: string): Command => {
-  const [first = "", ...rest] = run.map((entry) => entry.startsWith(resumeEnvPrefix) ? resumeEnvPrefix + pin : entry)
-  return [first, ...rest]
+  const mapped = run.map((entry) => entry.startsWith(resumeEnvPrefix) ? resumeEnvPrefix + pin : entry)
+  return [mapped.at(0) ?? "", ...mapped.slice(1)]
 }
 
 const attemptEnvPrefix = "ORC_DISPATCH_RUN_ID="
@@ -62,11 +62,10 @@ const withAttemptId = (run: Command, attempt: string): Command => {
   }
   const replaced = run.map((entry) => entry.startsWith(attemptEnvPrefix) ? attemptEnvPrefix + attempt : entry)
   if (replaced.some((entry) => entry.startsWith(attemptEnvPrefix))) {
-    const [first = "", ...rest] = replaced
-    return [first, ...rest]
+    return [replaced.at(0) ?? "", ...replaced.slice(1)]
   }
-  const [first = "", ...rest] = run
-  return first === "env" ? [first, attemptEnvPrefix + attempt, ...rest] : [first, ...rest]
+  const first = run.at(0) ?? ""
+  return first === "env" ? [first, attemptEnvPrefix + attempt, ...run.slice(1)] : [first, ...run.slice(1)]
 }
 
 const advancedPin = (

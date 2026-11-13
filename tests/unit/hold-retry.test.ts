@@ -70,9 +70,9 @@ const runHold = (
     const fs = yield* FileSystem.FileSystem
     const fake = Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
       const real = yield* ChildProcessSpawner.ChildProcessSpawner
-      return ChildProcessSpawner.make((command) =>
+      return ChildProcessSpawner.make((spawned) =>
         Effect.gen(function*() {
-          seen.push(ChildProcess.isStandardCommand(command) ? [...command.args] : [])
+          seen.push(ChildProcess.isStandardCommand(spawned) ? [...spawned.args] : [])
           if (seen.length === 1) {
             yield* TestClock.adjust(Duration.seconds(61))
             yield* first(valueOf(seen[0] ?? [], attemptPrefix))
