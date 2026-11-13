@@ -39,7 +39,7 @@ const holdFields = (hold: Hold | null): ReadonlyArray<string> =>
 const parkedFields = (parked: Parked | null): ReadonlyArray<string> =>
   parked === null
     ? []
-    : [field("parked_branch", parked.branch), field("parked_questions", questionFronts(parked.questions))]
+    : [field("parked_branch", parked.branch), field("parked_questions", questionFronts(parked.questions)), ...(parked.origin === undefined ? [] : [field("parked_origin", parked.origin)])]
 
 const stateFields = (state: TaskRecord["state"]): ReadonlyArray<string> => {
   switch (state.kind) {

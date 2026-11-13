@@ -8,6 +8,7 @@ import { type QuotaReading, readQuota } from "./quota"
 import { encodeRenewal, encodeToken, readToken, type RunToken, tokenLive } from "../../entities/token/index"
 import type { BeatAction, Progress } from "../../entities/attention/index"
 import { closeFinished } from "./beat-close"
+import { parkedResumeWait } from "./beat-resume"
 import { type FailingRead, openRunDeaths, routeFailingCommands, routeTaskItems } from "../../entities/attention/index"
 import { attentionActions } from "./beat-attention"
 import { type AskDecider, askDeciderWithPi, decideReviewQuestions } from "../../features/decider/index"
@@ -215,6 +216,10 @@ const considerTask = (
     const credential = yield* credentialFor(context, context.account)
     if (credential.kind === "waits") {
       return waits(credential.reason)
+    }
+    const resumeWait = yield* parkedResumeWait(task, context.home, placement.machine)
+    if (resumeWait !== null) {
+      return waits(resumeWait)
     }
     const claimed = yield* claimUnheld(context.root, task.spec.id, deciderOwns)
     if (claimed.kind !== "claimed") {

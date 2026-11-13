@@ -107,6 +107,31 @@ const taskOutcome = (db: Database, project: string, supplied: string): Promise<s
   )
 
 describe("resume recovers an interrupted agent from its live session", () => {
+  test("a pinned parked run cannot restart implementation from missing or different history", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "repo")
+        const priorDir = join(home, "runs", "prior-1")
+        await mkdir(priorDir, { recursive: true })
+        const taskFile = join(priorDir, "task.md")
+        await writeFile(taskFile, "Keep the output contract.\n")
+        const run = { ...await Effect.runPromise(historyFor("next-1", home, project, "2026-11-13T12:00:00.000Z")), resumeRun: "prior-1", answers: [{ question: "R1", answer: "Keep it" }] }
+        await expect(Effect.runPromise(buildResumePlan(db, run))).rejects.toThrow("cannot resume prior-1")
+        await seedRun(db, "prior-1", project, taskFile, "failed", "2026-11-13T10:00:00.000Z")
+        await seedStep(db, "prior-1", "implement", "passed", "2026-11-13T10:01:00.000Z", null)
+        await seedStep(db, "prior-1", "checks", "passed", "2026-11-13T10:02:00.000Z", null)
+        expect(await Effect.runPromise(buildResumePlan(db, run))).toMatchObject({
+          skipImplement: true, skipChecks: true, answers: [{ question: "R1", answer: "Keep it" }]
+        })
+        await seedRun(db, "another-run", project, taskFile, "failed", "2026-11-13T11:00:00.000Z")
+        await expect(Effect.runPromise(buildResumePlan(db, run))).rejects.toThrow("cannot resume prior-1")
+      } finally {
+        db.close()
+      }
+    })
+  })
+
   test("an interrupted implementation resumes the session still only in the agent sessions directory", async () => {
     await withHome(async (home) => {
       const db = await openDb(home)

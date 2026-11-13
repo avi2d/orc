@@ -12,15 +12,24 @@ import { OrcRunError } from "../../shared/lib/index"
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
 
+const checkedPriorRun = (db: Database, project: string, branch: string, expected: string | undefined) =>
+  resumePriorRun(db, project, branch).pipe(
+    Effect.mapError((cause) => historyFailure("read", cause)),
+    Effect.flatMap((prior) => expected !== undefined && prior?.id !== expected
+      ? refuse("orc: cannot resume " + expected + " on " + branch + ": " + (prior === null ? "no previous run is available" : "the latest resumable run is " + prior.id))
+      : Effect.succeed(prior))
+  )
+
 export const resolveTaskFile = (
   db: Database,
   fs: FileSystem.FileSystem,
   branch: string,
   projectDir: string,
-  supplied: string | null | undefined
+  supplied: string | null | undefined,
+  expectedRun?: string
 ): Effect.Effect<string, OrcRunError> =>
   Effect.gen(function*() {
-    const prior = yield* resumePriorRun(db, projectDir, branch).pipe(Effect.mapError((cause) => historyFailure("read", cause)))
+    const prior = yield* checkedPriorRun(db, projectDir, branch, expectedRun)
     if (supplied === undefined || supplied === null) {
       if (prior === null) {
         return yield* refuse("orc: no previous run for branch " + branch + ", so pass a task file")
@@ -221,9 +230,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
     const allow = run.allow ?? []
     const answers = run.answers ?? []
     const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow, answers, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null }
-    const prior = yield* resumePriorRun(db, run.projectDir, run.branch).pipe(
-      Effect.mapError((cause) => historyFailure("read", cause))
-    )
+    const prior = yield* checkedPriorRun(db, run.projectDir, run.branch, run.resumeRun)
     if (prior === null || prior.id === run.runId) {
       return empty
     }

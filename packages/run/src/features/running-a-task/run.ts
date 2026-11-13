@@ -49,6 +49,7 @@ export interface OrcRunRequest {
   readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
   readonly homeDir?: string | undefined
   readonly runId?: string | undefined
+  readonly resumeRun?: string | undefined
   readonly agentsDir?: string | undefined
 }
 
@@ -164,7 +165,7 @@ const readRunStart = (
     openDatabase(home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
     (db) =>
       Effect.all({
-        taskFile: resolveTaskFile(db, fs, checkout.branch, checkout.projectDir, request.taskFile),
+        taskFile: resolveTaskFile(db, fs, checkout.branch, checkout.projectDir, request.taskFile, request.resumeRun),
         sandbox: resolveSandboxKind(db, checkout.branch, checkout.projectDir, request.sandbox)
       }),
     (db) => Effect.sync(() => db.close())
@@ -272,6 +273,7 @@ export const runAgentStep = (
       delivery: subprocessDeliverer(request.delivery ?? "no-mistakes", { ...noMistakes, worktreeDir: copy.dir, branch: checkout.branch }),
       allow: request.allow ?? [],
       answers: request.answers ?? [],
+      resumeRun: request.resumeRun,
       answerWaitSeconds
     }
     return yield* Effect.acquireUseRelease(

@@ -46,7 +46,7 @@ export const askStartedTask = (
         return { kind: "keep", result: false } as const
       }
       yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null), asking.asked)
-      const parked: Parked = { branch: fresh.parked?.branch ?? taskBranch(id), questions }
+      const parked: Parked = { ...fresh.parked, branch: fresh.parked?.branch ?? taskBranch(id), questions }
       return { kind: "write", record: { ...fresh, parked }, result: true } as const
     }))
 
@@ -77,7 +77,8 @@ export const parkStartedTask = (
   id: string,
   branch: string,
   open: Arr.NonEmptyReadonlyArray<OpenQuestion>,
-  at: string
+  at: string,
+  run?: string
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const { fs, paths, file, grabbed, putBack, read } = yield* takenGrab(root, id, Effect.fail(new BacklogError({ detail: id + " was parked or closed by another command" })))
@@ -90,7 +91,8 @@ export const parkStartedTask = (
       const lastAsking = open.find((question) => question.asked !== undefined)?.asked ?? null
       const questions = parkedQuestions(open, record.parked?.questions ?? [], lastAsking, (question) => question.asked ?? at)
       yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null), at)
-      const parked: TaskRecord = { ...record, parked: { branch, questions }, state: { kind: "new" } }
+      const origin = run === undefined ? record.parked?.origin : { machine: record.state.claim.machine, run }
+      const parked: TaskRecord = { ...record, parked: { branch, questions, ...(origin === undefined ? {} : { origin }) }, state: { kind: "new" } }
       if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(parked)))) {
         return yield* new BacklogError({ detail: "new/ already holds " + id })
       }

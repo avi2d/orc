@@ -70,12 +70,13 @@ const endParked = (
   root: string,
   task: TaskRecord,
   machine: string,
-  ending: ParkEnding
+  ending: ParkEnding,
+  run: string | undefined
 ): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const id = task.spec.id
     const branch = task.parked?.branch ?? taskBranch(id)
-    const parked = yield* parkStartedTask(root, id, branch, ending.questions, yield* nowIso).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
+    const parked = yield* parkStartedTask(root, id, branch, ending.questions, yield* nowIso, run).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
     return parked === null
       ? Option.none()
       : Option.some({ kind: "parked", task: id, machine, branch, questions: ending.questions.map((question) => question.id), decider: [] } satisfies BeatAction)
@@ -174,9 +175,10 @@ const endTask = (
   root: string,
   task: TaskRecord,
   machine: string,
-  ending: RunEnding
+  ending: RunEnding,
+  run?: string
 ): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
-  ending.kind === "park" ? endParked(root, task, machine, ending) : ending.kind === "split" ? endSplit(root, task, machine, ending) : endClosed(root, task, machine, ending)
+  ending.kind === "park" ? endParked(root, task, machine, ending, run) : ending.kind === "split" ? endSplit(root, task, machine, ending) : endClosed(root, task, machine, ending)
 
 type Asking = NonNullable<NonNullable<Extract<RunnerResult, { readonly status: "running" | "paused" }>["run"]>["asking"]>
 
@@ -313,6 +315,6 @@ export const closeFinished = (
       const action = reading.asking === null ? null : yield* serveAsking(context, task, claim.machine, reading.asking, relay)
       return { kind: "running", outputAt: reading.outputAt, action, failing: reading.failing } satisfies Progress
     }
-    const ended = yield* endTask(context.root, task, claim.machine, ending)
+    const ended = yield* endTask(context.root, task, claim.machine, ending, reading.kind === "read" ? reading.result.run?.id : undefined)
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
   })

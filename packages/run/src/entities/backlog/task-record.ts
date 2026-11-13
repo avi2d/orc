@@ -71,7 +71,10 @@ export interface Hold {
   readonly history?: ReadonlyArray<typeof AnsweredHold.Type>
 }
 
+const ParkedOrigin = Schema.Struct({ machine: Schema.String.check(Schema.isNonEmpty()), run: Schema.String.check(Schema.isNonEmpty()) })
+
 export interface Parked {
+  readonly origin?: typeof ParkedOrigin.Type
   readonly branch: string
   readonly questions: Arr.NonEmptyReadonlyArray<ParkedQuestion>
 }
@@ -161,6 +164,7 @@ const Frontmatter = Schema.Struct({
   answer: Schema.optional(Schema.String),
   answered_at: Schema.optional(Schema.String),
   parked_branch: Schema.optional(Schema.String),
+  parked_origin: Schema.optional(ParkedOrigin),
   parked_questions: Schema.optional(Schema.Array(QuestionFront)),
   beat: Schema.optional(Schema.String),
   taken_for: Schema.optional(Schema.String),
@@ -229,7 +233,7 @@ const holdQuestionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what:
   checkedQuestions(fronts, what, (question, answer) => ({ id: question.id, text: question.text, answer }))
 
 const parkedOf = (front: Frontmatter): Parked | null | string => {
-  if (front.parked_branch === undefined && front.parked_questions === undefined) {
+  if (front.parked_branch === undefined && front.parked_questions === undefined && front.parked_origin === undefined) {
     return null
   }
   if (front.parked_branch === undefined || front.parked_branch === "") {
@@ -239,7 +243,9 @@ const parkedOf = (front: Frontmatter): Parked | null | string => {
   if (typeof questions === "string") {
     return questions
   }
-  return Arr.isReadonlyArrayNonEmpty(questions) ? { branch: front.parked_branch, questions } : "a parked task names no question"
+  return Arr.isReadonlyArrayNonEmpty(questions)
+    ? { branch: front.parked_branch, questions, ...(front.parked_origin === undefined ? {} : { origin: front.parked_origin }) }
+    : "a parked task names no question"
 }
 
 const holdOf = (front: Frontmatter): Hold | null | string => {

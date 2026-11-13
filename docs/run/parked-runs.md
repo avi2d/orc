@@ -17,19 +17,29 @@ A wait on several questions gets every answer given so far each time the beat ha
 A question the run asks again at a later wait is open again, and the chat posts it once more when the attention queue owns it for you.
 
 A run whose wait ends with a question unanswered parks its task instead of closing it failed.
-The beat moves the task back to `new` with `parked_branch` and `parked_questions` in its file, each question with its id, its text and the time it was asked.
+The beat moves the task back to `new` with `parked_branch`, `parked_origin`, and `parked_questions` in its file.
+The origin records the machine and run id.
+Each question keeps its id, text, and the time it was asked.
 It prints `parked <task-id> on <branch> for the captain's answer to <question-ids>`.
 A question the attention queue owns for the decider shows as `the decider's answer to <question-ids>` instead, after an `and` when you answer the others.
 Each later beat prints `waits <task-id>: parked on <branch> for the captain's answer to <question-ids>` and never starts it.
 That line names a question the attention queue owns for the decider the same way, as `the decider's answer to <question-ids>`, and so does the `wait` that `orc backlog --json` gives the task.
 To answer one question, run `orc backlog answer <task-id> <question-id>=<text>`.
 The task file keeps your text and its time on that question, and the other questions stay parked.
-Once every question has an answer, the next beat starts the task again on the same branch with `--answer <question-id>=<text>` for each one.
-The run resumes there and hands your answers to no-mistakes, so no new branch and no fresh run starts.
+Once every question has an answer, the next beat resumes the task on its original machine and branch with `--answer <question-id>=<text>` for each one.
+A machine with more room cannot take that resume.
+The beat waits if the original machine has no room or no configured checkout, or if the runner cannot find the recorded run.
+A task parked before its origin was recorded also waits rather than guessing a machine.
+The queue and run check the recorded run id before using its progress.
+The queued command carries that id in `ORC_DISPATCH_RESUME_RUN`.
+If the latest resumable run has changed or disappeared, Orc refuses the resume instead of starting fresh implementation.
+The resumed attempt keeps the earlier completed steps and hands your answers to no-mistakes.
 If the resumed run stops on new questions, the task parks again with those, and it keeps the answers it already has.
 An answer given after the beat last read the waiting run is kept too.
-So a task whose every question has an answer starts again at once.
-`orc backlog` shows a parked task as `parked (<question-ids>)`, and `orc backlog --json` gives every task a `parked`, either `null` or the branch and the questions with the time each was asked and their answers.
+A task whose every question has an answer can resume when its original machine and run are available.
+`orc backlog` shows a parked task as `parked (<question-ids>)`.
+`orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times and answers.
+Older parked records have no `origin` field.
 
 ## A looping run
 A run whose Pi fails one command 6 times in a row stops Pi and asks the question `looping`, as [How orc runs Pi](how-orc-runs-pi.md) shows.

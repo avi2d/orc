@@ -8,7 +8,7 @@ import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldT
 import { heldTask, orcGroup, parentLabel, PueueState, PueueStatus, taskLabel, type PueueTask } from "../../shared/process/index"
 import { readInstructions, TaskInstructions, writeInstructions } from "./runner-instructions"
 import { RunnerError } from "../../shared/process/index"
-import { runsForBranch } from "../../entities/run-history/index"
+import { resumePriorRun, runsForBranch } from "../../entities/run-history/index"
 import { formatHistoryError, markRunStopped, openDatabase, recordRun, stoppedEndReason } from "../../entities/run-history/index"
 
 import { newRunId } from "../../shared/lib/index"
@@ -24,6 +24,7 @@ const taskFields = {
   kind: Schema.optional(Schema.Literals(reportKinds)),
   delivery: Schema.optional(Schema.Literal("direct-PR")),
   branch: Schema.optional(Schema.String.check(Schema.isPattern(/^[A-Za-z0-9._/-]+$/))),
+  resumeRun: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
   answers: Schema.optional(Schema.Array(Schema.Struct({
     question: Schema.String.check(Schema.isPattern(/^[^\s=]+$/)),
     answer: Schema.String.check(Schema.isNonEmpty())
@@ -171,6 +172,15 @@ const checkQueueConfig = (home: string, request: QueueRequest): Effect.Effect<vo
 const bareCommand = (run: ReadonlyArray<string>, claudeConfigDir: string | undefined): ReadonlyArray<string> =>
   claudeConfigDir === undefined ? run : ["env", "ORC_DISPATCH_CLAUDE_CONFIG_DIR=" + claudeConfigDir, ...run]
 
+const requireResumeRun = (home: string, project: string, branch: string, expected: string | undefined) =>
+  expected === undefined ? Effect.void : Effect.acquireUseRelease(
+    openDatabase(home),
+    (db) => resumePriorRun(db, project, branch).pipe(Effect.flatMap((prior) =>
+      prior?.id === expected ? Effect.void : refuse("cannot resume " + expected + " on " + branch + ": " + (prior === null ? "no previous run is available" : "the latest resumable run is " + prior.id))
+    )),
+    (db) => Effect.sync(() => db.close())
+  ).pipe(Effect.mapError((error) => error instanceof RunnerError ? error : new RunnerError({ detail: "cannot check parked run " + expected + ": " + formatHistoryError(error) })))
+
 const queueTask = (
   request: QueueRequest,
   self: Command,
@@ -181,6 +191,7 @@ const queueTask = (
     yield* checkQueueConfig(home, request)
     yield* requireFolder(request.checkout)
     const project = yield* resolveProjectDir(request.checkout)
+    yield* requireResumeRun(home, project, request.branch ?? taskBranch(request.task), request.resumeRun)
     yield* ensureGroup(orcGroup)
     const label = runLabel(home, request.task, request.kind, request.label)
     const key = fileKeyOf(home, request.task, label)
@@ -198,7 +209,8 @@ const queueTask = (
     const kind = request.kind === undefined ? [] : ["--kind", request.kind]
     const delivery = request.delivery === undefined ? [] : ["--delivery", request.delivery]
     const instructions = request.instructions === undefined ? [] : ["--instructions", yield* writeInstructions(folder + "/" + key + ".instructions", request.instructions)]
-    const run = [...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...kind, ...delivery, ...instructions, ...answers]
+    const resume = request.resumeRun === undefined ? [] : ["env", "ORC_DISPATCH_RESUME_RUN=" + request.resumeRun]
+    const run = [...resume, ...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...kind, ...delivery, ...instructions, ...answers]
     const add = (command: ReadonlyArray<string>) =>
       pueue(["add", "--group", orcGroup, "--label", label, "--working-directory", project, "--print-task-id", "--escape", "--", ...command], { ORC_HOME: home })
     const holdArgs: ReadonlyArray<string> = label === taskLabel(home, request.task) ? [request.task] : [request.task, "--label", label]
@@ -269,10 +281,14 @@ const readRequest = (
     const body = record.spec.body + decisions.flatMap((decision) => decision.answer === null ? [] : [
       "\n\nHeld for the captain: " + decision.reason + "\nThe captain answered: " + decision.answer.words
     ]).join("")
+    if (record.parked !== null && record.parked.origin === undefined) {
+      return yield* refuse("the parked task has no recorded machine and run; recover its origin before resuming")
+    }
     const resume = record.parked === null
       ? (record.spec.kind === "parent" ? { branch: parentBranch(task) } : {})
       : {
         branch: record.parked.branch,
+        resumeRun: record.parked.origin?.run,
         answers: record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ question: question.id, answer: question.answer.words }])
       }
     const deliveryWord = env["ORC_TASK_DELIVERY"] ?? "no-mistakes"
