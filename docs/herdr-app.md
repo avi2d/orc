@@ -31,14 +31,42 @@ The command writes only names that start with `orc`, so Herdr's own mods and lay
 
 | Tab | Key | What it shows |
 | --- | --- | --- |
-| Board | `cmd-1` | The number of tasks in `orc backlog --json` |
+| Board | `cmd-1` | The backlog tasks in five lanes |
 | Resources | `cmd-2` | The account names in `orc-dash snapshot --json --only quota` |
 | Agents | `cmd-3` | The runs and the queued tasks, and the selected run's steps and step output |
 
-Board reads again every 15 seconds, and Resources every minute.
+Board reads `orc backlog --json` and `orc attention --json` when shown and every 10 seconds while shown.
+Resources reads every minute.
 Agents reads `orc runs --json` and `orc backlog --json` again every 4 seconds while it is the shown tab.
 It also reads the selected run with `orc show <run> --json` and the selected step with `orc log <run> <step-id>`.
 When a command fails or prints a document the tab cannot read, the tab shows the command and why.
+
+## Read the Board tab
+
+The Board groups tasks into Backlog, Planned, Awaiting you, Running, and Done.
+
+![Board showing example garden tasks in five lanes](images/herdr-board.png)
+
+Backlog stays empty because the backlog has no priority field.
+Held tasks, tasks with unanswered parked questions, tasks with an open attention item for you, and closed tasks with an open PR appear in Awaiting you.
+Taken and started tasks appear in Running.
+Other new tasks appear in Planned, and other closed tasks appear in Done.
+A PR whose state has not been read appears in Done.
+
+Select a lane header to fold or open it.
+Backlog and Done start folded.
+Select a project to filter the lanes, or select All to show every project.
+Select a card to mark it.
+Each lane lists its tasks oldest first.
+
+## Recapture the Board screenshot
+
+The committed shot is the proof of the two-line clip.
+The garden-6 title wraps to three lines and shows exactly two, with no word cut.
+To recapture it, run `packages/herdr-app/scripts/capture-board.sh <fixture-dir> <output-png>` with a scratch `HOME` and an `HC_SESSION` starting with `fm-lab-`.
+Use `tests/fixtures/herdr-board` as the fixture folder.
+The script refuses the login `HOME`, keeps the scratch App off the live core, and quits only the App it started.
+The live core's processes and terminals read the same before and after.
 
 ## Follow a run in the Agents tab
 

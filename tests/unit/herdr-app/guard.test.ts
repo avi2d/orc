@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
-import { backlog, guardJson, quotaSnapshot, runs, show } from "../../../packages/herdr-app/src/guard"
+import { backlog, guardJson, runs, show } from "../../../packages/herdr-app/src/guard"
+import { quotaSnapshot } from "../../../packages/herdr-app/src/quota"
 
 test("refuses a backlog task with no title instead of counting it", () => {
   const text = JSON.stringify({ schema: "orc.backlog.v1", tasks: [{ id: "task-1" }] })

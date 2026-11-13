@@ -3,8 +3,6 @@ import { v_flex } from "gpui-base"
 import { palette } from "./palette"
 import type { Reading } from "./orc-read"
 
-export const count = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
-
 export abstract class FactView<A> extends View {
   abstract readonly title: string
   abstract readonly command: string

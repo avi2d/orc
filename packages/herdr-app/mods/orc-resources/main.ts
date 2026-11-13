@@ -1,4 +1,4 @@
-import { type QuotaSnapshot, quotaSnapshot } from "../../src/guard"
+import { type QuotaSnapshot, quotaSnapshot } from "../../src/quota"
 import { FactView } from "../../src/fact-view"
 import { type Reading, readJson } from "../../src/orc-read"
 

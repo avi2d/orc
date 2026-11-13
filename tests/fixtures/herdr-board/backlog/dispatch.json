@@ -1,0 +1,1 @@
+{"machines":[{"name":"example","slots":4,"start":["true"]}],"quota":{"provider":"example","command":["example-quota"],"accounts":[{"name":"main","kind":"none"}],"floorPercent":15}}

@@ -265,6 +265,9 @@ To stop a task yourself, run `orc backlog stop <task-id>` where the backlog live
 It kills the run through the machine that started it and closes the task stopped.
 A stop for a task on a machine whose start runs any other program refuses, so close that task by hand with `orc backlog close <task-id> failed`.
 The closed task file keeps the PR link of the orc run on `orc/<task-id>` as `pr`, and `orc backlog --json` carries it as `pr`, or `null` when the run opened none.
+Every task in `orc backlog --json` carries `prState` as `open`, `closed`, `merged`, or `null`.
+The beat records the last state it read for the task's PR, and `prState` is `null` when the task has no PR or the beat has not read it.
+`orc backlog --json` reads that record without contacting the forge.
 The beat prints `closed <task-id> <done|failed|stopped> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds, until it stays unread for 10 minutes.
 A machine whose start runs any other program keeps owning its tasks, which the beat closes once their logs go quiet rather than stalls.
 To close one of those by hand, run `orc backlog close <task-id> <done|failed> [reason]`.
