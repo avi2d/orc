@@ -1,6 +1,6 @@
 {
   "name": "@avi2dg/orc",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "One chat and backlog that run AI agent tasks across your machines: Pi in a nono sandbox for a direct orc run, then your checks and no-mistakes review",
   "license": "MIT",
   "repository": "https://github.com/avi2d/orc.git",
