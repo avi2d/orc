@@ -70,7 +70,7 @@ The bar turns red once the share used passes that tick.
 Resets counts down to the window's reset, such as `3d 17h`, or `2h 53m` under a day, and shows `now` under a minute.
 Runs out shows when the window runs out at the current pace, and only when that comes before the reset.
 
-The Machines table lists this machine as `local` and the machine that `ORC_DASH_REMOTE_RESOURCES` reads under `ORC_DASH_REMOTE_MACHINE`.
+The Machines table lists this machine under `ORC_DASH_MACHINE`, `local` when unset, and the machine that `ORC_DASH_REMOTE_RESOURCES` reads under `ORC_DASH_REMOTE_MACHINE`.
 Load turns red above the machine's core count.
 Orc runs counts the running pueue tasks in the `orc` group.
 When a machine cannot be read, its cells show a dash and a line below the table gives the reason.

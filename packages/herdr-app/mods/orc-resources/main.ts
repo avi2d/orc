@@ -82,18 +82,26 @@ const section = (t: Palette, title: string, body: Element): Element =>
 
 export default class OrcResources extends View {
   reading: Reading<ResourcesSnapshot> = { kind: "reading" }
+  visible = false
+  lastRead = 0
   busy = false
 
   override init(_props: unknown, cx: AsyncContext): void {
-    this.refresh(cx)
-    cx.timer.every(everyMs, (tick) => {
-      if (shown()) this.refresh(tick)
+    cx.timer.every(1000, (tick) => {
+      const nowShown = shown()
+      if (nowShown && (!this.visible || Date.now() - this.lastRead >= everyMs)) this.refresh(tick)
+      this.visible = nowShown
     })
+    if (shown()) {
+      this.visible = true
+      this.refresh(cx)
+    }
   }
 
   refresh(cx: AsyncContext): void {
     if (this.busy) return
     this.busy = true
+    this.lastRead = Date.now()
     cx.spawn((task) =>
       readJson("orc-dash", args, resourcesSnapshot).then((reading) => {
         this.reading = reading
