@@ -56,6 +56,7 @@ export interface ParkedQuestion {
   readonly id: string
   readonly text: string
   readonly asked: string
+  readonly blocks: boolean
   readonly answer: ParkedAnswer | null
 }
 
@@ -125,6 +126,9 @@ const heldReason = (task: TaskRecord): string | null =>
 export const openQuestions = (task: TaskRecord): ReadonlyArray<ParkedQuestion> =>
   task.parked?.questions.filter((question) => question.answer === null) ?? []
 
+export const blockingQuestions = (task: TaskRecord): ReadonlyArray<ParkedQuestion> =>
+  openQuestions(task).filter((question) => question.blocks)
+
 export const ranClosing = (task: TaskRecord): RanClosing | null =>
   task.state.kind === "closed" && task.state.closing.outcome !== "start-failed" && task.state.closing.outcome !== "dropped" ? task.state.closing : null
 
@@ -139,7 +143,7 @@ export const answersAwaited = (captain: ReadonlyArray<string>, decider: Readonly
   ].join(" and ")
 
 const parkedReason = (task: TaskRecord, deciderOwns: DeciderOwns): string | null => {
-  const open = openQuestions(task)
+  const open = blockingQuestions(task)
   if (task.parked === null || open.length === 0) {
     return null
   }
@@ -169,6 +173,7 @@ const QuestionFront = Schema.Struct({
   answer: Schema.optional(Schema.String),
   answered_at: Schema.optional(Schema.String),
   asked_at: Schema.optional(Schema.String),
+  blocks: Schema.optional(Schema.Boolean),
   relayed_to: Schema.optional(Schema.String),
   used: Schema.optional(Schema.Boolean)
 })
@@ -255,6 +260,7 @@ const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: str
     id: question.id,
     text: question.text,
     asked: question.asked_at ?? "",
+    blocks: question.blocks ?? true,
     answer: answer === null ? null : { ...answer, relayedTo: question.relayed_to ?? (question.used === true ? (question.asked_at ?? "") : null) }
   }))
 

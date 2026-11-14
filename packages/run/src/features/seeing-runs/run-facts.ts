@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite"
 import { Effect, FileSystem, Schema } from "effect"
 import { type RunRecord, sqlite, type SqliteFailure, StepStatusSchema } from "../../entities/run-history/index"
-import { Asking, askingFileName, hasBlockingQuestion } from "../../entities/review-gate/index"
+import { Asking, askingFileName, isBlockingQuestion } from "../../entities/review-gate/index"
 import { readJsonFileIfPresent } from "../../shared/config/index"
 
 export const LatestStepSchema = Schema.Struct({
@@ -41,7 +41,7 @@ const readQuestions = (run: RunRecord): Effect.Effect<number, never, FileSystem.
   run.status !== "running"
     ? Effect.succeed(0)
     : readJsonFileIfPresent(runDirOf(run.taskFile) + "/" + askingFileName, Asking).pipe(
-      Effect.map((asking) => asking === null ? 0 : asking.questions.filter((question) => question.blocks !== false).length),
+      Effect.map((asking) => asking === null ? 0 : asking.questions.filter(isBlockingQuestion).length),
       Effect.orElseSucceed(() => 0)
     )
 

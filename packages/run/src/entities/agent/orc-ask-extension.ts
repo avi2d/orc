@@ -6,6 +6,7 @@ import { join } from "node:path"
 export const askToolName = "orc_ask"
 export const askDirFlag = "orc-ask-dir"
 export const replySuffix = ".reply.json"
+export const askSuffix = ".ask.json"
 const deliveredSuffix = ".delivered"
 const pollMillis = 1000
 
@@ -146,11 +147,42 @@ const description = [
   "With blocks false the tool returns at once, and the answer is added to the result of a later tool call."
 ].join(" ")
 
-const blocksOf = (params: unknown): boolean =>
-  typeof params === "object" && params !== null && "blocks" in params && params.blocks === true
+interface AskParams {
+  readonly question: string
+  readonly context?: string | undefined
+  readonly options?: ReadonlyArray<{ readonly text: string; readonly picture?: string | undefined }> | undefined
+  readonly blocks: boolean
+}
 
-const readableAsk = (params: unknown): boolean =>
-  typeof params === "object" && params !== null && "question" in params && typeof params.question === "string" && params.question.trim() !== "" && "blocks" in params && typeof params.blocks === "boolean"
+const askOptions = (value: unknown): AskParams["options"] => {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value.flatMap((item) => {
+    if (typeof item !== "object" || item === null || !("text" in item) || typeof item.text !== "string" || item.text.trim() === "") {
+      return []
+    }
+    const picture = "picture" in item && typeof item.picture === "string" && item.picture.trim() !== "" ? item.picture : undefined
+    return [{ text: item.text.trim(), ...(picture === undefined ? {} : { picture }) }]
+  })
+}
+
+const normalizeAsk = (params: unknown): AskParams | null => {
+  if (typeof params !== "object" || params === null) {
+    return null
+  }
+  const record = params as Record<string, unknown>
+  if (typeof record.question !== "string" || record.question.trim() === "" || typeof record.blocks !== "boolean") {
+    return null
+  }
+  const context = typeof record.context === "string" && record.context.trim() !== "" ? record.context.trim() : undefined
+  return {
+    question: record.question.trim(),
+    blocks: record.blocks,
+    ...(context === undefined ? {} : { context }),
+    options: askOptions(record.options)
+  }
+}
 
 export default (pi: AskHost): void => {
   pi.registerFlag(askDirFlag, { description: "The folder orc and the orc_ask tool trade questions and answers through", type: "string" })
@@ -169,13 +201,15 @@ export default (pi: AskHost): void => {
       if (dir === null) {
         throw new Error("Pi started without --" + askDirFlag + ", so no one can answer")
       }
-      if (!readableAsk(params)) {
+      const normalized = normalizeAsk(params)
+      if (normalized === null) {
         return textResult("orc could not read the question, so it was not asked. Carry on with the task.")
       }
-      if (!blocksOf(params)) {
+      const stem = askFileStem(toolCallId)
+      writeFileSync(join(dir, stem + askSuffix), JSON.stringify(normalized))
+      if (!normalized.blocks) {
         return textResult("orc put the question to the captain. Carry on with the task; the answer is added to the result of a later tool call.")
       }
-      const stem = askFileStem(toolCallId)
       waiting.add(stem)
       try {
         const reply = await waitForReply(dir, stem, signal)

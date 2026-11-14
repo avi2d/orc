@@ -13,6 +13,9 @@ const options = [{ text: "Keep the old flag" }, { text: "Drop the old flag", pic
 const askEvent = (blocks: boolean): string =>
   JSON.stringify({ type: "tool_execution_start", toolCallId: "call-1", toolName: "orc_ask", args: { question: "Keep the old flag?", context: "Two callers still pass it.", options, blocks } })
 
+const askFile = (blocks: boolean): string =>
+  JSON.stringify({ question: "Keep the old flag?", blocks, context: "Two callers still pass it.", options })
+
 const askingPi = async (fixture: NoSandboxFixture, blocks: boolean): Promise<void> => {
   const bin = fixture.fakeBin
   await writeFile(join(bin, "header.jsonl"), JSON.stringify({ type: "session", version: 3, id: sessionId, timestamp: "2026-10-28T10:00:00.000Z", cwd: "/repo" }) + "\n")
@@ -29,6 +32,7 @@ const askingPi = async (fixture: NoSandboxFixture, blocks: boolean): Promise<voi
     "cp \"" + bin + "/header.jsonl\" \"$session_dir/2026-10-28T10-00-00-000Z_" + sessionId + ".jsonl\"",
     "cat \"" + bin + "/header.jsonl\"",
     "echo '" + askEvent(blocks) + "'",
+    "echo '" + askFile(blocks) + "' > \"$ask_dir/call-1.ask.json\"",
     ...(blocks ? [] : ["echo '{\"type\":\"tool_execution_end\",\"toolCallId\":\"call-1\"}'"]),
     "while [ ! -f \"$ask_dir/call-1.reply.json\" ]; do sleep 0.2; done",
     "cp \"$ask_dir/call-1.reply.json\" \"" + bin + "/reply\"",

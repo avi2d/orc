@@ -13,15 +13,15 @@ import { planSandbox, type SandboxPlan } from "./sandbox-plan"
 import { type Checkout, openCheckout, parseRefuseMarkers } from "../../entities/task-copy/index"
 import { formatRefresh, refreshCheckout } from "../../entities/task-copy/index"
 import { OrcRunError } from "../../shared/lib/index"
-import { historyFailure, markRunStopped, openDatabase, orcHomeDir, stoppedEndReason, updateStep } from "../../entities/run-history/index"
+import { historyFailure, markRunStopped, openDatabase, openQuestionsForRun, orcHomeDir, stoppedEndReason, updateStep } from "../../entities/run-history/index"
 import { stepsForRun } from "../../entities/run-history/index"
 import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "./run-resume"
-import { finishRun, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordOpenQuestion, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordPullRequestDone, recordPullRequestStart, recordResumePublish, recordStepSession } from "./history-write"
+import { finishRun, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordOpenAsks, recordOpenQuestion, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordPullRequestDone, recordPullRequestStart, recordResumePublish, recordStepSession } from "./history-write"
 import { failedReport, writeEvidence, writeHandover, writeReport, type HistoryRun, type OrcRunCommit, type OrcRunReport } from "./run-record"
 import { longSessionWarning, type LongSessionCounts } from "../../entities/agent/index"
 import { runFull } from "./run-loop"
 import { claimedMachineName } from "./run-place"
-import type { RunCheckpoints, SandboxOps } from "./run-ops"
+import type { AgentStep, RunCheckpoints, SandboxOps } from "./run-ops"
 import { type ReportOutcome, type ReportRun, runReport } from "./report-run"
 import { runDirFor, type ReportKind } from "../../entities/backlog/index"
 import { noMistakesBinary, noMistakesVersionProblem, type AllowWord, type NoMistakesHost, type QuestionAnswer } from "../../entities/review-gate/index"
@@ -267,9 +267,15 @@ export const runAgentStep = (
     yield* writeAgentGitConfig(spawner, git, Bun.which("git") ?? "git", checkout.projectDir, copy.dir, agentGitConfig(folders))
     const exec = yield* openAgentExec(plan, folders, copy.dir, toolchain, { ...Bun.env, PATH: withHeavyPath(home, Bun.env.PATH ?? "") })
     yield* installCopy(spawner, fs, path, exec, path.join(folders.runDir, "prepare.log"))
-    const ops = agentOps({ spawner, fs, path, git }, exec, folders, piPacing(idleTimeoutSeconds), askSetupFor(folders.runDir, folders.piSessionDir, answerWaitSeconds, request.answers ?? []))
+    const priorOpen = request.resumeRun === undefined ? [] : yield* Effect.acquireUseRelease(
+      openDatabase(home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
+      (db) => openQuestionsForRun(db, request.resumeRun ?? "").pipe(Effect.mapError((cause) => historyFailure("read the prior run in", cause))),
+      (db) => Effect.sync(() => db.close())
+    )
+    const asks = askSetupFor(folders.runDir, folders.piSessionDir, answerWaitSeconds, request.answers ?? [], priorOpen)
+    const ops = agentOps({ spawner, fs, path, git }, exec, folders, piPacing(idleTimeoutSeconds), asks)
     const history: HistoryRun = {
-      fs, path, spawner, git: checkout.git, projectDir: checkout.projectDir, runId,
+      fs, path, spawner, git: checkout.git, projectDir: checkout.projectDir, runId, asks,
       runDir: folders.runDir, piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir,
       taskPath: folders.taskPath, instructions: folders.instructionsPath, agent, fixer, branch: checkout.branch, sandbox: sandboxKind, started,
       worktreeDir: copy.dir,
@@ -297,8 +303,12 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
     const resume = yield* buildResumePlan(db, run)
     yield* recordResumePublish(db, run, resume)
     let implementLong: { readonly counts: LongSessionCounts; readonly commits: Array<OrcRunCommit>; readonly sessionFile: string | null } | null = null
+    let lastStep: AgentStep = { name: "implement", attempt: 1 }
     const checkpoints: RunCheckpoints = {
-      implementStart: (started) => recordImplementStart(db, run, started, resume.implementSessionFile ?? undefined),
+      implementStart: (started) => {
+        lastStep = { name: "implement", attempt: 1 }
+        return recordImplementStart(db, run, started, resume.implementSessionFile ?? undefined)
+      },
       implementSession: (file) => recordStepSession(db, run.runId, "implement", 1, file),
       implementDone: (outcome, started, ended) => Effect.gen(function*() {
         yield* recordImplementDone(db, run, { agentPath: run.agent.path, sessionFile: outcome.sessionFile, tokens: outcome.tokens, commits: outcome.commits, sessionSize: outcome.sessionSize, implementPassed: outcome.completed }, started, ended)
@@ -331,7 +341,10 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       }),
       checksRoundStart: (round, started) => recordChecksStart(db, run.runId, round, started),
       checksRoundDone: (round) => recordChecksDone(db, run.runId, round),
-      fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer, started, attempt === 1 || attempt <= resume.inheritedFixes.length ? resume.fixSessionFile ?? undefined : undefined),
+      fixStart: (attempt, started) => {
+        lastStep = { name: "fix", attempt }
+        return recordFixStart(db, run.runId, attempt, run.fixer, started, attempt === 1 || attempt <= resume.inheritedFixes.length ? resume.fixSessionFile ?? undefined : undefined)
+      },
       fixSession: (attempt, file) => recordStepSession(db, run.runId, "fix", attempt, file),
       fixDone: (fix) => recordFixDone(db, run.runId, fix),
       noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
@@ -367,6 +380,7 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       }),
       Effect.onInterrupt(() => markRunStopped(db, run.runId, new Date().toISOString(), stoppedEndReason))
     )
+    yield* recordOpenAsks(checkpoints.questionAsked, run.asks, lastStep, []).pipe(Effect.orElseSucceed(() => undefined))
     const report = ended.report
     yield* writeEvidence(run, report)
     yield* writeReport(run, report)

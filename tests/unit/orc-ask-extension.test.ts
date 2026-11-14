@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import registerAsk, { askDirFlag, askToolName, replySuffix } from "../../packages/run/src/entities/agent/orc-ask-extension"
@@ -70,6 +70,26 @@ describe("the orc_ask tool inside Pi", () => {
       await reply(dir, "call-1", "B")
       expect(texts(afterTool({ content: [{ type: "text", text: "ls output" }] }))).toEqual(["ls output", "The captain answered your question ask-1 (Which colour?): B"])
       expect(afterTool({ content: [{ type: "text", text: "ls output" }] })).toBeUndefined()
+    })
+  })
+
+  test("a blocking ask writes its validated question to an ask file instead of relying on the raw tool args", async () => {
+    await withAskDir(async (dir) => {
+      const { tool } = loadAsk(dir)
+      const pending = tool.execute("call-7", { question: "  Which colour? ", context: "  ", options: [{ text: "  Red ", picture: " " }, { nope: 1 }], blocks: true, extra: "dropped" })
+      const stored = JSON.parse(await readFile(join(dir, "call-7.ask.json"), "utf8"))
+      expect(stored).toEqual({ question: "Which colour?", blocks: true, options: [{ text: "Red" }] })
+      await reply(dir, "call-7", "B")
+      await pending
+    })
+  }, 10_000)
+
+  test("a question orc cannot read is never asked instead of stalling the tool", async () => {
+    await withAskDir(async (dir) => {
+      const { tool } = loadAsk(dir)
+      const result = await tool.execute("call-9", { question: "   ", blocks: true })
+      expect(result.content.map((block) => block.text).join("")).toContain("not asked")
+      expect(await readdir(dir)).toEqual([])
     })
   })
 

@@ -200,7 +200,6 @@ export const runPi = (
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot place the orc_ask extension at " + request.asks.extensionFile + ": " + String(cause) }))
     )
     const asks = openWorkerAsks(fs, request.asks)
-    yield* Effect.addFinalizer(() => asks.finish)
     const handle = yield* spawner.spawn(agentCommand(exec, piArgv(request), textInput(request.prompt))).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: pi did not start: " + String(cause) }))
     )
@@ -229,8 +228,7 @@ export const runPi = (
           yield* log("> " + read.label)
         } else if (read.kind === "ask") {
           running.set(read.id, { label: askToolName, command: null, since: state.lastOutput })
-          const id = yield* asks.start(read.id, read.args)
-          yield* log(id === null ? "> " + askToolName + " with arguments orc cannot read" : "> " + askToolName + " " + id)
+          yield* log("> " + askToolName)
         } else if (read.kind === "turn-end") {
           const late = asks.timedOut()
           if (late !== null && !state.stoppedForAnswer) {

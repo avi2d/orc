@@ -13,10 +13,13 @@ const parkedQuestions = (
   askedOf: (question: OpenQuestion) => string
 ): Parked["questions"] => {
   const stillAsked = (known: ParkedQuestion, question: OpenQuestion) =>
-    known.id === question.id && known.text === question.text && (known.answer === null || answersAsking(known.answer, asking))
+    known.id === question.id && known.text === question.text && (known.asked === "" || known.asked === askedOf(question)) &&
+    (known.answer === null || answersAsking(known.answer, asking))
   const kept = prior.filter((known) => known.answer !== null && answersAsking(known.answer, asking) && !open.some((question) => question.id === known.id))
   return Arr.appendAll(
-    Arr.map(open, (question): ParkedQuestion => prior.find((known) => stillAsked(known, question)) ?? { id: question.id, text: question.text, asked: askedOf(question), answer: null }),
+    Arr.map(open, (question): ParkedQuestion =>
+      prior.find((known) => stillAsked(known, question)) ??
+      { id: question.id, text: question.text, asked: askedOf(question), blocks: question.blocks ?? true, answer: null }),
     kept
   )
 }
@@ -50,7 +53,7 @@ export const askStartedTask = (
       yield* openReviewQuestions(root, id, waiting.map((question) => {
         const options = optionsOf(question)
         return options === undefined ? question : { ...question, options }
-      }), asking.asked)
+      }))
       const parked: Parked = { ...fresh.parked, branch: fresh.parked?.branch ?? taskBranch(id), questions }
       return { kind: "write", record: { ...fresh, parked }, result: true } as const
     }))
@@ -71,7 +74,8 @@ export const handAnswersToResume = (record: TaskRecord): TaskRecord =>
 
 export const answersFor = (record: TaskRecord, asking: LiveAsking): ReadonlyArray<ParkedQuestion & { readonly answer: ParkedAnswer }> =>
   (record.parked?.questions ?? []).flatMap((question) =>
-    question.answer !== null && answersAsking(question.answer, asking.asked) && asking.questions.some((open) => open.id === question.id)
+    question.answer !== null && answersAsking(question.answer, asking.asked) &&
+    asking.questions.some((open) => open.id === question.id && (open.asked === undefined || open.asked === question.asked))
       ? [{ ...question, answer: question.answer }]
       : []
   )
@@ -95,7 +99,7 @@ export const parkStartedTask = (
       }
       const lastAsking = open.find((question) => question.asked !== undefined)?.asked ?? null
       const questions = parkedQuestions(open, record.parked?.questions ?? [], lastAsking, (question) => question.asked ?? at)
-      yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null), at)
+      yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null))
       const origin = run === undefined ? record.parked?.origin : { machine: record.state.claim.machine, run }
       const parked: TaskRecord = { ...record, parked: { branch, questions, ...(origin === undefined ? {} : { origin }) }, state: { kind: "new" } }
       if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(parked)))) {
@@ -206,14 +210,17 @@ export const markAnswersRelayed = (
   root: string,
   id: string,
   asking: string,
-  ids: ReadonlyArray<string>
+  relayed: ReadonlyArray<{ readonly id: string; readonly asked: string }>
 ): Effect.Effect<void, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   rewriteTaken(root, id, (fresh): Effect.Effect<Rewrite<void>, BacklogError> => {
     if (fresh.state.kind !== "started" || fresh.parked === null) {
       return Effect.succeed({ kind: "keep", result: undefined })
     }
     const questions = Arr.map(fresh.parked.questions, (question): ParkedQuestion =>
-      question.answer !== null && question.answer.relayedTo === null && ids.includes(question.id) ? { ...question, answer: { ...question.answer, relayedTo: asking } } : question
+      question.answer !== null && question.answer.relayedTo === null &&
+        relayed.some((entry) => entry.id === question.id && entry.asked === question.asked)
+        ? { ...question, answer: { ...question.answer, relayedTo: asking } }
+        : question
     )
     if (sameQuestions(questions, fresh.parked.questions)) {
       return Effect.succeed({ kind: "keep", result: undefined })

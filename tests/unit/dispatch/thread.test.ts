@@ -51,7 +51,7 @@ describe("orc backlog thread", () => {
     const task: TaskRecord = {
       spec,
       hold: { reason: "Wait for the merge", until: null, questions: [], answer: { words: "Merged", at: "2026-11-02T09:10:00.000Z" }, at: "2026-11-02T09:00:00.000Z" },
-      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, answer: { words: "Two retries", at: decided, relayedTo: null } }] },
+      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, blocks: true, answer: { words: "Two retries", at: decided, relayedTo: null } }] },
       state: started
     }
     const item = {
@@ -79,7 +79,7 @@ describe("orc backlog thread", () => {
     const task: TaskRecord = {
       spec,
       hold: null,
-      parked: { branch: "orc/orc-1", questions: [{ id: "r3", text: "Keep the flag?", asked: later, answer: null }] },
+      parked: { branch: "orc/orc-1", questions: [{ id: "r3", text: "Keep the flag?", asked: later, blocks: true, answer: null }] },
       state: started
     }
     const replaced = {
@@ -177,7 +177,7 @@ describe("orc backlog thread", () => {
     const before: TaskRecord = {
       spec,
       hold: null,
-      parked: { branch: "orc/orc-1", questions: [{ id: "r1", text: "How many retries?", asked: earlier, answer: { words: "Two", at: decided, relayedTo: null } }] },
+      parked: { branch: "orc/orc-1", questions: [{ id: "r1", text: "How many retries?", asked: earlier, blocks: true, answer: { words: "Two", at: decided, relayedTo: null } }] },
       state: started
     }
     const stored = {
@@ -193,7 +193,7 @@ describe("orc backlog thread", () => {
     const after: TaskRecord = {
       spec,
       hold: null,
-      parked: { branch: "orc/orc-1", questions: [{ id: "r3", text: "Keep the flag?", asked: later, answer: null }] },
+      parked: { branch: "orc/orc-1", questions: [{ id: "r3", text: "Keep the flag?", asked: later, blocks: true, answer: null }] },
       state: started
     }
     const current = {
@@ -214,7 +214,7 @@ describe("orc backlog thread", () => {
     const parked: TaskRecord = {
       spec,
       hold: null,
-      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, answer: { words: "Three", at: captainAt, relayedTo: null } }] },
+      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, blocks: true, answer: { words: "Three", at: captainAt, relayedTo: null } }] },
       state: started
     }
     const open = {
@@ -231,7 +231,7 @@ describe("orc backlog thread", () => {
     const replaced: TaskRecord = {
       spec,
       hold: null,
-      parked: { branch: "orc/orc-1", questions: [{ id: "r3", text: "Keep the flag?", asked: "2026-11-02T11:00:00.000Z", answer: null }] },
+      parked: { branch: "orc/orc-1", questions: [{ id: "r3", text: "Keep the flag?", asked: "2026-11-02T11:00:00.000Z", blocks: true, answer: null }] },
       state: started
     }
     const closed = {
@@ -253,7 +253,7 @@ describe("orc backlog thread", () => {
     const task: TaskRecord = {
       spec,
       hold: null,
-      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, answer: { words: "Two", at: answered, relayedTo: "" } }] },
+      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, blocks: true, answer: { words: "Two", at: answered, relayedTo: "" } }] },
       state: started
     }
     const item = {

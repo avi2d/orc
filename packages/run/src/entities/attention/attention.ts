@@ -84,22 +84,22 @@ export const openItem = (root: string, id: string, asked: Asked): Effect.Effect<
 interface AskedQuestion {
   readonly id: string
   readonly text: string
-  readonly asked: string
+  readonly asked?: string | undefined
+  readonly blocks?: boolean | undefined
   readonly options?: ReadonlyArray<AskOption>
 }
 
 const reviewQuestionItem = (
   task: string,
-  question: AskedQuestion,
-  at: string
+  question: AskedQuestion
 ): { readonly id: string; readonly asked: Asked } => {
-  const id = reviewQuestionId(task, question.id, question.asked)
+  const id = reviewQuestionId(task, question.id, question.asked ?? "")
   const asked: Asked = {
     kind: isWorkerQuestion(question.id) ? "worker-question" : "review-question",
     task,
     text: question.text,
     ...(question.options === undefined ? {} : { options: question.options }),
-    asked: Number.isNaN(Date.parse(question.asked)) ? at : question.asked,
+    asked: question.asked ?? "",
     owner: question.id === loopQuestionId ? "user" : "decider"
   }
   return { id, asked }
@@ -108,11 +108,10 @@ const reviewQuestionItem = (
 export const openReviewQuestions = (
   root: string,
   task: string,
-  questions: ReadonlyArray<AskedQuestion>,
-  at: string
+  questions: ReadonlyArray<AskedQuestion>
 ): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.forEach(questions, (question) => {
-    const item = reviewQuestionItem(task, question, at)
+    const item = reviewQuestionItem(task, question)
     return Effect.asVoid(openItem(root, item.id, item.asked))
   }, { discard: true })
 
@@ -300,7 +299,7 @@ export const routeTaskItems = (root: string, tasks: ReadonlyArray<TaskRecord>, a
         continue
       }
       for (const question of task.parked?.questions ?? []) {
-        const item = reviewQuestionItem(task.spec.id, question, at)
+        const item = reviewQuestionItem(task.spec.id, question)
         if (yield* routeOne(root, item.id, item.asked, question.answer)) {
           live.add(item.id)
         }

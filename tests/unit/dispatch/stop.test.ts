@@ -15,6 +15,7 @@ import { formatResult } from "../../../packages/run/src/features/queueing-a-task
 import { markRunStopped } from "../../../packages/run/src/entities/run-history/index"
 import { buildResumePlan } from "../../../packages/run/src/features/running-a-task/run-resume"
 import type { AgentFile } from "../../../packages/run/src/entities/agent/index"
+import { askSetupFor } from "../../../packages/run/src/entities/agent/index"
 import type { HistoryRun } from "../../../packages/run/src/features/running-a-task/run-record"
 import { subprocessNoMistakesRunner } from "../../../packages/run/src/entities/review-gate/no-mistakes"
 import { insertRun, openDatabase, recordStep, runById, stoppedEndReason } from "../../../packages/run/src/entities/run-history/index"
@@ -311,6 +312,7 @@ describe("runner kill", () => {
         const history: HistoryRun = {
           fs, path, spawner: childSpawner, git: "git", projectDir: "/checkout", runId: "run-9", runDir,
           piSessionDir: path.join(runDir, "session"),
+          asks: askSetupFor(runDir, path.join(runDir, "session"), 600, [], []),
           hostSessionsDir: path.join(runDir, "sessions"),
           taskPath: path.join(runDir, "task.md"),
           instructions: null, agent, fixer: { ...agent, kind: "fixer", body: "Fix the failure.", path: "bundled/fixer.md" }, branch: "orc/orc-1", sandbox: "nono",
@@ -512,6 +514,7 @@ describe("an interrupted run", () => {
         const history: HistoryRun = {
           fs, path, spawner, git: "git", projectDir: "/checkout", runId: "run-2", runDir,
           piSessionDir: path.join(runDir, "session"),
+          asks: askSetupFor(runDir, path.join(runDir, "session"), 600, [], []),
           hostSessionsDir: path.join(runDir, "sessions"),
           taskPath: path.join(runDir, "task.md"),
           instructions: null, agent, fixer, branch: "orc/orc-1", sandbox: "nono",

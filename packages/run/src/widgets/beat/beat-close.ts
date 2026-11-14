@@ -1,6 +1,6 @@
 import { Array as Arr, DateTime, Duration, Effect, FileSystem, Option, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { backlogPaths, closeStartedTask, findTask, listTasks, applyRunSplit, splitEventText, runLabel, taskBranch, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { backlogPaths, closeStartedTask, findTask, listTasks, applyRunSplit, splitEventText, runLabel, runDirFor, taskBranch, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
 import { recordEvent } from "../../entities/events/index"
 import type { BeatAction, Progress } from "../../entities/attention/index"
 import type { FailingMark } from "../../entities/agent/index"
@@ -8,6 +8,8 @@ import type { DispatchConfig } from "../../shared/config/index"
 import { ownedBySweep, throughFor } from "../../shared/config/index"
 import { logWrittenAt, stallMillis } from "./stall"
 import { answersFor, askStartedTask, markAnswersRelayed, parkStartedTask } from "../../entities/parked-runs/index"
+import { Asking, askingFileName, hasBlockingQuestion, type OpenQuestion } from "../../entities/review-gate/index"
+import { readJsonFileIfPresent } from "../../shared/config/index"
 import { type RunnerRequirements } from "../../features/queueing-a-task/index"
 import { type RunnerError } from "../../shared/process/index"
 import { type Command } from "../../shared/process/index"
@@ -27,7 +29,7 @@ const closeSeconds = 30
 const missingRunnerGraceMillis = 10 * 60 * 1000
 
 type CloseReading =
-  | { readonly kind: "read"; readonly result: RunnerResult; readonly ending: RunEnding | null; readonly outputAt: string | null; readonly asking: Asking | null; readonly failing: FailingMark | null }
+  | { readonly kind: "read"; readonly result: RunnerResult; readonly ending: RunEnding | null; readonly outputAt: string | null; readonly asking: typeof Asking.Type | null; readonly failing: FailingMark | null }
   | { readonly kind: "unread"; readonly reason: string }
 
 // A close read that stays unread past the queue delay releases the machine, measured from its first unread beat.
@@ -68,6 +70,7 @@ type CloseEnding = Extract<RunEnding, { readonly kind: "close" }>
 
 const endParked = (
   root: string,
+  home: string,
   task: TaskRecord,
   machine: string,
   ending: ParkEnding,
@@ -76,10 +79,17 @@ const endParked = (
   Effect.gen(function*() {
     const id = task.spec.id
     const branch = task.parked?.branch ?? taskBranch(id)
-    const parked = yield* parkStartedTask(root, id, branch, ending.questions, yield* nowIso, run).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
+    const live = yield* (run === undefined
+      ? Effect.succeed<ReadonlyArray<OpenQuestion>>([])
+      : readJsonFileIfPresent(runDirFor(home, run) + "/" + askingFileName, Asking).pipe(
+        Effect.map((asking) => asking === null ? [] as ReadonlyArray<OpenQuestion> : [...asking.questions]),
+        Effect.orElseSucceed(() => [] as ReadonlyArray<OpenQuestion>)
+      ))
+    const open = Arr.appendAll(ending.questions, live.filter((question) => !ending.questions.some((known) => known.id === question.id)))
+    const parked = yield* parkStartedTask(root, id, branch, open, yield* nowIso, run).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
     return parked === null
       ? Option.none()
-      : Option.some({ kind: "parked", task: id, machine, branch, questions: ending.questions.map((question) => question.id), decider: [] } satisfies BeatAction)
+      : Option.some({ kind: "parked", task: id, machine, branch, questions: open.map((question) => question.id), decider: [] } satisfies BeatAction)
   })
 
 const childIdsOf = (tasks: ReadonlyArray<TaskRecord>, parent: string): ReadonlyArray<string> =>
@@ -173,16 +183,15 @@ const endClosed = (
 
 const endTask = (
   root: string,
+  home: string,
   task: TaskRecord,
   machine: string,
   ending: RunEnding,
   run?: string
 ): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
-  ending.kind === "park" ? endParked(root, task, machine, ending, run) : ending.kind === "split" ? endSplit(root, task, machine, ending) : endClosed(root, task, machine, ending)
+  ending.kind === "park" ? endParked(root, home, task, machine, ending, run) : ending.kind === "split" ? endSplit(root, task, machine, ending) : endClosed(root, task, machine, ending)
 
-type Asking = NonNullable<NonNullable<Extract<RunnerResult, { readonly status: "running" | "paused" }>["run"]>["asking"]>
-
-const askingOf = (result: RunnerResult): Asking | null =>
+const askingOf = (result: RunnerResult): typeof Asking.Type | null =>
   (result.status === "running" || result.status === "paused") && result.run?.asking !== undefined ? result.run.asking : null
 
 const failingOf = (result: RunnerResult): FailingMark | null =>
@@ -191,7 +200,7 @@ const failingOf = (result: RunnerResult): FailingMark | null =>
 // A run waiting on the captain writes no output, and that silence is no stall.
 const outputAtOf = (result: RunnerResult): string | null => {
   const asking = askingOf(result)
-  const blocking = asking !== null && asking.questions.some((question) => (question as { blocks?: boolean }).blocks !== false)
+  const blocking = asking !== null && hasBlockingQuestion(asking)
   return (result.status === "running" || result.status === "paused") && result.outputAt !== undefined && !blocking ? result.outputAt : null
 }
 
@@ -199,7 +208,7 @@ const serveAsking = (
   context: CloseContext,
   task: TaskRecord,
   machine: string,
-  asking: Asking,
+  asking: typeof Asking.Type,
   relay: (relay: Relay) => Effect.Effect<string, RunnerError, RunnerRequirements>
 ): Effect.Effect<BeatAction | null, TaskFileError, RunnerRequirements> =>
   Effect.gen(function*() {
@@ -213,16 +222,16 @@ const serveAsking = (
       return { kind: "asking", task: id, machine, until: asking.until, questions: asking.questions.map((question) => question.id) } satisfies BeatAction
     }
     const answered = answersFor(task, live)
-    const fresh = answered.filter((question) => question.answer.relayedTo === null).map((question) => question.id)
+    const fresh = answered.filter((question) => question.answer.relayedTo === null)
     if (fresh.length === 0) {
       return null
     }
     // answers.json is replaced whole, so each relay carries every answer of the asking and not only the new ones.
     return yield* relay({ asking: asking.asked, answers: answered.map((question) => ({ question: question.id, answer: question.answer.words })) }).pipe(
-      Effect.andThen(markAnswersRelayed(context.root, id, asking.asked, fresh).pipe(
+      Effect.andThen(markAnswersRelayed(context.root, id, asking.asked, fresh.map((question) => ({ id: question.id, asked: question.asked }))).pipe(
         Effect.catchTag("BacklogError", () => Effect.void)
       )),
-      Effect.as<BeatAction>({ kind: "answered", task: id, machine, questions: fresh }),
+      Effect.as<BeatAction>({ kind: "answered", task: id, machine, questions: fresh.map((question) => question.id) }),
       Effect.catchTag("RunnerError", (error) => Effect.succeed<BeatAction>({ kind: "answer-failed", task: id, machine, reason: error.detail })),
       Effect.timeoutOrElse({
         duration: Duration.seconds(closeSeconds),
@@ -294,7 +303,7 @@ export const closeFinished = (
       if (silent === null) {
         return { kind: "own-log" } satisfies Progress
       }
-      const silentEnded = yield* endTask(context.root, task, claim.machine, silent)
+      const silentEnded = yield* endTask(context.root, context.home, task, claim.machine, silent)
       return Option.match(silentEnded, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
     }
     const through = throughFor(machine)
@@ -318,6 +327,6 @@ export const closeFinished = (
       const action = reading.asking === null ? null : yield* serveAsking(context, task, claim.machine, reading.asking, relay)
       return { kind: "running", outputAt: reading.outputAt, action, failing: reading.failing } satisfies Progress
     }
-    const ended = yield* endTask(context.root, task, claim.machine, ending, reading.kind === "read" ? reading.result.run?.id : undefined)
+    const ended = yield* endTask(context.root, context.home, task, claim.machine, ending, reading.kind === "read" ? reading.result.run?.id : undefined)
     return Option.match(ended, { onNone: (): Progress => ({ kind: "untracked" }), onSome: (action): Progress => ({ kind: "ended", action }) })
   })

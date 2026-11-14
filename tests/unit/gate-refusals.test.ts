@@ -7,6 +7,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
+import { askSetupFor } from "../../packages/run/src/entities/agent/index"
 import { openDatabase, recordRun, recordSignal, recordStep } from "../../packages/run/src/entities/run-history/index"
 import { recordChecksDone, recordResumePublish } from "../../packages/run/src/features/running-a-task/history-write"
 import { buildResumePlan } from "../../packages/run/src/features/running-a-task/run-resume"
@@ -265,6 +266,7 @@ describe("resumed refusals", () => {
             hostSessionsDir: path.join(runDir, "sessions"),
             taskPath: path.join(runDir, "task.md"),
             instructions: null, agent: implementer, fixer, branch: "orc/test", sandbox: "nono",
+            asks: askSetupFor(runDir, path.join(runDir, "session"), 600, [], []),
             started: "2026-10-19T10:00:00.000Z", worktreeDir: project, machine: null,
             delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git: "git", worktreeDir: project }) },
             allow: [], answers: []

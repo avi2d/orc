@@ -9,8 +9,9 @@ import { OrcRunError } from "../../shared/lib/index"
 import { historyFailure, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, sqlite, stepIdFor, updateRun, updateStep } from "../../entities/run-history/index"
 import type { EvidenceInput, SignalInput, StepInput } from "../../entities/run-history/index"
 import { measuredSignals, noMistakesSignals, openQuestionSignal } from "../../entities/run-history/index"
-import type { AgentStep, ResumePlan } from "./run-ops"
+import type { AgentStep, ResumePlan, RunCheckpoints } from "./run-ops"
 import type { AgentFile } from "../../entities/agent/index"
+import { liveAskQuestions, type AskSetup } from "../../entities/agent/index"
 import { taskOfBranch } from "../../entities/backlog/index"
 
 type StepAgent = Pick<AgentFile, "model" | "thinking">
@@ -193,6 +194,26 @@ export const recordOpenQuestion = (db: Database, runId: string, step: AgentStep,
       Effect.asVoid,
       Effect.mapError((cause) => historyFailure("record the question in", cause))
     )
+  })
+
+export const recordOpenAsks = (
+  questionAsked: RunCheckpoints["questionAsked"],
+  setup: AskSetup,
+  step: AgentStep,
+  seed: ReadonlyArray<OpenQuestion>
+): Effect.Effect<void, OrcRunError> =>
+  Effect.gen(function*() {
+    const seen = new Set<string>()
+    for (const question of [...seed, ...liveAskQuestions(setup), ...setup.priorOpen]) {
+      if (seen.has(question.id) || setup.state.recorded.has(question.id)) {
+        continue
+      }
+      seen.add(question.id)
+      const done = yield* questionAsked(step, question).pipe(Effect.as(true), Effect.orElseSucceed(() => false))
+      if (done) {
+        setup.state.recorded.add(question.id)
+      }
+    }
   })
 
 export const recordHandoverEvidence = (db: Database, runId: string, path: string): Effect.Effect<void, OrcRunError> =>

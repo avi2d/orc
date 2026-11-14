@@ -14,6 +14,7 @@ import { type DirectPrRecord, openDirectPr, type PullRequestOpener } from "../..
 import { readFailure } from "../../shared/config/index"
 import { countSessionSize, handoverImplementPrompt, type LongSessionCounts } from "../../entities/agent/index"
 import type { AgentOutcome, AgentRun, AgentRunResult, AgentStep, ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
+import { recordOpenAsks } from "./history-write"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 
 
@@ -87,7 +88,7 @@ const runSettled = (
       const result = yield* runAgent(next)
       made.push(...result.commits)
       if (result.end.kind === "asked") {
-        yield* questionAsked(step, result.end.question)
+        yield* recordOpenAsks(questionAsked, run.asks, step, [result.end.question])
         return { ...result, commits: made }
       }
       if (result.end.kind !== "looping") {
@@ -98,7 +99,7 @@ const runSettled = (
         return yield* new RunStopped({ reason: verdict.reason })
       }
       if (verdict.kind === "unanswered") {
-        yield* questionAsked(step, verdict.question)
+        yield* recordOpenAsks(questionAsked, run.asks, step, [verdict.question])
         return { ...result, commits: made }
       }
       next = { ...first, prompt: loopContinuePrompt(verdict.words), resumeSession: result.sessionFile ?? next.resumeSession }
@@ -374,7 +375,7 @@ const runChecksFixLoop = (
     return yield* new OrcRunError({ message: "orc: the checks loop ended without a result" })
   })
 
-export const runFull = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
+const runFullReport = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, tracked: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
     const plan = resume
     const parkedLoop = loopAnswerOf(plan.answers)
@@ -385,9 +386,9 @@ export const runFull = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, ch
     const done = plan.skipImplement
       ? yield* resumedOutcome(run, plan.implementSessionId, plan.implementSessionFile)
       : yield* Effect.gen(function*() {
-        yield* checkpoints.implementStart(implementStarted)
-        const outcome = yield* implement(run, ops.runAgent, plan, checkpoints)
-        yield* checkpoints.implementDone(outcome, implementStarted, new Date().toISOString())
+        yield* tracked.implementStart(implementStarted)
+        const outcome = yield* implement(run, ops.runAgent, plan, tracked)
+        yield* tracked.implementDone(outcome, implementStarted, new Date().toISOString())
         return outcome
       })
     const base: ImplementBase = {
@@ -413,7 +414,27 @@ export const runFull = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, ch
     const fixes: Array<RecordedFixAttempt> = [...plan.inheritedFixes]
     const commits = [...done.commits]
     if (plan.skipChecks) {
-      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints)
+      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, tracked)
     }
-    return yield* runChecksFixLoop(run, ops, base, rounds, fixes, commits, plan, checkpoints)
+    return yield* runChecksFixLoop(run, ops, base, rounds, fixes, commits, plan, tracked)
+  })
+
+
+export const runFull = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
+  Effect.gen(function*() {
+    let lastStep: AgentStep = { name: "implement", attempt: 1 }
+    const tracked: RunCheckpoints = {
+      ...checkpoints,
+      implementStart: (started) => {
+        lastStep = { name: "implement", attempt: 1 }
+        return checkpoints.implementStart(started)
+      },
+      fixStart: (attempt, started) => {
+        lastStep = { name: "fix", attempt }
+        return checkpoints.fixStart(attempt, started)
+      }
+    }
+    const report = yield* runFullReport(run, ops, resume, tracked)
+    yield* recordOpenAsks(tracked.questionAsked, run.asks, lastStep, []).pipe(Effect.orElseSucceed(() => undefined))
+    return report
   })

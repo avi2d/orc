@@ -8,7 +8,7 @@ import type { AgentFile } from "../../packages/run/src/entities/agent/index"
 import { subprocessNoMistakesRunner, type QuestionAnswer } from "../../packages/run/src/entities/review-gate/no-mistakes"
 import { subprocessPullRequestOpener } from "../../packages/run/src/entities/pull-request/direct-pr"
 import { hostGitShim } from "../../packages/run/src/shared/sandbox/host"
-import { orcCompletionLine } from "../../packages/run/src/entities/agent/index"
+import { askSetupFor, orcCompletionLine } from "../../packages/run/src/entities/agent/index"
 import { runWithHistory } from "../../packages/run/src/features/running-a-task/run"
 import type { OrcRunReport, RunDeliverer } from "../../packages/run/src/features/running-a-task/run-record"
 import { listRuns, openDatabase, type RunRecord } from "../../packages/run/src/entities/run-history/index"
@@ -246,6 +246,7 @@ const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: F
               fs, path, spawner, git: hostGit, projectDir: dir, runId: "step-run-1", runDir,
               piSessionDir: path.join(runDir, "session"), hostSessionsDir: path.join(runDir, "sessions"),
               taskPath: path.join(runDir, "task.md"), instructions: null, agent: implementer, fixer, branch: facts.branch, sandbox: "nono", started: "2026-10-19T10:00:00.000Z",
+              asks: askSetupFor(runDir, path.join(runDir, "session"), 600, answers, []),
               worktreeDir: facts.worktreeDir ?? dir, machine: facts.machine,
               delivery: deliver(spawner, hostGit, extraPath + stub.dir + ":" + (process.env.PATH ?? ""), dir),
               answers

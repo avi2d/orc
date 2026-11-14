@@ -55,6 +55,20 @@ export const isBlockingQuestion = (question: { readonly blocks?: boolean | undef
 export const hasBlockingQuestion = (asking: { readonly questions: ReadonlyArray<{ readonly blocks?: boolean | undefined }> }): boolean =>
   asking.questions.some(isBlockingQuestion)
 
+const dropAnswersFor = (relayed: string, missing: ReadonlyArray<Pick<NoMistakesFinding, "id" | "description">>, asked: string): Effect.Effect<void, never, FileSystem.FileSystem> =>
+  readJsonFileIfPresent(relayed, AnswersFile).pipe(
+    Effect.flatMap((stored) => {
+      if (stored === null || stored.asking !== asked) {
+        return Effect.void
+      }
+      const kept = stored.answers.filter((entry) => !missing.some((finding) => finding.id === entry.question))
+      return kept.length === stored.answers.length
+        ? Effect.void
+        : writeWhole(relayed, JSON.stringify({ asking: asked, answers: kept })).pipe(Effect.asVoid, Effect.orElseSucceed(() => undefined))
+    }),
+    Effect.orElseSucceed(() => undefined)
+  )
+
 const readRelayed = (file: string, asked: string): Effect.Effect<ReadonlyArray<QuestionAnswer>, never, FileSystem.FileSystem> =>
   readJsonFileIfPresent(file, AnswersFile).pipe(
     Effect.map((relayed) => relayed === null || relayed.asking !== asked ? [] : relayed.answers),
@@ -72,6 +86,7 @@ export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: stri
       }
       const now = new Date().toISOString()
       const previous = yield* readJsonFileIfPresent(asking, Asking).pipe(Effect.orElseSucceed(() => null))
+      yield* dropAnswersFor(relayed, missing, previous?.asked ?? now)
       const asked = previous?.asked ?? now
       const deadline = Date.now() + waitSeconds * 1000
       const until = new Date(deadline).toISOString()

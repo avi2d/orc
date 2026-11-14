@@ -37,6 +37,7 @@ export type {
 export {
   askSetupFor,
   isWorkerQuestion,
+  liveAskQuestions,
   workerQuestionText,
 } from "./worker-ask"
 export type {

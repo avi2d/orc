@@ -39,11 +39,11 @@ The queue and run check the recorded run id before using its progress.
 The queued command carries that id in `ORC_DISPATCH_RESUME_RUN`.
 If the latest resumable run has changed or disappeared, Orc refuses the resume instead of starting fresh implementation.
 The resumed attempt keeps the earlier completed steps and hands your answers to no-mistakes.
-If the resumed run stops on new questions, the task parks again with those, and it keeps the answers it already has.
+If the resumed run stops on new questions, the task parks again with those beside the questions it kept, and it keeps the answers it already has.
 An answer given after the beat last read the waiting run is kept too.
-A task whose every question has an answer can resume when its original machine and run are available.
+A task whose every blocking question has an answer can resume when its original machine and run are available.
 `orc backlog` shows a parked task as `parked (<question-ids>)`.
-`orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times and answers.
+`orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times, their blocking flag and their answers.
 Older parked records have no `origin` field.
 
 ## A looping run
@@ -60,14 +60,14 @@ A report run has no branch to park on, so a wait that ends unanswered ends it fa
 Pi asks you a question mid-run with the `orc_ask` tool, as [How orc runs Pi](how-orc-runs-pi.md) shows.
 The tool takes the `question`, an optional `context`, optional `options` each with a `text` and an optional `picture`, and `blocks`.
 Pi sets `blocks` to true when it cannot go on without the answer.
-Orc names each question `ask-<n>`, counting from 1 in a run, and writes it to the run's `asking.json`.
+Orc names each question `ask-<n>`, numbering from the highest id the task ever asked, and writes it to the run's `asking.json` beside the gate and loop questions.
 The question's text holds the question, then `Context:` and the context, then each option lettered `A)`, `B)` and on.
 The beat opens a `worker-question` item for it, as [The attention queue](attention-queue.md) shows, and hands its answer to the run the way it does at a gate.
 
 A blocking question holds Pi for 10 minutes, or for the `ORC_ANSWER_WAIT_SECONDS` its machine sets when that is shorter.
 An answer within the wait is the tool's result, and Pi carries on.
 When no answer comes, the tool tells Pi so, and orc stops Pi at the end of that turn with `orc stopped Pi when no answer to its question ask-<n> came in time` in the end reason.
-A ship run then parks its task on its branch for `ask-<n>`.
+A ship run then parks its task on its branch for every open question.
 Answer it with `orc backlog answer <task-id> ask-<n>=<text>`, and the beat resumes the task on the same machine and branch.
 The resumed run hands your answer to the same Pi session as `The captain answered your question ask-<n>: <text>`.
 A scout or task run has no branch to park on, so it ends failed with the question in its end reason.

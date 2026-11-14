@@ -18,6 +18,7 @@ const question = (id: string, text: string, askedAt: string, answer: { words: st
   id,
   text,
   asked: askedAt,
+  blocks: true,
   answer: answer === null ? null : { ...answer, relayedTo: null }
 })
 
@@ -79,12 +80,12 @@ describe("the attention queue", () => {
     })
   })
 
-  test("a question asked before asked_at existed opens its item at the beat time instead of an unreadable age", async () => {
+  test("a question asked before asked_at existed opens with no time instead of the beat time", async () => {
     await withRoot(async (root) => {
       await run(routeTaskItems(root, [parkedTask("orc-1", question("r2", "Keep the old flag?", "", null), [], { kind: "new" })], "2026-11-02T10:20:00.000Z"))
       const items = await run(openItems(root))
-      expect(items.map((entry) => entry.item.asked)).toEqual(["2026-11-02T10:20:00.000Z"])
-      expect(attentionJson(items, "2026-11-02T10:30:00.000Z", []).items[0]).toMatchObject({ ageSeconds: 600, overdue: true })
+      expect(items.map((entry) => entry.item.asked)).toEqual([""])
+      expect(attentionJson(items, "2026-11-02T10:30:00.000Z", []).items[0]).toMatchObject({ overdue: false })
     })
   })
 

@@ -1,7 +1,7 @@
 import { Effect, FileSystem, Option, Schema } from "effect"
 import { readJsonFileIfPresent, writeWhole } from "../../shared/config/index"
-import { AnswersFile, answersFileName, Asking, AskOption, askingFileName, hasBlockingQuestion, type OpenQuestion, type QuestionAnswer } from "../review-gate/index"
-import { askFileStem, type AskReply, replySuffix } from "./orc-ask-extension"
+import { AnswersFile, answersFileName, Asking, AskOption, askingFileName, hasBlockingQuestion, isBlockingQuestion, type OpenQuestion, type QuestionAnswer } from "../review-gate/index"
+import { askFileStem, askSuffix, type AskReply, replySuffix } from "./orc-ask-extension"
 
 const workerQuestionPattern = /^ask-(\d+)$/
 
@@ -27,6 +27,7 @@ export interface AskRunState {
   asked: string | null
   timedOut: WorkerAsk | null
   readonly asks: Array<WorkerAsk>
+  readonly recorded: Set<string>
 }
 
 export interface AskSetup {
@@ -35,22 +36,34 @@ export interface AskSetup {
   readonly extensionFile: string
   readonly waitSeconds: number
   readonly state: AskRunState
+  readonly priorOpen: ReadonlyArray<OpenQuestion>
 }
 
-export const askSetupFor = (runDir: string, piSessionDir: string, answerWaitSeconds: number, answered: ReadonlyArray<QuestionAnswer>): AskSetup => ({
+const askNumbers = (ids: ReadonlyArray<string>): Array<number> =>
+  ids.flatMap((id) => {
+    const found = workerQuestionPattern.exec(id)?.[1]
+    return found === undefined ? [] : [Number(found)]
+  })
+
+export const askSetupFor = (
+  runDir: string,
+  piSessionDir: string,
+  answerWaitSeconds: number,
+  answered: ReadonlyArray<QuestionAnswer>,
+  priorOpen: ReadonlyArray<OpenQuestion> = []
+): AskSetup => ({
   runDir,
   askDir: piSessionDir + "/asks",
   extensionFile: piSessionDir + "/orc-ask.ts",
   waitSeconds: Math.min(answerWaitSeconds, longestAskWaitSeconds),
   state: {
-    next: 1 + Math.max(0, ...answered.flatMap((answer) => {
-      const number = workerQuestionPattern.exec(answer.question)?.[1]
-      return number === undefined ? [] : [Number(number)]
-    })),
+    next: 1 + Math.max(0, ...askNumbers([...answered.map((answer) => answer.question), ...priorOpen.map((question) => question.id)])),
     asked: null,
     timedOut: null,
-    asks: []
-  }
+    asks: [],
+    recorded: new Set()
+  },
+  priorOpen
 })
 
 export type AskedQuestion = OpenQuestion & { readonly asked: string }
@@ -78,11 +91,17 @@ export const workerQuestionText = (args: Pick<AskArgs, "question" | "context" | 
     ...(args.options ?? []).map(optionLine)
   ].join("\n")
 
+export const liveAskQuestions = (setup: AskSetup): ReadonlyArray<OpenQuestion> =>
+  setup.state.asks.filter((ask) => !ask.replied).map((ask) => ({
+    id: ask.id,
+    text: ask.text,
+    asked: ask.askedAt,
+    blocks: ask.deadline !== null
+  }))
+
 export interface WorkerAsks {
-  readonly start: (toolCallId: string, args: unknown) => Effect.Effect<string | null>
   readonly tick: Effect.Effect<void>
   readonly timedOut: () => AskedQuestion | null
-  readonly finish: Effect.Effect<void>
 }
 
 const writeReply = (setup: AskSetup, ask: WorkerAsk, reply: AskReply): Effect.Effect<boolean, never, FileSystem.FileSystem> =>
@@ -92,6 +111,48 @@ export const openWorkerAsks = (fs: FileSystem.FileSystem, setup: AskSetup): Work
   const askingFile = setup.runDir + "/" + askingFileName
   const answersFile = setup.runDir + "/" + answersFileName
   const provided = <A>(effect: Effect.Effect<A, never, FileSystem.FileSystem>): Effect.Effect<A> => Effect.provideService(effect, FileSystem.FileSystem, fs)
+  const readAskFile = (stem: string): Effect.Effect<AskArgs | null> =>
+    Effect.gen(function*() {
+      const text = yield* provided(fs.readFileString(setup.askDir + "/" + stem + askSuffix).pipe(Effect.orElseSucceed(() => null)))
+      if (text === null) {
+        return null
+      }
+      const parsed: unknown = yield* Effect.try(() => JSON.parse(text) as unknown).pipe(Effect.orElseSucceed(() => null))
+      if (parsed === null) {
+        return null
+      }
+      const decoded = Option.getOrNull(decodeAskArgs(parsed))
+      return decoded !== null && decoded.question.trim() !== "" ? decoded : null
+    })
+  const registerNew = (): Effect.Effect<boolean> =>
+    Effect.gen(function*() {
+      const shared = setup.state
+      const names = yield* provided(fs.readDirectory(setup.askDir).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>)))
+      let added = false
+      for (const stem of names.filter((name) => name.endsWith(askSuffix)).map((name) => name.slice(0, -askSuffix.length)).toSorted()) {
+        if (shared.asks.some((ask) => ask.stem === stem)) {
+          continue
+        }
+        const decoded = yield* readAskFile(stem)
+        if (decoded === null) {
+          continue
+        }
+        const now = new Date().toISOString()
+        shared.asks.push({
+          id: "ask-" + String(shared.next),
+          stem,
+          question: decoded.question.trim(),
+          text: workerQuestionText(decoded),
+          options: decoded.options,
+          deadline: decoded.blocks ? Date.parse(now) + setup.waitSeconds * 1000 : null,
+          askedAt: now,
+          replied: false
+        })
+        shared.next += 1
+        added = true
+      }
+      return added
+    })
   const writeAsking = (): Effect.Effect<boolean> =>
     Effect.gen(function*() {
       const shared = setup.state
@@ -110,53 +171,36 @@ export const openWorkerAsks = (fs: FileSystem.FileSystem, setup: AskSetup): Work
           asked: ask.askedAt
         }))
       ]
+      if (questions.length === 0) {
+        yield* provided(fs.remove(askingFile, { force: true }).pipe(Effect.orElseSucceed(() => undefined)))
+        yield* provided(fs.remove(answersFile, { force: true }).pipe(Effect.orElseSucceed(() => undefined)))
+        return true
+      }
       const deadlines = open.flatMap((ask) => ask.deadline !== null ? [ask.deadline] : [])
-      if (previous !== null && previous.questions.some((question) => question.blocks !== false)) {
+      if (previous !== null && previous.questions.some(isBlockingQuestion)) {
         deadlines.push(Date.parse(previous.until))
       }
-      const blocking = questions.some((question) => question.blocks !== false)
-      const until = blocking
+      const until = hasBlockingQuestion({ questions })
         ? new Date(deadlines.length > 0 ? Math.max(...deadlines) : Date.parse(asked)).toISOString()
         : asked
       return yield* provided(writeWhole(askingFile, JSON.stringify({ asked, until, questions })))
     })
   return {
-    start: (toolCallId, args) =>
-      Option.match(decodeAskArgs(args), {
-        onNone: () => Effect.succeed(null),
-        onSome: (decoded) =>
-          Effect.gen(function*() {
-            const shared = setup.state
-            const now = new Date().toISOString()
-            if (shared.asked === null) {
-              const previous = yield* provided(readJsonFileIfPresent(askingFile, Asking).pipe(Effect.orElseSucceed(() => null)))
-              shared.asked = previous?.asked ?? now
-            }
-            const ask: WorkerAsk = {
-              id: "ask-" + String(shared.next),
-              stem: askFileStem(toolCallId),
-              question: decoded.question.trim(),
-              text: workerQuestionText(decoded),
-              options: decoded.options,
-              deadline: decoded.blocks ? Date.parse(now) + setup.waitSeconds * 1000 : null,
-              askedAt: now,
-              replied: false
-            }
-            shared.next += 1
-            shared.asks.push(ask)
-            yield* writeAsking()
-            return ask.id
-          })
-      }),
     tick: Effect.gen(function*() {
       const shared = setup.state
+      let changed = yield* registerNew()
+      if (shared.asks.length === 0) {
+        return
+      }
+      if (changed) {
+        yield* writeAsking()
+      }
       const asked = shared.asked
       if (asked === null) {
         return
       }
       const relayed = yield* provided(readJsonFileIfPresent(answersFile, AnswersFile).pipe(Effect.orElseSucceed(() => null)))
       const answers = relayed === null || relayed.asking !== asked ? [] : relayed.answers
-      let changed = false
       for (const ask of shared.asks) {
         const answer = answers.find((entry) => entry.question === ask.id)
         if (!ask.replied && answer !== undefined && (yield* provided(writeReply(setup, ask, { kind: "answer", id: ask.id, question: ask.question, words: answer.answer })))) {
@@ -180,9 +224,9 @@ export const openWorkerAsks = (fs: FileSystem.FileSystem, setup: AskSetup): Work
         yield* writeAsking()
       }
     }),
-    timedOut: () => sharedOf(setup).timedOut === null || sharedOf(setup).asked === null ? null : { id: sharedOf(setup).timedOut!.id, text: sharedOf(setup).timedOut!.text, asked: sharedOf(setup).timedOut!.askedAt },
-    finish: Effect.void
+    timedOut: () => {
+      const timedOut = setup.state.timedOut
+      return timedOut === null ? null : { id: timedOut.id, text: timedOut.text, asked: timedOut.askedAt }
+    }
   }
 }
-
-const sharedOf = (setup: AskSetup): AskRunState => setup.state
