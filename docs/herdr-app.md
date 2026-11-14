@@ -3,7 +3,7 @@ kind: how-to
 ---
 # Show orc in the Herdr App
 
-The `orc` layout gives orc a window in the Herdr App, with a Board, a Resources and an Agents tab.
+The `orc` layout gives orc a window in the Herdr App, with a Board, a Resources and an Agents tab, and a chat with orc over any of them.
 Install it once, and run `orc app install` again after each orc upgrade to pick up the new mods.
 That is the only step after an upgrade: `orc app install` builds the mods from the checkout itself, so `bun run build` is not needed.
 
@@ -22,9 +22,9 @@ To install the layout:
 1. Run `herdr-app do layout.switch --name orc`, or press the `layout.switch` key until the `orc` layout shows.
    Check `keys.json` for your `layout.switch` binding.
 
-`orc app install` copies the mods `orc-tabs`, `orc-board`, `orc-resources` and `orc-agents` into `~/.config/herdr-app/mods/`.
+`orc app install` copies the mods `orc-tabs`, `orc-board`, `orc-resources`, `orc-agents` and `orc-drawer` into `~/.config/herdr-app/mods/`.
 It copies `orc.json` and its preview `orc.svg` into `~/.config/herdr-app/layouts/`.
-It adds `cmd-1`, `cmd-2` and `cmd-3` to the `layout:orc` section of `~/.config/herdr-app/keys.json`.
+It adds `cmd-1`, `cmd-2`, `cmd-3` and `cmd-k` to the `layout:orc` section of `~/.config/herdr-app/keys.json`.
 A key you already set in that section stays, and the command prints it as skipped.
 The command writes only names that start with `orc`, so Herdr's own mods and layouts stay as they are.
 
@@ -112,6 +112,23 @@ A step shows ✓ when it passed, ✗ when it failed, ● while it runs, ◆ whil
 Select a step to show its output on the right: the Agent and Fix steps show what Pi writes as it works, and a Checks step shows the checks' output.
 The output shows the full log and follows new lines as they are written.
 Use your `layout.switch` key to go back to your own layout.
+
+## Chat with orc
+
+To open the chat, press `cmd-k` on any tab, or select Chat at the top right.
+The chat opens in a window over the tab, and you can drag it by its bar.
+Press `cmd-k` again or select ✕ to close it.
+
+The window has two views, Raw and Turns.
+Raw is the terminal that runs `orc chat`, where you type to orc.
+Turns shows the same conversation, read only, with one card for each reply of the model.
+A card gives the message that started it, the input, output, cache read and cache write tokens of that reply, and its time.
+Select Thinking to show the model's thinking.
+Each tool call shows ✓ when it succeeded, ✗ when it failed, and … while it runs, with the number of lines it printed.
+Select a call to show the first 20 lines of its output.
+
+Turns reads the Pi session file of the chat every second, from `~/.pi/agent/sessions/--orc-drawer--/`.
+The chat runs in herdr-core as the terminal `orc-chat`, so closing the window leaves it running and reopening it shows the same conversation.
 
 ## Change the mods
 
