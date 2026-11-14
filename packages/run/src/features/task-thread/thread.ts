@@ -65,19 +65,20 @@ const holdExchange = (hold: Pick<Hold, "reason" | "until" | "questions" | "answe
 const holdExchanges = (hold: Hold | null): ReadonlyArray<Exchange> =>
   hold === null ? [] : [...(hold.history ?? []).map((past) => holdExchange({ ...past, at: past.at ?? null })), holdExchange(hold)]
 
-const decidedByDecider = (item: OpenItem | undefined): boolean => item?.item.decision?.kind === "answered"
+const answeredByDecider = (item: OpenItem | undefined, answerAt: string): boolean => item?.item.decision?.kind === "answered" && item.item.decision.at === answerAt
 
 const parkedExchange = (task: string, question: ParkedQuestion, items: ReadonlyMap<string, OpenItem>): Exchange => {
-  const asked = entry(timeOrNull(question.asked), "worker", "question", question.id, question.text)
+  const id = reviewQuestionId(task, question.id, question.asked)
+  const asked = entry(timeOrNull(question.asked), "worker", "question", id, question.text)
   const answer = question.answer
   if (answer === null) {
     return [asked]
   }
-  const who = decidedByDecider(items.get(reviewQuestionId(task, question.id, question.asked))) ? "decider" : "user"
+  const who = answeredByDecider(items.get(id), answer.at) ? "decider" : "user"
   return [
     asked,
-    entry(answer.at, who, "answer", question.id, answer.words),
-    ...(answer.relayedTo === null ? [] : [entry(null, "beat", "delivered", question.id, "handed to the run that asked at " + answer.relayedTo)])
+    entry(answer.at, who, "answer", id, answer.words),
+    ...(answer.relayedTo === null ? [] : [entry(null, "beat", "delivered", id, answer.relayedTo === "" ? "handed to the run that asked" : "handed to the run that asked at " + answer.relayedTo)])
   ]
 }
 
@@ -89,10 +90,9 @@ const itemExchanges = (mirrored: ReadonlySet<string>) => (item: OpenItem): Reado
   const told = mirrored.has(id)
   const asked = told ? [] : [[entry(item.item.asked, askerOf(item), "question", id, item.item.text)]]
   const decided = decision === undefined ? [] : [[entry(decision.at, "decider", "decision", id, decision.kind + ": " + decision.reason)]]
-  const answerer = decidedByDecider(item) ? "decider" : "user"
   const settled = state.kind === "withdrawn"
     ? [[entry(state.at, "beat", "withdrawn", id, state.reason)]]
-    : state.kind === "closed" && !told ? [[entry(state.answer.at, answerer, "answer", id, state.answer.words)]] : []
+    : state.kind === "closed" && !told ? [[entry(state.answer.at, answeredByDecider(item, state.answer.at) ? "decider" : "user", "answer", id, state.answer.words)]] : []
   return [...asked, ...decided, ...settled]
 }
 

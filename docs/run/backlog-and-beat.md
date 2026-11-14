@@ -253,7 +253,7 @@ Whether a question is open is still read from the task file.
 Each entry has `at`, `who`, `kind`, `id` and `text`.
 `who` is `user`, `decider`, `worker` or `beat`.
 `kind` is `hold`, `question`, `decision`, `answer`, `delivered`, `withdrawn` or `note`.
-`id` names the question or the attention item, and it is `null` for a hold, a note and the answer to a hold with no questions.
+`id` names the attention item id for a parked review question, the hold question id for a hold question, and it is `null` for a hold, a note and the answer to a hold with no questions.
 
 - A hold and its questions name `user`, and a parked question names `worker`, the run that asked it.
 - A `decision` entry is the decider's `answered` or `escalated` with its reason.
@@ -261,7 +261,7 @@ Each entry has `at`, `who`, `kind`, `id` and `text`.
 - A `delivered` entry names `beat` and comes from the answer's `relayed_to`, the asking it was handed to.
 - A `withdrawn` entry names `beat` and gives the item's reason.
 - A run event item, such as `run-died`, is a `question` from `beat`.
-- A review question a later park replaced in the task file comes from its item, with the item id as `id`.
+- Every entry of one parked review question names the same attention item id, before and after a later park replaces the question.
 - A note names `user` for `captain`, and keeps `decider`, `worker` or `beat` as written.
 
 Orc lists the entries oldest first.

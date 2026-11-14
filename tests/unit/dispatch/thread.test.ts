@@ -66,10 +66,10 @@ describe("orc backlog thread", () => {
     expect(threadEntries(task, [item], [note])).toEqual([
       { at: "2026-11-02T09:00:00.000Z", who: "user", kind: "hold", id: null, text: "Wait for the merge" },
       { at: "2026-11-02T09:10:00.000Z", who: "user", kind: "answer", id: null, text: "Merged" },
-      { at: asked, who: "worker", kind: "question", id: "r2", text: "How many retries?" },
+      { at: asked, who: "worker", kind: "question", id: item.id, text: "How many retries?" },
       { at: "2026-11-02T10:25:00.000Z", who: "user", kind: "note", id: null, text: "the upload server is slow today" },
       { at: decided, who: "decider", kind: "decision", id: item.id, text: "answered: the intent says twice" },
-      { at: decided, who: "decider", kind: "answer", id: "r2", text: "Two retries" }
+      { at: decided, who: "decider", kind: "answer", id: item.id, text: "Two retries" }
     ])
   })
 
@@ -98,7 +98,7 @@ describe("orc backlog thread", () => {
       ["question", "worker", replaced.id, "How many retries?"],
       ["decision", "decider", replaced.id, "escalated: the intent names no count"],
       ["answer", "user", replaced.id, "Two"],
-      ["question", "worker", "r3", "Keep the flag?"]
+      ["question", "worker", current.id, "Keep the flag?"]
     ])
   })
 
@@ -140,15 +140,114 @@ describe("orc backlog thread", () => {
         schema: "orc.thread.v1",
         task: "orc-1",
         entries: [
-          { kind: "question", who: "worker", id: "r2" },
-          { kind: "question", who: "worker", id: "r3" },
+          { kind: "question", who: "worker", id: reviewQuestionId("orc-1", "r2", asked) },
+          { kind: "question", who: "worker", id: reviewQuestionId("orc-1", "r3", asked) },
           { kind: "decision", who: "decider", id: reviewQuestionId("orc-1", "r2", asked), text: "answered: the intent says twice" },
-          { kind: "answer", who: "decider", id: "r2", text: "Two retries" },
+          { kind: "answer", who: "decider", id: reviewQuestionId("orc-1", "r2", asked), text: "Two retries" },
           { kind: "decision", who: "decider", id: reviewQuestionId("orc-1", "r3", asked), text: "escalated: only the captain merges" },
-          { kind: "answer", who: "user", id: "r3", text: "Yes, merge it", at: "2099-01-01T00:00:00.000Z" }
+          { kind: "answer", who: "user", id: reviewQuestionId("orc-1", "r3", asked), text: "Yes, merge it", at: "2099-01-01T00:00:00.000Z" }
         ]
       })
     }))
+
+  test("a decision matches its question by id before a later park replaces it and after", () => {
+    const earlier = "2026-11-02T10:00:00.000Z"
+    const decided = "2026-11-02T10:05:00.000Z"
+    const later = "2026-11-02T11:00:00.000Z"
+    const before: TaskRecord = {
+      spec,
+      hold: null,
+      parked: { branch: "orc/orc-1", questions: [{ id: "r1", text: "How many retries?", asked: earlier, answer: { words: "Two", at: decided, relayedTo: null } }] },
+      state: started
+    }
+    const stored = {
+      id: reviewQuestionId("orc-1", "r1", earlier),
+      item: {
+        kind: "review-question" as const, task: "orc-1", text: "How many retries?", asked: earlier, owner: "decider" as const,
+        decision: { kind: "answered" as const, reason: "the intent says twice", at: decided },
+        state: { kind: "closed" as const, answer: { words: "Two", at: decided } }
+      }
+    }
+    const beforeIds = threadEntries(before, [stored], []).filter((line) => line.kind !== "delivered").map((line) => line.id)
+    expect(beforeIds).toEqual([stored.id, stored.id, stored.id])
+    const after: TaskRecord = {
+      spec,
+      hold: null,
+      parked: { branch: "orc/orc-1", questions: [{ id: "r3", text: "Keep the flag?", asked: later, answer: null }] },
+      state: started
+    }
+    const current = {
+      id: reviewQuestionId("orc-1", "r3", later),
+      item: { kind: "review-question" as const, task: "orc-1", text: "Keep the flag?", asked: later, owner: "decider" as const, state: { kind: "open" as const } }
+    }
+    const afterByKind = new Map(threadEntries(after, [stored, current], []).map((line) => [line.kind + ":" + line.text, line.id]))
+    expect(afterByKind.get("question:How many retries?")).toBe(stored.id)
+    expect(afterByKind.get("decision:answered: the intent says twice")).toBe(stored.id)
+    expect(afterByKind.get("answer:Two")).toBe(stored.id)
+    expect(afterByKind.get("question:Keep the flag?")).toBe(current.id)
+  })
+
+  test("an answer at a different time than the answered decision names user instead of decider", () => {
+    const asked = "2026-11-02T10:20:00.000Z"
+    const captainAt = "2026-11-02T10:25:00.000Z"
+    const deciderAt = "2026-11-02T10:30:00.000Z"
+    const parked: TaskRecord = {
+      spec,
+      hold: null,
+      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, answer: { words: "Three", at: captainAt, relayedTo: null } }] },
+      state: started
+    }
+    const open = {
+      id: reviewQuestionId("orc-1", "r2", asked),
+      item: {
+        kind: "review-question" as const, task: "orc-1", text: "How many retries?", asked, owner: "decider" as const,
+        decision: { kind: "answered" as const, reason: "the intent says twice", at: deciderAt },
+        state: { kind: "open" as const }
+      }
+    }
+    expect(threadEntries(parked, [open], []).filter((line) => line.kind === "answer")).toEqual([
+      { at: captainAt, who: "user", kind: "answer", id: open.id, text: "Three" }
+    ])
+    const replaced: TaskRecord = {
+      spec,
+      hold: null,
+      parked: { branch: "orc/orc-1", questions: [{ id: "r3", text: "Keep the flag?", asked: "2026-11-02T11:00:00.000Z", answer: null }] },
+      state: started
+    }
+    const closed = {
+      id: open.id,
+      item: {
+        kind: "review-question" as const, task: "orc-1", text: "How many retries?", asked, owner: "decider" as const,
+        decision: { kind: "answered" as const, reason: "the intent says twice", at: deciderAt },
+        state: { kind: "closed" as const, answer: { words: "Three", at: captainAt } }
+      }
+    }
+    expect(threadEntries(replaced, [closed], []).filter((line) => line.kind === "answer")).toEqual([
+      { at: captainAt, who: "user", kind: "answer", id: closed.id, text: "Three" }
+    ])
+  })
+
+  test("a delivered entry with no relay time names the handoff without an empty time", () => {
+    const asked = "2026-11-02T10:20:00.000Z"
+    const answered = "2026-11-02T10:30:00.000Z"
+    const task: TaskRecord = {
+      spec,
+      hold: null,
+      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, answer: { words: "Two", at: answered, relayedTo: "" } }] },
+      state: started
+    }
+    const item = {
+      id: reviewQuestionId("orc-1", "r2", asked),
+      item: {
+        kind: "review-question" as const, task: "orc-1", text: "How many retries?", asked, owner: "decider" as const,
+        decision: { kind: "answered" as const, reason: "the intent says twice", at: answered },
+        state: { kind: "open" as const }
+      }
+    }
+    expect(threadEntries(task, [item], []).filter((line) => line.kind === "delivered")).toEqual([
+      { at: null, who: "beat", kind: "delivered", id: item.id, text: "handed to the run that asked" }
+    ])
+  })
 
   test("refuses a task id the backlog does not hold", () =>
     withBacklog(async (root) => {
