@@ -199,6 +199,15 @@ It works on a held, parked or parent task, and the final check of a parent reads
 Orc refuses a text with no title, a task the backlog does not hold, and a task that is taken, started or closed, since a run has already read its text.
 It never asks the planner and never splits the task.
 The edit takes the task file by rename the way `orc backlog hold` does, so an edit and a beat taking the task at the same moment never both win.
+To take a new task you no longer want out of the backlog, run `orc backlog drop <task-id> <reason>`.
+It closes the task with the outcome `dropped` and your reason, and moves its file to `closed`, where it is kept.
+`orc backlog` lists it under CLOSED as `dropped: <reason>`, and `orc backlog --json` carries it with `outcome` `dropped` and `claim` `null`.
+A drop withdraws every attention item of the task, as a close does, and the chat posts it as it posts a close.
+It works on a held or parked task and drops an unanswered hold with it.
+Orc refuses a task the backlog does not hold, a task that is taken or started, which `orc backlog stop` ends, and a task already closed.
+It refuses a child, which leaves through `orc backlog plan <parent> --drop <child>`, and a parent with an open child.
+It refuses a task another open task waits on, until `orc backlog depend` changes that wait.
+The drop takes the task file by rename, so a drop and a beat taking the task at the same moment never both win.
 To record the machine and run of a task parked before orc recorded them, run `orc backlog origin <task-id> <machine> <run-id>`, as [Parked runs](parked-runs.md) shows.
 Add `--kind scout` or `--kind task` for a task that ends in a report instead of a PR, as [Task kinds](task-kinds.md) shows.
 To split a large task, add it with `--kind parent`, then add each part with `--parent <task-id>`, as [Parent tasks](task-kinds.md#parent-tasks) shows, or name a planner model so orc splits an over-budget request itself, as [Splitting at intake](task-kinds.md#splitting-at-intake) shows.

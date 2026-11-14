@@ -5,7 +5,7 @@ import { backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, mark
 import { readAttention, routeTaskItems } from "../entities/attention/index"
 import { backlogJson, type BacklogView, beatJson, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readRoom, recordOrigin, type RoomList, runBeat, runnerLoadText } from "../widgets/beat/index"
 import { answerItemText, attentionText } from "../features/attention-list/index"
-import { edit, holdTask, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
+import { dropTask, edit, holdTask, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
 import { answerTask } from "../entities/parked-runs/index"
 import { type ConfigError, readFailure, type DispatchConfig, readDispatchConfig, readProjects } from "../shared/config/index"
 import { holdRun, killHeld, queueFromText, renewTask, startTask, stopNow, formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson, ensureAlertStream, liveAlertStream } from "../features/queueing-a-task/index"
@@ -143,6 +143,14 @@ const closeNow = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, pl
     return "closed " + args.id + " " + args.outcome
   })
 
+const dropNow = (args: Extract<CommandArgs, { readonly kind: "DropTask" }>, place: DispatchPlace) =>
+  Effect.gen(function*() {
+    const at = DateTime.formatIso(yield* DateTime.now)
+    const dropped = yield* dropTask(backlogRoot(place), args.id, args.reason, at)
+    yield* routeTaskItems(backlogRoot(place), [dropped], at)
+    return "dropped " + args.id + ": " + args.reason
+  })
+
 const killNow = (args: Extract<CommandArgs, { readonly kind: "RunnerKill" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
     let label = runLabel(place.home, args.task, args.label === undefined ? yield* defaultKind(place, args.task) : undefined, args.label)
@@ -191,7 +199,7 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
-type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "RecordOrigin" | "CloseTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "NoteTask" | "ShowThread" | "DependTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
+type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "RecordOrigin" | "CloseTask" | "DropTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "NoteTask" | "ShowThread" | "DependTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
 
 const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   switch (args.kind) {
@@ -206,6 +214,9 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
     }
     case "CloseTask": {
       return closeNow(args, place)
+    }
+    case "DropTask": {
+      return dropNow(args, place)
     }
     case "MarkPosted": {
       return markPostedNow(args.id, place)
@@ -292,6 +303,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       case "EditTask":
       case "RecordOrigin":
       case "CloseTask":
+      case "DropTask":
       case "MarkPosted":
       case "MarkEventPosted":
       case "HoldTask":
