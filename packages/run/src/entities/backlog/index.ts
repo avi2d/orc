@@ -93,6 +93,7 @@ export type {
 export {
   answerDecision,
   decisionRefusal,
+  newTaskRefusal,
   readAnsweredDependencies,
   withDecisions,
 } from "./decision"

@@ -9,9 +9,11 @@ export {
   type DispatchSnapshot,
   type DispatchReading,
   missingBacklog,
+} from "./sources/dispatch";
+export {
   DispatchSource,
   dispatchSourceLayer,
-} from "./sources/dispatch";
+} from "./sources/dispatch-task";
 export {
   type RoomEntry,
   type RunRow,

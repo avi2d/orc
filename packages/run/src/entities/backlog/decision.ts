@@ -9,6 +9,9 @@ export const decisionRefusal = (record: TaskRecord, verb: string): string | null
     ? record.spec.id + " is a decision, so it takes no " + verb + ": answer it with orc backlog answer " + record.spec.id + " or drop it with orc backlog close " + record.spec.id + " failed"
     : null
 
+export const newTaskRefusal = (record: TaskRecord, id: string, verb: string, action: string): string | null =>
+  decisionRefusal(record, verb) ?? (record.state.kind === "new" ? null : id + " is " + record.state.kind + ", and only a new task " + action)
+
 const answeredRecord = (fresh: TaskRecord, words: string, at: string): TaskRecord => ({
   ...fresh,
   hold: isHeld(fresh) ? null : fresh.hold,
