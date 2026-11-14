@@ -1,6 +1,6 @@
 import { Effect, type FileSystem, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { BacklogError, backlogPaths, findTask, type TaskFileError } from "../../entities/backlog/index"
+import { BacklogError, backlogPaths, findTask, taskPr, type TaskFileError } from "../../entities/backlog/index"
 import { isYolo, readDispatchConfig, readProjects } from "../../shared/config/index"
 import type { ConfigError } from "../../shared/config/index"
 import type { RunnerError } from "../../shared/process/index"
@@ -44,9 +44,8 @@ export const mergeTask = (
 ): Effect.Effect<string, BacklogError | ConfigError | TaskFileError | RunnerError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const record = yield* findTask(root, id)
-    const closing = record.state.kind === "closed" && record.state.closing.outcome !== "start-failed" ? record.state.closing : null
-    const url = closing?.pr ?? null
-    if (closing === null || url === null) {
+    const url = taskPr(record)
+    if (url === null) {
       return yield* refuse(id + " names no PR to merge")
     }
     if (!prPattern.test(url)) {

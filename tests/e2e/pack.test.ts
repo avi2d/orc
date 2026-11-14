@@ -64,6 +64,7 @@ const expectedFiles = [
   "src/features/attention-list/attention-view.ts",
   "src/entities/attention/attention.ts",
   "src/features/backlog-planning/backlog-depend.ts",
+  "src/features/backlog-planning/backlog-drop.ts",
   "src/features/backlog-planning/backlog-edit.ts",
   "src/features/backlog-planning/backlog-hold.ts",
   "src/features/backlog-planning/backlog-plan.ts",

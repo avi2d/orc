@@ -1,7 +1,7 @@
 import { Array as Arr, Effect, FileSystem, Schema } from "effect"
 import { answerWait, type DeciderOwns, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 import { renderTaskFile } from "./task-record-render"
-import { BacklogError, backlogPaths, grabbedFile, platformFailure, publishOnce, scratchName, takeFile, takenGrab } from "./backlog-write"
+import { BacklogError, backlogPaths, grabIn, platformFailure, publishOnce, scratchName, takenGrab } from "./backlog-write"
 
 export { BacklogError } from "./backlog-write"
 
@@ -187,7 +187,7 @@ export const publishClosed = (root: string, record: TaskRecord): Effect.Effect<b
     return true
   })
 
-const answeredOnly = (parked: Parked | null): Parked | null => {
+export const answeredOnly = (parked: Parked | null): Parked | null => {
   const answered = parked?.questions.filter((question) => question.answer !== null) ?? []
   return parked !== null && Arr.isReadonlyArrayNonEmpty(answered) ? { ...parked, questions: answered } : null
 }
@@ -322,15 +322,7 @@ const rewriteIn = (folder: "new" | "taken") => <A>(
   decide: (fresh: TaskRecord) => Effect.Effect<Rewrite<A>, BacklogError, FileSystem.FileSystem>
 ): Effect.Effect<A, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const paths = backlogPaths(root)
-    const file = paths.taskFile(folder, id)
-    const grabbed = scratchName(paths.folder(folder), id)
-    const took = yield* takeFile(fs, file, grabbed, id)
-    if (!took) {
-      return yield* new BacklogError({ detail: id + " moved while orc read it, so run the command again" })
-    }
-    const { putBack, read } = grabbedFile(fs, file, grabbed, id)
+    const { fs, paths, file, grabbed, putBack, read } = yield* grabIn(root, folder, id, Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" })))
     const settle = Effect.gen(function*() {
       const text = yield* read
       const rewrite = yield* decide(yield* parseTaskFile(file, folder, text))
