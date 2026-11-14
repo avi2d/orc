@@ -22,7 +22,7 @@ const OrcRunsJson = Schema.Struct({
   schema: Schema.Literal("orc.runs.v1"),
   runs: Schema.Array(
     Schema.Struct({
-      id: Schema.String,
+      id: Schema.NullOr(Schema.String),
       branch: Schema.optional(Schema.String),
     }),
   ),
@@ -49,7 +49,9 @@ export const decodeOrcRuns = (text: string): Decoded<OrcSnapshot> => {
   if (parsed.kind !== "ok") return parsed;
   return {
     kind: "ok",
-    value: { runs: parsed.value.runs.map((run) => ({ id: run.id, branch: run.branch ?? undefined, notice: undefined, stages: [] })) },
+    value: {
+      runs: parsed.value.runs.flatMap(({ id, branch }) => (id === null ? [] : [{ id, branch: branch ?? undefined, notice: undefined, stages: [] }])),
+    },
   };
 };
 

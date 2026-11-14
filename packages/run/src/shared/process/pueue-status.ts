@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 
 export const orcGroup = "orc"
 
@@ -12,6 +12,7 @@ export const PueueTask = Schema.Struct({
 export type PueueTask = typeof PueueTask.Type
 
 export const PueueState = Schema.Struct({ tasks: Schema.Record(Schema.String, PueueTask) })
+export type PueueState = typeof PueueState.Type
 
 export const PueueResult = Schema.Union([
   Schema.Literals(["Success", "Killed", "Errored", "DependencyFailed"]),
@@ -33,6 +34,22 @@ export type PueueStatus = typeof PueueStatus.Type
 export const taskLabel = (home: string, task: string): string => home.replace(/\/+$/, "") + " " + task
 
 export const parentLabel = (home: string, task: string): string => taskLabel(home, task) + "-parent"
+
+export interface QueuedTask {
+  readonly task: string
+  readonly held: PueueTask
+}
+
+const isQueued = (candidate: PueueTask): boolean =>
+  Option.exists(Schema.decodeUnknownOption(PueueStatus)(candidate.status), (status) => "Queued" in status)
+
+export const queuedTasks = (state: PueueState, home: string): ReadonlyArray<QueuedTask> => {
+  const labelPrefix = taskLabel(home, "")
+  return Object.values(state.tasks)
+    .filter((candidate) => candidate.group === orcGroup && isQueued(candidate))
+    .flatMap((held) => held.label !== null && held.label.startsWith(labelPrefix) ? [{ task: held.label.slice(labelPrefix.length), held }] : [])
+    .sort((left, right) => left.held.id - right.held.id)
+}
 
 export const heldTask = (tasks: Readonly<Record<string, PueueTask>>, home: string, task: string, label?: string | null): PueueTask | null => {
   const want = label ?? taskLabel(home, task)

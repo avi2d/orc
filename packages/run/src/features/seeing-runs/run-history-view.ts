@@ -3,6 +3,8 @@ import { Asking, askingFileName, hasBlockingQuestion } from "../../entities/revi
 import { readJsonFileIfPresent } from "../../shared/config/index"
 import { RunSqlRowSchema, RunStatusSchema, RUNS_JSON_SCHEMA, type RunRecord } from "../../entities/run-history/index"
 import { formatTable } from "../../shared/lib/index"
+import type { QueuedTask } from "../../shared/process/index"
+import { isTaskId, taskBranch } from "../../entities/backlog/index"
 import { LatestStepSchema, type ListedRun } from "./run-facts"
 
 const RunStateSchema = Schema.Literals(["waiting", "running", "succeeded", "failed"])
@@ -64,6 +66,26 @@ const RunJsonEntrySchema = Schema.Struct({
   worktree
 })
 
+const QueuedJsonEntrySchema = Schema.Struct({
+  id: Schema.Null,
+  project: Schema.String,
+  branch: Schema.String,
+  status: Schema.Null,
+  state: Schema.Literal("queued"),
+  prLink: Schema.Null,
+  title: Schema.Null,
+  step: Schema.Null,
+  currentStep: Schema.Null,
+  questions: Schema.Literal(0),
+  endReason: Schema.Null,
+  kind: Schema.Null,
+  delivery: Schema.Null,
+  task: Schema.String,
+  machine,
+  worktree: Schema.Null
+})
+type QueuedJsonEntry = typeof QueuedJsonEntrySchema.Type
+
 const MachineFailureSchema = Schema.Struct({
   machine: Schema.String,
   error: Schema.String
@@ -71,7 +93,7 @@ const MachineFailureSchema = Schema.Struct({
 
 const RunsJsonSchema = Schema.Struct({
   schema: Schema.Literal(RUNS_JSON_SCHEMA),
-  runs: Schema.Array(RunJsonEntrySchema),
+  runs: Schema.Array(Schema.Union([RunJsonEntrySchema, QueuedJsonEntrySchema])),
   machines: Schema.Array(MachineFailureSchema)
 })
 
@@ -99,6 +121,30 @@ export const runsJson = (runs: ReadonlyArray<RunsJsonRun>): RunsJsonDocument => 
     worktree: run.worktree
   })),
   machines: []
+})
+
+const queuedEntryOf = ({ task, held }: QueuedTask): QueuedJsonEntry => ({
+  id: null,
+  project: held.path,
+  branch: taskBranch(task),
+  status: null,
+  state: "queued",
+  prLink: null,
+  title: null,
+  step: null,
+  currentStep: null,
+  questions: 0,
+  endReason: null,
+  kind: null,
+  delivery: null,
+  task,
+  machine: null,
+  worktree: null
+})
+
+export const withQueued = (document: RunsJsonDocument, queued: ReadonlyArray<QueuedTask>): RunsJsonDocument => ({
+  ...document,
+  runs: [...queued.filter(({ task }) => isTaskId(task)).map(queuedEntryOf), ...document.runs]
 })
 
 export const encodeRunsJson = (document: RunsJsonDocument): Effect.Effect<string, Schema.SchemaError> =>
