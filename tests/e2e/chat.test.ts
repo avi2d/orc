@@ -89,7 +89,7 @@ describe("orc chat", () => {
         "--extension",
         chatToolsPath,
         "--tools",
-        "orc_backlog_add,orc_backlog,orc_backlog_hold,orc_backlog_answer,merge_task,orc_decision_board",
+        "orc_backlog_add,orc_backlog,orc_backlog_hold,orc_backlog_edit,orc_backlog_answer,merge_task,orc_decision_board",
         "ORC_CHAT_ORC=" + JSON.stringify([process.execPath, binPath]),
         "ORC_CHAT_BOARDS=" + join(fixture.home, "boards")
       ])

@@ -44,6 +44,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/backlog-planning/intake-plan.ts` | The planner model ask at intake and its five minute limit |
 | `packages/run/src/features/backlog-planning/backlog-depend.ts` | The task dependency writes and the refusal when a wait would cycle |
 | `packages/run/src/features/backlog-planning/backlog-hold.ts` | The task hold writes and the refusal when a task is already held |
+| `packages/run/src/features/backlog-planning/backlog-edit.ts` | The `orc backlog edit` rewrite of a new task's title and body |
 
 ## features/task-thread
 
@@ -66,7 +67,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/chat/chat-closed.ts` | The closed task shape and the line the chat posts for it |
 | `packages/run/src/features/chat/chat-command.ts` | The shell a chat tool runs through the shared Bun layers |
 | `packages/run/src/features/chat/chat-error.ts` | The error a chat tool fails with |
-| `packages/run/src/features/chat/chat-inputs.ts` | The chat tool input shapes for add, hold, answer, board and merge |
+| `packages/run/src/features/chat/chat-inputs.ts` | The chat tool input shapes for add, hold, edit, answer, board and merge |
 | `packages/run/src/features/chat/chat-posts.ts` | The backlog read and the walk that delivers each closed task and event once |
 
 ## features/decider

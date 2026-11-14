@@ -5,7 +5,7 @@ import { backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, mark
 import { readAttention, routeTaskItems } from "../entities/attention/index"
 import { backlogJson, type BacklogView, beatJson, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readRoom, type RoomList, runBeat, runnerLoadText } from "../widgets/beat/index"
 import { answerItemText, attentionText } from "../features/attention-list/index"
-import { holdTask, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
+import { edit, holdTask, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
 import { answerTask } from "../entities/parked-runs/index"
 import { type ConfigError, readFailure, type DispatchConfig, readDispatchConfig, readProjects } from "../shared/config/index"
 import { holdRun, killHeld, queueFromText, renewTask, startTask, stopNow, formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson, ensureAlertStream, liveAlertStream } from "../features/queueing-a-task/index"
@@ -191,12 +191,15 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
-type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "CloseTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "NoteTask" | "DependTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
+type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "CloseTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "NoteTask" | "DependTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
 
 const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   switch (args.kind) {
     case "AnswerItem": {
       return DateTime.now.pipe(Effect.flatMap((now) => answerItemText(backlogRoot(place), args.id, { words: args.words, at: DateTime.formatIso(now) })))
+    }
+    case "EditTask": {
+      return edit(backlogRoot(place), args, place)
     }
     case "CloseTask": {
       return closeNow(args, place)
@@ -280,6 +283,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
         break
       }
       case "AnswerItem":
+      case "EditTask":
       case "CloseTask":
       case "MarkPosted":
       case "MarkEventPosted":

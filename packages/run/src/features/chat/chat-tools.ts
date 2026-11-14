@@ -4,7 +4,7 @@ import { type BoardHost, type Boards, boardsVar, decisionBoards } from "./chat-b
 import { type Env, runCommand } from "./chat-command"
 import { ChatToolError } from "./chat-error"
 import { type Deliver, postUnposted, type PostState, readBacklog } from "./chat-posts"
-import { AddTaskInput, AnswerInput, BoardInput, HoldInput, MergeInput } from "./chat-inputs"
+import { AddTaskInput, AnswerInput, BoardInput, EditInput, HoldInput, MergeInput } from "./chat-inputs"
 import { lavishLauncher } from "./chat-lavish"
 import { AttentionJson, parkedListing } from "./chat-parked"
 
@@ -170,6 +170,20 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
         ...(input.until === undefined ? [] : ["--until", input.until]),
         ...(input.questions ?? []).flatMap((question) => ["--question", question])
       ])
+  },
+  {
+    name: "orc_backlog_edit",
+    label: "Edit an orc task's text",
+    description:
+      "Replaces the title and the body of one new task through orc backlog edit, and keeps its id, kind, machine, parent, dependencies, hold and parked questions. It works on a held, parked or parent task, and orc refuses a task that is taken, started or closed, since a run has already read its text. It never splits the task.",
+    parameters: Schema.toJsonSchemaDocument(EditInput).schema,
+    execute: (_toolCallId, params) =>
+      Effect.runPromise(
+        decodeInput(EditInput, "orc_backlog_edit", params).pipe(
+          Effect.flatMap((input) => runOrc(env, ["backlog", "edit", input.id, "-"], input.task)),
+          Effect.map(textResult)
+        )
+      )
   },
   {
     name: "orc_backlog_answer",

@@ -29,7 +29,7 @@ export interface AddPlace {
 
 const refuse = (detail: string) => Effect.fail(new BacklogError({ detail }))
 
-const titleOf = (body: string): string =>
+export const titleOf = (body: string): string =>
   body.split("\n").map((line) => line.replace(/^#+\s*/, "").trim()).find((line) => line !== "") ?? ""
 
 interface TaskText {
@@ -37,11 +37,11 @@ interface TaskText {
   readonly body: string
 }
 
-const readTaskText = (source: TaskSource, place: AddPlace) =>
+export const readTaskText = (source: TaskSource, place: AddPlace, command: string): Effect.Effect<TaskText, BacklogError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
     if (source.kind === "stdin") {
       if (place.stdinIsTerminal) {
-        return yield* refuse("orc backlog add - reads the task from a pipe, and stdin is a terminal")
+        return yield* refuse(command + " - reads the task from a pipe, and stdin is a terminal")
       }
       const body = yield* place.stdin.pipe(Effect.mapError((error) => new BacklogError({ detail: error.detail })))
       return { from: "the task on stdin", body } satisfies TaskText
@@ -94,7 +94,7 @@ export const add = (
     if (links !== null) {
       return yield* refuse(links)
     }
-    const { from, body } = yield* readTaskText(args.task, place)
+    const { from, body } = yield* readTaskText(args.task, place, "orc backlog add")
     const title = titleOf(body)
     if (title === "") {
       return yield* refuse(from + " holds no text")
