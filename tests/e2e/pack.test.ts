@@ -59,14 +59,18 @@ const expectedFiles = [
   "src/entities/pull-request/direct-pr.ts",
   "src/entities/events/alert-events.ts",
   "src/features/queueing-a-task/alert-stream.ts",
+  "src/app/dispatch-args-answer.ts",
+  "src/app/dispatch-args-priority.ts",
   "src/app/dispatch-args-runner.ts",
   "src/app/dispatch-args.ts",
   "src/features/attention-list/attention-view.ts",
   "src/entities/attention/attention.ts",
   "src/features/backlog-planning/backlog-depend.ts",
+  "src/features/backlog-planning/backlog-drop.ts",
   "src/features/backlog-planning/backlog-edit.ts",
   "src/features/backlog-planning/backlog-hold.ts",
   "src/features/backlog-planning/backlog-plan.ts",
+  "src/features/backlog-planning/backlog-priority.ts",
   "src/entities/backlog/backlog-write.ts",
   "src/entities/backlog/backlog.ts",
   "src/entities/backlog/index.ts",
@@ -77,6 +81,7 @@ const expectedFiles = [
   "src/entities/attention/beat-action.ts",
   "src/widgets/beat/beat-attention.ts",
   "src/widgets/beat/beat-close.ts",
+  "src/widgets/beat/beat-origin.ts",
   "src/widgets/beat/beat-place.ts",
   "src/widgets/beat/beat-resume.ts",
   "src/widgets/beat/beat-token.ts",
@@ -199,7 +204,8 @@ const expectedFiles = [
   "src/features/merging-a-pr/index.ts",
   "src/features/seeing-runs/index.ts",
   "src/features/task-thread/index.ts",
-  "src/features/task-thread/note.ts"
+  "src/features/task-thread/note.ts",
+  "src/features/task-thread/thread.ts"
 ]
 
 const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => {

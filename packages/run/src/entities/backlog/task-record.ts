@@ -12,6 +12,11 @@ export interface SplitMark {
   readonly reason: string
 }
 
+export const taskPriorities = [0, 1, 2, 3, 4] as const
+export type TaskPriority = typeof taskPriorities[number]
+
+export const isTaskPriority = (value: number): value is TaskPriority => taskPriorities.some((priority) => priority === value)
+
 export interface TaskSpec {
   readonly id: string
   readonly title: string
@@ -22,6 +27,7 @@ export interface TaskSpec {
   readonly parent: string | null
   readonly split: SplitMark | null
   readonly dependsOn: ReadonlyArray<string>
+  readonly priority: TaskPriority | null
   readonly created: string
   readonly body: string
 }
@@ -81,15 +87,26 @@ export interface Parked {
   readonly questions: Arr.NonEmptyReadonlyArray<ParkedQuestion>
 }
 
-type Closing =
-  | { readonly outcome: "start-failed"; readonly reason: string }
-  | { readonly outcome: "done" | "failed" | "stopped"; readonly started: Started; readonly reason: string; readonly pr: string | null; readonly report: string | null }
+export interface RanClosing {
+  readonly outcome: "done" | "failed" | "stopped"
+  readonly started: Started
+  readonly reason: string
+  readonly pr: string | null
+  readonly report: string | null
+}
+
+type Closing = { readonly outcome: "start-failed"; readonly reason: string } | RanClosing
+
+type ClosedState = { readonly kind: "closed"; readonly closedAt: string; readonly postedAt: string | null } & (
+  | { readonly claim: Claim; readonly closing: Closing }
+  | { readonly claim: null; readonly closing: { readonly outcome: "dropped"; readonly reason: string } }
+)
 
 type TaskState =
   | { readonly kind: "new" }
   | { readonly kind: "taken"; readonly claim: Claim | null }
   | { readonly kind: "started"; readonly claim: Claim; readonly started: Started }
-  | { readonly kind: "closed"; readonly claim: Claim; readonly closing: Closing; readonly closedAt: string; readonly postedAt: string | null }
+  | ClosedState
 
 export interface TaskRecord {
   readonly spec: TaskSpec
@@ -108,8 +125,10 @@ const heldReason = (task: TaskRecord): string | null =>
 export const openQuestions = (task: TaskRecord): ReadonlyArray<ParkedQuestion> =>
   task.parked?.questions.filter((question) => question.answer === null) ?? []
 
-export const taskPr = (task: TaskRecord): string | null =>
-  task.state.kind === "closed" && task.state.closing.outcome !== "start-failed" ? task.state.closing.pr : null
+export const ranClosing = (task: TaskRecord): RanClosing | null =>
+  task.state.kind === "closed" && task.state.closing.outcome !== "start-failed" && task.state.closing.outcome !== "dropped" ? task.state.closing : null
+
+export const taskPr = (task: TaskRecord): string | null => ranClosing(task)?.pr ?? null
 
 export type DeciderOwns = (task: string, question: ParkedQuestion) => boolean
 
@@ -130,6 +149,9 @@ const parkedReason = (task: TaskRecord, deciderOwns: DeciderOwns): string | null
 }
 
 export const answerWait = (task: TaskRecord, deciderOwns: DeciderOwns): string | null => heldReason(task) ?? parkedReason(task, deciderOwns)
+
+export const missingOriginWait = (id: string): string =>
+  "the parked task has no recorded machine and run; record them with orc backlog origin " + id + " <machine> <run-id> before resuming"
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/
 
@@ -161,6 +183,7 @@ const Frontmatter = Schema.Struct({
   parent: Schema.optional(Schema.String),
   split: Schema.optional(Schema.Struct({ by: Schema.Literals(splitSources), reason: Schema.String })),
   depends_on: Schema.Array(Schema.String),
+  priority: Schema.optional(Schema.Literals(taskPriorities)),
   created: Schema.String,
   hold_reason: Schema.optional(Schema.String),
   hold_until: Schema.optional(Schema.String),
@@ -178,7 +201,7 @@ const Frontmatter = Schema.Struct({
   taken_at: Schema.optional(Schema.String),
   started_at: Schema.optional(Schema.String),
   start_log: Schema.optional(Schema.String),
-  outcome: Schema.optional(Schema.Literals(["done", "failed", "stopped", "start-failed"])),
+  outcome: Schema.optional(Schema.Literals(["done", "failed", "stopped", "start-failed", "dropped"])),
   closed_at: Schema.optional(Schema.String),
   reason: Schema.optional(Schema.String),
   pr: Schema.optional(Schema.String),
@@ -202,7 +225,7 @@ const closingOf = (front: Frontmatter, started: Started | null): Closing | null 
   if (front.outcome === "start-failed") {
     return { outcome: "start-failed", reason }
   }
-  return front.outcome === undefined || started === null ? null : { outcome: front.outcome, started, reason, pr: front.pr ?? null, report: front.report ?? null }
+  return front.outcome === undefined || front.outcome === "dropped" || started === null ? null : { outcome: front.outcome, started, reason, pr: front.pr ?? null, report: front.report ?? null }
 }
 
 const answerOf = (front: { readonly answer?: string | undefined; readonly answered_at?: string | undefined }): Answer | null | string => {
@@ -290,6 +313,11 @@ const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => 
     }
     return claim === null ? "a started task names no claim" : { kind: "started", claim, started }
   }
+  if (front.outcome === "dropped") {
+    return front.closed_at === undefined
+      ? "a dropped task names no close time"
+      : { kind: "closed", claim: null, closing: { outcome: "dropped", reason: front.reason ?? "" }, closedAt: front.closed_at, postedAt: front.posted_at ?? null }
+  }
   const closing = closingOf(front, started)
   if (claim === null || closing === null || front.closed_at === undefined) {
     return "a closed task names no claim, outcome or close time"
@@ -358,6 +386,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
         parent: front.parent ?? null,
         split: front.split ?? null,
         dependsOn: front.depends_on,
+        priority: front.priority ?? null,
         created: front.created,
         body: parts.body
       },

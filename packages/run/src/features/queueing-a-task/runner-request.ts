@@ -1,7 +1,7 @@
 import { Effect, FileSystem, Option, Path, Schema } from "effect"
 import { AbsolutePath, readFailure } from "../../shared/config/index"
 import { ProviderId } from "../../shared/config/index"
-import { TaskId, parseTaskFile, reportKinds, parentBranch, type TaskRecord } from "../../entities/backlog/index"
+import { TaskId, missingOriginWait, parseTaskFile, reportKinds, parentBranch, type TaskRecord } from "../../entities/backlog/index"
 import { TaskInstructions, readInstructions } from "./runner-instructions"
 import { RunnerError } from "../../shared/process/index"
 import { isRunDelivery } from "../../shared/config/index"
@@ -55,7 +55,7 @@ const takenBody = (record: TaskRecord): string => {
 
 const takenResume = (task: string, record: TaskRecord): Effect.Effect<Record<string, unknown>, RunnerError> => {
   if (record.parked !== null && record.parked.origin === undefined) {
-    return refuse("the parked task has no recorded machine and run; recover its origin before resuming")
+    return refuse(missingOriginWait(task))
   }
   return Effect.succeed(record.parked === null
     ? (record.spec.kind === "parent" ? { branch: parentBranch(task) } : {})

@@ -3,7 +3,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
 import type { ConfigError } from "../../shared/config/index"
 import { type Account, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "../../shared/config/index"
-import { type MachineRoom, type Placed, placeTask, readRoom, taskWait } from "./beat-place"
+import { type MachineRoom, type Placed, placeTask, readRoom, startOrder, taskWait } from "./beat-place"
 import { type QuotaReading, readQuota } from "./quota"
 import { encodeRenewal, encodeToken, type RunToken } from "../../entities/token/index"
 import { checkToken, type TokenCache } from "./beat-token"
@@ -362,7 +362,7 @@ export const runBeat = (
     yield* routeRunItems(root, started, progress, settled.closed, at)
     const { latest, relayed } = yield* decideAndRelay(root, context, started, progress, current, sources.askDecider)
     const { reported, queue, deciderOwns } = yield* attentionActions(root, latest, [...settled.closed, ...relayed.closed, ...settled.asking, ...relayed.asking], at)
-    const queued = latest.filter((task) => task.state.kind === "new")
+    const queued = latest.filter((task) => task.state.kind === "new").toSorted(startOrder)
     const overloaded = queued.length === 0 ? new Map<string, string>() : yield* readOverloaded(config.machines, home, sources.readLoad)
     const fresh: BeatContext = { ...context, tasks: latest, overloaded }
     const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))

@@ -194,11 +194,21 @@ To change what a new or held task waits for later, run `orc backlog depend <task
 Orc refuses a task the backlog does not hold, a task that is taken, started or closed, a task parked for the captain's answer, and a dependency on itself or one that would make two tasks wait on each other.
 A hold stays as it was when the dependencies change.
 To change the text of a new task, run `orc backlog edit <task-id> <task-file>`, or give `-` to pipe the text in as `orc backlog add` takes it.
-It replaces the title and the body and keeps the id, kind, machine, parent, split mark, dependencies, hold with its history and parked questions.
+It replaces the title and the body and keeps the id, kind, machine, parent, split mark, dependencies, priority, hold with its history and parked questions.
 It works on a held, parked or parent task, and the final check of a parent reads the `## Done when` list of the new text.
 Orc refuses a text with no title, a task the backlog does not hold, and a task that is taken, started or closed, since a run has already read its text.
 It never asks the planner and never splits the task.
 The edit takes the task file by rename the way `orc backlog hold` does, so an edit and a beat taking the task at the same moment never both win.
+To take a new task you no longer want out of the backlog, run `orc backlog drop <task-id> <reason>`.
+It closes the task with the outcome `dropped` and your reason, and moves its file to `closed`, where it is kept.
+`orc backlog` lists it under CLOSED as `dropped: <reason>`, and `orc backlog --json` carries it with `outcome` `dropped` and `claim` `null`.
+A drop withdraws every attention item of the task, as a close does, and the chat posts it as it posts a close.
+It works on a held or parked task and drops an unanswered hold with it.
+Orc refuses a task the backlog does not hold, a task that is taken or started, which `orc backlog stop` ends, and a task already closed.
+It refuses a child, which leaves through `orc backlog plan <parent> --drop <child>`, and a parent with an open child.
+It refuses a task another open task waits on, until `orc backlog depend` changes that wait.
+The drop takes the task file by rename, so a drop and a beat taking the task at the same moment never both win.
+To record the machine and run of a task parked before orc recorded them, run `orc backlog origin <task-id> <machine> <run-id>`, as [Parked runs](parked-runs.md) shows.
 Add `--kind scout` or `--kind task` for a task that ends in a report instead of a PR, as [Task kinds](task-kinds.md) shows.
 To split a large task, add it with `--kind parent`, then add each part with `--parent <task-id>`, as [Parent tasks](task-kinds.md#parent-tasks) shows, or name a planner model so orc splits an over-budget request itself, as [Splitting at intake](task-kinds.md#splitting-at-intake) shows.
 Add `--internal` to mark a ship task internal-only, which only a `no-mistakes-prod-only` project reads.
@@ -218,6 +228,17 @@ A ship task also waits for each ship prerequisite with a PR to merge, whether or
 A parent task also waits for every scout and task child closed done and every ship child with a PR merged.
 3. Its project has a checkout on a machine with a free slot.
 4. An account has room above 0% and at or above the floor, and the runs take the account with the most room.
+
+Each beat considers the new tasks in priority order, so when slots run short the first in that order start.
+A task with priority 0 goes first and one with priority 4 goes after the other priorities.
+A task with no priority goes last, but a priority never keeps a task back: a task with none still starts when there is room.
+Among tasks of the same priority the oldest by `created` goes first, and of two created at the same time the lower id goes first.
+To give a new task a priority, add `--priority <0-4>` to `orc backlog add`.
+To change it later, run `orc backlog priority <task-id> <0-4>`, or `orc backlog priority <task-id> none` to clear it.
+Orc refuses a task that is taken, started or closed, and it leaves a held or parked task's hold and questions as they were.
+The task file keeps the priority as `priority`, and a file with no `priority` key has no priority.
+When a task is split, at intake or by its run, each child takes the priority of the task it came from.
+`orc backlog` shows a priority as `P<n>` beside the task id, as in `orc-9 P0 orc`, and `orc backlog --json` gives every task a `priority`, either a number from 0 to 4 or `null`.
 
 To keep a new task back for a decision of yours, run `orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>]`.
 The task file keeps the time you placed the hold as `held_at`.
@@ -245,6 +266,49 @@ Each note goes out in one append write with a byte count check, so two notes wri
 A short write fails the note instead of writing the rest.
 A note takes any task the backlog holds, a closed one too, and orc refuses a task id the backlog does not hold.
 A note holds nothing and answers nothing, so it never changes when the beat starts the task.
+
+To read a task's conversation in order, run `orc backlog thread <task-id>`.
+Orc builds the thread on each read from the task file, the task's items in the [attention queue](attention-queue.md) and its notes.
+It stores no copy.
+The task file gives each hold and the holds in `hold_history`, their questions and answers, and each parked question with its answer.
+Whether a question is open is still read from the task file.
+Each entry has `at`, `who`, `kind`, `id` and `text`.
+`who` is `user`, `decider`, `worker` or `beat`.
+`kind` is `hold`, `question`, `decision`, `answer`, `delivered`, `withdrawn` or `note`.
+`id` names the attention item id for every entry built from an attention item.
+For a hold question it names the hold question id qualified by its hold generation.
+It is `null` for a hold, a note and the answer to a hold with no questions.
+
+- A hold and its questions name `user`, and a parked question names `worker`, the run that asked it.
+- A `decision` entry is the decider's `answered` or `escalated` with its reason.
+- An answer the decider gave names `decider`, a closure the beat wrote on a `pr-ready` item names `beat`, and any other answer names `user`.
+- A `delivered` entry names `beat` and comes from the answer's `relayed_to`, so it shows only for the current asking.
+- A `withdrawn` entry names `beat` and gives the item's reason.
+- A run event item, such as `run-died`, is a `question` from `beat`.
+- Every entry of one parked review question names the same attention item id, before and after a later park replaces the question.
+- A note names `user` for `captain`, and keeps `decider`, `worker` or `beat` as written.
+
+Orc lists the entries oldest first.
+An entry with no time sorts directly before the next timed entry of its exchange.
+Such an entry is a hold placed before orc kept `held_at` or a `delivered` entry.
+Such a hold sits directly before its answer, or after the last one when none follows.
+At the same time a hold comes first, then a question, a decision, an answer, a delivered, a withdrawn and a note.
+With nothing said on the task it prints `nothing is said on <task-id> yet`.
+The thread works on a closed task, and orc refuses a task id the backlog does not hold.
+To print it as JSON, run `orc backlog thread <task-id> --json`, whose document names its version first as `orc.thread.v1`:
+
+```json
+{
+  "schema": "orc.thread.v1",
+  "task": "orc-1",
+  "entries": [
+    { "at": "2026-11-02T09:00:00.000Z", "who": "user", "kind": "hold", "id": null, "text": "Choose the format" },
+    { "at": "2026-11-02T09:00:00.000Z", "who": "user", "kind": "question", "id": "hold-1/question-1", "text": "Which format?" },
+    { "at": "2026-11-02T09:10:00.000Z", "who": "user", "kind": "answer", "id": "hold-1/question-1", "text": "JSON" },
+    { "at": "2026-11-02T09:20:00.000Z", "who": "user", "kind": "note", "id": null, "text": "the merge waits on review" }
+  ]
+}
+```
 
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
 After the claim survives a recount, the beat writes the task started before it runs the start command.
