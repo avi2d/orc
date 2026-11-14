@@ -70,4 +70,27 @@ export const shellInAgent = (
     Effect.mapError((cause) => new OrcRunError({ message: "orc: " + command + " did not run: " + cause.message }))
   )
 
+export const streamShellInAgent = <E>(
+  spawner: Spawner,
+  exec: AgentExec,
+  command: string,
+  onOutput: (text: string) => Effect.Effect<void, E>
+): Effect.Effect<CommandResult, OrcRunError | E> =>
+  Effect.scoped(Effect.gen(function*() {
+    const didNotRun = (cause: unknown) => new OrcRunError({ message: "orc: " + command + " did not run: " + String(cause) })
+    const handle = yield* spawner.spawn(agentCommand(exec, ["sh", "-c", command])).pipe(Effect.mapError(didNotRun))
+    let stdout = ""
+    let stderr = ""
+    const output = Stream.merge(
+      handle.stdout.pipe(Stream.decodeText(), Stream.tap((text) => Effect.sync(() => { stdout += text }))),
+      handle.stderr.pipe(Stream.decodeText(), Stream.tap((text) => Effect.sync(() => { stderr += text })))
+    ).pipe(Stream.mapError(didNotRun))
+    const [, exitCode] = yield* Effect.all([
+      Stream.runForEach(output, onOutput),
+      handle.exitCode.pipe(Effect.mapError(didNotRun))
+    ], { concurrency: "unbounded" })
+    const code: number = exitCode
+    return { stdout, stderr, exitCode: code }
+  }))
+
 export const textInput = (text: string): ChildProcess.CommandInput => Stream.fromIterable([new TextEncoder().encode(text)])

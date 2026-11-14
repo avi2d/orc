@@ -1,4 +1,4 @@
-export { textInput, agentCommand, hostExec, shellInAgent } from "./agent-exec"
+export { textInput, agentCommand, hostExec, shellInAgent, streamShellInAgent } from "./agent-exec"
 export type { CommandResult, Argv, AgentExec } from "./agent-exec"
 export { hostGitSafetyEnv, hostGitRefusalExit, hostGitShim } from "./host"
 export { openNonoExec } from "./nono-exec"
