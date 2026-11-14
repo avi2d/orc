@@ -302,8 +302,8 @@ const topLevelParsers = {
 } satisfies Record<string, (rest: readonly string[]) => OrcArgs>
 
 export type CommandWord = keyof typeof topLevelParsers
-export const commandWords = Object.keys(topLevelParsers) as ReadonlyArray<CommandWord>
 export const isCommandWord = (word: string): word is CommandWord => Object.hasOwn(topLevelParsers, word)
+export const commandWords: ReadonlyArray<CommandWord> = Object.keys(topLevelParsers).filter(isCommandWord)
 
 const parseFlagArgs = (first: string, rest: readonly string[]): OrcArgs => {
   if (!first.startsWith("-")) {
