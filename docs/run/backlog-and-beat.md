@@ -247,13 +247,16 @@ A note takes any task the backlog holds, a closed one too, and orc refuses a tas
 A note holds nothing and answers nothing, so it never changes when the beat starts the task.
 
 To read a task's conversation in order, run `orc backlog thread <task-id>`.
-Orc builds the thread on each read from the task file, the task's items in the [attention queue](attention-queue.md) and its notes, and it stores no copy.
+Orc builds the thread on each read from the task file, the task's items in the [attention queue](attention-queue.md) and its notes.
+It stores no copy.
 The task file gives each hold and the holds in `hold_history`, their questions and answers, and each parked question with its answer.
 Whether a question is open is still read from the task file.
 Each entry has `at`, `who`, `kind`, `id` and `text`.
 `who` is `user`, `decider`, `worker` or `beat`.
 `kind` is `hold`, `question`, `decision`, `answer`, `delivered`, `withdrawn` or `note`.
-`id` names the attention item id for every entry built from an attention item, a hold question id qualified by its hold generation for a hold question, and it is `null` for a hold, a note and the answer to a hold with no questions.
+`id` names the attention item id for every entry built from an attention item.
+For a hold question it names the hold question id qualified by its hold generation.
+It is `null` for a hold, a note and the answer to a hold with no questions.
 
 - A hold and its questions name `user`, and a parked question names `worker`, the run that asked it.
 - A `decision` entry is the decider's `answered` or `escalated` with its reason.
@@ -265,7 +268,9 @@ Each entry has `at`, `who`, `kind`, `id` and `text`.
 - A note names `user` for `captain`, and keeps `decider`, `worker` or `beat` as written.
 
 Orc lists the entries oldest first.
-An entry with no time, such as a hold placed before orc kept `held_at` or a `delivered` entry, sorts directly before the next timed entry of its exchange, so such a hold sits directly before its answer, or after the last one when none follows.
+An entry with no time sorts directly before the next timed entry of its exchange.
+Such an entry is a hold placed before orc kept `held_at` or a `delivered` entry.
+Such a hold sits directly before its answer, or after the last one when none follows.
 At the same time a hold comes first, then a question, a decision, an answer, a delivered, a withdrawn and a note.
 With nothing said on the task it prints `nothing is said on <task-id> yet`.
 The thread works on a closed task, and orc refuses a task id the backlog does not hold.

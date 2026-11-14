@@ -127,7 +127,7 @@ export const threadEntries = (
     .map((placed) => placed.entry)
 }
 
-export const readThread = (root: string, id: string): Effect.Effect<ThreadJson, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+const readThread = (root: string, id: string): Effect.Effect<ThreadJson, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const task = yield* findTask(root, id)
     const entries = threadEntries(task, yield* taskItems(root, id), yield* readNotes(root, id))
