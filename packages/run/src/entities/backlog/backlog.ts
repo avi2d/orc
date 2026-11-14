@@ -187,7 +187,7 @@ export const publishClosed = (root: string, record: TaskRecord): Effect.Effect<b
     return true
   })
 
-const answeredOnly = (parked: Parked | null): Parked | null => {
+export const answeredOnly = (parked: Parked | null): Parked | null => {
   const answered = parked?.questions.filter((question) => question.answer !== null) ?? []
   return parked !== null && Arr.isReadonlyArrayNonEmpty(answered) ? { ...parked, questions: answered } : null
 }

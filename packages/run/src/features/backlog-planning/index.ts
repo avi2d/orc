@@ -1,4 +1,5 @@
 export { circularDependency, dependTask, refusedLinks } from "./backlog-depend"
+export { dropTask, type DropTask } from "./backlog-drop"
 export { edit, editTask, type EditTask } from "./backlog-edit"
 export { holdTask } from "./backlog-hold"
 export { dropChild, planText } from "./backlog-plan"
