@@ -1,11 +1,12 @@
 import { Effect, type FileSystem } from "effect"
-import { BacklogError, findTask, type Rewrite, rewriteNew, type TaskFileError, type TaskPriority, type TaskRecord } from "../../entities/backlog/index"
+import { BacklogError, newTaskRefusal, findTask, type Rewrite, rewriteNew, type TaskFileError, type TaskPriority, type TaskRecord } from "../../entities/backlog/index"
 
 export type PriorityOutcome = "set" | "unchanged"
 
 const prioritize = (id: string, priority: TaskPriority | null) => (fresh: TaskRecord): Effect.Effect<Rewrite<PriorityOutcome>, BacklogError> => {
-  if (fresh.state.kind !== "new") {
-    return Effect.fail(new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a new task takes a priority" }))
+  const refused = newTaskRefusal(fresh, id, "priority", "takes a priority")
+  if (refused !== null) {
+    return Effect.fail(new BacklogError({ detail: refused }))
   }
   if (fresh.spec.priority === priority) {
     return Effect.succeed({ kind: "keep", result: "unchanged" })

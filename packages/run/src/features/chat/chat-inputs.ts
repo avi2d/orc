@@ -6,7 +6,7 @@ export const AddTaskInput = Schema.Struct({
   project: Schema.String.annotate({ description: "The project the task is for, as the backlog's project list names it" }),
   task: Schema.String.annotate({ description: "The task as markdown, whose first line is its title" }),
   kind: Schema.optionalKey(Schema.Literals(taskKinds).annotate({
-    description: "ship ends in a PR and is the default; scout and task end in a report file in the run folder instead; parent holds the done criteria and waits for its children"
+    description: "ship ends in a PR and is the default; scout and task end in a report file in the run folder instead; parent holds the done criteria and waits for its children; decision is a question for the captain that never runs, takes no priority or machine, and closes done when orc_backlog_answer answers it, and a task that depends on it gets the question and answer in its run"
   })),
   internal: Schema.optionalKey(Schema.Boolean.annotate({
     description: "Marks a ship task internal-only, so a no-mistakes-prod-only project opens its PR after checks without no-mistakes"
@@ -15,7 +15,7 @@ export const AddTaskInput = Schema.Struct({
   parent: Schema.optionalKey(Schema.String.annotate({ description: "The id of the parent task this task is a child of" })),
   dependsOn: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: "The ids of the tasks that must close done before this one starts" })),
   priority: Schema.optionalKey(Schema.Literals(taskPriorities).annotate({
-    description: "The order the beat starts new tasks in: 0 starts first and 4 starts after the other priorities. Set one whenever the captain asks for work to happen, using the rank the captain's words give, or 2 when they rank nothing"
+    description: "The order the beat starts new tasks in: 0 starts first and 4 starts after the other priorities. Set one whenever the captain asks for work to happen, using the rank the captain's words give, or 2 when they rank nothing, never for a decision"
   }))
 })
 
@@ -41,7 +41,7 @@ export const EditInput = Schema.Struct({
 })
 
 export const AnswerInput = Schema.Struct({
-  id: Schema.String.annotate({ description: "The id of the held or parked task" }),
+  id: Schema.String.annotate({ description: "The id of the held, parked or decision task" }),
   question: Schema.optionalKey(Schema.String.annotate({
     description: "The id of the parked or held question the captain answers, such as question-4; leave it out for a task held with a reason and no questions"
   })),

@@ -1,5 +1,5 @@
 import { DateTime, Effect, FileSystem } from "effect"
-import { findTask, type Rewrite, rewriteNew, type Hold, type HoldQuestion, type TaskFileError, type TaskRecord, BacklogError } from "../../entities/backlog/index"
+import { newTaskRefusal, findTask, type Rewrite, rewriteNew, type Hold, type HoldQuestion, type TaskFileError, type TaskRecord, BacklogError } from "../../entities/backlog/index"
 
 export type HoldOutcome = { readonly kind: "held" | "already held"; readonly hold: Hold }
 
@@ -26,8 +26,9 @@ const holdAgain = (id: string, held: Hold, ask: HoldAsk): Effect.Effect<Rewrite<
 }
 
 const holdOn = (id: string, ask: HoldAsk, at: string) => (fresh: TaskRecord): Effect.Effect<Rewrite<HoldOutcome>, BacklogError> => {
-  if (fresh.state.kind !== "new") {
-    return Effect.fail(new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a new task is held" }))
+  const refused = newTaskRefusal(fresh, id, "hold", "is held")
+  if (refused !== null) {
+    return Effect.fail(new BacklogError({ detail: refused }))
   }
   if (fresh.parked !== null) {
     return Effect.fail(new BacklogError({ detail: id + " is parked for the captain's answer, so it cannot be held" }))

@@ -1,7 +1,7 @@
 import { Effect, FileSystem, Option, Path, Schema } from "effect"
 import { AbsolutePath, readFailure } from "../../shared/config/index"
 import { ProviderId } from "../../shared/config/index"
-import { TaskId, missingOriginWait, parseTaskFile, reportKinds, parentBranch, type TaskRecord } from "../../entities/backlog/index"
+import { TaskId, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type TaskRecord, withDecisions } from "../../entities/backlog/index"
 import { TaskInstructions, readInstructions } from "./runner-instructions"
 import { RunnerError } from "../../shared/process/index"
 import { isRunDelivery } from "../../shared/config/index"
@@ -45,6 +45,15 @@ const readTakenRecord = (fs: FileSystem.FileSystem, file: string): Effect.Effect
     ))
   )
 
+// The beat sets ORC_TASK_FILE to the task's file in the taken folder of its backlog.
+const backlogOfTaken = (path: Path.Path, file: string): string => path.dirname(path.dirname(file))
+
+const decidedBody = (path: Path.Path, file: string, record: TaskRecord): Effect.Effect<string, RunnerError, FileSystem.FileSystem> =>
+  readAnsweredDependencies(backlogOfTaken(path, file), record).pipe(
+    Effect.map((decisions) => withDecisions(takenBody(record), decisions)),
+    Effect.mapError((error) => new RunnerError({ detail: "cannot read the decisions " + record.spec.id + " waits on: " + ("file" in error ? error.file + ": " : "") + error.detail }))
+  )
+
 const takenBody = (record: TaskRecord): string => {
   const hold = record.hold
   const decisions = hold === null ? [] : [...hold.history ?? [], hold]
@@ -82,6 +91,9 @@ const readRequestFields = (
     const deliveryWord = env["ORC_TASK_DELIVERY"] ?? "no-mistakes"
     if (!isRunDelivery(deliveryWord)) {
       return yield* refuse("orc runner start reads ORC_TASK_DELIVERY as no-mistakes or direct-PR, not " + deliveryWord)
+    }
+    if (record.spec.kind === "decision") {
+      return yield* refuse(task + " is a decision, and a decision never runs")
     }
     const instructions = yield* readInstructions(env["ORC_TASK_INSTRUCTIONS"] ?? "")
     const kind = record.spec.kind === "ship" ? {} : { kind: record.spec.kind }
@@ -124,12 +136,13 @@ export const readRequest = (
 ): Effect.Effect<QueueRequest, RunnerError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
     const task = yield* requiredEnv(env, "ORC_TASK_ID")
     const file = yield* requiredEnv(env, "ORC_TASK_FILE")
     const checkout = yield* requiredEnv(env, "ORC_TASK_CHECKOUT")
     const provider = yield* requiredEnv(env, "ORC_TASK_PROVIDER")
     const record = yield* readTakenRecord(fs, file)
-    const body = takenBody(record)
+    const body = yield* decidedBody(path, file, record)
     const resume = yield* takenResume(task, record)
     const fields = yield* readRequestFields(task, checkout, provider, env, record, body, resume)
     const tokenFile = env["ORC_TASK_TOKEN_FILE"] ?? ""

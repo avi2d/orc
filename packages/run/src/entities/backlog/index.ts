@@ -66,6 +66,8 @@ export {
   openQuestions,
   taskPr,
   ranClosing,
+  decisionAnswer,
+  decisionWait,
   answersAwaited,
   answerWait,
   missingOriginWait,
@@ -89,15 +91,26 @@ export type {
   DeciderOwns,
 } from "./task-record"
 export {
+  answerDecision,
+  decisionRefusal,
+  newTaskRefusal,
+  readAnsweredDependencies,
+  withDecisions,
+} from "./decision"
+export {
   reportKinds,
+  runKinds,
   taskKinds,
   isTaskKind,
+  isRunKind,
   unknownKind,
+  unknownRunKind,
   agentReportFileName,
   runDirFor,
 } from "./task-kind"
 export type {
   ReportKind,
+  RunKind,
   TaskKind,
 } from "./task-kind"
 export {

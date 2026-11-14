@@ -217,16 +217,19 @@ To see the backlog, run `orc backlog`.
 It prints the new, taken and closed tasks side by side with the project list and each machine's busy slots beside them.
 To print the same facts as JSON, run `orc backlog --json`, whose document names its version first as `orc.backlog.v1`.
 `orc backlog --json` gives every new task a `wait`, either `null` or the reason the beat will not start it.
-The reason is a missing priority, the hold, the parked questions, the open children, or the dependency it waits on, including a ship prerequisite whose PR has not merged.
+The reason is a decision for the captain, a missing priority, the hold, or the parked questions.
+It is also the open children or the dependency the task waits on.
+That dependency includes a ship prerequisite whose PR has not merged.
 Taken, started and closed tasks carry `null` for `wait`.
 To start what can start, run `orc beat`, from launchd or cron every few minutes.
 Each beat runs the quota command and reads the room on each machine before it takes any task.
-A task starts only once five things hold:
+A [decision](task-kinds.md#decisions) never starts, and each beat prints `waits <task-id>: decision for the captain` for it.
+Any other task starts only once five things hold:
 
 1. It has a priority.
 A task with no priority never starts, and each beat prints `waits <task-id>: no priority` for it.
 2. No hold or parked question for the captain waits on it unanswered.
-3. Every task it depends on closed done.
+3. Every task it depends on closed done, and a decision closes done when the captain answers it.
 A ship task also waits for each ship prerequisite with a PR to merge, whether or not they share a parent.
 A parent task also waits for every scout and task child closed done and every ship child with a PR merged.
 4. Its project has a checkout on a machine with a free slot.

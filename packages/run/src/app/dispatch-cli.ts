@@ -135,9 +135,23 @@ const reportResult = (args: Extract<CommandArgs, { readonly kind: "RunnerResult"
     yield* Console.log(args.json ? JSON.stringify(runnerJson(result)) : formatResult(result))
   })
 
+const closeDecision = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, place: DispatchPlace, at: string) =>
+  Effect.gen(function*() {
+    if (args.outcome === "done") {
+      return yield* new BacklogError({ detail: args.id + " is a decision, so it closes done only by its answer: orc backlog answer " + args.id + " <words>" })
+    }
+    const reason = args.reason.trim() === "" ? "the captain dropped the decision" : args.reason
+    const dropped = yield* dropTask(backlogRoot(place), args.id, reason, at)
+    yield* routeTaskItems(backlogRoot(place), [dropped], at)
+    return "dropped " + args.id + ": " + reason
+  })
+
 const closeNow = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
     const at = DateTime.formatIso(yield* DateTime.now)
+    if ((yield* findTask(backlogRoot(place), args.id)).spec.kind === "decision") {
+      return yield* closeDecision(args, place, at)
+    }
     const closed = yield* closeStartedTask(backlogRoot(place), args.id, args.outcome, args.reason, { pr: null, report: null }, at)
     yield* routeTaskItems(backlogRoot(place), [closed], at)
     return "closed " + args.id + " " + args.outcome
@@ -183,6 +197,9 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
     const at = DateTime.formatIso(yield* DateTime.now)
     const answered = yield* answerTask(backlogRoot(place), args.id, args.words, at, args.expect)
     yield* routeTaskItems(backlogRoot(place), [yield* findTask(backlogRoot(place), args.id)], at)
+    if (answered.kind === "decision") {
+      return "answered " + args.id + " and closed it done, so the tasks that wait on it may start"
+    }
     if (answered.kind === "hold") {
       return "answered " + args.id + ", so the beat may start it"
     }

@@ -135,7 +135,7 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
     name: "orc_backlog_add",
     label: "Add to the orc backlog",
     description:
-      "Adds one task to the orc backlog through orc backlog add, and returns what orc prints, which names the new task's id. When a planner model is set and the request is over budget, orc adds it as a parent with one child per slice instead, prints one line per task, and the beat starts the independent children together. The task has no priority, so no beat starts it or its children until the captain sets one with orc backlog priority. When the task closes, orc chat posts its outcome and its PR, or its report for a scout or task, and later posts when its PR turns green and when it merges.",
+      "Adds one task to the orc backlog through orc backlog add, and returns what orc prints, which names the new task's id. When a planner model is set and the request is over budget, orc adds it as a parent with one child per slice instead, prints one line per task, and the beat starts the independent children together. The task has no priority, so no beat starts it or its children until the captain sets one with orc backlog priority, never for a decision. When the task closes, orc chat posts its outcome and its PR, or its report for a scout or task, and later posts when its PR turns green and when it merges.",
     parameters: Schema.toJsonSchemaDocument(AddTaskInput).schema,
     execute: (_toolCallId, params) =>
       Effect.runPromise(
@@ -199,9 +199,9 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
   },
   {
     name: "orc_backlog_answer",
-    label: "Answer a held or parked orc task",
+    label: "Answer a held, parked or decision orc task",
     description:
-      "Records the captain's words through orc backlog answer, word for word. On a held task it releases the task for the next beat, or on a hold with questions answers the one named and releases the task once every question is answered. On a parked task it answers the one question named, and the beat resumes the run on its branch once every question is answered.",
+      "Records the captain's words through orc backlog answer, word for word. On a held task it releases the task for the next beat, or on a hold with questions answers the one named and releases the task once every question is answered. On a parked task it answers the one question named, and the beat resumes the run on its branch once every question is answered. On a decision it closes the decision done with the answer, and the tasks that depend on it may start with its question and answer in their run.",
     parameters: Schema.toJsonSchemaDocument(AnswerInput).schema,
     execute: (_toolCallId, params) =>
       runTool(AnswerInput, "orc_backlog_answer", params, env, (input) =>

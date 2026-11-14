@@ -2,9 +2,10 @@
 kind: reference
 ---
 # Task kinds
-A task file's `kind` is `ship`, `scout`, `task` or `parent`, and a file with no `kind` reads as `ship`.
-Orc refuses any other kind, from `orc backlog add --kind` or in a task file, with `the kind <word> is not ship, scout, task or parent`.
-`orc backlog` names a scout, task or parent beside its id, as in `orc-1 scout orc`, and `orc backlog --json` gives every task a `kind`.
+A task file's `kind` is `ship`, `scout`, `task`, `parent` or `decision`, and a file with no `kind` reads as `ship`.
+Orc refuses any other kind, from `orc backlog add --kind` or in a task file, with `the kind <word> is not ship, scout, task, parent or decision`.
+`orc run --kind` takes only `ship`, `scout`, `task` or `parent`, and refuses `decision`, since a decision never runs.
+`orc backlog` names a scout, task, parent or decision beside its id, as in `orc-1 scout orc`, and `orc backlog --json` gives every task a `kind`.
 
 A `ship` task runs as [Running a task](running-a-task.md) shows and ends in a PR.
 A `scout` reads the checkout and changes nothing, and a `task` does what it asks and puts its evidence in the report.
@@ -23,6 +24,37 @@ When no report exists, it closes the task failed with `the run wrote no report` 
 The beat prints the report path in its `closed` line.
 The chat posts it where a shipped task posts its PR, as in `orc-1 Map the parser closed done: the run wrote its report, report /home/me/.orc/runs/<run-id>/agent-report.md`.
 A scout or task marked for a machine waits for room there as any task does.
+
+## Decisions
+
+A `decision` is a question for the captain, and no run ever answers it.
+Add it with `orc backlog add <project> <file|-> --kind decision`, whose body is the question.
+Orc refuses `--priority` and `--machine` on a decision, and `orc backlog priority` refuses one, since a decision never starts.
+The beat never starts a decision, and each beat prints `waits <task-id>: decision for the captain` for it.
+To answer it, run `orc backlog answer <task-id> <words>`.
+The answer closes the decision done with the reason `answered`, and its task file keeps the words as `answer` and the time as `answered_at`.
+To drop it instead, run `orc backlog close <task-id> failed [<reason>]`, which drops it as `orc backlog drop` does.
+`orc backlog close <task-id> done` refuses a decision, since only its answer closes it done.
+`orc backlog hold` and `orc merge` refuse a decision, and a decision never parks, since no run of it asks.
+`orc backlog` shows an answered decision as `answered: <words>`, and `orc backlog --json` gives it `kind: "decision"` and `answer` as its words and time.
+Every other closed task carries `null` for `answer`.
+
+A task added with `--depends-on <decision-id>` waits until the captain answers the decision, as any dependency does.
+When it starts, the runner appends the decision's question and the captain's answer after the task's own body in the run's task file:
+
+```text
+# Build the button
+
+The captain's decision orc-1 asked:
+
+# Which button goes first
+
+The left one or the right one?
+
+The captain answered: use the left one
+```
+
+In chat, `orc_backlog_add` takes `kind: "decision"`, and `orc_backlog_answer` answers the decision.
 
 ## Parent tasks
 

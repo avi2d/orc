@@ -14,6 +14,8 @@ import {
   dispatchView,
 } from "@avi2dg/orc-schema";
 import { emptyBacklogStdout, orcBacklogPrinting, realBacklogStdout, writeDispatchBacklog } from "../../lib/dispatch-fixture";
+import { addTask } from "../../../packages/run/src/entities/backlog/index";
+import { answerTask } from "../../../packages/run/src/entities/parked-runs/index";
 
 const readBacklogWith = (home: string, orc: Layer.Layer<CommandRunner>): Promise<DispatchReading> =>
   Effect.runPromise(
@@ -266,6 +268,18 @@ describe("the dispatch view", () => {
       expect(reasons.get("task-3")).toBe("the project site is not in the project list");
       expect(reasons.get("task-4")).toBe("the machine feld is not in dispatch.json");
       expect(reasons.get("task-5")).toBe("the project docs has no checkout on linux");
+    });
+  });
+
+  test("reads a decision the captain answered as closed instead of an unreadable file with no claim", async () => {
+    await withBacklog(async (root) => {
+      const backlog = join(root, "backlog");
+      const question = { title: "Which button goes first", project: "orc", kind: "decision" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: null, created: "2026-10-27T10:00:00.000Z", body: "# Which button goes first\n" };
+      const decision = await Effect.runPromise(addTask(backlog, question).pipe(Effect.provide(BunFileSystem.layer)));
+      await Effect.runPromise(answerTask(backlog, decision.spec.id, "use the left one", "2026-10-27T10:30:00.000Z").pipe(Effect.provide(BunFileSystem.layer)));
+      const snapshot = snapshotOf(await readBacklog(root));
+      expect(snapshot.unread).toEqual([]);
+      expect(snapshot.tasks.find((task) => task.id === decision.spec.id)?.state.kind).toBe("closed");
     });
   });
 

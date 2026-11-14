@@ -13,6 +13,7 @@ export const ClosedTask = Schema.Struct({
   reason: Schema.String,
   pr: Schema.NullOr(Schema.String),
   report: Schema.NullOr(Schema.String),
+  answer: Schema.NullOr(Schema.Struct({ words: Schema.String, at: Schema.String })),
   postedAt: Schema.NullOr(Schema.String)
 })
 export type ClosedTask = typeof ClosedTask.Type
@@ -20,6 +21,9 @@ export type ClosedTask = typeof ClosedTask.Type
 const deliveredPart = (task: ClosedTask): string => {
   if (task.outcome === "dropped") {
     return ""
+  }
+  if (task.kind === "decision") {
+    return task.answer === null ? "" : ": " + task.answer.words
   }
   if (task.kind !== "ship") {
     return task.report === null ? ", with no report" : ", report " + task.report

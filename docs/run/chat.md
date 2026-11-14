@@ -11,13 +11,14 @@ The chat's Pi has eight tools and no others:
 
 - `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project and the task's Markdown.
   It may add a kind, an internal mark, a machine, a parent, the ids the task depends on and a priority from 0 to 4, where 0 starts first.
+  A decision takes `kind: "decision"` and no priority or machine, as [Decisions](task-kinds.md#decisions) shows.
   When `models.planner` names a model and a ship add names no parent, an over budget request lands as a parent with one child per slice, as [Splitting at intake](task-kinds.md#splitting-at-intake) shows.
 - `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
-- `orc_backlog_hold` holds one new task through `orc backlog hold`, with the reason, an optional date and optional questions.
+- `orc_backlog_hold` holds one new task except a decision through `orc backlog hold`, with the reason, an optional date and optional questions.
 - `orc_backlog_priority` sets or clears one new task's priority through `orc backlog priority <task-id> <0-4|none>`, which orders the beat's starts.
-  It refuses a task that is taken, started or closed.
+  It refuses a decision and a task that is taken, started or closed.
 - `orc_backlog_edit` replaces the title and the body of one new task through `orc backlog edit <task-id> -`, and keeps its hold, dependencies and parked questions.
-- `orc_backlog_answer` answers a held task, a parked task, or a started task waiting at its gate through `orc backlog answer`.
+- `orc_backlog_answer` answers a held task, a parked task, a decision, or a started task waiting at its gate through `orc backlog answer`.
   It passes your words as you said them, or answers one open question when it names the question's id.
 - `merge_task` lands a closed task's PR through `orc merge <task-id> --basis <basis>`, as [Merging a task's PR](merging-a-tasks-pr.md) shows.
 - `orc_decision_board` opens a decision board for one held task, one parked task, or one started task waiting at its gate, as [Decision boards](chat.md#decision-boards) shows.

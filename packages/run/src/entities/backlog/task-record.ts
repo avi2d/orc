@@ -1,4 +1,5 @@
 import { Array as Arr, Data, Effect, Schema } from "effect"
+import { Answer, answerOf, decisionStateOf, type AnsweredClosing } from "./task-record-decision"
 import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
 
 export const taskFolders = ["new", "taken", "closed"] as const
@@ -44,10 +45,6 @@ export interface Started {
   readonly log: string
 }
 
-const Answer = Schema.Struct({ words: Schema.String, at: Schema.String })
-type Answer = typeof Answer.Type
-
-// relayedTo names the asking the answer was handed to, and null means no run has it yet.
 export interface ParkedAnswer extends Answer {
   readonly relayedTo: string | null
 }
@@ -100,7 +97,7 @@ type Closing = { readonly outcome: "start-failed"; readonly reason: string } | R
 
 type ClosedState = { readonly kind: "closed"; readonly closedAt: string; readonly postedAt: string | null } & (
   | { readonly claim: Claim; readonly closing: Closing }
-  | { readonly claim: null; readonly closing: { readonly outcome: "dropped"; readonly reason: string } }
+  | { readonly claim: null; readonly closing: { readonly outcome: "dropped"; readonly reason: string } | AnsweredClosing }
 )
 
 type TaskState =
@@ -127,7 +124,12 @@ export const openQuestions = (task: TaskRecord): ReadonlyArray<ParkedQuestion> =
   task.parked?.questions.filter((question) => question.answer === null) ?? []
 
 export const ranClosing = (task: TaskRecord): RanClosing | null =>
-  task.state.kind === "closed" && task.state.closing.outcome !== "start-failed" && task.state.closing.outcome !== "dropped" ? task.state.closing : null
+  task.state.kind === "closed" && task.state.claim !== null && task.state.closing.outcome !== "start-failed" ? task.state.closing : null
+
+export const decisionAnswer = (task: TaskRecord): Answer | null =>
+  task.state.kind === "closed" && task.state.claim === null && task.state.closing.outcome === "done" ? task.state.closing.answer : null
+
+export const decisionWait = "decision for the captain"
 
 export const taskPr = (task: TaskRecord): string | null => ranClosing(task)?.pr ?? null
 
@@ -228,16 +230,6 @@ const closingOf = (front: Frontmatter, started: Started | null): Closing | null 
     return { outcome: "start-failed", reason }
   }
   return front.outcome === undefined || front.outcome === "dropped" || started === null ? null : { outcome: front.outcome, started, reason, pr: front.pr ?? null, report: front.report ?? null }
-}
-
-const answerOf = (front: { readonly answer?: string | undefined; readonly answered_at?: string | undefined }): Answer | null | string => {
-  if (front.answer === undefined && front.answered_at === undefined) {
-    return null
-  }
-  if (front.answer === undefined || front.answered_at === undefined || Number.isNaN(Date.parse(front.answered_at))) {
-    return "an answer names no words or no time"
-  }
-  return { words: front.answer, at: front.answered_at }
 }
 
 const checkedQuestions = <Q>(fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string, toQuestion: (question: typeof QuestionFront.Type, answer: Answer | null) => Q): Array<Q> | string => {
@@ -360,11 +352,11 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     if (front.id !== stem) {
       return yield* new TaskFileError({ file, detail: "the frontmatter id " + front.id + " is not the file " + (stem ?? file) })
     }
-    const state = stateOf(folder, front)
+    const state = kind === "decision" ? decisionStateOf(folder, front, stateOf) : stateOf(folder, front)
     if (typeof state === "string") {
       return yield* new TaskFileError({ file, detail: state })
     }
-    const hold = holdOf(front)
+    const hold = kind === "decision" ? holdOf({ ...front, answer: undefined, answered_at: undefined }) : holdOf(front)
     if (typeof hold === "string") {
       return yield* new TaskFileError({ file, detail: hold })
     }

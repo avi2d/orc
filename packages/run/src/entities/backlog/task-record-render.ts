@@ -1,4 +1,4 @@
-import { fence, type Claim, type Hold, type HoldQuestion, type Parked, type ParkedQuestion, ranClosing, type Started, type TaskRecord } from "./task-record"
+import { decisionAnswer, fence, type Claim, type Hold, type HoldQuestion, type Parked, type ParkedQuestion, ranClosing, type Started, type TaskRecord } from "./task-record"
 
 const field = (key: string, value: unknown): string => key + ": " + JSON.stringify(value)
 
@@ -67,12 +67,14 @@ const stateFields = (record: TaskRecord): ReadonlyArray<string> => {
     }
     case "closed": {
       const ran = ranFields(record)
+      const answer = decisionAnswer(record)
       return [
         ...claimFields(state.claim),
         ...ran.started,
         field("outcome", state.closing.outcome),
         field("closed_at", state.closedAt),
         field("reason", state.closing.reason),
+        ...(answer === null ? [] : [field("answer", answer.words), field("answered_at", answer.at)]),
         ...ran.pr,
         ...(state.postedAt === null ? [] : [field("posted_at", state.postedAt)])
       ]

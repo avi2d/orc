@@ -1,6 +1,6 @@
 import { deliveryFor, type RunDelivery } from "../../shared/config/index"
 import { checkoutOn, type DispatchConfig, type Machine, modeOf, type Project } from "../../shared/config/index"
-import { answerWait, type DeciderOwns, type TaskRecord, childCount, dependencyWaits, missingOriginWait, taskPriorities } from "../../entities/backlog/index"
+import { answerWait, decisionWait, type DeciderOwns, type TaskRecord, childCount, dependencyWaits, missingOriginWait, taskPriorities } from "../../entities/backlog/index"
 
 export interface MachineRoom {
   readonly machine: string
@@ -40,6 +40,9 @@ const parkedOriginWait = (task: TaskRecord): string | null =>
     : null
 
 export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>, deciderOwns: DeciderOwns): string | null => {
+  if (task.spec.kind === "decision") {
+    return decisionWait
+  }
   if (task.spec.priority === null) {
     return "no priority"
   }
