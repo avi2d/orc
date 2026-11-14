@@ -62,6 +62,8 @@ Each lane lists its tasks oldest first.
 
 ## Read the Resources tab
 
+![Resources tab with example quota windows for two accounts and two machines](images/herdr-resources.png)
+
 The Subscriptions table lists each account once, with one row for each of its quota windows.
 Used shows the share of the window spent, with a tick at the share of the window's time already gone.
 The bar turns red once the share used passes that tick.
@@ -72,6 +74,8 @@ The Machines table lists this machine as `local` and the machine that `ORC_DASH_
 Load turns red above the machine's core count.
 Orc runs counts the running pueue tasks in the `orc` group.
 When a machine cannot be read, its cells show a dash and a line below the table gives the reason.
+
+![Resources tab with the second machine unreachable](images/herdr-resources-unreachable.png)
 
 ## Recapture the Board screenshot
 
