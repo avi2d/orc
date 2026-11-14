@@ -270,6 +270,20 @@ const toDispatch = (command: Parameters<typeof parseDispatchArgs>[0], rest: read
   return dispatch.kind === "UsageError" ? dispatch : { kind: "Dispatch", args: dispatch }
 }
 
+const appSubcommands = {
+  install: (): OrcArgs => ({ kind: "InstallApp" })
+} satisfies Record<string, () => OrcArgs>
+
+export type AppWord = keyof typeof appSubcommands
+const isAppWord = (word: string): word is AppWord => Object.hasOwn(appSubcommands, word)
+
+const parseAppArgs = (rest: readonly string[]): OrcArgs => {
+  const [word = ""] = rest
+  return rest.length === 1 && isAppWord(word) ? appSubcommands[word]() : { kind: "UsageError", detail: "orc app takes install" }
+}
+const parseChatArgs = (rest: readonly string[]): OrcArgs =>
+  rest.length === 0 ? { kind: "Chat" } : { kind: "UsageError", detail: `orc chat takes no argument: ${rest[0]}` }
+
 const topLevelParsers = {
   run: parseRunArgs,
   runs: (rest: readonly string[]): OrcArgs => parseJsonListArgs(rest, "ListRuns"),
@@ -290,19 +304,7 @@ const topLevelParsers = {
 export type CommandWord = keyof typeof topLevelParsers
 export const commandWords = Object.keys(topLevelParsers) as ReadonlyArray<CommandWord>
 export const isCommandWord = (word: string): word is CommandWord => Object.hasOwn(topLevelParsers, word)
-const appSubcommands = {
-  install: (): OrcArgs => ({ kind: "InstallApp" })
-} satisfies Record<string, () => OrcArgs>
 
-export type AppWord = keyof typeof appSubcommands
-const isAppWord = (word: string): word is AppWord => Object.hasOwn(appSubcommands, word)
-
-const parseAppArgs = (rest: readonly string[]): OrcArgs => {
-  const [word = ""] = rest
-  return rest.length === 1 && isAppWord(word) ? appSubcommands[word]() : { kind: "UsageError", detail: "orc app takes install" }
-}
-const parseChatArgs = (rest: readonly string[]): OrcArgs =>
-  rest.length === 0 ? { kind: "Chat" } : { kind: "UsageError", detail: `orc chat takes no argument: ${rest[0]}` }
 const parseFlagArgs = (first: string, rest: readonly string[]): OrcArgs => {
   if (!first.startsWith("-")) {
     return { kind: "UsageError", detail: `unknown command: ${first}` }
