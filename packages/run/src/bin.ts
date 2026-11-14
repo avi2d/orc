@@ -12,9 +12,9 @@ import { helpText, overview, usageErrorText } from "./app/help"
 import { runDispatch } from "./app/dispatch-cli"
 import { RunnerError } from "./shared/process/index"
 import { formatReport, formatReportOutcome, runAgentStep, runReportStep } from "./features/running-a-task/index"
-import type { ReportKind } from "./entities/backlog/index"
+import { type ReportKind, runDirFor } from "./entities/backlog/index"
 import { encodeRefusalsJson, formatHistoryError, formatRefusalsTable, listAllRuns, listRuns, openDatabase, orcHomeDir, readRefusals } from "./entities/run-history/index"
-import { encodeRunsJson, encodeShowJson, formatRunsTable, formatShow, readListedRuns, readShow, readStepLog, recordStepScore } from "./features/seeing-runs/index"
+import { encodeRunsJson, encodeShowJson, formatRunsTable, formatShow, readListedRuns, readRunsJsonRuns, readShow, readStepLog, recordStepScore } from "./features/seeing-runs/index"
 
 const readFailure = (error: unknown): string =>
   typeof error === "string" ? error : "orc: cannot read the run history: " + formatHistoryError(error)
@@ -117,7 +117,13 @@ const reportStep = (args: Extract<OrcArgs, { readonly kind: "RunAgent" }>, kind:
 const printRuns = (args: Extract<OrcArgs, { readonly kind: "ListRuns" }>) =>
   Effect.gen(function*() {
     if (args.json) {
-      const listed = yield* readHistory((db) => listAllRuns(db).pipe(Effect.flatMap((runs) => readListedRuns(db, runs))))
+      const home = orcHomeDir(Bun.env.ORC_HOME)
+      const listed = yield* readHistory((db) =>
+        listAllRuns(db).pipe(
+          Effect.flatMap((runs) => readListedRuns(db, runs)),
+          Effect.flatMap((runs) => readRunsJsonRuns(runs, (runId) => runDirFor(home, runId)))
+        )
+      )
       yield* Console.log(yield* encodeRunsJson(listed))
     } else {
       yield* Console.log(formatRunsTable(yield* readHistory((db) => listRuns(db))))
