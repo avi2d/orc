@@ -194,7 +194,7 @@ To change what a new or held task waits for later, run `orc backlog depend <task
 Orc refuses a task the backlog does not hold, a task that is taken, started or closed, a task parked for the captain's answer, and a dependency on itself or one that would make two tasks wait on each other.
 A hold stays as it was when the dependencies change.
 To change the text of a new task, run `orc backlog edit <task-id> <task-file>`, or give `-` to pipe the text in as `orc backlog add` takes it.
-It replaces the title and the body and keeps the id, kind, machine, parent, split mark, dependencies, hold with its history and parked questions.
+It replaces the title and the body and keeps the id, kind, machine, parent, split mark, dependencies, priority, hold with its history and parked questions.
 It works on a held, parked or parent task, and the final check of a parent reads the `## Done when` list of the new text.
 Orc refuses a text with no title, a task the backlog does not hold, and a task that is taken, started or closed, since a run has already read its text.
 It never asks the planner and never splits the task.
