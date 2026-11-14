@@ -2,6 +2,37 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.15.0
+
+Released 2026-11-14.
+
+### Features
+
+- **run:** let a worker ask the captain mid-run with orc_ask [#202](https://github.com/avi2d/orc/pull/202)
+- **run:** let the chat set a task priority [#201](https://github.com/avi2d/orc/pull/201)
+- **run:** keep tasks with no priority from starting [#199](https://github.com/avi2d/orc/pull/199)
+- **run:** include other machines' runs in orc runs --json [#200](https://github.com/avi2d/orc/pull/200)
+- **run:** make orc help human friendly [#195](https://github.com/avi2d/orc/pull/195)
+- **run:** add state and currentStep to orc runs JSON [#198](https://github.com/avi2d/orc/pull/198)
+- **run:** record task, machine, worktree, model and thinking in run history and JSON [#196](https://github.com/avi2d/orc/pull/196)
+- **run:** add backlog thread ordered task conversation [#194](https://github.com/avi2d/orc/pull/194)
+- **run:** add task priority that orders the beat [#191](https://github.com/avi2d/orc/pull/191)
+- **run:** add orc backlog drop to close unwanted new tasks [#192](https://github.com/avi2d/orc/pull/192)
+- **run:** add orc backlog origin to record a legacy parked task's run [#193](https://github.com/avi2d/orc/pull/193)
+- **run:** add orc backlog edit to replace a new task's text [#188](https://github.com/avi2d/orc/pull/188)
+- **herdr-app:** show subscriptions and machines on the Resources tab [#190](https://github.com/avi2d/orc/pull/190)
+- **herdr-app:** show backlog lanes on the Board tab [#189](https://github.com/avi2d/orc/pull/189)
+- **run:** add orc backlog note command [#186](https://github.com/avi2d/orc/pull/186)
+- **run:** record the time a hold is placed and keep it in hold_history [#183](https://github.com/avi2d/orc/pull/183)
+- **herdr-app:** show runs, steps, and step output in the Agents tab [#182](https://github.com/avi2d/orc/pull/182)
+
+### Fixes
+
+- **run:** stream check output into the evidence file as it prints [#184](https://github.com/avi2d/orc/pull/184)
+- **ci:** run mutation workflow only on manual start [#187](https://github.com/avi2d/orc/pull/187)
+- **run:** keep resumed step logs on original evidence and label rails by run id [#185](https://github.com/avi2d/orc/pull/185)
+- **run:** build Herdr App bundle during orc app install [#179](https://github.com/avi2d/orc/pull/179)
+
 ## 0.14.1
 
 Released 2026-11-13.
