@@ -591,5 +591,3 @@ describe("the beat's closing sweep", () => {
     })
   })
 })
-
-

@@ -4,7 +4,7 @@ import { type BoardHost, type Boards, boardsVar, decisionBoards } from "./chat-b
 import { type Env, runCommand } from "./chat-command"
 import { ChatToolError } from "./chat-error"
 import { type Deliver, postUnposted, type PostState, readBacklog } from "./chat-posts"
-import { AddTaskInput, AnswerInput, BoardInput, EditInput, HoldInput, MergeInput } from "./chat-inputs"
+import { AddTaskInput, AnswerInput, BoardInput, EditInput, HoldInput, MergeInput, PriorityInput } from "./chat-inputs"
 import { lavishLauncher } from "./chat-lavish"
 import { AttentionJson, parkedListing } from "./chat-parked"
 
@@ -120,6 +120,16 @@ const runTool = <A>(schema: Schema.Decoder<A>, name: string, params: unknown, en
     )
   )
 
+const priorityTool = (env: Env): ChatTool => ({
+  name: "orc_backlog_priority",
+  label: "Set an orc task's priority",
+  description:
+    "Sets or clears the priority of one new task through orc backlog priority, which orders the beat's starts: 0 starts first, 4 starts after the other priorities, and none clears it. orc refuses a task that is taken, started or closed.",
+  parameters: Schema.toJsonSchemaDocument(PriorityInput).schema,
+  execute: (_toolCallId, params) =>
+    runTool(PriorityInput, "orc_backlog_priority", params, env, (input) => ["backlog", "priority", input.id, String(input.priority)])
+})
+
 const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
   {
     name: "orc_backlog_add",
@@ -140,7 +150,8 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
               ...(input.internal === true ? ["--internal"] : []),
               ...(input.machine === undefined ? [] : ["--machine", input.machine]),
               ...(input.parent === undefined ? [] : ["--parent", input.parent]),
-              ...(input.dependsOn ?? []).flatMap((id) => ["--depends-on", id])
+              ...(input.dependsOn ?? []).flatMap((id) => ["--depends-on", id]),
+              ...(input.priority === undefined ? [] : ["--priority", String(input.priority)])
             ], input.task)
           ),
           Effect.map(textResult)
@@ -171,6 +182,7 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
         ...(input.questions ?? []).flatMap((question) => ["--question", question])
       ])
   },
+  priorityTool(env),
   {
     name: "orc_backlog_edit",
     label: "Edit an orc task's text",

@@ -125,3 +125,26 @@ describe("the startup held-decision listing", () => {
     }
   })
 })
+
+describe("the chat's backlog tools", () => {
+  const orcArgv = async (name: string, params: unknown): Promise<Array<string>> => {
+    const tool = chatSession({ [orcCommandVar]: JSON.stringify(["sh", "-c", 'printf "%s\\n" "$@"', "orc"]) }, () => false, () => undefined).tools.find((candidate) => candidate.name === name)
+    if (tool === undefined) {
+      throw new Error(name + " is not a chat tool")
+    }
+    const result = await tool.execute("call-1", params)
+    return result.content.map((part) => part.text).join("\n").split("\n")
+  }
+
+  test("orc_backlog_add passes --priority so a ranked task does not start in arrival order instead of dropping the rank", async () => {
+    expect(await orcArgv("orc_backlog_add", { project: "orc", task: "# Fix the thing\n", priority: 2 })).toEqual(["backlog", "add", "orc", "-", "--priority", "2"])
+  })
+
+  test("orc_backlog_add passes --priority 0 instead of reading the rank 0 as no rank", async () => {
+    expect(await orcArgv("orc_backlog_add", { project: "orc", task: "# Fix the thing\n", priority: 0 })).toEqual(["backlog", "add", "orc", "-", "--priority", "0"])
+  })
+
+  test("orc_backlog_priority passes none to orc backlog priority instead of dropping the clear", async () => {
+    expect(await orcArgv("orc_backlog_priority", { id: "orc-1", priority: "none" })).toEqual(["backlog", "priority", "orc-1", "none"])
+  })
+})
