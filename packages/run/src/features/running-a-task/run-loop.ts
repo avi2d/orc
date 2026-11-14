@@ -9,6 +9,7 @@ import { idleSpan, type PiEnd } from "../../entities/agent/index"
 import { OrcRunError } from "../../shared/lib/index"
 import { driveNoMistakes, type AllowWord, type QuestionAnswer } from "../../entities/review-gate/index"
 import { askOnLoop, loopAnswerOf, loopContinuePrompt, loopGuidance, loopingNote, RunStopped } from "./loop-pause"
+import { askedNote, workerAnswersOf, workerContinuePrompt, workerGuidance } from "./worker-question"
 import { type DirectPrRecord, openDirectPr, type PullRequestOpener } from "../../entities/pull-request/index"
 import { readFailure } from "../../shared/config/index"
 import { countSessionSize, handoverImplementPrompt, type LongSessionCounts } from "../../entities/agent/index"
@@ -41,8 +42,18 @@ interface CapturedAgentRun {
   readonly failure: string | null
 }
 
-const stoppedNote = (end: PiEnd): string | null =>
-  end.kind === "idle" ? "orc stopped Pi, idle for " + idleSpan(end.idleSeconds) + " with no tool running." : end.kind === "looping" ? loopingNote(end) : null
+const stoppedNote = (end: PiEnd): string | null => {
+  switch (end.kind) {
+    case "idle":
+      return "orc stopped Pi, idle for " + idleSpan(end.idleSeconds) + " with no tool running."
+    case "looping":
+      return loopingNote(end)
+    case "asked":
+      return askedNote(end.question) + "."
+    case "exited":
+      return null
+  }
+}
 
 const exitNote = (end: PiEnd): string =>
   end.kind === "exited" && end.exitCode !== 0 ? " Pi exited with code " + end.exitCode.toString() + "." : ""
@@ -67,7 +78,7 @@ const runSettled = (
   runAgent: SandboxOps["runAgent"],
   first: AgentRun,
   step: AgentStep,
-  loopAsked: RunCheckpoints["loopAsked"]
+  questionAsked: RunCheckpoints["questionAsked"]
 ): Effect.Effect<AgentRunResult, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
     const made: Array<{ readonly sha: string }> = []
@@ -75,6 +86,10 @@ const runSettled = (
     for (;;) {
       const result = yield* runAgent(next)
       made.push(...result.commits)
+      if (result.end.kind === "asked") {
+        yield* questionAsked(step, result.end.question)
+        return { ...result, commits: made }
+      }
       if (result.end.kind !== "looping") {
         return { ...result, commits: made }
       }
@@ -83,7 +98,7 @@ const runSettled = (
         return yield* new RunStopped({ reason: verdict.reason })
       }
       if (verdict.kind === "unanswered") {
-        yield* loopAsked(step, verdict.question)
+        yield* questionAsked(step, verdict.question)
         return { ...result, commits: made }
       }
       next = { ...first, prompt: loopContinuePrompt(verdict.words), resumeSession: result.sessionFile ?? next.resumeSession }
@@ -114,12 +129,17 @@ const resumedOutcome = (run: HistoryRun, sessionId: string | null, sessionFile: 
 
 const implementPrompt = (run: HistoryRun, plan: Pick<ResumePlan, "handover" | "implementSessionFile" | "answers">): string => {
   const loop = loopAnswerOf(plan.answers)
+  const worker = workerAnswersOf(plan.answers)
   if (loop?.kind === "continue" && plan.implementSessionFile !== null) {
     return loopContinuePrompt(loop.words)
   }
+  if (worker.length > 0 && plan.implementSessionFile !== null) {
+    return workerContinuePrompt(worker)
+  }
   const taskFile = run.path.join(run.piSessionDir, "task.md")
   const base = plan.handover === null ? buildImplementPrompt(run.agent, taskFile) : handoverImplementPrompt(run.agent, taskFile, plan.handover)
-  return loop?.kind === "continue" ? base + "\n" + loopGuidance(loop.words) : base
+  const guidance = [...(loop?.kind === "continue" ? [loopGuidance(loop.words)] : []), ...(worker.length > 0 ? [workerGuidance(worker)] : [])]
+  return [base, ...guidance].join("\n")
 }
 
 const replyErrorNote = (jsonl: string | null): string => {
@@ -138,11 +158,11 @@ const implement = (
   run: HistoryRun,
   runAgent: SandboxOps["runAgent"],
   plan: Pick<ResumePlan, "implementSessionId" | "implementSessionFile" | "handover" | "answers">,
-  checkpoints: Pick<RunCheckpoints, "implementSession" | "loopAsked">
+  checkpoints: Pick<RunCheckpoints, "implementSession" | "questionAsked">
 ): Effect.Effect<AgentOutcome, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
     const first: AgentRun = { agent: run.agent, prompt: implementPrompt(run, plan), logFile: "agent.log", resumeSession: plan.implementSessionFile, onSession: checkpoints.implementSession }
-    const result = yield* runSettled(run, runAgent, first, { name: "implement", attempt: 1 }, checkpoints.loopAsked)
+    const result = yield* runSettled(run, runAgent, first, { name: "implement", attempt: 1 }, checkpoints.questionAsked)
     const session = yield* sessionOf(run, result)
     const sessionSize = session.jsonl === null ? null : countSessionSize(session.jsonl)
     const verified = verifiedMarker(session.jsonl)
@@ -174,7 +194,7 @@ const fixOnce = (
   evidenceFile: string,
   attempt: number,
   resumed: { readonly session: string; readonly guidance: string | null } | null,
-  checkpoints: Pick<RunCheckpoints, "fixSession" | "loopAsked">,
+  checkpoints: Pick<RunCheckpoints, "fixSession" | "questionAsked">,
   continuationWords: string | null = null
 ): Effect.Effect<{ readonly fix: RecordedFixAttempt; readonly commits: ReadonlyArray<OrcRunCommit>; readonly paused: string | null }, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
@@ -183,7 +203,7 @@ const fixOnce = (
       ? loopContinuePrompt(continuationWords)
       : buildFixPrompt(run.fixer, evidenceFile) + (resumed?.guidance == null ? "" : "\n" + resumed.guidance)
     const first: AgentRun = { agent: run.fixer, prompt, logFile: "fix-" + attempt.toString() + ".log", resumeSession: resumed?.session ?? null, onSession: (file) => checkpoints.fixSession(attempt, file) }
-    const result = yield* runSettled(run, runAgent, first, { name: "fix", attempt }, checkpoints.loopAsked)
+    const result = yield* runSettled(run, runAgent, first, { name: "fix", attempt }, checkpoints.questionAsked)
     const session = yield* sessionOf(run, result)
     const verified = verifiedMarker(session.jsonl)
     const ended = new Date().toISOString()
@@ -202,7 +222,7 @@ const fixOnce = (
         tokens: session.tokens
       },
       commits: session.commits,
-      paused: result.end.kind === "looping" ? session.failure : null
+      paused: result.end.kind === "looping" || result.end.kind === "asked" ? session.failure : null
     }
   })
 
@@ -271,7 +291,9 @@ const resumedFix = (plan: Pick<ResumePlan, "fixSessionFile" | "answers">): { rea
     return null
   }
   const loop = loopAnswerOf(plan.answers)
-  return { session: plan.fixSessionFile, guidance: loop?.kind === "continue" ? loopGuidance(loop.words) : null }
+  const worker = workerAnswersOf(plan.answers)
+  const guidance = [...(loop?.kind === "continue" ? [loopGuidance(loop.words)] : []), ...(worker.length > 0 ? [workerGuidance(worker)] : [])]
+  return { session: plan.fixSessionFile, guidance: guidance.length === 0 ? null : guidance.join("\n") }
 }
 
 const retryParkedFix = (run: HistoryRun, ops: SandboxOps, base: ImplementBase, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, commits: Array<OrcRunCommit>, plan: ResumePlan, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport | null, OrcRunError | RunStopped> =>

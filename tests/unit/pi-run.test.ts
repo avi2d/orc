@@ -1,20 +1,24 @@
 import { describe, expect, test } from "bun:test"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
-import { piArgv, readPiLine, sessionFileName, stillRunningLines, toolLabel } from "../../packages/run/src/entities/agent/index"
+import { askSetupFor, piArgv, readPiLine, sessionFileName, stillRunningLines, toolLabel } from "../../packages/run/src/entities/agent/index"
 
 const agent: AgentFile = { kind: "implementer", model: "acme/coder", thinking: "high", tools: ["read", "bash"], body: "", path: "a.md", source: "bundled" }
 
+const asks = askSetupFor("/r", "/r/sessions/host", 60, [])
+
 describe("piArgv", () => {
   test("passes the session folder and the resumed id as separate arguments, never through a shell", () => {
-    expect(piArgv({ agent, instructions: "/r/instructions.md", sessionDir: "/r/sessions/host", resumeSession: "id; rm -rf ~" })).toEqual([
+    expect(piArgv({ agent, instructions: "/r/instructions.md", sessionDir: "/r/sessions/host", resumeSession: "id; rm -rf ~", asks })).toEqual([
       "pi", "-p", "--mode", "json", "--model", "acme/coder", "--thinking", "high",
-      "--session-dir", "/r/sessions/host", "--session", "id; rm -rf ~", "--tools", "read,bash", "--append-system-prompt", "/r/instructions.md"
+      "--session-dir", "/r/sessions/host", "--session", "id; rm -rf ~",
+      "--extension", "/r/sessions/host/orc-ask.ts", "--orc-ask-dir", "/r/sessions/host/asks",
+      "--tools", "read,bash,orc_ask", "--append-system-prompt", "/r/instructions.md"
     ])
   })
 
   test("leaves out --session and --append-system-prompt when there is nothing to resume or append", () => {
-    expect(piArgv({ agent, instructions: null, sessionDir: "/s", resumeSession: null })).not.toContain("--session")
-    expect(piArgv({ agent, instructions: null, sessionDir: "/s", resumeSession: null })).not.toContain("--append-system-prompt")
+    expect(piArgv({ agent, instructions: null, sessionDir: "/s", resumeSession: null, asks })).not.toContain("--session")
+    expect(piArgv({ agent, instructions: null, sessionDir: "/s", resumeSession: null, asks })).not.toContain("--append-system-prompt")
   })
 })
 

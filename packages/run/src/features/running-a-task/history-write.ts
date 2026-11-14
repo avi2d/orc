@@ -183,7 +183,7 @@ export const recordStepSession = (db: Database, runId: string, name: "implement"
     Effect.mapError((cause) => historyFailure("record the session file in", cause))
   )
 
-export const recordLoopQuestion = (db: Database, runId: string, step: AgentStep, question: OpenQuestion): Effect.Effect<void, OrcRunError> =>
+export const recordOpenQuestion = (db: Database, runId: string, step: AgentStep, question: OpenQuestion): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
     const stepId = yield* stepIdFor(db, runId, step.name, step.attempt).pipe(Effect.mapError((cause) => historyFailure("read the step in", cause)))
     if (stepId === null) {

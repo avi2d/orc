@@ -35,6 +35,15 @@ export type {
   PiRun,
 } from "./pi-run"
 export {
+  askSetupFor,
+  isWorkerQuestion,
+  workerQuestionText,
+} from "./worker-ask"
+export type {
+  AskedQuestion,
+  AskSetup,
+} from "./worker-ask"
+export {
   askAfterFailures,
   pauseAfterFailures,
   nextStreak,

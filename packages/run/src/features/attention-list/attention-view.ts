@@ -33,6 +33,7 @@ export const attentionJson = (items: ReadonlyArray<OpenItem>, at: string, decide
       kind: item.kind,
       task: item.task,
       text: item.text,
+      ...(item.options === undefined ? {} : { options: item.options }),
       asked: item.asked,
       owner: item.owner,
       ...(item.decision === undefined ? {} : { decision: item.decision }),
@@ -64,7 +65,7 @@ const formatAttention = (items: ReadonlyArray<OpenItem>, decided: ReadonlyArray<
   const view = attentionJson(items, at, decided)
   const open = formatTable(
     ["ITEM", "KIND", "TASK", "OWNER", "AGE", "TEXT"],
-    view.items.map((item) => [item.id, item.kind, item.task, item.owner, ageText(item.ageSeconds) + (item.overdue ? " overdue" : ""), item.text]),
+    view.items.map((item) => [item.id, item.kind, item.task, item.owner, ageText(item.ageSeconds) + (item.overdue ? " overdue" : ""), item.text.replace(/\s+/g, " ").trim()]),
     "nothing needs anyone"
   )
   const answered = view.decided.map((entry) => "answered " + entry.id + ": " + entry.answer.words + " (" + entry.decision.reason + ")")

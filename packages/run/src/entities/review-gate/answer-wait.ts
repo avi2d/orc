@@ -6,10 +6,14 @@ import type { NoMistakesFinding, OpenQuestion, QuestionAnswer } from "./no-mista
 export const askingFileName = "asking.json"
 export const answersFileName = "answers.json"
 
+export const AskOption = Schema.Struct({ text: Schema.String, picture: Schema.optionalKey(Schema.String) })
+
+export type AskOption = typeof AskOption.Type
+
 export const Asking = Schema.Struct({
   asked: Schema.String,
   until: Schema.String,
-  questions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String }))
+  questions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String, options: Schema.optionalKey(Schema.Array(AskOption)) }))
 })
 
 const RelayedAnswers = Schema.Array(Schema.Struct({ question: Schema.String, answer: Schema.String.check(Schema.isNonEmpty()) }))

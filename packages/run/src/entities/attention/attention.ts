@@ -2,7 +2,8 @@ import { Effect, FileSystem, Schema } from "effect"
 import { readNames, BacklogError, platformFailure, publishOnce, readIfPresent, scratchName, type TaskRecord } from "../backlog/index"
 import type { BeatAction } from "./beat-action"
 import { checkRefusals, greenChecks, type PullRequestView, redChecks } from "../pull-request/index"
-import { type FailingMark, failingText, loopQuestionId, pauseAfterFailures } from "../agent/index"
+import { type FailingMark, failingText, isWorkerQuestion, loopQuestionId, pauseAfterFailures } from "../agent/index"
+import { AskOption } from "../review-gate/index"
 
 const overdueMillis = 5 * 60 * 1000
 
@@ -14,9 +15,10 @@ const Answer = Schema.Struct({ words: Schema.String, at: Schema.String })
 const Decision = Schema.Struct({ kind: Schema.Literals(["answered", "escalated"]), reason: Schema.String, at: Schema.String })
 
 const AttentionItem = Schema.Struct({
-  kind: Schema.Literals(["review-question", "run-died", "check-red", "pr-ready", "overdue-wait", "failing-command"]),
+  kind: Schema.Literals(["review-question", "worker-question", "run-died", "check-red", "pr-ready", "overdue-wait", "failing-command"]),
   task: Schema.String,
   text: Schema.String,
+  options: Schema.optionalKey(Schema.Array(AskOption)),
   asked: Schema.String,
   owner: Schema.Literals(["decider", "user"]),
   decision: Schema.optionalKey(Decision),
@@ -79,16 +81,24 @@ export const openItem = (root: string, id: string, asked: Asked): Effect.Effect<
     return yield* publishOnce(folder, id + fileSuffix, yield* encodeItem(id, { ...asked, state: { kind: "open" } }))
   })
 
+interface AskedQuestion {
+  readonly id: string
+  readonly text: string
+  readonly asked: string
+  readonly options?: ReadonlyArray<AskOption>
+}
+
 const reviewQuestionItem = (
   task: string,
-  question: { readonly id: string; readonly text: string; readonly asked: string },
+  question: AskedQuestion,
   at: string
 ): { readonly id: string; readonly asked: Asked } => {
   const id = reviewQuestionId(task, question.id, question.asked)
   const asked: Asked = {
-    kind: "review-question",
+    kind: isWorkerQuestion(question.id) ? "worker-question" : "review-question",
     task,
     text: question.text,
+    ...(question.options === undefined ? {} : { options: question.options }),
     asked: Number.isNaN(Date.parse(question.asked)) ? at : question.asked,
     owner: question.id === loopQuestionId ? "user" : "decider"
   }
@@ -98,7 +108,7 @@ const reviewQuestionItem = (
 export const openReviewQuestions = (
   root: string,
   task: string,
-  questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly asked: string }>,
+  questions: ReadonlyArray<AskedQuestion>,
   at: string
 ): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.forEach(questions, (question) => {
@@ -227,9 +237,9 @@ export const ageMillis = (item: AttentionItem, nowMillis: number): number => Mat
 
 export const isOverdue = (item: AttentionItem, nowMillis: number): boolean => item.state.kind === "open" && ageMillis(item, nowMillis) > overdueMillis
 
-type TaskItemKind = Extract<AttentionItem["kind"], "review-question" | "overdue-wait">
+type TaskItemKind = Extract<AttentionItem["kind"], "review-question" | "worker-question" | "overdue-wait">
 
-const taskItemKinds: ReadonlySet<AttentionItem["kind"]> = new Set<TaskItemKind>(["review-question", "overdue-wait"])
+const taskItemKinds: ReadonlySet<AttentionItem["kind"]> = new Set<TaskItemKind>(["review-question", "worker-question", "overdue-wait"])
 
 // A hold names the day it is answered by, so its wait passes once that whole day has.
 const overdueWait = (task: TaskRecord, at: string): { readonly id: string; readonly asked: Asked | null; readonly answer: ItemAnswer | null } | null => {
@@ -303,7 +313,7 @@ export const routeTaskItems = (root: string, tasks: ReadonlyArray<TaskRecord>, a
     const tasksById = new Map(tasks.map((task) => [task.spec.id, task] as const))
     const stale = (yield* openItems(root)).filter((entry) => taskItemKinds.has(entry.item.kind) && tasksById.has(entry.item.task) && !live.has(entry.id))
     yield* Effect.forEach(stale, (entry) => {
-      const ended = entry.item.kind === "review-question" ? "question no longer asked" : "hold no longer waits"
+      const ended = entry.item.kind === "overdue-wait" ? "hold no longer waits" : "question no longer asked"
       const reason = tasksById.get(entry.item.task)?.state.kind === "closed" ? "task closed" : ended
       return Effect.asVoid(withdrawItem(root, entry.id, reason, at))
     }, { discard: true })

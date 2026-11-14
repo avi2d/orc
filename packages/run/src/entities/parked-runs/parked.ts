@@ -1,5 +1,5 @@
 import { Array as Arr, Effect, FileSystem } from "effect"
-import type { OpenQuestion } from "../review-gate/index"
+import type { AskOption, OpenQuestion } from "../review-gate/index"
 import { openReviewQuestions } from "../attention/index"
 import { findTask, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, platformFailure, publishOnce, takenGrab, type Hold, type HoldQuestion, isHeld, openQuestions, type Parked, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord, renderTaskFile } from "../backlog/index"
 
@@ -26,7 +26,7 @@ const sameQuestions = (left: ReadonlyArray<ParkedQuestion>, right: ReadonlyArray
 
 export interface LiveAsking {
   readonly asked: string
-  readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion>
+  readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion & { readonly options?: ReadonlyArray<AskOption> }>
 }
 
 // The live run keeps its claim, so its questions sit on the started task and orc backlog answer reaches them there.
@@ -45,7 +45,12 @@ export const askStartedTask = (
       if (sameQuestions(questions, known)) {
         return { kind: "keep", result: false } as const
       }
-      yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null), asking.asked)
+      const optionsOf = (question: ParkedQuestion) => asking.questions.find((live) => live.id === question.id)?.options
+      const waiting = questions.filter((question) => question.answer === null)
+      yield* openReviewQuestions(root, id, waiting.map((question) => {
+        const options = optionsOf(question)
+        return options === undefined ? question : { ...question, options }
+      }), asking.asked)
       const parked: Parked = { ...fresh.parked, branch: fresh.parked?.branch ?? taskBranch(id), questions }
       return { kind: "write", record: { ...fresh, parked }, result: true } as const
     }))

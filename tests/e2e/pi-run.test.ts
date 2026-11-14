@@ -7,7 +7,7 @@ import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { hostExec } from "../../packages/run/src/shared/sandbox/agent-exec"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
-import { type PiRun, runPi } from "../../packages/run/src/entities/agent/index"
+import { askSetupFor, type PiRun, runPi } from "../../packages/run/src/entities/agent/index"
 
 const agent: AgentFile = { kind: "implementer", model: "acme/coder", thinking: "high", tools: ["read", "bash"], body: "", path: "a.md", source: "bundled" }
 
@@ -61,6 +61,7 @@ const run = (fixture: Fixture, pacing: { readonly tickMillis: number; readonly i
     const exec = hostExec(fixture.dir, { PATH: join(fixture.dir, "bin") + ":" + (Bun.env.PATH ?? ""), HOME: fixture.dir }, {})
     return yield* runPi(spawner, fs, path, exec, {
       agent, prompt: "Do the task.", instructions: null, sessionDir: fixture.sessionDir, resumeSession: null, logFile: fixture.logFile, failingFile: fixture.failingFile,
+      asks: askSetupFor(fixture.dir, fixture.sessionDir, 60, []),
       onSession: (file) => Effect.promise(async () => {
         stored.push(file)
         await writeFile(fixture.marker, file)

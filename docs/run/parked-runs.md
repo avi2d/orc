@@ -55,3 +55,23 @@ Any other answer stops the run, and it ends `stopped` with your answer in its en
 A ship run whose wait ends unanswered parks its task on its branch like any other question.
 Answer it with `orc backlog answer <task-id> looping=continue <guidance>` to resume the paused step's session on that branch, or `looping=stop` to end the task's run before Pi starts again.
 A report run has no branch to park on, so a wait that ends unanswered ends it failed.
+
+## A worker question
+Pi asks you a question mid-run with the `orc_ask` tool, as [How orc runs Pi](how-orc-runs-pi.md) shows.
+The tool takes the `question`, an optional `context`, optional `options` each with a `text` and an optional `picture`, and `blocks`.
+Pi sets `blocks` to true when it cannot go on without the answer.
+Orc names each question `ask-<n>`, counting from 1 in a run, and writes it to the run's `asking.json`.
+The question's text holds the question, then `Context:` and the context, then each option lettered `A)`, `B)` and on.
+The beat opens a `worker-question` item for it, as [The attention queue](attention-queue.md) shows, and hands its answer to the run the way it does at a gate.
+
+A blocking question holds Pi for 10 minutes, or for the `ORC_ANSWER_WAIT_SECONDS` its machine sets when that is shorter.
+An answer within the wait is the tool's result, and Pi carries on.
+When no answer comes, the tool tells Pi so, and orc stops Pi at the end of that turn with `orc stopped Pi when no answer to its question ask-<n> came in time` in the end reason.
+A ship run then parks its task on its branch for `ask-<n>`.
+Answer it with `orc backlog answer <task-id> ask-<n>=<text>`, and the beat resumes the task on the same machine and branch.
+The resumed run hands your answer to the same Pi session as `The captain answered your question ask-<n>: <text>`.
+A scout or task run has no branch to park on, so it ends failed with the question in its end reason.
+
+A non-blocking question returns at once, and Pi carries on.
+An answer that reaches the run while Pi runs is added to the result of Pi's next tool call.
+A non-blocking question still open when the run ends stays in the attention queue, and its item is withdrawn when the task closes.

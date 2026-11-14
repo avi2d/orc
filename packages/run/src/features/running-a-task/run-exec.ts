@@ -5,7 +5,7 @@ import { prepareCommandOf, readChecksCommands } from "./checks"
 import { commitsSince, headOf } from "../../shared/process/index"
 import { openNonoExec } from "../../shared/sandbox/index"
 import type { ToolchainResolver } from "../../shared/sandbox/index"
-import { failingFileName, runPi, type PiPacing } from "../../entities/agent/index"
+import { type AskSetup, failingFileName, runPi, type PiPacing } from "../../entities/agent/index"
 import type { RunFolders } from "./run-folders"
 import type { SandboxOps } from "./run-ops"
 import { OrcRunError } from "../../shared/lib/index"
@@ -73,7 +73,8 @@ export const agentOps = (
   run: { readonly spawner: Spawner; readonly fs: FileSystem.FileSystem; readonly path: Path.Path; readonly git: string },
   exec: AgentExec,
   folders: RunFolders,
-  pacing: PiPacing
+  pacing: PiPacing,
+  asks: AskSetup
 ): SandboxOps => ({
   runAgent: (agentRun) =>
     Effect.gen(function*() {
@@ -86,6 +87,7 @@ export const agentOps = (
         resumeSession: agentRun.resumeSession,
         logFile: run.path.join(folders.runDir, agentRun.logFile),
         failingFile: run.path.join(folders.runDir, failingFileName),
+        asks,
         onSession: agentRun.onSession
       }, pacing)
       const commits = yield* commitsSince(run.spawner, run.git, exec.cwd, base)

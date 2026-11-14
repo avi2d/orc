@@ -5,7 +5,8 @@ import type { AgentExec } from "../../shared/sandbox/index"
 import type { AgentFile } from "../../entities/agent/index"
 import type { SandboxKind } from "../../shared/sandbox/index"
 import { orcCompletionLine } from "../../entities/agent/index"
-import { failingFileName, idleSpan, type PiPacing, runPi } from "../../entities/agent/index"
+import { type AskSetup, failingFileName, idleSpan, type PiPacing, runPi } from "../../entities/agent/index"
+import { askedNote } from "./worker-question"
 import { askOnLoop, loopContinuePrompt, loopingNote } from "./loop-pause"
 import { historyFailure, recordRun, recordStep, updateRun, updateStep } from "../../entities/run-history/index"
 import type { OrcRunError } from "../../shared/lib/index"
@@ -28,6 +29,7 @@ export interface ReportRun {
   readonly exec: AgentExec
   readonly pacing: PiPacing
   readonly answerWaitSeconds: number
+  readonly asks: AskSetup
 }
 
 export type ReportOutcome =
@@ -76,6 +78,7 @@ const runReportPi = (run: ReportRun): Effect.Effect<ReportPiEnd, OrcRunError, Fi
         resumeSession: next.resumeSession,
         logFile: run.runDir + "/agent.log",
         failingFile: run.runDir + "/" + failingFileName,
+        asks: run.asks,
         onSession: () => Effect.void
       }, run.pacing)
       if (pi.end.kind === "exited") {
@@ -83,6 +86,9 @@ const runReportPi = (run: ReportRun): Effect.Effect<ReportPiEnd, OrcRunError, Fi
       }
       if (pi.end.kind === "idle") {
         return { kind: "ended", reason: "orc stopped pi, idle for " + idleSpan(pi.end.idleSeconds) + " with no tool running" }
+      }
+      if (pi.end.kind === "asked") {
+        return { kind: "unanswered", reason: askedNote(pi.end.question) }
       }
       const verdict = yield* askOnLoop(run.runDir, run.answerWaitSeconds, pi.end)
       if (verdict.kind === "stop") {

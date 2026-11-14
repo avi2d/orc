@@ -129,6 +129,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/running-a-task/report-run.ts` | The report run: the Pi run that writes a report file instead of opening a PR |
 | `packages/run/src/features/running-a-task/run-deliverer.ts` | The deliverer a run takes: the direct PR opener or the no-mistakes runner |
 | `packages/run/src/features/running-a-task/run-place.ts` | The machine name a run records, read from `ORC_RUN_MACHINE` |
+| `packages/run/src/features/running-a-task/worker-question.ts` | The end reason of a run stopped on an unanswered `orc_ask` and the prompt that resumes it with the answers |
 
 ## features/seeing-runs
 
@@ -148,6 +149,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/agent/pi-run.ts` | The Pi process in JSON mode: its event lines, the agent log, the session file and the idle stop |
 | `packages/run/src/entities/agent/agents.ts` | The agent file parsing and lookup |
 | `packages/run/src/entities/agent/long-session.ts` | The long session watch: the turn and compaction counts, the handover note and the handover prompt |
+| `packages/run/src/entities/agent/orc-ask-extension.ts` | The Pi extension orc copies into the run's Pi folder, which adds the `orc_ask` tool |
+| `packages/run/src/entities/agent/worker-ask.ts` | The orc side of `orc_ask`: the `ask-<n>` ids, the `asking.json` it writes, the answers it hands back and the 10 minute wait |
 
 ## entities/attention
 

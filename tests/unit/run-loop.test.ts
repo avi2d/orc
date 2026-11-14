@@ -16,7 +16,7 @@ import {
   recordFixStart,
   recordImplementDone,
   recordImplementStart,
-  recordLoopQuestion,
+  recordOpenQuestion,
   recordNoMistakesDone,
   recordNoMistakesStart,
   recordPullRequestDone,
@@ -143,7 +143,7 @@ const runLoopCheckpoints = (db: Database, run: HistoryRun): RunCheckpoints => ({
   noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
   pullRequestStart: (started) => recordPullRequestStart(db, run.runId, started),
   pullRequestDone: (record) => recordPullRequestDone(db, run, record),
-  loopAsked: (step, question) => recordLoopQuestion(db, run.runId, step, question)
+  questionAsked: (step, question) => recordOpenQuestion(db, run.runId, step, question)
 })
 
 const seedRefusedPrior = async (db: Database, priorDir: string, project: string): Promise<void> => {

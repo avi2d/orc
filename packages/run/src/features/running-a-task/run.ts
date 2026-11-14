@@ -16,7 +16,7 @@ import { OrcRunError } from "../../shared/lib/index"
 import { historyFailure, markRunStopped, openDatabase, orcHomeDir, stoppedEndReason, updateStep } from "../../entities/run-history/index"
 import { stepsForRun } from "../../entities/run-history/index"
 import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "./run-resume"
-import { finishRun, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordLoopQuestion, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordPullRequestDone, recordPullRequestStart, recordResumePublish, recordStepSession } from "./history-write"
+import { finishRun, recordChecksDone, recordChecksStart, recordFixDone, recordFixStart, recordHandoverEvidence, recordImplementDone, recordOpenQuestion, recordImplementStart, recordNoMistakesDone, recordNoMistakesStart, recordPullRequestDone, recordPullRequestStart, recordResumePublish, recordStepSession } from "./history-write"
 import { failedReport, writeEvidence, writeHandover, writeReport, type HistoryRun, type OrcRunCommit, type OrcRunReport } from "./run-record"
 import { longSessionWarning, type LongSessionCounts } from "../../entities/agent/index"
 import { runFull } from "./run-loop"
@@ -33,7 +33,7 @@ import { closeTaskCopy, openTaskCopy, writeAgentGitConfig } from "../../entities
 import { ensureHeavyQueue, readHeavySettings } from "../../entities/heavy-queue/index"
 import { withHeavyPath } from "../../entities/heavy-queue/index"
 import { agentGitConfig, agentOps, installCopy, openAgentExec } from "./run-exec"
-import type { PiPacing } from "../../entities/agent/index"
+import { askSetupFor, type PiPacing } from "../../entities/agent/index"
 
 export type { SandboxOps }
 
@@ -237,7 +237,7 @@ export const runReportStep = (
     const run: ReportRun = {
       kind, runId: opened.runId, runDir: folders.runDir, projectDir: opened.checkout.projectDir, branch: opened.checkout.branch, machine: opened.machine, sandbox: opened.sandboxKind,
       taskPath: folders.taskPath, instructions: folders.instructionsPath, hostSessionsDir: folders.hostSessionsDir, agent, started: new Date().toISOString(),
-      exec, pacing: piPacing(idleTimeoutSeconds), answerWaitSeconds
+      exec, pacing: piPacing(idleTimeoutSeconds), answerWaitSeconds, asks: askSetupFor(folders.runDir, folders.piSessionDir, answerWaitSeconds, [])
     }
     return yield* Effect.acquireUseRelease(
       openDatabase(opened.home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
@@ -267,7 +267,7 @@ export const runAgentStep = (
     yield* writeAgentGitConfig(spawner, git, Bun.which("git") ?? "git", checkout.projectDir, copy.dir, agentGitConfig(folders))
     const exec = yield* openAgentExec(plan, folders, copy.dir, toolchain, { ...Bun.env, PATH: withHeavyPath(home, Bun.env.PATH ?? "") })
     yield* installCopy(spawner, fs, path, exec, path.join(folders.runDir, "prepare.log"))
-    const ops = agentOps({ spawner, fs, path, git }, exec, folders, piPacing(idleTimeoutSeconds))
+    const ops = agentOps({ spawner, fs, path, git }, exec, folders, piPacing(idleTimeoutSeconds), askSetupFor(folders.runDir, folders.piSessionDir, answerWaitSeconds, request.answers ?? []))
     const history: HistoryRun = {
       fs, path, spawner, git: checkout.git, projectDir: checkout.projectDir, runId,
       runDir: folders.runDir, piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir,
@@ -338,7 +338,7 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
       pullRequestStart: (started) => recordPullRequestStart(db, run.runId, started),
       pullRequestDone: (record) => recordPullRequestDone(db, run, record),
-      loopAsked: (step, question) => recordLoopQuestion(db, run.runId, step, question)
+      questionAsked: (step, question) => recordOpenQuestion(db, run.runId, step, question)
     }
     const endFailed = (reason: string) =>
       Effect.gen(function*() {
