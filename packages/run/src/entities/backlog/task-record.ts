@@ -126,9 +126,6 @@ const heldReason = (task: TaskRecord): string | null =>
 export const openQuestions = (task: TaskRecord): ReadonlyArray<ParkedQuestion> =>
   task.parked?.questions.filter((question) => question.answer === null) ?? []
 
-export const blockingQuestions = (task: TaskRecord): ReadonlyArray<ParkedQuestion> =>
-  openQuestions(task).filter((question) => question.blocks)
-
 export const ranClosing = (task: TaskRecord): RanClosing | null =>
   task.state.kind === "closed" && task.state.closing.outcome !== "start-failed" && task.state.closing.outcome !== "dropped" ? task.state.closing : null
 
@@ -143,7 +140,7 @@ export const answersAwaited = (captain: ReadonlyArray<string>, decider: Readonly
   ].join(" and ")
 
 const parkedReason = (task: TaskRecord, deciderOwns: DeciderOwns): string | null => {
-  const open = blockingQuestions(task)
+  const open = openQuestions(task).filter((question) => question.blocks)
   if (task.parked === null || open.length === 0) {
     return null
   }
@@ -401,4 +398,3 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
       state
     }
   })
-

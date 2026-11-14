@@ -12,7 +12,7 @@ type ToolResultHandler = (event: { readonly content: ReadonlyArray<unknown> }) =
 
 const loadAsk = (dir: string): { readonly tool: Registered; readonly afterTool: ToolResultHandler } => {
   const tools = new Map<string, Registered>()
-  const handlers: Array<ToolResultHandler> = []
+  const handlers: Array<ToolResultHandler | undefined> = []
   registerAsk({
     registerFlag: () => undefined,
     getFlag: (name) => name === askDirFlag ? dir : undefined,

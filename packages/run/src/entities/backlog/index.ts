@@ -64,7 +64,6 @@ export {
 export {
   isHeld,
   openQuestions,
-  blockingQuestions,
   taskPr,
   ranClosing,
   answersAwaited,

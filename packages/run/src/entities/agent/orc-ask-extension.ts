@@ -10,7 +10,7 @@ export const askSuffix = ".ask.json"
 const deliveredSuffix = ".delivered"
 const pollMillis = 1000
 
-export const askFileStem = (toolCallId: string): string => toolCallId.replace(/[^A-Za-z0-9_-]/g, "_")
+const askFileStem = (toolCallId: string): string => toolCallId.replace(/[^A-Za-z0-9_-]/g, "_")
 
 export type AskReply =
   | { readonly kind: "answer"; readonly id: string; readonly question: string; readonly words: string }
@@ -167,11 +167,14 @@ const askOptions = (value: unknown): AskParams["options"] => {
   })
 }
 
+const isAskRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null
+
 const normalizeAsk = (params: unknown): AskParams | null => {
-  if (typeof params !== "object" || params === null) {
+  if (!isAskRecord(params)) {
     return null
   }
-  const record = params as Record<string, unknown>
+  const record = params
   if (typeof record.question !== "string" || record.question.trim() === "" || typeof record.blocks !== "boolean") {
     return null
   }

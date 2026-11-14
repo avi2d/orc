@@ -1,7 +1,7 @@
 import { Console, Duration, Effect, FileSystem, Schema } from "effect"
 import { readJsonFileIfPresent, writeWhole } from "../../shared/config/index"
 import { OrcRunError } from "../../shared/lib/index"
-import type { NoMistakesFinding, OpenQuestion, QuestionAnswer } from "./no-mistakes-gate"
+import type { NoMistakesFinding, QuestionAnswer } from "./no-mistakes-gate"
 
 export const askingFileName = "asking.json"
 export const answersFileName = "answers.json"
@@ -10,7 +10,7 @@ export const AskOption = Schema.Struct({ text: Schema.String, picture: Schema.op
 
 export type AskOption = typeof AskOption.Type
 
-export const AskingQuestion = Schema.Struct({
+const AskingQuestion = Schema.Struct({
   id: Schema.String,
   text: Schema.String,
   options: Schema.optionalKey(Schema.Array(AskOption)),
@@ -18,7 +18,7 @@ export const AskingQuestion = Schema.Struct({
   asked: Schema.optional(Schema.String)
 })
 
-export type AskingQuestion = typeof AskingQuestion.Type
+type AskingQuestion = typeof AskingQuestion.Type
 
 export const Asking = Schema.Struct({
   asked: Schema.String,
