@@ -14,7 +14,7 @@ import {
   recordSignal,
   recordStep
 } from "../../packages/run/src/entities/run-history/index"
-import { decodeRunsJson, decodeShowJson, encodeRunsJson, encodeShowJson, formatShow, InvalidScore, readListedRuns, readShow, recordStepScore, UnknownRun, UnknownStep } from "../../packages/run/src/features/seeing-runs/index"
+import { decodeRunsJson, decodeShowJson, encodeRunsJson, encodeShowJson, formatShow, InvalidScore, readListedRuns, readRunsJsonRuns, readShow, recordStepScore, UnknownRun, UnknownStep } from "../../packages/run/src/features/seeing-runs/index"
 
 const withHome = async (use: (home: string) => Promise<void>): Promise<void> => {
   const home = await mkdtemp(join(tmpdir(), "orc-show-"))
@@ -319,7 +319,7 @@ describe("show JSON", () => {
       const db = await openDb(home)
       try {
         await fixture(db)
-        const runs = await Effect.runPromise(listRuns(db).pipe(Effect.flatMap((listed) => readListedRuns(db, listed)), Effect.provide(BunServices.layer)))
+        const runs = await Effect.runPromise(listRuns(db).pipe(Effect.flatMap((listed) => readListedRuns(db, listed)), Effect.flatMap((listed) => readRunsJsonRuns(listed, (runId) => join(home, "runs", runId))), Effect.provide(BunServices.layer)))
         const text = await Effect.runPromise(encodeRunsJson(runs))
         expect(text.startsWith('{"schema":"orc.runs.v1"')).toBe(true)
         const decoded = await Effect.runPromise(decodeRunsJson(JSON.parse(text)))

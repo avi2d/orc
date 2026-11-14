@@ -51,6 +51,7 @@ A request within the budget lands as one task, and orc prints `planned as one ta
 A request over the budget lands as a parent with the planner's done criteria under `## Done when`, and one ship child for each vertical slice, each one PR that merges on its own.
 A child waits until each earlier child the plan names has merged, so the next beat starts every child that waits on nothing at the same time.
 Each child also waits on what the added request waited on.
+The parent and each child take the request's priority.
 The parent's task file keeps `split: {"by": "intake", "reason": <text>}`, which `orc backlog --json` gives every task as `split`, and orc records the event `<parent-id>.split` that orc chat posts.
 A planner that fails, runs past five minutes or prints no `orc.split.v1` document leaves the request as one task, and orc prints `not planned, so it runs as one task: <why>`.
 With no `models.planner`, orc asks no model and adds the task as it is.
@@ -78,6 +79,7 @@ A request within the budget prints `{"schema": "orc.split.v1", "plan": "whole", 
 A ship worker that finds the change over the budget can stop and propose a split using the same `orc.split.v1` document.
 Orc records the run as failed without running checks or opening a PR.
 `orc runner result <task-id> --json` returns the validated document as `result.run.split`, and the text result prints it in the run reason.
+The parent and each child take the priority of the task that proposed the split, and a parked task that resumes keeps its priority.
 The beat turns the task into a parent instead of closing it, with the proposal's done criteria under `## Done when` and `split: {"by": "run", "reason": <text>}`.
 It adds one ship child for each slice, linked and waiting as [Splitting at intake](#splitting-at-intake) adds them, and starts every child that waits on nothing in the same beat.
 When the task proposing the split has a parent, the slices join that parent as children, since orc refuses a parent given a parent.
