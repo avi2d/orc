@@ -1,18 +1,18 @@
 import { describe, expect, test } from "bun:test"
 import { parseArgs } from "../../packages/run/src/app/args"
 describe("parseArgs", () => {
-  test("no flag is a usage error", () => {
-    expect(parseArgs([])).toEqual({ kind: "UsageError", detail: "orc takes one flag" })
+  test("bare orc asks for a command instead of running anything", () => {
+    expect(parseArgs([])).toEqual({ kind: "NoCommand" })
   })
   test("--version prints the version", () => {
     expect(parseArgs(["--version"])).toEqual({ kind: "PrintVersion" })
   })
-  test("--help prints the usage text", () => {
-    expect(parseArgs(["--help"])).toEqual({ kind: "PrintHelp" })
+  test("--help prints the overview instead of a command's help", () => {
+    expect(parseArgs(["--help"])).toEqual({ kind: "PrintHelp", words: [] })
   })
-  test("a subcommand's --help prints the usage text instead of naming a task file", () => {
-    expect(parseArgs(["run", "--help"])).toEqual({ kind: "PrintHelp" })
-    expect(parseArgs(["backlog", "add", "-h"])).toEqual({ kind: "PrintHelp" })
+  test("a subcommand's --help names its command instead of naming a task file", () => {
+    expect(parseArgs(["run", "--help"])).toEqual({ kind: "PrintHelp", words: ["run"] })
+    expect(parseArgs(["backlog", "add", "-h"])).toEqual({ kind: "PrintHelp", words: ["backlog", "add"] })
   })
   test("--help after -- belongs to the passed-on command, not to orc", () => {
     expect(parseArgs(["runner", "hold", "task-1", "--", "orc", "--help"]).kind).toBe("Dispatch")
@@ -24,7 +24,7 @@ describe("parseArgs", () => {
     expect(parseArgs(["chat", "add a task"])).toEqual({ kind: "UsageError", detail: "orc chat takes no argument: add a task" })
   })
   test("-h prints the usage text", () => {
-    expect(parseArgs(["-h"])).toEqual({ kind: "PrintHelp" })
+    expect(parseArgs(["-h"])).toEqual({ kind: "PrintHelp", words: [] })
   })
   test("an unknown flag is a usage error", () => {
     expect(parseArgs(["--frobnicate"])).toEqual({ kind: "UsageError", detail: "unknown flag: --frobnicate" })
@@ -289,9 +289,9 @@ describe("parseArgs run flags", () => {
     })
   })
   test("an explicit help flag still prints usage instead of becoming hold data", () => {
-    expect(parseArgs(["backlog", "answer", "--help"])).toEqual({ kind: "PrintHelp" })
-    expect(parseArgs(["backlog", "hold", "--help"])).toEqual({ kind: "PrintHelp" })
-    expect(parseArgs(["backlog", "--help"])).toEqual({ kind: "PrintHelp" })
+    expect(parseArgs(["backlog", "answer", "--help"])).toEqual({ kind: "PrintHelp", words: ["backlog", "answer"] })
+    expect(parseArgs(["backlog", "hold", "--help"])).toEqual({ kind: "PrintHelp", words: ["backlog", "hold"] })
+    expect(parseArgs(["backlog", "--help"])).toEqual({ kind: "PrintHelp", words: ["backlog"] })
   })
   test("merge takes the captain's word by default instead of yolo", () => {
     expect(parseArgs(["merge", "task-4"])).toEqual({ kind: "Dispatch", args: { kind: "MergeTask", id: "task-4", basis: "captain-word" } })
@@ -301,5 +301,11 @@ describe("parseArgs run flags", () => {
     expect(parseArgs(["merge", "task-4", "--basis", "green"])).toEqual({ kind: "UsageError", detail: "orc merge takes --basis once, with captain-word or yolo-green" })
     expect(parseArgs(["merge"])).toEqual({ kind: "UsageError", detail: "orc merge takes a task id" })
     expect(parseArgs(["merge", "https://github.com/acme/orc/pull/8"])).toEqual({ kind: "UsageError", detail: "orc merge takes a task id, got \"https://github.com/acme/orc/pull/8\"" })
+  })
+})
+
+describe("parseArgs command words", () => {
+  test("an unknown command word is named instead of read as a task file", () => {
+    expect(parseArgs(["rnu"])).toEqual({ kind: "UsageError", detail: "unknown command: rnu" })
   })
 })
