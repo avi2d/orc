@@ -1,10 +1,9 @@
 import { type AsyncContext, type Element, View, div } from "gpui-kit"
 import { h_flex, v_flex } from "gpui-base"
-import { layout } from "herdr"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 import { type AccountRows, type Cell, type ResourcesSnapshot, type WindowRow, machineCells, machineRows, resourcesSnapshot, subscriptionRows, unreadLines } from "../../src/resources"
-import { activeChild, viewsStack } from "../../src/views"
+import { refreshWhenShown } from "../../src/views"
 
 type Palette = ReturnType<typeof palette>
 
@@ -12,11 +11,6 @@ const everyMs = 60_000
 const thisView = "orc-resources"
 const args = ["snapshot", "--json", "--only", "quota,resources,queues"]
 const barWidth = 120
-
-const shown = (): boolean => {
-  const active = activeChild(layout(), viewsStack)
-  return active === null || active === thisView
-}
 
 const column = (width: number, content: Element | string): Element => div().w(width).flex_none().child(content)
 
@@ -86,29 +80,10 @@ export default class OrcResources extends View {
   lastRead = 0
   busy = false
 
-  override init(_props: unknown, cx: AsyncContext): void {
-    cx.timer.every(1000, (tick) => {
-      const nowShown = shown()
-      if (nowShown && (!this.visible || Date.now() - this.lastRead >= everyMs)) this.refresh(tick)
-      this.visible = nowShown
-    })
-    if (shown()) {
-      this.visible = true
-      this.refresh(cx)
-    }
-  }
+  load = (): Promise<Reading<ResourcesSnapshot>> => readJson("orc-dash", args, resourcesSnapshot)
 
-  refresh(cx: AsyncContext): void {
-    if (this.busy) return
-    this.busy = true
-    this.lastRead = Date.now()
-    cx.spawn((task) =>
-      readJson("orc-dash", args, resourcesSnapshot).then((reading) => {
-        this.reading = reading
-        this.busy = false
-        task.notify()
-      })
-    )
+  override init(_props: unknown, cx: AsyncContext): void {
+    refreshWhenShown(thisView, everyMs, cx, this)
   }
 
   render(): Element {

@@ -137,8 +137,8 @@ describe("the machines table", () => {
 
   test("marks an unreachable machine's cells unread, not zero", () => {
     const remote = rowsOf(remoteUnreachable)[1]
-    expect(remote?.load).toEqual({ kind: "failed", reason: "ssh timed out" })
-    expect(remote?.runs).toEqual({ kind: "value", text: "1", alert: false })
+    expect(remote.load).toEqual({ kind: "failed", reason: "ssh timed out" })
+    expect(remote.runs).toEqual({ kind: "value", text: "1", alert: false })
   })
 
   test("says an unreachable machine's reason once, not once for every cell", () => {

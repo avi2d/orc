@@ -1,21 +1,15 @@
 import { type AsyncContext, type Context, type Element, View, div } from "gpui-kit"
 import { h_flex, v_flex } from "gpui-base"
-import { layout } from "herdr"
+import { refreshWhenShown } from "../../src/views"
 import { type BoardTask, type Lane, lanes, tasksInLane, titleLines } from "../../src/board"
 import { type BoardAttention, type BoardBacklog, boardAttention, boardBacklog } from "../../src/guard"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
-import { activeChild, viewsStack } from "../../src/views"
 
 type Palette = ReturnType<typeof palette>
 interface BoardDocuments {
   readonly backlog: BoardBacklog
   readonly attention: BoardAttention
-}
-
-const shown = (): boolean => {
-  const active = activeChild(layout(), viewsStack)
-  return active === null || active === "orc-board"
 }
 
 const kindLabel = (kind: BoardTask["kind"]): string => {
@@ -37,30 +31,14 @@ export default class OrcBoard extends View {
   lastRead = 0
   busy = false
 
-  override init(_props: unknown, cx: AsyncContext): void {
-    cx.timer.every(1000, (tick) => {
-      const nowShown = shown()
-      if (nowShown && (!this.visible || Date.now() - this.lastRead >= 10_000)) this.refresh(tick)
-      this.visible = nowShown
-    })
-    if (shown()) {
-      this.visible = true
-      this.refresh(cx)
-    }
-  }
+  load = (): Promise<Reading<BoardDocuments>> => Promise.all([
+    readJson("orc", ["backlog", "--json"], boardBacklog),
+    readJson("orc", ["attention", "--json"], boardAttention)
+  ]).then(([backlog, attention]) =>
+    backlog.kind !== "ok" ? backlog : attention.kind !== "ok" ? attention : { kind: "ok", value: { backlog: backlog.value, attention: attention.value } })
 
-  refresh(cx: Context): void {
-    if (this.busy) return
-    this.busy = true
-    this.lastRead = Date.now()
-    cx.spawn((task) => Promise.all([
-      readJson("orc", ["backlog", "--json"], boardBacklog),
-      readJson("orc", ["attention", "--json"], boardAttention)
-    ]).then(([backlog, attention]) => {
-      this.reading = backlog.kind !== "ok" ? backlog : attention.kind !== "ok" ? attention : { kind: "ok", value: { backlog: backlog.value, attention: attention.value } }
-      this.busy = false
-      task.notify()
-    }))
+  override init(_props: unknown, cx: AsyncContext): void {
+    refreshWhenShown("orc-board", 10_000, cx, this)
   }
 
   toggle(cx: Context, lane: Lane): void {

@@ -80,7 +80,7 @@ const quotaWindow: Guard<QuotaWindow> = (value, at) => {
   })
 }
 
-export interface Bytes {
+interface Bytes {
   readonly usedBytes: number
   readonly totalBytes: number
 }
@@ -102,7 +102,7 @@ const bytes: Guard<Bytes> = (value, at) => {
   return ok({ usedBytes: usedBytes.value, totalBytes: totalBytes.value })
 }
 
-const cores: Guard<number> = (value, at) => {
+const coreCount: Guard<number> = (value, at) => {
   const record = fields(value, at)
   return record.kind === "refused" ? record : number(record.value, "cores", at)
 }
@@ -120,7 +120,7 @@ const machine: Guard<Machine> = (value, at) => {
   const where = child(at, "machine")
   const host = fields(report.value["machine"], where)
   if (host.kind === "refused") return host
-  const cpu = outcome(host.value, "cpu", where, cores)
+  const cpu = outcome(host.value, "cpu", where, coreCount)
   if (cpu.kind === "refused") return cpu
   const load = outcome(host.value, "load", where, oneMinuteLoad)
   if (load.kind === "refused") return load
@@ -292,7 +292,7 @@ const cellOf = <A>(known: Known<A>, cell: (value: A) => Cell): Cell => known.kin
 const bytesCell = (known: Known<Bytes>): Cell =>
   cellOf(known, ({ usedBytes, totalBytes }) => plain(`${Math.round(usedBytes / gib)} / ${Math.round(totalBytes / gib)} GiB`))
 
-export const orcGroup = "orc"
+const orcGroup = "orc"
 
 const runsCell = (name: string, queues: Known<Queues>): Cell => {
   if (queues.kind === "failed") return queues
