@@ -1,10 +1,11 @@
-import { Config, Context, DateTime, Duration, Effect, FileSystem, Layer, Result, Schema } from "effect";
+import { Config, Context, DateTime, Duration, Effect, FileSystem, Layer, Schema } from "effect";
 import { CommandRunner } from "../../../shared/lib";
 import { decodeJson, decodeValue } from "../../../shared/lib";
 import { mapOutcome, ok, type Outcome, unreachable } from "../../../shared/lib";
 import { runDecoded } from "../../../shared/lib";
 import { selector } from "../../../shared/config";
 import { duplicateOf, MachinesFile, ProjectsFile, rawAccounts, strictAccount } from "./dispatch-schema";
+import { stateOf, taskFields, type DispatchTaskState, type TaskFolder } from "./dispatch-task";
 
 type DispatchMachine = typeof MachinesFile.Type["machines"][number];
 
@@ -12,29 +13,6 @@ interface DispatchProject {
   readonly name: string;
   readonly checkouts: Readonly<Partial<Record<string, string>>>;
 }
-
-interface DispatchClaim {
-  readonly beat: string;
-  readonly machine: string;
-  readonly account: string;
-  readonly takenAt: string;
-}
-
-interface DispatchStarted {
-  readonly at: string;
-  readonly log: string;
-}
-
-type DispatchClosing =
-  | { readonly outcome: "start-failed"; readonly reason: string }
-  | { readonly outcome: "done" | "failed" | "stopped"; readonly started: DispatchStarted; readonly reason: string };
-
-type DispatchTaskState =
-  | { readonly kind: "new" }
-  | { readonly kind: "taken"; readonly claim: DispatchClaim | null }
-  | { readonly kind: "started"; readonly claim: DispatchClaim; readonly started: DispatchStarted }
-  | { readonly kind: "closed"; readonly claim: DispatchClaim; readonly closing: DispatchClosing; readonly closedAt: string }
-  | { readonly kind: "closed"; readonly claim: null; readonly closing: { readonly outcome: "dropped" | "answered"; readonly reason: string }; readonly closedAt: string };
 
 export interface DispatchTask {
   readonly id: string;
@@ -62,28 +40,6 @@ export interface DispatchReading {
 }
 
 
-const TaskFields = Schema.Struct({
-  id: Schema.String,
-  title: Schema.String,
-  project: Schema.String,
-  machine: Schema.NullOr(Schema.String),
-  depends_on: Schema.Array(Schema.String),
-  created: Schema.String,
-  kind: Schema.optional(Schema.Literals(["ship", "scout", "task", "parent", "decision"])),
-  beat: Schema.optional(Schema.String),
-  taken_for: Schema.optional(Schema.String),
-  account: Schema.optional(Schema.String),
-  taken_at: Schema.optional(Schema.String),
-  started_at: Schema.optional(Schema.String),
-  start_log: Schema.optional(Schema.String),
-  outcome: Schema.optional(Schema.Literals(["done", "failed", "stopped", "start-failed", "dropped"])),
-  closed_at: Schema.optional(Schema.String),
-  reason: Schema.optional(Schema.String),
-});
-
-type TaskFields = typeof TaskFields.Type;
-
-// Only orc knows which split sibling has merged, so each new task's wait comes from orc rather than from the task files.
 const BacklogWaits = Schema.Struct({
   schema: Schema.Literal("orc.backlog.v1"),
   tasks: Schema.Array(Schema.Struct({ id: Schema.String, wait: Schema.NullOr(Schema.String) })),
@@ -102,8 +58,6 @@ const readBeatWaits: Effect.Effect<Outcome<BeatWaits>, never, CommandRunner> = E
   (outcome) => mapOutcome(outcome, beatWaitsOf),
 );
 
-type TaskFolder = "new" | "taken" | "closed";
-
 const backlogVariable = "ORC_HOME";
 
 export const missingBacklog = (root: string): string => "no backlog at " + root + ": it lives on the machine that runs orc beat";
@@ -113,59 +67,6 @@ const backlogRoot: Config.Config<string> = Config.all({
   home: Config.String("HOME"),
 }).pipe(Config.map(({ explicit, home }) => (explicit ?? home + "/.orc") + "/backlog"));
 
-
-const feed = String.fromCharCode(10);
-const fence = "---";
-
-const splitFrontmatter = (text: string): string | undefined => {
-  if (!text.startsWith(fence + feed)) return undefined;
-  const end = text.indexOf(feed + fence + feed, fence.length);
-  return end === -1 ? undefined : text.slice(fence.length + 1, end);
-};
-
-const taskFields = (file: string, text: string): TaskFields | string => {
-  const head = splitFrontmatter(text);
-  if (head === undefined) return file + ": its first lines hold no task orc can read";
-  const raw = Result.try((): unknown => Bun.YAML.parse(head));
-  if (Result.isFailure(raw)) return file + ": its frontmatter is no YAML orc can read";
-  const fields = decodeValue(TaskFields)(raw.success);
-  return fields.kind === "ok" ? fields.value : file + ": its frontmatter holds no task orc can read";
-};
-
-const claimOf = (front: TaskFields): DispatchClaim | null =>
-  front.beat === undefined || front.taken_for === undefined || front.account === undefined || front.taken_at === undefined
-    ? null
-    : { beat: front.beat, machine: front.taken_for, account: front.account, takenAt: front.taken_at };
-
-const startedOf = (front: TaskFields): DispatchStarted | null =>
-  front.started_at === undefined ? null : { at: front.started_at, log: front.start_log ?? "" };
-
-const closingOf = (front: TaskFields, started: DispatchStarted | null): DispatchClosing | null => {
-  const reason = front.reason ?? "";
-  if (front.outcome === "start-failed") return { outcome: "start-failed", reason };
-  return front.outcome === undefined || front.outcome === "dropped" || started === null ? null : { outcome: front.outcome, started, reason };
-};
-
-const stateOf = (folder: TaskFolder, file: string, front: TaskFields): DispatchTaskState | string => {
-  if (folder === "new") return { kind: "new" };
-  const claim = claimOf(front);
-  const started = startedOf(front);
-  if (folder === "taken") {
-    if (started === null) return { kind: "taken", claim };
-    return claim === null ? file + ": a started task names no claim" : { kind: "started", claim, started };
-  }
-  const unclaimed = front.outcome === "dropped" ? "dropped" : front.kind === "decision" && front.outcome === "done" ? "answered" : null;
-  if (unclaimed !== null) {
-    return front.closed_at === undefined
-      ? file + ": a " + unclaimed + " task names no close time"
-      : { kind: "closed", claim: null, closing: { outcome: unclaimed, reason: front.reason ?? "" }, closedAt: front.closed_at };
-  }
-  const closing = closingOf(front, started);
-  if (claim === null || closing === null || front.closed_at === undefined) {
-    return file + ": a closed task names no claim, outcome or close time";
-  }
-  return { kind: "closed", claim, closing, closedAt: front.closed_at };
-};
 
 const taskOf = (folder: TaskFolder, file: string, stem: string, text: string): DispatchTask | string => {
   const front = taskFields(file, text);

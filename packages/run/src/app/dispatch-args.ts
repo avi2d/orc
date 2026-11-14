@@ -1,4 +1,4 @@
-import { isTaskId, isCalendarDate, isTaskKind, type TaskKind, unknownKind } from "../entities/backlog/index"
+import { isTaskId, isCalendarDate, isTaskKind, type TaskKind, type TaskPriority, unknownKind } from "../entities/backlog/index"
 import { parseJsonFlag, parseRunner, unexpected, type DispatchArgs as RunnerArgs } from "./dispatch-args-runner"
 import { parseHeavy } from "./dispatch-args-heavy"
 export type { HeavyWord } from "./dispatch-args-heavy"
@@ -57,6 +57,25 @@ const addTaskKind = (words: ReadonlyArray<string>): { readonly kind: "kind"; rea
   return isTaskKind(word) ? { kind: "kind", taskKind: word } : { kind: "refused", detail: unknownKind(word) }
 }
 
+const refuseAddFlags = (split: Extract<AddWords, { readonly kind: "words" }>, taskKind: TaskKind, priority: TaskPriority | null, machine: string | null, parent: string | null, moreParents: ReadonlyArray<string>): string | null => {
+  if (split.internal && taskKind !== "ship") {
+    return "orc backlog add takes --internal only for a ship task"
+  }
+  if (split.values["--machine"].length > 1) {
+    return "orc backlog add takes one --machine"
+  }
+  if (taskKind === "decision" && (priority !== null || machine !== null)) {
+    return "orc backlog add takes no --priority or --machine for a decision, since a decision never runs"
+  }
+  if (moreParents.length > 0) {
+    return "orc backlog add takes one --parent"
+  }
+  if (parent !== null && !isTaskId(parent)) {
+    return "orc backlog add takes a task id after --parent, got \"" + parent + "\""
+  }
+  return parent !== null && taskKind === "parent" ? "orc backlog add takes --parent only for a child, and a parent task has no parent" : null
+}
+
 const parseAdd = (rest: ReadonlyArray<string>): DispatchArgs => {
   const split = splitAdd(rest)
   if (split.kind === "missing") {
@@ -66,29 +85,15 @@ const parseAdd = (rest: ReadonlyArray<string>): DispatchArgs => {
   if (taskKind.kind === "refused") {
     return { kind: "UsageError", detail: taskKind.detail }
   }
-  if (split.internal && taskKind.taskKind !== "ship") {
-    return { kind: "UsageError", detail: "orc backlog add takes --internal only for a ship task" }
-  }
   const priority = addPriority(split.values["--priority"])
   if (priority.kind === "refused") {
     return { kind: "UsageError", detail: priority.detail }
   }
-  if (split.values["--machine"].length > 1) {
-    return { kind: "UsageError", detail: "orc backlog add takes one --machine" }
-  }
   const [machine = null] = split.values["--machine"]
-  if (taskKind.taskKind === "decision" && (priority.priority !== null || machine !== null)) {
-    return { kind: "UsageError", detail: "orc backlog add takes no --priority or --machine for a decision, since a decision never runs" }
-  }
   const [parent = null, ...moreParents] = split.values["--parent"]
-  if (moreParents.length > 0) {
-    return { kind: "UsageError", detail: "orc backlog add takes one --parent" }
-  }
-  if (parent !== null && !isTaskId(parent)) {
-    return { kind: "UsageError", detail: "orc backlog add takes a task id after --parent, got \"" + parent + "\"" }
-  }
-  if (parent !== null && taskKind.taskKind === "parent") {
-    return { kind: "UsageError", detail: "orc backlog add takes --parent only for a child, and a parent task has no parent" }
+  const refusal = refuseAddFlags(split, taskKind.taskKind, priority.priority, machine, parent, moreParents)
+  if (refusal !== null) {
+    return { kind: "UsageError", detail: refusal }
   }
   if (split.kept.length !== 2) {
     return { kind: "UsageError", detail: "orc backlog add takes a project and a task file" }

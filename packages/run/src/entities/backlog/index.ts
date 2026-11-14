@@ -68,7 +68,6 @@ export {
   ranClosing,
   decisionAnswer,
   decisionWait,
-  answeredReason,
   answersAwaited,
   answerWait,
   missingOriginWait,

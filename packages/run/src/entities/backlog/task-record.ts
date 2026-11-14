@@ -1,4 +1,5 @@
 import { Array as Arr, Data, Effect, Schema } from "effect"
+import { Answer, answerOf, decisionStateOf, type AnsweredClosing } from "./task-record-decision"
 import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
 
 export const taskFolders = ["new", "taken", "closed"] as const
@@ -44,10 +45,6 @@ export interface Started {
   readonly log: string
 }
 
-const Answer = Schema.Struct({ words: Schema.String, at: Schema.String })
-type Answer = typeof Answer.Type
-
-// relayedTo names the asking the answer was handed to, and null means no run has it yet.
 export interface ParkedAnswer extends Answer {
   readonly relayedTo: string | null
 }
@@ -97,14 +94,6 @@ export interface RanClosing {
 }
 
 type Closing = { readonly outcome: "start-failed"; readonly reason: string } | RanClosing
-
-export const answeredReason = "answered"
-
-export interface AnsweredClosing {
-  readonly outcome: "done"
-  readonly reason: typeof answeredReason
-  readonly answer: Answer
-}
 
 type ClosedState = { readonly kind: "closed"; readonly closedAt: string; readonly postedAt: string | null } & (
   | { readonly claim: Claim; readonly closing: Closing }
@@ -243,16 +232,6 @@ const closingOf = (front: Frontmatter, started: Started | null): Closing | null 
   return front.outcome === undefined || front.outcome === "dropped" || started === null ? null : { outcome: front.outcome, started, reason, pr: front.pr ?? null, report: front.report ?? null }
 }
 
-const answerOf = (front: { readonly answer?: string | undefined; readonly answered_at?: string | undefined }): Answer | null | string => {
-  if (front.answer === undefined && front.answered_at === undefined) {
-    return null
-  }
-  if (front.answer === undefined || front.answered_at === undefined || Number.isNaN(Date.parse(front.answered_at))) {
-    return "an answer names no words or no time"
-  }
-  return { words: front.answer, at: front.answered_at }
-}
-
 const checkedQuestions = <Q>(fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string, toQuestion: (question: typeof QuestionFront.Type, answer: Answer | null) => Q): Array<Q> | string => {
   const questions: Array<Q> = []
   for (const question of fronts) {
@@ -317,21 +296,6 @@ const holdOf = (front: Frontmatter): Hold | null | string => {
   return { reason: front.hold_reason, until: front.hold_until ?? null, questions, answer, at: front.held_at ?? null, ...(front.hold_history === undefined ? {} : { history: front.hold_history }) }
 }
 
-const answeredOf = (front: Frontmatter): ClosedState | string => {
-  const answer = answerOf(front)
-  if (answer === null || typeof answer === "string" || front.reason !== answeredReason || front.closed_at === undefined) {
-    return "a closed decision names no answer, answer time or close time"
-  }
-  return { kind: "closed", claim: null, closing: { outcome: "done", reason: answeredReason, answer }, closedAt: front.closed_at, postedAt: front.posted_at ?? null }
-}
-
-const decisionStateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => {
-  if (folder === "taken") {
-    return "a decision is never taken, since no run answers it"
-  }
-  return folder === "closed" && front.outcome === "done" ? answeredOf(front) : stateOf(folder, front)
-}
-
 const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => {
   if (folder === "new") {
     return { kind: "new" }
@@ -388,7 +352,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     if (front.id !== stem) {
       return yield* new TaskFileError({ file, detail: "the frontmatter id " + front.id + " is not the file " + (stem ?? file) })
     }
-    const state = kind === "decision" ? decisionStateOf(folder, front) : stateOf(folder, front)
+    const state = kind === "decision" ? decisionStateOf(folder, front, stateOf) : stateOf(folder, front)
     if (typeof state === "string") {
       return yield* new TaskFileError({ file, detail: state })
     }
