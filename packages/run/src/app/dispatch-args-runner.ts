@@ -142,8 +142,18 @@ const parseRunnerAnswer = (split: Extract<ReachSplit, { readonly kind: "split" }
   return extra.length === 0 ? { kind: "RunnerAnswer", task } : unexpected(extra[0])
 }
 
+const runnerVerbs = ["start", "queue", "renew", "hold", "token", "result", "kill", "answer", "load"] as const
+export type RunnerVerb = typeof runnerVerbs[number]
+const isRunnerVerb = (word: string): word is RunnerVerb => (runnerVerbs as ReadonlyArray<string>).includes(word)
+
+export const orList = (words: ReadonlyArray<string>): string =>
+  words.length < 2 ? words.join("") : words.slice(0, -1).join(", ") + " or " + words.at(-1)
+
 export const parseRunner = (rest: ReadonlyArray<string>): DispatchArgs => {
   const [verb = "", ...after] = rest
+  if (!isRunnerVerb(verb)) {
+    return { kind: "UsageError", detail: "orc runner takes " + orList(runnerVerbs) }
+  }
   if (verb === "queue") {
     return after.length === 0 ? { kind: "RunnerQueue" } : unexpected(after[0])
   }
@@ -152,9 +162,6 @@ export const parseRunner = (rest: ReadonlyArray<string>): DispatchArgs => {
   }
   if (verb === "token") {
     return parseRunnerToken(after)
-  }
-  if (verb !== "start" && verb !== "renew" && verb !== "hold" && verb !== "result" && verb !== "kill" && verb !== "answer") {
-    return { kind: "UsageError", detail: "orc runner takes start, queue, renew, hold, token, result, kill, answer or load" }
   }
   const split = splitReach(after)
   if (split.kind === "UsageError") {

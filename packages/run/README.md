@@ -34,8 +34,15 @@ To run one task, enter a clean checkout of the target project and run `orc run <
 To print the orc version, run `orc --version` from any folder.
 
 Orc prints `orc` and the version `package.json` names, and exits 0.
-`--help` or `-h` prints the usage text and exits 0, after any subcommand too, such as `orc run --help`.
-An unknown flag prints the usage text and exits 1.
+
+## Get help
+
+`orc --help` prints the commands grouped by what they do, each with one line on what it is for, and exits 0.
+Bare `orc` prints the same overview on stderr and exits 1.
+`orc <command> --help`, such as `orc run --help` or `orc backlog hold --help`, prints only that command: its usage, what it does, its options and examples.
+`-h` works in place of `--help` everywhere.
+A wrong or incomplete command prints the error, the usage of the nearest command and a pointer to its `--help`, and exits 1.
+An unknown command or subcommand that is one typo away from a real one names that one, such as `Did you mean orc run?`.
 
 ## Where things are
 

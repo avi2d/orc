@@ -5,7 +5,8 @@ import { isRunDelivery, type RunDelivery, runDeliveries } from "../shared/config
 import { sandboxKinds, type SandboxKind } from "../shared/sandbox/index"
 export type OrcArgs =
   | { readonly kind: "PrintVersion" }
-  | { readonly kind: "PrintHelp" }
+  | { readonly kind: "PrintHelp"; readonly words: ReadonlyArray<string> }
+  | { readonly kind: "NoCommand" }
   | { readonly kind: "ListRuns"; readonly json: boolean }
   | { readonly kind: "ListRefusals"; readonly json: boolean }
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
@@ -264,8 +265,10 @@ const asksForHelp = (rest: readonly string[]): boolean => {
   const end = words.indexOf("--")
   return (end === -1 ? words : words.slice(0, end)).some((word) => helpFlags.has(word))
 }
-const subcommands = new Set(["app", "runs", "refusals", "show", "log", "score", "run", "chat", "backlog", "attention", "beat", "runner", "merge", "heavy"])
 const dispatchSubcommands = ["backlog", "attention", "beat", "runner", "merge", "heavy"] as const
+export const commandWords = ["run", "runs", "show", "log", "score", "refusals", "chat", "app", ...dispatchSubcommands] as const
+export type CommandWord = typeof commandWords[number]
+export const isCommandWord = (word: string): word is CommandWord => (commandWords as ReadonlyArray<string>).includes(word)
 type DispatchSubcommand = typeof dispatchSubcommands[number]
 const isDispatchSubcommand = (word: string): word is DispatchSubcommand => (dispatchSubcommands as ReadonlyArray<string>).includes(word)
 const parseDispatchCommand = (first: string, rest: readonly string[]): OrcArgs | null => {
@@ -284,6 +287,9 @@ const parseFlagArgs = (first: string, rest: readonly string[]): OrcArgs => {
   if (dispatchCommand !== null) {
     return dispatchCommand
   }
+  if (!first.startsWith("-")) {
+    return { kind: "UsageError", detail: `unknown command: ${first}` }
+  }
   if (rest.length > 0) {
     return { kind: "UsageError", detail: `unexpected argument: ${rest[0]}` }
   }
@@ -293,7 +299,7 @@ const parseFlagArgs = (first: string, rest: readonly string[]): OrcArgs => {
     }
     case "--help":
     case "-h": {
-      return { kind: "PrintHelp" }
+      return { kind: "PrintHelp", words: [] }
     }
     default: {
       return { kind: "UsageError", detail: `unknown flag: ${first}` }
@@ -302,7 +308,7 @@ const parseFlagArgs = (first: string, rest: readonly string[]): OrcArgs => {
 }
 const parseWords = (args: readonly string[]): OrcArgs => {
   if (args.length === 0) {
-    return { kind: "UsageError", detail: "orc takes one flag" }
+    return { kind: "NoCommand" }
   }
   const [first, ...rest] = args
   if (first === "runs") {
@@ -332,4 +338,4 @@ const parseWords = (args: readonly string[]): OrcArgs => {
   return parseFlagArgs(first, rest)
 }
 export const parseArgs = (args: readonly string[]): OrcArgs =>
-  subcommands.has(args[0] ?? "") && asksForHelp(args.slice(1)) ? { kind: "PrintHelp" } : parseWords(args)
+  isCommandWord(args[0] ?? "") && asksForHelp(args.slice(1)) ? { kind: "PrintHelp", words: args.slice(0, args.findIndex((word) => helpFlags.has(word))) } : parseWords(args)

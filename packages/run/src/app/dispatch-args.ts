@@ -1,13 +1,10 @@
 import { isTaskId, isCalendarDate, isTaskKind, type TaskKind, unknownKind } from "../entities/backlog/index"
-import { parseJsonFlag, parseRunner, unexpected, type DispatchArgs as RunnerArgs } from "./dispatch-args-runner"
+import { orList, parseJsonFlag, parseRunner, unexpected, type DispatchArgs as RunnerArgs } from "./dispatch-args-runner"
 import type { EditTask, TaskSource } from "../features/backlog-planning/index"
 
 export type DispatchArgs = RunnerArgs | EditTask
 import { isEventKey } from "../entities/events/index"
 import { isMergeBasis, mergeBases } from "../entities/pull-request/index"
-
-export const dispatchUsage =
-  "orc backlog [--json] | orc attention [--json] | orc attention answer <item-id> <words> | orc backlog add <project> <task-file|-> [--kind <ship|scout|task|parent>] [--internal] [--machine <name>] [--parent <task-id>] [--depends-on <task-id>] | orc backlog edit <task-id> <task-file|-> | orc backlog close <task-id> <done|failed> [reason] | orc backlog stop <task-id> | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog note <task-id> <words> | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc backlog plan <task-id> [--drop <task-id>] | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <claude-credentials.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner kill <task-id> | orc runner answer <task-id> | orc runner load | orc heavy path | orc heavy check [--json] | orc heavy watch | orc heavy watch-once"
 
 const addFlags = ["--kind", "--machine", "--parent", "--depends-on"] as const
 type AddFlag = typeof addFlags[number]
@@ -322,6 +319,9 @@ const parseMerge = (rest: ReadonlyArray<string>): DispatchArgs => {
   return extra.length === 0 ? { kind: "MergeTask", id, basis } : unexpected(extra[0])
 }
 
+const heavyVerbs = ["path", "check", "watch", "watch-once"] as const
+export type HeavyWord = typeof heavyVerbs[number]
+
 const parseHeavy = (rest: ReadonlyArray<string>): DispatchArgs => {
   const [verb = "", ...extra] = rest
   if (verb === "path") {
@@ -336,21 +336,24 @@ const parseHeavy = (rest: ReadonlyArray<string>): DispatchArgs => {
   if (verb === "watch-once") {
     return extra.length === 0 ? { kind: "HeavyWatchOnce" } : unexpected(extra[0])
   }
-  return { kind: "UsageError", detail: "orc heavy takes path, check [--json], watch or watch-once, got \"" + verb + "\"" }
+  return { kind: "UsageError", detail: "orc heavy takes " + orList(heavyVerbs) + ", got \"" + verb + "\"" }
 }
 
-const backlogSubcommands: ReadonlyMap<string, (rest: ReadonlyArray<string>) => DispatchArgs> = new Map([
-  ["add", parseAdd],
-  ["edit", parseEdit],
-  ["close", parseClose],
-  ["stop", parseStop],
-  ["posted", parsePosted],
-  ["hold", parseHold],
-  ["answer", parseAnswer],
-  ["note", parseNote],
-  ["depend", parseDepend],
-  ["plan", parsePlan],
-])
+const backlogSubcommands = {
+  add: parseAdd,
+  edit: parseEdit,
+  close: parseClose,
+  stop: parseStop,
+  posted: parsePosted,
+  hold: parseHold,
+  answer: parseAnswer,
+  note: parseNote,
+  depend: parseDepend,
+  plan: parsePlan
+} satisfies Record<string, (rest: ReadonlyArray<string>) => DispatchArgs>
+
+export type BacklogVerb = keyof typeof backlogSubcommands
+const isBacklogVerb = (word: string): word is BacklogVerb => Object.hasOwn(backlogSubcommands, word)
 
 export const parseDispatchArgs = (command: "backlog" | "attention" | "beat" | "runner" | "merge" | "heavy", rest: ReadonlyArray<string>): DispatchArgs => {
   if (command === "attention") {
@@ -368,9 +371,9 @@ export const parseDispatchArgs = (command: "backlog" | "attention" | "beat" | "r
   if (command === "beat") {
     return parseJsonFlag(rest, (json) => ({ kind: "Beat", json }))
   }
-  const parseSubcommand = backlogSubcommands.get(rest[0] ?? "")
-  if (parseSubcommand !== undefined) {
-    return parseSubcommand(rest.slice(1))
+  const [verb = ""] = rest
+  if (isBacklogVerb(verb)) {
+    return backlogSubcommands[verb](rest.slice(1))
   }
   return parseJsonFlag(rest, (json) => ({ kind: "ShowBacklog", json }))
 }
