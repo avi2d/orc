@@ -123,7 +123,7 @@ const printRuns = (args: Extract<OrcArgs, { readonly kind: "ListRuns" }>) =>
       const listed = yield* readHistory((db) =>
         listAllRuns(db).pipe(
           Effect.flatMap((runs) => readListedRuns(db, runs)),
-          Effect.flatMap((runs) => readRunsJsonRuns(db, runs, (runId) => runDirFor(home, runId)))
+          Effect.flatMap((runs) => readRunsJsonRuns(runs, (runId) => runDirFor(home, runId)))
         )
       )
       yield* Console.log(yield* encodeRunsJson(listed))

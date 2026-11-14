@@ -1,7 +1,6 @@
-import type { Database } from "bun:sqlite"
 import { Effect, FileSystem, Schema } from "effect"
 import { askingFileName } from "../../entities/review-gate/index"
-import { RunSqlRowSchema, RunStatusSchema, RUNS_JSON_SCHEMA, type RunRecord, sqlite, type SqliteFailure } from "../../entities/run-history/index"
+import { RunSqlRowSchema, RunStatusSchema, RUNS_JSON_SCHEMA, type RunRecord } from "../../entities/run-history/index"
 import { formatTable } from "../../shared/lib/index"
 import { LatestStepSchema, type ListedRun } from "./run-facts"
 
@@ -32,25 +31,17 @@ const readState = (run: RunRecord, runFolderOf: (runId: string) => string): Effe
   }
 }
 
-// A run that ended can leave a step row still marked running, so an ended run has no current step.
-const readCurrentStep = (db: Database, run: RunRecord): Effect.Effect<CurrentStep | null, Schema.SchemaError | SqliteFailure> =>
-  run.status !== "running"
-    ? Effect.succeed(null)
-    : sqlite(() =>
-      db.query("SELECT name, attempt FROM steps WHERE run_id = ? AND status = 'running' ORDER BY started DESC, id DESC LIMIT 1").get(run.id)
-    ).pipe(
-      Effect.flatMap((row) => row === null || row === undefined ? Effect.succeed(null) : Schema.decodeUnknownEffect(CurrentStepSchema)(row))
-    )
+const currentStepOf = (listed: ListedRun): CurrentStep | null =>
+  listed.run.status === "running" && listed.step?.status === "running"
+    ? { name: listed.step.name, attempt: listed.step.attempt }
+    : null
 
 export const readRunsJsonRuns = (
-  db: Database,
   runs: ReadonlyArray<ListedRun>,
   runFolderOf: (runId: string) => string
-): Effect.Effect<ReadonlyArray<RunsJsonRun>, Schema.SchemaError | SqliteFailure, FileSystem.FileSystem> =>
+): Effect.Effect<ReadonlyArray<RunsJsonRun>, never, FileSystem.FileSystem> =>
   Effect.forEach(runs, (listed) =>
-    Effect.all({ state: readState(listed.run, runFolderOf), currentStep: readCurrentStep(db, listed.run) }).pipe(
-      Effect.map((progress) => ({ ...listed, ...progress }))
-    ))
+    Effect.map(readState(listed.run, runFolderOf), (state) => ({ ...listed, state, currentStep: currentStepOf(listed) })))
 
 const { kind, delivery, task, machine, worktree } = RunSqlRowSchema.fields
 

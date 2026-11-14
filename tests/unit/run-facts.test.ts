@@ -34,7 +34,7 @@ const jsonRuns = (home: string, db: Database) =>
   Effect.runPromise(
     listRuns(db).pipe(
       Effect.flatMap((runs) => readListedRuns(db, runs)),
-      Effect.flatMap((runs) => readRunsJsonRuns(db, runs, (runId) => join(home, "runs", runId))),
+      Effect.flatMap((runs) => readRunsJsonRuns(runs, (runId) => join(home, "runs", runId))),
       Effect.map((runs) => runsJson(runs).runs),
       Effect.provide(BunServices.layer)
     )
