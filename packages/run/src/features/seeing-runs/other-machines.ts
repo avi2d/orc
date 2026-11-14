@@ -53,7 +53,7 @@ const readMachine = (name: string, through: Command): Effect.Effect<Reading, nev
   )
 }
 
-export const readOtherMachines = (machines: ReadonlyArray<Machine>): Effect.Effect<OtherMachines, never, ChildProcessSpawner.ChildProcessSpawner> =>
+const readOtherMachines = (machines: ReadonlyArray<Machine>): Effect.Effect<OtherMachines, never, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.forEach(
     machines.flatMap((machine) => {
       const through = throughFor(machine)
