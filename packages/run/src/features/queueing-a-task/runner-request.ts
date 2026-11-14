@@ -92,6 +92,9 @@ const readRequestFields = (
     if (!isRunDelivery(deliveryWord)) {
       return yield* refuse("orc runner start reads ORC_TASK_DELIVERY as no-mistakes or direct-PR, not " + deliveryWord)
     }
+    if (record.spec.kind === "decision") {
+      return yield* refuse(task + " is a decision, and a decision never runs")
+    }
     const instructions = yield* readInstructions(env["ORC_TASK_INSTRUCTIONS"] ?? "")
     const kind = record.spec.kind === "ship" ? {} : { kind: record.spec.kind }
     const delivery = record.spec.kind === "ship" && deliveryWord === "direct-PR" ? { delivery: deliveryWord } : {}
