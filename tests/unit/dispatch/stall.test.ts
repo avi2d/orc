@@ -28,7 +28,7 @@ const withBacklog = async (body: (root: string) => Promise<void>): Promise<void>
   }
 }
 
-const spec = { title: "Fix the login page", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the login page\n" }
+const spec = { title: "Fix the login page", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: null, created: "2026-10-27T10:00:00.000Z", body: "# Fix the login page\n" }
 
 const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-10-27T10:01:00.000Z" }
 

@@ -40,7 +40,7 @@ const quotaStub: Layer.Layer<ChildProcessSpawner.ChildProcessSpawner> = Layer.ef
 
 const runnerStart = ["true", "runner", "start"] as const
 
-const spec = { title: "Fix the login page", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the login page\n" }
+const spec = { title: "Fix the login page", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: null, created: "2026-10-27T10:00:00.000Z", body: "# Fix the login page\n" }
 
 const writeBacklog = async (root: string, machine: Record<string, unknown>): Promise<void> => {
   await writeFile(join(root, "dispatch.json"), JSON.stringify({ machines: [{ name: "ridge", slots: 2, start: runnerStart, ...machine }], quota }))

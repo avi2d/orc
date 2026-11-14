@@ -1,6 +1,6 @@
 import { type BeatAction, type BeatReport, type MachineRoom } from "./beat"
 import { taskWait } from "./beat-place"
-import { type ChildCount, childCount, dependencyWaits, type TaskKind, answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, ranClosing, type SplitMark, type Started, type TaskRecord } from "../../entities/backlog/index"
+import { type ChildCount, childCount, dependencyWaits, type TaskKind, type TaskPriority, answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, ranClosing, type SplitMark, type Started, type TaskRecord } from "../../entities/backlog/index"
 import type { Project } from "../../shared/config/index"
 import { describeQuota } from "./quota"
 import type { ChatEvent, PrState } from "../../entities/events/index"
@@ -48,6 +48,7 @@ type TaskJson = {
   readonly wait: string | null
   readonly split: SplitMark | null
   readonly dependsOn: ReadonlyArray<string>
+  readonly priority: TaskPriority | null
   readonly created: string
   readonly prState: PrState | null
   readonly hold: Hold | null
@@ -126,6 +127,7 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     wait: record.state.kind === "new" ? taskWait(record, view.tasks, view.merged, view.deciderOwns) : null,
     split: record.spec.split,
     dependsOn: record.spec.dependsOn,
+    priority: record.spec.priority,
     created: record.spec.created,
     prState: view.prStates.get(record.spec.id) ?? null,
     hold: record.hold,
@@ -155,7 +157,7 @@ const sideBySide = (columns: ReadonlyArray<ReadonlyArray<string>>): string => {
 
 const pinOf = (record: TaskRecord): string => record.spec.machine === null ? "" : " @" + record.spec.machine
 
-const named = (record: TaskRecord): string => record.spec.id + (record.spec.kind === "ship" ? "" : " " + record.spec.kind) + " " + record.spec.project
+const named = (record: TaskRecord): string => record.spec.id + (record.spec.priority === null ? "" : " P" + record.spec.priority) + (record.spec.kind === "ship" ? "" : " " + record.spec.kind) + " " + record.spec.project
 
 const doneOf = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string => {
   if (record.spec.kind !== "parent") {

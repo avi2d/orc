@@ -194,7 +194,7 @@ To change what a new or held task waits for later, run `orc backlog depend <task
 Orc refuses a task the backlog does not hold, a task that is taken, started or closed, a task parked for the captain's answer, and a dependency on itself or one that would make two tasks wait on each other.
 A hold stays as it was when the dependencies change.
 To change the text of a new task, run `orc backlog edit <task-id> <task-file>`, or give `-` to pipe the text in as `orc backlog add` takes it.
-It replaces the title and the body and keeps the id, kind, machine, parent, split mark, dependencies, hold with its history and parked questions.
+It replaces the title and the body and keeps the id, kind, machine, parent, split mark, dependencies, priority, hold with its history and parked questions.
 It works on a held, parked or parent task, and the final check of a parent reads the `## Done when` list of the new text.
 Orc refuses a text with no title, a task the backlog does not hold, and a task that is taken, started or closed, since a run has already read its text.
 It never asks the planner and never splits the task.
@@ -228,6 +228,17 @@ A ship task also waits for each ship prerequisite with a PR to merge, whether or
 A parent task also waits for every scout and task child closed done and every ship child with a PR merged.
 3. Its project has a checkout on a machine with a free slot.
 4. An account has room above 0% and at or above the floor, and the runs take the account with the most room.
+
+Each beat considers the new tasks in priority order, so when slots run short the first in that order start.
+A task with priority 0 goes first and one with priority 4 goes after the other priorities.
+A task with no priority goes last, but a priority never keeps a task back: a task with none still starts when there is room.
+Among tasks of the same priority the oldest by `created` goes first, and of two created at the same time the lower id goes first.
+To give a new task a priority, add `--priority <0-4>` to `orc backlog add`.
+To change it later, run `orc backlog priority <task-id> <0-4>`, or `orc backlog priority <task-id> none` to clear it.
+Orc refuses a task that is taken, started or closed, and it leaves a held or parked task's hold and questions as they were.
+The task file keeps the priority as `priority`, and a file with no `priority` key has no priority.
+When a task is split, at intake or by its run, each child takes the priority of the task it came from.
+`orc backlog` shows a priority as `P<n>` beside the task id, as in `orc-9 P0 orc`, and `orc backlog --json` gives every task a `priority`, either a number from 0 to 4 or `null`.
 
 To keep a new task back for a decision of yours, run `orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>]`.
 The task file keeps the time you placed the hold as `held_at`.

@@ -171,7 +171,7 @@ const watchOne = (
     // The event is claimed before the task is added, so of two beats reading one change only the one that claims it adds the task.
     const claimed = yield* recordEvent(root, { key: changeKey(project, contribution, before, state), at, text: "upstream " + contribution.url + " of " + project + " changed: " + changes.join(", ") })
     const task = claimed
-      ? yield* addTask(root, { title, project, kind: "scout", internal: false, machine: null, parent: null, split: null, dependsOn: [], created: at, body: scoutBody(project, contribution, state, title, changes) })
+      ? yield* addTask(root, { title, project, kind: "scout", internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: null, created: at, body: scoutBody(project, contribution, state, title, changes) })
       : null
     yield* writeSeen(root, project, contribution, { url: contribution.url, state, changes: before.changes + 1 })
     return task === null ? Option.none() : Option.some<BeatAction>({ kind: "upstream-changed", project, url: contribution.url, changes, task: task.spec.id })

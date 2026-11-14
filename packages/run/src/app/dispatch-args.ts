@@ -1,6 +1,7 @@
-import { isTaskId, isTaskKind, type TaskKind, unknownKind } from "../entities/backlog/index"
-import { parseAnswer, parseHold } from "./dispatch-args-answer"
+import { isTaskId, isCalendarDate, isTaskKind, type TaskKind, unknownKind } from "../entities/backlog/index"
 import { parseJsonFlag, parseRunner, unexpected, type DispatchArgs as RunnerArgs } from "./dispatch-args-runner"
+import { parseAnswer, parseItemAnswer, parseNote } from "./dispatch-args-answer"
+import { addPriority, parsePriority } from "./dispatch-args-priority"
 import type { DropTask, EditTask, TaskSource } from "../features/backlog-planning/index"
 import type { RecordOrigin } from "../widgets/beat/index"
 
@@ -9,9 +10,9 @@ import { isEventKey } from "../entities/events/index"
 import { isMergeBasis, mergeBases } from "../entities/pull-request/index"
 
 export const dispatchUsage =
-  "orc backlog [--json] | orc attention [--json] | orc attention answer <item-id> <words> | orc backlog add <project> <task-file|-> [--kind <ship|scout|task|parent>] [--internal] [--machine <name>] [--parent <task-id>] [--depends-on <task-id>] | orc backlog edit <task-id> <task-file|-> | orc backlog origin <task-id> <machine> <run-id> | orc backlog close <task-id> <done|failed> [reason] | orc backlog stop <task-id> | orc backlog drop <task-id> <reason> | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog note <task-id> <words> | orc backlog thread <task-id> [--json] | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc backlog plan <task-id> [--drop <task-id>] | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <claude-credentials.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner kill <task-id> | orc runner answer <task-id> | orc runner load | orc heavy path | orc heavy check [--json] | orc heavy watch | orc heavy watch-once"
+  "orc backlog [--json] | orc attention [--json] | orc attention answer <item-id> <words> | orc backlog add <project> <task-file|-> [--kind <ship|scout|task|parent>] [--internal] [--machine <name>] [--parent <task-id>] [--depends-on <task-id>] [--priority <0-4>] | orc backlog priority <task-id> <0-4|none> | orc backlog edit <task-id> <task-file|-> | orc backlog origin <task-id> <machine> <run-id> | orc backlog close <task-id> <done|failed> [reason] | orc backlog stop <task-id> | orc backlog drop <task-id> <reason> | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog note <task-id> <words> | orc backlog thread <task-id> [--json] | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc backlog plan <task-id> [--drop <task-id>] | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <claude-credentials.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner kill <task-id> | orc runner answer <task-id> | orc runner load | orc heavy path | orc heavy check [--json] | orc heavy watch | orc heavy watch-once"
 
-const addFlags = ["--kind", "--machine", "--parent", "--depends-on"] as const
+const addFlags = ["--kind", "--machine", "--parent", "--depends-on", "--priority"] as const
 type AddFlag = typeof addFlags[number]
 
 const isAddFlag = (token: string): token is AddFlag => addFlags.some((flag) => flag === token)
@@ -27,7 +28,7 @@ type AddWords =
 
 const splitAdd = (rest: ReadonlyArray<string>): AddWords => {
   const kept: Array<string> = []
-  const values: Record<AddFlag, Array<string>> = { "--kind": [], "--machine": [], "--parent": [], "--depends-on": [] }
+  const values: Record<AddFlag, Array<string>> = { "--kind": [], "--machine": [], "--parent": [], "--depends-on": [], "--priority": [] }
   let internal = false
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index] ?? ""
@@ -69,6 +70,10 @@ const parseAdd = (rest: ReadonlyArray<string>): DispatchArgs => {
   if (split.internal && taskKind.taskKind !== "ship") {
     return { kind: "UsageError", detail: "orc backlog add takes --internal only for a ship task" }
   }
+  const priority = addPriority(split.values["--priority"])
+  if (priority.kind === "refused") {
+    return { kind: "UsageError", detail: priority.detail }
+  }
   if (split.values["--machine"].length > 1) {
     return { kind: "UsageError", detail: "orc backlog add takes one --machine" }
   }
@@ -88,7 +93,7 @@ const parseAdd = (rest: ReadonlyArray<string>): DispatchArgs => {
   }
   const [project = "", taskFile = ""] = split.kept
   const task: TaskSource = taskFile === "-" ? { kind: "stdin" } : { kind: "file", path: taskFile }
-  return { kind: "AddTask", project, task, taskKind: taskKind.taskKind, internal: split.internal, machine, parent, dependsOn: split.values["--depends-on"] }
+  return { kind: "AddTask", project, task, taskKind: taskKind.taskKind, internal: split.internal, machine, parent, dependsOn: split.values["--depends-on"], priority: priority.priority }
 }
 
 const parseEdit = (rest: ReadonlyArray<string>): DispatchArgs => {
@@ -153,13 +158,56 @@ const parsePosted = (rest: ReadonlyArray<string>): DispatchArgs => {
   return isEventKey(id) ? { kind: "MarkEventPosted", key: id } : { kind: "UsageError", detail: "orc backlog posted takes a task id or an event key, got \"" + id + "\"" }
 }
 
-const parseNote = (rest: ReadonlyArray<string>): DispatchArgs => {
-  const [id = "", ...words] = rest
-  if (!isTaskId(id)) {
-    return { kind: "UsageError", detail: "orc backlog note takes a task id, got \"" + id + "\"" }
+interface HoldFlags {
+  readonly reason: string | null
+  readonly until: string | null
+  readonly questions: ReadonlyArray<string>
+}
+
+const takeHoldFlags = (words: ReadonlyArray<string>): HoldFlags | { readonly error: string } => {
+  const values: { reason: string | null; until: string | null } = { reason: null, until: null }
+  const questions: Array<string> = []
+  for (let index = 0; index < words.length; index += 2) {
+    const flag = words[index] ?? ""
+    if (flag !== "--reason" && flag !== "--until" && flag !== "--question") {
+      return { error: "unexpected argument: " + flag }
+    }
+    if (index + 1 >= words.length) {
+      return { error: "orc backlog hold takes a value after " + flag }
+    }
+    const value = words[index + 1] ?? ""
+    if (flag === "--question") {
+      if (value.trim() === "") {
+        return { error: "orc backlog hold takes the question's text after --question" }
+      }
+      questions.push(value)
+      continue
+    }
+    const key = flag === "--reason" ? "reason" : "until"
+    if (values[key] !== null) {
+      return { error: "orc backlog hold takes one " + flag }
+    }
+    values[key] = value
   }
-  const said = words.join(" ")
-  return said.trim() === "" ? { kind: "UsageError", detail: "orc backlog note takes a task id and the note's words" } : { kind: "NoteTask", id, words: said }
+  return { ...values, questions }
+}
+
+const parseHold = (rest: ReadonlyArray<string>): DispatchArgs => {
+  const [id = "", ...flags] = rest
+  if (!isTaskId(id)) {
+    return { kind: "UsageError", detail: "orc backlog hold takes a task id, got \"" + id + "\"" }
+  }
+  const taken = takeHoldFlags(flags)
+  if ("error" in taken) {
+    return { kind: "UsageError", detail: taken.error }
+  }
+  if (taken.reason === null || taken.reason.trim() === "") {
+    return { kind: "UsageError", detail: "orc backlog hold takes --reason and why the task waits for the captain" }
+  }
+  if (taken.until !== null && !isCalendarDate(taken.until)) {
+    return { kind: "UsageError", detail: "orc backlog hold takes a YYYY-MM-DD date after --until, got \"" + taken.until + "\"" }
+  }
+  return { kind: "HoldTask", id, reason: taken.reason, until: taken.until, questions: taken.questions }
 }
 
 const parseThread = (rest: ReadonlyArray<string>): DispatchArgs => {
@@ -168,17 +216,6 @@ const parseThread = (rest: ReadonlyArray<string>): DispatchArgs => {
     return { kind: "UsageError", detail: "orc backlog thread takes a task id, got \"" + id + "\"" }
   }
   return parseJsonFlag(flags, (json) => ({ kind: "ShowThread", id, json }))
-}
-
-const isItemId = (text: string): boolean => /^[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(text)
-
-const parseItemAnswer = (rest: ReadonlyArray<string>): DispatchArgs => {
-  const [id = "", ...words] = rest
-  if (!isItemId(id)) {
-    return { kind: "UsageError", detail: "orc attention answer takes an item id, got \"" + id + "\"" }
-  }
-  const said = words.join(" ")
-  return said.trim() === "" ? { kind: "UsageError", detail: "orc attention answer takes an item id and the answer's words" } : { kind: "AnswerItem", id, words: said }
 }
 
 const parseDepend = (rest: ReadonlyArray<string>): DispatchArgs => {
@@ -270,6 +307,7 @@ const backlogSubcommands: ReadonlyMap<string, (rest: ReadonlyArray<string>) => D
   ["thread", parseThread],
   ["depend", parseDepend],
   ["plan", parsePlan],
+  ["priority", parsePriority],
 ])
 
 export const parseDispatchArgs = (command: "backlog" | "attention" | "beat" | "runner" | "merge" | "heavy", rest: ReadonlyArray<string>): DispatchArgs => {

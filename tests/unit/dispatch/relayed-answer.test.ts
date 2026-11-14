@@ -19,7 +19,7 @@ const withBacklog = async (body: (root: string) => Promise<void>): Promise<void>
   }
 }
 
-const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
+const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: null, created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
 
 const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-10-27T10:01:00.000Z" }
 
@@ -115,7 +115,7 @@ describe("a relayed answer", () => {
   })
   test("a resume hands every answer to the asking it answers instead of leaving it to answer a later asking", () => {
     const record: TaskRecord = {
-      spec: { ...spec, id: "orc-1", kind: "ship", internal: false, machine: null, parent: null, split: null, dependsOn: [], created: "2026-10-27" },
+      spec: { ...spec, id: "orc-1", kind: "ship", internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: null, created: "2026-10-27" },
       hold: null,
       parked: {
         branch: "orc/orc-1",

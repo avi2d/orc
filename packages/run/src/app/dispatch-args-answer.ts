@@ -1,57 +1,5 @@
-import { isCalendarDate, isTaskId } from "../entities/backlog/index"
+import { isTaskId } from "../entities/backlog/index"
 import type { DispatchArgs } from "./dispatch-args-runner"
-
-interface HoldFlags {
-  readonly reason: string | null
-  readonly until: string | null
-  readonly questions: ReadonlyArray<string>
-}
-
-const takeHoldFlags = (words: ReadonlyArray<string>): HoldFlags | { readonly error: string } => {
-  const values: { reason: string | null; until: string | null } = { reason: null, until: null }
-  const questions: Array<string> = []
-  for (let index = 0; index < words.length; index += 2) {
-    const flag = words[index] ?? ""
-    if (flag !== "--reason" && flag !== "--until" && flag !== "--question") {
-      return { error: "unexpected argument: " + flag }
-    }
-    if (index + 1 >= words.length) {
-      return { error: "orc backlog hold takes a value after " + flag }
-    }
-    const value = words[index + 1] ?? ""
-    if (flag === "--question") {
-      if (value.trim() === "") {
-        return { error: "orc backlog hold takes the question's text after --question" }
-      }
-      questions.push(value)
-      continue
-    }
-    const key = flag === "--reason" ? "reason" : "until"
-    if (values[key] !== null) {
-      return { error: "orc backlog hold takes one " + flag }
-    }
-    values[key] = value
-  }
-  return { ...values, questions }
-}
-
-export const parseHold = (rest: ReadonlyArray<string>): DispatchArgs => {
-  const [id = "", ...flags] = rest
-  if (!isTaskId(id)) {
-    return { kind: "UsageError", detail: "orc backlog hold takes a task id, got \"" + id + "\"" }
-  }
-  const taken = takeHoldFlags(flags)
-  if ("error" in taken) {
-    return { kind: "UsageError", detail: taken.error }
-  }
-  if (taken.reason === null || taken.reason.trim() === "") {
-    return { kind: "UsageError", detail: "orc backlog hold takes --reason and why the task waits for the captain" }
-  }
-  if (taken.until !== null && !isCalendarDate(taken.until)) {
-    return { kind: "UsageError", detail: "orc backlog hold takes a YYYY-MM-DD date after --until, got \"" + taken.until + "\"" }
-  }
-  return { kind: "HoldTask", id, reason: taken.reason, until: taken.until, questions: taken.questions }
-}
 
 type AnswerOptions = { readonly expect: "held" | "parked" | undefined; readonly generation: string | undefined; readonly cursor: ReadonlyArray<string> }
 
@@ -112,4 +60,24 @@ export const parseAnswer = (rest: ReadonlyArray<string>): DispatchArgs => {
   }
   const options = takeAnswerOptions(after)
   return "detail" in options ? { kind: "UsageError", detail: options.detail } : finishAnswer(id, options)
+}
+
+export const parseNote = (rest: ReadonlyArray<string>): DispatchArgs => {
+  const [id = "", ...words] = rest
+  if (!isTaskId(id)) {
+    return { kind: "UsageError", detail: "orc backlog note takes a task id, got \"" + id + "\"" }
+  }
+  const said = words.join(" ")
+  return said.trim() === "" ? { kind: "UsageError", detail: "orc backlog note takes a task id and the note's words" } : { kind: "NoteTask", id, words: said }
+}
+
+const isItemId = (text: string): boolean => /^[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(text)
+
+export const parseItemAnswer = (rest: ReadonlyArray<string>): DispatchArgs => {
+  const [id = "", ...words] = rest
+  if (!isItemId(id)) {
+    return { kind: "UsageError", detail: "orc attention answer takes an item id, got \"" + id + "\"" }
+  }
+  const said = words.join(" ")
+  return said.trim() === "" ? { kind: "UsageError", detail: "orc attention answer takes an item id and the answer's words" } : { kind: "AnswerItem", id, words: said }
 }

@@ -91,6 +91,7 @@ export const renderTaskFile = (record: TaskRecord): string =>
     ...(record.spec.parent === null ? [] : [field("parent", record.spec.parent)]),
     ...(record.spec.split === null ? [] : [field("split", record.spec.split)]),
     field("depends_on", record.spec.dependsOn),
+    ...(record.spec.priority === null ? [] : [field("priority", record.spec.priority)]),
     field("created", record.spec.created),
     ...holdFields(record.hold),
     ...parkedFields(record.parked),
