@@ -15,7 +15,7 @@ export const AddTaskInput = Schema.Struct({
   parent: Schema.optionalKey(Schema.String.annotate({ description: "The id of the parent task this task is a child of" })),
   dependsOn: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: "The ids of the tasks that must close done before this one starts" })),
   priority: Schema.optionalKey(Schema.Literals(taskPriorities).annotate({
-    description: "The order the beat starts new tasks in: 0 starts first and 4 starts after the other priorities. Set one whenever the captain asks for work to happen, using the rank the captain's words give, or 2 when they rank nothing"
+    description: "The order the beat starts new tasks in: 0 starts first and 4 starts after the other priorities. Set one whenever the captain asks for work to happen, using the rank the captain's words give, or 2 when they rank nothing, never for a decision"
   }))
 })
 
@@ -41,7 +41,7 @@ export const EditInput = Schema.Struct({
 })
 
 export const AnswerInput = Schema.Struct({
-  id: Schema.String.annotate({ description: "The id of the held or parked task" }),
+  id: Schema.String.annotate({ description: "The id of the held, parked or decision task" }),
   question: Schema.optionalKey(Schema.String.annotate({
     description: "The id of the parked or held question the captain answers, such as question-4; leave it out for a task held with a reason and no questions"
   })),
