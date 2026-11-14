@@ -194,6 +194,7 @@ const expectedFiles = [
   "src/shared/lib/table.ts",
   "src/entities/task-copy/task-copy.ts",
   "src/entities/backlog/task-kind.ts",
+  "src/entities/backlog/task-record-decision.ts",
   "src/shared/lib/index.ts",
   "src/shared/process/index.ts",
   "src/shared/sandbox/index.ts",
