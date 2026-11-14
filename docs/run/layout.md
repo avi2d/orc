@@ -51,6 +51,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/features/task-thread/note.ts` | The `orc backlog note` command and its refusal of a task id the backlog does not hold |
+| `packages/run/src/features/task-thread/thread.ts` | The `orc backlog thread` view, built on each read from the task file, its attention items and its notes, and its `orc.thread.v1` JSON |
 
 ## features/chat
 
@@ -149,7 +150,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/entities/attention/beat-action.ts` | The beat actions each beat step reports |
-| `packages/run/src/entities/attention/attention.ts` | The attention queue under `attention/`: one file per item, its open and close and withdraw, and the review questions, run events and overdue waits routed into it |
+| `packages/run/src/entities/attention/attention.ts` | The attention queue under `attention/`: one file per item, its open and close and withdraw, the items of one task, and the review questions, run events and overdue waits routed into it |
 
 ## entities/backlog
 

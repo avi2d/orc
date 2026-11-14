@@ -246,6 +246,44 @@ A short write fails the note instead of writing the rest.
 A note takes any task the backlog holds, a closed one too, and orc refuses a task id the backlog does not hold.
 A note holds nothing and answers nothing, so it never changes when the beat starts the task.
 
+To read a task's conversation in order, run `orc backlog thread <task-id>`.
+Orc builds the thread on each read from the task file, the task's items in the [attention queue](attention-queue.md) and its notes, and it stores no copy.
+The task file gives each hold and the holds in `hold_history`, their questions and answers, and each parked question with its answer.
+Whether a question is open is still read from the task file.
+Each entry has `at`, `who`, `kind`, `id` and `text`.
+`who` is `user`, `decider`, `worker` or `beat`.
+`kind` is `hold`, `question`, `decision`, `answer`, `delivered`, `withdrawn` or `note`.
+`id` names the question or the attention item, and it is `null` for a hold, a note and the answer to a hold with no questions.
+
+- A hold and its questions name `user`, and a parked question names `worker`, the run that asked it.
+- A `decision` entry is the decider's `answered` or `escalated` with its reason.
+- An answer the decider gave names `decider`, and any other answer names `user`.
+- A `delivered` entry names `beat` and comes from the answer's `relayed_to`, the asking it was handed to.
+- A `withdrawn` entry names `beat` and gives the item's reason.
+- A run event item, such as `run-died`, is a `question` from `beat`.
+- A review question a later park replaced in the task file comes from its item, with the item id as `id`.
+- A note names `user` for `captain`, and keeps `decider`, `worker` or `beat` as written.
+
+Orc lists the entries oldest first.
+An entry with no time, such as a hold placed before orc kept `held_at` or a `delivered` entry, sorts directly before the next timed entry of its exchange, so such a hold sits directly before its answer, or after the last one when none follows.
+At the same time a hold comes first, then a question, a decision, an answer, a delivery, a withdrawal and a note.
+With nothing said on the task it prints `nothing is said on <task-id> yet`.
+The thread works on a closed task, and orc refuses a task id the backlog does not hold.
+To print it as JSON, run `orc backlog thread <task-id> --json`, whose document names its version first as `orc.thread.v1`:
+
+```json
+{
+  "schema": "orc.thread.v1",
+  "task": "orc-1",
+  "entries": [
+    { "at": "2026-11-02T09:00:00.000Z", "who": "user", "kind": "hold", "id": null, "text": "Choose the format" },
+    { "at": "2026-11-02T09:00:00.000Z", "who": "user", "kind": "question", "id": "question-1", "text": "Which format?" },
+    { "at": "2026-11-02T09:10:00.000Z", "who": "user", "kind": "answer", "id": "question-1", "text": "JSON" },
+    { "at": "2026-11-02T09:20:00.000Z", "who": "user", "kind": "note", "id": null, "text": "the merge waits on review" }
+  ]
+}
+```
+
 The beat moves the task file from `new` to `taken` before it runs the start command, so of two beats only one takes a task.
 After the claim survives a recount, the beat writes the task started before it runs the start command.
 A task marked for a machine waits for a slot on that machine and never starts on another.

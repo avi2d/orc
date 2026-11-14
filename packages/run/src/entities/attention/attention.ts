@@ -200,6 +200,9 @@ const readAllItems = (root: string, keep?: (name: string) => boolean): Effect.Ef
 export const openItems = (root: string, keep?: (name: string) => boolean): Effect.Effect<ReadonlyArray<OpenItem>, BacklogError, FileSystem.FileSystem> =>
   Effect.map(readAllItems(root, keep), (entries) => entries.filter((entry) => entry.item.state.kind === "open"))
 
+export const taskItems = (root: string, task: string): Effect.Effect<ReadonlyArray<OpenItem>, BacklogError, FileSystem.FileSystem> =>
+  Effect.map(readAllItems(root), (entries) => entries.filter((entry) => entry.item.task === task))
+
 export interface DecidedItem {
   readonly id: string
   readonly item: AttentionItem
