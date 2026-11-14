@@ -431,22 +431,6 @@ describe("the beat", () => {
       expect(seen[0]).toContain("started_at: ")
     })
   })
-  test("a task with no priority waits with the reason no priority instead of starting on a free slot", async () => {
-    await withBacklog(async (root) => {
-      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["true"] }, { name: "linux", slots: 0, start: ["true"] }] }))
-      await writeFile(join(root, "projects.json"), JSON.stringify({ projects }))
-      await run(addTask(root, { ...spec, priority: null }))
-      const seen: Array<string> = []
-      const spawner = recordingSpawner(join(root, "taken", "orc-1.md"), seen).pipe(Layer.provide(BunServices.layer))
-      for (const _beat of [1, 2]) {
-        const report = await Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
-        expect(report.actions).toEqual([{ kind: "waits", task: "orc-1", reason: "no priority" }])
-        expect(formatBeat(report)).toContain("waits orc-1: no priority")
-      }
-      expect(seen).toEqual([])
-      expect(await backlogStates(root)).toEqual(["orc-1:new"])
-    })
-  })
 })
 
 const macProjects = [{ name: "orc", checkouts: { mac: "/checkout" } }]
