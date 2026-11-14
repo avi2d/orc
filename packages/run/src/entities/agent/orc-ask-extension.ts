@@ -149,6 +149,9 @@ const description = [
 const blocksOf = (params: unknown): boolean =>
   typeof params === "object" && params !== null && "blocks" in params && params.blocks === true
 
+const readableAsk = (params: unknown): boolean =>
+  typeof params === "object" && params !== null && "question" in params && typeof params.question === "string" && params.question.trim() !== "" && "blocks" in params && typeof params.blocks === "boolean"
+
 export default (pi: AskHost): void => {
   pi.registerFlag(askDirFlag, { description: "The folder orc and the orc_ask tool trade questions and answers through", type: "string" })
   const waiting = new Set<string>()
@@ -165,6 +168,9 @@ export default (pi: AskHost): void => {
       const dir = askDir()
       if (dir === null) {
         throw new Error("Pi started without --" + askDirFlag + ", so no one can answer")
+      }
+      if (!readableAsk(params)) {
+        return textResult("orc could not read the question, so it was not asked. Carry on with the task.")
       }
       if (!blocksOf(params)) {
         return textResult("orc put the question to the captain. Carry on with the task; the answer is added to the result of a later tool call.")

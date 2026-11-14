@@ -41,7 +41,7 @@ export const askStartedTask = (
         return yield* new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a started task asks" })
       }
       const known = fresh.parked?.questions ?? []
-      const questions = parkedQuestions(asking.questions, known, asking.asked, () => asking.asked)
+      const questions = parkedQuestions(asking.questions, known, asking.asked, (question) => question.asked ?? asking.asked)
       if (sameQuestions(questions, known)) {
         return { kind: "keep", result: false } as const
       }

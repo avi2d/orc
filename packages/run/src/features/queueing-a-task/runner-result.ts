@@ -277,7 +277,8 @@ export const readResult = (task: string, home: string, label?: string | null): E
       return result
     }
     const runAt = run === null ? null : yield* runLogAt(home, run.id)
-    return { ...result, status: run?.asking === undefined ? result.status : "paused", outputAt: runAt ?? result.started }
+    const blocking = run?.asking !== undefined && run.asking.questions.some((question) => (question as { blocks?: boolean }).blocks !== false)
+    return { ...result, status: blocking ? "paused" : result.status, outputAt: runAt ?? result.started }
   })
 
 const AnswerStdin = Schema.Struct({ ...AnswersFile.fields, label: Schema.optional(LabelArg) })
@@ -390,7 +391,7 @@ const runLine = (task: string, run: RunSummary | null): string =>
     ? "orc holds no run on " + taskBranch(task) + " or " + parentBranch(task)
     : "orc run " + run.id + " " + run.status + (run.prLink === null ? "" : ", PR " + run.prLink) + (run.report === undefined ? "" : ", report " + run.report) +
       (run.endReason === null ? "" : ": " + run.endReason) +
-      (run.asking === undefined ? "" : ", waiting until " + run.asking.until + " for the captain's answer to " + run.asking.questions.map((question) => question.id).join(", ")) +
+      (run.asking === undefined || !run.asking.questions.some((question) => (question as { blocks?: boolean }).blocks !== false) ? "" : ", waiting until " + run.asking.until + " for the captain's answer to " + run.asking.questions.filter((question) => (question as { blocks?: boolean }).blocks !== false).map((question) => question.id).join(", ")) +
       (run.failing === undefined ? "" : ", " + failingText(run.failing) + " since " + run.failing.since)
 
 export const formatResult = (result: RunnerResult): string =>

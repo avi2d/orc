@@ -1,6 +1,6 @@
 export { askUserWord } from "./no-mistakes-gate"
 export type { QuestionAnswer, OpenQuestion, NoMistakesFinding, AllowWord } from "./no-mistakes-gate"
 export { gateLogFileName, subprocessNoMistakesRunner, driveNoMistakes, noMistakesBinary, noMistakesVersionProblem } from "./no-mistakes"
-export { AskOption, Asking, askingFileName, AnswersFile, answersFileName, waitForAnswers, answerWaitFromEnv } from "./answer-wait"
+export { AskOption, Asking, AskingQuestion, askingFileName, AnswersFile, answersFileName, waitForAnswers, answerWaitFromEnv, isBlockingQuestion, hasBlockingQuestion } from "./answer-wait"
 export type { NoMistakesRecord } from "./no-mistakes-drive-log"
 export type { SubprocessRunnerOptions, NoMistakesRunner, NoMistakesHost } from "./no-mistakes"

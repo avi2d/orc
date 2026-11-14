@@ -93,7 +93,18 @@ describe("orc run with Pi asking the captain mid-run", () => {
       const argv = await readFile(join(fixture.fakeBin, "first-argv"), "utf8")
       expect(argv).toContain("--orc-ask-dir")
       expect(argv).toContain(",orc_ask")
-      expect(await readFile(join(fixture.fakeBin, "extension-copy"), "utf8")).toContain("registerTool")
+      const copied = await readFile(join(fixture.fakeBin, "extension-copy"), "utf8")
+      const checkFile = join(fixture.fakeBin, "extension-check.ts")
+      await writeFile(checkFile, copied)
+      const copiedModule = (await import(checkFile)) as typeof import("../../packages/run/src/entities/agent/orc-ask-extension")
+      const registered = new Map<string, { execute: (id: string, params: unknown) => Promise<{ content: ReadonlyArray<{ text: string }> }> }>()
+      copiedModule.default({ registerFlag: () => undefined, getFlag: (name: string) => (name === "orc-ask-dir" ? fixture.fakeBin : undefined), registerTool: (tool: { name: string; execute: (id: string, params: unknown) => Promise<{ content: ReadonlyArray<{ text: string }> }> }) => { registered.set(tool.name, tool) }, on: () => undefined } as never)
+      const tool = registered.get("orc_ask")
+      if (tool === undefined) {
+        throw new Error("the copied extension registers no orc_ask tool")
+      }
+      const nonBlocking = await tool.execute("call-check", { question: "Keep the old flag?", blocks: false })
+      expect(nonBlocking.content.map((block) => block.text).join("")).toContain("Carry on")
     })
   }, 60_000)
 

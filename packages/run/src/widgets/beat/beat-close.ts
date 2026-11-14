@@ -189,8 +189,11 @@ const failingOf = (result: RunnerResult): FailingMark | null =>
   (result.status === "running" || result.status === "paused") && result.run?.failing !== undefined ? result.run.failing : null
 
 // A run waiting on the captain writes no output, and that silence is no stall.
-const outputAtOf = (result: RunnerResult): string | null =>
-  (result.status === "running" || result.status === "paused") && result.outputAt !== undefined && askingOf(result) === null ? result.outputAt : null
+const outputAtOf = (result: RunnerResult): string | null => {
+  const asking = askingOf(result)
+  const blocking = asking !== null && asking.questions.some((question) => (question as { blocks?: boolean }).blocks !== false)
+  return (result.status === "running" || result.status === "paused") && result.outputAt !== undefined && !blocking ? result.outputAt : null
+}
 
 const serveAsking = (
   context: CloseContext,
