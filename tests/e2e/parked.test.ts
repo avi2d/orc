@@ -13,7 +13,7 @@ const startOnLinux = async (fixture: Fixture): Promise<void> => {
     quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", tokenFile: mainToken }], floorPercent: 15 }
   }))
   await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
   await orcOk(fixture, ["beat"])
   expect(await queuedArgs(fixture)).not.toBeNull()
   await rm(join(fixture.pueue, "add-args"))
@@ -181,7 +181,7 @@ describe("a parked run", () => {
       const runDir = await askWhileRunning(fixture)
       expect(await orcOk(fixture, ["beat"])).toContain("asking orc-1 on linux: the run waits until 2026-11-02T10:50:00.000Z for the captain's answer to r2")
       expect(await backlogTaskOne(fixture)).toMatchObject({ id: "orc-1", status: "started", parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "Keep the old flag?", asked: firstAsking.asked, answer: null }] } })
-      expect(await orcOk(fixture, ["backlog"])).toContain("orc-1 orc on linux started asking (r2)")
+      expect(await orcOk(fixture, ["backlog"])).toContain("orc-1 P0 orc on linux started asking (r2)")
       expect(await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Keep", "it", "behind", "a", "flag"])).toBe("answered r2 on orc-1, so the next beat hands it to the run waiting on orc/orc-1\n")
       const relayed = await orcOk(fixture, ["beat"])
       expect(relayed).toContain("handed r2 to the run of orc-1 on linux")

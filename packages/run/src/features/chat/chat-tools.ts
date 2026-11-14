@@ -125,7 +125,7 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
     name: "orc_backlog_add",
     label: "Add to the orc backlog",
     description:
-      "Adds one task to the orc backlog through orc backlog add, and returns what orc prints, which names the new task's id. When a planner model is set and the request is over budget, orc adds it as a parent with one child per slice instead, prints one line per task, and the beat starts the independent children together. When the task closes, orc chat posts its outcome and its PR, or its report for a scout or task, and later posts when its PR turns green and when it merges.",
+      "Adds one task to the orc backlog through orc backlog add, and returns what orc prints, which names the new task's id. When a planner model is set and the request is over budget, orc adds it as a parent with one child per slice instead, prints one line per task, and the beat starts the independent children together. The task has no priority, so no beat starts it or its children until the captain sets one with orc backlog priority. When the task closes, orc chat posts its outcome and its PR, or its report for a scout or task, and later posts when its PR turns green and when it merges.",
     parameters: Schema.toJsonSchemaDocument(AddTaskInput).schema,
     execute: (_toolCallId, params) =>
       Effect.runPromise(

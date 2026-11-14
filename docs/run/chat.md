@@ -11,6 +11,7 @@ The chat's Pi has seven tools and no others:
 
 - `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project and the task's Markdown.
   It may add a kind, an internal mark, a machine, a parent and the ids the task depends on.
+  It sets no priority, so the task waits until the captain sets one with `orc backlog priority <task-id> <0-4>`.
   When `models.planner` names a model and a ship add names no parent, an over budget request lands as a parent with one child per slice, as [Splitting at intake](task-kinds.md#splitting-at-intake) shows.
 - `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
 - `orc_backlog_hold` holds one new task through `orc backlog hold`, with the reason, an optional date and optional questions.
@@ -20,7 +21,7 @@ The chat's Pi has seven tools and no others:
 - `merge_task` lands a closed task's PR through `orc merge <task-id> --basis <basis>`, as [Merging a task's PR](merging-a-tasks-pr.md) shows.
 - `orc_decision_board` opens a decision board for one held task, one parked task, or one started task waiting at its gate, as [Decision boards](chat.md#decision-boards) shows.
 
-So a task from the chat enters the backlog the way any other does, and the beat starts it.
+So a task from the chat waits until the captain gives it a priority with `orc backlog priority <task-id> <0-4>`.
 When it starts and every 15 seconds after, the chat reads `orc backlog --json`.
 While Pi is idle, it posts each closed task that has no `postedAt`, with its outcome, its reason and its PR or report, as in `orc-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
 It posts a task whoever added it: this chat, an earlier chat or the command line.

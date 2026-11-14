@@ -16,7 +16,7 @@ const writeProject = async (fixture: Fixture, start: ReadonlyArray<string>): Pro
   }))
   await fakeQuota(fixture)
   await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
   await orcOk(fixture, ["beat"])
 }
 

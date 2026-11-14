@@ -60,7 +60,7 @@ describe("the dispatcher source", () => {
     await withBacklog(async (root) => {
       await writeFile(
         join(root, "backlog", "new", "orc-12.md"),
-        ["---", 'id: "orc-12"', 'title: "Project task"', 'project: "orc"', "machine: null", "depends_on: []", 'created: "2026-10-27T10:00:00.000Z"', "---", "# Project task", ""].join("\n"),
+        ["---", 'id: "orc-12"', 'title: "Project task"', 'project: "orc"', "machine: null", "depends_on: []", 'created: "2026-10-27T10:00:00.000Z"', "priority: 0", "---", "# Project task", ""].join("\n"),
       );
       const snapshot = snapshotOf(await readBacklog(root));
       expect(snapshot.unread).toEqual([]);
@@ -133,7 +133,7 @@ describe("the dispatch view", () => {
   test("a split child held by its unmerged sibling and its parent read as waiting instead of unclaimed", async () => {
     await withBacklog(async (root) => {
       const file = (id: string, title: string, dependsOn: ReadonlyArray<string>, extra: ReadonlyArray<string> = []): string =>
-        ["---", 'id: "' + id + '"', 'title: "' + title + '"', 'project: "orc"', "machine: null", "depends_on: " + JSON.stringify(dependsOn), 'created: "2026-10-27T10:00:00.000Z"', ...extra, "---", "# " + title, ""].join("\n");
+        ["---", 'id: "' + id + '"', 'title: "' + title + '"', 'project: "orc"', "machine: null", "depends_on: " + JSON.stringify(dependsOn), 'created: "2026-10-27T10:00:00.000Z"', "priority: 0", ...extra, "---", "# " + title, ""].join("\n");
       await writeFile(join(root, "backlog", "new", "orc-1.md"), file("orc-1", "Whole feature", [], ['kind: "parent"']));
       await writeFile(join(root, "backlog", "new", "orc-3.md"), file("orc-3", "Second part", ["orc-2"], ['parent: "orc-1"']));
       await writeFile(
@@ -170,7 +170,7 @@ describe("the dispatch view", () => {
   test("eligible tasks read as unclaimed instead of forecasting the beat", async () => {
     await withBacklog(async (root) => {
       const file = (id: string, title: string): string =>
-        ["---", 'id: "' + id + '"', 'title: "' + title + '"', 'project: "orc"', "machine: null", "depends_on: []", 'created: "2026-10-27T10:00:00.000Z"', "---", "# " + title, ""].join("\n");
+        ["---", 'id: "' + id + '"', 'title: "' + title + '"', 'project: "orc"', "machine: null", "depends_on: []", 'created: "2026-10-27T10:00:00.000Z"', "priority: 0", "---", "# " + title, ""].join("\n");
       await writeFile(join(root, "backlog", "new", "task-12.md"), file("task-12", "Second free task"));
       await writeFile(join(root, "backlog", "new", "task-13.md"), file("task-13", "Third free task"));
       const view = dispatchView(snapshotOf(await readBacklog(root)));
@@ -183,7 +183,7 @@ describe("the dispatch view", () => {
     await withBacklog(async (root) => {
       await writeFile(
         join(root, "backlog", "new", "task-12"),
-        ["---", 'id: "task-12"', 'title: "Extensionless task"', 'project: "orc"', "machine: null", "depends_on: []", 'created: "2026-10-27T10:00:00.000Z"', "---", "# Extensionless task", ""].join("\n"),
+        ["---", 'id: "task-12"', 'title: "Extensionless task"', 'project: "orc"', "machine: null", "depends_on: []", 'created: "2026-10-27T10:00:00.000Z"', "priority: 0", "---", "# Extensionless task", ""].join("\n"),
       );
       const view = dispatchView(snapshotOf(await readBacklog(root)));
       expect(view.waiting.some((row) => row.id === "task-12")).toBe(false);
@@ -208,7 +208,7 @@ describe("the dispatch view", () => {
       await writeFile(join(backlog, "projects.json"), "not json");
       await writeFile(
         join(backlog, "taken", "task-6.md"),
-        ["---", 'id: "task-6"', 'title: "Running task"', 'project: "orc"', "machine: null", "depends_on: []", 'beat: "beat-1"', 'taken_for: "mac"', 'account: "main"', 'taken_at: "2026-10-27T10:01:00.000Z"', 'created: "2026-10-27T10:00:00.000Z"', "---", "# Running task", ""].join("\n"),
+        ["---", 'id: "task-6"', 'title: "Running task"', 'project: "orc"', "machine: null", "depends_on: []", 'beat: "beat-1"', 'taken_for: "mac"', 'account: "main"', 'taken_at: "2026-10-27T10:01:00.000Z"', 'created: "2026-10-27T10:00:00.000Z"', "priority: 0", "---", "# Running task", ""].join("\n"),
       );
       const view = dispatchView(snapshotOf(await readBacklog(root)));
       expect(view.runs).toHaveLength(1);
@@ -250,7 +250,7 @@ describe("the dispatch view", () => {
       await writeFile(join(backlog, "projects.json"), JSON.stringify({ projects: [{ name: "proj", checkouts: {} }] }));
       await writeFile(
         join(backlog, "new", "task-1.md"),
-        ["---", 'id: "task-1"', 'title: "First task"', 'project: "proj"', "machine: null", "depends_on: []", 'created: "2026-10-27T10:00:00.000Z"', "---", "# First task", ""].join("\n"),
+        ["---", 'id: "task-1"', 'title: "First task"', 'project: "proj"', "machine: null", "depends_on: []", 'created: "2026-10-27T10:00:00.000Z"', "priority: 0", "---", "# First task", ""].join("\n"),
       );
       const view = dispatchView(snapshotOf(await readBacklog(root)));
       expect(view.waiting.find((row) => row.id === "task-1")?.reason).toBe("the project proj has no checkout on any machine");

@@ -9,7 +9,7 @@ import { addTask, applyRunSplit, applySplit, claimTask, listTasks, parseTaskFile
 import { prioritizeTask } from "../../../packages/run/src/features/backlog-planning/index"
 import { parseDispatchArgs } from "../../../packages/run/src/app/dispatch-args"
 import { runBeat } from "../../../packages/run/src/widgets/beat/beat"
-import { backlogJson, formatBoard } from "../../../packages/run/src/widgets/beat/board"
+import { backlogJson, formatBeat, formatBoard } from "../../../packages/run/src/widgets/beat/board"
 import { quietSources } from "../../lib/beat-sources"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
@@ -77,10 +77,17 @@ describe("the beat's start order", () => {
       expect(await startedIds(root)).toEqual(["orc-2"])
     })
   })
-  test("a task with no priority still starts instead of waiting for one", async () => {
+  test("a task with no priority waits with the reason no priority instead of starting on a free slot", async () => {
     await withBacklog(async (root) => {
       await addAt(root, spec.created, null)
-      expect(await startedIds(root)).toEqual(["orc-1"])
+      const beatOnce = () => Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, quotaOnly))))
+      const first = await beatOnce()
+      expect(first.actions).toEqual([{ kind: "waits", task: "orc-1", reason: "no priority" }])
+      expect(formatBeat(first)).toContain("waits orc-1: no priority")
+      const second = await beatOnce()
+      expect(second.actions).toEqual([{ kind: "waits", task: "orc-1", reason: "no priority" }])
+      expect(formatBeat(second)).toContain("waits orc-1: no priority")
+      expect((await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["orc-1:new"])
     })
   })
 })
@@ -141,7 +148,7 @@ describe("a priority in the task file", () => {
 describe("a priority across a split", () => {
   test("an intake split gives the parent and every child the requested priority instead of none", async () => {
     await withBacklog(async (root) => {
-      const applied = await run(applySplit(root, { title: spec.title, project: "orc", internal: false, machine: null, dependsOn: [], priority: 0, created: spec.created, body: spec.body }, plan, "intake"))
+      const applied = await run(applySplit(root, { title: spec.title, project: "orc", internal: false, machine: null, dependsOn: [], priority: 0 as const, created: spec.created, body: spec.body }, plan, "intake"))
       expect([applied.parent, ...applied.children].map((task) => task.spec.priority)).toEqual([0, 0, 0])
       expect((await run(listTasks(root))).map((task) => task.spec.priority)).toEqual([0, 0, 0])
     })
