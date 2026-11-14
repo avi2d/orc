@@ -120,7 +120,7 @@ const otherMachinesOf = (dispatchFile: string) =>
   readOtherMachinesFrom(dispatchFile).pipe(
     Effect.provide(BunServices.layer),
     Effect.catchTag("ConfigError", (error) =>
-      Console.error("orc: " + error.file + ": " + error.detail).pipe(Effect.andThen(Effect.fail("orc runs refused")))
+      Console.error("orc: " + error.file + ": " + error.detail).pipe(Effect.as({ runs: [], machines: [] }))
     )
   )
 

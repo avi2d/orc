@@ -10,16 +10,18 @@ Every JSON document names its version first as `schema`, starting at `orc.runs.v
 `orc runs --json` also reads the runs of each other machine in `dispatch.json` and adds them to `runs`.
 It reads each machine with the command that reaches it, as `orc runner result` does, and asks it for `orc runs --json --local`.
 A machine whose `start` names no reach command, such as `orc runner start` with nothing after `--`, is not read.
-A machine that fails, does not answer within 30 seconds, or prints JSON orc cannot read adds no runs.
+A machine that fails, does not answer within 10 seconds, or prints JSON orc cannot read adds no runs.
 It is named in `machines` with its `machine` and its `error`, the first line it printed or why its answer did not read, and the command still exits 0.
 `machines` is empty when every machine answers or `dispatch.json` names none.
 To print only this machine's runs, run `orc runs --json --local`.
+Poll with `--local` when you read every few seconds.
 Each run in it also gives `title`, the first line of its task file, and `endReason`, the reason it ended.
 Its `step` is the step running now, else the step that started last, as an id, name, attempt and status, and `null` before the first step.
 Its `questions` counts the questions a running run waits on you to answer, and is 0 otherwise.
 Its `task` is the backlog task id its `orc/<task-id>` or `orc/<task-id>-parent` branch names, and `null` on any other branch.
 Its `machine` is the dispatch machine the beat claimed for the run, which reaches `orc run` as `ORC_RUN_MACHINE`.
-A run you start by hand without `ORC_RUN_MACHINE` shows `null`.
+A run you start by hand on this machine without `ORC_RUN_MACHINE` shows `null`.
+A run from another machine names that machine when its own record names none.
 Its `worktree` is the checkout the run works in: the task copy for a ship run, the project checkout for a report run.
 Runs recorded before these facts show each as `null`.
 To see one run step by step, run `orc show <run-id>`.

@@ -13,7 +13,8 @@ type Reading =
   | { readonly kind: "answered"; readonly runs: ReadonlyArray<RunsJsonRun> }
   | { readonly kind: "failed"; readonly failure: MachineFailure }
 
-const answerWait = Duration.seconds(30)
+const answerSeconds = 10
+const answerWait = Duration.seconds(answerSeconds)
 
 // Without --local the other machine reads its own dispatch machines and could reach this one back.
 const localRunsOf = (through: Command): Command => [...through, "runs", "--json", "--local"]
@@ -34,11 +35,12 @@ const firstLine = (text: string): string => text.trim().split("\n")[0] ?? ""
 
 const answerOf = (command: Command): Effect.Effect<RunsJsonDocument, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   capture(command, null).pipe(
-    Effect.flatMap((result) =>
-      result.exitCode === 0
+    Effect.flatMap((result) => {
+      const line = firstLine(result.stderr)
+      return result.exitCode === 0
         ? decodeAnswer(command, result.stdout)
-        : Effect.fail(new RunnerError({ detail: command.join(" ") + " exited " + result.exitCode + ": " + firstLine(result.stderr) }))
-    )
+        : Effect.fail(new RunnerError({ detail: command.join(" ") + " exited " + result.exitCode + ": " + (line !== "" ? line : firstLine(result.stdout)) }))
+    })
   )
 
 const readMachine = (name: string, through: Command): Effect.Effect<Reading, never, ChildProcessSpawner.ChildProcessSpawner> => {
@@ -46,9 +48,9 @@ const readMachine = (name: string, through: Command): Effect.Effect<Reading, nev
   return answerOf(command).pipe(
     Effect.timeoutOrElse({
       duration: answerWait,
-      orElse: () => Effect.fail(new RunnerError({ detail: command.join(" ") + " did not answer within 30 seconds" }))
+      orElse: () => Effect.fail(new RunnerError({ detail: command.join(" ") + " did not answer within " + answerSeconds + " seconds" }))
     }),
-    Effect.map((document): Reading => ({ kind: "answered", runs: document.runs })),
+    Effect.map((document): Reading => ({ kind: "answered", runs: document.runs.map((run) => run.machine === null ? { ...run, machine: name } : run) })),
     Effect.catch((error) => Effect.succeed<Reading>({ kind: "failed", failure: { machine: name, error: error.detail } }))
   )
 }
