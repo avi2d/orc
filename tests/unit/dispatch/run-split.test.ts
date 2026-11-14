@@ -18,7 +18,7 @@ import { quietSources } from "../../lib/beat-sources"
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
 
-const spec = { title: "Ship task splitting", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: 0, created: "2026-11-11T10:00:00.000Z", body: "# Ship task splitting\n" }
+const spec = { title: "Ship task splitting", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: 0 as const, created: "2026-11-11T10:00:00.000Z", body: "# Ship task splitting\n" }
 const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-11-11T10:01:00.000Z" }
 const started = { at: "2026-11-11T10:02:00.000Z", log: "/logs/orc-1.log" }
 const quota = { provider: "keyed", command: ["orc-quota"], accounts: [{ name: "main", kind: "token-file", tokenFile: "/secrets/main-token" }], floorPercent: 15 } as const

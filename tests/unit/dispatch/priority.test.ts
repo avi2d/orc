@@ -148,7 +148,7 @@ describe("a priority in the task file", () => {
 describe("a priority across a split", () => {
   test("an intake split gives the parent and every child the requested priority instead of none", async () => {
     await withBacklog(async (root) => {
-      const applied = await run(applySplit(root, { title: spec.title, project: "orc", internal: false, machine: null, dependsOn: [], priority: 0, created: spec.created, body: spec.body }, plan, "intake"))
+      const applied = await run(applySplit(root, { title: spec.title, project: "orc", internal: false, machine: null, dependsOn: [], priority: 0 as const, created: spec.created, body: spec.body }, plan, "intake"))
       expect([applied.parent, ...applied.children].map((task) => task.spec.priority)).toEqual([0, 0, 0])
       expect((await run(listTasks(root))).map((task) => task.spec.priority)).toEqual([0, 0, 0])
     })
