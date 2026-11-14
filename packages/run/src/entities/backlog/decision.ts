@@ -1,5 +1,5 @@
 import { Effect, FileSystem } from "effect"
-import { answeredReason, decisionAnswer, parseTaskFile, type TaskFileError, type TaskRecord } from "./task-record"
+import { answeredReason, decisionAnswer, isHeld, parseTaskFile, type TaskFileError, type TaskRecord } from "./task-record"
 import { renderTaskFile } from "./task-record-render"
 import { BacklogError, backlogPaths, newGrab, platformFailure, publishOnce, readIfPresent } from "./backlog-write"
 
@@ -10,6 +10,7 @@ export const decisionRefusal = (record: TaskRecord, verb: string): string | null
 
 const answeredRecord = (fresh: TaskRecord, words: string, at: string): TaskRecord => ({
   ...fresh,
+  hold: isHeld(fresh) ? null : fresh.hold,
   state: { kind: "closed", claim: null, closing: { outcome: "done", reason: answeredReason, answer: { words, at } }, closedAt: at, postedAt: null }
 })
 

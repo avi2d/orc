@@ -392,7 +392,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     if (typeof state === "string") {
       return yield* new TaskFileError({ file, detail: state })
     }
-    const hold = holdOf(front)
+    const hold = kind === "decision" ? holdOf({ ...front, answer: undefined, answered_at: undefined }) : holdOf(front)
     if (typeof hold === "string") {
       return yield* new TaskFileError({ file, detail: hold })
     }

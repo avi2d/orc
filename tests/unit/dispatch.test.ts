@@ -15,6 +15,7 @@ import { mergeTask } from "../../packages/run/src/features/merging-a-pr/index"
 import { readRequest } from "../../packages/run/src/features/queueing-a-task/runner-request"
 import { placeTask, runBeat } from "../../packages/run/src/widgets/beat/beat"
 import { quietSources } from "../lib/beat-sources"
+import { realBacklogStdout } from "../lib/dispatch-fixture"
 import { formatBeat } from "../../packages/run/src/widgets/beat/board"
 import { insertRun, openDatabase } from "../../packages/run/src/entities/run-history/index"
 import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/shared/config/dispatch-config"
@@ -633,6 +634,9 @@ describe("a decision", () => {
       const text = await readFile(join(root, "closed", "orc-1.md"), "utf8")
       expect(text).toContain('answer: "use the left one"\n')
       expect(text).toContain('answered_at: "' + answeredAt + '"\n')
+      const shown = (JSON.parse(await realBacklogStdout(root)) as { tasks: ReadonlyArray<{ id: string; kind: string; answer: { words: string; at: string } | null }> }).tasks.find((task) => task.id === "orc-1")
+      expect(shown?.kind).toBe("decision")
+      expect(shown?.answer).toEqual({ words: "use the left one", at: answeredAt })
     })
   })
   test("a task waiting on a decision starts after the answer with the question and answer after its own body instead of its body alone", async () => {
