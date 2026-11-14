@@ -1,11 +1,19 @@
 #!/bin/bash
 set -euo pipefail
-if [ "$#" -ne 2 ]; then
-  echo "usage: capture-board.sh <fixture-dir> <output-png>" >&2
+if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
+  echo "usage: capture-board.sh <fixture-dir> <output-png> [orc-board|orc-resources|orc-agents]" >&2
   exit 2
 fi
 fixture=$1
 output=$2
+view=${3:-orc-board}
+case "$view" in
+  orc-board | orc-resources | orc-agents) ;;
+  *)
+    echo "unknown view: $view" >&2
+    exit 2
+    ;;
+esac
 if [ ! -d "$fixture/backlog" ]; then
   echo "fixture has no backlog dir: $fixture" >&2
   exit 1
@@ -40,8 +48,8 @@ if [ "${#HC_SOCKET}" -gt 103 ]; then
   exit 1
 fi
 app=/Applications/Herdr.app/Contents/MacOS/Herdr
-for tool in "$app" lsof osascript python3 /usr/sbin/screencapture; do
-  if [ ! -x "$tool" ]; then
+for tool in "$app" "$HOME/.local/bin/herdr-core" jq lsof osascript python3 /usr/sbin/screencapture; do
+  if ! command -v "$tool" >/dev/null; then
     echo "missing tool: $tool" >&2
     exit 1
   fi
@@ -93,6 +101,11 @@ cleanup() {
   exit "$code"
 }
 trap cleanup EXIT
+# A home with no welcome outcome opens the welcome over the view.
+mkdir -p "$HERDR_APP_HOME"
+shared=$HERDR_APP_HOME/shared.json
+[ -f "$shared" ] || echo '{}' > "$shared"
+jq '."frame.welcomed" = "finished"' "$shared" > "$shared.tmp" && mv "$shared.tmp" "$shared"
 "$app" > "$proof/app.log" 2>&1 </dev/null &
 pid=$!
 sleep 5
@@ -110,6 +123,7 @@ else
   echo "no scratch core socket" > "$proof/core-sockets"
 fi
 "$app" do layout.switch --name orc
+"$app" do layout.select "{\"stack\":\"orc-views\",\"child\":\"$view\"}"
 osascript - "$pid" <<'OSA'
 on run argv
   set appPid to (item 1 of argv) as integer
