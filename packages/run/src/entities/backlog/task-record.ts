@@ -332,11 +332,6 @@ const decisionStateOf = (folder: TaskFolder, front: Frontmatter): TaskState | st
   return folder === "closed" && front.outcome === "done" ? answeredOf(front) : stateOf(folder, front)
 }
 
-const decisionHoldOf = (front: Frontmatter): null | string =>
-  front.hold_reason === undefined && front.hold_until === undefined && front.held_at === undefined && front.hold_questions === undefined && front.hold_history === undefined
-    ? null
-    : "a decision carries no hold"
-
 const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => {
   if (folder === "new") {
     return { kind: "new" }
@@ -397,7 +392,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     if (typeof state === "string") {
       return yield* new TaskFileError({ file, detail: state })
     }
-    const hold = kind === "decision" ? decisionHoldOf(front) : holdOf(front)
+    const hold = holdOf(front)
     if (typeof hold === "string") {
       return yield* new TaskFileError({ file, detail: hold })
     }
