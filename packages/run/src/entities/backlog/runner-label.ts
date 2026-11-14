@@ -8,7 +8,8 @@ export const taskBranch = (task: string): string => taskBranchPrefix + task
 
 export const taskOfBranch = (branch: string): string | null => {
   const task = branch.startsWith(taskBranchPrefix) ? branch.slice(taskBranchPrefix.length) : null
-  return task !== null && isTaskId(task) ? task : null
+  const id = task !== null && task.endsWith("-parent") ? task.slice(0, -"-parent".length) : task
+  return id !== null && isTaskId(id) ? id : null
 }
 
 export const parentBranch = (task: string): string => taskBranch(task) + "-parent"

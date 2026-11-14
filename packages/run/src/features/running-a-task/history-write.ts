@@ -124,7 +124,7 @@ export const recordResumePublish = (db: Database, run: HistoryRun, resume: Resum
           id: run.runId, project: run.projectDir, branch: run.branch,
           taskFile: run.taskPath, status: "running", started: run.started, sandbox: run.sandbox,
           kind: "ship", delivery: run.delivery.kind,
-          task: taskOfBranch(run.branch), machine: run.machine ?? null, worktree: run.worktreeDir
+          task: taskOfBranch(run.branch), machine: run.machine, worktree: run.worktreeDir
         })
         if (resume.skipImplement) {
           const planned = planImplementDone(run, {

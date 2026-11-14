@@ -10,7 +10,7 @@ Every JSON document names its version first as `schema`, starting at `orc.runs.v
 Each run in it also gives `title`, the first line of its task file, and `endReason`, the reason it ended.
 Its `step` is the step running now, else the step that started last, as an id, name, attempt and status, and `null` before the first step.
 Its `questions` counts the questions a running run waits on you to answer, and is 0 otherwise.
-Its `task` is the backlog task id its `orc/<task-id>` branch names, and `null` on any other branch.
+Its `task` is the backlog task id its `orc/<task-id>` or `orc/<task-id>-parent` branch names, and `null` on any other branch.
 Its `machine` is the dispatch machine the beat claimed for the run, which reaches `orc run` as `ORC_RUN_MACHINE`.
 A run you start by hand without `ORC_RUN_MACHINE` shows `null`.
 Its `worktree` is the checkout the run works in: the task copy for a ship run, the project checkout for a report run.
