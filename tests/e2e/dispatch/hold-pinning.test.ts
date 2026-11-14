@@ -12,7 +12,7 @@ const dispatched = async (fixture: Fixture): Promise<void> => {
     machines: [{ name: "linux", slots: 1, start: ["true"] }],
     quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", kind: "none" }], floorPercent: 15 }
   }))
-  await orcOk(fixture, ["backlog", "add", "orc", "task.md"])
+  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0"])
 }
 
 const attentionIds = async (fixture: Fixture): Promise<ReadonlyArray<string>> => {

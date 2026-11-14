@@ -108,17 +108,17 @@ const threeSlicePlan = {
 const threeSlices = JSON.stringify(threeSlicePlan)
 
 const added = (fixture: Fixture, more: ReadonlyArray<string> = []): Promise<string> =>
-  orcOk(fixture, ["backlog", "add", "orc", "request.md", ...more])
+  orcOk(fixture, ["backlog", "add", "orc", "request.md", "--priority", "0", ...more])
 
 describe("orc backlog add with a planner model", () => {
   test("an over-budget request lands as a parent whose independent children start together instead of as one big task", async () => {
     await withFixture(true, async (fixture) => {
       await fixture.reply("Here is the plan.\n" + threeSlices + "\n")
       expect(await added(fixture)).toBe([
-        "added orc-1 for orc as a parent, split at intake: it touches the record, the intake and the listing",
-        "added orc-2 for orc as a child of orc-1",
-        "added orc-3 for orc as a child of orc-1",
-        "added orc-4 for orc as a child of orc-1",
+        "added orc-1 for orc as a parent at P0, split at intake: it touches the record, the intake and the listing",
+        "added orc-2 for orc as a child of orc-1 at P0",
+        "added orc-3 for orc as a child of orc-1 at P0",
+        "added orc-4 for orc as a child of orc-1 at P0",
         ""
       ].join("\n"))
       const asked = await readFile(fixture.piLog, "utf8")
@@ -130,7 +130,7 @@ describe("orc backlog add with a planner model", () => {
       expect(first).toContain("waits orc-4: waits on orc-2")
       expect(await startsAfter(fixture, 2)).toEqual(["orc-2", "orc-3"])
       expect((await orcOk(fixture, ["backlog"])).split("\n").filter((line) => line.includes(" parent "))).toEqual([
-        expect.stringContaining("orc-1 parent orc 0 of 3 done")
+        expect.stringContaining("orc-1 P0 parent orc 0 of 3 done")
       ])
       const parent = await readFile(join(fixture.dir, "home", "backlog", "new", "orc-1.md"), "utf8")
       expect(parent).toContain("- the plan shows on the parent")
@@ -168,19 +168,19 @@ describe("orc backlog add with a planner model", () => {
   test("a request that fits the budget stays one task instead of becoming a parent", async () => {
     await withFixture(true, async (fixture) => {
       await fixture.reply(JSON.stringify({ schema: "orc.split.v1", plan: "whole", reason: "one small change in one area" }))
-      expect(await added(fixture)).toBe("added orc-1 for orc\nplanned as one task: one small change in one area\n")
+      expect(await added(fixture)).toBe("added orc-1 for orc at P0\nplanned as one task: one small change in one area\n")
     })
   }, beatTimeout)
 
   test("a planner that fails or prints no plan leaves the request as one task instead of refusing it", async () => {
     await withFixture(true, async (fixture) => {
       await fixture.reply("", 3)
-      expect(await added(fixture)).toBe("added orc-1 for orc\nnot planned, so it runs as one task: the planner on acme/plan-1 exited 3: the planner said so\n")
+      expect(await added(fixture)).toBe("added orc-1 for orc at P0\nnot planned, so it runs as one task: the planner on acme/plan-1 exited 3: the planner said so\n")
       await fixture.reply("I would split this in two.")
-      expect(await added(fixture)).toBe("added orc-2 for orc\nnot planned, so it runs as one task: the planner on acme/plan-1 printed no orc.split.v1 document\n")
+      expect(await added(fixture)).toBe("added orc-2 for orc at P0\nnot planned, so it runs as one task: the planner on acme/plan-1 printed no orc.split.v1 document\n")
       await fixture.reply(JSON.stringify({ ...threeSlicePlan, children: [{ title: "A", body: "a", after: [2] }, { title: "B", body: "b", after: [] }] }))
       expect(await added(fixture)).toBe(
-        "added orc-3 for orc\nnot planned, so it runs as one task: the planner on acme/plan-1 printed a split where child 1 waits on child 2, and a child waits only on a child before it\n"
+        "added orc-3 for orc at P0\nnot planned, so it runs as one task: the planner on acme/plan-1 printed a split where child 1 waits on child 2, and a child waits only on a child before it\n"
       )
     })
   }, beatTimeout)
@@ -188,14 +188,14 @@ describe("orc backlog add with a planner model", () => {
   test("a scout, a parent, a child and a request with no planner model skip the planner instead of asking it", async () => {
     await withFixture(true, async (fixture) => {
       await fixture.reply(threeSlices)
-      expect(await added(fixture, ["--kind", "scout"])).toBe("added orc-1 for orc as a scout\n")
-      expect(await added(fixture, ["--kind", "parent"])).toBe("added orc-2 for orc as a parent\n")
-      expect(await added(fixture, ["--parent", "orc-2"])).toBe("added orc-3 for orc as a child of orc-2\n")
+      expect(await added(fixture, ["--kind", "scout"])).toBe("added orc-1 for orc as a scout at P0\n")
+      expect(await added(fixture, ["--kind", "parent"])).toBe("added orc-2 for orc as a parent at P0\n")
+      expect(await added(fixture, ["--parent", "orc-2"])).toBe("added orc-3 for orc as a child of orc-2 at P0\n")
       expect(await readFile(fixture.piLog, "utf8")).toBe("")
     })
     await withFixture(false, async (fixture) => {
       await fixture.reply(threeSlices)
-      expect(await added(fixture)).toBe("added orc-1 for orc\n")
+      expect(await added(fixture)).toBe("added orc-1 for orc at P0\n")
       expect(await readFile(fixture.piLog, "utf8")).toBe("")
     })
   }, beatTimeout)

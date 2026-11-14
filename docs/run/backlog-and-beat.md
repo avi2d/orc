@@ -175,6 +175,7 @@ Each beat reads each contribution's state: open, closed or merged, its comment c
 It keeps the last state it read in `~/.orc/backlog/upstream/<project>/<owner>.<repo>.<number>.json`, with the owner and repository in lower case, never in `projects.json`.
 The first beat to read a contribution records it, prints `watching <url> for <project>: <state>` and adds no task.
 A later beat that reads another state adds one scout task for the project, titled `Follow up on <owner>/<repo>#<number>: <changes>`, records the change as a chat event and prints `added <task-id> for <project> as a scout: <url> changed: <changes>`.
+The scout task has no priority, so it waits until you plan it with `orc backlog priority`.
 The event's key names the change, so of two beats reading one change only one adds the task, and a repeat beat on the same state adds none.
 A contribution gh cannot read within 30 seconds, through no network, no login or a deleted issue, prints `upstream of <project>: cannot read <url>: <reason>`, adds no task and keeps the recorded state.
 A recorded state orc cannot read prints `upstream of <project>:` with the file and adds no task until you remove the file, and the next beat then records the contribution afresh.
@@ -216,25 +217,26 @@ To see the backlog, run `orc backlog`.
 It prints the new, taken and closed tasks side by side with the project list and each machine's busy slots beside them.
 To print the same facts as JSON, run `orc backlog --json`, whose document names its version first as `orc.backlog.v1`.
 `orc backlog --json` gives every new task a `wait`, either `null` or the reason the beat will not start it.
-The reason is the hold, the parked questions, the open children, or the dependency it waits on, including a ship prerequisite whose PR has not merged.
+The reason is a missing priority, the hold, the parked questions, the open children, or the dependency it waits on, including a ship prerequisite whose PR has not merged.
 Taken, started and closed tasks carry `null` for `wait`.
 To start what can start, run `orc beat`, from launchd or cron every few minutes.
 Each beat runs the quota command and reads the room on each machine before it takes any task.
-A task starts only once four things hold:
+A task starts only once five things hold:
 
-1. No hold or parked question for the captain waits on it unanswered.
-2. Every task it depends on closed done.
+1. It has a priority.
+A task with no priority never starts, and each beat prints `waits <task-id>: no priority` for it.
+2. No hold or parked question for the captain waits on it unanswered.
+3. Every task it depends on closed done.
 A ship task also waits for each ship prerequisite with a PR to merge, whether or not they share a parent.
 A parent task also waits for every scout and task child closed done and every ship child with a PR merged.
-3. Its project has a checkout on a machine with a free slot.
-4. An account has room above 0% and at or above the floor, and the runs take the account with the most room.
+4. Its project has a checkout on a machine with a free slot.
+5. An account has room above 0% and at or above the floor, and the runs take the account with the most room.
 
 Each beat considers the new tasks in priority order, so when slots run short the first in that order start.
 A task with priority 0 goes first and one with priority 4 goes after the other priorities.
-A task with no priority goes last, but a priority never keeps a task back: a task with none still starts when there is room.
 Among tasks of the same priority the oldest by `created` goes first, and of two created at the same time the lower id goes first.
 To give a new task a priority, add `--priority <0-4>` to `orc backlog add`.
-To change it later, run `orc backlog priority <task-id> <0-4>`, or `orc backlog priority <task-id> none` to clear it.
+To change it later, run `orc backlog priority <task-id> <0-4>`, or `orc backlog priority <task-id> none` to clear it and keep the task from starting.
 Orc refuses a task that is taken, started or closed, and it leaves a held or parked task's hold and questions as they were.
 The task file keeps the priority as `priority`, and a file with no `priority` key has no priority.
 When a task is split, at intake or by its run, each child takes the priority of the task it came from.

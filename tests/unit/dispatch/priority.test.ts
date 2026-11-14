@@ -77,12 +77,6 @@ describe("the beat's start order", () => {
       expect(await startedIds(root)).toEqual(["orc-2"])
     })
   })
-  test("a task with no priority still starts instead of waiting for one", async () => {
-    await withBacklog(async (root) => {
-      await addAt(root, spec.created, null)
-      expect(await startedIds(root)).toEqual(["orc-1"])
-    })
-  })
 })
 
 describe("orc backlog priority", () => {

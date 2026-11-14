@@ -75,24 +75,24 @@ const startsAfter = async (fixture: Fixture, count: number): Promise<ReadonlyArr
 }
 
 const listLine = async (fixture: Fixture, id: string): Promise<string> =>
-  (await orcOk(fixture, ["backlog"])).split("\n").find((line) => line.includes(id + " parent")) ?? ""
+  (await orcOk(fixture, ["backlog"])).split("\n").find((line) => line.includes(id + " P0 parent")) ?? ""
 
 const addChild = (fixture: Fixture, more: ReadonlyArray<string> = []): Promise<string> =>
-  orcOk(fixture, ["backlog", "add", "orc", "child.md", "--parent", "orc-1", ...more])
+  orcOk(fixture, ["backlog", "add", "orc", "child.md", "--priority", "0", "--parent", "orc-1", ...more])
 
 describe("orc backlog add --parent", () => {
   test("independent children start together and the parent waits for all of them instead of starting beside them", async () => {
     await withFixture(async (fixture) => {
-      expect(await orcOk(fixture, ["backlog", "add", "orc", "parent.md", "--kind", "parent"])).toBe("added orc-1 for orc as a parent\n")
+      expect(await orcOk(fixture, ["backlog", "add", "orc", "parent.md", "--priority", "0", "--kind", "parent"])).toBe("added orc-1 for orc as a parent at P0\n")
       expect(await orcOk(fixture, ["beat"])).toContain("waits orc-1: waits for its first child")
-      expect(await addChild(fixture)).toBe("added orc-2 for orc as a child of orc-1\n")
+      expect(await addChild(fixture)).toBe("added orc-2 for orc as a child of orc-1 at P0\n")
       await addChild(fixture)
       await addChild(fixture, ["--depends-on", "orc-2"])
       const first = await orcOk(fixture, ["beat"])
       expect(first).toContain("waits orc-1: waits on its children, 0 of 3 done")
       expect(first).toContain("waits orc-4: waits on orc-2")
       expect(await startsAfter(fixture, 2)).toEqual(["orc-2", "orc-3"])
-      expect(await listLine(fixture, "orc-1")).toContain("orc-1 parent orc 0 of 3 done")
+      expect(await listLine(fixture, "orc-1")).toContain("orc-1 P0 parent orc 0 of 3 done")
       await orcOk(fixture, ["backlog", "close", "orc-2", "done"])
       await orcOk(fixture, ["backlog", "close", "orc-3", "done"])
       expect(await orcOk(fixture, ["beat"])).toContain("waits orc-1: waits on its children, 2 of 3 done")
@@ -100,13 +100,13 @@ describe("orc backlog add --parent", () => {
       await orcOk(fixture, ["backlog", "close", "orc-4", "done"])
       await orcOk(fixture, ["beat"])
       expect(await startsAfter(fixture, 4)).toEqual(["orc-1", "orc-2", "orc-3", "orc-4"])
-      expect(await listLine(fixture, "orc-1")).toContain("orc-1 parent orc 3 of 3 done")
+      expect(await listLine(fixture, "orc-1")).toContain("orc-1 P0 parent orc 3 of 3 done")
     })
   }, beatTimeout)
 
   test("backlog JSON keeps the next sibling and parent waiting until the earlier sibling merges", async () => {
     await withFixture(async (fixture) => {
-      await orcOk(fixture, ["backlog", "add", "orc", "parent.md", "--kind", "parent"])
+      await orcOk(fixture, ["backlog", "add", "orc", "parent.md", "--priority", "0", "--kind", "parent"])
       await addChild(fixture)
       await addChild(fixture, ["--depends-on", "orc-2"])
       await orcOk(fixture, ["beat"])
@@ -136,7 +136,7 @@ describe("orc backlog add --parent", () => {
 
   test("a failed child keeps the parent waiting instead of counting as done", async () => {
     await withFixture(async (fixture) => {
-      await orcOk(fixture, ["backlog", "add", "orc", "parent.md", "--kind", "parent"])
+      await orcOk(fixture, ["backlog", "add", "orc", "parent.md", "--priority", "0", "--kind", "parent"])
       await addChild(fixture)
       await orcOk(fixture, ["beat"])
       await orcOk(fixture, ["backlog", "close", "orc-2", "failed", "the tests broke"])
@@ -146,7 +146,7 @@ describe("orc backlog add --parent", () => {
 
   test("waits for the merge instead of starting the final check on an open PR", async () => {
     await withFixture(async (fixture) => {
-      await orcOk(fixture, ["backlog", "add", "orc", "parent.md", "--kind", "parent"])
+      await orcOk(fixture, ["backlog", "add", "orc", "parent.md", "--priority", "0", "--kind", "parent"])
       await addChild(fixture)
       await orcOk(fixture, ["beat"])
       await orcOk(fixture, ["backlog", "close", "orc-2", "done"])
@@ -157,7 +157,7 @@ describe("orc backlog add --parent", () => {
       const at = text.lastIndexOf(fence)
       await writeFile(closedFile, text.slice(0, at) + "\npr: " + JSON.stringify(pr) + text.slice(at))
       expect(await orcOk(fixture, ["beat"])).toContain("waits orc-1: waits on its children, 0 of 1 done")
-      expect(await listLine(fixture, "orc-1")).toContain("orc-1 parent orc 0 of 1 done")
+      expect(await listLine(fixture, "orc-1")).toContain("orc-1 P0 parent orc 0 of 1 done")
       await mkdir(join(fixture.dir, "home", "backlog", "events"), { recursive: true })
       await writeFile(
         join(fixture.dir, "home", "backlog", "events", "orc-2.merged.json"),
@@ -165,7 +165,7 @@ describe("orc backlog add --parent", () => {
       )
       await orcOk(fixture, ["beat"])
       expect(await startsAfter(fixture, 2)).toEqual(["orc-1", "orc-2"])
-      expect(await listLine(fixture, "orc-1")).toContain("orc-1 parent orc 1 of 1 done")
+      expect(await listLine(fixture, "orc-1")).toContain("orc-1 P0 parent orc 1 of 1 done")
     })
   }, beatTimeout)
 

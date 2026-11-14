@@ -424,6 +424,7 @@ describe("orc chat tools", () => {
       await Bun.sleep(500)
       reopened.fire("session_shutdown")
       expect([first.sent, reopened.sent]).toEqual([[{ message: heldPost, options: { triggerTurn: false } }], [{ message: heldPost, options: { triggerTurn: false } }]])
+      expect((await runOrc(fixture, ["backlog", "priority", "orc-1", "0"])).exitCode).toBe(0)
       const beat = await runOrc(fixture, ["beat"])
       expect(beat.stdout).toContain("waits orc-1: held for the captain: REST or gRPC, until 2026-12-01")
       expect(await Bun.file(join(fixture.home, "backlog", "new", "orc-1.md")).exists()).toBe(true)

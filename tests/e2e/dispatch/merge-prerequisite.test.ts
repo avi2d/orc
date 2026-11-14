@@ -11,14 +11,14 @@ test("a done ship prerequisite with an open PR cannot start an ordinary ship dep
       machines: [{ name: "linux", slots: 4, start: ["true"] }],
       quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", kind: "none" }], floorPercent: 15 }
     }))
-    await orcOk(fixture, ["backlog", "add", "orc", "task.md"])
+    await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0"])
     await orcOk(fixture, ["beat"])
     await orcOk(fixture, ["backlog", "close", "orc-1", "done"])
     const closed = join(fixture.home, "backlog", "closed", "orc-1.md")
     const text = await readFile(closed, "utf8")
     await writeFile(closed, text.replace("\n---\n", '\npr: "https://github.com/example/repo/pull/1"\n---\n'))
-    await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--depends-on", "orc-1"])
-    await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--kind", "scout", "--depends-on", "orc-1"])
+    await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--depends-on", "orc-1"])
+    await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--kind", "scout", "--depends-on", "orc-1"])
     const readTasks = async () => Schema.decodeSync(Schema.fromJsonString(Schema.Struct({
       tasks: Schema.Array(Schema.Struct({ id: Schema.String, status: Schema.String, wait: Schema.NullOr(Schema.String) }))
     })))(await orcOk(fixture, ["backlog", "--json"])).tasks
@@ -32,7 +32,7 @@ test("a done ship prerequisite with an open PR cannot start an ordinary ship dep
     expect(await readTasks()).toContainEqual({ id: "orc-2", status: "new", wait: null })
     expect(await orcOk(fixture, ["beat"])).toContain("started orc-2")
     await orcOk(fixture, ["backlog", "close", "orc-3", "done"])
-    await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--depends-on", "orc-3"])
+    await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--depends-on", "orc-3"])
     expect(await orcOk(fixture, ["beat"])).toContain("started orc-4")
   })
 }, runnerTimeout)

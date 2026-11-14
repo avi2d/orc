@@ -272,9 +272,9 @@ const prepareTwoHomes = async (fixture: Fixture, homeB: string, far: string): Pr
   const machineThroughFar = [process.execPath, binPath, "runner", "start", "--", ...orcThere(far)]
   await writeTwoHomeDispatches(fixture.home, homeB, machineThroughFar)
   await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
   await orcOk(fixture, ["beat"])
-  const addB = await runOrc(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"], { ORC_HOME: homeB })
+  const addB = await runOrc(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"], { ORC_HOME: homeB })
   if (addB.exitCode !== 0) {
     throw new Error("home-b add exited " + addB.exitCode + ": " + addB.stderr)
   }

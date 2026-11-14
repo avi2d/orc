@@ -28,7 +28,7 @@ describe("orc runner queue for a kind none account", () => {
         ] }
       }))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
       await orcOk(fixture, ["beat"])
       expect(await queuedArgs(fixture)).toEqual(expect.arrayContaining(["ORC_DISPATCH_CLAUDE_CONFIG_DIR=/accounts/second"]))
     })
@@ -47,7 +47,7 @@ describe("orc runner queue for a kind none account", () => {
         ] }
       }))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
       await orcOk(fixture, ["beat"])
       expect(await queuedArgs(fixture)).toEqual(expect.arrayContaining(["ORC_DISPATCH_CLAUDE_CONFIG_DIR=/accounts/second"]))
     })
@@ -106,7 +106,7 @@ describe("orc runner queue for a kind none account", () => {
         quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", kind: "none" }], floorPercent: 15 }
       }))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
       await orcOk(fixture, ["beat"])
       expect(await queuedArgs(fixture)).toEqual(bareRunArgs(fixture, "orc-1", "acme"))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({

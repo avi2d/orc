@@ -11,8 +11,8 @@ test("backlog distinguishes a scout PR's open, closed and merged states instead 
       machines: [{ name: "linux", slots: 4, start: ["true"] }],
       quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", kind: "none" }], floorPercent: 15 }
     }))
-    await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--kind", "scout"])
-    await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--kind", "scout"])
+    await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--kind", "scout"])
+    await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--kind", "scout"])
     await orcOk(fixture, ["beat"])
     await orcOk(fixture, ["backlog", "close", "orc-1", "done"])
     await orcOk(fixture, ["backlog", "close", "orc-2", "done"])

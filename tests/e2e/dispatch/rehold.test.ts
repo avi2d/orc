@@ -11,7 +11,7 @@ test("answering an earlier hold does not prevent a new hold or erase its prior d
       machines: [{ name: "linux", slots: 1, start: ["true"] }],
       quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", kind: "none" }], floorPercent: 15 }
     }))
-    await orcOk(fixture, ["backlog", "add", "orc", "task.md"])
+    await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0"])
     await orcOk(fixture, ["backlog", "hold", "orc-1", "--reason", "Choose the format", "--question", "Which format?"])
     await orcOk(fixture, ["backlog", "answer", "orc-1", "question-1=JSON"])
     const reheld = await runOrc(fixture, ["backlog", "hold", "orc-1", "--reason", "Wait for the merge", "--until", "2026-12-01"])

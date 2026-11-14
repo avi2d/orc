@@ -14,7 +14,7 @@ import { threadEntries, threadText } from "../../../packages/run/src/features/ta
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
 
-const spec = { id: "orc-1", title: "Retry the upload", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: null, created: "2026-11-02T10:00:00.000Z", body: "# Retry the upload\nRetry a failed upload twice, then give up.\n" }
+const spec = { id: "orc-1", title: "Retry the upload", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: 0, created: "2026-11-02T10:00:00.000Z", body: "# Retry the upload\nRetry a failed upload twice, then give up.\n" }
 
 const claim = { beat: "beat-1", machine: "linux", account: "main", takenAt: "2026-11-02T10:01:00.000Z" }
 

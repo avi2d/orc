@@ -28,7 +28,7 @@ const withBacklog = async (body: (root: string) => Promise<void>): Promise<void>
   }
 }
 
-const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: null, created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
+const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: 0, created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
 
 const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-10-27T10:01:00.000Z" }
 
@@ -429,6 +429,22 @@ describe("the beat", () => {
       expect(report.actions.map((action) => action.kind)).toEqual(["started"])
       expect(seen).toHaveLength(1)
       expect(seen[0]).toContain("started_at: ")
+    })
+  })
+  test("a task with no priority waits with the reason no priority instead of starting on a free slot", async () => {
+    await withBacklog(async (root) => {
+      await writeFile(join(root, "dispatch.json"), JSON.stringify({ ...config, machines: [{ name: "mac", slots: 1, start: ["true"] }, { name: "linux", slots: 0, start: ["true"] }] }))
+      await writeFile(join(root, "projects.json"), JSON.stringify({ projects }))
+      await run(addTask(root, { ...spec, priority: null }))
+      const seen: Array<string> = []
+      const spawner = recordingSpawner(join(root, "taken", "orc-1.md"), seen).pipe(Layer.provide(BunServices.layer))
+      for (const _beat of [1, 2]) {
+        const report = await Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+        expect(report.actions).toEqual([{ kind: "waits", task: "orc-1", reason: "no priority" }])
+        expect(formatBeat(report)).toContain("waits orc-1: no priority")
+      }
+      expect(seen).toEqual([])
+      expect(await backlogStates(root)).toEqual(["orc-1:new"])
     })
   })
 })
