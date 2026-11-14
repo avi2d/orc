@@ -1,13 +1,14 @@
 import { isTaskId, isCalendarDate, isTaskKind, type TaskKind, unknownKind } from "../entities/backlog/index"
 import { parseJsonFlag, parseRunner, unexpected, type DispatchArgs as RunnerArgs } from "./dispatch-args-runner"
 import type { DropTask, EditTask, TaskSource } from "../features/backlog-planning/index"
+import type { RecordOrigin } from "../widgets/beat/index"
 
-export type DispatchArgs = RunnerArgs | EditTask | DropTask
+export type DispatchArgs = RunnerArgs | EditTask | DropTask | RecordOrigin
 import { isEventKey } from "../entities/events/index"
 import { isMergeBasis, mergeBases } from "../entities/pull-request/index"
 
 export const dispatchUsage =
-  "orc backlog [--json] | orc attention [--json] | orc attention answer <item-id> <words> | orc backlog add <project> <task-file|-> [--kind <ship|scout|task|parent>] [--internal] [--machine <name>] [--parent <task-id>] [--depends-on <task-id>] | orc backlog edit <task-id> <task-file|-> | orc backlog close <task-id> <done|failed> [reason] | orc backlog stop <task-id> | orc backlog drop <task-id> <reason> | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog note <task-id> <words> | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc backlog plan <task-id> [--drop <task-id>] | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <claude-credentials.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner kill <task-id> | orc runner answer <task-id> | orc runner load | orc heavy path | orc heavy check [--json] | orc heavy watch | orc heavy watch-once"
+  "orc backlog [--json] | orc attention [--json] | orc attention answer <item-id> <words> | orc backlog add <project> <task-file|-> [--kind <ship|scout|task|parent>] [--internal] [--machine <name>] [--parent <task-id>] [--depends-on <task-id>] | orc backlog edit <task-id> <task-file|-> | orc backlog origin <task-id> <machine> <run-id> | orc backlog close <task-id> <done|failed> [reason] | orc backlog stop <task-id> | orc backlog drop <task-id> <reason> | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog note <task-id> <words> | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc backlog plan <task-id> [--drop <task-id>] | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <claude-credentials.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner kill <task-id> | orc runner answer <task-id> | orc runner load | orc heavy path | orc heavy check [--json] | orc heavy watch | orc heavy watch-once"
 
 const addFlags = ["--kind", "--machine", "--parent", "--depends-on"] as const
 type AddFlag = typeof addFlags[number]
@@ -98,6 +99,17 @@ const parseEdit = (rest: ReadonlyArray<string>): DispatchArgs => {
     return { kind: "UsageError", detail: "orc backlog edit takes a task id and a task file" }
   }
   return extra.length === 0 ? { kind: "EditTask", id, task: taskFile === "-" ? { kind: "stdin" } : { kind: "file", path: taskFile } } : unexpected(extra[0])
+}
+
+const parseOrigin = (rest: ReadonlyArray<string>): DispatchArgs => {
+  const [id = "", machine = "", run = "", ...extra] = rest
+  if (!isTaskId(id)) {
+    return { kind: "UsageError", detail: "orc backlog origin takes a task id, got \"" + id + "\"" }
+  }
+  if (machine === "" || run === "") {
+    return { kind: "UsageError", detail: "orc backlog origin takes a task id, a machine and a run id" }
+  }
+  return extra.length === 0 ? { kind: "RecordOrigin", id, machine, run } : unexpected(extra[0])
 }
 
 const parseStop = (rest: ReadonlyArray<string>): DispatchArgs => {
@@ -351,6 +363,7 @@ const parseHeavy = (rest: ReadonlyArray<string>): DispatchArgs => {
 const backlogSubcommands: ReadonlyMap<string, (rest: ReadonlyArray<string>) => DispatchArgs> = new Map([
   ["add", parseAdd],
   ["edit", parseEdit],
+  ["origin", parseOrigin],
   ["close", parseClose],
   ["stop", parseStop],
   ["drop", parseDrop],

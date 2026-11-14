@@ -78,6 +78,7 @@ const expectedFiles = [
   "src/entities/attention/beat-action.ts",
   "src/widgets/beat/beat-attention.ts",
   "src/widgets/beat/beat-close.ts",
+  "src/widgets/beat/beat-origin.ts",
   "src/widgets/beat/beat-place.ts",
   "src/widgets/beat/beat-resume.ts",
   "src/widgets/beat/beat-token.ts",

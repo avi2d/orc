@@ -208,6 +208,7 @@ Orc refuses a task the backlog does not hold, a task that is taken or started, w
 It refuses a child, which leaves through `orc backlog plan <parent> --drop <child>`, and a parent with an open child.
 It refuses a task another open task waits on, until `orc backlog depend` changes that wait.
 The drop takes the task file by rename, so a drop and a beat taking the task at the same moment never both win.
+To record the machine and run of a task parked before orc recorded them, run `orc backlog origin <task-id> <machine> <run-id>`, as [Parked runs](parked-runs.md) shows.
 Add `--kind scout` or `--kind task` for a task that ends in a report instead of a PR, as [Task kinds](task-kinds.md) shows.
 To split a large task, add it with `--kind parent`, then add each part with `--parent <task-id>`, as [Parent tasks](task-kinds.md#parent-tasks) shows, or name a planner model so orc splits an over-budget request itself, as [Splitting at intake](task-kinds.md#splitting-at-intake) shows.
 Add `--internal` to mark a ship task internal-only, which only a `no-mistakes-prod-only` project reads.
