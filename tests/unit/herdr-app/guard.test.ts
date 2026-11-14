@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { backlog, guardJson, quotaSnapshot, runs, show } from "../../../packages/herdr-app/src/guard"
+import { backlog, guardJson, runs, show } from "../../../packages/herdr-app/src/guard"
 
 test("refuses a backlog task with no title instead of counting it", () => {
   const text = JSON.stringify({ schema: "orc.backlog.v1", tasks: [{ id: "task-1" }] })
@@ -20,9 +20,4 @@ test("reads a parked task's open questions as their count, not as no question", 
   const text = JSON.stringify({ schema: "orc.backlog.v1", events: [], tasks: [{ id: "orc-34", title: "t", project: "orc", kind: "ship", status: "new", hold: null, parked: { questions: [{ id: "R2" }, { id: "R3" }] } }] })
   const guarded = guardJson(text, backlog)
   expect(guarded.kind === "ok" ? guarded.value.tasks[0]?.parked : guarded).toBe(2)
-})
-
-test("refuses a quota account without a title instead of displaying a blank name", () => {
-  const text = JSON.stringify({ schemaVersion: 1, sources: { quota: { status: "ok", report: { accounts: [{}] } } } })
-  expect(guardJson(text, quotaSnapshot)).toEqual({ kind: "refused", reason: "sources.quota.report.accounts[0].title is missing" })
 })

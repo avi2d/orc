@@ -117,13 +117,13 @@ describe("the result label on stdin", () => {
 
 describe("the board", () => {
   test("the JSON names its schema version so a reader can refuse a newer one", () => {
-    const json = backlogJson({ tasks: [newTask("mac")], events: [], projects: { kind: "read", projects }, room: { kind: "unread", reason: "no dispatch.json" }, merged: new Set(), deciderOwns: () => false })
+    const json = backlogJson({ tasks: [newTask("mac")], events: [], projects: { kind: "read", projects }, room: { kind: "unread", reason: "no dispatch.json" }, merged: new Set(), prStates: new Map(), deciderOwns: () => false })
     expect(json.schema).toBe("orc.backlog.v1")
-    expect(json.tasks[0]).toEqual({ id: "task-1", title: "Fix the thing", project: "orc", kind: "ship", machine: "mac", parent: null, children: null, wait: null, split: null, dependsOn: [], created: spec.created, hold: null, parked: null, status: "new" })
+    expect(json.tasks[0]).toEqual({ id: "task-1", title: "Fix the thing", project: "orc", kind: "ship", machine: "mac", parent: null, children: null, wait: null, split: null, dependsOn: [], created: spec.created, prState: null, hold: null, parked: null, status: "new" })
     expect(json.room).toBeNull()
   })
   test("the project list sits beside the backlog instead of under it", () => {
-    const board = formatBoard({ tasks: [newTask("mac")], events: [], projects: { kind: "read", projects }, room: { kind: "read", room: [{ machine: "mac", slots: 1, busy: 0 }] }, merged: new Set(), deciderOwns: () => false })
+    const board = formatBoard({ tasks: [newTask("mac")], events: [], projects: { kind: "read", projects }, room: { kind: "read", room: [{ machine: "mac", slots: 1, busy: 0 }] }, merged: new Set(), prStates: new Map(), deciderOwns: () => false })
     const [header = "", first = ""] = board.split("\n")
     expect(header).toMatch(/^NEW \(1\) +TAKEN \(0\) +CLOSED \(0\) +PROJECTS$/)
     expect(first).toMatch(/^task-1 orc @mac Fix the thing +orc on mac,linux$/)

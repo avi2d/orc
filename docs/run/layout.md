@@ -172,6 +172,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/events/events.ts` | The chat events under `events/`, their posted marks and the alert fires the backlog lists |
 | `packages/run/src/entities/events/alert-events.ts` | The reading of each `alerts.jsonl` line as one alert fire |
 | `packages/run/src/entities/events/chat-event.ts` | The chat event shape: its key, time and text |
+| `packages/run/src/entities/events/pr-state.ts` | The PR state the beat records under `pr-state/`: its read and write |
 
 ## entities/heavy-queue
 

@@ -90,6 +90,7 @@ const expectedFiles = [
   "src/features/decider/decider-ask.ts",
   "src/features/decider/decider.ts",
   "src/entities/events/events.ts",
+  "src/entities/events/pr-state.ts",
   "src/features/heavy-commands/heavy-cli.ts",
   "src/entities/heavy-queue/heavy-setup.ts",
   "src/entities/heavy-queue/heavy-classify.ts",

@@ -1,0 +1,415 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-03-02T12:00:00.000Z",
+  "machine": "local",
+  "sources": {
+    "quota": {
+      "status": "ok",
+      "report": {
+        "schemaVersion": 2,
+        "generatedAt": "2026-03-02T12:00:00.000Z",
+        "scope": "composed",
+        "estimate": {
+          "basis": "machine-logs",
+          "upperBound": true,
+          "priceRatios": {
+            "input": 1,
+            "output": 5,
+            "cacheRead": 0.1,
+            "cacheWrite": 2
+          }
+        },
+        "accounts": [
+          {
+            "provider": "claude",
+            "accountKey": null,
+            "credentialKey": "default",
+            "title": "claude",
+            "accountKeys": [
+              "default"
+            ],
+            "joins": [
+              {
+                "kind": "only-account"
+              }
+            ],
+            "quota": {
+              "status": "ok"
+            }
+          },
+          {
+            "provider": "codex",
+            "accountKey": null,
+            "credentialKey": "default",
+            "title": "codex",
+            "accountKeys": [
+              "default"
+            ],
+            "joins": [
+              {
+                "kind": "only-account"
+              }
+            ],
+            "quota": {
+              "status": "ok"
+            }
+          }
+        ],
+        "windows": [
+          {
+            "account": {
+              "provider": "claude",
+              "accountKey": null,
+              "credentialKey": "default",
+              "title": "claude"
+            },
+            "id": "five_hour",
+            "label": "session",
+            "kind": "session",
+            "source": {
+              "kind": "quota-axi",
+              "readAt": "2026-03-02T12:00:00.000Z"
+            },
+            "startsAt": "2026-03-02T10:00:00.000Z",
+            "resetsAt": "2026-03-02T15:00:00.000Z",
+            "usedPoints": 60,
+            "leftPoints": 40,
+            "pace": "ahead",
+            "elapsedFraction": 0.4,
+            "gate": {
+              "aheadOfPace": true,
+              "pastFirstTenth": true,
+              "open": false
+            },
+            "exhaustsBeforeReset": true,
+            "verdict": null,
+            "sustainablePointsPerHour": 0.5,
+            "activeSessions": 1,
+            "fairPointsPerHour": 0.5,
+            "observed": {
+              "calls": 10,
+              "tokens": {
+                "input": 1,
+                "output": 1,
+                "cacheRead": 1,
+                "cacheWrite": 1,
+                "total": 4
+              }
+            },
+            "unattributedPoints": 0,
+            "sessions": [],
+            "otherCycle": []
+          },
+          {
+            "account": {
+              "provider": "claude",
+              "accountKey": null,
+              "credentialKey": "default",
+              "title": "claude"
+            },
+            "id": "seven_day",
+            "label": "week",
+            "kind": "weekly",
+            "source": {
+              "kind": "quota-axi",
+              "readAt": "2026-03-02T12:00:00.000Z"
+            },
+            "startsAt": "2026-02-27T12:00:00.000Z",
+            "resetsAt": "2026-03-06T12:00:00.000Z",
+            "usedPoints": 20,
+            "leftPoints": 80,
+            "pace": "behind",
+            "elapsedFraction": 0.4285714285714286,
+            "gate": {
+              "aheadOfPace": false,
+              "pastFirstTenth": true,
+              "open": false
+            },
+            "exhaustsBeforeReset": false,
+            "verdict": null,
+            "sustainablePointsPerHour": 0.5,
+            "activeSessions": 1,
+            "fairPointsPerHour": 0.5,
+            "observed": {
+              "calls": 10,
+              "tokens": {
+                "input": 1,
+                "output": 1,
+                "cacheRead": 1,
+                "cacheWrite": 1,
+                "total": 4
+              }
+            },
+            "unattributedPoints": 0,
+            "sessions": [],
+            "otherCycle": []
+          },
+          {
+            "account": {
+              "provider": "codex",
+              "accountKey": null,
+              "credentialKey": "default",
+              "title": "codex"
+            },
+            "id": "seven_day",
+            "label": "week",
+            "kind": "weekly",
+            "source": {
+              "kind": "quota-axi",
+              "readAt": "2026-03-02T12:00:00.000Z"
+            },
+            "startsAt": "2026-03-01T12:00:00.000Z",
+            "resetsAt": "2026-03-08T12:00:00.000Z",
+            "usedPoints": 5,
+            "leftPoints": 95,
+            "pace": "behind",
+            "elapsedFraction": 0.14285714285714285,
+            "gate": {
+              "aheadOfPace": false,
+              "pastFirstTenth": true,
+              "open": false
+            },
+            "exhaustsBeforeReset": false,
+            "verdict": null,
+            "sustainablePointsPerHour": 0.5,
+            "activeSessions": 1,
+            "fairPointsPerHour": 0.5,
+            "observed": {
+              "calls": 10,
+              "tokens": {
+                "input": 1,
+                "output": 1,
+                "cacheRead": 1,
+                "cacheWrite": 1,
+                "total": 4
+              }
+            },
+            "unattributedPoints": 0,
+            "sessions": [],
+            "otherCycle": []
+          }
+        ],
+        "flags": [],
+        "ledger": {
+          "bridgeCopiesDropped": 728,
+          "repeatedLinesDropped": 869,
+          "emptyRowsDropped": 283,
+          "forkCopiesDropped": 0,
+          "repeatedCountsDropped": 0,
+          "unjoinedCalls": 0
+        },
+        "machines": [
+          {
+            "name": "local",
+            "role": "local",
+            "status": "ok",
+            "generatedAt": "2026-03-02T12:00:00.000Z",
+            "combined": true,
+            "sources": {
+              "quota": {
+                "status": "ok"
+              },
+              "herdr": {
+                "status": "ok"
+              },
+              "processes": {
+                "status": "ok"
+              }
+            },
+            "failedAccounts": []
+          }
+        ],
+        "sessions": [],
+        "unmatchedProcesses": [],
+        "unmetered": []
+      }
+    },
+    "resources": {
+      "status": "ok",
+      "machines": [
+        {
+          "name": "local",
+          "reading": {
+            "kind": "ok",
+            "value": {
+              "schemaVersion": 1,
+              "generatedAt": "2026-03-02T12:00:00.000Z",
+              "machine": {
+                "cpu": {
+                  "kind": "ok",
+                  "value": {
+                    "percent": 30,
+                    "cores": 10
+                  }
+                },
+                "memory": {
+                  "kind": "ok",
+                  "value": {
+                    "usedBytes": 8589934592,
+                    "totalBytes": 17179869184
+                  }
+                },
+                "load": {
+                  "kind": "ok",
+                  "value": [
+                    4.06,
+                    4.17,
+                    3.69
+                  ]
+                },
+                "disk": {
+                  "kind": "ok",
+                  "value": {
+                    "usedBytes": 397284474880,
+                    "totalBytes": 493921239040
+                  }
+                },
+                "processes": {
+                  "kind": "ok",
+                  "value": []
+                }
+              },
+              "gpu": null
+            }
+          }
+        },
+        {
+          "name": "build-box",
+          "reading": {
+            "kind": "ok",
+            "value": {
+              "schemaVersion": 1,
+              "generatedAt": "2026-03-02T12:00:00.000Z",
+              "machine": {
+                "cpu": {
+                  "kind": "ok",
+                  "value": {
+                    "percent": 30,
+                    "cores": 16
+                  }
+                },
+                "memory": {
+                  "kind": "ok",
+                  "value": {
+                    "usedBytes": 42949672960,
+                    "totalBytes": 68719476736
+                  }
+                },
+                "load": {
+                  "kind": "ok",
+                  "value": [
+                    18.5,
+                    12.1,
+                    9.2
+                  ]
+                },
+                "disk": {
+                  "kind": "ok",
+                  "value": {
+                    "usedBytes": 1288490188800,
+                    "totalBytes": 2000381018112
+                  }
+                },
+                "processes": {
+                  "kind": "ok",
+                  "value": []
+                }
+              },
+              "gpu": null
+            }
+          }
+        }
+      ]
+    },
+    "queues": {
+      "status": "ok",
+      "machines": [
+        {
+          "name": "local",
+          "pueue": {
+            "kind": "ok",
+            "value": {
+              "running": [
+                {
+                  "id": 1,
+                  "command": "orc run",
+                  "group": "orc",
+                  "project": "shop",
+                  "startedAt": "2026-03-02T11:00:00.000Z"
+                },
+                {
+                  "id": 2,
+                  "command": "orc run",
+                  "group": "orc",
+                  "project": "shop",
+                  "startedAt": "2026-03-02T11:00:00.000Z"
+                },
+                {
+                  "id": 3,
+                  "command": "orc run",
+                  "group": "default",
+                  "project": "shop",
+                  "startedAt": "2026-03-02T11:00:00.000Z"
+                }
+              ],
+              "queued": 0,
+              "paused": 0,
+              "ended": [],
+              "groups": [
+                {
+                  "name": "default",
+                  "status": "Running",
+                  "parallel": 8
+                },
+                {
+                  "name": "orc",
+                  "status": "Running",
+                  "parallel": 2
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "build-box",
+          "pueue": {
+            "kind": "ok",
+            "value": {
+              "running": [
+                {
+                  "id": 7,
+                  "command": "orc run",
+                  "group": "orc",
+                  "project": "shop",
+                  "startedAt": "2026-03-02T11:00:00.000Z"
+                }
+              ],
+              "queued": 0,
+              "paused": 0,
+              "ended": [],
+              "groups": [
+                {
+                  "name": "default",
+                  "status": "Running",
+                  "parallel": 8
+                },
+                {
+                  "name": "orc",
+                  "status": "Running",
+                  "parallel": 2
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "actions": {
+        "repo": "this repository",
+        "runs": {
+          "kind": "ok",
+          "value": []
+        }
+      }
+    }
+  }
+}

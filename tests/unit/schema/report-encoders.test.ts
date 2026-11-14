@@ -43,6 +43,15 @@ describe("the queues report printer", () => {
     ]);
   });
 
+  test("prints each task's own pueue group, never one group for every task", () => {
+    const pueue = valueOf(printed().machines[0]?.pueue ?? { kind: "invalid", issue: "no machine" });
+    expect(pueue.running.map(({ id, group }) => [id, group])).toEqual([
+      [5, "tests"],
+      [10, "default"],
+    ]);
+    expect(pueue.ended.find(({ id }) => id === 2)?.group).toBe("tests");
+  });
+
   test("never prints a task's environment", () => {
     expect(JSON.stringify(printed())).not.toContain("not-a-real-token");
   });

@@ -751,7 +751,7 @@ A machine whose command is unset or blank has no entry.
 | `sources.quota.report` | The report [Read the composed report](session-quota/compose-two-machines.md#read-the-composed-report) describes as the composed report |
 | `sources.resources.machines` | Each machine's `name` and a `reading` of the report [Read the resources report](#read-the-resources-report) describes |
 | `sources.queues.machines` | Each machine's `name` and a `pueue` reading of its `running` and `ended` tasks, how many are `queued` and `paused`, and its `groups` with their `status` and `parallel` count |
-| `sources.queues.machines` tasks | Each task's `id`, `command`, `project` and `startedAt`, and for an ended task its `endedAt` and `result` |
+| `sources.queues.machines` tasks | Each task's `id`, `command`, pueue `group`, `project` and `startedAt`, and for an ended task its `endedAt` and `result` |
 | `sources.queues.machines` result | `kind` `success`, `exit` with its `code`, `spawn` with its `error`, `killed`, `errored` or `dependency` |
 | `sources.queues.actions` | The `repo` and a reading of its `runs`, newest first, each with its `id`, `title`, `workflow`, `status` and `createdAt` |
 | `sources.tasks.machines` | Each machine's `name` and a `reading` of the report [Read the tasks report](#read-the-tasks-report) describes |

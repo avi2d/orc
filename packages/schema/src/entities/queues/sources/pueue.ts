@@ -27,6 +27,7 @@ const Task = Schema.Struct({
   id: Schema.Int,
   command: Schema.String,
   path: Schema.String,
+  group: Schema.String,
   status: TaskStatus,
 });
 

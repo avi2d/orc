@@ -31,6 +31,7 @@ export const realBacklogStdout = (backlog: string): Promise<string> =>
           projects: { kind: "read", projects: [] },
           room: { kind: "read", room: [] },
           merged,
+          prStates: new Map(),
           deciderOwns: () => false,
         }),
       );

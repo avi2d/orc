@@ -1,10 +1,10 @@
 import { Duration, Effect, type FileSystem, Option, Result } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { BacklogError, type TaskRecord } from "../../entities/backlog/index"
+import { BacklogError, taskPr, type TaskRecord } from "../../entities/backlog/index"
 import type { BeatAction, StalledAction } from "../../entities/attention/index"
 import type { ChatEvent } from "../../entities/events/index"
 import { routePullRequest } from "../../entities/attention/index"
-import { eventRecorded, recordEvent } from "../../entities/events/index"
+import { eventRecorded, readPrState, recordEvent, writePrState } from "../../entities/events/index"
 import { checkRefusals, greenChecks, type PullRequestView } from "../../entities/pull-request/index"
 import type { RunnerError } from "../../shared/process/index"
 
@@ -23,8 +23,6 @@ export const stallEvent = (root: string, task: TaskRecord, stall: StalledAction,
     text: named(task) + " stalled on " + stall.machine + ": no output since " + stall.since
   })
 
-const openPr = (task: TaskRecord): string | null =>
-  task.state.kind === "closed" && task.state.closing.outcome !== "start-failed" && task.spec.kind === "ship" ? task.state.closing.pr : null
 
 const prEvent = (task: TaskRecord, pr: string, view: PullRequestView, at: string, readyPosted: boolean): ChatEvent | null => {
   if (view.state === "MERGED") {
@@ -39,7 +37,6 @@ const prEvent = (task: TaskRecord, pr: string, view: PullRequestView, at: string
   return { key: task.spec.id + ".pr-ready", at, text: named(task) + " PR ready: " + pr + ", checks green: " + greenChecks(view).join(", ") }
 }
 
-// A merged or closed PR changes no more, so its task's PR is read no more.
 export const prEvents = (
   root: string,
   task: TaskRecord,
@@ -47,19 +44,33 @@ export const prEvents = (
   at: string
 ): Effect.Effect<Option.Option<BeatAction>, BacklogError, Requirements> =>
   Effect.gen(function*() {
-    const pr = openPr(task)
+    const pr = taskPr(task)
     const id = task.spec.id
-    if (pr === null || (yield* eventRecorded(root, id + ".merged")) || (yield* eventRecorded(root, id + ".pr-closed"))) {
+    if (pr === null) {
+      return Option.none()
+    }
+    const recorded = yield* readPrState(root, id, pr)
+    if (recorded === "merged" || recorded === "closed") {
       return Option.none()
     }
     const view = yield* read(pr).pipe(Effect.result, Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed(Result.fail(new BacklogError({ detail: "cannot read " + pr + ": the read timed out after " + prSeconds + " seconds" }))) }))
     if (Result.isFailure(view)) {
       return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: view.failure.detail })
     }
+    const state = view.success.state
+    if (state !== "OPEN" && state !== "CLOSED" && state !== "MERGED") {
+      return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: "unknown PR state " + state })
+    }
+    const prState = state === "OPEN" ? "open" : state === "CLOSED" ? "closed" : "merged"
+    if (task.spec.kind !== "ship") {
+      yield* writePrState(root, id, pr, prState)
+      return Option.none()
+    }
     yield* routePullRequest(root, id, pr, view.success, at)
     const event = prEvent(task, pr, view.success, at, yield* eventRecorded(root, id + ".pr-ready"))
     if (event !== null) {
       yield* recordEvent(root, event)
     }
+    yield* writePrState(root, id, pr, prState)
     return Option.none()
   })

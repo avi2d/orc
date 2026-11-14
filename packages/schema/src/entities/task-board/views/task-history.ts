@@ -136,8 +136,8 @@ const spendOf = (sampled: SampledSpend | null): TaskSpend | undefined =>
 
 const testOf = (run: SampledTestRun): TestRun =>
   "endedAt" in run
-    ? { id: run.id, command: run.command, path: run.path, project: projectOf(run.path), startedAt: run.startedAt, endedAt: run.endedAt, result: run.result }
-    : { id: run.id, command: run.command, path: run.path, project: projectOf(run.path), startedAt: run.startedAt };
+    ? { id: run.id, command: run.command, group: run.group, path: run.path, project: projectOf(run.path), startedAt: run.startedAt, endedAt: run.endedAt, result: run.result }
+    : { id: run.id, command: run.command, group: run.group, path: run.path, project: projectOf(run.path), startedAt: run.startedAt };
 
 export interface ResolvedDetail {
   readonly spend: SampledSpend | null;
