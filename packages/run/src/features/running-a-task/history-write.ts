@@ -216,7 +216,7 @@ export const recordFixStart = (db: Database, runId: string, attempt: number, age
   Effect.gen(function*() {
     const known = yield* stepIdFor(db, runId, "fix", attempt).pipe(Effect.mapError((cause) => historyFailure("read the fix step in", cause)))
     if (known !== null) {
-      yield* updateStep(db, runId, "fix", attempt, { status: "running", ended: null, piSessionFile: piSessionFile ?? undefined }).pipe(Effect.mapError((cause) => historyFailure("record the fix step in", cause)))
+      yield* updateStep(db, runId, "fix", attempt, { status: "running", ended: null, piSessionFile: piSessionFile ?? undefined, agentFile: agent.path, model: agent.model, thinking: agent.thinking }).pipe(Effect.mapError((cause) => historyFailure("record the fix step in", cause)))
       yield* sqlite(() => db.query("DELETE FROM evidence WHERE step_id = ? AND direction = ? AND kind = ?").run(known, "out", "log")).pipe(Effect.mapError((cause) => historyFailure("reset the fix log in", cause)))
       return
     }
@@ -270,7 +270,7 @@ export const recordFixDone = (db: Database, runId: string, fix: RecordedFixAttem
     const known = yield* stepIdFor(db, runId, "fix", fix.attempt).pipe(Effect.mapError(failed("read the fix step in")))
     const fixId = known ?? (yield* recordStep(db, planned.step).pipe(Effect.mapError(failed("record the fix step in"))))
     if (known !== null) {
-      yield* updateStep(db, runId, "fix", fix.attempt, { status: planned.step.status, ended: fix.ended, piSessionFile: fix.sessionFile ?? undefined }).pipe(Effect.mapError(failed("record the fix step in")))
+      yield* updateStep(db, runId, "fix", fix.attempt, { status: planned.step.status, ended: fix.ended, piSessionFile: fix.sessionFile ?? undefined, agentFile: planned.step.agentFile, model: planned.step.model, thinking: planned.step.thinking }).pipe(Effect.mapError(failed("record the fix step in")))
     }
     yield* recordEvidence(db, { stepId: fixId, ...planned.evidenceIn }).pipe(Effect.mapError(failed("record the fix evidence in")))
     if (planned.sessionEvidence !== null) {

@@ -256,6 +256,62 @@ describe("resumed runs publish inherited progress atomically", () => {
         }
     })
   })
+
+  test("inherited steps keep the prior run's agent facts when the current agents differ, instead of the current run's", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "project")
+        await mkdir(project, { recursive: true })
+        const git = await stubGit(home)
+        await seedRefusedPrior(db, join(home, "runs", "prior-a"), project)
+        const base = await Effect.runPromise(historyFor("next-b", home, project, "2026-10-19T10:00:00.000Z", git, ""))
+        const run: HistoryRun = {
+          ...base,
+          agent: { ...implementer, model: "other/implementer", thinking: "low", path: "bundled/other-implementer.md" },
+          fixer: { ...fixer, model: "other/fixer", thinking: "low", path: "bundled/other-fixer.md" }
+        }
+        const plan = await Effect.runPromise(buildResumePlan(db, run))
+        await Effect.runPromise(recordResumePublish(db, run, plan))
+        const steps = await Effect.runPromise(stepsForRun(db, "next-b"))
+        expect(steps.find((step) => step.name === "implement")).toMatchObject({ agentFile: implementer.path, model: implementer.model, thinking: implementer.thinking })
+        expect(steps.find((step) => step.name === "fix")).toMatchObject({ agentFile: fixer.path, model: fixer.model, thinking: fixer.thinking })
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a retried inherited fix records the current fixer instead of the inherited agent facts", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "project")
+        await mkdir(project, { recursive: true })
+        await Effect.runPromise(recordRun(db, {
+          id: "next-b", project, branch: "orc/test", taskFile: join(home, "task.md"),
+          status: "running", started: "2026-10-19T10:00:00.000Z"
+        }).pipe(Effect.asVoid))
+        await Effect.runPromise(recordStep(db, {
+          runId: "next-b", name: "fix", attempt: 1, status: "failed",
+          started: "2026-10-19T09:22:00.000Z", agentFile: "bundled/old-fixer.md",
+          piSessionFile: null, model: "old/fixer", thinking: "low"
+        }).pipe(Effect.asVoid))
+        const current = { ...fixer, model: "other/fixer", thinking: "low" as const, path: "bundled/other-fixer.md" }
+        await Effect.runPromise(recordFixStart(db, "next-b", 1, current, "2026-10-19T10:01:00.000Z"))
+        await Effect.runPromise(recordFixDone(db, "next-b", {
+          attempt: 1, status: "passed",
+          started: "2026-10-19T10:01:00.000Z", ended: "2026-10-19T10:02:00.000Z",
+          agentFile: current.path, sessionFile: null, model: current.model, thinking: current.thinking,
+          evidenceIn: join(home, "checks-1.md"), commits: 1, tokens: null
+        }, current))
+        const steps = await Effect.runPromise(stepsForRun(db, "next-b"))
+        expect(steps.find((step) => step.name === "fix")).toMatchObject({ agentFile: current.path, model: current.model, thinking: current.thinking })
+      } finally {
+        db.close()
+      }
+    })
+  })
 })
 
 const freshPlan = { implementSessionId: null, implementSessionFile: null, inheritedImplement: null, skipImplement: false, skipChecks: false, allow: [], answers: [], inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null, priorDir: null }
