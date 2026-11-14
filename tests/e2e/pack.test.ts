@@ -202,7 +202,8 @@ const expectedFiles = [
   "src/features/merging-a-pr/index.ts",
   "src/features/seeing-runs/index.ts",
   "src/features/task-thread/index.ts",
-  "src/features/task-thread/note.ts"
+  "src/features/task-thread/note.ts",
+  "src/features/task-thread/thread.ts"
 ]
 
 const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => {

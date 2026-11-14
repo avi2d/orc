@@ -81,3 +81,6 @@ To print the same facts as JSON, run `orc attention --json`, whose document name
 `at` is the time the queue was read, and each item's age and overdue flag are taken at that time.
 To watch the open items in a terminal, run `orc-dash panel attention`, as [orc-dash](../dash.md#run-the-attention-tool) shows.
 On a machine with no backlog folder, `orc attention` prints `no backlog at <path>`, and `orc attention --json` prints an empty queue.
+
+The queue holds every task's items.
+To see one task's items in order with its holds, questions, answers and notes, run `orc backlog thread <task-id>`, the per-task view [Backlog and beat](backlog-and-beat.md) describes.
