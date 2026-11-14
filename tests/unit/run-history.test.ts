@@ -52,6 +52,15 @@ const tableNames = (db: Database): Array<string> =>
     db.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all()
   ).map((row) => row.name)
 
+const stepsBeforeModel =
+  "CREATE TABLE steps (id INTEGER PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs (id), name TEXT NOT NULL, attempt INTEGER NOT NULL DEFAULT 1, " +
+  "status TEXT NOT NULL CHECK (status IN ('running', 'passed', 'failed', 'skipped')), started TEXT NOT NULL, ended TEXT, agent_file TEXT, pi_session_file TEXT)"
+
+const StepAgentRow = Schema.Struct({ model: Schema.NullOr(Schema.String), thinking: Schema.NullOr(Schema.String) })
+
+const stepAgents = (db: Database): ReadonlyArray<typeof StepAgentRow.Type> =>
+  Schema.decodeUnknownSync(Schema.Array(StepAgentRow))(db.query("SELECT model, thinking FROM steps ORDER BY id").all())
+
 const columnNames = (db: Database, table: string): Array<string> =>
   Schema.decodeUnknownSync(Schema.Array(NameRow))(db.query(`PRAGMA table_info (${table})`).all()).map((row) => row.name)
 
@@ -85,7 +94,10 @@ describe("openDatabase", () => {
         "end_reason",
         "sandbox",
         "kind",
-        "delivery"
+        "delivery",
+        "task",
+        "machine",
+        "worktree"
       ])
       expect(columnNames(db, "steps")).toEqual([
         "id",
@@ -96,7 +108,9 @@ describe("openDatabase", () => {
         "started",
         "ended",
         "agent_file",
-        "pi_session_file"
+        "pi_session_file",
+        "model",
+        "thinking"
       ])
       expect(columnNames(db, "evidence")).toEqual(["id", "step_id", "direction", "path", "kind"])
       expect(columnNames(db, "signals")).toEqual(["id", "step_id", "name", "value"])
@@ -117,13 +131,14 @@ describe("openDatabase", () => {
     await withHome(async (home) => {
       const v1 = new Database(join(home, "orc.sqlite"), { create: true })
       v1.run("CREATE TABLE runs (id TEXT PRIMARY KEY, project TEXT NOT NULL, branch TEXT NOT NULL, task_file TEXT NOT NULL, status TEXT NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')), started TEXT NOT NULL, ended TEXT, pr_link TEXT, end_reason TEXT)")
+      v1.run(stepsBeforeModel)
       v1.run("INSERT INTO runs (id, project, branch, task_file, status, started) VALUES ('old-run', 'orc', 'orc/x', 'task.md', 'failed', '2026-10-18T10:00:00.000Z')")
       v1.run("PRAGMA user_version = 1")
       v1.close()
       const db = await openDb(home)
       try {
         expect((await readRuns(db)).map((run) => [run.id, run.sandbox, run.kind, run.delivery])).toEqual([["old-run", null, null, null]])
-        expect(columnNames(db, "runs").slice(-3)).toEqual(["sandbox", "kind", "delivery"])
+        expect(columnNames(db, "runs").slice(-6)).toEqual(["sandbox", "kind", "delivery", "task", "machine", "worktree"])
       } finally {
         db.close()
       }
@@ -134,6 +149,7 @@ describe("openDatabase", () => {
     await withHome(async (home) => {
       const v2 = new Database(join(home, "orc.sqlite"), { create: true })
       v2.run("CREATE TABLE runs (id TEXT PRIMARY KEY, project TEXT NOT NULL, branch TEXT NOT NULL, task_file TEXT NOT NULL, status TEXT NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')), started TEXT NOT NULL, ended TEXT, pr_link TEXT, end_reason TEXT, sandbox TEXT CHECK (sandbox IN ('nono', 'none')))")
+      v2.run(stepsBeforeModel)
       v2.run("INSERT INTO runs (id, project, branch, task_file, status, started, sandbox) VALUES ('old-run', 'orc', 'orc/x', 'task.md', 'running', '2026-10-18T10:00:00.000Z', 'none')")
       v2.run("PRAGMA user_version = 2")
       v2.close()
@@ -142,6 +158,45 @@ describe("openDatabase", () => {
         expect((await readRuns(db)).map((run) => [run.id, run.status, run.sandbox])).toEqual([["old-run", "running", "none"]])
         db.run("INSERT INTO runs (id, project, branch, task_file, status, started) VALUES ('stopped-run', 'orc', 'orc/y', 'task.md', 'stopped', '2026-10-18T10:00:00.000Z')")
         expect((await readRuns(db)).map((run) => [run.id, run.status])).toContainEqual(["stopped-run", "stopped"])
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a version 3 history gains kind, delivery, task, machine, worktree, model and thinking as null instead of being refused", async () => {
+    await withHome(async (home) => {
+      const v3 = new Database(join(home, "orc.sqlite"), { create: true })
+      v3.run("CREATE TABLE runs (id TEXT PRIMARY KEY, project TEXT NOT NULL, branch TEXT NOT NULL, task_file TEXT NOT NULL, status TEXT NOT NULL CHECK (status IN ('running', 'succeeded', 'failed', 'stopped')), started TEXT NOT NULL, ended TEXT, pr_link TEXT, end_reason TEXT, sandbox TEXT CHECK (sandbox IN ('nono', 'none')))")
+      v3.run(stepsBeforeModel)
+      v3.run("INSERT INTO runs (id, project, branch, task_file, status, started, sandbox) VALUES ('old-run', 'orc', 'orc/orc-7', 'task.md', 'failed', '2026-10-18T10:00:00.000Z', 'none')")
+      v3.run("INSERT INTO steps (run_id, name, status, started, agent_file) VALUES ('old-run', 'implement', 'failed', '2026-10-18T10:00:00.000Z', 'bundled/implementer.md')")
+      v3.run("PRAGMA user_version = 3")
+      v3.close()
+      const db = await openDb(home)
+      try {
+        expect((await readRuns(db)).map((run) => [run.id, run.kind, run.delivery, run.task, run.machine, run.worktree])).toEqual([["old-run", null, null, null, null, null]])
+        expect(stepAgents(db)).toEqual([{ model: null, thinking: null }])
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a version 4 history gains task, machine, worktree, model and thinking with its kind kept instead of being refused", async () => {
+    await withHome(async (home) => {
+      const v4 = new Database(join(home, "orc.sqlite"), { create: true })
+      v4.run("CREATE TABLE runs (id TEXT PRIMARY KEY, project TEXT NOT NULL, branch TEXT NOT NULL, task_file TEXT NOT NULL, status TEXT NOT NULL CHECK (status IN ('running', 'succeeded', 'failed', 'stopped')), started TEXT NOT NULL, ended TEXT, pr_link TEXT, end_reason TEXT, sandbox TEXT CHECK (sandbox IN ('nono', 'none')), kind TEXT, delivery TEXT)")
+      v4.run(stepsBeforeModel)
+      v4.run("INSERT INTO runs (id, project, branch, task_file, status, started, kind, delivery) VALUES ('old-run', 'orc', 'orc/orc-7', 'task.md', 'succeeded', '2026-10-18T10:00:00.000Z', 'ship', 'no-mistakes')")
+      v4.run("INSERT INTO steps (run_id, name, status, started) VALUES ('old-run', 'implement', 'passed', '2026-10-18T10:00:00.000Z')")
+      v4.run("PRAGMA user_version = 4")
+      v4.close()
+      const db = await openDb(home)
+      try {
+        expect((await readRuns(db)).map((run) => [run.kind, run.delivery, run.task, run.machine, run.worktree])).toEqual([["ship", "no-mistakes", null, null, null]])
+        expect(stepAgents(db)).toEqual([{ model: null, thinking: null }])
+        expect(columnNames(db, "steps").slice(-2)).toEqual(["model", "thinking"])
       } finally {
         db.close()
       }
@@ -217,7 +272,10 @@ describe("record and list runs", () => {
         started: "2026-10-16T10:00:00.000Z",
         ended: "2026-10-16T10:05:00.000Z",
         prLink: "https://github.com/avi2d/orc/pull/1",
-        endReason: "pr opened"
+        endReason: "pr opened",
+        task: "orc-12",
+        machine: "linux",
+        worktree: "/work/orc-12"
       }))
       Effect.runSync(recordRun(db, {
         id: "run-new",
@@ -237,8 +295,21 @@ describe("record and list runs", () => {
         status: "succeeded",
         ended: "2026-10-16T10:05:00.000Z",
         prLink: "https://github.com/avi2d/orc/pull/1",
-        endReason: "pr opened"
+        endReason: "pr opened",
+        task: "orc-12",
+        machine: "linux",
+        worktree: "/work/orc-12"
       })
+      expect(runs.find((run) => run.id === "run-new")).toMatchObject({ task: null, machine: null, worktree: null })
+    })
+  })
+
+  test("a step keeps the model and thinking it was recorded with instead of dropping them", async () => {
+    await openTemp(async (_home, db) => {
+      Effect.runSync(recordRun(db, { id: "run-1", project: "orc", branch: "orc/x", taskFile: "task.md", status: "running", started: "2026-10-18T10:00:00.000Z" }))
+      Effect.runSync(recordStep(db, { runId: "run-1", name: "implement", attempt: 1, status: "running", started: "2026-10-18T10:00:00.000Z", model: "acme/coder", thinking: "high" }))
+      Effect.runSync(recordStep(db, { runId: "run-1", name: "checks", attempt: 1, status: "running", started: "2026-10-18T10:01:00.000Z" }))
+      expect(stepAgents(db)).toEqual([{ model: "acme/coder", thinking: "high" }, { model: null, thinking: null }])
     })
   })
 
@@ -331,7 +402,10 @@ describe("runsJson", () => {
       endReason: null,
       sandbox: "nono",
       kind: "ship",
-      delivery: null
+      delivery: null,
+      task: null,
+      machine: null,
+      worktree: null
     }
   ]
 
@@ -347,7 +421,7 @@ describe("runsJson", () => {
   test("carries the listed facts for every run", () => {
     const document = runsJson(facts)
     expect(document.runs).toHaveLength(1)
-    expect(Object.keys(document.runs[0] ?? {})).toEqual(["id", "project", "branch", "status", "prLink", "title", "step", "questions", "endReason", "kind", "delivery"])
+    expect(Object.keys(document.runs[0] ?? {})).toEqual(["id", "project", "branch", "status", "prLink", "title", "step", "questions", "endReason", "kind", "delivery", "task", "machine", "worktree"])
     expect(document.runs[0]).toEqual({
       id: "run-1",
       project: "orc",
@@ -359,7 +433,10 @@ describe("runsJson", () => {
       questions: 0,
       endReason: null,
       kind: "ship",
-      delivery: null
+      delivery: null,
+      task: null,
+      machine: null,
+      worktree: null
     })
   })
 
@@ -391,7 +468,10 @@ describe("formatRunsTable", () => {
         endReason: null,
         sandbox: "nono",
         kind: null,
-        delivery: null
+        delivery: null,
+        task: null,
+        machine: null,
+        worktree: null
       }
     ])
     const [header, row] = table.split("\n")
@@ -417,7 +497,10 @@ describe("formatRunsTable", () => {
       endReason: null,
       sandbox: "nono",
       kind: null,
-      delivery: null
+      delivery: null,
+      task: null,
+      machine: null,
+      worktree: null
     }
     const table = formatRunsTable([run, { ...run, id: "run-2", prLink: "https://github.com/avi2d/orc/pull/1" }])
     expect(table.split("\n")).toEqual([

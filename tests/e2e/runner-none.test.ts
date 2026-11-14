@@ -9,9 +9,9 @@ const queueWith = (fixture: Fixture, request: object, env: Record<string, string
 const mainToken = "/secrets/main-token"
 
 describe("orc runner queue for a kind none account", () => {
-  const bareRunArgs = (fixture: Fixture, task: string, provider: string): Array<string> => [
+  const bareRunArgs = (fixture: Fixture, task: string, provider: string, claimedMachine: ReadonlyArray<string> = []): Array<string> => [
     "--group", "orc", "--label", fixture.home + " " + task, "--working-directory", fixture.checkout, "--print-task-id", "--escape", "--",
-    process.execPath, binPath, "run", join(fixture.home, "runner", task + ".md"), "--branch", "orc/" + task,
+    ...claimedMachine, process.execPath, binPath, "run", join(fixture.home, "runner", task + ".md"), "--branch", "orc/" + task,
     "--sandbox", "none", "--provider", provider
   ]
 
@@ -108,7 +108,7 @@ describe("orc runner queue for a kind none account", () => {
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
       await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
       await orcOk(fixture, ["beat"])
-      expect(await queuedArgs(fixture)).toEqual(bareRunArgs(fixture, "orc-1", "acme"))
+      expect(await queuedArgs(fixture)).toEqual(bareRunArgs(fixture, "orc-1", "acme", ["env", "ORC_RUN_MACHINE=linux"]))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({
         tasks: {
           "77": {

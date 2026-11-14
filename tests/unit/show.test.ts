@@ -105,6 +105,45 @@ describe("readShow", () => {
   })
 })
 
+describe("readShow run and step facts", () => {
+  test("orc show JSON carries the run's task, machine and worktree and each step's model and thinking instead of leaving them out", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await Effect.runPromise(recordRun(db, {
+          id: "facts-1", project: "orc", branch: "orc/orc-36", taskFile: "/tmp/facts/task.md", status: "running", started: "2026-10-18T10:00:00.000Z",
+          task: "orc-36", machine: "linux", worktree: "/work/orc-36"
+        }))
+        await Effect.runPromise(recordStep(db, { runId: "facts-1", name: "implement", attempt: 1, status: "passed", started: "2026-10-18T10:00:00.000Z", model: "acme/coder", thinking: "high" }))
+        await Effect.runPromise(recordStep(db, { runId: "facts-1", name: "checks", attempt: 1, status: "passed", started: "2026-10-18T10:01:00.000Z" }))
+        const document = await Effect.runPromise(readShow(db, "facts-1"))
+        if (document === null) {
+          throw new Error("missing fixture")
+        }
+        const decoded = await Effect.runPromise(decodeShowJson(JSON.parse(await Effect.runPromise(encodeShowJson(document)))))
+        expect(decoded.run).toMatchObject({ task: "orc-36", machine: "linux", worktree: "/work/orc-36" })
+        expect(decoded.steps.map((step) => [step.name, step.model, step.thinking])).toEqual([["implement", "acme/coder", "high"], ["checks", null, null]])
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a run recorded without facts shows null task, machine and worktree instead of omitting the keys", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await fixture(db)
+        const document = await Effect.runPromise(readShow(db, "show-1"))
+        expect(document?.run).toMatchObject({ task: null, machine: null, worktree: null })
+        expect(document?.steps[0]).toMatchObject({ model: null, thinking: null })
+      } finally {
+        db.close()
+      }
+    })
+  })
+})
+
 describe("readShow orders and links", () => {
   test("steps read in execution order even when a fix was recorded after the recheck it caused", async () => {
     await withHome(async (home) => {
