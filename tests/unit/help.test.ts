@@ -141,7 +141,7 @@ describe("orc help", () => {
     const pages = invocations.map((invocation) => {
       const result = parseArgs([...invocation.path, "--help"])
       const text = result.kind === "PrintHelp" ? helpText(result.words) : ""
-      const usage = text.split("\n\n")[0].split("\n").filter((line) => !line.startsWith("    "))
+      const usage = text.split("\n\n")[0].split("\n").filter((line) => !line.startsWith(" ".repeat(11)))
       return { path: invocation.path.join(" "), usageNamesOnlyIt: usage.length > 0 && usage.every((line) => line.replace(/^(Usage:)? +/, "").startsWith("orc " + invocation.path.join(" "))), overview: text.includes("Run a task:") }
     })
     expect(pages).toEqual(invocations.map((invocation) => ({ path: invocation.path.join(" "), usageNamesOnlyIt: true, overview: false })))

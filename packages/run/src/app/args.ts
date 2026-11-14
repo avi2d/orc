@@ -278,8 +278,17 @@ const parseDispatchCommand = (first: string, rest: readonly string[]): OrcArgs |
   const dispatch = parseDispatchArgs(first, rest)
   return dispatch.kind === "UsageError" ? dispatch : { kind: "Dispatch", args: dispatch }
 }
-const parseAppArgs = (rest: readonly string[]): OrcArgs =>
-  rest.length === 1 && rest[0] === "install" ? { kind: "InstallApp" } : { kind: "UsageError", detail: "orc app takes install" }
+const appSubcommands = {
+  install: (): OrcArgs => ({ kind: "InstallApp" })
+} satisfies Record<string, () => OrcArgs>
+
+export type AppWord = keyof typeof appSubcommands
+const isAppWord = (word: string): word is AppWord => Object.hasOwn(appSubcommands, word)
+
+const parseAppArgs = (rest: readonly string[]): OrcArgs => {
+  const [word = ""] = rest
+  return rest.length === 1 && isAppWord(word) ? appSubcommands[word]() : { kind: "UsageError", detail: "orc app takes install" }
+}
 const parseChatArgs = (rest: readonly string[]): OrcArgs =>
   rest.length === 0 ? { kind: "Chat" } : { kind: "UsageError", detail: `orc chat takes no argument: ${rest[0]}` }
 const parseFlagArgs = (first: string, rest: readonly string[]): OrcArgs => {

@@ -1,4 +1,5 @@
-import { type CommandWord, commandWords, isCommandWord } from "./args"
+import { type AppWord, type CommandWord, commandWords, isCommandWord } from "./args"
+import type { AttentionWord } from "./dispatch-args"
 import { appHelp, appInstallHelp, chatHelp, logHelp, refusalsHelp, runHelp, runsHelp, scoreHelp, showHelp } from "./help-entries-run"
 import { attentionAnswerHelp, attentionHelp, backlogHelp, backlogVerbHelp, beatHelp, mergeHelp } from "./help-entries-backlog"
 import { heavyHelp, heavyVerbHelp, runnerHelp, runnerVerbHelp } from "./help-entries-runner"
@@ -41,12 +42,15 @@ const commandHelp: Record<CommandWord, HelpEntry> = {
   app: appHelp
 }
 
+const attentionSubcommandHelp: Record<AttentionWord, HelpEntry> = { answer: attentionAnswerHelp }
+const appSubcommandHelp: Record<AppWord, HelpEntry> = { install: appInstallHelp }
+
 const subcommandHelp: Partial<Record<CommandWord, Readonly<Record<string, HelpEntry>>>> = {
   backlog: backlogVerbHelp,
   runner: runnerVerbHelp,
   heavy: heavyVerbHelp,
-  attention: { answer: attentionAnswerHelp },
-  app: { install: appInstallHelp }
+  attention: attentionSubcommandHelp,
+  app: appSubcommandHelp
 }
 
 const about = "orc runs AI agent tasks across your machines and reports back."

@@ -42,7 +42,7 @@ Bare `orc` prints the same overview on stderr and exits 1.
 `orc <command> --help`, such as `orc run --help` or `orc backlog hold --help`, prints only that command: its usage, what it does, its options and examples.
 `-h` works in place of `--help` everywhere.
 A wrong or incomplete command prints the error, the usage of the nearest command and a pointer to its `--help`, and exits 1.
-An unknown command or subcommand that is one typo away from a real one names that one, such as `Did you mean orc run?`.
+An unknown command or subcommand that is one or two typos away from exactly one real one names that one, such as `Did you mean orc run?`.
 
 ## Where things are
 

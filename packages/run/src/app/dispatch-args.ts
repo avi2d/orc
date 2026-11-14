@@ -319,25 +319,27 @@ const parseMerge = (rest: ReadonlyArray<string>): DispatchArgs => {
   return extra.length === 0 ? { kind: "MergeTask", id, basis } : unexpected(extra[0])
 }
 
-const heavyVerbs = ["path", "check", "watch", "watch-once"] as const
-export type HeavyWord = typeof heavyVerbs[number]
+const heavySubcommands = {
+  path: (extra: ReadonlyArray<string>): DispatchArgs => (extra.length === 0 ? { kind: "HeavyPath" } : unexpected(extra[0])),
+  check: (extra: ReadonlyArray<string>): DispatchArgs => parseJsonFlag(extra, (json) => ({ kind: "HeavyCheck", json })),
+  watch: (extra: ReadonlyArray<string>): DispatchArgs => (extra.length === 0 ? { kind: "HeavyWatch" } : unexpected(extra[0])),
+  "watch-once": (extra: ReadonlyArray<string>): DispatchArgs => (extra.length === 0 ? { kind: "HeavyWatchOnce" } : unexpected(extra[0]))
+} satisfies Record<string, (rest: ReadonlyArray<string>) => DispatchArgs>
+
+export type HeavyWord = keyof typeof heavySubcommands
+const isHeavyWord = (word: string): word is HeavyWord => Object.hasOwn(heavySubcommands, word)
 
 const parseHeavy = (rest: ReadonlyArray<string>): DispatchArgs => {
   const [verb = "", ...extra] = rest
-  if (verb === "path") {
-    return extra.length === 0 ? { kind: "HeavyPath" } : unexpected(extra[0])
-  }
-  if (verb === "check") {
-    return parseJsonFlag(extra, (json) => ({ kind: "HeavyCheck", json }))
-  }
-  if (verb === "watch") {
-    return extra.length === 0 ? { kind: "HeavyWatch" } : unexpected(extra[0])
-  }
-  if (verb === "watch-once") {
-    return extra.length === 0 ? { kind: "HeavyWatchOnce" } : unexpected(extra[0])
-  }
-  return { kind: "UsageError", detail: "orc heavy takes " + orList(heavyVerbs) + ", got \"" + verb + "\"" }
+  return isHeavyWord(verb) ? heavySubcommands[verb](extra) : { kind: "UsageError", detail: "orc heavy takes " + orList(Object.keys(heavySubcommands)) + ", got \"" + verb + "\"" }
 }
+
+const attentionSubcommands = {
+  answer: parseItemAnswer
+} satisfies Record<string, (rest: ReadonlyArray<string>) => DispatchArgs>
+
+export type AttentionWord = keyof typeof attentionSubcommands
+const isAttentionWord = (word: string): word is AttentionWord => Object.hasOwn(attentionSubcommands, word)
 
 const backlogSubcommands = {
   add: parseAdd,
@@ -357,7 +359,8 @@ const isBacklogVerb = (word: string): word is BacklogVerb => Object.hasOwn(backl
 
 export const parseDispatchArgs = (command: "backlog" | "attention" | "beat" | "runner" | "merge" | "heavy", rest: ReadonlyArray<string>): DispatchArgs => {
   if (command === "attention") {
-    return rest[0] === "answer" ? parseItemAnswer(rest.slice(1)) : parseJsonFlag(rest, (json) => ({ kind: "ShowAttention", json }))
+    const [verb = ""] = rest
+    return isAttentionWord(verb) ? attentionSubcommands[verb](rest.slice(1)) : parseJsonFlag(rest, (json) => ({ kind: "ShowAttention", json }))
   }
   if (command === "heavy") {
     return parseHeavy(rest)
