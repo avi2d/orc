@@ -32,6 +32,13 @@ export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
     options: [],
     examples: ["orc backlog edit orc-9 ~/task.md"]
   },
+  origin: {
+    usage: ["orc backlog origin <task-id> <machine> <run-id>"],
+    summary: "Record where a parked task's run lives",
+    about: "Records the machine and the run id that a parked task resumes.",
+    options: [],
+    examples: ["orc backlog origin orc-9 linux-box run-42"]
+  },
   close: {
     usage: ["orc backlog close <task-id> <done|failed> [<reason>]"],
     summary: "Close a task by hand as done or failed",
@@ -45,6 +52,13 @@ export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
     about: "Kills the task's run through the machine that started it and closes the task stopped. Run it where the backlog lives.",
     options: [],
     examples: ["orc backlog stop orc-9"]
+  },
+  drop: {
+    usage: ["orc backlog drop <task-id> <reason>"],
+    summary: "Drop a new task with a reason",
+    about: "Closes a new task as dropped with the reason it never runs. A taken or started task ends with orc backlog stop instead.",
+    options: [],
+    examples: ["orc backlog drop orc-9 \"duplicate of orc-12\""]
   },
   posted: {
     usage: ["orc backlog posted <task-id|event-key>"],
