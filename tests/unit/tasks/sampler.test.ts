@@ -231,6 +231,7 @@ const opusSpend: SampledSpend = { model: "opus", tokens: 1200, outputTokens: 300
 const bunTest: SampledTestRun = {
   id: 7,
   command: "bun test",
+  group: "tests",
   path: "/home/example/work/harbor",
   startedAt: minute(0),
   endedAt: DateTime.add(minute(0), { seconds: 90 }),
