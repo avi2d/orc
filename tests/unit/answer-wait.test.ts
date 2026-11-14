@@ -68,6 +68,24 @@ describe("waitForAnswers", () => {
     })
   }, 15_000)
 
+  test("a wait that asks an id again drops the earlier asking's answer instead of taking it as this wait's", async () => {
+    await inTemp(async (dir) => {
+      const old = "2026-11-02T10:00:00.000Z"
+      await writeFile(join(dir, "asking.json"), JSON.stringify({ asked: old, until: old, questions: [{ id: "r2", text: "changes product behavior" }] }))
+      await writeFile(join(dir, "answers.json"), JSON.stringify({ asking: old, answers: [{ question: "r2", answer: "Stale" }] }))
+      const waiting = Effect.runPromise(waitForAnswers(dir, 30, "no-mistakes")([finding("r2", "changes product behavior")]).pipe(Effect.provide(BunServices.layer)))
+      for (;;) {
+        const text = await readFile(join(dir, "answers.json"), "utf8").catch(() => null)
+        if (text !== null && !text.includes("Stale")) {
+          break
+        }
+        await Bun.sleep(10)
+      }
+      await writeFile(join(dir, "answers.json"), JSON.stringify({ asking: old, answers: [{ question: "r2", answer: "Fresh" }] }))
+      expect(await waiting).toEqual({ asked: old, answers: [{ question: "r2", answer: "Fresh" }] })
+    })
+  }, 15_000)
+
   test("a wait that runs out returns no answer instead of waiting on", async () => {
     await inTemp(async (dir) => {
       const started = Date.now()

@@ -13,7 +13,7 @@ const startOnLinux = async (fixture: Fixture): Promise<void> => {
     quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", tokenFile: mainToken }], floorPercent: 15 }
   }))
   await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
   await orcOk(fixture, ["beat"])
   expect(await queuedArgs(fixture)).not.toBeNull()
   await rm(join(fixture.pueue, "add-args"))
@@ -57,7 +57,12 @@ const refuseOnQuestions = async (fixture: Fixture, questions: ReadonlyArray<{ re
   }
 }
 
-const firstAsking = { asked: "2026-11-02T10:20:00.000Z", until: "2026-11-02T10:50:00.000Z", questions: [{ id: "r2", text: "Keep the old flag?" }] }
+const workerAsk = {
+  text: "Keep the old flag?\nA) Keep the old flag\nB) Drop the old flag (picture: docs/flag.png)",
+  options: [{ text: "Keep the old flag" }, { text: "Drop the old flag", picture: "docs/flag.png" }]
+}
+
+const firstAsking: { readonly asked: string; readonly until: string; readonly questions: ReadonlyArray<{ readonly id: string; readonly text: string; readonly options?: ReadonlyArray<{ readonly text: string; readonly picture?: string }> }> } = { asked: "2026-11-02T10:20:00.000Z", until: "2026-11-02T10:50:00.000Z", questions: [{ id: "r2", text: "Keep the old flag?" }] }
 
 const askWhileRunning = async (fixture: Fixture, asking: typeof firstAsking = firstAsking): Promise<string> => {
   await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({
@@ -181,7 +186,7 @@ describe("a parked run", () => {
       const runDir = await askWhileRunning(fixture)
       expect(await orcOk(fixture, ["beat"])).toContain("asking orc-1 on linux: the run waits until 2026-11-02T10:50:00.000Z for the captain's answer to r2")
       expect(await backlogTaskOne(fixture)).toMatchObject({ id: "orc-1", status: "started", parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "Keep the old flag?", asked: firstAsking.asked, answer: null }] } })
-      expect(await orcOk(fixture, ["backlog"])).toContain("orc-1 orc on linux started asking (r2)")
+      expect(await orcOk(fixture, ["backlog"])).toContain("orc-1 P0 orc on linux started asking (r2)")
       expect(await orcOk(fixture, ["backlog", "answer", "orc-1", "r2=Keep", "it", "behind", "a", "flag"])).toBe("answered r2 on orc-1, so the next beat hands it to the run waiting on orc/orc-1\n")
       const relayed = await orcOk(fixture, ["beat"])
       expect(relayed).toContain("handed r2 to the run of orc-1 on linux")
@@ -389,6 +394,46 @@ describe("a parked run", () => {
       await rm(join(runDir, "failing.json"))
       await orcOk(fixture, ["beat"])
       expect(await openAttention(fixture)).toEqual([])
+    })
+  }, runnerTimeout)
+
+  test("a worker's mid-run ask shows in orc attention as a worker-question with its options, instead of a bare review question", async () => {
+    await withFixture(async (fixture) => {
+      await startOnLinux(fixture)
+      await askWhileRunning(fixture, { ...firstAsking, questions: [{ id: "ask-1", text: workerAsk.text, options: workerAsk.options }] })
+      await orcOk(fixture, ["beat"])
+      expect(await openAttention(fixture)).toMatchObject([{ kind: "worker-question", task: "orc-1", text: workerAsk.text, options: workerAsk.options, asked: firstAsking.asked }])
+    })
+  }, runnerTimeout)
+
+  test("a worker's answered ask is handed to its run and the thread marks it delivered, instead of leaving it only answered", async () => {
+    await withFixture(async (fixture) => {
+      await startOnLinux(fixture)
+      const runDir = await askWhileRunning(fixture, { ...firstAsking, questions: [{ id: "ask-1", text: workerAsk.text, options: workerAsk.options }] })
+      await orcOk(fixture, ["beat"])
+      await orcOk(fixture, ["backlog", "answer", "orc-1", "ask-1=B"])
+      expect(await orcOk(fixture, ["beat"])).toContain("handed ask-1 to the run of orc-1 on linux")
+      expect(JSON.parse(await readFile(join(runDir, "answers.json"), "utf8"))).toEqual({ asking: firstAsking.asked, answers: [{ question: "ask-1", answer: "B" }] })
+      const thread: unknown = JSON.parse(await orcOk(fixture, ["backlog", "thread", "orc-1", "--json"]))
+      const entries = isRecord(thread) && Array.isArray(thread.entries) ? thread.entries : []
+      expect(entries.filter((entry) => isRecord(entry) && entry.kind !== "decision")).toMatchObject([
+        { kind: "question", who: "worker", text: workerAsk.text },
+        { kind: "answer", text: "B" },
+        { kind: "delivered", who: "beat" }
+      ])
+    })
+  }, runnerTimeout)
+
+  test("a run stopped on an unanswered worker ask parks on its branch and its answer resumes it there, instead of closing failed", async () => {
+    await withFixture(async (fixture) => {
+      await startOnLinux(fixture)
+      await refuseOnQuestions(fixture, [{ id: "ask-1", text: workerAsk.text }], "implement")
+      expect(await orcOk(fixture, ["beat"])).toContain("parked orc-1 on orc/orc-1 for the")
+      expect(await openAttention(fixture)).toMatchObject([{ kind: "worker-question", task: "orc-1", text: workerAsk.text }])
+      expect(await orcOk(fixture, ["backlog", "answer", "orc-1", "ask-1=B"])).toBe("answered ask-1 on orc-1, so the beat resumes it on orc/orc-1\n")
+      expect(await orcOk(fixture, ["beat"])).toContain("started orc-1")
+      const added = await queuedArgs(fixture)
+      expect(added).toEqual(expect.arrayContaining(["--answer", "ask-1=B", "--branch", "orc/orc-1"]))
     })
   }, runnerTimeout)
 

@@ -38,7 +38,7 @@ The command writes only names that start with `orc`, so Herdr's own mods and lay
 
 Board reads `orc backlog --json` and `orc attention --json` when shown and every 10 seconds while shown.
 Resources reads `orc-dash snapshot --json --only quota,resources,queues` when shown and every minute.
-Agents reads `orc runs --json` and `orc backlog --json` again every 4 seconds while it is the shown tab.
+Agents reads `orc runs --json --local` and `orc backlog --json` again every 4 seconds while it is the shown tab.
 It also reads the selected run with `orc show <run> --json` and the selected step with `orc log <run> <step-id>`.
 When a command fails or prints a document the tab cannot read, the tab shows the command and why.
 
@@ -48,7 +48,7 @@ The Board groups tasks into Backlog, Planned, Awaiting you, Running, and Done.
 
 ![Board showing example garden tasks in five lanes](images/herdr-board.png)
 
-Backlog stays empty because the backlog has no priority field.
+Backlog stays empty.
 Held tasks, tasks with unanswered parked questions, tasks with an open attention item for you, and closed tasks with an open PR appear in Awaiting you.
 Taken and started tasks appear in Running.
 Other new tasks appear in Planned, and other closed tasks appear in Done.

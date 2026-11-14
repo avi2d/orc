@@ -46,7 +46,7 @@ const markTaskRunsStopped = (home: string, project: string, task: string, taskFi
           const grouped = yield* Effect.forEach(branches, (branch) => runsForBranch(db, project, branch))
           const running = grouped.flat().filter((run) => run.status === "running")
           if (running.length === 0) {
-            yield* recordRun(db, { id: newRunId(), project, branch: stoppedBranch, taskFile, status: "stopped", started, ended, endReason: stoppedEndReason })
+            yield* recordRun(db, { id: newRunId(), project, branch: stoppedBranch, taskFile, status: "stopped", started, ended, endReason: stoppedEndReason, task })
             return
           }
           yield* Effect.forEach(running, (run) => markRunStopped(db, run.id, ended, stoppedEndReason), { discard: true })
@@ -170,6 +170,9 @@ const writeTaskFile = (home: string, key: string, body: string): Effect.Effect<s
     return taskFile
   })
 
+const withClaimedMachine = (machine: string | undefined): ReadonlyArray<string> =>
+  machine === undefined ? [] : ["ORC_RUN_MACHINE=" + machine]
+
 const buildRun = (
   request: QueueRequest,
   self: Command,
@@ -183,8 +186,10 @@ const buildRun = (
     const kind = request.kind === undefined ? [] : ["--kind", request.kind]
     const delivery = request.delivery === undefined ? [] : ["--delivery", request.delivery]
     const instructions = request.instructions === undefined ? [] : ["--instructions", yield* writeInstructions(folder + "/" + key + ".instructions", request.instructions)]
-    const resume = request.resumeRun === undefined ? [] : ["env", "ORC_DISPATCH_RESUME_RUN=" + request.resumeRun]
-    return [...resume, ...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...kind, ...delivery, ...instructions, ...answers]
+    const resume = request.resumeRun === undefined ? [] : ["ORC_DISPATCH_RESUME_RUN=" + request.resumeRun]
+    const assigned = [...resume, ...withClaimedMachine(request.machine)]
+    const env = assigned.length === 0 ? [] : ["env", ...assigned]
+    return [...env, ...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...kind, ...delivery, ...instructions, ...answers]
   })
 
 const enqueueHeld = (

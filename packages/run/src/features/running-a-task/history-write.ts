@@ -9,7 +9,14 @@ import { OrcRunError } from "../../shared/lib/index"
 import { historyFailure, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, sqlite, stepIdFor, updateRun, updateStep } from "../../entities/run-history/index"
 import type { EvidenceInput, SignalInput, StepInput } from "../../entities/run-history/index"
 import { measuredSignals, noMistakesSignals, openQuestionSignal } from "../../entities/run-history/index"
-import type { AgentStep, ResumePlan } from "./run-ops"
+import type { AgentStep, ResumePlan, RunCheckpoints } from "./run-ops"
+import type { AgentFile } from "../../entities/agent/index"
+import { liveAskQuestions, type AskSetup } from "../../entities/agent/index"
+import { taskOfBranch } from "../../entities/backlog/index"
+
+type StepAgent = Pick<AgentFile, "model" | "thinking">
+
+const stepAgent = (agent: StepAgent): Pick<StepInput, "model" | "thinking"> => ({ model: agent.model, thinking: agent.thinking })
 
 type EvidenceRow = Omit<EvidenceInput, "stepId">
 
@@ -41,12 +48,13 @@ const planImplementDone = (
   run: HistoryRun,
   report: Pick<OrcRunReport, "agentPath" | "sessionFile" | "tokens" | "commits" | "sessionSize" | "implementPassed">,
   started: string,
-  ended: string
+  ended: string,
+  inherited: { readonly agentFile: string | null; readonly model: string | null; readonly thinking: string | null } | null = null
 ): PlannedImplement => ({
   step: {
     runId: run.runId, name: "implement", attempt: 1,
     status: report.implementPassed ? "passed" : "failed",
-    started, ended, agentFile: report.agentPath, piSessionFile: report.sessionFile
+    started, ended, agentFile: inherited === null ? report.agentPath : inherited.agentFile, piSessionFile: report.sessionFile, model: inherited === null ? run.agent.model : inherited.model, thinking: inherited === null ? run.agent.thinking : inherited.thinking
   },
   taskEvidence: { direction: "in", path: run.taskPath, kind: "task" },
   evidenceFile: { direction: "out", path: run.path.join(run.runDir, "implement-1.md"), kind: "evidence" },
@@ -72,7 +80,7 @@ const planChecksDone = (runId: string, round: ChecksRoundSummary): PlannedChecks
 const planFixDone = (runId: string, fix: RecordedFixAttempt): PlannedFix => ({
   step: {
     runId, name: "fix", attempt: fix.attempt, status: fix.status,
-    started: fix.started, ended: fix.ended, agentFile: fix.agentFile, piSessionFile: fix.sessionFile
+    started: fix.started, ended: fix.ended, agentFile: fix.agentFile, piSessionFile: fix.sessionFile, model: fix.model, thinking: fix.thinking
   },
   evidenceIn: { direction: "in", path: fix.evidenceIn, kind: "checks" },
   sessionEvidence: fix.sessionFile === null ? null : { direction: "out", path: fix.sessionFile, kind: "session" },
@@ -116,14 +124,15 @@ export const recordResumePublish = (db: Database, run: HistoryRun, resume: Resum
         insertRun(db, {
           id: run.runId, project: run.projectDir, branch: run.branch,
           taskFile: run.taskPath, status: "running", started: run.started, sandbox: run.sandbox,
-          kind: "ship", delivery: run.delivery.kind
+          kind: "ship", delivery: run.delivery.kind,
+          task: taskOfBranch(run.branch), machine: run.machine, worktree: run.worktreeDir
         })
         if (resume.skipImplement) {
           const planned = planImplementDone(run, {
             agentPath: run.agent.path,
             sessionFile: resume.implementSessionFile,
             tokens: null, commits: null, sessionSize: null, implementPassed: true
-          }, run.started, run.started)
+          }, run.started, run.started, resume.inheritedImplement)
           insertPlannedStep(db, planned.step, [
             planned.taskEvidence,
             planned.evidenceFile,
@@ -131,10 +140,10 @@ export const recordResumePublish = (db: Database, run: HistoryRun, resume: Resum
             ...(resume.priorDir === null ? [] : [{ direction: "out" as const, path: inheritedLog(db, run, resume.priorDir, "implement", 1), kind: "log" }])
           ], planned.signals)
         } else {
-          insertStep(db, { runId: run.runId, name: "implement", attempt: 1, status: "running", started: run.started, agentFile: run.agent.path, piSessionFile: resume.implementSessionFile })
+          insertStep(db, { runId: run.runId, name: "implement", attempt: 1, status: "running", started: run.started, agentFile: run.agent.path, piSessionFile: resume.implementSessionFile, ...stepAgent(run.agent) })
         }
         if (resume.fixRunning && resume.fixSessionFile !== null) {
-          insertStep(db, { runId: run.runId, name: "fix", attempt: resume.inheritedFixes.length + 1, status: "running", started: run.started, agentFile: run.fixer.path, piSessionFile: resume.fixSessionFile })
+          insertStep(db, { runId: run.runId, name: "fix", attempt: resume.inheritedFixes.length + 1, status: "running", started: run.started, agentFile: run.fixer.path, piSessionFile: resume.fixSessionFile, ...stepAgent(run.fixer) })
         }
         for (const round of resume.inheritedRounds) {
           const planned = planChecksDone(run.runId, round)
@@ -166,7 +175,7 @@ export const recordImplementStart = (db: Database, run: HistoryRun, started: str
       yield* updateStep(db, run.runId, "implement", 1, { status: "running", ended: null, piSessionFile: piSessionFile ?? undefined }).pipe(Effect.mapError((cause) => historyFailure("record the step in", cause)))
       return
     }
-    yield* recordStep(db, { runId: run.runId, name: "implement", attempt: 1, status: "running", started, agentFile: run.agent.path, piSessionFile: piSessionFile ?? null }).pipe(Effect.asVoid, Effect.mapError((cause) => historyFailure("record the step in", cause)))
+    yield* recordStep(db, { runId: run.runId, name: "implement", attempt: 1, status: "running", started, agentFile: run.agent.path, piSessionFile: piSessionFile ?? null, ...stepAgent(run.agent) }).pipe(Effect.asVoid, Effect.mapError((cause) => historyFailure("record the step in", cause)))
   })
 
 export const recordStepSession = (db: Database, runId: string, name: "implement" | "fix", attempt: number, piSessionFile: string): Effect.Effect<void, OrcRunError> =>
@@ -175,7 +184,7 @@ export const recordStepSession = (db: Database, runId: string, name: "implement"
     Effect.mapError((cause) => historyFailure("record the session file in", cause))
   )
 
-export const recordLoopQuestion = (db: Database, runId: string, step: AgentStep, question: OpenQuestion): Effect.Effect<void, OrcRunError> =>
+export const recordOpenQuestion = (db: Database, runId: string, step: AgentStep, question: OpenQuestion): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
     const stepId = yield* stepIdFor(db, runId, step.name, step.attempt).pipe(Effect.mapError((cause) => historyFailure("read the step in", cause)))
     if (stepId === null) {
@@ -185,6 +194,26 @@ export const recordLoopQuestion = (db: Database, runId: string, step: AgentStep,
       Effect.asVoid,
       Effect.mapError((cause) => historyFailure("record the question in", cause))
     )
+  })
+
+export const recordOpenAsks = (
+  questionAsked: RunCheckpoints["questionAsked"],
+  setup: AskSetup,
+  step: AgentStep,
+  seed: ReadonlyArray<OpenQuestion>
+): Effect.Effect<void, OrcRunError> =>
+  Effect.gen(function*() {
+    const seen = new Set<string>()
+    for (const question of [...seed, ...liveAskQuestions(setup), ...setup.priorOpen]) {
+      if (seen.has(question.id) || setup.state.recorded.has(question.id)) {
+        continue
+      }
+      seen.add(question.id)
+      const done = yield* questionAsked(step, question).pipe(Effect.as(true), Effect.orElseSucceed(() => false))
+      if (done) {
+        setup.state.recorded.add(question.id)
+      }
+    }
   })
 
 export const recordHandoverEvidence = (db: Database, runId: string, path: string): Effect.Effect<void, OrcRunError> =>
@@ -204,15 +233,15 @@ export const recordChecksStart = (db: Database, runId: string, round: number, st
     Effect.mapError((cause) => historyFailure("record the checks step in", cause))
   )
 
-export const recordFixStart = (db: Database, runId: string, attempt: number, agentFile: string, started: string, piSessionFile?: string | null): Effect.Effect<void, OrcRunError> =>
+export const recordFixStart = (db: Database, runId: string, attempt: number, agent: Pick<AgentFile, "path" | "model" | "thinking">, started: string, piSessionFile?: string | null): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
     const known = yield* stepIdFor(db, runId, "fix", attempt).pipe(Effect.mapError((cause) => historyFailure("read the fix step in", cause)))
     if (known !== null) {
-      yield* updateStep(db, runId, "fix", attempt, { status: "running", ended: null, piSessionFile: piSessionFile ?? undefined }).pipe(Effect.mapError((cause) => historyFailure("record the fix step in", cause)))
+      yield* updateStep(db, runId, "fix", attempt, { status: "running", ended: null, piSessionFile: piSessionFile ?? undefined, agentFile: agent.path, model: agent.model, thinking: agent.thinking }).pipe(Effect.mapError((cause) => historyFailure("record the fix step in", cause)))
       yield* sqlite(() => db.query("DELETE FROM evidence WHERE step_id = ? AND direction = ? AND kind = ?").run(known, "out", "log")).pipe(Effect.mapError((cause) => historyFailure("reset the fix log in", cause)))
       return
     }
-    yield* recordStep(db, { runId, name: "fix", attempt, status: "running", started, agentFile, piSessionFile: piSessionFile ?? null }).pipe(Effect.asVoid, Effect.mapError((cause) => historyFailure("record the fix step in", cause)))
+    yield* recordStep(db, { runId, name: "fix", attempt, status: "running", started, agentFile: agent.path, piSessionFile: piSessionFile ?? null, ...stepAgent(agent) }).pipe(Effect.asVoid, Effect.mapError((cause) => historyFailure("record the fix step in", cause)))
   })
 
 export const recordNoMistakesStart = (db: Database, runId: string, started: string): Effect.Effect<void, OrcRunError> =>
@@ -262,7 +291,7 @@ export const recordFixDone = (db: Database, runId: string, fix: RecordedFixAttem
     const known = yield* stepIdFor(db, runId, "fix", fix.attempt).pipe(Effect.mapError(failed("read the fix step in")))
     const fixId = known ?? (yield* recordStep(db, planned.step).pipe(Effect.mapError(failed("record the fix step in"))))
     if (known !== null) {
-      yield* updateStep(db, runId, "fix", fix.attempt, { status: planned.step.status, ended: fix.ended, piSessionFile: fix.sessionFile ?? undefined }).pipe(Effect.mapError(failed("record the fix step in")))
+      yield* updateStep(db, runId, "fix", fix.attempt, { status: planned.step.status, ended: fix.ended, piSessionFile: fix.sessionFile ?? undefined, agentFile: planned.step.agentFile, model: planned.step.model, thinking: planned.step.thinking }).pipe(Effect.mapError(failed("record the fix step in")))
     }
     yield* recordEvidence(db, { stepId: fixId, ...planned.evidenceIn }).pipe(Effect.mapError(failed("record the fix evidence in")))
     if (planned.sessionEvidence !== null) {

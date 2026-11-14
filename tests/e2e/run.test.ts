@@ -8,7 +8,7 @@ import { ChildProcessSpawner } from "effect/process"
 import { openCheckout } from "../../packages/run/src/entities/task-copy/index"
 import { openTaskCopy } from "../../packages/run/src/entities/task-copy/index"
 import { runAgentStep } from "../../packages/run/src/features/running-a-task/run"
-import { capturedSession, cleanFinish, commitOnBranch, git, passedWithPr, recordedNothing, providerErrorEchoingPrompt, runStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
+import { capturedSession, cleanFinish, commitOnBranch, git, passedWithPr, recordedNothing, providerErrorEchoingPrompt, runStep, runStepAs, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
 
 const refusal = async (input: {
   readonly cwd: string
@@ -554,6 +554,23 @@ describe("host git runs no transport program the sandbox can name in the reposit
       await withHome(async (home) => {
         git(dir, ["remote", "add", "origin", "https://example.invalid/repo.git"])
         expect(await refusal({ cwd: dir, taskFile: join(dir, "missing.md"), home, branch: "orc/test" })).toContain("cannot read the task file")
+      })
+    })
+  }, 60_000)
+})
+
+describe("orc run records where and with what it ran", () => {
+  test("a task run records its task, machine and task copy worktree and the implement step's model and thinking instead of the project checkout or null", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        const proposal = { schema: "orc.split.v1", plan: "split", reason: "two areas", done: ["both work"], children: [
+          { title: "First", body: "First area.", after: [] }, { title: "Second", body: "Second area.", after: [] }
+        ] }
+        await capturedSession(home, sessionEnding({ role: "assistant", content: [{ type: "text", text: "ORC_SPLIT\n" + JSON.stringify(proposal) }], stopReason: "stop" }))
+        const copy = join(dir, "task-copy")
+        const outcome = await runStepAs(dir, home, async (_run, sessionsDir) => ({ sessionId: "split", sessionFile: join(sessionsDir, "2026-10-19T10-00-00-000Z_0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b.jsonl"), commits: [] }), { branch: "orc/orc-36", machine: "linux", worktreeDir: copy })
+        expect(outcome.run).toMatchObject({ task: "orc-36", machine: "linux", worktree: copy })
+        expect(outcome.stepAgents).toEqual([{ name: "implement", model: "acme/coder", thinking: "high" }])
       })
     })
   }, 60_000)

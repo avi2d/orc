@@ -1,5 +1,6 @@
 export { deciderOwnership } from "./beat-attention"
 export { readRoom } from "./beat-place"
+export { type RecordOrigin, recordOrigin } from "./beat-origin"
 export { liveSources, runBeat } from "./beat"
 export { runnerLoadText } from "./load"
 export { type BacklogView, backlogJson, beatJson, formatBeat, formatBoard, type ProjectList, type RoomList } from "./board"

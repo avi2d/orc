@@ -36,17 +36,32 @@ describe("orc bin", () => {
     expect(result.stdout).toContain("Usage: orc")
   }, 60_000)
 
-  test("every subcommand in the usage text prints that usage for --help instead of reading --help as an argument", async () => {
-    const top = await runOrc(["--help"])
-    const subcommands = [...new Set([...top.stdout.matchAll(/(?:^Usage: |\| )orc (\w+)/g)].map((match) => match[1]))]
-    expect(subcommands).toContain("run")
-    const asked = subcommands.flatMap((subcommand) => ["--help", "-h"].map((flag) => [subcommand, flag]))
+  test("bare orc prints the overview on stderr and exits non-zero instead of starting a run", async () => {
+    const result = await runOrc([])
+    expect(result.exitCode).not.toBe(0)
+    expect(result.stdout).toBe("")
+    expect(result.stderr).toContain("Usage: orc <command> [<args>]")
+    expect(result.stderr).toContain("Run orc <command> --help")
+  }, 60_000)
+
+  test("each command's --help and -h print that command's usage on stdout instead of the whole list", async () => {
+    const commands = ["run", "runs", "show", "score", "chat", "backlog", "beat", "merge", "runner"]
+    const asked = commands.flatMap((command) => ["--help", "-h"].map((flag) => [command, flag]))
     const results = await Promise.all(asked.map(async (words) => {
       const result = await runOrc(words)
-      return { words, exitCode: result.exitCode, stdout: result.stdout }
+      return { words, exitCode: result.exitCode, usage: new RegExp("^Usage: orc " + words[0] + "\\b").test(result.stdout), overview: result.stdout.includes("Run a task:") }
     }))
-    expect(results).toEqual(asked.map((words) => ({ words, exitCode: 0, stdout: top.stdout })))
+    expect(results).toEqual(asked.map((words) => ({ words, exitCode: 0, usage: true, overview: false })))
   }, 30_000)
+
+  test("a wrong backlog subcommand prints only the backlog usage and the closest subcommand, not every command", async () => {
+    const result = await runOrc(["backlog", "hodl", "orc-9"])
+    expect(result.exitCode).not.toBe(0)
+    expect(result.stdout).toBe("")
+    expect(result.stderr).toContain("Did you mean orc backlog hold?")
+    expect(result.stderr).toContain("Usage: orc backlog")
+    expect(result.stderr).not.toContain("orc runner")
+  }, 60_000)
 
   test("an unknown flag prints usage and exits non-zero", async () => {
     const result = await runOrc(["--frobnicate"])

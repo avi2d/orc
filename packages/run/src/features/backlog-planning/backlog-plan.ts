@@ -1,5 +1,5 @@
 import { Effect, FileSystem } from "effect"
-import { backlogPaths, BacklogError, listTasks, grabbedFile, scratchName, takeFile, childCount, dependencyWaits, isHeld, parseTaskFile, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { BacklogError, listTasks, childCount, dependencyWaits, isHeld, newGrab, parseTaskFile, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
 import { mergedIds } from "../../entities/events/index"
 
 type Requirements = FileSystem.FileSystem
@@ -69,15 +69,8 @@ const droppable = (child: TaskRecord, parent: string, tasks: ReadonlyArray<TaskR
 // rename(2) takes the one task file at most once, so a beat's claim and a drop never both get the child.
 const removeNew = (root: string, child: TaskRecord, parent: string, tasks: ReadonlyArray<TaskRecord>): Effect.Effect<void, BacklogError | TaskFileError, Requirements> =>
   Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const paths = backlogPaths(root)
     const id = child.spec.id
-    const file = paths.taskFile("new", id)
-    const grabbed = scratchName(paths.folder("new"), id)
-    if (!(yield* takeFile(fs, file, grabbed, id))) {
-      return yield* new BacklogError({ detail: id + " moved while orc read it, so run the command again" })
-    }
-    const { putBack, read } = grabbedFile(fs, file, grabbed, id)
+    const { fs, file, grabbed, putBack, read } = yield* newGrab(root, id)
     const refused = yield* read.pipe(
       Effect.flatMap((text) => parseTaskFile(file, "new", text)),
       Effect.map((fresh) => droppable(fresh, parent, tasks)),

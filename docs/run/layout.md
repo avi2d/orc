@@ -10,9 +10,15 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/app/args.ts` | The flag parsing for the orc command |
-| `packages/run/src/app/dispatch-args.ts` | The flag parsing for `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` |
-| `packages/run/src/app/dispatch-cli.ts` | The `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
+| `packages/run/src/app/dispatch-args.ts` | The flag parsing for `orc backlog`, `orc attention`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` |
+| `packages/run/src/app/dispatch-cli.ts` | The `orc backlog`, `orc attention`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
 | `packages/run/src/app/dispatch-args-runner.ts` | The `orc runner` verb parsing and the shared `--json` flag and reach split |
+| `packages/run/src/app/dispatch-args-heavy.ts` | The `orc heavy` verb parsing |
+| `packages/run/src/app/help.ts` | The help pages: the overview, the per-command help, the usage error text and the closest-command suggestion |
+| `packages/run/src/app/help-format.ts` | The help layout: wrapping to 80 columns, the usage block and the name and text tables |
+| `packages/run/src/app/help-entries-run.ts` | The help entries for `orc run`, the run history commands, `orc chat` and `orc app` |
+| `packages/run/src/app/help-entries-backlog.ts` | The help entries for `orc backlog` and its subcommands, `orc attention`, `orc beat` and `orc merge` |
+| `packages/run/src/app/help-entries-runner.ts` | The help entries for `orc runner` and `orc heavy` and their subcommands |
 
 ## widgets/beat
 
@@ -22,6 +28,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/widgets/beat/beat.ts` | The beat: room, placement, take and start |
 | `packages/run/src/widgets/beat/beat-close.ts` | The closing of finished runs and the running output time |
 | `packages/run/src/widgets/beat/beat-place.ts` | The room reading, the placement of each new task and the wait it names |
+| `packages/run/src/widgets/beat/beat-origin.ts` | The `orc backlog origin` write of a parked task's machine and run, and its refusals |
 | `packages/run/src/widgets/beat/load.ts` | The five minute load reading and the overloaded machines |
 | `packages/run/src/widgets/beat/stall.ts` | The stalled run flag kept in the backlog logs |
 | `packages/run/src/widgets/beat/task-events.ts` | The stall and PR events the beat records for every task |
@@ -44,13 +51,16 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/backlog-planning/intake-plan.ts` | The planner model ask at intake and its five minute limit |
 | `packages/run/src/features/backlog-planning/backlog-depend.ts` | The task dependency writes and the refusal when a wait would cycle |
 | `packages/run/src/features/backlog-planning/backlog-hold.ts` | The task hold writes and the refusal when a task is already held |
+| `packages/run/src/features/backlog-planning/backlog-drop.ts` | The `orc backlog drop` close of a new task as `dropped` and its refusals |
 | `packages/run/src/features/backlog-planning/backlog-edit.ts` | The `orc backlog edit` rewrite of a new task's title and body |
+| `packages/run/src/features/backlog-planning/backlog-priority.ts` | The task priority writes and the refusal when a task is taken, started or closed |
 
 ## features/task-thread
 
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/features/task-thread/note.ts` | The `orc backlog note` command and its refusal of a task id the backlog does not hold |
+| `packages/run/src/features/task-thread/thread.ts` | The `orc backlog thread` view, built on each read from the task file, its attention items and its notes, and its `orc.thread.v1` JSON |
 
 ## features/chat
 
@@ -67,7 +77,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/chat/chat-closed.ts` | The closed task shape and the line the chat posts for it |
 | `packages/run/src/features/chat/chat-command.ts` | The shell a chat tool runs through the shared Bun layers |
 | `packages/run/src/features/chat/chat-error.ts` | The error a chat tool fails with |
-| `packages/run/src/features/chat/chat-inputs.ts` | The chat tool input shapes for add, hold, edit, answer, board and merge |
+| `packages/run/src/features/chat/chat-inputs.ts` | The chat tool input shapes for add, hold, priority, edit, answer, board and merge |
 | `packages/run/src/features/chat/chat-posts.ts` | The backlog read and the walk that delivers each closed task and event once |
 
 ## features/decider
@@ -117,6 +127,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/running-a-task/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
 | `packages/run/src/features/running-a-task/run-exec.ts` | The sandbox a run opens, the install that prepares the copy and the steps that run in it |
 | `packages/run/src/features/running-a-task/run-loop.ts` | The implement, check and fix steps of one run |
+| `packages/run/src/features/running-a-task/run-finish.ts` | The finish of a run after its checks pass: the direct PR or the no-mistakes gate |
 | `packages/run/src/features/running-a-task/run-resume.ts` | The prior run's session and passed steps a resume starts from |
 | `packages/run/src/features/running-a-task/checks.ts` | The check commands `.no-mistakes.yaml` names and their run in the copy |
 | `packages/run/src/features/running-a-task/run-folders.ts` | A run's folders, its copy of the task file and the instructions file `--instructions` names |
@@ -124,6 +135,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/running-a-task/context-mark.ts` | The 150 thousand token compaction mark orc writes into the run’s Pi folder |
 | `packages/run/src/features/running-a-task/report-run.ts` | The report run: the Pi run that writes a report file instead of opening a PR |
 | `packages/run/src/features/running-a-task/run-deliverer.ts` | The deliverer a run takes: the direct PR opener or the no-mistakes runner |
+| `packages/run/src/features/running-a-task/run-place.ts` | The machine name a run records, read from `ORC_RUN_MACHINE` |
+| `packages/run/src/features/running-a-task/worker-question.ts` | The end reason of a run stopped on an unanswered `orc_ask` and the prompt that resumes it with the answers |
 
 ## features/seeing-runs
 
@@ -134,6 +147,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/seeing-runs/run-facts.ts` | The facts `orc runs --json` reads beside each run: its title, latest step and open questions |
 | `packages/run/src/features/seeing-runs/step-log.ts` | The `orc log` reading of one step's output file |
 | `packages/run/src/features/seeing-runs/run-scores.ts` | The `orc score` step score writes: the 1 to 5 check, the note and the unknown run and step errors |
+| `packages/run/src/features/seeing-runs/other-machines.ts` | The other dispatch machines' runs `orc runs --json` adds, and the `machines` it names for those that fail |
 
 ## entities/agent
 
@@ -143,13 +157,15 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/agent/pi-run.ts` | The Pi process in JSON mode: its event lines, the agent log, the session file and the idle stop |
 | `packages/run/src/entities/agent/agents.ts` | The agent file parsing and lookup |
 | `packages/run/src/entities/agent/long-session.ts` | The long session watch: the turn and compaction counts, the handover note and the handover prompt |
+| `packages/run/src/entities/agent/orc-ask-extension.ts` | The Pi extension orc copies into the run's Pi folder, which adds the `orc_ask` tool |
+| `packages/run/src/entities/agent/worker-ask.ts` | The orc side of `orc_ask`: the `ask-<n>` ids, the `asking.json` it writes, the answers it hands back and the 10 minute wait |
 
 ## entities/attention
 
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/entities/attention/beat-action.ts` | The beat actions each beat step reports |
-| `packages/run/src/entities/attention/attention.ts` | The attention queue under `attention/`: one file per item, its open and close and withdraw, and the review questions, run events and overdue waits routed into it |
+| `packages/run/src/entities/attention/attention.ts` | The attention queue under `attention/`: one file per item, its open and close and withdraw, the items of one task, and the review questions, run events and overdue waits routed into it |
 
 ## entities/backlog
 

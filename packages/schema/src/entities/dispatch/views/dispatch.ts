@@ -35,7 +35,7 @@ export interface DispatchView {
 const claimedMachine = (task: DispatchTask): string | undefined => {
   const state = task.state;
   if (state.kind === "taken") return state.claim?.machine;
-  if (state.kind === "started" || state.kind === "closed") return state.claim.machine;
+  if (state.kind === "started" || state.kind === "closed") return state.claim?.machine;
   return undefined;
 };
 

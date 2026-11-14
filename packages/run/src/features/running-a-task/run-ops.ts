@@ -26,6 +26,7 @@ export interface SandboxOps {
 export interface ResumePlan {
   readonly implementSessionId: string | null
   readonly implementSessionFile: string | null
+  readonly inheritedImplement: { readonly agentFile: string | null; readonly model: string | null; readonly thinking: string | null } | null
   readonly skipImplement: boolean
   readonly skipChecks: boolean
   readonly allow: ReadonlyArray<AllowWord>
@@ -63,7 +64,7 @@ export interface RunCheckpoints {
   readonly noMistakesDone: (record: NoMistakesRecord) => Effect.Effect<void, OrcRunError>
   readonly pullRequestStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly pullRequestDone: (record: DirectPrRecord) => Effect.Effect<void, OrcRunError>
-  readonly loopAsked: (step: AgentStep, question: OpenQuestion) => Effect.Effect<void, OrcRunError>
+  readonly questionAsked: (step: AgentStep, question: OpenQuestion) => Effect.Effect<void, OrcRunError>
 }
 
 export type AgentStep = { readonly name: "implement"; readonly attempt: 1 } | { readonly name: "fix"; readonly attempt: number }

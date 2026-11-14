@@ -23,14 +23,14 @@ const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>, kind: 
   await fakeQuota(fixture)
   await writeMachine(fixture, start)
   await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux", ...kind])
+  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux", ...kind])
   await orcOk(fixture, ["beat"])
   return queuedArgs(fixture)
 }
 
 const pueueAddFor = (home: string, checkout: string): ReadonlyArray<string> => [
   "--group", "orc", "--label", home + " orc-1", "--working-directory", checkout, "--print-task-id", "--escape", "--",
-  process.execPath, binPath, "run", join(home, "runner", "orc-1.md"), "--branch", "orc/orc-1",
+  "env", "ORC_RUN_MACHINE=linux", process.execPath, binPath, "run", join(home, "runner", "orc-1.md"), "--branch", "orc/orc-1",
   "--sandbox", "none", "--provider", "acme", "--token-file", mainToken
 ]
 
@@ -101,7 +101,7 @@ describe("orc runner start", () => {
       const label = fixture.home + " orc-1"
       expect(added).toEqual([
         "--group", "orc", "--label", label, "--working-directory", fixture.checkout, "--print-task-id", "--escape", "--",
-        process.execPath, binPath, "run", join(far, "runner", "label-" + encodeURIComponent(label) + ".md"), "--branch", "orc/orc-1",
+        "env", "ORC_RUN_MACHINE=linux", process.execPath, binPath, "run", join(far, "runner", "label-" + encodeURIComponent(label) + ".md"), "--branch", "orc/orc-1",
         "--sandbox", "none", "--provider", "acme", "--token-file", mainToken
       ])
       expect(await queuedEnv(fixture)).toBe(far)
@@ -120,7 +120,7 @@ describe("orc runner start", () => {
       await fakeQuota(fixture)
       await writeMachine(fixture, [process.execPath, binPath, "runner", "start", "--", ...through])
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
       await orcOk(fixture, ["beat"])
       const deadline = Date.now() + startWaitMillis
       while (Date.now() < deadline) {

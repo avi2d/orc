@@ -77,7 +77,7 @@ export const backlogPaths = (root: string): BacklogPaths => ({
 })
 
 // rename(2) moves the one task file at most once, so the grab below takes it or reports it gone.
-export const takeFile = (fs: FileSystem.FileSystem, file: string, grabbed: string, id: string): Effect.Effect<boolean, BacklogError> =>
+const takeFile = (fs: FileSystem.FileSystem, file: string, grabbed: string, id: string): Effect.Effect<boolean, BacklogError> =>
   fs.rename(file, grabbed).pipe(
     Effect.as(true),
     Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(false)),
@@ -85,7 +85,7 @@ export const takeFile = (fs: FileSystem.FileSystem, file: string, grabbed: strin
   )
 
 // A failed read leaves putBack for the caller to run.
-export const grabbedFile = (
+const grabbedFile = (
   fs: FileSystem.FileSystem,
   file: string,
   grabbed: string,
@@ -98,29 +98,38 @@ export const grabbedFile = (
   read: fs.readFileString(grabbed).pipe(Effect.mapError(platformFailure("read " + grabbed)))
 })
 
-export const takenGrab = (
+type Grabbed = {
+  readonly fs: FileSystem.FileSystem
+  readonly paths: BacklogPaths
+  readonly file: string
+  readonly grabbed: string
+  readonly putBack: Effect.Effect<void, BacklogError>
+  readonly read: Effect.Effect<string, BacklogError>
+}
+
+export const grabIn = (
   root: string,
+  folder: TaskFolder,
   id: string,
   missed: Effect.Effect<never, BacklogError | TaskFileError, FileSystem.FileSystem>
-): Effect.Effect<
-  {
-    readonly fs: FileSystem.FileSystem
-    readonly paths: BacklogPaths
-    readonly file: string
-    readonly grabbed: string
-    readonly putBack: Effect.Effect<void, BacklogError>
-    readonly read: Effect.Effect<string, BacklogError>
-  },
-  BacklogError | TaskFileError,
-  FileSystem.FileSystem
-> =>
+): Effect.Effect<Grabbed, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const paths = backlogPaths(root)
-    const file = paths.taskFile("taken", id)
-    const grabbed = scratchName(paths.folder("taken"), id)
+    const file = paths.taskFile(folder, id)
+    const grabbed = scratchName(paths.folder(folder), id)
     if (!(yield* takeFile(fs, file, grabbed, id))) {
       return yield* missed
     }
     return { fs, paths, file, grabbed, ...grabbedFile(fs, file, grabbed, id) }
   })
+
+export const newGrab = (root: string, id: string): Effect.Effect<Grabbed, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  grabIn(root, "new", id, Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" })))
+
+export const takenGrab = (
+  root: string,
+  id: string,
+  missed: Effect.Effect<never, BacklogError | TaskFileError, FileSystem.FileSystem>
+): Effect.Effect<Grabbed, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  grabIn(root, "taken", id, missed)

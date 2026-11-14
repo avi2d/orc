@@ -3,9 +3,9 @@ import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs } from "./dispatch-args"
 import { backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted, runLabel, backlogPresent, backlogRoot as backlogRootOf, noBacklog, taskPr, type TaskFileError } from "../entities/backlog/index"
 import { readAttention, routeTaskItems } from "../entities/attention/index"
-import { backlogJson, type BacklogView, beatJson, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readRoom, type RoomList, runBeat, runnerLoadText } from "../widgets/beat/index"
+import { backlogJson, type BacklogView, beatJson, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readRoom, recordOrigin, type RoomList, runBeat, runnerLoadText } from "../widgets/beat/index"
 import { answerItemText, attentionText } from "../features/attention-list/index"
-import { edit, holdTask, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
+import { dropTask, edit, holdTask, prioritizeTask, priorityLine, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
 import { answerTask } from "../entities/parked-runs/index"
 import { type ConfigError, readFailure, type DispatchConfig, readDispatchConfig, readProjects } from "../shared/config/index"
 import { holdRun, killHeld, queueFromText, renewTask, startTask, stopNow, formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson, ensureAlertStream, liveAlertStream } from "../features/queueing-a-task/index"
@@ -13,7 +13,7 @@ import { mergeTask } from "../features/merging-a-pr/index"
 import { RunnerError, type Command } from "../shared/process/index"
 import { encodeToken, sessionToken } from "../entities/token/index"
 import { markEventPosted, mergedIds, readPrState, unpostedEvents } from "../entities/events/index"
-import { noteTask } from "../features/task-thread/index"
+import { noteTask, threadText } from "../features/task-thread/index"
 import { runHeavy, startHeavyWatch } from "../features/heavy-commands/index"
 
 type CommandArgs = Exclude<DispatchArgs, { readonly kind: "UsageError" }>
@@ -143,6 +143,14 @@ const closeNow = (args: Extract<CommandArgs, { readonly kind: "CloseTask" }>, pl
     return "closed " + args.id + " " + args.outcome
   })
 
+const dropNow = (args: Extract<CommandArgs, { readonly kind: "DropTask" }>, place: DispatchPlace) =>
+  Effect.gen(function*() {
+    const at = DateTime.formatIso(yield* DateTime.now)
+    const dropped = yield* dropTask(backlogRoot(place), args.id, args.reason, at)
+    yield* routeTaskItems(backlogRoot(place), [dropped], at)
+    return "dropped " + args.id + ": " + args.reason
+  })
+
 const killNow = (args: Extract<CommandArgs, { readonly kind: "RunnerKill" }>, place: DispatchPlace) =>
   Effect.gen(function*() {
     let label = runLabel(place.home, args.task, args.label === undefined ? yield* defaultKind(place, args.task) : undefined, args.label)
@@ -191,7 +199,7 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
-type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "CloseTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "NoteTask" | "DependTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
+type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "RecordOrigin" | "CloseTask" | "DropTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "NoteTask" | "ShowThread" | "DependTask" | "PrioritizeTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
 
 const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   switch (args.kind) {
@@ -201,8 +209,14 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
     case "EditTask": {
       return edit(backlogRoot(place), args, place)
     }
+    case "RecordOrigin": {
+      return recordOrigin(backlogRoot(place), place.home, args)
+    }
     case "CloseTask": {
       return closeNow(args, place)
+    }
+    case "DropTask": {
+      return dropNow(args, place)
     }
     case "MarkPosted": {
       return markPostedNow(args.id, place)
@@ -219,8 +233,14 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
     case "NoteTask": {
       return DateTime.now.pipe(Effect.flatMap((now) => noteTask(backlogRoot(place), args.id, args.words, DateTime.formatIso(now))))
     }
+    case "ShowThread": {
+      return threadText(backlogRoot(place), args.id, args.json)
+    }
     case "DependTask": {
       return dependNow(args, place)
+    }
+    case "PrioritizeTask": {
+      return prioritizeTask(backlogRoot(place), args.id, args.priority).pipe(Effect.map((outcome) => priorityLine(args.id, args.priority, outcome)))
     }
     case "MergeTask": {
       return mergeTask(backlogRoot(place), args.id, args.basis)
@@ -284,13 +304,17 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       }
       case "AnswerItem":
       case "EditTask":
+      case "RecordOrigin":
       case "CloseTask":
+      case "DropTask":
       case "MarkPosted":
       case "MarkEventPosted":
       case "HoldTask":
       case "AnswerTask":
       case "NoteTask":
+      case "ShowThread":
       case "DependTask":
+      case "PrioritizeTask":
       case "MergeTask":
       case "ShowPlan":
       case "DropChild": {

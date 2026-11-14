@@ -7,13 +7,15 @@ Each item is one JSON file with its `kind`, its `task`, its `text`, the time it 
 The owner names who must answer it, `decider` or `user`.
 The state starts as `open`.
 An answer makes it `closed`, and a closed item keeps the answer words and time.
-A review question or an overdue wait turns `withdrawn` with its reason and time when its task closes or when it is no longer asked.
-A review question or an overdue wait that a beat reads as still asked opens again, with its current text, and a review question keeps the owner and decision it had.
+A review question, a worker question or an overdue wait turns `withdrawn` with its reason and time when its task closes or when it is no longer asked.
+A review question, a worker question or an overdue wait that a beat reads as still asked opens again, with its current text, and a question keeps the owner and decision it had.
 An answer to that item closes it with the answer words and time.
 Showing an item never closes it.
 An open item is overdue once more than 5 minutes have passed since it was asked.
 
 A review question a run asks is an item of kind `review-question`, owned by the decider.
+A question Pi asks mid-run with `orc_ask` is an item of kind `worker-question`, owned by the decider, as [A worker question](parked-runs.md#a-worker-question) shows.
+Its item carries the question's `options` when Pi gave any, each with its `text` and an optional `picture`.
 The `looping` question a run asks when Pi fails one command 6 times in a row is owned by you, as [A looping run](parked-runs.md#a-looping-run) shows.
 A running run whose Pi has failed one command 3 times in a row opens an item of kind `failing-command` for you, which only tells you.
 It is withdrawn once a beat reads the run with that command no longer failing, or the run ends.
@@ -30,7 +32,7 @@ Either way the item keeps a `decision` with `answered` or `escalated`, the decid
 A reply orc cannot read, a call that fails or a missing `models.decider` escalates the item with that as its reason.
 
 ## Answering an item
-Answering a review question with `orc backlog answer <task-id> <question-id>=<text>` closes the item.
+Answering a review question or a worker question with `orc backlog answer <task-id> <question-id>=<text>` closes the item.
 A question asked again with the same words keeps its item.
 A question asked again with different words opens a new item, and the old item is withdrawn.
 An answered question asked again opens a new item, and the old item keeps its answer.
@@ -48,7 +50,7 @@ The beat opens an item for each run event, owned by the user:
   Closing the PR without merging closes it with the answer `closed without merging`.
 
 To answer one of these, run `orc attention answer <item-id> <words>`.
-It refuses a review question or an overdue wait and names the task to answer with `orc backlog answer` instead.
+It refuses a review question, a worker question or an overdue wait and names the task to answer with `orc backlog answer` instead.
 
 A held task whose `--until` date has passed opens an `overdue-wait` item, owned by the user and asked at the start of the next day on the machine local clock.
 Answering the hold closes the item with the hold's answer.
@@ -81,3 +83,6 @@ To print the same facts as JSON, run `orc attention --json`, whose document name
 `at` is the time the queue was read, and each item's age and overdue flag are taken at that time.
 To watch the open items in a terminal, run `orc-dash panel attention`, as [orc-dash](../dash.md#run-the-attention-tool) shows.
 On a machine with no backlog folder, `orc attention` prints `no backlog at <path>`, and `orc attention --json` prints an empty queue.
+
+The queue holds every task's items.
+To see one task's items in order with its holds, questions, answers and notes, run `orc backlog thread <task-id>`, the per-task view [Backlog and beat](backlog-and-beat.md) describes.

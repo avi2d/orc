@@ -1,6 +1,6 @@
 import { Effect, type FileSystem, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import type { AgentFile } from "../../entities/agent/index"
+import type { AgentFile, AskSetup } from "../../entities/agent/index"
 import type { SandboxKind } from "../../shared/sandbox/index"
 import { orcCompletionLine } from "../../entities/agent/index"
 import type { AllowWord, NoMistakesRecord, NoMistakesRunner, QuestionAnswer } from "../../entities/review-gate/index"
@@ -35,10 +35,12 @@ export interface HistoryRun {
   readonly instructions: string | null
   readonly agent: AgentFile
   readonly fixer: AgentFile
+  readonly asks: AskSetup
   readonly branch: string
   readonly sandbox: SandboxKind
   readonly started: string
   readonly worktreeDir: string
+  readonly machine: string | null
   readonly delivery: RunDeliverer
   readonly allow?: ReadonlyArray<AllowWord> | undefined
   readonly answers?: ReadonlyArray<QuestionAnswer> | undefined

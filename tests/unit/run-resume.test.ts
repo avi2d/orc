@@ -7,6 +7,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
+import { askSetupFor } from "../../packages/run/src/entities/agent/index"
 import { openDatabase, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
 import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "../../packages/run/src/features/running-a-task/run-resume"
 import type { SandboxKind } from "../../packages/run/src/shared/sandbox/sandbox-kind"
@@ -60,7 +61,9 @@ const historyFor = (runId: string, home: string, projectDir: string, started: st
       taskPath: path.join(runDir, "task.md"),
       instructions: null,
       agent: implementer, fixer, branch: "orc/test", sandbox: "nono", started,
+      asks: askSetupFor(runDir, path.join(runDir, "session"), 600, [], []),
       worktreeDir: projectDir,
+      machine: null,
       delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git: "git", worktreeDir: projectDir }) },
       allow: [], answers: []
     }
@@ -357,7 +360,7 @@ describe("reinterrupted continuations survive every handover", () => {
         await seedStep(db, "b", "fix", "failed", run.started, null)
         const row = Schema.decodeUnknownSync(Schema.Struct({ id: Schema.Finite }))(db.query("SELECT id FROM steps WHERE run_id = ?").get("b"))
         db.query("INSERT INTO evidence (step_id, direction, path, kind) VALUES (?, ?, ?, ?)").run(row.id, "out", old, "log")
-        await Effect.runPromise(recordFixStart(db, "b", 1, fixer.path, run.started))
+        await Effect.runPromise(recordFixStart(db, "b", 1, fixer, run.started))
         expect(await Effect.runPromise(readStepLog(db, "b", row.id).pipe(Effect.provide(BunServices.layer)))).toBe("new output")
       } finally {
         db.close()

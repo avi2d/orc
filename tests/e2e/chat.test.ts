@@ -89,7 +89,7 @@ describe("orc chat", () => {
         "--extension",
         chatToolsPath,
         "--tools",
-        "orc_backlog_add,orc_backlog,orc_backlog_hold,orc_backlog_edit,orc_backlog_answer,merge_task,orc_decision_board",
+        "orc_backlog_add,orc_backlog,orc_backlog_hold,orc_backlog_priority,orc_backlog_edit,orc_backlog_answer,merge_task,orc_decision_board",
         "ORC_CHAT_ORC=" + JSON.stringify([process.execPath, binPath]),
         "ORC_CHAT_BOARDS=" + join(fixture.home, "boards")
       ])
@@ -424,6 +424,7 @@ describe("orc chat tools", () => {
       await Bun.sleep(500)
       reopened.fire("session_shutdown")
       expect([first.sent, reopened.sent]).toEqual([[{ message: heldPost, options: { triggerTurn: false } }], [{ message: heldPost, options: { triggerTurn: false } }]])
+      expect((await runOrc(fixture, ["backlog", "priority", "orc-1", "0"])).exitCode).toBe(0)
       const beat = await runOrc(fixture, ["beat"])
       expect(beat.stdout).toContain("waits orc-1: held for the captain: REST or gRPC, until 2026-12-01")
       expect(await Bun.file(join(fixture.home, "backlog", "new", "orc-1.md")).exists()).toBe(true)

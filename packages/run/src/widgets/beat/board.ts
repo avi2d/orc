@@ -1,6 +1,6 @@
 import { type BeatAction, type BeatReport, type MachineRoom } from "./beat"
 import { taskWait } from "./beat-place"
-import { type ChildCount, childCount, dependencyWaits, type TaskKind, answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, type SplitMark, type Started, type TaskRecord } from "../../entities/backlog/index"
+import { type ChildCount, childCount, dependencyWaits, type TaskKind, type TaskPriority, answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, ranClosing, type SplitMark, type Started, type TaskRecord } from "../../entities/backlog/index"
 import type { Project } from "../../shared/config/index"
 import { describeQuota } from "./quota"
 import type { ChatEvent, PrState } from "../../entities/events/index"
@@ -27,9 +27,9 @@ type TaskStatusJson =
   | { readonly status: "started"; readonly claim: Claim; readonly started: Started }
   | {
     readonly status: "closed"
-    readonly claim: Claim
+    readonly claim: Claim | null
     readonly started: Started | null
-    readonly outcome: "done" | "failed" | "stopped" | "start-failed"
+    readonly outcome: "done" | "failed" | "stopped" | "start-failed" | "dropped"
     readonly reason: string
     readonly pr: string | null
     readonly report: string | null
@@ -48,6 +48,7 @@ type TaskJson = {
   readonly wait: string | null
   readonly split: SplitMark | null
   readonly dependsOn: ReadonlyArray<string>
+  readonly priority: TaskPriority | null
   readonly created: string
   readonly prState: PrState | null
   readonly hold: Hold | null
@@ -97,14 +98,15 @@ const claimJson = (record: TaskRecord): TaskStatusJson => {
       return { status: "started", claim: state.claim, started: state.started }
     }
     case "closed": {
+      const ran = ranClosing(record)
       return {
         status: "closed",
         claim: state.claim,
-        started: state.closing.outcome === "start-failed" ? null : state.closing.started,
+        started: ran?.started ?? null,
         outcome: state.closing.outcome,
         reason: state.closing.reason,
-        pr: state.closing.outcome === "start-failed" ? null : state.closing.pr,
-        report: state.closing.outcome === "start-failed" ? null : state.closing.report,
+        pr: ran?.pr ?? null,
+        report: ran?.report ?? null,
         closedAt: state.closedAt,
         postedAt: state.postedAt
       }
@@ -125,6 +127,7 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     wait: record.state.kind === "new" ? taskWait(record, view.tasks, view.merged, view.deciderOwns) : null,
     split: record.spec.split,
     dependsOn: record.spec.dependsOn,
+    priority: record.spec.priority,
     created: record.spec.created,
     prState: view.prStates.get(record.spec.id) ?? null,
     hold: record.hold,
@@ -154,7 +157,7 @@ const sideBySide = (columns: ReadonlyArray<ReadonlyArray<string>>): string => {
 
 const pinOf = (record: TaskRecord): string => record.spec.machine === null ? "" : " @" + record.spec.machine
 
-const named = (record: TaskRecord): string => record.spec.id + (record.spec.kind === "ship" ? "" : " " + record.spec.kind) + " " + record.spec.project
+const named = (record: TaskRecord): string => record.spec.id + (record.spec.priority === null ? "" : " P" + record.spec.priority) + (record.spec.kind === "ship" ? "" : " " + record.spec.kind) + " " + record.spec.project
 
 const doneOf = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string => {
   if (record.spec.kind !== "parent") {
@@ -187,8 +190,11 @@ const takenCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: R
   return named(record) + doneOf(record, all, merged) + machine + " taken"
 }
 
+const closingOf = (closing: Extract<TaskRecord["state"], { readonly kind: "closed" }>["closing"]): string =>
+  closing.outcome === "dropped" ? "dropped: " + closing.reason : closing.outcome
+
 const closedCell = (record: TaskRecord, all: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string =>
-  record.state.kind === "closed" ? named(record) + doneOf(record, all, merged) + " " + record.state.closing.outcome : record.spec.id
+  record.state.kind === "closed" ? named(record) + doneOf(record, all, merged) + " " + closingOf(record.state.closing) : record.spec.id
 
 const projectCells = (projects: ProjectList): ReadonlyArray<string> =>
   projects.kind === "unread"

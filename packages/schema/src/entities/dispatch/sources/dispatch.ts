@@ -33,7 +33,8 @@ type DispatchTaskState =
   | { readonly kind: "new" }
   | { readonly kind: "taken"; readonly claim: DispatchClaim | null }
   | { readonly kind: "started"; readonly claim: DispatchClaim; readonly started: DispatchStarted }
-  | { readonly kind: "closed"; readonly claim: DispatchClaim; readonly closing: DispatchClosing; readonly closedAt: string };
+  | { readonly kind: "closed"; readonly claim: DispatchClaim; readonly closing: DispatchClosing; readonly closedAt: string }
+  | { readonly kind: "closed"; readonly claim: null; readonly closing: { readonly outcome: "dropped"; readonly reason: string }; readonly closedAt: string };
 
 export interface DispatchTask {
   readonly id: string;
@@ -74,7 +75,7 @@ const TaskFields = Schema.Struct({
   taken_at: Schema.optional(Schema.String),
   started_at: Schema.optional(Schema.String),
   start_log: Schema.optional(Schema.String),
-  outcome: Schema.optional(Schema.Literals(["done", "failed", "stopped", "start-failed"])),
+  outcome: Schema.optional(Schema.Literals(["done", "failed", "stopped", "start-failed", "dropped"])),
   closed_at: Schema.optional(Schema.String),
   reason: Schema.optional(Schema.String),
 });
@@ -141,7 +142,7 @@ const startedOf = (front: TaskFields): DispatchStarted | null =>
 const closingOf = (front: TaskFields, started: DispatchStarted | null): DispatchClosing | null => {
   const reason = front.reason ?? "";
   if (front.outcome === "start-failed") return { outcome: "start-failed", reason };
-  return front.outcome === undefined || started === null ? null : { outcome: front.outcome, started, reason };
+  return front.outcome === undefined || front.outcome === "dropped" || started === null ? null : { outcome: front.outcome, started, reason };
 };
 
 const stateOf = (folder: TaskFolder, file: string, front: TaskFields): DispatchTaskState | string => {
@@ -151,6 +152,11 @@ const stateOf = (folder: TaskFolder, file: string, front: TaskFields): DispatchT
   if (folder === "taken") {
     if (started === null) return { kind: "taken", claim };
     return claim === null ? file + ": a started task names no claim" : { kind: "started", claim, started };
+  }
+  if (front.outcome === "dropped") {
+    return front.closed_at === undefined
+      ? file + ": a dropped task names no close time"
+      : { kind: "closed", claim: null, closing: { outcome: "dropped", reason: front.reason ?? "" }, closedAt: front.closed_at };
   }
   const closing = closingOf(front, started);
   if (claim === null || closing === null || front.closed_at === undefined) {

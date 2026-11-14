@@ -7,7 +7,7 @@ import { Effect, FileSystem, Layer, Path } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../../packages/run/src/app/dispatch-args"
 import { runDispatch, type DispatchPlace } from "../../../packages/run/src/app/dispatch-cli"
-import { addTask, claimTask, closeStartedTask, listTasks, writeTaken, renderTaskFile } from "../../../packages/run/src/entities/backlog/index"
+import { addTask, claimTask, closeStartedTask, listTasks, writeTaken, renderTaskFile, taskPr } from "../../../packages/run/src/entities/backlog/index"
 import { runBeat } from "../../../packages/run/src/widgets/beat/beat"
 import { taskLabel } from "../../../packages/run/src/shared/process/pueue-status"
 import { killHeld } from "../../../packages/run/src/features/queueing-a-task/index"
@@ -15,6 +15,7 @@ import { formatResult } from "../../../packages/run/src/features/queueing-a-task
 import { markRunStopped } from "../../../packages/run/src/entities/run-history/index"
 import { buildResumePlan } from "../../../packages/run/src/features/running-a-task/run-resume"
 import type { AgentFile } from "../../../packages/run/src/entities/agent/index"
+import { askSetupFor } from "../../../packages/run/src/entities/agent/index"
 import type { HistoryRun } from "../../../packages/run/src/features/running-a-task/run-record"
 import { subprocessNoMistakesRunner } from "../../../packages/run/src/entities/review-gate/no-mistakes"
 import { insertRun, openDatabase, recordStep, runById, stoppedEndReason } from "../../../packages/run/src/entities/run-history/index"
@@ -34,7 +35,7 @@ const withBacklog = async (body: (root: string) => Promise<void>): Promise<void>
   }
 }
 
-const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
+const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: 0 as const, created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
 
 const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-10-27T10:01:00.000Z" }
 
@@ -150,7 +151,7 @@ describe("backlog stop", () => {
       }
       expect(closed.state.closing.outcome).toBe("stopped")
       expect(closed.state.closing.reason).toBe(stoppedEndReason)
-      expect(closed.state.closing.outcome === "start-failed" ? null : closed.state.closing.pr).toBe("https://github.com/example/orc/pull/7")
+      expect(taskPr(closed)).toBe("https://github.com/example/orc/pull/7")
     })
   })
 })
@@ -311,10 +312,11 @@ describe("runner kill", () => {
         const history: HistoryRun = {
           fs, path, spawner: childSpawner, git: "git", projectDir: "/checkout", runId: "run-9", runDir,
           piSessionDir: path.join(runDir, "session"),
+          asks: askSetupFor(runDir, path.join(runDir, "session"), 600, [], []),
           hostSessionsDir: path.join(runDir, "sessions"),
           taskPath: path.join(runDir, "task.md"),
           instructions: null, agent, fixer: { ...agent, kind: "fixer", body: "Fix the failure.", path: "bundled/fixer.md" }, branch: "orc/orc-1", sandbox: "nono",
-          started: "2026-11-07T10:00:00.000Z", worktreeDir: "/checkout",
+          started: "2026-11-07T10:00:00.000Z", worktreeDir: "/checkout", machine: null,
           delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner: childSpawner, binary: "no-mistakes", pathEnv: "", git: "git", worktreeDir: "/checkout" }) },
           allow: [], answers: []
         }
@@ -425,7 +427,7 @@ describe("the beat's stale start", () => {
       const closed = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
       expect(closed?.state.kind === "closed" ? closed.state.closing.outcome + ":" + closed.state.closing.reason : "")
         .toBe("stopped:the run was stopped")
-      expect(closed?.state.kind === "closed" && closed.state.closing.outcome !== "start-failed" ? closed.state.closing.pr : null).toBe("https://github.com/example/orc/pull/7")
+      expect(closed === undefined ? null : taskPr(closed)).toBe("https://github.com/example/orc/pull/7")
       expect(closed === undefined ? "" : renderTaskFile(closed)).toContain("pr: \"https://github.com/example/orc/pull/7\"")
       expect(report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : ""))).toEqual(["closed:orc-1"])
     })
@@ -512,10 +514,11 @@ describe("an interrupted run", () => {
         const history: HistoryRun = {
           fs, path, spawner, git: "git", projectDir: "/checkout", runId: "run-2", runDir,
           piSessionDir: path.join(runDir, "session"),
+          asks: askSetupFor(runDir, path.join(runDir, "session"), 600, [], []),
           hostSessionsDir: path.join(runDir, "sessions"),
           taskPath: path.join(runDir, "task.md"),
           instructions: null, agent, fixer, branch: "orc/orc-1", sandbox: "nono",
-          started: "2026-11-07T10:00:00.000Z", worktreeDir: "/checkout",
+          started: "2026-11-07T10:00:00.000Z", worktreeDir: "/checkout", machine: null,
           delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git: "git", worktreeDir: "/checkout" }) },
           allow: [], answers: []
         }

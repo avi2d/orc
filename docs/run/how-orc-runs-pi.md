@@ -23,6 +23,8 @@ Orc runs only Pi, and it starts Pi itself as `pi -p --mode json` in the task cop
 - A valid `ORC_SPLIT` proposal records the run as failed without running checks or opening a PR.
 - The beat then turns the task into a parent and starts its children.
 - When the task has a parent, its children join that parent instead, as [A worker split proposal](task-kinds.md#a-worker-split-proposal) shows.
+- Orc also loads its `orc_ask` extension into Pi with `--extension` and adds `orc_ask` to the tools, as [A worker question](parked-runs.md#a-worker-question) shows.
+  Pi calls it to ask you a question mid-run instead of guessing or failing.
 - On resume orc passes the recorded session file as `--session`, and Pi continues that session instead of starting a new one.
 - Orc sums the `usage` input and output counts each session message carries into the run's token totals.
 

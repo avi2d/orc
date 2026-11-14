@@ -5,12 +5,13 @@ import type { AgentExec } from "../../shared/sandbox/index"
 import type { AgentFile } from "../../entities/agent/index"
 import type { SandboxKind } from "../../shared/sandbox/index"
 import { orcCompletionLine } from "../../entities/agent/index"
-import { failingFileName, idleSpan, type PiPacing, runPi } from "../../entities/agent/index"
+import { type AskSetup, failingFileName, idleSpan, type PiPacing, runPi } from "../../entities/agent/index"
+import { askedNote } from "./worker-question"
 import { askOnLoop, loopContinuePrompt, loopingNote } from "./loop-pause"
 import { historyFailure, recordRun, recordStep, updateRun, updateStep } from "../../entities/run-history/index"
 import type { OrcRunError } from "../../shared/lib/index"
 import { reportPathOf, writtenReport } from "../../entities/run-history/index"
-import type { ReportKind } from "../../entities/backlog/index"
+import { taskOfBranch, type ReportKind } from "../../entities/backlog/index"
 
 export interface ReportRun {
   readonly kind: ReportKind
@@ -18,6 +19,7 @@ export interface ReportRun {
   readonly runDir: string
   readonly projectDir: string
   readonly branch: string
+  readonly machine: string | null
   readonly sandbox: SandboxKind
   readonly taskPath: string
   readonly instructions: string | null
@@ -27,6 +29,7 @@ export interface ReportRun {
   readonly exec: AgentExec
   readonly pacing: PiPacing
   readonly answerWaitSeconds: number
+  readonly asks: AskSetup
 }
 
 export type ReportOutcome =
@@ -75,6 +78,7 @@ const runReportPi = (run: ReportRun): Effect.Effect<ReportPiEnd, OrcRunError, Fi
         resumeSession: next.resumeSession,
         logFile: run.runDir + "/agent.log",
         failingFile: run.runDir + "/" + failingFileName,
+        asks: run.asks,
         onSession: () => Effect.void
       }, run.pacing)
       if (pi.end.kind === "exited") {
@@ -82,6 +86,9 @@ const runReportPi = (run: ReportRun): Effect.Effect<ReportPiEnd, OrcRunError, Fi
       }
       if (pi.end.kind === "idle") {
         return { kind: "ended", reason: "orc stopped pi, idle for " + idleSpan(pi.end.idleSeconds) + " with no tool running" }
+      }
+      if (pi.end.kind === "asked") {
+        return { kind: "unanswered", reason: askedNote(pi.end.question) }
       }
       const verdict = yield* askOnLoop(run.runDir, run.answerWaitSeconds, pi.end)
       if (verdict.kind === "stop") {
@@ -118,9 +125,9 @@ export const runReport = (
   Effect.gen(function*() {
     yield* recordRun(db, {
       id: run.runId, project: run.projectDir, branch: run.branch, taskFile: run.taskPath, status: "running", started: run.started, sandbox: run.sandbox,
-      kind: run.kind, delivery: null
+      kind: run.kind, delivery: null, task: taskOfBranch(run.branch), machine: run.machine, worktree: run.projectDir
     }).pipe(Effect.mapError((cause) => historyFailure("record the run in", cause)))
-    yield* recordStep(db, { runId: run.runId, name: "implement", attempt: 1, status: "running", started: run.started, agentFile: run.agent.path, piSessionFile: null }).pipe(Effect.asVoid, Effect.mapError((cause) => historyFailure("record the step in", cause)))
+    yield* recordStep(db, { runId: run.runId, name: "implement", attempt: 1, status: "running", started: run.started, agentFile: run.agent.path, piSessionFile: null, model: run.agent.model, thinking: run.agent.thinking }).pipe(Effect.asVoid, Effect.mapError((cause) => historyFailure("record the step in", cause)))
     const piEnd = yield* runReportPi(run).pipe(Effect.catchTag("OrcRunError", (error) => Effect.succeed({ kind: "ended", reason: error.message } as const)))
     const written = yield* writtenReport(run.runDir)
     const fs = yield* FileSystem.FileSystem

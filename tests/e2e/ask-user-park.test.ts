@@ -15,7 +15,7 @@ describe("an ask-user finding parks as a question", () => {
         quota: { provider: "acme", command: ["orc-quota"], accounts: [{ name: "main", tokenFile: mainToken }], floorPercent: 15 }
       }))
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
       await orcOk(fixture, ["beat"])
       await rm(join(fixture.pueue, "add-args"), { force: true })
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({

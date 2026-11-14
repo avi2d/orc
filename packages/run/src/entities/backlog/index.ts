@@ -8,9 +8,8 @@ export {
   publishOnce,
   backlogRoot,
   backlogPaths,
-  takeFile,
-  grabbedFile,
   takenGrab,
+  newGrab,
 } from "./backlog-write"
 
 export {
@@ -26,6 +25,7 @@ export {
   writeTaken,
   publishClosed,
   closeStartedTask,
+  answeredOnly,
   markPosted,
   rewriteNew,
   rewriteTaken,
@@ -36,6 +36,7 @@ export type {
 } from "./backlog"
 export {
   taskBranch,
+  taskOfBranch,
   parentBranch,
   labelOf,
   runLabel,
@@ -64,9 +65,13 @@ export {
   isHeld,
   openQuestions,
   taskPr,
+  ranClosing,
   answersAwaited,
   answerWait,
+  missingOriginWait,
   isCalendarDate,
+  taskPriorities,
+  isTaskPriority,
   TaskFileError,
   parseTaskFile,
 } from "./task-record"
@@ -80,6 +85,7 @@ export type {
   Hold,
   Parked,
   TaskRecord,
+  TaskPriority,
   DeciderOwns,
 } from "./task-record"
 export {
