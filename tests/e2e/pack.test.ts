@@ -159,6 +159,7 @@ const expectedFiles = [
   "src/features/running-a-task/run-folders.ts",
   "src/features/seeing-runs/run-facts.ts",
   "src/features/seeing-runs/run-history-view.ts",
+  "src/entities/run-history/run-history-read.ts",
   "src/entities/run-history/run-history.ts",
   "src/shared/lib/run-id.ts",
   "src/features/running-a-task/run-loop.ts",
