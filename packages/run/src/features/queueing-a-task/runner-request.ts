@@ -16,6 +16,7 @@ const taskFields = {
   delivery: Schema.optional(Schema.Literal("direct-PR")),
   branch: Schema.optional(Schema.String.check(Schema.isPattern(/^[A-Za-z0-9._/-]+$/))),
   resumeRun: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
+  machine: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
   answers: Schema.optional(Schema.Array(Schema.Struct({
     question: Schema.String.check(Schema.isPattern(/^[^\s=]+$/)),
     answer: Schema.String.check(Schema.isNonEmpty())
@@ -85,7 +86,9 @@ const readRequestFields = (
     const instructions = yield* readInstructions(env["ORC_TASK_INSTRUCTIONS"] ?? "")
     const kind = record.spec.kind === "ship" ? {} : { kind: record.spec.kind }
     const delivery = record.spec.kind === "ship" && deliveryWord === "direct-PR" ? { delivery: deliveryWord } : {}
-    return yield* Schema.decodeEffect(RequestSchema)({ task, checkout, provider, body, ...kind, ...delivery, ...instructions, ...resume }).pipe(
+    const machineName = env["ORC_RUN_MACHINE"] ?? ""
+    const machine = machineName === "" ? {} : { machine: machineName }
+    return yield* Schema.decodeEffect(RequestSchema)({ task, checkout, provider, body, ...kind, ...delivery, ...instructions, ...machine, ...resume }).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
     )
   })

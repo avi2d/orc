@@ -165,7 +165,7 @@ describe("a beat with a token command", () => {
       const liveIso = new Date(liveAt).toISOString()
       await writeMachine(fixture, session, true)
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
       const beat = await orcOk(fixture, ["beat"])
       const added = await queuedArgs(fixture)
       const dir = tokenDir(fixture, "orc-1")
@@ -173,7 +173,7 @@ describe("a beat with a token command", () => {
       expect(beat).not.toContain(placeholder)
       expect(added?.slice(added.indexOf("--") + 1)).toEqual([
         ...orc, "runner", "hold", "orc-1", "--",
-        ...orc, "run", join(fixture.home, "runner", "orc-1.md"), "--branch", "orc/orc-1",
+        "env", "ORC_RUN_MACHINE=linux", ...orc, "run", join(fixture.home, "runner", "orc-1.md"), "--branch", "orc/orc-1",
         "--sandbox", "none", "--provider", "acme", "--token-file", join(dir, "token")
       ])
       expect(added?.some((word) => word.includes(placeholder))).toBe(false)
@@ -193,7 +193,7 @@ describe("a beat with a token command", () => {
       await fakeQuota(fixture)
       await writeSession(session, pastMillis)
       await writeMachine(fixture, session, true)
-      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
       expect(await orcOk(fixture, ["beat"])).toContain("waits orc-1: the token for main runs out at " + past)
       expect(await stat(join(fixture.pueue, "added-tasks")).then(() => true, () => false)).toBe(false)
       expect(await orcOk(fixture, ["backlog"])).toStartWith("NEW (1) ")
@@ -207,7 +207,7 @@ describe("a beat with a token command", () => {
       await writeSession(session, hoursFromNowMillis(2))
       await writeMachine(fixture, session, true)
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
       await orcOk(fixture, ["beat"])
       await queuedArgs(fixture)
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: { "77": runningTask(77, fixture.home + " orc-1") }, groups: {} }))
@@ -226,7 +226,7 @@ describe("a beat with a token command", () => {
       await writeSession(session, hoursFromNowMillis(2))
       await writeMachine(fixture, session, true)
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
       await orcOk(fixture, ["beat"])
       await queuedArgs(fixture)
       expect(await orcOk(fixture, ["beat"])).toContain("renew failed orc-1 on linux: the renew command exited 1")

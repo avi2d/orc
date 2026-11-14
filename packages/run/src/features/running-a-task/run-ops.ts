@@ -26,6 +26,7 @@ export interface SandboxOps {
 export interface ResumePlan {
   readonly implementSessionId: string | null
   readonly implementSessionFile: string | null
+  readonly inheritedImplement: { readonly agentFile: string | null; readonly model: string | null; readonly thinking: string | null } | null
   readonly skipImplement: boolean
   readonly skipChecks: boolean
   readonly allow: ReadonlyArray<AllowWord>

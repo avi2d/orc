@@ -243,6 +243,7 @@ const historyFor = (runId: string, home: string, projectDir: string, started: st
       instructions: null,
       agent: implementer, fixer, branch: "orc/sample", sandbox: "none", started,
       worktreeDir: projectDir,
+      machine: null,
       delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git, worktreeDir: projectDir }) },
       allow: [], answers: []
     }

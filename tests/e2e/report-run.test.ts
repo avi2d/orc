@@ -144,6 +144,15 @@ describe("orc run --kind scout", () => {
     })
   }, 60_000)
 
+  test("records the claimed ORC_RUN_MACHINE machine instead of the OS host name when no dispatch.json exists on the run machine", async () => {
+    await withReportFixture(true, async ({ repo, env }) => {
+      const result = await runOrc(scoutRun, repo, { ...env, ORC_RUN_MACHINE: "linux-box", HOSTNAME: "Some-MacBook-Pro.local" })
+      expect(result.exitCode).toBe(0)
+      const runs: unknown = JSON.parse((await runOrc(["runs", "--json"], repo, env)).stdout)
+      expect(runs).toMatchObject({ runs: [{ branch: "orc/task-1", machine: "linux-box", worktree: repo }] })
+    })
+  }, 60_000)
+
   test("without a queue bypass a run fails naming the heavy queue instead of running unqueued", async () => {
     await withReportFixture(true, async ({ repo, fakeBin, env }) => {
       const result = await runOrc(scoutRun, repo, { ...env, HEAVY_QUEUE_BYPASS: "" })

@@ -40,6 +40,9 @@ const parkedOriginWait = (task: TaskRecord): string | null =>
     : null
 
 export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>, deciderOwns: DeciderOwns): string | null => {
+  if (task.spec.priority === null) {
+    return "no priority"
+  }
   const held = answerWait(task, deciderOwns) ?? parkedOriginWait(task)
   if (held !== null) {
     return held

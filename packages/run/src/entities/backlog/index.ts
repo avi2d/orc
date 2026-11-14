@@ -36,6 +36,7 @@ export type {
 } from "./backlog"
 export {
   taskBranch,
+  taskOfBranch,
   parentBranch,
   labelOf,
   runLabel,

@@ -61,6 +61,7 @@ const historyFor = (runId: string, home: string, projectDir: string, started: st
       instructions: null,
       agent: implementer, fixer, branch: "orc/test", sandbox: "nono", started,
       worktreeDir: projectDir,
+      machine: null,
       delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git: "git", worktreeDir: projectDir }) },
       allow: [], answers: []
     }
@@ -357,7 +358,7 @@ describe("reinterrupted continuations survive every handover", () => {
         await seedStep(db, "b", "fix", "failed", run.started, null)
         const row = Schema.decodeUnknownSync(Schema.Struct({ id: Schema.Finite }))(db.query("SELECT id FROM steps WHERE run_id = ?").get("b"))
         db.query("INSERT INTO evidence (step_id, direction, path, kind) VALUES (?, ?, ?, ?)").run(row.id, "out", old, "log")
-        await Effect.runPromise(recordFixStart(db, "b", 1, fixer.path, run.started))
+        await Effect.runPromise(recordFixStart(db, "b", 1, fixer, run.started))
         expect(await Effect.runPromise(readStepLog(db, "b", row.id).pipe(Effect.provide(BunServices.layer)))).toBe("new output")
       } finally {
         db.close()

@@ -22,7 +22,7 @@ The chat's Pi has eight tools and no others:
 - `merge_task` lands a closed task's PR through `orc merge <task-id> --basis <basis>`, as [Merging a task's PR](merging-a-tasks-pr.md) shows.
 - `orc_decision_board` opens a decision board for one held task, one parked task, or one started task waiting at its gate, as [Decision boards](chat.md#decision-boards) shows.
 
-So a task from the chat enters the backlog the way any other does, and the beat starts it.
+So a task from the chat waits until the captain gives it a priority with `orc backlog priority <task-id> <0-4>`.
 When it starts and every 15 seconds after, the chat reads `orc backlog --json`.
 While Pi is idle, it posts each closed task that has no `postedAt`, with its outcome, its reason and its PR or report, as in `orc-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
 It posts a task whoever added it: this chat, an earlier chat or the command line.

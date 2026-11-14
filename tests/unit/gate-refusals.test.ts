@@ -265,7 +265,7 @@ describe("resumed refusals", () => {
             hostSessionsDir: path.join(runDir, "sessions"),
             taskPath: path.join(runDir, "task.md"),
             instructions: null, agent: implementer, fixer, branch: "orc/test", sandbox: "nono",
-            started: "2026-10-19T10:00:00.000Z", worktreeDir: project,
+            started: "2026-10-19T10:00:00.000Z", worktreeDir: project, machine: null,
             delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git: "git", worktreeDir: project }) },
             allow: [], answers: []
           }

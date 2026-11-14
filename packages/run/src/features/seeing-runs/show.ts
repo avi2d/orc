@@ -2,11 +2,13 @@ import type { Database } from "bun:sqlite"
 import { Effect, Schema } from "effect"
 import {
   EvidenceDirectionSchema,
+  runColumns,
   RunStatusSchema,
   RunSqlRowSchema,
   ScoreValueSchema,
   SHOW_JSON_SCHEMA,
   sqlite,
+  StepSqlRowSchema,
   StepStatusSchema,
   toFileUrl,
   type SqliteFailure
@@ -41,6 +43,8 @@ const ShowStepSchema = Schema.Struct({
   ended: Schema.NullOr(Schema.String),
   agentFile: Schema.NullOr(Schema.String),
   piSessionFile: Schema.NullOr(Schema.String),
+  model: Schema.NullOr(Schema.String),
+  thinking: Schema.NullOr(Schema.String),
   signals: Schema.Array(ShowSignalSchema),
   score: Schema.NullOr(ShowScoreSchema),
   evidence: Schema.Array(ShowEvidenceSchema)
@@ -58,7 +62,10 @@ const ShowRunSchema = Schema.Struct({
   taskFile: Schema.String,
   taskFileUrl: Schema.String,
   report: Schema.String,
-  reportUrl: Schema.String
+  reportUrl: Schema.String,
+  task: Schema.NullOr(Schema.String),
+  machine: Schema.NullOr(Schema.String),
+  worktree: Schema.NullOr(Schema.String)
 })
 
 const ShowJsonSchema = Schema.Struct({
@@ -74,18 +81,6 @@ export const encodeShowJson = (document: ShowJsonDocument): Effect.Effect<string
 
 export const decodeShowJson = (value: unknown): Effect.Effect<ShowJsonDocument, Schema.SchemaError> =>
   Schema.decodeUnknownEffect(ShowJsonSchema)(value)
-
-const StepSqlRowSchema = Schema.Struct({
-  id: Schema.Finite,
-  run_id: Schema.String,
-  name: Schema.String,
-  attempt: Schema.Finite,
-  status: StepStatusSchema,
-  started: Schema.String,
-  ended: Schema.NullOr(Schema.String),
-  agent_file: Schema.NullOr(Schema.String),
-  pi_session_file: Schema.NullOr(Schema.String)
-})
 
 const EvidenceSqlRowSchema = Schema.Struct({
   step_id: Schema.Finite,
@@ -112,11 +107,9 @@ export const readShow = (
   runId: string
 ): Effect.Effect<ShowJsonDocument | null, Schema.SchemaError | SqliteFailure> =>
   sqlite(() => ({
-    run: db.query(
-      "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox, kind, delivery FROM runs WHERE id = ?"
-    ).get(runId),
+    run: db.query(runColumns + " WHERE id = ?").get(runId),
     steps: db.query(
-      "SELECT id, run_id, name, attempt, status, started, ended, agent_file, pi_session_file FROM steps WHERE run_id = ? ORDER BY started ASC, id ASC"
+      "SELECT id, run_id, name, attempt, status, started, ended, agent_file, pi_session_file, model, thinking FROM steps WHERE run_id = ? ORDER BY started ASC, id ASC"
     ).all(runId)
   })).pipe(
     Effect.flatMap(({ run, steps }) =>
@@ -147,6 +140,8 @@ export const readShow = (
             ended: step.ended,
             agentFile: step.agent_file,
             piSessionFile: step.pi_session_file,
+            model: step.model,
+            thinking: step.thinking,
             signals: signals.map((signal) => ({ name: signal.name, value: signal.value })),
             score: score === null ? null : { score: score.score, note: score.note, scoredAt: score.scored_at },
             evidence: evidence.map((item) => ({
@@ -172,7 +167,10 @@ export const readShow = (
             taskFile: runRow.task_file,
             taskFileUrl: toFileUrl(runRow.task_file),
             report,
-            reportUrl: toFileUrl(report)
+            reportUrl: toFileUrl(report),
+            task: runRow.task,
+            machine: runRow.machine,
+            worktree: runRow.worktree
           },
           steps: detailed
         })

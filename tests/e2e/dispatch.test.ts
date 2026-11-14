@@ -143,7 +143,7 @@ const settledStarts = async (fixture: Fixture, count: number): Promise<ReadonlyA
 const addTasks = async (fixture: Fixture, count: number, machine: (index: number) => string | null = () => null): Promise<void> => {
   for (let index = 0; index < count; index += 1) {
     const pin = machine(index)
-    await orcOk(fixture, ["backlog", "add", "orc", "task.md", ...(pin === null ? [] : ["--machine", pin])])
+    await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", ...(pin === null ? [] : ["--machine", pin])])
   }
 }
 
@@ -224,6 +224,24 @@ describe("orc beat", () => {
       await orcOk(fixture, ["backlog", "close", "orc-1", "done"])
       await orcOk(fixture, ["beat"])
       expect(await settledStarts(fixture, 3)).toEqual(["orc-1 linux", "orc-2 linux", "orc-3 mac"])
+    })
+  }, beatTimeout)
+
+  test("a task with no priority waits while a P1 task takes the slot, and once set to 0 starts before a newer P0 task", async () => {
+    await withFixture({ mac: 1, linux: 0, floorPercent: 15 }, async (fixture) => {
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md"])
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "1"])
+      const first = await orcOk(fixture, ["beat"])
+      expect(first).toContain("started orc-2")
+      expect(first).toContain("waits orc-1: no priority")
+      expect(await settledStarts(fixture, 1)).toEqual(["orc-2 mac"])
+      await orcOk(fixture, ["backlog", "priority", "orc-1", "0"])
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0"])
+      await orcOk(fixture, ["backlog", "close", "orc-2", "done"])
+      const second = await orcOk(fixture, ["beat"])
+      expect(second).toContain("started orc-1")
+      expect(second).toContain("waits orc-3: no machine with a checkout of orc has room")
+      expect(await settledStarts(fixture, 2)).toEqual(["orc-1 mac", "orc-2 mac"])
     })
   }, beatTimeout)
 
@@ -424,8 +442,8 @@ describe("orc backlog hold and answer", () => {
       const at = isRecord(answered) && isRecord(answered.hold) && isRecord(answered.hold.answer) ? String(answered.hold.answer.at) : ""
       expect(Date.parse(at)).toBeGreaterThanOrEqual(before - 1_000)
       const board = await orcOk(fixture, ["backlog"])
-      expect(board).toContain("orc-1 orc held (which API shape) Do the thing")
-      expect(board).toContain("orc-2 orc Do the thing")
+      expect(board).toContain("orc-1 P0 orc held (which API shape) Do the thing")
+      expect(board).toContain("orc-2 P0 orc Do the thing")
     })
   }, beatTimeout)
 

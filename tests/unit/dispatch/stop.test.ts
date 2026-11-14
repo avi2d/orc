@@ -34,7 +34,7 @@ const withBacklog = async (body: (root: string) => Promise<void>): Promise<void>
   }
 }
 
-const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: null, created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
+const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: 0 as const, created: "2026-10-27T10:00:00.000Z", body: "# Fix the thing\n" }
 
 const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-10-27T10:01:00.000Z" }
 
@@ -314,7 +314,7 @@ describe("runner kill", () => {
           hostSessionsDir: path.join(runDir, "sessions"),
           taskPath: path.join(runDir, "task.md"),
           instructions: null, agent, fixer: { ...agent, kind: "fixer", body: "Fix the failure.", path: "bundled/fixer.md" }, branch: "orc/orc-1", sandbox: "nono",
-          started: "2026-11-07T10:00:00.000Z", worktreeDir: "/checkout",
+          started: "2026-11-07T10:00:00.000Z", worktreeDir: "/checkout", machine: null,
           delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner: childSpawner, binary: "no-mistakes", pathEnv: "", git: "git", worktreeDir: "/checkout" }) },
           allow: [], answers: []
         }
@@ -515,7 +515,7 @@ describe("an interrupted run", () => {
           hostSessionsDir: path.join(runDir, "sessions"),
           taskPath: path.join(runDir, "task.md"),
           instructions: null, agent, fixer, branch: "orc/orc-1", sandbox: "nono",
-          started: "2026-11-07T10:00:00.000Z", worktreeDir: "/checkout",
+          started: "2026-11-07T10:00:00.000Z", worktreeDir: "/checkout", machine: null,
           delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git: "git", worktreeDir: "/checkout" }) },
           allow: [], answers: []
         }
