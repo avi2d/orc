@@ -409,7 +409,7 @@ describe("runsJson", () => {
     }
   ]
 
-  const facts = listed.map((run) => ({ run, title: "Fix the gate", step: { id: 4, name: "checks", attempt: 2, status: "failed" as const }, questions: 0 }))
+  const facts = listed.map((run) => ({ run, title: "Fix the gate", step: { id: 4, name: "checks", attempt: 2, status: "failed" as const }, questions: 0, state: "succeeded" as const, currentStep: null }))
 
   test("names the schema version first, then the runs", () => {
     const document = runsJson(facts)
@@ -421,15 +421,17 @@ describe("runsJson", () => {
   test("carries the listed facts for every run", () => {
     const document = runsJson(facts)
     expect(document.runs).toHaveLength(1)
-    expect(Object.keys(document.runs[0] ?? {})).toEqual(["id", "project", "branch", "status", "prLink", "title", "step", "questions", "endReason", "kind", "delivery", "task", "machine", "worktree"])
+    expect(Object.keys(document.runs[0] ?? {})).toEqual(["id", "project", "branch", "status", "state", "prLink", "title", "step", "currentStep", "questions", "endReason", "kind", "delivery", "task", "machine", "worktree"])
     expect(document.runs[0]).toEqual({
       id: "run-1",
       project: "orc",
       branch: "orc/x",
       status: "succeeded",
+      state: "succeeded",
       prLink: "https://github.com/avi2d/orc/pull/1",
       title: "Fix the gate",
       step: { id: 4, name: "checks", attempt: 2, status: "failed" },
+      currentStep: null,
       questions: 0,
       endReason: null,
       kind: "ship",
