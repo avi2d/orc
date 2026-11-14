@@ -1,4 +1,4 @@
-import { isTaskId } from "../entities/backlog/index"
+import { isTaskId, type TaskPriority } from "../entities/backlog/index"
 import type { MergeBasis } from "../entities/pull-request/index"
 import type { ExpectedDecision } from "../entities/parked-runs/index"
 import type { AddTask } from "../features/backlog-planning/index"
@@ -18,6 +18,7 @@ export type DispatchArgs =
   | { readonly kind: "AnswerTask"; readonly id: string; readonly words: string; readonly expect?: ExpectedDecision }
   | { readonly kind: "NoteTask"; readonly id: string; readonly words: string }
   | { readonly kind: "DependTask"; readonly id: string; readonly dependsOn: ReadonlyArray<string> }
+  | { readonly kind: "PrioritizeTask"; readonly id: string; readonly priority: TaskPriority | null }
   | { readonly kind: "ShowPlan"; readonly parent: string }
   | { readonly kind: "DropChild"; readonly parent: string; readonly child: string }
   | { readonly kind: "MergeTask"; readonly id: string; readonly basis: MergeBasis }
