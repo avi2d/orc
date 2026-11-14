@@ -13,11 +13,11 @@ interface OrcResult {
   readonly stderr: string
 }
 
-const runOrc = async (args: ReadonlyArray<string>, home: string): Promise<OrcResult> => {
+const runOrc = async (args: ReadonlyArray<string>, home: string, env: Record<string, string> = {}): Promise<OrcResult> => {
   const proc = Bun.spawn([process.execPath, "packages/run/src/bin.ts", ...args], {
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, HOME: home, ORC_HOME: "" }
+    env: { ...process.env, HOME: home, ORC_HOME: "", ...env }
   })
   const stdout = proc.stdout
   const stderr = proc.stderr
@@ -105,6 +105,16 @@ const writeFakeMachine = async (home: string, answer: { readonly stdout: string;
   await writeFile(script, lines.join("\n") + "\n")
   return { script, argv }
 }
+
+const writeFakePueue = async (home: string, answer: { readonly stdout: string; readonly status: number }): Promise<Record<string, string>> => {
+  const bin = join(home, "fake-bin")
+  await mkdir(bin)
+  await writeFile(join(home, "pueue-answer.json"), answer.stdout)
+  await writeFile(join(bin, "pueue"), ["#!/bin/sh", `cat '${join(home, "pueue-answer.json")}'`, `exit ${answer.status}`].join("\n") + "\n", { mode: 0o755 })
+  return { PATH: bin + ":" + (process.env["PATH"] ?? "") }
+}
+
+const pueueTask = (id: number, label: string, status: unknown) => ({ id, label, group: "orc", path: "/work/kelp", status })
 
 const writeDispatch = async (home: string, start: ReadonlyArray<string>): Promise<void> => {
   await mkdir(join(home, ".orc", "backlog"), { recursive: true })
@@ -257,6 +267,36 @@ describe("orc runs", () => {
       expect(document.runs.map((run) => run["id"])).toEqual(["run-1", "run-9"])
       expect(document.runs[1]).toEqual(machineRun)
       expect(document.machines).toEqual([])
+    })
+  })
+
+  test("runs --json lists this home's queued pueue task as a queued entry before the recorded runs, and not a running or foreign one", async () => {
+    await withHome(async (home) => {
+      await recordLocalRun(home)
+      const queued = { Queued: { enqueued_at: "2026-11-14T09:00:00Z" } }
+      const tasks = {
+        "4": pueueTask(4, join(home, ".orc") + " kelp-12", queued),
+        "5": pueueTask(5, join(home, ".orc") + " kelp-11", { Running: { enqueued_at: "2026-11-14T08:00:00Z", start: "2026-11-14T08:00:01Z" } }),
+        "6": pueueTask(6, "/elsewhere/.orc kelp-13", queued)
+      }
+      const env = await writeFakePueue(home, { stdout: JSON.stringify({ tasks, groups: {} }), status: 0 })
+      const result = await runOrc(["runs", "--json", "--local"], home, env)
+      expect(result.exitCode).toBe(0)
+      expect(result.stderr).toBe("")
+      const document = Schema.decodeUnknownSync(Schema.Struct({ runs: Schema.Array(Schema.Record(Schema.String, Schema.Unknown)) }))(JSON.parse(result.stdout))
+      expect(document.runs.map((run) => [run["id"], run["state"], run["task"], run["branch"]])).toEqual([[null, "queued", "kelp-12", "orc/kelp-12"], ["run-1", "running", null, "orc/x"]])
+    })
+  })
+
+  test("runs --json still prints the recorded runs when pueue cannot be reached", async () => {
+    await withHome(async (home) => {
+      await recordLocalRun(home)
+      const env = await writeFakePueue(home, { stdout: "", status: 2 })
+      const result = await runOrc(["runs", "--json", "--local"], home, env)
+      expect(result.exitCode).toBe(0)
+      expect(result.stderr).toBe("")
+      const document = Schema.decodeUnknownSync(Schema.Struct({ runs: Schema.Array(Schema.Record(Schema.String, Schema.Unknown)) }))(JSON.parse(result.stdout))
+      expect(document.runs.map((run) => run["id"])).toEqual(["run-1"])
     })
   })
 

@@ -365,7 +365,9 @@ export const runs: Guard<Runs> = (value, at) => {
   if (record.kind === "refused") return record
   const schema = literal(record.value, "schema", at, "orc.runs.v1")
   if (schema.kind === "refused") return schema
-  const list = arrayOf(record.value, "runs", at, run)
+  const listed = record.value["runs"]
+  const started = Array.isArray(listed) ? listed.filter((entry) => !(isFields(entry) && entry["state"] === "queued")) : listed
+  const list = arrayOf({ runs: started }, "runs", at, run)
   if (list.kind === "refused") return list
   return ok({ schema: schema.value, runs: list.value })
 }

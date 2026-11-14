@@ -492,6 +492,11 @@ describe("an orc run reads orc show, a listing never read as a run", () => {
     expect(decodeOrcRuns(fixture("orc/show.json")).kind).toBe("invalid");
   });
 
+  test("a queued task in the listing is left out instead of refusing every run", () => {
+    const text = JSON.stringify({ schema: "orc.runs.v1", runs: [{ id: null, project: "/home/sam/work/kelp", branch: "orc/kelp-12", status: null, state: "queued", prLink: null, title: null, step: null, currentStep: null, questions: 0, endReason: null, kind: null, delivery: null, task: "kelp-12", machine: null, worktree: null }, { id: "run-1", branch: "orc/kelp-11" }] });
+    expect(valueOf(decodeOrcRuns(text)).runs.map((run) => run.id)).toEqual(["run-1"]);
+  });
+
   test("output outside JSON reads as unread, never as an empty run", () => {
     expect(decodeOrcShow("not json").kind).toBe("invalid");
     expect(decodeOrcShow("{}").kind).toBe("invalid");
