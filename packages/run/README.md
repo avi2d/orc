@@ -54,7 +54,7 @@ An unknown command or subcommand that is one or two typos away from exactly one 
 | `src/entities/review-gate/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
 | `src/widgets/beat/beat.ts` | The beat: room, placement, take and start |
 | `src/features/queueing-a-task/runner.ts` | The runner: the start, the kill and the token renewal through pueue |
-| `src/app/dispatch-cli.ts` | The `orc backlog`, `orc beat`, `orc runner` and `orc merge` commands |
+| `src/app/dispatch-cli.ts` | The `orc backlog`, `orc attention`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
 | `agents` | The bundled agent files |
 
 [Where every source file is](https://github.com/avi2d/orc/blob/main/docs/run/layout.md) maps the rest of the package and the tests.

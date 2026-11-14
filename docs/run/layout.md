@@ -10,8 +10,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/app/args.ts` | The flag parsing for the orc command |
-| `packages/run/src/app/dispatch-args.ts` | The flag parsing for `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` |
-| `packages/run/src/app/dispatch-cli.ts` | The `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
+| `packages/run/src/app/dispatch-args.ts` | The flag parsing for `orc backlog`, `orc attention`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` |
+| `packages/run/src/app/dispatch-cli.ts` | The `orc backlog`, `orc attention`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
 | `packages/run/src/app/dispatch-args-runner.ts` | The `orc runner` verb parsing and the shared `--json` flag and reach split |
 | `packages/run/src/app/dispatch-args-heavy.ts` | The `orc heavy` verb parsing |
 | `packages/run/src/app/help.ts` | The help pages: the overview, the per-command help, the usage error text and the closest-command suggestion |
