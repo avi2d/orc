@@ -123,10 +123,10 @@ export const runsJson = (runs: ReadonlyArray<RunsJsonRun>): RunsJsonDocument => 
   machines: []
 })
 
-const queuedEntryOf = ({ task, held }: QueuedTask): QueuedJsonEntry => ({
+const queuedEntryOf = ({ task: taskId, held }: QueuedTask): QueuedJsonEntry => ({
   id: null,
   project: held.path,
-  branch: taskBranch(task),
+  branch: taskBranch(taskId),
   status: null,
   state: "queued",
   prLink: null,
@@ -137,14 +137,14 @@ const queuedEntryOf = ({ task, held }: QueuedTask): QueuedJsonEntry => ({
   endReason: null,
   kind: null,
   delivery: null,
-  task,
+  task: taskId,
   machine: null,
   worktree: null
 })
 
 export const withQueued = (document: RunsJsonDocument, queued: ReadonlyArray<QueuedTask>): RunsJsonDocument => ({
   ...document,
-  runs: [...queued.filter(({ task }) => isTaskId(task)).map(queuedEntryOf), ...document.runs]
+  runs: [...queued.filter(({ task: taskId }) => isTaskId(taskId)).map(queuedEntryOf), ...document.runs]
 })
 
 export const encodeRunsJson = (document: RunsJsonDocument): Effect.Effect<string, Schema.SchemaError> =>
