@@ -1,6 +1,6 @@
 import { deliveryFor, type RunDelivery } from "../../shared/config/index"
 import { checkoutOn, type DispatchConfig, type Machine, modeOf, type Project } from "../../shared/config/index"
-import { answerWait, type DeciderOwns, type TaskRecord, childCount, dependencyWaits, taskPriorities } from "../../entities/backlog/index"
+import { answerWait, type DeciderOwns, type TaskRecord, childCount, dependencyWaits, missingOriginWait, taskPriorities } from "../../entities/backlog/index"
 
 export interface MachineRoom {
   readonly machine: string
@@ -36,7 +36,7 @@ const childrenWait = (parent: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merg
 
 const parkedOriginWait = (task: TaskRecord): string | null =>
   task.parked !== null && task.parked.origin === undefined
-    ? "the parked task has no recorded machine and run; recover its origin before resuming"
+    ? missingOriginWait(task.spec.id)
     : null
 
 export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>, deciderOwns: DeciderOwns): string | null => {

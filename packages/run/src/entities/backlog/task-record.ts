@@ -137,6 +137,9 @@ const parkedReason = (task: TaskRecord, deciderOwns: DeciderOwns): string | null
 
 export const answerWait = (task: TaskRecord, deciderOwns: DeciderOwns): string | null => heldReason(task) ?? parkedReason(task, deciderOwns)
 
+export const missingOriginWait = (id: string): string =>
+  "the parked task has no recorded machine and run; record them with orc backlog origin " + id + " <machine> <run-id> before resuming"
+
 const datePattern = /^\d{4}-\d{2}-\d{2}$/
 
 export const isCalendarDate = (text: string): boolean =>

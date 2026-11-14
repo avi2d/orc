@@ -22,6 +22,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/widgets/beat/beat.ts` | The beat: room, placement, take and start |
 | `packages/run/src/widgets/beat/beat-close.ts` | The closing of finished runs and the running output time |
 | `packages/run/src/widgets/beat/beat-place.ts` | The room reading, the placement of each new task and the wait it names |
+| `packages/run/src/widgets/beat/beat-origin.ts` | The `orc backlog origin` write of a parked task's machine and run, and its refusals |
 | `packages/run/src/widgets/beat/load.ts` | The five minute load reading and the overloaded machines |
 | `packages/run/src/widgets/beat/stall.ts` | The stalled run flag kept in the backlog logs |
 | `packages/run/src/widgets/beat/task-events.ts` | The stall and PR events the beat records for every task |
