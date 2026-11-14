@@ -159,7 +159,7 @@ const seedRefusedPrior = async (db: Database, priorDir: string, project: string)
   }).pipe(Effect.asVoid))
   await Effect.runPromise(recordStep(db, {
     runId: "prior-a", name: "implement", attempt: 1, status: "passed",
-    started: "2026-10-19T09:00:00.000Z", agentFile: implementer.path, piSessionFile: implementSession
+    started: "2026-10-19T09:00:00.000Z", agentFile: implementer.path, piSessionFile: implementSession, model: implementer.model, thinking: implementer.thinking
   }).pipe(Effect.asVoid))
   await Effect.runPromise(recordChecksDone(db, "prior-a", {
     round: 1, file: join(priorDir, "checks-1.md"),
@@ -169,7 +169,7 @@ const seedRefusedPrior = async (db: Database, priorDir: string, project: string)
   await Effect.runPromise(recordFixDone(db, "prior-a", {
     attempt: 1, status: "passed",
     started: "2026-10-19T09:22:00.000Z", ended: "2026-10-19T09:23:00.000Z",
-    agentFile: fixer.path, sessionFile: fixSession, evidenceIn: join(priorDir, "checks-1.md"),
+    agentFile: fixer.path, sessionFile: fixSession, model: fixer.model, thinking: fixer.thinking, evidenceIn: join(priorDir, "checks-1.md"),
     commits: 1, tokens: { input: 10, output: 5 }
   }, fixer))
   await Effect.runPromise(recordStep(db, {
@@ -258,7 +258,7 @@ describe("resumed runs publish inherited progress atomically", () => {
   })
 })
 
-const freshPlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow: [], answers: [], inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null, priorDir: null }
+const freshPlan = { implementSessionId: null, implementSessionFile: null, inheritedImplement: null, skipImplement: false, skipChecks: false, allow: [], answers: [], inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null, priorDir: null }
 
 const looping = { kind: "looping", label: "bun run test" } as const
 
@@ -381,7 +381,7 @@ describe("runFull has no checkpoint-free mode", () => {
         await mkdir(project, { recursive: true })
         const git = await stubGit(home)
         const run = await Effect.runPromise(historyFor("next-x", home, project, "2026-10-19T10:00:00.000Z", git, ""))
-        const plan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow: [], answers: [], inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null, priorDir: null }
+        const plan = { implementSessionId: null, implementSessionFile: null, inheritedImplement: null, skipImplement: false, skipChecks: false, allow: [], answers: [], inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null, priorDir: null }
         let agentCalls = 0
         let checkCalls = 0
         const ops = fakeOps({

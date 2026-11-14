@@ -29,6 +29,8 @@ export interface RecordedFixAttempt {
   readonly ended: string
   readonly agentFile: string
   readonly sessionFile: string | null
+  readonly model: string | null
+  readonly thinking: string | null
   readonly evidenceIn: string
   readonly commits: number
   readonly tokens: PiTokenUse | null

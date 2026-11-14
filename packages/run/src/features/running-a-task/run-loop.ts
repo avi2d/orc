@@ -195,6 +195,8 @@ const fixOnce = (
         ended,
         agentFile: run.fixer.path,
         sessionFile: session.sessionFile,
+        model: run.fixer.model,
+        thinking: run.fixer.thinking,
         evidenceIn: evidenceFile,
         commits: session.commits.length,
         tokens: session.tokens

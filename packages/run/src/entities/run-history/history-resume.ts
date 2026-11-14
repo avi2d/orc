@@ -10,13 +10,19 @@ export interface BranchStep {
   readonly status: string
   readonly attempt: number
   readonly piSessionFile: string | null
+  readonly agentFile: string | null
+  readonly model: string | null
+  readonly thinking: string | null
 }
 
 const BranchStepRowSchema = Schema.Struct({
   name: Schema.String,
   status: Schema.String,
   attempt: Schema.Finite,
-  pi_session_file: Schema.NullOr(Schema.String)
+  pi_session_file: Schema.NullOr(Schema.String),
+  agent_file: Schema.NullOr(Schema.String),
+  model: Schema.NullOr(Schema.String),
+  thinking: Schema.NullOr(Schema.String)
 })
 
 export const latestRunForBranchName = (
@@ -70,10 +76,10 @@ export const stepsForRun = (
   runId: string
 ): Effect.Effect<ReadonlyArray<BranchStep>, Schema.SchemaError | SqliteFailure> =>
   sqlite(() =>
-    db.query("SELECT name, status, attempt, pi_session_file FROM steps WHERE run_id = ? ORDER BY id ASC").all(runId)
+    db.query("SELECT name, status, attempt, pi_session_file, agent_file, model, thinking FROM steps WHERE run_id = ? ORDER BY id ASC").all(runId)
   ).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(BranchStepRowSchema))),
-    Effect.map((rows) => rows.map((row) => ({ name: row.name, status: row.status, attempt: row.attempt, piSessionFile: row.pi_session_file })))
+    Effect.map((rows) => rows.map((row) => ({ name: row.name, status: row.status, attempt: row.attempt, piSessionFile: row.pi_session_file, agentFile: row.agent_file, model: row.model, thinking: row.thinking })))
   )
 
 const SignalValues = Schema.Array(Schema.Struct({ value: Schema.fromJsonString(Schema.Struct({ id: Schema.String, text: Schema.String, asked: Schema.optional(Schema.String) })) }))
@@ -106,6 +112,8 @@ export interface StoredFix {
   readonly ended: string
   readonly agentFile: string | null
   readonly sessionFile: string | null
+  readonly model: string | null
+  readonly thinking: string | null
   readonly evidenceIn: string
   readonly commits: number
   readonly inputTokens: number | null
@@ -131,7 +139,9 @@ const FixStepRowSchema = Schema.Struct({
   started: Schema.String,
   ended: Schema.NullOr(Schema.String),
   agent_file: Schema.NullOr(Schema.String),
-  pi_session_file: Schema.NullOr(Schema.String)
+  pi_session_file: Schema.NullOr(Schema.String),
+  model: Schema.NullOr(Schema.String),
+  thinking: Schema.NullOr(Schema.String)
 })
 
 const checksFileFor = (db: Database, stepId: number): Effect.Effect<string, Schema.SchemaError | SqliteFailure> =>
@@ -186,7 +196,7 @@ const tokenSignal = (signals: ReadonlyMap<string, string>, name: string): number
   signals.has(name) ? Number.parseInt(signals.get(name) ?? "0", 10) : null
 
 export const fixesForRun = (db: Database, runId: string): Effect.Effect<ReadonlyArray<StoredFix>, Schema.SchemaError | SqliteFailure> =>
-  sqlite(() => db.query("SELECT id, attempt, status, started, ended, agent_file, pi_session_file FROM steps WHERE run_id = ? AND name = ? ORDER BY attempt ASC").all(runId, "fix")).pipe(
+  sqlite(() => db.query("SELECT id, attempt, status, started, ended, agent_file, pi_session_file, model, thinking FROM steps WHERE run_id = ? AND name = ? ORDER BY attempt ASC").all(runId, "fix")).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(FixStepRowSchema))),
     Effect.flatMap((steps) =>
       Effect.forEach(steps, (step) =>
@@ -200,6 +210,8 @@ export const fixesForRun = (db: Database, runId: string): Effect.Effect<Readonly
             ended: step.ended ?? step.started,
             agentFile: step.agent_file,
             sessionFile: step.pi_session_file,
+            model: step.model,
+            thinking: step.thinking,
             evidenceIn,
             commits: countSignal(signals, "commit-count"),
             inputTokens: tokenSignal(signals, "input-tokens"),

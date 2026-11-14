@@ -47,12 +47,13 @@ const planImplementDone = (
   run: HistoryRun,
   report: Pick<OrcRunReport, "agentPath" | "sessionFile" | "tokens" | "commits" | "sessionSize" | "implementPassed">,
   started: string,
-  ended: string
+  ended: string,
+  inherited: { readonly agentFile: string | null; readonly model: string | null; readonly thinking: string | null } | null = null
 ): PlannedImplement => ({
   step: {
     runId: run.runId, name: "implement", attempt: 1,
     status: report.implementPassed ? "passed" : "failed",
-    started, ended, agentFile: report.agentPath, piSessionFile: report.sessionFile, ...stepAgent(run.agent)
+    started, ended, agentFile: inherited === null ? report.agentPath : inherited.agentFile, piSessionFile: report.sessionFile, model: inherited === null ? run.agent.model : inherited.model, thinking: inherited === null ? run.agent.thinking : inherited.thinking
   },
   taskEvidence: { direction: "in", path: run.taskPath, kind: "task" },
   evidenceFile: { direction: "out", path: run.path.join(run.runDir, "implement-1.md"), kind: "evidence" },
@@ -78,7 +79,7 @@ const planChecksDone = (runId: string, round: ChecksRoundSummary): PlannedChecks
 const planFixDone = (runId: string, fix: RecordedFixAttempt, agent: StepAgent | null): PlannedFix => ({
   step: {
     runId, name: "fix", attempt: fix.attempt, status: fix.status,
-    started: fix.started, ended: fix.ended, agentFile: fix.agentFile, piSessionFile: fix.sessionFile, ...stepAgent(agent)
+    started: fix.started, ended: fix.ended, agentFile: fix.agentFile, piSessionFile: fix.sessionFile, model: fix.model ?? agent?.model ?? null, thinking: fix.thinking ?? agent?.thinking ?? null
   },
   evidenceIn: { direction: "in", path: fix.evidenceIn, kind: "checks" },
   sessionEvidence: fix.sessionFile === null ? null : { direction: "out", path: fix.sessionFile, kind: "session" },
@@ -130,7 +131,7 @@ export const recordResumePublish = (db: Database, run: HistoryRun, resume: Resum
             agentPath: run.agent.path,
             sessionFile: resume.implementSessionFile,
             tokens: null, commits: null, sessionSize: null, implementPassed: true
-          }, run.started, run.started)
+          }, run.started, run.started, resume.inheritedImplement)
           insertPlannedStep(db, planned.step, [
             planned.taskEvidence,
             planned.evidenceFile,

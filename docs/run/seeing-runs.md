@@ -13,7 +13,7 @@ Its `questions` counts the questions a running run waits on you to answer, and i
 Its `task` is the backlog task id its `orc/<task-id>` branch names, and `null` on any other branch.
 Its `machine` is the dispatch machine the beat claimed for the run, which reaches `orc run` as `ORC_RUN_MACHINE`.
 A run you start by hand without `ORC_RUN_MACHINE` shows `null`.
-Its `worktree` is the folder the agent worked in.
+Its `worktree` is the checkout the run works in: the task copy for a ship run, the project checkout for a report run.
 Runs recorded before these facts show each as `null`.
 To see one run step by step, run `orc show <run-id>`.
 It lists each step with its agent, session, signals, latest score and evidence, every file as a full link.

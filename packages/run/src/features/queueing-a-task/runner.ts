@@ -2,7 +2,7 @@ import { DateTime, Duration, Effect, FileSystem, Option, Path, Schema, Stream } 
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { decodeJson, decodeSecret, ensureGroup, pueue, type Command, type Reach } from "../../shared/process/index"
 import { readOrcConfig } from "../../shared/config/index"
-import { fileKeyOf, labelOf, parentBranch, runLabel, taskBranch } from "../../entities/backlog/index"
+import { fileKeyOf, labelOf, parentBranch, runLabel, taskBranch, taskOfBranch } from "../../entities/backlog/index"
 import { dropHeldToken, heldTokenFile, holdToken, releaseHeldToken, replaceHeldToken } from "../../entities/token/index"
 import { heldTask, orcGroup, parentLabel, PueueState, PueueStatus, taskLabel, type PueueTask } from "../../shared/process/index"
 import { writeInstructions } from "./runner-instructions"
@@ -46,7 +46,7 @@ const markTaskRunsStopped = (home: string, project: string, task: string, taskFi
           const grouped = yield* Effect.forEach(branches, (branch) => runsForBranch(db, project, branch))
           const running = grouped.flat().filter((run) => run.status === "running")
           if (running.length === 0) {
-            yield* recordRun(db, { id: newRunId(), project, branch: stoppedBranch, taskFile, status: "stopped", started, ended, endReason: stoppedEndReason })
+            yield* recordRun(db, { id: newRunId(), project, branch: stoppedBranch, taskFile, status: "stopped", started, ended, endReason: stoppedEndReason, task: taskOfBranch(stoppedBranch) })
             return
           }
           yield* Effect.forEach(running, (run) => markRunStopped(db, run.id, ended, stoppedEndReason), { discard: true })

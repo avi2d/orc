@@ -105,6 +105,7 @@ export interface StepOutcome {
 export interface RunFacts {
   readonly branch: string
   readonly machine: string | null
+  readonly worktreeDir?: string | undefined
 }
 
 const handRunFacts: RunFacts = { branch: "orc/test", machine: null }
@@ -245,7 +246,7 @@ const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: F
               fs, path, spawner, git: hostGit, projectDir: dir, runId: "step-run-1", runDir,
               piSessionDir: path.join(runDir, "session"), hostSessionsDir: path.join(runDir, "sessions"),
               taskPath: path.join(runDir, "task.md"), instructions: null, agent: implementer, fixer, branch: facts.branch, sandbox: "nono", started: "2026-10-19T10:00:00.000Z",
-              worktreeDir: dir, machine: facts.machine,
+              worktreeDir: facts.worktreeDir ?? dir, machine: facts.machine,
               delivery: deliver(spawner, hostGit, extraPath + stub.dir + ":" + (process.env.PATH ?? ""), dir),
               answers
             }, fakeOps({ runAgent: sandbox, execCheck }, path.join(runDir, "sessions")))

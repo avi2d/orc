@@ -560,15 +560,16 @@ describe("host git runs no transport program the sandbox can name in the reposit
 })
 
 describe("orc run records where and with what it ran", () => {
-  test("a task run records its task, machine and worktree and the implement step's model and thinking instead of leaving them null", async () => {
+  test("a task run records its task, machine and task copy worktree and the implement step's model and thinking instead of the project checkout or null", async () => {
     await withRepo(async (dir) => {
       await withHome(async (home) => {
         const proposal = { schema: "orc.split.v1", plan: "split", reason: "two areas", done: ["both work"], children: [
           { title: "First", body: "First area.", after: [] }, { title: "Second", body: "Second area.", after: [] }
         ] }
         await capturedSession(home, sessionEnding({ role: "assistant", content: [{ type: "text", text: "ORC_SPLIT\n" + JSON.stringify(proposal) }], stopReason: "stop" }))
-        const outcome = await runStepAs(dir, home, async (_run, sessionsDir) => ({ sessionId: "split", sessionFile: join(sessionsDir, "2026-10-19T10-00-00-000Z_0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b.jsonl"), commits: [] }), { branch: "orc/orc-36", machine: "linux" })
-        expect(outcome.run).toMatchObject({ task: "orc-36", machine: "linux", worktree: dir })
+        const copy = join(dir, "task-copy")
+        const outcome = await runStepAs(dir, home, async (_run, sessionsDir) => ({ sessionId: "split", sessionFile: join(sessionsDir, "2026-10-19T10-00-00-000Z_0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b.jsonl"), commits: [] }), { branch: "orc/orc-36", machine: "linux", worktreeDir: copy })
+        expect(outcome.run).toMatchObject({ task: "orc-36", machine: "linux", worktree: copy })
         expect(outcome.stepAgents).toEqual([{ name: "implement", model: "acme/coder", thinking: "high" }])
       })
     })
