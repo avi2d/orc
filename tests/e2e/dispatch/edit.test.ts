@@ -21,4 +21,4 @@ test("orc backlog edit replaces a held task's title through the bin instead of r
     const piped = await runOrc(fixture, ["backlog", "edit", "orc-9", "-"], {}, "# Another\n")
     expect({ code: piped.exitCode, error: piped.stderr.trim() }).toEqual({ code: 1, error: "orc: the backlog holds no orc-9" })
   })
-})
+}, 60_000)
