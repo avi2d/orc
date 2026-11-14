@@ -110,7 +110,7 @@ const orcDetailOf = (
 
 const orcIn = ({ folder, branches }: PipelineFolder) =>
   Effect.gen(function* () {
-    const listed = yield* runDecoded({ argv: ["orc", "runs", "--json"], cwd: folder, timeout }, decodeOrcRuns);
+    const listed = yield* runDecoded({ argv: ["orc", "runs", "--json", "--local"], cwd: folder, timeout }, decodeOrcRuns);
     return yield* orcDetailOf(listed, branches, (id) =>
       runDecoded({ argv: ["orc", "show", id, "--json"], cwd: folder, timeout }, decodeOrcShow),
     );
@@ -137,7 +137,7 @@ const remoteNoMistakesIn = (prefix: string) => ({ folder, branches }: PipelineFo
 
 const remoteOrcIn = (prefix: string) => ({ folder, branches }: PipelineFolder) =>
   Effect.gen(function* () {
-    const listed = yield* runDecoded({ argv: remoteArgv(prefix, remoteScript(folder, "orc runs --json")), timeout }, decodeOrcRuns);
+    const listed = yield* runDecoded({ argv: remoteArgv(prefix, remoteScript(folder, "orc runs --json --local")), timeout }, decodeOrcRuns);
     return yield* orcDetailOf(listed, branches, (id) =>
       runDecoded({ argv: remoteArgv(prefix, remoteScript(folder, `orc show ${shellQuoted(id)} --json`)), timeout }, decodeOrcShow),
     );

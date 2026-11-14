@@ -28,10 +28,13 @@ export const runHelp: HelpEntry = {
 }
 
 export const runsHelp: HelpEntry = {
-  usage: ["orc runs [--json]"],
+  usage: ["orc runs [--json [--local]]"],
   summary: "List recent runs with their status and PR",
   about: "Lists the recent runs this home recorded, newest first, with each run's project, branch, status and PR.",
-  options: [{ flag: "--json", meaning: "Print the runs as an orc.runs.v1 JSON document." }],
+  options: [
+    { flag: "--json", meaning: "Print the runs as an orc.runs.v1 JSON document." },
+    { flag: "--local", meaning: "With --json, read only this machine's runs." }
+  ],
   examples: ["orc runs", "orc runs --json"]
 }
 

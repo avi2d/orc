@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
@@ -52,6 +52,67 @@ const withHome = async (use: (home: string) => Promise<void>): Promise<void> => 
   } finally {
     await rm(home, { recursive: true, force: true })
   }
+}
+
+const machineRun = {
+  id: "run-9",
+  project: "orc",
+  branch: "orc/orc-40",
+  status: "succeeded",
+  state: "succeeded",
+  prLink: "https://github.com/avi2d/orc/pull/9",
+  title: "Remote task",
+  step: null,
+  currentStep: null,
+  questions: 0,
+  endReason: null,
+  kind: "ship",
+  delivery: "no-mistakes",
+  task: "orc-40",
+  machine: "box",
+  worktree: "/work/orc-40"
+}
+
+const recordLocalRun = async (home: string): Promise<void> => {
+  const db = await openDb(home)
+  try {
+    Effect.runSync(recordRun(db, {
+      id: "run-1",
+      project: "orc",
+      branch: "orc/x",
+      taskFile: "task.md",
+      status: "running",
+      started: "2026-10-18T10:00:00.000Z"
+    }))
+  } finally {
+    db.close()
+  }
+}
+
+// The fake machine stands in for the command that reaches another machine: it records its argv and prints or fails as told.
+const writeFakeMachine = async (home: string, answer: { readonly stdout: string; readonly stderr?: string; readonly status?: number }) => {
+  const script = join(home, "fake-machine.sh")
+  const argv = join(home, "argv.txt")
+  const stdoutFile = join(home, "answer.txt")
+  await writeFile(stdoutFile, answer.stdout)
+  const lines = [
+    "#!/bin/sh",
+    `echo "$*" > '${argv}'`,
+    ...(answer.stderr === undefined ? [] : [`printf '%s\\n' '${answer.stderr}' >&2`]),
+    `cat '${stdoutFile}'`,
+    `exit ${answer.status ?? 0}`
+  ]
+  await writeFile(script, lines.join("\n") + "\n")
+  return { script, argv }
+}
+
+const writeDispatch = async (home: string, start: ReadonlyArray<string>): Promise<void> => {
+  await mkdir(join(home, ".orc", "backlog"), { recursive: true })
+  const dispatch = {
+    machines: [{ name: "box", slots: 1, start }],
+    quota: { provider: "example", command: ["example-quota"], accounts: [{ name: "main", kind: "none" }] }
+  }
+  await writeFile(join(home, ".orc", "backlog", "dispatch.json"), JSON.stringify(dispatch))
 }
 
 describe("orc runs", () => {
@@ -180,6 +241,53 @@ describe("orc runs", () => {
       const result = await runOrc(["log", "nope", "1"], home)
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr).toBe("orc: unknown run nope\n")
+    })
+  })
+
+  test("runs --json adds the runs another dispatch machine answers with to the list", async () => {
+    await withHome(async (home) => {
+      await recordLocalRun(home)
+      const fake = await writeFakeMachine(home, { stdout: JSON.stringify({ schema: "orc.runs.v1", runs: [machineRun], machines: [] }) })
+      await writeDispatch(home, ["orc", "runner", "start", "--", "sh", fake.script])
+      const result = await runOrc(["runs", "--json"], home)
+      expect(result.exitCode).toBe(0)
+      expect(result.stderr).toBe("")
+      expect(await readFile(fake.argv, "utf8")).toBe("runs --json --local\n")
+      const document = Schema.decodeUnknownSync(Schema.Struct({ runs: Schema.Array(Schema.Record(Schema.String, Schema.Unknown)), machines: Schema.Array(Schema.Record(Schema.String, Schema.Unknown)) }))(JSON.parse(result.stdout))
+      expect(document.runs.map((run) => run["id"])).toEqual(["run-1", "run-9"])
+      expect(document.runs[1]).toEqual(machineRun)
+      expect(document.machines).toEqual([])
+    })
+  })
+
+  test("a dispatch machine that fails is named in machines with its error while the local runs still print", async () => {
+    await withHome(async (home) => {
+      await recordLocalRun(home)
+      const fake = await writeFakeMachine(home, { stdout: "", stderr: "orc: not installed", status: 3 })
+      await writeDispatch(home, ["orc", "runner", "start", "--", "sh", fake.script])
+      const result = await runOrc(["runs", "--json"], home)
+      expect(result.exitCode).toBe(0)
+      const document = Schema.decodeUnknownSync(Schema.Struct({ runs: Schema.Array(Schema.Record(Schema.String, Schema.Unknown)), machines: Schema.Array(Schema.Struct({ machine: Schema.String, error: Schema.String })) }))(JSON.parse(result.stdout))
+      expect(document.runs.map((run) => run["id"])).toEqual(["run-1"])
+      expect(document.machines).toHaveLength(1)
+      expect(document.machines[0]?.machine).toBe("box")
+      expect(document.machines[0]?.error).toContain("exited 3")
+      expect(document.machines[0]?.error).toContain("orc: not installed")
+    })
+  })
+
+  test("a dispatch machine that prints JSON orc cannot read is named in machines and adds no runs", async () => {
+    await withHome(async (home) => {
+      await recordLocalRun(home)
+      const fake = await writeFakeMachine(home, { stdout: JSON.stringify({ schema: "orc.runs.v1", runs: [{ id: "run-9" }], machines: [] }) })
+      await writeDispatch(home, ["orc", "runner", "start", "--", "sh", fake.script])
+      const result = await runOrc(["runs", "--json"], home)
+      expect(result.exitCode).toBe(0)
+      const document = Schema.decodeUnknownSync(Schema.Struct({ runs: Schema.Array(Schema.Record(Schema.String, Schema.Unknown)), machines: Schema.Array(Schema.Struct({ machine: Schema.String, error: Schema.String })) }))(JSON.parse(result.stdout))
+      expect(document.runs.map((run) => run["id"])).toEqual(["run-1"])
+      expect(document.machines).toHaveLength(1)
+      expect(document.machines[0]?.machine).toBe("box")
+      expect(document.machines[0]?.error).toContain("JSON orc cannot read")
     })
   })
 

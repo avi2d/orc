@@ -12,9 +12,9 @@ import { helpText, overview, usageErrorText } from "./app/help"
 import { runDispatch } from "./app/dispatch-cli"
 import { RunnerError } from "./shared/process/index"
 import { formatReport, formatReportOutcome, runAgentStep, runReportStep } from "./features/running-a-task/index"
-import { type ReportKind, runDirFor } from "./entities/backlog/index"
+import { backlogPaths, backlogRoot as backlogRootOf, type ReportKind, runDirFor } from "./entities/backlog/index"
 import { encodeRefusalsJson, formatHistoryError, formatRefusalsTable, listAllRuns, listRuns, openDatabase, orcHomeDir, readRefusals } from "./entities/run-history/index"
-import { encodeRunsJson, encodeShowJson, formatRunsTable, formatShow, readListedRuns, readRunsJsonRuns, readShow, readStepLog, recordStepScore } from "./features/seeing-runs/index"
+import { encodeRunsJson, encodeShowJson, formatRunsTable, formatShow, readListedRuns, readOtherMachinesFrom, readRunsJsonRuns, readShow, readStepLog, recordStepScore, runsJson, withOtherMachines } from "./features/seeing-runs/index"
 
 const readFailure = (error: unknown): string =>
   typeof error === "string" ? error : "orc: cannot read the run history: " + formatHistoryError(error)
@@ -114,6 +114,14 @@ const reportStep = (args: Extract<OrcArgs, { readonly kind: "RunAgent" }>, kind:
     }
   })
 
+const otherMachinesOf = (dispatchFile: string) =>
+  readOtherMachinesFrom(dispatchFile).pipe(
+    Effect.provide(BunServices.layer),
+    Effect.catchTag("ConfigError", (error) =>
+      Console.error("orc: " + error.file + ": " + error.detail).pipe(Effect.as({ runs: [], machines: [] }))
+    )
+  )
+
 const printRuns = (args: Extract<OrcArgs, { readonly kind: "ListRuns" }>) =>
   Effect.gen(function*() {
     if (args.json) {
@@ -124,7 +132,9 @@ const printRuns = (args: Extract<OrcArgs, { readonly kind: "ListRuns" }>) =>
           Effect.flatMap((runs) => readRunsJsonRuns(runs, (runId) => runDirFor(home, runId)))
         )
       )
-      yield* Console.log(yield* encodeRunsJson(listed))
+      const local = runsJson(listed)
+      const others = args.local ? null : yield* otherMachinesOf(backlogPaths(backlogRootOf(orcHomeDir(Bun.env.ORC_HOME))).dispatchConfig)
+      yield* Console.log(yield* encodeRunsJson(others === null ? local : withOtherMachines(local, others)))
     } else {
       yield* Console.log(formatRunsTable(yield* readHistory((db) => listRuns(db))))
     }
