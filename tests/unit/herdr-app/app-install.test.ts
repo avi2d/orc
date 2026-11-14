@@ -24,10 +24,10 @@ test("keeps a ⌘K the person already bound instead of the chat drawer's", async
     await writeFile(join(source, "mods", "orc-drawer", "main.js"), "orc")
     await copyFile(join(import.meta.dir, "../../../packages/herdr-app/keys.json"), join(source, "keys.json"))
     await writeFile(join(home, "keys.json"), JSON.stringify({ "layout:orc": { "cmd-k": "app.palette" } }))
-    await Effect.runPromise(installApp(source, home).pipe(Effect.provide(BunServices.layer)))
-    const installed = await readFile(join(home, "keys.json"), "utf8")
-    expect(installed).toContain(`"cmd-k": "app.palette"`)
-    expect(installed).not.toContain("orc-drawer.toggle")
+    const install = await Effect.runPromise(installApp(source, home).pipe(Effect.provide(BunServices.layer)))
+    const installed = JSON.parse(await readFile(join(home, "keys.json"), "utf8")) as Record<string, Record<string, unknown>>
+    expect(installed["layout:orc"]?.["cmd-k"]).toBe("app.palette")
+    expect(install.skipped).toContainEqual({ section: "layout:orc", key: "cmd-k", kept: "app.palette" })
   } finally {
     await rm(root, { recursive: true, force: true })
   }
