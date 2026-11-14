@@ -1,7 +1,9 @@
 import { Effect, Schema } from "effect"
-import { RunStatusSchema, RUNS_JSON_SCHEMA, type RunRecord } from "../../entities/run-history/index"
+import { RunSqlRowSchema, RunStatusSchema, RUNS_JSON_SCHEMA, type RunRecord } from "../../entities/run-history/index"
 import { formatTable } from "../../shared/lib/index"
 import { LatestStepSchema, type ListedRun } from "./run-facts"
+
+const { kind, delivery, task, machine, worktree } = RunSqlRowSchema.fields
 
 const RunJsonEntrySchema = Schema.Struct({
   id: Schema.String,
@@ -13,11 +15,11 @@ const RunJsonEntrySchema = Schema.Struct({
   step: Schema.NullOr(LatestStepSchema),
   questions: Schema.Finite,
   endReason: Schema.NullOr(Schema.String),
-  kind: Schema.NullOr(Schema.String),
-  delivery: Schema.NullOr(Schema.String),
-  task: Schema.NullOr(Schema.String),
-  machine: Schema.NullOr(Schema.String),
-  worktree: Schema.NullOr(Schema.String)
+  kind,
+  delivery,
+  task,
+  machine,
+  worktree
 })
 
 const RunsJsonSchema = Schema.Struct({

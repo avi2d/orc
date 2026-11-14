@@ -8,6 +8,7 @@ import {
   ScoreValueSchema,
   SHOW_JSON_SCHEMA,
   sqlite,
+  StepSqlRowSchema,
   StepStatusSchema,
   toFileUrl,
   type SqliteFailure
@@ -80,20 +81,6 @@ export const encodeShowJson = (document: ShowJsonDocument): Effect.Effect<string
 
 export const decodeShowJson = (value: unknown): Effect.Effect<ShowJsonDocument, Schema.SchemaError> =>
   Schema.decodeUnknownEffect(ShowJsonSchema)(value)
-
-const StepSqlRowSchema = Schema.Struct({
-  id: Schema.Finite,
-  run_id: Schema.String,
-  name: Schema.String,
-  attempt: Schema.Finite,
-  status: StepStatusSchema,
-  started: Schema.String,
-  ended: Schema.NullOr(Schema.String),
-  agent_file: Schema.NullOr(Schema.String),
-  pi_session_file: Schema.NullOr(Schema.String),
-  model: Schema.NullOr(Schema.String),
-  thinking: Schema.NullOr(Schema.String)
-})
 
 const EvidenceSqlRowSchema = Schema.Struct({
   step_id: Schema.Finite,

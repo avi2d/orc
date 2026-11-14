@@ -3,7 +3,8 @@ import { Effect, Schema } from "effect"
 import { GateRefusalSchema, refusalSignalName, type GateRefusal } from "./gate-refusals"
 import type { OpenQuestion } from "../review-gate/index"
 import { openQuestionSignal } from "./report"
-import { decodedRunRow, runColumns, RunSqlRowSchema, runRecordOf, sqlite, type RunRecord, type SqliteFailure } from "./run-history"
+import { sqlite, type RunRecord, type SqliteFailure } from "./run-history"
+import { decodedRunRow, runColumns, RunSqlRowSchema, runRecordOf, StepSqlRowSchema } from "./run-history-read"
 
 export interface BranchStep {
   readonly name: string
@@ -132,18 +133,6 @@ const EvidencePathRowSchema = Schema.Struct({ path: Schema.String })
 
 const SignalRowSchema = Schema.Struct({ name: Schema.String, value: Schema.String })
 
-const FixStepRowSchema = Schema.Struct({
-  id: Schema.Finite,
-  attempt: Schema.Finite,
-  status: Schema.String,
-  started: Schema.String,
-  ended: Schema.NullOr(Schema.String),
-  agent_file: Schema.NullOr(Schema.String),
-  pi_session_file: Schema.NullOr(Schema.String),
-  model: Schema.NullOr(Schema.String),
-  thinking: Schema.NullOr(Schema.String)
-})
-
 const checksFileFor = (db: Database, stepId: number): Effect.Effect<string, Schema.SchemaError | SqliteFailure> =>
   sqlite(() => db.query("SELECT path FROM evidence WHERE step_id = ? AND kind = ? ORDER BY id ASC LIMIT 1").all(stepId, "checks")).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(EvidencePathRowSchema))),
@@ -196,8 +185,8 @@ const tokenSignal = (signals: ReadonlyMap<string, string>, name: string): number
   signals.has(name) ? Number.parseInt(signals.get(name) ?? "0", 10) : null
 
 export const fixesForRun = (db: Database, runId: string): Effect.Effect<ReadonlyArray<StoredFix>, Schema.SchemaError | SqliteFailure> =>
-  sqlite(() => db.query("SELECT id, attempt, status, started, ended, agent_file, pi_session_file, model, thinking FROM steps WHERE run_id = ? AND name = ? ORDER BY attempt ASC").all(runId, "fix")).pipe(
-    Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(FixStepRowSchema))),
+  sqlite(() => db.query("SELECT id, run_id, name, attempt, status, started, ended, agent_file, pi_session_file, model, thinking FROM steps WHERE run_id = ? AND name = ? ORDER BY attempt ASC").all(runId, "fix")).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(StepSqlRowSchema))),
     Effect.flatMap((steps) =>
       Effect.forEach(steps, (step) =>
         Effect.gen(function*() {

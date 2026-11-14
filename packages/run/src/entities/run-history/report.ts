@@ -4,7 +4,7 @@ import type { OrcRunCommit } from "../../shared/process/index"
 import type { PiTokenUse } from "../agent/index"
 import { longSessionSignal, type LongSessionCounts } from "../agent/index"
 import type { NoMistakesFinding, NoMistakesRecord } from "../review-gate/index"
-import { toFileUrl } from "./run-history"
+import { toFileUrl } from "./run-history-read"
 import { agentReportFileName } from "../backlog/index"
 
 export const reportFileName = "report.md"
