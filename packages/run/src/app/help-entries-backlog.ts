@@ -96,6 +96,13 @@ export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
     options: [],
     examples: ["orc backlog note orc-9 the login page moved to /auth"]
   },
+  thread: {
+    usage: ["orc backlog thread <task-id> [--json]"],
+    summary: "Show a task's conversation in order",
+    about: "Prints a task's holds, questions, decisions, answers, deliveries, withdrawals and notes, oldest first. It works on a closed task too.",
+    options: [{ flag: "--json", meaning: "Print the thread as an orc.thread.v1 JSON document." }],
+    examples: ["orc backlog thread orc-9", "orc backlog thread orc-9 --json"]
+  },
   depend: {
     usage: ["orc backlog depend <task-id> --on <task-id>[,<task-id>...]", "orc backlog depend <task-id> --clear"],
     summary: "Change the tasks a new task waits for",

@@ -209,6 +209,14 @@ const parseHold = (rest: ReadonlyArray<string>): DispatchArgs => {
   return { kind: "HoldTask", id, reason: taken.reason, until: taken.until, questions: taken.questions }
 }
 
+const parseThread = (rest: ReadonlyArray<string>): DispatchArgs => {
+  const [id = "", ...flags] = rest
+  if (!isTaskId(id)) {
+    return { kind: "UsageError", detail: "orc backlog thread takes a task id, got \"" + id + "\"" }
+  }
+  return parseJsonFlag(flags, (json) => ({ kind: "ShowThread", id, json }))
+}
+
 const parseDepend = (rest: ReadonlyArray<string>): DispatchArgs => {
   const [id = "", flag = "", ...after] = rest
   if (!isTaskId(id)) {
@@ -285,6 +293,7 @@ const backlogSubcommands = {
   hold: parseHold,
   answer: parseAnswer,
   note: parseNote,
+  thread: parseThread,
   depend: parseDepend,
   plan: parsePlan,
   priority: parsePriority
