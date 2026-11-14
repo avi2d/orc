@@ -28,7 +28,7 @@ test("thread --json lists a hold, its question and answer, a second hold and a n
     })
     expect(thread).toHaveProperty("entries.length", 5)
     const plain = await orcOk(fixture, ["backlog", "thread", "orc-1"])
-    expect(plain.split("\n").map((line) => line.split(/\s{2,}/)[2])).toEqual(["KIND", "hold", "question", "answer", "hold", "note", undefined])
+    expect(plain.trim().split("\n").map((line) => line.split(/\s{2,}/)[2] ?? "")).toEqual(["KIND", "hold", "question", "answer", "hold", "note"])
     const unknown = await runOrc(fixture, ["backlog", "thread", "orc-9"])
     expect({ code: unknown.exitCode, error: unknown.stderr.trim() }).toEqual({ code: 1, error: "orc: the backlog holds no orc-9" })
   })
