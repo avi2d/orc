@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Layer } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { addTask, applyRunSplit, applySplit, claimTask, listTasks, parseTaskFile, renderTaskFile, type TaskPriority, writeTaken } from "../../../packages/run/src/entities/backlog/index"
+import { addTask, applyRunSplit, applySplit, claimTask, listTasks, parseTaskFile, renderTaskFile, TaskFileError, type TaskPriority, writeTaken } from "../../../packages/run/src/entities/backlog/index"
 import { prioritizeTask } from "../../../packages/run/src/features/backlog-planning/index"
 import { parseDispatchArgs } from "../../../packages/run/src/app/dispatch-args"
 import { runBeat } from "../../../packages/run/src/widgets/beat/beat"
@@ -134,7 +134,7 @@ describe("a priority in the task file", () => {
   })
   test("a priority of 7 in the file is refused instead of ranking past no priority", async () => {
     const text = ["---", "id: orc-1", "title: T", "project: orc", "machine: null", "depends_on: []", "priority: 7", "created: 2026-11-01T10:00:00.000Z", "---", "# T", ""].join("\n")
-    expect((await run(Effect.flip(parseTaskFile("orc-1.md", "new", text))))._tag).toBe("TaskFileError")
+    expect(await run(Effect.flip(parseTaskFile("orc-1.md", "new", text)))).toBeInstanceOf(TaskFileError)
   })
 })
 

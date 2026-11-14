@@ -1,5 +1,6 @@
-import { isTaskId, isCalendarDate, isTaskKind, isTaskPriority, type TaskKind, type TaskPriority, unknownKind } from "../entities/backlog/index"
+import { isTaskId, isCalendarDate, isTaskKind, type TaskKind, unknownKind } from "../entities/backlog/index"
 import { parseJsonFlag, parseRunner, unexpected, type DispatchArgs as RunnerArgs } from "./dispatch-args-runner"
+import { addPriority, parsePriority } from "./dispatch-args-priority"
 import type { EditTask, TaskSource } from "../features/backlog-planning/index"
 
 export type DispatchArgs = RunnerArgs | EditTask
@@ -55,23 +56,6 @@ const addTaskKind = (words: ReadonlyArray<string>): { readonly kind: "kind"; rea
   return isTaskKind(word) ? { kind: "kind", taskKind: word } : { kind: "refused", detail: unknownKind(word) }
 }
 
-const priorityOf = (word: string): TaskPriority | null => {
-  const value = /^\d$/.test(word) ? Number(word) : -1
-  return isTaskPriority(value) ? value : null
-}
-
-const addPriority = (words: ReadonlyArray<string>): { readonly kind: "priority"; readonly priority: TaskPriority | null } | { readonly kind: "refused"; readonly detail: string } => {
-  if (words.length > 1) {
-    return { kind: "refused", detail: "orc backlog add takes one --priority" }
-  }
-  const [word] = words
-  if (word === undefined) {
-    return { kind: "priority", priority: null }
-  }
-  const priority = priorityOf(word)
-  return priority === null ? { kind: "refused", detail: "orc backlog add takes 0 to 4 after --priority, got \"" + word + "\"" } : { kind: "priority", priority }
-}
-
 const parseAdd = (rest: ReadonlyArray<string>): DispatchArgs => {
   const split = splitAdd(rest)
   if (split.kind === "missing") {
@@ -108,23 +92,6 @@ const parseAdd = (rest: ReadonlyArray<string>): DispatchArgs => {
   const [project = "", taskFile = ""] = split.kept
   const task: TaskSource = taskFile === "-" ? { kind: "stdin" } : { kind: "file", path: taskFile }
   return { kind: "AddTask", project, task, taskKind: taskKind.taskKind, internal: split.internal, machine, parent, dependsOn: split.values["--depends-on"], priority: priority.priority }
-}
-
-const parsePriority = (rest: ReadonlyArray<string>): DispatchArgs => {
-  const [id = "", word = "", ...extra] = rest
-  if (!isTaskId(id)) {
-    return { kind: "UsageError", detail: "orc backlog priority takes a task id, got \"" + id + "\"" }
-  }
-  if (extra.length > 0) {
-    return unexpected(extra[0])
-  }
-  if (word === "none") {
-    return { kind: "PrioritizeTask", id, priority: null }
-  }
-  const priority = priorityOf(word)
-  return priority === null
-    ? { kind: "UsageError", detail: "orc backlog priority takes 0 to 4 or none, got \"" + word + "\"" }
-    : { kind: "PrioritizeTask", id, priority }
 }
 
 const parseEdit = (rest: ReadonlyArray<string>): DispatchArgs => {
