@@ -56,6 +56,7 @@ const task = (
     ["machine", machine === null ? "null" : JSON.stringify(machine)],
     ["depends_on", JSON.stringify(dependsOn)],
     ["created", JSON.stringify("2026-10-27T10:00:00.000Z")],
+    ["priority", "0"],
     ...extra,
   ]) + "# " + title + String.fromCharCode(10);
 

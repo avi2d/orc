@@ -23,7 +23,7 @@ const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>, kind: 
   await fakeQuota(fixture)
   await writeMachine(fixture, start)
   await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux", ...kind])
+  await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux", ...kind])
   await orcOk(fixture, ["beat"])
   return queuedArgs(fixture)
 }
@@ -120,7 +120,7 @@ describe("orc runner start", () => {
       await fakeQuota(fixture)
       await writeMachine(fixture, [process.execPath, binPath, "runner", "start", "--", ...through])
       await writeFile(join(fixture.pueue, "status.json"), JSON.stringify({ tasks: {}, groups: {} }))
-      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--machine", "linux"])
+      await orcOk(fixture, ["backlog", "add", "orc", "task.md", "--priority", "0", "--machine", "linux"])
       await orcOk(fixture, ["beat"])
       const deadline = Date.now() + startWaitMillis
       while (Date.now() < deadline) {

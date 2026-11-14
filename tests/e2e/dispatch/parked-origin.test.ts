@@ -94,7 +94,7 @@ test("an answered parked task cannot move to a roomier machine or start fresh wi
       }] }))
     }
     await dispatch([{ ...localMachine, slots: 0 }, remoteMachine])
-    await orcOk(local, ["backlog", "add", "orc", "task.md"])
+    await orcOk(local, ["backlog", "add", "orc", "task.md", "--priority", "0"])
     expect(await orcOk(local, ["beat"])).toContain("started orc-1 on winbox")
     await queuedRun(remote)
     await rename(join(remote.pueue, "run-args"), join(remote.pueue, "original-args"))

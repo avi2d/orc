@@ -1,5 +1,7 @@
 import { isTaskId, isCalendarDate, isTaskKind, type TaskKind, unknownKind } from "../entities/backlog/index"
 import { parseJsonFlag, parseRunner, unexpected, type DispatchArgs as RunnerArgs } from "./dispatch-args-runner"
+import { parseHeavy } from "./dispatch-args-heavy"
+export type { HeavyWord } from "./dispatch-args-heavy"
 import { parseAnswer, parseItemAnswer, parseNote } from "./dispatch-args-answer"
 import { addPriority, parsePriority } from "./dispatch-args-priority"
 import type { DropTask, EditTask, TaskSource } from "../features/backlog-planning/index"
@@ -8,9 +10,6 @@ import type { RecordOrigin } from "../widgets/beat/index"
 export type DispatchArgs = RunnerArgs | EditTask | DropTask | RecordOrigin
 import { isEventKey } from "../entities/events/index"
 import { isMergeBasis, mergeBases } from "../entities/pull-request/index"
-
-export const dispatchUsage =
-  "orc backlog [--json] | orc attention [--json] | orc attention answer <item-id> <words> | orc backlog add <project> <task-file|-> [--kind <ship|scout|task|parent>] [--internal] [--machine <name>] [--parent <task-id>] [--depends-on <task-id>] [--priority <0-4>] | orc backlog priority <task-id> <0-4|none> | orc backlog edit <task-id> <task-file|-> | orc backlog origin <task-id> <machine> <run-id> | orc backlog close <task-id> <done|failed> [reason] | orc backlog stop <task-id> | orc backlog drop <task-id> <reason> | orc backlog posted <task-id|event-key> | orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>] [--question <text>] | orc backlog answer <task-id> <words|question-id=text> | orc backlog note <task-id> <words> | orc backlog thread <task-id> [--json] | orc backlog depend <task-id> --on <task-id>[,<task-id>...] | orc backlog depend <task-id> --clear | orc backlog plan <task-id> [--drop <task-id>] | orc merge <task-id> [--basis captain-word|yolo-green] | orc beat [--json] | orc runner start [-- <command that runs orc there>] | orc runner queue | orc runner renew [-- <command that runs orc there>] | orc runner hold <task-id> -- <run command> | orc runner token <claude-credentials.json> | orc runner result <task-id> [--json] [-- <command that runs orc there>] | orc runner kill <task-id> | orc runner answer <task-id> | orc runner load | orc heavy path | orc heavy check [--json] | orc heavy watch | orc heavy watch-once"
 
 const addFlags = ["--kind", "--machine", "--parent", "--depends-on", "--priority"] as const
 type AddFlag = typeof addFlags[number]
@@ -276,43 +275,37 @@ const parseMerge = (rest: ReadonlyArray<string>): DispatchArgs => {
   return extra.length === 0 ? { kind: "MergeTask", id, basis } : unexpected(extra[0])
 }
 
-const parseHeavy = (rest: ReadonlyArray<string>): DispatchArgs => {
-  const [verb = "", ...extra] = rest
-  if (verb === "path") {
-    return extra.length === 0 ? { kind: "HeavyPath" } : unexpected(extra[0])
-  }
-  if (verb === "check") {
-    return parseJsonFlag(extra, (json) => ({ kind: "HeavyCheck", json }))
-  }
-  if (verb === "watch") {
-    return extra.length === 0 ? { kind: "HeavyWatch" } : unexpected(extra[0])
-  }
-  if (verb === "watch-once") {
-    return extra.length === 0 ? { kind: "HeavyWatchOnce" } : unexpected(extra[0])
-  }
-  return { kind: "UsageError", detail: "orc heavy takes path, check [--json], watch or watch-once, got \"" + verb + "\"" }
-}
+const attentionSubcommands = {
+  answer: parseItemAnswer
+} satisfies Record<string, (rest: ReadonlyArray<string>) => DispatchArgs>
 
-const backlogSubcommands: ReadonlyMap<string, (rest: ReadonlyArray<string>) => DispatchArgs> = new Map([
-  ["add", parseAdd],
-  ["edit", parseEdit],
-  ["origin", parseOrigin],
-  ["close", parseClose],
-  ["stop", parseStop],
-  ["drop", parseDrop],
-  ["posted", parsePosted],
-  ["hold", parseHold],
-  ["answer", parseAnswer],
-  ["note", parseNote],
-  ["thread", parseThread],
-  ["depend", parseDepend],
-  ["plan", parsePlan],
-  ["priority", parsePriority],
-])
+export type AttentionWord = keyof typeof attentionSubcommands
+const isAttentionWord = (word: string): word is AttentionWord => Object.hasOwn(attentionSubcommands, word)
+
+const backlogSubcommands = {
+  add: parseAdd,
+  edit: parseEdit,
+  origin: parseOrigin,
+  close: parseClose,
+  stop: parseStop,
+  drop: parseDrop,
+  posted: parsePosted,
+  hold: parseHold,
+  answer: parseAnswer,
+  note: parseNote,
+  thread: parseThread,
+  depend: parseDepend,
+  plan: parsePlan,
+  priority: parsePriority
+} satisfies Record<string, (rest: ReadonlyArray<string>) => DispatchArgs>
+
+export type BacklogVerb = keyof typeof backlogSubcommands
+const isBacklogVerb = (word: string): word is BacklogVerb => Object.hasOwn(backlogSubcommands, word)
 
 export const parseDispatchArgs = (command: "backlog" | "attention" | "beat" | "runner" | "merge" | "heavy", rest: ReadonlyArray<string>): DispatchArgs => {
   if (command === "attention") {
-    return rest[0] === "answer" ? parseItemAnswer(rest.slice(1)) : parseJsonFlag(rest, (json) => ({ kind: "ShowAttention", json }))
+    const [verb = ""] = rest
+    return isAttentionWord(verb) ? attentionSubcommands[verb](rest.slice(1)) : parseJsonFlag(rest, (json) => ({ kind: "ShowAttention", json }))
   }
   if (command === "heavy") {
     return parseHeavy(rest)
@@ -326,9 +319,9 @@ export const parseDispatchArgs = (command: "backlog" | "attention" | "beat" | "r
   if (command === "beat") {
     return parseJsonFlag(rest, (json) => ({ kind: "Beat", json }))
   }
-  const parseSubcommand = backlogSubcommands.get(rest[0] ?? "")
-  if (parseSubcommand !== undefined) {
-    return parseSubcommand(rest.slice(1))
+  const [verb = ""] = rest
+  if (isBacklogVerb(verb)) {
+    return backlogSubcommands[verb](rest.slice(1))
   }
   return parseJsonFlag(rest, (json) => ({ kind: "ShowBacklog", json }))
 }

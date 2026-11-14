@@ -39,7 +39,7 @@ const withRoot = async (body: (root: string) => Promise<void>): Promise<void> =>
 describe("a split keeps the priority of the task that proposed it", () => {
   test("a split request at P2 gives its parent and every child P2 instead of dropping it", async () => {
     await withRoot(async (root) => {
-      await run(applySplit(root, { ...spec, priority: 2 }, plan, "intake"))
+      await run(applySplit(root, { ...spec, priority: 2 as const }, plan, "intake"))
       const tasks = await run(listTasks(root))
       expect(tasks.map((task) => [task.spec.id, task.spec.kind, task.spec.priority])).toEqual([
         ["orc-1", "parent", 2],

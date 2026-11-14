@@ -8,15 +8,13 @@ import packageJson from "../package.json" with { type: "json" }
 import { appHomeDir, bundledAppDir, formatAppInstall, herdrAppSourceDir, installApp, readyBundledApp } from "./features/installing-the-app/index"
 import { type OrcArgs, parseArgs } from "./app/args"
 import { runChat } from "./features/chat/index"
-import { dispatchUsage } from "./app/dispatch-args"
+import { helpText, overview, usageErrorText } from "./app/help"
 import { runDispatch } from "./app/dispatch-cli"
 import { RunnerError } from "./shared/process/index"
 import { formatReport, formatReportOutcome, runAgentStep, runReportStep } from "./features/running-a-task/index"
-import { type ReportKind, runDirFor } from "./entities/backlog/index"
+import { backlogPaths, backlogRoot as backlogRootOf, type ReportKind, runDirFor } from "./entities/backlog/index"
 import { encodeRefusalsJson, formatHistoryError, formatRefusalsTable, listAllRuns, listRuns, openDatabase, orcHomeDir, readRefusals } from "./entities/run-history/index"
-import { encodeRunsJson, encodeShowJson, formatRunsTable, formatShow, readListedRuns, readRunsJsonRuns, readShow, readStepLog, recordStepScore } from "./features/seeing-runs/index"
-
-const usage = "Usage: orc [--version] [--help] | orc app install | orc chat | orc runs [--json] | orc refusals [--json] | orc show <run> [--json] | orc log <run> <step-id> | orc score <run> <step> <1 to 5> [note] | orc run [<task-file>] [--kind ship|scout|task|parent] [--delivery no-mistakes|direct-PR] [--branch <name>] [--sandbox nono|none] [--token-file <path>] [--provider <id>] [--instructions <path>] [--allow ask-user] [--answer <question-or-finding-id>=\"<text>\"] | " + dispatchUsage
+import { encodeRunsJson, encodeShowJson, formatRunsTable, formatShow, readListedRuns, readOtherMachinesFrom, readRunsJsonRuns, readShow, readStepLog, recordStepScore, runsJson, withOtherMachines } from "./features/seeing-runs/index"
 
 const readFailure = (error: unknown): string =>
   typeof error === "string" ? error : "orc: cannot read the run history: " + formatHistoryError(error)
@@ -116,6 +114,14 @@ const reportStep = (args: Extract<OrcArgs, { readonly kind: "RunAgent" }>, kind:
     }
   })
 
+const otherMachinesOf = (dispatchFile: string) =>
+  readOtherMachinesFrom(dispatchFile).pipe(
+    Effect.provide(BunServices.layer),
+    Effect.catchTag("ConfigError", (error) =>
+      Console.error("orc: " + error.file + ": " + error.detail).pipe(Effect.as({ runs: [], machines: [] }))
+    )
+  )
+
 const printRuns = (args: Extract<OrcArgs, { readonly kind: "ListRuns" }>) =>
   Effect.gen(function*() {
     if (args.json) {
@@ -126,7 +132,9 @@ const printRuns = (args: Extract<OrcArgs, { readonly kind: "ListRuns" }>) =>
           Effect.flatMap((runs) => readRunsJsonRuns(runs, (runId) => runDirFor(home, runId)))
         )
       )
-      yield* Console.log(yield* encodeRunsJson(listed))
+      const local = runsJson(listed)
+      const others = args.local ? null : yield* otherMachinesOf(backlogPaths(backlogRootOf(orcHomeDir(Bun.env.ORC_HOME))).dispatchConfig)
+      yield* Console.log(yield* encodeRunsJson(others === null ? local : withOtherMachines(local, others)))
     } else {
       yield* Console.log(formatRunsTable(yield* readHistory((db) => listRuns(db))))
     }
@@ -181,15 +189,20 @@ const runInstallApp = Effect.gen(function*() {
 })
 
 const program = Effect.gen(function*() {
-  const args = parseArgs(Bun.argv.slice(2))
+  const words = Bun.argv.slice(2)
+  const args = parseArgs(words)
   switch (args.kind) {
     case "PrintVersion": {
       yield* Console.log(`orc ${packageJson.version}`)
       break
     }
     case "PrintHelp": {
-      yield* Console.log(usage)
+      yield* Console.log(helpText(args.words))
       break
+    }
+    case "NoCommand": {
+      yield* Console.error(overview())
+      return yield* Effect.fail("orc takes a command")
     }
     case "ListRuns": {
       return yield* printRuns(args)
@@ -219,7 +232,7 @@ const program = Effect.gen(function*() {
       return yield* chat
     }
     case "UsageError": {
-      yield* Console.error(`${args.detail}\n${usage}`)
+      yield* Console.error(usageErrorText(args.detail, words))
       return yield* Effect.fail(args.detail)
     }
   }

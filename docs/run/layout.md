@@ -10,9 +10,15 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/app/args.ts` | The flag parsing for the orc command |
-| `packages/run/src/app/dispatch-args.ts` | The flag parsing for `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` |
-| `packages/run/src/app/dispatch-cli.ts` | The `orc backlog`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
+| `packages/run/src/app/dispatch-args.ts` | The flag parsing for `orc backlog`, `orc attention`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` |
+| `packages/run/src/app/dispatch-cli.ts` | The `orc backlog`, `orc attention`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
 | `packages/run/src/app/dispatch-args-runner.ts` | The `orc runner` verb parsing and the shared `--json` flag and reach split |
+| `packages/run/src/app/dispatch-args-heavy.ts` | The `orc heavy` verb parsing |
+| `packages/run/src/app/help.ts` | The help pages: the overview, the per-command help, the usage error text and the closest-command suggestion |
+| `packages/run/src/app/help-format.ts` | The help layout: wrapping to 80 columns, the usage block and the name and text tables |
+| `packages/run/src/app/help-entries-run.ts` | The help entries for `orc run`, the run history commands, `orc chat` and `orc app` |
+| `packages/run/src/app/help-entries-backlog.ts` | The help entries for `orc backlog` and its subcommands, `orc attention`, `orc beat` and `orc merge` |
+| `packages/run/src/app/help-entries-runner.ts` | The help entries for `orc runner` and `orc heavy` and their subcommands |
 
 ## widgets/beat
 
@@ -71,7 +77,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/chat/chat-closed.ts` | The closed task shape and the line the chat posts for it |
 | `packages/run/src/features/chat/chat-command.ts` | The shell a chat tool runs through the shared Bun layers |
 | `packages/run/src/features/chat/chat-error.ts` | The error a chat tool fails with |
-| `packages/run/src/features/chat/chat-inputs.ts` | The chat tool input shapes for add, hold, edit, answer, board and merge |
+| `packages/run/src/features/chat/chat-inputs.ts` | The chat tool input shapes for add, hold, priority, edit, answer, board and merge |
 | `packages/run/src/features/chat/chat-posts.ts` | The backlog read and the walk that delivers each closed task and event once |
 
 ## features/decider
@@ -141,6 +147,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/seeing-runs/run-facts.ts` | The facts `orc runs --json` reads beside each run: its title, latest step and open questions |
 | `packages/run/src/features/seeing-runs/step-log.ts` | The `orc log` reading of one step's output file |
 | `packages/run/src/features/seeing-runs/run-scores.ts` | The `orc score` step score writes: the 1 to 5 check, the note and the unknown run and step errors |
+| `packages/run/src/features/seeing-runs/other-machines.ts` | The other dispatch machines' runs `orc runs --json` adds, and the `machines` it names for those that fail |
 
 ## entities/agent
 

@@ -119,7 +119,7 @@ describe("orc show", () => {
     await withHome(async (home) => {
       const result = await runOrc(["show"], home)
       expect(result.exitCode).not.toBe(0)
-      expect(result.stderr).toContain("orc show <run> [--json]")
+      expect(result.stderr).toContain("Usage: orc show <run-id> [--json]")
     })
   })
 })

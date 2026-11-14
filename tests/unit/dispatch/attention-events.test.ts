@@ -49,7 +49,7 @@ const beat = (root: string, at: string, view: PullRequestView = uncheckedOpen): 
     return formatBeat(yield* runBeat(root, root, quietSources(unread, () => Effect.succeed(view))))
   }).pipe(Effect.provide(Layer.mergeAll(BunServices.layer, commands, TestClock.layer()))))
 
-const spec = { title: "Fix the login page", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: null, created: "2026-10-27T10:00:00.000Z", body: "# Fix the login page\n" }
+const spec = { title: "Fix the login page", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: 0 as const, created: "2026-10-27T10:00:00.000Z", body: "# Fix the login page\n" }
 
 const pr = "https://github.com/acme/orc/pull/7"
 

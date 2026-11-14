@@ -29,14 +29,14 @@ A scout or task marked for a machine waits for room there as any task does.
 A `parent` holds the captain's words and the done criteria for work too large for one PR, and has no code or PR of its own.
 Add it with `orc backlog add <project> <task-file> --kind parent`, then add each part with `orc backlog add <project> <task-file> --parent <task-id>`.
 The child's task file keeps the link as `parent`, and `orc backlog --json` gives every task a `parent` and every parent `children` as `{"done": <n>, "total": <n>}`.
-Children may wait on each other with `--depends-on`, and the beat starts the children that wait on nothing at the same time.
+Children may wait on each other with `--depends-on`, and the beat starts the children with a priority that wait on nothing at the same time.
 Orc refuses a `--parent` the backlog does not hold, one that is not a parent, or one that is no longer new.
 Orc refuses a parent given a parent and a child that waits on a task already waiting on its parent.
 Until every scout and task child closes done and every ship child with a PR merges, each beat prints `waits <task-id>: waits on its children, <done> of <total> done`, or `waits for its first child` while it has none.
 A failed child keeps its parent waiting.
 `orc backlog` shows the count on the parent's line, as in `orc-1 parent orc 3 of 5 done Ship the whole feature`.
 
-When every scout and task child closed done and every ship child with a PR merged, the beat starts the parent's final check once.
+When every scout and task child closed done and every ship child with a PR merged, the beat starts the parent's final check once, and only when the parent has a priority.
 The runner queues it as `orc run <task-file> --branch orc/<task-id>-parent --kind parent --sandbox none`, which reviews no code and changes nothing in the checkout.
 It starts fresh there and never resumes the worker's failed run, whose partial work stays on `orc/<task-id>`.
 Pi runs the whole result in the real place it serves, checks each done criterion, and ends `agent-report.md` with the line `verdict: pass` or `verdict: fail`.
@@ -49,7 +49,7 @@ When `models.planner` in `config.json` names a model, as [Configuring providers]
 The budget for one task is about 300 changed lines or one area.
 A request within the budget lands as one task, and orc prints `planned as one task: <reason>` under the added line.
 A request over the budget lands as a parent with the planner's done criteria under `## Done when`, and one ship child for each vertical slice, each one PR that merges on its own.
-A child waits until each earlier child the plan names has merged, so the next beat starts every child that waits on nothing at the same time.
+A child waits until each earlier child the plan names has merged, so the next beat starts every child with a priority that waits on nothing at the same time.
 Each child also waits on what the added request waited on.
 The parent and each child take the request's priority.
 The parent's task file keeps `split: {"by": "intake", "reason": <text>}`, which `orc backlog --json` gives every task as `split`, and orc records the event `<parent-id>.split` that orc chat posts.
@@ -81,7 +81,7 @@ Orc records the run as failed without running checks or opening a PR.
 `orc runner result <task-id> --json` returns the validated document as `result.run.split`, and the text result prints it in the run reason.
 The parent and each child take the priority of the task that proposed the split, and a parked task that resumes keeps its priority.
 The beat turns the task into a parent instead of closing it, with the proposal's done criteria under `## Done when` and `split: {"by": "run", "reason": <text>}`.
-It adds one ship child for each slice, linked and waiting as [Splitting at intake](#splitting-at-intake) adds them, and starts every child that waits on nothing in the same beat.
+It adds one ship child for each slice, linked and waiting as [Splitting at intake](#splitting-at-intake) adds them, and starts every child with a priority that waits on nothing in the same beat.
 When the task proposing the split has a parent, the slices join that parent as children, since orc refuses a parent given a parent.
 The proposal's done criteria join that parent under `## Done when` as lines naming the split task, so the final check verifies them with the rest.
 The task then leaves that parent and closes done with the reason `split into <child-ids>: <reason>`, and every task that waited on it waits on all slices instead.
