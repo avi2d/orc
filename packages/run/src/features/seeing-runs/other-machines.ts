@@ -31,15 +31,13 @@ const decodeAnswer = (command: Command, stdout: string): Effect.Effect<RunsJsonD
     )
   )
 
-const firstLine = (text: string): string => text.trim().split("\n")[0] ?? ""
-
 const answerOf = (command: Command): Effect.Effect<RunsJsonDocument, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   capture(command, null).pipe(
     Effect.flatMap((result) => {
-      const line = firstLine(result.stderr)
+      const printed = result.stderr.trim() !== "" ? result.stderr.trim() : result.stdout.trim()
       return result.exitCode === 0
         ? decodeAnswer(command, result.stdout)
-        : Effect.fail(new RunnerError({ detail: command.join(" ") + " exited " + result.exitCode + ": " + (line !== "" ? line : firstLine(result.stdout)) }))
+        : Effect.fail(new RunnerError({ detail: command.join(" ") + " exited " + result.exitCode + ": " + printed }))
     })
   )
 

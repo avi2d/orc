@@ -11,7 +11,7 @@ Every JSON document names its version first as `schema`, starting at `orc.runs.v
 It reads each machine with the command that reaches it, as `orc runner result` does, and asks it for `orc runs --json --local`.
 A machine whose `start` names no reach command, such as `orc runner start` with nothing after `--`, is not read.
 A machine that fails, does not answer within 10 seconds, or prints JSON orc cannot read adds no runs.
-It is named in `machines` with its `machine` and its `error`, the first line it printed or why its answer did not read, and the command still exits 0.
+It is named in `machines` with its `machine` and its `error`, what it printed or why its answer did not read, and the command still exits 0.
 `machines` is empty when every machine answers, when `dispatch.json` names none, or when `dispatch.json` cannot be read, and the reason is on stderr.
 To print only this machine's runs, run `orc runs --json --local`.
 Poll with `--local` when you read every few seconds.
