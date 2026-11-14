@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, unlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { Database } from "bun:sqlite"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { listRuns, openDatabase, recordEvidence, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
-import { readListedRuns, readStepLog, stepLogFile, titleOf } from "../../packages/run/src/features/seeing-runs/index"
+import { listRuns, openDatabase, recordEvidence, recordRun, recordStep, updateRun } from "../../packages/run/src/entities/run-history/index"
+import { readListedRuns, readRunsJsonRuns, readStepLog, runsJson, stepLogFile, titleOf } from "../../packages/run/src/features/seeing-runs/index"
 
 const withDb = async (use: (home: string, db: Database) => Promise<void>): Promise<void> => {
   const home = await mkdtemp(join(tmpdir(), "orc-run-facts-"))
@@ -29,6 +29,16 @@ const run = async (db: Database, home: string, id: string, status: "running" | "
 
 const listed = (db: Database) =>
   Effect.runPromise(listRuns(db).pipe(Effect.flatMap((runs) => readListedRuns(db, runs)), Effect.provide(BunServices.layer)))
+
+const jsonRuns = (home: string, db: Database) =>
+  Effect.runPromise(
+    listRuns(db).pipe(
+      Effect.flatMap((runs) => readListedRuns(db, runs)),
+      Effect.flatMap((runs) => readRunsJsonRuns(db, runs, (runId) => join(home, "runs", runId))),
+      Effect.map((runs) => runsJson(runs).runs),
+      Effect.provide(BunServices.layer)
+    )
+  )
 
 const asking = (count: number): string =>
   JSON.stringify({ asked: "2026-11-13T10:01:00.000Z", until: "2026-11-13T10:31:00.000Z", questions: Array.from({ length: count }, (_, index) => ({ id: "q" + index.toString(), text: "which one?" })) })
@@ -84,6 +94,45 @@ describe("readListedRuns", () => {
       await Effect.runPromise(recordStep(db, { runId: "run-e", name: "implement", attempt: 1, status: "failed", started: "2026-11-13T10:02:00.000Z" }))
       const entries = await listed(db)
       expect(entries.find((entry) => entry.run.id === "run-d")?.step).toBeNull()
+    })
+  })
+})
+
+describe("readRunsJsonRuns", () => {
+  test("a running run reads waiting while asking.json stands and running once it is removed, not running throughout", async () => {
+    await withDb(async (home, db) => {
+      const runDir = await run(db, home, "run-w", "running", "# Ask\n")
+      expect((await jsonRuns(home, db))[0]?.state).toBe("running")
+      await writeFile(join(runDir, "asking.json"), asking(1))
+      expect((await jsonRuns(home, db))[0]?.state).toBe("waiting")
+      await unlink(join(runDir, "asking.json"))
+      expect((await jsonRuns(home, db))[0]?.state).toBe("running")
+    })
+  })
+
+  test("an ended run reads its outcome even beside a leftover asking.json, and a stopped run reads failed rather than stopped", async () => {
+    await withDb(async (home, db) => {
+      const succeededDir = await run(db, home, "run-s", "running", "# Done\n")
+      await run(db, home, "run-t", "running", "# Stopped\n")
+      await run(db, home, "run-u", "failed", "# Failed\n")
+      await writeFile(join(succeededDir, "asking.json"), asking(1))
+      await Effect.runPromise(updateRun(db, "run-s", { status: "succeeded", ended: "2026-11-13T10:09:00.000Z", prLink: null, endReason: null }))
+      await Effect.runPromise(updateRun(db, "run-t", { status: "stopped", ended: "2026-11-13T10:09:00.000Z", prLink: null, endReason: null }))
+      const states = Object.fromEntries((await jsonRuns(home, db)).map((entry) => [entry.id, entry.state]))
+      expect(states).toEqual({ "run-s": "succeeded", "run-t": "failed", "run-u": "failed" })
+    })
+  })
+
+  test("currentStep names the running step's attempt rather than the first attempt or a later ended step, and is null once the run ends", async () => {
+    await withDb(async (home, db) => {
+      await run(db, home, "run-c", "running", "# Steps\n")
+      expect((await jsonRuns(home, db))[0]?.currentStep).toBeNull()
+      await Effect.runPromise(recordStep(db, { runId: "run-c", name: "fix", attempt: 1, status: "failed", started: "2026-11-13T10:01:00.000Z", ended: "2026-11-13T10:02:00.000Z" }))
+      await Effect.runPromise(recordStep(db, { runId: "run-c", name: "fix", attempt: 2, status: "running", started: "2026-11-13T10:03:00.000Z" }))
+      await Effect.runPromise(recordStep(db, { runId: "run-c", name: "checks", attempt: 1, status: "passed", started: "2026-11-13T10:04:00.000Z", ended: "2026-11-13T10:05:00.000Z" }))
+      expect((await jsonRuns(home, db))[0]?.currentStep).toEqual({ name: "fix", attempt: 2 })
+      await Effect.runPromise(updateRun(db, "run-c", { status: "failed", ended: "2026-11-13T10:06:00.000Z", prLink: null, endReason: null }))
+      expect((await jsonRuns(home, db))[0]?.currentStep).toBeNull()
     })
   })
 })
