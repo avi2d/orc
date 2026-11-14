@@ -290,6 +290,7 @@ describe("taskLevels keeps the done tasks of the current day, not yesterday's or
                 id: 7,
                 command: "bun test",
                 path: "/work/a",
+                group: "default",
                 status: { Done: { start: "2026-10-18T22:30:00Z", end: "2026-10-18T22:35:00Z", result: "Success" } },
               },
             },

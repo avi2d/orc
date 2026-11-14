@@ -200,7 +200,7 @@ describe("a machine's queue", () => {
 
   test("joins both machines' queues with a machine per row and the shared CI runs once", () => {
     const southStatus = valueOf(
-      decodePueue(JSON.stringify({ tasks: { "7": { id: 7, command: "bun test", path: "/home/example/work/kelp", status: { Running: { start: lastEnd } } } }, groups: {} })),
+      decodePueue(JSON.stringify({ tasks: { "7": { id: 7, command: "bun test", path: "/home/example/work/kelp", group: "default", status: { Running: { start: lastEnd } } } }, groups: {} })),
     );
     const joined = machineQueue(
       [

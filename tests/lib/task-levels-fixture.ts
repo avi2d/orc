@@ -145,6 +145,7 @@ const samples: ReadonlyArray<TaskSampleRecord> = [
 const done = (path: string, command: string, start: string, end: string, result: "Success" | { readonly Failed: number }) => ({
   command,
   path,
+  group: "default",
   status: { Done: { start: at(start), end: at(end), result } },
 });
 
@@ -154,7 +155,7 @@ const pueue: PueueStatus = {
     "1": { id: 1, ...done("/home/example/.no-mistakes/worktrees/a1b2c3/run-7", "bun test", "2026-10-19T07:55:00Z", "2026-10-19T07:56:30Z", "Success") },
     "2": { id: 2, ...done("/home/example/work/harbor", "bun run lint", "2026-10-19T05:00:00Z", "2026-10-19T05:00:20Z", { Failed: 1 }) },
     "3": { id: 3, ...done("/home/example/work/notes", "bun test", "2026-10-18T10:00:00Z", "2026-10-18T10:01:00Z", "Success") },
-    "4": { id: 4, command: "bun test --watch", path: "/home/example/work/harbor", status: { Running: { start: at("2026-10-19T08:00:00Z") } } },
+    "4": { id: 4, command: "bun test --watch", path: "/home/example/work/harbor", group: "default", status: { Running: { start: at("2026-10-19T08:00:00Z") } } },
     "5": { id: 5, ...done("/home/example/elsewhere", "true", "2026-10-19T07:00:00Z", "2026-10-19T07:00:01Z", "Success") },
   },
 };

@@ -32,7 +32,7 @@ const jobsB: PueueStatus = {
   ...jobsA,
   tasks: {
     ...jobsA.tasks,
-    "99": { id: 99, command: "sleep 100", path: "/tmp", status: { Running: { start: t0 } } },
+    "99": { id: 99, command: "sleep 100", path: "/tmp", group: "default", status: { Running: { start: t0 } } },
   },
 };
 
