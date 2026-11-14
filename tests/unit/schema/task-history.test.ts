@@ -162,7 +162,7 @@ describe("taskHistories reads the last 7 days, excluding a sample from 7 days an
 
 describe("taskHistories over lines that carry detail only on change, keeping the model line and test runs of an earlier line", () => {
   const spend = { model: "opus", tokens: 1200, outputTokens: 300, fair: null };
-  const testRun = { id: 7, command: "bun test", path: "/home/example/work/harbor", startedAt: minutesAfter(0) };
+  const testRun = { id: 7, command: "bun test", group: "tests", path: "/home/example/work/harbor", startedAt: minutesAfter(0) };
 
   test("resolves each line to its task's latest carrying line", () => {
     const records = [
@@ -180,6 +180,25 @@ describe("taskHistories over lines that carry detail only on change, keeping the
     const records = [sample(0, { cpuCores: 8.5 }, { spend, tests: [testRun] }), sample(1, { cpuCores: 8.5 }, { tests: [] })];
     const history = historyAt(records, 1);
     expect(history?.tests.map((run) => run.command)).toEqual(["bun test"]);
+  });
+
+  test("keeps the pueue group on a resolved test run, never unknown", () => {
+    const records = [sample(0, { cpuCores: 8.5 }, { spend, tests: [testRun] })];
+    expect(historyAt(records, 0)?.tests.map((run) => run.group)).toEqual(["tests"]);
+  });
+
+  test("keeps a line written before the sampler kept the group, marking its test runs unknown", () => {
+    const line = JSON.stringify({
+      schemaVersion: 1,
+      at: "2026-10-19T08:00:00Z",
+      machine: { cores: 16, memoryBytes: 47 * gib },
+      task: { id: task.id, title: task.title, project: task.project, state: "working", firstStartedAt: "2026-10-19T07:30:00Z", endedAt: null },
+      usage: null,
+      tests: [{ id: 7, command: "bun test", path: "/home/example/work/harbor", startedAt: "2026-10-19T08:00:00Z" }],
+    });
+    const decoded = taskSampleRecords(line + "\n");
+    expect(decoded).toHaveLength(1);
+    expect(historyAt(decoded, 0)?.tests.map((run) => run.group)).toEqual(["unknown"]);
   });
 
   test("an unchanged keyframe past its expired baseline is not activity", () => {

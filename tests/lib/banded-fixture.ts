@@ -71,7 +71,7 @@ const pueueStatus = () => fixture("pueue/status.json").replaceAll("2026-10-18T03
 const southPueue = (): Decoded<PueueStatus> =>
   decodePueue(
     JSON.stringify({
-      tasks: { "7": { id: 7, command: "bun test", path: "/home/example/work/kelp", status: { Running: { start: "2026-10-13T22:50:00Z" } } } },
+      tasks: { "7": { id: 7, command: "bun test", path: "/home/example/work/kelp", group: "default", status: { Running: { start: "2026-10-13T22:50:00Z" } } } },
       groups: { default: { status: "Running", parallel_tasks: 1 } },
     }),
   );

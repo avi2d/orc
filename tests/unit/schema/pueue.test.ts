@@ -34,6 +34,11 @@ describe("a recorded pueue status", () => {
     ]);
   });
 
+  test("refuses a task with no group rather than guessing one", () => {
+    const groupless = fixture("pueue/status.json").replace('"group": "gpu",', "");
+    expect(issueOf(decodePueue(groupless))).toContain("group");
+  });
+
   test("reads a task that failed to spawn with its reason", () => {
     const spawned = fixture("pueue/status.json").replace('"result": "Success"', '"result": { "FailedToSpawn": "No such file or directory" }');
     expect(pueueView(valueOf(decodePueue(spawned))).ended.find((run) => run.id === 1)?.result).toEqual({

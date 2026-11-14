@@ -30,7 +30,7 @@ export const string = (record: Fields, name: string, at: string): Guarded<string
   return typeof value === "string" ? ok(value) : refused(child(at, name), "a string", value)
 }
 
-const number = (record: Fields, name: string, at: string): Guarded<number> => {
+export const number = (record: Fields, name: string, at: string): Guarded<number> => {
   const value = record[name]
   return typeof value === "number" && Number.isFinite(value) ? ok(value) : refused(child(at, name), "a number", value)
 }

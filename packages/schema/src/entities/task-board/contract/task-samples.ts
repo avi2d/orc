@@ -58,9 +58,11 @@ const SampledResult = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("dependency") }),
 ]);
 
+// A required field would drop the lines written before the sampler kept the group.
 const runFields = {
   id: Schema.Int,
   command: Schema.String,
+  group: Schema.String.pipe(Schema.withDecodingDefaultKey(Effect.succeed("unknown"))),
   path: Schema.String,
   startedAt: Instant,
 };

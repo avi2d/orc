@@ -12,6 +12,7 @@ That is the only step after an upgrade: `orc app install` builds the mods from t
 - The Herdr App, run at least once so that `~/.config/herdr-app` exists.
 - `orc` on the `PATH` of your login shell, since the mods run it through the App.
 - `orc-dash` on that `PATH` too, for the Resources tab.
+- For a second machine on the Resources tab, `ORC_DASH_REMOTE_RESOURCES` and `ORC_DASH_REMOTE_PUEUE` set where the App runs, as [orc-dash](dash.md) describes.
 
 ## Install the layout
 
@@ -32,11 +33,11 @@ The command writes only names that start with `orc`, so Herdr's own mods and lay
 | Tab | Key | What it shows |
 | --- | --- | --- |
 | Board | `cmd-1` | The backlog tasks in five lanes |
-| Resources | `cmd-2` | The account names in `orc-dash snapshot --json --only quota` |
+| Resources | `cmd-2` | Each subscription's quota windows, and each machine's cores, load, memory, disk and running orc runs |
 | Agents | `cmd-3` | The runs and the queued tasks, and the selected run's steps and step output |
 
 Board reads `orc backlog --json` and `orc attention --json` when shown and every 10 seconds while shown.
-Resources reads every minute.
+Resources reads `orc-dash snapshot --json --only quota,resources,queues` when shown and every minute.
 Agents reads `orc runs --json` and `orc backlog --json` again every 4 seconds while it is the shown tab.
 It also reads the selected run with `orc show <run> --json` and the selected step with `orc log <run> <step-id>`.
 When a command fails or prints a document the tab cannot read, the tab shows the command and why.
@@ -59,12 +60,31 @@ Select a project to filter the lanes, or select All to show every project.
 Select a card to mark it.
 Each lane lists its tasks oldest first.
 
+## Read the Resources tab
+
+![Resources tab with example quota windows for two accounts and two machines](images/herdr-resources.png)
+
+The Subscriptions table lists each account once, with one row for each of its quota windows.
+Used shows the share of the window spent, with a tick at the share of the window's time already gone.
+The bar turns red once the share used passes that tick.
+Resets counts down to the window's reset, such as `3d 17h`, or `2h 53m` under a day, and shows `now` under a minute.
+Runs out shows when the window runs out at the current pace, and only when that comes before the reset.
+
+The Machines table lists this machine under `ORC_DASH_MACHINE`, `local` when unset, and the machine that `ORC_DASH_REMOTE_RESOURCES` reads under `ORC_DASH_REMOTE_MACHINE`, `remote` when unset.
+Load turns red above the machine's core count.
+Orc runs counts the running pueue tasks in the `orc` group.
+When a machine cannot be read, its cells show a dash and a line below the table gives the reason.
+
+![Resources tab with the second machine unreachable](images/herdr-resources-unreachable.png)
+
 ## Recapture the Board screenshot
 
 The committed shot is the proof of the two-line clip.
 The garden-6 title wraps to three lines and shows exactly two, with no word cut.
 To recapture it, run `packages/herdr-app/scripts/capture-board.sh <fixture-dir> <output-png>` with a scratch `HOME` and an `HC_SESSION` starting with `fm-lab-`.
 Use `tests/fixtures/herdr-board` as the fixture folder.
+Add `orc-resources` or `orc-agents` as a third argument to capture that tab instead of the Board.
+The script brings the scratch App to the front, because a Herdr window that was never shown does not repaint.
 The script refuses the login `HOME`, keeps the scratch App off the live core, and quits only the App it started.
 The live core's processes and terminals read the same before and after.
 

@@ -11,7 +11,7 @@ export const activeRunStatuses = ["requested", "pending", "waiting", "queued", "
 
 const Count = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 
-export const RunningJson = Schema.Struct({ id: Count, command: Schema.String, project: Schema.String, startedAt: Schema.String });
+export const RunningJson = Schema.Struct({ id: Count, command: Schema.String, group: Schema.String, project: Schema.String, startedAt: Schema.String });
 
 const ResultJson = Schema.Union([
   Schema.Struct({ kind: Schema.Literals(["success", "killed", "errored", "dependency"]) }),

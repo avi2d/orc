@@ -317,7 +317,7 @@ describe("the next list", () => {
 
   test("joins both machines' delayed jobs and dated items soonest first", () => {
     const stashed = (id: number, path: string, when: string) =>
-      decodePueue(JSON.stringify({ tasks: { [id]: { id, command: "bun test", path, status: { Stashed: { enqueue_at: when } } } }, groups: {} }));
+      decodePueue(JSON.stringify({ tasks: { [id]: { id, command: "bun test", path, group: "default", status: { Stashed: { enqueue_at: when } } } }, groups: {} }));
     const joined = nextUp({
       schedules: [],
       pueues: [{ machine: "north", status: stashed(3, "/home/example/work/harbor", "2026-10-20T10:30:00Z") }, { machine: "south", status: stashed(7, "/home/example/work/kelp", "2026-10-20T10:20:00Z") }],
@@ -343,7 +343,7 @@ describe("the next list", () => {
 
   test("keeps the answered machine's delayed jobs while the other machine is still reading", () => {
     const stashed = decodePueue(
-      JSON.stringify({ tasks: { "3": { id: 3, command: "bun test", path: "/home/example/work/harbor", status: { Stashed: { enqueue_at: "2026-10-20T10:30:00Z" } } } }, groups: {} }),
+      JSON.stringify({ tasks: { "3": { id: 3, command: "bun test", path: "/home/example/work/harbor", group: "default", status: { Stashed: { enqueue_at: "2026-10-20T10:30:00Z" } } } }, groups: {} }),
     );
     const joined = nextUp({ schedules: [], pueues: [{ machine: "north", status: stashed }, { machine: "south", status: undefined }], orchestrators: [{ machine: "north", read: "absent" }], local: "north", now, zone: berlin });
     expect(joined.rows.map((row) => row.what)).toEqual(["harbor bun test"]);
@@ -399,7 +399,7 @@ describe("the next list", () => {
 
   test("names each failed machine while the answered machine\u2019s delayed jobs stay", () => {
     const stashed = decodePueue(
-      JSON.stringify({ tasks: { "3": { id: 3, command: "bun test", path: "/home/example/work/harbor", status: { Stashed: { enqueue_at: "2026-10-20T10:30:00Z" } } } }, groups: {} }),
+      JSON.stringify({ tasks: { "3": { id: 3, command: "bun test", path: "/home/example/work/harbor", group: "default", status: { Stashed: { enqueue_at: "2026-10-20T10:30:00Z" } } } }, groups: {} }),
     );
     const down = { kind: "unreachable" as const, reason: "daemon down" };
     const mixed = nextUp({
@@ -466,7 +466,7 @@ describe("the next list", () => {
 
   test("marks local timer and agent rows with this machine and leaves shared CI rows blank", () => {
     const stashed = decodePueue(
-      JSON.stringify({ tasks: { "3": { id: 3, command: "bun test", path: "/home/example/work/harbor", status: { Stashed: { enqueue_at: "2026-10-20T10:30:00Z" } } } }, groups: {} }),
+      JSON.stringify({ tasks: { "3": { id: 3, command: "bun test", path: "/home/example/work/harbor", group: "default", status: { Stashed: { enqueue_at: "2026-10-20T10:30:00Z" } } } }, groups: {} }),
     );
     const rows = nextUp({
       schedules: [

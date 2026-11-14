@@ -27,6 +27,7 @@ type RunResult = { readonly kind: "success" } | FailureView;
 export interface RunningRow {
   readonly id: number;
   readonly command: string;
+  readonly group: string;
   readonly path: string;
   readonly project: string;
   readonly startedAt: DateTime.Utc;
@@ -89,14 +90,14 @@ const namedProjectOf = (path: string, projects: ProjectNames | undefined): strin
 
 const runningRowOf = (projects: ProjectNames | undefined) => (task: PueueTask): ReadonlyArray<RunningRow> =>
   "Running" in task.status
-    ? [{ id: task.id, command: task.command, path: task.path, project: namedProjectOf(task.path, projects), startedAt: task.status.Running.start }]
+    ? [{ id: task.id, command: task.command, group: task.group, path: task.path, project: namedProjectOf(task.path, projects), startedAt: task.status.Running.start }]
     : [];
 
 const endedRowOf = (projects: ProjectNames | undefined) => (task: PueueTask): ReadonlyArray<EndedRow> => {
   if (!("Done" in task.status)) return [];
   const { start, end, result } = task.status.Done;
   return [
-    { id: task.id, command: task.command, path: task.path, project: namedProjectOf(task.path, projects), startedAt: start, endedAt: end, result: resultOf(result) },
+    { id: task.id, command: task.command, group: task.group, path: task.path, project: namedProjectOf(task.path, projects), startedAt: start, endedAt: end, result: resultOf(result) },
   ];
 };
 
@@ -172,6 +173,7 @@ export const queuesPending = (view: QueuesView): boolean =>
 const runningJson = (row: RunningRow): typeof RunningJson.Type => ({
   id: row.id,
   command: row.command,
+  group: row.group,
   project: row.project,
   startedAt: DateTime.formatIso(row.startedAt),
 });
