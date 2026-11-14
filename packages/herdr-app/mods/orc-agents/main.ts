@@ -98,7 +98,7 @@ export default class OrcAgents extends View {
 
   readAll(): Promise<void> {
     return Promise.all([
-      readJson("orc", ["runs", "--json"], runs),
+      readJson("orc", ["runs", "--json", "--local"], runs),
       readJson("orc", ["backlog", "--json"], backlog)
     ]).then(([runsReading, backlogReading]) => {
       this.cards = runsReading.kind !== "ok"
