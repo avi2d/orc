@@ -15,7 +15,7 @@ import { taskOfBranch } from "../../entities/backlog/index"
 
 type StepAgent = Pick<AgentFile, "model" | "thinking">
 
-const stepAgent = (agent: StepAgent | null): Pick<StepInput, "model" | "thinking"> => ({ model: agent?.model ?? null, thinking: agent?.thinking ?? null })
+const stepAgent = (agent: StepAgent): Pick<StepInput, "model" | "thinking"> => ({ model: agent.model, thinking: agent.thinking })
 
 type EvidenceRow = Omit<EvidenceInput, "stepId">
 
@@ -76,10 +76,10 @@ const planChecksDone = (runId: string, round: ChecksRoundSummary): PlannedChecks
   ]
 })
 
-const planFixDone = (runId: string, fix: RecordedFixAttempt, agent: StepAgent | null): PlannedFix => ({
+const planFixDone = (runId: string, fix: RecordedFixAttempt): PlannedFix => ({
   step: {
     runId, name: "fix", attempt: fix.attempt, status: fix.status,
-    started: fix.started, ended: fix.ended, agentFile: fix.agentFile, piSessionFile: fix.sessionFile, model: fix.model ?? agent?.model ?? null, thinking: fix.thinking ?? agent?.thinking ?? null
+    started: fix.started, ended: fix.ended, agentFile: fix.agentFile, piSessionFile: fix.sessionFile, model: fix.model, thinking: fix.thinking
   },
   evidenceIn: { direction: "in", path: fix.evidenceIn, kind: "checks" },
   sessionEvidence: fix.sessionFile === null ? null : { direction: "out", path: fix.sessionFile, kind: "session" },
@@ -149,7 +149,7 @@ export const recordResumePublish = (db: Database, run: HistoryRun, resume: Resum
           insertPlannedStep(db, planned.step, [planned.checksEvidence], planned.signals.filter((signal) => signal.name !== refusalSignalName))
         }
         for (const fix of resume.inheritedFixes) {
-          const planned = planFixDone(run.runId, fix, null)
+          const planned = planFixDone(run.runId, fix)
           insertPlannedStep(db, planned.step, [
             planned.evidenceIn,
             ...(planned.sessionEvidence === null ? [] : [planned.sessionEvidence]),
@@ -263,10 +263,10 @@ export const recordChecksDone = (db: Database, runId: string, round: ChecksRound
     }
   })
 
-export const recordFixDone = (db: Database, runId: string, fix: RecordedFixAttempt, agent: StepAgent | null): Effect.Effect<void, OrcRunError> =>
+export const recordFixDone = (db: Database, runId: string, fix: RecordedFixAttempt): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
     const failed = (action: string) => (cause: unknown) => historyFailure(action, cause)
-    const planned = planFixDone(runId, fix, agent)
+    const planned = planFixDone(runId, fix)
     const known = yield* stepIdFor(db, runId, "fix", fix.attempt).pipe(Effect.mapError(failed("read the fix step in")))
     const fixId = known ?? (yield* recordStep(db, planned.step).pipe(Effect.mapError(failed("record the fix step in"))))
     if (known !== null) {

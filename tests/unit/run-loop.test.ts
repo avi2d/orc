@@ -137,7 +137,7 @@ const runLoopCheckpoints = (db: Database, run: HistoryRun): RunCheckpoints => ({
   checksRoundDone: (round) => recordChecksDone(db, run.runId, round),
   fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer, started),
   fixSession: (attempt, file) => recordStepSession(db, run.runId, "fix", attempt, file),
-  fixDone: (fix) => recordFixDone(db, run.runId, fix, run.fixer),
+  fixDone: (fix) => recordFixDone(db, run.runId, fix),
   noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
   noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
   pullRequestStart: (started) => recordPullRequestStart(db, run.runId, started),
@@ -171,7 +171,7 @@ const seedRefusedPrior = async (db: Database, priorDir: string, project: string)
     started: "2026-10-19T09:22:00.000Z", ended: "2026-10-19T09:23:00.000Z",
     agentFile: fixer.path, sessionFile: fixSession, model: fixer.model, thinking: fixer.thinking, evidenceIn: join(priorDir, "checks-1.md"),
     commits: 1, tokens: { input: 10, output: 5 }
-  }, fixer))
+  }))
   await Effect.runPromise(recordStep(db, {
     runId: "prior-a", name: "no-mistakes", attempt: 1, status: "failed",
     started: "2026-10-19T09:24:00.000Z", agentFile: null, piSessionFile: null
@@ -304,7 +304,7 @@ describe("resumed runs publish inherited progress atomically", () => {
           started: "2026-10-19T10:01:00.000Z", ended: "2026-10-19T10:02:00.000Z",
           agentFile: current.path, sessionFile: null, model: current.model, thinking: current.thinking,
           evidenceIn: join(home, "checks-1.md"), commits: 1, tokens: null
-        }, current))
+        }))
         const steps = await Effect.runPromise(stepsForRun(db, "next-b"))
         expect(steps.find((step) => step.name === "fix")).toMatchObject({ agentFile: current.path, model: current.model, thinking: current.thinking })
       } finally {

@@ -333,7 +333,7 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       checksRoundDone: (round) => recordChecksDone(db, run.runId, round),
       fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer, started, attempt === 1 || attempt <= resume.inheritedFixes.length ? resume.fixSessionFile ?? undefined : undefined),
       fixSession: (attempt, file) => recordStepSession(db, run.runId, "fix", attempt, file),
-      fixDone: (fix) => recordFixDone(db, run.runId, fix, run.fixer),
+      fixDone: (fix) => recordFixDone(db, run.runId, fix),
       noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
       noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
       pullRequestStart: (started) => recordPullRequestStart(db, run.runId, started),
