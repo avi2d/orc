@@ -48,7 +48,7 @@ The Board groups tasks into Backlog, Planned, Awaiting you, Running, and Done.
 
 ![Board showing example garden tasks in five lanes](images/herdr-board.png)
 
-Backlog stays empty because the backlog has no priority field.
+Backlog stays empty.
 Held tasks, tasks with unanswered parked questions, tasks with an open attention item for you, and closed tasks with an open PR appear in Awaiting you.
 Taken and started tasks appear in Running.
 Other new tasks appear in Planned, and other closed tasks appear in Done.
