@@ -139,6 +139,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/seeing-runs/run-facts.ts` | The facts `orc runs --json` reads beside each run: its title, latest step and open questions |
 | `packages/run/src/features/seeing-runs/step-log.ts` | The `orc log` reading of one step's output file |
 | `packages/run/src/features/seeing-runs/run-scores.ts` | The `orc score` step score writes: the 1 to 5 check, the note and the unknown run and step errors |
+| `packages/run/src/features/seeing-runs/other-machines.ts` | The other dispatch machines' runs `orc runs --json` adds, and the `machines` it names for those that fail |
 
 ## entities/agent
 

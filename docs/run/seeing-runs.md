@@ -22,7 +22,7 @@ Its `task` is the backlog task id its `orc/<task-id>` or `orc/<task-id>-parent` 
 Its `machine` is the dispatch machine the beat claimed for the run, which reaches `orc run` as `ORC_RUN_MACHINE`.
 A run you start by hand on this machine without `ORC_RUN_MACHINE` shows `null`.
 A run from another machine names that machine when its own record names none.
-Showing other machines belongs to the Agents tab task.
+The Agents tab and orc-dash read with `--local`, so they show only this machine's runs.
 Its `worktree` is the checkout the run works in: the task copy for a ship run, the project checkout for a report run.
 Runs recorded before these facts show each as `null`.
 To see one run step by step, run `orc show <run-id>`.
