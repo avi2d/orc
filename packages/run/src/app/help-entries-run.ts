@@ -1,5 +1,5 @@
 import { askUserWord } from "../entities/review-gate/index"
-import { taskKinds } from "../entities/backlog/index"
+import { runKinds } from "../entities/backlog/index"
 import { runDeliveries } from "../shared/config/index"
 import { sandboxKinds } from "../shared/sandbox/index"
 import type { HelpEntry } from "./help-format"
@@ -7,11 +7,11 @@ import type { HelpEntry } from "./help-format"
 const choice = (values: ReadonlyArray<string>): string => "<" + values.join("|") + ">"
 
 export const runHelp: HelpEntry = {
-  usage: ["orc run [<task-file>] [--kind " + choice(taskKinds) + "] [--delivery " + choice(runDeliveries) + "] [--branch <name>] [--sandbox " + choice(sandboxKinds) + "] [--token-file <path>] [--provider <id>] [--instructions <path>] [--allow " + askUserWord + "] [--answer <id>=<text>]"],
+  usage: ["orc run [<task-file>] [--kind " + choice(runKinds) + "] [--delivery " + choice(runDeliveries) + "] [--branch <name>] [--sandbox " + choice(sandboxKinds) + "] [--token-file <path>] [--provider <id>] [--instructions <path>] [--allow " + askUserWord + "] [--answer <id>=<text>]"],
   summary: "Run one task file in this checkout and end in a PR or a report",
   about: "Runs the task in the clean checkout you are in: Pi writes the change, the checks run, and no-mistakes reviews it and opens the PR. Give --branch with no task file to resume a stopped run on that branch.",
   options: [
-    { flag: "--kind " + choice(taskKinds), meaning: "What the task ends in. ship ends in a PR, scout and task end in a report, and parent runs a parent's final check. Defaults to ship." },
+    { flag: "--kind " + choice(runKinds), meaning: "What the task ends in. ship ends in a PR, scout and task end in a report, and parent runs a parent's final check. Defaults to ship." },
     { flag: "--delivery " + choice(runDeliveries), meaning: "How a ship task reaches its PR. Defaults to no-mistakes, and direct-PR opens the PR with no review." },
     { flag: "--branch <name>", meaning: "The branch to commit to, or to resume. Defaults to orc/<run-id>." },
     { flag: "--sandbox " + choice(sandboxKinds), meaning: "Where the agent runs. Defaults to nono, and none runs it on the host as you." },

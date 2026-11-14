@@ -77,6 +77,9 @@ const parseAdd = (rest: ReadonlyArray<string>): DispatchArgs => {
     return { kind: "UsageError", detail: "orc backlog add takes one --machine" }
   }
   const [machine = null] = split.values["--machine"]
+  if (taskKind.taskKind === "decision" && (priority.priority !== null || machine !== null)) {
+    return { kind: "UsageError", detail: "orc backlog add takes no --priority or --machine for a decision, since a decision never runs" }
+  }
   const [parent = null, ...moreParents] = split.values["--parent"]
   if (moreParents.length > 0) {
     return { kind: "UsageError", detail: "orc backlog add takes one --parent" }

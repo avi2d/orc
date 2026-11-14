@@ -1,6 +1,6 @@
 import { type DispatchArgs, parseDispatchArgs } from "./dispatch-args"
 import { askUserWord, type QuestionAnswer } from "../entities/review-gate/index"
-import { isTaskKind, type TaskKind, unknownKind } from "../entities/backlog/index"
+import { isRunKind, type RunKind, unknownRunKind } from "../entities/backlog/index"
 import { isRunDelivery, type RunDelivery, runDeliveries } from "../shared/config/index"
 import { sandboxKinds, type SandboxKind } from "../shared/sandbox/index"
 export type OrcArgs =
@@ -12,7 +12,7 @@ export type OrcArgs =
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
   | { readonly kind: "ShowStepLog"; readonly runId: string; readonly stepId: number }
   | { readonly kind: "ScoreStep"; readonly runId: string; readonly step: string; readonly score: number; readonly note: string }
-  | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly taskKind: TaskKind; readonly delivery: RunDelivery; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly instructions: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
+  | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly taskKind: RunKind; readonly delivery: RunDelivery; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly instructions: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
   | { readonly kind: "Dispatch"; readonly args: Exclude<DispatchArgs, { readonly kind: "UsageError" }> }
   | { readonly kind: "Chat" }
   | { readonly kind: "InstallApp" }
@@ -62,7 +62,7 @@ const parseScoreArgs = (rest: readonly string[]): OrcArgs => {
 }
 
 type RunSplit =
-  | { readonly kind: "ok"; readonly taskKind: TaskKind; readonly delivery: RunDelivery; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly instructions: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer>; readonly kept: ReadonlyArray<string> }
+  | { readonly kind: "ok"; readonly taskKind: RunKind; readonly delivery: RunDelivery; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly instructions: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer>; readonly kept: ReadonlyArray<string> }
   | { readonly kind: "error"; readonly detail: string }
 type AnswerParse =
   | { readonly kind: "ok"; readonly value: QuestionAnswer }
@@ -120,7 +120,7 @@ const takeSandboxKind = (rest: readonly string[], index: number, taken: SandboxK
   return taken === undefined ? sandboxKinds.find((kind) => kind === name) ?? null : null
 }
 interface RunFlags {
-  taskKind: TaskKind | undefined
+  taskKind: RunKind | undefined
   delivery: RunDelivery | undefined
   branch: string | undefined
   sandbox: SandboxKind | undefined
@@ -145,8 +145,8 @@ const takeTaskKind = (rest: readonly string[], index: number, flags: RunFlags): 
   if (flags.taskKind !== undefined || word === "" || word.startsWith("--")) {
     return { kind: "error", detail: "orc run takes --kind once, with ship, scout, task or parent" }
   }
-  if (!isTaskKind(word)) {
-    return { kind: "error", detail: unknownKind(word) }
+  if (!isRunKind(word)) {
+    return { kind: "error", detail: unknownRunKind(word) }
   }
   flags.taskKind = word
   return { kind: "taken" }

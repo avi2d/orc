@@ -1,5 +1,5 @@
 import { Effect, FileSystem } from "effect"
-import { BacklogError, listTasks, childCount, dependencyWaits, isHeld, newGrab, parseTaskFile, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { BacklogError, listTasks, childCount, dependencyWaits, isHeld, newGrab, parseTaskFile, ranClosing, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
 import { mergedIds } from "../../entities/events/index"
 
 type Requirements = FileSystem.FileSystem
@@ -15,7 +15,8 @@ const parentIn = (tasks: ReadonlyArray<TaskRecord>, id: string): Effect.Effect<T
 }
 
 const shipState = (child: TaskRecord, merged: ReadonlySet<string>): string => {
-  const pr = child.spec.kind === "ship" && child.state.kind === "closed" && child.state.closing.outcome === "done" ? child.state.closing.pr : null
+  const ran = ranClosing(child)
+  const pr = child.spec.kind === "ship" && ran?.outcome === "done" ? ran.pr : null
   return pr === null ? "" : merged.has(child.spec.id) ? " merged" : " waits for its PR to merge"
 }
 

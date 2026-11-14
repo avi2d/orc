@@ -1,5 +1,5 @@
 import { DateTime, Effect, FileSystem } from "effect"
-import { findTask, type Rewrite, rewriteNew, type Hold, type HoldQuestion, type TaskFileError, type TaskRecord, BacklogError } from "../../entities/backlog/index"
+import { decisionRefusal, findTask, type Rewrite, rewriteNew, type Hold, type HoldQuestion, type TaskFileError, type TaskRecord, BacklogError } from "../../entities/backlog/index"
 
 export type HoldOutcome = { readonly kind: "held" | "already held"; readonly hold: Hold }
 
@@ -26,6 +26,10 @@ const holdAgain = (id: string, held: Hold, ask: HoldAsk): Effect.Effect<Rewrite<
 }
 
 const holdOn = (id: string, ask: HoldAsk, at: string) => (fresh: TaskRecord): Effect.Effect<Rewrite<HoldOutcome>, BacklogError> => {
+  const decision = decisionRefusal(fresh, "hold")
+  if (decision !== null) {
+    return Effect.fail(new BacklogError({ detail: decision }))
+  }
   if (fresh.state.kind !== "new") {
     return Effect.fail(new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a new task is held" }))
   }

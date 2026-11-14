@@ -53,7 +53,7 @@ describe("task files", () => {
   })
   test("a task file with an unknown kind is refused with the kinds it may take instead of read as ship", async () => {
     const result = await run(Effect.result(parseTaskFile("task-1.md", "new", frontmatter("kind: deploy\n"))))
-    expect(Result.isFailure(result) ? result.failure.detail : null).toBe("the kind deploy is not ship, scout, task or parent")
+    expect(Result.isFailure(result) ? result.failure.detail : null).toBe("the kind deploy is not ship, scout, task, parent or decision")
   })
   test("an internal ship task keeps its mark through a write and a read instead of reading as unmarked", async () => {
     const record: TaskRecord = { spec: { ...spec, id: "task-3", internal: true }, hold: null, parked: null, state: { kind: "new" } }

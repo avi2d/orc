@@ -1,7 +1,7 @@
 import { Array as Arr, Effect, FileSystem } from "effect"
 import type { AskOption, OpenQuestion } from "../review-gate/index"
 import { openReviewQuestions } from "../attention/index"
-import { findTask, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, platformFailure, publishOnce, takenGrab, type Hold, type HoldQuestion, isHeld, openQuestions, type Parked, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord, renderTaskFile } from "../backlog/index"
+import { answerDecision, findTask, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, platformFailure, publishOnce, takenGrab, type Hold, type HoldQuestion, isHeld, openQuestions, type Parked, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord, renderTaskFile } from "../backlog/index"
 
 // An answer handed to an asking that ended went into the run, so only one never handed out or handed to this asking still answers it.
 const answersAsking = (answer: ParkedAnswer, asking: string | null): boolean => answer.relayedTo === null || answer.relayedTo === asking
@@ -114,6 +114,7 @@ export const parkStartedTask = (
 
 export type AnswerOutcome =
   | { readonly kind: "hold"; readonly hold: Hold }
+  | { readonly kind: "decision" }
   | { readonly kind: "held question"; readonly question: string; readonly open: ReadonlyArray<HoldQuestion> }
   | { readonly kind: "question"; readonly question: string; readonly branch: string; readonly live: boolean; readonly open: ReadonlyArray<ParkedQuestion> }
 
@@ -237,6 +238,13 @@ export const answerTask = (
 ): Effect.Effect<AnswerOutcome, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const record = yield* findTask(root, id)
+    if (record.spec.kind === "decision") {
+      if (record.state.kind === "closed") {
+        return yield* new BacklogError({ detail: id + " is a decision already closed " + record.state.closing.outcome + ": " + record.state.closing.reason })
+      }
+      yield* answerDecision(root, id, words, at)
+      return { kind: "decision" } as const
+    }
     const decide = answerOn(id, words, at, expected)
     if (record.state.kind === "started" && openQuestions(record).length > 0) {
       return yield* rewriteTaken(root, id, decide)

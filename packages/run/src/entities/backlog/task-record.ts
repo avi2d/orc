@@ -98,9 +98,17 @@ export interface RanClosing {
 
 type Closing = { readonly outcome: "start-failed"; readonly reason: string } | RanClosing
 
+export const answeredReason = "answered"
+
+export interface AnsweredClosing {
+  readonly outcome: "done"
+  readonly reason: typeof answeredReason
+  readonly answer: Answer
+}
+
 type ClosedState = { readonly kind: "closed"; readonly closedAt: string; readonly postedAt: string | null } & (
   | { readonly claim: Claim; readonly closing: Closing }
-  | { readonly claim: null; readonly closing: { readonly outcome: "dropped"; readonly reason: string } }
+  | { readonly claim: null; readonly closing: { readonly outcome: "dropped"; readonly reason: string } | AnsweredClosing }
 )
 
 type TaskState =
@@ -127,7 +135,12 @@ export const openQuestions = (task: TaskRecord): ReadonlyArray<ParkedQuestion> =
   task.parked?.questions.filter((question) => question.answer === null) ?? []
 
 export const ranClosing = (task: TaskRecord): RanClosing | null =>
-  task.state.kind === "closed" && task.state.closing.outcome !== "start-failed" && task.state.closing.outcome !== "dropped" ? task.state.closing : null
+  task.state.kind === "closed" && task.state.claim !== null && task.state.closing.outcome !== "start-failed" ? task.state.closing : null
+
+export const decisionAnswer = (task: TaskRecord): Answer | null =>
+  task.state.kind === "closed" && task.state.claim === null && task.state.closing.outcome === "done" ? task.state.closing.answer : null
+
+export const decisionWait = "decision for the captain"
 
 export const taskPr = (task: TaskRecord): string | null => ranClosing(task)?.pr ?? null
 
@@ -304,6 +317,26 @@ const holdOf = (front: Frontmatter): Hold | null | string => {
   return { reason: front.hold_reason, until: front.hold_until ?? null, questions, answer, at: front.held_at ?? null, ...(front.hold_history === undefined ? {} : { history: front.hold_history }) }
 }
 
+const answeredOf = (front: Frontmatter): ClosedState | string => {
+  const answer = answerOf(front)
+  if (answer === null || typeof answer === "string" || front.reason !== answeredReason || front.closed_at === undefined) {
+    return "a closed decision names no answer, answer time or close time"
+  }
+  return { kind: "closed", claim: null, closing: { outcome: "done", reason: answeredReason, answer }, closedAt: front.closed_at, postedAt: front.posted_at ?? null }
+}
+
+const decisionStateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => {
+  if (folder === "taken") {
+    return "a decision is never taken, since no run answers it"
+  }
+  return folder === "closed" && front.outcome === "done" ? answeredOf(front) : stateOf(folder, front)
+}
+
+const decisionHoldOf = (front: Frontmatter): null | string =>
+  front.hold_reason === undefined && front.hold_until === undefined && front.held_at === undefined && front.hold_questions === undefined && front.hold_history === undefined
+    ? null
+    : "a decision carries no hold"
+
 const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => {
   if (folder === "new") {
     return { kind: "new" }
@@ -360,11 +393,11 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
     if (front.id !== stem) {
       return yield* new TaskFileError({ file, detail: "the frontmatter id " + front.id + " is not the file " + (stem ?? file) })
     }
-    const state = stateOf(folder, front)
+    const state = kind === "decision" ? decisionStateOf(folder, front) : stateOf(folder, front)
     if (typeof state === "string") {
       return yield* new TaskFileError({ file, detail: state })
     }
-    const hold = holdOf(front)
+    const hold = kind === "decision" ? decisionHoldOf(front) : holdOf(front)
     if (typeof hold === "string") {
       return yield* new TaskFileError({ file, detail: hold })
     }

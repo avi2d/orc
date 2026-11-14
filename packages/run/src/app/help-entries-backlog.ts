@@ -17,7 +17,7 @@ export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
     summary: "Add a task to the backlog",
     about: "Adds a task for a project that projects.json names, and prints its new id, such as orc-9. Give - as the task file to read the task from standard input.",
     options: [
-      { flag: "--kind <" + taskKinds.join("|") + ">", meaning: "What the task ends in. Defaults to ship, or to the kind the task file names." },
+      { flag: "--kind <" + taskKinds.join("|") + ">", meaning: "What the task ends in. Defaults to ship, or to the kind the task file names. A decision is a question for the captain that never runs and takes no --priority or --machine." },
       { flag: "--internal", meaning: "Mark a ship task internal-only, which a no-mistakes-prod-only project ships as direct-PR." },
       { flag: "--machine <name>", meaning: "Run the task on this machine only." },
       { flag: "--parent <task-id>", meaning: "Add the task as a child of a new parent task." },
@@ -43,7 +43,7 @@ export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
   close: {
     usage: ["orc backlog close <task-id> <done|failed> [<reason>]"],
     summary: "Close a task by hand as done or failed",
-    about: "Closes a started task as done or failed, with an optional reason, for a machine whose start command orc does not run.",
+    about: "Closes a started task as done or failed, with an optional reason, for a machine whose start command orc does not run. On a decision, failed drops it, and done is refused, since only orc backlog answer closes a decision done.",
     options: [],
     examples: ["orc backlog close orc-9 failed \"the machine was rebuilt\""]
   },
@@ -81,8 +81,8 @@ export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
   },
   answer: {
     usage: ["orc backlog answer <task-id> [--expect <held|parked>] [--generation <n>] <words|question-id=text>"],
-    summary: "Answer a held or parked task",
-    about: "Answers a held task, a parked run's question or a run waiting at its gate. Give question-id=text to answer one open question, or plain words to answer the hold.",
+    summary: "Answer a held, parked or decision task",
+    about: "Answers a held task, a parked run's question, a run waiting at its gate or a decision. Give question-id=text to answer one open question, or plain words to answer the hold. Answering a decision closes it done, and its question and answer go into the run of each task that depends on it.",
     options: [
       { flag: "--expect <held|parked>", meaning: "Answer only when the task waits in this decision, so a stale answer is refused." },
       { flag: "--generation <n>", meaning: "The hold generation the answer is for. Needed with --expect held." }

@@ -34,7 +34,7 @@ type DispatchTaskState =
   | { readonly kind: "taken"; readonly claim: DispatchClaim | null }
   | { readonly kind: "started"; readonly claim: DispatchClaim; readonly started: DispatchStarted }
   | { readonly kind: "closed"; readonly claim: DispatchClaim; readonly closing: DispatchClosing; readonly closedAt: string }
-  | { readonly kind: "closed"; readonly claim: null; readonly closing: { readonly outcome: "dropped"; readonly reason: string }; readonly closedAt: string };
+  | { readonly kind: "closed"; readonly claim: null; readonly closing: { readonly outcome: "dropped" | "answered"; readonly reason: string }; readonly closedAt: string };
 
 export interface DispatchTask {
   readonly id: string;
@@ -69,6 +69,7 @@ const TaskFields = Schema.Struct({
   machine: Schema.NullOr(Schema.String),
   depends_on: Schema.Array(Schema.String),
   created: Schema.String,
+  kind: Schema.optional(Schema.Literals(["ship", "scout", "task", "parent", "decision"])),
   beat: Schema.optional(Schema.String),
   taken_for: Schema.optional(Schema.String),
   account: Schema.optional(Schema.String),
@@ -153,10 +154,11 @@ const stateOf = (folder: TaskFolder, file: string, front: TaskFields): DispatchT
     if (started === null) return { kind: "taken", claim };
     return claim === null ? file + ": a started task names no claim" : { kind: "started", claim, started };
   }
-  if (front.outcome === "dropped") {
+  const unclaimed = front.outcome === "dropped" ? "dropped" : front.kind === "decision" && front.outcome === "done" ? "answered" : null;
+  if (unclaimed !== null) {
     return front.closed_at === undefined
-      ? file + ": a dropped task names no close time"
-      : { kind: "closed", claim: null, closing: { outcome: "dropped", reason: front.reason ?? "" }, closedAt: front.closed_at };
+      ? file + ": a " + unclaimed + " task names no close time"
+      : { kind: "closed", claim: null, closing: { outcome: unclaimed, reason: front.reason ?? "" }, closedAt: front.closed_at };
   }
   const closing = closingOf(front, started);
   if (claim === null || closing === null || front.closed_at === undefined) {
