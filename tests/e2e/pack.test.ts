@@ -203,6 +203,7 @@ const expectedFiles = [
   "src/features/decider/index.ts",
   "src/features/merging-a-pr/index.ts",
   "src/features/seeing-runs/index.ts",
+  "src/features/seeing-runs/other-machines.ts",
   "src/features/task-thread/index.ts",
   "src/features/task-thread/note.ts",
   "src/features/task-thread/thread.ts"
