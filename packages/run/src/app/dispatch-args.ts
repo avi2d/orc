@@ -1,5 +1,7 @@
 import { isTaskId, isCalendarDate, isTaskKind, type TaskKind, unknownKind } from "../entities/backlog/index"
-import { orList, parseJsonFlag, parseRunner, unexpected, type DispatchArgs as RunnerArgs } from "./dispatch-args-runner"
+import { parseJsonFlag, parseRunner, unexpected, type DispatchArgs as RunnerArgs } from "./dispatch-args-runner"
+import { parseHeavy } from "./dispatch-args-heavy"
+export type { HeavyWord } from "./dispatch-args-heavy"
 import type { DropTask, EditTask, TaskSource } from "../features/backlog-planning/index"
 import type { RecordOrigin } from "../widgets/beat/index"
 
@@ -341,21 +343,6 @@ const parseMerge = (rest: ReadonlyArray<string>): DispatchArgs => {
     return { kind: "UsageError", detail: "orc merge takes --basis once, with " + mergeBases.join(" or ") }
   }
   return extra.length === 0 ? { kind: "MergeTask", id, basis } : unexpected(extra[0])
-}
-
-const heavySubcommands = {
-  path: (extra: ReadonlyArray<string>): DispatchArgs => (extra.length === 0 ? { kind: "HeavyPath" } : unexpected(extra[0])),
-  check: (extra: ReadonlyArray<string>): DispatchArgs => parseJsonFlag(extra, (json) => ({ kind: "HeavyCheck", json })),
-  watch: (extra: ReadonlyArray<string>): DispatchArgs => (extra.length === 0 ? { kind: "HeavyWatch" } : unexpected(extra[0])),
-  "watch-once": (extra: ReadonlyArray<string>): DispatchArgs => (extra.length === 0 ? { kind: "HeavyWatchOnce" } : unexpected(extra[0]))
-} satisfies Record<string, (rest: ReadonlyArray<string>) => DispatchArgs>
-
-export type HeavyWord = keyof typeof heavySubcommands
-const isHeavyWord = (word: string): word is HeavyWord => Object.hasOwn(heavySubcommands, word)
-
-const parseHeavy = (rest: ReadonlyArray<string>): DispatchArgs => {
-  const [verb = "", ...extra] = rest
-  return isHeavyWord(verb) ? heavySubcommands[verb](extra) : { kind: "UsageError", detail: "orc heavy takes " + orList(Object.keys(heavySubcommands)) + ", got \"" + verb + "\"" }
 }
 
 const attentionSubcommands = {
