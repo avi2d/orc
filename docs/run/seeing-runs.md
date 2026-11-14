@@ -9,11 +9,20 @@ To print the same facts as JSON, run `orc runs --json`.
 Every JSON document names its version first as `schema`, starting at `orc.runs.v1`.
 Each run in it also gives `title`, the first line of its task file, and `endReason`, the reason it ended.
 Its `step` is the step running now, else the step that started last, as an id, name, attempt and status, and `null` before the first step.
+Its `state` is `waiting` while a running run's folder holds `asking.json`, else `running`, `succeeded` or `failed` from its status, and a stopped run reads `failed`.
+Its `currentStep` gives the name and attempt of the step running now, and `null` when no step runs or the run has ended.
 Its `questions` counts the questions a running run waits on you to answer, and is 0 otherwise.
+Its `task` is the backlog task id its `orc/<task-id>` or `orc/<task-id>-parent` branch names, and `null` on any other branch.
+Its `machine` is the dispatch machine the beat claimed for the run, which reaches `orc run` as `ORC_RUN_MACHINE`.
+A run you start by hand without `ORC_RUN_MACHINE` shows `null`.
+Its `worktree` is the checkout the run works in: the task copy for a ship run, the project checkout for a report run.
+Runs recorded before these facts show each as `null`.
 To see one run step by step, run `orc show <run-id>`.
 It lists each step with its agent, session, signals, latest score and evidence, every file as a full link.
 To print the same facts as JSON, run `orc show <run-id> --json`.
 Its JSON document names its version first as `schema`, starting at `orc.show.v1`.
+Its `run` gives the same `task`, `machine` and `worktree` as `orc runs --json`.
+Each step gives the `model` and `thinking` level its agent ran with, and `null` for a step no agent ran.
 To print one step's output, run `orc log <run-id> <step-id>` with the step's `id` from that JSON.
 An implement step prints `agent.log` and a fix step its `fix-<attempt>.log`, which Pi appends to as it works.
 A checks or no-mistakes step prints the file it wrote.

@@ -14,7 +14,7 @@ import {
   recordSignal,
   recordStep
 } from "../../packages/run/src/entities/run-history/index"
-import { decodeRunsJson, decodeShowJson, encodeRunsJson, encodeShowJson, formatShow, InvalidScore, readListedRuns, readShow, recordStepScore, UnknownRun, UnknownStep } from "../../packages/run/src/features/seeing-runs/index"
+import { decodeRunsJson, decodeShowJson, encodeRunsJson, encodeShowJson, formatShow, InvalidScore, readListedRuns, readRunsJsonRuns, readShow, recordStepScore, UnknownRun, UnknownStep } from "../../packages/run/src/features/seeing-runs/index"
 
 const withHome = async (use: (home: string) => Promise<void>): Promise<void> => {
   const home = await mkdtemp(join(tmpdir(), "orc-show-"))
@@ -98,6 +98,45 @@ describe("readShow", () => {
           "file:///tmp/show-home/runs/show-1/implement-1.md"
         ])
         expect(document?.steps[1]?.score).toBeNull()
+      } finally {
+        db.close()
+      }
+    })
+  })
+})
+
+describe("readShow run and step facts", () => {
+  test("orc show JSON carries the run's task, machine and worktree and each step's model and thinking instead of leaving them out", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await Effect.runPromise(recordRun(db, {
+          id: "facts-1", project: "orc", branch: "orc/orc-36", taskFile: "/tmp/facts/task.md", status: "running", started: "2026-10-18T10:00:00.000Z",
+          task: "orc-36", machine: "linux", worktree: "/work/orc-36"
+        }))
+        await Effect.runPromise(recordStep(db, { runId: "facts-1", name: "implement", attempt: 1, status: "passed", started: "2026-10-18T10:00:00.000Z", model: "acme/coder", thinking: "high" }))
+        await Effect.runPromise(recordStep(db, { runId: "facts-1", name: "checks", attempt: 1, status: "passed", started: "2026-10-18T10:01:00.000Z" }))
+        const document = await Effect.runPromise(readShow(db, "facts-1"))
+        if (document === null) {
+          throw new Error("missing fixture")
+        }
+        const decoded = await Effect.runPromise(decodeShowJson(JSON.parse(await Effect.runPromise(encodeShowJson(document)))))
+        expect(decoded.run).toMatchObject({ task: "orc-36", machine: "linux", worktree: "/work/orc-36" })
+        expect(decoded.steps.map((step) => [step.name, step.model, step.thinking])).toEqual([["implement", "acme/coder", "high"], ["checks", null, null]])
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a run recorded without facts shows null task, machine and worktree instead of omitting the keys", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await fixture(db)
+        const document = await Effect.runPromise(readShow(db, "show-1"))
+        expect(document?.run).toMatchObject({ task: null, machine: null, worktree: null })
+        expect(document?.steps[0]).toMatchObject({ model: null, thinking: null })
       } finally {
         db.close()
       }
@@ -280,7 +319,7 @@ describe("show JSON", () => {
       const db = await openDb(home)
       try {
         await fixture(db)
-        const runs = await Effect.runPromise(listRuns(db).pipe(Effect.flatMap((listed) => readListedRuns(db, listed)), Effect.provide(BunServices.layer)))
+        const runs = await Effect.runPromise(listRuns(db).pipe(Effect.flatMap((listed) => readListedRuns(db, listed)), Effect.flatMap((listed) => readRunsJsonRuns(listed, (runId) => join(home, "runs", runId))), Effect.provide(BunServices.layer)))
         const text = await Effect.runPromise(encodeRunsJson(runs))
         expect(text.startsWith('{"schema":"orc.runs.v1"')).toBe(true)
         const decoded = await Effect.runPromise(decodeRunsJson(JSON.parse(text)))

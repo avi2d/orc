@@ -30,7 +30,7 @@ const beatStarts = async (fixture: Fixture, start: ReadonlyArray<string>, kind: 
 
 const pueueAddFor = (home: string, checkout: string): ReadonlyArray<string> => [
   "--group", "orc", "--label", home + " orc-1", "--working-directory", checkout, "--print-task-id", "--escape", "--",
-  process.execPath, binPath, "run", join(home, "runner", "orc-1.md"), "--branch", "orc/orc-1",
+  "env", "ORC_RUN_MACHINE=linux", process.execPath, binPath, "run", join(home, "runner", "orc-1.md"), "--branch", "orc/orc-1",
   "--sandbox", "none", "--provider", "acme", "--token-file", mainToken
 ]
 
@@ -101,7 +101,7 @@ describe("orc runner start", () => {
       const label = fixture.home + " orc-1"
       expect(added).toEqual([
         "--group", "orc", "--label", label, "--working-directory", fixture.checkout, "--print-task-id", "--escape", "--",
-        process.execPath, binPath, "run", join(far, "runner", "label-" + encodeURIComponent(label) + ".md"), "--branch", "orc/orc-1",
+        "env", "ORC_RUN_MACHINE=linux", process.execPath, binPath, "run", join(far, "runner", "label-" + encodeURIComponent(label) + ".md"), "--branch", "orc/orc-1",
         "--sandbox", "none", "--provider", "acme", "--token-file", mainToken
       ])
       expect(await queuedEnv(fixture)).toBe(far)

@@ -135,8 +135,8 @@ describe("orc runs", () => {
       expect(document.schema).toBe("orc.runs.v1")
       expect(document.runs).toHaveLength(1)
       const printed = Schema.decodeUnknownSync(Schema.Struct({ runs: Schema.Array(Schema.Record(Schema.String, Schema.Unknown)) }))(JSON.parse(result.stdout))
-      expect(Object.keys(printed.runs[0] ?? {}).sort()).toEqual(["branch", "delivery", "endReason", "id", "kind", "prLink", "project", "questions", "status", "step", "title"])
-      expect(document.runs[0]).toMatchObject({ id: "run-1", project: "orc", branch: "orc/x", status: "running" })
+      expect(Object.keys(printed.runs[0] ?? {}).sort()).toEqual(["branch", "currentStep", "delivery", "endReason", "id", "kind", "machine", "prLink", "project", "questions", "state", "status", "step", "task", "title", "worktree"])
+      expect(printed.runs[0]).toMatchObject({ id: "run-1", project: "orc", branch: "orc/x", status: "running", state: "running", currentStep: null })
     })
   })
 
