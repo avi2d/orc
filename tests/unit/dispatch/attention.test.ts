@@ -22,14 +22,14 @@ const question = (id: string, text: string, askedAt: string, answer: { words: st
 })
 
 const parkedTask = (id: string, first: ParkedQuestion, rest: ReadonlyArray<ParkedQuestion>, state: TaskRecord["state"]): TaskRecord => ({
-  spec: { id, title: id, project: "orc", kind: "ship", internal: false, machine: null, parent: null, split: null, dependsOn: [], created: "2026-11-02T10:00:00.000Z", body: id },
+  spec: { id, title: id, project: "orc", kind: "ship", internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: null, created: "2026-11-02T10:00:00.000Z", body: id },
   hold: null,
   parked: { branch: "orc/" + id, questions: Arr.make(first, ...rest) },
   state
 })
 
 const closedTask = (id: string): TaskRecord => ({
-  spec: { id, title: id, project: "orc", kind: "ship", internal: false, machine: null, parent: null, split: null, dependsOn: [], created: "2026-11-02T10:00:00.000Z", body: id },
+  spec: { id, title: id, project: "orc", kind: "ship", internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: null, created: "2026-11-02T10:00:00.000Z", body: id },
   hold: null,
   parked: null,
   state: {

@@ -219,6 +219,17 @@ A parent task also waits for every scout and task child closed done and every sh
 3. Its project has a checkout on a machine with a free slot.
 4. An account has room above 0% and at or above the floor, and the runs take the account with the most room.
 
+Each beat considers the new tasks in priority order, so when slots run short the first in that order start.
+A task with priority 0 goes first and one with priority 4 goes after the other priorities.
+A task with no priority goes last, but a priority never keeps a task back: a task with none still starts when there is room.
+Among tasks of the same priority the oldest by `created` goes first, and of two created at the same time the lower id goes first.
+To give a new task a priority, add `--priority <0-4>` to `orc backlog add`.
+To change it later, run `orc backlog priority <task-id> <0-4>`, or `orc backlog priority <task-id> none` to clear it.
+Orc refuses a task that is taken, started or closed, and it leaves a held or parked task's hold and questions as they were.
+The task file keeps the priority as `priority`, and a file with no `priority` key has no priority.
+When a task is split, at intake or by its run, each child takes the priority of the task it came from.
+`orc backlog` shows a priority as `P<n>` beside the task id, as in `orc-9 P0 orc`, and `orc backlog --json` gives every task a `priority`, either a number from 0 to 4 or `null`.
+
 To keep a new task back for a decision of yours, run `orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>]`.
 The task file keeps the time you placed the hold as `held_at`.
 A hold written before orc recorded that time has no `held_at`, and orc reads its time as `null`.

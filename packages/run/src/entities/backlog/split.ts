@@ -92,7 +92,7 @@ export const readPlanDocument = (text: string): Result.Result<PlanDocument, stri
   return wait === null ? Result.succeed(decoded.success) : Result.fail("printed a split where " + wait)
 }
 
-export type SplitRequest = Pick<TaskSpec, "title" | "project" | "internal" | "machine" | "dependsOn" | "created" | "body">
+export type SplitRequest = Pick<TaskSpec, "title" | "project" | "internal" | "machine" | "dependsOn" | "priority" | "created" | "body">
 
 export interface AppliedSplit {
   readonly parent: TaskRecord
@@ -178,7 +178,7 @@ export const applyRunSplit = (
   created: string
 ): Effect.Effect<AppliedSplit, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const { title, project, internal, machine, dependsOn, body, parent } = task.spec
+    const { title, project, internal, machine, dependsOn, priority, body, parent } = task.spec
     if (parent !== null) {
       const grandparent = yield* findTask(root, parent)
       yield* rewriteNew(root, grandparent.spec.id, (fresh) =>
@@ -187,7 +187,7 @@ export const applyRunSplit = (
           record: { ...fresh, spec: { ...fresh.spec, body: childSplitDone(fresh.spec.body, task.spec.id, plan.done) } },
           result: undefined
         } satisfies Rewrite<void>))
-      const siblings = yield* addChildren(root, { title, project, internal, machine, dependsOn, created, body }, grandparent, plan)
+      const siblings = yield* addChildren(root, { title, project, internal, machine, dependsOn, priority, created, body }, grandparent, plan)
       // A proposer closed done with no PR frees its dependents, so they must wait on the slices before it closes.
       yield* handOverDependents(root, task.spec.id, siblings.children.map((child) => child.spec.id))
       const closed = yield* closeStartedTask(
@@ -208,7 +208,7 @@ export const applyRunSplit = (
       split: { by: "run", reason: plan.reason.trim() },
       body: parentBody(spec, plan.done)
     }))
-    return yield* addChildren(root, { title, project, internal, machine, dependsOn, created, body }, reopened, plan)
+    return yield* addChildren(root, { title, project, internal, machine, dependsOn, priority, created, body }, reopened, plan)
   })
 
 export const splitEventText = (applied: AppliedSplit, by: SplitSource, reason: string): string =>

@@ -12,6 +12,11 @@ export interface SplitMark {
   readonly reason: string
 }
 
+export const taskPriorities = [0, 1, 2, 3, 4] as const
+export type TaskPriority = typeof taskPriorities[number]
+
+export const isTaskPriority = (value: number): value is TaskPriority => taskPriorities.some((priority) => priority === value)
+
 export interface TaskSpec {
   readonly id: string
   readonly title: string
@@ -22,6 +27,7 @@ export interface TaskSpec {
   readonly parent: string | null
   readonly split: SplitMark | null
   readonly dependsOn: ReadonlyArray<string>
+  readonly priority: TaskPriority | null
   readonly created: string
   readonly body: string
 }
@@ -161,6 +167,7 @@ const Frontmatter = Schema.Struct({
   parent: Schema.optional(Schema.String),
   split: Schema.optional(Schema.Struct({ by: Schema.Literals(splitSources), reason: Schema.String })),
   depends_on: Schema.Array(Schema.String),
+  priority: Schema.optional(Schema.Literals(taskPriorities)),
   created: Schema.String,
   hold_reason: Schema.optional(Schema.String),
   hold_until: Schema.optional(Schema.String),
@@ -358,6 +365,7 @@ export const parseTaskFile = (file: string, folder: TaskFolder, text: string): E
         parent: front.parent ?? null,
         split: front.split ?? null,
         dependsOn: front.depends_on,
+        priority: front.priority ?? null,
         created: front.created,
         body: parts.body
       },

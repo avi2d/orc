@@ -1,6 +1,6 @@
 import { deliveryFor, type RunDelivery } from "../../shared/config/index"
 import { checkoutOn, type DispatchConfig, type Machine, modeOf, type Project } from "../../shared/config/index"
-import { answerWait, type DeciderOwns, type TaskRecord, childCount, dependencyWaits } from "../../entities/backlog/index"
+import { answerWait, type DeciderOwns, type TaskRecord, childCount, dependencyWaits, taskPriorities } from "../../entities/backlog/index"
 
 export interface MachineRoom {
   readonly machine: string
@@ -16,6 +16,13 @@ export const readRoom = (machines: ReadonlyArray<Machine>, tasks: ReadonlyArray<
       (task.state.kind === "taken" || task.state.kind === "started") && task.state.claim?.machine === machine.name
     ).length
   }))
+
+const priorityRank = (task: TaskRecord): number => task.spec.priority ?? taskPriorities.length
+
+export const startOrder = (left: TaskRecord, right: TaskRecord): number =>
+  priorityRank(left) - priorityRank(right) ||
+  left.spec.created.localeCompare(right.spec.created) ||
+  left.spec.id.localeCompare(right.spec.id, "en", { numeric: true })
 
 const freeRoom = (room: MachineRoom): number => Math.max(0, room.slots - room.busy)
 

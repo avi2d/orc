@@ -18,7 +18,7 @@ import { quietSources } from "../../lib/beat-sources"
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
 
-const spec = { title: "Ship task splitting", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], created: "2026-11-11T10:00:00.000Z", body: "# Ship task splitting\n" }
+const spec = { title: "Ship task splitting", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: null, created: "2026-11-11T10:00:00.000Z", body: "# Ship task splitting\n" }
 const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-11-11T10:01:00.000Z" }
 const started = { at: "2026-11-11T10:02:00.000Z", log: "/logs/orc-1.log" }
 const quota = { provider: "keyed", command: ["orc-quota"], accounts: [{ name: "main", kind: "token-file", tokenFile: "/secrets/main-token" }], floorPercent: 15 } as const
@@ -92,8 +92,8 @@ const beatAfterChildSplit = async (body: (root: string, lines: ReadonlyArray<str
   try {
     await writeFile(join(root, "dispatch.json"), JSON.stringify({ machines: [{ name: "mac", slots: 4, start: ["sh", "-c", "true", "runner", "start"] }], quota }))
     await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: "/checkout" } }] }))
-    const grandparent = { title: "Big feature", project: "orc", kind: "parent" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], created: "2026-11-11T10:00:00.000Z", body: "# Big feature\n" }
-    const child = { title: "Second slice", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: "orc-1", split: null, dependsOn: [], created: "2026-11-11T10:00:00.000Z", body: "# Second slice\n" }
+    const grandparent = { title: "Big feature", project: "orc", kind: "parent" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: null, created: "2026-11-11T10:00:00.000Z", body: "# Big feature\n" }
+    const child = { title: "Second slice", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: "orc-1", split: null, dependsOn: [], priority: null, created: "2026-11-11T10:00:00.000Z", body: "# Second slice\n" }
     await run(addTask(root, grandparent))
     await run(addTask(root, child))
     await run(addTask(root, { ...child, title: "Third slice", body: "# Third slice\n", dependsOn: ["orc-2"] }))

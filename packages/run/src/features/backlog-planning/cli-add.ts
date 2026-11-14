@@ -1,5 +1,5 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
-import { type TaskKind, addTask, backlogPaths, backlogRoot, BacklogError, listTasks, applySplit, splitEventText, type SplitRequest, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { type TaskKind, type TaskPriority, addTask, backlogPaths, backlogRoot, BacklogError, listTasks, applySplit, splitEventText, type SplitRequest, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
 import { refusedLinks } from "./backlog-depend"
 import { checkoutOn, readDispatchConfig, readProjects, type ConfigError, readFailure } from "../../shared/config/index"
 import { recordEvent } from "../../entities/events/index"
@@ -18,6 +18,7 @@ export type AddTask = {
   readonly machine: string | null
   readonly parent: string | null
   readonly dependsOn: ReadonlyArray<string>
+  readonly priority: TaskPriority | null
 }
 
 export interface AddPlace {
@@ -59,6 +60,7 @@ const addedLine = (record: TaskRecord): string =>
   "added " + record.spec.id + " for " + record.spec.project + (record.spec.machine === null ? "" : " on " + record.spec.machine) +
   (record.spec.kind === "ship" ? "" : " as a " + record.spec.kind) + (record.spec.internal ? " marked internal" : "") +
   (record.spec.parent === null ? "" : " as a child of " + record.spec.parent) +
+  (record.spec.priority === null ? "" : " at P" + record.spec.priority) +
   (record.spec.split === null ? "" : ", split at " + record.spec.split.by + ": " + record.spec.split.reason)
 
 const planNote = (plan: IntakePlan): string => {
@@ -100,7 +102,7 @@ export const add = (
       return yield* refuse(from + " holds no text")
     }
     const created = DateTime.formatIso(yield* DateTime.now)
-    const request: SplitRequest = { title, project: project.name, internal: args.internal, machine: args.machine, dependsOn: args.dependsOn, created, body }
+    const request: SplitRequest = { title, project: project.name, internal: args.internal, machine: args.machine, dependsOn: args.dependsOn, priority: args.priority, created, body }
     const plan = args.taskKind === "ship" && args.parent === null ? yield* planIntake(place.home, body) : { kind: "off" } satisfies IntakePlan
     if (plan.kind === "planned" && plan.plan.plan === "split") {
       const applied = yield* applySplit(root, request, plan.plan, "intake")
