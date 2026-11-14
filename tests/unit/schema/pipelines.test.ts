@@ -27,7 +27,7 @@ const recorded = (asked: Array<Command>) => (command: Command): Effect.Effect<st
   if (line.startsWith("no-mistakes axi status --run ")) return Effect.succeed(fixture("no-mistakes/run.txt"));
   if (line === "no-mistakes axi status" && command.cwd === fastStart) return Effect.succeed(fixture("no-mistakes/run.txt"));
   if (line === "no-mistakes axi status") return Effect.succeed(fixture("no-mistakes/overview.txt"));
-  if (line === "orc runs --json") return Effect.succeed(fixture("orc/runs.json"));
+  if (line === "orc runs --json --local") return Effect.succeed(fixture("orc/runs.json"));
   if (line.startsWith("orc show ")) return Effect.succeed(fixture("orc/show.json"));
   return Effect.fail(new CommandUnreachable({ reason: `unexpected ${line}` }));
 };
@@ -106,7 +106,7 @@ describe("orc reads the folders its open runs work in", () => {
   test("orc runs lists in each folder, and the branch newest run reads in detail", async () => {
     const { reading, asked } = await readOrc([{ folder: harbor, branches: ["fm/orc-step-7"] }]);
     expect(asked.map((command) => [command.argv.join(" "), command.cwd])).toEqual([
-      ["orc runs --json", harbor],
+      ["orc runs --json --local", harbor],
       ["orc show 20261024-091523-7f3a9c --json", harbor],
     ]);
     expect(valueOf(reading).runs.map((run) => run.id)).toEqual(["20261024-091523-7f3a9c", "20261023-141007-2b8e51"]);
@@ -118,7 +118,7 @@ describe("orc reads the folders its open runs work in", () => {
 
   test("a branch the listing never names reads no detail", async () => {
     const { reading, asked } = await readOrc([{ folder: harbor, branches: ["fm/never-recorded"] }]);
-    expect(asked.map((command) => [command.argv.join(" "), command.cwd])).toEqual([["orc runs --json", harbor]]);
+    expect(asked.map((command) => [command.argv.join(" "), command.cwd])).toEqual([["orc runs --json --local", harbor]]);
     expect(valueOf(reading).runs.map((run) => run.stages.length)).toEqual([0, 0]);
   });
 
@@ -191,7 +191,7 @@ describe("pipelines ride the other machine's tasks route", () => {
   test("the other machine's orc runs list in its folder over ssh", async () => {
     const { reading, asked } = await readRemoteOrc([{ folder: kelp, branches: [] }]);
     expect(asked.map((command) => command.argv)).toEqual([
-      ["sh", "-c", String.raw`ssh -o BatchMode=yes south.example.com 'cd '\''/home/south/work/kelp'\'' && orc runs --json'`],
+      ["sh", "-c", String.raw`ssh -o BatchMode=yes south.example.com 'cd '\''/home/south/work/kelp'\'' && orc runs --json --local'`],
     ]);
     expect(valueOf(reading).runs.map((run) => run.id)).toEqual(["20261024-091523-7f3a9c", "20261023-141007-2b8e51"]);
   });
@@ -199,7 +199,7 @@ describe("pipelines ride the other machine's tasks route", () => {
   test("the other machine's orc run detail reads by the listing's id over ssh", async () => {
     const { reading, asked } = await readRemoteOrc([{ folder: kelp, branches: ["fm/orc-step-7"] }]);
     expect(asked.map((command) => command.argv)).toEqual([
-      ["sh", "-c", String.raw`ssh -o BatchMode=yes south.example.com 'cd '\''/home/south/work/kelp'\'' && orc runs --json'`],
+      ["sh", "-c", String.raw`ssh -o BatchMode=yes south.example.com 'cd '\''/home/south/work/kelp'\'' && orc runs --json --local'`],
       ["sh", "-c", String.raw`ssh -o BatchMode=yes south.example.com 'cd '\''/home/south/work/kelp'\'' && orc show '\''20261024-091523-7f3a9c'\'' --json'`],
     ]);
     expect(valueOf(reading).runs.find((run) => run.id === "20261024-091523-7f3a9c")?.stages.map((stage) => stage.name)).toEqual([

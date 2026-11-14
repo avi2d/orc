@@ -35,7 +35,7 @@ A panel whose tool is missing says so on its own line, and the rest of the scree
 | `herdr` 0.9.5 | Live agent sessions named by pane, from `herdr agent list` | Sessions show from their processes and logs with no pane names, and only a `herdr` that is installed but does not answer warns |
 | `pueue` 4.0.4 | The queues panel's jobs, from `pueue status --json` | The queues panel reads pueue unreachable |
 | `no-mistakes` | The stages of a `full review fix` task, from `no-mistakes axi status` | Those tasks show no stages, and the projects box says `no-mistakes` is not installed |
-| `orc` | The stages of an `orc run` task, from `orc runs --json` and `orc show <run> --json`, and the attention queue, from `orc attention --json` | Those tasks show no stages, the projects box says `orc` is not installed, and the attention panel says so too |
+| `orc` | The stages of an `orc run` task, from `orc runs --json --local` and `orc show <run> --json`, and the attention queue, from `orc attention --json` | Those tasks show no stages, the projects box says `orc` is not installed, and the attention panel says so too |
 | `gh`, signed in to an account that can read the repository | The GitHub Actions runs the queues panel lists, from `gh run list`, and the runner repositories the dashboard reads through `gh api` | The actions panel reads gh unreachable |
 
 A tasks report, a second machine and saved quota profiles each come from a shell command you set, and stay off until you set it.
@@ -445,7 +445,7 @@ The row of such a task gains a pipe column with a mark for each stage.
 | A dash | Skipped |
 
 A full review fix reads its stages from `no-mistakes axi status` in the task's folders, by the task's branches.
-An orc run lists them with `orc runs --json` in its folders, and reads the run newest on its branches with `orc show <run> --json`.
+An orc run lists them with `orc runs --json --local` in its folders, and reads the run newest on its branches with `orc show <run> --json`.
 The other kinds read their stage from the task's detail.
 The other machine's full review fix and orc run tasks read theirs over its tasks route, in the background beside its report.
 A stage can hold a live task in a graver state than the orchestrator reports, but never in a milder one.

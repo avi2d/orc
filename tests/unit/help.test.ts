@@ -15,7 +15,7 @@ const call = (path: ReadonlyArray<string>, positionals: ReadonlyArray<string> = 
 
 const invocations: ReadonlyArray<Invocation> = [
   call(["run"], ["t.md"]),
-  call(["runs"]),
+  call(["runs"], [], ["--json"]),
   call(["show"], ["r1"]),
   call(["log"], ["r1", "1"]),
   call(["score"], ["r1", "s", "3"]),
@@ -66,7 +66,7 @@ const entryOf = (invocation: Invocation) => {
   return topic.entry
 }
 
-const parserFlags = ["--json", "--kind", "--delivery", "--branch", "--sandbox", "--token-file", "--provider", "--instructions", "--allow", "--answer", "--internal", "--machine", "--parent", "--depends-on", "--reason", "--until", "--question", "--expect", "--generation", "--on", "--clear", "--drop", "--basis", "--priority", "--label", "--stdin-label", "--force", "--dry-run", "--all", "--verbose"]
+const parserFlags = ["--json", "--local", "--kind", "--delivery", "--branch", "--sandbox", "--token-file", "--provider", "--instructions", "--allow", "--answer", "--internal", "--machine", "--parent", "--depends-on", "--reason", "--until", "--question", "--expect", "--generation", "--on", "--clear", "--drop", "--basis", "--priority", "--label", "--stdin-label", "--force", "--dry-run", "--all", "--verbose"]
 
 const values = ["", "x", "1", "orc-1", "q=1", "2026-12-01", "ship", "no-mistakes", "none", "ask-user", "parked", "yolo-green"]
 
