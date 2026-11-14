@@ -112,6 +112,7 @@ interface PriorProgress {
   readonly checksPassed: boolean
   readonly implementSource: string | null
   readonly implementSessionId: string | null
+  readonly implementAgent: { readonly agentFile: string | null; readonly model: string | null; readonly thinking: string | null }
   readonly fixSource: string | null
   readonly fixSessionId: string | null
   readonly fixRunning: boolean
@@ -125,6 +126,8 @@ const readPriorProgress = (db: Database, run: HistoryRun, prior: RunRecord): Eff
     const implementPassed = implementSteps.some((step) => step.status === "passed")
     const checksPassed = steps.some((step) => step.name === "checks" && step.status === "passed")
     const implementFile = implementSteps.flatMap((step) => step.piSessionFile === null ? [] : [step.piSessionFile]).at(-1) ?? null
+    const implementRow = implementSteps.at(-1) ?? null
+    const implementAgent = { agentFile: implementRow?.agentFile ?? null, model: implementRow?.model ?? null, thinking: implementRow?.thinking ?? null }
     const interruptedImplement = implementSteps.some((step) => step.status === "running")
     const interruptedFix = steps.some((step) => step.name === "fix" && step.status === "running")
     const priorDir = run.path.join(run.path.dirname(run.runDir), prior.id)
@@ -143,7 +146,7 @@ const readPriorProgress = (db: Database, run: HistoryRun, prior: RunRecord): Eff
       ? sessionIdFromFile(liveFile)
       : null
     const fixSource = liveFixId !== null ? liveFile : storedFixFile
-    return { priorId: prior.id, implementPassed, checksPassed, implementSource, implementSessionId, fixSource, fixSessionId: liveFixId ?? sessionIdFromFile(storedFixFile), fixRunning: interruptedFix, storedFixes }
+    return { priorId: prior.id, implementPassed, checksPassed, implementSource, implementSessionId, implementAgent, fixSource, fixSessionId: liveFixId ?? sessionIdFromFile(storedFixFile), fixRunning: interruptedFix, storedFixes }
   })
 
 const decodeJsonLine = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))
@@ -218,6 +221,8 @@ const inheritedCompletion = (
         ended: fix.ended,
         agentFile: fix.agentFile ?? run.fixer.path,
         sessionFile: fix.sessionFile,
+        model: fix.model,
+        thinking: fix.thinking,
         evidenceIn: fix.evidenceIn,
         commits: fix.commits,
         tokens: fix.inputTokens === null || fix.outputTokens === null ? null : { input: fix.inputTokens, output: fix.outputTokens }
@@ -229,7 +234,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
   Effect.gen(function*() {
     const allow = run.allow ?? []
     const answers = run.answers ?? []
-    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, skipImplement: false, skipChecks: false, allow, answers, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null, priorDir: null }
+    const empty: ResumePlan = { implementSessionId: null, implementSessionFile: null, inheritedImplement: null, skipImplement: false, skipChecks: false, allow, answers, inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null, priorDir: null }
     const prior = yield* checkedPriorRun(db, run.projectDir, run.branch, run.resumeRun)
     if (prior === null || prior.id === run.runId) {
       return empty
@@ -260,6 +265,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
     return {
       implementSessionId: carriedImplement?.id ?? null,
       implementSessionFile: carriedImplement?.file ?? null,
+      inheritedImplement: progress.implementPassed ? progress.implementAgent : null,
       skipImplement,
       skipChecks,
       allow,

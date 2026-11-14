@@ -99,7 +99,16 @@ export interface StepOutcome {
   readonly steps: unknown
   readonly signals: unknown
   readonly evidence: string
+  readonly stepAgents: unknown
 }
+
+export interface RunFacts {
+  readonly branch: string
+  readonly machine: string | null
+  readonly worktreeDir?: string | undefined
+}
+
+const handRunFacts: RunFacts = { branch: "orc/test", machine: null }
 
 const unexpectedChecks: FakeCheck = async () => {
   throw new Error("checks ran before implement completed")
@@ -204,6 +213,9 @@ const noMistakesDelivery: DelivererFor = (spawner, hostGit, pathEnv, dir) =>
 export const runStep = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck = unexpectedChecks, nmReplies: ReadonlyArray<NoMistakesReply> = unexpectedNoMistakes, answers: ReadonlyArray<QuestionAnswer> = []): Promise<StepOutcome & { readonly nmCalls: string }> =>
   runStepWith(dir, home, sandbox, execCheck, nmReplies, answers, noMistakesDelivery, "")
 
+export const runStepAs = (dir: string, home: string, sandbox: FakeAgent, facts: RunFacts): Promise<StepOutcome & { readonly nmCalls: string }> =>
+  runStepWith(dir, home, sandbox, unexpectedChecks, unexpectedNoMistakes, [], noMistakesDelivery, "", facts)
+
 export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
   const gh = await stubGh()
   try {
@@ -215,7 +227,7 @@ export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAg
   }
 }
 
-const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, nmReplies: ReadonlyArray<NoMistakesReply>, answers: ReadonlyArray<QuestionAnswer>, deliver: DelivererFor, extraPath: string): Promise<StepOutcome & { readonly nmCalls: string }> =>
+const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, nmReplies: ReadonlyArray<NoMistakesReply>, answers: ReadonlyArray<QuestionAnswer>, deliver: DelivererFor, extraPath: string, facts: RunFacts = handRunFacts): Promise<StepOutcome & { readonly nmCalls: string }> =>
   Effect.runPromise(
     Effect.gen(function*() {
       const fs = yield* FileSystem.FileSystem
@@ -233,17 +245,18 @@ const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: F
             const report = yield* runWithHistory(db, {
               fs, path, spawner, git: hostGit, projectDir: dir, runId: "step-run-1", runDir,
               piSessionDir: path.join(runDir, "session"), hostSessionsDir: path.join(runDir, "sessions"),
-              taskPath: path.join(runDir, "task.md"), instructions: null, agent: implementer, fixer, branch: "orc/test", sandbox: "nono", started: "2026-10-19T10:00:00.000Z",
-              worktreeDir: dir,
+              taskPath: path.join(runDir, "task.md"), instructions: null, agent: implementer, fixer, branch: facts.branch, sandbox: "nono", started: "2026-10-19T10:00:00.000Z",
+              worktreeDir: facts.worktreeDir ?? dir, machine: facts.machine,
               delivery: deliver(spawner, hostGit, extraPath + stub.dir + ":" + (process.env.PATH ?? ""), dir),
               answers
             }, fakeOps({ runAgent: sandbox, execCheck }, path.join(runDir, "sessions")))
             const runs = yield* listRuns(db)
             const steps = db.query("SELECT name, status FROM steps WHERE run_id = ?").all("step-run-1")
             const signals = db.query("SELECT name, value FROM signals ORDER BY name").all()
+            const stepAgents = db.query("SELECT name, model, thinking FROM steps WHERE run_id = ? ORDER BY id").all("step-run-1")
             const evidence = yield* fs.readFileString(path.join(runDir, "implement-1.md"))
             const nmCalls = yield* fs.readFileString(stub.calls)
-            return { report, run: runs.find((run) => run.id === "step-run-1"), steps, signals, evidence, nmCalls }
+            return { report, run: runs.find((run) => run.id === "step-run-1"), steps, signals, evidence, stepAgents, nmCalls }
           }),
         (db) => Effect.sync(() => db.close())
       )
