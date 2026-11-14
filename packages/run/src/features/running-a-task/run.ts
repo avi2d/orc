@@ -20,6 +20,7 @@ import { finishRun, recordChecksDone, recordChecksStart, recordFixDone, recordFi
 import { failedReport, writeEvidence, writeHandover, writeReport, type HistoryRun, type OrcRunCommit, type OrcRunReport } from "./run-record"
 import { longSessionWarning, type LongSessionCounts } from "../../entities/agent/index"
 import { runFull } from "./run-loop"
+import { claimedMachineName } from "./run-place"
 import type { RunCheckpoints, SandboxOps } from "./run-ops"
 import { type ReportOutcome, type ReportRun, runReport } from "./report-run"
 import { runDirFor, type ReportKind } from "../../entities/backlog/index"
@@ -183,6 +184,7 @@ interface OpenedRun {
   readonly effectiveTaskFile: string
   readonly instructionsFile: string | null
   readonly sandboxKind: SandboxKind
+  readonly machine: string | null
 }
 
 
@@ -203,7 +205,8 @@ const openRun = (
     yield* Console.log(formatRefresh(checkout.projectDir, yield* refreshCheckout(checkout.projectDir)))
     const runDir = runDirFor(home, runId)
     const { taskFile: effectiveTaskFile, sandbox: sandboxKind } = yield* readRunStart(fs, home, checkout, request)
-    return { fs, path, spawner, home, runId, git, checkout, runDir, effectiveTaskFile, instructionsFile, sandboxKind }
+    const machine = claimedMachineName(Bun.env)
+    return { fs, path, spawner, home, runId, git, checkout, runDir, effectiveTaskFile, instructionsFile, sandboxKind, machine }
   })
 
 const prepareRunAgents = (opened: OpenedRun, request: OrcRunRequest) =>
@@ -232,7 +235,7 @@ export const runReportStep = (
     const { folders, agent, plan } = yield* prepareRunAgents(opened, request).pipe(Effect.onError(() => removeRunDir(opened)))
     const exec = yield* openAgentExec(plan, folders, folders.runDir, toolchain, { ...Bun.env, PATH: withHeavyPath(opened.home, Bun.env.PATH ?? "") })
     const run: ReportRun = {
-      kind, runId: opened.runId, runDir: folders.runDir, projectDir: opened.checkout.projectDir, branch: opened.checkout.branch, sandbox: opened.sandboxKind,
+      kind, runId: opened.runId, runDir: folders.runDir, projectDir: opened.checkout.projectDir, branch: opened.checkout.branch, machine: opened.machine, sandbox: opened.sandboxKind,
       taskPath: folders.taskPath, instructions: folders.instructionsPath, hostSessionsDir: folders.hostSessionsDir, agent, started: new Date().toISOString(),
       exec, pacing: piPacing(idleTimeoutSeconds), answerWaitSeconds
     }
@@ -270,6 +273,7 @@ export const runAgentStep = (
       runDir: folders.runDir, piSessionDir: folders.piSessionDir, hostSessionsDir: folders.hostSessionsDir,
       taskPath: folders.taskPath, instructions: folders.instructionsPath, agent, fixer, branch: checkout.branch, sandbox: sandboxKind, started,
       worktreeDir: copy.dir,
+      machine: opened.machine,
       delivery: subprocessDeliverer(request.delivery ?? "no-mistakes", { ...noMistakes, worktreeDir: copy.dir, branch: checkout.branch }),
       allow: request.allow ?? [],
       answers: request.answers ?? [],
@@ -327,9 +331,9 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
       }),
       checksRoundStart: (round, started) => recordChecksStart(db, run.runId, round, started),
       checksRoundDone: (round) => recordChecksDone(db, run.runId, round),
-      fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer.path, started, attempt === 1 || attempt <= resume.inheritedFixes.length ? resume.fixSessionFile ?? undefined : undefined),
+      fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer, started, attempt === 1 || attempt <= resume.inheritedFixes.length ? resume.fixSessionFile ?? undefined : undefined),
       fixSession: (attempt, file) => recordStepSession(db, run.runId, "fix", attempt, file),
-      fixDone: (fix) => recordFixDone(db, run.runId, fix),
+      fixDone: (fix) => recordFixDone(db, run.runId, fix, run.fixer),
       noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
       noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
       pullRequestStart: (started) => recordPullRequestStart(db, run.runId, started),

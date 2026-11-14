@@ -113,6 +113,7 @@ const startTask = (
       ORC_TASK_DELIVERY: place.delivery,
       ORC_TASK_INSTRUCTIONS: place.instructions ?? "",
       ORC_TASK_MACHINE: machine.name,
+      ORC_RUN_MACHINE: machine.name,
       ORC_TASK_PROVIDER: credential.provider,
       ORC_TASK_ACCOUNT: claim.account,
       ORC_TASK_TOKEN_FILE: credential.kind === "file" ? credential.tokenFile : "",

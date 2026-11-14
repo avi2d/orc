@@ -39,6 +39,7 @@ export interface HistoryRun {
   readonly sandbox: SandboxKind
   readonly started: string
   readonly worktreeDir: string
+  readonly machine?: string | null | undefined
   readonly delivery: RunDeliverer
   readonly allow?: ReadonlyArray<AllowWord> | undefined
   readonly answers?: ReadonlyArray<QuestionAnswer> | undefined

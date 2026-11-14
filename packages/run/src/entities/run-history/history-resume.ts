@@ -3,7 +3,7 @@ import { Effect, Schema } from "effect"
 import { GateRefusalSchema, refusalSignalName, type GateRefusal } from "./gate-refusals"
 import type { OpenQuestion } from "../review-gate/index"
 import { openQuestionSignal } from "./report"
-import { decodedRunRow, RunSqlRowSchema, runRecordOf, sqlite, type RunRecord, type SqliteFailure } from "./run-history"
+import { decodedRunRow, runColumns, RunSqlRowSchema, runRecordOf, sqlite, type RunRecord, type SqliteFailure } from "./run-history"
 
 export interface BranchStep {
   readonly name: string
@@ -24,9 +24,7 @@ export const latestRunForBranchName = (
   branch: string
 ): Effect.Effect<RunRecord | null, Schema.SchemaError | SqliteFailure> =>
   sqlite(() =>
-    db.query(
-      "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox, kind, delivery FROM runs WHERE branch = ? ORDER BY started DESC, id DESC LIMIT 1"
-    ).get(branch)
+    db.query(runColumns + " WHERE branch = ? ORDER BY started DESC, id DESC LIMIT 1").get(branch)
   ).pipe(Effect.flatMap(decodedRunRow))
 
 export const resumePriorRun = (
@@ -61,9 +59,7 @@ export const runsForBranch = (
   branch: string
 ): Effect.Effect<ReadonlyArray<RunRecord>, Schema.SchemaError | SqliteFailure> =>
   sqlite(() =>
-    db.query(
-      "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox, kind, delivery FROM runs WHERE project = ? AND branch = ? ORDER BY started DESC, id DESC"
-    ).all(project, branch)
+    db.query(runColumns + " WHERE project = ? AND branch = ? ORDER BY started DESC, id DESC").all(project, branch)
   ).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(RunSqlRowSchema))),
     Effect.map((rows) => rows.map(runRecordOf))

@@ -14,7 +14,10 @@ const RunJsonEntrySchema = Schema.Struct({
   questions: Schema.Finite,
   endReason: Schema.NullOr(Schema.String),
   kind: Schema.NullOr(Schema.String),
-  delivery: Schema.NullOr(Schema.String)
+  delivery: Schema.NullOr(Schema.String),
+  task: Schema.NullOr(Schema.String),
+  machine: Schema.NullOr(Schema.String),
+  worktree: Schema.NullOr(Schema.String)
 })
 
 const RunsJsonSchema = Schema.Struct({
@@ -37,7 +40,10 @@ export const runsJson = (runs: ReadonlyArray<ListedRun>): RunsJsonDocument => ({
     questions,
     endReason: run.endReason,
     kind: run.kind,
-    delivery: run.delivery
+    delivery: run.delivery,
+    task: run.task,
+    machine: run.machine,
+    worktree: run.worktree
   }))
 })
 

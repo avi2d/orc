@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { sandboxKinds, type SandboxKind } from "../../shared/sandbox/index"
 import { OrcRunError } from "../../shared/lib/index"
 
-export const RUN_HISTORY_SCHEMA_VERSION = 4
+export const RUN_HISTORY_SCHEMA_VERSION = 5
 export const RUNS_JSON_SCHEMA = "orc.runs.v1" as const
 export const SHOW_JSON_SCHEMA = "orc.show.v1" as const
 
@@ -44,6 +44,9 @@ export interface RunInput {
   readonly sandbox?: SandboxKind | null | undefined
   readonly kind?: string | null | undefined
   readonly delivery?: string | null | undefined
+  readonly task?: string | null | undefined
+  readonly machine?: string | null | undefined
+  readonly worktree?: string | null | undefined
 }
 
 export interface RunRecord {
@@ -59,6 +62,9 @@ export interface RunRecord {
   readonly sandbox: SandboxKind | null
   readonly kind: string | null
   readonly delivery: string | null
+  readonly task: string | null
+  readonly machine: string | null
+  readonly worktree: string | null
 }
 
 export interface StepInput {
@@ -70,6 +76,8 @@ export interface StepInput {
   readonly ended?: string | null | undefined
   readonly agentFile?: string | null | undefined
   readonly piSessionFile?: string | null | undefined
+  readonly model?: string | null | undefined
+  readonly thinking?: string | null | undefined
 }
 
 export interface EvidenceInput {
@@ -108,6 +116,11 @@ export const formatHistoryError = (error: unknown): string => {
 export const orcHomeDir = (override?: string): string =>
   override === undefined || override === "" ? `${homedir()}/.orc` : fileURLToPath(new URL(override, pathToFileURL(process.cwd() + "/")))
 
+const runFactColumns: ReadonlyArray<string> = ["task TEXT", "machine TEXT", "worktree TEXT"]
+const stepAgentColumns: ReadonlyArray<string> = ["model TEXT", "thinking TEXT"]
+const addRunFacts = runFactColumns.map((column) => "ALTER TABLE runs ADD COLUMN " + column)
+const addStepAgents = stepAgentColumns.map((column) => "ALTER TABLE steps ADD COLUMN " + column)
+
 const sandboxColumn = "sandbox TEXT CHECK (sandbox IN (" + sandboxKinds.map((kind) => "'" + kind + "'").join(", ") + "))"
 
 const runsColumns =
@@ -122,7 +135,8 @@ const runsColumns =
   "end_reason TEXT, " +
   sandboxColumn + ", " +
   "kind TEXT, " +
-  "delivery TEXT"
+  "delivery TEXT, " +
+  runFactColumns.join(", ")
 
 const rebuildRunsForStopped: ReadonlyArray<string> = [
   "CREATE TABLE runs_new (" + runsColumns + ")",
@@ -143,7 +157,8 @@ const schemaStatements: ReadonlyArray<string> = [
     "started TEXT NOT NULL, " +
     "ended TEXT, " +
     "agent_file TEXT, " +
-    "pi_session_file TEXT" +
+    "pi_session_file TEXT, " +
+    stepAgentColumns.join(", ") +
     ")",
   "CREATE TABLE IF NOT EXISTS evidence (" +
     "id INTEGER PRIMARY KEY, " +
@@ -177,9 +192,10 @@ const busyTimeoutMillis = 5000
 
 const upgrades: ReadonlyMap<number, ReadonlyArray<string>> = new Map([
   [0, schemaStatements],
-  [1, ["ALTER TABLE runs ADD COLUMN " + sandboxColumn, ...rebuildRunsForStopped]],
-  [2, rebuildRunsForStopped],
-  [3, ["ALTER TABLE runs ADD COLUMN kind TEXT", "ALTER TABLE runs ADD COLUMN delivery TEXT"]]
+  [1, ["ALTER TABLE runs ADD COLUMN " + sandboxColumn, ...rebuildRunsForStopped, ...addStepAgents]],
+  [2, [...rebuildRunsForStopped, ...addStepAgents]],
+  [3, ["ALTER TABLE runs ADD COLUMN kind TEXT", "ALTER TABLE runs ADD COLUMN delivery TEXT", ...addRunFacts, ...addStepAgents]],
+  [4, [...addRunFacts, ...addStepAgents]]
 ])
 
 const readSchemaVersion = (db: Database): Effect.Effect<number, HistoryError> =>
@@ -226,7 +242,7 @@ export const openDatabase = (homeDir: string): Effect.Effect<Database, HistoryEr
 
 export const insertRun = (db: Database, input: RunInput): void => {
   db.query(
-    "INSERT INTO runs (id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox, kind, delivery) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO runs (id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox, kind, delivery, task, machine, worktree) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   ).run(
       input.id,
       input.project,
@@ -239,7 +255,10 @@ export const insertRun = (db: Database, input: RunInput): void => {
       input.endReason ?? null,
       input.sandbox ?? null,
       input.kind ?? null,
-      input.delivery ?? null
+      input.delivery ?? null,
+      input.task ?? null,
+      input.machine ?? null,
+      input.worktree ?? null
     )
 }
 
@@ -249,7 +268,7 @@ export const recordRun = (db: Database, input: RunInput): Effect.Effect<void, Sq
 export const insertStep = (db: Database, input: StepInput): number =>
   Number(
       db.query(
-        "INSERT INTO steps (run_id, name, attempt, status, started, ended, agent_file, pi_session_file) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO steps (run_id, name, attempt, status, started, ended, agent_file, pi_session_file, model, thinking) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       ).run(
         input.runId,
         input.name,
@@ -258,7 +277,9 @@ export const insertStep = (db: Database, input: StepInput): number =>
         input.started,
         input.ended ?? null,
         input.agentFile ?? null,
-        input.piSessionFile ?? null
+        input.piSessionFile ?? null,
+        input.model ?? null,
+        input.thinking ?? null
       ).lastInsertRowid
   )
 
@@ -306,7 +327,10 @@ export const RunSqlRowSchema = Schema.Struct({
   end_reason: Schema.NullOr(Schema.String),
   sandbox: Schema.NullOr(Schema.Literals(sandboxKinds)),
   kind: Schema.NullOr(Schema.String),
-  delivery: Schema.NullOr(Schema.String)
+  delivery: Schema.NullOr(Schema.String),
+  task: Schema.NullOr(Schema.String),
+  machine: Schema.NullOr(Schema.String),
+  worktree: Schema.NullOr(Schema.String)
 })
 
 export const runRecordOf = (row: typeof RunSqlRowSchema.Type): RunRecord => ({
@@ -321,7 +345,10 @@ export const runRecordOf = (row: typeof RunSqlRowSchema.Type): RunRecord => ({
   endReason: row.end_reason,
   sandbox: row.sandbox,
   kind: row.kind,
-  delivery: row.delivery
+  delivery: row.delivery,
+  task: row.task,
+  machine: row.machine,
+  worktree: row.worktree
 })
 
 export const decodedRunRow = (row: unknown): Effect.Effect<RunRecord | null, Schema.SchemaError> =>
@@ -331,7 +358,7 @@ export const decodedRunRow = (row: unknown): Effect.Effect<RunRecord | null, Sch
 
 export const stoppedEndReason = "the run was stopped"
 
-const runColumns = "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox, kind, delivery FROM runs"
+export const runColumns = "SELECT id, project, branch, task_file, status, started, ended, pr_link, end_reason, sandbox, kind, delivery, task, machine, worktree FROM runs"
 
 export const runById = (db: Database, id: string): Effect.Effect<RunRecord | null, Schema.SchemaError | SqliteFailure> =>
   sqlite(() => db.query(runColumns + " WHERE id = ?").get(id)).pipe(Effect.flatMap(decodedRunRow))

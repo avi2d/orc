@@ -135,9 +135,9 @@ const runLoopCheckpoints = (db: Database, run: HistoryRun): RunCheckpoints => ({
     }, started, ended),
   checksRoundStart: (round, started) => recordChecksStart(db, run.runId, round, started),
   checksRoundDone: (round) => recordChecksDone(db, run.runId, round),
-  fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer.path, started),
+  fixStart: (attempt, started) => recordFixStart(db, run.runId, attempt, run.fixer, started),
   fixSession: (attempt, file) => recordStepSession(db, run.runId, "fix", attempt, file),
-  fixDone: (fix) => recordFixDone(db, run.runId, fix),
+  fixDone: (fix) => recordFixDone(db, run.runId, fix, run.fixer),
   noMistakesStart: (started) => recordNoMistakesStart(db, run.runId, started),
   noMistakesDone: (record) => recordNoMistakesDone(db, run, record),
   pullRequestStart: (started) => recordPullRequestStart(db, run.runId, started),
@@ -171,7 +171,7 @@ const seedRefusedPrior = async (db: Database, priorDir: string, project: string)
     started: "2026-10-19T09:22:00.000Z", ended: "2026-10-19T09:23:00.000Z",
     agentFile: fixer.path, sessionFile: fixSession, evidenceIn: join(priorDir, "checks-1.md"),
     commits: 1, tokens: { input: 10, output: 5 }
-  }))
+  }, fixer))
   await Effect.runPromise(recordStep(db, {
     runId: "prior-a", name: "no-mistakes", attempt: 1, status: "failed",
     started: "2026-10-19T09:24:00.000Z", agentFile: null, piSessionFile: null

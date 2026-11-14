@@ -173,7 +173,7 @@ describe("a beat with a token command", () => {
       expect(beat).not.toContain(placeholder)
       expect(added?.slice(added.indexOf("--") + 1)).toEqual([
         ...orc, "runner", "hold", "orc-1", "--",
-        ...orc, "run", join(fixture.home, "runner", "orc-1.md"), "--branch", "orc/orc-1",
+        "env", "ORC_RUN_MACHINE=linux", ...orc, "run", join(fixture.home, "runner", "orc-1.md"), "--branch", "orc/orc-1",
         "--sandbox", "none", "--provider", "acme", "--token-file", join(dir, "token")
       ])
       expect(added?.some((word) => word.includes(placeholder))).toBe(false)
