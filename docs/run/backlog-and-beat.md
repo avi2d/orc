@@ -266,7 +266,7 @@ Each entry has `at`, `who`, `kind`, `id` and `text`.
 
 Orc lists the entries oldest first.
 An entry with no time, such as a hold placed before orc kept `held_at` or a `delivered` entry, sorts directly before the next timed entry of its exchange, so such a hold sits directly before its answer, or after the last one when none follows.
-At the same time a hold comes first, then a question, a decision, an answer, a delivery, a withdrawal and a note.
+At the same time a hold comes first, then a question, a decision, an answer, a delivered, a withdrawn and a note.
 With nothing said on the task it prints `nothing is said on <task-id> yet`.
 The thread works on a closed task, and orc refuses a task id the backlog does not hold.
 To print it as JSON, run `orc backlog thread <task-id> --json`, whose document names its version first as `orc.thread.v1`:
