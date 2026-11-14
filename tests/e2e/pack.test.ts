@@ -59,6 +59,7 @@ const expectedFiles = [
   "src/entities/pull-request/direct-pr.ts",
   "src/entities/events/alert-events.ts",
   "src/features/queueing-a-task/alert-stream.ts",
+  "src/app/dispatch-args-answer.ts",
   "src/app/dispatch-args-runner.ts",
   "src/app/dispatch-args.ts",
   "src/features/attention-list/attention-view.ts",
