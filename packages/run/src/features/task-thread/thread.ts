@@ -92,9 +92,10 @@ const itemExchanges = (mirrored: ReadonlySet<string>) => (item: OpenItem): Reado
   const told = mirrored.has(id)
   const asked = told ? [] : [[entry(item.item.asked, askerOf(item), "question", id, item.item.text)]]
   const decided = decision === undefined ? [] : [[entry(decision.at, "decider", "decision", id, decision.kind + ": " + decision.reason)]]
+  const beatClosure = item.item.kind === "pr-ready" && state.kind === "closed" && (state.answer.words === "merged" || state.answer.words === "closed without merging")
   const settled = state.kind === "withdrawn"
     ? [[entry(state.at, "beat", "withdrawn", id, state.reason)]]
-    : state.kind === "closed" && !told ? [[entry(state.answer.at, answeredByDecider(item, state.answer.at) ? "decider" : "user", "answer", id, state.answer.words)]] : []
+    : state.kind === "closed" && !told ? [[entry(state.answer.at, answeredByDecider(item, state.answer.at) ? "decider" : beatClosure ? "beat" : "user", "answer", id, state.answer.words)]] : []
   return [...asked, ...decided, ...settled]
 }
 

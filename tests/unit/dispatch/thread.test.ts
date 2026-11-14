@@ -269,6 +269,22 @@ describe("orc backlog thread", () => {
     ])
   })
 
+  test("a closure the beat wrote on a pr-ready item names beat instead of user", () => {
+    const task: TaskRecord = { spec, hold: null, parked: null, state: { kind: "new" } }
+    const merged = {
+      id: "orc-1.pr-ready.abc123",
+      item: { kind: "pr-ready" as const, task: "orc-1", text: "orc-1 is ready to merge", asked: "2026-11-02T10:00:00.000Z", owner: "user" as const, state: { kind: "closed" as const, answer: { words: "merged", at: "2026-11-02T11:00:00.000Z" } } }
+    }
+    const unmerged = {
+      id: "orc-1.pr-ready.def456",
+      item: { kind: "pr-ready" as const, task: "orc-1", text: "orc-1 is ready to merge", asked: "2026-11-02T10:00:00.000Z", owner: "user" as const, state: { kind: "closed" as const, answer: { words: "closed without merging", at: "2026-11-02T11:00:00.000Z" } } }
+    }
+    expect(threadEntries(task, [merged, unmerged], []).filter((line) => line.kind === "answer")).toEqual([
+      { at: "2026-11-02T11:00:00.000Z", who: "beat", kind: "answer", id: merged.id, text: "merged" },
+      { at: "2026-11-02T11:00:00.000Z", who: "beat", kind: "answer", id: unmerged.id, text: "closed without merging" }
+    ])
+  })
+
   test("refuses a task id the backlog does not hold", () =>
     withBacklog(async (root) => {
       await run(addTask(root, spec))

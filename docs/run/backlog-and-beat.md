@@ -257,8 +257,8 @@ Each entry has `at`, `who`, `kind`, `id` and `text`.
 
 - A hold and its questions name `user`, and a parked question names `worker`, the run that asked it.
 - A `decision` entry is the decider's `answered` or `escalated` with its reason.
-- An answer the decider gave names `decider`, and any other answer names `user`.
-- A `delivered` entry names `beat` and comes from the answer's `relayed_to`, the asking it was handed to.
+- An answer the decider gave names `decider`, a closure the beat wrote on a `pr-ready` item names `beat`, and any other answer names `user`.
+- A `delivered` entry names `beat` and comes from the answer's `relayed_to`, so it shows only for the current asking.
 - A `withdrawn` entry names `beat` and gives the item's reason.
 - A run event item, such as `run-died`, is a `question` from `beat`.
 - Every entry of one parked review question names the same attention item id, before and after a later park replaces the question.
