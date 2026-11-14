@@ -121,6 +121,26 @@ describe("orc backlog thread", () => {
     ])
   })
 
+  test("two holds with the same question number keep separate ids for each question and answer", () => {
+    const task: TaskRecord = {
+      spec,
+      hold: {
+        reason: "Wait for the merge", until: null, at: "2026-11-02T11:00:00.000Z",
+        questions: [{ id: "question-1", text: "Which host?", answer: { words: "prod", at: "2026-11-02T11:10:00.000Z" } }],
+        answer: null,
+        history: [{ reason: "Choose the format", until: null, at: "2026-11-02T09:00:00.000Z", questions: [{ id: "question-1", text: "Which format?", answer: { words: "JSON", at: "2026-11-02T09:10:00.000Z" } }], answer: { words: "JSON", at: "2026-11-02T09:10:00.000Z" } }]
+      },
+      parked: null,
+      state: { kind: "new" }
+    }
+    expect(threadEntries(task, [], []).filter((line) => line.kind === "question" || line.kind === "answer").map((line) => [line.kind, line.id, line.text])).toEqual([
+      ["question", "hold-1/question-1", "Which format?"],
+      ["answer", "hold-1/question-1", "JSON"],
+      ["question", "hold-2/question-1", "Which host?"],
+      ["answer", "hold-2/question-1", "prod"]
+    ])
+  })
+
   test("a decider answer names the decider, and the captain's answer to an escalated question names the user", () =>
     withBacklog(async (root) => {
       await startedTask(root)

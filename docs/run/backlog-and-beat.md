@@ -253,7 +253,7 @@ Whether a question is open is still read from the task file.
 Each entry has `at`, `who`, `kind`, `id` and `text`.
 `who` is `user`, `decider`, `worker` or `beat`.
 `kind` is `hold`, `question`, `decision`, `answer`, `delivered`, `withdrawn` or `note`.
-`id` names the attention item id for a parked review question, the hold question id for a hold question, and it is `null` for a hold, a note and the answer to a hold with no questions.
+`id` names the attention item id for every entry built from an attention item, a hold question id qualified by its hold generation for a hold question, and it is `null` for a hold, a note and the answer to a hold with no questions.
 
 - A hold and its questions name `user`, and a parked question names `worker`, the run that asked it.
 - A `decision` entry is the decider's `answered` or `escalated` with its reason.
@@ -277,8 +277,8 @@ To print it as JSON, run `orc backlog thread <task-id> --json`, whose document n
   "task": "orc-1",
   "entries": [
     { "at": "2026-11-02T09:00:00.000Z", "who": "user", "kind": "hold", "id": null, "text": "Choose the format" },
-    { "at": "2026-11-02T09:00:00.000Z", "who": "user", "kind": "question", "id": "question-1", "text": "Which format?" },
-    { "at": "2026-11-02T09:10:00.000Z", "who": "user", "kind": "answer", "id": "question-1", "text": "JSON" },
+    { "at": "2026-11-02T09:00:00.000Z", "who": "user", "kind": "question", "id": "hold-1/question-1", "text": "Which format?" },
+    { "at": "2026-11-02T09:10:00.000Z", "who": "user", "kind": "answer", "id": "hold-1/question-1", "text": "JSON" },
     { "at": "2026-11-02T09:20:00.000Z", "who": "user", "kind": "note", "id": null, "text": "the merge waits on review" }
   ]
 }

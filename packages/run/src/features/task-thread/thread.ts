@@ -55,15 +55,17 @@ const holdText = (hold: { readonly reason: string; readonly until: string | null
 // Once every question is answered the hold's own answer is those answers joined, so it is told once through the questions.
 const answeredThroughQuestions = (questions: ReadonlyArray<HoldQuestion>): boolean => questions.length > 0 && questions.every((question) => question.answer !== null)
 
-const holdExchange = (hold: Pick<Hold, "reason" | "until" | "questions" | "answer" | "at">): Exchange => [
+const holdQuestionId = (generation: number, question: string): string => "hold-" + generation + "/" + question
+
+const holdExchange = (hold: Pick<Hold, "reason" | "until" | "questions" | "answer" | "at">, generation: number): Exchange => [
   entry(hold.at, "user", "hold", null, holdText(hold)),
-  ...hold.questions.map((question) => entry(hold.at, "user", "question", question.id, question.text)),
-  ...hold.questions.flatMap((question) => question.answer === null ? [] : [entry(question.answer.at, "user", "answer", question.id, question.answer.words)]),
+  ...hold.questions.map((question) => entry(hold.at, "user", "question", holdQuestionId(generation, question.id), question.text)),
+  ...hold.questions.flatMap((question) => question.answer === null ? [] : [entry(question.answer.at, "user", "answer", holdQuestionId(generation, question.id), question.answer.words)]),
   ...(hold.answer === null || answeredThroughQuestions(hold.questions) ? [] : [entry(hold.answer.at, "user", "answer", null, hold.answer.words)])
 ]
 
 const holdExchanges = (hold: Hold | null): ReadonlyArray<Exchange> =>
-  hold === null ? [] : [...(hold.history ?? []).map((past) => holdExchange({ ...past, at: past.at ?? null })), holdExchange(hold)]
+  hold === null ? [] : [...(hold.history ?? []).map((past, index) => holdExchange({ ...past, at: past.at ?? null }, index + 1)), holdExchange(hold, (hold.history ?? []).length + 1)]
 
 const answeredByDecider = (item: OpenItem | undefined, answerAt: string): boolean => item?.item.decision?.kind === "answered" && item.item.decision.at === answerAt
 

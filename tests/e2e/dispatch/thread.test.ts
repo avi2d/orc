@@ -20,8 +20,8 @@ test("thread --json lists a hold, its question and answer, a second hold and a n
       task: "orc-1",
       entries: [
         { kind: "hold", who: "user", id: null, text: "Choose the format" },
-        { kind: "question", who: "user", id: "question-1", text: "Which format?" },
-        { kind: "answer", who: "user", id: "question-1", text: "JSON" },
+        { kind: "question", who: "user", id: "hold-1/question-1", text: "Which format?" },
+        { kind: "answer", who: "user", id: "hold-1/question-1", text: "JSON" },
         { kind: "hold", who: "user", id: null, text: "Wait for the merge" },
         { kind: "note", who: "user", id: null, text: "the merge waits on review" }
       ]
