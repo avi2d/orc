@@ -30,6 +30,11 @@ Once every question has an answer, the next beat resumes the task on its origina
 A machine with more room cannot take that resume.
 The beat waits if the original machine has no room or no configured checkout, or if the runner cannot find the recorded run.
 A task parked before its origin was recorded also waits rather than guessing a machine.
+Its wait reads `the parked task has no recorded machine and run; record them with orc backlog origin <task-id> <machine> <run-id> before resuming`.
+Find the run id in `orc runs --json` on that machine, then run `orc backlog origin <task-id> <machine> <run-id>` to record it, and the next beat resumes the task there.
+Orc refuses a machine `dispatch.json` does not name, a task that is not parked, and a task that already has an origin.
+It reads the task's run on that machine the way the resume check does, and refuses a run id the runner does not report for that task.
+The command takes the task file by rename the way `orc backlog hold` does, so it and a beat never both win.
 The queue and run check the recorded run id before using its progress.
 The queued command carries that id in `ORC_DISPATCH_RESUME_RUN`.
 If the latest resumable run has changed or disappeared, Orc refuses the resume instead of starting fresh implementation.

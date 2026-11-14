@@ -43,14 +43,24 @@ const failRemoteRun = async (remote: Fixture, label: string): Promise<void> => {
   }, groups: {} }))
 }
 
+const refusedOrigin = async (local: Fixture, args: ReadonlyArray<string>) => {
+  const refused = await runOrc(local, ["backlog", "origin", "orc-1", ...args])
+  return { code: refused.exitCode, error: refused.stderr.trim() }
+}
+
 const checkLegacyOrigin = async (local: Fixture): Promise<void> => {
   const taskFile = join(local.home, "backlog", "new", "orc-1.md")
   const parked = await readFile(taskFile, "utf8")
   await writeFile(taskFile, parked.replace(/^parked_origin: .+\n/m, ""))
   const legacy: unknown = JSON.parse(await orcOk(local, ["backlog", "--json"]))
-  expect(legacy).toMatchObject({ tasks: [{ id: "orc-1", status: "new", wait: "the parked task has no recorded machine and run; recover its origin before resuming" }] })
-  expect(await orcOk(local, ["beat"])).toContain("waits orc-1: the parked task has no recorded machine and run")
-  await writeFile(taskFile, parked)
+  const wait = "the parked task has no recorded machine and run; record them with orc backlog origin orc-1 <machine> <run-id> before resuming"
+  expect(legacy).toMatchObject({ tasks: [{ id: "orc-1", status: "new", wait }] })
+  expect(await orcOk(local, ["beat"])).toContain("waits orc-1: " + wait)
+  expect(await refusedOrigin(local, ["macbox", "origin-run"])).toEqual({ code: 1, error: "orc: the machine macbox is not in dispatch.json" })
+  expect(await refusedOrigin(local, ["winbox", "other-run"])).toEqual({ code: 1, error: "orc: run other-run is not the run of orc-1 on winbox: the runner now reports origin-run" })
+  expect(await orcOk(local, ["backlog", "origin", "orc-1", "winbox", "origin-run"])).toBe("recorded run origin-run on winbox as the origin of orc-1, so the beat resumes it there\n")
+  expect(await readFile(taskFile, "utf8")).toBe(parked)
+  expect(await refusedOrigin(local, ["winbox", "origin-run"])).toEqual({ code: 1, error: "orc: orc-1 already resumes run origin-run on winbox" })
 }
 
 const checkUnavailableOrigin = async (remote: Fixture, local: Fixture): Promise<void> => {

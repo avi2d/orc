@@ -3,7 +3,7 @@ import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs } from "./dispatch-args"
 import { backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted, runLabel, backlogPresent, backlogRoot as backlogRootOf, noBacklog, taskPr, type TaskFileError } from "../entities/backlog/index"
 import { readAttention, routeTaskItems } from "../entities/attention/index"
-import { backlogJson, type BacklogView, beatJson, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readRoom, type RoomList, runBeat, runnerLoadText } from "../widgets/beat/index"
+import { backlogJson, type BacklogView, beatJson, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readRoom, recordOrigin, type RoomList, runBeat, runnerLoadText } from "../widgets/beat/index"
 import { answerItemText, attentionText } from "../features/attention-list/index"
 import { edit, holdTask, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
 import { answerTask } from "../entities/parked-runs/index"
@@ -191,7 +191,7 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
-type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "CloseTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "NoteTask" | "ShowThread" | "DependTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
+type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "RecordOrigin" | "CloseTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "NoteTask" | "ShowThread" | "DependTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
 
 const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   switch (args.kind) {
@@ -200,6 +200,9 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
     }
     case "EditTask": {
       return edit(backlogRoot(place), args, place)
+    }
+    case "RecordOrigin": {
+      return recordOrigin(backlogRoot(place), place.home, args)
     }
     case "CloseTask": {
       return closeNow(args, place)
@@ -287,6 +290,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       }
       case "AnswerItem":
       case "EditTask":
+      case "RecordOrigin":
       case "CloseTask":
       case "MarkPosted":
       case "MarkEventPosted":

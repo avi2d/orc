@@ -199,6 +199,7 @@ It works on a held, parked or parent task, and the final check of a parent reads
 Orc refuses a text with no title, a task the backlog does not hold, and a task that is taken, started or closed, since a run has already read its text.
 It never asks the planner and never splits the task.
 The edit takes the task file by rename the way `orc backlog hold` does, so an edit and a beat taking the task at the same moment never both win.
+To record the machine and run of a task parked before orc recorded them, run `orc backlog origin <task-id> <machine> <run-id>`, as [Parked runs](parked-runs.md) shows.
 Add `--kind scout` or `--kind task` for a task that ends in a report instead of a PR, as [Task kinds](task-kinds.md) shows.
 To split a large task, add it with `--kind parent`, then add each part with `--parent <task-id>`, as [Parent tasks](task-kinds.md#parent-tasks) shows, or name a planner model so orc splits an over-budget request itself, as [Splitting at intake](task-kinds.md#splitting-at-intake) shows.
 Add `--internal` to mark a ship task internal-only, which only a `no-mistakes-prod-only` project reads.
