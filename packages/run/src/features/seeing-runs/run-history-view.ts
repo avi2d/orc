@@ -22,12 +22,20 @@ const RunJsonEntrySchema = Schema.Struct({
   worktree
 })
 
+const MachineFailureSchema = Schema.Struct({
+  machine: Schema.String,
+  error: Schema.String
+})
+
 const RunsJsonSchema = Schema.Struct({
   schema: Schema.Literal(RUNS_JSON_SCHEMA),
-  runs: Schema.Array(RunJsonEntrySchema)
+  runs: Schema.Array(RunJsonEntrySchema),
+  machines: Schema.Array(MachineFailureSchema)
 })
 
 export type RunsJsonDocument = typeof RunsJsonSchema.Type
+export type RunsJsonRun = RunsJsonDocument["runs"][number]
+export type MachineFailure = RunsJsonDocument["machines"][number]
 
 export const runsJson = (runs: ReadonlyArray<ListedRun>): RunsJsonDocument => ({
   schema: RUNS_JSON_SCHEMA,
@@ -46,11 +54,12 @@ export const runsJson = (runs: ReadonlyArray<ListedRun>): RunsJsonDocument => ({
     task: run.task,
     machine: run.machine,
     worktree: run.worktree
-  }))
+  })),
+  machines: []
 })
 
-export const encodeRunsJson = (runs: ReadonlyArray<ListedRun>): Effect.Effect<string, Schema.SchemaError> =>
-  Schema.encodeEffect(RunsJsonSchema)(runsJson(runs)).pipe(Effect.map((encoded) => JSON.stringify(encoded)))
+export const encodeRunsJson = (document: RunsJsonDocument): Effect.Effect<string, Schema.SchemaError> =>
+  Schema.encodeEffect(RunsJsonSchema)(document).pipe(Effect.map((encoded) => JSON.stringify(encoded)))
 
 export const decodeRunsJson = (value: unknown): Effect.Effect<RunsJsonDocument, Schema.SchemaError> =>
   Schema.decodeUnknownEffect(RunsJsonSchema)(value)

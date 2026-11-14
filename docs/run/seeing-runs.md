@@ -7,6 +7,13 @@ Orc keeps its records in `~/.orc`, outside every project repo.
 Set `ORC_HOME` to keep them somewhere else.
 To print the same facts as JSON, run `orc runs --json`.
 Every JSON document names its version first as `schema`, starting at `orc.runs.v1`.
+`orc runs --json` also reads the runs of each other machine in `dispatch.json` and adds them to `runs`.
+It reads each machine with the command that reaches it, as `orc runner result` does, and asks it for `orc runs --json --local`.
+A machine whose `start` names no reach command, such as `orc runner start` with nothing after `--`, is not read.
+A machine that fails, does not answer within 30 seconds, or prints JSON orc cannot read adds no runs.
+It is named in `machines` with its `machine` and its `error`, the first line it printed or why its answer did not read, and the command still exits 0.
+`machines` is empty when every machine answers or `dispatch.json` names none.
+To print only this machine's runs, run `orc runs --json --local`.
 Each run in it also gives `title`, the first line of its task file, and `endReason`, the reason it ended.
 Its `step` is the step running now, else the step that started last, as an id, name, attempt and status, and `null` before the first step.
 Its `questions` counts the questions a running run waits on you to answer, and is 0 otherwise.

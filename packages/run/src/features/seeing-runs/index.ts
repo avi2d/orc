@@ -1,4 +1,5 @@
 export { decodeRunsJson, encodeRunsJson, formatRunsTable, runsJson } from "./run-history-view"
+export { readOtherMachinesFrom, withOtherMachines } from "./other-machines"
 export { readListedRuns, titleOf } from "./run-facts"
 export { InvalidScore, recordStepScore, UnknownRun, UnknownStep } from "./run-scores"
 export { decodeShowJson, encodeShowJson, formatShow, readShow } from "./show"

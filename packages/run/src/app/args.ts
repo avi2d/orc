@@ -6,7 +6,7 @@ import { sandboxKinds, type SandboxKind } from "../shared/sandbox/index"
 export type OrcArgs =
   | { readonly kind: "PrintVersion" }
   | { readonly kind: "PrintHelp" }
-  | { readonly kind: "ListRuns"; readonly json: boolean }
+  | { readonly kind: "ListRuns"; readonly json: boolean; readonly local: boolean }
   | { readonly kind: "ListRefusals"; readonly json: boolean }
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
   | { readonly kind: "ShowStepLog"; readonly runId: string; readonly stepId: number }
@@ -234,7 +234,7 @@ const parseRunArgs = (rest: readonly string[]): OrcArgs => {
   const taskFile = split.kept.length === 1 ? split.kept[0] : null
   return { kind: "RunAgent", taskFile, taskKind: split.taskKind, delivery: split.delivery, branch: split.branch, sandbox: split.sandbox, tokenFile: split.tokenFile, provider: split.provider, instructions: split.instructions, allow: split.allow, answers: split.answers }
 }
-const parseJsonListArgs = (rest: readonly string[], kind: "ListRuns" | "ListRefusals"): OrcArgs => {
+const parseJsonListArgs = (rest: readonly string[], kind: "ListRefusals"): OrcArgs => {
   if (rest.length === 0) {
     return { kind, json: false }
   }
@@ -246,6 +246,22 @@ const parseJsonListArgs = (rest: readonly string[], kind: "ListRuns" | "ListRefu
     return { kind: "UsageError", detail: `unexpected argument: ${extra[0]}` }
   }
   return { kind, json: true }
+}
+const parseRunsArgs = (rest: readonly string[]): OrcArgs => {
+  if (rest.length === 0) {
+    return { kind: "ListRuns", json: false, local: false }
+  }
+  const [flag, ...extra] = rest
+  if (flag !== "--json") {
+    return { kind: "UsageError", detail: `unexpected argument: ${flag}` }
+  }
+  if (extra.length === 0) {
+    return { kind: "ListRuns", json: true, local: false }
+  }
+  if (extra.length === 1 && extra[0] === "--local") {
+    return { kind: "ListRuns", json: true, local: true }
+  }
+  return { kind: "UsageError", detail: `unexpected argument: ${extra[0]}` }
 }
 const helpFlags = new Set(["--help", "-h"])
 const holdValueFlags = new Set(["--reason", "--until"])
@@ -306,7 +322,7 @@ const parseWords = (args: readonly string[]): OrcArgs => {
   }
   const [first, ...rest] = args
   if (first === "runs") {
-    return parseJsonListArgs(rest, "ListRuns")
+    return parseRunsArgs(rest)
   }
   if (first === "refusals") {
     return parseJsonListArgs(rest, "ListRefusals")

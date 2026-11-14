@@ -413,7 +413,7 @@ describe("runsJson", () => {
 
   test("names the schema version first, then the runs", () => {
     const document = runsJson(facts)
-    expect(Object.keys(document)).toEqual(["schema", "runs"])
+    expect(Object.keys(document)).toEqual(["schema", "runs", "machines"])
     expect(document.schema).toBe(RUNS_JSON_SCHEMA)
     expect(document.schema).toBe("orc.runs.v1")
   })
