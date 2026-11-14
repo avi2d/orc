@@ -265,19 +265,31 @@ const asksForHelp = (rest: readonly string[]): boolean => {
   const end = words.indexOf("--")
   return (end === -1 ? words : words.slice(0, end)).some((word) => helpFlags.has(word))
 }
-const dispatchSubcommands = ["backlog", "attention", "beat", "runner", "merge", "heavy"] as const
-export const commandWords = ["run", "runs", "show", "log", "score", "refusals", "chat", "app", ...dispatchSubcommands] as const
-export type CommandWord = typeof commandWords[number]
-export const isCommandWord = (word: string): word is CommandWord => (commandWords as ReadonlyArray<string>).includes(word)
-type DispatchSubcommand = typeof dispatchSubcommands[number]
-const isDispatchSubcommand = (word: string): word is DispatchSubcommand => (dispatchSubcommands as ReadonlyArray<string>).includes(word)
-const parseDispatchCommand = (first: string, rest: readonly string[]): OrcArgs | null => {
-  if (!isDispatchSubcommand(first)) {
-    return null
-  }
-  const dispatch = parseDispatchArgs(first, rest)
+const toDispatch = (command: Parameters<typeof parseDispatchArgs>[0], rest: readonly string[]): OrcArgs => {
+  const dispatch = parseDispatchArgs(command, rest)
   return dispatch.kind === "UsageError" ? dispatch : { kind: "Dispatch", args: dispatch }
 }
+
+const topLevelParsers = {
+  run: parseRunArgs,
+  runs: (rest: readonly string[]): OrcArgs => parseJsonListArgs(rest, "ListRuns"),
+  show: parseShowArgs,
+  log: parseLogArgs,
+  score: parseScoreArgs,
+  refusals: (rest: readonly string[]): OrcArgs => parseJsonListArgs(rest, "ListRefusals"),
+  chat: parseChatArgs,
+  app: parseAppArgs,
+  backlog: (rest: readonly string[]): OrcArgs => toDispatch("backlog", rest),
+  attention: (rest: readonly string[]): OrcArgs => toDispatch("attention", rest),
+  beat: (rest: readonly string[]): OrcArgs => toDispatch("beat", rest),
+  runner: (rest: readonly string[]): OrcArgs => toDispatch("runner", rest),
+  merge: (rest: readonly string[]): OrcArgs => toDispatch("merge", rest),
+  heavy: (rest: readonly string[]): OrcArgs => toDispatch("heavy", rest)
+} satisfies Record<string, (rest: readonly string[]) => OrcArgs>
+
+export type CommandWord = keyof typeof topLevelParsers
+export const commandWords = Object.keys(topLevelParsers) as ReadonlyArray<CommandWord>
+export const isCommandWord = (word: string): word is CommandWord => Object.hasOwn(topLevelParsers, word)
 const appSubcommands = {
   install: (): OrcArgs => ({ kind: "InstallApp" })
 } satisfies Record<string, () => OrcArgs>
@@ -292,10 +304,6 @@ const parseAppArgs = (rest: readonly string[]): OrcArgs => {
 const parseChatArgs = (rest: readonly string[]): OrcArgs =>
   rest.length === 0 ? { kind: "Chat" } : { kind: "UsageError", detail: `orc chat takes no argument: ${rest[0]}` }
 const parseFlagArgs = (first: string, rest: readonly string[]): OrcArgs => {
-  const dispatchCommand = parseDispatchCommand(first, rest)
-  if (dispatchCommand !== null) {
-    return dispatchCommand
-  }
   if (!first.startsWith("-")) {
     return { kind: "UsageError", detail: `unknown command: ${first}` }
   }
@@ -319,32 +327,8 @@ const parseWords = (args: readonly string[]): OrcArgs => {
   if (args.length === 0) {
     return { kind: "NoCommand" }
   }
-  const [first, ...rest] = args
-  if (first === "runs") {
-    return parseJsonListArgs(rest, "ListRuns")
-  }
-  if (first === "refusals") {
-    return parseJsonListArgs(rest, "ListRefusals")
-  }
-  if (first === "show") {
-    return parseShowArgs(rest)
-  }
-  if (first === "log") {
-    return parseLogArgs(rest)
-  }
-  if (first === "score") {
-    return parseScoreArgs(rest)
-  }
-  if (first === "run") {
-    return parseRunArgs(rest)
-  }
-  if (first === "app") {
-    return parseAppArgs(rest)
-  }
-  if (first === "chat") {
-    return parseChatArgs(rest)
-  }
-  return parseFlagArgs(first, rest)
+  const [first = "", ...rest] = args
+  return isCommandWord(first) ? topLevelParsers[first](rest) : parseFlagArgs(first, rest)
 }
 export const parseArgs = (args: readonly string[]): OrcArgs =>
   isCommandWord(args[0] ?? "") && asksForHelp(args.slice(1)) ? { kind: "PrintHelp", words: args.slice(0, args.findIndex((word) => helpFlags.has(word))) } : parseWords(args)
