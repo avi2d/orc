@@ -120,6 +120,16 @@ const runTool = <A>(schema: Schema.Decoder<A>, name: string, params: unknown, en
     )
   )
 
+const priorityTool = (env: Env): ChatTool => ({
+  name: "orc_backlog_priority",
+  label: "Set an orc task's priority",
+  description:
+    "Sets or clears the priority of one new task through orc backlog priority, which orders the beat's starts: 0 starts first, 4 starts after the other priorities, and none clears it. orc refuses a task that is taken, started or closed.",
+  parameters: Schema.toJsonSchemaDocument(PriorityInput).schema,
+  execute: (_toolCallId, params) =>
+    runTool(PriorityInput, "orc_backlog_priority", params, env, (input) => ["backlog", "priority", input.id, String(input.priority)])
+})
+
 const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
   {
     name: "orc_backlog_add",
@@ -172,15 +182,7 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
         ...(input.questions ?? []).flatMap((question) => ["--question", question])
       ])
   },
-  {
-    name: "orc_backlog_priority",
-    label: "Set an orc task's priority",
-    description:
-      "Sets or clears the priority of one new task through orc backlog priority, which orders the beat's starts: 0 starts first, 4 starts after the other priorities, and none clears it. orc refuses a task that is taken, started or closed.",
-    parameters: Schema.toJsonSchemaDocument(PriorityInput).schema,
-    execute: (_toolCallId, params) =>
-      runTool(PriorityInput, "orc_backlog_priority", params, env, (input) => ["backlog", "priority", input.id, String(input.priority)])
-  },
+  priorityTool(env),
   {
     name: "orc_backlog_edit",
     label: "Edit an orc task's text",
