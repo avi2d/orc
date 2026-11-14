@@ -11,6 +11,13 @@ test("refuses a run from an orc that prints no title instead of showing a blank 
   expect(guardJson(text, runs)).toEqual({ kind: "refused", reason: "runs[0].title is missing" })
 })
 
+test("leaves a queued task out of the runs instead of refusing it for its null id", () => {
+  const started = { id: "r1", project: "/p", branch: "b", status: "running", prLink: null, title: "t", step: null, questions: 0, endReason: null }
+  const text = JSON.stringify({ schema: "orc.runs.v1", runs: [{ id: null, project: "/home/sam/work/kelp", branch: "orc/kelp-12", status: null, state: "queued", prLink: null, title: null, step: null, currentStep: null, questions: 0, endReason: null, kind: null, delivery: null, task: "kelp-12", machine: null, worktree: null }, started] })
+  const guarded = guardJson(text, runs)
+  expect(guarded.kind === "ok" ? guarded.value.runs.map((run) => run.id) : guarded).toEqual(["r1"])
+})
+
 test("refuses a step status it has no mark for instead of marking it passed", () => {
   const text = JSON.stringify({ schema: "orc.show.v1", steps: [{ id: 1, name: "implement", attempt: 1, status: "paused" }] })
   expect(guardJson(text, show)).toEqual({ kind: "refused", reason: 'steps[0].status is "paused", not "running" or "passed" or "failed" or "skipped"' })

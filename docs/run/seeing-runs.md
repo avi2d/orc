@@ -18,6 +18,10 @@ Poll with `--local` when you read every few seconds.
 Each run in it also gives `title`, the first line of its task file, and `endReason`, the reason it ended.
 Its `step` is the step running now, else the step that started last, as an id, name, attempt and status, and `null` before the first step.
 Its `state` is `waiting` while a running run's folder holds `asking.json`, else `running`, `succeeded` or `failed` from its status, and a stopped run reads `failed`.
+Each backlog task that waits in the runner's `orc` pueue group for this `ORC_HOME` adds one entry with `state` `queued`, listed before the recorded runs.
+A `queued` entry gives the backlog id as `task`, its `orc/<task-id>` branch, the checkout it will run in as `project`, and 0 `questions`.
+Its `id`, `status` and every other fact a run gains once it starts are `null`.
+When pueue cannot be reached, `orc runs --json` adds no `queued` entry and still prints the recorded runs.
 Its `currentStep` gives the name and attempt of the step running now, and `null` when no step runs or the run has ended.
 Its `questions` counts the questions a running run waits on you to answer, and is 0 otherwise.
 Its `task` is the backlog task id its `orc/<task-id>` or `orc/<task-id>-parent` branch names, and `null` on any other branch.
