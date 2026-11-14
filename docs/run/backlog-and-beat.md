@@ -237,7 +237,7 @@ To give a new task a priority, add `--priority <0-4>` to `orc backlog add`.
 To change it later, run `orc backlog priority <task-id> <0-4>`, or `orc backlog priority <task-id> none` to clear it.
 Orc refuses a task that is taken, started or closed, and it leaves a held or parked task's hold and questions as they were.
 The task file keeps the priority as `priority`, and a file with no `priority` key has no priority.
-When a task is split, at intake or by its run, each child takes the priority of the task it came from.
+A split keeps the priority on the parent and each child, as [Splitting at intake](task-kinds.md#splitting-at-intake) and [A worker split proposal](task-kinds.md#a-worker-split-proposal) show.
 `orc backlog` shows a priority as `P<n>` beside the task id, as in `orc-9 P0 orc`, and `orc backlog --json` gives every task a `priority`, either a number from 0 to 4 or `null`.
 
 To keep a new task back for a decision of yours, run `orc backlog hold <task-id> --reason <text> [--until <YYYY-MM-DD>]`.
