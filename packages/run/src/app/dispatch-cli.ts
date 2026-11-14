@@ -5,7 +5,7 @@ import { backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, mark
 import { readAttention, routeTaskItems } from "../entities/attention/index"
 import { backlogJson, type BacklogView, beatJson, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readRoom, recordOrigin, type RoomList, runBeat, runnerLoadText } from "../widgets/beat/index"
 import { answerItemText, attentionText } from "../features/attention-list/index"
-import { dropTask, edit, holdTask, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
+import { dropTask, edit, holdTask, prioritizeTask, priorityLine, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
 import { answerTask } from "../entities/parked-runs/index"
 import { type ConfigError, readFailure, type DispatchConfig, readDispatchConfig, readProjects } from "../shared/config/index"
 import { holdRun, killHeld, queueFromText, renewTask, startTask, stopNow, formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson, ensureAlertStream, liveAlertStream } from "../features/queueing-a-task/index"
@@ -199,7 +199,7 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
-type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "RecordOrigin" | "CloseTask" | "DropTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "NoteTask" | "DependTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
+type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "RecordOrigin" | "CloseTask" | "DropTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "NoteTask" | "DependTask" | "PrioritizeTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
 
 const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   switch (args.kind) {
@@ -235,6 +235,9 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
     }
     case "DependTask": {
       return dependNow(args, place)
+    }
+    case "PrioritizeTask": {
+      return prioritizeTask(backlogRoot(place), args.id, args.priority).pipe(Effect.map((outcome) => priorityLine(args.id, args.priority, outcome)))
     }
     case "MergeTask": {
       return mergeTask(backlogRoot(place), args.id, args.basis)
@@ -307,6 +310,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       case "AnswerTask":
       case "NoteTask":
       case "DependTask":
+      case "PrioritizeTask":
       case "MergeTask":
       case "ShowPlan":
       case "DropChild": {

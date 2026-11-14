@@ -47,6 +47,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/backlog-planning/backlog-hold.ts` | The task hold writes and the refusal when a task is already held |
 | `packages/run/src/features/backlog-planning/backlog-drop.ts` | The `orc backlog drop` close of a new task as `dropped` and its refusals |
 | `packages/run/src/features/backlog-planning/backlog-edit.ts` | The `orc backlog edit` rewrite of a new task's title and body |
+| `packages/run/src/features/backlog-planning/backlog-priority.ts` | The task priority writes and the refusal when a task is taken, started or closed |
 
 ## features/task-thread
 
