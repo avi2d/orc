@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { mergeBases } from "../../entities/pull-request/index"
-import { taskKinds } from "../../entities/backlog/index"
+import { taskKinds, taskPriorities } from "../../entities/backlog/index"
 
 export const AddTaskInput = Schema.Struct({
   project: Schema.String.annotate({ description: "The project the task is for, as the backlog's project list names it" }),
@@ -13,7 +13,10 @@ export const AddTaskInput = Schema.Struct({
   })),
   machine: Schema.optionalKey(Schema.String.annotate({ description: "The one machine the task may run on" })),
   parent: Schema.optionalKey(Schema.String.annotate({ description: "The id of the parent task this task is a child of" })),
-  dependsOn: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: "The ids of the tasks that must close done before this one starts" }))
+  dependsOn: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: "The ids of the tasks that must close done before this one starts" })),
+  priority: Schema.optionalKey(Schema.Literals(taskPriorities).annotate({
+    description: "The order the beat starts new tasks in: 0 starts first and 4 starts after the other priorities. Set one whenever the captain asks for work to happen, using the rank the captain's words give, or 2 when they rank nothing"
+  }))
 })
 
 export const HoldInput = Schema.Struct({
@@ -23,6 +26,13 @@ export const HoldInput = Schema.Struct({
   questions: Schema.optionalKey(Schema.Array(Schema.String.check(Schema.isNonEmpty())).annotate({
     description: "The separate questions the captain answers one by one, ids question-1 onward; the task stays held until every one is answered"
   }))
+})
+
+export const PriorityInput = Schema.Struct({
+  id: Schema.String.annotate({ description: "The id of the new task whose priority changes" }),
+  priority: Schema.Literals([...taskPriorities, "none"] as const).annotate({
+    description: "0 to 4 for the rank the beat starts the task at, or none to clear it"
+  })
 })
 
 export const EditInput = Schema.Struct({

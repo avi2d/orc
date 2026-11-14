@@ -15,6 +15,7 @@ import { insertRun, openDatabase } from "../../packages/run/src/entities/run-his
 import { type DispatchConfig, type Project, readDispatchConfig } from "../../packages/run/src/shared/config/dispatch-config"
 import { assessQuota } from "../../packages/run/src/widgets/beat/quota"
 import { taskLabel } from "../../packages/run/src/shared/process/pueue-status"
+import { chatSession, orcCommandVar } from "../../packages/run/src/features/chat/chat-tools"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -592,4 +593,25 @@ describe("the beat's closing sweep", () => {
   })
 })
 
+describe("the chat's backlog tools", () => {
+  const orcArgv = async (name: string, params: unknown): Promise<Array<string>> => {
+    const tool = chatSession({ [orcCommandVar]: JSON.stringify(["sh", "-c", 'printf "%s\\n" "$@"', "orc"]) }, () => false, () => undefined).tools.find((candidate) => candidate.name === name)
+    if (tool === undefined) {
+      throw new Error(name + " is not a chat tool")
+    }
+    const result = await tool.execute("call-1", params)
+    return result.content.map((part) => part.text).join("\n").split("\n")
+  }
 
+  test("orc_backlog_add passes --priority so a ranked task does not start in arrival order instead of dropping the rank", async () => {
+    expect(await orcArgv("orc_backlog_add", { project: "orc", task: "# Fix the thing\n", priority: 2 })).toEqual(["backlog", "add", "orc", "-", "--priority", "2"])
+  })
+
+  test("orc_backlog_add passes --priority 0 instead of reading the rank 0 as no rank", async () => {
+    expect(await orcArgv("orc_backlog_add", { project: "orc", task: "# Fix the thing\n", priority: 0 })).toEqual(["backlog", "add", "orc", "-", "--priority", "0"])
+  })
+
+  test("orc_backlog_priority passes none to orc backlog priority instead of dropping the clear", async () => {
+    expect(await orcArgv("orc_backlog_priority", { id: "orc-1", priority: "none" })).toEqual(["backlog", "priority", "orc-1", "none"])
+  })
+})
