@@ -13,7 +13,7 @@ export const backlogHelp: HelpEntry = {
 
 export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
   add: {
-    usage: ["orc backlog add <project> <task-file|-> [--kind <" + taskKinds.join("|") + ">] [--internal] [--machine <name>] [--parent <task-id>] [--depends-on <task-id>]"],
+    usage: ["orc backlog add <project> <task-file|-> [--kind <" + taskKinds.join("|") + ">] [--internal] [--machine <name>] [--parent <task-id>] [--depends-on <task-id>] [--priority <0-4>]"],
     summary: "Add a task to the backlog",
     about: "Adds a task for a project that projects.json names, and prints its new id, such as orc-9. Give - as the task file to read the task from standard input.",
     options: [
@@ -21,7 +21,8 @@ export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
       { flag: "--internal", meaning: "Mark a ship task internal-only, which a no-mistakes-prod-only project ships as direct-PR." },
       { flag: "--machine <name>", meaning: "Run the task on this machine only." },
       { flag: "--parent <task-id>", meaning: "Add the task as a child of a new parent task." },
-      { flag: "--depends-on <task-id>", meaning: "A task this one waits for. Give it once per task." }
+      { flag: "--depends-on <task-id>", meaning: "A task this one waits for. Give it once per task." },
+      { flag: "--priority <0-4>", meaning: "Order new tasks by this priority, 0 first. One with none goes last." }
     ],
     examples: ["orc backlog add orc ~/task.md --machine linux-box", "orc backlog add orc ~/part.md --parent orc-12 --depends-on orc-13"]
   },
@@ -111,6 +112,13 @@ export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
     about: "Prints a parent task's count, how it was split, and one line per child with its state and what it waits on.",
     options: [{ flag: "--drop <task-id>", meaning: "Remove this new child from the plan." }],
     examples: ["orc backlog plan orc-12", "orc backlog plan orc-12 --drop orc-14"]
+  },
+  priority: {
+    usage: ["orc backlog priority <task-id> <0-4|none>"],
+    summary: "Set or clear a new task's priority",
+    about: "Sets the priority that orders new tasks in the beat, 0 first and none last, or clears it with none. It refuses a task that is taken, started or closed.",
+    options: [],
+    examples: ["orc backlog priority orc-9 0", "orc backlog priority orc-9 none"]
   }
 }
 
