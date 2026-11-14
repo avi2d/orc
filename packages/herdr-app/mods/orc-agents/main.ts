@@ -224,7 +224,7 @@ export default class OrcAgents extends View {
     const body = this.cards.kind === "failed"
       ? div().p(12).text_color(t.blocked).child(this.cards.reason)
       : this.cards.kind === "reading"
-      ? div().p(12).text_color(t.muted).child("Reading orc runs --json")
+      ? div().p(12).text_color(t.muted).child("Reading orc runs --json --local")
       : cards.length === 0
       ? div().p(12).text_color(t.muted).child("No run matches these filters")
       : v_flex().id("cards").flex_1().overflow_y_scrollbar().px(8).py(8).gap(6)
