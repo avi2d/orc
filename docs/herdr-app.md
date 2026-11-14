@@ -115,20 +115,20 @@ Use your `layout.switch` key to go back to your own layout.
 
 ## Chat with orc
 
-To open the chat, press `cmd-k` on any tab, or select Chat at the top right.
-The chat opens in a window over the tab, and you can drag it by its bar.
-Press `cmd-k` again or select ✕ to close it.
-
-The window has two views, Raw and Turns.
+Press `cmd-k` to open the chat drawer, and press `cmd-k` again to close it.
+The drawer floats over the tab, and you can drag it anywhere by its bar.
+Select Raw or Turns in the bar to switch views, or select ✕ to close the drawer.
+Press Esc in the bar or in the Turns view to close the drawer.
+In the Raw view Esc goes to Pi as an interrupt, so it never closes the drawer.
 Raw is the terminal that runs `orc chat`, where you type to orc.
-Turns shows the same conversation, read only, with one card for each reply of the model.
+Turns shows the same conversation read only, with one card for each reply of the model.
 A card gives the message that started it, the input, output, cache read and cache write tokens of that reply, and its time.
-Select Thinking to show the model's thinking.
+Select Thinking to show the thinking of the model.
 Each tool call shows ✓ when it succeeded, ✗ when it failed, and … while it runs, with the number of lines it printed.
 Select a call to show the first 20 lines of its output.
-
-Turns reads the Pi session file of the chat every second, from `~/.pi/agent/sessions/--orc-drawer--/`.
-The chat runs in herdr-core as the terminal `orc-chat`, so closing the window leaves it running and reopening it shows the same conversation.
+Turns reads the Pi session file of the chat every second, found through `herdr agent list` for the `orc-chat` terminal.
+Before the first reply Turns shows an empty state, never another chat.
+Closing the drawer leaves the chat terminal running, so reopening it shows the same conversation.
 
 ## Change the mods
 
