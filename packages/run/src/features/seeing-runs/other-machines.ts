@@ -2,15 +2,17 @@ import { Duration, Effect, FileSystem } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { type Command, ConfigError, type Machine, readDispatchConfig, throughFor } from "../../shared/config/index"
 import { capture, RunnerError } from "../../shared/process/index"
-import { decodeRunsJson, type MachineFailure, type RunsJsonDocument, type RunsJsonRun } from "./run-history-view"
+import { decodeRunsJson, type MachineFailure, type RunsJsonDocument } from "./run-history-view"
+
+type RunsJsonRow = RunsJsonDocument["runs"][number]
 
 export interface OtherMachines {
-  readonly runs: ReadonlyArray<RunsJsonRun>
+  readonly runs: ReadonlyArray<RunsJsonRow>
   readonly machines: ReadonlyArray<MachineFailure>
 }
 
 type Reading =
-  | { readonly kind: "answered"; readonly runs: ReadonlyArray<RunsJsonRun> }
+  | { readonly kind: "answered"; readonly runs: ReadonlyArray<RunsJsonRow> }
   | { readonly kind: "failed"; readonly failure: MachineFailure }
 
 const answerSeconds = 10

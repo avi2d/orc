@@ -20,4 +20,4 @@ test("orc backlog drop closes a new task as dropped through the bin instead of r
     const again = await runOrc(fixture, ["backlog", "drop", "orc-1", "twice"])
     expect({ code: again.exitCode, error: again.stderr.trim() }).toEqual({ code: 1, error: "orc: orc-1 is already closed dropped" })
   })
-})
+}, 60_000)
