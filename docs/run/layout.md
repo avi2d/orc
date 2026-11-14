@@ -177,7 +177,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/backlog/split.ts` | The `orc.split.v1` planner document and the parent with vertical slice children it applies |
 | `packages/run/src/entities/backlog/backlog-write.ts` | The backlog file helpers: the error, the scratch publish, the folder paths and the file take |
 | `packages/run/src/entities/backlog/runner-label.ts` | The task branch names, the run labels and the file keys the runner files use |
-| `packages/run/src/entities/backlog/task-kind.ts` | The task kinds `ship`, `scout`, `task` and `parent`, the agent report file name and the run folder |
+| `packages/run/src/entities/backlog/task-kind.ts` | The task, run and report kinds, the agent report file name and the run folder |
 | `packages/run/src/entities/backlog/task-record-render.ts` | The task file rendering from a task record |
 | `packages/run/src/entities/backlog/notes.ts` | The task notes under `notes/`: one `<task-id>.jsonl` file per task, each note one appended line with its time, writer and text |
 
