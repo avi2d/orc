@@ -1,4 +1,4 @@
-import { fence, type Claim, type Hold, type HoldQuestion, type Parked, type ParkedQuestion, type Started, type TaskRecord } from "./task-record"
+import { fence, type Claim, type Hold, type HoldQuestion, type Parked, type ParkedQuestion, ranClosing, type Started, type TaskRecord } from "./task-record"
 
 const field = (key: string, value: unknown): string => key + ": " + JSON.stringify(value)
 
@@ -42,7 +42,18 @@ const parkedFields = (parked: Parked | null): ReadonlyArray<string> =>
     ? []
     : [field("parked_branch", parked.branch), field("parked_questions", questionFronts(parked.questions)), ...(parked.origin === undefined ? [] : [field("parked_origin", parked.origin)])]
 
-const stateFields = (state: TaskRecord["state"]): ReadonlyArray<string> => {
+const ranFields = (record: TaskRecord): { readonly started: ReadonlyArray<string>; readonly pr: ReadonlyArray<string> } => {
+  const ran = ranClosing(record)
+  return ran === null
+    ? { started: [], pr: [] }
+    : {
+      started: startedFields(ran.started),
+      pr: [...(ran.pr === null ? [] : [field("pr", ran.pr)]), ...(ran.report === null ? [] : [field("report", ran.report)])]
+    }
+}
+
+const stateFields = (record: TaskRecord): ReadonlyArray<string> => {
+  const state = record.state
   switch (state.kind) {
     case "new": {
       return []
@@ -54,15 +65,7 @@ const stateFields = (state: TaskRecord["state"]): ReadonlyArray<string> => {
       return [...claimFields(state.claim), ...startedFields(state.started)]
     }
     case "closed": {
-      const ran = state.closing.outcome === "start-failed"
-        ? { started: [], pr: [] }
-        : {
-          started: startedFields(state.closing.started),
-          pr: [
-            ...(state.closing.pr === null ? [] : [field("pr", state.closing.pr)]),
-            ...(state.closing.report === null ? [] : [field("report", state.closing.report)])
-          ]
-        }
+      const ran = ranFields(record)
       return [
         ...claimFields(state.claim),
         ...ran.started,
@@ -92,7 +95,7 @@ export const renderTaskFile = (record: TaskRecord): string =>
     field("created", record.spec.created),
     ...holdFields(record.hold),
     ...parkedFields(record.parked),
-    ...stateFields(record.state),
+    ...stateFields(record),
     fence,
     record.spec.body
   ].join("\n")

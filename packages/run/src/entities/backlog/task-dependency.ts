@@ -1,4 +1,4 @@
-import type { TaskRecord } from "./task-record"
+import { taskPr, type TaskRecord } from "./task-record"
 
 const dependencyOpen = (dependency: TaskRecord | undefined): boolean =>
   dependency === undefined || dependency.state.kind !== "closed" || dependency.state.closing.outcome !== "done"
@@ -15,7 +15,7 @@ const childDone = (child: TaskRecord, merged: ReadonlySet<string>): boolean => {
   if (child.spec.kind !== "ship") {
     return true
   }
-  const pr = child.state.kind === "closed" && child.state.closing.outcome !== "start-failed" ? child.state.closing.pr : null
+  const pr = taskPr(child)
   return pr === null || merged.has(child.spec.id)
 }
 
@@ -31,9 +31,6 @@ const shipPrerequisiteUnmerged = (task: TaskRecord, dependency: TaskRecord, merg
   if (task.spec.kind !== "ship" || dependency.spec.kind !== "ship") {
     return false
   }
-  if (dependency.state.kind !== "closed" || dependency.state.closing.outcome === "start-failed") {
-    return false
-  }
-  const pr = dependency.state.closing.pr
+  const pr = taskPr(dependency)
   return pr !== null && !merged.has(dependency.spec.id)
 }

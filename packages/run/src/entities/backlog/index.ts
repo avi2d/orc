@@ -8,9 +8,8 @@ export {
   publishOnce,
   backlogRoot,
   backlogPaths,
-  takeFile,
-  grabbedFile,
   takenGrab,
+  newGrab,
 } from "./backlog-write"
 
 export {
@@ -26,6 +25,7 @@ export {
   writeTaken,
   publishClosed,
   closeStartedTask,
+  answeredOnly,
   markPosted,
   rewriteNew,
   rewriteTaken,
@@ -64,6 +64,7 @@ export {
   isHeld,
   openQuestions,
   taskPr,
+  ranClosing,
   answersAwaited,
   answerWait,
   missingOriginWait,

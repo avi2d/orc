@@ -7,7 +7,7 @@ import { Effect, Fiber, FileSystem, Layer, Result } from "effect"
 import { TestClock } from "effect/testing"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { parseDispatchArgs } from "../../packages/run/src/app/dispatch-args"
-import { addTask, claimTask, closeStartedTask, listTasks, releaseTask, writeTaken, type TaskRecord, renderTaskFile } from "../../packages/run/src/entities/backlog/index"
+import { addTask, claimTask, closeStartedTask, listTasks, ranClosing, releaseTask, writeTaken, type TaskRecord, renderTaskFile } from "../../packages/run/src/entities/backlog/index"
 import { placeTask, runBeat } from "../../packages/run/src/widgets/beat/beat"
 import { quietSources } from "../lib/beat-sources"
 import { formatBeat } from "../../packages/run/src/widgets/beat/board"
@@ -511,7 +511,7 @@ const beatAfterRun = async (root: string, result: unknown): Promise<BeatAfterRun
     states: tasks.map((task) => task.spec.id + ":" + task.state.kind),
     actions: report.actions.map((action) => action.kind + ":" + ("task" in action ? action.task : "")),
     reasons: tasks.flatMap((task) => task.state.kind === "closed" ? [task.state.closing.outcome + ":" + task.state.closing.reason] : []),
-    prs: tasks.flatMap((task) => task.state.kind === "closed" && task.state.closing.outcome !== "start-failed" ? [task.state.closing.pr] : []),
+    prs: tasks.flatMap((task) => ranClosing(task) ?? []).map((closing) => closing.pr),
     lines: formatBeat(report).split("\n").filter((line) => line.startsWith("closed "))
   }
 }
