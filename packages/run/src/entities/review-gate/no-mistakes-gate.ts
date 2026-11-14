@@ -11,6 +11,7 @@ export interface OpenQuestion {
   readonly id: string
   readonly text: string
   readonly asked?: string | undefined
+  readonly blocks?: boolean | undefined
 }
 
 export interface NoMistakesFinding {

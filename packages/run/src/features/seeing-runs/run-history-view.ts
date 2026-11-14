@@ -1,5 +1,6 @@
-import { Effect, FileSystem, Schema } from "effect"
-import { askingFileName } from "../../entities/review-gate/index"
+import { Effect, type FileSystem, Schema } from "effect"
+import { Asking, askingFileName, hasBlockingQuestion } from "../../entities/review-gate/index"
+import { readJsonFileIfPresent } from "../../shared/config/index"
 import { RunSqlRowSchema, RunStatusSchema, RUNS_JSON_SCHEMA, type RunRecord } from "../../entities/run-history/index"
 import { formatTable } from "../../shared/lib/index"
 import { LatestStepSchema, type ListedRun } from "./run-facts"
@@ -18,10 +19,9 @@ export interface RunsJsonRun extends ListedRun {
 const readState = (run: RunRecord, runFolderOf: (runId: string) => string): Effect.Effect<RunState, never, FileSystem.FileSystem> => {
   switch (run.status) {
     case "running":
-      return FileSystem.FileSystem.pipe(
-        Effect.flatMap((fs) => fs.exists(runFolderOf(run.id) + "/" + askingFileName)),
-        Effect.orElseSucceed(() => false),
-        Effect.map((asking): RunState => asking ? "waiting" : "running")
+      return readJsonFileIfPresent(runFolderOf(run.id) + "/" + askingFileName, Asking).pipe(
+        Effect.map((asking): RunState => asking !== null && hasBlockingQuestion(asking) ? "waiting" : "running"),
+        Effect.orElseSucceed((): RunState => "running")
       )
     case "succeeded":
       return Effect.succeed("succeeded")

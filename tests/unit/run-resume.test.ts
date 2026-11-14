@@ -7,6 +7,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
+import { askSetupFor } from "../../packages/run/src/entities/agent/index"
 import { openDatabase, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
 import { buildResumePlan, resolveSandboxKind, resolveTaskFile } from "../../packages/run/src/features/running-a-task/run-resume"
 import type { SandboxKind } from "../../packages/run/src/shared/sandbox/sandbox-kind"
@@ -60,6 +61,7 @@ const historyFor = (runId: string, home: string, projectDir: string, started: st
       taskPath: path.join(runDir, "task.md"),
       instructions: null,
       agent: implementer, fixer, branch: "orc/test", sandbox: "nono", started,
+      asks: askSetupFor(runDir, path.join(runDir, "session"), 600, [], []),
       worktreeDir: projectDir,
       machine: null,
       delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git: "git", worktreeDir: projectDir }) },

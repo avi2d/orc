@@ -1,5 +1,5 @@
 import { Array as Arr, Effect, FileSystem } from "effect"
-import type { OpenQuestion } from "../review-gate/index"
+import type { AskOption, OpenQuestion } from "../review-gate/index"
 import { openReviewQuestions } from "../attention/index"
 import { findTask, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, platformFailure, publishOnce, takenGrab, type Hold, type HoldQuestion, isHeld, openQuestions, type Parked, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord, renderTaskFile } from "../backlog/index"
 
@@ -13,10 +13,13 @@ const parkedQuestions = (
   askedOf: (question: OpenQuestion) => string
 ): Parked["questions"] => {
   const stillAsked = (known: ParkedQuestion, question: OpenQuestion) =>
-    known.id === question.id && known.text === question.text && (known.answer === null || answersAsking(known.answer, asking))
+    known.id === question.id && known.text === question.text && (known.asked === "" || question.asked === undefined || known.asked === askedOf(question)) &&
+    (known.answer === null || answersAsking(known.answer, asking))
   const kept = prior.filter((known) => known.answer !== null && answersAsking(known.answer, asking) && !open.some((question) => question.id === known.id))
   return Arr.appendAll(
-    Arr.map(open, (question): ParkedQuestion => prior.find((known) => stillAsked(known, question)) ?? { id: question.id, text: question.text, asked: askedOf(question), answer: null }),
+    Arr.map(open, (question): ParkedQuestion =>
+      prior.find((known) => stillAsked(known, question)) ??
+      { id: question.id, text: question.text, asked: askedOf(question), blocks: question.blocks ?? true, answer: null }),
     kept
   )
 }
@@ -26,7 +29,7 @@ const sameQuestions = (left: ReadonlyArray<ParkedQuestion>, right: ReadonlyArray
 
 export interface LiveAsking {
   readonly asked: string
-  readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion>
+  readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion & { readonly options?: ReadonlyArray<AskOption> }>
 }
 
 // The live run keeps its claim, so its questions sit on the started task and orc backlog answer reaches them there.
@@ -41,11 +44,16 @@ export const askStartedTask = (
         return yield* new BacklogError({ detail: id + " is " + fresh.state.kind + ", and only a started task asks" })
       }
       const known = fresh.parked?.questions ?? []
-      const questions = parkedQuestions(asking.questions, known, asking.asked, () => asking.asked)
+      const questions = parkedQuestions(asking.questions, known, asking.asked, (question) => question.asked ?? asking.asked)
       if (sameQuestions(questions, known)) {
         return { kind: "keep", result: false } as const
       }
-      yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null), asking.asked)
+      const optionsOf = (question: ParkedQuestion) => asking.questions.find((live) => live.id === question.id)?.options
+      const waiting = questions.filter((question) => question.answer === null)
+      yield* openReviewQuestions(root, id, waiting.map((question) => {
+        const options = optionsOf(question)
+        return options === undefined ? question : { ...question, options }
+      }))
       const parked: Parked = { ...fresh.parked, branch: fresh.parked?.branch ?? taskBranch(id), questions }
       return { kind: "write", record: { ...fresh, parked }, result: true } as const
     }))
@@ -66,7 +74,8 @@ export const handAnswersToResume = (record: TaskRecord): TaskRecord =>
 
 export const answersFor = (record: TaskRecord, asking: LiveAsking): ReadonlyArray<ParkedQuestion & { readonly answer: ParkedAnswer }> =>
   (record.parked?.questions ?? []).flatMap((question) =>
-    question.answer !== null && answersAsking(question.answer, asking.asked) && asking.questions.some((open) => open.id === question.id)
+    question.answer !== null && answersAsking(question.answer, asking.asked) &&
+    asking.questions.some((open) => open.id === question.id && (open.asked === undefined || open.asked === question.asked))
       ? [{ ...question, answer: question.answer }]
       : []
   )
@@ -90,7 +99,7 @@ export const parkStartedTask = (
       }
       const lastAsking = open.find((question) => question.asked !== undefined)?.asked ?? null
       const questions = parkedQuestions(open, record.parked?.questions ?? [], lastAsking, (question) => question.asked ?? at)
-      yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null), at)
+      yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null))
       const origin = run === undefined ? record.parked?.origin : { machine: record.state.claim.machine, run }
       const parked: TaskRecord = { ...record, parked: { branch, questions, ...(origin === undefined ? {} : { origin }) }, state: { kind: "new" } }
       if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(parked)))) {
@@ -201,14 +210,17 @@ export const markAnswersRelayed = (
   root: string,
   id: string,
   asking: string,
-  ids: ReadonlyArray<string>
+  relayed: ReadonlyArray<{ readonly id: string; readonly asked: string }>
 ): Effect.Effect<void, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   rewriteTaken(root, id, (fresh): Effect.Effect<Rewrite<void>, BacklogError> => {
     if (fresh.state.kind !== "started" || fresh.parked === null) {
       return Effect.succeed({ kind: "keep", result: undefined })
     }
     const questions = Arr.map(fresh.parked.questions, (question): ParkedQuestion =>
-      question.answer !== null && question.answer.relayedTo === null && ids.includes(question.id) ? { ...question, answer: { ...question.answer, relayedTo: asking } } : question
+      question.answer !== null && question.answer.relayedTo === null &&
+        relayed.some((entry) => entry.id === question.id && entry.asked === question.asked)
+        ? { ...question, answer: { ...question.answer, relayedTo: asking } }
+        : question
     )
     if (sameQuestions(questions, fresh.parked.questions)) {
       return Effect.succeed({ kind: "keep", result: undefined })

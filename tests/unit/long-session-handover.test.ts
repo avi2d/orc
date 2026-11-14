@@ -15,7 +15,7 @@ import type { HistoryRun } from "../../packages/run/src/features/running-a-task/
 import { subprocessNoMistakesRunner, type NoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
 import { drawTasks, type TasksReadings } from "@avi2dg/orc-tasks"
 import { plain } from "@avi2dg/orc-ui"
-import { handoverFileName, longSessionWarning } from "../../packages/run/src/entities/agent/index"
+import { askSetupFor, handoverFileName, longSessionWarning } from "../../packages/run/src/entities/agent/index"
 import { anchorOf, decodeOrcShow, ok, orcPipelineOf, orcRunOf, taskLevels } from "@avi2dg/orc-schema"
 import { pipelineTaskReadings } from "../lib/task-levels-fixture"
 import { valueOf } from "../lib/outcomes"
@@ -88,6 +88,7 @@ const historyFor = (runId: string, home: string, projectDir: string, started: st
       taskPath: path.join(runDir, "task.md"),
       instructions: null,
       agent: implementer, fixer, branch: "orc/sample", sandbox: "none", started,
+      asks: askSetupFor(runDir, path.join(runDir, "session"), 600, [], []),
       worktreeDir: projectDir,
       machine: null,
       delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git, worktreeDir: projectDir }) },

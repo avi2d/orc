@@ -21,7 +21,8 @@ import {
   inheritedHandoverFileName,
   lastAssistantReply,
   longSessionSignal,
-  longSessionWarning
+  longSessionWarning,
+  askSetupFor
 } from "../../packages/run/src/entities/agent/index"
 import { fixture } from "../lib/fixtures"
 import { fakeOps } from "../lib/fake-ops"
@@ -242,6 +243,7 @@ const historyFor = (runId: string, home: string, projectDir: string, started: st
       taskPath: path.join(runDir, "task.md"),
       instructions: null,
       agent: implementer, fixer, branch: "orc/sample", sandbox: "none", started,
+      asks: askSetupFor(runDir, path.join(runDir, "session"), 600, [], []),
       worktreeDir: projectDir,
       machine: null,
       delivery: { kind: "no-mistakes", runner: subprocessNoMistakesRunner({ spawner, binary: "no-mistakes", pathEnv: "", git, worktreeDir: projectDir }) },

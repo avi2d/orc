@@ -1,5 +1,4 @@
 import { Effect, FileSystem, Result } from "effect"
-import { waitForAnswers } from "../../entities/review-gate/index"
 import { buildFixPrompt, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
 import { distinctRefusals } from "../../entities/run-history/index"
 import { branchCommits, runGit } from "../../shared/process/index"
@@ -7,13 +6,14 @@ import { buildImplementPrompt, finalReplyError, finalReplyText, orcCompletionLin
 import { readPlanDocument, splitReasonPrefix } from "../../entities/backlog/index"
 import { idleSpan, type PiEnd } from "../../entities/agent/index"
 import { OrcRunError } from "../../shared/lib/index"
-import { driveNoMistakes, type AllowWord, type QuestionAnswer } from "../../entities/review-gate/index"
 import { askOnLoop, loopAnswerOf, loopContinuePrompt, loopGuidance, loopingNote, RunStopped } from "./loop-pause"
-import { type DirectPrRecord, openDirectPr, type PullRequestOpener } from "../../entities/pull-request/index"
+import { askedNote, workerAnswersOf, workerContinuePrompt, workerGuidance } from "./worker-question"
+import { finishAfterChecks } from "./run-finish"
 import { readFailure } from "../../shared/config/index"
-import { countSessionSize, handoverImplementPrompt, type LongSessionCounts } from "../../entities/agent/index"
+import { countSessionSize, handoverImplementPrompt } from "../../entities/agent/index"
 import type { AgentOutcome, AgentRun, AgentRunResult, AgentStep, ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
-import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
+import { recordOpenAsks } from "./history-write"
+import { type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 
 
 const collectCommits = (
@@ -41,8 +41,18 @@ interface CapturedAgentRun {
   readonly failure: string | null
 }
 
-const stoppedNote = (end: PiEnd): string | null =>
-  end.kind === "idle" ? "orc stopped Pi, idle for " + idleSpan(end.idleSeconds) + " with no tool running." : end.kind === "looping" ? loopingNote(end) : null
+const stoppedNote = (end: PiEnd): string | null => {
+  switch (end.kind) {
+    case "idle":
+      return "orc stopped Pi, idle for " + idleSpan(end.idleSeconds) + " with no tool running."
+    case "looping":
+      return loopingNote(end)
+    case "asked":
+      return askedNote(end.question) + "."
+    case "exited":
+      return null
+  }
+}
 
 const exitNote = (end: PiEnd): string =>
   end.kind === "exited" && end.exitCode !== 0 ? " Pi exited with code " + end.exitCode.toString() + "." : ""
@@ -67,7 +77,7 @@ const runSettled = (
   runAgent: SandboxOps["runAgent"],
   first: AgentRun,
   step: AgentStep,
-  loopAsked: RunCheckpoints["loopAsked"]
+  questionAsked: RunCheckpoints["questionAsked"]
 ): Effect.Effect<AgentRunResult, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
     const made: Array<{ readonly sha: string }> = []
@@ -75,6 +85,10 @@ const runSettled = (
     for (;;) {
       const result = yield* runAgent(next)
       made.push(...result.commits)
+      if (result.end.kind === "asked") {
+        yield* recordOpenAsks(questionAsked, run.asks, step, [result.end.question])
+        return { ...result, commits: made }
+      }
       if (result.end.kind !== "looping") {
         return { ...result, commits: made }
       }
@@ -83,7 +97,7 @@ const runSettled = (
         return yield* new RunStopped({ reason: verdict.reason })
       }
       if (verdict.kind === "unanswered") {
-        yield* loopAsked(step, verdict.question)
+        yield* recordOpenAsks(questionAsked, run.asks, step, [verdict.question])
         return { ...result, commits: made }
       }
       next = { ...first, prompt: loopContinuePrompt(verdict.words), resumeSession: result.sessionFile ?? next.resumeSession }
@@ -114,12 +128,17 @@ const resumedOutcome = (run: HistoryRun, sessionId: string | null, sessionFile: 
 
 const implementPrompt = (run: HistoryRun, plan: Pick<ResumePlan, "handover" | "implementSessionFile" | "answers">): string => {
   const loop = loopAnswerOf(plan.answers)
+  const worker = workerAnswersOf(plan.answers)
   if (loop?.kind === "continue" && plan.implementSessionFile !== null) {
     return loopContinuePrompt(loop.words)
   }
+  if (worker.length > 0 && plan.implementSessionFile !== null) {
+    return workerContinuePrompt(worker)
+  }
   const taskFile = run.path.join(run.piSessionDir, "task.md")
   const base = plan.handover === null ? buildImplementPrompt(run.agent, taskFile) : handoverImplementPrompt(run.agent, taskFile, plan.handover)
-  return loop?.kind === "continue" ? base + "\n" + loopGuidance(loop.words) : base
+  const guidance = [...(loop?.kind === "continue" ? [loopGuidance(loop.words)] : []), ...(worker.length > 0 ? [workerGuidance(worker)] : [])]
+  return [base, ...guidance].join("\n")
 }
 
 const replyErrorNote = (jsonl: string | null): string => {
@@ -138,11 +157,11 @@ const implement = (
   run: HistoryRun,
   runAgent: SandboxOps["runAgent"],
   plan: Pick<ResumePlan, "implementSessionId" | "implementSessionFile" | "handover" | "answers">,
-  checkpoints: Pick<RunCheckpoints, "implementSession" | "loopAsked">
+  checkpoints: Pick<RunCheckpoints, "implementSession" | "questionAsked">
 ): Effect.Effect<AgentOutcome, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
     const first: AgentRun = { agent: run.agent, prompt: implementPrompt(run, plan), logFile: "agent.log", resumeSession: plan.implementSessionFile, onSession: checkpoints.implementSession }
-    const result = yield* runSettled(run, runAgent, first, { name: "implement", attempt: 1 }, checkpoints.loopAsked)
+    const result = yield* runSettled(run, runAgent, first, { name: "implement", attempt: 1 }, checkpoints.questionAsked)
     const session = yield* sessionOf(run, result)
     const sessionSize = session.jsonl === null ? null : countSessionSize(session.jsonl)
     const verified = verifiedMarker(session.jsonl)
@@ -174,7 +193,7 @@ const fixOnce = (
   evidenceFile: string,
   attempt: number,
   resumed: { readonly session: string; readonly guidance: string | null } | null,
-  checkpoints: Pick<RunCheckpoints, "fixSession" | "loopAsked">,
+  checkpoints: Pick<RunCheckpoints, "fixSession" | "questionAsked">,
   continuationWords: string | null = null
 ): Effect.Effect<{ readonly fix: RecordedFixAttempt; readonly commits: ReadonlyArray<OrcRunCommit>; readonly paused: string | null }, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
@@ -183,7 +202,7 @@ const fixOnce = (
       ? loopContinuePrompt(continuationWords)
       : buildFixPrompt(run.fixer, evidenceFile) + (resumed?.guidance == null ? "" : "\n" + resumed.guidance)
     const first: AgentRun = { agent: run.fixer, prompt, logFile: "fix-" + attempt.toString() + ".log", resumeSession: resumed?.session ?? null, onSession: (file) => checkpoints.fixSession(attempt, file) }
-    const result = yield* runSettled(run, runAgent, first, { name: "fix", attempt }, checkpoints.loopAsked)
+    const result = yield* runSettled(run, runAgent, first, { name: "fix", attempt }, checkpoints.questionAsked)
     const session = yield* sessionOf(run, result)
     const verified = verifiedMarker(session.jsonl)
     const ended = new Date().toISOString()
@@ -202,7 +221,7 @@ const fixOnce = (
         tokens: session.tokens
       },
       commits: session.commits,
-      paused: result.end.kind === "looping" ? session.failure : null
+      paused: result.end.kind === "looping" || result.end.kind === "asked" ? session.failure : null
     }
   })
 
@@ -216,54 +235,6 @@ const readProjectChecks = (run: HistoryRun): Effect.Effect<ReadonlyArray<ChecksC
     )
   )
 
-const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError> =>
-  Effect.gen(function*() {
-    const checked = "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + ", and the checks passed. "
-    const settled = { ...base, commits, checksRounds: rounds, fixes, fixAttempts: fixes.length }
-    if (run.delivery.kind === "direct-PR") {
-      const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints)
-      return { ...settled, completed: pr.status === "opened", prLink: pr.prLink, endReason: checked + pr.result }
-    }
-    yield* checkpoints.noMistakesStart(new Date().toISOString())
-    const waitSeconds = run.answerWaitSeconds ?? 0
-    const waiting = waitSeconds === 0 ? {} : { waitForAnswers: waitForAnswers(run.runDir, waitSeconds, "no-mistakes") }
-    const noMistakes = yield* driveNoMistakes({ runner: run.delivery.runner, taskFile: run.taskPath, runDir: run.runDir, allow, answers, ...waiting }).pipe(
-      Effect.provideService(FileSystem.FileSystem, run.fs)
-    )
-    yield* checkpoints.noMistakesDone(noMistakes)
-    return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
-  })
-
-const prBody = (subjects: ReadonlyArray<string>, rounds: ReadonlyArray<ChecksRoundSummary>): string => {
-  const passed = rounds.at(-1)?.checks.map((check) => check.name) ?? []
-  const closing = "orc opened this PR after " + (passed.length === 0 ? "the checks" : passed.join(", ")) + " passed, without no-mistakes.\n"
-  return subjects.length === 0 ? closing : subjects.map((subject) => "- " + subject).join("\n") + "\n\n---\n\n" + closing
-}
-
-const openPullRequest = (
-  run: HistoryRun,
-  opener: PullRequestOpener,
-  rounds: ReadonlyArray<ChecksRoundSummary>,
-  checkpoints: RunCheckpoints
-): Effect.Effect<DirectPrRecord, OrcRunError> =>
-  Effect.gen(function*() {
-    yield* checkpoints.pullRequestStart(new Date().toISOString())
-    const head = yield* runGit(run.spawner, run.git, ["log", "-1", "--format=%s", run.branch], run.worktreeDir).pipe(
-      Effect.map((logged) => logged.stdout.trim()),
-      Effect.orElseSucceed(() => "")
-    )
-    const listed = yield* branchCommits(run.spawner, run.git, run.branch, run.projectDir).pipe(Effect.orElseSucceed(() => [] as Array<OrcRunCommit>))
-    const subjects = listed.map((commit) => commit.subject.trim()).filter((subject) => subject !== "")
-    const bodySubjects = subjects.length > 0 ? subjects : (head !== "" ? [head] : [])
-    const bodyFile = run.path.join(run.runDir, prBodyFileName)
-    yield* run.fs.writeFileString(bodyFile, prBody(bodySubjects, rounds)).pipe(
-      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot write " + bodyFile + ": " + String(cause) }))
-    )
-    const pr = yield* openDirectPr(opener, run.branch, head !== "" ? head : run.branch, bodyFile)
-    yield* checkpoints.pullRequestDone(pr)
-    return pr
-  })
-
 type ImplementBase = Parameters<typeof finishAfterChecks>[1]
 
 const resumedFix = (plan: Pick<ResumePlan, "fixSessionFile" | "answers">): { readonly session: string; readonly guidance: string | null } | null => {
@@ -271,7 +242,9 @@ const resumedFix = (plan: Pick<ResumePlan, "fixSessionFile" | "answers">): { rea
     return null
   }
   const loop = loopAnswerOf(plan.answers)
-  return { session: plan.fixSessionFile, guidance: loop?.kind === "continue" ? loopGuidance(loop.words) : null }
+  const worker = workerAnswersOf(plan.answers)
+  const guidance = [...(loop?.kind === "continue" ? [loopGuidance(loop.words)] : []), ...(worker.length > 0 ? [workerGuidance(worker)] : [])]
+  return { session: plan.fixSessionFile, guidance: guidance.length === 0 ? null : guidance.join("\n") }
 }
 
 const retryParkedFix = (run: HistoryRun, ops: SandboxOps, base: ImplementBase, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, commits: Array<OrcRunCommit>, plan: ResumePlan, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport | null, OrcRunError | RunStopped> =>
@@ -352,7 +325,7 @@ const runChecksFixLoop = (
     return yield* new OrcRunError({ message: "orc: the checks loop ended without a result" })
   })
 
-export const runFull = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
+const runFullReport = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, tracked: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
     const plan = resume
     const parkedLoop = loopAnswerOf(plan.answers)
@@ -363,9 +336,9 @@ export const runFull = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, ch
     const done = plan.skipImplement
       ? yield* resumedOutcome(run, plan.implementSessionId, plan.implementSessionFile)
       : yield* Effect.gen(function*() {
-        yield* checkpoints.implementStart(implementStarted)
-        const outcome = yield* implement(run, ops.runAgent, plan, checkpoints)
-        yield* checkpoints.implementDone(outcome, implementStarted, new Date().toISOString())
+        yield* tracked.implementStart(implementStarted)
+        const outcome = yield* implement(run, ops.runAgent, plan, tracked)
+        yield* tracked.implementDone(outcome, implementStarted, new Date().toISOString())
         return outcome
       })
     const base: ImplementBase = {
@@ -391,7 +364,27 @@ export const runFull = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, ch
     const fixes: Array<RecordedFixAttempt> = [...plan.inheritedFixes]
     const commits = [...done.commits]
     if (plan.skipChecks) {
-      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, checkpoints)
+      return yield* finishAfterChecks(run, base, commits, rounds, fixes, plan.allow, plan.answers, tracked)
     }
-    return yield* runChecksFixLoop(run, ops, base, rounds, fixes, commits, plan, checkpoints)
+    return yield* runChecksFixLoop(run, ops, base, rounds, fixes, commits, plan, tracked)
+  })
+
+
+export const runFull = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError | RunStopped> =>
+  Effect.gen(function*() {
+    let lastStep: AgentStep = { name: "implement", attempt: 1 }
+    const tracked: RunCheckpoints = {
+      ...checkpoints,
+      implementStart: (started) => {
+        lastStep = { name: "implement", attempt: 1 }
+        return checkpoints.implementStart(started)
+      },
+      fixStart: (attempt, started) => {
+        lastStep = { name: "fix", attempt }
+        return checkpoints.fixStart(attempt, started)
+      }
+    }
+    const report = yield* runFullReport(run, ops, resume, tracked)
+    yield* recordOpenAsks(tracked.questionAsked, run.asks, lastStep, []).pipe(Effect.orElseSucceed(() => undefined))
+    return report
   })

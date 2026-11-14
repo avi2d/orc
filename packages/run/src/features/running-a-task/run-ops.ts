@@ -64,7 +64,7 @@ export interface RunCheckpoints {
   readonly noMistakesDone: (record: NoMistakesRecord) => Effect.Effect<void, OrcRunError>
   readonly pullRequestStart: (started: string) => Effect.Effect<void, OrcRunError>
   readonly pullRequestDone: (record: DirectPrRecord) => Effect.Effect<void, OrcRunError>
-  readonly loopAsked: (step: AgentStep, question: OpenQuestion) => Effect.Effect<void, OrcRunError>
+  readonly questionAsked: (step: AgentStep, question: OpenQuestion) => Effect.Effect<void, OrcRunError>
 }
 
 export type AgentStep = { readonly name: "implement"; readonly attempt: 1 } | { readonly name: "fix"; readonly attempt: number }

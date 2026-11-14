@@ -6,7 +6,7 @@ import type { OpenQuestion, QuestionAnswer } from "../../entities/review-gate/in
 import { formatHistoryError, openDatabase, stoppedEndReason, type RunRecord, RunStatusSchema } from "../../entities/run-history/index"
 import { writtenReport } from "../../entities/run-history/index"
 import { gateLogFileName } from "../../entities/review-gate/index"
-import { Asking, askingFileName, AnswersFile, answersFileName } from "../../entities/review-gate/index"
+import { Asking, askingFileName, AnswersFile, answersFileName, hasBlockingQuestion, isBlockingQuestion } from "../../entities/review-gate/index"
 import { readJsonFileIfPresent, writeWhole } from "../../shared/config/index"
 import { FailingMark, failingFileName, failingText } from "../../entities/agent/index"
 import { runDirFor, type TaskKind, TaskId, readPlanDocument, SplitDocument, type SplitPlan, splitReasonPrefix, parentBranch, taskBranch } from "../../entities/backlog/index"
@@ -277,7 +277,8 @@ export const readResult = (task: string, home: string, label?: string | null): E
       return result
     }
     const runAt = run === null ? null : yield* runLogAt(home, run.id)
-    return { ...result, status: run?.asking === undefined ? result.status : "paused", outputAt: runAt ?? result.started }
+    const blocking = run?.asking !== undefined && hasBlockingQuestion(run.asking)
+    return { ...result, status: blocking ? "paused" : result.status, outputAt: runAt ?? result.started }
   })
 
 const AnswerStdin = Schema.Struct({ ...AnswersFile.fields, label: Schema.optional(LabelArg) })
@@ -390,7 +391,7 @@ const runLine = (task: string, run: RunSummary | null): string =>
     ? "orc holds no run on " + taskBranch(task) + " or " + parentBranch(task)
     : "orc run " + run.id + " " + run.status + (run.prLink === null ? "" : ", PR " + run.prLink) + (run.report === undefined ? "" : ", report " + run.report) +
       (run.endReason === null ? "" : ": " + run.endReason) +
-      (run.asking === undefined ? "" : ", waiting until " + run.asking.until + " for the captain's answer to " + run.asking.questions.map((question) => question.id).join(", ")) +
+      (run.asking === undefined || !hasBlockingQuestion(run.asking) ? "" : ", waiting until " + run.asking.until + " for the captain's answer to " + run.asking.questions.filter(isBlockingQuestion).map((question) => question.id).join(", ")) +
       (run.failing === undefined ? "" : ", " + failingText(run.failing) + " since " + run.failing.since)
 
 export const formatResult = (result: RunnerResult): string =>
