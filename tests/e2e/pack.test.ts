@@ -65,6 +65,7 @@ const expectedFiles = [
   "src/entities/events/alert-events.ts",
   "src/features/queueing-a-task/alert-stream.ts",
   "src/app/dispatch-args-answer.ts",
+  "src/app/dispatch-args-heavy.ts",
   "src/app/dispatch-args-priority.ts",
   "src/app/dispatch-args-runner.ts",
   "src/app/dispatch-args.ts",
