@@ -4,22 +4,11 @@ import { defineConfig } from "@avi2dg/checks/oxlint";
 export default defineConfig({
   effect: {
     excludeFiles: [
+      "packages/run/src/entities/agent/orc-ask-extension.ts",
       "packages/run/src/entities/heavy-queue/heavy-process-tree.ts",
       "packages/run/src/entities/heavy-queue/heavy-pueue-task.ts",
       "packages/run/src/entities/heavy-queue/heavy-standin-exec.ts",
       "packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts"
     ]
-  },
-  overrides: [
-    {
-      files: ["packages/run/src/entities/agent/orc-ask-extension.ts"],
-      rules: {
-        "node/no-sync": "off",
-        "promise/avoid-new": "off",
-        "oxc/no-async-await": "off",
-        "effect-channel/no-try-catch": "off",
-        "effect-channel/no-throw": "off"
-      }
-    }
-  ]
+  }
 });
