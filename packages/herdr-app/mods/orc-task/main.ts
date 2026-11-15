@@ -202,7 +202,11 @@ export default class OrcTask extends View {
       setShared(agentsOpenKey, { run: open, at: Date.now() })
       run("layout.select", { stack: viewsStack, child: "orc-agents" })
     })]
-    return h_flex().px(16).py(12).gap(12).items_start().border_b(1).border_color(t.border).child(facts).children(actions)
+    const close = div().id("close").flex_shrink_0().px(6).rounded(4).cursor_pointer().text_color(t.muted)
+      .hover((style) => style.bg(t.hover).text_color(t.foreground))
+      .on_click(() => setShared(selectedTaskKey, null))
+      .child("✕")
+    return h_flex().px(16).py(12).gap(12).items_start().border_b(1).border_color(t.border).child(facts).children(actions).child(close)
   }
 
   button(t: Palette, id: string, label: string, busy: boolean, press: (cx: Context) => void): Element {

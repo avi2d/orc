@@ -1,13 +1,14 @@
-import { type AsyncContext, type Context, type Element, View, div } from "gpui-kit"
+import { type AsyncContext, type Context, type Element, type FocusHandle, View, div } from "gpui-kit"
 import { h_flex, v_flex } from "gpui-base"
-import { setShared, shared } from "herdr"
+import { run, setShared, shared } from "herdr"
 import { refreshWhenShown, selectedTaskKey } from "../../src/views"
-import { type BoardTask, type Lane, kindLabel, lanes, tasksInLane, titleClip } from "../../src/board"
+import { type BoardTask, type Lane, clickedSelection, kindLabel, lanes, panelCommand, selectionOnBoard, tasksInLane, titleClip } from "../../src/board"
 import { type BoardAttention, type BoardBacklog, boardAttention, boardBacklog } from "../../src/guard-board"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 
 type Palette = ReturnType<typeof palette>
+const taskBlock = "orc-task"
 interface BoardDocuments {
   readonly backlog: BoardBacklog
   readonly attention: BoardAttention
@@ -20,6 +21,8 @@ export default class OrcBoard extends View {
   visible = false
   lastRead = 0
   busy = false
+  panelShown: boolean | null = null
+  focusHandle: FocusHandle | null = null
 
   load = (): Promise<Reading<BoardDocuments>> => Promise.all([
     readJson("orc", ["backlog", "--json"], boardBacklog),
@@ -28,7 +31,34 @@ export default class OrcBoard extends View {
     backlog.kind !== "ok" ? backlog : attention.kind !== "ok" ? attention : { kind: "ok", value: { backlog: backlog.value, attention: attention.value } })
 
   override init(_props: unknown, cx: AsyncContext): void {
+    this.focusHandle = cx.focus_handle()
     refreshWhenShown("orc-board", 10_000, cx, this)
+  }
+
+  selected(): string | null {
+    const value = shared(selectedTaskKey)
+    return typeof value === "string" ? value : null
+  }
+
+  // setShared redraws every mod and layout.show moves the columns, so both go out only when the value changed.
+  syncPanel(): void {
+    const selected = this.selected()
+    const kept = selectionOnBoard(selected, this.reading.kind === "ok" ? this.reading.value.backlog.tasks : null)
+    if (kept !== selected) setShared(selectedTaskKey, kept)
+    const command = panelCommand(kept, this.panelShown)
+    if (command !== null) {
+      this.panelShown = kept !== null
+      run(command, { id: taskBlock })
+    }
+  }
+
+  closeOnEscape(element: Element): Element {
+    if (this.focusHandle === null) return element
+    return element.track_focus(this.focusHandle).on_key_down((event, cx) => {
+      if (event.key !== "escape" || this.selected() === null) return
+      setShared(selectedTaskKey, null)
+      cx.stop_propagation()
+    })
   }
 
   toggle(cx: Context, lane: Lane): void {
@@ -45,8 +75,9 @@ export default class OrcBoard extends View {
   }
 
   render(): Element {
+    this.syncPanel()
     const t = palette()
-    const root = v_flex().id("root").size_full().bg(t.surface).text_size(13).text_color(t.foreground)
+    const root = this.closeOnEscape(v_flex().id("root").size_full().bg(t.surface).text_size(13).text_color(t.foreground))
     if (this.reading.kind === "failed") return root.child(div().p(16).text_color(t.blocked).child(this.reading.reason))
     if (this.reading.kind === "reading") return root.child(div().p(16).text_color(t.muted).child("Reading the backlog"))
     const { backlog, attention } = this.reading.value
@@ -74,11 +105,14 @@ export default class OrcBoard extends View {
   }
 
   card(t: Palette, task: BoardTask): Element {
-    const selected = shared(selectedTaskKey) === task.id
+    const selected = this.selected() === task.id
     return v_flex().id(`card-${task.id}`).h(84).p(8).gap(4).rounded(6).cursor_pointer().flex_shrink_0()
       .bg(selected ? t.selected : t.background)
       .hover((style) => style.bg(selected ? t.selected : t.hover))
-      .on_click(() => setShared(selectedTaskKey, task.id))
+      .on_click(() => {
+        this.focusHandle?.focus()
+        setShared(selectedTaskKey, clickedSelection(this.selected(), task.id))
+      })
       .child(h_flex().gap(8).child(div().font_semibold().child(task.id)).child(div().text_color(t.dim).child(kindLabel(task.kind))))
       .child(div().h(titleClip.heightPx).line_height(`${titleClip.lineHeightPx}px`).overflow_hidden().child(task.title))
   }

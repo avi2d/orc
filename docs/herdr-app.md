@@ -32,12 +32,12 @@ The command writes only names that start with `orc`, so Herdr's own mods and lay
 
 | Tab | Key | What it shows |
 | --- | --- | --- |
-| Board | `cmd-1` | The backlog tasks in five lanes, and the selected task beside them |
+| Board | `cmd-1` | The backlog tasks in five lanes, and the task panel for the selected card |
 | Resources | `cmd-2` | Each subscription's quota windows, and each machine's cores, load, memory, disk and running orc runs |
 | Agents | `cmd-3` | The runs and the queued tasks, and the selected run's steps, step output and changes |
 
 Board reads `orc backlog --json` and `orc attention --json` when shown and every 10 seconds while shown.
-The task panel beside it reads `orc backlog --json`, `orc runs --json`, `orc runs --json --local` and `orc backlog thread <task> --json` for the selected task on the same schedule.
+The task panel reads `orc backlog --json`, `orc runs --json`, `orc runs --json --local` and `orc backlog thread <task> --json` for the selected task on the same schedule.
 It reads them again as soon as you select another card.
 Resources reads `orc-dash snapshot --json --only quota,resources,queues` when shown and every minute.
 Agents reads `orc runs --json --local` and `orc backlog --json` again every 4 seconds while it is the shown tab.
@@ -63,14 +63,18 @@ A closed task whose PR the beat has not read yet appears in Done.
 Select a lane header to fold or open it.
 Backlog and Done start folded.
 Select a project to filter the lanes, or select All to show every project.
-Select a card to show its task in the panel on the right.
+With no card selected the lanes fill the whole width.
+Select a card to open the task panel on the right with that task.
+To close the panel and clear the selection, select the selected card again, press Escape while the Board has focus, or select ✕ in the panel's header.
+The panel also closes when the selected task leaves the backlog.
+The panel stays open or closed when you switch to another tab and back.
 Each lane lists its tasks oldest first.
 
 ## Read a task
 
 ![Task panel showing a held example task with one answered and one open question](images/herdr-task-held.png)
 
-The panel shows the id, the kind and the title of the selected task.
+The panel shows the id, the kind and the title of the selected task, and ✕ to close the panel.
 When `orc runs --json --local` lists a run of the task, Open run switches to the Agents tab with the newest such run selected.
 A run outside that list has no Open run, since the Agents tab shows those runs only.
 A run belongs to the task when its branch is `orc/<task id>` or, for a parent task's planning run, `orc/<task id>-parent`.
@@ -152,13 +156,15 @@ The script refuses the login `HOME` and an `HC_SESSION` that does not start with
 It keeps the scratch App off the live core, and quits only the App and the core it started.
 The live core's processes and terminals read the same before and after.
 
-## Recapture the Board screenshot
+## Recapture the Board screenshots
 
-The committed shot is the proof of the two-line clip.
+The Board shot with the panel closed is the proof of the two-line clip.
 The garden-6 title wraps to three lines and shows exactly two, with no word cut.
 To recapture it, run `packages/herdr-app/scripts/capture-board.sh <fixture-dir> <output-png>` with a scratch `HOME` that has the layout installed.
 Use `tests/fixtures/herdr-board` as the fixture folder.
 Add `orc-resources` or `orc-agents` as a third argument to capture that tab instead of the Board.
+To capture the Board with the task panel open, pass `orc-board` and then a task id, such as `garden-6`.
+The script writes that id to `orc.board.selected` in the scratch App's `shared.json`, and removes the key when no id is given.
 The script starts the App through `with-scratch-app.sh`, so it takes no focus.
 It saves the window with the App's own `shot` command, which needs no screen-recording permission and works while the window is covered.
 
