@@ -24,6 +24,13 @@ const parkedQuestions = (
   )
 }
 
+// A resumed run carries the open-question signals of the run it resumes, so one id can come back from an earlier asking beside the latest one.
+const latestAskings = (open: Arr.NonEmptyReadonlyArray<OpenQuestion>): Arr.NonEmptyReadonlyArray<OpenQuestion> =>
+  Arr.dedupeWith(
+    Arr.map(open, (question) => open.reduce((latest, other) => other.id === latest.id && (other.asked ?? "") >= (latest.asked ?? "") ? other : latest, question)),
+    (left, right) => left.id === right.id
+  )
+
 const sameQuestions = (left: ReadonlyArray<ParkedQuestion>, right: ReadonlyArray<ParkedQuestion>): boolean =>
   left.length === right.length && left.every((question, index) => question === right[index])
 
@@ -85,11 +92,12 @@ export const parkStartedTask = (
   root: string,
   id: string,
   branch: string,
-  open: Arr.NonEmptyReadonlyArray<OpenQuestion>,
+  asked: Arr.NonEmptyReadonlyArray<OpenQuestion>,
   at: string,
   run?: string
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
+    const open = latestAskings(asked)
     const { fs, paths, file, grabbed, putBack, read } = yield* takenGrab(root, id, Effect.fail(new BacklogError({ detail: id + " was parked or closed by another command" })))
     const park = Effect.gen(function*() {
       const text = yield* read
