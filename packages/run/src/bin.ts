@@ -82,7 +82,7 @@ const scoreStep = (args: Extract<OrcArgs, { readonly kind: "ScoreStep" }>) =>
     yield* Console.log(`orc score recorded ${args.score} for ${args.step} in ${args.runId}`)
   })
 
-const chat = runChat(orcHomeDir(Bun.env.ORC_HOME), [process.execPath, Bun.main]).pipe(
+const chat = (sessionFile: string | null) => runChat(orcHomeDir(Bun.env.ORC_HOME), [process.execPath, Bun.main], sessionFile).pipe(
   Effect.provide(BunServices.layer),
   Effect.catchTag("ChatError", (error) => Console.error(error.message).pipe(Effect.andThen(Effect.fail("orc chat refused")))),
   Effect.flatMap((exitCode) => exitCode === 0 ? Effect.void : Effect.fail("pi exited " + String(exitCode)))
@@ -237,7 +237,7 @@ const program = Effect.gen(function*() {
       return yield* runInstallApp
     }
     case "Chat": {
-      return yield* chat
+      return yield* chat(args.sessionFile)
     }
     case "UsageError": {
       yield* Console.error(usageErrorText(args.detail, words))

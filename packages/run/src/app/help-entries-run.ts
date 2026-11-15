@@ -71,11 +71,11 @@ export const refusalsHelp: HelpEntry = {
 }
 
 export const chatHelp: HelpEntry = {
-  usage: ["orc chat"],
+  usage: ["orc chat [--session <file>]"],
   summary: "Talk to the orchestrator, which adds, holds and answers tasks",
   about: "Starts Pi on the model models.orchestrator names in config.json, with tools that add, hold, edit and answer backlog tasks and merge their PRs. It posts each closed task and event as it lands.",
-  options: [],
-  examples: ["orc chat"]
+  options: [{ flag: "--session <file>", meaning: "The Pi session file the chat keeps. A missing file starts a new chat that Pi writes there after its first reply, and an existing one resumes." }],
+  examples: ["orc chat", "orc chat --session ~/chats/orc.jsonl"]
 }
 
 export const appHelp: HelpEntry = {

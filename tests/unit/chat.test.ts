@@ -37,7 +37,7 @@ const piSeesAccount = async (providers: ReadonlyArray<object>, orchestrator: str
           : real.spawn(command)
       )
     })).pipe(Layer.provide(BunServices.layer))
-    const exit = await Effect.runPromise(runChat(home, ["orc"]).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+    const exit = await Effect.runPromise(runChat(home, ["orc"], null).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
     expect(exit).toBe(0)
     return await readFile(probe, "utf8")
   } finally {
@@ -50,7 +50,41 @@ const piSeesAccount = async (providers: ReadonlyArray<object>, orchestrator: str
   }
 }
 
+const piArgsFor = async (sessionFile: string | null): Promise<ReadonlyArray<string>> => {
+  const home = await mkdtemp(join(tmpdir(), "orc-chat-"))
+  const seen: Array<ReadonlyArray<string>> = []
+  try {
+    await writeFile(join(home, "config.json"), JSON.stringify({ providers: [loginProvider], models: { orchestrator: "opencode-go/model" } }))
+    const spawner = Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
+      const real = yield* ChildProcessSpawner.ChildProcessSpawner
+      return ChildProcessSpawner.make((command) => {
+        if (ChildProcess.isStandardCommand(command) && command.command === "pi") {
+          seen.push(command.args)
+          return real.spawn(ChildProcess.make("true", [], command.options))
+        }
+        return real.spawn(command)
+      })
+    })).pipe(Layer.provide(BunServices.layer))
+    await Effect.runPromise(runChat(home, ["orc"], sessionFile).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+    expect(seen).toHaveLength(1)
+    return seen[0] ?? []
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
+}
+
+const sessionArgsOf = (args: ReadonlyArray<string>): ReadonlyArray<string> =>
+  args.flatMap((arg, index) => args[index - 1] === "--session" ? ["--session", arg] : [])
+
 describe("runChat", () => {
+  test("a relative --session file reaches Pi as an absolute path, not as a session id Pi would search for", async () => {
+    expect(sessionArgsOf(await piArgsFor("chats/orc.jsonl"))).toEqual(["--session", join(process.cwd(), "chats/orc.jsonl")])
+  })
+
+  test("a chat with no --session passes Pi no --session instead of an empty one", async () => {
+    expect(sessionArgsOf(await piArgsFor(null))).toEqual([])
+  })
+
   test("a CLAUDE_CONFIG_DIR the shell exports does not override the orchestrator provider's env", async () => {
     expect(await piSeesAccount([packageProvider], "claude-bridge/claude-sonnet-5-5", "/accounts/main")).toBe("/accounts/second")
   })

@@ -1,4 +1,4 @@
-import { Console, Data, Effect, FileSystem, type Path } from "effect"
+import { Console, Data, Effect, FileSystem, Path } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { boardsVar } from "./chat-board"
 import { chatToolNames, orcCommandVar } from "./chat-tools"
@@ -58,7 +58,7 @@ const instructionsWords = (rules: ChatRules, instructions: ReadonlyArray<Project
 const instructionsPrompt = (entry: LoadedInstructions): string =>
   "The instructions file for the project " + entry.project + ", " + entry.file + ":\n\n" + entry.text
 
-const chatLaunch = (orcHome: string, model: string, rules: ChatRules, instructions: ReadonlyArray<LoadedInstructions>, self: Command): ChatLaunch => ({
+const chatLaunch = (orcHome: string, model: string, rules: ChatRules, instructions: ReadonlyArray<LoadedInstructions>, self: Command, sessionFile: string | null): ChatLaunch => ({
   command: [
     "pi",
     "--model",
@@ -68,14 +68,16 @@ const chatLaunch = (orcHome: string, model: string, rules: ChatRules, instructio
     "--tools",
     chatToolNames.join(","),
     ...(rules.kind === "loaded" ? ["--append-system-prompt", rules.file] : []),
-    ...instructions.flatMap((entry) => ["--append-system-prompt", instructionsPrompt(entry)])
+    ...instructions.flatMap((entry) => ["--append-system-prompt", instructionsPrompt(entry)]),
+    ...(sessionFile === null ? [] : ["--session", sessionFile])
   ],
   env: { [orcCommandVar]: JSON.stringify(self), [boardsVar]: orcHome + "/boards" }
 })
 
 export const runChat = (
   orcHome: string,
-  self: Command
+  self: Command,
+  sessionFile: string | null
 ): Effect.Effect<number, ChatError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const config = yield* readOrcConfig(orcHome).pipe(
@@ -88,7 +90,9 @@ export const runChat = (
     const rules = yield* chatRules(orcHome)
     const instructions = yield* chatInstructions(orcHome)
     yield* Console.log(rulesWords(rules) + instructionsWords(rules, instructions))
-    const launch = chatLaunch(orcHome, model, rules, instructions, self)
+    // Pi reads a value with no slash and no .jsonl as a session id to search for, and an absolute path is always a file.
+    const absoluteSession = sessionFile === null ? null : (yield* Path.Path).resolve(sessionFile)
+    const launch = chatLaunch(orcHome, model, rules, instructions, self, absoluteSession)
     const [program, ...args] = launch.command
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     // extendEnv lays this over the shell's environment, so the provider's env wins over an exported variable.

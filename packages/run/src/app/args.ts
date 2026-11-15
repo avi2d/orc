@@ -14,7 +14,7 @@ export type OrcArgs =
   | { readonly kind: "ScoreStep"; readonly runId: string; readonly step: string; readonly score: number; readonly note: string }
   | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly taskKind: RunKind; readonly delivery: RunDelivery; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly instructions: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
   | { readonly kind: "Dispatch"; readonly args: Exclude<DispatchArgs, { readonly kind: "UsageError" }> }
-  | { readonly kind: "Chat" }
+  | { readonly kind: "Chat"; readonly sessionFile: string | null }
   | { readonly kind: "InstallApp" }
   | { readonly kind: "UsageError"; readonly detail: string }
 const parseShowArgs = (rest: readonly string[]): OrcArgs => {
@@ -297,8 +297,19 @@ const parseAppArgs = (rest: readonly string[]): OrcArgs => {
   const [word = ""] = rest
   return rest.length === 1 && isAppWord(word) ? appSubcommands[word]() : { kind: "UsageError", detail: "orc app takes install" }
 }
-const parseChatArgs = (rest: readonly string[]): OrcArgs =>
-  rest.length === 0 ? { kind: "Chat" } : { kind: "UsageError", detail: `orc chat takes no argument: ${rest[0]}` }
+const parseChatArgs = (rest: readonly string[]): OrcArgs => {
+  if (rest.length === 0) {
+    return { kind: "Chat", sessionFile: null }
+  }
+  const [flag, file = "", ...extra] = rest
+  if (flag !== "--session") {
+    return { kind: "UsageError", detail: `orc chat takes only --session <file>: ${flag}` }
+  }
+  if (file === "" || file.startsWith("--") || extra.length > 0) {
+    return { kind: "UsageError", detail: "orc chat takes --session once, with a session file path" }
+  }
+  return { kind: "Chat", sessionFile: file }
+}
 
 const topLevelParsers = {
   run: parseRunArgs,
