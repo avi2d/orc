@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { laneFor, lanes, tasksInLane, titleClip, type BoardTask } from "../../../packages/herdr-app/src/board"
-import { boardBacklog, guardJson } from "../../../packages/herdr-app/src/guard"
+import { guardJson } from "../../../packages/herdr-app/src/guard"
+import { boardBacklog } from "../../../packages/herdr-app/src/guard-board"
 
 const task: BoardTask = {
   id: "orc-1", title: "A task", project: "orc", kind: "ship", created: "2026-01-01T00:00:00Z",

@@ -5,9 +5,23 @@
   "active": "orc-board",
   "header": { "content": { "mod": "orc-tabs" }, "height": 40 },
   "children": [
-    { "id": "orc-board", "type": "block", "content": { "mod": "orc-board" } },
+    {
+      "id": "orc-board",
+      "type": "row",
+      "children": [
+        { "id": "orc-board-lanes", "type": "block", "content": { "mod": "orc-board" } },
+        { "id": "orc-task", "type": "block", "size": { "px": 460 }, "min": 320, "content": { "mod": "orc-task" } }
+      ]
+    },
     { "id": "orc-resources", "type": "block", "content": { "mod": "orc-resources" } },
-    { "id": "orc-agents", "type": "block", "content": { "mod": "orc-agents" } }
+    {
+      "id": "orc-agents",
+      "type": "row",
+      "children": [
+        { "id": "orc-agents-runs", "type": "block", "content": { "mod": "orc-agents" } },
+        { "id": "orc-changes", "type": "block", "size": { "px": 460 }, "min": 280, "hidden": true, "content": { "mod": "orc-changes" } }
+      ]
+    }
   ],
   "floating": [
     { "id": "orc-drawer", "edge": "top", "align": "center", "content": { "mod": "orc-drawer" } }

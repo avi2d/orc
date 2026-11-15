@@ -9,7 +9,9 @@
     "./orc-board": "./mods/orc-board/main.ts",
     "./orc-resources": "./mods/orc-resources/main.ts",
     "./orc-agents": "./mods/orc-agents/main.ts",
-    "./orc-drawer": "./mods/orc-drawer/main.ts"
+    "./orc-task": "./mods/orc-task/main.ts",
+    "./orc-drawer": "./mods/orc-drawer/main.ts",
+    "./orc-changes": "./mods/orc-changes/main.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && bun scripts/build.ts",
