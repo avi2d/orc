@@ -30,7 +30,7 @@ The rules are your rules in `<ORC_HOME>/orchestrator.md` and the instructions fi
 
 Some questions never reach the decider.
 Before the call, orc checks the question's words against a fixed list of topics: deleting, security, keys or credentials, merging, pushing, releasing, spending, and anything that cannot be undone.
-Deleting matches remove and drop as well as delete.
+Deleting matches delete, remove, drop, erase, wipe, purge, destroy and rm.
 A question on that list goes to you, and its `decision` is `escalated` with the topic and the word that matched as its reason.
 The list is in the code, so neither your rules nor the policy can widen what the decider answers.
 
@@ -38,7 +38,7 @@ The decider takes one of four actions, and the item keeps it as a `decision` wit
 
 - **answer**: the reply names the answer, the reason and the `rule` it rests on, quoted word for word from your rules, the project's instructions, the policy or the task's body.
   Orc escalates an answer whose quote is no whole sentence or line of them, after whitespace is collapsed and surrounding quotes and a leading list or quote marker are stripped on both sides.
-  A quote matches a whole line, a sentence within a line, or a sentence of a paragraph joined across its lines.
+  A quote matches a whole line, a sentence within a line, a whole paragraph joined across its lines, or a sentence of that joined paragraph.
   The answer goes to the task as `orc backlog answer` would give it, so the item closes with the answer's words.
   The `decision` is `answered` with the reason and the `rule`, which holds the `quote` and the `source` file it came from.
 - **ask back**: for a `worker-question`, the decider may put one question to the worker instead of answering.
