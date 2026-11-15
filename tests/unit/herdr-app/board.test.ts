@@ -49,9 +49,9 @@ test("a closed task without an open PR, including one no beat has read, is not i
   expect(laneFor({ ...task, status: "closed", prState: "closed" }, new Set())).toBe("Done")
 })
 
-const queuedEntry = (task: string, machine: string | null, ahead?: number) => ({
-  id: null, project: "/home/sam/work/orc", branch: `orc/${task}`, status: null, state: "queued", prLink: null, title: null, step: null,
-  currentStep: null, questions: 0, endReason: null, kind: null, delivery: null, task, machine, worktree: null, ...(ahead === undefined ? {} : { ahead })
+const queuedEntry = (taskId: string, machine: string | null, ahead?: number) => ({
+  id: null, project: "/home/sam/work/orc", branch: `orc/${taskId}`, status: null, state: "queued", prLink: null, title: null, step: null,
+  currentStep: null, questions: 0, endReason: null, kind: null, delivery: null, task: taskId, machine, worktree: null, ...(ahead === undefined ? {} : { ahead })
 })
 
 const startedRun = {
