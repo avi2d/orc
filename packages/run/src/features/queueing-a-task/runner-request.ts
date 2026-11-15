@@ -1,7 +1,7 @@
 import { Effect, FileSystem, Option, Path, Schema } from "effect"
-import { AbsolutePath, readFailure } from "../../shared/config/index"
+import { AbsolutePath, readDispatchConfig, readFailure } from "../../shared/config/index"
 import { ProviderId } from "../../shared/config/index"
-import { TaskId, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type TaskRecord, withDecisions } from "../../entities/backlog/index"
+import { TaskId, backlogPaths, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type TaskRecord, withDecisions } from "../../entities/backlog/index"
 import { TaskInstructions, readInstructions } from "./runner-instructions"
 import { RunnerError } from "../../shared/process/index"
 import { isRunDelivery } from "../../shared/config/index"
@@ -17,6 +17,7 @@ const taskFields = {
   branch: Schema.optional(Schema.String.check(Schema.isPattern(/^[A-Za-z0-9._/-]+$/))),
   resumeRun: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
   machine: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
+  slots: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   answers: Schema.optional(Schema.Array(Schema.Struct({
     question: Schema.String.check(Schema.isPattern(/^[^\s=]+$/)),
     answer: Schema.String.check(Schema.isNonEmpty())
@@ -47,6 +48,23 @@ const readTakenRecord = (fs: FileSystem.FileSystem, file: string): Effect.Effect
 
 // The beat sets ORC_TASK_FILE to the task's file in the taken folder of its backlog.
 const backlogOfTaken = (path: Path.Path, file: string): string => path.dirname(path.dirname(file))
+
+const readSlots = (path: Path.Path, file: string, env: Readonly<Record<string, string | undefined>>): Effect.Effect<{ readonly slots?: number }, RunnerError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const name = env["ORC_TASK_MACHINE"] ?? ""
+    if (name === "") {
+      return {}
+    }
+    const dispatchFile = backlogPaths(backlogOfTaken(path, file)).dispatchConfig
+    const config = yield* readDispatchConfig(dispatchFile).pipe(
+      Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot read the slots of " + name + ": " + error.file + ": " + error.detail }))
+    )
+    const machine = config.machines.find((entry) => entry.name === name)
+    if (machine === undefined) {
+      return yield* refuse("orc runner start cannot read the slots of " + name + ": the machine is not in " + dispatchFile)
+    }
+    return { slots: machine.slots }
+  })
 
 const decidedBody = (path: Path.Path, file: string, record: TaskRecord): Effect.Effect<string, RunnerError, FileSystem.FileSystem> =>
   readAnsweredDependencies(backlogOfTaken(path, file), record).pipe(
@@ -144,7 +162,8 @@ export const readRequest = (
     const record = yield* readTakenRecord(fs, file)
     const body = yield* decidedBody(path, file, record)
     const resume = yield* takenResume(task, record)
-    const fields = yield* readRequestFields(task, checkout, provider, env, record, body, resume)
+    const slots = yield* readSlots(path, file, env)
+    const fields = yield* readRequestFields(task, checkout, provider, env, record, body, { ...resume, ...slots })
     const tokenFile = env["ORC_TASK_TOKEN_FILE"] ?? ""
     if (tokenFile !== "") {
       return yield* finishFileRequest(fields, task, tokenFile)

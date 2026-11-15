@@ -1,5 +1,6 @@
 import { type Guard, type Guarded, arrayOf, boardKinds, child, fields, literal, nullableString, number, ok, oneOf, prStates, refused, runsHead, string } from "./guard"
 import type { Answer, Asked, TaskDetail, TaskHold, TaskParked, TaskRun, TaskState } from "./task"
+import { type Thread, type ThreadLine, threadKinds, threadWhos } from "./thread"
 
 type Fields = Readonly<Record<string, unknown>>
 
@@ -48,8 +49,6 @@ const hold: Guard<TaskHold> = (value, at) => {
   if (given.kind === "refused") return given
   return ok({ reason: reason.value, until: until.value, at: when.value, questions: questions.value, answer: given.value })
 }
-
-
 
 const parked: Guard<TaskParked> = (value, at) => {
   const record = fields(value, at)
@@ -160,4 +159,30 @@ export const taskRuns: Guard<ReadonlyArray<TaskRun>> = (value, at) => {
   if (document.kind === "refused") return document
   const listed = arrayOf(document.value.record, "runs", at, taskRun)
   return listed.kind === "refused" ? listed : ok(listed.value.filter((entry) => entry !== null))
+}
+
+const threadLine: Guard<ThreadLine> = (value, at) => {
+  const record = fields(value, at)
+  if (record.kind === "refused") return record
+  const when = nullableString(record.value, "at", at)
+  if (when.kind === "refused") return when
+  const who = oneOf(record.value, "who", at, threadWhos)
+  if (who.kind === "refused") return who
+  const kind = oneOf(record.value, "kind", at, threadKinds)
+  if (kind.kind === "refused") return kind
+  const id = nullableString(record.value, "id", at)
+  if (id.kind === "refused") return id
+  const text = string(record.value, "text", at)
+  return text.kind === "refused" ? text : ok({ at: when.value, who: who.value, kind: kind.value, id: id.value, text: text.value })
+}
+
+export const thread: Guard<Thread> = (value, at) => {
+  const record = fields(value, at)
+  if (record.kind === "refused") return record
+  const schema = literal(record.value, "schema", at, "orc.thread.v1")
+  if (schema.kind === "refused") return schema
+  const task = string(record.value, "task", at)
+  if (task.kind === "refused") return task
+  const entries = arrayOf(record.value, "entries", at, threadLine)
+  return entries.kind === "refused" ? entries : ok({ task: task.value, entries: entries.value })
 }
