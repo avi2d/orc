@@ -67,7 +67,6 @@ A Claude quota read through claude-bridge prints this document.
 The quota command may instead print the document of `quota-axi --full --json --provider <id>`, such as `["quota-axi", "--full", "--json", "--provider", "codex"]`.
 Orc reads a document with a `providers` key this way.
 An account named in `dispatch.json` reads the provider entry whose `accountKey` or `accountKeys` names it.
-When the quota names one account and the document holds one entry, that entry reads for the account whatever its key.
 The account's room is the `effectivePercentRemaining` of the entry's `all_models` scope under `quotaSemantics`, so a Codex code review window does not count.
 The account's reset time is the `resetsAt` of the scope's limiting window, the latest one when several tie, and the beat line prints it after the room.
 An entry with no window or no `all_models` percent cannot run, and the reason names its quota-axi state when that state is not fresh.

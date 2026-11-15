@@ -51,14 +51,14 @@ const opencodeGo = {
 
 describe("assessQuota on a quota-axi document", () => {
   test("a Codex document reads the all_models percent and the reset of its limiting window", () => {
-    const reading = assessQuota(codex, settings("main"))
+    const reading = assessQuota(codex, settings("codex-home"))
     expect(reading).toEqual({
       kind: "read",
       floorPercent: 15,
-      accounts: [{ account: "main", kind: "usable", remainingPercent: 30, resetsAt: "2026-11-15T19:43:54.000Z" }],
-      pick: "main"
+      accounts: [{ account: "codex-home", kind: "usable", remainingPercent: 30, resetsAt: "2026-11-15T19:43:54.000Z" }],
+      pick: "codex-home"
     })
-    expect(describeQuota(reading)).toBe("quota: main 30% left until 2026-11-15T19:43:54.000Z, floor 15%: runs use main")
+    expect(describeQuota(reading)).toBe("quota: codex-home 30% left until 2026-11-15T19:43:54.000Z, floor 15%: runs use codex-home")
   })
   test("an opencode-go document reads the weekly window that bounds it below the rolling and monthly ones", () => {
     expect(assessQuota(opencodeGo, settings("default"))).toEqual({
@@ -79,10 +79,10 @@ describe("assessQuota on a quota-axi document", () => {
   })
   test("an entry with no all_models percent cannot run and says why", () => {
     const stale = { ...codex, providers: [{ ...codex.providers[0], state: { status: "auth_required", stale: true }, quotaSemantics: { status: "unknown", effectiveAvailability: [] } }] }
-    expect(assessQuota(stale, settings("main"))).toEqual({
+    expect(assessQuota(stale, settings("codex-home"))).toEqual({
       kind: "read",
       floorPercent: 15,
-      accounts: [{ account: "main", kind: "unusable", reason: "quota-axi reads no all_models remaining percent for codex, its state is auth_required" }],
+      accounts: [{ account: "codex-home", kind: "unusable", reason: "quota-axi reads no all_models remaining percent for codex, its state is auth_required" }],
       pick: null
     })
   })

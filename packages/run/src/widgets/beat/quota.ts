@@ -60,7 +60,8 @@ const readQuotaAxiAccount = (entry: QuotaAxiProvider | undefined, account: strin
   if (entry === undefined) {
     return { account, kind: "unusable", reason: "the quota-axi document names no account key " + account }
   }
-  const stateNote = entry.state?.error ?? (entry.state === undefined || entry.state.status === "fresh" ? "" : "its state is " + entry.state.status)
+  const statusNote = entry.state === undefined || entry.state.status === "fresh" ? "" : "its state is " + entry.state.status
+  const stateNote = entry.state?.error === undefined ? statusNote : statusNote === "" ? entry.state.error : statusNote + ": " + entry.state.error
   const unusable = (reason: string): AccountReading => ({ account, kind: "unusable", reason: stateNote === "" ? reason : reason + ", " + stateNote })
   if (entry.windows.length === 0) {
     return unusable("quota-axi names no window for " + entry.provider)
@@ -91,11 +92,7 @@ const assessQuotaAxi = (document: unknown, settings: QuotaSettings): QuotaReadin
   if (duplicate !== null) {
     return { kind: "unread", reason: "the quota-axi document names the account key " + duplicate + " twice" }
   }
-  const [only] = entries
-  return settings.accounts.map(({ name }) => {
-    const named = entries.find((entry) => accountKeysOf(entry).includes(name))
-    return readQuotaAxiAccount(named ?? (entries.length === 1 && settings.accounts.length === 1 ? only : undefined), name)
-  })
+  return settings.accounts.map(({ name }) => readQuotaAxiAccount(entries.find((entry) => accountKeysOf(entry).includes(name)), name))
 }
 
 const readAccount = (entry: QuotaAccount | undefined, account: string): AccountReading => {
