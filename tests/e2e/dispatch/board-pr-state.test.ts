@@ -31,7 +31,7 @@ test("backlog distinguishes a scout PR's open, closed and merged states instead 
       })))(await orcOk(fixture, ["backlog", "--json"])).tasks
       return new Map(tasks.map((task) => [task.id, task.prState] as const))
     }
-    expect(await readStates()).toEqual(new Map([["orc-1", null], ["orc-2", null]]))
+    expect(await readStates()).toEqual(new Map([["orc-1", "open"], ["orc-2", "open"]]))
     await writeFile(state1, "OPEN")
     await writeFile(state2, "OPEN")
     await orcOk(fixture, ["beat"])

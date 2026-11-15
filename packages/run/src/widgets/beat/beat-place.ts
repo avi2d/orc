@@ -1,6 +1,6 @@
 import { deliveryFor, type RunDelivery } from "../../shared/config/index"
 import { checkoutOn, type DispatchConfig, type Machine, modeOf, type Project } from "../../shared/config/index"
-import { answerWait, decisionWait, type DeciderOwns, type TaskRecord, childCount, dependencyWaits, missingOriginWait, taskPriorities } from "../../entities/backlog/index"
+import { answerWait, decisionWait, type DeciderOwns, type TaskRecord, childCount, dependencyWaits, isHeld, missingOriginWait, taskPriorities } from "../../entities/backlog/index"
 
 export interface MachineRoom {
   readonly machine: string
@@ -39,17 +39,12 @@ const parkedOriginWait = (task: TaskRecord): string | null =>
     ? missingOriginWait(task.spec.id)
     : null
 
-export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>, deciderOwns: DeciderOwns): string | null => {
-  if (task.spec.kind === "decision") {
-    return decisionWait
-  }
-  if (task.spec.priority === null) {
-    return "no priority"
-  }
-  const held = answerWait(task, deciderOwns) ?? parkedOriginWait(task)
-  if (held !== null) {
-    return held
-  }
+export interface TaskWait {
+  readonly kind: "no-priority" | "decision" | "held" | "parked" | "depends"
+  readonly detail: string
+}
+
+const dependsWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>): string | null => {
   const children = task.spec.kind === "parent" ? childrenWait(task, tasks, merged) : null
   if (children !== null) {
     return children
@@ -65,6 +60,28 @@ export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>, mer
   }
   return null
 }
+
+export const taskWaiting = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>, deciderOwns: DeciderOwns): TaskWait | null => {
+  if (task.spec.kind === "decision") {
+    return { kind: "decision", detail: decisionWait }
+  }
+  if (task.spec.priority === null) {
+    return { kind: "no-priority", detail: "no priority" }
+  }
+  const answer = answerWait(task, deciderOwns)
+  if (answer !== null) {
+    return { kind: isHeld(task) ? "held" : "parked", detail: answer }
+  }
+  const origin = parkedOriginWait(task)
+  if (origin !== null) {
+    return { kind: "parked", detail: origin }
+  }
+  const depends = dependsWait(task, tasks, merged)
+  return depends === null ? null : { kind: "depends", detail: depends }
+}
+
+export const taskWait = (task: TaskRecord, tasks: ReadonlyArray<TaskRecord>, merged: ReadonlySet<string>, deciderOwns: DeciderOwns): string | null =>
+  taskWaiting(task, tasks, merged, deciderOwns)?.detail ?? null
 
 export interface Placed {
   readonly kind: "place"

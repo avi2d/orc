@@ -1,5 +1,5 @@
 import { Effect, FileSystem, Schema } from "effect"
-import { BacklogError, platformFailure, readIfPresent, scratchName } from "../backlog/index"
+import { BacklogError, platformFailure, readIfPresent, scratchName, writeAtomic } from "../backlog/index"
 
 const PrState = Schema.Literals(["open", "closed", "merged"])
 export type PrState = typeof PrState.Type
@@ -26,6 +26,5 @@ export const writePrState = (root: string, id: string, pr: string, state: PrStat
     const text = yield* Schema.encodeEffect(PrReading)({ pr, state }).pipe(
       Effect.mapError((error) => new BacklogError({ detail: "cannot write " + file + ": " + error.message }))
     )
-    yield* fs.writeFileString(scratch, text).pipe(Effect.mapError(platformFailure("write " + scratch)))
-    yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
+    yield* writeAtomic(scratch, file, text)
   })

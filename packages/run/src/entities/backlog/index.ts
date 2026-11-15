@@ -5,6 +5,7 @@ export {
   noBacklog,
   readIfPresent,
   scratchName,
+  writeAtomic,
   publishOnce,
   backlogRoot,
   backlogPaths,

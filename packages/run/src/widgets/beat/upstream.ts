@@ -1,6 +1,6 @@
 import { Duration, Effect, FileSystem, Option, Result, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { addTask, BacklogError, platformFailure, readIfPresent, scratchName } from "../../entities/backlog/index"
+import { addTask, BacklogError, platformFailure, readIfPresent, scratchName, writeAtomic } from "../../entities/backlog/index"
 import type { BeatAction } from "../../entities/attention/index"
 import { type Contribution, contributionId, type Project } from "../../shared/config/index"
 import { recordEvent } from "../../entities/events/index"
@@ -103,8 +103,7 @@ const writeSeen = (root: string, project: string, contribution: Contribution, se
       Effect.mapError((error) => new BacklogError({ detail: "cannot write " + file + ": " + error.message }))
     )
     const scratch = scratchName(folder, contributionId(contribution))
-    yield* fs.writeFileString(scratch, text).pipe(Effect.mapError(platformFailure("write " + scratch)))
-    yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
+    yield* writeAtomic(scratch, file, text)
   })
 
 const shortName = (contribution: Contribution): string => contribution.owner + "/" + contribution.repo + "#" + String(contribution.number)

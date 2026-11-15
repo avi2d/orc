@@ -1,9 +1,9 @@
 import { Console, DateTime, Effect, FileSystem, Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import type { DispatchArgs } from "./dispatch-args"
-import { backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted, runLabel, backlogPresent, backlogRoot as backlogRootOf, noBacklog, taskPr, type TaskFileError } from "../entities/backlog/index"
+import { backlogPaths, BacklogError, closeStartedTask, findTask, listTasks, markPosted, runLabel, backlogPresent, backlogRoot as backlogRootOf, noBacklog, type TaskFileError } from "../entities/backlog/index"
 import { readAttention, routeTaskItems } from "../entities/attention/index"
-import { backlogJson, type BacklogView, beatJson, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readRoom, recordOrigin, type RoomList, runBeat, runnerLoadText } from "../widgets/beat/index"
+import { backlogJson, type BacklogView, beatJson, deciderOwnership, formatBeat, formatBoard, liveSources, type ProjectList, readBeatWaits, readRoom, recordOrigin, type RoomList, runBeat, runnerLoadText, taskPrState } from "../widgets/beat/index"
 import { answerItemText, attentionText } from "../features/attention-list/index"
 import { dropTask, edit, holdTask, prioritizeTask, priorityLine, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
 import { answerTask } from "../entities/parked-runs/index"
@@ -12,7 +12,7 @@ import { holdRun, killHeld, queueFromText, renewTask, startTask, stopNow, format
 import { mergeTask } from "../features/merging-a-pr/index"
 import { RunnerError, type Command } from "../shared/process/index"
 import { encodeToken, sessionToken } from "../entities/token/index"
-import { markEventPosted, mergedIds, readPrState, unpostedEvents } from "../entities/events/index"
+import { markEventPosted, mergedIds, unpostedEvents } from "../entities/events/index"
 import { noteTask, threadText } from "../features/task-thread/index"
 import { runHeavy, startHeavyWatch } from "../features/heavy-commands/index"
 
@@ -47,20 +47,18 @@ const readView = (root: string): Effect.Effect<BacklogView, BacklogError | TaskF
     )
     const events = yield* unpostedEvents(root)
     const merged = yield* mergedIds(root)
-    const prStates = new Map(yield* Effect.forEach(tasks, (task) => {
-      const pr = taskPr(task)
-      return pr === null ? Effect.succeed([task.spec.id, null] as const) : Effect.map(readPrState(root, task.spec.id, pr), (value) => [task.spec.id, value] as const)
-    }))
+    const prStates = new Map(yield* Effect.forEach(tasks, (task) => Effect.map(taskPrState(root, task), (state) => [task.spec.id, state] as const)))
+    const beatWaits = yield* readBeatWaits(root)
     const deciderOwns = deciderOwnership(yield* readAttention(root, tasks))
     if (reading.kind === "unread") {
-      return { tasks, events, projects: reading, room: reading, merged, prStates, deciderOwns }
+      return { tasks, events, projects: reading, room: reading, merged, prStates, beatWaits, deciderOwns }
     }
     const projects = yield* readProjects(paths.projects, reading.config.machines).pipe(
       Effect.map((list): ProjectList => ({ kind: "read", projects: list })),
       Effect.catchTag("ConfigError", (error) => Effect.succeed<ProjectList>({ kind: "unread", reason: failure(error) }))
     )
     const room: RoomList = { kind: "read", room: readRoom(reading.config.machines, tasks) }
-    return { tasks, events, projects, room, merged, prStates, deciderOwns }
+    return { tasks, events, projects, room, merged, prStates, beatWaits, deciderOwns }
   })
 
 const refuse = (detail: string) => Effect.fail(new BacklogError({ detail }))
