@@ -94,6 +94,18 @@ describe("a relayed answer", () => {
       expect(parked.parked?.questions).toEqual([{ ...r2, asked: second, blocks: true, answer: null }])
     })
   })
+  test("a task parked twice on one question id resumes on one answer instead of staying parked after its only open question is answered", async () => {
+    await withBacklog(async (root) => {
+      await startStarted(root)
+      await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked: first }], "2026-10-27T10:05:00.000Z"))
+      await run(answerTask(root, "orc-1", "r2=Keep it", "2026-10-27T10:06:00.000Z"))
+      await run(claimTask(root, "orc-1"))
+      await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:10:00.000Z", log: root + "/logs/orc-1.log" } } }))
+      const parked = await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked: first }, { ...r2, asked: second }], "2026-10-27T10:35:00.000Z"))
+      expect(parked.parked?.questions).toEqual([{ ...r2, asked: second, blocks: true, answer: null }])
+      expect(await run(answerTask(root, "orc-1", "r2=Restore it", "2026-10-27T10:36:00.000Z"))).toMatchObject({ kind: "question", question: "r2", open: [] })
+    })
+  })
   test("a question parked with no wait is stamped with the park time instead of left with no asking", async () => {
     await withBacklog(async (root) => {
       await startStarted(root)
