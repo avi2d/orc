@@ -108,7 +108,8 @@ export const parkStartedTask = (
       const lastAsking = asked.find((question) => question.asked !== undefined)?.asked ?? null
       const questions = parkedQuestions(open, record.parked?.questions ?? [], lastAsking, (question) => question.asked ?? at)
       yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null))
-      const origin = run === undefined ? record.parked?.origin : { machine: record.state.claim.machine, run }
+      const sentPr = record.parked?.origin?.pr
+      const origin = run === undefined ? record.parked?.origin : { machine: record.state.claim.machine, run, ...(sentPr === undefined ? {} : { pr: sentPr }) }
       const parked: TaskRecord = { ...record, parked: { branch, questions, ...(origin === undefined ? {} : { origin }) }, state: { kind: "new" } }
       if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(parked)))) {
         return yield* new BacklogError({ detail: "new/ already holds " + id })
@@ -289,10 +290,12 @@ export const sendBackClosedTask = (
     const { fs, paths, file, grabbed, putBack, read } = yield* grabIn(root, "closed", id, Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" })))
     const send = Effect.gen(function*() {
       const record = yield* parseTaskFile(file, "closed", yield* read)
-      if (ranClosing(record) === null) {
+      const ran = ranClosing(record)
+      if (ran === null) {
         return yield* new BacklogError({ detail: id + " closed without a run, so it has no branch to send back" })
       }
-      const sent: TaskRecord = { ...record, parked: { branch: taskBranch(id), questions: [sendBackQuestion(sendBackQuestionId, words, at)], origin }, state: { kind: "new" } }
+      const parked: Parked = { branch: taskBranch(id), questions: [sendBackQuestion(sendBackQuestionId, words, at)], origin: ran.pr === null ? origin : { ...origin, pr: ran.pr } }
+      const sent: TaskRecord = { ...record, parked, state: { kind: "new" } }
       if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(sent)))) {
         return yield* new BacklogError({ detail: "new/ already holds " + id })
       }

@@ -46,6 +46,11 @@ test("finds a task's runs by its exact branch instead of a branch it prefixes", 
   expect(runsOfTask(runs, "orc-3").map((run) => run.id)).toEqual(["r1"])
 })
 
+test("finds a parent task's planning run on its parent branch instead of showing no runs", () => {
+  const runs = [{ id: "r1", branch: "orc/orc-3-parent", machine: null }, { id: "r2", branch: "orc/orc-34-parent", machine: null }]
+  expect(runsOfTask(runs, "orc-3").map((run) => run.id)).toEqual(["r1"])
+})
+
 test("opens the newest run in the local list instead of a newer run outside it", () => {
   const runs = runsOfTask([{ id: "20261113-100000-a", branch: "orc/orc-34", machine: "mac" }, { id: "20261113-120000-b", branch: "orc/orc-34", machine: null }], "orc-34")
   expect(runToOpen(runs, new Set(["20261113-100000-a"]))).toBe("20261113-100000-a")

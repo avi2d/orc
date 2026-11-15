@@ -77,7 +77,7 @@ Each lane lists its tasks oldest first.
 The panel shows the id, the kind and the title of the selected task, and ✕ to close the panel.
 When `orc runs --json --local` lists a run of the task, Open run switches to the Agents tab with the newest such run selected.
 A run outside that list has no Open run, since the Agents tab shows those runs only.
-A run belongs to the task when its branch is `orc/<task id>`.
+A run belongs to the task when its branch is `orc/<task id>` or, for a parent task's planning run, `orc/<task id>-parent`.
 
 The panel has three tabs:
 
