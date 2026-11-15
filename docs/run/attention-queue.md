@@ -29,8 +29,11 @@ Its prompt holds the rules it reads, each under a label that names its file, the
 The rules are your rules in `<ORC_HOME>/orchestrator.md` and the instructions file of the task's project in `projects.json`, each when it exists.
 
 Some questions never reach the decider.
-Before the call, orc checks the question's words against a fixed list of topics: deleting, security, keys or credentials, merging, pushing, releasing, spending, and anything that cannot be undone.
+Before the call, orc checks the question's words against a fixed list of topics: deleting, security, keys or credentials, merging, pushing, releasing, spending, anything that cannot be undone, a site's look, legal text, and logins.
 Deleting matches delete, remove, drop, erase, wipe, purge, destroy and rm.
+A site's look matches look, appearance, visual, screenshot and preview.
+Legal text matches legal, law, privacy policy, terms of use, consent and offer.
+Logins match login, log in, sign in, auth, authentication, authorization and oauth.
 A question on that list goes to you, and its `decision` is `escalated` with the topic and the word that matched as its reason.
 The list is in the code, so neither your rules nor the policy can widen what the decider answers.
 

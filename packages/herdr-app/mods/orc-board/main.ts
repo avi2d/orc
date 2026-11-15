@@ -3,7 +3,7 @@ import { h_flex, v_flex } from "gpui-base"
 import { setShared, shared } from "herdr"
 import { refreshWhenShown, selectedTaskKey } from "../../src/views"
 import { type BoardTask, type Lane, kindLabel, lanes, tasksInLane, titleClip } from "../../src/board"
-import { type BoardAttention, type BoardBacklog, boardAttention, boardBacklog } from "../../src/guard"
+import { type BoardAttention, type BoardBacklog, boardAttention, boardBacklog } from "../../src/guard-board"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 

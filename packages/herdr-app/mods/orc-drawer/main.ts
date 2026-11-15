@@ -293,7 +293,7 @@ export default class OrcDrawer extends View {
       return this.closeOnEscape(v_flex().size_full().bg(t.surface).child(turnsView(t, this.turns, { thinking: this.openThinking, calls: this.openCalls }, {
         toggleThinking: (turn, cx) => this.flip(this.openThinking, turn, cx),
         toggleCall: (call, cx) => this.flip(this.openCalls, call, cx)
-      }, this.scroll)))
+      }, this.scroll, { reading: "Reading the chat's Pi session", empty: "No turn yet. Type a message in Raw and its reply shows here." })))
     }
     return this.problem === null ? div() : div().px(12).py(6).text_size(13).text_color(t.ansi1).child(this.problem)
   }

@@ -22,7 +22,7 @@ To install the layout:
 1. Run `herdr-app do layout.switch --name orc`, or press the `layout.switch` key until the `orc` layout shows.
    Check `keys.json` for your `layout.switch` binding.
 
-`orc app install` copies the mods `orc-tabs`, `orc-board`, `orc-task`, `orc-resources`, `orc-agents` and `orc-drawer` into `~/.config/herdr-app/mods/`.
+`orc app install` copies the mods `orc-tabs`, `orc-board`, `orc-task`, `orc-resources`, `orc-agents`, `orc-changes` and `orc-drawer` into `~/.config/herdr-app/mods/`.
 It copies `orc.json` and its preview `orc.svg` into `~/.config/herdr-app/layouts/`.
 It adds `cmd-1`, `cmd-2`, `cmd-3` and `cmd-k` to the `layout:orc` section of `~/.config/herdr-app/keys.json`.
 A key you already set in that section stays, and the command prints it as skipped.
@@ -34,14 +34,18 @@ The command writes only names that start with `orc`, so Herdr's own mods and lay
 | --- | --- | --- |
 | Board | `cmd-1` | The backlog tasks in five lanes, and the selected task beside them |
 | Resources | `cmd-2` | Each subscription's quota windows, and each machine's cores, load, memory, disk and running orc runs |
-| Agents | `cmd-3` | The runs and the queued tasks, and the selected run's steps and step output |
+| Agents | `cmd-3` | The runs and the queued tasks, and the selected run's steps, step output and changes |
 
 Board reads `orc backlog --json` and `orc attention --json` when shown and every 10 seconds while shown.
 The task panel beside it reads `orc backlog --json`, `orc runs --json`, `orc runs --json --local` and `orc backlog thread <task> --json` for the selected task on the same schedule.
 It reads them again as soon as you select another card.
 Resources reads `orc-dash snapshot --json --only quota,resources,queues` when shown and every minute.
 Agents reads `orc runs --json --local` and `orc backlog --json` again every 4 seconds while it is the shown tab.
-It also reads the selected run with `orc show <run> --json` and the selected step with `orc log <run> <step-id>`.
+It also reads the selected run with `orc show <run> --json`.
+It reads the selected step's log with `orc log <run> <step-id>` when the step shows its log.
+To label each card it reads `orc show <run> --json` once for each listed ended run and again on every 4 second refresh for each running run, at most 4 at a time.
+For the Turns view it reads the Pi session file that `orc show` names for the step.
+For the Changes column it runs `git rev-parse`, `git merge-base` and `git diff` in the run's worktree.
 When a command fails or prints a document the tab cannot read, the tab shows the command and why.
 
 ## Read the Board tab
@@ -162,6 +166,8 @@ It saves the window with the App's own `shot` command, which needs no screen-rec
 
 The Agents tab lists one card for each run, and one for each task still to start.
 A card gives the task id and kind, or the run id and kind for a run started outside the backlog, the title, and where the run is now, such as `Fix 1`, `Question 1`, `Approve PR #48` or `orc exited 1`.
+Before where the run is, a card names the model and the thinking level of the run's Agent step, such as `claude-opus-5-5 high`.
+A run that recorded no model shows only where it is.
 The cards sort by status in this order: Awaiting you, Running, Queued, Failed and Done.
 
 | Status | When |
@@ -179,8 +185,42 @@ The middle column lists the selected run's steps, those done and those still to 
 A report run shows only its Agent step.
 A ship run shows Agent, Checks, Fix when checks fail, and No mistakes for the standard delivery or PR for a direct PR delivery.
 A step shows ✓ when it passed, ✗ when it failed, ● while it runs, ◆ while it waits for you, and ○ when it has not started.
-Select a step to show its output on the right: the Agent and Fix steps show what Pi writes as it works, and a Checks step shows the checks' output.
-The output shows the full log and follows new lines as they are written.
+A step names its model only when that model differs from the Agent step's.
+Select a step to show it on the right, under a bar that gives the step, its model and its thinking level.
+The Agent step opens in the Turns view, with one card for each reply of the model, as [Chat with orc](#chat-with-orc) describes.
+Turns reads the step's Pi session file, and follows new replies as Pi writes them.
+Select Raw in the bar to show the step's log instead, and select Turns to go back.
+Every other step shows its log: a Fix step shows what Pi writes as it works, and a Checks step shows the checks' output.
+The log shows in full and follows new lines as they are written.
+
+![Agents tab with a running run's Agent step in the Turns view and its Changes column](images/herdr-agents-turns.png)
+
+### Approve a run's PR
+
+A Code run whose PR waits for your word ends in an Approve step, and the tab opens on it.
+
+![Agents tab on the Approve step of a run whose PR waits](images/herdr-agents-approve.png)
+
+To merge the PR:
+
+1. Select the Approve step.
+1. Select Approve and merge.
+1. Confirm in the dialog that opens.
+
+The tab runs `orc merge <task> --basis captain-word`, and the button reads Merging until the command ends.
+When the command fails, its first line of output shows under the button.
+
+![Agents tab on an Approve step after a merge that failed](images/herdr-agents-merge-failed.png)
+
+### Read a run's changes
+
+When the selected run changed files, a Changes column opens on the right.
+It lists each changed file with its added and deleted line counts, and `binary` for a binary file.
+Select a file to show its diff below the list.
+The column compares the run's branch with the commit where it left `origin/HEAD`, in the run's worktree.
+A run with no changed file, a run that recorded no worktree, and a run whose worktree is gone show no Changes column.
+When git fails, the steps column gives the reason.
+
 Use your `layout.switch` key to go back to your own layout.
 
 ## Chat with orc
