@@ -6,7 +6,7 @@ import { taskWait } from "./beat-place"
 const BeatWait = Schema.Struct({ task: Schema.String, reason: Schema.String })
 type BeatWait = typeof BeatWait.Type
 
-const BeatWaitsFile = Schema.fromJsonString(Schema.Struct({ beat: Schema.String, at: Schema.String, waits: Schema.Array(BeatWait) }))
+const BeatWaitsFile = Schema.fromJsonString(Schema.Struct({ at: Schema.String, waits: Schema.Array(BeatWait) }))
 
 export type BeatWaits = Pick<typeof BeatWaitsFile.Type, "at"> & { readonly reasons: ReadonlyMap<string, string> }
 
@@ -26,12 +26,12 @@ export const readBeatWaits = (root: string): Effect.Effect<BeatWaits | null, Bac
   })
 
 // rename(2) replaces the file whole, so a reader sees one beat's waits and never a mix of two.
-export const writeBeatWaits = (root: string, beat: string, at: string, waits: ReadonlyArray<BeatWait>): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+export const writeBeatWaits = (root: string, at: string, waits: ReadonlyArray<BeatWait>): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const file = beatWaitsFile(root)
     const scratch = scratchName(root, "waits")
-    const text = yield* Schema.encodeEffect(BeatWaitsFile)({ beat, at, waits }).pipe(
+    const text = yield* Schema.encodeEffect(BeatWaitsFile)({ at, waits }).pipe(
       Effect.mapError((error) => new BacklogError({ detail: "cannot write " + file + ": " + error.message }))
     )
     yield* fs.writeFileString(scratch, text).pipe(Effect.mapError(platformFailure("write " + scratch)))

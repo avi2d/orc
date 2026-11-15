@@ -368,7 +368,7 @@ export const runBeat = (
     const fresh: BeatContext = { ...context, tasks: latest, overloaded }
     const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, deciderOwns, task))
-    yield* openRunDeaths(root, actions, at).pipe(Effect.andThen(writeBeatWaits(root, beat, at, roomWaits(queued, actions, fresh.tasks, fresh.merged, deciderOwns))))
+    yield* openRunDeaths(root, actions, at).pipe(Effect.andThen(writeBeatWaits(root, at, roomWaits(queued, actions, fresh.tasks, fresh.merged, deciderOwns))))
     const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at))
     return { beat, at, quota, room: readRoom(config.machines, latest), actions: [
         ...reported,
