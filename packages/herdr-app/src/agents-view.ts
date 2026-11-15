@@ -3,6 +3,7 @@ import { Input, type InputState, type ScrollHandle, h_flex, v_flex } from "gpui-
 import { openOverlay, settings } from "herdr"
 import { type Card, type CardStatus, type Filter, type Mark, type RunAgent, type StepRow, agentLabel, approveRow, cardPlace, cardStatuses, filterCards, namedModels, opensTurns, projectsOf, railLabel, sendBackArgs, stepRows } from "./agents"
 import type { Show, ShownStep } from "./guard"
+import { linkedText } from "./links-view"
 import { type Reading, readText } from "./orc-read"
 import type { palette } from "./palette"
 import { type Turn } from "./turns"
@@ -247,7 +248,7 @@ const approvePane = (t: Palette, card: Card, approval: Approval, merge: MergeOut
       .child(div().font_semibold().child(`Approve ${approval.pr}`)),
     v_flex().p(16).gap(12).items_start()
       .child(div().child(card.title))
-      .child(div().text_color(t.muted).child(approval.link))
+      .child(div().text_color(t.muted).child(linkedText(`approve-${card.key}`, approval.link)))
       .child(div().text_color(t.muted).child(`The run passed and ${approval.pr} waits for your word. Merging runs orc merge ${card.id} --basis captain-word.`))
       .child(merging ? button : button.cursor_pointer().hover((style) => style.opacity(0.88)).on_click(() => act.askMerge(card, approval)))
       .children(merge?.kind === "failed" ? [div().text_color(t.ansi1).child(merge.reason)] : [])
