@@ -124,8 +124,10 @@ Raw is the terminal that runs `orc chat`, where you type to orc.
 Turns shows the same conversation read only, with one card for each reply of the model.
 A card gives the input, output, cache read and cache write tokens of that reply, and its time.
 Select Thinking to show the thinking of the model.
-Each tool call shows ✓ when it succeeded, ✗ when it failed, and … while it runs, with the number of lines it printed.
-Select a call to show the first 20 lines of its output.
+Each tool call shows ✓ when it succeeded, ✗ when it failed, and … while it runs.
+Beside the mark it shows running while it runs, and its line count once it finishes.
+Select a finished call to show the first 20 lines of its output.
+A call with no output shows No output instead.
 The drawer starts the chat as `orc chat --session ~/.orc/chat/drawer-<time>.jsonl` and keeps that file beside the chat terminal's address.
 Turns reads that one file every second.
 Pi writes the file after its first reply, so until then Turns shows an empty state, never another chat.
