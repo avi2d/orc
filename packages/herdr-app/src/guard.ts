@@ -74,13 +74,18 @@ export const guardJson = <A>(text: string, guard: Guard<A>): Guarded<A> => {
   return guard(value, "")
 }
 
-const pair = <A>(record: Fields, at: string, first: string, second: string, make: (a: string, b: string) => A): Guarded<A> => {
-  const a = string(record, first, at)
-  if (a.kind === "refused") return a
-  const b = string(record, second, at)
-  if (b.kind === "refused") return b
-  return ok(make(a.value, b.value))
-}
+const pairOf = <T>(read: (record: Fields, name: string, at: string) => Guarded<T>) =>
+  <A>(record: Fields, at: string, first: string, second: string, make: (a: T, b: T) => A): Guarded<A> => {
+    const a = read(record, first, at)
+    if (a.kind === "refused") return a
+    const b = read(record, second, at)
+    if (b.kind === "refused") return b
+    return ok(make(a.value, b.value))
+  }
+
+const pair = pairOf(string)
+
+const absentPair = pairOf(absentOrString)
 
 const question: Guard<string> = (value, at) => {
   const record = fields(value, at)
@@ -331,7 +336,7 @@ const attentionItem: Guard<AttentionItem> = (value, at) => {
   if (record.kind === "refused") return record
   const named = pair(record.value, at, "id", "kind", (id, kind) => ({ id, kind }))
   if (named.kind === "refused") return named
-  const placed = pair(record.value, at, "task", "asked", (task, asked) => ({ task, asked }))
+  const placed = pair(record.value, at, "task", "asked", (taskId, asked) => ({ task: taskId, asked }))
   if (placed.kind === "refused") return placed
   const owner = oneOf(record.value, "owner", at, ["user", "decider"] as const)
   if (owner.kind === "refused") return owner
@@ -361,15 +366,13 @@ export interface AskingRun {
 const askingRun: Guard<AskingRun> = (value, at) => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
+  const placed = absentPair(record.value, at, "task", "machine", (taskId, machine) => ({ task: taskId, machine }))
+  if (placed.kind === "refused") return placed
   const branch = string(record.value, "branch", at)
   if (branch.kind === "refused") return branch
-  const task = absentOrString(record.value, "task", at)
-  if (task.kind === "refused") return task
-  const machine = absentOrString(record.value, "machine", at)
-  if (machine.kind === "refused") return machine
   const questions = number(record.value, "questions", at)
   if (questions.kind === "refused") return questions
-  return ok({ branch: branch.value, task: task.value, machine: machine.value, questions: questions.value })
+  return ok({ branch: branch.value, ...placed.value, questions: questions.value })
 }
 
 export const askingRuns: Guard<ReadonlyArray<AskingRun>> = (value, at) => {

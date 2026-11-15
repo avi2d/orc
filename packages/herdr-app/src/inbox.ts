@@ -2,7 +2,7 @@ import type { AskingRun, AttentionItem } from "./guard"
 import { type AnswerTarget, type TaskDetail, mergeArgv } from "./task"
 import { type AskText, type Thread, type ThreadCard, type ThreadLine, askText, threadCards } from "./thread"
 
-export type InboxAction =
+type InboxAction =
   | { readonly kind: "answer"; readonly target: AnswerTarget }
   | { readonly kind: "merge"; readonly argv: ReadonlyArray<string> }
 
