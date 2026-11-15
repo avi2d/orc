@@ -86,4 +86,13 @@ describe("assessQuota on a quota-axi document", () => {
       pick: null
     })
   })
+  test("a stale entry names its stale state before its error", () => {
+    const stale = { ...codex, providers: [{ ...codex.providers[0], state: { status: "stale", stale: true, error: "credentials_expired" }, quotaSemantics: { status: "unknown", effectiveAvailability: [] } }] }
+    expect(assessQuota(stale, settings("codex-home"))).toEqual({
+      kind: "read",
+      floorPercent: 15,
+      accounts: [{ account: "codex-home", kind: "unusable", reason: "quota-axi reads no all_models remaining percent for codex, its state is stale: credentials_expired" }],
+      pick: null
+    })
+  })
 })
