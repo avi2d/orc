@@ -220,7 +220,7 @@ const paneChoice = (t: Palette, pane: Pane, label: string, on: boolean, act: Age
     .on_click((_event, cx) => act.setPane(cx, pane))
     .child(label)
 
-export const stepBar = (t: Palette, step: ShownStep, title: string, source: string, pane: Pane, act: AgentsActions): Element => {
+const stepBar = (t: Palette, step: ShownStep, title: string, source: string, pane: Pane, act: AgentsActions): Element => {
   const agent = agentLabel({ model: step.model, effort: step.thinking })
   return h_flex().px(16).h(40).gap(12).flex_shrink_0().items_center().border_b(1).border_color(t.border)
     .child(div().flex_shrink_0().font_semibold().child(title))
@@ -231,13 +231,13 @@ export const stepBar = (t: Palette, step: ShownStep, title: string, source: stri
     .child(div().flex_1().min_w_0().truncate().text_right().text_size(12).text_color(t.dim).child(source))
 }
 
-export const detailPane = (t: Palette, parts: ReadonlyArray<Element>): Element =>
+const detailPane = (t: Palette, parts: ReadonlyArray<Element>): Element =>
   v_flex().flex_1().min_w_0().h_full().bg(t.background).children(parts)
 
-export const detailNote = (t: Palette, text: string): Element =>
+const detailNote = (t: Palette, text: string): Element =>
   detailPane(t, [div().p(16).text_color(t.muted).child(text)])
 
-export const approvePane = (t: Palette, card: Card, approval: Approval, merge: MergeOutcome | null, act: AgentsActions): Element => {
+const approvePane = (t: Palette, card: Card, approval: Approval, merge: MergeOutcome | null, act: AgentsActions): Element => {
   const merging = merge?.kind === "merging"
   const button = h_flex().id("approve-merge").h(32).px(14).items_center().rounded(8).text_size(13)
     .bg(merging ? t.raised : t.solid).text_color(merging ? t.dim : t.solid_foreground)
@@ -254,7 +254,7 @@ export const approvePane = (t: Palette, card: Card, approval: Approval, merge: M
   ])
 }
 
-export const logBody = (t: Palette, reading: Reading<string>, scroll: ScrollHandle): Element => {
+const logBody = (t: Palette, reading: Reading<string>, scroll: ScrollHandle): Element => {
   if (reading.kind === "failed") {
     return div().p(16).text_color(t.blocked).child(reading.reason)
   }
@@ -269,7 +269,7 @@ export const logBody = (t: Palette, reading: Reading<string>, scroll: ScrollHand
     .children(logLines(reading.value).map((text) => div().child(text === "" ? " " : text)))
 }
 
-export const stepTitle = (card: Card, steps: ReadonlyArray<ShownStep>, stepId: number): string =>
+const stepTitle = (card: Card, steps: ReadonlyArray<ShownStep>, stepId: number): string =>
   stepRows(card.standing, steps, card.kind, card.delivery).find((row) => row.stepId === stepId)?.label ?? "Step"
 
 export const askMerge = (card: Card, approval: Approval, command: string): void => {
