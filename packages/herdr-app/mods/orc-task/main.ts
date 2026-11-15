@@ -33,6 +33,7 @@ export default class OrcTask extends View {
   lastRead = 0
   busy = false
   stale = false
+  selectSeq = 0
   tab: Tab = "Thread"
   shownTask: string | null = null
   boxes = new Map<string, InputState>()
@@ -77,11 +78,11 @@ export default class OrcTask extends View {
   }
 
   orc(cx: Context, key: string, argv: ReadonlyArray<string>, done: () => void): void {
-    const issued = this.shownTask
+    const issued = this.selectSeq
     this.sent.set(key, { kind: "sending" })
     cx.spawn((task) => exec("orc", [...argv]).then(
       (result) => {
-        if (issued !== this.shownTask) {
+        if (issued !== this.selectSeq) {
           this.reload(task)
           task.notify()
           return
@@ -96,7 +97,7 @@ export default class OrcTask extends View {
         task.notify()
       },
       () => {
-        if (issued !== this.shownTask) return
+        if (issued !== this.selectSeq) return
         this.sent.set(key, { kind: "failed", reason: "Could not start orc. Check that it is on PATH." })
         task.notify()
       }
@@ -136,6 +137,7 @@ export default class OrcTask extends View {
     const id = selectedTask()
     let changed = false
     if (id !== this.shownTask) {
+      this.selectSeq += 1
       this.shownTask = id
       this.tab = "Thread"
       for (const box of this.boxes.values()) box.release()
