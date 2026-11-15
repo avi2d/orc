@@ -280,7 +280,7 @@ export default class OrcTask extends View {
     const shape = optionShape(option)
     const shown = shape.kind === "tile"
       ? v_flex().id(id).w(180).rounded(6).border(1).border_color(t.border).bg(t.background).overflow_hidden()
-        .child(image(shape.picture).w(180).h(112)).child(div().p(6).child(label))
+        .child(image(shape.picture).w(180).h(112)).child(div().p(6).child(label)).child(div().px(6).pb(6).text_size(11).text_color(t.muted).child(shape.picture))
       : div().id(id).px(12).py(4).rounded(6).border(1).border_color(t.border).bg(t.background).child(label)
     if (reply === null || reply.kind !== "question" || this.sent.get(card.key)?.kind === "sending") return shown
     return shown.cursor_pointer().hover((style) => style.bg(t.hover))
