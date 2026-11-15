@@ -129,7 +129,7 @@ const ownerAlive = (pid: number): Effect.Effect<boolean> =>
   )
 
 // Only the killed owner wrote a result, so a task file in any folder is its finished result and the grab is dropped.
-// rename(2) moves the grab at most once, so of two readers recovering it exactly one puts it back.
+// link(2) refuses an existing name, so a recovery never replaces a live task file.
 const recoverGrab = (fs: FileSystem.FileSystem, paths: BacklogPaths, folder: TaskFolder, grabbed: string, id: string): Effect.Effect<void, BacklogError> =>
   Effect.gen(function*() {
     const results = yield* Effect.forEach(taskFolders, (each) =>
@@ -140,9 +140,18 @@ const recoverGrab = (fs: FileSystem.FileSystem, paths: BacklogPaths, folder: Tas
         Effect.mapError(platformFailure("remove " + grabbed))
       )
     }
-    yield* fs.rename(grabbed, paths.taskFile(folder, id)).pipe(
-      Effect.catchReason("PlatformError", "NotFound", () => Effect.void),
+    const linked = yield* fs.link(grabbed, paths.taskFile(folder, id)).pipe(
+      Effect.as(true),
+      Effect.catchReason("PlatformError", "AlreadyExists", () => Effect.succeed(false)),
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)),
       Effect.mapError(platformFailure("put back " + id))
+    )
+    if (linked === null) {
+      return
+    }
+    yield* fs.remove(grabbed).pipe(
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.void),
+      Effect.mapError(platformFailure("remove " + grabbed))
     )
   })
 
