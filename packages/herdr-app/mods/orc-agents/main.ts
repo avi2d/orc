@@ -17,35 +17,11 @@ type Palette = ReturnType<typeof palette>
 const everyMs = 4000
 const thisView = "orc-agents"
 
-const statusColor = (t: Palette, status: CardStatus): Color => {
-  switch (status) {
-    case "Awaiting you":
-      return t.blocked
-    case "Running":
-      return t.working
-    case "Queued":
-      return t.muted
-    case "Failed":
-      return t.ansi1
-    case "Done":
-      return t.done
-  }
-}
+const statusColor = (t: Palette, status: CardStatus): Color =>
+  ({ "Awaiting you": t.blocked, Running: t.working, Queued: t.muted, Failed: t.ansi1, Done: t.done } satisfies Record<CardStatus, Color>)[status]
 
-const markColor = (t: Palette, mark: Mark): Color => {
-  switch (mark) {
-    case "✓":
-      return t.done
-    case "✗":
-      return t.ansi1
-    case "●":
-      return t.working
-    case "◆":
-      return t.blocked
-    case "○":
-      return t.dim
-  }
-}
+const markColor = (t: Palette, mark: Mark): Color =>
+  ({ "✓": t.done, "✗": t.ansi1, "●": t.working, "◆": t.blocked, "○": t.dim } satisfies Record<Mark, Color>)[mark]
 
 const escapeSequence = new RegExp(String.fromCharCode(27) + "\\[[0-9;?]*[A-Za-z]", "g")
 
