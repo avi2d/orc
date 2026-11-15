@@ -28,7 +28,7 @@ export default class OrcBoard extends View {
     readJson("orc", ["backlog", "--json"], boardBacklog),
     readJson("orc", ["attention", "--json"], boardAttention)
   ]).then(([backlog, attention]) =>
-    backlog.kind !== "ok" ? backlog : attention.kind !== "ok" ? attention : { kind: "ok", value: { backlog: backlog.value, attention: attention.value } } })
+    backlog.kind !== "ok" ? backlog : attention.kind !== "ok" ? attention : { kind: "ok", value: { backlog: backlog.value, attention: attention.value } })
 
   loadQueue = (): Promise<Reading<ReadonlyArray<QueuedRun>>> => readJson("orc", ["runs", "--json"], boardQueue)
 
