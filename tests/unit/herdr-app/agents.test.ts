@@ -236,6 +236,10 @@ describe("the pane a step opens in", () => {
   test("a Checks step with no Pi session shows its log, not an empty Turns view", () => {
     expect(opensTurns({ name: "checks", piSessionFile: null })).toBe(false)
   })
+
+  test("a Fix step with no Pi session shows its log, not an empty Turns view", () => {
+    expect(opensTurns({ name: "fix", piSessionFile: null })).toBe(false)
+  })
 })
 
 describe("the Approve step and the Changes column of a run", () => {

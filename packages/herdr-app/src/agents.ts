@@ -239,7 +239,7 @@ export const runAgent = (steps: ReadonlyArray<Pick<ShownStep, "name" | "model" |
   return agent === undefined ? null : { model: agent.model, effort: agent.thinking }
 }
 
-const piSteps: ReadonlySet<string> = new Set(["implement", "fix"])
+const piSteps: ReadonlySet<string> = new Set(["implement"])
 
 export const opensTurns = (step: Pick<ShownStep, "name" | "piSessionFile">): boolean =>
   piSteps.has(step.name) || step.piSessionFile !== null
