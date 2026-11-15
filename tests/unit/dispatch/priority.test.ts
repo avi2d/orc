@@ -178,4 +178,14 @@ describe("the backlog listing", () => {
       expect(board).toContain("orc-2 orc")
     })
   })
+  test("carries each task's body as its task file holds it instead of leaving the body out", async () => {
+    await withBacklog(async (root) => {
+      const body = "# Fix the thing\n\nThe button **stays** grey.\n"
+      await run(addTask(root, { ...spec, body }))
+      const tasks = await run(listTasks(root))
+      const view = { tasks, events: [], projects: { kind: "read" as const, projects: [] }, room: { kind: "read" as const, room: [] }, merged: new Set<string>(), prStates: new Map(), beatWaits: null, deciderOwns: () => false }
+      const printed: unknown = JSON.parse(JSON.stringify(backlogJson(view)))
+      expect(printed).toMatchObject({ schema: "orc.backlog.v1", tasks: [{ id: "orc-1", body }] })
+    })
+  })
 })

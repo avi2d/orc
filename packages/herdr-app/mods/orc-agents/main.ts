@@ -1,11 +1,11 @@
 import { type AsyncContext, type Color, type Context, type Element, View, div } from "gpui-kit"
 import { Input, InputState, ScrollHandle, h_flex, v_flex } from "gpui-base"
-import { layout, settings } from "herdr"
+import { layout, setShared, settings, shared } from "herdr"
 import { type Card, type CardStatus, type Filter, type Mark, type StepRow, buildCards, cardStatuses, filterCards, projectsOf, railLabel, sendBackArgs, stepRows } from "../../src/agents"
 import { backlog, runs, show, type Show } from "../../src/guard"
 import { type Reading, readJson, readText } from "../../src/orc-read"
 import { palette } from "../../src/palette"
-import { activeChild, viewsStack } from "../../src/views"
+import { activeChild, agentsOpenKey, openAsk, viewsStack } from "../../src/views"
 
 interface Keyed<A> {
   readonly of: string
@@ -17,35 +17,11 @@ type Palette = ReturnType<typeof palette>
 const everyMs = 4000
 const thisView = "orc-agents"
 
-const statusColor = (t: Palette, status: CardStatus): Color => {
-  switch (status) {
-    case "Awaiting you":
-      return t.blocked
-    case "Running":
-      return t.working
-    case "Queued":
-      return t.muted
-    case "Failed":
-      return t.ansi1
-    case "Done":
-      return t.done
-  }
-}
+const statusColor = (t: Palette, status: CardStatus): Color =>
+  ({ "Awaiting you": t.blocked, Running: t.working, Queued: t.muted, Failed: t.ansi1, Done: t.done } satisfies Record<CardStatus, Color>)[status]
 
-const markColor = (t: Palette, mark: Mark): Color => {
-  switch (mark) {
-    case "✓":
-      return t.done
-    case "✗":
-      return t.ansi1
-    case "●":
-      return t.working
-    case "◆":
-      return t.blocked
-    case "○":
-      return t.dim
-  }
-}
+const markColor = (t: Palette, mark: Mark): Color =>
+  ({ "✓": t.done, "✗": t.ansi1, "●": t.working, "◆": t.blocked, "○": t.dim } satisfies Record<Mark, Color>)[mark]
 
 const escapeSequence = new RegExp(String.fromCharCode(27) + "\\[[0-9;?]*[A-Za-z]", "g")
 
@@ -66,6 +42,7 @@ export default class OrcAgents extends View {
   cards: Reading<ReadonlyArray<Card>> = { kind: "reading" }
   filter: Filter = { project: null, status: null }
   selectedKey: string | null = null
+  opened = 0
   chosenStep: number | null = null
   folded = false
   steps: Keyed<Show> | null = null
@@ -243,7 +220,17 @@ export default class OrcAgents extends View {
     cx.notify()
   }
 
-  render(): Element {
+  openAsked(cx: Context): void {
+    const asked = openAsk(shared(agentsOpenKey))
+    if (asked === null || asked.at === this.opened) return
+    this.opened = asked.at
+    this.filter = { project: null, status: null }
+    this.select(cx, asked.run)
+    setShared(agentsOpenKey, null)
+  }
+
+  render(cx: Context): Element {
+    this.openAsked(cx)
     const t = palette()
     const card = this.selectedCard()
     return h_flex().id("root").size_full().bg(t.surface).text_size(13).text_color(t.foreground)
