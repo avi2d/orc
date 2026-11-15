@@ -54,7 +54,6 @@ const turnView = (t: Palette, turn: Turn, open: TurnsOpen, act: TurnsActions): E
     .child(div().child(clock(turn.at)))
   const thinkingOpen = open.thinking.has(turn.id)
   return v_flex().id(`turn-${turn.id}`).gap(8).p(12).rounded(6).bg(t.raised)
-    .when(turn.prompt !== null, (block) => block.child(div().text_color(t.accent).child(`› ${turn.prompt ?? ""}`)))
     .child(header)
     .when(turn.thinking !== "", (block) => block.child(v_flex().gap(4)
       .child(div().id(`thinking-${turn.id}`).cursor_pointer().text_color(t.muted).hover((style) => style.text_color(t.foreground))
@@ -63,7 +62,6 @@ const turnView = (t: Palette, turn: Turn, open: TurnsOpen, act: TurnsActions): E
       .when(thinkingOpen, (column) => column.child(v_flex().pl(14).text_color(t.muted).italic().children(lines(turn.thinking).map((line) => div().child(line)))))))
     .when(turn.text !== "", (block) => block.child(v_flex().children(lines(turn.text).map((line) => div().child(line)))))
     .when(turn.calls.length > 0, (block) => block.child(v_flex().gap(2).children(turn.calls.map((call) => callView(t, call, open.calls.has(call.id), act)))))
-    .when(turn.stopped !== null, (block) => block.child(div().text_color(t.ansi1).child(turn.stopped ?? "")))
 }
 
 export const turnsView = (t: Palette, reading: Reading<ReadonlyArray<Turn>>, open: TurnsOpen, act: TurnsActions, scroll: ScrollHandle): Element => {

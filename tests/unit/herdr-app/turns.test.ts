@@ -29,14 +29,6 @@ describe("the Turns view of a recorded orc chat session", () => {
     expect(calls).toEqual([["orc_backlog_answer", "✗"], ["orc_backlog", "✓"]])
   })
 
-  test("puts the typed message on the first turn only, not on the replies after a call", () => {
-    expect(turnsOf(recorded).map((turn) => turn.prompt)).toEqual([
-      "Answer the hold on task garden-99 with the word blue using orc_backlog_answer, then list the backlog with orc_backlog. Keep the reply to two sentences.",
-      null,
-      null
-    ])
-  })
-
   test("waits for a half-written last line instead of refusing the whole file", () => {
     const cut = recorded.slice(0, recorded.trimEnd().lastIndexOf("\n") + 40)
     expect(turnsOf(cut)).toHaveLength(2)

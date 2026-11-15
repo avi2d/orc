@@ -22,12 +22,10 @@ export interface TurnCall {
 export interface Turn {
   readonly id: string
   readonly at: number
-  readonly prompt: string | null
   readonly usage: TurnUsage
   readonly thinking: string
   readonly text: string
   readonly calls: ReadonlyArray<TurnCall>
-  readonly stopped: string | null
 }
 
 type Fields = Readonly<Record<string, unknown>>
@@ -40,7 +38,7 @@ type Block =
 
 type Message =
   | { readonly role: "user"; readonly text: string }
-  | { readonly role: "assistant"; readonly blocks: ReadonlyArray<Block>; readonly usage: TurnUsage; readonly at: number; readonly stopped: string | null }
+  | { readonly role: "assistant"; readonly blocks: ReadonlyArray<Block>; readonly usage: TurnUsage; readonly at: number }
   | { readonly role: "toolResult"; readonly callId: string; readonly failed: boolean; readonly output: string }
   | { readonly role: "other" }
 
@@ -109,18 +107,6 @@ const usage = (record: Fields, at: string): Guarded<TurnUsage> => {
   return ok({ input: input.value, output: output.value, cacheRead: cacheRead.value, cacheWrite: cacheWrite.value })
 }
 
-const stopReasons = ["stop", "length", "toolUse", "error", "aborted", "deferred"] as const
-
-const stopped = (record: Fields, at: string): Guarded<string | null> => {
-  const reason = string(record, "stopReason", at)
-  if (reason.kind === "refused") return reason
-  const known = stopReasons.find((entry) => entry === reason.value)
-  if (known === undefined) return refusedAs(child(at, "stopReason"), stopReasons.join(" or "), reason.value)
-  if (known !== "error" && known !== "aborted") return ok(null)
-  const detail = record["errorMessage"]
-  return ok(typeof detail === "string" && detail !== "" ? detail : known === "error" ? "The model call failed" : "Stopped")
-}
-
 const userText = (record: Fields, at: string): Guarded<string> => {
   if (typeof record["content"] === "string") return ok(record["content"])
   const blocks = arrayOf(record, "content", at, block)
@@ -134,9 +120,7 @@ const assistantMessage = (record: Fields, at: string): Guarded<Message> => {
   if (spent.kind === "refused") return spent
   const time = number(record, "timestamp", at)
   if (time.kind === "refused") return time
-  const stop = stopped(record, at)
-  if (stop.kind === "refused") return stop
-  return ok({ role: "assistant", blocks: blocks.value, usage: spent.value, at: time.value, stopped: stop.value })
+  return ok({ role: "assistant", blocks: blocks.value, usage: spent.value, at: time.value })
 }
 
 const toolResultMessage = (record: Fields, at: string): Guarded<Message> => {
@@ -237,24 +221,19 @@ export const sessionTurns = (text: string): Guarded<ReadonlyArray<Turn>> => {
     }
   }
   const turns: Array<Turn> = []
-  let prompt: string | null = null
   for (const entry of branch) {
     const said = entry.message
-    if (said?.role === "user") prompt = said.text
     if (said?.role !== "assistant") continue
     turns.push({
       id: entry.id,
       at: said.at,
-      prompt,
       usage: said.usage,
       thinking: said.blocks.map((part) => part.type === "thinking" ? part.thinking : "").filter((thought) => thought !== "").join("\n\n"),
       text: textOf(said.blocks.filter((part) => part.type === "text")),
       calls: said.blocks.flatMap((part) => part.type === "toolCall"
         ? [{ id: part.id, name: part.name, arguments: callArguments(part.arguments), result: results.get(part.id) ?? { kind: "running" } }]
-        : []),
-      stopped: said.stopped
+        : [])
     })
-    prompt = null
   }
   return ok(turns)
 }
