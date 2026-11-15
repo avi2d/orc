@@ -37,7 +37,8 @@ To print the same facts as JSON, run `orc show <run-id> --json`.
 Its JSON document names its version first as `schema`, starting at `orc.show.v1`.
 Its `run` gives the same `task`, `machine` and `worktree` as `orc runs --json`.
 Each step gives the `model` and `thinking` level its agent ran with, and `null` for a step no agent ran.
-A resumed run lists first the steps it carries from the earlier run, with the implement step first and the rest in the order they ran there.
+A resumed run lists first the steps it carries from the earlier run.
+The implement step comes first and the rest follow in the order they ran there.
 Each carried step gives that run's id as `from`, read from the folder its evidence names, and every other step gives `null`.
 `orc show <run-id>` prints `from run <run-id>` under each carried step.
 To print one step's output, run `orc log <run-id> <step-id>` with the step's `id` from that JSON.
