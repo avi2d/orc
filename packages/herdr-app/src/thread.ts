@@ -61,7 +61,9 @@ export const askText = (text: string): AskText => {
   while (lines.length > 1) {
     const found = optionLine.exec(lines.at(-1) ?? "")
     if (found === null) break
-    options.unshift({ letter: found[1] ?? "", text: found[2] ?? "", picture: found[3] ?? null })
+    const [, letter, option] = found
+    // RegExpExecArray types every group as string, yet the unmatched optional picture group is undefined, which only at() admits.
+    options.unshift({ letter, text: option, picture: found.at(3) ?? null })
     lines.pop()
   }
   const lettered = options.every((option, index) => option.letter === String.fromCharCode(65 + index))
@@ -75,47 +77,52 @@ export const askText = (text: string): AskText => {
 }
 
 // A hold question's id carries its hold generation, and a parked question's id is the attention item id task.question.asked.
-export const questionIdOf = (id: string): string | null => {
-  const held = /^hold-\d+\/(.+)$/.exec(id)
-  if (held !== null) return held[1] ?? null
+const questionIdOf = (id: string): string | null => {
+  const held = /^hold-\d+\/(.+)$/.exec(id)?.[1]
+  if (held !== undefined) return held
   const parts = id.split(".")
   return parts.length === 3 ? parts[1] ?? null : null
 }
 
 const answerable = (line: ThreadLine): boolean => line.who === "user" || line.who === "worker"
 
+const follow = (card: ThreadCard, line: ThreadLine): ThreadCard => {
+  if (line.kind === "answer") return { ...card, answers: [...card.answers, line], reply: null }
+  if (line.kind === "delivered") return { ...card, delivered: true }
+  return { ...card, notes: [...card.notes, line], reply: line.kind === "withdrawn" ? null : card.reply }
+}
+
+const followedCard = (line: ThreadLine, questions: ReadonlyMap<string, number>, lastHold: number): number | undefined => {
+  if (line.kind === "question") return undefined
+  if (line.id !== null) return questions.get(line.id)
+  return line.kind === "answer" && lastHold !== -1 ? lastHold : undefined
+}
+
+const startCard = (line: ThreadLine, index: number, open: boolean): ThreadCard => {
+  const asked = line.kind === "question" ? line.id : null
+  const question = asked === null ? null : questionIdOf(asked)
+  const reply = open && question !== null && answerable(line) ? { kind: "question" as const, id: question } : null
+  const key = asked === null ? `${line.kind}-${line.at ?? index}` : `question-${asked}`
+  const what = question === null ? kindLabels[line.kind] : `${kindLabels[line.kind]} ${question}`
+  return { key, line, what, ask: line.kind === "question" ? askText(line.text) : null, answers: [], delivered: false, notes: [], reply }
+}
+
 export const threadCards = (thread: Thread, task: TaskDetail): ReadonlyArray<ThreadCard> => {
   const open = task.state.status !== "closed"
   const cards: Array<ThreadCard> = []
   const questions = new Map<string, number>()
   let lastHold = -1
-  const attach = (index: number, change: (card: ThreadCard) => ThreadCard): void => {
-    const card = cards[index]
-    if (card !== undefined) cards[index] = change(card)
-  }
   for (const [index, line] of thread.entries.entries()) {
-    const asked = line.id === null ? undefined : questions.get(line.id)
-    if (asked !== undefined && line.kind !== "question") {
-      attach(asked, (card) => line.kind === "answer"
-        ? { ...card, answers: [...card.answers, line], reply: null }
-        : line.kind === "delivered"
-        ? { ...card, delivered: true }
-        : { ...card, notes: [...card.notes, line], reply: line.kind === "withdrawn" ? null : card.reply })
-      continue
+    const followed = followedCard(line, questions, lastHold)
+    if (followed !== undefined) {
+      cards[followed] = follow(cards[followed], line)
+    } else {
+      if (line.kind === "question" && line.id !== null) questions.set(line.id, cards.length)
+      if (line.kind === "hold") lastHold = cards.length
+      cards.push(startCard(line, index, open))
     }
-    if (line.kind === "answer" && line.id === null && lastHold !== -1) {
-      attach(lastHold, (card) => ({ ...card, answers: [...card.answers, line] }))
-      continue
-    }
-    const question = line.kind === "question" && line.id !== null ? questionIdOf(line.id) : null
-    const reply = open && question !== null && answerable(line) ? { kind: "question" as const, id: question } : null
-    const key = line.kind === "question" && line.id !== null ? `question-${line.id}` : `${line.kind}-${line.at ?? index}`
-    const what = question === null ? kindLabels[line.kind] : `${kindLabels[line.kind]} ${question}`
-    if (line.kind === "question" && line.id !== null) questions.set(line.id, cards.length)
-    if (line.kind === "hold") lastHold = cards.length
-    cards.push({ key, line, what, ask: line.kind === "question" ? askText(line.text) : null, answers: [], delivered: false, notes: [], reply })
   }
   const hold = task.hold
-  if (open && hold !== null && hold.answer === null && hold.questions.length === 0) attach(lastHold, (card) => ({ ...card, reply: { kind: "hold" } }))
+  if (open && lastHold !== -1 && hold !== null && hold.answer === null && hold.questions.length === 0) cards[lastHold] = { ...cards[lastHold], reply: { kind: "hold" } }
   return cards
 }

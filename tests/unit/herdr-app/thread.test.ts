@@ -40,7 +40,7 @@ test("keeps a question with lines that only look like options whole instead of c
 
 test("answers a clicked worker option through orc backlog answer with the ask id instead of the attention item id", () => {
   const [card] = threadCards({ task: "orc-16", entries: [pictureAsk] }, started)
-  const reply = card?.reply ?? null
+  const reply = card.reply
   expect(reply).toEqual({ kind: "question", id: "ask-1" })
   expect(reply === null ? null : answerArgv("orc-16", reply, "Wide")).toEqual(["backlog", "answer", "orc-16", "ask-1=Wide"])
 })
@@ -55,9 +55,9 @@ test("indents a decider note under its question instead of as its own entry", ()
 test("marks an answered question delivered only after the delivered entry instead of on the answer alone", () => {
   const answer = line("answer", "user", askId, "Wide", "2026-11-13T11:02:00.000Z")
   const answered = threadCards({ task: "orc-16", entries: [pictureAsk, answer] }, started)[0]
-  expect([answered?.answers, answered?.delivered, answered?.reply]).toEqual([[answer], false, null])
+  expect([answered.answers, answered.delivered, answered.reply]).toEqual([[answer], false, null])
   const delivered = threadCards({ task: "orc-16", entries: [pictureAsk, answer, line("delivered", "beat", askId, "handed to the run that asked", null)] }, started)[0]
-  expect(delivered?.delivered).toBe(true)
+  expect(delivered.delivered).toBe(true)
 })
 
 test("answers a hold question by its id without the hold generation instead of the thread id", () => {
