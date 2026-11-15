@@ -99,12 +99,6 @@ export default class OrcAgents extends View {
         : backlogReading.kind !== "ok"
         ? backlogReading
         : { kind: "ok", value: buildCards(runsReading.value, backlogReading.value) }
-      if (this.cards.kind === "ok" && this.filter.project === null && !this.filter.allRuns && this.selectedKey !== null) {
-        const selected = this.cards.value.find((card) => card.key === this.selectedKey)
-        if (selected?.known === false) {
-          this.filter = { ...this.filter, allRuns: true }
-        }
-      }
       if (this.selectedKey !== null && !this.visibleCards().some((card) => card.key === this.selectedKey) && this.review.value() !== "") {
         this.review.set_value("")
       }
@@ -348,8 +342,7 @@ export default class OrcAgents extends View {
     const asked = openAsk(shared(agentsOpenKey))
     if (asked === null || asked.at === this.opened) return
     this.opened = asked.at
-    const askedCard = this.cards.kind === "ok" ? this.cards.value.find((card) => card.key === asked.run) : undefined
-    this.filter = { project: null, status: null, allRuns: askedCard?.known === false }
+    this.filter = { project: null, status: null, allRuns: false }
     this.select(cx, asked.run)
     setShared(agentsOpenKey, null)
   }
