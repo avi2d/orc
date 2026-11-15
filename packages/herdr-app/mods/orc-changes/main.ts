@@ -110,7 +110,7 @@ export default class OrcChanges extends View {
         .child(div().flex_1())
         .child(div().text_size(12).text_color(t.ansi2).child(`+${totals.added.toString()}`))
         .child(div().text_size(12).text_color(t.ansi1).child(`−${totals.deleted.toString()}`)))
-      .child(v_flex().id("files").flex_shrink_0().max_h(fileHeight * 8 + 12).overflow_y_scrollbar().p(6).border_b(1).border_color(t.border)
+      .child(v_flex().id("files").flex_shrink_0().h(Math.min(changes.files.length, 8) * fileHeight + 12).overflow_y_scrollbar().p(6).border_b(1).border_color(t.border)
         .children(changes.files.map((file) => this.fileRow(t, file, file.path === open?.path))))
       .child(this.diffPane(t, open === null ? null : diffKey(changes, open)))
   }
@@ -135,7 +135,7 @@ export default class OrcChanges extends View {
 
   diffPane(t: Palette, of: string | null): Element {
     const current = this.diff !== null && this.diff.of === of ? this.diff : null
-    const reading: Reading<ReadonlyArray<DiffRow>> = current ?? { kind: "reading" }
+    const reading: Reading<ReadonlyArray<DiffRow>> = current?.reading ?? { kind: "reading" }
     const note = (text: string, failed: boolean): Element => div().p(12).text_color(failed ? t.blocked : t.muted).child(text)
     if (reading.kind === "reading") return note("Reading the file's diff", false)
     if (reading.kind === "failed") return note(reading.reason, true)
