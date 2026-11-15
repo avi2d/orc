@@ -104,6 +104,9 @@ The current hold with no questions has one box, which runs `orc backlog answer <
 When the command fails, the card shows the command and its error.
 Assets shows the report file of a closed task when it has one.
 
+A PR address in the PR row or in a thread entry opens in your default browser when you select it.
+It shows a pointer and an underline when you hover over it.
+
 When the task's PR is open, the PR row has a Merge button.
 It asks first, and on Confirm runs `orc merge <task> --basis captain-word`.
 
@@ -206,6 +209,8 @@ The log shows in full and follows new lines as they are written.
 A Code run whose PR waits for your word ends in an Approve step, and the tab opens on it.
 
 ![Agents tab on the Approve step of a run whose PR waits](images/herdr-agents-approve.png)
+
+The Approve step shows the PR address, and selecting it opens the PR in your default browser.
 
 To merge the PR:
 
