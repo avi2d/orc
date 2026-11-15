@@ -41,7 +41,8 @@ const updateReply = (update: Forge["update"]): ReadonlyArray<string> => {
     case "head moved": {
       return ["echo '{\"message\":\"expected head sha did not match current head ref.\"}'", "echo 'gh: expected head sha did not match current head ref. (HTTP 422)' >&2", "exit 1"]
     }
-    default: {
+    case "updates":
+    case undefined: {
       return ["touch \"$VIEWS/updated\"", "echo '{\"message\":\"Updating pull request branch.\"}'", "exit 0"]
     }
   }
