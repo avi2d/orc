@@ -311,7 +311,7 @@ describe("the decider", () => {
       expect(heard).toEqual([])
       expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({
         owner: "user",
-        decision: { kind: "escalated", reason: "orc never hands the decider a question about deleting, and this one says \"delete\"" },
+        decision: { kind: "escalated", reason: "orc never hands the decider a question about deleting, and this one says \"delete the old branch\"" },
         state: { kind: "open" }
       })
     }, [r4])
@@ -338,6 +338,40 @@ describe("the decider", () => {
       expect(filedAt(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("deleting")
     }, [remove])
   })
+
+  test("a question asking to delete a branch with unlanded work reaches the captain with no decider call, instead of being decided by the decider", async () => {
+    const unlanded = { id: "r4", text: "May I delete the orc/orc-12 branch? It holds unlanded work that never reached main. Recommended: yes." }
+    await withAskingTask(async (root) => {
+      const heard: Array<DeciderRequest> = []
+      await decide(root, replies({ [unlanded.text]: answer }, heard))
+      expect(heard).toEqual([])
+      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+      expect(filedAt(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("deleting")
+    }, [unlanded])
+  })
+
+  const codeQuestions = [
+    {
+      rejects: "escalated as deleting because it says Removing",
+      text: "The new field silently accepts an older orc instead. The narrower form is `nullableString(record.value, \"from\", at)` as a required field, matching `model`. Removing the fallback changes compatibility with older orc builds, so confirm before removing it."
+    },
+    {
+      rejects: "escalated as credentials because it says keys",
+      text: "The projects file keys each checkout path separately (`checkouts: Record<machine, path>`), and the folder name need not equal the project name. Matching `run.project` against the printed checkout paths would make this exact."
+    }
+  ]
+
+  for (const code of codeQuestions) {
+    test("a code question reaches the decider, instead of being " + code.rejects, async () => {
+      const question = { id: "r4", text: code.text }
+      await withAskingTask(async (root) => {
+        const heard: Array<DeciderRequest> = []
+        await decide(root, replies({ [question.text]: answer }, heard))
+        expect(heard).toHaveLength(1)
+        expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ decision: { kind: "answered" } })
+      }, [question])
+    })
+  }
 
   const guardedTopics = [
     { topic: "a site's look", text: "Which header look should the landing page get on its preview? Recommended: the dark one.", rejects: "a site's look" },
