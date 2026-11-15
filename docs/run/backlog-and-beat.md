@@ -12,6 +12,8 @@ Every other `orc backlog` command except `add` refuses with the same words.
 A task file sits in `new`, `taken` or `closed`, and the folder it sits in is its state.
 Two files beside the folders tell the beat where tasks may go.
 `dispatch.json` names each machine, its slots, its start command and its renew command, and the quota.
+A machine's slots cap the tasks the beat starts there.
+They also set the parallel limit of the pueue group `orc` on that machine each time `orc runner start` queues a task there.
 The quota names the provider its accounts belong to, the command that reads their room, and each account's credential kind.
 An account of kind `token-file` names a `tokenFile` and needs only a start command on each machine.
 An account of kind `token-command` names a `tokenCommand`, for a token that lives on the dispatching machine and rolls over, and every machine names a `renew` command beside its start command.
