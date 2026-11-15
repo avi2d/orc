@@ -9,6 +9,7 @@ export {
   publishOnce,
   backlogRoot,
   backlogPaths,
+  grabIn,
   takenGrab,
   newGrab,
 } from "./backlog-write"

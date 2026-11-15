@@ -1,7 +1,7 @@
 import { type AsyncContext, type Context, type Element, View, div } from "gpui-kit"
-import { ScrollHandle, h_flex } from "gpui-base"
+import { Input, InputState, ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { exec, layout, nextCommand, notify, readTextFile, run, setShared } from "herdr"
-import { type Card, type Filter, type RunAgent, buildCards, filterCards, goesOn, runAgent } from "../../src/agents"
+import { type Card, type Filter, type RunAgent, buildCards, filterCards, goesOn, runAgent, sendBackArgs } from "../../src/agents"
 import { type AgentsActions, type Chosen, type MergeOutcome, type Pane, approvalOf, approvePane, askMerge, detailNote, detailPane, logBody, logLines, runsColumn, stepBar, stepTitle, stepsColumn } from "../../src/agents-view"
 import { type RunChanges, changesKey } from "../../src/changes"
 import { readChanges } from "../../src/changes-read"
@@ -62,8 +62,15 @@ export default class OrcAgents extends View {
   stale = false
   logScroll = ScrollHandle.new()
   turnsScroll = ScrollHandle.new()
+  review = InputState.new({ placeholder: "What to change before this PR merges" })
+  sent: Keyed<string> | null = null
 
   override init(_props: unknown, cx: AsyncContext): void {
+    this.review.on("submit", (_event, submitted) => this.sendBack(submitted))
+    this.review.on("change", (_event, changed) => {
+      this.selectedKey = this.selectedCard()?.key ?? null
+      changed.notify()
+    })
     this.refresh(cx)
     cx.spawn((task) => this.listen(task))
     cx.timer.every(everyMs, (tick) => {
@@ -111,6 +118,9 @@ export default class OrcAgents extends View {
         : backlogReading.kind !== "ok"
         ? backlogReading
         : { kind: "ok", value: buildCards(runsReading.value, backlogReading.value) }
+      if (this.selectedKey !== null && !this.visibleCards().some((card) => card.key === this.selectedKey) && this.review.value() !== "") {
+        this.review.set_value("")
+      }
       return Promise.all([this.readSelectedRun(), this.readSelectedChanges()]).then(() => undefined)
     })
   }
@@ -308,6 +318,7 @@ export default class OrcAgents extends View {
     if ((this.selectedCard()?.key ?? null) !== before) {
       this.changesProblem = null
       this.shareChanges(null)
+      this.review.set_value("")
     }
     this.refresh(cx)
     cx.notify()
@@ -341,6 +352,49 @@ export default class OrcAgents extends View {
     cx.notify()
   }
 
+  sendBack(cx: Context): void {
+    const card = this.selectedCard()
+    const args = card === null ? null : sendBackArgs(card, this.review.value())
+    if (card === null || args === null || this.sent?.reading.kind === "reading") {
+      return
+    }
+    this.sent = { of: card.key, reading: { kind: "reading" } }
+    cx.notify()
+    cx.spawn((task) =>
+      readText("orc", [...args]).then((reading) => {
+        this.sent = { of: card.key, reading }
+        if (reading.kind === "ok") {
+          this.review.set_value("")
+        }
+        this.refresh(task)
+        task.notify()
+      })
+    )
+  }
+
+  sentLine(t: Palette, sent: Reading<string> | null): ReadonlyArray<Element> {
+    if (sent === null) {
+      return []
+    }
+    const words = sent.kind === "reading" ? "Sending it back" : sent.kind === "ok" ? sent.value.trim() : sent.reason
+    return [div().text_size(12).text_color(sent.kind === "failed" ? t.blocked : t.muted).child(words)]
+  }
+
+  sendBackBar(t: Palette, card: Card): ReadonlyArray<Element> {
+    const sent = this.sent?.of === card.key ? this.sent.reading : null
+    const said = this.sentLine(t, sent)
+    if (card.sendBack === null) {
+      return sent?.kind === "ok" ? [v_flex().px(16).py(8).border_b(1).border_color(t.border).children(said)] : []
+    }
+    const ready = sendBackArgs(card, this.review.value()) !== null && sent?.kind !== "reading"
+    const button = div().id("send-back").px(10).py(4).rounded(4).flex_shrink_0().bg(t.selected).text_color(ready ? t.foreground : t.dim).child(sent?.kind === "reading" ? "Sending back" : "Send back")
+    return [v_flex().px(16).py(8).gap(6).border_b(1).border_color(t.border)
+      .child(h_flex().gap(8).items_center()
+        .child(div().flex_1().min_w_0().child(Input.new(this.review)))
+        .child(ready ? button.cursor_pointer().hover((style) => style.bg(t.hover)).on_click((_event, cx) => this.sendBack(cx)) : button))
+      .children(said)]
+  }
+
   setFilter(cx: Context, filter: Filter): void {
     this.moveSelection(cx, () => { this.filter = filter })
   }
@@ -371,7 +425,9 @@ export default class OrcAgents extends View {
     }
     const approval = approvalOf(card)
     if (approval !== null && this.target()?.kind === "approve") {
-      return approvePane(t, card, approval, this.merge?.task === card.id ? this.merge.outcome : null, act)
+      const pane = approvePane(t, card, approval, this.merge?.task === card.id ? this.merge.outcome : null, act)
+      const back = this.sendBackBar(t, card)
+      return back.length === 0 ? pane : detailPane(t, [...back, pane])
     }
     const step = this.stepShown()
     if (step === null) {
@@ -386,13 +442,13 @@ export default class OrcAgents extends View {
     const title = stepTitle(card, this.recordedSteps(card), step.id)
     if (this.showsTurns(step)) {
       const turns: Reading<ReadonlyArray<Turn>> = this.turns?.of === of ? this.turns.reading : { kind: "reading" }
-      return detailPane(t, [stepBar(t, step, title, "Pi session", this.pane, act),
+      return detailPane(t, [...this.sendBackBar(t, card), stepBar(t, step, title, "Pi session", this.pane, act),
         div().flex_1().min_h_0().child(turnsView(t, turns, { thinking: this.openThinking, calls: this.openCalls }, {
           toggleThinking: (turn, cx) => this.flip(this.openThinking, turn, cx),
           toggleCall: (call, cx) => this.flip(this.openCalls, call, cx)
         }, this.turnsScroll, { reading: "Reading the step's Pi session", empty: "No turn yet. Pi writes its session after its first reply." }))])
     }
     const reading: Reading<string> = this.log?.of === of ? this.log.reading : { kind: "reading" }
-    return detailPane(t, [stepBar(t, step, title, `orc log ${runId} ${step.id}`, this.pane, act), logBody(t, reading, this.logScroll)])
+    return detailPane(t, [...this.sendBackBar(t, card), stepBar(t, step, title, `orc log ${runId} ${step.id}`, this.pane, act), logBody(t, reading, this.logScroll)])
   }
 }

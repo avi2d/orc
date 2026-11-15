@@ -136,7 +136,20 @@ export interface Task {
   readonly status: string
   readonly hold: number | null
   readonly parked: number | null
+  readonly parkedOrigin: string | null
   readonly reason: string | null
+}
+
+const parkedOrigin = (record: Fields, at: string): Guarded<string | null> => {
+  const parked = record["parked"]
+  if (parked === null || parked === undefined) return ok(null)
+  const holder = fields(parked, child(at, "parked"))
+  if (holder.kind === "refused") return holder
+  const origin = holder.value["origin"]
+  if (origin === null || origin === undefined) return ok(null)
+  const guarded = fields(origin, child(child(at, "parked"), "origin"))
+  if (guarded.kind === "refused") return guarded
+  return string(guarded.value, "run", child(child(at, "parked"), "origin"))
 }
 
 const task: Guard<Task> = (value, at) => {
@@ -148,9 +161,11 @@ const task: Guard<Task> = (value, at) => {
   if (hold.kind === "refused") return hold
   const parked = questionCount(record.value, "parked", at)
   if (parked.kind === "refused") return parked
+  const origin = parkedOrigin(record.value, at)
+  if (origin.kind === "refused") return origin
   const reason = absentOrString(record.value, "reason", at)
   if (reason.kind === "refused") return reason
-  return ok({ ...head.value, hold: hold.value, parked: parked.value, reason: reason.value })
+  return ok({ ...head.value, hold: hold.value, parked: parked.value, parkedOrigin: origin.value, reason: reason.value })
 }
 
 export interface Backlog {

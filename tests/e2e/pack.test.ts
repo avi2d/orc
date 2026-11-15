@@ -147,6 +147,7 @@ const expectedFiles = [
   "src/entities/backlog/notes.ts",
   "src/features/queueing-a-task/runner-result.ts",
   "src/features/queueing-a-task/runner.ts",
+  "src/features/queueing-a-task/send-back.ts",
   "src/entities/backlog/split.ts",
   "src/widgets/beat/stall.ts",
   "src/entities/backlog/task-dependency.ts",
