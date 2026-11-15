@@ -113,7 +113,15 @@ const chatTerminal = (): Promise<Guarded<DrawerChat>> => {
   if (held === null) return startChat()
   return hc(["get", chatName, "--json"]).then(
     (result) => {
-      if (result.code !== 0) return { kind: "refused", reason: ["hc get failed:", (result.stderr || result.stdout).trim()].join(" ") }
+      if (result.code !== 0) {
+        const text = (result.stderr || result.stdout).trim()
+        try {
+          if (missing(JSON.parse(text))) return startChat()
+        } catch {
+          return { kind: "refused", reason: ["hc get failed:", text].join(" ") }
+        }
+        return { kind: "refused", reason: ["hc get failed:", text].join(" ") }
+      }
       let value: unknown
       try {
         value = JSON.parse(result.stdout)
