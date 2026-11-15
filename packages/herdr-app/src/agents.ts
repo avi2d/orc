@@ -87,11 +87,11 @@ const newestRun = (runs: Runs): ReadonlySet<string> => {
   return new Set(newest.values())
 }
 
-const prPlace = (pr: string, task: Task | undefined, merged: ReadonlySet<string>, newest: boolean): { readonly standing: Standing; readonly where: string } => {
+const prPlace = (pr: string, runId: string, task: Task | undefined, merged: ReadonlySet<string>, newest: boolean): { readonly standing: Standing; readonly where: string } => {
   if (task === undefined) {
     return { standing: { status: "Done" }, where: pr }
   }
-  if (task.status !== "closed" && task.parked !== null) {
+  if (task.status !== "closed" && task.parkedOrigin === runId) {
     return { standing: { status: "Done" }, where: `Sent back ${pr}` }
   }
   if (!newest) {
@@ -115,7 +115,7 @@ const runPlace = (run: Run, task: Task | undefined, merged: ReadonlySet<string>,
     return { standing: { status: "Running" }, where: run.step === null ? "Starting" : stepLabel(run.step) }
   }
   if (run.status === "succeeded") {
-    return run.prLink === null ? { standing: { status: "Done" }, where: "Done" } : prPlace(prNumber(run.prLink), task, merged, newest)
+    return run.prLink === null ? { standing: { status: "Done" }, where: "Done" } : prPlace(prNumber(run.prLink), run.id, task, merged, newest)
   }
   return { standing: { status: "Failed" }, where: firstLine(run.endReason ?? task?.reason ?? run.status) }
 }

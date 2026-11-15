@@ -7,7 +7,7 @@ const run = (id: string, fields: Partial<Run>): Run => ({
 })
 
 const task = (id: string, fields: Partial<Task>): Task => ({
-  id, title: `task ${id}`, project: "orc", kind: "ship", status: "new", hold: null, parked: null, reason: null, ...fields
+  id, title: `task ${id}`, project: "orc", kind: "ship", status: "new", hold: null, parked: null, parkedOrigin: null, reason: null, ...fields
 })
 
 const runs = (list: ReadonlyArray<Run>): Runs => ({ schema: "orc.runs.v1", runs: list })
@@ -45,10 +45,24 @@ describe("sending a PR back", () => {
   })
 
   test("a sent-back PR's old run reads Sent back, not still awaiting approval", () => {
-    const cards = buildCards(runs([prRun]), backlog([task("orc-48", { status: "new", parked: 0 })]))
+    const cards = buildCards(runs([prRun]), backlog([task("orc-48", { status: "new", parked: 0, parkedOrigin: prRun.id })]))
     expect(cards.map((card) => [card.id, card.standing.status, card.where, card.sendBack])).toEqual([
       ["orc-48", "Queued", "Waiting to start", null],
       ["orc-48", "Done", "Sent back PR #48", null]
+    ])
+  })
+
+  test("a resumed run with answered questions awaits approval, not a mistaken sent-back", () => {
+    const cards = buildCards(runs([prRun]), backlog([task("orc-48", { status: "started", parked: 0 })]))
+    expect(cards.map((card) => [card.id, card.standing.status, card.where, card.sendBack])).toEqual([
+      ["orc-48", "Awaiting you", "Approve PR #48", null]
+    ])
+  })
+
+  test("a sent-back run that succeeded before its close awaits approval, not a second sent-back", () => {
+    const cards = buildCards(runs([prRun]), backlog([task("orc-48", { status: "started", parked: 0, parkedOrigin: "20261113-070000-cccccc" })]))
+    expect(cards.map((card) => [card.id, card.standing.status, card.where, card.sendBack])).toEqual([
+      ["orc-48", "Awaiting you", "Approve PR #48", null]
     ])
   })
 })

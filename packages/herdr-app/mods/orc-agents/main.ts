@@ -113,6 +113,9 @@ export default class OrcAgents extends View {
         : backlogReading.kind !== "ok"
         ? backlogReading
         : { kind: "ok", value: buildCards(runsReading.value, backlogReading.value) }
+      if (this.selectedKey !== null && !this.visibleCards().some((card) => card.key === this.selectedKey) && this.review.value() !== "") {
+        this.review.set_value("")
+      }
       const runId = this.selectedCard()?.runId ?? null
       if (runId === null) {
         this.steps = null
