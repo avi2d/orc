@@ -294,6 +294,21 @@ const routeQuestion = (root: string, task: string, question: ParkedQuestion): Ef
   return Effect.map(routeOne(root, item.id, item.asked, closing === null ? null : { words: closing.words, at: closing.at }, overturns), (live) => live ? item.id : null)
 }
 
+const closeAskedBackEarlier = (root: string, task: TaskRecord, asked: string, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    for (const entry of yield* taskItems(root, task.spec.id)) {
+      const decision = entry.item.decision
+      if (entry.item.kind !== "worker-question" || entry.item.state.kind !== "open" || decision?.kind !== "asked-back" || !(Date.parse(decision.at) < Date.parse(asked))) {
+        continue
+      }
+      const stored = task.parked?.questions.find((candidate) => reviewQuestionId(task.spec.id, candidate.id, candidate.asked) === entry.id)?.answer
+      if (stored === null || stored === undefined) {
+        continue
+      }
+      yield* Effect.asVoid(closeItem(root, entry.id, { words: stored.words, at }))
+    }
+  })
+
 const routeTask = (root: string, task: TaskRecord, at: string): Effect.Effect<ReadonlyArray<string>, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const live: Array<string> = []
@@ -301,6 +316,11 @@ const routeTask = (root: string, task: TaskRecord, at: string): Effect.Effect<Re
       const id = yield* routeQuestion(root, task.spec.id, question)
       if (id !== null) {
         live.push(id)
+        continue
+      }
+      const answer = question.answer
+      if (answer !== null && answer !== undefined && answer.by !== "asked-back" && isWorkerQuestion(question.id)) {
+        yield* closeAskedBackEarlier(root, task, question.asked, at)
       }
     }
     const wait = overdueWait(task, at)
