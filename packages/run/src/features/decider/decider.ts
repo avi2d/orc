@@ -1,7 +1,7 @@
 import { Data, DateTime, Effect, FileSystem, Option, type Path, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { bundledAgentsDir } from "../../entities/agent/index"
-import { type AttentionItem, claimDeciding, type OpenItem, openItems, recordDecision, reviewQuestionId, routeTaskItems, taskItems } from "../../entities/attention/index"
+import { type AttentionItem, claimDeciding, closeItem, type OpenItem, openItems, recordDecision, reviewQuestionId, routeTaskItems, taskItems } from "../../entities/attention/index"
 import { backlogPaths, findTask, type BacklogError, type ParkedQuestion, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
 import { readInstructions, readOrcRules } from "../../entities/orc-rules/index"
 import { answerTask } from "../../entities/parked-runs/index"
@@ -60,12 +60,30 @@ const spaced = (text: string): string => text.replace(/\s+/g, " ").trim()
 
 const unquoted = (quote: string): string => spaced(quote).replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
 
-const fewestQuotedWords = 3
+const sentencesAndLinesOf = (text: string): ReadonlyArray<string> => {
+  const out: Array<string> = []
+  for (const line of text.split("\n")) {
+    const trimmed = spaced(line)
+    if (trimmed === "") {
+      continue
+    }
+    const whole = unquoted(trimmed)
+    if (whole !== "") {
+      out.push(whole)
+    }
+    for (const part of trimmed.split(/(?<=[.!?])\s+/)) {
+      const sentence = unquoted(part)
+      if (sentence !== "" && sentence !== whole) {
+        out.push(sentence)
+      }
+    }
+  }
+  return out
+}
 
-// Any source holds a word or two, so a quote that short proves no rule.
 const quotedSource = (quote: string, sources: ReadonlyArray<RuleSource>): RuleSource | undefined => {
-  const words = unquoted(quote)
-  return words.split(" ").length < fewestQuotedWords ? undefined : sources.find((source) => spaced(source.text).includes(words))
+  const wanted = unquoted(quote)
+  return wanted === "" ? undefined : sources.find((source) => sentencesAndLinesOf(source.text).includes(wanted))
 }
 
 interface Earlier {
@@ -80,6 +98,18 @@ const answeredEarlier = (items: ReadonlyArray<OpenItem>, current: string): Reado
       ? [{ id, text: item.text, answer: item.state.answer.words }]
       : [])
 
+interface AskedBack {
+  readonly id: string
+  readonly text: string
+  readonly question: string
+}
+
+const askedBackEarlier = (items: ReadonlyArray<OpenItem>, current: string): ReadonlyArray<AskedBack> =>
+  items.flatMap(({ id, item }) =>
+    id !== current && item.kind === "worker-question" && item.state.kind === "open" && item.decision?.kind === "asked-back"
+      ? [{ id, text: item.text, question: item.decision.question }]
+      : [])
+
 const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlier: ReadonlyArray<Earlier>, kind: AttentionItem["kind"]): Verdict => {
   switch (reply.decision) {
     case "escalate": {
@@ -88,7 +118,7 @@ const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlie
     case "answer": {
       const found = quotedSource(reply.rule, sources)
       return found === undefined
-        ? { kind: "escalated", reason: "the decider answered " + JSON.stringify(reply.answer) + " on a rule of fewer than " + fewestQuotedWords + " words or in none of the rules it read: " + JSON.stringify(reply.rule) }
+        ? { kind: "escalated", reason: "the decider answered " + JSON.stringify(reply.answer) + " on a rule in none of the rules it read as a whole sentence or line: " + JSON.stringify(reply.rule) }
         : { kind: "answered", words: reply.answer.trim(), basis: { kind: "rule", quote: unquoted(reply.rule), source: found.source, reason: reply.reason } }
     }
     case "duplicate": {
@@ -115,11 +145,17 @@ const earlierSection = (earlier: ReadonlyArray<Earlier>): ReadonlyArray<string> 
     : [section("The questions of this task already answered, which a duplicate links by id", earlier.map((entry) => "- " + entry.id + ": " + spaced(entry.text) + "\n  answered: " + spaced(entry.answer)).join("\n"))]
 
 // The question comes last, so nothing the prompt quotes after it reads as the question.
-const deciderPrompt = (task: TaskRecord, question: ParkedQuestion, kind: AttentionItem["kind"], rules: ReadonlyArray<WrittenRules>, earlier: ReadonlyArray<Earlier>): string =>
+const askedBackSection = (askedBack: ReadonlyArray<AskedBack>): ReadonlyArray<string> =>
+  askedBack.length === 0
+    ? []
+    : [section("The earlier worker questions the decider already asked back on, which the follow-up answers", askedBack.map((entry) => "- " + entry.id + ": " + spaced(entry.text) + "\n  decider asked back: " + spaced(entry.question)).join("\n"))]
+
+const deciderPrompt = (task: TaskRecord, question: ParkedQuestion, kind: AttentionItem["kind"], rules: ReadonlyArray<WrittenRules>, earlier: ReadonlyArray<Earlier>, askedBack: ReadonlyArray<AskedBack>): string =>
   [
     ...rules.map((source) => section(source.heading, source.text)),
     section("The intent of the task " + task.spec.id + ", " + task.spec.title, task.spec.body),
     ...earlierSection(earlier),
+    ...askedBackSection(askedBack),
     kind === "worker-question"
       ? section("The question the worker asked mid-run with orc_ask, " + question.id + ", which you may ask back", question.text)
       : section("The review question its run stopped on, " + question.id, question.text)
@@ -150,8 +186,10 @@ const askOne = (ask: AskDecider, policy: string, root: string, task: TaskRecord,
       return { kind: "escalated", reason: rules.reason } satisfies Verdict
     }
     const quotable: ReadonlyArray<RuleSource> = [...rules.written, { source: "decider policy", text: policy }, { source: "task " + task.spec.id, text: task.spec.body }]
-    const earlier = answeredEarlier(yield* taskItems(root, task.spec.id), entry.id)
-    const prompt = deciderPrompt(task, question, entry.item.kind, rules.written, earlier)
+    const items = yield* taskItems(root, task.spec.id)
+    const earlier = answeredEarlier(items, entry.id)
+    const askedBack = askedBackEarlier(items, entry.id)
+    const prompt = deciderPrompt(task, question, entry.item.kind, rules.written, earlier, askedBack)
     return yield* ask.ask({ policy, prompt }).pipe(
       Effect.map((text): Verdict => {
         const reply = readReply(text)
@@ -171,10 +209,25 @@ const decisionOf = (verdict: Exclude<Verdict, { readonly kind: "escalated" }>, a
     : { kind: "answered" as const, reason: basis.reason, rule: { quote: basis.quote, source: basis.source }, at }
 }
 
-const settle = (root: string, task: TaskRecord, question: ParkedQuestion, item: string, verdict: Verdict, at: string) =>
+const closeAskedBackEarlier = (root: string, taskId: string, current: string, at: string) =>
+  Effect.gen(function*() {
+    const fresh = yield* findTask(root, taskId)
+    for (const entry of yield* taskItems(root, taskId)) {
+      if (entry.id === current || entry.item.kind !== "worker-question" || entry.item.state.kind !== "open" || entry.item.decision?.kind !== "asked-back") {
+        continue
+      }
+      const stored = fresh.parked?.questions.find((candidate) => reviewQuestionId(taskId, candidate.id, candidate.asked) === entry.id)?.answer
+      yield* closeItem(root, entry.id, stored === null || stored === undefined ? { words: askBackWords(entry.item.decision.question), at } : { words: stored.words, at: stored.at }).pipe(Effect.catchTag("BacklogError", () => Effect.void))
+    }
+  })
+
+const settle = (root: string, task: TaskRecord, question: ParkedQuestion, item: string, kind: AttentionItem["kind"], verdict: Verdict, at: string) =>
   Effect.gen(function*() {
     if (verdict.kind === "escalated") {
       yield* recordDecision(root, item, { kind: "escalated", reason: verdict.reason, at })
+      if (kind === "worker-question") {
+        yield* closeAskedBackEarlier(root, task.spec.id, item, at)
+      }
       return verdict
     }
     yield* recordDecision(root, item, decisionOf(verdict, at))
@@ -186,12 +239,18 @@ const settle = (root: string, task: TaskRecord, question: ParkedQuestion, item: 
     )
     if (refused === null) {
       yield* routeTaskItems(root, [yield* findTask(root, task.spec.id)], at)
+      if (kind === "worker-question") {
+        yield* closeAskedBackEarlier(root, task.spec.id, item, at)
+      }
       return verdict
     }
     const fresh = yield* findTask(root, task.spec.id)
     const stored = fresh.parked?.questions.find((candidate) => candidate.id === question.id)?.answer
     if (stored !== null && stored !== undefined) {
       yield* routeTaskItems(root, [fresh], at)
+      if (kind === "worker-question") {
+        yield* closeAskedBackEarlier(root, task.spec.id, item, at)
+      }
       return verdict
     }
     const escalated: Verdict = { kind: "escalated", reason: "the decider's answer did not reach the task: " + refused }
@@ -247,7 +306,7 @@ export const decideReviewQuestions = (
         continue
       }
       const verdict = yield* verdictOf(ask, policy, root, decidable)
-      decided.push({ item: entry.id, task: decidable.task.spec.id, verdict: yield* settle(root, decidable.task, decidable.question, entry.id, verdict, DateTime.formatIso(yield* DateTime.now)) })
+      decided.push({ item: entry.id, task: decidable.task.spec.id, verdict: yield* settle(root, decidable.task, decidable.question, entry.id, decidable.entry.item.kind, verdict, DateTime.formatIso(yield* DateTime.now)) })
     }
     return decided
   })

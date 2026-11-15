@@ -231,18 +231,28 @@ export const markAnswersRelayed = (
   root: string,
   id: string,
   asking: string,
-  relayed: ReadonlyArray<{ readonly id: string; readonly asked: string }>
+  relayed: ReadonlyArray<{ readonly id: string; readonly asked: string; readonly words: string }>
 ): Effect.Effect<void, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   rewriteTaken(root, id, (fresh): Effect.Effect<Rewrite<void>, BacklogError> => {
     if (fresh.state.kind !== "started" || fresh.parked === null) {
       return Effect.succeed({ kind: "keep", result: undefined })
     }
-    const questions = Arr.map(fresh.parked.questions, (question): ParkedQuestion =>
-      question.answer !== null && question.answer.relayedTo === null &&
-        relayed.some((entry) => entry.id === question.id && entry.asked === question.asked)
-        ? { ...question, answer: { ...question.answer, relayedTo: asking } }
-        : question
-    )
+    const questions = Arr.map(fresh.parked.questions, (question): ParkedQuestion => {
+      if (question.answer === null) {
+        return question
+      }
+      const entry = relayed.find((candidate) => candidate.id === question.id && candidate.asked === question.asked)
+      if (entry === undefined) {
+        return question
+      }
+      if (question.answer.words === entry.words && question.answer.relayedTo === null) {
+        return { ...question, answer: { ...question.answer, relayedTo: asking } }
+      }
+      if (!isDeciderAnswer(question.answer) && question.answer.overturned !== undefined && question.answer.overturned.relayedTo === null && question.answer.overturned.words === entry.words) {
+        return { ...question, answer: { ...question.answer, overturned: { ...question.answer.overturned, relayedTo: asking } } }
+      }
+      return question
+    })
     if (sameQuestions(questions, fresh.parked.questions)) {
       return Effect.succeed({ kind: "keep", result: undefined })
     }

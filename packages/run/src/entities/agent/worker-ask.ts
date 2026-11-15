@@ -20,7 +20,6 @@ interface WorkerAsk {
   readonly deadline: number | null
   readonly askedAt: string
   replied: boolean
-  answered: string | null
 }
 
 interface AskRunState {
@@ -151,8 +150,7 @@ const registerNew = (fs: FileSystem.FileSystem, setup: AskSetup): Effect.Effect<
         options: decoded.options,
         deadline: decoded.blocks ? Date.parse(now) + setup.waitSeconds * 1000 : null,
         askedAt: now,
-        replied: false,
-        answered: null
+        replied: false
       })
       shared.next += 1
       added = true
@@ -207,15 +205,14 @@ const relayReplies = (fs: FileSystem.FileSystem, setup: AskSetup, asked: string)
         continue
       }
       if (ask.replied) {
-        if (ask.answered !== null && ask.answered !== answer.answer) {
+        const known = setup.state.corrected.get(ask.id)
+        if (known !== undefined && known !== answer.answer) {
           yield* deliverCorrection(fs, setup, ask.id, ask.question, answer.answer)
-          ask.answered = answer.answer
         }
         continue
       }
       if (yield* provideFs(fs, writeReply(setup, ask, { kind: "answer", id: ask.id, question: ask.question, words: answer.answer }))) {
         ask.replied = true
-        ask.answered = answer.answer
         setup.state.corrected.set(ask.id, answer.answer)
         changed = true
       }
@@ -242,9 +239,6 @@ const relayCorrections = (fs: FileSystem.FileSystem, setup: AskSetup): Effect.Ef
       }
       const ask = setup.state.asks.find((candidate) => candidate.id === correction.question)
       yield* deliverCorrection(fs, setup, correction.question, ask?.question ?? "", correction.answer)
-      if (ask !== undefined) {
-        ask.answered = correction.answer
-      }
     }
   })
 

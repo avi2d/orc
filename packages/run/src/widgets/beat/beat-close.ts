@@ -228,7 +228,7 @@ const serveAsking = (
     }
     // answers.json is replaced whole, so each relay carries every answer of the asking and not only the new ones.
     return yield* relay({ asking: asking.asked, answers: answered.map((question) => ({ question: question.id, answer: question.answer.words })) }).pipe(
-      Effect.andThen(markAnswersRelayed(context.root, id, asking.asked, fresh.map((question) => ({ id: question.id, asked: question.asked }))).pipe(
+      Effect.andThen(markAnswersRelayed(context.root, id, asking.asked, fresh.map((question) => ({ id: question.id, asked: question.asked, words: question.answer.words }))).pipe(
         Effect.catchTag("BacklogError", () => Effect.void)
       )),
       Effect.as<BeatAction>({ kind: "answered", task: id, machine, questions: fresh.map((question) => question.id) }),

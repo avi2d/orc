@@ -271,9 +271,40 @@ describe("the decider", () => {
     }, [r4])
   })
 
+  test("a push question reaches the captain with no decider call, instead of letting the decider allow a push", async () => {
+    const push = { id: "r4", text: "Should I push the branch to main?" }
+    await withAskingTask(async (root) => {
+      const heard: Array<DeciderRequest> = []
+      await decide(root, replies({ [push.text]: answer }, heard))
+      expect(heard).toEqual([])
+      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+      expect(filedAt(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("pushing")
+    }, [push])
+  })
+
+  test("a remove question reaches the captain with no decider call, instead of letting the decider allow a deletion", async () => {
+    const remove = { id: "r4", text: "May I remove the old branch?" }
+    await withAskingTask(async (root) => {
+      const heard: Array<DeciderRequest> = []
+      await decide(root, replies({ [remove.text]: answer }, heard))
+      expect(heard).toEqual([])
+      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+      expect(filedAt(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("deleting")
+    }, [remove])
+  })
+
   test("an answer whose quoted rule is in no source escalates instead of answering on a made-up rule", async () => {
     await withAskingTask(async (root) => {
       await decide(root, replies({ [r2.text]: JSON.stringify({ decision: "answer", answer: "Five retries", rule: "Retry a failed upload five times.", reason: "the rule says five" }) }))
+      expect(await itemFile(root, r2Item)).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+      expect(filedAt(await itemFile(root, r2Item), "decision", "reason")).toContain("in none of the rules it read")
+      expect((await run(listTasks(root))).at(0)?.parked?.questions.find((question) => question.id === "r2")?.answer).toBeNull()
+    }, [r2])
+  })
+
+  test("an answer quoting a fragment of a policy sentence escalates instead of passing as a rule", async () => {
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [r2.text]: JSON.stringify({ decision: "answer", answer: "Two retries", rule: "settle one question", reason: "the policy settles it" }) }))
       expect(await itemFile(root, r2Item)).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
       expect(filedAt(await itemFile(root, r2Item), "decision", "reason")).toContain("in none of the rules it read")
       expect((await run(listTasks(root))).at(0)?.parked?.questions.find((question) => question.id === "r2")?.answer).toBeNull()
@@ -338,6 +369,39 @@ describe("the decider", () => {
     }, [ask1])
   })
 
+  test("a follow-up carries the asked-back exchange in its prompt, instead of asking without that context", async () => {
+    const ask1 = { id: "ask-1", text: "Which retry count should the upload use?" }
+    const ask2 = { id: "ask-2", text: "It runs in CI, should it retry twice?" }
+    const asked2 = "2026-11-02T10:21:00.000Z"
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [ask1.text]: JSON.stringify({ decision: "ask-back", question: "Does the upload run in CI?" }) }))
+      await run(askStartedTask(root, "orc-1", { asked: asked2, questions: [ask2] }))
+      await run(routeTaskItems(root, await run(listTasks(root)), asked2))
+      const heard: Array<DeciderRequest> = []
+      await decide(root, replies({ [ask2.text]: escalate }, heard))
+      expect(heard).toHaveLength(1)
+      expect(heard[0]?.prompt).toContain("Which retry count should the upload use?")
+      expect(heard[0]?.prompt).toContain("Does the upload run in CI?")
+    }, [ask1])
+  })
+
+  test("a settled follow-up closes the earlier asked-back item, instead of leaving it open with no owner", async () => {
+    const ask1 = { id: "ask-1", text: "Which retry count should the upload use?" }
+    const ask2 = { id: "ask-2", text: "It runs in CI, should it retry twice?" }
+    const asked2 = "2026-11-02T10:21:00.000Z"
+    const item1 = "orc-1.ask-1.2026-11-02T10_20_00_000Z"
+    const item2 = "orc-1.ask-2." + asked2.replace(/[^A-Za-z0-9_-]/g, "_")
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [ask1.text]: JSON.stringify({ decision: "ask-back", question: "Does the upload run in CI?" }) }))
+      await run(askStartedTask(root, "orc-1", { asked: asked2, questions: [ask2] }))
+      await run(routeTaskItems(root, await run(listTasks(root)), asked2))
+      await decide(root, replies({ [ask2.text]: answer }))
+      expect((await run(openItems(root))).map((entry) => entry.id)).not.toContain(item1)
+      expect(await itemFile(root, item1)).toMatchObject({ state: { kind: "closed" } })
+      expect(await itemFile(root, item2)).toMatchObject({ state: { kind: "closed", answer: { words: "Two retries" } } })
+    }, [ask1])
+  })
+
   test("an ask back on a review question escalates instead of asking a run that cannot reply", async () => {
     await withAskingTask(async (root) => {
       await decide(root, replies({ [r2.text]: JSON.stringify({ decision: "ask-back", question: "Does the upload run in CI?" }) }))
@@ -365,7 +429,7 @@ describe("the decider", () => {
   test("an overturned answer the run already took is due to it as a correction, instead of standing unsent", async () => {
     await withAskingTask(async (root) => {
       await decide(root, replies({ [r2.text]: answer }))
-      await run(markAnswersRelayed(root, "orc-1", asked, [{ id: "r2", asked }]))
+      await run(markAnswersRelayed(root, "orc-1", asked, [{ id: "r2", asked, words: "Two retries" }]))
       await run(answerTask(root, "orc-1", "r2=Three retries", "2099-01-01T00:00:00.000Z"))
       const task = (await run(listTasks(root))).at(0)
       if (task === undefined) {
