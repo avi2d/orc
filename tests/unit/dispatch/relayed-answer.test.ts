@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { addTask, claimTask, listTasks, writeTaken, type TaskRecord } from "../../../packages/run/src/entities/backlog/index"
+import { addTask, answerWait, claimTask, listTasks, renderTaskFile, writeTaken, type TaskRecord } from "../../../packages/run/src/entities/backlog/index"
 import { answersFor, answerTask, askStartedTask, handAnswersToResume, markAnswersRelayed, parkStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
@@ -104,6 +104,19 @@ describe("a relayed answer", () => {
       const parked = await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked: first }, { ...r2, asked: second }], "2026-10-27T10:35:00.000Z"))
       expect(parked.parked?.questions).toEqual([{ ...r2, asked: second, blocks: true, answer: null }])
       expect(await run(answerTask(root, "orc-1", "r2=Restore it", "2026-10-27T10:36:00.000Z"))).toMatchObject({ kind: "question", question: "r2", open: [] })
+    })
+  })
+  test("a parked task holding an answered and an open entry of one id takes the answer on the open entry instead of refusing it", async () => {
+    await withBacklog(async (root) => {
+      const added = await run(addTask(root, spec))
+      const kept = { ...r2, asked: first, blocks: true, answer: { words: "keep", at: "2026-10-27T10:05:00.000Z", relayedTo: first } }
+      const repeated = { ...r2, asked: second, blocks: true, answer: null }
+      await writeFile(join(root, "new", "orc-1.md"), renderTaskFile({ ...added, parked: { branch: "orc/orc-1", questions: [kept, repeated] } }))
+      expect(answerWait(await current(root), () => false)).toBe("parked on orc/orc-1 for the captain's answer to r2")
+      expect(await run(answerTask(root, "orc-1", "r2=drop", "2026-10-27T10:36:00.000Z"))).toMatchObject({ kind: "question", question: "r2", open: [] })
+      const answered = await current(root)
+      expect(answered.parked?.questions).toEqual([kept, { ...repeated, answer: { words: "drop", at: "2026-10-27T10:36:00.000Z", relayedTo: null } }])
+      expect(answerWait(answered, () => false)).toBeNull()
     })
   })
   test("a question parked with no wait is stamped with the park time instead of left with no asking", async () => {

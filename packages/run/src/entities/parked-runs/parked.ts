@@ -142,7 +142,8 @@ const answerOneOf = <Q extends { readonly id: string; readonly answer: { readonl
   const cut = words.indexOf("=")
   const question = cut === -1 ? "" : words.slice(0, cut)
   const text = cut === -1 ? "" : words.slice(cut + 1)
-  const asked = questions.find((candidate) => candidate.id === question)
+  const named = questions.filter((candidate) => candidate.id === question)
+  const asked = named.find((candidate) => candidate.answer === null) ?? named.find((candidate) => candidate.answer !== null && overturns(candidate.answer)) ?? named.at(0)
   if (asked === undefined || text.trim() === "") {
     return Effect.fail(new BacklogError({ detail: id + " is " + waits + " for the captain's answer to " + open.map((candidate) => candidate.id).join(", ") + ", so answer one as <question-id>=<text>" }))
   }
