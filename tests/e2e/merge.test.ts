@@ -71,6 +71,7 @@ const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
     "  exit 0",
     "fi",
     "case \"$*\" in *compare/main..." + head + "*) echo " + String(forge.behind ?? 0) + "; exit 0;; esac",
+    "case \"$*\" in *commits/*) echo " + head + "; exit 0;; esac",
     "if [ \"$1\" = api ]; then echo 0; exit 0; fi",
     "if [ \"$1 $2\" = \"pr merge\" ]; then exit 0; fi",
     "echo 'unexpected gh call' >&2",
