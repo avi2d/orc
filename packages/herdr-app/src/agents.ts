@@ -22,6 +22,7 @@ export interface Card {
   readonly standing: Standing
   readonly where: string
   readonly runId: string | null
+  readonly sendBack: string | null
 }
 
 export interface Filter {
@@ -75,6 +76,22 @@ const queuedWhere = (task: Task): string => task.hold === null ? "Waiting to sta
 const awaitingAnswer = (count: number): { readonly standing: Standing; readonly where: string } =>
   ({ standing: { status: "Awaiting you", waiting: { on: "answer" } }, where: questionsLabel(count) })
 
+const prPlace = (pr: string, task: Task | undefined, merged: ReadonlySet<string>): { readonly standing: Standing; readonly where: string } => {
+  if (task === undefined) {
+    return { standing: { status: "Done" }, where: pr }
+  }
+  if (task.status !== "closed" && task.parked !== null) {
+    return { standing: { status: "Done" }, where: `Sent back ${pr}` }
+  }
+  if (!merged.has(task.id)) {
+    return { standing: { status: "Awaiting you", waiting: { on: "approval", pr } }, where: `Approve ${pr}` }
+  }
+  return { standing: { status: "Done" }, where: `Merged ${pr}` }
+}
+
+const sendBackOf = (task: Task | undefined, standing: Standing): string | null =>
+  task?.status === "closed" && standing.status === "Awaiting you" && standing.waiting.on === "approval" ? task.id : null
+
 const runPlace = (run: Run, task: Task | undefined, merged: ReadonlySet<string>): { readonly standing: Standing; readonly where: string } => {
   const questions = run.status === "running" ? run.questions : 0
   if (questions > 0) {
@@ -84,14 +101,7 @@ const runPlace = (run: Run, task: Task | undefined, merged: ReadonlySet<string>)
     return { standing: { status: "Running" }, where: run.step === null ? "Starting" : stepLabel(run.step) }
   }
   if (run.status === "succeeded") {
-    if (run.prLink === null) {
-      return { standing: { status: "Done" }, where: "Done" }
-    }
-    const pr = prNumber(run.prLink)
-    if (task !== undefined && !merged.has(task.id)) {
-      return { standing: { status: "Awaiting you", waiting: { on: "approval", pr } }, where: `Approve ${pr}` }
-    }
-    return { standing: { status: "Done" }, where: task === undefined ? pr : `Merged ${pr}` }
+    return run.prLink === null ? { standing: { status: "Done" }, where: "Done" } : prPlace(prNumber(run.prLink), task, merged)
   }
   return { standing: { status: "Failed" }, where: firstLine(run.endReason ?? task?.reason ?? run.status) }
 }
@@ -115,7 +125,8 @@ export const buildCards = (runs: Runs, backlog: Backlog): ReadonlyArray<Card> =>
       title: run.title ?? task?.title ?? run.branch,
       project: task?.project ?? lastSegment(run.project),
       ...place,
-      runId: place.standing.status === "Queued" ? null : run.id
+      runId: place.standing.status === "Queued" ? null : run.id,
+      sendBack: sendBackOf(task, place.standing)
     })
   }
   for (const task of backlog.tasks) {
@@ -124,10 +135,13 @@ export const buildCards = (runs: Runs, backlog: Backlog): ReadonlyArray<Card> =>
     }
     const questions = openQuestions(task)
     const place = questions > 0 ? awaitingAnswer(questions) : { standing: { status: "Queued" } as const, where: queuedWhere(task) }
-    cards.push({ key: task.id, id: task.id, kind: task.kind, delivery: null, title: task.title, project: task.project, ...place, runId: null })
+    cards.push({ key: task.id, id: task.id, kind: task.kind, delivery: null, title: task.title, project: task.project, ...place, runId: null, sendBack: null })
   }
   return sortCards(cards)
 }
+
+export const sendBackArgs = (card: Pick<Card, "sendBack">, words: string): ReadonlyArray<string> | null =>
+  card.sendBack === null || words.trim() === "" ? null : ["backlog", "send-back", card.sendBack, words.trim()]
 
 const sortCards = (cards: ReadonlyArray<Card>): ReadonlyArray<Card> =>
   cardStatuses.flatMap((status) => cards.filter((card) => card.standing.status === status))

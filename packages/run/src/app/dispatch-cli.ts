@@ -8,7 +8,7 @@ import { answerItemText, attentionText } from "../features/attention-list/index"
 import { dropTask, edit, holdTask, prioritizeTask, priorityLine, dropChild, planText, circularDependency, dependTask, refusedLinks, add } from "../features/backlog-planning/index"
 import { answerTask } from "../entities/parked-runs/index"
 import { type ConfigError, readFailure, type DispatchConfig, readDispatchConfig, readProjects } from "../shared/config/index"
-import { holdRun, killHeld, queueFromText, renewTask, startTask, stopNow, formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson, ensureAlertStream, liveAlertStream } from "../features/queueing-a-task/index"
+import { holdRun, sendBack, killHeld, queueFromText, renewTask, startTask, stopNow, formatResult, readResult, readResultThrough, readStdinLabel, relayAnswers, runnerJson, ensureAlertStream, liveAlertStream } from "../features/queueing-a-task/index"
 import { mergeTask } from "../features/merging-a-pr/index"
 import { RunnerError, type Command } from "../shared/process/index"
 import { encodeToken, sessionToken } from "../entities/token/index"
@@ -214,7 +214,7 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
       : "answered " + answered.question + " on " + args.id + ", and it stays parked for " + answered.open.map((question) => question.id).join(", ")
   })
 
-type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "RecordOrigin" | "CloseTask" | "DropTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "NoteTask" | "ShowThread" | "DependTask" | "PrioritizeTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
+type TaskVerb = Extract<CommandArgs, { readonly kind: "AnswerItem" | "EditTask" | "RecordOrigin" | "CloseTask" | "DropTask" | "MarkPosted" | "MarkEventPosted" | "HoldTask" | "AnswerTask" | "SendBack" | "NoteTask" | "ShowThread" | "DependTask" | "PrioritizeTask" | "MergeTask" | "ShowPlan" | "DropChild" }>
 
 const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
   switch (args.kind) {
@@ -244,6 +244,9 @@ const taskVerbLine = (args: TaskVerb, place: DispatchPlace) => {
     }
     case "AnswerTask": {
       return answerNow(args, place)
+    }
+    case "SendBack": {
+      return DateTime.now.pipe(Effect.flatMap((now) => sendBack(backlogRoot(place), place.home, args, DateTime.formatIso(now))))
     }
     case "NoteTask": {
       return DateTime.now.pipe(Effect.flatMap((now) => noteTask(backlogRoot(place), args.id, args.words, DateTime.formatIso(now))))
@@ -326,6 +329,7 @@ const execute = (args: CommandArgs, place: DispatchPlace) =>
       case "MarkEventPosted":
       case "HoldTask":
       case "AnswerTask":
+      case "SendBack":
       case "NoteTask":
       case "ShowThread":
       case "DependTask":

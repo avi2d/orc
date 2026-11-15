@@ -1,4 +1,5 @@
 export { holdRun } from "./hold"
+export { type SendBack, sendBack } from "./send-back"
 export { ensureAlertStream, liveAlertStream } from "./alert-stream"
 export { stopNow } from "./cli-stop"
 export { killHeld, queueFromText, refuse, renewTask, type RunnerRequirements, startTask } from "./runner"
