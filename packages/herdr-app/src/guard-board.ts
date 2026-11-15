@@ -1,9 +1,7 @@
 import type { BoardTask } from "./board"
-import { type Guard, type Guarded, arrayOf, child, fields, literal, ok, oneOf, schemaTasks, string, taskHead } from "./guard"
+import { type Guard, type Guarded, arrayOf, boardKinds, child, fields, literal, ok, oneOf, prStates, schemaTasks, string, taskHead } from "./guard"
 
-const boardKinds = ["ship", "scout", "task", "decision", "parent"] as const
 const boardStatuses = ["new", "taken", "started", "closed"] as const
-const prStates = ["open", "closed", "merged"] as const
 
 const answerPresent = (value: unknown, at: string): Guarded<boolean> => {
   if (value === null) return ok(false)

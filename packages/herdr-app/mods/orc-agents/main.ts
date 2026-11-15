@@ -352,11 +352,11 @@ export default class OrcAgents extends View {
     const t = palette()
     const card = this.selectedCard()
     const act: AgentsActions = {
-      select: (cx, key) => this.select(cx, key),
-      toggleFold: (cx) => this.toggleFold(cx),
-      setFilter: (cx, filter) => this.setFilter(cx, filter),
-      choose: (cx, chosen) => this.choose(cx, chosen),
-      setPane: (cx, pane) => this.setPane(cx, pane),
+      select: (spot, key) => this.select(spot, key),
+      toggleFold: (spot) => this.toggleFold(spot),
+      setFilter: (spot, filter) => this.setFilter(spot, filter),
+      choose: (spot, chosen) => this.choose(spot, chosen),
+      setPane: (spot, pane) => this.setPane(spot, pane),
       askMerge: (asked, approval) => askMerge(asked, approval, `${thisView}.${mergeCommand}${asked.id}`)
     }
     return h_flex().id("root").size_full().bg(t.surface).text_size(13).text_color(t.foreground)
