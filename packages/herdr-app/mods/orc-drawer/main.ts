@@ -1,7 +1,7 @@
 import { type AsyncContext, type Context, type Element, type FocusHandle, View, div } from "gpui-kit"
 import { ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { exec, hc, home, layout, nextCommand, props, readTextFile, run, setShared, shared } from "herdr"
-import { type Guard, type Guarded, arrayOf, fields, guardJson, ok, string } from "../../src/guard"
+import { type Guard, type Guarded, fields, guardJson, ok, string } from "../../src/guard"
 import type { Reading } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 import { type Turn, sessionTurns } from "../../src/turns"
@@ -28,27 +28,30 @@ const stopPress = (element: Element): Element => element.on_mouse_down("left", (
 
 const activePane = (): string => activeChild(layout(), viewsId) === turnsId ? "turns" : "raw"
 
-interface Listed {
+interface Named {
   readonly address: string
+  readonly name: string
   readonly state: string
-  readonly name: string | null
 }
 
-const listed: Guard<Listed> = (value, at) => {
+const named: Guard<Named> = (value, at) => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
   const address = string(record.value, "address", at)
   if (address.kind === "refused") return address
+  const name = string(record.value, "name", at)
+  if (name.kind === "refused") return name
   const state = string(record.value, "state", at)
   if (state.kind === "refused") return state
-  const name = record.value["name"]
-  if (name !== undefined && name !== null && typeof name !== "string") return { kind: "refused", reason: `${at}.name is ${JSON.stringify(name)}, not a string` }
-  return ok({ address: address.value, state: state.value, name: typeof name === "string" ? name : null })
+  return ok({ address: address.value, name: name.value, state: state.value })
 }
 
-const terminalList: Guard<ReadonlyArray<Listed>> = (value, at) => {
-  const record = fields(value, at)
-  return record.kind === "refused" ? record : arrayOf(record.value, "terminals", at, listed)
+const missing = (value: unknown): boolean => {
+  const record = fields(value, "")
+  if (record.kind === "refused") return false
+  const error = fields(record.value["error"], "error")
+  if (error.kind === "refused") return false
+  return error.value["kind"] === "not_found"
 }
 
 const started: Guard<string> = (value, at) => {
@@ -105,13 +108,25 @@ const startChat = (): Promise<Guarded<DrawerChat>> => {
   )
 }
 
-const chatTerminal = (): Promise<Guarded<DrawerChat>> =>
-  hcJson(["ls", "--json"], terminalList).then((terminals) => {
-    if (terminals.kind === "refused") return terminals
-    const held = heldChat()
-    const live = held !== null && terminals.value.some((terminal) => terminal.address === held.address && terminal.state === "live" && terminal.name === chatName)
-    return live ? ok(held) : startChat()
-  })
+const chatTerminal = (): Promise<Guarded<DrawerChat>> => {
+  const held = heldChat()
+  if (held === null) return startChat()
+  return hc(["get", chatName, "--json"]).then(
+    (result) => {
+      if (result.code !== 0) return { kind: "refused", reason: ["hc get failed:", (result.stderr || result.stdout).trim()].join(" ") }
+      let value: unknown
+      try {
+        value = JSON.parse(result.stdout)
+      } catch {
+        return { kind: "refused", reason: "hc get is no JSON" }
+      }
+      const found = named(value, "")
+      if (found.kind === "refused") return missing(value) ? startChat() : found
+      return found.value.address === held.address && found.value.state === "live" ? ok(held) : startChat()
+    },
+    (error) => ({ kind: "refused", reason: error instanceof Error ? error.message : "hc get could not start" })
+  )
+}
 
 export default class OrcDrawer extends View {
   part: Part = { part: "bar" }
@@ -129,6 +144,7 @@ export default class OrcDrawer extends View {
     this.focusHandle = cx.focus_handle()
     if (this.part.part === "bar") {
       cx.spawn((task) => this.listen(task))
+      this.ensureChat(cx)
     }
     if (this.part.part === "turns") {
       if (this.focusHandle !== null) this.focusHandle.focus()
@@ -167,9 +183,7 @@ export default class OrcDrawer extends View {
         run("layout.select", { stack: viewsId, child })
       })
     }
-    return this.ensureChat(cx).then(() => {
-      run("layout.toggle", { id: drawerId })
-    })
+    return Promise.resolve()
   }
 
   ensureChat(cx: AsyncContext): Promise<void> {

@@ -129,7 +129,7 @@ Select a call to show the first 20 lines of its output.
 The drawer starts the chat as `orc chat --session ~/.orc/chat/drawer-<time>.jsonl` and keeps that file beside the chat terminal's address.
 Turns reads that one file every second.
 Pi writes the file after its first reply, so until then Turns shows an empty state, never another chat.
-When the chat terminal has exited, the next `cmd-k` starts a new chat with a new file.
+When the chat terminal has exited, selecting Raw or Turns in the bar starts a new chat with a new file.
 Closing the drawer leaves the chat terminal running, so reopening it shows the same conversation.
 
 ## Change the mods
