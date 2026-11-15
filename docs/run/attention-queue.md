@@ -29,18 +29,20 @@ Its prompt holds the rules it reads, each under a label that names its file, the
 The rules are your rules in `<ORC_HOME>/orchestrator.md` and the instructions file of the task's project in `projects.json`, each when it exists.
 
 Some questions never reach the decider.
-Before the call, orc checks the question's words against a fixed list of topics: deleting, security, keys or credentials, merging, releasing, spending, and anything that cannot be undone.
+Before the call, orc checks the question's words against a fixed list of topics: deleting, security, keys or credentials, merging, pushing, releasing, spending, and anything that cannot be undone.
+Deleting matches remove and drop as well as delete.
 A question on that list goes to you, and its `decision` is `escalated` with the topic and the word that matched as its reason.
 The list is in the code, so neither your rules nor the policy can widen what the decider answers.
 
 The decider takes one of four actions, and the item keeps it as a `decision` with its time:
 
 - **answer**: the reply names the answer, the reason and the `rule` it rests on, quoted word for word from your rules, the project's instructions, the policy or the task's body.
-  Orc escalates an answer whose quote is shorter than 3 words or is in none of them.
+  Orc escalates an answer whose quote is no whole sentence or line of them, after whitespace is collapsed and surrounding quotes are stripped.
   The answer goes to the task as `orc backlog answer` would give it, so the item closes with the answer's words.
   The `decision` is `answered` with the reason and the `rule`, which holds the `quote` and the `source` file it came from.
 - **ask back**: for a `worker-question`, the decider may put one question to the worker instead of answering.
   The worker gets that question as the result of its `orc_ask` call, and the item stays open.
+  A follow-up worker question carries the earlier asked-back question and the decider's question back in its prompt, and settling the follow-up closes the earlier asked-back item.
   The `decision` is `asked-back` with the decider's `question`.
   An ask back on a `review-question` escalates, because the run that asked it has stopped.
 - **link a duplicate**: the decider may name an earlier answered question of the same task by its item id.

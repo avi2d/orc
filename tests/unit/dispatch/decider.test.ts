@@ -372,7 +372,7 @@ describe("the decider", () => {
   test("a follow-up carries the asked-back exchange in its prompt, instead of asking without that context", async () => {
     const ask1 = { id: "ask-1", text: "Which retry count should the upload use?" }
     const ask2 = { id: "ask-2", text: "It runs in CI, should it retry twice?" }
-    const asked2 = "2026-11-02T10:21:00.000Z"
+    const asked2 = new Date(Date.now() + 60_000).toISOString()
     await withAskingTask(async (root) => {
       await decide(root, replies({ [ask1.text]: JSON.stringify({ decision: "ask-back", question: "Does the upload run in CI?" }) }))
       await run(askStartedTask(root, "orc-1", { asked: asked2, questions: [ask2] }))
@@ -388,7 +388,7 @@ describe("the decider", () => {
   test("a settled follow-up closes the earlier asked-back item, instead of leaving it open with no owner", async () => {
     const ask1 = { id: "ask-1", text: "Which retry count should the upload use?" }
     const ask2 = { id: "ask-2", text: "It runs in CI, should it retry twice?" }
-    const asked2 = "2026-11-02T10:21:00.000Z"
+    const asked2 = new Date(Date.now() + 60_000).toISOString()
     const item1 = "orc-1.ask-1.2026-11-02T10_20_00_000Z"
     const item2 = "orc-1.ask-2." + asked2.replace(/[^A-Za-z0-9_-]/g, "_")
     await withAskingTask(async (root) => {
@@ -423,6 +423,20 @@ describe("the decider", () => {
       expect(correctionsDue(task)).toEqual([])
       expect(await itemFile(root, r2Item)).toMatchObject({ state: { kind: "closed", answer: { words: "Three retries" }, overturned: { words: "Two retries" } } })
       expect(await run(attentionText(false, root))).toContain("answered " + r2Item + ": Three retries (the captain replaced the decider's answer \"Two retries\")")
+    }, [r2])
+  })
+
+  test("a late mark of the relayed decider words leaves the captain's answer unmarked and due, instead of marking words the run never got", async () => {
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [r2.text]: answer }))
+      await run(answerTask(root, "orc-1", "r2=Three retries", "2099-01-01T00:00:00.000Z"))
+      await run(markAnswersRelayed(root, "orc-1", asked, [{ id: "r2", asked, words: "Two retries" }]))
+      const task = (await run(listTasks(root))).at(0)
+      if (task === undefined) {
+        throw new Error("the task is gone")
+      }
+      expect(task.parked?.questions.at(0)?.answer).toMatchObject({ words: "Three retries", relayedTo: null })
+      expect(correctionsDue(task).map((question) => [question.id, question.answer.words, question.answer.overturned.words])).toEqual([["r2", "Three retries", "Two retries"]])
     }, [r2])
   })
 

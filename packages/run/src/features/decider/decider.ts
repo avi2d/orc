@@ -60,20 +60,29 @@ const spaced = (text: string): string => text.replace(/\s+/g, " ").trim()
 
 const unquoted = (quote: string): string => spaced(quote).replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
 
+const stripMarker = (line: string): string => spaced(line).replace(/^(?:[-*+>]\s+|\d+[.)]\s+)/, "")
+
 const sentencesAndLinesOf = (text: string): ReadonlyArray<string> => {
   const out: Array<string> = []
-  for (const line of text.split("\n")) {
-    const trimmed = spaced(line)
-    if (trimmed === "") {
+  for (const paragraph of text.split(/\n\s*\n/)) {
+    const lines = paragraph.split("\n").map(stripMarker).filter((line) => line !== "")
+    for (const line of lines) {
+      const whole = unquoted(line)
+      if (whole !== "" && !out.includes(whole)) {
+        out.push(whole)
+      }
+    }
+    if (lines.length === 0) {
       continue
     }
-    const whole = unquoted(trimmed)
-    if (whole !== "") {
-      out.push(whole)
+    const joined = spaced(lines.join(" "))
+    const paragraphWhole = unquoted(joined)
+    if (paragraphWhole !== "" && !out.includes(paragraphWhole)) {
+      out.push(paragraphWhole)
     }
-    for (const part of trimmed.split(/(?<=[.!?])\s+/)) {
+    for (const part of joined.split(/(?<=[.!?])\s+/)) {
       const sentence = unquoted(part)
-      if (sentence !== "" && sentence !== whole) {
+      if (sentence !== "" && !out.includes(sentence)) {
         out.push(sentence)
       }
     }
@@ -94,7 +103,7 @@ interface Earlier {
 
 const answeredEarlier = (items: ReadonlyArray<OpenItem>, current: string): ReadonlyArray<Earlier> =>
   items.flatMap(({ id, item }) =>
-    id !== current && (item.kind === "review-question" || item.kind === "worker-question") && item.state.kind === "closed"
+    id !== current && (item.kind === "review-question" || item.kind === "worker-question") && item.state.kind === "closed" && item.decision?.kind !== "asked-back"
       ? [{ id, text: item.text, answer: item.state.answer.words }]
       : [])
 
@@ -104,9 +113,9 @@ interface AskedBack {
   readonly question: string
 }
 
-const askedBackEarlier = (items: ReadonlyArray<OpenItem>, current: string): ReadonlyArray<AskedBack> =>
+const askedBackEarlier = (items: ReadonlyArray<OpenItem>, current: OpenItem): ReadonlyArray<AskedBack> =>
   items.flatMap(({ id, item }) =>
-    id !== current && item.kind === "worker-question" && item.state.kind === "open" && item.decision?.kind === "asked-back"
+    id !== current.id && item.kind === "worker-question" && item.state.kind === "open" && item.decision?.kind === "asked-back" && Date.parse(item.decision.at) < Date.parse(current.item.asked)
       ? [{ id, text: item.text, question: item.decision.question }]
       : [])
 
@@ -188,7 +197,7 @@ const askOne = (ask: AskDecider, policy: string, root: string, task: TaskRecord,
     const quotable: ReadonlyArray<RuleSource> = [...rules.written, { source: "decider policy", text: policy }, { source: "task " + task.spec.id, text: task.spec.body }]
     const items = yield* taskItems(root, task.spec.id)
     const earlier = answeredEarlier(items, entry.id)
-    const askedBack = askedBackEarlier(items, entry.id)
+    const askedBack = askedBackEarlier(items, entry)
     const prompt = deciderPrompt(task, question, entry.item.kind, rules.written, earlier, askedBack)
     return yield* ask.ask({ policy, prompt }).pipe(
       Effect.map((text): Verdict => {
@@ -209,11 +218,11 @@ const decisionOf = (verdict: Exclude<Verdict, { readonly kind: "escalated" }>, a
     : { kind: "answered" as const, reason: basis.reason, rule: { quote: basis.quote, source: basis.source }, at }
 }
 
-const closeAskedBackEarlier = (root: string, taskId: string, current: string, at: string) =>
+const closeAskedBackEarlier = (root: string, taskId: string, current: OpenItem, at: string) =>
   Effect.gen(function*() {
     const fresh = yield* findTask(root, taskId)
     for (const entry of yield* taskItems(root, taskId)) {
-      if (entry.id === current || entry.item.kind !== "worker-question" || entry.item.state.kind !== "open" || entry.item.decision?.kind !== "asked-back") {
+      if (entry.id === current.id || entry.item.kind !== "worker-question" || entry.item.state.kind !== "open" || entry.item.decision?.kind !== "asked-back" || !(Date.parse(entry.item.decision.at) < Date.parse(current.item.asked))) {
         continue
       }
       const stored = fresh.parked?.questions.find((candidate) => reviewQuestionId(taskId, candidate.id, candidate.asked) === entry.id)?.answer
@@ -221,12 +230,14 @@ const closeAskedBackEarlier = (root: string, taskId: string, current: string, at
     }
   })
 
-const settle = (root: string, task: TaskRecord, question: ParkedQuestion, item: string, kind: AttentionItem["kind"], verdict: Verdict, at: string) =>
+const settle = (root: string, task: TaskRecord, question: ParkedQuestion, entry: OpenItem, verdict: Verdict, at: string) =>
   Effect.gen(function*() {
+    const item = entry.id
+    const kind = entry.item.kind
     if (verdict.kind === "escalated") {
       yield* recordDecision(root, item, { kind: "escalated", reason: verdict.reason, at })
       if (kind === "worker-question") {
-        yield* closeAskedBackEarlier(root, task.spec.id, item, at)
+        yield* closeAskedBackEarlier(root, task.spec.id, entry, at)
       }
       return verdict
     }
@@ -239,8 +250,8 @@ const settle = (root: string, task: TaskRecord, question: ParkedQuestion, item: 
     )
     if (refused === null) {
       yield* routeTaskItems(root, [yield* findTask(root, task.spec.id)], at)
-      if (kind === "worker-question") {
-        yield* closeAskedBackEarlier(root, task.spec.id, item, at)
+      if (kind === "worker-question" && verdict.kind !== "asked-back") {
+        yield* closeAskedBackEarlier(root, task.spec.id, entry, at)
       }
       return verdict
     }
@@ -248,8 +259,8 @@ const settle = (root: string, task: TaskRecord, question: ParkedQuestion, item: 
     const stored = fresh.parked?.questions.find((candidate) => candidate.id === question.id)?.answer
     if (stored !== null && stored !== undefined) {
       yield* routeTaskItems(root, [fresh], at)
-      if (kind === "worker-question") {
-        yield* closeAskedBackEarlier(root, task.spec.id, item, at)
+      if (kind === "worker-question" && verdict.kind !== "asked-back") {
+        yield* closeAskedBackEarlier(root, task.spec.id, entry, at)
       }
       return verdict
     }
@@ -306,7 +317,7 @@ export const decideReviewQuestions = (
         continue
       }
       const verdict = yield* verdictOf(ask, policy, root, decidable)
-      decided.push({ item: entry.id, task: decidable.task.spec.id, verdict: yield* settle(root, decidable.task, decidable.question, entry.id, decidable.entry.item.kind, verdict, DateTime.formatIso(yield* DateTime.now)) })
+      decided.push({ item: entry.id, task: decidable.task.spec.id, verdict: yield* settle(root, decidable.task, decidable.question, decidable.entry, verdict, DateTime.formatIso(yield* DateTime.now)) })
     }
     return decided
   })
