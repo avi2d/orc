@@ -116,7 +116,7 @@ Use your `layout.switch` key to go back to your own layout.
 ## Chat with orc
 
 Press `cmd-k` to open the chat drawer, and press `cmd-k` again to close it.
-The drawer floats over the tab, and you can drag it anywhere by its bar.
+The drawer floats over the tab, and you can drag it by its bar to another edge of the window.
 Select Raw or Turns in the bar to switch views, or select ✕ to close the drawer.
 Press Esc in the bar or in the Turns view to close the drawer.
 In the Raw view Esc goes to Pi as an interrupt, so it never closes the drawer.
@@ -126,8 +126,10 @@ A card gives the message that started it, the input, output, cache read and cach
 Select Thinking to show the thinking of the model.
 Each tool call shows ✓ when it succeeded, ✗ when it failed, and … while it runs, with the number of lines it printed.
 Select a call to show the first 20 lines of its output.
-Turns reads the Pi session file of the chat every second, found through `herdr agent list` for the `orc-chat` terminal.
-Before the first reply Turns shows an empty state, never another chat.
+The drawer starts the chat as `orc chat --session ~/.orc/chat/drawer-<time>.jsonl` and keeps that file beside the chat terminal's address.
+Turns reads that one file every second.
+Pi writes the file after its first reply, so until then Turns shows an empty state, never another chat.
+When the chat terminal has exited, the next `cmd-k` starts a new chat with a new file.
 Closing the drawer leaves the chat terminal running, so reopening it shows the same conversation.
 
 ## Change the mods

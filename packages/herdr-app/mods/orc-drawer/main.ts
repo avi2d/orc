@@ -1,6 +1,6 @@
 import { type AsyncContext, type Context, type Element, type FocusHandle, View, div } from "gpui-kit"
 import { ScrollHandle, h_flex, v_flex } from "gpui-base"
-import { exec, hc, home, layout, nextCommand, props, readTextFile, run } from "herdr"
+import { exec, hc, home, layout, nextCommand, props, readTextFile, run, setShared, shared } from "herdr"
 import { type Guard, type Guarded, arrayOf, fields, guardJson, ok, string } from "../../src/guard"
 import type { Reading } from "../../src/orc-read"
 import { palette } from "../../src/palette"
@@ -30,7 +30,6 @@ const activePane = (): string => activeChild(layout(), viewsId) === turnsId ? "t
 
 interface Listed {
   readonly address: string
-  readonly name: string | null
   readonly state: string
 }
 
@@ -41,9 +40,7 @@ const listed: Guard<Listed> = (value, at) => {
   if (address.kind === "refused") return address
   const state = string(record.value, "state", at)
   if (state.kind === "refused") return state
-  const name = record.value["name"] === undefined ? ok(null) : string(record.value, "name", at)
-  if (name.kind === "refused") return name
-  return ok({ address: address.value, name: name.value, state: state.value })
+  return ok({ address: address.value, state: state.value })
 }
 
 const terminalList: Guard<ReadonlyArray<Listed>> = (value, at) => {
@@ -64,90 +61,53 @@ const hcJson = <A>(args: ReadonlyArray<string>, guard: Guard<A>): Promise<Guarde
     (error) => ({ kind: "refused", reason: error instanceof Error ? error.message : ["hc", args[0] ?? "", "could not start"].join(" ") })
   )
 
-const startChat = (): Promise<Guarded<string>> =>
-  hcJson(["run", "--bg", "--json", "--no-parent", "--name", chatName, "--cwd", home(), "--", "orc", "chat"], started)
+interface DrawerChat {
+  readonly address: string
+  readonly session: string
+}
 
-const chatTerminal = (): Promise<Guarded<string>> =>
+const chatKey = "orc-drawer.chat"
+
+const drawerChat: Guard<DrawerChat> = (value, at) => {
+  const record = fields(value, at)
+  if (record.kind === "refused") return record
+  const address = string(record.value, "address", at)
+  if (address.kind === "refused") return address
+  const session = string(record.value, "session", at)
+  if (session.kind === "refused") return session
+  return ok({ address: address.value, session: session.value })
+}
+
+const heldChat = (): DrawerChat | null => {
+  const value = shared(chatKey)
+  if (value === null || value === undefined) return null
+  const held = drawerChat(value, chatKey)
+  return held.kind === "ok" ? held.value : null
+}
+
+const chatFolder = (): string => [home(), ".orc", "chat"].join("/")
+
+const startChat = (): Promise<Guarded<DrawerChat>> => {
+  const session = [chatFolder(), ["drawer-", String(Date.now()), ".jsonl"].join("")].join("/")
+  return exec("mkdir", ["-p", chatFolder()]).then(
+    (made): Promise<Guarded<DrawerChat>> => made.code !== 0
+      ? Promise.resolve({ kind: "refused", reason: ["Cannot make", chatFolder(), (made.stderr || made.stdout).trim()].join(" ") })
+      : hcJson(["run", "--bg", "--json", "--no-parent", "--name", chatName, "--cwd", home(), "--", "orc", "chat", "--session", session], started).then((address) => {
+        if (address.kind === "refused") return address
+        const chat = { address: address.value, session }
+        setShared(chatKey, chat)
+        return ok(chat)
+      }),
+    (error) => ({ kind: "refused", reason: error instanceof Error ? error.message : "mkdir could not start" })
+  )
+}
+
+const chatTerminal = (): Promise<Guarded<DrawerChat>> =>
   hcJson(["ls", "--json"], terminalList).then((terminals) => {
     if (terminals.kind === "refused") return terminals
-    const live = terminals.value.find((terminal) => terminal.name === chatName && terminal.state === "live")
-    return live === undefined ? startChat() : ok(live.address)
-  })
-
-interface AgentSession {
-  readonly kind: string
-  readonly value: string
-}
-
-interface AgentEntry {
-  readonly address: string | null
-  readonly terminal: string | null
-  readonly name: string | null
-  readonly session: AgentSession | null
-}
-
-const textField = (record: Record<string, unknown>, name: string): string | null => {
-  const value = record[name]
-  return typeof value === "string" ? value : null
-}
-
-const agentEntry: Guard<AgentEntry> = (value, at) => {
-  const record = fields(value, at)
-  if (record.kind === "refused") return record
-  const held = record.value
-  const sessionValue = held["agent_session"]
-  if (sessionValue !== undefined && sessionValue !== null) {
-    const sessionRecord = fields(sessionValue, at)
-    if (sessionRecord.kind === "refused") return sessionRecord
-    const kind = string(sessionRecord.value, "kind", at)
-    if (kind.kind === "refused") return kind
-    const sessionPath = string(sessionRecord.value, "value", at)
-    if (sessionPath.kind === "refused") return sessionPath
-    return ok({
-      address: textField(held, "address") ?? textField(held, "terminal") ?? textField(held, "pane_id"),
-      terminal: textField(held, "terminal"),
-      name: textField(held, "name"),
-      session: { kind: kind.value, value: sessionPath.value }
-    })
-  }
-  return ok({
-    address: textField(held, "address") ?? textField(held, "terminal") ?? textField(held, "pane_id"),
-    terminal: textField(held, "terminal"),
-    name: textField(held, "name"),
-    session: null
-  })
-}
-
-const agentList: Guard<ReadonlyArray<AgentEntry>> = (value, at) => {
-  const record = fields(value, at)
-  if (record.kind === "refused") return record
-  const result = fields(record.value["result"], at)
-  if (result.kind === "refused") return result
-  return arrayOf(result.value, "agents", at, agentEntry)
-}
-
-const sessionFor = (agents: ReadonlyArray<AgentEntry>, address: string): string | null => {
-  const direct = agents.find((agent) => agent.session !== null && agent.session.kind === "path" && (agent.address === address || agent.terminal === address))
-  if (direct !== undefined && direct.session !== null) return direct.session.value
-  const named = agents.find((agent) => agent.session !== null && agent.session.kind === "path" && agent.name === chatName)
-  return named !== undefined && named.session !== null ? named.session.value : null
-}
-
-const agentSessionPath = (address: string): Promise<Guarded<string | null>> =>
-  exec("herdr", ["agent", "list"]).then(
-    (result) => {
-      if (result.code !== 0) return { kind: "refused", reason: ["herdr agent list failed:", (result.stderr || result.stdout).trim()].join(" ") }
-      const parsed = guardJson(result.stdout, agentList)
-      if (parsed.kind === "refused") return parsed
-      return ok(sessionFor(parsed.value, address))
-    },
-    (error) => ({ kind: "refused", reason: error instanceof Error ? error.message : "herdr agent list could not start" })
-  )
-
-const drawerSession = (): Promise<Guarded<string | null>> =>
-  chatTerminal().then((terminal) => {
-    if (terminal.kind === "refused") return terminal
-    return agentSessionPath(terminal.value)
+    const held = heldChat()
+    const live = held !== null && terminals.value.some((terminal) => terminal.address === held.address && terminal.state === "live")
+    return live ? ok(held) : startChat()
   })
 
 export default class OrcDrawer extends View {
@@ -155,6 +115,7 @@ export default class OrcDrawer extends View {
   problem: string | null = null
   turns: Reading<ReadonlyArray<Turn>> = { kind: "reading" }
   readText: string | null = null
+  reading = false
   openThinking = new Set<string>()
   openCalls = new Set<string>()
   scroll = ScrollHandle.new()
@@ -226,36 +187,36 @@ export default class OrcDrawer extends View {
   }
 
   readTurns(cx: AsyncContext): void {
-    cx.spawn((task) => drawerSession().then(
-      (session) => {
-        if (session.kind === "refused") {
-          this.turns = { kind: "failed", reason: session.reason }
-          task.notify()
-          return
-        }
-        if (session.value === null) {
-          this.turns = { kind: "ok", value: [] }
-          task.notify()
-          return
-        }
-        const file = session.value
-        return readTextFile(file).then(
-          (text) => this.showTurns(task, file, text),
-          () => {
-            this.turns = { kind: "failed", reason: ["Cannot read", file].join(" ") }
-            task.notify()
-          }
-        )
+    if (this.reading) return
+    const chat = heldChat()
+    if (chat === null) {
+      this.showNoTurn(cx)
+      return
+    }
+    this.reading = true
+    cx.spawn((task) => readTextFile(chat.session).then(
+      (text) => {
+        this.reading = false
+        if (text === null) this.showNoTurn(task)
+        else this.showTurns(task, chat.session, text)
       },
       () => {
-        this.turns = { kind: "failed", reason: "herdr agent list could not start" }
+        this.reading = false
+        this.readText = null
+        this.turns = { kind: "failed", reason: ["Cannot read", chat.session].join(" ") }
         task.notify()
       }
     ))
   }
 
-  showTurns(cx: AsyncContext, file: string, text: string | null): void {
-    if (text === null || text === this.readText) return
+  showNoTurn(cx: AsyncContext): void {
+    this.readText = null
+    this.turns = { kind: "ok", value: [] }
+    cx.notify()
+  }
+
+  showTurns(cx: AsyncContext, file: string, text: string): void {
+    if (text === this.readText) return
     this.readText = text
     const shown = this.turns.kind === "ok" ? this.turns.value.length : 0
     const parsed = sessionTurns(text)
@@ -271,13 +232,7 @@ export default class OrcDrawer extends View {
         toggleThinking: (turn, cx) => this.flip(this.openThinking, turn, cx),
         toggleCall: (call, cx) => this.flip(this.openCalls, call, cx)
       }, this.scroll))
-      if (this.focusHandle === null) return body
-      const handle = this.focusHandle
-      return body.track_focus(handle).on_key_down((event, cx) => {
-        if (event.key !== "escape") return
-        run("layout.hide", { id: drawerId })
-        cx.stop_propagation()
-      })
+      return this.hideOnEscape(body)
     }
     return this.bar(t)
   }
