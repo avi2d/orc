@@ -1,9 +1,9 @@
 import { Array as Arr, Effect, FileSystem, Schema } from "effect"
 import { answerWait, type DeciderOwns, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 import { renderTaskFile } from "./task-record-render"
-import { BacklogError, backlogPaths, grabIn, platformFailure, publishOnce, recoverGrabs, scratchName, takenGrab } from "./backlog-write"
+import { BacklogError, backlogPaths, grabIn, platformFailure, publishOnce, readNames, recoverGrabs, scratchName, takenGrab } from "./backlog-write"
 
-export { BacklogError } from "./backlog-write"
+export { BacklogError, readNames } from "./backlog-write"
 
 // A project name may hold dashes, so an id splits at its last dash.
 const idPattern = /^([A-Za-z0-9][A-Za-z0-9._-]*)-(\d+)$/
@@ -25,15 +25,6 @@ export const ensureBacklog = (root: string): Effect.Effect<void, BacklogError, F
     for (const folder of [paths.ids, paths.logs, ...taskFolders.map(paths.folder)]) {
       yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.mapError(platformFailure("make " + folder)))
     }
-  })
-
-export const readNames = (folder: string): Effect.Effect<ReadonlyArray<string>, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    return yield* fs.readDirectory(folder).pipe(
-      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed<ReadonlyArray<string>>([])),
-      Effect.mapError(platformFailure("list " + folder))
-    )
   })
 
 const byCreated = (left: TaskRecord, right: TaskRecord): number =>
