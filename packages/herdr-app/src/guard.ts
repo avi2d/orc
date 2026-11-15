@@ -298,6 +298,26 @@ const step: Guard<Step> = (value, at) => {
   return ok({ id: id.value, name: name.value, attempt: attempt.value, status: status.value })
 }
 
+export interface ShownStep extends Step {
+  readonly model: string | null
+  readonly thinking: string | null
+  readonly piSessionFile: string | null
+}
+
+const shownStep: Guard<ShownStep> = (value, at) => {
+  const brief = step(value, at)
+  if (brief.kind === "refused") return brief
+  const record = fields(value, at)
+  if (record.kind === "refused") return record
+  const model = nullableString(record.value, "model", at)
+  if (model.kind === "refused") return model
+  const thinking = nullableString(record.value, "thinking", at)
+  if (thinking.kind === "refused") return thinking
+  const piSessionFile = nullableString(record.value, "piSessionFile", at)
+  if (piSessionFile.kind === "refused") return piSessionFile
+  return ok({ ...brief.value, model: model.value, thinking: thinking.value, piSessionFile: piSessionFile.value })
+}
+
 const runStatuses = ["running", "succeeded", "failed", "stopped"] as const
 
 export interface Run {
@@ -312,6 +332,7 @@ export interface Run {
   readonly endReason: string | null
   readonly kind: string | null
   readonly delivery: string | null
+  readonly worktree: string | null
 }
 
 const run: Guard<Run> = (value, at) => {
@@ -337,7 +358,9 @@ const run: Guard<Run> = (value, at) => {
   if (kind.kind === "refused") return kind
   const delivery = record.value["delivery"] === undefined ? ok(null) : nullableString(record.value, "delivery", at)
   if (delivery.kind === "refused") return delivery
-  return ok({ ...placed.value, branch: branch.value, status: status.value, prLink: prLink.value, title: title.value, step: latest.value, questions: questions.value, endReason: endReason.value, kind: kind.value, delivery: delivery.value })
+  const worktree = nullableString(record.value, "worktree", at)
+  if (worktree.kind === "refused") return worktree
+  return ok({ ...placed.value, branch: branch.value, status: status.value, prLink: prLink.value, title: title.value, step: latest.value, questions: questions.value, endReason: endReason.value, kind: kind.value, delivery: delivery.value, worktree: worktree.value })
 }
 
 export interface Runs {
@@ -347,7 +370,7 @@ export interface Runs {
 
 export interface Show {
   readonly schema: "orc.show.v1"
-  readonly steps: ReadonlyArray<Step>
+  readonly steps: ReadonlyArray<ShownStep>
 }
 
 export const show: Guard<Show> = (value, at) => {
@@ -355,7 +378,7 @@ export const show: Guard<Show> = (value, at) => {
   if (record.kind === "refused") return record
   const schema = literal(record.value, "schema", at, "orc.show.v1")
   if (schema.kind === "refused") return schema
-  const steps = arrayOf(record.value, "steps", at, step)
+  const steps = arrayOf(record.value, "steps", at, shownStep)
   if (steps.kind === "refused") return steps
   return ok({ schema: schema.value, steps: steps.value })
 }

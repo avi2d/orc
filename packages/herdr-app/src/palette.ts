@@ -3,7 +3,7 @@ import { theme } from "herdr"
 
 type ColorName =
   | "background" | "surface" | "chrome" | "raised" | "hover" | "selected" | "border"
-  | "foreground" | "muted" | "dim" | "accent" | "working" | "blocked" | "done" | "ansi1"
+  | "foreground" | "muted" | "dim" | "accent" | "working" | "blocked" | "done" | "ansi1" | "ansi2" | "solid" | "solid_foreground"
 
 const isColor = (value: string | undefined): value is Color => value?.startsWith("#") === true
 
@@ -28,6 +28,9 @@ export const palette = (): Readonly<Record<ColorName, Color>> => {
     working: pick("working"),
     blocked: pick("blocked"),
     done: pick("done"),
-    ansi1: pick("ansi1")
+    ansi1: pick("ansi1"),
+    ansi2: pick("ansi2"),
+    solid: pick("solid"),
+    solid_foreground: pick("solid_foreground")
   }
 }

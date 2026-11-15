@@ -1,11 +1,21 @@
-import { type AsyncContext, type Color, type Context, type Element, View, div } from "gpui-kit"
-import { ScrollHandle, h_flex, v_flex } from "gpui-base"
-import { layout, settings } from "herdr"
-import { type Card, type CardStatus, type Filter, type Mark, type StepRow, buildCards, cardStatuses, filterCards, projectsOf, railLabel, stepRows } from "../../src/agents"
-import { backlog, runs, show, type Show } from "../../src/guard"
+import { type AsyncContext, type Context, type Element, View, div } from "gpui-kit"
+import { ScrollHandle, h_flex } from "gpui-base"
+import { exec, layout, nextCommand, notify, readTextFile, run, setShared } from "herdr"
+import { type Card, type Filter, type RunAgent, buildCards, filterCards, goesOn, runAgent } from "../../src/agents"
+import { type AgentsActions, type Chosen, type MergeOutcome, type Pane, approvalOf, approvePane, askMerge, detailNote, detailPane, logBody, logLines, runsColumn, stepBar, stepTitle, stepsColumn } from "../../src/agents-view"
+import { type RunChanges, changesKey } from "../../src/changes"
+import { readChanges } from "../../src/changes-read"
+import { backlog, runs, show, type Show, type ShownStep } from "../../src/guard"
 import { type Reading, readJson, readText } from "../../src/orc-read"
 import { palette } from "../../src/palette"
+import { type Turn, sessionTurns } from "../../src/turns"
+import { turnsView } from "../../src/turns-view"
 import { activeChild, viewsStack } from "../../src/views"
+
+interface Merge {
+  readonly task: string
+  readonly outcome: MergeOutcome
+}
 
 interface Keyed<A> {
   readonly of: string
@@ -16,46 +26,12 @@ type Palette = ReturnType<typeof palette>
 
 const everyMs = 4000
 const thisView = "orc-agents"
+const changesBlock = "orc-changes"
+const mergeCommand = "merge:"
+const mergeTimeoutMs = 600_000
+const showsAtOnce = 4
 
-const statusColor = (t: Palette, status: CardStatus): Color => {
-  switch (status) {
-    case "Awaiting you":
-      return t.blocked
-    case "Running":
-      return t.working
-    case "Queued":
-      return t.muted
-    case "Failed":
-      return t.ansi1
-    case "Done":
-      return t.done
-  }
-}
-
-const markColor = (t: Palette, mark: Mark): Color => {
-  switch (mark) {
-    case "✓":
-      return t.done
-    case "✗":
-      return t.ansi1
-    case "●":
-      return t.working
-    case "◆":
-      return t.blocked
-    case "○":
-      return t.dim
-  }
-}
-
-const escapeSequence = new RegExp(String.fromCharCode(27) + "\\[[0-9;?]*[A-Za-z]", "g")
-
-const logLines = (text: string): ReadonlyArray<string> =>
-  text.replace(escapeSequence, "").replace(/\n$/, "").split("\n")
-
-const monospace = (): string => {
-  const family = settings()["font_family"]
-  return typeof family === "string" ? family : "Menlo"
-}
+const firstLine = (text: string): string => text.trim().split("\n")[0] ?? ""
 
 const shown = (): boolean => {
   const active = activeChild(layout(), viewsStack)
@@ -66,16 +42,30 @@ export default class OrcAgents extends View {
   cards: Reading<ReadonlyArray<Card>> = { kind: "reading" }
   filter: Filter = { project: null, status: null }
   selectedKey: string | null = null
-  chosenStep: number | null = null
+  chosen: Chosen | null = null
+  pane: Pane = "turns"
   folded = false
   steps: Keyed<Show> | null = null
   log: Keyed<string> | null = null
   shownLines = 0
+  turns: Keyed<ReadonlyArray<Turn>> | null = null
+  turnsText: string | null = null
+  openThinking = new Set<string>()
+  openCalls = new Set<string>()
+  agents = new Map<string, RunAgent | null>()
+  labelling = false
+  changesProblem: string | null = null
+  sharedChanges: string | null = null
+  changesShown: boolean | null = null
+  merge: Merge | null = null
   busy = false
+  stale = false
   logScroll = ScrollHandle.new()
+  turnsScroll = ScrollHandle.new()
 
   override init(_props: unknown, cx: AsyncContext): void {
     this.refresh(cx)
+    cx.spawn((task) => this.listen(task))
     cx.timer.every(everyMs, (tick) => {
       if (shown()) {
         this.refresh(tick)
@@ -83,15 +73,30 @@ export default class OrcAgents extends View {
     })
   }
 
+  listen(cx: AsyncContext): Promise<void> {
+    return nextCommand().then((command) => {
+      if (command.startsWith(mergeCommand)) {
+        this.startMerge(cx, command.slice(mergeCommand.length))
+      }
+      return this.listen(cx)
+    }, () => undefined)
+  }
+
   refresh(cx: Context): void {
     if (this.busy) {
+      this.stale = true
       return
     }
     this.busy = true
+    this.stale = false
     cx.spawn((task) =>
       this.readAll().then(() => {
         this.busy = false
         task.notify()
+        this.labelRuns(task)
+        if (this.stale) {
+          this.refresh(task)
+        }
       })
     )
   }
@@ -106,30 +111,138 @@ export default class OrcAgents extends View {
         : backlogReading.kind !== "ok"
         ? backlogReading
         : { kind: "ok", value: buildCards(runsReading.value, backlogReading.value) }
-      const runId = this.selectedCard()?.runId ?? null
-      if (runId === null) {
-        this.steps = null
-        this.log = null
+      return Promise.all([this.readSelectedRun(), this.readSelectedChanges()]).then(() => undefined)
+    })
+  }
+
+  readSelectedRun(): Promise<void> {
+    const runId = this.selectedCard()?.runId ?? null
+    if (runId === null) {
+      this.steps = null
+      this.log = null
+      this.turns = null
+      return Promise.resolve()
+    }
+    return readJson("orc", ["show", runId, "--json"], show).then((showReading) => {
+      this.steps = { of: runId, reading: showReading }
+      if (showReading.kind !== "ok") {
         return
       }
-      return readJson("orc", ["show", runId, "--json"], show).then((showReading) => {
-        this.steps = { of: runId, reading: showReading }
-        const stepId = this.stepShown()
-        if (stepId === null) {
-          this.log = null
-          return
-        }
-        return readText("orc", ["log", runId, stepId.toString()]).then((reading) => {
-          const of = `${runId}/${stepId}`
-          const lines = reading.kind === "ok" ? logLines(reading.value).length : 0
-          if (this.log?.of !== of || lines !== this.shownLines) {
-            this.shownLines = lines
-            this.logScroll.scroll_to_item(Math.max(lines - 1, 0))
-          }
-          this.log = { of, reading }
-        })
-      })
+      this.agents.set(runId, runAgent(showReading.value.steps))
+      const step = this.stepShown()
+      if (step === null) {
+        return
+      }
+      const of = `${runId}/${step.id}`
+      return this.showsTurns(step) ? this.readTurns(of, step.piSessionFile) : this.readLog(of, runId, step.id)
     })
+  }
+
+  readLog(of: string, runId: string, stepId: number): Promise<void> {
+    return readText("orc", ["log", runId, stepId.toString()]).then((reading) => {
+      const lines = reading.kind === "ok" ? logLines(reading.value).length : 0
+      if (this.log?.of !== of || lines !== this.shownLines) {
+        this.shownLines = lines
+        this.logScroll.scroll_to_item(Math.max(lines - 1, 0))
+      }
+      this.log = { of, reading }
+    })
+  }
+
+  readTurns(of: string, file: string | null): Promise<void> {
+    if (file === null) {
+      this.showTurns(of, "", "")
+      return Promise.resolve()
+    }
+    return readTextFile(file).then(
+      (text) => this.showTurns(of, file, text ?? ""),
+      () => {
+        this.turnsText = null
+        this.turns = { of, reading: { kind: "failed", reason: `Cannot read ${file}` } }
+      }
+    )
+  }
+
+  showTurns(of: string, file: string, text: string): void {
+    if (this.turns?.of === of && text === this.turnsText) {
+      return
+    }
+    const before = this.turns?.of === of && this.turns.reading.kind === "ok" ? this.turns.reading.value.length : 0
+    const parsed = sessionTurns(text)
+    this.turnsText = text
+    this.turns = { of, reading: parsed.kind === "ok" ? { kind: "ok", value: parsed.value } : { kind: "failed", reason: `${file}: ${parsed.reason}` } }
+    if (parsed.kind === "ok" && parsed.value.length > before) {
+      this.turnsScroll.scroll_to_item(parsed.value.length - 1)
+    }
+  }
+
+  readSelectedChanges(): Promise<void> {
+    const checkout = this.selectedCard()?.checkout ?? null
+    const reading: Promise<Reading<RunChanges | null>> = checkout === null ? Promise.resolve({ kind: "ok", value: null }) : readChanges(checkout)
+    return reading.then((changes) => {
+      this.changesProblem = changes.kind === "failed" ? changes.reason : null
+      this.shareChanges(changes.kind === "ok" ? changes.value : null)
+    })
+  }
+
+  // setShared redraws every mod and layout.show moves the columns, so both go out only when the value changed.
+  shareChanges(changes: RunChanges | null): void {
+    const written = JSON.stringify(changes)
+    if (written !== this.sharedChanges) {
+      this.sharedChanges = written
+      setShared(changesKey, changes)
+    }
+    const wanted = changes !== null
+    if (wanted !== this.changesShown) {
+      this.changesShown = wanted
+      run(wanted ? "layout.show" : "layout.hide", { id: changesBlock })
+    }
+  }
+
+  labelRuns(cx: AsyncContext): void {
+    const cards = this.cards.kind === "ok" ? this.cards.value : []
+    const wanted = cards.flatMap((card) => card.runId !== null && (!this.agents.has(card.runId) || goesOn(card.standing)) ? [card.runId] : [])
+    if (this.labelling || wanted.length === 0) {
+      return
+    }
+    this.labelling = true
+    const label = (runId: string): Promise<void> =>
+      readJson("orc", ["show", runId, "--json"], show).then((reading) => {
+        if (reading.kind === "ok") {
+          this.agents.set(runId, runAgent(reading.value.steps))
+        }
+      })
+    const from = (start: number, task: AsyncContext): Promise<void> =>
+      start >= wanted.length
+        ? Promise.resolve()
+        : Promise.all(wanted.slice(start, start + showsAtOnce).map(label)).then(() => {
+          task.notify()
+          return from(start + showsAtOnce, task)
+        })
+    cx.spawn((task) => from(0, task).then(() => {
+      this.labelling = false
+    }))
+  }
+
+  startMerge(cx: AsyncContext, task: string): void {
+    if (this.merge?.outcome.kind === "merging") {
+      return
+    }
+    this.merge = { task, outcome: { kind: "merging" } }
+    cx.notify()
+    cx.spawn((spot) =>
+      exec("orc", ["merge", task, "--basis", "captain-word"], { timeout: mergeTimeoutMs }).then(
+        (result) => result.code === 0 ? null : `orc merge ${task} exited ${result.code}: ${firstLine(result.stderr) || firstLine(result.stdout)}`,
+        () => `orc merge ${task} did not finish. Check that orc is on PATH.`
+      ).then((problem) => {
+        this.merge = problem === null ? null : { task, outcome: { kind: "failed", reason: problem } }
+        if (problem === null) {
+          notify({ title: `Merged ${task}`, level: "success" })
+        }
+        this.refresh(spot)
+        spot.notify()
+      })
+    )
   }
 
   visibleCards(): ReadonlyArray<Card> {
@@ -148,26 +261,69 @@ export default class OrcAgents extends View {
     return this.steps?.of === card.runId ? this.steps.reading : { kind: "reading" }
   }
 
-  stepShown(): number | null {
+  recordedSteps(card: Card): ReadonlyArray<ShownStep> {
+    const steps = this.currentSteps(card)
+    return steps?.kind === "ok" ? steps.value.steps : []
+  }
+
+  target(): Chosen | null {
     const card = this.selectedCard()
-    const steps = card === null ? null : this.currentSteps(card)
-    if (steps?.kind !== "ok") {
+    if (card === null) {
       return null
     }
-    const ids = steps.value.steps.map((step) => step.id)
-    return this.chosenStep !== null && ids.includes(this.chosenStep) ? this.chosenStep : ids.at(-1) ?? null
+    const approval = approvalOf(card) !== null
+    if (this.chosen?.kind === "approve" && approval) {
+      return this.chosen
+    }
+    const ids = this.recordedSteps(card).map((step) => step.id)
+    if (this.chosen?.kind === "step" && ids.includes(this.chosen.id)) {
+      return this.chosen
+    }
+    if (approval) {
+      return { kind: "approve" }
+    }
+    const last = ids.at(-1)
+    return last === undefined ? null : { kind: "step", id: last }
+  }
+
+  stepShown(): ShownStep | null {
+    const card = this.selectedCard()
+    const target = this.target()
+    if (card === null || target?.kind !== "step") {
+      return null
+    }
+    return this.recordedSteps(card).find((step) => step.id === target.id) ?? null
+  }
+
+  showsTurns(step: ShownStep): boolean {
+    return step.name === "implement" && this.pane === "turns"
   }
 
   select(cx: Context, key: string): void {
     this.selectedKey = key
-    this.chosenStep = null
+    this.chosen = null
     this.refresh(cx)
     cx.notify()
   }
 
-  chooseStep(cx: Context, stepId: number): void {
-    this.chosenStep = stepId
+  choose(cx: Context, chosen: Chosen): void {
+    this.chosen = chosen
     this.refresh(cx)
+    cx.notify()
+  }
+
+  setPane(cx: Context, pane: Pane): void {
+    this.pane = pane
+    this.refresh(cx)
+    cx.notify()
+  }
+
+  flip(open: Set<string>, id: string, cx: Context): void {
+    if (open.has(id)) {
+      open.delete(id)
+    } else {
+      open.add(id)
+    }
     cx.notify()
   }
 
@@ -178,7 +334,7 @@ export default class OrcAgents extends View {
 
   setFilter(cx: Context, filter: Filter): void {
     this.filter = filter
-    this.chosenStep = null
+    this.chosen = null
     this.refresh(cx)
     cx.notify()
   }
@@ -186,158 +342,51 @@ export default class OrcAgents extends View {
   render(): Element {
     const t = palette()
     const card = this.selectedCard()
+    const act: AgentsActions = {
+      select: (cx, key) => this.select(cx, key),
+      toggleFold: (cx) => this.toggleFold(cx),
+      setFilter: (cx, filter) => this.setFilter(cx, filter),
+      choose: (cx, chosen) => this.choose(cx, chosen),
+      setPane: (cx, pane) => this.setPane(cx, pane),
+      askMerge: (asked, approval) => askMerge(asked, approval, `${thisView}.${mergeCommand}${asked.id}`)
+    }
     return h_flex().id("root").size_full().bg(t.surface).text_size(13).text_color(t.foreground)
-      .child(this.folded ? this.rail(t, card) : this.list(t, card))
-      .child(this.stepsColumn(t, card))
-      .child(this.detail(t, card))
+      .child(runsColumn(t, { cards: this.cards, filter: this.filter, selectedKey: card?.key ?? null, agents: this.agents, folded: this.folded }, act))
+      .child(stepsColumn(t, card, card === null ? null : this.currentSteps(card), this.target(), this.changesProblem, act))
+      .child(this.detail(t, card, act))
   }
 
-  chip(t: Palette, id: string, label: string, on: boolean, pick: (cx: Context) => void): Element {
-    return div().id(id).px(8).py(2).rounded(4).cursor_pointer()
-      .bg(on ? t.selected : t.surface).text_color(on ? t.foreground : t.muted)
-      .hover((style) => style.bg(t.hover))
-      .on_click((_event, cx) => pick(cx))
-      .child(label)
-  }
-
-  filters(t: Palette): Element {
-    const all = this.cards.kind === "ok" ? this.cards.value : []
-    const byProject = filterCards(all, { project: this.filter.project, status: null })
-    const projects = projectsOf(all)
-    return v_flex().gap(6).px(12).pb(8).border_b(1).border_color(t.border)
-      .child(h_flex().gap(4).flex_wrap().items_center()
-        .child(div().w(52).text_color(t.dim).child("Project"))
-        .child(this.chip(t, "project-all", "All", this.filter.project === null, (cx) => this.setFilter(cx, { ...this.filter, project: null })))
-        .children(projects.map((project) =>
-          this.chip(t, `project-${project}`, project, this.filter.project === project, (cx) => this.setFilter(cx, { ...this.filter, project })))))
-      .child(h_flex().gap(4).flex_wrap().items_center()
-        .child(div().w(52).text_color(t.dim).child("Status"))
-        .child(this.chip(t, "status-all", "All", this.filter.status === null, (cx) => this.setFilter(cx, { ...this.filter, status: null })))
-        .children(cardStatuses.map((status) => {
-          const count = byProject.filter((entry) => entry.standing.status === status).length
-          return this.chip(t, `status-${status}`, `${status} ${count}`, this.filter.status === status, (cx) => this.setFilter(cx, { ...this.filter, status }))
-        })))
-  }
-
-  list(t: Palette, selected: Card | null): Element {
-    const cards = this.visibleCards()
-    const body = this.cards.kind === "failed"
-      ? div().p(12).text_color(t.blocked).child(this.cards.reason)
-      : this.cards.kind === "reading"
-      ? div().p(12).text_color(t.muted).child("Reading orc runs --json --local")
-      : cards.length === 0
-      ? div().p(12).text_color(t.muted).child("No run matches these filters")
-      : v_flex().id("cards").flex_1().overflow_y_scrollbar().px(8).py(8).gap(6)
-        .children(cards.map((card) => this.cardView(t, card, card.key === selected?.key)))
-    return v_flex().w(380).h_full().flex_shrink_0().bg(t.chrome).border_r(1).border_color(t.border)
-      .child(h_flex().px(12).h(44).items_center().justify_between()
-        .child(div().text_size(15).font_semibold().child("Runs"))
-        .child(this.foldButton(t, "fold", "«")))
-      .child(this.filters(t))
-      .child(body)
-  }
-
-  cardView(t: Palette, card: Card, selected: boolean): Element {
-    const color = statusColor(t, card.standing.status)
-    return v_flex().id(`card-${card.key}`).p(10).gap(3).rounded(6).cursor_pointer().border_l(3).border_color(color)
-      .bg(selected ? t.selected : t.background)
-      .hover((style) => style.bg(selected ? t.selected : t.hover))
-      .on_click((_event, cx) => this.select(cx, card.key))
-      .child(h_flex().justify_between().gap(8)
-        .child(h_flex().gap(6).min_w_0()
-          .child(div().font_semibold().truncate().child(card.id))
-          .children(card.kind === null ? [] : [div().text_color(t.dim).flex_shrink_0().child(card.kind)]))
-        .child(div().flex_shrink_0().text_size(12).text_color(color).child(card.standing.status)))
-      .child(div().truncate().child(card.title))
-      .child(div().truncate().text_color(t.muted).child(card.where))
-  }
-
-  foldButton(t: Palette, id: string, label: string): Element {
-    return div().id(id).px(8).py(2).rounded(4).cursor_pointer().text_size(15).text_color(t.muted)
-      .hover((style) => style.bg(t.hover))
-      .on_click((_event, cx) => this.toggleFold(cx))
-      .child(label)
-  }
-
-  rail(t: Palette, selected: Card | null): Element {
-    return v_flex().id("rail").w(96).h_full().flex_shrink_0().bg(t.chrome).border_r(1).border_color(t.border)
-      .child(h_flex().h(44).px(8).items_center().child(this.foldButton(t, "unfold", "»")))
-      .child(v_flex().id("rail-ids").flex_1().overflow_y_scrollbar().px(6).gap(2)
-        .children(this.visibleCards().map((card) =>
-          div().id(`rail-${card.key}`).px(6).py(3).rounded(4).cursor_pointer().truncate()
-            .text_color(statusColor(t, card.standing.status))
-            .bg(card.key === selected?.key ? t.selected : t.chrome)
-            .hover((style) => style.bg(t.hover))
-            .on_click((_event, cx) => this.select(cx, card.key))
-            .child(railLabel(card)))))
-  }
-
-  stepsColumn(t: Palette, card: Card | null): Element {
-    const column = v_flex().w(240).h_full().flex_shrink_0().border_r(1).border_color(t.border)
+  detail(t: Palette, card: Card | null, act: AgentsActions): Element {
     if (card === null) {
-      return column
+      return detailNote(t, "No run selected")
     }
-    const reading = this.currentSteps(card)
-    const header = v_flex().px(12).py(10).gap(2).border_b(1).border_color(t.border)
-      .child(div().font_semibold().truncate().child(card.title))
-      .child(div().text_size(12).text_color(t.dim).truncate().child(card.runId ?? "No run yet"))
-    if (reading?.kind === "failed") {
-      return column.child(header).child(div().p(12).text_color(t.blocked).child(reading.reason))
+    if (card.runId === null) {
+      return detailNote(t, "The task has not started a run yet")
     }
-    if (reading?.kind === "reading") {
-      return column.child(header).child(div().p(12).text_color(t.muted).child("Reading its steps"))
+    const approval = approvalOf(card)
+    if (approval !== null && this.target()?.kind === "approve") {
+      return approvePane(t, card, approval, this.merge?.task === card.id ? this.merge.outcome : null, act)
     }
-    const shownStep = this.stepShown()
-    const rows = stepRows(card.standing, reading?.value.steps ?? [], card.kind, card.delivery)
-    return column.child(header)
-      .child(v_flex().id("steps").flex_1().overflow_y_scrollbar().p(6).gap(2)
-        .children(rows.map((row) => this.rowView(t, row, row.stepId !== null && row.stepId === shownStep))))
-  }
-
-  rowView(t: Palette, row: StepRow, selected: boolean): Element {
-    const line = h_flex().id(`row-${row.key}`).px(8).py(4).gap(8).rounded(4).items_center()
-      .bg(selected ? t.selected : t.surface)
-      .child(div().w(14).text_color(markColor(t, row.mark)).child(row.mark))
-      .child(div().text_color(row.stepId === null ? t.muted : t.foreground).child(row.label))
-    const stepId = row.stepId
-    return stepId === null
-      ? line
-      : line.cursor_pointer().hover((style) => style.bg(selected ? t.selected : t.hover)).on_click((_event, cx) => this.chooseStep(cx, stepId))
-  }
-
-  detail(t: Palette, card: Card | null): Element {
-    const pane = v_flex().flex_1().min_w_0().h_full().bg(t.background)
-    if (card === null) {
-      return pane.child(div().p(16).text_color(t.muted).child("No run selected"))
-    }
-    const runId = card.runId
-    const stepId = this.stepShown()
-    if (runId === null) {
-      return pane.child(div().p(16).text_color(t.muted).child("The task has not started a run yet"))
-    }
-    if (stepId === null) {
+    const step = this.stepShown()
+    if (step === null) {
       const settled = card.standing.status === "Failed" || card.standing.status === "Done"
-      return pane.child(div().p(16).text_color(t.muted).child(settled ? "This run ended before it recorded a step" : "No step has started yet"))
+      return detailNote(t, settled ? "This run ended before it recorded a step" : "No step has started yet")
     }
-    const reading = this.log?.of === `${runId}/${stepId}` ? this.log.reading : { kind: "reading" as const }
-    const header = h_flex().px(16).h(40).flex_shrink_0().items_center().justify_between().border_b(1).border_color(t.border)
-      .child(div().font_semibold().child(this.stepTitle(card, stepId)))
-      .child(div().text_size(12).text_color(t.dim).child(`orc log ${runId} ${stepId}`))
-    const body = reading.kind === "failed"
-      ? div().p(16).text_color(t.blocked).child(reading.reason)
-      : reading.kind === "reading"
-      ? div().p(16).text_color(t.muted).child("Reading the step's output")
-      : reading.value === ""
-      ? div().p(16).text_color(t.muted).child("Nothing written yet")
-      : v_flex().id("log").flex_1().overflow_y_scrollbar().track_scroll(this.logScroll).px(16).py(10)
-        .font_family(monospace()).text_size(12)
-        .children(logLines(reading.value).map((text) => div().child(text === "" ? " " : text)))
-    return pane.child(header).child(body)
+    return this.stepDetail(t, card, card.runId, step, act)
   }
 
-  stepTitle(card: Card, stepId: number): string {
-    const steps = this.currentSteps(card)
-    const row = steps?.kind === "ok" ? stepRows(card.standing, steps.value.steps, card.kind, card.delivery).find((entry) => entry.stepId === stepId) : undefined
-    return row?.label ?? "Step"
+  stepDetail(t: Palette, card: Card, runId: string, step: ShownStep, act: AgentsActions): Element {
+    const of = `${runId}/${step.id}`
+    const title = stepTitle(card, this.recordedSteps(card), step.id)
+    if (this.showsTurns(step)) {
+      const turns: Reading<ReadonlyArray<Turn>> = this.turns?.of === of ? this.turns.reading : { kind: "reading" }
+      return detailPane(t, [stepBar(t, step, title, "Pi session", this.pane, act),
+        div().flex_1().min_h_0().child(turnsView(t, turns, { thinking: this.openThinking, calls: this.openCalls }, {
+          toggleThinking: (turn, cx) => this.flip(this.openThinking, turn, cx),
+          toggleCall: (call, cx) => this.flip(this.openCalls, call, cx)
+        }, this.turnsScroll, { reading: "Reading the step's Pi session", empty: "No turn yet. Pi writes its session after its first reply." }))])
+    }
+    const reading: Reading<string> = this.log?.of === of ? this.log.reading : { kind: "reading" }
+    return detailPane(t, [stepBar(t, step, title, `orc log ${runId} ${step.id}`, this.pane, act), logBody(t, reading, this.logScroll)])
   }
 }
