@@ -39,7 +39,8 @@ The command writes only names that start with `orc`, so Herdr's own mods and lay
 Board reads `orc backlog --json` and `orc attention --json` when shown and every 10 seconds while shown.
 Resources reads `orc-dash snapshot --json --only quota,resources,queues` when shown and every minute.
 Agents reads `orc runs --json --local` and `orc backlog --json` again every 4 seconds while it is the shown tab.
-It also reads the selected run with `orc show <run> --json` and the selected step with `orc log <run> <step-id>`.
+It also reads the selected run with `orc show <run> --json`.
+It reads the selected step's log with `orc log <run> <step-id>` when the step shows its log.
 To label each card it reads `orc show <run> --json` once for each listed ended run and again on every 4 second refresh for each running run, at most 4 at a time.
 For the Turns view it reads the Pi session file that `orc show` names for the step.
 For the Changes column it runs `git rev-parse`, `git merge-base` and `git diff` in the run's worktree.
