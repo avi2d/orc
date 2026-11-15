@@ -12,6 +12,7 @@ So a program that starts the chat knows the one file that holds its turns.
 When `<ORC_HOME>/orchestrator.md` exists, the chat adds it to Pi's system prompt as the orchestrator's rules.
 It also adds the instructions file of each project in `projects.json` that names one, labelled with the project's name.
 Its first line of output names the rules file it loaded, or says it found none, and then names each instructions file.
+The same rules file and the instructions file of a task's project also feed the decider, as [The decider](attention-queue.md#the-decider) shows.
 The chat's Pi has eight tools and no others:
 
 - `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project and the task's Markdown.

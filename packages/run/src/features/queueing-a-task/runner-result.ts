@@ -2,12 +2,12 @@ import { Array as Arr, Effect, FileSystem, Option, Result, Schema } from "effect
 import type { Database } from "bun:sqlite"
 import type { ChildProcessSpawner } from "effect/process"
 import { latestRunForBranchName, openQuestionsForRun, runsForBranch } from "../../entities/run-history/index"
-import type { OpenQuestion, QuestionAnswer } from "../../entities/review-gate/index"
+import type { OpenQuestion } from "../../entities/review-gate/index"
 import { formatHistoryError, openDatabase, stoppedEndReason, type RunRecord, RunStatusSchema } from "../../entities/run-history/index"
 import { writtenReport } from "../../entities/run-history/index"
 import { gateLogFileName } from "../../entities/review-gate/index"
-import { Asking, askingFileName, AnswersFile, answersFileName, hasBlockingQuestion, isBlockingQuestion } from "../../entities/review-gate/index"
-import { readJsonFileIfPresent, writeWhole } from "../../shared/config/index"
+import { Asking, askingFileName, hasBlockingQuestion, isBlockingQuestion } from "../../entities/review-gate/index"
+import { readJsonFileIfPresent } from "../../shared/config/index"
 import { FailingMark, failingFileName, failingText } from "../../entities/agent/index"
 import { runDirFor, type TaskKind, TaskId, readPlanDocument, SplitDocument, type SplitPlan, splitReasonPrefix, parentBranch, taskBranch } from "../../entities/backlog/index"
 import { orcGroup, PueueResult, PueueStatus } from "../../shared/process/index"
@@ -280,51 +280,6 @@ export const readResult = (task: string, home: string, label?: string | null): E
     const blocking = run?.asking !== undefined && hasBlockingQuestion(run.asking)
     return { ...result, status: blocking ? "paused" : result.status, outputAt: runAt ?? result.started }
   })
-
-const AnswerStdin = Schema.Struct({ ...AnswersFile.fields, label: Schema.optional(LabelArg) })
-
-export interface Relay {
-  readonly asking: string
-  readonly answers: ReadonlyArray<QuestionAnswer>
-}
-
-const relayInto = (home: string, task: string, label: string | null, relay: Relay): Effect.Effect<string, RunnerError, RunnerRequirements> =>
-  Effect.gen(function*() {
-    const result = yield* readResult(task, home, label)
-    const run = result.status === "unknown" ? null : result.run
-    if (run === null || run.asking === undefined) {
-      return yield* refuse("no run of " + task + " waits for an answer")
-    }
-    if (run.asking.asked !== relay.asking) {
-      return yield* refuse("run " + run.id + " of " + task + " no longer waits on the asking of " + relay.asking + ", it waits on the asking of " + run.asking.asked)
-    }
-    const file = runDirFor(home, run.id) + "/" + answersFileName
-    if (!(yield* writeWhole(file, JSON.stringify({ asking: relay.asking, answers: relay.answers })))) {
-      return yield* refuse("cannot write " + file)
-    }
-    return "handed " + relay.answers.map((entry) => entry.question).join(", ") + " to run " + run.id + " of " + task
-  })
-
-export const relayAnswers = (home: string, task: string, stdin: Effect.Effect<string, RunnerError>): Effect.Effect<string, RunnerError, RunnerRequirements> =>
-  stdin.pipe(
-    Effect.flatMap((text) => decodeJson(text, AnswerStdin, "the answers on stdin")),
-    Effect.flatMap((request) => relayInto(home, task, request.label ?? null, request))
-  )
-
-// The answers travel on stdin, so a reach that joins its argv for a remote shell cannot split the captain's words.
-export const relayAnswersThrough = (
-  command: Command,
-  task: string,
-  label: string | null,
-  relay: Relay
-): Effect.Effect<string, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  capture([...command, "runner", "answer", task], JSON.stringify({ ...(label === null ? {} : { label }), asking: relay.asking, answers: relay.answers })).pipe(
-    Effect.flatMap((result) =>
-      result.exitCode === 0
-        ? Effect.succeed(result.stdout.trim())
-        : refuse(command.join(" ") + " runner answer exited " + result.exitCode + ": " + result.stderr.trim())
-    )
-  )
 
 const ResultStdin = Schema.Struct({ label: LabelArg })
 

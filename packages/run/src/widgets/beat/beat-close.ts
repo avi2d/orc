@@ -7,13 +7,13 @@ import type { FailingMark } from "../../entities/agent/index"
 import type { DispatchConfig } from "../../shared/config/index"
 import { ownedBySweep, throughFor } from "../../shared/config/index"
 import { logWrittenAt, stallMillis } from "./stall"
-import { answersFor, askStartedTask, markAnswersRelayed, parkStartedTask } from "../../entities/parked-runs/index"
-import { Asking, askingFileName, hasBlockingQuestion, type OpenQuestion } from "../../entities/review-gate/index"
+import { answersFor, askStartedTask, correctionsDue, markAnswersRelayed, markCorrectionsRelayed, parkStartedTask } from "../../entities/parked-runs/index"
+import { Asking, askingFileName, hasBlockingQuestion, type OpenQuestion, type QuestionAnswer } from "../../entities/review-gate/index"
 import { readJsonFileIfPresent } from "../../shared/config/index"
 import { type RunnerRequirements } from "../../features/queueing-a-task/index"
 import { type RunnerError } from "../../shared/process/index"
 import { type Command } from "../../shared/process/index"
-import { endingFromResult, type Relay, relayAnswers, relayAnswersThrough, type RunEnding, readResult, readResultThrough, type RunnerResult } from "../../features/queueing-a-task/index"
+import { correctThrough, endingFromResult, type Relay, relayAnswers, relayAnswersThrough, type RunEnding, readResult, readResultThrough, type RunnerResult } from "../../features/queueing-a-task/index"
 
 export interface CloseContext {
   readonly root: string
@@ -228,7 +228,7 @@ const serveAsking = (
     }
     // answers.json is replaced whole, so each relay carries every answer of the asking and not only the new ones.
     return yield* relay({ asking: asking.asked, answers: answered.map((question) => ({ question: question.id, answer: question.answer.words })) }).pipe(
-      Effect.andThen(markAnswersRelayed(context.root, id, asking.asked, fresh.map((question) => ({ id: question.id, asked: question.asked }))).pipe(
+      Effect.andThen(markAnswersRelayed(context.root, id, asking.asked, fresh.map((question) => ({ id: question.id, asked: question.asked, words: question.answer.words }))).pipe(
         Effect.catchTag("BacklogError", () => Effect.void)
       )),
       Effect.as<BeatAction>({ kind: "answered", task: id, machine, questions: fresh.map((question) => question.id) }),
@@ -238,6 +238,48 @@ const serveAsking = (
         orElse: () => Effect.succeed<BeatAction>({ kind: "answer-failed", task: id, machine, reason: "the answer relay timed out after " + closeSeconds + " seconds" })
       })
     )
+  })
+
+const serveCorrections = (
+  context: CloseContext,
+  task: TaskRecord,
+  machine: string,
+  correct: (corrections: ReadonlyArray<QuestionAnswer>) => Effect.Effect<string, RunnerError, RunnerRequirements>
+): Effect.Effect<BeatAction | null, never, RunnerRequirements> => {
+  const due = correctionsDue(task)
+  if (due.length === 0) {
+    return Effect.succeed(null)
+  }
+  const id = task.spec.id
+  return correct(due.map((question) => ({ question: question.id, answer: question.answer.words }))).pipe(
+    Effect.andThen(markCorrectionsRelayed(context.root, id, due).pipe(Effect.catchTags({ BacklogError: () => Effect.void, TaskFileError: () => Effect.void }))),
+    Effect.as<BeatAction>({ kind: "answered", task: id, machine, questions: due.map((question) => question.id) }),
+    Effect.catchTag("RunnerError", (error) => Effect.succeed<BeatAction>({ kind: "answer-failed", task: id, machine, reason: error.detail })),
+    Effect.timeoutOrElse({
+      duration: Duration.seconds(closeSeconds),
+      orElse: () => Effect.succeed<BeatAction>({ kind: "answer-failed", task: id, machine, reason: "the correction relay timed out after " + closeSeconds + " seconds" })
+    })
+  )
+}
+
+const serveRunning = (
+  context: CloseContext,
+  task: TaskRecord,
+  machine: string,
+  through: Command | null,
+  label: string,
+  asking: typeof Asking.Type | null
+): Effect.Effect<BeatAction | null, TaskFileError, RunnerRequirements> =>
+  Effect.gen(function*() {
+    const relay = (handed: Relay) =>
+      through === null
+        ? relayAnswers(context.home, task.spec.id, Effect.succeed(JSON.stringify({ label, asking: handed.asking, answers: handed.answers })))
+        : relayAnswersThrough(through, task.spec.id, label, handed)
+    const correct = (corrections: ReadonlyArray<QuestionAnswer>) =>
+      through === null
+        ? relayAnswers(context.home, task.spec.id, Effect.succeed(JSON.stringify({ label, corrections })))
+        : correctThrough(through, task.spec.id, label, corrections)
+    return (asking === null ? null : yield* serveAsking(context, task, machine, asking, relay)) ?? (yield* serveCorrections(context, task, machine, correct))
   })
 
 const readClose = (
@@ -320,11 +362,7 @@ export const closeFinished = (
       if (reading.kind === "unread") {
         return { kind: "ended", action: { kind: "close-failed", task: task.spec.id, machine: claim.machine, reason: reading.reason } } satisfies Progress
       }
-      const relay = (handed: Relay) =>
-        through === null
-          ? relayAnswers(context.home, task.spec.id, Effect.succeed(JSON.stringify({ label, asking: handed.asking, answers: handed.answers })))
-          : relayAnswersThrough(through, task.spec.id, label, handed)
-      const action = reading.asking === null ? null : yield* serveAsking(context, task, claim.machine, reading.asking, relay)
+      const action = yield* serveRunning(context, task, claim.machine, through, label, reading.asking)
       return { kind: "running", outputAt: reading.outputAt, action, failing: reading.failing } satisfies Progress
     }
     const ended = yield* endTask(context.root, context.home, task, claim.machine, ending, reading.kind === "read" ? reading.result.run?.id : undefined)

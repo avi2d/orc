@@ -11,7 +11,7 @@ export const uncheckedOpen: PullRequestView = { state: "OPEN", headRefOid: "0".r
 
 const noUpstream: ReadUpstream = (contribution) => Effect.fail(new BacklogError({ detail: "no upstream read for " + contribution.url + " in this test" }))
 
-const escalateAll: AskDecider = () => Effect.succeed(JSON.stringify({ decision: "escalate", reason: "no decider in this test" }))
+const escalateAll: AskDecider = { home: "/nonexistent/orc-home", ask: () => Effect.succeed(JSON.stringify({ decision: "escalate", reason: "no decider in this test" })) }
 
 export const quietSources = (
   readLoad: ReadLoad = readMachineLoad,
