@@ -7,6 +7,7 @@ import { palette } from "../../src/palette"
 import { type AnswerTarget, type TaskDetail, type TaskRun, answerArgv, descriptionOf, infoRows, mergeArgv, runToOpen, runsOfTask, shortTime } from "../../src/task"
 import { taskDetails, taskRuns, thread } from "../../src/task-guard"
 import { type AskOption, type Thread, type ThreadCard, type ThreadLine, lineLabel, optionShape, threadCards, whoLabel } from "../../src/thread"
+import { linkedText } from "../../src/links-view"
 import { agentsOpenKey, selectedTaskKey, viewsStack, refreshWhenShown } from "../../src/views"
 
 type Palette = ReturnType<typeof palette>
@@ -246,7 +247,7 @@ export default class OrcTask extends View {
         return body.gap(6).children(infoRows(task, runs).map((row) => {
           const line = h_flex().gap(12).items_start()
             .child(div().w(96).flex_shrink_0().text_color(t.dim).child(row.label))
-            .child(div().flex_1().min_w_0().child(row.value))
+            .child(div().flex_1().min_w_0().child(linkedText(`info-${row.label}`, row.value)))
           return row.label === "PR" && task.prState === "open" ? line.child(this.mergeButton(t, task.id)) : line
         })).children(this.failure(t, "merge"))
     }
@@ -292,29 +293,29 @@ export default class OrcTask extends View {
 
   askBody(t: Palette, task: string, card: ThreadCard): ReadonlyArray<Element> {
     const ask = card.ask
-    if (ask === null) return [div().child(card.line.text)]
+    if (ask === null) return [linkedText(`text-${card.key}`, card.line.text)]
     const pictures = ask.options.flatMap((option) => option.picture === null ? [] : [`${option.letter}) ${option.picture}`])
     return [
-      ...(ask.context === null ? [] : [this.section(t, "Context", div().child(ask.context))]),
-      this.section(t, "Question", div().child(ask.question)),
+      ...(ask.context === null ? [] : [this.section(t, "Context", linkedText(`context-${card.key}`, ask.context))]),
+      this.section(t, "Question", linkedText(`question-${card.key}`, ask.question)),
       ...(ask.options.length === 0 ? [] : [this.section(t, "Options", h_flex().flex_wrap().gap(8).children(ask.options.map((option) => this.option(t, task, card, option))))]),
       ...(pictures.length === 0 ? [] : [this.section(t, "Evidence", v_flex().text_color(t.muted).children(pictures.map((picture) => div().child(picture))))])
     ]
   }
 
-  answerLine(t: Palette, line: ThreadLine, delivered: boolean): Element {
+  answerLine(t: Palette, key: string, line: ThreadLine, delivered: boolean): Element {
     return v_flex().gap(4).p(8).rounded(6).bg(t.surface)
       .child(this.lineHeader(t, line, "Answer").children(delivered ? [div().text_color(t.done).child("· Delivered")] : []))
-      .child(div().child(line.text))
+      .child(linkedText(key, line.text))
   }
 
   card(t: Palette, task: string, card: ThreadCard): Element {
-    const answers = card.answers.map((line, index) => this.answerLine(t, line, card.delivered && index === card.answers.length - 1))
+    const answers = card.answers.map((line, index) => this.answerLine(t, `answer-${card.key}-${index}`, line, card.delivered && index === card.answers.length - 1))
     const shown = v_flex().id(`entry-${card.key}`).gap(6).p(10).rounded(6).bg(t.raised)
       .child(this.lineHeader(t, card.line, card.what)).children(this.askBody(t, task, card)).children(answers)
       .children(this.replyBox(t, task, card)).children(this.failure(t, card.key))
-    const notes = card.notes.map((line) => v_flex().ml(24).gap(4).p(8).rounded(6).border_l(2).border_color(t.border).bg(t.surface)
-      .child(this.lineHeader(t, line, lineLabel(line))).child(div().child(line.text)))
+    const notes = card.notes.map((line, index) => v_flex().ml(24).gap(4).p(8).rounded(6).border_l(2).border_color(t.border).bg(t.surface)
+      .child(this.lineHeader(t, line, lineLabel(line))).child(linkedText(`note-${card.key}-${index}`, line.text)))
     return v_flex().gap(6).child(shown).children(notes)
   }
 
