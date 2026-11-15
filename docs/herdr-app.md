@@ -122,7 +122,7 @@ Press Esc in the bar or in the Turns view to close the drawer.
 In the Raw view Esc goes to Pi as an interrupt, so it never closes the drawer.
 Raw is the terminal that runs `orc chat`, where you type to orc.
 Turns shows the same conversation read only, with one card for each reply of the model.
-A card gives the message that started it, the input, output, cache read and cache write tokens of that reply, and its time.
+A card gives the input, output, cache read and cache write tokens of that reply, and its time.
 Select Thinking to show the thinking of the model.
 Each tool call shows ✓ when it succeeded, ✗ when it failed, and … while it runs, with the number of lines it printed.
 Select a call to show the first 20 lines of its output.

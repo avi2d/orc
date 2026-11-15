@@ -31,6 +31,7 @@ const activePane = (): string => activeChild(layout(), viewsId) === turnsId ? "t
 interface Listed {
   readonly address: string
   readonly state: string
+  readonly name: string | null
 }
 
 const listed: Guard<Listed> = (value, at) => {
@@ -40,7 +41,9 @@ const listed: Guard<Listed> = (value, at) => {
   if (address.kind === "refused") return address
   const state = string(record.value, "state", at)
   if (state.kind === "refused") return state
-  return ok({ address: address.value, state: state.value })
+  const name = record.value["name"]
+  if (name !== undefined && name !== null && typeof name !== "string") return { kind: "refused", reason: `${at}.name is ${JSON.stringify(name)}, not a string` }
+  return ok({ address: address.value, state: state.value, name: typeof name === "string" ? name : null })
 }
 
 const terminalList: Guard<ReadonlyArray<Listed>> = (value, at) => {
@@ -106,7 +109,7 @@ const chatTerminal = (): Promise<Guarded<DrawerChat>> =>
   hcJson(["ls", "--json"], terminalList).then((terminals) => {
     if (terminals.kind === "refused") return terminals
     const held = heldChat()
-    const live = held !== null && terminals.value.some((terminal) => terminal.address === held.address && terminal.state === "live")
+    const live = held !== null && terminals.value.some((terminal) => terminal.address === held.address && terminal.state === "live" && terminal.name === chatName)
     return live ? ok(held) : startChat()
   })
 

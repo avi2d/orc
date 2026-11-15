@@ -54,7 +54,8 @@ export const activeChild = (node: unknown, stack: string): string | null => {
     return typeof node["active"] === "string" ? node["active"] : null
   }
   const children = Array.isArray(node["children"]) ? node["children"] : []
-  for (const child of children) {
+  const floating = Array.isArray(node["floating"]) ? node["floating"] : []
+  for (const child of [...children, ...floating]) {
     const found = activeChild(child, stack)
     if (found !== null) {
       return found
