@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { laneFor, lanes, shownTitleLines, tasksInLane, type BoardTask } from "../../../packages/herdr-app/src/board"
+import { laneFor, lanes, tasksInLane, titleClip, type BoardTask } from "../../../packages/herdr-app/src/board"
 import { boardBacklog, guardJson } from "../../../packages/herdr-app/src/guard"
 
 const task: BoardTask = {
@@ -43,8 +43,8 @@ test("a closed task whose PR no beat has read is not in Awaiting you", () => {
 })
 
 test("a card title that wraps to three lines shows two rather than three", () => {
-  expect(shownTitleLines(3)).toBe(2)
-  expect(shownTitleLines(1)).toBe(1)
+  expect(titleClip.heightPx).toBe(2 * titleClip.lineHeightPx)
+  expect(titleClip.overflow).toBe("overflow_hidden")
 })
 
 test("a closed task without an open PR is not in Running", () => {
