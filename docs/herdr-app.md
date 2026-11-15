@@ -187,10 +187,11 @@ A ship run shows Agent, Checks, Fix when checks fail, and No mistakes for the st
 A step shows ✓ when it passed, ✗ when it failed, ● while it runs, ◆ while it waits for you, and ○ when it has not started.
 A step names its model only when that model differs from the Agent step's.
 Select a step to show it on the right, under a bar that gives the step, its model and its thinking level.
-The Agent step opens in the Turns view, with one card for each reply of the model, as [Chat with orc](#chat-with-orc) describes.
+Every step that runs a Pi session opens in the Turns view, with one card for each reply of the model, as [Chat with orc](#chat-with-orc) describes.
+That covers the Agent step, the Fix step, and any other step that `orc show` gives a Pi session file.
 Turns reads the step's Pi session file, and follows new replies as Pi writes them.
 Select Raw in the bar to show the step's log instead, and select Turns to go back.
-Every other step shows its log: a Fix step shows what Pi writes as it works, and a Checks step shows the checks' output.
+A step with no Pi session, such as a Checks step, shows its log with the checks' output.
 The log shows in full and follows new lines as they are written.
 
 ![Agents tab with a running run's Agent step in the Turns view and its Changes column](images/herdr-agents-turns.png)
@@ -233,7 +234,9 @@ In the Raw view Esc goes to Pi as an interrupt, so it never closes the drawer.
 Both views show the same bar: select Raw to go back to the terminal, select Turns to read, or select ✕ to close the drawer.
 Press Esc in the Turns view to close the drawer.
 Turns shows the same conversation read only, with one card for each reply of the model.
-A card gives the input, output, cache read and cache write tokens of that reply, and its time.
+A card gives its number, the input, output, cache read and cache write tokens of that reply, and its time.
+The first card of a step or a chat is 1, and the numbers run on through the whole session.
+Each tool call carries its number within the session, such as 3.2 for the second call of the third card.
 Select Thinking to show the thinking of the model.
 Each tool call shows ✓ when it succeeded, ✗ when it failed, and … while it runs.
 Beside the mark it shows running while it runs, and its line count once it finishes.
