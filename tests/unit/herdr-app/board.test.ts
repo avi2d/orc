@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
-import { clickedSelection, laneFor, lanes, panelCommand, selectionOnBoard, tasksInLane, titleClip, type BoardTask } from "../../../packages/herdr-app/src/board"
+import { clickedSelection, laneFor, lanes, panelCommand, queueLine, selectionOnBoard, tasksInLane, titleClip, type BoardTask } from "../../../packages/herdr-app/src/board"
 import { guardJson } from "../../../packages/herdr-app/src/guard"
-import { boardBacklog } from "../../../packages/herdr-app/src/guard-board"
+import { boardBacklog, boardQueue } from "../../../packages/herdr-app/src/guard-board"
 
 const task: BoardTask = {
   id: "orc-1", title: "A task", project: "orc", kind: "ship", created: "2026-01-01T00:00:00Z",
@@ -47,6 +47,36 @@ test("a closed task without an open PR, including one no beat has read, is not i
   expect(laneFor({ ...task, status: "closed", prState: null }, new Set())).toBe("Done")
   expect(laneFor({ ...task, status: "closed", prState: "merged" }, new Set())).toBe("Done")
   expect(laneFor({ ...task, status: "closed", prState: "closed" }, new Set())).toBe("Done")
+})
+
+const queuedEntry = (taskId: string, machine: string | null, ahead?: number) => ({
+  id: null, project: "/home/sam/work/orc", branch: `orc/${taskId}`, status: null, state: "queued", prLink: null, title: null, step: null,
+  currentStep: null, questions: 0, endReason: null, kind: null, delivery: null, task: taskId, machine, worktree: null, ...(ahead === undefined ? {} : { ahead })
+})
+
+const startedRun = {
+  id: "20261115-1", project: "/home/sam/work/orc", branch: "orc/orc-59", status: "running", state: "running", prLink: null, title: null, step: null,
+  currentStep: null, questions: 0, endReason: null, kind: "ship", delivery: null, task: "orc-59", machine: "winbox", worktree: null
+}
+
+const queueOf = (runs: ReadonlyArray<unknown>) => {
+  const read = guardJson(JSON.stringify({ schema: "orc.runs.v1", runs, machines: [] }), boardQueue)
+  if (read.kind !== "ok") throw new Error(read.reason)
+  return read.value
+}
+
+test("a queued task with no run says where it waits and how many are ahead instead of nothing", () => {
+  const queued = queueOf([queuedEntry("orc-54", "winbox", 1), queuedEntry("orc-60", null, 4), startedRun])
+  expect(queueLine(queued, "orc-54")).toBe("Queued on winbox, 1 ahead")
+  expect(queueLine(queued, "orc-60")).toBe("Queued on this machine, 4 ahead")
+})
+
+test("a started run's task shows no queued line instead of one that outlives the queue", () => {
+  expect(queueLine(queueOf([startedRun]), "orc-59")).toBeNull()
+})
+
+test("a queued entry from an older orc with no count ahead still says where it waits instead of refusing the runs", () => {
+  expect(queueLine(queueOf([queuedEntry("orc-61", "winbox")]), "orc-61")).toBe("Queued on winbox")
 })
 
 test("a Board with no selection keeps the task panel closed instead of showing it", () => {

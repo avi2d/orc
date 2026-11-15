@@ -36,8 +36,8 @@ The command writes only names that start with `orc`, so Herdr's own mods and lay
 | Resources | `cmd-2` | Each subscription's quota windows, and each machine's cores, load, memory, disk and running orc runs |
 | Agents | `cmd-3` | The runs and the queued tasks, and the selected run's steps, step output and changes |
 
-Board reads `orc backlog --json` and `orc attention --json` when shown and every 10 seconds while shown.
-The task panel reads `orc backlog --json`, `orc runs --json`, `orc runs --json --local` and `orc backlog thread <task> --json` for the selected task on the same schedule.
+Board reads `orc backlog --json`, `orc attention --json` and `orc runs --json` when shown and every 10 seconds while shown.
+The task panel beside it reads `orc backlog --json`, `orc runs --json`, `orc runs --json --local` and `orc backlog thread <task> --json` for the selected task on the same schedule.
 It reads them again as soon as you select another card.
 Resources reads `orc-dash snapshot --json --only quota,resources,queues` when shown and every minute.
 Agents reads `orc runs --json --local` and `orc backlog --json` again every 4 seconds while it is the shown tab.
@@ -57,6 +57,11 @@ The Board groups tasks into Backlog, Planned, Awaiting you, Running, and Done.
 Backlog stays empty.
 Held tasks, tasks with unanswered parked questions, tasks with an open attention item for you, and closed tasks with an open PR appear in Awaiting you.
 Taken and started tasks appear in Running.
+A task that waits in a pueue queue with no run yet shows a line such as `Queued on winbox, 2 ahead` on its card.
+The line comes from the queued entries of `orc runs --json`, and names `this machine` for the machine the App runs on.
+The count ahead covers the running tasks and the earlier queued tasks of the `orc` pueue group, from every orc home on that machine, and leaves out other groups.
+An entry from an older orc that gives no count shows only `Queued on <machine>`.
+Once the run starts, the line goes.
 Other new tasks appear in Planned, and other closed tasks appear in Done.
 A closed task whose PR the beat has not read yet appears in Done.
 
@@ -77,6 +82,7 @@ Each lane lists its tasks oldest first.
 The panel shows the id, the kind and the title of the selected task, and ✕ to close the panel.
 When `orc runs --json --local` lists a run of the task, Open run switches to the Agents tab with the newest such run selected.
 A run outside that list has no Open run, since the Agents tab shows those runs only.
+While the task waits in a pueue queue, the header shows the card's `Queued on <machine>, <n> ahead` line in place of Open run.
 A run belongs to the task when its branch is `orc/<task id>` or, for a parent task's planning run, `orc/<task id>-parent`.
 
 The panel has three tabs:

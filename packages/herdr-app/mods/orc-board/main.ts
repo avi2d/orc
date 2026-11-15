@@ -2,8 +2,8 @@ import { type AsyncContext, type Context, type Element, type FocusHandle, View, 
 import { h_flex, v_flex } from "gpui-base"
 import { run, setShared, shared } from "herdr"
 import { refreshWhenShown, selectedTaskKey } from "../../src/views"
-import { type BoardTask, type Lane, clickedSelection, kindLabel, lanes, panelCommand, selectionOnBoard, tasksInLane, titleClip } from "../../src/board"
-import { type BoardAttention, type BoardBacklog, boardAttention, boardBacklog } from "../../src/guard-board"
+import { type BoardTask, type Lane, type QueuedRun, clickedSelection, kindLabel, lanes, panelCommand, queueLine, selectionOnBoard, tasksInLane, titleClip } from "../../src/board"
+import { type BoardAttention, type BoardBacklog, boardAttention, boardBacklog, boardQueue } from "../../src/guard-board"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 
@@ -16,11 +16,14 @@ interface BoardDocuments {
 
 export default class OrcBoard extends View {
   reading: Reading<BoardDocuments> = { kind: "reading" }
+  queue: Reading<ReadonlyArray<QueuedRun>> = { kind: "reading" }
   project: string | null = null
   folded = new Set<Lane>(["Backlog", "Done"])
   visible = false
   lastRead = 0
   busy = false
+  lastQueueRead = 0
+  queueBusy = false
   panelShown: boolean | null = null
   focusHandle: FocusHandle | null = null
 
@@ -30,9 +33,27 @@ export default class OrcBoard extends View {
   ]).then(([backlog, attention]) =>
     backlog.kind !== "ok" ? backlog : attention.kind !== "ok" ? attention : { kind: "ok", value: { backlog: backlog.value, attention: attention.value } })
 
+  loadQueue = (): Promise<Reading<ReadonlyArray<QueuedRun>>> => readJson("orc", ["runs", "--json"], boardQueue)
+
+  reloadQueue(cx: Context): void {
+    if (this.queueBusy) return
+    this.queueBusy = true
+    this.lastQueueRead = Date.now()
+    cx.spawn((task) => this.loadQueue().then((queue) => {
+      this.queue = queue
+      this.queueBusy = false
+      task.notify()
+    }))
+  }
+
   override init(_props: unknown, cx: AsyncContext): void {
     this.focusHandle = cx.focus_handle()
     refreshWhenShown("orc-board", 10_000, cx, this)
+    cx.timer.every(1000, (tick) => {
+      if (!this.visible || Date.now() - this.lastQueueRead < 10_000) return
+      this.reloadQueue(tick)
+    })
+    if (this.visible) this.reloadQueue(cx)
   }
 
   selected(): string | null {
@@ -81,6 +102,7 @@ export default class OrcBoard extends View {
     if (this.reading.kind === "failed") return root.child(div().p(16).text_color(t.blocked).child(this.reading.reason))
     if (this.reading.kind === "reading") return root.child(div().p(16).text_color(t.muted).child("Reading the backlog"))
     const { backlog, attention } = this.reading.value
+    const queued = this.queue.kind === "ok" ? this.queue.value : []
     const owned = new Set(attention.items.filter((item) => item.owner === "user").map((item) => item.task))
     const filters = h_flex().id("filters").gap(4).px(12).py(8).flex_wrap().items_center()
       .child(div().text_color(t.dim).child("Project"))
@@ -88,11 +110,12 @@ export default class OrcBoard extends View {
       .children((backlog.projects ?? []).map((project) => this.chip(t, `project-${project}`, project, this.project === project, (cx) => { this.project = project; cx.notify() })))
     return root.child(filters)
       .children(backlog.projects === null ? [div().px(12).text_color(t.blocked).child("Projects could not be read")] : [])
+      .children(this.queue.kind === "failed" ? [div().px(12).text_color(t.blocked).child("Queue could not be read")] : [])
       .child(h_flex().id("lanes").flex_1().min_w_0().overflow_x_scroll()
-        .children(lanes.map((lane) => this.lane(t, lane, tasksInLane(backlog.tasks, lane, this.project, owned)))))
+        .children(lanes.map((lane) => this.lane(t, lane, tasksInLane(backlog.tasks, lane, this.project, owned), queued))))
   }
 
-  lane(t: Palette, lane: Lane, tasks: ReadonlyArray<BoardTask>): Element {
+  lane(t: Palette, lane: Lane, tasks: ReadonlyArray<BoardTask>, queued: ReadonlyArray<QueuedRun>): Element {
     const folded = this.folded.has(lane)
     const header = h_flex().id(`toggle-${lane}`).h(44).px(8).gap(6).items_center().cursor_pointer()
       .hover((style) => style.bg(t.hover)).on_click((_event, cx) => this.toggle(cx, lane))
@@ -101,12 +124,12 @@ export default class OrcBoard extends View {
     const column = v_flex().id(`lane-${lane}`).h_full().flex_shrink_0().w(folded ? 110 : 260)
       .bg(t.chrome).border_r(1).border_color(t.border).child(header)
     return folded ? column : column.child(v_flex().id(`cards-${lane}`).flex_1().overflow_y_scrollbar().p(8).gap(6)
-      .children(tasks.map((task) => this.card(t, task))))
+      .children(tasks.map((task) => this.card(t, task, queueLine(queued, task.id)))))
   }
 
-  card(t: Palette, task: BoardTask): Element {
+  card(t: Palette, task: BoardTask, waiting: string | null): Element {
     const selected = this.selected() === task.id
-    return v_flex().id(`card-${task.id}`).h(84).p(8).gap(4).rounded(6).cursor_pointer().flex_shrink_0()
+    return v_flex().id(`card-${task.id}`).h(waiting === null ? 84 : 106).p(8).gap(4).rounded(6).cursor_pointer().flex_shrink_0()
       .bg(selected ? t.selected : t.background)
       .hover((style) => style.bg(selected ? t.selected : t.hover))
       .on_click(() => {
@@ -115,5 +138,6 @@ export default class OrcBoard extends View {
       })
       .child(h_flex().gap(8).child(div().font_semibold().child(task.id)).child(div().text_color(t.dim).child(kindLabel(task.kind))))
       .child(div().h(titleClip.heightPx).line_height(`${titleClip.lineHeightPx}px`).overflow_hidden().child(task.title))
+      .children(waiting === null ? [] : [div().text_color(t.muted).child(waiting)])
   }
 }
