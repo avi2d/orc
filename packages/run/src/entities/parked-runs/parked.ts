@@ -105,7 +105,7 @@ export const parkStartedTask = (
       if (record.state.kind !== "started") {
         return yield* new BacklogError({ detail: id + " is " + record.state.kind + ", and only a started task parks" })
       }
-      const lastAsking = open.find((question) => question.asked !== undefined)?.asked ?? null
+      const lastAsking = asked.find((question) => question.asked !== undefined)?.asked ?? null
       const questions = parkedQuestions(open, record.parked?.questions ?? [], lastAsking, (question) => question.asked ?? at)
       yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null))
       const origin = run === undefined ? record.parked?.origin : { machine: record.state.claim.machine, run }
