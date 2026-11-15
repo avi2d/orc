@@ -45,7 +45,7 @@ if [ -n "${HERDR_CORE_DIRS:-}" ]; then
   core_dirs=$HERDR_CORE_DIRS
 else
   core_places="PATH and the login home"
-  core_dirs=$PATH:$real_home/.local/bin:$real_home/.local/share/herdr-core/current/Contents/MacOS:$real_home/.local/share/herdr-core/Herdr Core.app/Contents/MacOS:/opt/homebrew/bin:/usr/local/bin:$real_home/.local/share/mise/shims:/run/current-system/sw/bin:$real_home/.cargo/bin
+  core_dirs="$PATH:$real_home/.local/bin:$real_home/.local/share/herdr-core/current/Contents/MacOS:$real_home/.local/share/herdr-core/Herdr Core.app/Contents/MacOS:/opt/homebrew/bin:/usr/local/bin:$real_home/.local/share/mise/shims:/run/current-system/sw/bin:$real_home/.cargo/bin"
 fi
 core_dir=
 IFS=: read -r -a core_dir_list <<< "$core_dirs"
@@ -145,6 +145,19 @@ for attempt in $(seq 1 175); do
 done
 if [ -z "$pid" ]; then
   echo "timed out waiting 35 seconds for the App socket at $HERDR_APP_HOME/herdr-app.sock" >&2
+  candidates=""
+  for candidate in $(ps -eo pid= 2>/dev/null); do
+    if ps eww -p "$candidate" -o command= 2>/dev/null | grep -F "$app" >/dev/null && ps eww -p "$candidate" -o command= 2>/dev/null | tr ' ' '\n' | grep -Fx "HOME=$HOME" >/dev/null; then
+      candidates="$candidates $candidate"
+      kill -TERM "$candidate" 2>/dev/null || true
+    fi
+  done
+  for attempt in $(seq 1 10); do
+    alive=0
+    for candidate in $candidates; do kill -0 "$candidate" 2>/dev/null && alive=1; done
+    [ "$alive" -eq 0 ] && break
+    sleep 0.2
+  done
   exit 1
 fi
 if [ ! -S "$HC_SOCKET" ]; then
@@ -153,7 +166,7 @@ if [ ! -S "$HC_SOCKET" ]; then
   for attempt in $(seq 1 10); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
   exit 1
 fi
-lsof -a -p "$pid" -U > "$proof/app-sockets" || true
+lsof -a -p "$pid" -U > "$proof/app-sockets"
 lsof -U 2>/dev/null | grep -F "$live" > "$proof/live-sockets-during" || true
 if grep -F "$live_state/herdr-core" "$proof/app-sockets" >/dev/null || [ "$(wc -l < "$proof/live-sockets-before")" -ne "$(wc -l < "$proof/live-sockets-during")" ]; then
   echo "scratch App may be attached to live core" >&2

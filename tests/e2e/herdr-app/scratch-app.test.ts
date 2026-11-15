@@ -21,7 +21,6 @@ nohup env -i "\${pairs[@]}" "$bundle/Contents/MacOS/Herdr" >/dev/null 2>&1 &
 
 const lsofStub = `#!/bin/bash
 if [ "$1" = -t ] && [ "$2" = "$HERDR_APP_HOME/herdr-app.sock" ]; then cat "$STUB_APP_PID" 2>/dev/null; exit 0; fi
-if [ "$1" = -t ] && [ "$2" = "$HC_SOCKET" ]; then exit 1; fi
 exit 1
 `
 
@@ -114,18 +113,47 @@ test("times out after 35 seconds when the herdr-core socket never appears", asyn
     const appPid = Number((await readFile(staged.appPidFile, "utf8")).trim())
     await Bun.sleep(500)
     expect(isRunning(appPid)).toBe(false)
+    const openArgs = (await readFile(staged.openArgsFile, "utf8")).split("\n")
+    expect(openArgs).toContain("-g")
   } finally {
     await rm(staged.root, { recursive: true, force: true })
   }
 }, 120000)
 
-test("does not start the App in the foreground", async () => {
-  const staged = await stage(true)
+test("finds herdr-core on PATH instead of failing when HERDR_CORE_DIRS is unset", async () => {
+  const staged = await stage(false)
   try {
-    await launch(staged.env)
-    const args = (await readFile(staged.openArgsFile, "utf8")).split("\n")
-    expect(args).toContain("-g")
+    await executable(join(staged.root, "bin", "herdr-core"), "#!/bin/bash\nexit 0\n")
+    const env = { ...staged.env }
+    delete env["HERDR_CORE_DIRS"]
+    const child = Bun.spawn([launcher, "true"], { env, stdout: "ignore", stderr: "ignore" })
+    try {
+      const deadline = Date.now() + 15000
+      while (!(await Bun.file(staged.openArgsFile).exists())) {
+        if (Date.now() > deadline) break
+        await Bun.sleep(100)
+      }
+      expect(await Bun.file(staged.openArgsFile).exists()).toBe(true)
+      const args = (await readFile(staged.openArgsFile, "utf8")).split("\n")
+      expect(args).toContain(`HERDR_CORE_DIRS=${join(staged.root, "bin")}`)
+    } finally {
+      try {
+        process.kill(child.pid, "SIGKILL")
+      } catch {
+      }
+      await child.exited
+      try {
+        const appPid = Number((await readFile(staged.appPidFile, "utf8")).trim())
+        if (Number.isFinite(appPid)) {
+          try {
+            process.kill(appPid, "SIGKILL")
+          } catch {
+          }
+        }
+      } catch {
+      }
+    }
   } finally {
     await rm(staged.root, { recursive: true, force: true })
   }
-}, 120000)
+}, 30000)
