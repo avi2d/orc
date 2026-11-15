@@ -48,7 +48,8 @@ test("a queued task, a running task and another home's queued task give one queu
     delivery: null,
     task: "kelp-12",
     machine: null,
-    worktree: null
+    worktree: null,
+    ahead: 1
   }])
 })
 
@@ -61,4 +62,20 @@ test("a queued entry survives the JSON another machine reads back instead of fai
 test("a queued parent task is not listed as a task named with -parent", () => {
   const state = Schema.decodeUnknownSync(PueueState)({ tasks: { "3": pueueTask(3, home + " kelp-12-parent", { Queued: { enqueued_at: "2026-11-14T09:00:01.000000+00:00" } }) } })
   expect(withQueued(runsJson([]), queuedTasks(state, home)).runs).toEqual([])
+})
+
+test("a queued task's count ahead leaves out tasks of other pueue groups instead of counting them", () => {
+  const queued = { Queued: { enqueued_at: "2026-11-15T09:00:01.000000+00:00" } }
+  const running = { Running: { enqueued_at: "2026-11-15T08:00:01.000000+00:00", start: "2026-11-15T08:00:02.000000+00:00" } }
+  const state = Schema.decodeUnknownSync(PueueState)({
+    tasks: {
+      "1": { ...pueueTask(1, "build", running), group: "default" },
+      "2": { ...pueueTask(2, "lint", queued), group: "default" },
+      "3": pueueTask(3, home + " orc-59", running),
+      "4": pueueTask(4, otherHome + " orc-58", queued),
+      "5": pueueTask(5, home + " orc-54", queued),
+      "6": pueueTask(6, home + " orc-56", queued)
+    }
+  })
+  expect(queuedTasks(state, home).map(({ task, ahead }) => ({ task, ahead }))).toEqual([{ task: "orc-54", ahead: 2 }, { task: "orc-56", ahead: 3 }])
 })

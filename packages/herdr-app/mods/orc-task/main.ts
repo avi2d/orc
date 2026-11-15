@@ -1,11 +1,11 @@
 import { type AsyncContext, type Context, type Element, View, div } from "gpui-kit"
 import { Avatar, AvatarFallback, AvatarImage, Input, InputState, TextView, h_flex, v_flex } from "gpui-base"
 import { exec, nextCommand, openOverlay, run, setShared, shared } from "herdr"
-import { kindLabel } from "../../src/board"
+import { type QueuedRun, kindLabel, queueLine } from "../../src/board"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 import { type AnswerTarget, type TaskDetail, type TaskRun, answerArgv, descriptionOf, infoRows, mergeArgv, runToOpen, runsOfTask, shortTime } from "../../src/task"
-import { taskDetails, taskRuns, thread } from "../../src/task-guard"
+import { taskDetails, taskRuns, taskRunsAndQueue, thread } from "../../src/task-guard"
 import { type AskOption, type Thread, type ThreadCard, type ThreadLine, lineLabel, optionShape, threadCards, whoLabel } from "../../src/thread"
 import { agentsOpenKey, selectedTaskKey, viewsStack, refreshWhenShown } from "../../src/views"
 
@@ -16,6 +16,7 @@ const tabs: ReadonlyArray<Tab> = ["Thread", "Description", "Info"]
 interface TaskDocuments {
   readonly tasks: ReadonlyArray<TaskDetail>
   readonly runs: ReadonlyArray<TaskRun>
+  readonly queued: ReadonlyArray<QueuedRun>
   readonly local: ReadonlyArray<TaskRun>
   readonly thread: Reading<Thread> | null
 }
@@ -46,11 +47,11 @@ export default class OrcTask extends View {
     const id = selectedTask()
     return Promise.all([
       readJson("orc", ["backlog", "--json"], taskDetails),
-      readJson("orc", ["runs", "--json"], taskRuns),
+      readJson("orc", ["runs", "--json"], taskRunsAndQueue),
       readJson("orc", ["runs", "--json", "--local"], taskRuns),
       id === null ? Promise.resolve(null) : readJson("orc", ["backlog", "thread", id, "--json"], thread)
     ]).then(([tasks, runs, local, told]) =>
-      tasks.kind !== "ok" ? tasks : runs.kind !== "ok" ? runs : local.kind !== "ok" ? local : { kind: "ok", value: { tasks: tasks.value, runs: runs.value, local: local.value, thread: told } })
+      tasks.kind !== "ok" ? tasks : runs.kind !== "ok" ? runs : local.kind !== "ok" ? local : { kind: "ok", value: { tasks: tasks.value, runs: runs.value.runs, queued: runs.value.queued, local: local.value, thread: told } })
   }
 
   override init(_props: unknown, cx: AsyncContext): void {
@@ -189,16 +190,16 @@ export default class OrcTask extends View {
     if (task === undefined) return root.child(div().p(16).text_color(t.muted).child(`${id} is no longer in the backlog`))
     const runs = runsOfTask(this.reading.value.runs, task.id)
     const local = new Set(this.reading.value.local.map((localRun) => localRun.id))
-    return root.child(this.header(t, task, runToOpen(runs, local)))
+    return root.child(this.header(t, task, runToOpen(runs, local), queueLine(this.reading.value.queued, task.id)))
       .child(this.tabStrip(t))
       .child(this.tabBody(t, task, runs))
   }
 
-  header(t: Palette, task: TaskDetail, open: string | null): Element {
+  header(t: Palette, task: TaskDetail, open: string | null, waiting: string | null): Element {
     const facts = v_flex().flex_1().min_w_0().gap(4)
       .child(h_flex().gap(8).child(div().font_semibold().child(task.id)).child(div().text_color(t.dim).child(kindLabel(task.kind))))
       .child(div().text_size(15).font_semibold().child(task.title))
-    const actions = open === null ? [] : [this.button(t, "open-run", "Open run", false, () => {
+    const actions = waiting !== null ? [div().flex_shrink_0().py(4).text_color(t.muted).child(waiting)] : open === null ? [] : [this.button(t, "open-run", "Open run", false, () => {
       setShared(agentsOpenKey, { run: open, at: Date.now() })
       run("layout.select", { stack: viewsStack, child: "orc-agents" })
     })]
