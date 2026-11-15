@@ -15,21 +15,23 @@ test("does not refuse a fresh checkout that has the sources but no build", async
     await writeFile(join(home, "keys.json"), "{}")
     const ready = await Effect.runPromise(readyBundledApp(herdrAppSourceDir(), bundled).pipe(Effect.provide(BunServices.layer)))
     const result = await Effect.runPromise(installApp(ready, home).pipe(Effect.provide(BunServices.layer)))
-    expect(result.mods).toEqual(["orc-agents", "orc-board", "orc-resources", "orc-tabs"])
+    expect(result.mods).toEqual(["orc-agents", "orc-board", "orc-drawer", "orc-resources", "orc-tabs"])
     expect(result.layouts).toEqual(["orc.json", "orc.svg"])
     expect(result.added).toEqual([
       { section: "layout:orc", key: "cmd-1" },
       { section: "layout:orc", key: "cmd-2" },
-      { section: "layout:orc", key: "cmd-3" }
+      { section: "layout:orc", key: "cmd-3" },
+      { section: "layout:orc", key: "cmd-k" }
     ])
-    expect((await readdir(join(home, "mods"))).sort()).toEqual(["orc-agents", "orc-board", "orc-resources", "orc-tabs"])
+    expect((await readdir(join(home, "mods"))).sort()).toEqual(["orc-agents", "orc-board", "orc-drawer", "orc-resources", "orc-tabs"])
     expect((await readdir(join(home, "layouts"))).sort()).toEqual(["orc.json", "orc.svg"])
     const keys: unknown = JSON.parse(await readFile(join(home, "keys.json"), "utf8"))
     expect(keys).toEqual({
       "layout:orc": {
         "cmd-1": { command: "layout.select", args: { stack: "orc-views", child: "orc-board" } },
         "cmd-2": { command: "layout.select", args: { stack: "orc-views", child: "orc-resources" } },
-        "cmd-3": { command: "layout.select", args: { stack: "orc-views", child: "orc-agents" } }
+        "cmd-3": { command: "layout.select", args: { stack: "orc-views", child: "orc-agents" } },
+        "cmd-k": { command: "layout.toggle", args: { id: "orc-drawer" } }
       }
     })
   } finally {
