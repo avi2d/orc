@@ -64,7 +64,7 @@ const hcJson = <A>(args: ReadonlyArray<string>, guard: Guard<A>): Promise<Guarde
     (result) => result.code === 0
       ? guardJson(result.stdout, guard)
       : { kind: "refused", reason: ["hc", args[0] ?? "", "failed:", (result.stderr || result.stdout).trim()].join(" ") },
-    (error) => ({ kind: "refused", reason: error instanceof Error ? error.message : ["hc", args[0] ?? "", "could not start"].join(" ") })
+    (error: unknown) => ({ kind: "refused", reason: error instanceof Error ? error.message : ["hc", args[0] ?? "", "could not start"].join(" ") })
   )
 
 interface DrawerChat {
@@ -104,7 +104,7 @@ const startChat = (): Promise<Guarded<DrawerChat>> => {
         setShared(chatKey, chat)
         return ok(chat)
       }),
-    (error) => ({ kind: "refused", reason: error instanceof Error ? error.message : "mkdir could not start" })
+    (error: unknown) => ({ kind: "refused", reason: error instanceof Error ? error.message : "mkdir could not start" })
   )
 }
 
@@ -132,7 +132,7 @@ const chatTerminal = (): Promise<Guarded<DrawerChat>> => {
       if (found.kind === "refused") return missing(value) ? startChat() : found
       return found.value.address === held.address && found.value.state === "live" ? ok(held) : startChat()
     },
-    (error) => ({ kind: "refused", reason: error instanceof Error ? error.message : "hc get could not start" })
+    (error: unknown) => ({ kind: "refused", reason: error instanceof Error ? error.message : "hc get could not start" })
   )
 }
 
@@ -149,13 +149,14 @@ export default class OrcDrawer extends View {
 
   override init(_props: unknown, cx: AsyncContext): void {
     this.part = partOf(props())
-    this.focusHandle = cx.focus_handle()
+    const handle = cx.focus_handle()
+    this.focusHandle = handle
     if (this.part.part === "bar") {
       cx.spawn((task) => this.listen(task))
-      this.ensureChat(cx)
+      void this.ensureChat(cx)
     }
     if (this.part.part === "turns") {
-      if (this.focusHandle !== null) this.focusHandle.focus()
+      handle.focus()
       this.readTurns(cx)
       cx.timer.every(everyMs, (tick) => this.readTurns(tick))
     }
@@ -164,7 +165,7 @@ export default class OrcDrawer extends View {
   listen(cx: AsyncContext): Promise<void> {
     return nextCommand().then(
       (command) => this.obey(cx, command),
-      (error) => {
+      (error: unknown) => {
         this.problem = error instanceof Error ? error.message : "The drawer command failed"
       }
     ).then(
@@ -204,7 +205,7 @@ export default class OrcDrawer extends View {
         }
         cx.notify()
       },
-      (error) => {
+      (error: unknown) => {
         this.problem = error instanceof Error ? error.message : "orc chat could not start"
         cx.notify()
       }
