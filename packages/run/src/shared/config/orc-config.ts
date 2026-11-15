@@ -5,7 +5,7 @@ export const ProviderId = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Z
 
 const EnvVarName = Schema.String.check(Schema.isPattern(/^[A-Za-z_][A-Za-z0-9_]*$/))
 
-const ModelRef = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*\/\S+$/))
+export const ModelRef = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*\/\S+$/))
 
 const HeaderToken = Schema.String.check(Schema.makeFilter((value) => /^[A-Za-z0-9!#$%&'*+\-.^_`|~]+$/.test(value)))
 

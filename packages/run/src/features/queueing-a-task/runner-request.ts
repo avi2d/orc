@@ -1,6 +1,6 @@
 import { Effect, FileSystem, Option, Path, Schema } from "effect"
 import { AbsolutePath, readFailure } from "../../shared/config/index"
-import { ProviderId } from "../../shared/config/index"
+import { ModelRef, ProviderId } from "../../shared/config/index"
 import { TaskId, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type TaskRecord, withDecisions } from "../../entities/backlog/index"
 import { TaskInstructions, readInstructions } from "./runner-instructions"
 import { RunnerError } from "../../shared/process/index"
@@ -11,6 +11,8 @@ const taskFields = {
   task: TaskId,
   checkout: AbsolutePath,
   provider: ProviderId,
+  implementerModel: Schema.optional(ModelRef),
+  fixerModel: Schema.optional(ModelRef),
   body: Schema.String,
   kind: Schema.optional(Schema.Literals(reportKinds)),
   delivery: Schema.optional(Schema.Literal("direct-PR")),
@@ -78,6 +80,12 @@ const takenResume = (task: string, record: TaskRecord): Effect.Effect<Record<str
 const RequestSchema = Schema.Struct(taskFields)
 type RequestFields = typeof RequestSchema.Type
 
+const handedModels = (env: Readonly<Record<string, string | undefined>>): Record<string, string> => {
+  const implementer = env["ORC_TASK_IMPLEMENTER_MODEL"] ?? ""
+  const fixer = env["ORC_TASK_FIXER_MODEL"] ?? ""
+  return { ...(implementer === "" ? {} : { implementerModel: implementer }), ...(fixer === "" ? {} : { fixerModel: fixer }) }
+}
+
 const readRequestFields = (
   task: string,
   checkout: string,
@@ -100,7 +108,8 @@ const readRequestFields = (
     const delivery = record.spec.kind === "ship" && deliveryWord === "direct-PR" ? { delivery: deliveryWord } : {}
     const machineName = env["ORC_RUN_MACHINE"] ?? ""
     const machine = machineName === "" ? {} : { machine: machineName }
-    return yield* Schema.decodeEffect(RequestSchema)({ task, checkout, provider, body, ...kind, ...delivery, ...instructions, ...machine, ...resume }).pipe(
+    const models = handedModels(env)
+    return yield* Schema.decodeEffect(RequestSchema)({ task, checkout, provider, body, ...models, ...kind, ...delivery, ...instructions, ...machine, ...resume }).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
     )
   })
