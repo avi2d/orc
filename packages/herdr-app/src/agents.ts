@@ -48,9 +48,11 @@ export type Mark = "✓" | "✗" | "●" | "◆" | "○"
 export interface StepRow {
   readonly key: string
   readonly label: string
-  readonly mark: Mark
+  readonly mark: Mark | null
   readonly stepId: number | null
 }
+
+type ListedStep = Step & Partial<Pick<ShownStep, "from">>
 
 const lastSegment = (path: string): string => path.split("/").filter((part) => part !== "").at(-1) ?? path
 
@@ -223,15 +225,19 @@ const stepsToCome = (steps: ReadonlyArray<Step>, kind: string | null, delivery: 
 export const goesOn = (standing: Standing): boolean =>
   standing.status === "Running" || standing.status === "Queued" || (standing.status === "Awaiting you" && standing.waiting.on === "answer")
 
-export const stepRows = (standing: Standing, steps: ReadonlyArray<Step>, kind: string | null = null, delivery: string | null = null): ReadonlyArray<StepRow> => {
-  const recorded = steps.map((step): StepRow => ({ key: `step-${step.id}`, label: stepLabel(step), mark: recordedMark(step, standing), stepId: step.id }))
+export const stepRows = (standing: Standing, steps: ReadonlyArray<ListedStep>, kind: string | null = null, delivery: string | null = null): ReadonlyArray<StepRow> => {
+  const carried = steps.filter((step) => (step.from ?? null) !== null)
+  const ordered = [...carried, ...steps.filter((step) => (step.from ?? null) === null)]
+  const origin = carried[0]?.from ?? null
+  const group = origin === null ? [] : [{ key: `from-${origin}`, label: `From run ${origin}`, mark: null, stepId: null }]
+  const recorded = ordered.map((step): StepRow => ({ key: `step-${step.id}`, label: stepLabel(step), mark: recordedMark(step, standing), stepId: step.id }))
   const toCome = goesOn(standing)
-    ? stepsToCome(steps, kind, delivery).map((label): StepRow => ({ key: `next-${label}`, label, mark: "○", stepId: null }))
+    ? stepsToCome(ordered, kind, delivery).map((label): StepRow => ({ key: `next-${label}`, label, mark: "○", stepId: null }))
     : []
   const approval = standing.status === "Awaiting you" && standing.waiting.on === "approval"
     ? [{ key: approveRow, label: `Approve ${standing.waiting.pr}`, mark: "◆" as const, stepId: null }]
     : []
-  return [...recorded, ...toCome, ...approval]
+  return [...group, ...recorded, ...toCome, ...approval]
 }
 
 export const runAgent = (steps: ReadonlyArray<Pick<ShownStep, "name" | "model" | "thinking">>): RunAgent | null => {

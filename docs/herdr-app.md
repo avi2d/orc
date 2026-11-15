@@ -174,6 +174,9 @@ A report run shows only its Agent step.
 A ship run shows Agent, Checks, Fix when checks fail, and No mistakes for the standard delivery or PR for a direct PR delivery.
 A step shows ✓ when it passed, ✗ when it failed, ● while it runs, ◆ while it waits for you, and ○ when it has not started.
 A step names its model only when that model differs from the Agent step's.
+A resumed run lists the steps it carries from the earlier run first, under one `From run <run-id>` row, in the order they ran there.
+Its own steps follow in the order they ran.
+A carried step opens the log the earlier run wrote.
 Select a step to show it on the right, under a bar that gives the step, its model and its thinking level.
 The Agent step opens in the Turns view, with one card for each reply of the model, as [Chat with orc](#chat-with-orc) describes.
 Turns reads the step's Pi session file, and follows new replies as Pi writes them.

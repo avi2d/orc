@@ -158,6 +158,14 @@ describe("stepLogFile", () => {
     expect(stepLogFile("/new", { name: "fix", attempt: 2, status: "failed", out: [{ kind: "session", path: "/prior/s.jsonl" }, { kind: "log", path: "/prior/fix-2.log" }] })).toBe("/prior/fix-2.log")
   })
 
+  test("a carried fix step with no log row reads the earlier run's fix log, not a missing log in this run's folder", () => {
+    expect(stepLogFile("/runs/new", { name: "fix", attempt: 2, status: "failed", out: [{ kind: "session", path: "/runs/prior/sessions/s.jsonl" }] })).toBe("/runs/prior/fix-2.log")
+  })
+
+  test("a retried carried fix step that runs again reads this run's fix log, not the earlier run's", () => {
+    expect(stepLogFile("/runs/new", { name: "fix", attempt: 2, status: "running", out: [{ kind: "session", path: "/runs/prior/sessions/s.jsonl" }] })).toBe("/runs/new/fix-2.log")
+  })
+
   test("a running checks step with no evidence reads the live session checks file", () => {
     expect(stepLogFile("/r", { name: "checks", attempt: 1, status: "running", out: [] })).toBe("/r/session/checks-1.txt")
   })
@@ -206,6 +214,35 @@ describe("readStepLog", () => {
       await Effect.runPromise(recordEvidence(db, { stepId, direction: "out", path: join(priorDir, "agent.log"), kind: "log" }))
       const text = await Effect.runPromise(readStepLog(db, "run-j", stepId).pipe(Effect.provide(BunServices.layer)))
       expect(text).toBe("prior output\n")
+    })
+  })
+
+  test("a carried fix step recorded before log rows reads its log from the earlier run's folder instead of reading as missing", async () => {
+    await withDb(async (home, db) => {
+      await run(db, home, "run-m", "running", "# Fix\n")
+      const priorDir = join(home, "runs", "prior-2")
+      await mkdir(join(priorDir, "session"), { recursive: true })
+      await writeFile(join(priorDir, "fix-2.log"), "prior fix output\n")
+      const stepId = await Effect.runPromise(recordStep(db, { runId: "run-m", name: "fix", attempt: 2, status: "failed", started: "2026-11-13T09:02:00.000Z" }))
+      await Effect.runPromise(recordEvidence(db, { stepId, direction: "in", path: join(priorDir, "session", "checks-2.txt"), kind: "checks" }))
+      await Effect.runPromise(recordEvidence(db, { stepId, direction: "out", path: join(priorDir, "sessions", "s.jsonl"), kind: "session" }))
+      const text = await Effect.runPromise(readStepLog(db, "run-m", stepId).pipe(Effect.provide(BunServices.layer)))
+      expect(text).toBe("prior fix output\n")
+    })
+  })
+
+  test("a carried implement step recorded before log rows reads the earlier run's agent.log instead of reading as missing", async () => {
+    await withDb(async (home, db) => {
+      const runDir = await run(db, home, "run-n", "running", "# Agent\n")
+      const priorDir = join(home, "runs", "prior-3")
+      await mkdir(join(priorDir, "session"), { recursive: true })
+      await writeFile(join(priorDir, "agent.log"), "prior agent output\n")
+      const stepId = await Effect.runPromise(recordStep(db, { runId: "run-n", name: "implement", attempt: 1, status: "passed", started: "2026-11-13T10:00:00.000Z" }))
+      await Effect.runPromise(recordEvidence(db, { stepId, direction: "out", path: join(runDir, "implement-1.md"), kind: "evidence" }))
+      const checks = await Effect.runPromise(recordStep(db, { runId: "run-n", name: "checks", attempt: 1, status: "passed", started: "2026-11-13T09:02:00.000Z" }))
+      await Effect.runPromise(recordEvidence(db, { stepId: checks, direction: "out", path: join(priorDir, "session", "checks-1.txt"), kind: "checks" }))
+      const text = await Effect.runPromise(readStepLog(db, "run-n", stepId).pipe(Effect.provide(BunServices.layer)))
+      expect(text).toBe("prior agent output\n")
     })
   })
 
