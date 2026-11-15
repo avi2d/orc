@@ -67,6 +67,9 @@ const delivered = (pr: TaskDetail["prState"]): TaskDetail => ({
 })
 
 test("drops a merged PR instead of still asking to merge it", () => {
+  const ready: AttentionItem = { id: "orc-61.pr-ready", kind: "pr-ready", task: "orc-61", escalated: false }
+  const readyLine = line("question", "beat", "orc-61.pr-ready", "https://github.com/o/r/pull/9 is ready to merge, checks green: ci", "2026-11-13T12:00:00.000Z")
+  expect(inboxItems({ backlog: [delivered("merged")], attention: [ready], runs: [], threads: new Map([["orc-61", { task: "orc-61", entries: [readyLine] }]]) })).toEqual([])
   expect(inboxItems({ backlog: [delivered("merged")], attention: [], runs: [], threads: new Map() })).toEqual([])
   const [open] = inboxItems({ backlog: [delivered("open")], attention: [], runs: [], threads: new Map() })
   expect(open.action).toEqual({ kind: "merge", argv: ["merge", "orc-61", "--basis", "captain-word"] })
@@ -85,6 +88,7 @@ test("sorts items oldest first instead of by task", () => {
 })
 
 test("reads no thread for a task nothing flags instead of every task", () => {
-  const quiet: AttentionItem = { id: "x", kind: "run-died", task: "orc-70", escalated: false }
+  const quiet: AttentionItem = { id: "x", kind: "run-died", task: "orc-60", escalated: false }
   expect(inboxTasks({ backlog: [started], attention: [quiet], runs: [] })).toEqual([])
+  expect(inboxItems(sources([line("question", "beat", "x", "the run on mac died: boom")]))).toEqual([])
 })

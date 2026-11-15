@@ -56,9 +56,7 @@ const cardItem = (task: TaskDetail, card: ThreadCard, attention: ReadonlyArray<A
   if (card.line.kind === "hold") return card.reply?.kind === "hold" ? { ...base, kind: "hold", ask: askText(card.line.text) } : null
   if (card.line.kind !== "question") return null
   const item = attention.find((entry) => entry.id === card.line.id)
-  if (item?.kind === "pr-ready") return null
   if (card.line.who === "beat") return null
-  if (item !== undefined && !questionKinds.has(item.kind)) return null
   return { ...base, kind: item?.escalated === true ? "decision" : "question", ask: card.ask ?? askText(card.line.text) }
 }
 

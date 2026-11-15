@@ -74,16 +74,13 @@ export const guardJson = <A>(text: string, guard: Guard<A>): Guarded<A> => {
   return guard(value, "")
 }
 
-const pairOf = <T>(read: (record: Fields, name: string, at: string) => Guarded<T>) =>
-  <A>(record: Fields, at: string, first: string, second: string, make: (a: T, b: T) => A): Guarded<A> => {
-    const a = read(record, first, at)
-    if (a.kind === "refused") return a
-    const b = read(record, second, at)
-    if (b.kind === "refused") return b
-    return ok(make(a.value, b.value))
-  }
-
-const pair = pairOf(string)
+const pair = <A>(record: Fields, at: string, first: string, second: string, make: (a: string, b: string) => A): Guarded<A> => {
+  const a = string(record, first, at)
+  if (a.kind === "refused") return a
+  const b = string(record, second, at)
+  if (b.kind === "refused") return b
+  return ok(make(a.value, b.value))
+}
 
 
 const question: Guard<string> = (value, at) => {
