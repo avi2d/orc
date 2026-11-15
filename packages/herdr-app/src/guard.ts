@@ -10,7 +10,7 @@ type Fields = Readonly<Record<string, unknown>>
 
 export const ok = <A>(value: A): Guarded<A> => ({ kind: "ok", value })
 
-const refused = (at: string, wanted: string, value: unknown): Guarded<never> => {
+export const refused = (at: string, wanted: string, value: unknown): Guarded<never> => {
   const where = at === "" ? "the document" : at
   return {
     kind: "refused",
@@ -35,13 +35,13 @@ export const number = (record: Fields, name: string, at: string): Guarded<number
   return typeof value === "number" && Number.isFinite(value) ? ok(value) : refused(child(at, name), "a number", value)
 }
 
-const nullableString = (record: Fields, name: string, at: string): Guarded<string | null> =>
+export const nullableString = (record: Fields, name: string, at: string): Guarded<string | null> =>
   record[name] === null ? ok(null) : string(record, name, at)
 
 const absentOrString = (record: Fields, name: string, at: string): Guarded<string | null> =>
   record[name] === undefined ? ok(null) : nullableString(record, name, at)
 
-const oneOf = <L extends string>(record: Fields, name: string, at: string, wanted: ReadonlyArray<L>): Guarded<L> => {
+export const oneOf = <L extends string>(record: Fields, name: string, at: string, wanted: ReadonlyArray<L>): Guarded<L> => {
   const value = record[name]
   const found = wanted.find((entry) => entry === value)
   return found === undefined ? refused(child(at, name), wanted.map((entry) => JSON.stringify(entry)).join(" or "), value) : ok(found)
@@ -175,9 +175,9 @@ export const backlog: Guard<Backlog> = (value, at) => {
   return ok({ schema: head.value.schema, tasks: head.value.tasks, merged })
 }
 
-const boardKinds = ["ship", "scout", "task", "decision", "parent"] as const
+export const boardKinds = ["ship", "scout", "task", "decision", "parent"] as const
 const boardStatuses = ["new", "taken", "started", "closed"] as const
-const prStates = ["open", "closed", "merged"] as const
+export const prStates = ["open", "closed", "merged"] as const
 
 const answerPresent = (value: unknown, at: string): Guarded<boolean> => {
   if (value === null) return ok(false)

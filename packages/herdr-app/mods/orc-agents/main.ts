@@ -1,11 +1,11 @@
 import { type AsyncContext, type Color, type Context, type Element, View, div } from "gpui-kit"
 import { ScrollHandle, h_flex, v_flex } from "gpui-base"
-import { layout, settings } from "herdr"
+import { layout, settings, shared } from "herdr"
 import { type Card, type CardStatus, type Filter, type Mark, type StepRow, buildCards, cardStatuses, filterCards, projectsOf, railLabel, stepRows } from "../../src/agents"
 import { backlog, runs, show, type Show } from "../../src/guard"
 import { type Reading, readJson, readText } from "../../src/orc-read"
 import { palette } from "../../src/palette"
-import { activeChild, viewsStack } from "../../src/views"
+import { activeChild, agentsOpenKey, openAsk, viewsStack } from "../../src/views"
 
 interface Keyed<A> {
   readonly of: string
@@ -66,6 +66,7 @@ export default class OrcAgents extends View {
   cards: Reading<ReadonlyArray<Card>> = { kind: "reading" }
   filter: Filter = { project: null, status: null }
   selectedKey: string | null = null
+  opened = 0
   chosenStep: number | null = null
   folded = false
   steps: Keyed<Show> | null = null
@@ -183,7 +184,16 @@ export default class OrcAgents extends View {
     cx.notify()
   }
 
-  render(): Element {
+  openAsked(cx: Context): void {
+    const asked = openAsk(shared(agentsOpenKey))
+    if (asked === null || asked.at === this.opened) return
+    this.opened = asked.at
+    this.filter = { project: null, status: null }
+    this.select(cx, asked.run)
+  }
+
+  render(cx: Context): Element {
+    this.openAsked(cx)
     const t = palette()
     const card = this.selectedCard()
     return h_flex().id("root").size_full().bg(t.surface).text_size(13).text_color(t.foreground)

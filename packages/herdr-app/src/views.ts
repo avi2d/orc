@@ -2,6 +2,16 @@ import type { AsyncContext } from "gpui-kit"
 import { layout } from "herdr"
 
 export const viewsStack = "orc-views"
+export const selectedTaskKey = "orc.board.selected"
+export const agentsOpenKey = "orc.agents.open"
+
+export interface OpenAsk {
+  readonly run: string
+  readonly at: number
+}
+
+export const openAsk = (value: unknown): OpenAsk | null =>
+  isRecord(value) && typeof value["run"] === "string" && typeof value["at"] === "number" ? { run: value["run"], at: value["at"] } : null
 
 export const views = [
   { id: "orc-board", label: "Board", key: "⌘1" },
