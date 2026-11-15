@@ -1,10 +1,13 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { installApp, mergeKeys, readyBundledApp } from "../../../packages/run/src/features/installing-the-app/index"
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 
 test("adds missing keys without replacing a person's binding", async () => {
   const ours = { "layout:orc": { "cmd-1": "orc-tabs.select:orc-board", "cmd-2": "orc-tabs.select:orc-resources" } }
@@ -12,6 +15,28 @@ test("adds missing keys without replacing a person's binding", async () => {
   expect(result.keys).toEqual({ "layout:orc": { "cmd-1": "orc-tabs.select:orc-board", "cmd-2": "tab.next" } })
   expect(result.added).toEqual([{ section: "layout:orc", key: "cmd-1" }])
   expect(result.skipped).toEqual([{ section: "layout:orc", key: "cmd-2", kept: "tab.next" }])
+})
+
+test("keeps a ⌘K the person already bound instead of the chat drawer's", async () => {
+  const root = await mkdtemp(join(tmpdir(), "orc-app-test-"))
+  try {
+    const source = join(root, "source")
+    const home = join(root, "home")
+    await mkdir(join(source, "mods", "orc-drawer"), { recursive: true })
+    await mkdir(join(source, "layouts"), { recursive: true })
+    await mkdir(home, { recursive: true })
+    await writeFile(join(source, "mods", "orc-drawer", "main.js"), "orc")
+    await writeFile(join(source, "layouts", "orc.json"), "{}")
+    await copyFile(join(import.meta.dir, "../../../packages/herdr-app/keys.json"), join(source, "keys.json"))
+    await writeFile(join(home, "keys.json"), JSON.stringify({ "layout:orc": { "cmd-k": "app.palette" } }))
+    const install = await Effect.runPromise(installApp(source, home).pipe(Effect.provide(BunServices.layer)))
+    const installed: unknown = JSON.parse(await readFile(join(home, "keys.json"), "utf8"))
+    const section: unknown = isRecord(installed) ? installed["layout:orc"] : undefined
+    expect(isRecord(section) ? section["cmd-k"] : undefined).toBe("app.palette")
+    expect(install.skipped).toContainEqual({ section: "layout:orc", key: "cmd-k", kept: "app.palette" })
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 test("installs only orc names without touching personal files", async () => {
