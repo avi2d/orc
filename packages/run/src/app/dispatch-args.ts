@@ -2,12 +2,13 @@ import { isTaskId, isCalendarDate, isTaskKind, type TaskKind, type TaskPriority,
 import { parseJsonFlag, parseRunner, unexpected, type DispatchArgs as RunnerArgs } from "./dispatch-args-runner"
 import { parseHeavy } from "./dispatch-args-heavy"
 export type { HeavyWord } from "./dispatch-args-heavy"
-import { parseAnswer, parseItemAnswer, parseNote } from "./dispatch-args-answer"
+import { parseAnswer, parseItemAnswer, parseNote, parseSendBack } from "./dispatch-args-answer"
 import { addPriority, parsePriority } from "./dispatch-args-priority"
 import type { DropTask, EditTask, TaskSource } from "../features/backlog-planning/index"
 import type { RecordOrigin } from "../widgets/beat/index"
+import type { SendBack } from "../features/queueing-a-task/index"
 
-export type DispatchArgs = RunnerArgs | EditTask | DropTask | RecordOrigin
+export type DispatchArgs = RunnerArgs | EditTask | DropTask | RecordOrigin | SendBack
 import { isEventKey } from "../entities/events/index"
 import { isMergeBasis, mergeBases } from "../entities/pull-request/index"
 
@@ -300,6 +301,7 @@ const backlogSubcommands = {
   posted: parsePosted,
   hold: parseHold,
   answer: parseAnswer,
+  "send-back": parseSendBack,
   note: parseNote,
   thread: parseThread,
   depend: parseDepend,
