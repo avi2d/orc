@@ -37,16 +37,17 @@ To print the same facts as JSON, run `orc show <run-id> --json`.
 Its JSON document names its version first as `schema`, starting at `orc.show.v1`.
 Its `run` gives the same `task`, `machine` and `worktree` as `orc runs --json`.
 Each step gives the `model` and `thinking` level its agent ran with, and `null` for a step no agent ran.
-A resumed run lists first the steps it carries from the earlier run.
+A resumed run lists first the steps it carries from each earlier run.
 The implement step comes first and the rest follow in the order they ran there.
-Each carried step gives that run's id as `from`, read from the folder its evidence names, and every other step gives `null`.
+Each carried step gives the id of the run it ran in as `from`, read from the folder its evidence names, and every other step gives `null`.
+An implement step beside carried steps gives their run even when its own evidence names this run.
 `orc show <run-id>` prints `from run <run-id>` under each carried step.
 To print one step's output, run `orc log <run-id> <step-id>` with the step's `id` from that JSON.
 An implement step prints `agent.log` and a fix step its `fix-<attempt>.log`, which Pi appends to as it works.
 A checks or no-mistakes step prints the file it wrote.
 A step whose output is not written yet prints nothing.
 A carried step prints the log from the evidence path it records.
-A carried step recorded without a log path prints the log from the earlier run's folder that its evidence names.
+A carried step recorded without a log path prints the log from the run named by its `from`.
 To score a step, run `orc score <run-id> <step> <1 to 5> [note]`.
 Use fix#1 to score the first fix attempt and plain fix scores the latest attempt in execution order.
 Use the step id from orc show JSON to score one resumed checks row when an attempt ran twice.
