@@ -65,7 +65,7 @@ const updateBranch = (landing: Landing, view: PullRequestView) =>
         "orc merge could not update " + landing.url + " from " + view.baseRefName + ": update-branch reported a merge conflict between " + view.headRefOid + " and " + view.baseRefName + ". Merge " + view.baseRefName + " into the branch, settle the conflict and push."
       )
     }
-    if (/HTTP 422/.test(said)) {
+    if (/expected.?head.?sha/i.test(said)) {
       return yield* refuse(refusal(landing.id, landing.url, ["changed after its checks were read: update-branch found its head is no longer " + view.headRefOid + ", so read its checks again before merging"]))
     }
     return yield* refuse(refusal(landing.id, landing.url, ["could not be updated from " + view.baseRefName + ": gh api update-branch said " + updated.said]))
@@ -82,36 +82,53 @@ const commitParents = (url: string, sha: string) =>
     return yield* gh(["api", "--hostname", host, "repos/" + owner + "/" + repo + "/commits/" + sha, "--jq", ".parents[].sha"])
   })
 
+interface Lineage {
+  readonly sha: string
+  readonly ok: boolean
+  readonly said: string | null
+}
+
+type PolledHead =
+  | { readonly kind: "closed"; readonly view: PullRequestView }
+  | { readonly kind: "foreign"; readonly view: PullRequestView; readonly said: string | null }
+  | { readonly kind: "red"; readonly view: PullRequestView }
+  | { readonly kind: "ready"; readonly view: PullRequestView }
+
+const lineageOf = (url: string, checked: string, sha: string): Effect.Effect<Lineage, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    const parents = yield* commitParents(url, sha)
+    if (parents.exitCode !== 0) {
+      return { sha, ok: false, said: parents.said }
+    }
+    const seen = parents.stdout.split("\n").map((line) => line.trim()).filter((line) => line !== "")
+    return seen.includes(checked) ? { sha, ok: true, said: null } : { sha, ok: false, said: null }
+  })
+
 // After update-branch GitHub moves the head a few seconds later and the new head starts with no check, so neither an unmoved head nor an empty rollup is an answer yet.
-const awaitNewHead = (url: string, checked: PullRequestView, poll: number): Effect.Effect<PullRequestView, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+const awaitNewHead = (url: string, checked: PullRequestView, poll: number, known?: Lineage): Effect.Effect<PolledHead, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     yield* Effect.sleep(Duration.seconds(Math.min(2 ** poll, longestPollSeconds)))
     const fresh = yield* readView(url)
     if (fresh.state !== "OPEN") {
-      return fresh
+      return { kind: "closed", view: fresh }
     }
-    if (fresh.headRefOid !== checked.headRefOid) {
-      const parents = yield* commitParents(url, fresh.headRefOid)
-      if (parents.exitCode !== 0 || !parents.stdout.split("\n").map((line) => line.trim()).filter((line) => line !== "").includes(checked.headRefOid)) {
-        return fresh
-      }
+    if (fresh.headRefOid === checked.headRefOid) {
+      return yield* awaitNewHead(url, checked, poll + 1, known)
     }
-    if (fresh.headRefOid !== checked.headRefOid && (redChecks(fresh).length > 0 || (checkRefusals(fresh).length === 0 && missingChecks(checked, fresh).length === 0))) {
-      return fresh
+    let lineage = known
+    if (lineage === undefined || lineage.sha !== fresh.headRefOid) {
+      lineage = yield* lineageOf(url, checked.headRefOid, fresh.headRefOid)
     }
-    return yield* awaitNewHead(url, checked, poll + 1)
-  })
-
-const childOf = (landing: Landing, checked: string, fresh: string) =>
-  Effect.gen(function*() {
-    const parents = yield* commitParents(landing.url, fresh)
-    if (parents.exitCode !== 0) {
-      return yield* refuse(refusal(landing.id, landing.url, ["could not read the parents of its new head " + fresh + ": " + parents.said]))
+    if (!lineage.ok) {
+      return { kind: "foreign", view: fresh, said: lineage.said }
     }
-    const seen = parents.stdout.split("\n").map((line) => line.trim()).filter((line) => line !== "")
-    if (!seen.includes(checked)) {
-      return yield* refuse(refusal(landing.id, landing.url, ["changed after its checks were read: update-branch found its head is no longer " + checked + ", so read its checks again before merging"]))
+    if (redChecks(fresh).length > 0) {
+      return { kind: "red", view: fresh }
     }
+    if (checkRefusals(fresh).length === 0 && missingChecks(checked, fresh).length === 0) {
+      return { kind: "ready", view: fresh }
+    }
+    return yield* awaitNewHead(url, checked, poll + 1, lineage)
   })
 
 const mergeAt = (landing: Landing, view: PullRequestView) =>
@@ -127,16 +144,22 @@ const landUpdated = (landing: Landing, checked: PullRequestView) =>
   Effect.gen(function*() {
     yield* updateBranch(landing, checked)
     yield* Console.log("Checks running")
-    const view = yield* awaitNewHead(landing.url, checked, 0).pipe(
+    const settled = yield* awaitNewHead(landing.url, checked, 0).pipe(
       Effect.timeoutOrElse({
         duration: checksTimeout,
         orElse: () => refuse(refusal(landing.id, landing.url, ["was updated from " + checked.baseRefName + ", and the checks on its new head did not all report within 20 minutes, so run orc merge again once they do"]))
       })
     )
-    if (view.state !== "OPEN") {
-      return yield* refuse(refusal(landing.id, landing.url, ["is " + view.state.toLowerCase() + ", not open"]))
+    if (settled.kind === "closed") {
+      return yield* refuse(refusal(landing.id, landing.url, ["is " + settled.view.state.toLowerCase() + ", not open"]))
     }
-    yield* childOf(landing, checked.headRefOid, view.headRefOid)
+    if (settled.kind === "foreign") {
+      if (settled.said !== null) {
+        return yield* refuse(refusal(landing.id, landing.url, ["could not read the parents of its new head " + settled.view.headRefOid + ": " + settled.said]))
+      }
+      return yield* refuse(refusal(landing.id, landing.url, ["changed after its checks were read: update-branch found its head is no longer " + checked.headRefOid + ", so read its checks again before merging"]))
+    }
+    const view = settled.view
     const red = redChecks(view)
     if (red.length > 0) {
       return yield* refuseAndSendBack(
