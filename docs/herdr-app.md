@@ -189,6 +189,7 @@ A step names its model only when that model differs from the Agent step's.
 Select a step to show it on the right, under a bar that gives the step, its model and its thinking level.
 Every step that runs a Pi session opens in the Turns view, with one card for each reply of the model, as [Chat with orc](#chat-with-orc) describes.
 That covers the Agent step, the Fix step, and any other step that `orc show` gives a Pi session file.
+The Agent step opens in the Turns view even before Pi writes its session file.
 Turns reads the step's Pi session file, and follows new replies as Pi writes them.
 Select Raw in the bar to show the step's log instead, and select Turns to go back.
 A step with no Pi session, such as a Checks step, shows its log with the checks' output.
