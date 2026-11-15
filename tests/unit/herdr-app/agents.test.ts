@@ -176,6 +176,18 @@ describe("the selected run's steps", () => {
     expect(stepRows({ status: "Queued" }, [], "scout", null).map((row) => row.label)).toEqual(["Agent"])
   })
 
+  test("a resumed run groups its carried steps under the earlier run before its own, not carried checks sorted before its own agent step", () => {
+    const rows = stepRows({ status: "Done" }, [
+      { id: 1, name: "implement", attempt: 1, status: "passed", from: "run-a" },
+      { id: 2, name: "checks", attempt: 1, status: "failed", from: "run-a" },
+      { id: 9, name: "no-mistakes", attempt: 1, status: "passed", from: null },
+      { id: 3, name: "fix", attempt: 1, status: "passed", from: "run-a" },
+      { id: 4, name: "checks", attempt: 2, status: "passed", from: "run-a" }
+    ], "ship", null)
+    expect(rows.map((row) => `${row.mark ?? "-"} ${row.label}`)).toEqual(["- From run run-a", "✓ Agent", "✗ Checks 1", "✓ Fix 1", "✓ Checks 2", "✓ No mistakes"])
+    expect(rows[0]?.stepId).toBeNull()
+  })
+
   test("a restarted checks round predicts the next round from the restart, not the inherited maximum", () => {
     const rows = stepRows({ status: "Running" }, [
       { id: 1, name: "implement", attempt: 1, status: "passed" },

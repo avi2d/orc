@@ -199,6 +199,56 @@ describe("readShow orders and links", () => {
   })
 })
 
+describe("readShow of a resumed run", () => {
+  const carried = async (db: Database, name: string, attempt: number, started: string, out: { readonly path: string; readonly kind: string }): Promise<void> => {
+    const stepId = await Effect.runPromise(recordStep(db, { runId: "resumed-b", name, attempt, status: name === "checks" && attempt === 3 ? "passed" : "failed", started, ended: started }))
+    await Effect.runPromise(recordEvidence(db, { stepId, direction: "out", ...out }))
+  }
+
+  test("a resumed run lists its carried steps from the earlier run before its own, not carried checks sorted before its own agent step", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const runs = join(home, "runs")
+        await Effect.runPromise(recordRun(db, { id: "resumed-b", project: "orc", branch: "orc/demo", taskFile: join(runs, "resumed-b", "task.md"), status: "succeeded", started: "2026-10-18T12:00:00.000Z" }))
+        const implement = await Effect.runPromise(recordStep(db, { runId: "resumed-b", name: "implement", attempt: 1, status: "passed", started: "2026-10-18T12:00:00.000Z", ended: "2026-10-18T12:00:00.000Z" }))
+        await Effect.runPromise(recordEvidence(db, { stepId: implement, direction: "out", path: join(runs, "resumed-b", "implement-1.md"), kind: "evidence" }))
+        await carried(db, "checks", 1, "2026-10-18T10:10:00.000Z", { path: join(runs, "resumed-a", "session", "checks-1.txt"), kind: "checks" })
+        await carried(db, "checks", 2, "2026-10-18T10:30:00.000Z", { path: join(runs, "resumed-a", "session", "checks-2.txt"), kind: "checks" })
+        await carried(db, "checks", 3, "2026-10-18T10:50:00.000Z", { path: join(runs, "resumed-a", "session", "checks-3.txt"), kind: "checks" })
+        await carried(db, "fix", 1, "2026-10-18T10:20:00.000Z", { path: join(runs, "resumed-a", "sessions", "f1.jsonl"), kind: "session" })
+        await carried(db, "fix", 2, "2026-10-18T10:40:00.000Z", { path: join(runs, "resumed-a", "fix-2.log"), kind: "log" })
+        await Effect.runPromise(recordStep(db, { runId: "resumed-b", name: "no-mistakes", attempt: 1, status: "passed", started: "2026-10-18T12:01:00.000Z" }))
+        const document = await Effect.runPromise(readShow(db, "resumed-b"))
+        expect(document?.steps.map((step) => [step.name + " " + step.attempt.toString(), step.from])).toEqual([
+          ["implement 1", "resumed-a"],
+          ["checks 1", "resumed-a"],
+          ["fix 1", "resumed-a"],
+          ["checks 2", "resumed-a"],
+          ["fix 2", "resumed-a"],
+          ["checks 3", "resumed-a"],
+          ["no-mistakes 1", null]
+        ])
+      } finally {
+        db.close()
+      }
+    })
+  })
+
+  test("a run that carries nothing names no earlier run on its steps", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        await fixture(db)
+        const document = await Effect.runPromise(readShow(db, "show-1"))
+        expect(document?.steps.map((step) => step.from)).toEqual([null, null])
+      } finally {
+        db.close()
+      }
+    })
+  })
+})
+
 describe("orc score latest wins in orc show", () => {
   test("a later orc score replaces the earlier score in orc show", async () => {
     await withHome(async (home) => {

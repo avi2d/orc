@@ -182,7 +182,7 @@ const rowView = (t: Palette, row: StepRow, target: Chosen | null, model: string 
   const selected = opens !== null && target !== null && sameTarget(opens, target)
   const line = h_flex().id(`row-${row.key}`).px(8).py(4).gap(8).rounded(4).items_center()
     .bg(selected ? t.selected : t.surface)
-    .child(div().w(14).flex_shrink_0().text_color(markColor(t, row.mark)).child(row.mark))
+    .child(div().w(14).flex_shrink_0().text_color(row.mark === null ? t.dim : markColor(t, row.mark)).child(row.mark ?? ""))
     .child(div().flex_shrink_0().text_color(opens === null ? t.muted : t.foreground).child(row.label))
     .children(model === null ? [] : [div().flex_1().min_w_0().truncate().text_size(12).text_color(t.dim).child(model)])
   return opens === null
