@@ -163,9 +163,15 @@ The cards sort by status in this order: Awaiting you, Running, Queued, Failed an
 | Awaiting you | The run waits on your answer, or its PR is open and its task has no merge recorded |
 | Running | The run is running |
 | Queued | The task has not started, is held, or waits to run again |
-| Failed | The run failed or was stopped |
+| Failed | The run failed or was stopped, or its PR closed unmerged |
 | Done | The run succeeded, and its PR merged or it opened none |
 
+The PR state comes from the `prState` that `orc backlog --json` prints for the task, which the beat reads from GitHub.
+A PR merged or closed outside orc therefore moves the task's newest run to Done or Failed, whatever the run recorded.
+
+The list and the Project row show only the projects in orc's projects file, which `orc backlog --json` prints under `projects`.
+Select All runs in the Project row to show the runs of every other project as well.
+When orc cannot read its projects file, the tab shows every project.
 To narrow the list, pick a project in the Project row or a status in the Status row.
 To fold the list to a rail of ids coloured by status, select «, and select » to open it again.
 

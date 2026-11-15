@@ -136,6 +136,7 @@ export interface Task {
   readonly parked: number | null
   readonly parkedOrigin: string | null
   readonly reason: string | null
+  readonly prState: typeof prStates[number] | null
 }
 
 const parkedOrigin = (record: Fields, at: string): Guarded<string | null> => {
@@ -163,29 +164,42 @@ const task: Guard<Task> = (value, at) => {
   if (origin.kind === "refused") return origin
   const reason = absentOrString(record.value, "reason", at)
   if (reason.kind === "refused") return reason
-  return ok({ ...head.value, hold: hold.value, parked: parked.value, parkedOrigin: origin.value, reason: reason.value })
+  const prState = record.value["prState"] === null || record.value["prState"] === undefined ? ok(null) : oneOf(record.value, "prState", at, prStates)
+  if (prState.kind === "refused") return prState
+  return ok({ ...head.value, hold: hold.value, parked: parked.value, parkedOrigin: origin.value, reason: reason.value, prState: prState.value })
 }
 
 export interface Backlog {
   readonly schema: "orc.backlog.v1"
   readonly tasks: ReadonlyArray<Task>
   readonly merged: ReadonlyArray<string>
+  readonly projects: ReadonlyArray<string> | null
 }
+
+export const projectName: Guard<string> = (value, at) => {
+  const project = fields(value, at)
+  return project.kind === "refused" ? project : string(project.value, "name", at)
+}
+
+const projectNames = (record: Fields, at: string): Guarded<ReadonlyArray<string> | null> =>
+  record["projects"] === null || record["projects"] === undefined ? ok(null) : arrayOf(record, "projects", at, projectName)
 
 export const backlog: Guard<Backlog> = (value, at) => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
   const head = schemaTasks(record.value, at, task)
   if (head.kind === "refused") return head
+  const projects = projectNames(record.value, at)
+  if (projects.kind === "refused") return projects
   const mergedRaw = record.value["merged"]
-  if (mergedRaw === undefined) return ok({ schema: head.value.schema, tasks: head.value.tasks, merged: [] })
+  if (mergedRaw === undefined) return ok({ schema: head.value.schema, tasks: head.value.tasks, merged: [], projects: projects.value })
   if (!Array.isArray(mergedRaw)) return refused(child(at, "merged"), "an array", mergedRaw)
   const merged: Array<string> = []
   for (const [index, entry] of mergedRaw.entries()) {
     if (typeof entry !== "string") return refused(child(at, "merged") + "[" + index.toString() + "]", "a string", entry)
     merged.push(entry)
   }
-  return ok({ schema: head.value.schema, tasks: head.value.tasks, merged })
+  return ok({ schema: head.value.schema, tasks: head.value.tasks, merged, projects: projects.value })
 }
 
 export const boardKinds = ["ship", "scout", "task", "decision", "parent"] as const
