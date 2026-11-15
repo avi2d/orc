@@ -8,12 +8,14 @@ interface Node {
 
 const nodes = new WeakMap<object, Node>()
 
+const isKid = (value: unknown): value is object | string => typeof value === "string" || (typeof value === "object" && value !== null)
+
 const node = (): object => {
   const made: Node = { calls: [], kids: [] }
   const element: object = new Proxy({}, {
     get: (_target, name) => (...args: ReadonlyArray<unknown>) => {
-      if (name === "child") made.kids.push(args[0] as object | string)
-      else if (name === "children") made.kids.push(...(args[0] as ReadonlyArray<object>))
+      const kids: ReadonlyArray<unknown> = name === "child" ? [args[0]] : name === "children" && Array.isArray(args[0]) ? args[0] : []
+      if (name === "child" || name === "children") made.kids.push(...kids.filter(isKid))
       else made.calls.push({ name: String(name), args })
       return element
     }
@@ -34,9 +36,9 @@ const find = (element: object | string, id: string): Node | null => {
   return null
 }
 
-mock.module("gpui-kit", () => ({ View: class {}, div: node }))
-mock.module("gpui-base", () => ({ h_flex: node, v_flex: node, ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) } }))
-mock.module("herdr", () => ({ shared: () => null, setShared: () => undefined, layout: () => null, exec: () => undefined, theme: () => ({}) }))
+void mock.module("gpui-kit", () => ({ View: Object, div: node }))
+void mock.module("gpui-base", () => ({ h_flex: node, v_flex: node, ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) } }))
+void mock.module("herdr", () => ({ shared: () => null, setShared: () => undefined, layout: () => null, exec: () => undefined, theme: () => ({}) }))
 
 const task = (index: number): BoardTask => ({
   id: `orc-${index}`, title: "A task", project: "orc", kind: "ship", created: `2026-01-${String(index + 1).padStart(2, "0")}`,

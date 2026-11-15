@@ -42,7 +42,7 @@ export interface LaneView {
   readonly heightPx: number
 }
 
-export const laneKeys: ReadonlySet<string> = new Set(["up", "down", "pageup", "pagedown", "home", "end"])
+const laneKeys: ReadonlySet<string> = new Set(["up", "down", "pageup", "pagedown", "home", "end"])
 
 const cardStep = cardBox.heightPx + cardBox.gapPx
 const cardTop = (index: number): number => cardBox.padPx + index * cardStep
@@ -55,17 +55,30 @@ const maxOffset = (view: LaneView, count: number): number =>
 export const wheelOffset = (view: LaneView, count: number, deltaY: number): number =>
   clamp(view.offsetPx - deltaY, 0, maxOffset(view, count))
 
-// ScrollHandle only offers scroll_to_item, which moves the least distance that shows the whole card, so the next offset follows that rule.
-export const laneJump = (key: string, view: LaneView, count: number): { readonly item: number; readonly offsetPx: number } | null => {
-  if (count === 0 || !laneKeys.has(key)) return null
-  const index = (value: number): number => clamp(value, 0, count - 1)
+const laneTarget = (key: string, view: LaneView): number => {
   const page = Math.max(1, Math.floor(view.heightPx / cardStep))
-  const first = index(Math.ceil((view.offsetPx - cardBox.padPx) / cardStep))
-  const last = index(Math.floor((view.offsetPx + view.heightPx - cardBox.padPx - cardBox.heightPx) / cardStep))
-  const item = index(key === "up" ? first - 1 : key === "pageup" ? first - page : key === "home" ? 0
-    : key === "down" ? last + 1 : key === "pagedown" ? last + page : count - 1)
+  const first = Math.ceil((view.offsetPx - cardBox.padPx) / cardStep)
+  const last = Math.floor((view.offsetPx + view.heightPx - cardBox.padPx - cardBox.heightPx) / cardStep)
+  switch (key) {
+    case "up": return first - 1
+    case "pageup": return first - page
+    case "home": return 0
+    case "down": return last + 1
+    case "pagedown": return last + page
+    default: return Number.POSITIVE_INFINITY
+  }
+}
+
+// ScrollHandle only offers scroll_to_item, which moves the least distance that shows the whole card, so the next offset follows that rule.
+const offsetShowing = (item: number, view: LaneView): number => {
   const top = cardTop(item)
   const bottom = top + cardBox.heightPx
-  const shown = top < view.offsetPx ? top : bottom > view.offsetPx + view.heightPx ? bottom - view.heightPx : view.offsetPx
-  return { item, offsetPx: clamp(shown, 0, maxOffset(view, count)) }
+  if (top < view.offsetPx) return top
+  return bottom > view.offsetPx + view.heightPx ? bottom - view.heightPx : view.offsetPx
+}
+
+export const laneJump = (key: string, view: LaneView, count: number): { readonly item: number; readonly offsetPx: number } | null => {
+  if (count === 0 || !laneKeys.has(key)) return null
+  const item = clamp(laneTarget(key, view), 0, count - 1)
+  return { item, offsetPx: clamp(offsetShowing(item, view), 0, maxOffset(view, count)) }
 }
