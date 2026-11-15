@@ -77,6 +77,10 @@ export default class OrcChanges extends View {
         this.diff = { of, reading: { kind: "ok", value: rows }, width: (longest + 2) * glyphWidth }
       }
       task.notify()
+      const heldNow = heldChanges()
+      const changesNow = heldNow.kind === "ok" ? heldNow.value : null
+      const fileNow = changesNow === null ? null : this.openFile(changesNow)
+      if (fileNow !== null && changesNow !== null && diffKey(changesNow, fileNow) !== of) this.follow(task)
     }))
   }
 

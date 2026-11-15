@@ -177,9 +177,8 @@ export default class OrcAgents extends View {
   }
 
   readSelectedChanges(): Promise<void> {
-    const card = this.selectedCard()
-    const key = card?.key ?? null
-    const checkout = card?.checkout ?? null
+    const key = this.selectedCard()?.key ?? null
+    const checkout = this.selectedCard()?.checkout ?? null
     const reading: Promise<Reading<RunChanges | null>> = checkout === null ? Promise.resolve({ kind: "ok", value: null }) : readChanges(checkout)
     return reading.then((changes) => {
       if ((this.selectedCard()?.key ?? null) !== key) return
@@ -302,10 +301,10 @@ export default class OrcAgents extends View {
     return step.name === "implement" && this.pane === "turns"
   }
 
-  select(cx: Context, key: string): void {
+  moveSelection(cx: Context, change: () => void): void {
     const before = this.selectedCard()?.key ?? null
-    this.selectedKey = key
     this.chosen = null
+    change()
     if ((this.selectedCard()?.key ?? null) !== before) {
       this.changesProblem = null
       this.shareChanges(null)
@@ -314,10 +313,12 @@ export default class OrcAgents extends View {
     cx.notify()
   }
 
+  select(cx: Context, key: string): void {
+    this.moveSelection(cx, () => { this.selectedKey = key })
+  }
+
   choose(cx: Context, chosen: Chosen): void {
-    this.chosen = chosen
-    this.refresh(cx)
-    cx.notify()
+    this.moveSelection(cx, () => { this.chosen = chosen })
   }
 
   setPane(cx: Context, pane: Pane): void {
@@ -341,15 +342,7 @@ export default class OrcAgents extends View {
   }
 
   setFilter(cx: Context, filter: Filter): void {
-    const before = this.selectedCard()?.key ?? null
-    this.filter = filter
-    this.chosen = null
-    if ((this.selectedCard()?.key ?? null) !== before) {
-      this.changesProblem = null
-      this.shareChanges(null)
-    }
-    this.refresh(cx)
-    cx.notify()
+    this.moveSelection(cx, () => { this.filter = filter })
   }
 
   render(): Element {
