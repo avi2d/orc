@@ -24,7 +24,7 @@ To install the layout:
 
 `orc app install` copies the mods `orc-tabs`, `orc-board`, `orc-resources`, `orc-agents` and `orc-drawer` into `~/.config/herdr-app/mods/`.
 It copies `orc.json` and its preview `orc.svg` into `~/.config/herdr-app/layouts/`.
-It adds `cmd-1`, `cmd-2`, `cmd-3`, `cmd-k` and `cmd-shift-k` to the `layout:orc` section of `~/.config/herdr-app/keys.json`.
+It adds `cmd-1`, `cmd-2`, `cmd-3` and `cmd-k` to the `layout:orc` section of `~/.config/herdr-app/keys.json`.
 A key you already set in that section stays, and the command prints it as skipped.
 The command writes only names that start with `orc`, so Herdr's own mods and layouts stay as they are.
 
@@ -147,11 +147,10 @@ Use your `layout.switch` key to go back to your own layout.
 ## Chat with orc
 
 Press `cmd-k` to open the chat drawer in the Raw view, and press `cmd-k` again to close it.
-Press `cmd-shift-k` to switch between the Raw and Turns views.
-The drawer floats over the top of the tab, and you can drag it to another edge of the window.
+The drawer opens centered and keeps its spot.
 Raw is the terminal that runs `orc chat`, where you type to orc.
 In the Raw view Esc goes to Pi as an interrupt, so it never closes the drawer.
-The Turns view has a bar: select Raw to go back to the terminal, or select ✕ to close the drawer.
+Both views show the same bar: select Raw to go back to the terminal, select Turns to read, or select ✕ to close the drawer.
 Press Esc in the Turns view to close the drawer.
 Turns shows the same conversation read only, with one card for each reply of the model.
 A card gives the input, output, cache read and cache write tokens of that reply, and its time.

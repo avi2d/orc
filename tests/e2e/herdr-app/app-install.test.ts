@@ -21,8 +21,7 @@ test("does not refuse a fresh checkout that has the sources but no build", async
       { section: "layout:orc", key: "cmd-1" },
       { section: "layout:orc", key: "cmd-2" },
       { section: "layout:orc", key: "cmd-3" },
-      { section: "layout:orc", key: "cmd-k" },
-      { section: "layout:orc", key: "cmd-shift-k" }
+      { section: "layout:orc", key: "cmd-k" }
     ])
     expect((await readdir(join(home, "mods"))).sort()).toEqual(["orc-agents", "orc-board", "orc-drawer", "orc-resources", "orc-tabs"])
     expect((await readdir(join(home, "layouts"))).sort()).toEqual(["orc.json", "orc.svg"])
@@ -32,8 +31,7 @@ test("does not refuse a fresh checkout that has the sources but no build", async
         "cmd-1": { command: "layout.select", args: { stack: "orc-views", child: "orc-board" } },
         "cmd-2": { command: "layout.select", args: { stack: "orc-views", child: "orc-resources" } },
         "cmd-3": { command: "layout.select", args: { stack: "orc-views", child: "orc-agents" } },
-        "cmd-k": "orc-drawer.toggle",
-        "cmd-shift-k": "orc-drawer.switch"
+        "cmd-k": "orc-drawer.toggle"
       }
     })
   } finally {

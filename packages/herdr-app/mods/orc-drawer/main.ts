@@ -196,26 +196,36 @@ export default class OrcDrawer extends View {
   }
 
   obey(cx: AsyncContext, command: string): Promise<void> {
-    if (command === "toggle") return this.overlay === null ? this.open(cx, "raw") : Promise.resolve(this.close())
-    if (command === "switch") return this.open(cx, this.overlay?.view === "raw" ? "turns" : "raw")
+    if (command.startsWith("gone:")) {
+      if (this.overlay?.id === command.slice(5)) this.overlay = null
+      return Promise.resolve()
+    }
+    if (command === "toggle") return this.overlay === null ? this.open(cx, "raw") : Promise.resolve(this.hideDrawer())
     if (command === "show:raw") return this.open(cx, "raw")
     if (command === "show:turns") return this.open(cx, "turns")
-    if (command === "close") this.close()
+    if (command === "close") this.hideDrawer()
     return Promise.resolve()
   }
 
   open(cx: AsyncContext, view: Pane): Promise<void> {
     return this.ensureChat(cx).then((chat) => {
       if (chat === null) return
-      this.close()
+      this.hideDrawer()
       const id = openOverlay({ kind: "window", key: overlayKey, width: drawerWidth, height: drawerHeight, layout: drawerLayout(view, chat) })
       this.overlay = { id, view }
+      if (view === "raw") run("pane.focus", { terminal: chat.address })
     })
   }
 
-  close(): void {
+  hideDrawer(): void {
     if (this.overlay !== null) closeOverlay(this.overlay.id)
     this.overlay = null
+  }
+
+  override close(_cx: AsyncContext): void {
+    if (this.role.role !== "bar") return
+    const overlay = (props() as { readonly overlay?: unknown }).overlay
+    if (typeof overlay === "string") run([modName, ["gone", overlay].join(":")].join("."))
   }
 
   ensureChat(cx: AsyncContext): Promise<DrawerChat | null> {
@@ -313,7 +323,6 @@ export default class OrcDrawer extends View {
       .child(div().font_semibold().child("orc chat"))
       .child(h_flex().gap(2).child(choice("raw", "Raw")).child(choice("turns", "Turns")))
       .child(div().flex_1())
-      .child(div().text_size(12).text_color(t.dim).child("⌘⇧K switches"))
       .child(stopPress(div().id("close").px(6).rounded(4).cursor_pointer().text_color(t.muted)
         .hover((style) => style.bg(t.hover).text_color(t.foreground))
         .on_click(() => run([modName, "close"].join(".")))
