@@ -7,7 +7,7 @@ import { readPlanDocument, splitReasonPrefix } from "../../entities/backlog/inde
 import { idleSpan, type PiEnd } from "../../entities/agent/index"
 import { OrcRunError } from "../../shared/lib/index"
 import { askOnLoop, loopAnswerOf, loopContinuePrompt, loopGuidance, loopingNote, RunStopped } from "./loop-pause"
-import { askedNote, workerAnswersOf, workerContinuePrompt, workerGuidance } from "./worker-question"
+import { askedNote, sentBackContinuePrompt, sentBackGuidance, sentBackWordsOf, workerAnswersOf, workerContinuePrompt, workerGuidance } from "./worker-question"
 import { finishAfterChecks } from "./run-finish"
 import { readFailure } from "../../shared/config/index"
 import { countSessionSize, handoverImplementPrompt } from "../../entities/agent/index"
@@ -129,6 +129,10 @@ const resumedOutcome = (run: HistoryRun, sessionId: string | null, sessionFile: 
 const implementPrompt = (run: HistoryRun, plan: Pick<ResumePlan, "handover" | "implementSessionFile" | "answers">): string => {
   const loop = loopAnswerOf(plan.answers)
   const worker = workerAnswersOf(plan.answers)
+  const sentBack = sentBackWordsOf(plan.answers)
+  if (sentBack.length > 0 && plan.implementSessionFile !== null) {
+    return sentBackContinuePrompt(sentBack)
+  }
   if (loop?.kind === "continue" && plan.implementSessionFile !== null) {
     return loopContinuePrompt(loop.words)
   }
@@ -137,7 +141,7 @@ const implementPrompt = (run: HistoryRun, plan: Pick<ResumePlan, "handover" | "i
   }
   const taskFile = run.path.join(run.piSessionDir, "task.md")
   const base = plan.handover === null ? buildImplementPrompt(run.agent, taskFile) : handoverImplementPrompt(run.agent, taskFile, plan.handover)
-  const guidance = [...(loop?.kind === "continue" ? [loopGuidance(loop.words)] : []), ...(worker.length > 0 ? [workerGuidance(worker)] : [])]
+  const guidance = [...(sentBack.length === 0 ? [] : [sentBackGuidance(sentBack)]), ...(loop?.kind === "continue" ? [loopGuidance(loop.words)] : []), ...(worker.length > 0 ? [workerGuidance(worker)] : [])]
   return [base, ...guidance].join("\n")
 }
 

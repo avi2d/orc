@@ -1,6 +1,6 @@
 import { Effect, type FileSystem } from "effect"
-import { reviewQuestionId, taskItems, type OpenItem } from "../../entities/attention/index"
-import { findTask, readNotes, type BacklogError, type Hold, type HoldQuestion, type ParkedQuestion, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
+import { decisionText, reviewQuestionId, taskItems, type OpenItem } from "../../entities/attention/index"
+import { findTask, isDeciderAnswer, readNotes, type BacklogError, type Hold, type HoldQuestion, type ParkedQuestion, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
 import { formatTable } from "../../shared/lib/index"
 
 const THREAD_JSON_SCHEMA = "orc.thread.v1" as const
@@ -67,7 +67,10 @@ const holdExchange = (hold: Pick<Hold, "reason" | "until" | "questions" | "answe
 const holdExchanges = (hold: Hold | null): ReadonlyArray<Exchange> =>
   hold === null ? [] : [...(hold.history ?? []).map((past, index) => holdExchange({ ...past, at: past.at ?? null }, index + 1)), holdExchange(hold, (hold.history ?? []).length + 1)]
 
-const answeredByDecider = (item: OpenItem | undefined, answerAt: string): boolean => item?.item.decision?.kind === "answered" && item.item.decision.at === answerAt
+const answeredByDecider = (item: OpenItem | undefined, answerAt: string): boolean => {
+  const decision = item?.item.decision
+  return (decision?.kind === "answered" || decision?.kind === "duplicate") && decision.at === answerAt
+}
 
 const parkedExchange = (task: string, question: ParkedQuestion, items: ReadonlyMap<string, OpenItem>): Exchange => {
   const id = reviewQuestionId(task, question.id, question.asked)
@@ -76,10 +79,12 @@ const parkedExchange = (task: string, question: ParkedQuestion, items: ReadonlyM
   if (answer === null) {
     return [asked]
   }
-  const who = answeredByDecider(items.get(id), answer.at) ? "decider" : "user"
+  const who = isDeciderAnswer(answer) || answeredByDecider(items.get(id), answer.at) ? "decider" : "user"
+  const replaced = isDeciderAnswer(answer) ? undefined : answer.overturned
   return [
     asked,
-    entry(answer.at, who, "answer", id, answer.words),
+    ...(replaced === undefined ? [] : [entry(replaced.at, "decider", "answer", id, replaced.words)]),
+    entry(answer.at, who, "answer", id, replaced === undefined ? answer.words : answer.words + " (replaces the decider's answer " + JSON.stringify(replaced.words) + ")"),
     ...(answer.relayedTo === null ? [] : [entry(null, "beat", "delivered", id, answer.relayedTo === "" ? "handed to the run that asked" : "handed to the run that asked at " + answer.relayedTo)])
   ]
 }
@@ -91,7 +96,7 @@ const itemExchanges = (mirrored: ReadonlySet<string>) => (item: OpenItem): Reado
   const { id, item: { decision, state } } = item
   const told = mirrored.has(id)
   const asked = told ? [] : [[entry(item.item.asked, askerOf(item), "question", id, item.item.text)]]
-  const decided = decision === undefined ? [] : [[entry(decision.at, "decider", "decision", id, decision.kind + ": " + decision.reason)]]
+  const decided = decision === undefined ? [] : [[entry(decision.at, "decider", "decision", id, decision.kind + ": " + decisionText(decision))]]
   const beatClosure = item.item.kind === "pr-ready" && state.kind === "closed" && (state.answer.words === "merged" || state.answer.words === "closed without merging")
   const settled = state.kind === "withdrawn"
     ? [[entry(state.at, "beat", "withdrawn", id, state.reason)]]

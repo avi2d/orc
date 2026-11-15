@@ -42,7 +42,7 @@ describe("a relayed answer", () => {
   }
   const relayedIds = async (root: string, asking: { readonly asked: string; readonly questions: readonly [typeof r2, ...Array<typeof r2>] }): Promise<ReadonlyArray<string>> => {
     const answered = answersFor(await current(root), asking)
-    await run(markAnswersRelayed(root, "orc-1", asking.asked, answered.map((question) => ({ id: question.id, asked: question.asked }))))
+    await run(markAnswersRelayed(root, "orc-1", asking.asked, answered.map((question) => ({ id: question.id, asked: question.asked, words: question.answer.words }))))
     return answered.map((question) => question.id + "=" + question.answer.words)
   }
   test("a second answer to a wait of two questions relays both instead of reopening the first", async () => {

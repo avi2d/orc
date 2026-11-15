@@ -312,8 +312,8 @@ const decideAndRelay = (
 ): Effect.Effect<{ readonly latest: ReadonlyArray<TaskRecord>; readonly relayed: ReturnType<typeof settledProgress> }, BacklogError | TaskFileError, BeatRequirements> =>
   Effect.gen(function*() {
     const decided = yield* decideReviewQuestions(root, current, askDecider)
-    const latest = decided.some((entry) => entry.verdict.kind === "answered") ? yield* listTasks(root) : current
-    const answeredTasks = new Set(decided.flatMap((entry) => entry.verdict.kind === "answered" ? [entry.task] : []))
+    const latest = decided.some((entry) => entry.verdict.kind !== "escalated") ? yield* listTasks(root) : current
+    const answeredTasks = new Set(decided.flatMap((entry) => entry.verdict.kind !== "escalated" ? [entry.task] : []))
     const firstRunning = new Set(started.flatMap((task, index) => progress[index]?.kind === "running" ? [task.spec.id] : []))
     const relayProgress = answeredTasks.size === 0
       ? []

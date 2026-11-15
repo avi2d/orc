@@ -56,6 +56,7 @@ type TaskJson = {
   readonly dependsOn: ReadonlyArray<string>
   readonly priority: TaskPriority | null
   readonly created: string
+  readonly body: string
   readonly prState: PrState | null
   readonly hold: Hold | null
   readonly parked: ParkedJson | null
@@ -145,6 +146,7 @@ const taskJson = (record: TaskRecord, view: BacklogView): TaskJson => {
     dependsOn: record.spec.dependsOn,
     priority: record.spec.priority,
     created: record.spec.created,
+    body: record.spec.body,
     prState: view.prStates.get(record.spec.id) ?? null,
     hold: record.hold,
     parked: record.parked === null ? null : parkedJson(record.parked),

@@ -10,6 +10,9 @@ When the run starts, it fast-forwards the checkout's default branch from its rem
 The refresh needs Git 2.48 or later.
 The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
 The runner creates the `orc` group when the machine lacks it.
+Each time it queues a task, the runner runs `pueue parallel <slots> --group orc` with the machine's slots from `dispatch.json`.
+It reads the machine named in `ORC_TASK_MACHINE`, so a change to the slots takes effect at the next task queued there.
+A machine with 0 slots gets a limit of 1, because pueue reads 0 as no limit.
 The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
 When the task names instructions, the queued `orc run` gets `--instructions` pointing at a copy in `~/.orc/runner/<task-id>.instructions/<file name>` on that machine.
 A task queued for another home keeps a scoped file instead, so two homes holding the same task id never share one file.
@@ -21,6 +24,7 @@ When pueue refuses the stream, the start prints why on standard error and still 
 
 To start on another machine, put the command that runs orc there after `--`, as in `orc runner start -- ssh linux-box orc`.
 That runs `orc runner queue` on the far side and sends it the task as JSON on stdin, so the task text never passes through a remote shell.
+The JSON carries the machine's slots, and the far side sets its `orc` group's parallel limit from them.
 SSH can drop once pueue holds the run, since pueue on that machine owns it.
 Pueue runs the task with the environment of the command that queued it.
 So the command after `--` must give orc the `PATH` its runs need on that machine.

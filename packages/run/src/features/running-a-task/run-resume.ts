@@ -9,6 +9,7 @@ import type { HistoryRun } from "./run-record"
 import type { ResumePlan } from "./run-ops"
 import { handoverFileName, inheritedHandoverFileName } from "../../entities/agent/index"
 import { OrcRunError } from "../../shared/lib/index"
+import { sentBackWordsOf } from "./worker-question"
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
 
@@ -256,16 +257,17 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
     }
     const fresh = !progress.implementPassed && (own !== null || (forwarded !== null && progress.implementSessionId === null))
     const carriedImplement = fresh ? null : yield* carrySession(run, progress.implementSource, progress.implementSessionId)
-    const carriedFix = yield* carrySession(run, progress.fixSource, progress.fixSessionId)
-    const skipImplement = progress.implementPassed
-    const skipChecks = progress.implementPassed && progress.checksPassed
-    const inherited = progress.implementPassed
+    const sentBack = sentBackWordsOf(answers).length > 0
+    const carriedFix = sentBack ? null : yield* carrySession(run, progress.fixSource, progress.fixSessionId)
+    const skipImplement = progress.implementPassed && !sentBack
+    const skipChecks = skipImplement && progress.checksPassed
+    const inherited = skipImplement
       ? yield* inheritedCompletion(db, run, progress.priorId, progress.storedFixes)
       : { inheritedRounds: [], inheritedFixes: [] }
     return {
       implementSessionId: carriedImplement?.id ?? null,
       implementSessionFile: carriedImplement?.file ?? null,
-      inheritedImplement: progress.implementPassed ? progress.implementAgent : null,
+      inheritedImplement: skipImplement ? progress.implementAgent : null,
       skipImplement,
       skipChecks,
       allow,
@@ -274,7 +276,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       inheritedFixes: inherited.inheritedFixes,
       fixSessionId: carriedFix?.id ?? null,
       fixSessionFile: carriedFix?.file ?? null,
-      fixRunning: progress.fixRunning,
+      fixRunning: !sentBack && progress.fixRunning,
       handover,
       priorDir
     }

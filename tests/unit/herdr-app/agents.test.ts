@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test"
-import { buildCards, filterCards, railLabel, stepRows } from "../../../packages/herdr-app/src/agents"
+import { buildCards, cardPlace, filterCards, namedModels, railLabel, runAgent, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
 import type { Backlog, Run, Runs, Task } from "../../../packages/herdr-app/src/guard"
 
 const run = (id: string, fields: Partial<Run>): Run => ({
-  id, project: "/work/orc", branch: `orc/x-${id}`, status: "running", prLink: null, title: `run ${id}`, step: null, questions: 0, endReason: null, kind: null, delivery: null, ...fields
+  id, project: "/work/orc", branch: `orc/x-${id}`, status: "running", prLink: null, title: `run ${id}`, step: null, questions: 0, endReason: null, kind: null, delivery: null, worktree: null, ...fields
 })
 
 const task = (id: string, fields: Partial<Task>): Task => ({
-  id, title: `task ${id}`, project: "orc", kind: "ship", status: "new", hold: null, parked: null, reason: null, ...fields
+  id, title: `task ${id}`, project: "orc", kind: "ship", status: "new", hold: null, parked: null, parkedOrigin: null, reason: null, ...fields
 })
 
 const runs = (list: ReadonlyArray<Run>): Runs => ({ schema: "orc.runs.v1", runs: list })
@@ -23,6 +23,49 @@ const board = buildCards(
   ]),
   backlog([task("orc-48", { status: "closed" }), task("orc-50", {})])
 )
+
+describe("sending a PR back", () => {
+  const prRun = run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" })
+
+  test("a closed task's open PR offers send-back with the captain's words, not an empty review", () => {
+    const [card] = buildCards(runs([prRun]), backlog([task("orc-48", { status: "closed" })]))
+    expect(card.sendBack).toBe("orc-48")
+    expect(sendBackArgs({ sendBack: "orc-48" }, "  rename the flag ")).toEqual(["backlog", "send-back", "orc-48", "rename the flag"])
+    expect(sendBackArgs({ sendBack: "orc-48" }, "   ")).toBeNull()
+  })
+
+  test("a merged PR offers no send-back instead of restarting a finished task", () => {
+    const [card] = buildCards(runs([prRun]), backlog([task("orc-48", { status: "closed" })], ["orc-48"]))
+    expect(card.sendBack).toBeNull()
+  })
+
+  test("a task still running toward its close offers no send-back that orc would refuse", () => {
+    const [card] = buildCards(runs([prRun]), backlog([task("orc-48", { status: "started" })]))
+    expect(card.sendBack).toBeNull()
+  })
+
+  test("a sent-back PR's old run reads Sent back, not still awaiting approval", () => {
+    const cards = buildCards(runs([prRun]), backlog([task("orc-48", { status: "new", parked: 0, parkedOrigin: prRun.id })]))
+    expect(cards.map((card) => [card.id, card.standing.status, card.where, card.sendBack])).toEqual([
+      ["orc-48", "Queued", "Waiting to start", null],
+      ["orc-48", "Done", "Sent back PR #48", null]
+    ])
+  })
+
+  test("a resumed run with answered questions awaits approval, not a mistaken sent-back", () => {
+    const cards = buildCards(runs([prRun]), backlog([task("orc-48", { status: "started", parked: 0 })]))
+    expect(cards.map((card) => [card.id, card.standing.status, card.where, card.sendBack])).toEqual([
+      ["orc-48", "Awaiting you", "Approve PR #48", null]
+    ])
+  })
+
+  test("a sent-back run that succeeded before its close awaits approval, not a second sent-back", () => {
+    const cards = buildCards(runs([prRun]), backlog([task("orc-48", { status: "started", parked: 0, parkedOrigin: "20261113-070000-cccccc" })]))
+    expect(cards.map((card) => [card.id, card.standing.status, card.where, card.sendBack])).toEqual([
+      ["orc-48", "Awaiting you", "Approve PR #48", null]
+    ])
+  })
+})
 
 describe("the runs list", () => {
   test("two runs of one task do not share a rail label", () => {
@@ -156,5 +199,51 @@ describe("the selected run's steps", () => {
       { id: 6, name: "checks", attempt: 1, status: "failed" }
     ], "ship", null)
     expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["\u2713 Agent", "\u2717 Checks 1", "\u2717 Checks 2", "\u2713 Fix 1", "\u2713 Fix 2", "\u2717 Checks 1", "\u25cb Fix 3", "\u25cb Checks 2", "\u25cb No mistakes"])
+  })
+})
+
+describe("the model and effort of a run", () => {
+  const steps = [
+    { id: 1, name: "implement", model: "claude-opus-5-5", thinking: "high" },
+    { id: 2, name: "checks", model: null, thinking: null },
+    { id: 3, name: "fix", model: "claude-sonnet-5-5", thinking: "medium" },
+    { id: 4, name: "fix", model: "claude-opus-5-5", thinking: "high" }
+  ]
+
+  test("a card names the Agent step's model and effort before where the run is, not the last step's", () => {
+    expect(cardPlace({ where: "Fix 2" }, runAgent(steps))).toBe("claude-opus-5-5 high · Fix 2")
+  })
+
+  test("a card whose run recorded no model says only where the run is, not an empty separator", () => {
+    expect(cardPlace({ where: "orc exited 1" }, runAgent([{ name: "implement", model: null, thinking: null }]))).toBe("orc exited 1")
+    expect(cardPlace({ where: "Waiting to start" }, null)).toBe("Waiting to start")
+  })
+
+  test("only the step whose model differs from the run's names it, not every agent step", () => {
+    expect([...namedModels(steps)]).toEqual([[3, "claude-sonnet-5-5"]])
+  })
+})
+
+describe("the Approve step and the Changes column of a run", () => {
+  test("a Code run awaiting approval ends in Approve, not in its delivery step", () => {
+    const cards = buildCards(
+      runs([run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" })]),
+      backlog([task("orc-48", { status: "closed" })])
+    )
+    const standing = cards[0]?.standing ?? { status: "Queued" as const }
+    const rows = stepRows(standing, [
+      { id: 1, name: "implement", attempt: 1, status: "passed" },
+      { id: 2, name: "checks", attempt: 1, status: "passed" },
+      { id: 3, name: "no-mistakes", attempt: 1, status: "passed" }
+    ], "ship", null)
+    expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["✓ Agent", "✓ Checks 1", "✓ No mistakes", "◆ Approve PR #48"])
+  })
+
+  test("a run that recorded no worktree has no checkout to diff, not its project folder", () => {
+    const cards = buildCards(runs([
+      run("20261113-090000-aaaaaa", { branch: "orc/orc-7", worktree: "/home/sam/.orc/worktrees/orc-1/orc/orc-7" }),
+      run("20261113-080000-bbbbbb", { branch: "orc/orc-8" })
+    ]), backlog([]))
+    expect(cards.map((card) => card.checkout)).toEqual([{ worktree: "/home/sam/.orc/worktrees/orc-1/orc/orc-7", branch: "orc/orc-7" }, null])
   })
 })

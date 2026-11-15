@@ -12,6 +12,8 @@ Every other `orc backlog` command except `add` refuses with the same words.
 A task file sits in `new`, `taken` or `closed`, and the folder it sits in is its state.
 Two files beside the folders tell the beat where tasks may go.
 `dispatch.json` names each machine, its slots, its start command and its renew command, and the quota.
+A machine's slots cap the tasks the beat starts there.
+They also set the parallel limit of the pueue group `orc` on that machine each time `orc runner start` queues a task there.
 The quota names the provider its accounts belong to, the command that reads their room, and each account's credential kind.
 An account of kind `token-file` names a `tokenFile` and needs only a start command on each machine.
 An account of kind `token-command` names a `tokenCommand`, for a token that lives on the dispatching machine and rolls over, and every machine names a `renew` command beside its start command.
@@ -210,6 +212,14 @@ It refuses a child, which leaves through `orc backlog plan <parent> --drop <chil
 It refuses a task another open task waits on, until `orc backlog depend` changes that wait.
 The drop takes the task file by rename, so a drop and a beat taking the task at the same moment never both win.
 To record the machine and run of a task parked before orc recorded them, run `orc backlog origin <task-id> <machine> <run-id>`, as [Parked runs](parked-runs.md) shows.
+To send a closed task's open PR back for another pass, run `orc backlog send-back <task-id> <words>`, as in `orc backlog send-back orc-9 rename the flag`.
+It moves the task to `new`, parked on its branch `orc/<task-id>` with your words as the answer to the question `send-back`, and records the machine and run that closed it as the origin.
+The next beat resumes that run on the same machine and branch.
+The implementer resumes the session it worked in with your words as the review, the checks run again, and the push updates the same PR.
+Orc refuses a task that is neither closed nor sent back, a task that names no PR, and a PR that is merged or closed.
+It also refuses when the runner holds no run of the task, since no session is left to resume.
+To add more words before the next beat starts it, run `orc backlog send-back` again on the new task, and the run gets every set of words in order.
+The Agents tab offers the same as **Send back** beside a PR that awaits your approval.
 Add `--kind scout` or `--kind task` for a task that ends in a report instead of a PR, as [Task kinds](task-kinds.md) shows.
 To split a large task, add it with `--kind parent`, then add each part with `--parent <task-id>`, as [Parent tasks](task-kinds.md#parent-tasks) shows, or name a planner model so orc splits an over-budget request itself, as [Splitting at intake](task-kinds.md#splitting-at-intake) shows.
 Add `--internal` to mark a ship task internal-only, which only a `no-mistakes-prod-only` project reads.
@@ -290,8 +300,9 @@ For a hold question it names the hold question id qualified by its hold generati
 It is `null` for a hold, a note and the answer to a hold with no questions.
 
 - A hold and its questions name `user`, and a parked question names `worker`, the run that asked it.
-- A `decision` entry is the decider's `answered` or `escalated` with its reason.
+- A `decision` entry is the decider's `answered`, `duplicate`, `asked-back` or `escalated` with its text, as [The decider](attention-queue.md#the-decider) shows.
 - An answer the decider gave names `decider`, a closure the beat wrote on a `pr-ready` item names `beat`, and any other answer names `user`.
+- An answer that replaces the decider's names `user` and notes the words it replaces, after the decider's own answer entry.
 - A `delivered` entry names `beat` and comes from the answer's `relayed_to`, so it shows only for the current asking.
 - A `withdrawn` entry names `beat` and gives the item's reason.
 - A run event item, such as `run-died`, is a `question` from `beat`.

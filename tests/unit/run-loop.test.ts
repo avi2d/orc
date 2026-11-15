@@ -317,6 +317,54 @@ describe("resumed runs publish inherited progress atomically", () => {
   })
 })
 
+describe("a run sent back with the captain's review", () => {
+  test("resumes the passed implement session with the review and reruns checks, instead of inheriting the finished work", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "project")
+        await mkdir(project, { recursive: true })
+        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  test: bun test\n")
+        const git = await stubGit(home)
+        const priorDir = join(home, "runs", "prior-a")
+        await seedRefusedPrior(db, priorDir, project)
+        const bin = await stubNoMistakesBin(home)
+        const base = await Effect.runPromise(historyFor("next-b", home, project, "2026-10-19T10:00:00.000Z", git, bin + ":" + (process.env.PATH ?? "")))
+        const run: HistoryRun = { ...base, answers: [{ question: "send-back", answer: "rename the flag" }, { question: "send-back-2", answer: "and its help" }] }
+        await mkdir(run.runDir, { recursive: true })
+        await writeFile(run.taskPath, "Do the thing.\n")
+        const plan = await Effect.runPromise(buildResumePlan(db, run))
+        expect(plan).toMatchObject({ skipImplement: false, skipChecks: false, inheritedRounds: [], inheritedFixes: [], fixSessionFile: null })
+        expect(plan.implementSessionFile).not.toBeNull()
+        await Effect.runPromise(recordResumePublish(db, run, plan))
+        const runs: Array<AgentRun> = []
+        let checks = 0
+        const ops = fakeOps({
+          runAgent: async (agentRun) => {
+            runs.push(agentRun)
+            await mkdir(run.hostSessionsDir, { recursive: true })
+            await writeFile(join(run.hostSessionsDir, "2026-10-19T10-01-00-000Z_sent.jsonl"), JSON.stringify({ type: "message", message: { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "renamed\nORC_COMPLETE" }] } }) + "\n")
+            return { sessionId: "sent", commits: [{ sha: "c3" }] }
+          },
+          execCheck: async () => {
+            checks += 1
+            return { stdout: "", stderr: "", exitCode: 0 }
+          }
+        }, run.hostSessionsDir)
+        const report = await Effect.runPromise(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
+        expect(report.implementPassed).toBe(true)
+        expect(report.checksRounds?.length).toBe(1)
+        expect(runs.length).toBe(1)
+        expect(runs[0]?.resumeSession).toBe(plan.implementSessionFile ?? "")
+        expect(runs[0]?.prompt).toContain("sent it back: rename the flag\nThe captain also wrote: and its help\n")
+        expect(checks).toBeGreaterThan(0)
+      } finally {
+        db.close()
+      }
+    })
+  }, 20_000)
+})
+
 const freshPlan = { implementSessionId: null, implementSessionFile: null, inheritedImplement: null, skipImplement: false, skipChecks: false, allow: [], answers: [], inheritedRounds: [], inheritedFixes: [], fixSessionId: null, fixSessionFile: null, fixRunning: false, handover: null, priorDir: null }
 
 const looping = { kind: "looping", label: "bun run test" } as const

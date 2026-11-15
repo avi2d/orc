@@ -1,4 +1,5 @@
 import { isTaskId } from "../entities/backlog/index"
+import type { SendBack } from "../features/queueing-a-task/index"
 import type { DispatchArgs } from "./dispatch-args-runner"
 
 type AnswerOptions = { readonly expect: "held" | "parked" | undefined; readonly generation: string | undefined; readonly cursor: ReadonlyArray<string> }
@@ -69,6 +70,15 @@ export const parseNote = (rest: ReadonlyArray<string>): DispatchArgs => {
   }
   const said = words.join(" ")
   return said.trim() === "" ? { kind: "UsageError", detail: "orc backlog note takes a task id and the note's words" } : { kind: "NoteTask", id, words: said }
+}
+
+export const parseSendBack = (rest: ReadonlyArray<string>): DispatchArgs | SendBack => {
+  const [id = "", ...words] = rest
+  if (!isTaskId(id)) {
+    return { kind: "UsageError", detail: "orc backlog send-back takes a task id, got \"" + id + "\"" }
+  }
+  const said = words.join(" ")
+  return said.trim() === "" ? { kind: "UsageError", detail: "orc backlog send-back takes a task id and the review's words" } : { kind: "SendBack", id, words: said }
 }
 
 const isItemId = (text: string): boolean => /^[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(text)

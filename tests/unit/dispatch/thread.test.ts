@@ -58,7 +58,7 @@ describe("orc backlog thread", () => {
       id: reviewQuestionId("orc-1", "r2", asked),
       item: {
         kind: "review-question" as const, task: "orc-1", text: "How many retries?", asked, owner: "decider" as const,
-        decision: { kind: "answered" as const, reason: "the intent says twice", at: decided },
+        decision: { kind: "answered" as const, reason: "the intent says twice", rule: { quote: "Retry a failed upload twice, then give up.", source: "task orc-1" }, at: decided },
         state: { kind: "closed" as const, answer: { words: "Two retries", at: decided } }
       }
     }
@@ -68,7 +68,7 @@ describe("orc backlog thread", () => {
       { at: "2026-11-02T09:10:00.000Z", who: "user", kind: "answer", id: null, text: "Merged" },
       { at: asked, who: "worker", kind: "question", id: item.id, text: "How many retries?" },
       { at: "2026-11-02T10:25:00.000Z", who: "user", kind: "note", id: null, text: "the upload server is slow today" },
-      { at: decided, who: "decider", kind: "decision", id: item.id, text: "answered: the intent says twice" },
+      { at: decided, who: "decider", kind: "decision", id: item.id, text: "answered: the intent says twice, quoting task orc-1: \"Retry a failed upload twice, then give up.\"" },
       { at: decided, who: "decider", kind: "answer", id: item.id, text: "Two retries" }
     ])
   })
@@ -99,6 +99,30 @@ describe("orc backlog thread", () => {
       ["decision", "decider", replaced.id, "escalated: the intent names no count"],
       ["answer", "user", replaced.id, "Two"],
       ["question", "worker", current.id, "Keep the flag?"]
+    ])
+  })
+
+  test("an answer that overturned the decider's shows both, the captain's naming the one it replaced, instead of only the last", () => {
+    const asked = "2026-11-02T10:20:00.000Z"
+    const decided = "2026-11-02T10:30:00.000Z"
+    const overturnedAt = "2026-11-02T10:40:00.000Z"
+    const task: TaskRecord = {
+      spec,
+      hold: null,
+      parked: { branch: "orc/orc-1", questions: [{ id: "r2", text: "How many retries?", asked, blocks: true, answer: { words: "Three retries", at: overturnedAt, relayedTo: null, overturned: { words: "Two retries", at: decided, by: "decider", relayedTo: null } } }] },
+      state: started
+    }
+    const item = {
+      id: reviewQuestionId("orc-1", "r2", asked),
+      item: {
+        kind: "review-question" as const, task: "orc-1", text: "How many retries?", asked, owner: "decider" as const,
+        decision: { kind: "answered" as const, reason: "the intent says twice", at: decided },
+        state: { kind: "closed" as const, answer: { words: "Three retries", at: overturnedAt }, overturned: { words: "Two retries", at: decided } }
+      }
+    }
+    expect(threadEntries(task, [item], []).filter((line) => line.kind === "answer").map((line) => [line.who, line.at, line.text])).toEqual([
+      ["decider", decided, "Two retries"],
+      ["user", overturnedAt, "Three retries (replaces the decider's answer \"Two retries\")"]
     ])
   })
 
@@ -147,12 +171,13 @@ describe("orc backlog thread", () => {
       const asked = "2026-11-02T10:20:00.000Z"
       await run(askStartedTask(root, "orc-1", { asked, questions: [{ id: "r2", text: "How many retries?" }, { id: "r3", text: "Merge the PR once it is green?" }] }))
       await run(routeTaskItems(root, await run(listTasks(root)), asked))
-      const ask: AskDecider = (request) =>
-        request.prompt.includes("How many retries?")
-          ? Effect.succeed(JSON.stringify({ decision: "answer", answer: "Two retries", reason: "the intent says twice" }))
-          : request.prompt.includes("Merge the PR")
-          ? Effect.succeed(JSON.stringify({ decision: "escalate", reason: "only the captain merges" }))
-          : Effect.fail(new DeciderUnheard({ reason: "no reply in this test" }))
+      const ask: AskDecider = {
+        home: "/nonexistent/orc-home",
+        ask: (request) =>
+          request.prompt.includes("How many retries?")
+            ? Effect.succeed(JSON.stringify({ decision: "answer", answer: "Two retries", rule: "Retry a failed upload twice, then give up.", reason: "the intent says twice" }))
+            : Effect.fail(new DeciderUnheard({ reason: "no reply in this test" }))
+      }
       await run(decideReviewQuestions(root, await run(listTasks(root)), ask))
       await run(answerTask(root, "orc-1", "r3=Yes, merge it", "2099-01-01T00:00:00.000Z"))
       const thread: unknown = JSON.parse(await run(threadText(root, "orc-1", true)))
@@ -162,9 +187,9 @@ describe("orc backlog thread", () => {
         entries: [
           { kind: "question", who: "worker", id: reviewQuestionId("orc-1", "r2", asked) },
           { kind: "question", who: "worker", id: reviewQuestionId("orc-1", "r3", asked) },
-          { kind: "decision", who: "decider", id: reviewQuestionId("orc-1", "r2", asked), text: "answered: the intent says twice" },
+          { kind: "decision", who: "decider", id: reviewQuestionId("orc-1", "r2", asked), text: "answered: the intent says twice, quoting task orc-1: \"Retry a failed upload twice, then give up.\"" },
           { kind: "answer", who: "decider", id: reviewQuestionId("orc-1", "r2", asked), text: "Two retries" },
-          { kind: "decision", who: "decider", id: reviewQuestionId("orc-1", "r3", asked), text: "escalated: only the captain merges" },
+          { kind: "decision", who: "decider", id: reviewQuestionId("orc-1", "r3", asked), text: "escalated: orc never hands the decider a question about merging, and this one says \"Merge\"" },
           { kind: "answer", who: "user", id: reviewQuestionId("orc-1", "r3", asked), text: "Yes, merge it", at: "2099-01-01T00:00:00.000Z" }
         ]
       })

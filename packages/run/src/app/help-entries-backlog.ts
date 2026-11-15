@@ -89,6 +89,13 @@ export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
     ],
     examples: ["orc backlog answer orc-9 use the REST API", "orc backlog answer orc-9 question-1=REST"]
   },
+  "send-back": {
+    usage: ["orc backlog send-back <task-id> <words>"],
+    summary: "Send a closed task's open PR back for another pass",
+    about: "Moves a closed task whose PR is still open back to new, parked on its branch orc/<task-id> with your words as the review. The next beat resumes its run on that branch, where the implementer takes the review in the session it worked in, the checks run again, and the push updates the same PR. Run it again before the beat starts the task to add more words, and the run gets them all. Refused when the task is neither closed nor sent back, names no PR, or its PR is merged or closed.",
+    options: [],
+    examples: ["orc backlog send-back orc-9 rename the flag to --dry-run"]
+  },
   note: {
     usage: ["orc backlog note <task-id> <words>"],
     summary: "Leave a note on a task",
