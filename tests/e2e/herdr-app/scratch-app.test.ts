@@ -89,6 +89,22 @@ const isRunning = (pid: number): boolean => {
   }
 }
 
+const killPidFile = async (path: string): Promise<void> => {
+  let raw: string
+  try {
+    raw = (await readFile(path, "utf8")).trim()
+  } catch {
+    return
+  }
+  const pid = Number(raw)
+  if (!Number.isInteger(pid) || pid <= 0) return
+  try {
+    process.kill(pid, "SIGKILL")
+  } catch {
+    return
+  }
+}
+
 test("does not start the App when HERDR_CORE_DIRS holds no herdr-core", async () => {
   const staged = await stage(false)
   try {
@@ -142,16 +158,7 @@ test("finds herdr-core on PATH instead of failing when HERDR_CORE_DIRS is unset"
       } catch {
       }
       await child.exited
-      try {
-        const appPid = Number((await readFile(staged.appPidFile, "utf8")).trim())
-        if (Number.isFinite(appPid)) {
-          try {
-            process.kill(appPid, "SIGKILL")
-          } catch {
-          }
-        }
-      } catch {
-      }
+      await killPidFile(staged.appPidFile)
     }
   } finally {
     await rm(staged.root, { recursive: true, force: true })
