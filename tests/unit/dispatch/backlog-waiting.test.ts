@@ -123,9 +123,9 @@ describe("a task's PR state in backlog --json", () => {
       expect(await run(taskPrState(root, closedWithPr("orc-1", null)))).toBeNull()
     })
   })
-  test("a PR with no merge or close recorded reads open instead of null, so a board shows it awaiting the captain rather than Done", async () => {
+  test("a PR no beat has read yet reads null instead of open, so a board shows its closed task in Done rather than Awaiting you", async () => {
     await withBacklog(async (root) => {
-      expect(await run(taskPrState(root, closedWithPr("orc-1", pr)))).toBe("open")
+      expect(await run(taskPrState(root, closedWithPr("orc-1", pr)))).toBeNull()
     })
   })
   test("a PR with a merged event reads merged instead of open, so a board shows it Done rather than awaiting the captain", async () => {
