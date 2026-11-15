@@ -224,7 +224,9 @@ export default class OrcDrawer extends View {
 
   override close(_cx: AsyncContext): void {
     if (this.role.role !== "bar") return
-    const overlay = (props() as { readonly overlay?: unknown }).overlay
+    const record = fields(props(), "")
+    if (record.kind === "refused") return
+    const overlay = record.value["overlay"]
     if (typeof overlay === "string") run([modName, ["gone", overlay].join(":")].join("."))
   }
 
