@@ -6,6 +6,9 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { installApp, mergeKeys, readyBundledApp } from "../../../packages/run/src/features/installing-the-app/index"
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
 test("adds missing keys without replacing a person's binding", async () => {
   const ours = { "layout:orc": { "cmd-1": "orc-tabs.select:orc-board", "cmd-2": "orc-tabs.select:orc-resources" } }
   const result = await Effect.runPromise(mergeKeys({ "layout:orc": { "cmd-2": "tab.next" } }, ours).pipe(Effect.provide(BunServices.layer)))
@@ -25,8 +28,9 @@ test("keeps a ⌘K the person already bound instead of the chat drawer's", async
     await copyFile(join(import.meta.dir, "../../../packages/herdr-app/keys.json"), join(source, "keys.json"))
     await writeFile(join(home, "keys.json"), JSON.stringify({ "layout:orc": { "cmd-k": "app.palette" } }))
     const install = await Effect.runPromise(installApp(source, home).pipe(Effect.provide(BunServices.layer)))
-    const installed = JSON.parse(await readFile(join(home, "keys.json"), "utf8")) as Record<string, Record<string, unknown>>
-    expect(installed["layout:orc"]?.["cmd-k"]).toBe("app.palette")
+    const installed: unknown = JSON.parse(await readFile(join(home, "keys.json"), "utf8"))
+    const section: unknown = isRecord(installed) ? installed["layout:orc"] : undefined
+    expect(isRecord(section) ? section["cmd-k"] : undefined).toBe("app.palette")
     expect(install.skipped).toContainEqual({ section: "layout:orc", key: "cmd-k", kept: "app.palette" })
   } finally {
     await rm(root, { recursive: true, force: true })
