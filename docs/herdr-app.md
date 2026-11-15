@@ -186,7 +186,7 @@ A report run shows only its Agent step.
 A ship run shows Agent, Checks, Fix when checks fail, and No mistakes for the standard delivery or PR for a direct PR delivery.
 A step shows ✓ when it passed, ✗ when it failed, ● while it runs, ◆ while it waits for you, and ○ when it has not started.
 A step names its model only when that model differs from the Agent step's.
-A resumed run lists the steps it carries from the earlier run first, under one `From run <run-id>` row, in the order they ran there.
+A resumed run lists the steps it carries from each earlier run first, under a `From run <run-id>` row for each origin run, in the order they ran there.
 Its own steps follow in the order they ran.
 A carried step opens the log the earlier run wrote.
 Select a step to show it on the right, under a bar that gives the step, its model and its thinking level.

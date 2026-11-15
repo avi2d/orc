@@ -40,7 +40,7 @@ test("refuses a step from an orc that prints no model instead of showing a card 
 })
 
 test("reads a step's model, thinking level and session file rather than dropping them", () => {
-  const text = JSON.stringify({ schema: "orc.show.v1", steps: [{ id: 1, name: "implement", attempt: 1, status: "passed", model: "claude-opus-5-5", thinking: "high", piSessionFile: "/home/sam/.orc/runs/r1/sessions/s.jsonl" }] })
+  const text = JSON.stringify({ schema: "orc.show.v1", steps: [{ id: 1, name: "implement", attempt: 1, status: "passed", model: "claude-opus-5-5", thinking: "high", piSessionFile: "/home/sam/.orc/runs/r1/sessions/s.jsonl", from: null }] })
   const guarded = guardJson(text, show)
   expect(guarded.kind === "ok" ? guarded.value.steps : guarded).toEqual([{ id: 1, name: "implement", attempt: 1, status: "passed", model: "claude-opus-5-5", thinking: "high", piSessionFile: "/home/sam/.orc/runs/r1/sessions/s.jsonl", from: null }])
 })

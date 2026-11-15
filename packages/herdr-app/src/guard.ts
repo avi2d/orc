@@ -232,7 +232,7 @@ const shownStep: Guard<ShownStep> = (value, at) => {
   if (thinking.kind === "refused") return thinking
   const piSessionFile = nullableString(record.value, "piSessionFile", at)
   if (piSessionFile.kind === "refused") return piSessionFile
-  const from = record.value["from"] === undefined ? ok(null) : nullableString(record.value, "from", at)
+  const from = nullableString(record.value, "from", at)
   if (from.kind === "refused") return from
   return ok({ ...brief.value, model: model.value, thinking: thinking.value, piSessionFile: piSessionFile.value, from: from.value })
 }
