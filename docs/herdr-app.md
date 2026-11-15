@@ -52,7 +52,7 @@ Backlog stays empty.
 Held tasks, tasks with unanswered parked questions, tasks with an open attention item for you, and closed tasks with an open PR appear in Awaiting you.
 Taken and started tasks appear in Running.
 Other new tasks appear in Planned, and other closed tasks appear in Done.
-A PR whose state has not been read appears in Done.
+A PR whose state has not been read counts as open, so its closed task appears in Awaiting you.
 
 Select a lane header to fold or open it.
 Backlog and Done start folded.
@@ -77,16 +77,47 @@ When a machine cannot be read, its cells show a dash and a line below the table 
 
 ![Resources tab with the second machine unreachable](images/herdr-resources-unreachable.png)
 
+## Start a scratch App
+
+A scratch App is a second Herdr App with its own `HOME`, for a screenshot or a live check that must stay off your own App.
+`packages/herdr-app/scripts/with-scratch-app.sh <command> [argument...]` starts one, runs the command, and quits the App it started.
+Every script in this repository that starts the App goes through it.
+
+To check a mod in a scratch App:
+
+1. Make an empty folder for the scratch `HOME`, such as `/tmp/scratch-home`.
+1. Run `mkdir -p /tmp/scratch-home/.config/herdr-app && echo '{}' > /tmp/scratch-home/.config/herdr-app/keys.json`.
+1. Run `HOME=/tmp/scratch-home orc app install` to copy the layout into it.
+1. Run `HOME=/tmp/scratch-home packages/herdr-app/scripts/with-scratch-app.sh <command>`.
+
+The command runs with `SCRATCH_APP_BIN` set to the App's binary and `SCRATCH_APP_PID` set to its process id.
+`"$SCRATCH_APP_BIN" do <command>` drives the scratch App, and `"$SCRATCH_APP_BIN" shot <file.png>` saves its window as a PNG.
+
+The script never takes focus.
+It starts the App with `open -g`, behind the other apps, and the app you are working in stays in front.
+The App's window opens at 1400 by 900 points.
+
+A scratch `HOME` has no herdr-core, so an App left to search it opens the "Herdr needs herdr-core" window and waits for a click.
+The script finds herdr-core first, on `PATH` and in the places under your login home where the App looks, and hands the App that folder in `HERDR_CORE_DIRS`.
+When herdr-core is somewhere else, set `HERDR_CORE_DIRS` to the folder that holds it.
+When the script finds no herdr-core, it stops before it starts the App.
+When the App socket or the herdr-core socket never appears within 35 seconds, the script stops the App and exits with a timeout that names the missing socket.
+For the herdr-core socket the timeout also names HERDR_CORE_DIRS.
+
+Set `HERDR_APP_BUNDLE` when the App is not at `/Applications/Herdr.app`.
+The script refuses the login `HOME` and an `HC_SESSION` that does not start with `fm-lab-`.
+It keeps the scratch App off the live core, and quits only the App and the core it started.
+The live core's processes and terminals read the same before and after.
+
 ## Recapture the Board screenshot
 
 The committed shot is the proof of the two-line clip.
 The garden-6 title wraps to three lines and shows exactly two, with no word cut.
-To recapture it, run `packages/herdr-app/scripts/capture-board.sh <fixture-dir> <output-png>` with a scratch `HOME` and an `HC_SESSION` starting with `fm-lab-`.
+To recapture it, run `packages/herdr-app/scripts/capture-board.sh <fixture-dir> <output-png>` with a scratch `HOME` that has the layout installed.
 Use `tests/fixtures/herdr-board` as the fixture folder.
 Add `orc-resources` or `orc-agents` as a third argument to capture that tab instead of the Board.
-The script brings the scratch App to the front, because a Herdr window that was never shown does not repaint.
-The script refuses the login `HOME`, keeps the scratch App off the live core, and quits only the App it started.
-The live core's processes and terminals read the same before and after.
+The script starts the App through `with-scratch-app.sh`, so it takes no focus.
+It saves the window with the App's own `shot` command, which needs no screen-recording permission and works while the window is covered.
 
 ## Follow a run in the Agents tab
 

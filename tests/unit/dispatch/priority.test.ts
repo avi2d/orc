@@ -171,7 +171,7 @@ describe("the backlog listing", () => {
       await addAt(root, "2026-11-01T09:00:00.000Z", 2)
       await addAt(root, "2026-11-01T10:00:00.000Z", null)
       const tasks = await run(listTasks(root))
-      const view = { tasks, events: [], projects: { kind: "read" as const, projects: [] }, room: { kind: "read" as const, room: [] }, merged: new Set<string>(), prStates: new Map(), deciderOwns: () => false }
+      const view = { tasks, events: [], projects: { kind: "read" as const, projects: [] }, room: { kind: "read" as const, room: [] }, merged: new Set<string>(), prStates: new Map(), beatWaits: null, deciderOwns: () => false }
       expect(backlogJson(view).tasks.map((task) => task.priority)).toEqual([2, null])
       const board = formatBoard(view)
       expect(board).toContain("orc-1 P2 orc")
