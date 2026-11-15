@@ -53,7 +53,7 @@ export default class OrcChanges extends View {
     return changes.files.find((file) => file.path === this.openPath) ?? changes.files.at(0) ?? null
   }
 
-  follow(cx: AsyncContext): void {
+  follow(cx: Context): void {
     const held = heldChanges()
     const changes = held.kind === "ok" ? held.value : null
     const file = changes === null ? null : this.openFile(changes)
@@ -82,6 +82,7 @@ export default class OrcChanges extends View {
 
   pick(cx: Context, path: string): void {
     this.openPath = path
+    this.follow(cx)
     cx.notify()
   }
 

@@ -42,7 +42,7 @@ Agents reads `orc runs --json --local` and `orc backlog --json` again every 4 se
 It also reads the selected run with `orc show <run> --json` and the selected step with `orc log <run> <step-id>`.
 To label each card it reads `orc show <run> --json` once for each listed ended run and again on every 4 second refresh for each running run, at most 4 at a time.
 For the Turns view it reads the Pi session file that `orc show` names for the step.
-For the Changes column it runs `git merge-base` and `git diff` in the run's worktree.
+For the Changes column it runs `git rev-parse`, `git merge-base` and `git diff` in the run's worktree.
 When a command fails or prints a document the tab cannot read, the tab shows the command and why.
 
 ## Read the Board tab

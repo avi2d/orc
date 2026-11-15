@@ -303,10 +303,13 @@ export default class OrcAgents extends View {
   }
 
   select(cx: Context, key: string): void {
+    const before = this.selectedCard()?.key ?? null
     this.selectedKey = key
     this.chosen = null
-    this.changesProblem = null
-    this.shareChanges(null)
+    if ((this.selectedCard()?.key ?? null) !== before) {
+      this.changesProblem = null
+      this.shareChanges(null)
+    }
     this.refresh(cx)
     cx.notify()
   }
@@ -338,10 +341,13 @@ export default class OrcAgents extends View {
   }
 
   setFilter(cx: Context, filter: Filter): void {
+    const before = this.selectedCard()?.key ?? null
     this.filter = filter
     this.chosen = null
-    this.changesProblem = null
-    this.shareChanges(null)
+    if ((this.selectedCard()?.key ?? null) !== before) {
+      this.changesProblem = null
+      this.shareChanges(null)
+    }
     this.refresh(cx)
     cx.notify()
   }

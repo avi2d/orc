@@ -29,4 +29,4 @@ export const readChanges = (checkout: Checkout): Promise<Reading<RunChanges | nu
   })
 
 export const readDiff = (changes: Pick<RunChanges, "worktree" | "base" | "branch">, path: string): Promise<Reading<string>> =>
-  git(changes.worktree, ["diff", "--literal-pathspecs", "--no-ext-diff", "--no-textconv", "--no-color", "--no-renames", changes.base, changes.branch, "--", path])
+  git(changes.worktree, ["--literal-pathspecs", "diff", "--no-ext-diff", "--no-textconv", "--no-color", "--no-renames", changes.base, changes.branch, "--", path])
