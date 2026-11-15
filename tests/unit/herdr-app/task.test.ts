@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { guardJson } from "../../../packages/herdr-app/src/guard"
-import { type TaskDetail, answerArgv, infoRows, mergeArgv, runToOpen, runsOfTask, threadEntries } from "../../../packages/herdr-app/src/task"
+import { type TaskDetail, answerArgv, descriptionOf, infoRows, mergeArgv, runToOpen, runsOfTask, threadEntries } from "../../../packages/herdr-app/src/task"
 import { taskDetails } from "../../../packages/herdr-app/src/task-guard"
 
 const fresh: TaskDetail = {
@@ -66,7 +66,7 @@ test("puts each parked answer under its question with who and time instead of le
   const parked: TaskDetail = { ...fresh, parked: { branch: "orc/orc-34", questions: [asked("R3", true)] } }
   expect(threadEntries(parked).map((entry) => [entry.who, entry.what, entry.at])).toEqual([
     ["Run", "Question R3", "2026-11-13T11:00:00.000Z"],
-    ["You", "Answer to R3", "2026-11-13T12:00:00.000Z"]
+    ["Answer", "Answer to R3", "2026-11-13T12:00:00.000Z"]
   ])
 })
 
@@ -75,9 +75,43 @@ test("finds a task's runs by its exact branch instead of a branch it prefixes", 
   expect(runsOfTask(runs, "orc-3").map((run) => run.id)).toEqual(["r1"])
 })
 
-test("opens the newest run on this machine instead of one the Agents tab does not list", () => {
-  const runs = runsOfTask([{ id: "20261113-100000-a", branch: "orc/orc-34", machine: null }, { id: "20261113-120000-b", branch: "orc/orc-34", machine: "winbox" }], "orc-34")
-  expect(runToOpen(runs)).toBe("20261113-100000-a")
+test("opens the newest run in the local list instead of a newer run outside it", () => {
+  const runs = runsOfTask([{ id: "20261113-100000-a", branch: "orc/orc-34", machine: "mac" }, { id: "20261113-120000-b", branch: "orc/orc-34", machine: null }], "orc-34")
+  expect(runToOpen(runs, new Set(["20261113-100000-a"]))).toBe("20261113-100000-a")
+})
+
+test("shows no Open run when the local list misses the task instead of opening by machine", () => {
+  const runs = runsOfTask([{ id: "20261113-120000-b", branch: "orc/orc-34", machine: null }], "orc-34")
+  expect(runToOpen(runs, new Set([]))).toBeNull()
+})
+
+test("drops the title line from the description instead of repeating the header", () => {
+  expect(descriptionOf("Show the selected task\n\nThe body stays.")).toBe("The body stays.")
+})
+
+test("shows no description for a title-only body instead of repeating the title", () => {
+  expect(descriptionOf("Show the selected task\n")).toBe("")
+})
+
+test("gives a closed task no parked answer box instead of one that always fails", () => {
+  const closed: TaskDetail = { ...fresh, parked: { branch: "orc/orc-34", questions: [asked("R3", false)] }, state: { status: "closed", account: "main", started: null, outcome: "done", pr: null, report: null, answer: null, closedAt: "2026-11-13T12:00:00.000Z" } }
+  expect(threadEntries(closed).map((entry) => entry.reply)).toEqual([null])
+})
+
+test("leaves past holds out of the thread instead of repeating their questions", () => {
+  const past = { reason: "old hold", until: null, at: null, questions: [asked("Q0", false)], answer: null }
+  const held: TaskDetail = { ...fresh, hold: { reason: "waits for the PR", until: null, at: null, questions: [], answer: null, history: [past] } }
+  expect(threadEntries(held).map((entry) => entry.what)).toEqual(["Hold"])
+})
+
+test("leaves a closed decision answer out of the thread instead of showing it again", () => {
+  const closed: TaskDetail = { ...fresh, state: { status: "closed", account: "main", started: null, outcome: "done", pr: null, report: null, answer: { words: "yes", at: "2026-11-13T12:00:00.000Z" }, closedAt: "2026-11-13T12:00:00.000Z" } }
+  expect(threadEntries(closed)).toEqual([])
+})
+
+test("labels a hold answer Answer instead of You", () => {
+  const held: TaskDetail = { ...fresh, hold: { reason: "waits for the PR", until: null, at: null, questions: [], answer: { words: "go", at: "2026-11-13T12:00:00.000Z" }, history: [] } }
+  expect(threadEntries(held).map((entry) => [entry.who, entry.what])).toEqual([["orc", "Hold"], ["Answer", "Answer"]])
 })
 
 test("refuses a backlog task with no body instead of showing an empty description", () => {

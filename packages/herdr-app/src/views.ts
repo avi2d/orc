@@ -26,6 +26,7 @@ interface ShownRefresh<T> {
   visible: boolean
   lastRead: number
   busy: boolean
+  stale?: boolean
   reading: T
   load: () => Promise<T>
 }
@@ -38,7 +39,12 @@ export const refreshWhenShown = <T>(view: string, everyMs: number, cx: AsyncCont
     spot.spawn((task) => host.load().then((reading) => {
       host.reading = reading
       host.busy = false
-      task.notify()
+      if (host.stale === true) {
+        host.stale = false
+        refresh(task)
+      } else {
+        task.notify()
+      }
     }))
   }
   const shown = (): boolean => {

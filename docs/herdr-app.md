@@ -66,8 +66,8 @@ Each lane lists its tasks oldest first.
 ![Task panel showing a held example task with one answered and one open question](images/herdr-task-held.png)
 
 The panel shows the id, the kind and the title of the selected task.
-When the task has a run on this machine, Open run switches to the Agents tab with the newest such run selected.
-A run on another machine has no Open run, since the Agents tab lists this machine's runs only.
+When the task has a run in the local list, Open run switches to the Agents tab with the newest such run selected.
+A run outside that list has no Open run, since the Agents tab lists that list only.
 A run belongs to the task when its branch is `orc/<task id>`.
 
 The panel has three tabs:
@@ -75,7 +75,7 @@ The panel has three tabs:
 | Tab | What it shows |
 | --- | --- |
 | Thread | The hold reason, the hold's questions and the run's parked questions, each with who asked, what it is and when, and each answer below its question |
-| Description | The task's body as markdown |
+| Description | The task's body without its title line as markdown, or No description when nothing remains |
 | Info | Account, Run, Branch, PR, Depends on, Created, Started, Closed, Priority and Assets, in that order, with `—` for an empty row |
 
 Each unanswered question has an answer box.

@@ -4,7 +4,7 @@ import { exec, nextCommand, openOverlay, run, setShared, shared } from "herdr"
 import { kindLabel } from "../../src/board"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
-import { type AnswerTarget, type TaskDetail, type TaskRun, type ThreadEntry, answerArgv, infoRows, mergeArgv, runToOpen, runsOfTask, shortTime, threadEntries } from "../../src/task"
+import { type AnswerTarget, type TaskDetail, type TaskRun, type ThreadEntry, answerArgv, descriptionOf, infoRows, mergeArgv, runToOpen, runsOfTask, shortTime, threadEntries } from "../../src/task"
 import { taskDetails, taskRuns } from "../../src/task-guard"
 import { agentsOpenKey, selectedTaskKey, viewsStack, refreshWhenShown } from "../../src/views"
 
@@ -15,6 +15,7 @@ const tabs: ReadonlyArray<Tab> = ["Thread", "Description", "Info"]
 interface TaskDocuments {
   readonly tasks: ReadonlyArray<TaskDetail>
   readonly runs: ReadonlyArray<TaskRun>
+  readonly local: ReadonlyArray<TaskRun>
 }
 
 type Sent = { readonly kind: "sending" } | { readonly kind: "failed"; readonly reason: string }
@@ -31,6 +32,7 @@ export default class OrcTask extends View {
   visible = false
   lastRead = 0
   busy = false
+  stale = false
   tab: Tab = "Thread"
   shownTask: string | null = null
   boxes = new Map<string, InputState>()
@@ -39,9 +41,10 @@ export default class OrcTask extends View {
 
   load = (): Promise<Reading<TaskDocuments>> => Promise.all([
     readJson("orc", ["backlog", "--json"], taskDetails),
-    readJson("orc", ["runs", "--json"], taskRuns)
-  ]).then(([tasks, runs]) =>
-    tasks.kind !== "ok" ? tasks : runs.kind !== "ok" ? runs : { kind: "ok", value: { tasks: tasks.value, runs: runs.value } })
+    readJson("orc", ["runs", "--json"], taskRuns),
+    readJson("orc", ["runs", "--json", "--local"], taskRuns)
+  ]).then(([tasks, runs, local]) =>
+    tasks.kind !== "ok" ? tasks : runs.kind !== "ok" ? runs : local.kind !== "ok" ? local : { kind: "ok", value: { tasks: tasks.value, runs: runs.value, local: local.value } })
 
   override init(_props: unknown, cx: AsyncContext): void {
     refreshWhenShown("orc-board", 10_000, cx, this)
@@ -51,22 +54,24 @@ export default class OrcTask extends View {
 
   listen(cx: AsyncContext): Promise<void> {
     return nextCommand().then((command) => {
-      const tab = tabs.find((entry) => entry.toLowerCase() === command)
-      if (tab !== undefined) {
-        this.tab = tab
-        cx.notify()
-      }
       if (command === "merge") this.merge(cx)
       return this.listen(cx)
     })
   }
 
   reload(cx: Context): void {
-    if (this.busy) return
+    if (this.busy) {
+      this.stale = true
+      return
+    }
     this.busy = true
     cx.spawn((task) => this.load().then((reading) => {
       this.reading = reading
       this.busy = false
+      if (this.stale) {
+        this.stale = false
+        this.reload(task)
+      }
       task.notify()
     }))
   }
@@ -81,7 +86,6 @@ export default class OrcTask extends View {
         } else {
           this.sent.set(key, { kind: "failed", reason: `orc ${argv.join(" ")} exited ${result.code}: ${firstLine(result.stderr) || firstLine(result.stdout)}` })
         }
-        this.busy = false
         this.reload(task)
         task.notify()
       },
@@ -159,7 +163,8 @@ export default class OrcTask extends View {
     const task = this.reading.value.tasks.find((entry) => entry.id === id)
     if (task === undefined) return root.child(div().p(16).text_color(t.muted).child(`${id} is no longer in the backlog`))
     const runs = runsOfTask(this.reading.value.runs, task.id)
-    return root.child(this.header(t, task, runToOpen(runs)))
+    const local = new Set(this.reading.value.local.map((run) => run.id))
+    return root.child(this.header(t, task, runToOpen(runs, local)))
       .child(this.tabStrip(t))
       .child(this.tabBody(t, task, runs))
   }
@@ -203,10 +208,12 @@ export default class OrcTask extends View {
           ? body.child(div().text_color(t.muted).child("No hold and no questions"))
           : body.children(entries.map((entry) => this.entry(t, task.id, entry)))
       }
-      case "Description":
-        return task.body.trim() === ""
+      case "Description": {
+        const description = descriptionOf(task.body)
+        return description === ""
           ? body.child(div().text_color(t.muted).child("No description"))
-          : body.child(TextView.markdown(`description-${task.id}`, task.body))
+          : body.child(TextView.markdown(`description-${task.id}`, description))
+      }
       case "Info":
         return body.gap(6).children(infoRows(task, runs).map((row) => {
           const line = h_flex().gap(12).items_start()
@@ -232,7 +239,7 @@ export default class OrcTask extends View {
       .child(div().text_color(t.dim).child("·"))
       .child(div().text_color(t.muted).child(entry.what))
       .children(entry.at === null ? [] : [div().text_color(t.dim).child("·"), div().text_color(t.dim).child(shortTime(entry.at))])
-    const card = v_flex().id(`entry-${entry.key}`).gap(6).p(10).rounded(6).bg(entry.who === "You" ? t.surface : t.raised)
+    const card = v_flex().id(`entry-${entry.key}`).gap(6).p(10).rounded(6).bg(entry.who === "Answer" ? t.surface : t.raised)
       .child(line).child(div().child(entry.text))
     const reply = entry.reply
     if (reply === null) return card
