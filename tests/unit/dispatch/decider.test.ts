@@ -48,8 +48,8 @@ const replies = (byQuestion: Readonly<Record<string, string>>, heard: Array<Deci
     heard.push(request)
     const matching = Object.entries(byQuestion).filter(([text]) => request.prompt.includes(text))
     matching.sort((a, b) => request.prompt.lastIndexOf(b[0]) - request.prompt.lastIndexOf(a[0]))
-    const reply = matching[0]?.[1]
-    return reply === undefined ? Effect.fail(new DeciderUnheard({ reason: "no reply in this test" })) : Effect.succeed(reply)
+    const first = matching.at(0)
+    return first === undefined ? Effect.fail(new DeciderUnheard({ reason: "no reply in this test" })) : Effect.succeed(first[1])
   }
 })
 
