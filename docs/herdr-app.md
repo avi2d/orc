@@ -65,6 +65,9 @@ Backlog and Done start folded.
 Select a project to filter the lanes, or select All to show every project.
 Select a card to show its task in the panel on the right.
 Each lane lists its tasks oldest first.
+Each open lane scrolls on its own with the trackpad or the mouse wheel, and its header stays in place.
+To scroll a lane with the keyboard, click inside it first.
+Then press the up and down arrows, Page Up, Page Down, Home or End.
 
 ## Read a task
 

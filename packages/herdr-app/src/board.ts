@@ -34,3 +34,38 @@ export const laneFor = (task: BoardTask, attention: ReadonlySet<string>): Lane =
 export const tasksInLane = (tasks: ReadonlyArray<BoardTask>, lane: Lane, project: string | null, attention: ReadonlySet<string>): ReadonlyArray<BoardTask> =>
   tasks.filter((task) => (project === null || task.project === project) && laneFor(task, attention) === lane)
     .sort((a, b) => a.created.localeCompare(b.created) || a.id.localeCompare(b.id))
+
+export const cardBox: { readonly heightPx: number; readonly gapPx: number; readonly padPx: number } = { heightPx: 84, gapPx: 6, padPx: 8 }
+
+export interface LaneView {
+  readonly offsetPx: number
+  readonly heightPx: number
+}
+
+export const laneKeys: ReadonlySet<string> = new Set(["up", "down", "pageup", "pagedown", "home", "end"])
+
+const cardStep = cardBox.heightPx + cardBox.gapPx
+const cardTop = (index: number): number => cardBox.padPx + index * cardStep
+
+const clamp = (value: number, low: number, high: number): number => Math.min(Math.max(value, low), Math.max(low, high))
+
+const maxOffset = (view: LaneView, count: number): number =>
+  2 * cardBox.padPx + count * cardBox.heightPx + Math.max(0, count - 1) * cardBox.gapPx - view.heightPx
+
+export const wheelOffset = (view: LaneView, count: number, deltaY: number): number =>
+  clamp(view.offsetPx - deltaY, 0, maxOffset(view, count))
+
+// ScrollHandle only offers scroll_to_item, which moves the least distance that shows the whole card, so the next offset follows that rule.
+export const laneJump = (key: string, view: LaneView, count: number): { readonly item: number; readonly offsetPx: number } | null => {
+  if (count === 0 || !laneKeys.has(key)) return null
+  const index = (value: number): number => clamp(value, 0, count - 1)
+  const page = Math.max(1, Math.floor(view.heightPx / cardStep))
+  const first = index(Math.ceil((view.offsetPx - cardBox.padPx) / cardStep))
+  const last = index(Math.floor((view.offsetPx + view.heightPx - cardBox.padPx - cardBox.heightPx) / cardStep))
+  const item = index(key === "up" ? first - 1 : key === "pageup" ? first - page : key === "home" ? 0
+    : key === "down" ? last + 1 : key === "pagedown" ? last + page : count - 1)
+  const top = cardTop(item)
+  const bottom = top + cardBox.heightPx
+  const shown = top < view.offsetPx ? top : bottom > view.offsetPx + view.heightPx ? bottom - view.heightPx : view.offsetPx
+  return { item, offsetPx: clamp(shown, 0, maxOffset(view, count)) }
+}
