@@ -261,7 +261,7 @@ export const closeStartedTask = (
     ...fresh,
     spec: reshape(fresh.spec),
     parked: answeredOnly(fresh.parked),
-    state: { kind: "closed", claim: fresh.state.claim, closing: { outcome, started: fresh.state.started, reason, ...delivered }, closedAt, postedAt: null }
+    state: { kind: "closed", claim: fresh.state.claim, closing: { outcome, started: fresh.state.started, reason, pr: delivered.pr ?? fresh.parked?.origin?.pr ?? null, report: delivered.report }, closedAt, postedAt: null }
   }))
 
 export const reopenStartedTask = (
