@@ -8,9 +8,10 @@ It reads the task from the beat's `ORC_TASK_*` variables and queues `orc run` in
 The run takes `--sandbox none --provider <provider> --token-file <path>` when the account holds a token file or token, and `--sandbox none --provider <provider>` with no token file when the account is kind `none`, so it runs on the picked account and refuses an implementer on any other provider.
 When the beat sets `ORC_TASK_IMPLEMENTER_MODEL` or `ORC_TASK_FIXER_MODEL`, the run also takes `--implementer-model <model>` or `--fixer-model <model>`.
 The run then uses that model instead of the one `models` in `~/.orc/config.json` names.
-So the beat can hand a run models from the provider of the account it picked, and the run is not refused for a model mismatch.
+So the beat can hand a run models from the provider of the account it picked.
+The run is then not refused for a model mismatch.
 An agent file that names its own model still wins over a handed model.
-With neither variable set, the run takes its models from the config or agent files as before.
+With neither variable set, the run takes its models from the config or agent files.
 When the run starts, it fast-forwards the checkout's default branch from its remote, or says in its output why not.
 The refresh needs Git 2.48 or later.
 The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
