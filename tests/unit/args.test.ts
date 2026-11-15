@@ -17,12 +17,6 @@ describe("parseArgs", () => {
   test("--help after -- belongs to the passed-on command, not to orc", () => {
     expect(parseArgs(["runner", "hold", "task-1", "--", "orc", "--help"]).kind).toBe("Dispatch")
   })
-  test("chat starts the orchestrator", () => {
-    expect(parseArgs(["chat"])).toEqual({ kind: "Chat" })
-  })
-  test("chat refuses an argument instead of dropping it", () => {
-    expect(parseArgs(["chat", "add a task"])).toEqual({ kind: "UsageError", detail: "orc chat takes no argument: add a task" })
-  })
   test("-h prints the usage text", () => {
     expect(parseArgs(["-h"])).toEqual({ kind: "PrintHelp", words: [] })
   })
@@ -208,6 +202,21 @@ describe("parseArgs", () => {
   })
   test("run rejects a branch flag without a name", () => {
     expect(parseArgs(["run", "task.md", "--branch"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --branch" })
+  })
+})
+describe("parseArgs chat", () => {
+  test("chat starts the orchestrator", () => {
+    expect(parseArgs(["chat"])).toEqual({ kind: "Chat", sessionFile: null })
+  })
+  test("chat refuses an argument instead of dropping it", () => {
+    expect(parseArgs(["chat", "add a task"])).toEqual({ kind: "UsageError", detail: "orc chat takes only --session <file>: add a task" })
+  })
+  test("chat --session keeps the file instead of starting an unnamed session", () => {
+    expect(parseArgs(["chat", "--session", "/tmp/chat.jsonl"])).toEqual({ kind: "Chat", sessionFile: "/tmp/chat.jsonl" })
+  })
+  test("chat --session with no file is refused instead of taking the next flag as the path", () => {
+    expect(parseArgs(["chat", "--session", "--other"])).toEqual({ kind: "UsageError", detail: "orc chat takes --session once, with a session file path" })
+    expect(parseArgs(["chat", "--session"])).toEqual({ kind: "UsageError", detail: "orc chat takes --session once, with a session file path" })
   })
 })
 describe("parseArgs run flags", () => {
