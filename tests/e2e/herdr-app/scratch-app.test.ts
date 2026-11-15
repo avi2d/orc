@@ -20,7 +20,8 @@ nohup env -i "\${pairs[@]}" "$bundle/Contents/MacOS/Herdr" >/dev/null 2>&1 &
 `
 
 const lsofStub = `#!/bin/bash
-if [ "$1" = -t ] && [ "$2" = "$HERDR_APP_HOME/herdr-app.sock" ]; then cat "$STUB_APP_PID" 2>/dev/null; fi
+if [ "$1" = -t ] && [ "$2" = "$HERDR_APP_HOME/herdr-app.sock" ]; then cat "$STUB_APP_PID" 2>/dev/null; exit 0; fi
+if [ "$1" = -t ] && [ "$2" = "$HC_SOCKET" ]; then exit 1; fi
 exit 1
 `
 
@@ -101,21 +102,22 @@ test("does not start the App when HERDR_CORE_DIRS holds no herdr-core", async ()
   }
 }, 30000)
 
-test("does not leave the caller waiting on an App that starts no herdr-core", async () => {
+test("times out after 35 seconds when the herdr-core socket never appears", async () => {
   const staged = await stage(true)
   try {
     const result = await launch(staged.env)
     expect(result.code).toBe(1)
-    expect(result.stderr).toContain("did not start herdr-core")
-    expect(result.stderr).toContain("Herdr needs herdr-core")
-    expect(result.seconds).toBeLessThan(20)
+    expect(result.stderr).toContain("timed out waiting 35 seconds for the herdr-core socket")
+    expect(result.stderr).toContain(staged.env["HC_SOCKET"])
+    expect(result.stderr).toContain("HERDR_CORE_DIRS=")
+    expect(result.seconds).toBeLessThan(70)
     const appPid = Number((await readFile(staged.appPidFile, "utf8")).trim())
     await Bun.sleep(500)
     expect(isRunning(appPid)).toBe(false)
   } finally {
     await rm(staged.root, { recursive: true, force: true })
   }
-}, 30000)
+}, 120000)
 
 test("does not start the App in the foreground", async () => {
   const staged = await stage(true)
@@ -126,4 +128,4 @@ test("does not start the App in the foreground", async () => {
   } finally {
     await rm(staged.root, { recursive: true, force: true })
   }
-}, 30000)
+}, 120000)

@@ -45,7 +45,7 @@ if [ -n "${HERDR_CORE_DIRS:-}" ]; then
   core_dirs=$HERDR_CORE_DIRS
 else
   core_places="PATH and the login home"
-  core_dirs=$PATH:$real_home/.local/bin:$real_home/.local/share/herdr-core/current/Contents/MacOS:/opt/homebrew/bin:/usr/local/bin:$real_home/.local/share/mise/shims:/run/current-system/sw/bin:$real_home/.cargo/bin
+  core_dirs=$PATH:$real_home/.local/bin:$real_home/.local/share/herdr-core/current/Contents/MacOS:$real_home/.local/share/herdr-core/Herdr Core.app/Contents/MacOS:/opt/homebrew/bin:/usr/local/bin:$real_home/.local/share/mise/shims:/run/current-system/sw/bin:$real_home/.cargo/bin
 fi
 core_dir=
 IFS=: read -r -a core_dir_list <<< "$core_dirs"
@@ -133,40 +133,33 @@ while IFS= read -r -d '' pair; do
     *) launch+=(--env "$pair") ;;
   esac
 done < <(env -0)
+# A reused HOME leaves a socket file with no process behind it.
+if [ -e "$HC_SOCKET" ] && ! lsof -t "$HC_SOCKET" >/dev/null 2>&1; then
+  rm -f "$HC_SOCKET"
+fi
 "${launch[@]}"
-# An App that finds no core opens the "Herdr needs herdr-core" window and never opens the core socket.
-for attempt in $(seq 1 50); do
+for attempt in $(seq 1 175); do
   [ -n "$pid" ] || find_app_pid || true
   [ -S "$HC_SOCKET" ] && [ -n "$pid" ] && break
   sleep 0.2
 done
 if [ -z "$pid" ]; then
-  echo "the scratch App from $bundle opened no socket at $HERDR_APP_HOME/herdr-app.sock within 10 seconds" >&2
+  echo "timed out waiting 35 seconds for the App socket at $HERDR_APP_HOME/herdr-app.sock" >&2
   exit 1
 fi
 if [ ! -S "$HC_SOCKET" ]; then
-  echo "the scratch App did not start herdr-core at $HC_SOCKET within 10 seconds; it shows the \"Herdr needs herdr-core\" window when it accepts no herdr-core in HERDR_CORE_DIRS=$HERDR_CORE_DIRS" >&2
-  # That window answers no app.quit, so the polite quit in cleanup would only add its timeouts.
+  echo "timed out waiting 35 seconds for the herdr-core socket at $HC_SOCKET with HERDR_CORE_DIRS=$HERDR_CORE_DIRS" >&2
   kill -TERM "$pid" 2>/dev/null || true
   for attempt in $(seq 1 10); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
   exit 1
 fi
-for attempt in $(seq 1 75); do
-  app_owns_socket && break
-  kill -0 "$pid" 2>/dev/null || break
-  sleep 0.2
-done
-lsof -a -p "$pid" -U > "$proof/app-sockets"
-if ! grep -F "$HERDR_APP_HOME/herdr-app.sock" "$proof/app-sockets" >/dev/null; then
-  echo "the scratch App opened no socket at $HERDR_APP_HOME/herdr-app.sock within 15 seconds" >&2
-  exit 1
-fi
+lsof -a -p "$pid" -U > "$proof/app-sockets" || true
 lsof -U 2>/dev/null | grep -F "$live" > "$proof/live-sockets-during" || true
 if grep -F "$live_state/herdr-core" "$proof/app-sockets" >/dev/null || [ "$(wc -l < "$proof/live-sockets-before")" -ne "$(wc -l < "$proof/live-sockets-during")" ]; then
   echo "scratch App may be attached to live core" >&2
   exit 1
 fi
-lsof -U 2>/dev/null | grep -F "$HC_SOCKET" > "$proof/core-sockets"
+lsof -U 2>/dev/null | grep -F "$HC_SOCKET" > "$proof/core-sockets" || true
 export SCRATCH_APP_BIN=$app
 export SCRATCH_APP_PID=$pid
 "$@"

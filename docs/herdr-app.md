@@ -101,7 +101,8 @@ A scratch `HOME` has no herdr-core, so an App left to search it opens the "Herdr
 The script finds herdr-core first, on `PATH` and in the places under your login home where the App looks, and hands the App that folder in `HERDR_CORE_DIRS`.
 When herdr-core is somewhere else, set `HERDR_CORE_DIRS` to the folder that holds it.
 When the script finds no herdr-core, it stops before it starts the App.
-When the App starts no herdr-core within 10 seconds, the script stops the App and exits with an error that names herdr-core.
+When the App socket or the herdr-core socket never appears within 35 seconds, the script stops the App and exits with a timeout that names the missing socket.
+For the herdr-core socket the timeout also names HERDR_CORE_DIRS.
 
 Set `HERDR_APP_BUNDLE` when the App is not at `/Applications/Herdr.app`.
 The script refuses the login `HOME` and an `HC_SESSION` that does not start with `fm-lab-`.
