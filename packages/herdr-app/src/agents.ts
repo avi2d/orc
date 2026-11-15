@@ -239,6 +239,11 @@ export const runAgent = (steps: ReadonlyArray<Pick<ShownStep, "name" | "model" |
   return agent === undefined ? null : { model: agent.model, effort: agent.thinking }
 }
 
+const piSteps: ReadonlySet<string> = new Set(["implement"])
+
+export const opensTurns = (step: Pick<ShownStep, "name" | "piSessionFile">): boolean =>
+  piSteps.has(step.name) || step.piSessionFile !== null
+
 export const agentLabel = (agent: RunAgent | null): string | null => {
   const words = agent === null ? [] : [agent.model, agent.effort].filter((word) => word !== null)
   return words.length === 0 ? null : words.join(" ")

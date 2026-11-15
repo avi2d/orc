@@ -47,3 +47,11 @@ export const queueLine = (queued: ReadonlyArray<QueuedRun>, task: string): strin
 export const tasksInLane = (tasks: ReadonlyArray<BoardTask>, lane: Lane, project: string | null, attention: ReadonlySet<string>): ReadonlyArray<BoardTask> =>
   tasks.filter((task) => (project === null || task.project === project) && laneFor(task, attention) === lane)
     .sort((a, b) => a.created.localeCompare(b.created) || a.id.localeCompare(b.id))
+
+export const clickedSelection = (selected: string | null, clicked: string): string | null => selected === clicked ? null : clicked
+
+export const selectionOnBoard = (selected: string | null, tasks: ReadonlyArray<BoardTask> | null): string | null =>
+  selected === null || tasks === null || tasks.some((task) => task.id === selected) ? selected : null
+
+export const panelCommand = (kept: string | null, shown: boolean | null): "layout.show" | "layout.hide" | null =>
+  (kept !== null) === shown ? null : kept !== null ? "layout.show" : "layout.hide"

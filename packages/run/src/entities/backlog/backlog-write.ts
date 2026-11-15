@@ -1,6 +1,6 @@
-import { Data, Effect, FileSystem } from "effect"
+import { Data, Effect, FileSystem, Predicate } from "effect"
 import type { PlatformError } from "effect/PlatformError"
-import type { TaskFileError, TaskFolder } from "./task-record"
+import { type TaskFileError, type TaskFolder, taskFolders } from "./task-record"
 
 export class BacklogError extends Data.TaggedError("BacklogError")<{
   readonly detail: string
@@ -110,6 +110,93 @@ const grabbedFile = (
   read: fs.readFileString(grabbed).pipe(Effect.mapError(platformFailure("read " + grabbed)))
 })
 
+// The owner's pid sits in the name, so a later reader can tell a grab a killed process left from one still held.
+const grabName = (folder: string, id: string): string => folder + "/." + id + ".grab-" + process.pid + "-" + crypto.randomUUID() + ".tmp"
+
+const grabPattern = /^\.(.+)\.grab-(\d+)-[0-9a-f-]+\.tmp$/
+
+class SignalRefused extends Data.TaggedError("SignalRefused")<{
+  readonly ownedByAnotherUser: boolean
+}> {}
+
+const ownerAlive = (pid: number): Effect.Effect<boolean> =>
+  Effect.try({
+    try: () => process.kill(pid, 0),
+    catch: (error) => new SignalRefused({ ownedByAnotherUser: Predicate.hasProperty(error, "code") && error.code === "EPERM" })
+  }).pipe(
+    Effect.as(true),
+    Effect.catchTag("SignalRefused", (refused) => Effect.succeed(refused.ownedByAnotherUser))
+  )
+
+export const readNames = (folder: string): Effect.Effect<ReadonlyArray<string>, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    return yield* fs.readDirectory(folder).pipe(
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed<ReadonlyArray<string>>([])),
+      Effect.mapError(platformFailure("list " + folder))
+    )
+  })
+
+const grabOwner = (name: string): { readonly id: string; readonly pid: number } | null => {
+  const grab = grabPattern.exec(name)
+  return grab === null ? null : { id: grab[1], pid: Number(grab[2]) }
+}
+
+const grabAlive = (paths: BacklogPaths, id: string): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    for (const folder of taskFolders) {
+      for (const name of yield* readNames(paths.folder(folder))) {
+        const owner = grabOwner(name)
+        if (owner !== null && owner.id === id && (yield* ownerAlive(owner.pid))) {
+          return true
+        }
+      }
+    }
+    return false
+  })
+
+// Only the killed owner wrote a result, so a task file in any folder is its finished result and the grab is dropped.
+// link(2) refuses an existing name, so a recovery never replaces a live task file.
+const recoverGrab = (fs: FileSystem.FileSystem, paths: BacklogPaths, folder: TaskFolder, grabbed: string, id: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    if (yield* grabAlive(paths, id)) {
+      return
+    }
+    const results = yield* Effect.forEach(taskFolders, (each) =>
+      fs.exists(paths.taskFile(each, id)).pipe(Effect.mapError(platformFailure("read " + id))))
+    const dropGrab = fs.remove(grabbed).pipe(
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.void),
+      Effect.mapError(platformFailure("remove " + grabbed))
+    )
+    if (results.some(Boolean)) {
+      return yield* dropGrab
+    }
+    const missing = yield* fs.link(grabbed, paths.taskFile(folder, id)).pipe(
+      Effect.as(false),
+      Effect.catchReason("PlatformError", "AlreadyExists", () => Effect.succeed(false)),
+      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(true)),
+      Effect.mapError(platformFailure("put back " + id))
+    )
+    if (missing) {
+      return
+    }
+    yield* dropGrab
+  })
+
+export const recoverGrabs = (root: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const paths = backlogPaths(root)
+    for (const folder of taskFolders) {
+      for (const name of yield* readNames(paths.folder(folder))) {
+        const owner = grabOwner(name)
+        if (owner !== null && !(yield* ownerAlive(owner.pid))) {
+          yield* recoverGrab(fs, paths, folder, paths.folder(folder) + "/" + name, owner.id)
+        }
+      }
+    }
+  })
+
 type Grabbed = {
   readonly fs: FileSystem.FileSystem
   readonly paths: BacklogPaths
@@ -129,7 +216,7 @@ export const grabIn = (
     const fs = yield* FileSystem.FileSystem
     const paths = backlogPaths(root)
     const file = paths.taskFile(folder, id)
-    const grabbed = scratchName(paths.folder(folder), id)
+    const grabbed = grabName(paths.folder(folder), id)
     if (!(yield* takeFile(fs, file, grabbed, id))) {
       return yield* missed
     }

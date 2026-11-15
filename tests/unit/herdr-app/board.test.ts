@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { laneFor, lanes, queueLine, tasksInLane, titleClip, type BoardTask } from "../../../packages/herdr-app/src/board"
+import { clickedSelection, laneFor, lanes, panelCommand, queueLine, selectionOnBoard, tasksInLane, titleClip, type BoardTask } from "../../../packages/herdr-app/src/board"
 import { guardJson } from "../../../packages/herdr-app/src/guard"
 import { boardBacklog, boardQueue } from "../../../packages/herdr-app/src/guard-board"
 
@@ -77,4 +77,28 @@ test("a started run's task shows no queued line instead of one that outlives the
 
 test("a queued entry from an older orc with no count ahead still says where it waits instead of refusing the runs", () => {
   expect(queueLine(queueOf([queuedEntry("orc-61", "winbox")]), "orc-61")).toBe("Queued on winbox")
+})
+
+test("a Board with no selection keeps the task panel closed instead of showing it", () => {
+  expect(selectionOnBoard(null, [task])).toBeNull()
+  expect(panelCommand(null, null)).toBe("layout.hide")
+  expect(panelCommand(null, true)).toBe("layout.hide")
+  expect(panelCommand(null, false)).toBeNull()
+})
+
+test("a second click on the selected card clears the selection instead of leaving the panel open", () => {
+  expect(clickedSelection(null, "orc-1")).toBe("orc-1")
+  expect(clickedSelection("orc-2", "orc-1")).toBe("orc-1")
+  expect(clickedSelection("orc-1", "orc-1")).toBeNull()
+  expect(panelCommand(clickedSelection("orc-1", "orc-1"), true)).toBe("layout.hide")
+  expect(panelCommand(clickedSelection("orc-2", "orc-1"), false)).toBe("layout.show")
+})
+
+test("a selection of a task gone from the Board closes the panel instead of keeping it open", () => {
+  expect(selectionOnBoard("orc-9", [task])).toBeNull()
+  expect(selectionOnBoard("orc-1", [task])).toBe("orc-1")
+  expect(selectionOnBoard("orc-9", null)).toBe("orc-9")
+  expect(panelCommand(selectionOnBoard("orc-9", [task]), true)).toBe("layout.hide")
+  expect(panelCommand(selectionOnBoard("orc-1", [task]), false)).toBe("layout.show")
+  expect(panelCommand(selectionOnBoard("orc-1", [task]), true)).toBeNull()
 })

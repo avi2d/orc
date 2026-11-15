@@ -1,9 +1,9 @@
 import { Array as Arr, Effect, FileSystem, Schema } from "effect"
 import { answerWait, type DeciderOwns, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 import { renderTaskFile } from "./task-record-render"
-import { BacklogError, backlogPaths, grabIn, platformFailure, publishOnce, scratchName, takenGrab } from "./backlog-write"
+import { BacklogError, backlogPaths, grabIn, platformFailure, publishOnce, readNames, recoverGrabs, scratchName, takenGrab } from "./backlog-write"
 
-export { BacklogError } from "./backlog-write"
+export { BacklogError, readNames } from "./backlog-write"
 
 // A project name may hold dashes, so an id splits at its last dash.
 const idPattern = /^([A-Za-z0-9][A-Za-z0-9._-]*)-(\d+)$/
@@ -25,15 +25,6 @@ export const ensureBacklog = (root: string): Effect.Effect<void, BacklogError, F
     for (const folder of [paths.ids, paths.logs, ...taskFolders.map(paths.folder)]) {
       yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.mapError(platformFailure("make " + folder)))
     }
-  })
-
-export const readNames = (folder: string): Effect.Effect<ReadonlyArray<string>, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    return yield* fs.readDirectory(folder).pipe(
-      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed<ReadonlyArray<string>>([])),
-      Effect.mapError(platformFailure("list " + folder))
-    )
   })
 
 const byCreated = (left: TaskRecord, right: TaskRecord): number =>
@@ -68,7 +59,8 @@ const readFolder = (
 export const listTasks = (
   root: string
 ): Effect.Effect<ReadonlyArray<TaskRecord>, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  Effect.forEach(taskFolders, (folder) => readFolder(root, folder)).pipe(
+  recoverGrabs(root).pipe(
+    Effect.andThen(Effect.forEach(taskFolders, (folder) => readFolder(root, folder))),
     Effect.map((folders) => {
       const all = folders.flat()
       const closed = new Set(all.filter((record) => record.state.kind === "closed").map((record) => record.spec.id))
@@ -199,6 +191,7 @@ const missedClose = (
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const paths = backlogPaths(root)
+    yield* recoverGrabs(root)
     const takenNames = yield* fs.readDirectory(paths.folder("taken")).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
     if (takenNames.some((name) => name.startsWith("." + id + "."))) {
       return yield* new BacklogError({ detail: id + " moved while orc read it, so run the command again" })
