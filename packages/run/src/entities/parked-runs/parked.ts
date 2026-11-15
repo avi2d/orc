@@ -227,17 +227,30 @@ const answerOn = (id: string, words: string, at: string, expected: ExpectedDecis
   return Effect.succeed({ kind: "write", record: { ...fresh, hold: answered }, result: { kind: "hold", hold: answered } })
 }
 
+const relayTakenQuestions = (
+  root: string,
+  id: string,
+  map: (questions: ReadonlyArray<ParkedQuestion>) => ReadonlyArray<ParkedQuestion>
+): Effect.Effect<void, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  rewriteTaken(root, id, (fresh): Effect.Effect<Rewrite<void>, BacklogError> => {
+    if (fresh.state.kind !== "started" || fresh.parked === null) {
+      return Effect.succeed({ kind: "keep", result: undefined })
+    }
+    const questions = map(fresh.parked.questions)
+    if (sameQuestions(questions, fresh.parked.questions)) {
+      return Effect.succeed({ kind: "keep", result: undefined })
+    }
+    return Effect.succeed({ kind: "write", record: { ...fresh, parked: { ...fresh.parked, questions } }, result: undefined })
+  })
+
 export const markAnswersRelayed = (
   root: string,
   id: string,
   asking: string,
   relayed: ReadonlyArray<{ readonly id: string; readonly asked: string; readonly words: string }>
 ): Effect.Effect<void, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  rewriteTaken(root, id, (fresh): Effect.Effect<Rewrite<void>, BacklogError> => {
-    if (fresh.state.kind !== "started" || fresh.parked === null) {
-      return Effect.succeed({ kind: "keep", result: undefined })
-    }
-    const questions = Arr.map(fresh.parked.questions, (question): ParkedQuestion => {
+  relayTakenQuestions(root, id, (prior) =>
+    Arr.map(prior, (question): ParkedQuestion => {
       if (question.answer === null) {
         return question
       }
@@ -252,12 +265,7 @@ export const markAnswersRelayed = (
         return { ...question, answer: { ...question.answer, overturned: { ...question.answer.overturned, relayedTo: asking } } }
       }
       return question
-    })
-    if (sameQuestions(questions, fresh.parked.questions)) {
-      return Effect.succeed({ kind: "keep", result: undefined })
-    }
-    return Effect.succeed({ kind: "write", record: { ...fresh, parked: { ...fresh.parked, questions } }, result: undefined })
-  })
+    }))
 
 type Corrected = ParkedQuestion & { readonly answer: CaptainAnswer & { readonly overturned: DeciderAnswer & { readonly relayedTo: string } } }
 
@@ -275,20 +283,12 @@ export const markCorrectionsRelayed = (
   id: string,
   corrected: ReadonlyArray<{ readonly id: string; readonly asked: string }>
 ): Effect.Effect<void, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  rewriteTaken(root, id, (fresh): Effect.Effect<Rewrite<void>, BacklogError> => {
-    if (fresh.state.kind !== "started" || fresh.parked === null) {
-      return Effect.succeed({ kind: "keep", result: undefined })
-    }
-    const questions = Arr.map(fresh.parked.questions, (question): ParkedQuestion =>
+  relayTakenQuestions(root, id, (prior) =>
+    Arr.map(prior, (question): ParkedQuestion =>
       isDueCorrection(question) && corrected.some((entry) => entry.id === question.id && entry.asked === question.asked)
         ? { ...question, answer: { ...question.answer, relayedTo: question.answer.overturned.relayedTo } }
         : question
-    )
-    if (sameQuestions(questions, fresh.parked.questions)) {
-      return Effect.succeed({ kind: "keep", result: undefined })
-    }
-    return Effect.succeed({ kind: "write", record: { ...fresh, parked: { ...fresh.parked, questions } }, result: undefined })
-  })
+    ))
 
 export const answerTask = (
   root: string,
