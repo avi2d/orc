@@ -49,7 +49,7 @@ export const taskPrState = (root: string, task: TaskRecord): Effect.Effect<PrSta
     if (yield* eventRecorded(root, task.spec.id + ".pr-closed")) {
       return "closed"
     }
-    return (yield* readPrState(root, task.spec.id, pr)) ?? "open"
+    return yield* readPrState(root, task.spec.id, pr)
   })
 
 export const prEvents = (

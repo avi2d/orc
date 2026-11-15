@@ -1,6 +1,10 @@
 import { Array as Arr, Data, Effect, Schema } from "effect"
 import { Answer, answerOf, decisionStateOf, type AnsweredClosing } from "./task-record-decision"
 import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
+import { deciderAnswerKinds, OverturnedFront, type ParkedAnswer, parkedAnswerOf } from "./task-record-answer"
+
+export { isDeciderAnswer } from "./task-record-answer"
+export type { CaptainAnswer, DeciderAnswer, ParkedAnswer } from "./task-record-answer"
 
 export const taskFolders = ["new", "taken", "closed"] as const
 export type TaskFolder = typeof taskFolders[number]
@@ -43,10 +47,6 @@ export interface Claim {
 export interface Started {
   readonly at: string
   readonly log: string
-}
-
-export interface ParkedAnswer extends Answer {
-  readonly relayedTo: string | null
 }
 
 export interface ParkedQuestion {
@@ -174,7 +174,9 @@ const QuestionFront = Schema.Struct({
   asked_at: Schema.optional(Schema.String),
   blocks: Schema.optional(Schema.Boolean),
   relayed_to: Schema.optional(Schema.String),
-  used: Schema.optional(Schema.Boolean)
+  used: Schema.optional(Schema.Boolean),
+  answered_by: Schema.optional(Schema.Literals(deciderAnswerKinds)),
+  overturned: Schema.optional(OverturnedFront)
 })
 
 const Frontmatter = Schema.Struct({
@@ -250,7 +252,7 @@ const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: str
     text: question.text,
     asked: question.asked_at ?? "",
     blocks: question.blocks ?? true,
-    answer: answer === null ? null : { ...answer, relayedTo: question.relayed_to ?? (question.used === true ? (question.asked_at ?? "") : null) }
+    answer: answer === null ? null : parkedAnswerOf(question, answer)
   }))
 
 const holdQuestionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string): Array<HoldQuestion> | string =>

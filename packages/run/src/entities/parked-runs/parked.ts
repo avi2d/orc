@@ -1,7 +1,7 @@
 import { Array as Arr, Effect, FileSystem } from "effect"
 import type { AskOption, OpenQuestion } from "../review-gate/index"
 import { openReviewQuestions } from "../attention/index"
-import { answerDecision, findTask, grabIn, ranClosing, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, platformFailure, publishOnce, takenGrab, type Hold, type HoldQuestion, isHeld, openQuestions, type Parked, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord, renderTaskFile } from "../backlog/index"
+import { answerDecision, findTask, grabIn, ranClosing, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, platformFailure, publishOnce, takenGrab, type Hold, type HoldQuestion, isHeld, isDeciderAnswer, openQuestions, type Parked, type CaptainAnswer, type DeciderAnswer, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord, renderTaskFile } from "../backlog/index"
 
 // An answer handed to an asking that ended went into the run, so only one never handed out or handed to this asking still answers it.
 const answersAsking = (answer: ParkedAnswer, asking: string | null): boolean => answer.relayedTo === null || answer.relayedTo === asking
@@ -126,7 +126,8 @@ const answerOneOf = <Q extends { readonly id: string; readonly answer: { readonl
   at: string,
   questions: ReadonlyArray<Q>,
   waits: "parked" | "held",
-  fresh: TaskRecord
+  fresh: TaskRecord,
+  overturns: (answer: NonNullable<Q["answer"]>) => boolean = () => false
 ): Effect.Effect<{ readonly asked: Q; readonly answer: { readonly words: string; readonly at: string } }, BacklogError> => {
   const open = unanswered(questions)
   const cut = words.indexOf("=")
@@ -136,7 +137,7 @@ const answerOneOf = <Q extends { readonly id: string; readonly answer: { readonl
   if (asked === undefined || text.trim() === "") {
     return Effect.fail(new BacklogError({ detail: id + " is " + waits + " for the captain's answer to " + open.map((candidate) => candidate.id).join(", ") + ", so answer one as <question-id>=<text>" }))
   }
-  if (asked.answer !== null) {
+  if (asked.answer !== null && !overturns(asked.answer)) {
     return Effect.fail(new BacklogError({ detail: id + " already has an answer to " + question + ": " + asked.answer.words }))
   }
   if (fresh.state.kind !== "new" && !(waits === "parked" && fresh.state.kind === "started")) {
@@ -145,12 +146,28 @@ const answerOneOf = <Q extends { readonly id: string; readonly answer: { readonl
   return Effect.succeed({ asked, answer: { words: text, at } })
 }
 
-const answerQuestionOn = (id: string, words: string, at: string, fresh: TaskRecord & { readonly parked: Parked }): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
-  if (openQuestions(fresh).length === 0) {
+export type AnswerBy = "captain" | "decider" | "asked-back"
+
+// Only the captain has the last word, so a captain's answer replaces a decider's and nothing replaces a captain's.
+const overturnedBy = (by: AnswerBy) => (answer: ParkedAnswer): boolean => by === "captain" && isDeciderAnswer(answer)
+
+const givenAnswer = (answer: { readonly words: string; readonly at: string }, by: AnswerBy, before: ParkedAnswer | null): ParkedAnswer => {
+  if (by !== "captain") {
+    return { ...answer, relayedTo: null, by }
+  }
+  return before !== null && isDeciderAnswer(before) ? { ...answer, relayedTo: null, overturned: before } : { ...answer, relayedTo: null }
+}
+
+const answerQuestionOn = (id: string, words: string, at: string, fresh: TaskRecord & { readonly parked: Parked }, by: AnswerBy): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
+  if (fresh.state.kind === "closed") {
+    return Effect.fail(new BacklogError({ detail: id + " is closed, so the answers its run took stand" }))
+  }
+  const overturns = overturnedBy(by)
+  if (openQuestions(fresh).length === 0 && !fresh.parked.questions.some((question) => question.answer !== null && overturns(question.answer))) {
     return Effect.fail(new BacklogError({ detail: id + " is not parked: its questions were answered" }))
   }
-  return answerOneOf(id, words, at, fresh.parked.questions, "parked", fresh).pipe(Effect.map(({ asked, answer }) => {
-    const questions = Arr.map(fresh.parked.questions, (candidate): ParkedQuestion => candidate === asked ? { ...asked, answer: { ...answer, relayedTo: null } } : candidate)
+  return answerOneOf(id, words, at, fresh.parked.questions, "parked", fresh, overturns).pipe(Effect.map(({ asked, answer }) => {
+    const questions = Arr.map(fresh.parked.questions, (candidate): ParkedQuestion => candidate === asked ? { ...asked, answer: givenAnswer(answer, by, asked.answer) } : candidate)
     const record: TaskRecord = { ...fresh, parked: { ...fresh.parked, questions } }
     return { kind: "write", record, result: { kind: "question", question: asked.id, branch: fresh.parked.branch, live: fresh.state.kind === "started", open: openQuestions(record) } }
   }))
@@ -180,12 +197,15 @@ const answerHeldQuestionOn = (id: string, words: string, at: string, fresh: Task
   }))
 }
 
-const answerOn = (id: string, words: string, at: string, expected?: ExpectedDecision) => (fresh: TaskRecord): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
+const answerOn = (id: string, words: string, at: string, expected: ExpectedDecision | undefined, by: AnswerBy) => (fresh: TaskRecord): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
   if (fresh.parked !== null) {
     if (expected !== undefined && expected.kind !== "parked") {
       return Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" }))
     }
-    return answerQuestionOn(id, words, at, { ...fresh, parked: fresh.parked })
+    return answerQuestionOn(id, words, at, { ...fresh, parked: fresh.parked }, by)
+  }
+  if (by !== "captain") {
+    return Effect.fail(new BacklogError({ detail: id + " is not parked, and the decider answers only a parked question" }))
   }
   if (expected !== undefined && expected.kind !== "held") {
     return Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" }))
@@ -207,22 +227,16 @@ const answerOn = (id: string, words: string, at: string, expected?: ExpectedDeci
   return Effect.succeed({ kind: "write", record: { ...fresh, hold: answered }, result: { kind: "hold", hold: answered } })
 }
 
-export const markAnswersRelayed = (
+const relayTakenQuestions = (
   root: string,
   id: string,
-  asking: string,
-  relayed: ReadonlyArray<{ readonly id: string; readonly asked: string }>
+  map: (questions: Arr.NonEmptyReadonlyArray<ParkedQuestion>) => Arr.NonEmptyReadonlyArray<ParkedQuestion>
 ): Effect.Effect<void, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   rewriteTaken(root, id, (fresh): Effect.Effect<Rewrite<void>, BacklogError> => {
     if (fresh.state.kind !== "started" || fresh.parked === null) {
       return Effect.succeed({ kind: "keep", result: undefined })
     }
-    const questions = Arr.map(fresh.parked.questions, (question): ParkedQuestion =>
-      question.answer !== null && question.answer.relayedTo === null &&
-        relayed.some((entry) => entry.id === question.id && entry.asked === question.asked)
-        ? { ...question, answer: { ...question.answer, relayedTo: asking } }
-        : question
-    )
+    const questions = map(fresh.parked.questions)
     if (sameQuestions(questions, fresh.parked.questions)) {
       return Effect.succeed({ kind: "keep", result: undefined })
     }
@@ -280,13 +294,59 @@ export const sendBackClosedTask = (
     yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
     return sent
   })
+export const markAnswersRelayed = (
+  root: string,
+  id: string,
+  asking: string,
+  relayed: ReadonlyArray<{ readonly id: string; readonly asked: string; readonly words: string }>
+): Effect.Effect<void, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  relayTakenQuestions(root, id, (prior) =>
+    Arr.map(prior, (question): ParkedQuestion => {
+      if (question.answer === null) {
+        return question
+      }
+      const entry = relayed.find((candidate) => candidate.id === question.id && candidate.asked === question.asked)
+      if (entry === undefined) {
+        return question
+      }
+      if (question.answer.words === entry.words && question.answer.relayedTo === null) {
+        return { ...question, answer: { ...question.answer, relayedTo: asking } }
+      }
+      if (!isDeciderAnswer(question.answer) && question.answer.overturned !== undefined && question.answer.overturned.relayedTo === null && question.answer.overturned.words === entry.words) {
+        return { ...question, answer: { ...question.answer, overturned: { ...question.answer.overturned, relayedTo: asking } } }
+      }
+      return question
+    }))
 
+type Corrected = ParkedQuestion & { readonly answer: CaptainAnswer & { readonly overturned: DeciderAnswer & { readonly relayedTo: string } } }
+
+const isDueCorrection = (question: ParkedQuestion): question is Corrected => {
+  const answer = question.answer
+  return answer !== null && !isDeciderAnswer(answer) && answer.relayedTo === null && answer.overturned !== undefined && answer.overturned.relayedTo !== null
+}
+
+// Only an overturned answer the run already took needs a correction, because one it never took is replaced in the relay itself.
+export const correctionsDue = (record: TaskRecord): ReadonlyArray<Corrected> =>
+  record.state.kind === "started" ? (record.parked?.questions ?? []).flatMap((question) => isDueCorrection(question) ? [question] : []) : []
+
+export const markCorrectionsRelayed = (
+  root: string,
+  id: string,
+  corrected: ReadonlyArray<{ readonly id: string; readonly asked: string }>
+): Effect.Effect<void, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  relayTakenQuestions(root, id, (prior) =>
+    Arr.map(prior, (question): ParkedQuestion =>
+      isDueCorrection(question) && corrected.some((entry) => entry.id === question.id && entry.asked === question.asked)
+        ? { ...question, answer: { ...question.answer, relayedTo: question.answer.overturned.relayedTo } }
+        : question
+    ))
 export const answerTask = (
   root: string,
   id: string,
   words: string,
   at: string,
-  expected?: ExpectedDecision
+  expected?: ExpectedDecision,
+  by: AnswerBy = "captain"
 ): Effect.Effect<AnswerOutcome, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const record = yield* findTask(root, id)
@@ -297,8 +357,8 @@ export const answerTask = (
       yield* answerDecision(root, id, words, at)
       return { kind: "decision" } as const
     }
-    const decide = answerOn(id, words, at, expected)
-    if (record.state.kind === "started" && openQuestions(record).length > 0) {
+    const decide = answerOn(id, words, at, expected, by)
+    if (record.state.kind === "started" && record.parked !== null) {
       return yield* rewriteTaken(root, id, decide)
     }
     if (record.state.kind !== "new") {

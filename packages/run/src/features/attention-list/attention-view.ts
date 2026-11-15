@@ -1,5 +1,5 @@
 import { DateTime, Effect, type FileSystem } from "effect"
-import { ageMillis, answerItem, type AttentionItem, type DecidedItem, isOverdue, type OpenItem, readAttention } from "../../entities/attention/index"
+import { ageMillis, answerItem, type Decision, decisionText, type AttentionItem, type DecidedItem, isOverdue, type OpenItem, readAttention } from "../../entities/attention/index"
 import { listTasks, BacklogError, backlogPresent, noBacklog, type TaskFileError } from "../../entities/backlog/index"
 import { formatTable } from "../../shared/lib/index"
 
@@ -12,8 +12,9 @@ interface DecidedJson {
   readonly text: string
   readonly asked: string
   readonly owner: AttentionItem["owner"]
-  readonly decision: NonNullable<AttentionItem["decision"]>
+  readonly decision: Decision
   readonly answer: { readonly words: string; readonly at: string }
+  readonly overturned?: { readonly words: string; readonly at: string }
 }
 
 interface AttentionJson {
@@ -48,7 +49,8 @@ export const attentionJson = (items: ReadonlyArray<OpenItem>, at: string, decide
       asked: item.asked,
       owner: item.owner,
       decision: item.decision,
-      answer: item.state.answer
+      answer: item.state.answer,
+      ...(item.state.overturned === undefined ? {} : { overturned: item.state.overturned })
     }] : [])
   }
 }
@@ -61,14 +63,21 @@ const ageText = (seconds: number): string => {
   return minutes < 60 ? minutes + "m" : Math.floor(minutes / 60) + "h" + String(minutes % 60).padStart(2, "0") + "m"
 }
 
+const openText = (item: { readonly text: string; readonly decision?: Decision }): string => {
+  const text = item.text.replace(/\s+/g, " ").trim()
+  return item.decision?.kind === "asked-back" ? text + " (" + decisionText(item.decision) + ")" : text
+}
+
 const formatAttention = (items: ReadonlyArray<OpenItem>, decided: ReadonlyArray<DecidedItem>, at: string): string => {
   const view = attentionJson(items, at, decided)
   const open = formatTable(
     ["ITEM", "KIND", "TASK", "OWNER", "AGE", "TEXT"],
-    view.items.map((item) => [item.id, item.kind, item.task, item.owner, ageText(item.ageSeconds) + (item.overdue ? " overdue" : ""), item.text.replace(/\s+/g, " ").trim()]),
+    view.items.map((item) => [item.id, item.kind, item.task, item.owner, ageText(item.ageSeconds) + (item.overdue ? " overdue" : ""), openText(item)]),
     "nothing needs anyone"
   )
-  const answered = view.decided.map((entry) => "answered " + entry.id + ": " + entry.answer.words + " (" + entry.decision.reason + ")")
+  const answered = view.decided.map((entry) =>
+    "answered " + entry.id + ": " + entry.answer.words + " (" +
+    (entry.overturned === undefined ? decisionText(entry.decision) : "the captain replaced the decider's answer " + JSON.stringify(entry.overturned.words)) + ")")
   return answered.length > 0 ? open + "\n\nDecided:\n" + answered.join("\n") : open
 }
 

@@ -65,6 +65,7 @@ export {
 } from "./task-record-render"
 export {
   isHeld,
+  isDeciderAnswer,
   openQuestions,
   taskPr,
   ranClosing,
@@ -83,6 +84,8 @@ export type {
   SplitMark,
   Claim,
   Started,
+  CaptainAnswer,
+  DeciderAnswer,
   ParkedAnswer,
   ParkedQuestion,
   HoldQuestion,

@@ -8,5 +8,8 @@
     { "id": "orc-board", "type": "block", "content": { "mod": "orc-board" } },
     { "id": "orc-resources", "type": "block", "content": { "mod": "orc-resources" } },
     { "id": "orc-agents", "type": "block", "content": { "mod": "orc-agents" } }
+  ],
+  "floating": [
+    { "id": "orc-drawer", "edge": "top", "align": "center", "content": { "mod": "orc-drawer" } }
   ]
 }
