@@ -76,12 +76,9 @@ const queuedWhere = (task: Task): string => task.hold === null ? "Waiting to sta
 const awaitingAnswer = (count: number): { readonly standing: Standing; readonly where: string } =>
   ({ standing: { status: "Awaiting you", waiting: { on: "answer" } }, where: questionsLabel(count) })
 
-const newestApproval = (runs: Runs): ReadonlySet<string> => {
+const newestRun = (runs: Runs): ReadonlySet<string> => {
   const newest = new Map<string, string>()
   for (const run of runs.runs) {
-    if (run.status !== "succeeded" || run.prLink === null) {
-      continue
-    }
     const prior = newest.get(run.branch)
     if (prior === undefined || prior < run.id) {
       newest.set(run.branch, run.id)
@@ -126,7 +123,7 @@ const runPlace = (run: Run, task: Task | undefined, merged: ReadonlySet<string>,
 export const buildCards = (runs: Runs, backlog: Backlog): ReadonlyArray<Card> => {
   const byBranch = new Map(backlog.tasks.flatMap((task) => taskBranches(task).map((branch) => [branch, task] as const)))
   const merged = new Set(backlog.merged)
-  const approval = newestApproval(runs)
+  const approval = newestRun(runs)
   const active = new Set<string>()
   const cards: Array<Card> = []
   for (const run of runs.runs) {

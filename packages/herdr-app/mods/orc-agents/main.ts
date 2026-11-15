@@ -78,7 +78,10 @@ export default class OrcAgents extends View {
 
   override init(_props: unknown, cx: AsyncContext): void {
     this.review.on("submit", (_event, submitted) => this.sendBack(submitted))
-    this.review.on("change", (_event, changed) => changed.notify())
+    this.review.on("change", (_event, changed) => {
+      this.selectedKey = this.selectedCard()?.key ?? null
+      changed.notify()
+    })
     this.refresh(cx)
     cx.timer.every(everyMs, (tick) => {
       if (shown()) {
