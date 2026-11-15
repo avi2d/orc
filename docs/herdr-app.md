@@ -37,7 +37,7 @@ The command writes only names that start with `orc`, so Herdr's own mods and lay
 | Agents | `cmd-3` | The runs and the queued tasks, and the selected run's steps and step output |
 
 Board reads `orc backlog --json` and `orc attention --json` when shown and every 10 seconds while shown.
-The task panel beside it reads `orc backlog --json` and `orc runs --json` on the same schedule.
+The task panel beside it reads `orc backlog --json`, `orc runs --json` and `orc runs --json --local` on the same schedule.
 Resources reads `orc-dash snapshot --json --only quota,resources,queues` when shown and every minute.
 Agents reads `orc runs --json --local` and `orc backlog --json` again every 4 seconds while it is the shown tab.
 It also reads the selected run with `orc show <run> --json` and the selected step with `orc log <run> <step-id>`.
@@ -66,8 +66,8 @@ Each lane lists its tasks oldest first.
 ![Task panel showing a held example task with one answered and one open question](images/herdr-task-held.png)
 
 The panel shows the id, the kind and the title of the selected task.
-When the task has a run in the local list, Open run switches to the Agents tab with the newest such run selected.
-A run outside that list has no Open run, since the Agents tab lists that list only.
+When `orc runs --json --local` lists a run of the task, Open run switches to the Agents tab with the newest such run selected.
+A run outside that list has no Open run, since the Agents tab shows those runs only.
 A run belongs to the task when its branch is `orc/<task id>`.
 
 The panel has three tabs:

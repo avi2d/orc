@@ -29,7 +29,7 @@ test("lists the info rows in the fixed order with a dash for each empty one inst
 })
 
 test("shows a closed task's report file as its asset instead of a dash", () => {
-  const closed: TaskDetail = { ...fresh, state: { status: "closed", account: "main", started: null, outcome: "done", pr: null, report: "/home/sam/.orc/reports/orc-34.md", answer: null, closedAt: "2026-11-13T12:00:00.000Z" } }
+  const closed: TaskDetail = { ...fresh, state: { status: "closed", account: "main", started: null, outcome: "done", pr: null, report: "/home/sam/.orc/reports/orc-34.md", closedAt: "2026-11-13T12:00:00.000Z" } }
   expect(infoRows(closed, []).find((row) => row.label === "Assets")?.value).toBe("/home/sam/.orc/reports/orc-34.md")
 })
 
@@ -47,18 +47,18 @@ test("merges with the captain's word as basis instead of no basis", () => {
 })
 
 test("gives a hold without questions one answer box instead of none", () => {
-  const held: TaskDetail = { ...fresh, hold: { reason: "waits for the PR", until: null, at: null, questions: [], answer: null, history: [] } }
+  const held: TaskDetail = { ...fresh, hold: { reason: "waits for the PR", until: null, at: null, questions: [], answer: null } }
   expect(threadEntries(held).map((entry) => entry.reply)).toEqual([{ kind: "hold" }])
 })
 
 test("gives a box to each unanswered question only instead of the hold or an answered one", () => {
-  const held: TaskDetail = { ...fresh, hold: { reason: "two questions", until: null, at: null, questions: [asked("Q1", true), asked("Q2", false)], answer: null, history: [] } }
+  const held: TaskDetail = { ...fresh, hold: { reason: "two questions", until: null, at: null, questions: [asked("Q1", true), asked("Q2", false)], answer: null } }
   expect(threadEntries(held).filter((entry) => entry.reply !== null).map((entry) => entry.reply)).toEqual([{ kind: "question", id: "Q2" }])
 })
 
 test("shows each answered question once instead of again in the hold's joined answer", () => {
   const answered = { words: "question Q1: yes\nquestion Q2: yes", at: "2026-11-13T12:00:00.000Z" }
-  const held: TaskDetail = { ...fresh, hold: { reason: "two questions", until: null, at: null, questions: [asked("Q1", true), asked("Q2", true)], answer: answered, history: [] } }
+  const held: TaskDetail = { ...fresh, hold: { reason: "two questions", until: null, at: null, questions: [asked("Q1", true), asked("Q2", true)], answer: answered } }
   expect(threadEntries(held).map((entry) => entry.what)).toEqual(["Hold", "Question Q1", "Answer to Q1", "Question Q2", "Answer to Q2"])
 })
 
@@ -94,23 +94,12 @@ test("shows no description for a title-only body instead of repeating the title"
 })
 
 test("gives a closed task no parked answer box instead of one that always fails", () => {
-  const closed: TaskDetail = { ...fresh, parked: { branch: "orc/orc-34", questions: [asked("R3", false)] }, state: { status: "closed", account: "main", started: null, outcome: "done", pr: null, report: null, answer: null, closedAt: "2026-11-13T12:00:00.000Z" } }
+  const closed: TaskDetail = { ...fresh, parked: { branch: "orc/orc-34", questions: [asked("R3", false)] }, state: { status: "closed", account: "main", started: null, outcome: "done", pr: null, report: null, closedAt: "2026-11-13T12:00:00.000Z" } }
   expect(threadEntries(closed).map((entry) => entry.reply)).toEqual([null])
 })
 
-test("leaves past holds out of the thread instead of repeating their questions", () => {
-  const past = { reason: "old hold", until: null, at: null, questions: [asked("Q0", false)], answer: null }
-  const held: TaskDetail = { ...fresh, hold: { reason: "waits for the PR", until: null, at: null, questions: [], answer: null, history: [past] } }
-  expect(threadEntries(held).map((entry) => entry.what)).toEqual(["Hold"])
-})
-
-test("leaves a closed decision answer out of the thread instead of showing it again", () => {
-  const closed: TaskDetail = { ...fresh, state: { status: "closed", account: "main", started: null, outcome: "done", pr: null, report: null, answer: { words: "yes", at: "2026-11-13T12:00:00.000Z" }, closedAt: "2026-11-13T12:00:00.000Z" } }
-  expect(threadEntries(closed)).toEqual([])
-})
-
 test("labels a hold answer Answer instead of You", () => {
-  const held: TaskDetail = { ...fresh, hold: { reason: "waits for the PR", until: null, at: null, questions: [], answer: { words: "go", at: "2026-11-13T12:00:00.000Z" }, history: [] } }
+  const held: TaskDetail = { ...fresh, hold: { reason: "waits for the PR", until: null, at: null, questions: [], answer: { words: "go", at: "2026-11-13T12:00:00.000Z" } } }
   expect(threadEntries(held).map((entry) => [entry.who, entry.what])).toEqual([["orc", "Hold"], ["Answer", "Answer"]])
 })
 

@@ -77,9 +77,15 @@ export default class OrcTask extends View {
   }
 
   orc(cx: Context, key: string, argv: ReadonlyArray<string>, done: () => void): void {
+    const issued = this.shownTask
     this.sent.set(key, { kind: "sending" })
     cx.spawn((task) => exec("orc", [...argv]).then(
       (result) => {
+        if (issued !== this.shownTask) {
+          this.reload(task)
+          task.notify()
+          return
+        }
         if (result.code === 0) {
           this.sent.delete(key)
           done()
@@ -90,6 +96,7 @@ export default class OrcTask extends View {
         task.notify()
       },
       () => {
+        if (issued !== this.shownTask) return
         this.sent.set(key, { kind: "failed", reason: "Could not start orc. Check that it is on PATH." })
         task.notify()
       }
@@ -98,6 +105,7 @@ export default class OrcTask extends View {
   }
 
   answer(cx: Context, task: string, entry: ThreadEntry, reply: AnswerTarget): void {
+    if (this.sent.get(entry.key)?.kind === "sending") return
     const box = this.boxes.get(entry.key)
     if (box === undefined) return
     const argv = answerArgv(task, reply, box.value())

@@ -12,16 +12,12 @@ export interface Asked {
   readonly answer: Answer | null
 }
 
-export interface HoldRecord {
+export interface TaskHold {
   readonly reason: string
   readonly until: string | null
   readonly at: string | null
   readonly questions: ReadonlyArray<Asked>
   readonly answer: Answer | null
-}
-
-export interface TaskHold extends HoldRecord {
-  readonly history: ReadonlyArray<HoldRecord>
 }
 
 export interface TaskParked {
@@ -40,7 +36,6 @@ export type TaskState =
     readonly outcome: string
     readonly pr: string | null
     readonly report: string | null
-    readonly answer: Answer | null
     readonly closedAt: string
   }
 
@@ -172,7 +167,7 @@ const questionEntries = (prefix: string, who: string, questions: ReadonlyArray<A
     return question.answer === null ? [asked] : [asked, answerEntry(`${key}-answer`, `Answer to ${question.id}`, question.answer)]
   })
 
-const holdEntries = (prefix: string, hold: HoldRecord, openTask: boolean): ReadonlyArray<ThreadEntry> => {
+const holdEntries = (prefix: string, hold: TaskHold, openTask: boolean): ReadonlyArray<ThreadEntry> => {
   const open = openTask && hold.answer === null
   const reason: ThreadEntry = {
     key: prefix, who: "orc", what: hold.until === null ? "Hold" : `Hold until ${shortTime(hold.until)}`, at: hold.at, text: hold.reason,

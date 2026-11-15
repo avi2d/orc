@@ -1,5 +1,5 @@
 import { type Guard, type Guarded, arrayOf, boardKinds, child, fields, literal, nullableString, number, ok, oneOf, prStates, refused, string } from "./guard"
-import type { Answer, Asked, HoldRecord, TaskDetail, TaskHold, TaskParked, TaskRun, TaskState } from "./task"
+import type { Answer, Asked, TaskDetail, TaskHold, TaskParked, TaskRun, TaskState } from "./task"
 
 type Fields = Readonly<Record<string, unknown>>
 
@@ -33,7 +33,7 @@ const asked: Guard<Asked> = (value, at) => {
   return given.kind === "refused" ? given : ok({ id: id.value, text: text.value, asked: when.value, answer: given.value })
 }
 
-const holdRecord: Guard<HoldRecord> = (value, at) => {
+const hold: Guard<TaskHold> = (value, at) => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
   const reason = string(record.value, "reason", at)
@@ -49,14 +49,7 @@ const holdRecord: Guard<HoldRecord> = (value, at) => {
   return ok({ reason: reason.value, until: until.value, at: when.value, questions: questions.value, answer: given.value })
 }
 
-const hold: Guard<TaskHold> = (value, at) => {
-  const current = holdRecord(value, at)
-  if (current.kind === "refused") return current
-  const record = fields(value, at)
-  if (record.kind === "refused") return record
-  const history = record.value["history"] === undefined ? ok([]) : arrayOf(record.value, "history", at, holdRecord)
-  return history.kind === "refused" ? history : ok({ ...current.value, history: history.value })
-}
+
 
 const parked: Guard<TaskParked> = (value, at) => {
   const record = fields(value, at)
@@ -88,11 +81,9 @@ const closedState = (record: Fields, at: string, claimed: string | null): Guarde
   if (pr.kind === "refused") return pr
   const report = nullableString(record, "report", at)
   if (report.kind === "refused") return report
-  const given = absentOr(record, "answer", at, (entry, where) => entry === null ? ok(null) : answer(entry, where))
-  if (given.kind === "refused") return given
   const closedAt = string(record, "closedAt", at)
   if (closedAt.kind === "refused") return closedAt
-  return ok({ status: "closed", account: claimed, started: started.value, outcome: outcome.value, pr: pr.value, report: report.value, answer: given.value, closedAt: closedAt.value })
+  return ok({ status: "closed", account: claimed, started: started.value, outcome: outcome.value, pr: pr.value, report: report.value, closedAt: closedAt.value })
 }
 
 const taskState = (record: Fields, at: string): Guarded<TaskState> => {
