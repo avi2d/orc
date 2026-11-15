@@ -2,6 +2,27 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.16.0
+
+Released 2026-11-15.
+
+### Features
+
+- **herdr-app:** agents turns view, changes column, and approve and merge [#215](https://github.com/avi2d/orc/pull/215)
+- **herdr-app:** show the selected task in a task panel [#214](https://github.com/avi2d/orc/pull/214)
+- **run:** add orc backlog send-back for a PR that needs one more pass [#213](https://github.com/avi2d/orc/pull/213)
+- **run:** let the decider read the owner's rules and never have the last word [#211](https://github.com/avi2d/orc/pull/211)
+- **herdr-app:** open orc chat in a cmd-k drawer with Raw and Turns views [#207](https://github.com/avi2d/orc/pull/207)
+- **run:** report task waiting reason and PR state in backlog JSON [#210](https://github.com/avi2d/orc/pull/210)
+- **run:** add --session file to orc chat [#206](https://github.com/avi2d/orc/pull/206)
+- **run:** add decision backlog kind for captain-answered questions [#205](https://github.com/avi2d/orc/pull/205)
+- **run:** list queued backlog tasks in orc runs JSON [#204](https://github.com/avi2d/orc/pull/204)
+
+### Fixes
+
+- **run:** treat unread PR state as null so closed tasks land in Done [#212](https://github.com/avi2d/orc/pull/212)
+- **herdr-app:** start the scratch App with herdr-core found and no focus taken [#208](https://github.com/avi2d/orc/pull/208)
+
 ## 0.15.0
 
 Released 2026-11-14.
