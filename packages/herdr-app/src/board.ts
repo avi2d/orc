@@ -39,3 +39,6 @@ export const clickedSelection = (selected: string | null, clicked: string): stri
 
 export const selectionOnBoard = (selected: string | null, tasks: ReadonlyArray<BoardTask> | null): string | null =>
   selected === null || tasks === null || tasks.some((task) => task.id === selected) ? selected : null
+
+export const panelCommand = (kept: string | null, shown: boolean | null): "layout.show" | "layout.hide" | null =>
+  (kept !== null) === shown ? null : kept !== null ? "layout.show" : "layout.hide"

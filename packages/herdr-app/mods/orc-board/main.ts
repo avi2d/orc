@@ -2,7 +2,7 @@ import { type AsyncContext, type Context, type Element, type FocusHandle, View, 
 import { h_flex, v_flex } from "gpui-base"
 import { run, setShared, shared } from "herdr"
 import { refreshWhenShown, selectedTaskKey } from "../../src/views"
-import { type BoardTask, type Lane, clickedSelection, kindLabel, lanes, selectionOnBoard, tasksInLane, titleClip } from "../../src/board"
+import { type BoardTask, type Lane, clickedSelection, kindLabel, lanes, panelCommand, selectionOnBoard, tasksInLane, titleClip } from "../../src/board"
 import { type BoardAttention, type BoardBacklog, boardAttention, boardBacklog } from "../../src/guard-board"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
@@ -45,10 +45,10 @@ export default class OrcBoard extends View {
     const selected = this.selected()
     const kept = selectionOnBoard(selected, this.reading.kind === "ok" ? this.reading.value.backlog.tasks : null)
     if (kept !== selected) setShared(selectedTaskKey, kept)
-    const wanted = kept !== null
-    if (wanted !== this.panelShown) {
-      this.panelShown = wanted
-      run(wanted ? "layout.show" : "layout.hide", { id: taskBlock })
+    const command = panelCommand(kept, this.panelShown)
+    if (command !== null) {
+      this.panelShown = kept !== null
+      run(command, { id: taskBlock })
     }
   }
 
