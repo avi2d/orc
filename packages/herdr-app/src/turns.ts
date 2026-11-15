@@ -232,18 +232,18 @@ export const sessionTurns = (text: string): Guarded<ReadonlyArray<Turn>> => {
   for (const entry of branch) {
     const said = entry.message
     if (said?.role !== "assistant") continue
-    const number = turns.length + 1
+    const turnNumber = turns.length + 1
     const calls = said.blocks.flatMap((part) => part.type === "toolCall" ? [part] : [])
     turns.push({
       id: entry.id,
-      number,
+      number: turnNumber,
       at: said.at,
       usage: said.usage,
       thinking: said.blocks.map((part) => part.type === "thinking" ? part.thinking : "").filter((thought) => thought !== "").join("\n\n"),
       text: textOf(said.blocks.filter((part) => part.type === "text")),
       calls: calls.map((part, index) => ({
         id: part.id,
-        number: `${number.toString()}.${(index + 1).toString()}`,
+        number: `${turnNumber.toString()}.${(index + 1).toString()}`,
         name: part.name,
         arguments: callArguments(part.arguments),
         result: results.get(part.id) ?? { kind: "running" }
