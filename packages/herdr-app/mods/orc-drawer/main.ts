@@ -1,32 +1,42 @@
 import { type AsyncContext, type Context, type Element, type FocusHandle, View, div } from "gpui-kit"
 import { ScrollHandle, h_flex, v_flex } from "gpui-base"
-import { exec, hc, home, layout, nextCommand, props, readTextFile, run, setShared, shared } from "herdr"
+import { closeOverlay, exec, hc, home, nextCommand, openOverlay, props, readTextFile, run, setShared, shared } from "herdr"
 import { type Guard, type Guarded, fields, guardJson, ok, string } from "../../src/guard"
 import type { Reading } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 import { type Turn, sessionTurns } from "../../src/turns"
 import { turnsView } from "../../src/turns-view"
-import { activeChild } from "../../src/views"
 
-type Part = { readonly part: "bar" } | { readonly part: "turns" }
+type Pane = "raw" | "turns"
 
-const modName = "orc-drawer"
+type Role = { readonly role: "controller" } | { readonly role: "bar"; readonly view: Pane } | { readonly role: "turns" }
+
 const chatName = "orc-chat"
-const drawerId = "orc-drawer"
-const viewsId = "orc-drawer-views"
-const rawId = "orc-drawer-raw"
-const turnsId = "orc-drawer-turns"
+const modName = "orc-drawer"
+const overlayKey = "orc-drawer"
 const everyMs = 1000
+const drawerWidth = 900
+const drawerHeight = 532
+const barHeight = 32
 
-const partOf = (value: unknown): Part => {
+const roleOf = (value: unknown): Role => {
   const record = fields(value, "")
-  if (record.kind === "refused") return { part: "bar" }
-  return record.value["view"] === "turns" ? { part: "turns" } : { part: "bar" }
+  if (record.kind === "refused") return { role: "controller" }
+  const view = record.value["view"]
+  if (view === "turns") return { role: "turns" }
+  if (view === "bar") return { role: "bar", view: record.value["shown"] === "turns" ? "turns" : "raw" }
+  return { role: "controller" }
 }
 
-const stopPress = (element: Element): Element => element.on_mouse_down("left", (_event, cx) => cx.stop_propagation())
+const drawerLayout = (view: Pane, chat: DrawerChat): unknown => ({
+  type: "column",
+  children: [
+    { type: "block", size: { px: barHeight }, content: { mod: modName, props: { view: "bar", shown: view } } },
+    { type: "block", content: view === "raw" ? { terminal: chat.address } : { mod: modName, props: { view: "turns" } } }
+  ]
+})
 
-const activePane = (): string => activeChild(layout(), viewsId) === turnsId ? "turns" : "raw"
+const stopPress = (element: Element): Element => element.on_mouse_down("left", (_event, cx) => cx.stop_propagation())
 
 interface Named {
   readonly address: string
@@ -141,7 +151,9 @@ const chatTerminal = (): Promise<Guarded<DrawerChat>> => {
 }
 
 export default class OrcDrawer extends View {
-  part: Part = { part: "bar" }
+  role: Role = { role: "controller" }
+  overlay: { readonly id: string; readonly view: Pane } | null = null
+  chatCheck: Promise<Guarded<DrawerChat>> | null = null
   problem: string | null = null
   turns: Reading<ReadonlyArray<Turn>> = { kind: "reading" }
   readText: string | null = null
@@ -152,15 +164,14 @@ export default class OrcDrawer extends View {
   focusHandle: FocusHandle | null = null
 
   override init(_props: unknown, cx: AsyncContext): void {
-    this.part = partOf(props())
-    const handle = cx.focus_handle()
-    this.focusHandle = handle
-    if (this.part.part === "bar") {
+    this.role = roleOf(props())
+    this.focusHandle = cx.focus_handle()
+    if (this.role.role === "controller") {
       cx.spawn((task) => this.listen(task))
       void this.ensureChat(cx)
     }
-    if (this.part.part === "turns") {
-      handle.focus()
+    if (this.role.role === "turns") {
+      this.focusHandle.focus()
       this.readTurns(cx)
       cx.timer.every(everyMs, (tick) => this.readTurns(tick))
     }
@@ -185,33 +196,42 @@ export default class OrcDrawer extends View {
   }
 
   obey(cx: AsyncContext, command: string): Promise<void> {
-    if (command === "close") {
-      run("layout.hide", { id: drawerId })
-      return Promise.resolve()
-    }
-    if (command === "show:raw" || command === "show:turns") {
-      const child = command === "show:raw" ? rawId : turnsId
-      return this.ensureChat(cx).then(() => {
-        run("layout.show", { id: drawerId })
-        run("layout.select", { stack: viewsId, child })
-      })
-    }
+    if (command === "toggle") return this.overlay === null ? this.open(cx, "raw") : Promise.resolve(this.close())
+    if (command === "switch") return this.open(cx, this.overlay?.view === "raw" ? "turns" : "raw")
+    if (command === "show:raw") return this.open(cx, "raw")
+    if (command === "show:turns") return this.open(cx, "turns")
+    if (command === "close") this.close()
     return Promise.resolve()
   }
 
-  ensureChat(cx: AsyncContext): Promise<void> {
-    return chatTerminal().then(
+  open(cx: AsyncContext, view: Pane): Promise<void> {
+    return this.ensureChat(cx).then((chat) => {
+      if (chat === null) return
+      this.close()
+      const id = openOverlay({ kind: "window", key: overlayKey, width: drawerWidth, height: drawerHeight, layout: drawerLayout(view, chat) })
+      this.overlay = { id, view }
+    })
+  }
+
+  close(): void {
+    if (this.overlay !== null) closeOverlay(this.overlay.id)
+    this.overlay = null
+  }
+
+  ensureChat(cx: AsyncContext): Promise<DrawerChat | null> {
+    this.chatCheck ??= chatTerminal().finally(() => {
+      this.chatCheck = null
+    })
+    return this.chatCheck.then(
       (terminal) => {
-        if (terminal.kind === "refused") {
-          this.problem = terminal.reason
-        } else {
-          this.problem = null
-        }
+        this.problem = terminal.kind === "refused" ? terminal.reason : null
         cx.notify()
+        return terminal.kind === "ok" ? terminal.value : null
       },
       (error: unknown) => {
         this.problem = error instanceof Error ? error.message : "orc chat could not start"
         cx.notify()
+        return null
       }
     )
   }
@@ -257,14 +277,14 @@ export default class OrcDrawer extends View {
 
   render(): Element {
     const t = palette()
-    if (this.part.part === "turns") {
-      const body = v_flex().size_full().bg(t.surface).child(turnsView(t, this.turns, { thinking: this.openThinking, calls: this.openCalls }, {
+    if (this.role.role === "bar") return this.closeOnEscape(this.bar(t, this.role.view))
+    if (this.role.role === "turns") {
+      return this.closeOnEscape(v_flex().size_full().bg(t.surface).child(turnsView(t, this.turns, { thinking: this.openThinking, calls: this.openCalls }, {
         toggleThinking: (turn, cx) => this.flip(this.openThinking, turn, cx),
         toggleCall: (call, cx) => this.flip(this.openCalls, call, cx)
-      }, this.scroll))
-      return this.hideOnEscape(body)
+      }, this.scroll)))
     }
-    return this.bar(t)
+    return this.problem === null ? div() : div().px(12).py(6).text_size(13).text_color(t.ansi1).child(this.problem)
   }
 
   flip(open: Set<string>, id: string, cx: Context): void {
@@ -273,33 +293,30 @@ export default class OrcDrawer extends View {
     cx.notify()
   }
 
-  hideOnEscape(element: Element): Element {
+  closeOnEscape(element: Element): Element {
     if (this.focusHandle === null) return element
-    const handle = this.focusHandle
-    return element.track_focus(handle).on_key_down((event, cx) => {
+    return element.track_focus(this.focusHandle).on_key_down((event, cx) => {
       if (event.key !== "escape") return
-      run("layout.hide", { id: drawerId })
+      run([modName, "close"].join("."))
       cx.stop_propagation()
     })
   }
 
-  bar(t: ReturnType<typeof palette>): Element {
-    const pane = activePane()
-    const choice = (id: string, label: string, command: string): Element =>
+  bar(t: ReturnType<typeof palette>, view: Pane): Element {
+    const choice = (id: Pane, label: string): Element =>
       stopPress(div().id(["pane", id].join("-")).px(10).py(2).rounded(4).cursor_pointer()
-        .bg(id === pane ? t.selected : t.chrome).text_color(id === pane ? t.foreground : t.muted)
+        .bg(id === view ? t.selected : t.chrome).text_color(id === view ? t.foreground : t.muted)
         .hover((style) => style.bg(t.hover))
-        .on_click(() => run([modName, command].join(".")))
+        .on_click(() => run([modName, ["show", id].join(":")].join(".")))
         .child(label))
-    const root = h_flex().id("bar").size_full().px(12).gap(10).items_center().bg(t.chrome).text_size(13).text_color(t.foreground)
-      .child(div().font_semibold().child(this.problem ?? "orc chat"))
-      .child(h_flex().gap(2).child(choice("raw", "Raw", "show:raw")).child(choice("turns", "Turns", "show:turns")))
+    return h_flex().id("bar").size_full().px(12).gap(10).items_center().bg(t.chrome).text_size(13).text_color(t.foreground)
+      .child(div().font_semibold().child("orc chat"))
+      .child(h_flex().gap(2).child(choice("raw", "Raw")).child(choice("turns", "Turns")))
       .child(div().flex_1())
-      .child(div().text_size(12).text_color(t.dim).child("Esc closes"))
+      .child(div().text_size(12).text_color(t.dim).child("⌘⇧K switches"))
       .child(stopPress(div().id("close").px(6).rounded(4).cursor_pointer().text_color(t.muted)
         .hover((style) => style.bg(t.hover).text_color(t.foreground))
         .on_click(() => run([modName, "close"].join(".")))
         .child("✕")))
-    return this.hideOnEscape(root)
   }
 }

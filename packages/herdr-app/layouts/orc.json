@@ -10,26 +10,6 @@
     { "id": "orc-agents", "type": "block", "content": { "mod": "orc-agents" } }
   ],
   "floating": [
-    {
-      "id": "orc-drawer",
-      "type": "column",
-      "hidden": true,
-      "edge": "top",
-      "align": "center",
-      "size": { "px": 900 },
-      "children": [
-        { "id": "orc-drawer-bar", "type": "block", "size": { "px": 32 }, "content": { "mod": "orc-drawer" } },
-        {
-          "id": "orc-drawer-views",
-          "type": "stack",
-          "active": "orc-drawer-raw",
-          "size": { "px": 500 },
-          "children": [
-            { "id": "orc-drawer-raw", "type": "block", "content": { "terminal": "orc-chat" } },
-            { "id": "orc-drawer-turns", "type": "block", "content": { "mod": "orc-drawer", "props": { "view": "turns" } } }
-          ]
-        }
-      ]
-    }
+    { "id": "orc-drawer", "edge": "top", "align": "center", "content": { "mod": "orc-drawer" } }
   ]
 }
