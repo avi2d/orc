@@ -38,7 +38,7 @@ const find = (element: object | string, id: string): Node | null => {
 
 void mock.module("gpui-kit", () => ({ View: Object, div: node }))
 void mock.module("gpui-base", () => ({ h_flex: node, v_flex: node, ScrollHandle: { new: () => ({ scroll_to_item: () => undefined }) } }))
-void mock.module("herdr", () => ({ shared: () => null, setShared: () => undefined, layout: () => null, exec: () => undefined, theme: () => ({}) }))
+void mock.module("herdr", () => ({ shared: () => null, setShared: () => undefined, run: () => undefined, layout: () => null, exec: () => undefined, theme: () => ({}) }))
 
 const task = (index: number): BoardTask => ({
   id: `orc-${index}`, title: "A task", project: "orc", kind: "ship", created: `2026-01-${String(index + 1).padStart(2, "0")}`,

@@ -88,3 +88,11 @@ export const laneJump = (key: string, view: LaneView, count: number): { readonly
   const item = clamp(laneTarget(key, at), 0, count - 1)
   return { item, offsetPx: clamp(offsetShowing(item, at), 0, maxOffset(at, count)) }
 }
+
+export const clickedSelection = (selected: string | null, clicked: string): string | null => selected === clicked ? null : clicked
+
+export const selectionOnBoard = (selected: string | null, tasks: ReadonlyArray<BoardTask> | null): string | null =>
+  selected === null || tasks === null || tasks.some((task) => task.id === selected) ? selected : null
+
+export const panelCommand = (kept: string | null, shown: boolean | null): "layout.show" | "layout.hide" | null =>
+  (kept !== null) === shown ? null : kept !== null ? "layout.show" : "layout.hide"
