@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { buildCards, filterCards, railLabel, stepRows } from "../../../packages/herdr-app/src/agents"
+import { buildCards, filterCards, railLabel, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
 import type { Backlog, Run, Runs, Task } from "../../../packages/herdr-app/src/guard"
 
 const run = (id: string, fields: Partial<Run>): Run => ({
@@ -7,7 +7,7 @@ const run = (id: string, fields: Partial<Run>): Run => ({
 })
 
 const task = (id: string, fields: Partial<Task>): Task => ({
-  id, title: `task ${id}`, project: "orc", kind: "ship", status: "new", hold: null, parked: null, reason: null, ...fields
+  id, title: `task ${id}`, project: "orc", kind: "ship", status: "new", hold: null, parked: null, parkedOrigin: null, reason: null, ...fields
 })
 
 const runs = (list: ReadonlyArray<Run>): Runs => ({ schema: "orc.runs.v1", runs: list })
@@ -23,6 +23,49 @@ const board = buildCards(
   ]),
   backlog([task("orc-48", { status: "closed" }), task("orc-50", {})])
 )
+
+describe("sending a PR back", () => {
+  const prRun = run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48" })
+
+  test("a closed task's open PR offers send-back with the captain's words, not an empty review", () => {
+    const [card] = buildCards(runs([prRun]), backlog([task("orc-48", { status: "closed" })]))
+    expect(card.sendBack).toBe("orc-48")
+    expect(sendBackArgs({ sendBack: "orc-48" }, "  rename the flag ")).toEqual(["backlog", "send-back", "orc-48", "rename the flag"])
+    expect(sendBackArgs({ sendBack: "orc-48" }, "   ")).toBeNull()
+  })
+
+  test("a merged PR offers no send-back instead of restarting a finished task", () => {
+    const [card] = buildCards(runs([prRun]), backlog([task("orc-48", { status: "closed" })], ["orc-48"]))
+    expect(card.sendBack).toBeNull()
+  })
+
+  test("a task still running toward its close offers no send-back that orc would refuse", () => {
+    const [card] = buildCards(runs([prRun]), backlog([task("orc-48", { status: "started" })]))
+    expect(card.sendBack).toBeNull()
+  })
+
+  test("a sent-back PR's old run reads Sent back, not still awaiting approval", () => {
+    const cards = buildCards(runs([prRun]), backlog([task("orc-48", { status: "new", parked: 0, parkedOrigin: prRun.id })]))
+    expect(cards.map((card) => [card.id, card.standing.status, card.where, card.sendBack])).toEqual([
+      ["orc-48", "Queued", "Waiting to start", null],
+      ["orc-48", "Done", "Sent back PR #48", null]
+    ])
+  })
+
+  test("a resumed run with answered questions awaits approval, not a mistaken sent-back", () => {
+    const cards = buildCards(runs([prRun]), backlog([task("orc-48", { status: "started", parked: 0 })]))
+    expect(cards.map((card) => [card.id, card.standing.status, card.where, card.sendBack])).toEqual([
+      ["orc-48", "Awaiting you", "Approve PR #48", null]
+    ])
+  })
+
+  test("a sent-back run that succeeded before its close awaits approval, not a second sent-back", () => {
+    const cards = buildCards(runs([prRun]), backlog([task("orc-48", { status: "started", parked: 0, parkedOrigin: "20261113-070000-cccccc" })]))
+    expect(cards.map((card) => [card.id, card.standing.status, card.where, card.sendBack])).toEqual([
+      ["orc-48", "Awaiting you", "Approve PR #48", null]
+    ])
+  })
+})
 
 describe("the runs list", () => {
   test("two runs of one task do not share a rail label", () => {

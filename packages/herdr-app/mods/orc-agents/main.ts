@@ -1,7 +1,7 @@
 import { type AsyncContext, type Color, type Context, type Element, View, div } from "gpui-kit"
-import { ScrollHandle, h_flex, v_flex } from "gpui-base"
+import { Input, InputState, ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { layout, setShared, settings, shared } from "herdr"
-import { type Card, type CardStatus, type Filter, type Mark, type StepRow, buildCards, cardStatuses, filterCards, projectsOf, railLabel, stepRows } from "../../src/agents"
+import { type Card, type CardStatus, type Filter, type Mark, type StepRow, buildCards, cardStatuses, filterCards, projectsOf, railLabel, sendBackArgs, stepRows } from "../../src/agents"
 import { backlog, runs, show, type Show } from "../../src/guard"
 import { type Reading, readJson, readText } from "../../src/orc-read"
 import { palette } from "../../src/palette"
@@ -74,8 +74,15 @@ export default class OrcAgents extends View {
   shownLines = 0
   busy = false
   logScroll = ScrollHandle.new()
+  review = InputState.new({ placeholder: "What to change before this PR merges" })
+  sent: Keyed<string> | null = null
 
   override init(_props: unknown, cx: AsyncContext): void {
+    this.review.on("submit", (_event, submitted) => this.sendBack(submitted))
+    this.review.on("change", (_event, changed) => {
+      this.selectedKey = this.selectedCard()?.key ?? null
+      changed.notify()
+    })
     this.refresh(cx)
     cx.timer.every(everyMs, (tick) => {
       if (shown()) {
@@ -107,6 +114,9 @@ export default class OrcAgents extends View {
         : backlogReading.kind !== "ok"
         ? backlogReading
         : { kind: "ok", value: buildCards(runsReading.value, backlogReading.value) }
+      if (this.selectedKey !== null && !this.visibleCards().some((card) => card.key === this.selectedKey) && this.review.value() !== "") {
+        this.review.set_value("")
+      }
       const runId = this.selectedCard()?.runId ?? null
       if (runId === null) {
         this.steps = null
@@ -160,6 +170,9 @@ export default class OrcAgents extends View {
   }
 
   select(cx: Context, key: string): void {
+    if (this.selectedKey !== key) {
+      this.review.set_value("")
+    }
     this.selectedKey = key
     this.chosenStep = null
     this.refresh(cx)
@@ -177,9 +190,56 @@ export default class OrcAgents extends View {
     cx.notify()
   }
 
+  sendBack(cx: Context): void {
+    const card = this.selectedCard()
+    const args = card === null ? null : sendBackArgs(card, this.review.value())
+    if (card === null || args === null || this.sent?.reading.kind === "reading") {
+      return
+    }
+    this.sent = { of: card.key, reading: { kind: "reading" } }
+    cx.notify()
+    cx.spawn((task) =>
+      readText("orc", [...args]).then((reading) => {
+        this.sent = { of: card.key, reading }
+        if (reading.kind === "ok") {
+          this.review.set_value("")
+        }
+        this.refresh(task)
+        task.notify()
+      })
+    )
+  }
+
+  sentLine(t: Palette, sent: Reading<string> | null): ReadonlyArray<Element> {
+    if (sent === null) {
+      return []
+    }
+    const words = sent.kind === "reading" ? "Sending it back" : sent.kind === "ok" ? sent.value.trim() : sent.reason
+    return [div().text_size(12).text_color(sent.kind === "failed" ? t.blocked : t.muted).child(words)]
+  }
+
+  sendBackBar(t: Palette, card: Card): ReadonlyArray<Element> {
+    const sent = this.sent?.of === card.key ? this.sent.reading : null
+    const said = this.sentLine(t, sent)
+    if (card.sendBack === null) {
+      return sent?.kind === "ok" ? [v_flex().px(16).py(8).border_b(1).border_color(t.border).children(said)] : []
+    }
+    const ready = sendBackArgs(card, this.review.value()) !== null && sent?.kind !== "reading"
+    const button = div().id("send-back").px(10).py(4).rounded(4).flex_shrink_0().bg(t.selected).text_color(ready ? t.foreground : t.dim).child(sent?.kind === "reading" ? "Sending back" : "Send back")
+    return [v_flex().px(16).py(8).gap(6).border_b(1).border_color(t.border)
+      .child(h_flex().gap(8).items_center()
+        .child(div().flex_1().min_w_0().child(Input.new(this.review)))
+        .child(ready ? button.cursor_pointer().hover((style) => style.bg(t.hover)).on_click((_event, cx) => this.sendBack(cx)) : button))
+      .children(said)]
+  }
+
   setFilter(cx: Context, filter: Filter): void {
+    const before = this.selectedCard()?.key ?? null
     this.filter = filter
     this.chosenStep = null
+    if (this.selectedCard()?.key !== before) {
+      this.review.set_value("")
+    }
     this.refresh(cx)
     cx.notify()
   }
@@ -198,17 +258,13 @@ export default class OrcAgents extends View {
     const t = palette()
     const card = this.selectedCard()
     return h_flex().id("root").size_full().bg(t.surface).text_size(13).text_color(t.foreground)
-      .child(this.folded ? this.rail(t, card) : this.list(t, card))
-      .child(this.stepsColumn(t, card))
-      .child(this.detail(t, card))
+      .child(this.folded ? this.rail(t, card) : this.list(t, card)).child(this.stepsColumn(t, card)).child(this.detail(t, card))
   }
 
   chip(t: Palette, id: string, label: string, on: boolean, pick: (cx: Context) => void): Element {
     return div().id(id).px(8).py(2).rounded(4).cursor_pointer()
       .bg(on ? t.selected : t.surface).text_color(on ? t.foreground : t.muted)
-      .hover((style) => style.bg(t.hover))
-      .on_click((_event, cx) => pick(cx))
-      .child(label)
+      .hover((style) => style.bg(t.hover)).on_click((_event, cx) => pick(cx)).child(label)
   }
 
   filters(t: Palette): Element {
@@ -317,10 +373,10 @@ export default class OrcAgents extends View {
   }
 
   detail(t: Palette, card: Card | null): Element {
-    const pane = v_flex().flex_1().min_w_0().h_full().bg(t.background)
     if (card === null) {
-      return pane.child(div().p(16).text_color(t.muted).child("No run selected"))
+      return v_flex().flex_1().min_w_0().h_full().bg(t.background).child(div().p(16).text_color(t.muted).child("No run selected"))
     }
+    const pane = v_flex().flex_1().min_w_0().h_full().bg(t.background).children(this.sendBackBar(t, card))
     const runId = card.runId
     const stepId = this.stepShown()
     if (runId === null) {
