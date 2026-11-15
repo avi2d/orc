@@ -25,7 +25,7 @@ const line = (kind: ThreadLine["kind"], who: ThreadLine["who"], id: string | nul
 
 const ask = line("question", "worker", askId, "Which layout?\nA) Wide\nB) Narrow")
 
-const remoteRun: AskingRun = { branch: "orc/orc-60", task: "orc-60", machine: "mac", questions: 1 }
+const remoteRun: AskingRun = { branch: "orc/orc-60", task: "orc-60", questions: 1 }
 
 const sources = (entries: ReadonlyArray<ThreadLine>, more: Partial<InboxSources> = {}): InboxSources => ({
   backlog: [started],
@@ -85,6 +85,6 @@ test("sorts items oldest first instead of by task", () => {
 })
 
 test("reads no thread for a task nothing flags instead of every task", () => {
-  const quiet: AttentionItem = { id: "x", kind: "run-died", task: "orc-70", asked: "2026-11-13T11:00:00.000Z", owner: "user", escalated: false }
+  const quiet: AttentionItem = { id: "x", kind: "run-died", task: "orc-70", escalated: false }
   expect(inboxTasks({ backlog: [started], attention: [quiet], runs: [] })).toEqual([])
 })

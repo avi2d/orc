@@ -37,9 +37,11 @@ const holdOpen = (task: TaskDetail): boolean =>
 const parkedOpen = (task: TaskDetail): boolean =>
   task.parked !== null && task.parked.questions.some((question) => question.answer === null)
 
+const questionKinds: ReadonlySet<string> = new Set(["worker-question", "review-question"])
+
 export const inboxTasks = (sources: Omit<InboxSources, "threads">): ReadonlyArray<string> =>
   sources.backlog.filter((task) =>
-    holdOpen(task) || parkedOpen(task) || openPr(task) !== null || runAsks(sources.runs, task.id) || sources.attention.some((item) => item.task === task.id)
+    holdOpen(task) || parkedOpen(task) || openPr(task) !== null || runAsks(sources.runs, task.id) || sources.attention.some((item) => item.task === task.id && questionKinds.has(item.kind))
   ).map((task) => task.id)
 
 const settled = (card: ThreadCard): boolean =>
@@ -54,7 +56,9 @@ const cardItem = (task: TaskDetail, card: ThreadCard, attention: ReadonlyArray<A
   if (card.line.kind === "hold") return card.reply?.kind === "hold" ? { ...base, kind: "hold", ask: askText(card.line.text) } : null
   if (card.line.kind !== "question") return null
   const item = attention.find((entry) => entry.id === card.line.id)
-  if (item?.kind === "pr-ready" && openPr(task) !== null) return null
+  if (item?.kind === "pr-ready") return null
+  if (card.line.who === "beat") return null
+  if (item !== undefined && !questionKinds.has(item.kind)) return null
   return { ...base, kind: item?.escalated === true ? "decision" : "question", ask: card.ask ?? askText(card.line.text) }
 }
 
