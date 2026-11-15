@@ -76,6 +76,12 @@ const missingChecks = (checked: PullRequestView, fresh: PullRequestView): Readon
   return greenChecks(checked).filter((name) => !green.has(name))
 }
 
+const commitParents = (url: string, sha: string) =>
+  Effect.gen(function*() {
+    const [, host = "", owner = "", repo = ""] = prPattern.exec(url) ?? []
+    return yield* gh(["api", "--hostname", host, "repos/" + owner + "/" + repo + "/commits/" + sha, "--jq", ".parents[].sha"])
+  })
+
 // After update-branch GitHub moves the head a few seconds later and the new head starts with no check, so neither an unmoved head nor an empty rollup is an answer yet.
 const awaitNewHead = (url: string, checked: PullRequestView, poll: number): Effect.Effect<PullRequestView, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
@@ -83,6 +89,12 @@ const awaitNewHead = (url: string, checked: PullRequestView, poll: number): Effe
     const fresh = yield* readView(url)
     if (fresh.state !== "OPEN") {
       return fresh
+    }
+    if (fresh.headRefOid !== checked.headRefOid) {
+      const parents = yield* commitParents(url, fresh.headRefOid)
+      if (parents.exitCode !== 0 || !parents.stdout.split("\n").map((line) => line.trim()).filter((line) => line !== "").includes(checked.headRefOid)) {
+        return fresh
+      }
     }
     if (fresh.headRefOid !== checked.headRefOid && (redChecks(fresh).length > 0 || (checkRefusals(fresh).length === 0 && missingChecks(checked, fresh).length === 0))) {
       return fresh
@@ -92,8 +104,7 @@ const awaitNewHead = (url: string, checked: PullRequestView, poll: number): Effe
 
 const childOf = (landing: Landing, checked: string, fresh: string) =>
   Effect.gen(function*() {
-    const [, host = "", owner = "", repo = ""] = prPattern.exec(landing.url) ?? []
-    const parents = yield* gh(["api", "--hostname", host, "repos/" + owner + "/" + repo + "/commits/" + fresh, "--jq", ".parents[].sha"])
+    const parents = yield* commitParents(landing.url, fresh)
     if (parents.exitCode !== 0) {
       return yield* refuse(refusal(landing.id, landing.url, ["could not read the parents of its new head " + fresh + ": " + parents.said]))
     }
@@ -125,6 +136,7 @@ const landUpdated = (landing: Landing, checked: PullRequestView) =>
     if (view.state !== "OPEN") {
       return yield* refuse(refusal(landing.id, landing.url, ["is " + view.state.toLowerCase() + ", not open"]))
     }
+    yield* childOf(landing, checked.headRefOid, view.headRefOid)
     const red = redChecks(view)
     if (red.length > 0) {
       return yield* refuseAndSendBack(
@@ -133,15 +145,10 @@ const landUpdated = (landing: Landing, checked: PullRequestView) =>
         "orc merge updated " + landing.url + " from " + view.baseRefName + ", and the check " + red.join(", ") + " is red on the new head " + view.headRefOid + ". Fix the failure and push."
       )
     }
-    const missing = missingChecks(checked, view)
-    if (missing.length > 0) {
-      return yield* refuse(refusal(landing.id, landing.url, ["the check " + missing.join(", ") + " has not reported on its new head " + view.headRefOid + " after the update from " + view.baseRefName + ", so run orc merge again once it does"]))
-    }
     const behind = yield* behindBy(landing.id, landing.url, view)
     if (behind > 0) {
       return yield* refuse(refusal(landing.id, landing.url, ["is still " + commits(behind) + " behind " + view.baseRefName + " after the update, because " + view.baseRefName + " moved again, so run orc merge again"]))
     }
-    yield* childOf(landing, checked.headRefOid, view.headRefOid)
     return yield* mergeAt(landing, view)
   })
 

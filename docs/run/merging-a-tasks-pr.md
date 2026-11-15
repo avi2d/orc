@@ -17,7 +17,9 @@ Otherwise orc runs `gh pr merge <url> --squash --match-head-commit <sha>` at the
 When the compare API's `behind_by` says an open green PR is behind its base, orc updates the branch instead of refusing it.
 It prints `Updating from main` and runs `gh api -X PUT repos/<owner>/<repo>/pulls/<n>/update-branch -f expected_head_sha=<sha>` with the head it checked.
 It then prints `Checks running` and reads the PR again with `gh pr view`, first after 1 second and then at doubling waits of at most 15 seconds.
-It waits until the head has moved and every check on the new head has reported, for at most 20 minutes.
+It waits until the head has moved, every check on the new head has reported and every check that was green on the checked head is green on the new head, for at most 20 minutes.
+It stops waiting early once a check on the new head is red.
+It reads the new head's parents and treats a head that leaves out the checked head as changed after the approval.
 Once the new head is green and no longer behind, orc runs `gh pr merge <url> --squash --match-head-commit <new sha>`.
 
 Orc merges nothing and refuses when any of these holds:
@@ -25,6 +27,8 @@ Orc merges nothing and refuses when any of these holds:
 - update-branch reports a merge conflict.
 - A check on the new head is red.
 - update-branch answers HTTP 422 because the head is no longer the one orc checked, so someone changed the PR after the approval.
+- The new head leaves the checked head out of its parents, so someone changed the branch after the approval.
+- Orc cannot read the new head's parents, so it cannot tell whether the new head follows the checked head.
 - The checks on the new head do not all report within 20 minutes.
 - The new head is still behind its base, because the base moved again.
 

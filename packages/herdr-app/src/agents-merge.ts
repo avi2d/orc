@@ -16,7 +16,10 @@ const firstLine = (text: string): string => text.trim().split("\n")[0] ?? ""
 export const runMerge = (task: string): Promise<string | null> =>
   exec("orc", ["merge", task, "--basis", "captain-word"], { timeout: mergeTimeoutMs }).then(
     (result) => result.code === 0 ? null : `orc merge ${task} exited ${result.code}: ${firstLine(result.stderr) || firstLine(result.stdout)}`,
-    () => `orc merge ${task} timed out waiting for checks.`
+    (reason: unknown) => {
+      const said = reason instanceof Error ? reason.message : String(reason)
+      return /enoent|not found|spawn|path/i.test(said) ? `Could not start orc merge ${task}. Check that orc is on PATH.` : `orc merge ${task} timed out waiting for checks.`
+    }
   )
 
 export const mergedNote = (task: string): void => {
