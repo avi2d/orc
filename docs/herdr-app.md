@@ -22,7 +22,7 @@ To install the layout:
 1. Run `herdr-app do layout.switch --name orc`, or press the `layout.switch` key until the `orc` layout shows.
    Check `keys.json` for your `layout.switch` binding.
 
-`orc app install` copies the mods `orc-tabs`, `orc-board`, `orc-resources`, `orc-agents`, `orc-changes` and `orc-drawer` into `~/.config/herdr-app/mods/`.
+`orc app install` copies the mods `orc-tabs`, `orc-board`, `orc-task`, `orc-resources`, `orc-agents`, `orc-changes` and `orc-drawer` into `~/.config/herdr-app/mods/`.
 It copies `orc.json` and its preview `orc.svg` into `~/.config/herdr-app/layouts/`.
 It adds `cmd-1`, `cmd-2`, `cmd-3` and `cmd-k` to the `layout:orc` section of `~/.config/herdr-app/keys.json`.
 A key you already set in that section stays, and the command prints it as skipped.
@@ -32,11 +32,12 @@ The command writes only names that start with `orc`, so Herdr's own mods and lay
 
 | Tab | Key | What it shows |
 | --- | --- | --- |
-| Board | `cmd-1` | The backlog tasks in five lanes |
+| Board | `cmd-1` | The backlog tasks in five lanes, and the selected task beside them |
 | Resources | `cmd-2` | Each subscription's quota windows, and each machine's cores, load, memory, disk and running orc runs |
 | Agents | `cmd-3` | The runs and the queued tasks, and the selected run's steps, step output and changes |
 
 Board reads `orc backlog --json` and `orc attention --json` when shown and every 10 seconds while shown.
+The task panel beside it reads `orc backlog --json`, `orc runs --json` and `orc runs --json --local` on the same schedule.
 Resources reads `orc-dash snapshot --json --only quota,resources,queues` when shown and every minute.
 Agents reads `orc runs --json --local` and `orc backlog --json` again every 4 seconds while it is the shown tab.
 It also reads the selected run with `orc show <run> --json`.
@@ -61,8 +62,34 @@ A closed task whose PR the beat has not read yet appears in Done.
 Select a lane header to fold or open it.
 Backlog and Done start folded.
 Select a project to filter the lanes, or select All to show every project.
-Select a card to mark it.
+Select a card to show its task in the panel on the right.
 Each lane lists its tasks oldest first.
+
+## Read a task
+
+![Task panel showing a held example task with one answered and one open question](images/herdr-task-held.png)
+
+The panel shows the id, the kind and the title of the selected task.
+When `orc runs --json --local` lists a run of the task, Open run switches to the Agents tab with the newest such run selected.
+A run outside that list has no Open run, since the Agents tab shows those runs only.
+A run belongs to the task when its branch is `orc/<task id>`.
+
+The panel has three tabs:
+
+| Tab | What it shows |
+| --- | --- |
+| Thread | The hold reason, the hold's questions and the run's parked questions, each with who asked, what it is and when, and each answer below its question |
+| Description | The task's body without its title line as markdown, or No description when nothing remains |
+| Info | Account, Run, Branch, PR, Depends on, Created, Started, Closed, Priority and Assets, in that order, with `—` for an empty row |
+
+Each unanswered question has an answer box.
+Press Enter or select Send to run `orc backlog answer <task> <question-id>=<text>`.
+A hold with no questions has one box, which runs `orc backlog answer <task> <text>`.
+When the command fails, the box shows the command and its error.
+Assets shows the report file of a closed task when it has one.
+
+When the task's PR is open, the PR row has a Merge button.
+It asks first, and on Confirm runs `orc merge <task> --basis captain-word`.
 
 ## Read the Resources tab
 

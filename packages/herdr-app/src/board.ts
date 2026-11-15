@@ -13,6 +13,16 @@ export interface BoardTask {
   readonly prState: "open" | "closed" | "merged" | null
 }
 
+export const kindLabel = (kind: BoardTask["kind"]): string => {
+  switch (kind) {
+    case "ship": return "Code"
+    case "scout": return "Research"
+    case "task": return "Ops"
+    case "decision": return "Decision"
+    case "parent": return "Parent"
+  }
+}
+
 export const titleClip: { readonly heightPx: number; readonly lineHeightPx: number } = { heightPx: 36, lineHeightPx: 18 }
 
 export const laneFor = (task: BoardTask, attention: ReadonlySet<string>): Lane => {

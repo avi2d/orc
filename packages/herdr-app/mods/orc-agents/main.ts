@@ -1,6 +1,6 @@
 import { type AsyncContext, type Context, type Element, View } from "gpui-kit"
 import { InputState, ScrollHandle, h_flex } from "gpui-base"
-import { layout, readTextFile, run, setShared } from "herdr"
+import { layout, readTextFile, run, setShared, shared } from "herdr"
 import { type Card, type Filter, type RunAgent, buildCards, filterCards, goesOn, runAgent } from "../../src/agents"
 import { type AgentsActions, type Chosen, type DetailShown, type Keyed, type Pane, approvalOf, askMerge, detailView, logLines, runsColumn, sendBackBar, stepsColumn, submitSendBack } from "../../src/agents-view"
 import { type Merge, mergeCommand, mergedNote, runMerge, watchMerges } from "../../src/agents-merge"
@@ -10,7 +10,7 @@ import { backlog, runs, show, type Show, type ShownStep } from "../../src/guard"
 import { type Reading, readJson, readText } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 import { type Turn, sessionTurns } from "../../src/turns"
-import { activeChild, viewsStack } from "../../src/views"
+import { activeChild, agentsOpenKey, openAsk, viewsStack } from "../../src/views"
 
 type Palette = ReturnType<typeof palette>
 
@@ -33,6 +33,7 @@ export default class OrcAgents extends View {
   selectedKey: string | null = null
   chosen: Chosen | null = null
   pane: Pane = "turns"
+  opened = 0
   folded = false
   steps: Keyed<Show> | null = null
   log: Keyed<string> | null = null
@@ -337,7 +338,17 @@ export default class OrcAgents extends View {
     this.moveSelection(cx, () => { this.filter = filter })
   }
 
-  render(): Element {
+  openAsked(cx: Context): void {
+    const asked = openAsk(shared(agentsOpenKey))
+    if (asked === null || asked.at === this.opened) return
+    this.opened = asked.at
+    this.filter = { project: null, status: null }
+    this.select(cx, asked.run)
+    setShared(agentsOpenKey, null)
+  }
+
+  render(cx: Context): Element {
+    this.openAsked(cx)
     const t = palette()
     const card = this.selectedCard()
     const act: AgentsActions = {

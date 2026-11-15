@@ -1,7 +1,8 @@
 import { type AsyncContext, type Context, type Element, View, div } from "gpui-kit"
 import { h_flex, v_flex } from "gpui-base"
-import { refreshWhenShown } from "../../src/views"
-import { type BoardTask, type Lane, lanes, tasksInLane, titleClip } from "../../src/board"
+import { setShared, shared } from "herdr"
+import { refreshWhenShown, selectedTaskKey } from "../../src/views"
+import { type BoardTask, type Lane, kindLabel, lanes, tasksInLane, titleClip } from "../../src/board"
 import { type BoardAttention, type BoardBacklog, boardAttention, boardBacklog } from "../../src/guard-board"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
@@ -12,20 +13,9 @@ interface BoardDocuments {
   readonly attention: BoardAttention
 }
 
-const kindLabel = (kind: BoardTask["kind"]): string => {
-  switch (kind) {
-    case "ship": return "Code"
-    case "scout": return "Research"
-    case "task": return "Ops"
-    case "decision": return "Decision"
-    case "parent": return "Parent"
-  }
-}
-
 export default class OrcBoard extends View {
   reading: Reading<BoardDocuments> = { kind: "reading" }
   project: string | null = null
-  selected: string | null = null
   folded = new Set<Lane>(["Backlog", "Done"])
   visible = false
   lastRead = 0
@@ -84,11 +74,11 @@ export default class OrcBoard extends View {
   }
 
   card(t: Palette, task: BoardTask): Element {
-    const selected = this.selected === task.id
+    const selected = shared(selectedTaskKey) === task.id
     return v_flex().id(`card-${task.id}`).h(84).p(8).gap(4).rounded(6).cursor_pointer().flex_shrink_0()
       .bg(selected ? t.selected : t.background)
       .hover((style) => style.bg(selected ? t.selected : t.hover))
-      .on_click((_event, cx) => { this.selected = task.id; cx.notify() })
+      .on_click(() => setShared(selectedTaskKey, task.id))
       .child(h_flex().gap(8).child(div().font_semibold().child(task.id)).child(div().text_color(t.dim).child(kindLabel(task.kind))))
       .child(div().h(titleClip.heightPx).line_height(`${titleClip.lineHeightPx}px`).overflow_hidden().child(task.title))
   }

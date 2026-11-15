@@ -33,6 +33,8 @@ const expectedFiles = [
   "dist/herdr-app/mods/orc-resources/mod.json",
   "dist/herdr-app/mods/orc-tabs/main.js",
   "dist/herdr-app/mods/orc-tabs/mod.json",
+  "dist/herdr-app/mods/orc-task/main.js",
+  "dist/herdr-app/mods/orc-task/mod.json",
   "package.json",
   "scripts/patch-knip-jiti.ts",
   "src/shared/sandbox/agent-exec.ts",
