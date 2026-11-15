@@ -90,6 +90,6 @@ export default class OrcBoard extends View {
       .hover((style) => style.bg(selected ? t.selected : t.hover))
       .on_click((_event, cx) => { this.selected = task.id; cx.notify() })
       .child(h_flex().gap(8).child(div().font_semibold().child(task.id)).child(div().text_color(t.dim).child(kindLabel(task.kind))))
-      .child(div().h(titleClip.heightPx).line_height(`${titleClip.lineHeightPx}px`)[titleClip.overflow]().child(task.title))
+      .child(div().h(titleClip.heightPx).line_height(`${titleClip.lineHeightPx}px`).overflow_hidden().child(task.title))
   }
 }

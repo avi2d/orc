@@ -44,7 +44,6 @@ test("a closed task whose PR no beat has read is not in Awaiting you", () => {
 
 test("a card title that wraps to three lines shows two rather than three", () => {
   expect(titleClip.heightPx).toBe(2 * titleClip.lineHeightPx)
-  expect(titleClip.overflow).toBe("overflow_hidden")
 })
 
 test("a closed task without an open PR is not in Running", () => {
