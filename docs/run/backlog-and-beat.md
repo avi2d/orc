@@ -221,7 +221,7 @@ The reason is a decision for the captain, a missing priority, the hold, or the p
 It is also the open children or the dependency the task waits on.
 That dependency includes a ship prerequisite whose PR has not merged.
 Taken, started and closed tasks carry `null` for `wait`.
-Every task also carries `waiting`, which is `null` for a taken, started or closed task and `{ kind, detail }` for a new one.
+Every task also carries `waiting`, which is `null` for a taken, started or closed task and `{ kind, detail }` for a new one, plus `at` for a `room` wait.
 The `kind` is `decision`, `no-priority`, `held`, `parked` or `depends` for the reasons above, and `detail` is the same words as `wait`.
 A new task with none of those reasons has the `kind` `room`, for what only a beat sees: no free slot, no account with room, the machines' load or the token.
 Each beat replaces `~/.orc/backlog/waits.json` with the reasons it gave those tasks.
