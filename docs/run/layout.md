@@ -84,7 +84,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 
 | Path | What it holds |
 | --- | --- |
-| `packages/run/src/features/decider/decider.ts` | The decider: one call per open review question it owns, and its answer or escalation recorded on the item |
+| `packages/run/src/features/decider/decider.ts` | The decider: one call per open question it owns with the rules it reads, its reply checked as an answer on a quoted rule, an ask back, a duplicate link or an escalation, and that decision recorded on the item |
+| `packages/run/src/features/decider/decider-guard.ts` | The fixed list of topics orc never hands the decider, and the words an ask back hands the worker |
 | `packages/run/src/features/decider/decider-ask.ts` | The decider's call, Pi on `models.decider` with the policy as its system prompt and no tools |
 
 ## features/heavy-commands
@@ -115,6 +116,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/queueing-a-task/runner.ts` | The runner: the start, the kill and the token renewal through pueue |
 | `packages/run/src/features/queueing-a-task/runner-instructions.ts` | The project instructions a start carries to the machine that queues the run |
 | `packages/run/src/features/queueing-a-task/runner-result.ts` | The reading of a task's result and the `orc.runner.v1` JSON |
+| `packages/run/src/features/queueing-a-task/runner-answer.ts` | `orc runner answer`: the answers it hands an asking run and the corrected answers it hands a live run, locally or through a machine's command |
 | `packages/run/src/features/queueing-a-task/hold.ts` | `orc runner hold`: the wait for a live token, the rerun and the folder removal |
 | `packages/run/src/features/queueing-a-task/cli-stop.ts` | The stop of a started task: the kill, the result read and the close as stopped |
 
@@ -158,7 +160,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/agent/agents.ts` | The agent file parsing and lookup |
 | `packages/run/src/entities/agent/long-session.ts` | The long session watch: the turn and compaction counts, the handover note and the handover prompt |
 | `packages/run/src/entities/agent/orc-ask-extension.ts` | The Pi extension orc copies into the run's Pi folder, which adds the `orc_ask` tool |
-| `packages/run/src/entities/agent/worker-ask.ts` | The orc side of `orc_ask`: the `ask-<n>` ids, the `asking.json` it writes, the answers it hands back and the 10 minute wait |
+| `packages/run/src/entities/agent/worker-ask.ts` | The orc side of `orc_ask`: the `ask-<n>` ids, the `asking.json` it writes, the answers it hands back, the corrected answers it hands on after Pi's next tool call and the 10 minute wait |
 
 ## entities/attention
 
@@ -166,6 +168,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/entities/attention/beat-action.ts` | The beat actions each beat step reports |
 | `packages/run/src/entities/attention/attention.ts` | The attention queue under `attention/`: one file per item, its open and close and withdraw, the items of one task, and the review questions, run events and overdue waits routed into it |
+| `packages/run/src/entities/attention/attention-item.ts` | The item file shape, the decider's decisions it records and their text |
+| `packages/run/src/entities/attention/failing-command.ts` | The `failing-command` items of running runs whose command keeps failing |
 
 ## entities/backlog
 
@@ -179,6 +183,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/backlog/runner-label.ts` | The task branch names, the run labels and the file keys the runner files use |
 | `packages/run/src/entities/backlog/task-kind.ts` | The task, run and report kinds, the agent report file name and the run folder |
 | `packages/run/src/entities/backlog/task-record-render.ts` | The task file rendering from a task record |
+| `packages/run/src/entities/backlog/task-record-answer.ts` | The answer to a parked question: the captain's or the decider's, and the decider's answer the captain's replaced |
 | `packages/run/src/entities/backlog/notes.ts` | The task notes under `notes/`: one `<task-id>.jsonl` file per task, each note one appended line with its time, writer and text |
 
 ## entities/events
@@ -203,6 +208,12 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts` | The stand in runtime: the helper command, the real tool lookup, the bypass event, the plan of a call and the queue wait |
 | `packages/run/src/entities/heavy-queue/heavy-process-tree.ts` | The process tree walk that finds a call inside a held slot or under the through command |
 | `packages/run/src/entities/heavy-queue/heavy-pueue-task.ts` | The reading of pueue status and log JSON for the queue wait and the exit code |
+
+## entities/orc-rules
+
+| Path | What it holds |
+| --- | --- |
+| `packages/run/src/entities/orc-rules/orc-rules.ts` | The reading of `<ORC_HOME>/orchestrator.md` and the projects' instructions files that the chat and the decider load |
 
 ## entities/parked-runs
 

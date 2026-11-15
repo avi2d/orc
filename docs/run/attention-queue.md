@@ -24,12 +24,41 @@ The beat that writes the question into the task's `parked_questions`, as [Parked
 ## The decider
 The same beat hands each open item the decider owns to the decider, one short Pi call per question.
 The call runs on `models.decider` in `config.json`, as [Configuring providers](configuring-providers.md) shows, with no tools.
-Its system prompt is the written policy in `packages/run/agents/decider-policy.md`, and its prompt is the task's title and body, which hold its intent, and the question.
-It answers a routine question, or escalates the question to the user.
-Its answer goes to the task as `orc backlog answer` would give it, so the item closes with the answer's words.
-An escalation hands the item to the user, and the item stays open.
-Either way the item keeps a `decision` with `answered` or `escalated`, the decider's reason and its time, so `orc attention` shows the decider's answers afterwards.
-A reply orc cannot read, a call that fails or a missing `models.decider` escalates the item with that as its reason.
+Its system prompt is the written policy in `packages/run/agents/decider-policy.md`.
+Its prompt holds the rules it reads, each under a label that names its file, then the task's title and body, which hold its intent, then the question.
+The rules are your rules in `<ORC_HOME>/orchestrator.md` and the instructions file of the task's project in `projects.json`, each when it exists.
+
+Some questions never reach the decider.
+Before the call, orc checks the question's words against a fixed list of topics: deleting, security, keys or credentials, merging, releasing, spending, and anything that cannot be undone.
+A question on that list goes to you, and its `decision` is `escalated` with the topic and the word that matched as its reason.
+The list is in the code, so neither your rules nor the policy can widen what the decider answers.
+
+The decider takes one of four actions, and the item keeps it as a `decision` with its time:
+
+- **answer**: the reply names the answer, the reason and the `rule` it rests on, quoted word for word from your rules, the project's instructions, the policy or the task's body.
+  Orc escalates an answer whose quote is shorter than 3 words or is in none of them.
+  The answer goes to the task as `orc backlog answer` would give it, so the item closes with the answer's words.
+  The `decision` is `answered` with the reason and the `rule`, which holds the `quote` and the `source` file it came from.
+- **ask back**: for a `worker-question`, the decider may put one question to the worker instead of answering.
+  The worker gets that question as the result of its `orc_ask` call, and the item stays open.
+  The `decision` is `asked-back` with the decider's `question`.
+  An ask back on a `review-question` escalates, because the run that asked it has stopped.
+- **link a duplicate**: the decider may name an earlier answered question of the same task by its item id.
+  Orc checks that the earlier item exists and has an answer, gives that answer, and records the `decision` as `duplicate` with the earlier item's id in `of`.
+  A link to an item that does not exist or has no answer escalates.
+- **escalate**: the item goes to you and stays open, and the `decision` is `escalated` with the decider's reason as its note to you.
+
+A reply orc cannot read, a call that fails, a missing `models.decider` or a rules file orc cannot read escalates the item with that as its reason.
+
+## Overturning a decider answer
+The decider never has the last word.
+To replace an answer the decider gave, run `orc backlog answer <task-id> <question-id>=<text>`.
+Your answer stands, and the task file keeps the decider's answer beside it under `overturned`.
+The item keeps the decider's answer under `overturned` in its `closed` state, and its `answer` is yours.
+A run that has not received the decider's answer gets only yours.
+A live run that already has it gets yours as a correction after its next tool call.
+A closed task refuses the answer, because its run is over.
+A second answer never replaces yours.
 
 ## Answering an item
 Answering a review question or a worker question with `orc backlog answer <task-id> <question-id>=<text>` closes the item.
@@ -61,6 +90,9 @@ Each beat reads the queue before it starts a new task, and prints one `needs the
 To see every open item, oldest first, run `orc attention`.
 It prints each item's id, kind, task, owner, age and text, and marks an overdue one `overdue`.
 It then prints each item the decider answered under a `Decided:` heading as `answered <id>: <words> (<reason>)`.
+The reason of an answer on a rule ends with `, quoting <source>: "<quote>"`, and a duplicate shows `the same question as <item-id>`.
+An answer you replaced shows `(the captain replaced the decider's answer "<words>")`.
+An open item the decider asked back shows `(asked the worker back: <question>)` after its text.
 An item the decider escalated carries its `decision` in `items`.
 An item the decider answered stays visible under `decided` with its answer and its `decision` in the JSON.
 An answered item leaves `decided` once its task closes.
@@ -75,7 +107,7 @@ To print the same facts as JSON, run `orc attention --json`, whose document name
     { "id": "orc-1.r2.2026-11-02T10_00_00_000Z", "kind": "review-question", "task": "orc-1", "text": "Keep the old flag?", "asked": "2026-11-02T10:00:00.000Z", "owner": "decider", "ageSeconds": 600, "overdue": true }
   ],
   "decided": [
-    { "id": "orc-1.r3.2026-11-02T09_50_00_000Z", "kind": "review-question", "task": "orc-1", "text": "Keep the old flag?", "asked": "2026-11-02T09:50:00.000Z", "owner": "decider", "decision": { "kind": "answered", "reason": "the intent keeps the old flag", "at": "2026-11-02T10:00:00.000Z" }, "answer": { "words": "Keep it", "at": "2026-11-02T10:00:00.000Z" } }
+    { "id": "orc-1.r3.2026-11-02T09_50_00_000Z", "kind": "review-question", "task": "orc-1", "text": "Keep the old flag?", "asked": "2026-11-02T09:50:00.000Z", "owner": "decider", "decision": { "kind": "answered", "reason": "the intent keeps the old flag", "rule": { "quote": "Keep the old flag for one release.", "source": "task orc-1" }, "at": "2026-11-02T10:00:00.000Z" }, "answer": { "words": "Keep it", "at": "2026-11-02T10:00:00.000Z" } }
   ]
 }
 ```

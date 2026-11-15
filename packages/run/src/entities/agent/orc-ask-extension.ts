@@ -13,7 +13,7 @@ const pollMillis = 1000
 const askFileStem = (toolCallId: string): string => toolCallId.replace(/[^A-Za-z0-9_-]/g, "_")
 
 export type AskReply =
-  | { readonly kind: "answer"; readonly id: string; readonly question: string; readonly words: string }
+  | { readonly kind: "answer" | "correction"; readonly id: string; readonly question: string; readonly words: string }
   | { readonly kind: "timeout"; readonly id: string }
 
 interface TextBlock {
@@ -52,7 +52,7 @@ const isAskReply = (value: unknown): value is AskReply => {
   if (value.kind === "timeout") {
     return true
   }
-  return value.kind === "answer" && "question" in value && typeof value.question === "string" && "words" in value && typeof value.words === "string"
+  return (value.kind === "answer" || value.kind === "correction") && "question" in value && typeof value.question === "string" && "words" in value && typeof value.words === "string"
 }
 
 const readReply = (dir: string, stem: string): AskReply | null => {
@@ -72,10 +72,22 @@ const markDelivered = (dir: string, stem: string): void => {
   writeFileSync(join(dir, stem + deliveredSuffix), "")
 }
 
-const replyText = (reply: AskReply): string =>
-  reply.kind === "answer"
-    ? "The captain answered your question " + reply.id + " (" + reply.question + "): " + reply.words
-    : "No answer to " + reply.id + " came in time. orc stops this session now and resumes it with the captain's answer, so do nothing more."
+const questionNamed = (reply: { readonly id: string; readonly question: string }): string =>
+  reply.id + (reply.question === "" ? "" : " (" + reply.question + ")")
+
+const replyText = (reply: AskReply): string => {
+  switch (reply.kind) {
+    case "answer": {
+      return "The captain answered your question " + questionNamed(reply) + ": " + reply.words
+    }
+    case "correction": {
+      return "The captain replaced the answer you got to your question " + questionNamed(reply) + ". Work from this answer instead: " + reply.words
+    }
+    case "timeout": {
+      return "No answer to " + reply.id + " came in time. orc stops this session now and resumes it with the captain's answer, so do nothing more."
+    }
+  }
+}
 
 const textResult = (text: string): AskToolResult => ({ content: [{ type: "text", text }], details: undefined })
 
@@ -111,7 +123,7 @@ const undeliveredAnswers = (dir: string, waiting: ReadonlySet<string>): Readonly
     .toSorted()
     .flatMap((stem) => {
       const reply = readReply(dir, stem)
-      if (reply?.kind !== "answer") {
+      if (reply === null || reply.kind === "timeout") {
         return []
       }
       markDelivered(dir, stem)

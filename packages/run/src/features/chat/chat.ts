@@ -3,7 +3,8 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { boardsVar } from "./chat-board"
 import { chatToolNames, orcCommandVar } from "./chat-tools"
 import { backlogPaths } from "../../entities/backlog/index"
-import { type ProjectInstructions, readProjectInstructions, readFailure, providerEnvOf, readOrcConfig } from "../../shared/config/index"
+import { type LoadedInstructions, type OrcRules, readInstructions, readOrcRules } from "../../entities/orc-rules/index"
+import { type ProjectInstructions, providerEnvOf, readOrcConfig } from "../../shared/config/index"
 import type { Command } from "../../shared/process/index"
 
 export class ChatError extends Data.TaggedError("ChatError")<{
@@ -17,40 +18,16 @@ interface ChatLaunch {
 
 const chatToolsFile = import.meta.dir + "/chat-tools.ts"
 
-type ChatRules = { readonly kind: "loaded"; readonly file: string } | { readonly kind: "none"; readonly file: string }
-
-const chatRules = (orcHome: string): Effect.Effect<ChatRules, ChatError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const file = orcHome + "/orchestrator.md"
-    const fs = yield* FileSystem.FileSystem
-    const info = yield* fs.stat(file).pipe(
-      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)),
-      Effect.mapError((error) => new ChatError({ message: "orc chat: " + file + ": " + error.message }))
-    )
-    return info !== null && info.type === "File" ? { kind: "loaded", file } : { kind: "none", file }
-  })
-
-interface LoadedInstructions extends ProjectInstructions {
-  readonly text: string
-}
+const chatRules = (orcHome: string): Effect.Effect<OrcRules, ChatError, FileSystem.FileSystem> =>
+  readOrcRules(orcHome).pipe(Effect.mapError((error) => new ChatError({ message: "orc chat: " + error.message })))
 
 const chatInstructions = (orcHome: string): Effect.Effect<ReadonlyArray<LoadedInstructions>, ChatError, FileSystem.FileSystem | Path.Path> =>
-  Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const named = yield* readProjectInstructions(backlogPaths(orcHome + "/backlog").projects).pipe(
-      Effect.mapError((error) => new ChatError({ message: "orc chat: " + error.file + ": " + error.detail }))
-    )
-    return yield* Effect.forEach(named, (entry) =>
-      fs.readFileString(entry.file).pipe(
-        Effect.map((text) => ({ ...entry, text })),
-        Effect.mapError((error) => new ChatError({ message: "orc chat: cannot read the instructions file " + entry.file + ": " + readFailure(error) }))
-      ))
-  })
+  readInstructions(backlogPaths(orcHome + "/backlog").projects).pipe(Effect.mapError((error) => new ChatError({ message: "orc chat: " + error.message })))
 
-const rulesWords = (rules: ChatRules): string =>
+const rulesWords = (rules: OrcRules): string =>
   rules.kind === "loaded" ? "orc chat loaded the rules in " + rules.file : "orc chat found no rules at " + rules.file
 
-const instructionsWords = (rules: ChatRules, instructions: ReadonlyArray<ProjectInstructions>): string =>
+const instructionsWords = (rules: OrcRules, instructions: ReadonlyArray<ProjectInstructions>): string =>
   instructions.length === 0
     ? ""
     : (rules.kind === "loaded" ? " and" : "; it loaded") + " the instructions for " + instructions.map((entry) => entry.project + " in " + entry.file).join(" and for ")
@@ -58,7 +35,7 @@ const instructionsWords = (rules: ChatRules, instructions: ReadonlyArray<Project
 const instructionsPrompt = (entry: LoadedInstructions): string =>
   "The instructions file for the project " + entry.project + ", " + entry.file + ":\n\n" + entry.text
 
-const chatLaunch = (orcHome: string, model: string, rules: ChatRules, instructions: ReadonlyArray<LoadedInstructions>, self: Command, sessionFile: string | null): ChatLaunch => ({
+const chatLaunch = (orcHome: string, model: string, rules: OrcRules, instructions: ReadonlyArray<LoadedInstructions>, self: Command, sessionFile: string | null): ChatLaunch => ({
   command: [
     "pi",
     "--model",

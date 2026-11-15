@@ -1,6 +1,6 @@
 import { Effect, FileSystem, Option, Schema } from "effect"
 import { readJsonFileIfPresent, writeWhole } from "../../shared/config/index"
-import { AnswersFile, answersFileName, Asking, AskOption, askingFileName, hasBlockingQuestion, isBlockingQuestion, type OpenQuestion, type QuestionAnswer } from "../review-gate/index"
+import { AnswersFile, answersFileName, Asking, AskOption, askingFileName, CorrectionsFile, correctionsFileName, hasBlockingQuestion, isBlockingQuestion, type OpenQuestion, type QuestionAnswer } from "../review-gate/index"
 import { askSuffix, type AskReply, replySuffix } from "./orc-ask-extension"
 
 const workerQuestionPattern = /^ask-(\d+)$/
@@ -20,6 +20,7 @@ interface WorkerAsk {
   readonly deadline: number | null
   readonly askedAt: string
   replied: boolean
+  answered: string | null
 }
 
 interface AskRunState {
@@ -28,6 +29,8 @@ interface AskRunState {
   timedOut: WorkerAsk | null
   readonly asks: Array<WorkerAsk>
   readonly recorded: Set<string>
+  readonly corrected: Map<string, string>
+  correctionsSent: number
 }
 
 export interface AskSetup {
@@ -61,7 +64,9 @@ export const askSetupFor = (
     asked: null,
     timedOut: null,
     asks: [],
-    recorded: new Set()
+    recorded: new Set(),
+    corrected: new Map(),
+    correctionsSent: 0
   },
   priorOpen
 })
@@ -146,7 +151,8 @@ const registerNew = (fs: FileSystem.FileSystem, setup: AskSetup): Effect.Effect<
         options: decoded.options,
         deadline: decoded.blocks ? Date.parse(now) + setup.waitSeconds * 1000 : null,
         askedAt: now,
-        replied: false
+        replied: false,
+        answered: null
       })
       shared.next += 1
       added = true
@@ -197,12 +203,49 @@ const relayReplies = (fs: FileSystem.FileSystem, setup: AskSetup, asked: string)
     let changed = false
     for (const ask of setup.state.asks) {
       const answer = answers.find((entry) => entry.question === ask.id)
-      if (!ask.replied && answer !== undefined && (yield* provideFs(fs, writeReply(setup, ask, { kind: "answer", id: ask.id, question: ask.question, words: answer.answer })))) {
+      if (answer === undefined) {
+        continue
+      }
+      if (ask.replied) {
+        if (ask.answered !== null && ask.answered !== answer.answer) {
+          yield* deliverCorrection(fs, setup, ask.id, ask.question, answer.answer)
+          ask.answered = answer.answer
+        }
+        continue
+      }
+      if (yield* provideFs(fs, writeReply(setup, ask, { kind: "answer", id: ask.id, question: ask.question, words: answer.answer }))) {
         ask.replied = true
+        ask.answered = answer.answer
+        setup.state.corrected.set(ask.id, answer.answer)
         changed = true
       }
     }
     return changed
+  })
+
+// The worker already acted on the answer it got, so a replaced answer reaches it as a correction after its next tool call rather than as a reply.
+const deliverCorrection = (fs: FileSystem.FileSystem, setup: AskSetup, id: string, question: string, words: string): Effect.Effect<void> =>
+  Effect.gen(function*() {
+    setup.state.correctionsSent += 1
+    const stem = "correction-" + id.replace(/[^A-Za-z0-9_-]/g, "_") + "-" + String(setup.state.correctionsSent)
+    if (yield* provideFs(fs, writeWhole(setup.askDir + "/" + stem + replySuffix, JSON.stringify({ kind: "correction", id, question, words } satisfies AskReply)))) {
+      setup.state.corrected.set(id, words)
+    }
+  })
+
+const relayCorrections = (fs: FileSystem.FileSystem, setup: AskSetup): Effect.Effect<void> =>
+  Effect.gen(function*() {
+    const file = yield* provideFs(fs, readJsonFileIfPresent(setup.runDir + "/" + correctionsFileName, CorrectionsFile).pipe(Effect.orElseSucceed(() => null)))
+    for (const correction of file?.corrections ?? []) {
+      if (setup.state.corrected.get(correction.question) === correction.answer) {
+        continue
+      }
+      const ask = setup.state.asks.find((candidate) => candidate.id === correction.question)
+      yield* deliverCorrection(fs, setup, correction.question, ask?.question ?? "", correction.answer)
+      if (ask !== undefined) {
+        ask.answered = correction.answer
+      }
+    }
   })
 
 const expireAsks = (fs: FileSystem.FileSystem, setup: AskSetup): Effect.Effect<boolean> =>
@@ -225,7 +268,15 @@ const expireAsks = (fs: FileSystem.FileSystem, setup: AskSetup): Effect.Effect<b
   })
 
 export const openWorkerAsks = (fs: FileSystem.FileSystem, setup: AskSetup): WorkerAsks => ({
-  tick: Effect.gen(function*() {
+  tick: Effect.andThen(serveAsks(fs, setup), relayCorrections(fs, setup)),
+  timedOut: () => {
+    const timedOut = setup.state.timedOut
+    return timedOut === null ? null : { id: timedOut.id, text: timedOut.text, asked: timedOut.askedAt }
+  }
+})
+
+const serveAsks = (fs: FileSystem.FileSystem, setup: AskSetup): Effect.Effect<void> =>
+  Effect.gen(function*() {
     let changed = yield* registerNew(fs, setup)
     if (setup.state.asks.length === 0) {
       return
@@ -246,9 +297,4 @@ export const openWorkerAsks = (fs: FileSystem.FileSystem, setup: AskSetup): Work
     if (changed) {
       yield* writeAsking(fs, setup)
     }
-  }),
-  timedOut: () => {
-    const timedOut = setup.state.timedOut
-    return timedOut === null ? null : { id: timedOut.id, text: timedOut.text, asked: timedOut.askedAt }
-  }
-})
+  })
