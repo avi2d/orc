@@ -214,7 +214,7 @@ To send a closed task's open PR back for another pass, run `orc backlog send-bac
 It moves the task to `new`, parked on its branch `orc/<task-id>` with your words as the answer to the question `send-back`, and records the machine and run that closed it as the origin.
 The next beat resumes that run on the same machine and branch.
 The implementer resumes the session it worked in with your words as the review, the checks run again, and the push updates the same PR.
-Orc refuses a task that is not closed, a task that names no PR, and a PR that is merged or closed.
+Orc refuses a task that is neither closed nor sent back, a task that names no PR, and a PR that is merged or closed.
 It also refuses when the runner holds no run of the task, since no session is left to resume.
 To add more words before the next beat starts it, run `orc backlog send-back` again on the new task, and the run gets every set of words in order.
 The Agents tab offers the same as **Send back** beside a PR that awaits your approval.
