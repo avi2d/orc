@@ -163,6 +163,9 @@ export default class OrcAgents extends View {
   }
 
   select(cx: Context, key: string): void {
+    if (this.selectedKey !== key) {
+      this.review.set_value("")
+    }
     this.selectedKey = key
     this.chosenStep = null
     this.refresh(cx)
@@ -226,8 +229,12 @@ export default class OrcAgents extends View {
   }
 
   setFilter(cx: Context, filter: Filter): void {
+    const before = this.selectedCard()?.key ?? null
     this.filter = filter
     this.chosenStep = null
+    if (this.selectedCard()?.key !== before) {
+      this.review.set_value("")
+    }
     this.refresh(cx)
     cx.notify()
   }

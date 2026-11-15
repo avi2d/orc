@@ -1,7 +1,7 @@
 import { Duration, Effect } from "effect"
 import { runLabel, type TaskRecord } from "../../entities/backlog/index"
-import { readResult, readResultThrough, type RunnerRequirements, type RunnerResult } from "../../features/queueing-a-task/index"
-import { type Machine, throughFor } from "../../shared/config/index"
+import { readRunResult, type RunnerRequirements, type RunnerResult } from "../../features/queueing-a-task/index"
+import type { Machine } from "../../shared/config/index"
 
 export type RunReading =
   | { readonly kind: "read"; readonly run: string | null; readonly status: RunnerResult["status"] }
@@ -9,16 +9,12 @@ export type RunReading =
 
 export type ReadTaskRun = (task: TaskRecord, home: string, machine: Machine) => Effect.Effect<RunReading, never, RunnerRequirements>
 
-export const readTaskRun: ReadTaskRun = (task, home, machine) => {
-  const label = runLabel(home, task.spec.id, task.spec.kind)
-  const through = throughFor(machine)
-  const reading = through === null ? readResult(task.spec.id, home, label) : readResultThrough(through, task.spec.id, label)
-  return reading.pipe(
+export const readTaskRun: ReadTaskRun = (task, home, machine) =>
+  readRunResult(task.spec.id, home, runLabel(home, task.spec.id, task.spec.kind), machine).pipe(
     Effect.map((result): RunReading => ({ kind: "read", run: result.run?.id ?? null, status: result.status })),
     Effect.catchTag("RunnerError", (error) => Effect.succeed<RunReading>({ kind: "unread", reason: error.detail })),
     Effect.timeoutOrElse({ duration: Duration.seconds(30), orElse: () => Effect.succeed<RunReading>({ kind: "unread", reason: "the runner did not answer within 30 seconds" }) })
   )
-}
 
 export const otherRun = (reading: RunReading, run: string): string | null => {
   if (reading.kind === "unread") {

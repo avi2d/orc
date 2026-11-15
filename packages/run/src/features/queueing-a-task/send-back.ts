@@ -2,9 +2,9 @@ import { Duration, Effect, type FileSystem } from "effect"
 import { BacklogError, backlogPaths, findTask, runLabel, taskBranch, type TaskFileError, taskPr } from "../../entities/backlog/index"
 import { addSendBackWords, sendBackClosedTask } from "../../entities/parked-runs/index"
 import { prPattern, readPullRequest } from "../../entities/pull-request/index"
-import { type ConfigError, type Machine, readDispatchConfig, throughFor } from "../../shared/config/index"
+import { type ConfigError, type Machine, readDispatchConfig } from "../../shared/config/index"
 import type { RunnerRequirements } from "./runner"
-import { readResult, readResultThrough } from "./runner-result"
+import { readRunResult } from "./runner-result"
 
 export type SendBack = {
   readonly kind: "SendBack"
@@ -14,14 +14,11 @@ export type SendBack = {
 
 const refuse = (detail: string) => Effect.fail(new BacklogError({ detail: "orc backlog send-back refused: " + detail }))
 
-const readOriginRun = (id: string, home: string, label: string, machine: Machine) => {
-  const through = throughFor(machine)
-  const reading = through === null ? readResult(id, home, label) : readResultThrough(through, id, label)
-  return reading.pipe(
+const readOriginRun = (id: string, home: string, label: string, machine: Machine) =>
+  readRunResult(id, home, label, machine).pipe(
     Effect.map((result) => result.run?.id ?? null),
     Effect.timeoutOrElse({ duration: Duration.seconds(30), orElse: () => Effect.fail(new BacklogError({ detail: "orc backlog send-back refused: the runner did not answer within 30 seconds" })) })
   )
-}
 
 export const sendBack = (
   root: string,

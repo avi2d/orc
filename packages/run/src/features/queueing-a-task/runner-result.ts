@@ -7,7 +7,7 @@ import { formatHistoryError, openDatabase, stoppedEndReason, type RunRecord, Run
 import { writtenReport } from "../../entities/run-history/index"
 import { gateLogFileName } from "../../entities/review-gate/index"
 import { Asking, askingFileName, AnswersFile, answersFileName, hasBlockingQuestion, isBlockingQuestion } from "../../entities/review-gate/index"
-import { readJsonFileIfPresent, writeWhole } from "../../shared/config/index"
+import { readJsonFileIfPresent, throughFor, writeWhole, type Machine } from "../../shared/config/index"
 import { FailingMark, failingFileName, failingText } from "../../entities/agent/index"
 import { runDirFor, type TaskKind, TaskId, readPlanDocument, SplitDocument, type SplitPlan, splitReasonPrefix, parentBranch, taskBranch } from "../../entities/backlog/index"
 import { orcGroup, PueueResult, PueueStatus } from "../../shared/process/index"
@@ -348,6 +348,11 @@ export const readResultThrough = (command: Command, task: string, label?: string
     ),
     Effect.map((document) => document.result)
   )
+}
+
+export const readRunResult = (id: string, home: string, label: string | null | undefined, machine: Machine): Effect.Effect<RunnerResult, RunnerError, RunnerRequirements> => {
+  const through = throughFor(machine)
+  return through === null ? readResult(id, home, label) : readResultThrough(through, id, label)
 }
 
 export const killHeldThrough = (command: Command, task: string, label?: string | null): Effect.Effect<string, RunnerError, ChildProcessSpawner.ChildProcessSpawner> => {

@@ -76,11 +76,28 @@ const queuedWhere = (task: Task): string => task.hold === null ? "Waiting to sta
 const awaitingAnswer = (count: number): { readonly standing: Standing; readonly where: string } =>
   ({ standing: { status: "Awaiting you", waiting: { on: "answer" } }, where: questionsLabel(count) })
 
-const prPlace = (pr: string, task: Task | undefined, merged: ReadonlySet<string>): { readonly standing: Standing; readonly where: string } => {
+const newestApproval = (runs: Runs): ReadonlySet<string> => {
+  const newest = new Map<string, string>()
+  for (const run of runs.runs) {
+    if (run.status !== "succeeded" || run.prLink === null) {
+      continue
+    }
+    const prior = newest.get(run.branch)
+    if (prior === undefined || prior < run.id) {
+      newest.set(run.branch, run.id)
+    }
+  }
+  return new Set(newest.values())
+}
+
+const prPlace = (pr: string, task: Task | undefined, merged: ReadonlySet<string>, newest: boolean): { readonly standing: Standing; readonly where: string } => {
   if (task === undefined) {
     return { standing: { status: "Done" }, where: pr }
   }
   if (task.status !== "closed" && task.parked !== null) {
+    return { standing: { status: "Done" }, where: `Sent back ${pr}` }
+  }
+  if (!newest) {
     return { standing: { status: "Done" }, where: `Sent back ${pr}` }
   }
   if (!merged.has(task.id)) {
@@ -92,7 +109,7 @@ const prPlace = (pr: string, task: Task | undefined, merged: ReadonlySet<string>
 const sendBackOf = (task: Task | undefined, standing: Standing): string | null =>
   task?.status === "closed" && standing.status === "Awaiting you" && standing.waiting.on === "approval" ? task.id : null
 
-const runPlace = (run: Run, task: Task | undefined, merged: ReadonlySet<string>): { readonly standing: Standing; readonly where: string } => {
+const runPlace = (run: Run, task: Task | undefined, merged: ReadonlySet<string>, newest: boolean): { readonly standing: Standing; readonly where: string } => {
   const questions = run.status === "running" ? run.questions : 0
   if (questions > 0) {
     return awaitingAnswer(questions)
@@ -101,7 +118,7 @@ const runPlace = (run: Run, task: Task | undefined, merged: ReadonlySet<string>)
     return { standing: { status: "Running" }, where: run.step === null ? "Starting" : stepLabel(run.step) }
   }
   if (run.status === "succeeded") {
-    return run.prLink === null ? { standing: { status: "Done" }, where: "Done" } : prPlace(prNumber(run.prLink), task, merged)
+    return run.prLink === null ? { standing: { status: "Done" }, where: "Done" } : prPlace(prNumber(run.prLink), task, merged, newest)
   }
   return { standing: { status: "Failed" }, where: firstLine(run.endReason ?? task?.reason ?? run.status) }
 }
@@ -109,11 +126,12 @@ const runPlace = (run: Run, task: Task | undefined, merged: ReadonlySet<string>)
 export const buildCards = (runs: Runs, backlog: Backlog): ReadonlyArray<Card> => {
   const byBranch = new Map(backlog.tasks.flatMap((task) => taskBranches(task).map((branch) => [branch, task] as const)))
   const merged = new Set(backlog.merged)
+  const approval = newestApproval(runs)
   const active = new Set<string>()
   const cards: Array<Card> = []
   for (const run of runs.runs) {
     const task = byBranch.get(run.branch)
-    const place = runPlace(run, task, merged)
+    const place = runPlace(run, task, merged, approval.has(run.id))
     if (task !== undefined && (place.standing.status === "Running" || place.standing.status === "Awaiting you")) {
       active.add(task.id)
     }

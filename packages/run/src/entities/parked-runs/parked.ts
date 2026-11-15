@@ -1,7 +1,7 @@
 import { Array as Arr, Effect, FileSystem } from "effect"
 import type { AskOption, OpenQuestion } from "../review-gate/index"
 import { openReviewQuestions } from "../attention/index"
-import { answerDecision, backlogPaths, findTask, ranClosing, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, platformFailure, publishOnce, takenGrab, type Hold, type HoldQuestion, isHeld, openQuestions, type Parked, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord, renderTaskFile } from "../backlog/index"
+import { answerDecision, findTask, grabIn, ranClosing, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, platformFailure, publishOnce, takenGrab, type Hold, type HoldQuestion, isHeld, openQuestions, type Parked, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord, renderTaskFile } from "../backlog/index"
 
 // An answer handed to an asking that ended went into the run, so only one never handed out or handed to this asking still answers it.
 const answersAsking = (answer: ParkedAnswer, asking: string | null): boolean => answer.relayedTo === null || answer.relayedTo === asking
@@ -264,25 +264,20 @@ export const sendBackClosedTask = (
   origin: NonNullable<Parked["origin"]>
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
-    const paths = backlogPaths(root)
-    const file = paths.taskFile("closed", id)
-    const text = yield* fs.readFileString(file).pipe(
-      Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)),
-      Effect.mapError(platformFailure("read " + file))
-    )
-    if (text === null) {
-      return yield* new BacklogError({ detail: id + " moved while orc read it, so run the command again" })
-    }
-    const record = yield* parseTaskFile(file, "closed", text)
-    if (ranClosing(record) === null) {
-      return yield* new BacklogError({ detail: id + " closed without a run, so it has no branch to send back" })
-    }
-    const sent: TaskRecord = { ...record, parked: { branch: taskBranch(id), questions: [sendBackQuestion(sendBackQuestionId, words, at)], origin }, state: { kind: "new" } }
-    if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(sent)))) {
-      return yield* new BacklogError({ detail: "new/ already holds " + id })
-    }
-    yield* fs.remove(file).pipe(Effect.mapError(platformFailure("remove " + file)))
+    const { fs, paths, file, grabbed, putBack, read } = yield* grabIn(root, "closed", id, Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" })))
+    const send = Effect.gen(function*() {
+      const record = yield* parseTaskFile(file, "closed", yield* read)
+      if (ranClosing(record) === null) {
+        return yield* new BacklogError({ detail: id + " closed without a run, so it has no branch to send back" })
+      }
+      const sent: TaskRecord = { ...record, parked: { branch: taskBranch(id), questions: [sendBackQuestion(sendBackQuestionId, words, at)], origin }, state: { kind: "new" } }
+      if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(sent)))) {
+        return yield* new BacklogError({ detail: "new/ already holds " + id })
+      }
+      return sent
+    })
+    const sent = yield* send.pipe(Effect.catch((error) => putBack.pipe(Effect.andThen(Effect.fail(error)))))
+    yield* fs.remove(grabbed).pipe(Effect.mapError(platformFailure("remove " + grabbed)))
     return sent
   })
 
