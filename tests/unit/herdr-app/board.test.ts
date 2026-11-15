@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { laneFor, lanes, tasksInLane, titleClip, type BoardTask } from "../../../packages/herdr-app/src/board"
+import { clickedSelection, laneFor, lanes, selectionOnBoard, tasksInLane, titleClip, type BoardTask } from "../../../packages/herdr-app/src/board"
 import { guardJson } from "../../../packages/herdr-app/src/guard"
 import { boardBacklog } from "../../../packages/herdr-app/src/guard-board"
 
@@ -47,4 +47,20 @@ test("a closed task without an open PR, including one no beat has read, is not i
   expect(laneFor({ ...task, status: "closed", prState: null }, new Set())).toBe("Done")
   expect(laneFor({ ...task, status: "closed", prState: "merged" }, new Set())).toBe("Done")
   expect(laneFor({ ...task, status: "closed", prState: "closed" }, new Set())).toBe("Done")
+})
+
+test("a Board with no selection keeps the task panel closed instead of showing it", () => {
+  expect(selectionOnBoard(null, [task])).toBeNull()
+})
+
+test("a second click on the selected card clears the selection instead of leaving the panel open", () => {
+  expect(clickedSelection(null, "orc-1")).toBe("orc-1")
+  expect(clickedSelection("orc-2", "orc-1")).toBe("orc-1")
+  expect(clickedSelection("orc-1", "orc-1")).toBeNull()
+})
+
+test("a selection of a task gone from the Board closes the panel instead of keeping it open", () => {
+  expect(selectionOnBoard("orc-9", [task])).toBeNull()
+  expect(selectionOnBoard("orc-1", [task])).toBe("orc-1")
+  expect(selectionOnBoard("orc-9", null)).toBe("orc-9")
 })
