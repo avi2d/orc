@@ -99,6 +99,12 @@ export default class OrcAgents extends View {
         : backlogReading.kind !== "ok"
         ? backlogReading
         : { kind: "ok", value: buildCards(runsReading.value, backlogReading.value) }
+      if (this.cards.kind === "ok" && this.filter.project === null && !this.filter.allRuns && this.selectedKey !== null) {
+        const selected = this.cards.value.find((card) => card.key === this.selectedKey)
+        if (selected?.known === false) {
+          this.filter = { ...this.filter, allRuns: true }
+        }
+      }
       if (this.selectedKey !== null && !this.visibleCards().some((card) => card.key === this.selectedKey) && this.review.value() !== "") {
         this.review.set_value("")
       }
@@ -236,7 +242,7 @@ export default class OrcAgents extends View {
   }
 
   visibleCards(): ReadonlyArray<Card> {
-    return this.cards.kind === "ok" ? filterCards(this.cards.value, this.filter) : []
+    return this.cards.kind === "ok" ? filterCards(this.cards.value, this.filter, this.selectedKey) : []
   }
 
   selectedCard(): Card | null {

@@ -160,6 +160,7 @@ export const buildCards = (runs: Runs, backlog: Backlog): ReadonlyArray<Card> =>
   const merged = new Set(backlog.merged)
   const approval = newestRun(runs)
   const known = (project: string): boolean => backlog.projects === null || backlog.projects.includes(project)
+  const checkoutProject = new Map(backlog.projectCheckouts.flatMap((project) => project.paths.map((path) => [path, project.name] as const)))
   const active = new Set<string>()
   const cards: Array<Card> = []
   for (const run of runs.runs) {
@@ -168,7 +169,7 @@ export const buildCards = (runs: Runs, backlog: Backlog): ReadonlyArray<Card> =>
     if (task !== undefined && (place.standing.status === "Running" || place.standing.status === "Awaiting you")) {
       active.add(task.id)
     }
-    const project = task?.project ?? lastSegment(run.project)
+    const project = task?.project ?? checkoutProject.get(run.project) ?? lastSegment(run.project)
     cards.push({
       key: run.id,
       id: task?.id ?? run.id,
@@ -200,9 +201,9 @@ export const sendBackArgs = (card: Pick<Card, "sendBack">, words: string): Reado
 const sortCards = (cards: ReadonlyArray<Card>): ReadonlyArray<Card> =>
   cardStatuses.flatMap((status) => cards.filter((card) => card.standing.status === status))
 
-export const filterCards = (cards: ReadonlyArray<Card>, filter: Filter): ReadonlyArray<Card> =>
+export const filterCards = (cards: ReadonlyArray<Card>, filter: Filter, keepKey: string | null = null): ReadonlyArray<Card> =>
   cards.filter((card) =>
-    (filter.project === null ? filter.allRuns || card.known : card.project === filter.project) &&
+    (filter.project === null ? filter.allRuns || card.known || card.key === keepKey : card.project === filter.project) &&
     (filter.status === null || card.standing.status === filter.status))
 
 export const projectsOf = (cards: ReadonlyArray<Card>): ReadonlyArray<string> =>

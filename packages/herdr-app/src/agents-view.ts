@@ -156,7 +156,7 @@ const rail = (t: Palette, shown: RunsShown, visible: ReadonlyArray<Card>, act: A
 
 export const runsColumn = (t: Palette, shown: RunsShown, act: AgentsActions): Element => {
   const all = shown.cards.kind === "ok" ? shown.cards.value : []
-  const visible = filterCards(all, shown.filter)
+  const visible = filterCards(all, shown.filter, shown.selectedKey)
   if (shown.folded) {
     return rail(t, shown, visible, act)
   }
