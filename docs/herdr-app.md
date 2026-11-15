@@ -52,7 +52,7 @@ Backlog stays empty.
 Held tasks, tasks with unanswered parked questions, tasks with an open attention item for you, and closed tasks with an open PR appear in Awaiting you.
 Taken and started tasks appear in Running.
 Other new tasks appear in Planned, and other closed tasks appear in Done.
-A PR whose state has not been read appears in Done.
+A PR whose state has not been read counts as open, so its closed task appears in Awaiting you.
 
 Select a lane header to fold or open it.
 Backlog and Done start folded.
