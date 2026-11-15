@@ -13,7 +13,11 @@ export interface BoardTask {
   readonly prState: "open" | "closed" | "merged" | null
 }
 
-export const titleLines = 2
+const titleLines = 2
+export const titleLineHeight = 18
+export const titleHeight = titleLines * titleLineHeight
+
+export const shownTitleLines = (wrappedLines: number): number => Math.min(wrappedLines, Math.floor(titleHeight / titleLineHeight))
 
 export const laneFor = (task: BoardTask, attention: ReadonlySet<string>): Lane => {
   if (task.held || task.parked || attention.has(task.id) || (task.status === "closed" && task.prState === "open")) return "Awaiting you"
