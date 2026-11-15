@@ -241,7 +241,7 @@ describe("orc runner queue with a token", () => {
       const request = { task: "orc-9", checkout: fixture.checkout, provider: "acme", body: "# x\n", tokenFile: "/secrets/main-token", token: placeholder, expiresAt: newYear }
       const result = await runOrc(fixture, ["runner", "queue"], {}, JSON.stringify(request))
       expect(result.exitCode).not.toBe(0)
-      expect(result.stderr).toBe("orc: the queue request on stdin is no task, checkout, provider and body with an optional tokenFile or an optional token and expiresAt\n")
+      expect(result.stderr).toBe("orc: the queue request on stdin is no task, checkout, provider and body with optional slots and an optional tokenFile or an optional token and expiresAt\n")
       expect(await stat(tokenDir(fixture, "orc-9")).then(() => true, () => false)).toBe(false)
     })
   }, runnerTimeout)
