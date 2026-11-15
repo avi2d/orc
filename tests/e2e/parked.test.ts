@@ -132,7 +132,7 @@ describe("a parked run", () => {
       const pi = join(fixture.dir, "bin", "pi")
       const answer = JSON.stringify({ decision: "answer", answer: "Two retries", rule: "Answer it only when it is routine.", reason: "the intent says twice" })
       const escalate = JSON.stringify({ decision: "escalate", reason: "only the captain knows" })
-      await writeFile(pi, "#!/bin/sh\nif grep -q 'Which retries' ; then printf '%s\\n' '" + answer + "' ; else printf '%s\\n' '" + escalate + "' ; fi\n")
+      await writeFile(pi, "#!/bin/sh\nif grep -q 'stopped on, question-4' ; then printf '%s\\n' '" + answer + "' ; else printf '%s\\n' '" + escalate + "' ; fi\n")
       await chmod(pi, 0o755)
       await refuseOnQuestions(fixture)
       expect(await orcOk(fixture, ["beat"])).toContain("parked orc-1 on orc/orc-1 for the captain's answer to question-5 and the decider's answer to question-4")
