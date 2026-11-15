@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { buildCards, cardPlace, filterCards, namedModels, railLabel, runAgent, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
+import { buildCards, cardPlace, filterCards, namedModels, opensTurns, railLabel, runAgent, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
 import type { Backlog, Run, Runs, Task } from "../../../packages/herdr-app/src/guard"
 
 const run = (id: string, fields: Partial<Run>): Run => ({
@@ -246,6 +246,24 @@ describe("the model and effort of a run", () => {
 
   test("only the step whose model differs from the run's names it, not every agent step", () => {
     expect([...namedModels(steps)]).toEqual([[3, "claude-sonnet-5-5"]])
+  })
+})
+
+describe("the pane a step opens in", () => {
+  test("a Fix step with a Pi session opens in Turns, not as raw text", () => {
+    expect(opensTurns({ name: "fix", piSessionFile: "/home/me/.pi/sessions/fix-1.jsonl" })).toBe(true)
+  })
+
+  test("any agent step with a Pi session opens in Turns, not only Agent and Fix", () => {
+    expect(opensTurns({ name: "review", piSessionFile: "/home/me/.pi/sessions/review-1.jsonl" })).toBe(true)
+  })
+
+  test("a Checks step with no Pi session shows its log, not an empty Turns view", () => {
+    expect(opensTurns({ name: "checks", piSessionFile: null })).toBe(false)
+  })
+
+  test("a Fix step with no Pi session shows its log, not an empty Turns view", () => {
+    expect(opensTurns({ name: "fix", piSessionFile: null })).toBe(false)
   })
 })
 

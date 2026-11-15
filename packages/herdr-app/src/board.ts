@@ -31,6 +31,27 @@ export const laneFor = (task: BoardTask, attention: ReadonlySet<string>): Lane =
   return task.status === "closed" ? "Done" : "Planned"
 }
 
+export interface QueuedRun {
+  readonly task: string
+  readonly machine: string | null
+  readonly ahead: number | null
+}
+
+export const queueLine = (queued: ReadonlyArray<QueuedRun>, task: string): string | null => {
+  const entry = queued.find((candidate) => candidate.task === task)
+  if (entry === undefined) return null
+  const place = `Queued on ${entry.machine ?? "this machine"}`
+  return entry.ahead === null ? place : `${place}, ${entry.ahead} ahead`
+}
+
 export const tasksInLane = (tasks: ReadonlyArray<BoardTask>, lane: Lane, project: string | null, attention: ReadonlySet<string>): ReadonlyArray<BoardTask> =>
   tasks.filter((task) => (project === null || task.project === project) && laneFor(task, attention) === lane)
     .sort((a, b) => a.created.localeCompare(b.created) || a.id.localeCompare(b.id))
+
+export const clickedSelection = (selected: string | null, clicked: string): string | null => selected === clicked ? null : clicked
+
+export const selectionOnBoard = (selected: string | null, tasks: ReadonlyArray<BoardTask> | null): string | null =>
+  selected === null || tasks === null || tasks.some((task) => task.id === selected) ? selected : null
+
+export const panelCommand = (kept: string | null, shown: boolean | null): "layout.show" | "layout.hide" | null =>
+  (kept !== null) === shown ? null : kept !== null ? "layout.show" : "layout.hide"

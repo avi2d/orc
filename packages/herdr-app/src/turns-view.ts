@@ -42,6 +42,7 @@ const callView = (t: Palette, call: TurnCall, open: boolean, act: TurnsActions):
     .hover((style) => style.bg(t.hover))
     .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
     .on_click((_event, cx) => act.toggleCall(call.id, cx))
+    .child(div().flex_shrink_0().text_color(t.dim).child(call.number))
     .child(div().w(12).flex_shrink_0().text_color(mark === "✓" ? t.done : mark === "✗" ? t.ansi1 : t.working).child(mark))
     .child(div().flex_shrink_0().font_semibold().child(call.name))
     .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(call.arguments))
@@ -56,6 +57,7 @@ const callView = (t: Palette, call: TurnCall, open: boolean, act: TurnsActions):
 
 const turnView = (t: Palette, turn: Turn, open: TurnsOpen, act: TurnsActions): Element => {
   const header = h_flex().justify_between().items_start().gap(8).text_size(12).text_color(t.dim)
+    .child(div().flex_shrink_0().font_semibold().text_color(t.foreground).child(turn.number.toString()))
     .child(div().flex_1().min_w(0).child(turnHeader(turn)))
     .child(div().flex_shrink_0().child(clock(turn.at)))
   const thinkingOpen = open.thinking.has(turn.id)
