@@ -290,8 +290,9 @@ For a hold question it names the hold question id qualified by its hold generati
 It is `null` for a hold, a note and the answer to a hold with no questions.
 
 - A hold and its questions name `user`, and a parked question names `worker`, the run that asked it.
-- A `decision` entry is the decider's `answered` or `escalated` with its reason.
+- A `decision` entry is the decider's `answered`, `duplicate`, `asked-back` or `escalated` with its text, as [The decider](attention-queue.md#the-decider) shows.
 - An answer the decider gave names `decider`, a closure the beat wrote on a `pr-ready` item names `beat`, and any other answer names `user`.
+- An answer that replaces the decider's names `user` and notes the words it replaces, after the decider's own answer entry.
 - A `delivered` entry names `beat` and comes from the answer's `relayed_to`, so it shows only for the current asking.
 - A `withdrawn` entry names `beat` and gives the item's reason.
 - A run event item, such as `run-died`, is a `question` from `beat`.

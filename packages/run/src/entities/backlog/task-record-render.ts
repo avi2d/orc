@@ -1,4 +1,4 @@
-import { decisionAnswer, fence, type Claim, type Hold, type HoldQuestion, type Parked, type ParkedQuestion, ranClosing, type Started, type TaskRecord } from "./task-record"
+import { decisionAnswer, fence, type Claim, type Hold, type HoldQuestion, isDeciderAnswer, type Parked, type ParkedAnswer, type ParkedQuestion, ranClosing, type Started, type TaskRecord } from "./task-record"
 
 const field = (key: string, value: unknown): string => key + ": " + JSON.stringify(value)
 
@@ -9,13 +9,23 @@ const claimFields = (claim: Claim | null): ReadonlyArray<string> =>
 
 const startedFields = (started: Started): ReadonlyArray<string> => [field("started_at", started.at), field("start_log", started.log)]
 
+const answerFronts = (answer: ParkedAnswer) => {
+  if (isDeciderAnswer(answer)) {
+    return { answered_by: answer.by }
+  }
+  const overturned = answer.overturned
+  return overturned === undefined
+    ? {}
+    : { overturned: { answer: overturned.words, answered_at: overturned.at, answered_by: overturned.by, ...(overturned.relayedTo === null ? {} : { relayed_to: overturned.relayedTo }) } }
+}
+
 const questionFronts = (questions: ReadonlyArray<ParkedQuestion>) =>
   questions.map((question) => ({
     id: question.id,
     text: question.text,
     asked_at: question.asked,
     ...(question.blocks ? {} : { blocks: false }),
-    ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at }),
+    ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at, ...answerFronts(question.answer) }),
     ...(question.answer?.relayedTo == null ? {} : { relayed_to: question.answer.relayedTo })
   }))
 

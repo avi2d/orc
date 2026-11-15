@@ -5,6 +5,7 @@ import type { NoMistakesFinding, QuestionAnswer } from "./no-mistakes-gate"
 
 export const askingFileName = "asking.json"
 export const answersFileName = "answers.json"
+export const correctionsFileName = "corrections.json"
 
 export const AskOption = Schema.Struct({ text: Schema.String, picture: Schema.optionalKey(Schema.String) })
 
@@ -29,6 +30,8 @@ export const Asking = Schema.Struct({
 const RelayedAnswers = Schema.Array(Schema.Struct({ question: Schema.String, answer: Schema.String.check(Schema.isNonEmpty()) }))
 
 export const AnswersFile = Schema.Struct({ asking: Schema.String, answers: RelayedAnswers })
+
+export const CorrectionsFile = Schema.Struct({ corrections: RelayedAnswers })
 
 export interface WaitResult {
   readonly asked: string | null

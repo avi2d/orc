@@ -102,4 +102,19 @@ describe("the orc_ask tool inside Pi", () => {
       expect(afterTool({ content: [] })).toBeUndefined()
     })
   }, 10_000)
+
+  test("a correction to an answer already delivered joins the next tool result as a replacement once, instead of being dropped or read as a second answer", async () => {
+    await withAskDir(async (dir) => {
+      const { tool, afterTool } = loadAsk(dir)
+      const pending = tool.execute("call-1", { question: "Which colour?", blocks: true })
+      await reply(dir, "call-1", "B")
+      await pending
+      await writeFile(join(dir, "correction-ask-1-1" + replySuffix), JSON.stringify({ kind: "correction", id: "ask-1", question: "Which colour?", words: "R" }))
+      expect(texts(afterTool({ content: [{ type: "text", text: "ls output" }] }))).toEqual([
+        "ls output",
+        "The captain replaced the answer you got to your question ask-1 (Which colour?). Work from this answer instead: R"
+      ])
+      expect(afterTool({ content: [] })).toBeUndefined()
+    })
+  }, 10_000)
 })
