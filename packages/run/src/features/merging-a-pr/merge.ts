@@ -1,11 +1,11 @@
-import { Effect, type FileSystem, type Path } from "effect"
+import { Console, Duration, Effect, type FileSystem, type Path } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { BacklogError, backlogPaths, decisionRefusal, findTask, taskPr, type TaskFileError } from "../../entities/backlog/index"
 import { isYolo, readDispatchConfig, readProjects } from "../../shared/config/index"
 import type { ConfigError } from "../../shared/config/index"
 import type { RunnerError } from "../../shared/process/index"
 import type { MergeBasis } from "../../entities/pull-request/index"
-import { checkRefusals, gh, prPattern, type PullRequestView, readPullRequest } from "../../entities/pull-request/index"
+import { checkRefusals, gh, prPattern, type PullRequestView, readPullRequest, redChecks } from "../../entities/pull-request/index"
 
 const refuse = (detail: string) => Effect.fail(new BacklogError({ detail }))
 
@@ -26,6 +26,99 @@ const behindBy = (id: string, url: string, view: PullRequestView) =>
     return behind
   })
 
+type MergeRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
+type MergeError = BacklogError | ConfigError | TaskFileError | RunnerError
+
+export type SendBackForFix = (words: string) => Effect.Effect<string, BacklogError | ConfigError | TaskFileError, MergeRequirements>
+
+interface Landing {
+  readonly id: string
+  readonly url: string
+  readonly sendBack: SendBackForFix
+}
+
+const checksTimeout = Duration.minutes(20)
+const longestPollSeconds = 15
+
+const commits = (count: number): string => String(count) + " commit" + (count === 1 ? "" : "s")
+
+const refuseAndSendBack = (landing: Landing, reason: string, words: string) =>
+  landing.sendBack(words).pipe(
+    Effect.catch((error) => Effect.succeed("orc backlog send-back could not send " + landing.id + " back: " + ("file" in error ? error.file + ": " : "") + error.detail)),
+    Effect.flatMap((sent) => refuse(refusal(landing.id, landing.url, [reason]) + "; " + sent))
+  )
+
+const updateBranch = (landing: Landing, view: PullRequestView) =>
+  Effect.gen(function*() {
+    const [, host = "", owner = "", repo = ""] = prPattern.exec(landing.url) ?? []
+    const number = landing.url.slice(landing.url.lastIndexOf("/") + 1)
+    yield* Console.log("Updating from " + view.baseRefName)
+    const updated = yield* gh(["api", "--hostname", host, "-X", "PUT", "repos/" + owner + "/" + repo + "/pulls/" + number + "/update-branch", "-f", "expected_head_sha=" + view.headRefOid])
+    if (updated.exitCode === 0) {
+      return
+    }
+    const said = updated.stderr + "\n" + updated.stdout
+    if (/conflict/i.test(said)) {
+      return yield* refuseAndSendBack(
+        landing,
+        "has a merge conflict with " + view.baseRefName + ", so update-branch could not bring it up to date",
+        "orc merge could not update " + landing.url + " from " + view.baseRefName + ": update-branch reported a merge conflict between " + view.headRefOid + " and " + view.baseRefName + ". Merge " + view.baseRefName + " into the branch, settle the conflict and push."
+      )
+    }
+    if (/HTTP 422/.test(said)) {
+      return yield* refuse(refusal(landing.id, landing.url, ["changed after its checks were read: update-branch found its head is no longer " + view.headRefOid + ", so read its checks again before merging"]))
+    }
+    return yield* refuse(refusal(landing.id, landing.url, ["could not be updated from " + view.baseRefName + ": gh api update-branch said " + updated.said]))
+  })
+
+// After update-branch GitHub moves the head a few seconds later and the new head starts with no check, so neither an unmoved head nor an empty rollup is an answer yet.
+const awaitNewHead = (url: string, checked: string, poll: number): Effect.Effect<PullRequestView, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    yield* Effect.sleep(Duration.seconds(Math.min(2 ** poll, longestPollSeconds)))
+    const fresh = yield* readView(url)
+    if (fresh.state !== "OPEN" || (fresh.headRefOid !== checked && (redChecks(fresh).length > 0 || checkRefusals(fresh).length === 0))) {
+      return fresh
+    }
+    return yield* awaitNewHead(url, checked, poll + 1)
+  })
+
+const mergeAt = (landing: Landing, view: PullRequestView) =>
+  Effect.gen(function*() {
+    const merged = yield* gh(["pr", "merge", landing.url, "--squash", "--match-head-commit", view.headRefOid])
+    if (merged.exitCode !== 0) {
+      return yield* refuse("gh pr merge refused " + landing.url + ": " + merged.said)
+    }
+    return "merged " + landing.id + " " + landing.url
+  })
+
+const landUpdated = (landing: Landing, checked: PullRequestView) =>
+  Effect.gen(function*() {
+    yield* updateBranch(landing, checked)
+    yield* Console.log("Checks running")
+    const view = yield* awaitNewHead(landing.url, checked.headRefOid, 0).pipe(
+      Effect.timeoutOrElse({
+        duration: checksTimeout,
+        orElse: () => refuse(refusal(landing.id, landing.url, ["was updated from " + checked.baseRefName + ", and the checks on its new head did not all report within 20 minutes, so run orc merge again once they do"]))
+      })
+    )
+    if (view.state !== "OPEN") {
+      return yield* refuse(refusal(landing.id, landing.url, ["is " + view.state.toLowerCase() + ", not open"]))
+    }
+    const red = redChecks(view)
+    if (red.length > 0) {
+      return yield* refuseAndSendBack(
+        landing,
+        "the check " + red.join(", ") + " is red on its new head " + view.headRefOid + " after the update from " + view.baseRefName,
+        "orc merge updated " + landing.url + " from " + view.baseRefName + ", and the check " + red.join(", ") + " is red on the new head " + view.headRefOid + ". Fix the failure and push."
+      )
+    }
+    const behind = yield* behindBy(landing.id, landing.url, view)
+    if (behind > 0) {
+      return yield* refuse(refusal(landing.id, landing.url, ["is still " + commits(behind) + " behind " + view.baseRefName + " after the update, because " + view.baseRefName + " moved again, so run orc merge again"]))
+    }
+    return yield* mergeAt(landing, view)
+  })
+
 const yoloRefusal = (place: { readonly root: string }, project: string) =>
   Effect.gen(function*() {
     const paths = backlogPaths(place.root)
@@ -40,8 +133,9 @@ const yoloRefusal = (place: { readonly root: string }, project: string) =>
 export const mergeTask = (
   root: string,
   id: string,
-  basis: MergeBasis
-): Effect.Effect<string, BacklogError | ConfigError | TaskFileError | RunnerError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
+  basis: MergeBasis,
+  sendBack: SendBackForFix
+): Effect.Effect<string, MergeError, MergeRequirements> =>
   Effect.gen(function*() {
     const record = yield* findTask(root, id)
     const decision = decisionRefusal(record, "merge")
@@ -65,17 +159,11 @@ export const mergeTask = (
     if (view.state !== "OPEN") {
       return yield* refuse(refusal(id, url, ["is " + view.state.toLowerCase() + ", not open"]))
     }
-    const reasons = [...checkRefusals(view)]
-    const behind = yield* behindBy(id, url, view)
-    if (behind > 0) {
-      reasons.push("is " + String(behind) + " commit" + (behind === 1 ? "" : "s") + " behind " + view.baseRefName + ", so update the branch and let its checks run again")
-    }
+    const landing: Landing = { id, url, sendBack }
+    const reasons = checkRefusals(view)
     if (reasons.length > 0) {
       return yield* refuse(refusal(id, url, reasons))
     }
-    const merged = yield* gh(["pr", "merge", url, "--squash", "--match-head-commit", view.headRefOid])
-    if (merged.exitCode !== 0) {
-      return yield* refuse("gh pr merge refused " + url + ": " + merged.said)
-    }
-    return "merged " + id + " " + url
+    const behind = yield* behindBy(id, url, view)
+    return yield* behind > 0 ? landUpdated(landing, view) : mergeAt(landing, view)
   })
