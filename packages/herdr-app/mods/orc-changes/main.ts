@@ -11,6 +11,7 @@ type Palette = ReturnType<typeof palette>
 interface Diff {
   readonly of: string
   readonly reading: Reading<ReadonlyArray<DiffRow>>
+  readonly width: number
 }
 
 const everyMs = 1000
@@ -65,7 +66,16 @@ export default class OrcChanges extends View {
     this.busy = true
     cx.spawn((task) => readDiff(changes, file.path).then((reading) => {
       this.busy = false
-      this.diff = { of, reading: reading.kind === "ok" ? { kind: "ok", value: diffRows(reading.value) } : reading }
+      if (reading.kind !== "ok") {
+        this.diff = { of, reading, width: 0 }
+      } else {
+        const rows = diffRows(reading.value)
+        let longest = 0
+        for (const row of rows) {
+          if (row.text.length > longest) longest = row.text.length
+        }
+        this.diff = { of, reading: { kind: "ok", value: rows }, width: (longest + 2) * glyphWidth }
+      }
       task.notify()
     }))
   }
@@ -119,13 +129,14 @@ export default class OrcChanges extends View {
   }
 
   diffPane(t: Palette, of: string | null): Element {
-    const reading: Reading<ReadonlyArray<DiffRow>> = this.diff !== null && this.diff.of === of ? this.diff.reading : { kind: "reading" }
+    const current = this.diff !== null && this.diff.of === of ? this.diff : null
+    const reading: Reading<ReadonlyArray<DiffRow>> = current ?? { kind: "reading" }
     const note = (text: string, failed: boolean): Element => div().p(12).text_color(failed ? t.blocked : t.muted).child(text)
     if (reading.kind === "reading") return note("Reading the file's diff", false)
     if (reading.kind === "failed") return note(reading.reason, true)
     const rows = reading.value
     if (rows.length === 0) return note("This file has no text diff", false)
-    const width = Math.max(...rows.map((row) => row.text.length + 2)) * glyphWidth
+    const width = current?.width ?? 0
     return div().flex_1().min_h_0().relative().font_family(monospace()).text_size(12)
       .child(div().id("diff-x").size_full().overflow_x_scrollbar()
         .child(div().w_full().min_w(width).h_full()

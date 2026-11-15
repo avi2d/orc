@@ -177,9 +177,12 @@ export default class OrcAgents extends View {
   }
 
   readSelectedChanges(): Promise<void> {
-    const checkout = this.selectedCard()?.checkout ?? null
+    const card = this.selectedCard()
+    const key = card?.key ?? null
+    const checkout = card?.checkout ?? null
     const reading: Promise<Reading<RunChanges | null>> = checkout === null ? Promise.resolve({ kind: "ok", value: null }) : readChanges(checkout)
     return reading.then((changes) => {
+      if ((this.selectedCard()?.key ?? null) !== key) return
       this.changesProblem = changes.kind === "failed" ? changes.reason : null
       this.shareChanges(changes.kind === "ok" ? changes.value : null)
     })
@@ -302,6 +305,8 @@ export default class OrcAgents extends View {
   select(cx: Context, key: string): void {
     this.selectedKey = key
     this.chosen = null
+    this.changesProblem = null
+    this.shareChanges(null)
     this.refresh(cx)
     cx.notify()
   }
@@ -335,6 +340,8 @@ export default class OrcAgents extends View {
   setFilter(cx: Context, filter: Filter): void {
     this.filter = filter
     this.chosen = null
+    this.changesProblem = null
+    this.shareChanges(null)
     this.refresh(cx)
     cx.notify()
   }

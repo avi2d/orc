@@ -20,9 +20,13 @@ const readFiles = (checkout: Checkout, base: string): Promise<Reading<RunChanges
 export const readChanges = (checkout: Checkout): Promise<Reading<RunChanges | null>> =>
   folderExists(checkout.worktree).then((exists): Promise<Reading<RunChanges | null>> | Reading<RunChanges | null> => {
     if (!exists) return { kind: "ok", value: null }
-    return git(checkout.worktree, ["merge-base", checkout.branch, "origin/HEAD"]).then((base) =>
-      base.kind === "ok" ? readFiles(checkout, base.value.trim()) : base)
+    return git(checkout.worktree, ["rev-parse", "--verify", checkout.branch]).then((rev) => {
+      if (rev.kind !== "ok") return rev
+      const commit = rev.value.trim()
+      return git(checkout.worktree, ["merge-base", commit, "origin/HEAD"]).then((base) =>
+        base.kind === "ok" ? readFiles({ worktree: checkout.worktree, branch: commit }, base.value.trim()) : base)
+    })
   })
 
 export const readDiff = (changes: Pick<RunChanges, "worktree" | "base" | "branch">, path: string): Promise<Reading<string>> =>
-  git(changes.worktree, ["diff", "--no-ext-diff", "--no-textconv", "--no-color", "--no-renames", changes.base, changes.branch, "--", path])
+  git(changes.worktree, ["diff", "--literal-pathspecs", "--no-ext-diff", "--no-textconv", "--no-color", "--no-renames", changes.base, changes.branch, "--", path])
