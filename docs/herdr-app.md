@@ -37,7 +37,8 @@ The command writes only names that start with `orc`, so Herdr's own mods and lay
 | Agents | `cmd-3` | The runs and the queued tasks, and the selected run's steps, step output and changes |
 
 Board reads `orc backlog --json` and `orc attention --json` when shown and every 10 seconds while shown.
-The task panel reads `orc backlog --json`, `orc runs --json` and `orc runs --json --local` on the same schedule.
+The task panel reads `orc backlog --json`, `orc runs --json`, `orc runs --json --local` and `orc backlog thread <task> --json` for the selected task on the same schedule.
+It reads them again as soon as you select another card.
 Resources reads `orc-dash snapshot --json --only quota,resources,queues` when shown and every minute.
 Agents reads `orc runs --json --local` and `orc backlog --json` again every 4 seconds while it is the shown tab.
 It also reads the selected run with `orc show <run> --json`.
@@ -82,14 +83,25 @@ The panel has three tabs:
 
 | Tab | What it shows |
 | --- | --- |
-| Thread | The hold reason, the hold's questions and the run's parked questions, each with who asked, what it is and when, and each answer below its question |
+| Thread | Every entry of `orc backlog thread`, oldest first, each headed by who, what it is and when |
 | Description | The task's body without its title line as markdown, or No description when nothing remains |
 | Info | Account, Run, Branch, PR, Depends on, Created, Started, Closed, Priority and Assets, in that order, with `—` for an empty row |
 
-Each unanswered question has an answer box.
-Press Enter or select Send to run `orc backlog answer <task> <question-id>=<text>`.
-A hold with no questions has one box, which runs `orc backlog answer <task> <text>`.
-When the command fails, the box shows the command and its error.
+A question shows its Context, Question, Options and Evidence.
+The panel reads them from the question's text, where `orc_ask` writes the context after `Context:` and each option as `A) <text> (picture: <path>)`.
+An option with a picture shows as a picture tile, and an option without one shows as a button.
+Evidence lists the picture file of each option that has one.
+A tile whose picture cannot load shows its path as text in place of the picture.
+A decision of the decider and a withdraw sit indented under the question they are about.
+An answer sits inside its question's card, and it shows Delivered once the thread holds the `delivered` entry for that question.
+
+Each unanswered question of a task that is not closed has an answer box.
+Select an option, or press Enter or select Send in the box, to run `orc backlog answer <task> <question-id>=<text>`.
+An option sends its text without its letter.
+The question id is the hold question id without its `hold-<n>/` part, or the parked question id inside the attention item id `<task>.<question-id>.<asked>`.
+A question the beat asks for a run event has no box, since `orc backlog answer` does not take it.
+The current hold with no questions has one box, which runs `orc backlog answer <task> <text>`.
+When the command fails, the card shows the command and its error.
 Assets shows the report file of a closed task when it has one.
 
 When the task's PR is open, the PR row has a Merge button.
