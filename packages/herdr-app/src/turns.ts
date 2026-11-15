@@ -60,32 +60,39 @@ const boolean = (record: Fields, name: string, at: string): Guarded<boolean> => 
 
 const object = (record: Fields, name: string, at: string): Guarded<Fields> => fields(record[name], child(at, name))
 
-const block: Guard<Block> = (value, at) => {
+const recordWithType = (value: unknown, at: string): Guarded<{ record: Fields; type: string }> => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
   const type = string(record.value, "type", at)
   if (type.kind === "refused") return type
-  switch (type.value) {
+  return ok({ record: record.value, type: type.value })
+}
+
+const block: Guard<Block> = (value, at) => {
+  const found = recordWithType(value, at)
+  if (found.kind === "refused") return found
+  const record = found.value.record
+  switch (found.value.type) {
     case "text": {
-      const text = string(record.value, "text", at)
+      const text = string(record, "text", at)
       return text.kind === "refused" ? text : ok({ type: "text", text: text.value })
     }
     case "thinking": {
-      const thinking = string(record.value, "thinking", at)
+      const thinking = string(record, "thinking", at)
       return thinking.kind === "refused" ? thinking : ok({ type: "thinking", thinking: thinking.value })
     }
     case "toolCall": {
-      const id = string(record.value, "id", at)
+      const id = string(record, "id", at)
       if (id.kind === "refused") return id
-      const name = string(record.value, "name", at)
+      const name = string(record, "name", at)
       if (name.kind === "refused") return name
-      const args = object(record.value, "arguments", at)
+      const args = object(record, "arguments", at)
       return args.kind === "refused" ? args : ok({ type: "toolCall", id: id.value, name: name.value, arguments: args.value })
     }
     case "image":
       return ok({ type: "image" })
     default:
-      return refusedAs(child(at, "type"), "text, thinking, toolCall or image", type.value)
+      return refusedAs(child(at, "type"), "text, thinking, toolCall or image", found.value.type)
   }
 }
 
@@ -153,17 +160,16 @@ const message: Guard<Message> = (value, at) => {
 }
 
 const sessionEntry: Guard<Entry | null> = (value, at) => {
-  const record = fields(value, at)
-  if (record.kind === "refused") return record
-  const type = string(record.value, "type", at)
-  if (type.kind === "refused") return type
-  if (type.value === "session") return ok(null)
-  const id = string(record.value, "id", at)
+  const found = recordWithType(value, at)
+  if (found.kind === "refused") return found
+  const record = found.value.record
+  if (found.value.type === "session") return ok(null)
+  const id = string(record, "id", at)
   if (id.kind === "refused") return id
-  const parent = record.value["parentId"]
+  const parent = record["parentId"]
   if (parent !== null && typeof parent !== "string") return refusedAs(child(at, "parentId"), "a string or null", parent)
-  if (type.value !== "message") return ok({ id: id.value, parentId: parent, message: null })
-  const said = message(record.value["message"], child(at, "message"))
+  if (found.value.type !== "message") return ok({ id: id.value, parentId: parent, message: null })
+  const said = message(record["message"], child(at, "message"))
   return said.kind === "refused" ? said : ok({ id: id.value, parentId: parent, message: said.value })
 }
 

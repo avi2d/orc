@@ -34,16 +34,22 @@ interface Named {
   readonly state: string
 }
 
-const named: Guard<Named> = (value, at) => {
+const recordWithAddress = (value: unknown, at: string): Guarded<{ record: Readonly<Record<string, unknown>>; address: string }> => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
   const address = string(record.value, "address", at)
   if (address.kind === "refused") return address
-  const name = string(record.value, "name", at)
+  return ok({ record: record.value, address: address.value })
+}
+
+const named: Guard<Named> = (value, at) => {
+  const found = recordWithAddress(value, at)
+  if (found.kind === "refused") return found
+  const name = string(found.value.record, "name", at)
   if (name.kind === "refused") return name
-  const state = string(record.value, "state", at)
+  const state = string(found.value.record, "state", at)
   if (state.kind === "refused") return state
-  return ok({ address: address.value, name: name.value, state: state.value })
+  return ok({ address: found.value.address, name: name.value, state: state.value })
 }
 
 const missing = (value: unknown): boolean => {
@@ -75,13 +81,11 @@ interface DrawerChat {
 const chatKey = "orc-drawer.chat"
 
 const drawerChat: Guard<DrawerChat> = (value, at) => {
-  const record = fields(value, at)
-  if (record.kind === "refused") return record
-  const address = string(record.value, "address", at)
-  if (address.kind === "refused") return address
-  const session = string(record.value, "session", at)
+  const found = recordWithAddress(value, at)
+  if (found.kind === "refused") return found
+  const session = string(found.value.record, "session", at)
   if (session.kind === "refused") return session
-  return ok({ address: address.value, session: session.value })
+  return ok({ address: found.value.address, session: session.value })
 }
 
 const heldChat = (): DrawerChat | null => {
