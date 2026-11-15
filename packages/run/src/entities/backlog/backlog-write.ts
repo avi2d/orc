@@ -1,4 +1,4 @@
-import { Data, Effect, FileSystem } from "effect"
+import { Data, Effect, FileSystem, Predicate } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { type TaskFileError, type TaskFolder, taskFolders } from "./task-record"
 
@@ -115,14 +115,18 @@ const grabName = (folder: string, id: string): string => folder + "/." + id + ".
 
 const grabPattern = /^\.(.+)\.grab-(\d+)-[0-9a-f-]+\.tmp$/
 
-const ownerAlive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === "EPERM"
-  }
-}
+class SignalRefused extends Data.TaggedError("SignalRefused")<{
+  readonly ownedByAnotherUser: boolean
+}> {}
+
+const ownerAlive = (pid: number): Effect.Effect<boolean> =>
+  Effect.try({
+    try: () => process.kill(pid, 0),
+    catch: (error) => new SignalRefused({ ownedByAnotherUser: Predicate.hasProperty(error, "code") && error.code === "EPERM" })
+  }).pipe(
+    Effect.as(true),
+    Effect.catchTag("SignalRefused", (refused) => Effect.succeed(refused.ownedByAnotherUser))
+  )
 
 // Only the killed owner wrote a result, so a task file in any folder is its finished result and the grab is dropped.
 // rename(2) moves the grab at most once, so of two readers recovering it exactly one puts it back.
@@ -153,7 +157,7 @@ export const recoverGrabs = (root: string): Effect.Effect<void, BacklogError, Fi
       )
       for (const name of names) {
         const grab = grabPattern.exec(name)
-        if (grab !== null && !ownerAlive(Number(grab[2]))) {
+        if (grab !== null && !(yield* ownerAlive(Number(grab[2])))) {
           yield* recoverGrab(fs, paths, folder, paths.folder(folder) + "/" + name, grab[1])
         }
       }

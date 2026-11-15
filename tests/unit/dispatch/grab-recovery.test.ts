@@ -20,7 +20,8 @@ const withRoot = async (body: (root: string) => Promise<void>): Promise<void> =>
   }
 }
 
-const deadPid = (): number => Bun.spawnSync(["true"]).pid
+// Linux caps pids at 2^22 and macOS at 99999, so no process ever holds this one.
+const deadPid = 2 ** 31 - 1
 
 const grabbedName = (id: string, pid: number): string => "." + id + ".grab-" + pid + "-" + crypto.randomUUID() + ".tmp"
 
@@ -30,7 +31,7 @@ describe("a grab left by a killed process", () => {
       await run(addTask(root, spec))
       const file = join(root, "new", "orc-1.md")
       const text = await readFile(file, "utf8")
-      await rename(file, join(root, "new", grabbedName("orc-1", deadPid())))
+      await rename(file, join(root, "new", grabbedName("orc-1", deadPid)))
       const tasks = await run(listTasks(root))
       expect(tasks.map((task) => task.spec.id)).toEqual(["orc-1"])
       expect(await readFile(file, "utf8")).toBe(text)
@@ -43,7 +44,7 @@ describe("a grab left by a killed process", () => {
       await run(addTask(root, spec))
       const file = join(root, "new", "orc-1.md")
       const rewritten = (await readFile(file, "utf8")).replaceAll("Fix the thing", "Fix the other thing")
-      await rename(file, join(root, "new", grabbedName("orc-1", deadPid())))
+      await rename(file, join(root, "new", grabbedName("orc-1", deadPid)))
       await writeFile(file, rewritten)
       const tasks = await run(listTasks(root))
       expect(tasks.map((task) => task.spec.title)).toEqual(["Fix the other thing"])
