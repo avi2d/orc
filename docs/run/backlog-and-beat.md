@@ -221,6 +221,11 @@ The reason is a decision for the captain, a missing priority, the hold, or the p
 It is also the open children or the dependency the task waits on.
 That dependency includes a ship prerequisite whose PR has not merged.
 Taken, started and closed tasks carry `null` for `wait`.
+Every task also carries `waiting`, which is `null` for a taken, started or closed task and `{ kind, detail }` for a new one.
+The `kind` is `decision`, `no-priority`, `held`, `parked` or `depends` for the reasons above, and `detail` is the same words as `wait`.
+A new task with none of those reasons has the `kind` `room`, for what only a beat sees: no free slot, no account with room, the machines' load or the token.
+Each beat replaces `~/.orc/backlog/waits.json` with the reasons it gave those tasks.
+A `room` wait carries the last beat's reason as `detail` and that beat's time as `at`, or `null` for both when the last beat gave the task no reason.
 To start what can start, run `orc beat`, from launchd or cron every few minutes.
 Each beat runs the quota command and reads the room on each machine before it takes any task.
 A [decision](task-kinds.md#decisions) never starts, and each beat prints `waits <task-id>: decision for the captain` for it.
@@ -343,8 +348,10 @@ It kills the run through the machine that started it and closes the task stopped
 A stop for a task on a machine whose start runs any other program refuses, so close that task by hand with `orc backlog close <task-id> failed`.
 The closed task file keeps the PR link of the orc run on `orc/<task-id>` as `pr`, and `orc backlog --json` carries it as `pr`, or `null` when the run opened none.
 Every task in `orc backlog --json` carries `prState` as `open`, `closed`, `merged`, or `null`.
-The beat records the last state it read for the task's PR, and `prState` is `null` when the task has no PR or the beat has not read it.
-`orc backlog --json` reads that record without contacting the forge.
+`prState` is `null` when the task has no PR.
+A recorded `<task-id>.merged` event makes it `merged`, and a recorded `<task-id>.pr-closed` event makes it `closed`.
+Without either event it is the last state the beat read for the PR, or `open` when the beat has not read it yet.
+`orc backlog --json` reads those records without contacting the forge.
 The beat prints `closed <task-id> <done|failed|stopped> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds, until it stays unread for 10 minutes.
 A machine whose start runs any other program keeps owning its tasks, which the beat closes once their logs go quiet rather than stalls.
 To close one of those by hand, run `orc backlog close <task-id> <done|failed> [reason]`.

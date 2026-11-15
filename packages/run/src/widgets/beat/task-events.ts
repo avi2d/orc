@@ -2,7 +2,7 @@ import { Duration, Effect, type FileSystem, Option, Result } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { BacklogError, taskPr, type TaskRecord } from "../../entities/backlog/index"
 import type { BeatAction, StalledAction } from "../../entities/attention/index"
-import type { ChatEvent } from "../../entities/events/index"
+import type { ChatEvent, PrState } from "../../entities/events/index"
 import { routePullRequest } from "../../entities/attention/index"
 import { eventRecorded, readPrState, recordEvent, writePrState } from "../../entities/events/index"
 import { checkRefusals, greenChecks, type PullRequestView } from "../../entities/pull-request/index"
@@ -36,6 +36,21 @@ const prEvent = (task: TaskRecord, pr: string, view: PullRequestView, at: string
   }
   return { key: task.spec.id + ".pr-ready", at, text: named(task) + " PR ready: " + pr + ", checks green: " + greenChecks(view).join(", ") }
 }
+
+export const taskPrState = (root: string, task: TaskRecord): Effect.Effect<PrState | null, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const pr = taskPr(task)
+    if (pr === null) {
+      return null
+    }
+    if (yield* eventRecorded(root, task.spec.id + ".merged")) {
+      return "merged"
+    }
+    if (yield* eventRecorded(root, task.spec.id + ".pr-closed")) {
+      return "closed"
+    }
+    return (yield* readPrState(root, task.spec.id, pr)) ?? "open"
+  })
 
 export const prEvents = (
   root: string,
