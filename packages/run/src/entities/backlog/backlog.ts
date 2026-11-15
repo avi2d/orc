@@ -1,7 +1,7 @@
 import { Array as Arr, Effect, FileSystem, Schema } from "effect"
 import { answerWait, type DeciderOwns, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 import { renderTaskFile } from "./task-record-render"
-import { BacklogError, backlogPaths, grabIn, platformFailure, publishOnce, scratchName, takenGrab } from "./backlog-write"
+import { BacklogError, backlogPaths, grabIn, platformFailure, publishOnce, recoverGrabs, scratchName, takenGrab } from "./backlog-write"
 
 export { BacklogError } from "./backlog-write"
 
@@ -68,7 +68,8 @@ const readFolder = (
 export const listTasks = (
   root: string
 ): Effect.Effect<ReadonlyArray<TaskRecord>, BacklogError | TaskFileError, FileSystem.FileSystem> =>
-  Effect.forEach(taskFolders, (folder) => readFolder(root, folder)).pipe(
+  recoverGrabs(root).pipe(
+    Effect.andThen(Effect.forEach(taskFolders, (folder) => readFolder(root, folder))),
     Effect.map((folders) => {
       const all = folders.flat()
       const closed = new Set(all.filter((record) => record.state.kind === "closed").map((record) => record.spec.id))
@@ -199,6 +200,7 @@ const missedClose = (
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const paths = backlogPaths(root)
+    yield* recoverGrabs(root)
     const takenNames = yield* fs.readDirectory(paths.folder("taken")).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<string>))
     if (takenNames.some((name) => name.startsWith("." + id + "."))) {
       return yield* new BacklogError({ detail: id + " moved while orc read it, so run the command again" })
