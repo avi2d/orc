@@ -173,7 +173,7 @@ export default class OrcTask extends View {
     const task = this.reading.value.tasks.find((entry) => entry.id === id)
     if (task === undefined) return root.child(div().p(16).text_color(t.muted).child(`${id} is no longer in the backlog`))
     const runs = runsOfTask(this.reading.value.runs, task.id)
-    const local = new Set(this.reading.value.local.map((run) => run.id))
+    const local = new Set(this.reading.value.local.map((localRun) => localRun.id))
     return root.child(this.header(t, task, runToOpen(runs, local)))
       .child(this.tabStrip(t))
       .child(this.tabBody(t, task, runs))

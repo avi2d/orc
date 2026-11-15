@@ -1,4 +1,4 @@
-import { type Guard, type Guarded, arrayOf, boardKinds, child, fields, literal, nullableString, number, ok, oneOf, prStates, refused, string } from "./guard"
+import { type Guard, type Guarded, arrayOf, boardKinds, child, fields, literal, nullableString, number, ok, oneOf, prStates, refused, runsHead, string } from "./guard"
 import type { Answer, Asked, TaskDetail, TaskHold, TaskParked, TaskRun, TaskState } from "./task"
 
 type Fields = Readonly<Record<string, unknown>>
@@ -156,10 +156,8 @@ const taskRun: Guard<TaskRun | null> = (value, at) => {
 }
 
 export const taskRuns: Guard<ReadonlyArray<TaskRun>> = (value, at) => {
-  const record = fields(value, at)
-  if (record.kind === "refused") return record
-  const schema = literal(record.value, "schema", at, "orc.runs.v1")
-  if (schema.kind === "refused") return schema
-  const listed = arrayOf(record.value, "runs", at, taskRun)
+  const document = runsHead(value, at)
+  if (document.kind === "refused") return document
+  const listed = arrayOf(document.value.record, "runs", at, taskRun)
   return listed.kind === "refused" ? listed : ok(listed.value.filter((entry) => entry !== null))
 }

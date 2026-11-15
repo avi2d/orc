@@ -360,15 +360,20 @@ export const show: Guard<Show> = (value, at) => {
   return ok({ schema: schema.value, steps: steps.value })
 }
 
-export const runs: Guard<Runs> = (value, at) => {
+export const runsHead = (value: unknown, at: string): Guarded<{ schema: "orc.runs.v1"; record: Fields }> => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
   const schema = literal(record.value, "schema", at, "orc.runs.v1")
-  if (schema.kind === "refused") return schema
-  const listed = record.value["runs"]
+  return schema.kind === "refused" ? schema : ok({ schema: schema.value, record: record.value })
+}
+
+export const runs: Guard<Runs> = (value, at) => {
+  const head = runsHead(value, at)
+  if (head.kind === "refused") return head
+  const listed = head.value.record["runs"]
   const started = Array.isArray(listed) ? listed.filter((entry) => !(isFields(entry) && entry["state"] === "queued")) : listed
   const list = arrayOf({ runs: started }, "runs", at, run)
   if (list.kind === "refused") return list
-  return ok({ schema: schema.value, runs: list.value })
+  return ok({ schema: head.value.schema, runs: list.value })
 }
 
