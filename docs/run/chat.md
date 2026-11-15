@@ -4,6 +4,11 @@ kind: reference
 # Adding tasks from a chat
 To say tasks in a chat instead of writing task files, run `orc chat`.
 It starts Pi on the model `models.orchestrator` names in `config.json`, and refuses to start when it names none.
+To keep the chat in a session file you choose, run `orc chat --session <file>`.
+Orc makes the path absolute and passes it to Pi's `--session`.
+When the file is missing, Pi starts a new chat and writes it there after the first reply.
+When the file exists, the chat resumes it.
+So a program that starts the chat knows the one file that holds its turns.
 When `<ORC_HOME>/orchestrator.md` exists, the chat adds it to Pi's system prompt as the orchestrator's rules.
 It also adds the instructions file of each project in `projects.json` that names one, labelled with the project's name.
 Its first line of output names the rules file it loaded, or says it found none, and then names each instructions file.
