@@ -11,26 +11,45 @@ type Palette = ReturnType<typeof palette>
 interface BoardDocuments {
   readonly backlog: BoardBacklog
   readonly attention: BoardAttention
-  readonly queued: ReadonlyArray<QueuedRun>
 }
 
 export default class OrcBoard extends View {
   reading: Reading<BoardDocuments> = { kind: "reading" }
+  queue: Reading<ReadonlyArray<QueuedRun>> = { kind: "reading" }
   project: string | null = null
   folded = new Set<Lane>(["Backlog", "Done"])
   visible = false
   lastRead = 0
   busy = false
+  lastQueueRead = 0
+  queueBusy = false
 
   load = (): Promise<Reading<BoardDocuments>> => Promise.all([
     readJson("orc", ["backlog", "--json"], boardBacklog),
-    readJson("orc", ["attention", "--json"], boardAttention),
-    readJson("orc", ["runs", "--json"], boardQueue)
-  ]).then(([backlog, attention, queued]) =>
-    backlog.kind !== "ok" ? backlog : attention.kind !== "ok" ? attention : queued.kind !== "ok" ? queued : { kind: "ok", value: { backlog: backlog.value, attention: attention.value, queued: queued.value } })
+    readJson("orc", ["attention", "--json"], boardAttention)
+  ]).then(([backlog, attention]) =>
+    backlog.kind !== "ok" ? backlog : attention.kind !== "ok" ? attention : { kind: "ok", value: { backlog: backlog.value, attention: attention.value } } })
+
+  loadQueue = (): Promise<Reading<ReadonlyArray<QueuedRun>>> => readJson("orc", ["runs", "--json"], boardQueue)
+
+  reloadQueue(cx: Context): void {
+    if (this.queueBusy) return
+    this.queueBusy = true
+    this.lastQueueRead = Date.now()
+    cx.spawn((task) => this.loadQueue().then((queue) => {
+      this.queue = queue
+      this.queueBusy = false
+      task.notify()
+    }))
+  }
 
   override init(_props: unknown, cx: AsyncContext): void {
     refreshWhenShown("orc-board", 10_000, cx, this)
+    cx.timer.every(1000, (tick) => {
+      if (!this.visible || Date.now() - this.lastQueueRead < 10_000) return
+      this.reloadQueue(tick)
+    })
+    if (this.visible) this.reloadQueue(cx)
   }
 
   toggle(cx: Context, lane: Lane): void {
@@ -51,7 +70,8 @@ export default class OrcBoard extends View {
     const root = v_flex().id("root").size_full().bg(t.surface).text_size(13).text_color(t.foreground)
     if (this.reading.kind === "failed") return root.child(div().p(16).text_color(t.blocked).child(this.reading.reason))
     if (this.reading.kind === "reading") return root.child(div().p(16).text_color(t.muted).child("Reading the backlog"))
-    const { backlog, attention, queued } = this.reading.value
+    const { backlog, attention } = this.reading.value
+    const queued = this.queue.kind === "ok" ? this.queue.value : []
     const owned = new Set(attention.items.filter((item) => item.owner === "user").map((item) => item.task))
     const filters = h_flex().id("filters").gap(4).px(12).py(8).flex_wrap().items_center()
       .child(div().text_color(t.dim).child("Project"))
@@ -59,6 +79,7 @@ export default class OrcBoard extends View {
       .children((backlog.projects ?? []).map((project) => this.chip(t, `project-${project}`, project, this.project === project, (cx) => { this.project = project; cx.notify() })))
     return root.child(filters)
       .children(backlog.projects === null ? [div().px(12).text_color(t.blocked).child("Projects could not be read")] : [])
+      .children(this.queue.kind === "failed" ? [div().px(12).text_color(t.blocked).child("Queue could not be read")] : [])
       .child(h_flex().id("lanes").flex_1().min_w_0().overflow_x_scroll()
         .children(lanes.map((lane) => this.lane(t, lane, tasksInLane(backlog.tasks, lane, this.project, owned), queued))))
   }

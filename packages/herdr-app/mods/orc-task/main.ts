@@ -199,10 +199,10 @@ export default class OrcTask extends View {
     const facts = v_flex().flex_1().min_w_0().gap(4)
       .child(h_flex().gap(8).child(div().font_semibold().child(task.id)).child(div().text_color(t.dim).child(kindLabel(task.kind))))
       .child(div().text_size(15).font_semibold().child(task.title))
-    const actions = waiting !== null ? [div().flex_shrink_0().py(4).text_color(t.muted).child(waiting)] : open === null ? [] : [this.button(t, "open-run", "Open run", false, () => {
+    const actions = open !== null ? [this.button(t, "open-run", "Open run", false, () => {
       setShared(agentsOpenKey, { run: open, at: Date.now() })
       run("layout.select", { stack: viewsStack, child: "orc-agents" })
-    })]
+    })] : waiting !== null ? [div().flex_shrink_0().py(4).text_color(t.muted).child(waiting)] : []
     return h_flex().px(16).py(12).gap(12).items_start().border_b(1).border_color(t.border).child(facts).children(actions)
   }
 
