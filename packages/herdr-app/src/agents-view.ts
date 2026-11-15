@@ -1,7 +1,7 @@
 import { type Color, type Context, type Element, div } from "gpui-kit"
 import { Input, type InputState, type ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { openOverlay, settings } from "herdr"
-import { type Card, type CardStatus, type Filter, type Mark, type RunAgent, type StepRow, agentLabel, approveRow, cardPlace, cardStatuses, filterCards, namedModels, projectsOf, railLabel, sendBackArgs, stepRows } from "./agents"
+import { type Card, type CardStatus, type Filter, type Mark, type RunAgent, type StepRow, agentLabel, approveRow, cardPlace, cardStatuses, filterCards, namedModels, opensTurns, projectsOf, railLabel, sendBackArgs, stepRows } from "./agents"
 import type { Show, ShownStep } from "./guard"
 import { linkedText } from "./links-view"
 import { type Reading, readText } from "./orc-read"
@@ -226,7 +226,7 @@ const stepBar = (t: Palette, step: ShownStep, title: string, source: string, pan
   return h_flex().px(16).h(40).gap(12).flex_shrink_0().items_center().border_b(1).border_color(t.border)
     .child(div().flex_shrink_0().font_semibold().child(title))
     .children(agent === null ? [] : [div().flex_shrink_0().text_size(12).text_color(t.muted).child(agent)])
-    .children(step.name === "implement"
+    .children(opensTurns(step)
       ? [h_flex().gap(2).flex_shrink_0().child(paneChoice(t, "turns", "Turns", pane === "turns", act)).child(paneChoice(t, "raw", "Raw", pane === "raw", act))]
       : [])
     .child(div().flex_1().min_w_0().truncate().text_right().text_size(12).text_color(t.dim).child(source))
@@ -368,7 +368,7 @@ export const detailView = (t: Palette, card: Card | null, act: AgentsActions, sh
     return detailNote(t, settled ? "This run ended before it recorded a step" : "No step has started yet")
   }
   const title = stepTitle(card, shown.steps, step.id)
-  if (step.name === "implement" && shown.pane === "turns") {
+  if (opensTurns(step) && shown.pane === "turns") {
     return detailPane(t, [...shown.back, stepBar(t, step, title, "Pi session", shown.pane, act),
       div().flex_1().min_h_0().child(turnsView(t, shown.turns, { thinking: shown.thinking, calls: shown.calls }, {
         toggleThinking: (turn, cx) => shown.flipThinking(turn, cx),
