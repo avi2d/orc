@@ -13,7 +13,7 @@ export interface BoardTask {
   readonly prState: "open" | "closed" | "merged" | null
 }
 
-export const titleClip = { heightPx: 36, lineHeightPx: 18 } as const
+export const titleClip: { readonly heightPx: number; readonly lineHeightPx: number } = { heightPx: 36, lineHeightPx: 18 }
 
 export const laneFor = (task: BoardTask, attention: ReadonlySet<string>): Lane => {
   if (task.held || task.parked || attention.has(task.id) || (task.status === "closed" && task.prState === "open")) return "Awaiting you"
