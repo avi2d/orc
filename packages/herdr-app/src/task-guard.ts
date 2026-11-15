@@ -1,4 +1,6 @@
 import { type Guard, type Guarded, arrayOf, boardKinds, child, fields, literal, nullableString, number, ok, oneOf, prStates, refused, runsHead, string } from "./guard"
+import type { QueuedRun } from "./board"
+import { boardQueue } from "./guard-board"
 import type { Answer, Asked, TaskDetail, TaskHold, TaskParked, TaskRun, TaskState } from "./task"
 import { type Thread, type ThreadLine, threadKinds, threadWhos } from "./thread"
 
@@ -159,6 +161,18 @@ export const taskRuns: Guard<ReadonlyArray<TaskRun>> = (value, at) => {
   if (document.kind === "refused") return document
   const listed = arrayOf(document.value.record, "runs", at, taskRun)
   return listed.kind === "refused" ? listed : ok(listed.value.filter((entry) => entry !== null))
+}
+
+export interface RunsAndQueue {
+  readonly runs: ReadonlyArray<TaskRun>
+  readonly queued: ReadonlyArray<QueuedRun>
+}
+
+export const taskRunsAndQueue: Guard<RunsAndQueue> = (value, at) => {
+  const runs = taskRuns(value, at)
+  if (runs.kind === "refused") return runs
+  const queued = boardQueue(value, at)
+  return queued.kind === "refused" ? queued : ok({ runs: runs.value, queued: queued.value })
 }
 
 const threadLine: Guard<ThreadLine> = (value, at) => {
