@@ -229,7 +229,7 @@ export const markAnswersRelayed = (
     return Effect.succeed({ kind: "write", record: { ...fresh, parked: { ...fresh.parked, questions } }, result: undefined })
   })
 
-export const sendBackQuestionId = "send-back"
+const sendBackQuestionId = "send-back"
 
 export const isSendBackQuestion = (question: string): boolean =>
   question === sendBackQuestionId || question.startsWith(sendBackQuestionId + "-")

@@ -358,11 +358,7 @@ export const readRunResult = (id: string, home: string, label: string | null | u
 export const killHeldThrough = (command: Command, task: string, label?: string | null): Effect.Effect<string, RunnerError, ChildProcessSpawner.ChildProcessSpawner> => {
   const stdin = label == null ? null : JSON.stringify({ label })
   return capture([...command, "runner", "kill", task, ...(stdin === null ? [] : ["--stdin-label"])], stdin).pipe(
-    Effect.flatMap((result) =>
-      result.exitCode === 0
-        ? Effect.succeed(result.stdout.trim())
-        : refuse(command.join(" ") + " runner kill exited " + result.exitCode + ": " + result.stderr.trim())
-    )
+    Effect.flatMap((result) => result.exitCode === 0 ? Effect.succeed(result.stdout.trim()) : refuse(command.join(" ") + " runner kill exited " + result.exitCode + ": " + result.stderr.trim()))
   )
 }
 

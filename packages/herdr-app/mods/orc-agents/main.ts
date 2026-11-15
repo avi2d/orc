@@ -224,9 +224,7 @@ export default class OrcAgents extends View {
       return sent?.kind === "ok" ? [v_flex().px(16).py(8).border_b(1).border_color(t.border).children(said)] : []
     }
     const ready = sendBackArgs(card, this.review.value()) !== null && sent?.kind !== "reading"
-    const button = div().id("send-back").px(10).py(4).rounded(4).flex_shrink_0()
-      .bg(t.selected).text_color(ready ? t.foreground : t.dim)
-      .child(sent?.kind === "reading" ? "Sending back" : "Send back")
+    const button = div().id("send-back").px(10).py(4).rounded(4).flex_shrink_0().bg(t.selected).text_color(ready ? t.foreground : t.dim).child(sent?.kind === "reading" ? "Sending back" : "Send back")
     return [v_flex().px(16).py(8).gap(6).border_b(1).border_color(t.border)
       .child(h_flex().gap(8).items_center()
         .child(div().flex_1().min_w_0().child(Input.new(this.review)))
@@ -249,17 +247,13 @@ export default class OrcAgents extends View {
     const t = palette()
     const card = this.selectedCard()
     return h_flex().id("root").size_full().bg(t.surface).text_size(13).text_color(t.foreground)
-      .child(this.folded ? this.rail(t, card) : this.list(t, card))
-      .child(this.stepsColumn(t, card))
-      .child(this.detail(t, card))
+      .child(this.folded ? this.rail(t, card) : this.list(t, card)).child(this.stepsColumn(t, card)).child(this.detail(t, card))
   }
 
   chip(t: Palette, id: string, label: string, on: boolean, pick: (cx: Context) => void): Element {
     return div().id(id).px(8).py(2).rounded(4).cursor_pointer()
       .bg(on ? t.selected : t.surface).text_color(on ? t.foreground : t.muted)
-      .hover((style) => style.bg(t.hover))
-      .on_click((_event, cx) => pick(cx))
-      .child(label)
+      .hover((style) => style.bg(t.hover)).on_click((_event, cx) => pick(cx)).child(label)
   }
 
   filters(t: Palette): Element {
