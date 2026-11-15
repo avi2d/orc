@@ -168,6 +168,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | --- | --- |
 | `packages/run/src/entities/attention/beat-action.ts` | The beat actions each beat step reports |
 | `packages/run/src/entities/attention/attention.ts` | The attention queue under `attention/`: one file per item, its open and close and withdraw, the items of one task, and the review questions, run events and overdue waits routed into it |
+| `packages/run/src/entities/attention/attention-overdue.ts` | The age of an attention item and whether an open item is overdue |
 | `packages/run/src/entities/attention/attention-item.ts` | The item file shape, the decider's decisions it records and their text |
 | `packages/run/src/entities/attention/failing-command.ts` | The `failing-command` items of running runs whose command keeps failing |
 

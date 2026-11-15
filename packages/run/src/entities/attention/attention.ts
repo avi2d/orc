@@ -4,8 +4,6 @@ import type { BeatAction } from "./beat-action"
 import { checkRefusals, greenChecks, type PullRequestView, redChecks } from "../pull-request/index"
 import { isWorkerQuestion, loopQuestionId } from "../agent/index"
 
-const overdueMillis = 5 * 60 * 1000
-
 export const deciderTimeoutMillis = 180 * 1000
 const deciderClaimMillis = deciderTimeoutMillis + 60 * 1000
 
@@ -212,10 +210,6 @@ export const readAttention = (root: string, tasks: ReadonlyArray<TaskRecord>): E
     }
   })
 
-export const ageMillis = (item: AttentionItem, nowMillis: number): number => Math.max(0, nowMillis - Date.parse(item.asked))
-
-export const isOverdue = (item: AttentionItem, nowMillis: number): boolean => item.state.kind === "open" && ageMillis(item, nowMillis) > overdueMillis
-
 type TaskItemKind = Extract<AttentionItem["kind"], "review-question" | "worker-question" | "overdue-wait">
 
 const taskItemKinds: ReadonlySet<AttentionItem["kind"]> = new Set<TaskItemKind>(["review-question", "worker-question", "overdue-wait"])
@@ -319,7 +313,7 @@ const routeTask = (root: string, task: TaskRecord, at: string): Effect.Effect<Re
         continue
       }
       const answer = question.answer
-      if (answer !== null && answer !== undefined && answer.by !== "asked-back" && isWorkerQuestion(question.id)) {
+      if (answer !== null && answer.by !== "asked-back" && isWorkerQuestion(question.id)) {
         yield* closeAskedBackEarlier(root, task, question.asked, at)
       }
     }

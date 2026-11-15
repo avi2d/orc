@@ -62,36 +62,43 @@ const unquoted = (quote: string): string => spaced(quote).replace(/^["'“”‘
 
 const stripMarker = (line: string): string => spaced(line).replace(/^(?:[-*+>]\s+|\d+[.)]\s+)/, "")
 
+const pushOnce = (out: Array<string>, value: string): void => {
+  if (value !== "" && !out.includes(value)) {
+    out.push(value)
+  }
+}
+
+const sentencesOf = (text: string): ReadonlyArray<string> =>
+  text.split(/(?<=[.!?])\s+/).map(unquoted).filter((sentence) => sentence !== "")
+
+const collectSentences = (out: Array<string>, text: string): void => {
+  for (const sentence of sentencesOf(text)) {
+    pushOnce(out, sentence)
+  }
+}
+
+const collectLine = (out: Array<string>, line: string): void => {
+  pushOnce(out, unquoted(line))
+  collectSentences(out, line)
+}
+
+const collectParagraph = (out: Array<string>, paragraph: string): void => {
+  const lines = paragraph.split("\n").map(stripMarker).filter((line) => line !== "")
+  for (const line of lines) {
+    collectLine(out, line)
+  }
+  if (lines.length === 0) {
+    return
+  }
+  const joined = spaced(lines.join(" "))
+  pushOnce(out, unquoted(joined))
+  collectSentences(out, joined)
+}
+
 const sentencesAndLinesOf = (text: string): ReadonlyArray<string> => {
   const out: Array<string> = []
   for (const paragraph of text.split(/\n\s*\n/)) {
-    const lines = paragraph.split("\n").map(stripMarker).filter((line) => line !== "")
-    for (const line of lines) {
-      const whole = unquoted(line)
-      if (whole !== "" && !out.includes(whole)) {
-        out.push(whole)
-      }
-      for (const part of line.split(/(?<=[.!?])\s+/)) {
-        const sentence = unquoted(part)
-        if (sentence !== "" && !out.includes(sentence)) {
-          out.push(sentence)
-        }
-      }
-    }
-    if (lines.length === 0) {
-      continue
-    }
-    const joined = spaced(lines.join(" "))
-    const paragraphWhole = unquoted(joined)
-    if (paragraphWhole !== "" && !out.includes(paragraphWhole)) {
-      out.push(paragraphWhole)
-    }
-    for (const part of joined.split(/(?<=[.!?])\s+/)) {
-      const sentence = unquoted(part)
-      if (sentence !== "" && !out.includes(sentence)) {
-        out.push(sentence)
-      }
-    }
+    collectParagraph(out, paragraph)
   }
   return out
 }
