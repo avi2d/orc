@@ -17,6 +17,11 @@ export interface TurnsActions {
   readonly toggleCall: (call: string, cx: Context) => void
 }
 
+export interface TurnsWords {
+  readonly reading: string
+  readonly empty: string
+}
+
 const outputLines = 20
 
 const monospace = (): string => {
@@ -50,9 +55,9 @@ const callView = (t: Palette, call: TurnCall, open: boolean, act: TurnsActions):
 }
 
 const turnView = (t: Palette, turn: Turn, open: TurnsOpen, act: TurnsActions): Element => {
-  const header = h_flex().justify_between().items_center().text_size(12).text_color(t.dim)
-    .child(div().child(turnHeader(turn)))
-    .child(div().child(clock(turn.at)))
+  const header = h_flex().justify_between().items_start().gap(8).text_size(12).text_color(t.dim)
+    .child(div().flex_1().min_w(0).child(turnHeader(turn)))
+    .child(div().flex_shrink_0().child(clock(turn.at)))
   const thinkingOpen = open.thinking.has(turn.id)
   return v_flex().id(`turn-${turn.id}`).gap(8).p(12).rounded(6).bg(t.raised)
     .child(header)
@@ -66,11 +71,11 @@ const turnView = (t: Palette, turn: Turn, open: TurnsOpen, act: TurnsActions): E
     .when(turn.calls.length > 0, (block) => block.child(v_flex().gap(2).children(turn.calls.map((call) => callView(t, call, open.calls.has(call.id), act)))))
 }
 
-export const turnsView = (t: Palette, reading: Reading<ReadonlyArray<Turn>>, open: TurnsOpen, act: TurnsActions, scroll: ScrollHandle): Element => {
+export const turnsView = (t: Palette, reading: Reading<ReadonlyArray<Turn>>, open: TurnsOpen, act: TurnsActions, scroll: ScrollHandle, words: TurnsWords): Element => {
   const note = (text: string, color: Palette[keyof Palette]): Element => div().p(16).text_color(color).child(text)
-  if (reading.kind === "reading") return note("Reading the chat's Pi session", t.muted)
+  if (reading.kind === "reading") return note(words.reading, t.muted)
   if (reading.kind === "failed") return note(reading.reason, t.blocked)
-  if (reading.value.length === 0) return note("No turn yet. Type a message in Raw and its reply shows here.", t.muted)
+  if (reading.value.length === 0) return note(words.empty, t.muted)
   return v_flex().id("turns").size_full().overflow_y_scrollbar().track_scroll(scroll).p(12).gap(10).text_size(13).text_color(t.foreground)
     .children(reading.value.map((turn) => turnView(t, turn, open, act)))
 }

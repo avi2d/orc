@@ -34,3 +34,20 @@ describe("the Turns view of a recorded orc chat session", () => {
     expect(turnsOf(cut)).toHaveLength(2)
   })
 })
+
+describe("the Turns view of a recorded run's Agent step session", () => {
+  const session = readFile(join(import.meta.dir, "../../fixtures/herdr-agents/run-session.jsonl"), "utf8")
+
+  test("marks the bash call Pi recorded as an error ✗, not ✓ like the calls beside it", async () => {
+    const calls = turnsOf(await session).flatMap((turn) => turn.calls.map((call) => [call.name, callMark(call.result)]))
+    expect(calls).toEqual([["read", "✓"], ["bash", "✗"], ["bash", "✓"]])
+  })
+
+  test("heads each turn with the tokens Pi recorded for it, not a running total", async () => {
+    expect(turnsOf(await session).map(turnHeader)).toEqual([
+      "in 2 · out 86 · cache read 2.0k · cache write 6.2k",
+      "in 2 · out 110 · cache read 8.2k · cache write 1.4k",
+      "in 2 · out 172 · cache read 9.6k · cache write 738"
+    ])
+  })
+})

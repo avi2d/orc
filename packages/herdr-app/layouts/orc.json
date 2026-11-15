@@ -14,7 +14,14 @@
       ]
     },
     { "id": "orc-resources", "type": "block", "content": { "mod": "orc-resources" } },
-    { "id": "orc-agents", "type": "block", "content": { "mod": "orc-agents" } }
+    {
+      "id": "orc-agents",
+      "type": "row",
+      "children": [
+        { "id": "orc-agents-runs", "type": "block", "content": { "mod": "orc-agents" } },
+        { "id": "orc-changes", "type": "block", "size": { "px": 460 }, "min": 280, "hidden": true, "content": { "mod": "orc-changes" } }
+      ]
+    }
   ],
   "floating": [
     { "id": "orc-drawer", "edge": "top", "align": "center", "content": { "mod": "orc-drawer" } }
