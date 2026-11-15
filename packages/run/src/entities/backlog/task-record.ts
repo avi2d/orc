@@ -77,7 +77,7 @@ export interface Hold {
   readonly history?: ReadonlyArray<typeof AnsweredHold.Type>
 }
 
-const ParkedOrigin = Schema.Struct({ machine: Schema.String.check(Schema.isNonEmpty()), run: Schema.String.check(Schema.isNonEmpty()) })
+const ParkedOrigin = Schema.Struct({ machine: Schema.String.check(Schema.isNonEmpty()), run: Schema.String.check(Schema.isNonEmpty()), pr: Schema.optional(Schema.String) })
 
 export interface Parked {
   readonly origin?: typeof ParkedOrigin.Type
