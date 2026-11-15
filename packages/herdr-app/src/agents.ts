@@ -128,7 +128,8 @@ const settledPlace = (run: Run, task: Task | undefined, newest: boolean): { read
       return { standing: { status: "Done" }, where: `Merged ${pr}` }
     case "closed":
       return { standing: { status: "Failed" }, where: `Closed ${pr}` }
-    default:
+    case "open":
+    case null:
       return null
   }
 }
