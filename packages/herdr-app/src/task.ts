@@ -61,10 +61,10 @@ export interface TaskRun {
 
 const empty = "—"
 
-const taskBranch = (task: string): string => `orc/${task}`
+const taskBranches = (task: string): ReadonlyArray<string> => [`orc/${task}`, `orc/${task}-parent`]
 
 export const runsOfTask = (runs: ReadonlyArray<TaskRun>, task: string): ReadonlyArray<TaskRun> =>
-  runs.filter((run) => run.branch === taskBranch(task)).sort((a, b) => b.id.localeCompare(a.id))
+  runs.filter((run) => taskBranches(task).includes(run.branch)).sort((a, b) => b.id.localeCompare(a.id))
 
 export const runToOpen = (runs: ReadonlyArray<TaskRun>, local: ReadonlySet<string>): string | null =>
   runs.find((run) => local.has(run.id))?.id ?? null
@@ -115,7 +115,7 @@ const infoValue = (task: TaskDetail, runs: ReadonlyArray<TaskRun>, label: InfoLa
   switch (label) {
     case "Account": return accountOf(task.state)
     case "Run": return runValue(runs)
-    case "Branch": return runs.length > 0 ? taskBranch(task.id) : task.parked?.branch ?? null
+    case "Branch": return runs.at(0)?.branch ?? task.parked?.branch ?? null
     case "PR": return prValue(task)
     case "Depends on": return task.dependsOn.length === 0 ? null : task.dependsOn.join(", ")
     case "Created": return shortTime(task.created)
