@@ -230,7 +230,7 @@ const answerOn = (id: string, words: string, at: string, expected: ExpectedDecis
 const relayTakenQuestions = (
   root: string,
   id: string,
-  map: (questions: ReadonlyArray<ParkedQuestion>) => ReadonlyArray<ParkedQuestion>
+  map: (questions: Arr.NonEmptyReadonlyArray<ParkedQuestion>) => Arr.NonEmptyReadonlyArray<ParkedQuestion>
 ): Effect.Effect<void, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   rewriteTaken(root, id, (fresh): Effect.Effect<Rewrite<void>, BacklogError> => {
     if (fresh.state.kind !== "started" || fresh.parked === null) {

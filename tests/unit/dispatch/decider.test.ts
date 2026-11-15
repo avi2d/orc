@@ -46,7 +46,9 @@ const replies = (byQuestion: Readonly<Record<string, string>>, heard: Array<Deci
   home,
   ask: (request) => {
     heard.push(request)
-    const reply = Object.entries(byQuestion).find(([text]) => request.prompt.includes(text))?.[1]
+    const matching = Object.entries(byQuestion).filter(([text]) => request.prompt.includes(text))
+    matching.sort((a, b) => request.prompt.lastIndexOf(b[0]) - request.prompt.lastIndexOf(a[0]))
+    const reply = matching[0]?.[1]
     return reply === undefined ? Effect.fail(new DeciderUnheard({ reason: "no reply in this test" })) : Effect.succeed(reply)
   }
 })
