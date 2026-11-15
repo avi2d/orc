@@ -40,8 +40,8 @@ The list is in the code, so neither your rules nor the policy can widen what the
 The decider takes one of four actions, and the item keeps it as a `decision` with its time:
 
 - **answer**: the reply names the answer, the reason and the `rule` it rests on, quoted word for word from your rules, the project's instructions, the policy or the task's body.
-  Orc escalates an answer whose quote is no whole sentence or line of them, after whitespace is collapsed and surrounding quotes and a leading list or quote marker are stripped on both sides.
-  A quote matches a whole line, a sentence within a line, a whole paragraph joined across its lines, or a sentence of that joined paragraph.
+  Orc escalates an answer whose quote is no whole clause of them, after whitespace is collapsed and surrounding quotes and a leading list or quote marker are stripped on both sides.
+  A quote matches a whole line, a sentence within a line, a whole paragraph joined across its lines, a sentence of that joined paragraph, or a run of those lines to the end of its paragraph, where the quote starts at the start or after a period, exclamation mark, question mark, colon or semicolon and ends at the end or before one of those marks.
   The answer goes to the task as `orc backlog answer` would give it, so the item closes with the answer's words.
   The `decision` is `answered` with the reason and the `rule`, which holds the `quote` and the `source` file it came from.
 - **ask back**: for a `worker-question`, the decider may put one question to the worker instead of answering.
