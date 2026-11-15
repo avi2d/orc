@@ -79,7 +79,7 @@ The panel shows the id, the kind and the title of the selected task.
 When `orc runs --json --local` lists a run of the task, Open run switches to the Agents tab with the newest such run selected.
 A run outside that list has no Open run, since the Agents tab shows those runs only.
 While the task waits in a pueue queue, the header shows the card's `Queued on <machine>, <n> ahead` line in place of Open run.
-A run belongs to the task when its branch is `orc/<task id>`.
+A run belongs to the task when its branch is `orc/<task id>` or, for a parent task's planning run, `orc/<task id>-parent`.
 
 The panel has three tabs:
 
