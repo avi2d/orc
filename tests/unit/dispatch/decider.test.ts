@@ -28,10 +28,10 @@ const r3Item = "orc-1.r3.2026-11-02T10_20_00_000Z"
 
 type AskedQuestion = { readonly id: string; readonly text: string }
 
-const withAskingTask = async (body: (root: string) => Promise<void>, questions: readonly [AskedQuestion, ...ReadonlyArray<AskedQuestion>] = [r2, r3], body: string = intent): Promise<void> => {
+const withAskingTask = async (body: (root: string) => Promise<void>, questions: readonly [AskedQuestion, ...ReadonlyArray<AskedQuestion>] = [r2, r3], taskBody: string = intent): Promise<void> => {
   const root = await mkdtemp(join(tmpdir(), "orc-decider-"))
   try {
-    const record = await run(addTask(root, { ...spec, body }))
+    const record = await run(addTask(root, { ...spec, body: taskBody }))
     await run(claimTask(root, record.spec.id))
     await run(writeTaken(root, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-11-02T10:02:00.000Z", log: root + "/logs/orc-1.log" } } }))
     await run(askStartedTask(root, "orc-1", { asked, questions }))
