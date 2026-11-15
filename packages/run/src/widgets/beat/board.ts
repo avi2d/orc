@@ -1,5 +1,6 @@
 import { type BeatAction, type BeatReport, type MachineRoom } from "./beat"
-import { taskWait } from "./beat-place"
+import type { BeatWaits } from "./beat-waits"
+import { type TaskWait, taskWaiting } from "./beat-place"
 import { type ChildCount, childCount, decisionAnswer, dependencyWaits, type TaskKind, type TaskPriority, answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, ranClosing, type SplitMark, type Started, type TaskRecord } from "../../entities/backlog/index"
 import type { Project } from "../../shared/config/index"
 import { describeQuota } from "./quota"
@@ -18,8 +19,11 @@ export interface BacklogView {
   readonly room: RoomList
   readonly merged: ReadonlySet<string>
   readonly prStates: ReadonlyMap<string, PrState | null>
+  readonly beatWaits: BeatWaits | null
   readonly deciderOwns: DeciderOwns
 }
+
+type WaitingJson = TaskWait | { readonly kind: "room"; readonly detail: string | null; readonly at: string | null }
 
 type TaskStatusJson =
   | { readonly status: "new" }
@@ -47,6 +51,7 @@ type TaskJson = {
   readonly parent: string | null
   readonly children: ChildCount | null
   readonly wait: string | null
+  readonly waiting: WaitingJson | null
   readonly split: SplitMark | null
   readonly dependsOn: ReadonlyArray<string>
   readonly priority: TaskPriority | null
@@ -116,9 +121,17 @@ const claimJson = (record: TaskRecord): TaskStatusJson => {
   }
 }
 
-export const backlogJson = (view: BacklogView): BacklogJson => ({
-  schema: BACKLOG_JSON_SCHEMA,
-  tasks: view.tasks.map((record) => ({
+const roomWaiting = (id: string, beatWaits: BeatWaits | null): WaitingJson => {
+  const detail = beatWaits?.reasons.get(id)
+  return detail === undefined || beatWaits === null ? { kind: "room", detail: null, at: null } : { kind: "room", detail, at: beatWaits.at }
+}
+
+const waitingOf = (record: TaskRecord, view: BacklogView): WaitingJson | null =>
+  record.state.kind === "new" ? taskWaiting(record, view.tasks, view.merged, view.deciderOwns) ?? roomWaiting(record.spec.id, view.beatWaits) : null
+
+const taskJson = (record: TaskRecord, view: BacklogView): TaskJson => {
+  const waiting = waitingOf(record, view)
+  return {
     id: record.spec.id,
     title: record.spec.title,
     project: record.spec.project,
@@ -126,7 +139,8 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     machine: record.spec.machine,
     parent: record.spec.parent,
     children: record.spec.kind === "parent" ? childCount(record, view.tasks, view.merged) : null,
-    wait: record.state.kind === "new" ? taskWait(record, view.tasks, view.merged, view.deciderOwns) : null,
+    wait: waiting === null || waiting.kind === "room" ? null : waiting.detail,
+    waiting,
     split: record.spec.split,
     dependsOn: record.spec.dependsOn,
     priority: record.spec.priority,
@@ -135,7 +149,12 @@ export const backlogJson = (view: BacklogView): BacklogJson => ({
     hold: record.hold,
     parked: record.parked === null ? null : parkedJson(record.parked),
     ...claimJson(record)
-  })),
+  }
+}
+
+export const backlogJson = (view: BacklogView): BacklogJson => ({
+  schema: BACKLOG_JSON_SCHEMA,
+  tasks: view.tasks.map((record) => taskJson(record, view)),
   events: view.events,
   merged: [...view.merged],
   projects: view.projects.kind === "read" ? view.projects.projects : null,

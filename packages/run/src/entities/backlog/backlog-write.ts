@@ -28,6 +28,18 @@ export const readIfPresent = (file: string): Effect.Effect<string | null, Backlo
 
 export const scratchName = (folder: string, id: string): string => folder + "/." + id + "." + crypto.randomUUID() + ".tmp"
 
+// rename(2) replaces the file whole, so a reader sees one write and never a mix of two.
+export const writeAtomic = (
+  scratch: string,
+  file: string,
+  text: string
+): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    yield* fs.writeFileString(scratch, text).pipe(Effect.mapError(platformFailure("write " + scratch)))
+    yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
+  })
+
 // link(2) refuses an existing name, so the file appears whole and at most once.
 export const publishOnce = (
   folder: string,
