@@ -7,6 +7,10 @@ Answer it only when it is routine.
 A question is routine when a written rule or the task's intent settles it, and the answer keeps the change inside that intent.
 The written rules are what a review already holds a change to: keep the change small, follow the patterns the code already has, run the project's checks, and keep each package inside the borders its project names.
 
+When a question names a recommended option and the question is not on the never list, answer with that option.
+The never list holds the topics orc keeps for the owner: deleting, security, keys or credentials, merging, pushing, releasing, spending, anything that cannot be undone, a site's look, legal text and logins.
+For such an answer, put the sentence that starts with "When a question names a recommended option" in rule, and quote in reason the words of the question that name the option.
+
 Escalate it to the owner when any of these holds:
 - It picks between product choices that the intent leaves open.
 - It would widen the task beyond its intent.
