@@ -1,5 +1,5 @@
 import { Effect, FileSystem, Schema } from "effect"
-import { BacklogError, type DeciderOwns, platformFailure, readIfPresent, scratchName, type TaskRecord } from "../../entities/backlog/index"
+import { BacklogError, type DeciderOwns, readIfPresent, scratchName, type TaskRecord, writeAtomic } from "../../entities/backlog/index"
 import type { BeatAction } from "../../entities/attention/index"
 import { taskWait } from "./beat-place"
 
@@ -25,17 +25,14 @@ export const readBeatWaits = (root: string): Effect.Effect<BeatWaits | null, Bac
     return { at: reading.at, reasons: new Map(reading.waits.map((wait) => [wait.task, wait.reason] as const)) }
   })
 
-// rename(2) replaces the file whole, so a reader sees one beat's waits and never a mix of two.
 export const writeBeatWaits = (root: string, at: string, waits: ReadonlyArray<BeatWait>): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
-    const fs = yield* FileSystem.FileSystem
     const file = beatWaitsFile(root)
     const scratch = scratchName(root, "waits")
     const text = yield* Schema.encodeEffect(BeatWaitsFile)({ at, waits }).pipe(
       Effect.mapError((error) => new BacklogError({ detail: "cannot write " + file + ": " + error.message }))
     )
-    yield* fs.writeFileString(scratch, text).pipe(Effect.mapError(platformFailure("write " + scratch)))
-    yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
+    yield* writeAtomic(scratch, file, text)
   })
 
 export const roomWaits = (
