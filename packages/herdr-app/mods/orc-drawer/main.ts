@@ -213,7 +213,6 @@ export default class OrcDrawer extends View {
       this.hideDrawer()
       const id = openOverlay({ kind: "window", key: overlayKey, width: drawerWidth, height: drawerHeight, layout: drawerLayout(view, chat) })
       this.overlay = { id, view }
-      if (view === "raw") run("pane.focus", { terminal: chat.address })
     })
   }
 

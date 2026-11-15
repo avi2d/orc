@@ -149,6 +149,7 @@ Use your `layout.switch` key to go back to your own layout.
 Press `cmd-k` to open the chat drawer in the Raw view, and press `cmd-k` again to close it.
 The drawer opens centered and keeps its spot.
 Raw is the terminal that runs `orc chat`, where you type to orc.
+The drawer opens without the keyboard, so select the terminal before you type.
 In the Raw view Esc goes to Pi as an interrupt, so it never closes the drawer.
 Both views show the same bar: select Raw to go back to the terminal, select Turns to read, or select ✕ to close the drawer.
 Press Esc in the Turns view to close the drawer.
