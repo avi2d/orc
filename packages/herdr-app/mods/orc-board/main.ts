@@ -2,7 +2,7 @@ import { type AsyncContext, type Context, type Element, type FocusHandle, View, 
 import { ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { setShared, shared } from "herdr"
 import { refreshWhenShown, selectedTaskKey } from "../../src/views"
-import { type BoardTask, type Lane, type LaneView, cardBox, kindLabel, laneJump, lanes, tasksInLane, titleClip, wheelOffset } from "../../src/board"
+import { type BoardTask, type Lane, type LaneView, cardBox, clampedLaneView, kindLabel, laneJump, lanes, tasksInLane, titleClip, wheelOffset } from "../../src/board"
 import { type BoardAttention, type BoardBacklog, boardAttention, boardBacklog } from "../../src/guard-board"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
@@ -77,7 +77,7 @@ export default class OrcBoard extends View {
     const column = v_flex().id(`lane-${lane}`).h_full().min_h_0().flex_shrink_0().w(folded ? 110 : 260)
       .bg(t.chrome).border_r(1).border_color(t.border).child(header)
     if (folded) return column
-    const view = (): LaneView => this.views.get(lane) ?? { offsetPx: 0, heightPx: 0 }
+    const view = (): LaneView => clampedLaneView(this.views.get(lane) ?? { offsetPx: 0, heightPx: 0 }, tasks.length)
     const focus = this.focus?.[lane]
     const keyed = focus === undefined ? column : column.track_focus(focus)
       .on_mouse_down("left", () => focus.focus())
@@ -90,7 +90,7 @@ export default class OrcBoard extends View {
       })
     return keyed.child(v_flex().id(`cards-${lane}`).flex_1().min_h_0().overflow_y_scrollbar().track_scroll(this.scrolls[lane])
       .p(cardBox.padPx).gap(cardBox.gapPx)
-      .on_size_change((size) => this.views.set(lane, { ...view(), heightPx: size.height }))
+      .on_size_change((size) => this.views.set(lane, clampedLaneView({ ...view(), heightPx: size.height }, tasks.length)))
       .on_scroll_wheel((event) => this.views.set(lane, { ...view(), offsetPx: wheelOffset(view(), tasks.length, event.delta.y) }))
       .children(tasks.map((task) => this.card(t, task))))
   }

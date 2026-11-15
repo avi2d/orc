@@ -52,8 +52,13 @@ const clamp = (value: number, low: number, high: number): number => Math.min(Mat
 const maxOffset = (view: LaneView, count: number): number =>
   2 * cardBox.padPx + count * cardBox.heightPx + Math.max(0, count - 1) * cardBox.gapPx - view.heightPx
 
-export const wheelOffset = (view: LaneView, count: number, deltaY: number): number =>
-  clamp(view.offsetPx - deltaY, 0, maxOffset(view, count))
+export const clampedLaneView = (view: LaneView, count: number): LaneView =>
+  ({ ...view, offsetPx: clamp(view.offsetPx, 0, maxOffset(view, count)) })
+
+export const wheelOffset = (view: LaneView, count: number, deltaY: number): number => {
+  const at = clampedLaneView(view, count)
+  return clamp(at.offsetPx - deltaY, 0, maxOffset(at, count))
+}
 
 const laneTarget = (key: string, view: LaneView): number => {
   const page = Math.max(1, Math.floor(view.heightPx / cardStep))
@@ -79,6 +84,7 @@ const offsetShowing = (item: number, view: LaneView): number => {
 
 export const laneJump = (key: string, view: LaneView, count: number): { readonly item: number; readonly offsetPx: number } | null => {
   if (count === 0 || !laneKeys.has(key)) return null
-  const item = clamp(laneTarget(key, view), 0, count - 1)
-  return { item, offsetPx: clamp(offsetShowing(item, view), 0, maxOffset(view, count)) }
+  const at = clampedLaneView(view, count)
+  const item = clamp(laneTarget(key, at), 0, count - 1)
+  return { item, offsetPx: clamp(offsetShowing(item, at), 0, maxOffset(at, count)) }
 }
