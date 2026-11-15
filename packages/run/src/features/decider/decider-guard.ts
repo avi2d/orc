@@ -15,7 +15,7 @@ const neverDecided: ReadonlyArray<NeverDecided> = [
   { topic: "anything that cannot be undone", words: /\b(irreversib\w*|irrevocab\w*|permanent\w*|undoable|(cannot|can't|can not) be (undone|reversed)|force[- ]push\w*)/i },
   { topic: "a site's look", words: /\b(look|looks|looking|appearance|visual\w*|screenshots?|previews?)\b/i },
   { topic: "legal text", words: /\b(legal\w*|laws?|privacy polic(y|ies)|terms of use|consent\w*|offers?)\b/i },
-  { topic: "logins", words: /\b(log-?ins?|log(s|ged|ging)? in|sign(s|ed|ing)?[- ]in|auth|authn|authz|authenticat\w*|authoriz\w*|oauth\w*)\b/i }
+  { topic: "logins", words: /\b(log-?ins?|log in|sign[- ]in|auth|authn|authz|authenticat\w*|authoriz\w*|oauth\w*)\b/i }
 ]
 
 export const neverDecidedReason = (question: string): string | null => {

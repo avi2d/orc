@@ -324,6 +324,16 @@ describe("the decider", () => {
     }, [naming])
   })
 
+  test("a logging question with a recommended option reaches the decider, instead of being escalated as a login question", async () => {
+    const logging = { id: "r4", text: "Should the worker keep its logs in the run folder? Recommended: yes." }
+    await withAskingTask(async (root) => {
+      const heard: Array<DeciderRequest> = []
+      await decide(root, replies({ [logging.text]: answer }, heard))
+      expect(heard).toHaveLength(1)
+      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ decision: { kind: "answered" } })
+    }, [logging])
+  })
+
   test("an answer whose quoted rule is in no source escalates instead of answering on a made-up rule", async () => {
     await withAskingTask(async (root) => {
       await decide(root, replies({ [r2.text]: JSON.stringify({ decision: "answer", answer: "Five retries", rule: "Retry a failed upload five times.", reason: "the rule says five" }) }))
