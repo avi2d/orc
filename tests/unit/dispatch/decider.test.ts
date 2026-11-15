@@ -295,6 +295,45 @@ describe("the decider", () => {
     }, [remove])
   })
 
+  const guardedTopics = [
+    { topic: "a site's look", text: "Which header look should the landing page get on its preview? Recommended: the dark one.", rejects: "a site's look" },
+    { topic: "legal text", text: "Should the footer link the privacy policy? Recommended: yes.", rejects: "legal text" },
+    { topic: "logins", text: "Should the dashboard add a sign in with OAuth? Recommended: yes.", rejects: "a login" }
+  ]
+
+  for (const guarded of guardedTopics) {
+    test("a question about " + guarded.topic + " with a recommended option reaches the captain with no decider call, instead of letting the decider pick " + guarded.rejects, async () => {
+      const question = { id: "r4", text: guarded.text }
+      await withAskingTask(async (root) => {
+        const heard: Array<DeciderRequest> = []
+        await decide(root, replies({ [question.text]: answer }, heard))
+        expect(heard).toEqual([])
+        expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+        expect(filedAt(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z"), "decision", "reason")).toContain("orc never hands the decider a question about " + guarded.topic)
+      }, [question])
+    })
+  }
+
+  test("a variable name question with a recommended option reaches the decider, instead of being kept for the captain", async () => {
+    const naming = { id: "r4", text: "Should the retry counter variable be named retryCount or attempts? Recommended: retryCount." }
+    await withAskingTask(async (root) => {
+      const heard: Array<DeciderRequest> = []
+      await decide(root, replies({ [naming.text]: answer }, heard))
+      expect(heard).toHaveLength(1)
+      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ decision: { kind: "answered" } })
+    }, [naming])
+  })
+
+  test("a logging question with a recommended option reaches the decider, instead of being escalated as a login question", async () => {
+    const logging = { id: "r4", text: "Should the worker keep its logs in the run folder? Recommended: yes." }
+    await withAskingTask(async (root) => {
+      const heard: Array<DeciderRequest> = []
+      await decide(root, replies({ [logging.text]: answer }, heard))
+      expect(heard).toHaveLength(1)
+      expect(await itemFile(root, "orc-1.r4.2026-11-02T10_20_00_000Z")).toMatchObject({ decision: { kind: "answered" } })
+    }, [logging])
+  })
+
   test("an answer whose quoted rule is in no source escalates instead of answering on a made-up rule", async () => {
     await withAskingTask(async (root) => {
       await decide(root, replies({ [r2.text]: JSON.stringify({ decision: "answer", answer: "Five retries", rule: "Retry a failed upload five times.", reason: "the rule says five" }) }))
