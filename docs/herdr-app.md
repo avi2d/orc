@@ -83,6 +83,7 @@ A question shows its Context, Question, Options and Evidence.
 The panel reads them from the question's text, where `orc_ask` writes the context after `Context:` and each option as `A) <text> (picture: <path>)`.
 An option with a picture shows as a picture tile, and an option without one shows as a button.
 Evidence lists the picture file of each option that has one.
+A tile whose picture cannot load shows its path as text in place of the picture.
 A decision of the decider and a withdraw sit indented under the question they are about.
 An answer sits inside its question's card, and it shows Delivered once the thread holds the `delivered` entry for that question.
 

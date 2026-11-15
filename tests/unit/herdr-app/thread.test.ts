@@ -32,6 +32,12 @@ test("shows picture options as tiles and text options as buttons instead of one 
   expect(ask.options.map(optionShape)).toEqual([{ kind: "tile", picture: "/tmp/wide.png" }, { kind: "tile", picture: "/tmp/narrow.png" }, { kind: "button" }])
 })
 
+test("shows a missing picture's path in the tile fallback instead of repeating it under a loaded picture", () => {
+  const ask = askText("Which layout?\nA) Wide (picture: /tmp/wide.png)\nB) Drop the old flag (picture: docs/flag.png)")
+  expect(ask.options.map((option) => option.picture)).toEqual(["/tmp/wide.png", "docs/flag.png"])
+  expect(ask.options.every((option) => !option.text.includes("picture:"))).toBe(true)
+})
+
 test("keeps a question with lines that only look like options whole instead of cutting options out of it", () => {
   const ask = askText("Pick one\nB) second")
   expect(ask.options).toEqual([])
