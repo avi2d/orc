@@ -27,6 +27,8 @@ interface Forge {
   readonly update?: "updates" | "conflicts" | "head moved"
   readonly afterUpdate?: ReadonlyArray<HeadView>
   readonly parents?: string
+  readonly flakyViews?: number
+  readonly flakyParents?: number
 }
 
 const ghCalls = (fixture: Fixture): string => join(fixture.dir, "gh-calls")
@@ -67,12 +69,17 @@ const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
     ";; esac",
     "if [ \"$1 $2\" = \"pr view\" ]; then",
     "  if [ ! -f \"$VIEWS/updated\" ]; then cat \"$VIEWS/before.json\"; exit 0; fi",
+    "  f=$(( $(cat \"$VIEWS/flaky\" 2>/dev/null || echo 0) + 1 )); echo $f > \"$VIEWS/flaky\"",
+    "  if [ \"$f\" -le " + String(forge.flakyViews ?? 0) + " ]; then echo 'gh: Internal Server Error (HTTP 500)' >&2; exit 1; fi",
     "  n=$(( $(cat \"$VIEWS/served\" 2>/dev/null || echo 0) + 1 )); echo $n > \"$VIEWS/served\"",
     "  if [ -f \"$VIEWS/after-$n.json\" ]; then cat \"$VIEWS/after-$n.json\"; else cat \"$VIEWS/after-last.json\"; fi",
     "  exit 0",
     "fi",
     "case \"$*\" in *compare/main..." + head + "*) echo " + String(forge.behind ?? 0) + "; exit 0;; esac",
-    "case \"$*\" in *commits/*) echo " + (forge.parents ?? head) + "; exit 0;; esac",
+    "case \"$*\" in *commits/*)",
+    "  c=$(( $(cat \"$VIEWS/parents-flaky\" 2>/dev/null || echo 0) + 1 )); echo $c > \"$VIEWS/parents-flaky\"",
+    "  if [ \"$c\" -le " + String(forge.flakyParents ?? 0) + " ]; then echo 'gh: Not Found (HTTP 404)' >&2; exit 1; fi",
+    "  echo " + (forge.parents ?? head) + "; exit 0;; esac",
     "if [ \"$1\" = api ]; then echo 0; exit 0; fi",
     "if [ \"$1 $2\" = \"pr merge\" ]; then exit 0; fi",
     "echo 'unexpected gh call' >&2",
@@ -228,6 +235,26 @@ describe("orc merge updates a PR that is only behind its base", () => {
       const merged = await runOrc(fixture, ["merge", "orc-1"])
       expect(merged.stdout.trim()).toEndWith("merged orc-1 " + prUrl)
       expect(await forgeSteps(fixture)).toEqual(["view", "update", "view", "view", "pr merge " + prUrl + " --squash --match-head-commit " + newHead])
+    })
+  }, 60_000)
+
+  test("a PR with a transient view failure during the wait is still merged once the view answers", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1, flakyViews: 1 })
+      const merged = await runOrc(fixture, ["merge", "orc-1"])
+      expect(merged.stdout.trim()).toEndWith("merged orc-1 " + prUrl)
+      expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + newHead])
+    })
+  }, 60_000)
+
+  test("a PR with a transient parents failure during the wait is still merged once the parents answer", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubGh(fixture, { behind: 1, flakyParents: 1 })
+      const merged = await runOrc(fixture, ["merge", "orc-1"])
+      expect(merged.stdout.trim()).toEndWith("merged orc-1 " + prUrl)
+      expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + newHead])
     })
   }, 60_000)
 

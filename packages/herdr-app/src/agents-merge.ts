@@ -9,7 +9,7 @@ export interface Merge {
 
 export const mergeCommand = "merge:"
 
-const mergeTimeoutMs = 1500000
+const mergeTimeoutMs = 25 * 60 * 1000
 
 const firstLine = (text: string): string => text.trim().split("\n")[0] ?? ""
 
