@@ -1,10 +1,12 @@
 import { type Color, type Context, type Element, div } from "gpui-kit"
-import { type ScrollHandle, h_flex, v_flex } from "gpui-base"
+import { Input, type InputState, type ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { openOverlay, settings } from "herdr"
-import { type Card, type CardStatus, type Filter, type Mark, type RunAgent, type StepRow, agentLabel, approveRow, cardPlace, cardStatuses, filterCards, namedModels, projectsOf, railLabel, stepRows } from "./agents"
+import { type Card, type CardStatus, type Filter, type Mark, type RunAgent, type StepRow, agentLabel, approveRow, cardPlace, cardStatuses, filterCards, namedModels, projectsOf, railLabel, sendBackArgs, stepRows } from "./agents"
 import type { Show, ShownStep } from "./guard"
-import type { Reading } from "./orc-read"
+import { type Reading, readText } from "./orc-read"
 import type { palette } from "./palette"
+import { type Turn } from "./turns"
+import { turnsView } from "./turns-view"
 
 type Palette = ReturnType<typeof palette>
 
@@ -282,4 +284,95 @@ export const askMerge = (card: Card, approval: Approval, command: string): void 
       command: { name: command }
     }
   })
+}
+
+export interface Keyed<A> {
+  readonly of: string
+  readonly reading: Reading<A>
+}
+
+export interface SendBackMod {
+  selectedCard(): Card | null
+  readonly review: InputState
+  sent: Keyed<string> | null
+  refresh(cx: Context): void
+}
+
+export const submitSendBack = (mod: SendBackMod, cx: Context): void => {
+  const card = mod.selectedCard()
+  const args = card === null ? null : sendBackArgs(card, mod.review.value())
+  if (card === null || args === null || mod.sent?.reading.kind === "reading") {
+    return
+  }
+  mod.sent = { of: card.key, reading: { kind: "reading" } }
+  cx.notify()
+  cx.spawn((task) =>
+    readText("orc", [...args]).then((reading) => {
+      mod.sent = { of: card.key, reading }
+      if (reading.kind === "ok") {
+        mod.review.set_value("")
+      }
+      mod.refresh(task)
+      task.notify()
+    })
+  )
+}
+
+export const sendBackBar = (t: Palette, card: Card, review: InputState, sent: Reading<string> | null, send: (cx: Context) => void): ReadonlyArray<Element> => {
+  const said = sent === null ? [] : [div().text_size(12).text_color(sent.kind === "failed" ? t.blocked : t.muted).child(sent.kind === "reading" ? "Sending it back" : sent.kind === "ok" ? sent.value.trim() : sent.reason)]
+  if (card.sendBack === null) {
+    return sent?.kind === "ok" ? [v_flex().px(16).py(8).border_b(1).border_color(t.border).children(said)] : []
+  }
+  const ready = sendBackArgs(card, review.value()) !== null && sent?.kind !== "reading"
+  const button = div().id("send-back").px(10).py(4).rounded(4).flex_shrink_0().bg(t.selected).text_color(ready ? t.foreground : t.dim).child(sent?.kind === "reading" ? "Sending back" : "Send back")
+  return [v_flex().px(16).py(8).gap(6).border_b(1).border_color(t.border)
+    .child(h_flex().gap(8).items_center()
+      .child(div().flex_1().min_w_0().child(Input.new(review)))
+      .child(ready ? button.cursor_pointer().hover((style) => style.bg(t.hover)).on_click((_event, cx) => send(cx)) : button))
+    .children(said)]
+}
+
+export interface DetailShown {
+  readonly target: Chosen | null
+  readonly merge: MergeOutcome | null
+  readonly step: ShownStep | null
+  readonly steps: ReadonlyArray<ShownStep>
+  readonly back: ReadonlyArray<Element>
+  readonly pane: Pane
+  readonly turns: Reading<ReadonlyArray<Turn>>
+  readonly log: Reading<string>
+  readonly thinking: ReadonlySet<string>
+  readonly calls: ReadonlySet<string>
+  readonly turnsScroll: ScrollHandle
+  readonly logScroll: ScrollHandle
+  readonly flipThinking: (turn: string, cx: Context) => void
+  readonly flipCall: (call: string, cx: Context) => void
+}
+
+export const detailView = (t: Palette, card: Card | null, act: AgentsActions, shown: DetailShown): Element => {
+  if (card === null) {
+    return detailNote(t, "No run selected")
+  }
+  if (card.runId === null) {
+    return detailNote(t, "The task has not started a run yet")
+  }
+  const approval = approvalOf(card)
+  if (approval !== null && shown.target?.kind === "approve") {
+    const pane = approvePane(t, card, approval, shown.merge, act)
+    return shown.back.length === 0 ? pane : detailPane(t, [...shown.back, pane])
+  }
+  const step = shown.step
+  if (step === null) {
+    const settled = card.standing.status === "Failed" || card.standing.status === "Done"
+    return detailNote(t, settled ? "This run ended before it recorded a step" : "No step has started yet")
+  }
+  const title = stepTitle(card, shown.steps, step.id)
+  if (step.name === "implement" && shown.pane === "turns") {
+    return detailPane(t, [...shown.back, stepBar(t, step, title, "Pi session", shown.pane, act),
+      div().flex_1().min_h_0().child(turnsView(t, shown.turns, { thinking: shown.thinking, calls: shown.calls }, {
+        toggleThinking: (turn, cx) => shown.flipThinking(turn, cx),
+        toggleCall: (call, cx) => shown.flipCall(call, cx)
+      }, shown.turnsScroll, { reading: "Reading the step's Pi session", empty: "No turn yet. Pi writes its session after its first reply." }))])
+  }
+  return detailPane(t, [...shown.back, stepBar(t, step, title, `orc log ${card.runId} ${step.id}`, shown.pane, act), logBody(t, shown.log, shown.logScroll)])
 }

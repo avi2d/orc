@@ -1,42 +1,31 @@
-import { type AsyncContext, type Context, type Element, View, div } from "gpui-kit"
-import { Input, InputState, ScrollHandle, h_flex, v_flex } from "gpui-base"
-import { exec, layout, nextCommand, notify, readTextFile, run, setShared } from "herdr"
-import { type Card, type Filter, type RunAgent, buildCards, filterCards, goesOn, runAgent, sendBackArgs } from "../../src/agents"
-import { type AgentsActions, type Chosen, type MergeOutcome, type Pane, approvalOf, approvePane, askMerge, detailNote, detailPane, logBody, logLines, runsColumn, stepBar, stepTitle, stepsColumn } from "../../src/agents-view"
+import { type AsyncContext, type Context, type Element, View } from "gpui-kit"
+import { InputState, ScrollHandle, h_flex } from "gpui-base"
+import { layout, readTextFile, run, setShared } from "herdr"
+import { type Card, type Filter, type RunAgent, buildCards, filterCards, goesOn, runAgent } from "../../src/agents"
+import { type AgentsActions, type Chosen, type DetailShown, type Keyed, type Pane, approvalOf, askMerge, detailView, logLines, runsColumn, sendBackBar, stepsColumn, submitSendBack } from "../../src/agents-view"
+import { type Merge, mergeCommand, mergedNote, runMerge, watchMerges } from "../../src/agents-merge"
 import { type RunChanges, changesKey } from "../../src/changes"
 import { readChanges } from "../../src/changes-read"
 import { backlog, runs, show, type Show, type ShownStep } from "../../src/guard"
 import { type Reading, readJson, readText } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 import { type Turn, sessionTurns } from "../../src/turns"
-import { turnsView } from "../../src/turns-view"
 import { activeChild, viewsStack } from "../../src/views"
-
-interface Merge {
-  readonly task: string
-  readonly outcome: MergeOutcome
-}
-
-interface Keyed<A> {
-  readonly of: string
-  readonly reading: Reading<A>
-}
 
 type Palette = ReturnType<typeof palette>
 
 const everyMs = 4000
 const thisView = "orc-agents"
 const changesBlock = "orc-changes"
-const mergeCommand = "merge:"
-const mergeTimeoutMs = 600_000
 const showsAtOnce = 4
-
-const firstLine = (text: string): string => text.trim().split("\n")[0] ?? ""
 
 const shown = (): boolean => {
   const active = activeChild(layout(), viewsStack)
   return active === null || active === thisView
 }
+
+const readingOf = <A>(keyed: Keyed<A> | null, of: string | null): Reading<A> =>
+  of !== null && keyed?.of === of ? keyed.reading : { kind: "reading" }
 
 export default class OrcAgents extends View {
   cards: Reading<ReadonlyArray<Card>> = { kind: "reading" }
@@ -72,21 +61,12 @@ export default class OrcAgents extends View {
       changed.notify()
     })
     this.refresh(cx)
-    cx.spawn((task) => this.listen(task))
+    cx.spawn((task) => watchMerges(task, (spot, id) => this.startMerge(spot, id)))
     cx.timer.every(everyMs, (tick) => {
       if (shown()) {
         this.refresh(tick)
       }
     })
-  }
-
-  listen(cx: AsyncContext): Promise<void> {
-    return nextCommand().then((command) => {
-      if (command.startsWith(mergeCommand)) {
-        this.startMerge(cx, command.slice(mergeCommand.length))
-      }
-      return this.listen(cx)
-    }, () => undefined)
   }
 
   refresh(cx: Context): void {
@@ -243,13 +223,10 @@ export default class OrcAgents extends View {
     this.merge = { task, outcome: { kind: "merging" } }
     cx.notify()
     cx.spawn((spot) =>
-      exec("orc", ["merge", task, "--basis", "captain-word"], { timeout: mergeTimeoutMs }).then(
-        (result) => result.code === 0 ? null : `orc merge ${task} exited ${result.code}: ${firstLine(result.stderr) || firstLine(result.stdout)}`,
-        () => `orc merge ${task} did not finish. Check that orc is on PATH.`
-      ).then((problem) => {
+      runMerge(task).then((problem) => {
         this.merge = problem === null ? null : { task, outcome: { kind: "failed", reason: problem } }
         if (problem === null) {
-          notify({ title: `Merged ${task}`, level: "success" })
+          mergedNote(task)
         }
         this.refresh(spot)
         spot.notify()
@@ -353,46 +330,7 @@ export default class OrcAgents extends View {
   }
 
   sendBack(cx: Context): void {
-    const card = this.selectedCard()
-    const args = card === null ? null : sendBackArgs(card, this.review.value())
-    if (card === null || args === null || this.sent?.reading.kind === "reading") {
-      return
-    }
-    this.sent = { of: card.key, reading: { kind: "reading" } }
-    cx.notify()
-    cx.spawn((task) =>
-      readText("orc", [...args]).then((reading) => {
-        this.sent = { of: card.key, reading }
-        if (reading.kind === "ok") {
-          this.review.set_value("")
-        }
-        this.refresh(task)
-        task.notify()
-      })
-    )
-  }
-
-  sentLine(t: Palette, sent: Reading<string> | null): ReadonlyArray<Element> {
-    if (sent === null) {
-      return []
-    }
-    const words = sent.kind === "reading" ? "Sending it back" : sent.kind === "ok" ? sent.value.trim() : sent.reason
-    return [div().text_size(12).text_color(sent.kind === "failed" ? t.blocked : t.muted).child(words)]
-  }
-
-  sendBackBar(t: Palette, card: Card): ReadonlyArray<Element> {
-    const sent = this.sent?.of === card.key ? this.sent.reading : null
-    const said = this.sentLine(t, sent)
-    if (card.sendBack === null) {
-      return sent?.kind === "ok" ? [v_flex().px(16).py(8).border_b(1).border_color(t.border).children(said)] : []
-    }
-    const ready = sendBackArgs(card, this.review.value()) !== null && sent?.kind !== "reading"
-    const button = div().id("send-back").px(10).py(4).rounded(4).flex_shrink_0().bg(t.selected).text_color(ready ? t.foreground : t.dim).child(sent?.kind === "reading" ? "Sending back" : "Send back")
-    return [v_flex().px(16).py(8).gap(6).border_b(1).border_color(t.border)
-      .child(h_flex().gap(8).items_center()
-        .child(div().flex_1().min_w_0().child(Input.new(this.review)))
-        .child(ready ? button.cursor_pointer().hover((style) => style.bg(t.hover)).on_click((_event, cx) => this.sendBack(cx)) : button))
-      .children(said)]
+    submitSendBack(this, cx)
   }
 
   setFilter(cx: Context, filter: Filter): void {
@@ -417,38 +355,28 @@ export default class OrcAgents extends View {
   }
 
   detail(t: Palette, card: Card | null, act: AgentsActions): Element {
-    if (card === null) {
-      return detailNote(t, "No run selected")
-    }
-    if (card.runId === null) {
-      return detailNote(t, "The task has not started a run yet")
-    }
-    const approval = approvalOf(card)
-    if (approval !== null && this.target()?.kind === "approve") {
-      const pane = approvePane(t, card, approval, this.merge?.task === card.id ? this.merge.outcome : null, act)
-      const back = this.sendBackBar(t, card)
-      return back.length === 0 ? pane : detailPane(t, [...back, pane])
-    }
-    const step = this.stepShown()
-    if (step === null) {
-      const settled = card.standing.status === "Failed" || card.standing.status === "Done"
-      return detailNote(t, settled ? "This run ended before it recorded a step" : "No step has started yet")
-    }
-    return this.stepDetail(t, card, card.runId, step, act)
+    return detailView(t, card, act, this.shownDetail(t, card))
   }
 
-  stepDetail(t: Palette, card: Card, runId: string, step: ShownStep, act: AgentsActions): Element {
-    const of = `${runId}/${step.id}`
-    const title = stepTitle(card, this.recordedSteps(card), step.id)
-    if (this.showsTurns(step)) {
-      const turns: Reading<ReadonlyArray<Turn>> = this.turns?.of === of ? this.turns.reading : { kind: "reading" }
-      return detailPane(t, [...this.sendBackBar(t, card), stepBar(t, step, title, "Pi session", this.pane, act),
-        div().flex_1().min_h_0().child(turnsView(t, turns, { thinking: this.openThinking, calls: this.openCalls }, {
-          toggleThinking: (turn, cx) => this.flip(this.openThinking, turn, cx),
-          toggleCall: (call, cx) => this.flip(this.openCalls, call, cx)
-        }, this.turnsScroll, { reading: "Reading the step's Pi session", empty: "No turn yet. Pi writes its session after its first reply." }))])
+  shownDetail(t: Palette, card: Card | null): DetailShown {
+    const step = card === null ? null : this.stepShown()
+    const runId = card?.runId ?? null
+    const of = step === null || runId === null ? null : `${runId}/${step.id}`
+    return {
+      target: this.target(),
+      merge: card === null ? null : this.merge?.task === card.id ? this.merge.outcome : null,
+      step,
+      steps: card === null ? [] : this.recordedSteps(card),
+      back: card === null ? [] : sendBackBar(t, card, this.review, this.sent?.of === card.key ? this.sent.reading : null, (cx) => this.sendBack(cx)),
+      pane: this.pane,
+      turns: readingOf(this.turns, of),
+      log: readingOf(this.log, of),
+      thinking: this.openThinking,
+      calls: this.openCalls,
+      turnsScroll: this.turnsScroll,
+      logScroll: this.logScroll,
+      flipThinking: (turn, cx) => this.flip(this.openThinking, turn, cx),
+      flipCall: (call, cx) => this.flip(this.openCalls, call, cx)
     }
-    const reading: Reading<string> = this.log?.of === of ? this.log.reading : { kind: "reading" }
-    return detailPane(t, [...this.sendBackBar(t, card), stepBar(t, step, title, `orc log ${runId} ${step.id}`, this.pane, act), logBody(t, reading, this.logScroll)])
   }
 }

@@ -2,7 +2,7 @@ import { type AsyncContext, type Context, type Element, View, div } from "gpui-k
 import { h_flex, v_flex } from "gpui-base"
 import { refreshWhenShown } from "../../src/views"
 import { type BoardTask, type Lane, lanes, tasksInLane, titleClip } from "../../src/board"
-import { type BoardAttention, type BoardBacklog, boardAttention, boardBacklog } from "../../src/guard"
+import { type BoardAttention, type BoardBacklog, boardAttention, boardBacklog } from "../../src/guard-board"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 
