@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { laneFor, lanes, tasksInLane, type BoardTask } from "../../../packages/herdr-app/src/board"
+import { laneFor, lanes, tasksInLane, titleClip, type BoardTask } from "../../../packages/herdr-app/src/board"
 import { boardBacklog, guardJson } from "../../../packages/herdr-app/src/guard"
 
 const task: BoardTask = {
@@ -38,7 +38,11 @@ test("a started task is not in Planned", () => {
   expect(laneFor({ ...task, status: "taken" }, new Set())).toBe("Running")
 })
 
-test("a closed task without an open PR is not in Running", () => {
+test("a card title that wraps to three lines shows two rather than three", () => {
+  expect(titleClip.heightPx).toBe(2 * titleClip.lineHeightPx)
+})
+
+test("a closed task without an open PR, including one no beat has read, is not in Running or Awaiting you", () => {
   expect(laneFor({ ...task, status: "closed", prState: null }, new Set())).toBe("Done")
   expect(laneFor({ ...task, status: "closed", prState: "merged" }, new Set())).toBe("Done")
   expect(laneFor({ ...task, status: "closed", prState: "closed" }, new Set())).toBe("Done")

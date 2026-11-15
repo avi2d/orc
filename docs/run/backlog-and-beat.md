@@ -348,9 +348,9 @@ It kills the run through the machine that started it and closes the task stopped
 A stop for a task on a machine whose start runs any other program refuses, so close that task by hand with `orc backlog close <task-id> failed`.
 The closed task file keeps the PR link of the orc run on `orc/<task-id>` as `pr`, and `orc backlog --json` carries it as `pr`, or `null` when the run opened none.
 Every task in `orc backlog --json` carries `prState` as `open`, `closed`, `merged`, or `null`.
-`prState` is `null` when the task has no PR.
+`prState` is `null` when the task has no PR, or when the beat has not read its PR yet.
 A recorded `<task-id>.merged` event makes it `merged`, and a recorded `<task-id>.pr-closed` event makes it `closed`.
-Without either event it is the last state the beat read for the PR, or `open` when the beat has not read it yet.
+Without either event it is the last state the beat read for the PR.
 `orc backlog --json` reads those records without contacting the forge.
 The beat prints `closed <task-id> <done|failed|stopped> on <machine>` with the reason and the PR when the run opened one, or `close failed <task-id> on <machine>` with the reason when the read fails or runs past 30 seconds, until it stays unread for 10 minutes.
 A machine whose start runs any other program keeps owning its tasks, which the beat closes once their logs go quiet rather than stalls.
