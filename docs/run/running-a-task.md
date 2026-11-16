@@ -83,7 +83,7 @@ Orc takes the implementer agent file from the first of these that exists:
 
 An agent file opens with a `---` header naming `thinking`, `tools` and optionally `model`, and its body holds the instructions.
 The bundled agent files name no model.
-An agent file that names no model takes the one `models` in `config.json` names for its role, and orc refuses a run when neither names one.
+An agent file that names no model takes the `--implementer-model` or `--fixer-model` flag for its role when set, else the one `models` in `config.json` names, and orc refuses a run when none names one.
 Orc runs only a model whose provider `config.json` names, and refuses any other model.
 Orc refuses an implementer and a fixer that name models from different providers.
 
@@ -119,7 +119,7 @@ The branch holds at least one new commit.
 The project's checks pass.
 no-mistakes opened the PR and reported CI green.
 A `direct-PR` run succeeds once the first three facts hold and its pull request opens, as [Delivery modes](delivery-modes.md) shows.
-A run the captain stops at its looping question records the run stopped with the answer as the reason and exits 1.
+A run you stop at its looping question records the run stopped with the answer as the reason and exits 1.
 Any other run that misses those facts records the run failed with the reason and exits 1.
 Each run keeps its task, evidence, agent log and Pi session in `$ORC_HOME/runs/<run-id>`, default `~/.orc/runs/<run-id>` when `ORC_HOME` is unset or empty.
 On a `no-mistakes` run, its `no-mistakes.txt` and the run history hold the no-mistakes findings, their count, the gates orc answered, the final result and the PR link.

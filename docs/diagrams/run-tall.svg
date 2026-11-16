@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 1304" class="orc-d" role="img" aria-labelledby="d-run-tall-title d-run-tall-desc">
+<title id="d-run-tall-title">A run: one attempt at one task</title>
+<desc id="d-run-tall-desc">The runner starts most runs, and you can start one by hand. A run makes a copy of the project on a new branch, runs the prepare command, and starts the Pi agent, which writes the change and commits it. The project's checks run, a fixer repairs what failed up to three times, and the run delivers a pull request or a report. Orc watches Pi while it works, and keeps the record of every run in its own folder.</desc>
+<style>.orc-d {
+  color-scheme: light dark;
+  --d-ink: light-dark(#1f2328, #e8eaed);
+  --d-mute: light-dark(#57606a, #a3abb5);
+  --d-line: light-dark(#c8cdd5, #474d57);
+  --d-card: light-dark(#ffffff, #22252b);
+  --d-zone: light-dark(#f3f4f6, #17191d);
+  --d-work: light-dark(#3451b2, #a8b1ff);
+  --d-work-soft: light-dark(#e8ebfc, #272c52);
+  --d-on-work: light-dark(#ffffff, #14162b);
+  --d-ask: light-dark(#8a5a00, #e9b949);
+  --d-ask-soft: light-dark(#fff3d1, #3a300f);
+  --d-ok: light-dark(#17794c, #48d597);
+  --d-ok-soft: light-dark(#def5e8, #12301f);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.orc-d text { fill: var(--d-mute); font-size: 12.5px; }
+.orc-d .title { fill: var(--d-ink); font-size: 14px; font-weight: 650; }
+.orc-d .big { fill: var(--d-ink); font-size: 15.5px; font-weight: 650; }
+.orc-d .label { fill: var(--d-mute); font-size: 12px; font-weight: 600; }
+.orc-d .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; fill: var(--d-ink); }
+.orc-d .ask-text { fill: var(--d-ask); font-weight: 600; }
+.orc-d .work-text { fill: var(--d-work); font-weight: 600; }
+.orc-d .ok-text { fill: var(--d-ok); font-weight: 600; }
+.orc-d .zone { fill: var(--d-zone); stroke: var(--d-line); }
+.orc-d .card { fill: var(--d-card); stroke: var(--d-line); }
+.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); }
+.orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); }
+.orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); }
+.orc-d .line { fill: none; stroke: var(--d-mute); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .line-work { fill: none; stroke: var(--d-work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .line-ask { fill: none; stroke: var(--d-ask); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
+.orc-d .line-ok { fill: none; stroke: var(--d-ok); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .faint { fill: none; stroke: var(--d-line); stroke-width: 3; stroke-linecap: round; }
+.orc-d .head-work { fill: var(--d-work); }
+.orc-d .head-ask { fill: var(--d-ask); }
+.orc-d .head-mute { fill: var(--d-mute); }
+.orc-d .dot-work { fill: var(--d-work); }
+.orc-d .dot-ask { fill: var(--d-ask); }
+.orc-d .dot-ok { fill: var(--d-ok); }
+.orc-d .dot-mute { fill: var(--d-line); }
+.orc-d .num { fill: var(--d-on-work); font-size: 13px; font-weight: 700; }
+.orc-d .num-ask { fill: var(--d-card); font-size: 13px; font-weight: 700; }
+.orc-d .tick { fill: none; stroke: var(--d-card); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .dot-mute-strong { fill: var(--d-mute); }
+</style>
+<rect x="4" y="4" width="352" height="224" rx="14" class="zone"/><text x="16" y="25" class="label" text-anchor="start"><tspan x="16" dy="0">Who starts it</tspan></text>
+<g data-part="runner"><rect x="16" y="36" width="328" height="78" rx="10" class="card"/><text x="28" y="64" class="title" text-anchor="start"><tspan x="28" dy="0">The runner</tspan></text><text x="28" y="82" class="" text-anchor="start"><tspan x="28" dy="0">The beat starts most runs through it, on the</tspan><tspan x="28" dy="16">host.</tspan></text><path d="M325,54 l5,5.5 l-5,5.5" class="line-work"/></g>
+<rect x="16" y="122" width="328" height="94" rx="10" class="card"/><text x="28" y="150" class="title" text-anchor="start"><tspan x="28" dy="0">You, by hand</tspan></text><text x="28" y="168" class="" text-anchor="start"><tspan x="28" dy="0"><tspan class="code">orc run &lt;task-file></tspan> in a clean checkout. It</tspan><tspan x="28" dy="16">works inside the nono sandbox unless you say</tspan><tspan x="28" dy="16">otherwise.</tspan></text>
+<path d="M180,231 L180,249" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,249) rotate(90)"/>
+<rect x="4" y="252" width="352" height="546" rx="14" class="zone"/><text x="16" y="273" class="label" text-anchor="start"><tspan x="16" dy="0">The run, on a machine that works</tspan></text>
+<rect x="16" y="284" width="328" height="94" rx="10" class="card"/><circle cx="39" cy="307" r="11" class="dot-work"/><text x="39" y="311.5" class="num" text-anchor="middle"><tspan x="39" dy="0">1</tspan></text><text x="56" y="312" class="title" text-anchor="start"><tspan x="56" dy="0">A copy</tspan></text><text x="28" y="330" class="" text-anchor="start"><tspan x="28" dy="0">A git worktree on a new branch, under</tspan><tspan x="28" dy="16"><tspan class="code">~/.orc/worktrees</tspan>. Your own checkout is never</tspan><tspan x="28" dy="16">touched.</tspan></text>
+<path d="M180,380 L180,400" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,400) rotate(90)"/>
+<rect x="16" y="402" width="328" height="78" rx="10" class="card"/><circle cx="39" cy="425" r="11" class="dot-work"/><text x="39" y="429.5" class="num" text-anchor="middle"><tspan x="39" dy="0">2</tspan></text><text x="56" y="430" class="title" text-anchor="start"><tspan x="56" dy="0">Prepare</tspan></text><text x="28" y="448" class="" text-anchor="start"><tspan x="28" dy="0">The project's <tspan class="code">prepare</tspan> command, such as an</tspan><tspan x="28" dy="16">install.</tspan></text>
+<path d="M180,482 L180,502" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,502) rotate(90)"/>
+<rect x="16" y="504" width="328" height="78" rx="10" class="card"/><circle cx="39" cy="527" r="11" class="dot-work"/><text x="39" y="531.5" class="num" text-anchor="middle"><tspan x="39" dy="0">3</tspan></text><text x="56" y="532" class="title" text-anchor="start"><tspan x="56" dy="0">Pi works</tspan></text><text x="28" y="550" class="" text-anchor="start"><tspan x="28" dy="0">The agent writes the change, commits it, and</tspan><tspan x="28" dy="16">prints <tspan class="code">ORC_COMPLETE</tspan>.</tspan></text>
+<path d="M180,584 L180,604" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,604) rotate(90)"/>
+<g data-part="checks"><rect x="16" y="606" width="328" height="78" rx="10" class="card"/><circle cx="39" cy="629" r="11" class="dot-work"/><text x="39" y="633.5" class="num" text-anchor="middle"><tspan x="39" dy="0">4</tspan></text><text x="56" y="634" class="title" text-anchor="start"><tspan x="56" dy="0">Checks</tspan></text><text x="28" y="652" class="" text-anchor="start"><tspan x="28" dy="0">The project's own checks. A fixer repairs what</tspan><tspan x="28" dy="16">failed, up to three times.</tspan></text><path d="M325,624 l5,5.5 l-5,5.5" class="line-work"/></g>
+<path d="M180,686 L180,706" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,706) rotate(90)"/>
+<g data-part="checks"><rect x="16" y="708" width="328" height="78" rx="10" class="card"/><circle cx="39" cy="731" r="11" class="dot-work"/><text x="39" y="735.5" class="num" text-anchor="middle"><tspan x="39" dy="0">5</tspan></text><text x="56" y="736" class="title" text-anchor="start"><tspan x="56" dy="0">Deliver</tspan></text><text x="28" y="754" class="" text-anchor="start"><tspan x="28" dy="0">Review, push, pull request. A report run writes</tspan><tspan x="28" dy="16"><tspan class="code">agent-report.md</tspan> instead.</tspan></text><path d="M325,726 l5,5.5 l-5,5.5" class="line-work"/></g>
+<path d="M180,801 L180,819" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,819) rotate(90)"/>
+<rect x="4" y="822" width="352" height="230" rx="14" class="zone"/><text x="16" y="843" class="label" text-anchor="start"><tspan x="16" dy="0">Orc watches Pi while it works</tspan></text>
+<g data-part="attention"><rect x="16" y="854" width="328" height="186" rx="10" class="card-ask"/><text x="28" y="882" class="title" text-anchor="start"><tspan x="28" dy="0">What orc does about it</tspan></text><circle cx="31" cy="900" r="2" class="dot-mute-strong"/><text x="40" y="904" class="" text-anchor="start"><tspan x="40" dy="0">Pi prints nothing for 45 minutes with no tool</tspan><tspan x="40" dy="16">running: orc stops it.</tspan></text><circle cx="31" cy="934" r="2" class="dot-mute-strong"/><text x="40" y="938" class="" text-anchor="start"><tspan x="40" dy="0">Pi fails one command 3 times in a row: you are</tspan><tspan x="40" dy="16">told.</tspan></text><circle cx="31" cy="968" r="2" class="dot-mute-strong"/><text x="40" y="972" class="" text-anchor="start"><tspan x="40" dy="0">Pi fails it 6 times in a row: orc stops Pi and</tspan><tspan x="40" dy="16">asks you whether to continue.</tspan></text><circle cx="31" cy="1002" r="2" class="dot-mute-strong"/><text x="40" y="1006" class="" text-anchor="start"><tspan x="40" dy="0">Pi is unsure: it asks you a question instead</tspan><tspan x="40" dy="16">of guessing.</tspan></text><path d="M325,872 l5,5.5 l-5,5.5" class="line-work"/></g>
+<path d="M180,1055 L180,1073" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,1073) rotate(90)"/>
+<rect x="4" y="1076" width="352" height="224" rx="14" class="zone"/><text x="16" y="1097" class="label" text-anchor="start"><tspan x="16" dy="0">The record</tspan></text>
+<rect x="16" y="1108" width="328" height="94" rx="10" class="card"/><text x="28" y="1136" class="title" text-anchor="start"><tspan x="28" dy="0"><tspan class="code">~/.orc/runs/&lt;run-id></tspan></tspan></text><text x="28" y="1154" class="" text-anchor="start"><tspan x="28" dy="0">The task, the logs, the Pi session and</tspan><tspan x="28" dy="16"><tspan class="code">report.md</tspan>. Read it with <tspan class="code">orc runs</tspan>, <tspan class="code">orc show</tspan></tspan><tspan x="28" dy="16">and <tspan class="code">orc log</tspan>.</tspan></text>
+<rect x="16" y="1210" width="328" height="78" rx="10" class="card"/><text x="28" y="1238" class="title" text-anchor="start"><tspan x="28" dy="0">Resume</tspan></text><text x="28" y="1256" class="" text-anchor="start"><tspan x="28" dy="0"><tspan class="code">orc run --branch &lt;name></tspan> skips the steps that</tspan><tspan x="28" dy="16">passed, and Pi resumes its session.</tspan></text>
+</svg>

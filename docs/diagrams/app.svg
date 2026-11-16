@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 496" class="orc-d" role="img" aria-labelledby="d-app-title d-app-desc">
+<title id="d-app-title">The app and the dashboard: two screens over the same commands</title>
+<desc id="d-app-desc">The Herdr App layout and the orc-dash terminal dashboard hold no state of their own. Both run the orc commands and draw what those print. The app has a Board tab, an Agents tab, a Resources tab and a chat drawer. The dashboard shows the same facts as panels in a terminal, and its alert stream is where the chat's alerts come from.</desc>
+<style>.orc-d {
+  color-scheme: light dark;
+  --d-ink: light-dark(#1f2328, #e8eaed);
+  --d-mute: light-dark(#57606a, #a3abb5);
+  --d-line: light-dark(#c8cdd5, #474d57);
+  --d-card: light-dark(#ffffff, #22252b);
+  --d-zone: light-dark(#f3f4f6, #17191d);
+  --d-work: light-dark(#3451b2, #a8b1ff);
+  --d-work-soft: light-dark(#e8ebfc, #272c52);
+  --d-on-work: light-dark(#ffffff, #14162b);
+  --d-ask: light-dark(#8a5a00, #e9b949);
+  --d-ask-soft: light-dark(#fff3d1, #3a300f);
+  --d-ok: light-dark(#17794c, #48d597);
+  --d-ok-soft: light-dark(#def5e8, #12301f);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.orc-d text { fill: var(--d-mute); font-size: 12.5px; }
+.orc-d .title { fill: var(--d-ink); font-size: 14px; font-weight: 650; }
+.orc-d .big { fill: var(--d-ink); font-size: 15.5px; font-weight: 650; }
+.orc-d .label { fill: var(--d-mute); font-size: 12px; font-weight: 600; }
+.orc-d .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; fill: var(--d-ink); }
+.orc-d .ask-text { fill: var(--d-ask); font-weight: 600; }
+.orc-d .work-text { fill: var(--d-work); font-weight: 600; }
+.orc-d .ok-text { fill: var(--d-ok); font-weight: 600; }
+.orc-d .zone { fill: var(--d-zone); stroke: var(--d-line); }
+.orc-d .card { fill: var(--d-card); stroke: var(--d-line); }
+.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); }
+.orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); }
+.orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); }
+.orc-d .line { fill: none; stroke: var(--d-mute); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .line-work { fill: none; stroke: var(--d-work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .line-ask { fill: none; stroke: var(--d-ask); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
+.orc-d .line-ok { fill: none; stroke: var(--d-ok); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .faint { fill: none; stroke: var(--d-line); stroke-width: 3; stroke-linecap: round; }
+.orc-d .head-work { fill: var(--d-work); }
+.orc-d .head-ask { fill: var(--d-ask); }
+.orc-d .head-mute { fill: var(--d-mute); }
+.orc-d .dot-work { fill: var(--d-work); }
+.orc-d .dot-ask { fill: var(--d-ask); }
+.orc-d .dot-ok { fill: var(--d-ok); }
+.orc-d .dot-mute { fill: var(--d-line); }
+.orc-d .num { fill: var(--d-on-work); font-size: 13px; font-weight: 700; }
+.orc-d .num-ask { fill: var(--d-card); font-size: 13px; font-weight: 700; }
+.orc-d .tick { fill: none; stroke: var(--d-card); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .dot-mute-strong { fill: var(--d-mute); }
+</style>
+<rect x="8" y="8" width="200" height="480" rx="14" class="zone"/><text x="20" y="29" class="label" text-anchor="start"><tspan x="20" dy="0">What both screens draw</tspan></text>
+<rect x="228" y="8" width="484" height="480" rx="14" class="zone"/><text x="240" y="29" class="label" text-anchor="start"><tspan x="240" dy="0">The Herdr App</tspan></text>
+<rect x="732" y="8" width="220" height="480" rx="14" class="zone"/><text x="744" y="29" class="label" text-anchor="start"><tspan x="744" dy="0">The terminal</tspan></text>
+<rect x="18" y="42" width="180" height="100" rx="10" class="card"/><text x="30" y="70" class="title" text-anchor="start"><tspan x="30" dy="0">The state</tspan></text><text x="30" y="88" class="" text-anchor="start"><tspan x="30" dy="0">Files in <tspan class="code">~/.orc</tspan>, and the</tspan><tspan x="30" dy="16">pueue queues.</tspan></text>
+<rect x="38" y="176" width="160" height="120" rx="10" class="card"/><text x="50" y="204" class="title" text-anchor="start"><tspan x="50" dy="0">The <tspan class="code">orc</tspan> commands</tspan></text><text x="50" y="222" class="" text-anchor="start"><tspan x="50" dy="0"><tspan class="code">orc backlog</tspan>, <tspan class="code">orc</tspan></tspan><tspan x="50" dy="16"><tspan class="code">runs</tspan> and <tspan class="code">orc</tspan></tspan><tspan x="50" dy="16"><tspan class="code">attention</tspan>, printed</tspan><tspan x="50" dy="16">as JSON.</tspan></text>
+<rect x="18" y="330" width="180" height="100" rx="10" class="card"/><text x="30" y="358" class="title" text-anchor="start"><tspan x="30" dy="0"><tspan class="code">orc-dash snapshot</tspan></tspan></text><text x="30" y="376" class="" text-anchor="start"><tspan x="30" dy="0">What the Resources tab</tspan><tspan x="30" dy="16">draws.</tspan></text>
+<path d="M118,142 L118,174" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(118,174) rotate(90)"/>
+<path d="M28,142 L28,328" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(28,328) rotate(90)"/>
+<g data-part="backlog"><rect x="238" y="42" width="227" height="158" rx="10" class="card"/><text x="250" y="70" class="title" text-anchor="start"><tspan x="250" dy="0">Board</tspan></text><text x="250" y="88" class="" text-anchor="start"><tspan x="250" dy="0">The backlog as cards in five</tspan><tspan x="250" dy="16">lanes: Backlog, Planned,</tspan><tspan x="250" dy="16">Awaiting you, Running and Done.</tspan><tspan x="250" dy="16">A card opens the task, with its</tspan><tspan x="250" dy="16">open questions to answer.</tspan></text><path d="M446,60 l5,5.5 l-5,5.5" class="line-work"/></g>
+<g data-part="run"><rect x="475" y="42" width="227" height="158" rx="10" class="card"/><text x="487" y="70" class="title" text-anchor="start"><tspan x="487" dy="0">Agents</tspan></text><text x="487" y="88" class="" text-anchor="start"><tspan x="487" dy="0">The runs and the queued tasks.</tspan><tspan x="487" dy="16">Each step, the agent's turns and</tspan><tspan x="487" dy="16">the changes. The Approve step</tspan><tspan x="487" dy="16">merges through <tspan class="code">orc merge</tspan>.</tspan></text><path d="M683,60 l5,5.5 l-5,5.5" class="line-work"/></g>
+<g data-part="quota"><rect x="238" y="212" width="227" height="158" rx="10" class="card"/><text x="250" y="240" class="title" text-anchor="start"><tspan x="250" dy="0">Resources</tspan></text><text x="250" y="258" class="" text-anchor="start"><tspan x="250" dy="0">Each account's quota windows.</tspan><tspan x="250" dy="16">Each machine's cores, load,</tspan><tspan x="250" dy="16">memory, disk and running runs.</tspan></text><path d="M446,230 l5,5.5 l-5,5.5" class="line-work"/></g>
+<g data-part="chat"><rect x="475" y="212" width="227" height="158" rx="10" class="card"/><text x="487" y="240" class="title" text-anchor="start"><tspan x="487" dy="0">The chat drawer</tspan></text><text x="487" y="258" class="" text-anchor="start"><tspan x="487" dy="0"><tspan class="code">cmd-k</tspan> on any tab. The same <tspan class="code">orc</tspan></tspan><tspan x="487" dy="16"><tspan class="code">chat</tspan> as in a terminal, with the</tspan><tspan x="487" dy="16">same eight tools.</tspan></text><path d="M683,230 l5,5.5 l-5,5.5" class="line-work"/></g>
+<rect x="238" y="388" width="464" height="90" rx="10" class="card-work"/><text x="250" y="416" class="title" text-anchor="start"><tspan x="250" dy="0">Neither screen holds state of its own</tspan></text><text x="250" y="434" class="" text-anchor="start"><tspan x="250" dy="0">Both run the <tspan class="code">orc</tspan> commands and draw what those print, so a screen and</tspan><tspan x="250" dy="16">the command line never disagree.</tspan></text>
+<path d="M198,186 L236,186" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(236,186) rotate(0)"/>
+<path d="M198,350 L236,350" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(236,350) rotate(0)"/>
+<rect x="742" y="42" width="200" height="158" rx="10" class="card"/><text x="754" y="70" class="title" text-anchor="start"><tspan x="754" dy="0"><tspan class="code">orc-dash</tspan></tspan></text><text x="754" y="88" class="" text-anchor="start"><tspan x="754" dy="0">The same facts as panels:</tspan><tspan x="754" dy="16">quota, session quota,</tspan><tspan x="754" dy="16">resources, queues,</tspan><tspan x="754" dy="16">schedules, dispatch,</tspan><tspan x="754" dy="16">attention, tasks, alerts</tspan><tspan x="754" dy="16">and ledger.</tspan></text>
+<g data-part="chat"><rect x="742" y="212" width="200" height="158" rx="10" class="card"/><text x="754" y="240" class="title" text-anchor="start"><tspan x="754" dy="0">Its alert stream</tspan></text><text x="754" y="258" class="" text-anchor="start"><tspan x="754" dy="0">It watches quota pace,</tspan><tspan x="754" dy="16">machine load and long</tspan><tspan x="754" dy="16">tasks. The chat's alerts</tspan><tspan x="754" dy="16">come from here.</tspan></text><path d="M923,230 l5,5.5 l-5,5.5" class="line-work"/></g>
+</svg>

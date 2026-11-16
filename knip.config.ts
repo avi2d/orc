@@ -15,5 +15,8 @@ export default defineConfig({
     "packages/dashboard/src/index.ts",
     "packages/cli/src/index.ts",
     "packages/cli/src/bin.ts",
+    "docs/.vitepress/config.ts",
+    "docs/.vitepress/theme/index.ts",
+    "docs/map/client.ts",
   ],
 });

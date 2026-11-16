@@ -64,6 +64,17 @@ Orc runs the quota command with no input and reads its standard output as this d
 
 Each entry gives the percent of room left, from 0 to 100, or the reason the account cannot run.
 An account the document does not name cannot run.
+A Claude quota read through claude-bridge prints this document.
+
+The quota command may instead print the document of `quota-axi --full --json --provider <id>`, such as `["quota-axi", "--full", "--json", "--provider", "codex"]`.
+Orc reads a document with a `providers` key this way.
+An account named in `dispatch.json` reads the provider entry whose `accountKey` or `accountKeys` names it.
+The account's room is the `effectivePercentRemaining` of the entry's `all_models` scope under `quotaSemantics`, so a Codex code review window does not count.
+The account's reset time is the `resetsAt` of the scope's limiting window, the latest one when several tie, and the beat line prints it after the room.
+When no limiting window names a reset time, the account reads usable with no reset time.
+An entry with no window or no `all_models` percent cannot run, and the reason names its quota-axi state when that state is not fresh, with the error after a colon when the state carries one.
+A quota-axi document that names no window at all, or names one account key twice, leaves the quota unread.
+
 A command that exits non-zero, runs past 15 seconds or prints any other document leaves the quota unread, and the beat starts nothing.
 
 A quota with a token command account then looks like this:
@@ -194,7 +205,7 @@ To pipe the task in instead, give `-` as the task file, as in `printf '# Fix the
 It reads stdin to its end and refuses a terminal.
 Add `--machine <name>` to run the task on that machine only, and `--depends-on <task-id>` once per task it waits for.
 To change what a new or held task waits for later, run `orc backlog depend <task-id> --on <task-id>,<task-id>`, which replaces its whole list, or `orc backlog depend <task-id> --clear` to empty it.
-Orc refuses a task the backlog does not hold, a task that is taken, started or closed, a task parked for the captain's answer, and a dependency on itself or one that would make two tasks wait on each other.
+Orc refuses a task the backlog does not hold, a task that is taken, started or closed, a task parked for your answer, and a dependency on itself or one that would make two tasks wait on each other.
 A hold stays as it was when the dependencies change.
 To change the text of a new task, run `orc backlog edit <task-id> <task-file>`, or give `-` to pipe the text in as `orc backlog add` takes it.
 It replaces the title and the body and keeps the id, kind, machine, parent, split mark, dependencies, priority, hold with its history and parked questions.
@@ -213,12 +224,14 @@ It refuses a task another open task waits on, until `orc backlog depend` changes
 The drop takes the task file by rename, so a drop and a beat taking the task at the same moment never both win.
 To record the machine and run of a task parked before orc recorded them, run `orc backlog origin <task-id> <machine> <run-id>`, as [Parked runs](parked-runs.md) shows.
 To send a closed task's open PR back for another pass, run `orc backlog send-back <task-id> <words>`, as in `orc backlog send-back orc-9 rename the flag`.
-It moves the task to `new`, parked on its branch `orc/<task-id>` with your words as the answer to the question `send-back`, and records the machine and run that closed it as the origin.
+It moves the task to `new`, parked on its branch `orc/<task-id>` with your words as the answer to the question `send-back`, and records the machine and run that closed it and its PR as the origin in `parked_origin`.
+A sent-back run that closes before its push still names that PR, so `orc merge` and another send-back find it.
 The next beat resumes that run on the same machine and branch.
 The implementer resumes the session it worked in with your words as the review, the checks run again, and the push updates the same PR.
 Orc refuses a task that is neither closed nor sent back, a task that names no PR, and a PR that is merged or closed.
 It also refuses when the runner holds no run of the task, since no session is left to resume.
 To add more words before the next beat starts it, run `orc backlog send-back` again on the new task, and the run gets every set of words in order.
+Orc refuses those words once the PR is merged or closed.
 The Agents tab offers the same as **Send back** beside a PR that awaits your approval.
 Add `--kind scout` or `--kind task` for a task that ends in a report instead of a PR, as [Task kinds](task-kinds.md) shows.
 To split a large task, add it with `--kind parent`, then add each part with `--parent <task-id>`, as [Parent tasks](task-kinds.md#parent-tasks) shows, or name a planner model so orc splits an over-budget request itself, as [Splitting at intake](task-kinds.md#splitting-at-intake) shows.
@@ -227,7 +240,7 @@ To see the backlog, run `orc backlog`.
 It prints the new, taken and closed tasks side by side with the project list and each machine's busy slots beside them.
 To print the same facts as JSON, run `orc backlog --json`, whose document names its version first as `orc.backlog.v1`.
 `orc backlog --json` gives every new task a `wait`, either `null` or the reason the beat will not start it.
-The reason is a decision for the captain, a missing priority, the hold, or the parked questions.
+The reason is a decision for you, a missing priority, the hold, or the parked questions.
 It is also the open children or the dependency the task waits on.
 That dependency includes a ship prerequisite whose PR has not merged.
 Taken, started and closed tasks carry `null` for `wait`.
@@ -243,8 +256,8 @@ Any other task starts only once five things hold:
 
 1. It has a priority.
 A task with no priority never starts, and each beat prints `waits <task-id>: no priority` for it.
-2. No hold or parked question for the captain waits on it unanswered.
-3. Every task it depends on closed done, and a decision closes done when the captain answers it.
+2. No hold or parked question for you waits on it unanswered.
+3. Every task it depends on closed done, and a decision closes done when you answer it.
 A ship task also waits for each ship prerequisite with a PR to merge, whether or not they share a parent.
 A parent task also waits for every scout and task child closed done and every ship child with a PR merged.
 4. Its project has a checkout on a machine with a free slot.

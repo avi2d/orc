@@ -15,11 +15,11 @@ That run skips no-mistakes and the PR and creates no branch.
 It starts Pi on the host in `~/.orc/runs/<run-id>`, tells it where the task and the checkout are, and asks it to write `agent-report.md` there.
 Orc refuses a scout or task run without `--sandbox none`, and refuses `--allow` and `--answer` on one.
 It prints `orc: <kind> run <run-id> wrote its report to <path>` and records the run succeeded.
-A run the captain stops at its looping question prints `orc: <kind> run <run-id> stopped: <reason>` and records the run stopped.
+A run you stop at its looping question prints `orc: <kind> run <run-id> stopped: <reason>` and records the run stopped.
 Any other run that does not report prints why it failed, records the run failed and exits non-zero.
 The beat closes the task done with the reason `the run wrote its report` and keeps the path as `report` in the task file and in `orc backlog --json`.
 A run that wrote a report and still failed closes the task failed with the run reason and keeps the path as `report`.
-A run the captain stops closes the task stopped with the run reason.
+A run you stop closes the task stopped with the run reason.
 When no report exists, it closes the task failed with `the run wrote no report` and the run's reason, even when pueue says the run succeeded.
 The beat prints the report path in its `closed` line.
 The chat posts it where a shipped task posts its PR, as in `orc-1 Map the parser closed done: the run wrote its report, report /home/me/.orc/runs/<run-id>/agent-report.md`.
@@ -27,7 +27,7 @@ A scout or task marked for a machine waits for room there as any task does.
 
 ## Decisions
 
-A `decision` is a question for the captain, and no run ever answers it.
+A `decision` is a question for you, and no run ever answers it.
 Add it with `orc backlog add <project> <file|-> --kind decision`, whose body is the question.
 Orc refuses `--priority` and `--machine` on a decision, and `orc backlog priority` refuses one, since a decision never starts.
 The beat never starts a decision, and each beat prints `waits <task-id>: decision for the captain` for it.
@@ -39,8 +39,8 @@ To drop it instead, run `orc backlog close <task-id> failed [<reason>]`, which d
 `orc backlog` shows an answered decision as `answered: <words>`, and `orc backlog --json` gives it `kind: "decision"` and `answer` as its words and time.
 Every other closed task carries `null` for `answer`.
 
-A task added with `--depends-on <decision-id>` waits until the captain answers the decision, as any dependency does.
-When it starts, the runner appends the decision's question and the captain's answer after the task's own body in the run's task file:
+A task added with `--depends-on <decision-id>` waits until you answer the decision, as any dependency does.
+When it starts, the runner appends the decision's question and your answer after the task's own body in the run's task file:
 
 ```text
 # Build the button
@@ -58,7 +58,7 @@ In chat, `orc_backlog_add` takes `kind: "decision"`, and `orc_backlog_answer` an
 
 ## Parent tasks
 
-A `parent` holds the captain's words and the done criteria for work too large for one PR, and has no code or PR of its own.
+A `parent` holds your words and the done criteria for work too large for one PR, and has no code or PR of its own.
 Add it with `orc backlog add <project> <task-file> --kind parent`, then add each part with `orc backlog add <project> <task-file> --parent <task-id>`.
 The child's task file keeps the link as `parent`, and `orc backlog --json` gives every task a `parent` and every parent `children` as `{"done": <n>, "total": <n>}`.
 Children may wait on each other with `--depends-on`, and the beat starts the children with a priority that wait on nothing at the same time.
