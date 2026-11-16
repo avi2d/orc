@@ -59,7 +59,22 @@
 
 .diagram-wide,
 .diagram-tall {
+  position: relative;
   display: block;
+}
+
+.map-link {
+  position: absolute;
+  border-radius: 9px;
+}
+
+.map-link:hover {
+  box-shadow: inset 0 0 0 2px var(--vp-c-brand-1);
+}
+
+.map-link:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
 }
 
 .diagram-tall {
@@ -89,28 +104,46 @@
   max-width: 688px;
 }
 
-.wide-page .vp-doc > div > p:has(.diagram),
-.wide-page .vp-doc > div > .demo-variants {
+.wide-page .vp-doc > div > p:has(.diagram) {
   max-width: none;
 }
 
-.demo-switch {
+.map-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: 12px 0;
-}
-
-.demo-switch button {
-  padding: 6px 14px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 999px;
+  align-items: baseline;
+  gap: 4px 20px;
+  margin-bottom: 8px;
   font-size: 14px;
-  font-weight: 600;
+  line-height: 24px;
+  color: var(--vp-c-text-2);
 }
 
-.demo-switch button[aria-pressed="true"] {
-  border-color: var(--vp-c-brand-1);
-  background: var(--vp-c-brand-soft);
-  color: var(--vp-c-brand-1);
+.map-bar strong {
+  color: var(--vp-c-text-1);
+}
+
+.map-bar a {
+  padding-block: 6px;
+}
+
+.map,
+.map-deep {
+  scroll-margin-top: 80px;
+}
+
+.map-top {
+  display: block;
+}
+
+.map-deep {
+  display: none;
+}
+
+.map-deep:target {
+  display: block;
+}
+
+.map:has(.map-deep:target) .map-top {
+  display: none;
 }

@@ -41,3 +41,5 @@
 .orc-d .dot-mute { fill: var(--d-line); }
 .orc-d .num { fill: var(--d-on-work); font-size: 13px; font-weight: 700; }
 .orc-d .num-ask { fill: var(--d-card); font-size: 13px; font-weight: 700; }
+.orc-d .tick { fill: none; stroke: var(--d-card); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .dot-mute-strong { fill: var(--d-mute); }

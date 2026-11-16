@@ -1,27 +1,14 @@
 ---
+aside: false
+pageClass: wide-page
 kind: explanation
 ---
-# The attention queue
+# The attention queue and the decider
 
 Everything that waits on someone is one item in one queue, so you have a single place to look.
 Each item names who must answer it, and a small model called the decider takes the routine ones off your hands.
 
-```mermaid
-flowchart TD
-  question([A run asks a question])
-  topic{Does it touch a<br/>guarded topic?}
-  decider[The decider reads your rules<br/>and the task]
-  quote{Can it quote a rule<br/>that settles it?}
-  answered([Answered, and the run carries on])
-  you([It waits for you:<br/>orc backlog answer])
-  question --> topic
-  topic -- yes --> you
-  topic -- no --> decider
-  decider --> quote
-  quote -- yes --> answered
-  quote -- no --> you
-  you --> answered
-```
+![The attention queue and the decider: who answers what](../diagrams/attention.svg)
 
 ## What opens an item
 

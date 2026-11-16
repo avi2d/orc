@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 496" class="orc-d" role="img" aria-labelledby="d-attention-title d-attention-desc">
+<title id="d-attention-title">The attention queue and the decider: who answers what</title>
+<desc id="d-attention-desc">A question from a run and news for you both open an item in the attention queue. A question on a guarded topic goes straight to you. Any other question goes to the decider, a small model that may answer only by quoting a rule you wrote. When no rule settles it, the question goes to you. Your answer replaces the decider's, and the run carries on.</desc>
+<style>.orc-d {
+  color-scheme: light dark;
+  --d-ink: light-dark(#1f2328, #e8eaed);
+  --d-mute: light-dark(#57606a, #a3abb5);
+  --d-line: light-dark(#c8cdd5, #474d57);
+  --d-card: light-dark(#ffffff, #22252b);
+  --d-zone: light-dark(#f3f4f6, #17191d);
+  --d-work: light-dark(#3451b2, #a8b1ff);
+  --d-work-soft: light-dark(#e8ebfc, #272c52);
+  --d-on-work: light-dark(#ffffff, #14162b);
+  --d-ask: light-dark(#8a5a00, #e9b949);
+  --d-ask-soft: light-dark(#fff3d1, #3a300f);
+  --d-ok: light-dark(#17794c, #48d597);
+  --d-ok-soft: light-dark(#def5e8, #12301f);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.orc-d text { fill: var(--d-mute); font-size: 12.5px; }
+.orc-d .title { fill: var(--d-ink); font-size: 14px; font-weight: 650; }
+.orc-d .big { fill: var(--d-ink); font-size: 15.5px; font-weight: 650; }
+.orc-d .label { fill: var(--d-mute); font-size: 12px; font-weight: 600; }
+.orc-d .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; fill: var(--d-ink); }
+.orc-d .ask-text { fill: var(--d-ask); font-weight: 600; }
+.orc-d .work-text { fill: var(--d-work); font-weight: 600; }
+.orc-d .ok-text { fill: var(--d-ok); font-weight: 600; }
+.orc-d .zone { fill: var(--d-zone); stroke: var(--d-line); }
+.orc-d .card { fill: var(--d-card); stroke: var(--d-line); }
+.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); }
+.orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); }
+.orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); }
+.orc-d .line { fill: none; stroke: var(--d-mute); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .line-work { fill: none; stroke: var(--d-work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .line-ask { fill: none; stroke: var(--d-ask); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
+.orc-d .line-ok { fill: none; stroke: var(--d-ok); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .faint { fill: none; stroke: var(--d-line); stroke-width: 3; stroke-linecap: round; }
+.orc-d .head-work { fill: var(--d-work); }
+.orc-d .head-ask { fill: var(--d-ask); }
+.orc-d .head-mute { fill: var(--d-mute); }
+.orc-d .dot-work { fill: var(--d-work); }
+.orc-d .dot-ask { fill: var(--d-ask); }
+.orc-d .dot-ok { fill: var(--d-ok); }
+.orc-d .dot-mute { fill: var(--d-line); }
+.orc-d .num { fill: var(--d-on-work); font-size: 13px; font-weight: 700; }
+.orc-d .num-ask { fill: var(--d-card); font-size: 13px; font-weight: 700; }
+.orc-d .tick { fill: none; stroke: var(--d-card); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .dot-mute-strong { fill: var(--d-mute); }
+</style>
+<rect x="8" y="8" width="200" height="480" rx="14" class="zone"/><text x="20" y="29" class="label" text-anchor="start"><tspan x="20" dy="0">What opens an item</tspan></text>
+<rect x="228" y="8" width="484" height="480" rx="14" class="zone"/><text x="240" y="29" class="label" text-anchor="start"><tspan x="240" dy="0">The machine that plans</tspan></text>
+<rect x="732" y="8" width="220" height="480" rx="14" class="zone"/><text x="744" y="29" class="label" text-anchor="start"><tspan x="744" dy="0">You</tspan></text>
+<g data-part="checks"><rect x="18" y="42" width="180" height="120" rx="10" class="card"/><text x="30" y="70" class="title" text-anchor="start"><tspan x="30" dy="0">A question from a</tspan><tspan x="30" dy="18">run</tspan></text><text x="30" y="106" class="" text-anchor="start"><tspan x="30" dy="0">The review raised it, or</tspan><tspan x="30" dy="16">the agent asked it</tspan><tspan x="30" dy="16">instead of guessing.</tspan></text><path d="M179,60 l5,5.5 l-5,5.5" class="line-work"/></g>
+<rect x="18" y="212" width="180" height="150" rx="10" class="card"/><text x="30" y="240" class="title" text-anchor="start"><tspan x="30" dy="0">News for you</tspan></text><circle cx="33" cy="258" r="2" class="dot-mute-strong"/><text x="42" y="262" class="" text-anchor="start"><tspan x="42" dy="0">a run died</tspan></text><circle cx="33" cy="276" r="2" class="dot-mute-strong"/><text x="42" y="280" class="" text-anchor="start"><tspan x="42" dy="0">a check went red</tspan></text><circle cx="33" cy="294" r="2" class="dot-mute-strong"/><text x="42" y="298" class="" text-anchor="start"><tspan x="42" dy="0">a pull request is ready</tspan></text><circle cx="33" cy="312" r="2" class="dot-mute-strong"/><text x="42" y="316" class="" text-anchor="start"><tspan x="42" dy="0">a hold is overdue</tspan></text><circle cx="33" cy="330" r="2" class="dot-mute-strong"/><text x="42" y="334" class="" text-anchor="start"><tspan x="42" dy="0">a command keeps failing</tspan></text>
+<rect x="240" y="42" width="216" height="108" rx="10" class="card-ask"/><text x="252" y="70" class="title" text-anchor="start"><tspan x="252" dy="0">The attention queue</tspan></text><text x="252" y="88" class="" text-anchor="start"><tspan x="252" dy="0">Everything that waits on</tspan><tspan x="252" dy="16">someone, oldest first. <tspan class="code">orc</tspan></tspan><tspan x="252" dy="16"><tspan class="code">attention</tspan> lists it.</tspan></text>
+<rect x="240" y="196" width="216" height="190" rx="10" class="card-ask"/><text x="252" y="224" class="title" text-anchor="start"><tspan x="252" dy="0">Is it on a guarded</tspan><tspan x="252" dy="18">topic?</tspan></text><circle cx="255" cy="260" r="2" class="dot-mute-strong"/><text x="264" y="264" class="" text-anchor="start"><tspan x="264" dy="0">deleting, or anything that</tspan><tspan x="264" dy="16">cannot be undone</tspan></text><circle cx="255" cy="294" r="2" class="dot-mute-strong"/><text x="264" y="298" class="" text-anchor="start"><tspan x="264" dy="0">security, keys and logins</tspan></text><circle cx="255" cy="312" r="2" class="dot-mute-strong"/><text x="264" y="316" class="" text-anchor="start"><tspan x="264" dy="0">merging, pushing, releasing</tspan></text><circle cx="255" cy="330" r="2" class="dot-mute-strong"/><text x="264" y="334" class="" text-anchor="start"><tspan x="264" dy="0">spending</tspan></text><circle cx="255" cy="348" r="2" class="dot-mute-strong"/><text x="264" y="352" class="" text-anchor="start"><tspan x="264" dy="0">a site's look, and legal text</tspan></text>
+<rect x="486" y="42" width="216" height="124" rx="10" class="card-ask"/><text x="498" y="70" class="title" text-anchor="start"><tspan x="498" dy="0">The decider</tspan></text><text x="498" y="88" class="" text-anchor="start"><tspan x="498" dy="0">A small model with no tools. It</tspan><tspan x="498" dy="16">reads your rules, the project's</tspan><tspan x="498" dy="16">instructions and the task.</tspan></text>
+<rect x="486" y="226" width="216" height="108" rx="10" class="card-ask"/><text x="498" y="254" class="title" text-anchor="start"><tspan x="498" dy="0">Can it quote a rule that</tspan><tspan x="498" dy="18">settles it?</tspan></text><text x="498" y="290" class="" text-anchor="start"><tspan x="498" dy="0">It may answer only by quoting</tspan><tspan x="498" dy="16">your rule, word for word.</tspan></text>
+<rect x="742" y="42" width="200" height="84" rx="10" class="card-ok"/><text x="754" y="70" class="title" text-anchor="start"><tspan x="754" dy="0">Answered</tspan></text><text x="754" y="88" class="" text-anchor="start"><tspan x="754" dy="0">The run carries on where it</tspan><tspan x="754" dy="16">waited.</tspan></text>
+<g data-part="chat"><rect x="742" y="226" width="200" height="140" rx="10" class="card"/><text x="754" y="254" class="title" text-anchor="start"><tspan x="754" dy="0">You answer</tspan></text><text x="754" y="272" class="" text-anchor="start"><tspan x="754" dy="0">In the chat, in the app, or</tspan><tspan x="754" dy="16">with <tspan class="code">orc backlog answer</tspan>.</tspan><tspan x="754" dy="16">Your answer replaces the</tspan><tspan x="754" dy="16">decider's.</tspan></text><path d="M923,244 l5,5.5 l-5,5.5" class="line-work"/></g>
+<path d="M198,90 L238,90" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(238,90) rotate(0)"/>
+<path d="M348,150 L348,194" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(348,194) rotate(90)"/>
+<path d="M456,216 L471,216 L471,104 L484,104" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(484,104) rotate(0)"/>
+<text x="476" y="98" class="ask-text" text-anchor="middle"><tspan x="476" dy="0">no</tspan></text>
+<path d="M594,166 L594,224" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(594,224) rotate(90)"/>
+<path d="M702,256 L722,256 L722,84 L740,84" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(740,84) rotate(0)"/>
+<text x="727" y="180" class="ask-text" text-anchor="start"><tspan x="727" dy="0">yes</tspan></text>
+<path d="M702,306 L740,306" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(740,306) rotate(0)"/>
+<text x="721" y="324" class="ask-text" text-anchor="middle"><tspan x="721" dy="0">no</tspan></text>
+<path d="M348,386 L348,426 L822,426 L822,368" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(822,368) rotate(-90)"/>
+<text x="360" y="420" class="ask-text" text-anchor="start"><tspan x="360" dy="0">yes: it goes straight to you</tspan></text>
+<path d="M108,362 L108,458 L876,458 L876,368" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(876,368) rotate(-90)"/>
+<text x="120" y="452" class="ask-text" text-anchor="start"><tspan x="120" dy="0">it waits for you</tspan></text>
+<path d="M842,226 L842,128" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(842,128) rotate(-90)"/>
+</svg>

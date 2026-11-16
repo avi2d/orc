@@ -8,13 +8,81 @@ const diagrams = join(import.meta.dirname, "..", "diagrams")
 
 const diagramFile = /(?:^|\/)diagrams\/([\w-]+)\.svg$/
 
-const inlineSvg = (file: string, layout: string): string =>
-  existsSync(file)
-    ? '<span class="diagram-' + layout + '">' + readFileSync(file, "utf8").replace(/<style>[\s\S]*?<\/style>/, "") + "</span>"
-    : ""
+const topMap = "how-orc-works"
+
+interface Part {
+  readonly id: string
+  readonly title: string
+  readonly link: string
+}
+
+const parts: readonly Part[] = [
+  { id: "backlog", title: "The backlog", link: "concepts/backlog" },
+  { id: "beat", title: "The beat", link: "concepts/beat" },
+  { id: "quota", title: "Accounts and quota", link: "concepts/accounts-and-quota" },
+  { id: "runner", title: "The runner", link: "concepts/runner" },
+  { id: "run", title: "A run", link: "concepts/run" },
+  { id: "checks", title: "Checks and review", link: "concepts/checks-and-review" },
+  { id: "merge", title: "The merge", link: "concepts/merge" },
+  { id: "attention", title: "The attention queue and the decider", link: "concepts/attention" },
+  { id: "chat", title: "The chat", link: "concepts/chat" },
+  { id: "app", title: "The app and the dashboard", link: "concepts/app" }
+]
+
+const drawn = (id: string): boolean => existsSync(join(diagrams, id + ".svg"))
+
+type Target = (part: Part) => string
+
+const pageOf: Target = (part) => base + part.link
+
+const mapOrPageOf: Target = (part) => (drawn(part.id) ? "#map-" + part.id : pageOf(part))
+
+const linked = /<g data-part="([\w-]+)">([\s\S]*?)<\/g>/g
+
+const box = /<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/
+
+const heading = /<text[^>]*class="title"[^>]*>([\s\S]*?)<\/text>/
+
+const size = /viewBox="0 0 ([\d.]+) ([\d.]+)"/
+
+const percent = (value: string | undefined, of: string | undefined): string => ((Number(value) / Number(of)) * 100).toFixed(3) + "%"
+
+const layout = (name: string, kind: string, target: Target): string => {
+  const file = join(diagrams, name + (kind === "tall" ? "-tall" : "") + ".svg")
+  if (!existsSync(file)) return ""
+  const drawing = readFileSync(file, "utf8").replace(/<style>[\s\S]*?<\/style>/, "")
+  const [, width, height] = size.exec(drawing) ?? []
+  const links = [...drawing.matchAll(linked)].map(([, id, inner]) => {
+    const part = parts.find((candidate) => candidate.id === id)
+    const [, x, y, w, h] = box.exec(inner ?? "") ?? []
+    const label = (heading.exec(inner ?? "")?.[1] ?? "").replaceAll(/<[^>]+>/g, "")
+    if (part === undefined) return ""
+    const place = "left:" + percent(x, width) + ";top:" + percent(y, height) + ";width:" + percent(w, width) + ";height:" + percent(h, height)
+    return '<a class="map-link" href="' + target(part) + '" style="' + place + '" aria-label="' + label + '"></a>'
+  })
+  return '<span class="diagram-' + kind + '">' + drawing + links.join("") + "</span>"
+}
+
+const layouts = (name: string, target: Target): string => layout(name, "wide", target) + layout(name, "tall", target)
+
+const bar = (inner: string): string => '<span class="map-bar">' + inner + "</span>"
 
 const diagram = (name: string): string =>
-  '<span class="diagram" v-pre>' + inlineSvg(join(diagrams, name + ".svg"), "wide") + inlineSvg(join(diagrams, name + ".tall.svg"), "tall") + "</span>"
+  '<span class="diagram vp-raw" v-pre>' + (parts.some((part) => part.id === name) ? bar('<a href="' + base + '#map">← The whole map</a>') : "") + layouts(name, pageOf) + "</span>"
+
+const deeper = (part: Part): string =>
+  '<span class="map-deep" id="map-' + part.id + '">' +
+  bar('<a href="#map">← The whole map</a><strong>' + part.title + '</strong><a href="' + pageOf(part) + '">Read the page →</a>') +
+  layouts(part.id, mapOrPageOf) +
+  "</span>"
+
+const explorer = (): string =>
+  '<span class="diagram map vp-raw" id="map" v-pre><span class="map-top">' +
+  bar("Select a part to see how it works.") +
+  layouts(topMap, mapOrPageOf) +
+  "</span>" +
+  parts.filter((part) => drawn(part.id)).map(deeper).join("") +
+  "</span>"
 
 const page = (text: string, link: string): DefaultTheme.SidebarItem => ({ text, link })
 
@@ -24,18 +92,7 @@ const start = [
   page("Where orc is going", "/roadmap")
 ]
 
-const concepts = [
-  page("The backlog", "/concepts/backlog"),
-  page("The beat", "/concepts/beat"),
-  page("Accounts and quota", "/concepts/accounts-and-quota"),
-  page("The runner", "/concepts/runner"),
-  page("A run", "/concepts/run"),
-  page("Checks and review", "/concepts/checks-and-review"),
-  page("The merge", "/concepts/merge"),
-  page("The attention queue", "/concepts/attention"),
-  page("The chat", "/concepts/chat"),
-  page("The App and the dashboard", "/concepts/app")
-]
+const concepts = parts.map((part) => page(part.title, "/" + part.link))
 
 const tasks = [
   page("Run your first task", "/tasks/run-your-first-task"),
@@ -97,7 +154,6 @@ export default defineConfig({
   description: "How orc runs AI agent tasks across your machines, and how to use it",
   base,
   head: [["link", { rel: "icon", type: "image/svg+xml", href: base + "favicon.svg" }]],
-  srcExclude: process.env["DOCS_DEMO"] === undefined ? ["demo/**"] : [],
   cleanUrls: true,
   lastUpdated: true,
   rewrites: { "adr/README.md": "adr/index.md" },
@@ -115,7 +171,7 @@ export default defineConfig({
       const image = md.renderer.rules.image
       md.renderer.rules.image = (tokens, index, options, env, self) => {
         const name = diagramFile.exec(tokens.at(index)?.attrGet("src") ?? "")?.[1]
-        if (name !== undefined) return diagram(name)
+        if (name !== undefined) return name === topMap ? explorer() : diagram(name)
         return image === undefined ? self.renderToken(tokens, index, options) : image(tokens, index, options, env, self)
       }
       // Vue compiles each page as a template, so a placeholder such as <folder> in prose would be read as an unclosed element.

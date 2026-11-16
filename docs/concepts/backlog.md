@@ -1,4 +1,6 @@
 ---
+aside: false
+pageClass: wide-page
 kind: explanation
 ---
 # The backlog
@@ -6,20 +8,7 @@ kind: explanation
 The backlog is the one list of everything orc has to do, kept as one Markdown file per task in `~/.orc/backlog`.
 It lives only on the machine that runs `orc beat`, and every other part of orc reads or changes it through the `orc backlog` commands.
 
-```mermaid
-flowchart TD
-  add([orc backlog add])
-  new[new]
-  taken[taken]
-  started[started]
-  closed[closed]
-  add --> new
-  new -- a beat claims it --> taken
-  taken -- the start command runs --> started
-  started -- the run ends --> closed
-  started -- parked on<br/>a question --> new
-  closed -- orc backlog<br/>send-back --> new
-```
+![The backlog: where a task file sits, and how it moves](../diagrams/backlog.svg)
 
 ## A task and its states
 

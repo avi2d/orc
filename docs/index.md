@@ -1,50 +1,18 @@
 ---
+aside: false
+pageClass: wide-page
 kind: explanation
 ---
 # How orc works
 
-Orc takes work you describe and runs an AI agent on it on one of your machines.
-It checks and reviews the result, then hands you a pull request or a report.
-You are the captain: you say what needs doing, you answer the questions only you can answer, and you say when a pull request lands.
+Orc takes work you describe, runs an AI agent on it on one of your machines, checks the result, and hands you a pull request or a report.
 
-## The whole system
-
-The picture follows one task from your words to a merged pull request.
-
-```mermaid
-flowchart TD
-  you([You, the captain])
-  chat[orc chat]
-  backlog[(The backlog<br/>one file per task)]
-  quota[/Quota command<br/>room left per account/]
-  beat{{orc beat<br/>every few minutes}}
-  runner[The runner<br/>pueue on one machine]
-  subgraph run [A run, on its own branch]
-    direction TB
-    pi[Pi writes the change]
-    checks{Project checks}
-    review[Review by no-mistakes]
-    pi --> checks
-    checks -- red --> pi
-    checks -- green --> review
-  end
-  pr[Pull request, CI green]
-  merge[orc merge]
-  attention[(Attention queue)]
-  you -- say the work --> chat
-  chat -- adds tasks --> backlog
-  backlog --> beat
-  quota --> beat
-  beat -- task, machine, account --> runner
-  runner --> run
-  review --> pr
-  pr -- your word --> merge
-  run -. a question .-> attention
-  attention -. decider answers,<br/>or you do .-> run
-```
+![How orc works: every part, and every way a task ends](diagrams/how-orc-works.svg)
 
 Solid arrows are the path of the work.
 Dotted arrows are the questions a run asks on the way and the answers that come back.
+
+You are the captain: you say what needs doing, you answer the questions only you can answer, and you say when a pull request lands.
 
 ## The path of one task
 
@@ -89,7 +57,7 @@ Two more parts sit beside that path.
 - **The App.**
   The Herdr App layout and the `orc-dash` terminal dashboard show the backlog, the runs, the machines and the quota.
   They only read what the commands print, so everything they show you can also read with `orc backlog`, `orc runs` and `orc attention`.
-  [The App and the dashboard](concepts/app.md) shows the screens.
+  [The app and the dashboard](concepts/app.md) shows the screens.
 
 ## Where each part lives
 
