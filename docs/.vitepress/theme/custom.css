@@ -17,6 +17,10 @@
   height: auto;
 }
 
+.diagram .orc-d {
+  color-scheme: inherit;
+}
+
 .diagram-wide,
 .diagram-tall {
   position: relative;

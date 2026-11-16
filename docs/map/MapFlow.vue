@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from "vue"
 import { BaseEdge, EdgeLabelRenderer, Handle, MarkerType, Position, VueFlow, useVueFlow, type Edge, type Node } from "@vue-flow/core"
 import "@vue-flow/core/dist/style.css"
 import { useData } from "vitepress"
@@ -110,7 +110,6 @@ const onWidth = (): void => {
   void nextTick(() => layout())
 }
 
-watch(isDark, () => void layout())
 onMounted(() => {
   narrow?.addEventListener("change", onWidth)
   void document.fonts.ready.then(onWidth)
@@ -122,7 +121,7 @@ onBeforeUnmount(() => narrow?.removeEventListener("change", onWidth))
   <MapShell @open-all="setAll(parts.filter((part) => folds(part.id)).map((part) => part.id))" @fold-all="setAll(groups)">
     <div ref="measure" class="map-measure" aria-hidden="true" inert>
       <div v-for="part in parts" :key="part.id" :data-part="part.id" :style="{ width: cardWidth + 'px' }">
-        <PartCard :part="part" :folds="folds(part.id)" :open="false" />
+        <PartCard :part="part" :folds="part.inside !== undefined && folds(part.id)" :open="false" />
       </div>
       <span v-for="label in labelTexts" :key="label" class="map-label" :data-label="label">{{ label }}</span>
     </div>
@@ -142,7 +141,7 @@ onBeforeUnmount(() => narrow?.removeEventListener("change", onWidth))
       @node-mouse-leave="hovered = undefined"
     >
       <template #node-part="{ id, data }">
-        <PartCard :part="data.part" :folds="folds(id)" :open="data.open" @toggle="toggle(id)" />
+        <PartCard :part="data.part" :folds="data.part.inside !== undefined && folds(id)" :open="data.open" @toggle="toggle(id)" />
         <Handle type="source" :position="Position.Bottom" :connectable="false" />
         <Handle type="target" :position="Position.Top" :connectable="false" />
       </template>

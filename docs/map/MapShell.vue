@@ -9,7 +9,7 @@ const { isDark } = useData()
 
 <template>
   <div class="orc-map">
-    <header class="map-bar">
+    <header class="orc-map-bar">
       <a class="map-back" :href="withBase('/')" aria-label="Back to the orc docs">←<span> Docs</span></a>
       <p class="map-title">{{ mapTitle }}<small>Select a part to open it</small></p>
       <button type="button" @click="$emit('openAll')">Open all</button>
@@ -43,7 +43,7 @@ const { isDark } = useData()
   color: var(--m-ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
-.map-bar {
+.orc-map-bar {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -52,7 +52,7 @@ const { isDark } = useData()
   border-bottom: 1px solid var(--m-line);
   background: var(--m-card);
 }
-.map-bar .map-title {
+.orc-map-bar .map-title {
   flex: 1;
   min-width: 0;
   margin: 0;
@@ -63,14 +63,14 @@ const { isDark } = useData()
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.map-bar small {
+.orc-map-bar small {
   margin-left: 8px;
   color: var(--m-mute);
   font-size: 12px;
   font-weight: 500;
 }
-.map-bar a,
-.map-bar button {
+.orc-map-bar a,
+.orc-map-bar button {
   min-height: 36px;
   padding: 0 10px;
   border: 1px solid var(--m-line);
@@ -83,8 +83,8 @@ const { isDark } = useData()
   white-space: nowrap;
   cursor: pointer;
 }
-.map-bar a:focus-visible,
-.map-bar button:focus-visible {
+.orc-map-bar a:focus-visible,
+.orc-map-bar button:focus-visible {
   outline: 2px solid var(--m-work);
   outline-offset: 2px;
 }
@@ -94,12 +94,12 @@ const { isDark } = useData()
   overflow: hidden;
 }
 @media (max-width: 520px) {
-  .map-bar small,
+  .orc-map-bar small,
   .map-back span {
     display: none;
   }
-  .map-bar a,
-  .map-bar button {
+  .orc-map-bar a,
+  .orc-map-bar button {
     padding: 0 8px;
   }
 }
