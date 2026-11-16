@@ -15,5 +15,3 @@ This repository holds the orc command and the orc-dash panels it ships beside, a
 - `packages/run/README.md` ships in the npm package, so it links `docs/run/` by its GitHub URL, never by a relative path.
 - Each page under `docs/` declares its `kind` in front matter, as the templates in `node_modules/@avi2dg/checks/dist/templates/` hold.
 - `CHANGELOG.md` is the one changelog, and `bun run build` copies it into the run package.
-- `docs/` is also the VitePress site that `bun run docs:build` builds, and `docs/.vitepress/config.ts` lists each page in its sidebar.
-- `bun run build` writes `docs/reference/commands.md` from the `--help` text, so a command's words change in `packages/run/src/app`.
