@@ -90,9 +90,6 @@ const collectParagraph = (out: Array<string>, paragraph: string): void => {
   if (lines.length === 0) {
     return
   }
-  for (const [index] of lines.entries()) {
-    pushOnce(out, spaced(lines.slice(index).join(" ")))
-  }
   const joined = spaced(lines.join(" "))
   pushOnce(out, unquoted(joined))
   collectSentences(out, joined)
