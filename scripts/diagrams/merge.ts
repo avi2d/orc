@@ -22,7 +22,7 @@ const merged: Part = { title: "Squash merge", text: "At the exact commit it chec
 const refused: Part = { title: "Refused: nothing merges", text: "The refusal names every reason." }
 
 const word: readonly Part[] = [
-  { title: "`captain-word`", text: "The default basis. You said to merge that pull request." },
+  { title: "Your word", text: "The default basis. You said to merge that pull request." },
   { title: "`yolo-green`", text: "The project has `\"yolo\": true`, and you ask the chat to merge its green pull request." },
   { title: "Never the decider", text: "It answers no question about merging, so a merge always traces back to you.", href: "attention" },
   { title: "After the merge", text: "A later beat records it, the chat posts it, and a ship task that waited on it can start.", href: "beat" }
