@@ -1,0 +1,25 @@
+.mermaid-diagram {
+  margin: 20px 0;
+  padding: 16px 8px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+  text-align: center;
+  overflow: hidden;
+}
+
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-diagram-source {
+  text-align: left;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.vp-doc table {
+  display: block;
+  overflow-x: auto;
+}
