@@ -169,7 +169,7 @@ const task: Guard<Task> = (value, at) => {
   return ok({ ...head.value, hold: hold.value, parked: parked.value, parkedOrigin: origin.value, reason: reason.value, prState: prState.value })
 }
 
-export interface ProjectCheckouts {
+interface ProjectCheckouts {
   readonly name: string
   readonly paths: ReadonlyArray<string>
 }
@@ -187,20 +187,26 @@ export const projectName: Guard<string> = (value, at) => {
   return project.kind === "refused" ? project : string(project.value, "name", at)
 }
 
-const projectCheckouts: Guard<ProjectCheckouts> = (value, at) => {
+export const namedFields = (value: unknown, at: string): Guarded<{ record: Fields; name: string }> => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
   const name = string(record.value, "name", at)
   if (name.kind === "refused") return name
-  const checkouts = record.value["checkouts"]
-  if (checkouts === undefined || checkouts === null) return ok({ name: name.value, paths: [] })
+  return ok({ record: record.value, name: name.value })
+}
+
+const projectCheckouts: Guard<ProjectCheckouts> = (value, at) => {
+  const named = namedFields(value, at)
+  if (named.kind === "refused") return named
+  const checkouts = named.value.record["checkouts"]
+  if (checkouts === undefined || checkouts === null) return ok({ name: named.value.name, paths: [] })
   if (typeof checkouts !== "object" || Array.isArray(checkouts)) return refused(child(at, "checkouts"), "an object", checkouts)
   const paths: Array<string> = []
   for (const [machine, path] of Object.entries(checkouts)) {
     if (typeof path !== "string") return refused(child(at, "checkouts") + "." + machine, "a path", path)
     paths.push(path)
   }
-  return ok({ name: name.value, paths })
+  return ok({ name: named.value.name, paths })
 }
 
 const readProjects = (record: Fields, at: string): Guarded<{ readonly names: ReadonlyArray<string> | null; readonly checkouts: ReadonlyArray<ProjectCheckouts> }> => {
