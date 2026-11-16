@@ -103,7 +103,7 @@ const lineageOf = (url: string, checked: string, sha: string): Effect.Effect<Lin
       const seen = parents.stdout.split("\n").map((line) => line.trim()).filter((line) => line !== "")
       return seen.includes(checked) ? { sha, kind: "child" } : { sha, kind: "foreign" }
     }),
-    Effect.catchAll((error) => Effect.succeed({ sha, kind: "unknown" as const, said: error.detail }))
+    Effect.catch((error) => Effect.succeed({ sha, kind: "unknown" as const, said: error.detail }))
   )
 
 // After update-branch GitHub moves the head a few seconds later and the new head starts with no check, so neither an unmoved head nor an empty rollup is an answer yet.
@@ -118,12 +118,13 @@ const awaitNewHead = (
     yield* Effect.sleep(Duration.seconds(Math.min(2 ** poll, longestPollSeconds)))
     const reading = yield* readView(url).pipe(
       Effect.map((view) => ({ ok: true as const, view })),
-      Effect.catchAll((error) => Effect.succeed({ ok: false as const, said: error.detail }))
+      Effect.catch((error) => Effect.succeed({ ok: false as const, said: error.detail }))
     )
     if (!reading.ok) {
       yield* Ref.set(unreadable, reading.said)
       return yield* awaitNewHead(url, checked, poll + 1, unreadable, known)
     }
+    yield* Ref.set(unreadable, null)
     const fresh = reading.view
     if (fresh.state !== "OPEN") {
       return { kind: "closed", view: fresh }
@@ -139,7 +140,6 @@ const awaitNewHead = (
       yield* Ref.set(unreadable, lineage.said)
       return yield* awaitNewHead(url, checked, poll + 1, unreadable, known)
     }
-    yield* Ref.set(unreadable, null)
     if (lineage.kind === "foreign") {
       return { kind: "foreign", view: fresh }
     }
