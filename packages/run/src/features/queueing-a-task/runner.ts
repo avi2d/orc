@@ -191,11 +191,15 @@ const buildRun = (
     const answers = (request.answers ?? []).flatMap((entry) => ["--answer", entry.question + "=" + entry.answer])
     const kind = request.kind === undefined ? [] : ["--kind", request.kind]
     const delivery = request.delivery === undefined ? [] : ["--delivery", request.delivery]
+    const models = [
+      ...(request.implementerModel === undefined ? [] : ["--implementer-model", request.implementerModel]),
+      ...(request.fixerModel === undefined ? [] : ["--fixer-model", request.fixerModel])
+    ]
     const instructions = request.instructions === undefined ? [] : ["--instructions", yield* writeInstructions(folder + "/" + key + ".instructions", request.instructions)]
     const resume = request.resumeRun === undefined ? [] : ["ORC_DISPATCH_RESUME_RUN=" + request.resumeRun]
     const assigned = [...resume, ...withClaimedMachine(request.machine)]
     const env = assigned.length === 0 ? [] : ["env", ...assigned]
-    return [...env, ...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...kind, ...delivery, ...instructions, ...answers]
+    return [...env, ...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...models, ...kind, ...delivery, ...instructions, ...answers]
   })
 
 const enqueueHeld = (

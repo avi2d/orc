@@ -83,7 +83,7 @@ Orc takes the implementer agent file from the first of these that exists:
 
 An agent file opens with a `---` header naming `thinking`, `tools` and optionally `model`, and its body holds the instructions.
 The bundled agent files name no model.
-An agent file that names no model takes the one `models` in `config.json` names for its role, and orc refuses a run when neither names one.
+An agent file that names no model takes the `--implementer-model` or `--fixer-model` flag for its role when set, else the one `models` in `config.json` names, and orc refuses a run when none names one.
 Orc runs only a model whose provider `config.json` names, and refuses any other model.
 Orc refuses an implementer and a fixer that name models from different providers.
 
