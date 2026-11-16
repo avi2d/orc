@@ -7,7 +7,7 @@
 
 Use one chat to describe work and keep it in a backlog.
 Orc runs tasks across your machines with the models you configure.
-You can monitor tasks, runs and resources live in the terminal dashboard or the Herdr app dashboards.
+You can monitor tasks, runs and resources live in the terminal dashboard or the Herdr App dashboards.
 
 [Read the orc docs](https://avi2d.github.io/orc/).
 

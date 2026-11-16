@@ -5,11 +5,11 @@ kind: explanation
 ---
 # How orc works
 
-One chat to run your AI agent work on all your machines and models, with a backlog, live monitoring and Herdr app dashboards.
+One chat to run your AI agent work on all your machines and models, with a backlog, live monitoring and Herdr App dashboards.
 
 Use one chat to describe work and keep it in a backlog.
 Orc runs tasks across your machines with the models you configure.
-You can monitor tasks, runs and resources live in the terminal dashboard or the Herdr app dashboards.
+You can monitor tasks, runs and resources live in the terminal dashboard or the Herdr App dashboards.
 
 [Open the interactive map](map/index.md){.map-open}
 
