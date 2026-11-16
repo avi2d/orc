@@ -1,8 +1,8 @@
 import { type AsyncContext, type Context, type Element, type FocusHandle, View, div } from "gpui-kit"
-import { h_flex, v_flex } from "gpui-base"
+import { ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { run, setShared, shared } from "herdr"
 import { refreshWhenShown, selectedTaskKey } from "../../src/views"
-import { type BoardTask, type Lane, type QueuedRun, clickedSelection, kindLabel, lanes, panelCommand, queueLine, selectionOnBoard, tasksInLane, titleClip } from "../../src/board"
+import { type BoardTask, type Lane, type LaneView, type QueuedRun, cardBox, cardHeight, clampedLaneView, clickedSelection, kindLabel, laneJump, lanes, panelCommand, queueLine, selectionOnBoard, tasksInLane, titleClip, wheelOffset } from "../../src/board"
 import { type BoardAttention, type BoardBacklog, boardAttention, boardBacklog, boardQueue } from "../../src/guard-board"
 import { type Reading, readJson } from "../../src/orc-read"
 import { palette } from "../../src/palette"
@@ -14,6 +14,9 @@ interface BoardDocuments {
   readonly attention: BoardAttention
 }
 
+const perLane = <T>(make: () => T): Record<Lane, T> =>
+  ({ Backlog: make(), Planned: make(), "Awaiting you": make(), Running: make(), Done: make() })
+
 export default class OrcBoard extends View {
   reading: Reading<BoardDocuments> = { kind: "reading" }
   queue: Reading<ReadonlyArray<QueuedRun>> = { kind: "reading" }
@@ -24,6 +27,9 @@ export default class OrcBoard extends View {
   busy = false
   lastQueueRead = 0
   queueBusy = false
+  scrolls = perLane(() => ScrollHandle.new())
+  focus: Record<Lane, FocusHandle> | null = null
+  views = new Map<Lane, LaneView>()
   panelShown: boolean | null = null
   focusHandle: FocusHandle | null = null
 
@@ -47,6 +53,7 @@ export default class OrcBoard extends View {
   }
 
   override init(_props: unknown, cx: AsyncContext): void {
+    this.focus = perLane(() => cx.focus_handle())
     this.focusHandle = cx.focus_handle()
     refreshWhenShown("orc-board", 10_000, cx, this)
     cx.timer.every(1000, (tick) => {
@@ -111,25 +118,42 @@ export default class OrcBoard extends View {
     return root.child(filters)
       .children(backlog.projects === null ? [div().px(12).text_color(t.blocked).child("Projects could not be read")] : [])
       .children(this.queue.kind === "failed" ? [div().px(12).text_color(t.blocked).child("Queue could not be read")] : [])
-      .child(h_flex().id("lanes").flex_1().min_w_0().overflow_x_scroll()
+      .child(h_flex().id("lanes").flex_1().min_h_0().min_w_0().overflow_x_scroll()
         .children(lanes.map((lane) => this.lane(t, lane, tasksInLane(backlog.tasks, lane, this.project, owned), queued))))
   }
 
   lane(t: Palette, lane: Lane, tasks: ReadonlyArray<BoardTask>, queued: ReadonlyArray<QueuedRun>): Element {
     const folded = this.folded.has(lane)
-    const header = h_flex().id(`toggle-${lane}`).h(44).px(8).gap(6).items_center().cursor_pointer()
+    const header = h_flex().id(`toggle-${lane}`).h(44).flex_shrink_0().px(8).gap(6).items_center().cursor_pointer()
       .hover((style) => style.bg(t.hover)).on_click((_event, cx) => this.toggle(cx, lane))
       .child(div().flex_1().child(lane)).child(div().text_color(t.muted).child(String(tasks.length)))
       .child(div().text_color(t.muted).child(folded ? "»" : "«"))
-    const column = v_flex().id(`lane-${lane}`).h_full().flex_shrink_0().w(folded ? 110 : 260)
+    const column = v_flex().id(`lane-${lane}`).h_full().min_h_0().flex_shrink_0().w(folded ? 110 : 260)
       .bg(t.chrome).border_r(1).border_color(t.border).child(header)
-    return folded ? column : column.child(v_flex().id(`cards-${lane}`).flex_1().overflow_y_scrollbar().p(8).gap(6)
-      .children(tasks.map((task) => this.card(t, task, queueLine(queued, task.id)))))
+    if (folded) return column
+    const waiting = tasks.map((task) => queueLine(queued, task.id))
+    const heights = waiting.map(cardHeight)
+    const view = (): LaneView => clampedLaneView(this.views.get(lane) ?? { offsetPx: 0, heightPx: 0 }, heights)
+    const focus = this.focus?.[lane]
+    const keyed = focus === undefined ? column : column.track_focus(focus)
+      .on_mouse_down("left", () => focus.focus())
+      .on_key_down((event, cx) => {
+        const jump = laneJump(event.key, view(), heights)
+        if (jump === null) return
+        this.scrolls[lane].scroll_to_item(jump.item)
+        this.views.set(lane, { ...view(), offsetPx: jump.offsetPx })
+        cx.stop_propagation()
+      })
+    return keyed.child(v_flex().id(`cards-${lane}`).flex_1().min_h_0().overflow_y_scrollbar().track_scroll(this.scrolls[lane])
+      .p(cardBox.padPx).gap(cardBox.gapPx)
+      .on_size_change((size) => this.views.set(lane, clampedLaneView({ ...view(), heightPx: size.height }, heights)))
+      .on_scroll_wheel((event) => this.views.set(lane, { ...view(), offsetPx: wheelOffset(view(), heights, event.delta.y) }))
+      .children(tasks.map((task, index) => this.card(t, task, waiting[index] ?? null))))
   }
 
   card(t: Palette, task: BoardTask, waiting: string | null): Element {
     const selected = this.selected() === task.id
-    return v_flex().id(`card-${task.id}`).h(waiting === null ? 84 : 106).p(8).gap(4).rounded(6).cursor_pointer().flex_shrink_0()
+    return v_flex().id(`card-${task.id}`).h(cardHeight(waiting)).p(8).gap(4).rounded(6).cursor_pointer().flex_shrink_0()
       .bg(selected ? t.selected : t.background)
       .hover((style) => style.bg(selected ? t.selected : t.hover))
       .on_click(() => {
