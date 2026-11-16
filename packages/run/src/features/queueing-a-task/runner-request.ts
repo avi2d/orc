@@ -2,6 +2,7 @@ import { Effect, FileSystem, Option, Path, Schema } from "effect"
 import { AbsolutePath, readDispatchConfig, readFailure } from "../../shared/config/index"
 import { ProviderId } from "../../shared/config/index"
 import { TaskId, backlogPaths, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type TaskRecord, withDecisions } from "../../entities/backlog/index"
+import { latestPerId } from "../../entities/parked-runs/index"
 import { TaskInstructions, readInstructions } from "./runner-instructions"
 import { RunnerError } from "../../shared/process/index"
 import { isRunDelivery } from "../../shared/config/index"
@@ -89,7 +90,7 @@ const takenResume = (task: string, record: TaskRecord): Effect.Effect<Record<str
     : {
       branch: record.parked.branch,
       resumeRun: record.parked.origin?.run,
-      answers: record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ question: question.id, answer: question.answer.words }])
+      answers: latestPerId(record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ ...question, answer: question.answer }])).map((question) => ({ question: question.id, answer: question.answer.words }))
     })
 }
 

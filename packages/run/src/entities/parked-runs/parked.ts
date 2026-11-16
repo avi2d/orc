@@ -55,7 +55,7 @@ export const askStartedTask = (
       if (sameQuestions(questions, known)) {
         return { kind: "keep", result: false } as const
       }
-      const optionsOf = (question: ParkedQuestion) => asking.questions.find((live) => live.id === question.id)?.options
+      const optionsOf = (question: ParkedQuestion) => asking.questions.find((live) => live.id === question.id && (live.asked === undefined || live.asked === question.asked))?.options
       const waiting = questions.filter((question) => question.answer === null)
       yield* openReviewQuestions(root, id, waiting.map((question) => {
         const options = optionsOf(question)
@@ -79,13 +79,24 @@ export const handAnswersToResume = (record: TaskRecord): TaskRecord =>
       }
     }
 
+export const latestPerId = <Q extends { readonly id: string; readonly asked: string }>(questions: ReadonlyArray<Q>): ReadonlyArray<Q> => {
+  const latest = new Map<string, Q>()
+  for (const question of questions) {
+    const known = latest.get(question.id)
+    if (known === undefined || question.asked >= known.asked) {
+      latest.set(question.id, question)
+    }
+  }
+  return [...latest.values()]
+}
+
 export const answersFor = (record: TaskRecord, asking: LiveAsking): ReadonlyArray<ParkedQuestion & { readonly answer: ParkedAnswer }> =>
-  (record.parked?.questions ?? []).flatMap((question) =>
+  latestPerId((record.parked?.questions ?? []).flatMap((question) =>
     question.answer !== null && answersAsking(question.answer, asking.asked) &&
     asking.questions.some((open) => open.id === question.id && (open.asked === undefined || open.asked === question.asked))
       ? [{ ...question, answer: question.answer }]
       : []
-  )
+  ))
 
 // rename(2) takes the taken file at most once, so of two beats parking one run exactly one moves it back to new.
 export const parkStartedTask = (
