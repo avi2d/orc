@@ -8,7 +8,7 @@ Each task has a kind, and the kind decides how it ends:
 - `scout` reads the checkout, changes nothing and ends in a report.
 - `task` does the work it describes and ends in a report with its evidence.
 - `parent` holds the done criteria for work too large for one PR and waits for its children.
-- `decision` asks the captain a question and never runs, as [Decisions](run/task-kinds.md#decisions) shows.
+- `decision` asks you a question and never runs, as [Decisions](run/task-kinds.md#decisions) shows.
 
 To pick one, add `--kind scout`, `--kind task`, `--kind parent` or `--kind decision` to `orc backlog add`, or say it in the chat.
 Add `--kind scout`, `--kind task` or `--kind parent` to `orc run`.

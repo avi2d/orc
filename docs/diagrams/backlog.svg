@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 496" class="orc-d" role="img" aria-labelledby="d-backlog-title d-backlog-desc">
+<title id="d-backlog-title">The backlog: where a task file sits, and how it moves</title>
+<desc id="d-backlog-desc">You add a task in the chat or with orc backlog add. Its file sits in the folder new until a beat takes it, then in taken while its run is queued or running, then in closed with its outcome. A run that stops on a question sends the task back to new, and so does orc backlog send-back. The kind of a task, ship, scout, task, parent or decision, decides how it ends.</desc>
+<style>.orc-d {
+  color-scheme: light dark;
+  --d-ink: light-dark(#1f2328, #e8eaed);
+  --d-mute: light-dark(#57606a, #a3abb5);
+  --d-line: light-dark(#c8cdd5, #474d57);
+  --d-card: light-dark(#ffffff, #22252b);
+  --d-zone: light-dark(#f3f4f6, #17191d);
+  --d-work: light-dark(#3451b2, #a8b1ff);
+  --d-work-soft: light-dark(#e8ebfc, #272c52);
+  --d-on-work: light-dark(#ffffff, #14162b);
+  --d-ask: light-dark(#8a5a00, #e9b949);
+  --d-ask-soft: light-dark(#fff3d1, #3a300f);
+  --d-ok: light-dark(#17794c, #48d597);
+  --d-ok-soft: light-dark(#def5e8, #12301f);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.orc-d text { fill: var(--d-mute); font-size: 12.5px; }
+.orc-d .title { fill: var(--d-ink); font-size: 14px; font-weight: 650; }
+.orc-d .big { fill: var(--d-ink); font-size: 15.5px; font-weight: 650; }
+.orc-d .label { fill: var(--d-mute); font-size: 12px; font-weight: 600; }
+.orc-d .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; fill: var(--d-ink); }
+.orc-d .ask-text { fill: var(--d-ask); font-weight: 600; }
+.orc-d .work-text { fill: var(--d-work); font-weight: 600; }
+.orc-d .ok-text { fill: var(--d-ok); font-weight: 600; }
+.orc-d .zone { fill: var(--d-zone); stroke: var(--d-line); }
+.orc-d .card { fill: var(--d-card); stroke: var(--d-line); }
+.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); }
+.orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); }
+.orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); }
+.orc-d .line { fill: none; stroke: var(--d-mute); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .line-work { fill: none; stroke: var(--d-work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .line-ask { fill: none; stroke: var(--d-ask); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
+.orc-d .line-ok { fill: none; stroke: var(--d-ok); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .faint { fill: none; stroke: var(--d-line); stroke-width: 3; stroke-linecap: round; }
+.orc-d .head-work { fill: var(--d-work); }
+.orc-d .head-ask { fill: var(--d-ask); }
+.orc-d .head-mute { fill: var(--d-mute); }
+.orc-d .dot-work { fill: var(--d-work); }
+.orc-d .dot-ask { fill: var(--d-ask); }
+.orc-d .dot-ok { fill: var(--d-ok); }
+.orc-d .dot-mute { fill: var(--d-line); }
+.orc-d .num { fill: var(--d-on-work); font-size: 13px; font-weight: 700; }
+.orc-d .num-ask { fill: var(--d-card); font-size: 13px; font-weight: 700; }
+.orc-d .tick { fill: none; stroke: var(--d-card); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .dot-mute-strong { fill: var(--d-mute); }
+</style>
+<rect x="8" y="8" width="170" height="300" rx="14" class="zone"/><text x="20" y="29" class="label" text-anchor="start"><tspan x="20" dy="0">You</tspan></text>
+<rect x="198" y="8" width="754" height="300" rx="14" class="zone"/><text x="210" y="29" class="label" text-anchor="start"><tspan x="210" dy="0">The folder a task file sits in is its state</tspan></text>
+<rect x="8" y="322" width="944" height="166" rx="14" class="zone"/><text x="20" y="343" class="label" text-anchor="start"><tspan x="20" dy="0">The kind of a task decides how it ends</tspan></text>
+<g data-part="chat"><rect x="18" y="42" width="150" height="120" rx="10" class="card"/><text x="30" y="70" class="title" text-anchor="start"><tspan x="30" dy="0">Add a task</tspan></text><text x="30" y="88" class="" text-anchor="start"><tspan x="30" dy="0">Say it in the chat,</tspan><tspan x="30" dy="16">or run <tspan class="code">orc backlog</tspan></tspan><tspan x="30" dy="16"><tspan class="code">add</tspan>.</tspan></text><path d="M149,60 l5,5.5 l-5,5.5" class="line-work"/></g>
+<rect x="18" y="176" width="150" height="120" rx="10" class="card"/><text x="30" y="204" class="title" text-anchor="start"><tspan x="30" dy="0">Change your mind</tspan></text><text x="30" y="222" class="" text-anchor="start"><tspan x="30" dy="0"><tspan class="code">orc backlog drop</tspan></tspan><tspan x="30" dy="16">closes a task that</tspan><tspan x="30" dy="16">has not started.</tspan></text>
+<rect x="210" y="42" width="200" height="254" rx="10" class="card-work"/><text x="222" y="70" class="title" text-anchor="start"><tspan x="222" dy="0"><tspan class="code">new</tspan></tspan></text><text x="222" y="88" class="" text-anchor="start"><tspan x="222" dy="0">Waiting to start, in</tspan><tspan x="222" dy="16">priority order. It waits</tspan><tspan x="222" dy="16">while:</tspan></text><circle cx="225" cy="142" r="2" class="dot-mute-strong"/><text x="234" y="146" class="" text-anchor="start"><tspan x="234" dy="0">it has no priority</tspan></text><circle cx="225" cy="160" r="2" class="dot-mute-strong"/><text x="234" y="164" class="" text-anchor="start"><tspan x="234" dy="0">you hold it</tspan></text><circle cx="225" cy="178" r="2" class="dot-mute-strong"/><text x="234" y="182" class="" text-anchor="start"><tspan x="234" dy="0">a question has no answer</tspan></text><circle cx="225" cy="196" r="2" class="dot-mute-strong"/><text x="234" y="200" class="" text-anchor="start"><tspan x="234" dy="0">it depends on an open task</tspan></text><circle cx="225" cy="214" r="2" class="dot-mute-strong"/><text x="234" y="218" class="" text-anchor="start"><tspan x="234" dy="0">no machine has a free slot</tspan></text><circle cx="225" cy="232" r="2" class="dot-mute-strong"/><text x="234" y="236" class="" text-anchor="start"><tspan x="234" dy="0">no account has room</tspan></text>
+<g data-part="beat"><rect x="480" y="42" width="200" height="104" rx="10" class="card"/><text x="492" y="70" class="title" text-anchor="start"><tspan x="492" dy="0"><tspan class="code">taken</tspan></tspan></text><text x="492" y="88" class="" text-anchor="start"><tspan x="492" dy="0">A beat took it. Its run is</tspan><tspan x="492" dy="16">queued or running on a</tspan><tspan x="492" dy="16">machine.</tspan></text><path d="M661,60 l5,5.5 l-5,5.5" class="line-work"/></g>
+<rect x="740" y="42" width="200" height="254" rx="10" class="card"/><text x="752" y="70" class="title" text-anchor="start"><tspan x="752" dy="0"><tspan class="code">closed</tspan></tspan></text><text x="752" y="88" class="" text-anchor="start"><tspan x="752" dy="0">It keeps its outcome and</tspan><tspan x="752" dy="16">the reason:</tspan></text><circle cx="755" cy="126" r="2" class="dot-mute-strong"/><text x="764" y="130" class="" text-anchor="start"><tspan x="764" dy="0"><tspan class="code">done</tspan>, with a pull request</tspan><tspan x="764" dy="16">or a report</tspan></text><circle cx="755" cy="160" r="2" class="dot-mute-strong"/><text x="764" y="164" class="" text-anchor="start"><tspan x="764" dy="0"><tspan class="code">failed</tspan> or <tspan class="code">start-failed</tspan></tspan></text><circle cx="755" cy="178" r="2" class="dot-mute-strong"/><text x="764" y="182" class="" text-anchor="start"><tspan x="764" dy="0"><tspan class="code">stopped</tspan></tspan></text><circle cx="755" cy="196" r="2" class="dot-mute-strong"/><text x="764" y="200" class="" text-anchor="start"><tspan x="764" dy="0"><tspan class="code">dropped</tspan></tspan></text>
+<path d="M168,90 L208,90" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(208,90) rotate(0)"/>
+<path d="M410,84 L478,84" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(478,84) rotate(0)"/>
+<text x="444" y="62" class="" text-anchor="middle"><tspan x="444" dy="0">a beat</tspan><tspan x="444" dy="14">takes it</tspan></text>
+<path d="M680,84 L738,84" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(738,84) rotate(0)"/>
+<text x="710" y="62" class="" text-anchor="middle"><tspan x="710" dy="0">the run</tspan><tspan x="710" dy="14">ends</tspan></text>
+<path d="M480,126 L412,126" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(412,126) rotate(180)"/>
+<text x="446" y="146" class="ask-text" text-anchor="middle"><tspan x="446" dy="0">its run</tspan><tspan x="446" dy="14">stops on a</tspan><tspan x="446" dy="14">question</tspan></text>
+<path d="M738,250 L412,250" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(412,250) rotate(180)"/>
+<text x="575" y="242" class="ask-text" text-anchor="middle"><tspan x="575" dy="0"><tspan class="code">orc backlog send-back</tspan>: one more pass</tspan></text>
+<rect x="18" y="356" width="176" height="122" rx="10" class="card"/><text x="30" y="384" class="title" text-anchor="start"><tspan x="30" dy="0"><tspan class="code">ship</tspan></tspan></text><text x="30" y="402" class="" text-anchor="start"><tspan x="30" dy="0">The default. Changes</tspan><tspan x="30" dy="16">code and ends in a pull</tspan><tspan x="30" dy="16">request.</tspan></text>
+<rect x="204.5" y="356" width="176" height="122" rx="10" class="card"/><text x="216.5" y="384" class="title" text-anchor="start"><tspan x="216.5" dy="0"><tspan class="code">scout</tspan></tspan></text><text x="216.5" y="402" class="" text-anchor="start"><tspan x="216.5" dy="0">Reads the project and</tspan><tspan x="216.5" dy="16">changes nothing. Ends in</tspan><tspan x="216.5" dy="16">a report.</tspan></text>
+<rect x="391" y="356" width="176" height="122" rx="10" class="card"/><text x="403" y="384" class="title" text-anchor="start"><tspan x="403" dy="0"><tspan class="code">task</tspan></tspan></text><text x="403" y="402" class="" text-anchor="start"><tspan x="403" dy="0">Does the work it</tspan><tspan x="403" dy="16">describes. Ends in a</tspan><tspan x="403" dy="16">report with its</tspan><tspan x="403" dy="16">evidence.</tspan></text>
+<rect x="577.5" y="356" width="176" height="122" rx="10" class="card"/><text x="589.5" y="384" class="title" text-anchor="start"><tspan x="589.5" dy="0"><tspan class="code">parent</tspan></tspan></text><text x="589.5" y="402" class="" text-anchor="start"><tspan x="589.5" dy="0">Holds work too large for</tspan><tspan x="589.5" dy="16">one pull request. Ends</tspan><tspan x="589.5" dy="16">once its children are</tspan><tspan x="589.5" dy="16">done.</tspan></text>
+<rect x="764" y="356" width="176" height="122" rx="10" class="card"/><text x="776" y="384" class="title" text-anchor="start"><tspan x="776" dy="0"><tspan class="code">decision</tspan></tspan></text><text x="776" y="402" class="" text-anchor="start"><tspan x="776" dy="0">Asks you a question and</tspan><tspan x="776" dy="16">never runs. Ends with</tspan><tspan x="776" dy="16">your answer.</tspan></text>
+</svg>
