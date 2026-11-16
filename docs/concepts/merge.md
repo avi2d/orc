@@ -17,9 +17,9 @@ Orc reads the pull request with `gh pr view` and merges nothing when any of thes
 - The task names no pull request.
 - The pull request is closed or merged.
 - A check is red, a check has not reported, or no check has reported at all.
-- The branch is behind its base.
 
 Each refusal names every reason.
+When the branch is behind its base, orc updates it from the base and merges once the new checks are green.
 Otherwise orc squash merges at the exact commit it checked, so a push that lands after the check merges nothing.
 
 ## Whose word merges

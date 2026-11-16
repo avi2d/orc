@@ -3,7 +3,7 @@ import { arrow, card, svg, tall, text, zone, type Drawing, type Part } from "./k
 const title = "The merge: what orc merge checks before it lands a pull request"
 
 const desc =
-  "You, the chat and the app all merge through orc merge. It merges only when the task names a pull request, the pull request is open, every check has reported green, and the branch is not behind its base. Otherwise it refuses, names every reason, and merges nothing. It squash merges at the exact commit it checked. A merge always traces back to your word, and the decider never answers a question about merging."
+  "You, the chat and the app all merge through orc merge. It merges only when the task names a pull request, the pull request is open, and every check has reported green. Otherwise it refuses, names every reason, and merges nothing. A branch behind its base updates first. It squash merges at the exact commit it checked. A merge always traces back to your word, and the decider never answers a question about merging."
 
 const askers: readonly Part[] = [
   { title: "You", text: "`orc merge <task-id>`" },
@@ -14,11 +14,10 @@ const askers: readonly Part[] = [
 const conditions: readonly Part[] = [
   { title: "A pull request", text: "The task names one." },
   { title: "Open", text: "It is not closed, and not merged yet." },
-  { title: "Green", text: "Every check has reported, and none is red." },
-  { title: "Up to date", text: "The branch is not behind its base." }
+  { title: "Green", text: "Every check has reported, and none is red." }
 ]
 
-const merged: Part = { title: "Squash merge", text: "At the exact commit it checked. A push after the check merges nothing.", cls: "card-ok" }
+const merged: Part = { title: "Squash merge", text: "At the checked commit, updating a branch behind its base first.", cls: "card-ok" }
 const refused: Part = { title: "Refused: nothing merges", text: "The refusal names every reason." }
 
 const word: readonly Part[] = [
@@ -31,7 +30,7 @@ const word: readonly Part[] = [
 const wide = (): Drawing => {
   const body = [
     zone(8, 8, 190, 292, "Who asks"),
-    zone(218, 8, 734, 292, "`orc merge` lands it once all four hold"),
+    zone(218, 8, 734, 292, "`orc merge` lands it once all three hold"),
     zone(8, 314, 944, 174, "Whose word merges"),
     ...askers.map((asker, index) => card(18, 42 + index * 84, 170, 76, asker)),
     arrow([[188, 80], [226, 80]], "work"),
@@ -49,7 +48,7 @@ export const merge = (): readonly Drawing[] => [
   wide(),
   tall("merge", title, desc, [
     { label: "Who asks", rows: askers },
-    { label: "`orc merge` lands it once all four hold", rows: [...conditions, { arrow: "work", note: "all four hold" }, merged, { note: "If one does not hold:" }, refused] },
+    { label: "`orc merge` lands it once all three hold", rows: [...conditions, { arrow: "work", note: "all three hold" }, merged, { note: "If one does not hold:" }, refused] },
     { label: "Whose word merges", rows: word }
   ])
 ]
