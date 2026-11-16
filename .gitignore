@@ -5,3 +5,5 @@ reports/
 .stryker-tmp/
 .orc-home/
 repos/*
+docs/.vitepress/dist/
+docs/.vitepress/cache/

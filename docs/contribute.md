@@ -9,6 +9,30 @@ To run the checks:
 1. Run `bun run typecheck` to typecheck it.
 1. Run `bun run test` to test it.
 
+## Update the command reference
+
+To update the command reference:
+
+1. Run `bun run build` to regenerate `docs/reference/commands.md` from the help text.
+1. Commit the regenerated page with the change that changed the help.
+1. Run `bun run docs:build` to confirm the site still builds.
+
+The reference page is generated.
+Change the help in `packages/run/src/app` and never the page.
+The same build regenerates the drawings under `docs/diagrams`.
+Change `scripts/diagrams` and never the SVGs.
+
+## Preview the docs site
+
+To preview the docs site:
+
+1. Run `bun run docs:dev` to serve the site locally.
+1. Open the address the command prints.
+1. Read the changed pages.
+
+The base path is `/orc/`, set once in `docs/.vitepress/config.ts`.
+For a preview served at the site root, run `DOCS_BASE=/ bun run docs:build`, then `DOCS_BASE=/ bun run docs:preview`.
+
 The secrets gate in `bun run lint` fails a change that adds a term from a private list of host and person names.
 The list is a JSON file in the format [checks-secrets](https://github.com/avi2d/checks/blob/main/docs/gates/checks-secrets.md#the-private-pack) reads, with keys such as `hosts` and `names`.
 It lives outside orc, at `~/.config/checks/secrets-pack.json`, or wherever `CHECKS_SECRETS_PACK` points.

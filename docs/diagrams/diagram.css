@@ -1,0 +1,45 @@
+.orc-d {
+  color-scheme: light dark;
+  --d-ink: light-dark(#1f2328, #e8eaed);
+  --d-mute: light-dark(#57606a, #a3abb5);
+  --d-line: light-dark(#c8cdd5, #474d57);
+  --d-card: light-dark(#ffffff, #22252b);
+  --d-zone: light-dark(#f3f4f6, #17191d);
+  --d-work: light-dark(#3451b2, #a8b1ff);
+  --d-work-soft: light-dark(#e8ebfc, #272c52);
+  --d-on-work: light-dark(#ffffff, #14162b);
+  --d-ask: light-dark(#8a5a00, #e9b949);
+  --d-ask-soft: light-dark(#fff3d1, #3a300f);
+  --d-ok: light-dark(#17794c, #48d597);
+  --d-ok-soft: light-dark(#def5e8, #12301f);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.orc-d text { fill: var(--d-mute); font-size: 12.5px; }
+.orc-d .title { fill: var(--d-ink); font-size: 14px; font-weight: 650; }
+.orc-d .big { fill: var(--d-ink); font-size: 15.5px; font-weight: 650; }
+.orc-d .label { fill: var(--d-mute); font-size: 12px; font-weight: 600; }
+.orc-d .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; fill: var(--d-ink); }
+.orc-d .ask-text { fill: var(--d-ask); font-weight: 600; }
+.orc-d .work-text { fill: var(--d-work); font-weight: 600; }
+.orc-d .ok-text { fill: var(--d-ok); font-weight: 600; }
+.orc-d .zone { fill: var(--d-zone); stroke: var(--d-line); }
+.orc-d .card { fill: var(--d-card); stroke: var(--d-line); }
+.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); }
+.orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); }
+.orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); }
+.orc-d .line { fill: none; stroke: var(--d-mute); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .line-work { fill: none; stroke: var(--d-work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .line-ask { fill: none; stroke: var(--d-ask); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
+.orc-d .line-ok { fill: none; stroke: var(--d-ok); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .faint { fill: none; stroke: var(--d-line); stroke-width: 3; stroke-linecap: round; }
+.orc-d .head-work { fill: var(--d-work); }
+.orc-d .head-ask { fill: var(--d-ask); }
+.orc-d .head-mute { fill: var(--d-mute); }
+.orc-d .dot-work { fill: var(--d-work); }
+.orc-d .dot-ask { fill: var(--d-ask); }
+.orc-d .dot-ok { fill: var(--d-ok); }
+.orc-d .dot-mute { fill: var(--d-line); }
+.orc-d .num { fill: var(--d-on-work); font-size: 13px; font-weight: 700; }
+.orc-d .num-ask { fill: var(--d-card); font-size: 13px; font-weight: 700; }
+.orc-d .tick { fill: none; stroke: var(--d-card); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .dot-mute-strong { fill: var(--d-mute); }
