@@ -36,7 +36,7 @@ const nodes = computed(() =>
 )
 
 const edges = computed(() => {
-  const ink = { work: isDark.value ? "#a8b1ff" : "#3451b2", ask: isDark.value ? "#e9b949" : "#8a5a00" }
+  const ink = { work: isDark.value ? "#f0624a" : "#a3160f", ask: isDark.value ? "#e6ac3f" : "#774d00" }
   return placed.value.links.map((item): Edge<{ path: string; label?: PlacedLabel }> => {
     const touched = hovered.value !== undefined && (item.link.from === hovered.value || item.link.to === hovered.value)
     return {

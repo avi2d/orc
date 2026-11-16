@@ -3,33 +3,38 @@
 <desc id="d-how-orc-works-desc">You say the work in the chat. The backlog keeps one file per task. The beat reads the quota and starts a task on a machine with a free slot. The runner queues it, an agent writes the change, and the checks and a review judge it. A question waits in the attention queue, where the decider answers the routine ones and you answer the rest. A task ends dropped, answered, stopped, failed, with a report, or with a pull request that you merge.</desc>
 <style>.orc-d {
   color-scheme: light dark;
-  --d-ink: light-dark(#1f2328, #e8eaed);
-  --d-mute: light-dark(#57606a, #a3abb5);
-  --d-line: light-dark(#c8cdd5, #474d57);
-  --d-card: light-dark(#ffffff, #22252b);
-  --d-zone: light-dark(#f3f4f6, #17191d);
-  --d-work: light-dark(#3451b2, #a8b1ff);
-  --d-work-soft: light-dark(#e8ebfc, #272c52);
-  --d-on-work: light-dark(#ffffff, #14162b);
-  --d-ask: light-dark(#8a5a00, #e9b949);
-  --d-ask-soft: light-dark(#fff3d1, #3a300f);
-  --d-ok: light-dark(#17794c, #48d597);
-  --d-ok-soft: light-dark(#def5e8, #12301f);
+  --d-ink: light-dark(#221812, #f3e8d6);
+  --d-mute: light-dark(#5b4a3c, #bca995);
+  --d-line: light-dark(#d6c8b1, #43352a);
+  --d-edge: light-dark(#3a2a1f, #7a6655);
+  --d-card: light-dark(#fffbf2, #211a14);
+  --d-zone: light-dark(#eee5d4, #2c231b);
+  --d-work: light-dark(#a3160f, #f0624a);
+  --d-work-soft: light-dark(#f7e6de, #342019);
+  --d-on-work: light-dark(#fff8ec, #1a0b07);
+  --d-ask: light-dark(#774d00, #e6ac3f);
+  --d-ask-soft: light-dark(#ede4d3, #3b2d1a);
+  --d-ok: light-dark(#2d6220, #9dc56e);
+  --d-ok-soft: light-dark(#e6e9d9, #302f1f);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 .orc-d text { fill: var(--d-mute); font-size: 12.5px; }
 .orc-d .title { fill: var(--d-ink); font-size: 14px; font-weight: 650; }
 .orc-d .big { fill: var(--d-ink); font-size: 15.5px; font-weight: 650; }
 .orc-d .label { fill: var(--d-mute); font-size: 12px; font-weight: 600; }
-.orc-d .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; fill: var(--d-ink); }
+.orc-d .code { font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; fill: var(--d-ink); }
 .orc-d .ask-text { fill: var(--d-ask); font-weight: 600; }
 .orc-d .work-text { fill: var(--d-work); font-weight: 600; }
 .orc-d .ok-text { fill: var(--d-ok); font-weight: 600; }
 .orc-d .zone { fill: var(--d-zone); stroke: var(--d-line); }
-.orc-d .card { fill: var(--d-card); stroke: var(--d-line); }
-.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); }
-.orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); }
-.orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); }
+.orc-d .card { fill: var(--d-card); stroke: var(--d-edge); stroke-width: 1.5; }
+.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); stroke-width: 1.5; }
+.orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); stroke-width: 1.5; }
+.orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); stroke-width: 1.5; }
+.orc-d .mark-running, .orc-d .mark-failed { color: var(--d-work); }
+.orc-d .mark-waiting { color: var(--d-mute); }
+.orc-d .mark-done { color: var(--d-ok); }
+.orc-d .mark-attention { color: var(--d-ask); }
 .orc-d .line { fill: none; stroke: var(--d-mute); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .line-work { fill: none; stroke: var(--d-work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .line-ask { fill: none; stroke: var(--d-ask); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
@@ -58,18 +63,18 @@
 <g data-part="quota"><rect x="188" y="170" width="134" height="124" rx="10" class="card-work"/><text x="200" y="198" class="title" text-anchor="start"><tspan x="200" dy="0">Quota</tspan></text><text x="200" y="216" class="" text-anchor="start"><tspan x="200" dy="0">Room left on each</tspan><tspan x="200" dy="16">account.</tspan></text><path d="M200,252 h110" class="faint"/><path d="M200,252 h82" class="line-work"/><path d="M200,264 h110" class="faint"/><path d="M200,264 h30" class="line-work"/><path d="M303,188 l5,5.5 l-5,5.5" class="line-work"/></g>
 <g data-part="beat"><rect x="342" y="170" width="134" height="124" rx="10" class="card"/><circle cx="365" cy="193" r="11" class="dot-work"/><text x="365" y="197.5" class="num" text-anchor="middle"><tspan x="365" dy="0">3</tspan></text><text x="382" y="198" class="title" text-anchor="start"><tspan x="382" dy="0">The beat</tspan></text><text x="354" y="216" class="" text-anchor="start"><tspan x="354" dy="0">Every few</tspan><tspan x="354" dy="16">minutes, starts</tspan><tspan x="354" dy="16">what can start.</tspan></text><path d="M457,188 l5,5.5 l-5,5.5" class="line-work"/></g>
 <g data-part="attention"><rect x="188" y="404" width="134" height="170" rx="10" class="card-ask"/><text x="200" y="432" class="title" text-anchor="start"><tspan x="200" dy="0">The decider</tspan></text><text x="200" y="450" class="" text-anchor="start"><tspan x="200" dy="0">A small model. It</tspan><tspan x="200" dy="16">answers a routine</tspan><tspan x="200" dy="16">question by</tspan><tspan x="200" dy="16">quoting a rule</tspan><tspan x="200" dy="16">you wrote.</tspan></text><path d="M303,422 l5,5.5 l-5,5.5" class="line-work"/></g>
-<g data-part="attention"><rect x="342" y="404" width="134" height="170" rx="10" class="card-ask"/><text x="354" y="432" class="title" text-anchor="start"><tspan x="354" dy="0">The</tspan><tspan x="354" dy="18">attention</tspan><tspan x="354" dy="18">queue</tspan></text><text x="354" y="486" class="" text-anchor="start"><tspan x="354" dy="0">Every open</tspan><tspan x="354" dy="16">question waits</tspan><tspan x="354" dy="16">here.</tspan></text><path d="M457,422 l5,5.5 l-5,5.5" class="line-work"/></g>
+<g data-part="attention"><rect x="342" y="404" width="134" height="170" rx="10" class="card-ask"/><text x="354" y="432" class="title" text-anchor="start"><tspan x="354" dy="0">The</tspan><tspan x="354" dy="18">attention</tspan><tspan x="354" dy="18">queue</tspan></text><text x="354" y="486" class="" text-anchor="start"><tspan x="354" dy="0">Every open</tspan><tspan x="354" dy="16">question waits</tspan><tspan x="354" dy="16">here.</tspan></text><svg x="434" y="419" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="mark mark-attention" aria-hidden="true"><path fill-rule="evenodd" d="M12 1C5.5 1 1 5.5 1 11.5C1 14.3 2 16 3.2 17.6L1.7 21.2Q1 23 3.1 22.2L7.2 20.5C8.5 21.2 10.3 22 12 22C18.5 22 23 17.5 23 11.5S18.5 1 12 1ZM10.3 5.3A1.7 1.7 0 0 1 13.7 5.3V12A1.7 1.7 0 0 1 10.3 12ZM12 15.5A1.7 1.7 0 1 0 12 18.9A1.7 1.7 0 1 0 12 15.5Z"/></svg><path d="M457,422 l5,5.5 l-5,5.5" class="line-work"/></g>
 <g data-part="runner"><rect x="516" y="42" width="204" height="96" rx="10" class="card"/><circle cx="539" cy="65" r="11" class="dot-work"/><text x="539" y="69.5" class="num" text-anchor="middle"><tspan x="539" dy="0">4</tspan></text><text x="556" y="70" class="title" text-anchor="start"><tspan x="556" dy="0">The runner</tspan></text><text x="528" y="88" class="" text-anchor="start"><tspan x="528" dy="0">A queue on the machine, a</tspan><tspan x="528" dy="16">few tasks at a time.</tspan></text><path d="M701,60 l5,5.5 l-5,5.5" class="line-work"/></g>
-<g data-part="run"><rect x="516" y="162" width="204" height="120" rx="10" class="card"/><circle cx="539" cy="185" r="11" class="dot-work"/><text x="539" y="189.5" class="num" text-anchor="middle"><tspan x="539" dy="0">5</tspan></text><text x="556" y="190" class="title" text-anchor="start"><tspan x="556" dy="0">A run</tspan></text><text x="528" y="208" class="" text-anchor="start"><tspan x="528" dy="0">An agent writes the change</tspan><tspan x="528" dy="16">in its own copy of the</tspan><tspan x="528" dy="16">project, on a new branch.</tspan></text><path d="M701,180 l5,5.5 l-5,5.5" class="line-work"/></g>
+<g data-part="run"><rect x="516" y="162" width="204" height="120" rx="10" class="card"/><circle cx="539" cy="185" r="11" class="dot-work"/><text x="539" y="189.5" class="num" text-anchor="middle"><tspan x="539" dy="0">5</tspan></text><text x="556" y="190" class="title" text-anchor="start"><tspan x="556" dy="0">A run</tspan></text><text x="528" y="208" class="" text-anchor="start"><tspan x="528" dy="0">An agent writes the change</tspan><tspan x="528" dy="16">in its own copy of the</tspan><tspan x="528" dy="16">project, on a new branch.</tspan></text><svg x="678" y="177" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="mark mark-running" aria-hidden="true"><path d="M10 4.5Q10 2.7 11.7 3.7L22 10.3Q24 11.7 22 13.1L11.7 20Q10 21 10 19.2Z"/></svg><path d="M701,180 l5,5.5 l-5,5.5" class="line-work"/></g>
 <g data-part="checks"><rect x="516" y="306" width="204" height="268" rx="10" class="card"/><circle cx="539" cy="329" r="11" class="dot-work"/><text x="539" y="333.5" class="num" text-anchor="middle"><tspan x="539" dy="0">6</tspan></text><text x="556" y="334" class="title" text-anchor="start"><tspan x="556" dy="0">Checks and review</tspan></text><text x="528" y="352" class="" text-anchor="start"><tspan x="528" dy="0">The agent fixes what the</tspan><tspan x="528" dy="16">checks refuse. Then a review</tspan><tspan x="528" dy="16">reads the branch.</tspan></text><rect x="528" y="402" width="82" height="32" rx="6" class="card-work"/><text x="569" y="422.5" class="" text-anchor="middle"><tspan x="569" dy="0">Checks</tspan></text><path d="M613,418 L623,418" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(623,418) rotate(0)"/><rect x="626" y="402" width="82" height="32" rx="6" class="card-work"/><text x="667" y="422.5" class="" text-anchor="middle"><tspan x="667" dy="0">Review</tspan></text><circle cx="531" cy="452" r="2" class="dot-mute-strong"/><text x="540" y="456" class="" text-anchor="start"><tspan x="540" dy="0">Still red after three</tspan><tspan x="540" dy="16">fixes: the run fails.</tspan></text><circle cx="531" cy="486" r="2" class="dot-mute-strong"/><text x="540" y="490" class="" text-anchor="start"><tspan x="540" dy="0">A question waits here 30</tspan><tspan x="540" dy="16">minutes. Then the task</tspan><tspan x="540" dy="16">parks on its branch.</tspan></text><path d="M701,324 l5,5.5 l-5,5.5" class="line-work"/></g>
 <text x="766" y="50" class="label" text-anchor="start"><tspan x="766" dy="0">Without a run</tspan></text>
 <rect x="764" y="58" width="178" height="62" rx="10" class="card"/><text x="776" y="86" class="title" text-anchor="start"><tspan x="776" dy="0">Dropped</tspan></text><text x="776" y="104" class="" text-anchor="start"><tspan x="776" dy="0">Before it started.</tspan></text>
 <rect x="764" y="126" width="178" height="78" rx="10" class="card"/><text x="776" y="154" class="title" text-anchor="start"><tspan x="776" dy="0">Answered</tspan></text><text x="776" y="172" class="" text-anchor="start"><tspan x="776" dy="0">A decision never runs.</tspan><tspan x="776" dy="16">Your answer closes it.</tspan></text>
 <text x="766" y="224" class="label" text-anchor="start"><tspan x="766" dy="0">After a run</tspan></text>
 <rect x="764" y="232" width="178" height="62" rx="10" class="card"/><text x="776" y="260" class="title" text-anchor="start"><tspan x="776" dy="0">Stopped</tspan></text><text x="776" y="278" class="" text-anchor="start"><tspan x="776" dy="0">You stopped the run.</tspan></text>
-<rect x="764" y="300" width="178" height="94" rx="10" class="card"/><text x="776" y="328" class="title" text-anchor="start"><tspan x="776" dy="0">Failed</tspan></text><text x="776" y="346" class="" text-anchor="start"><tspan x="776" dy="0">It could not start, it</tspan><tspan x="776" dy="16">died, or its checks</tspan><tspan x="776" dy="16">stayed red.</tspan></text>
-<rect x="764" y="400" width="178" height="78" rx="10" class="card-ok"/><text x="776" y="428" class="title" text-anchor="start"><tspan x="776" dy="0">A report</tspan></text><text x="776" y="446" class="" text-anchor="start"><tspan x="776" dy="0">A task that changes no</tspan><tspan x="776" dy="16">code. No pull request.</tspan></text>
-<g data-part="merge"><rect x="764" y="484" width="178" height="78" rx="10" class="card-ok"/><text x="776" y="512" class="title" text-anchor="start"><tspan x="776" dy="0">A pull request</tspan></text><text x="776" y="530" class="" text-anchor="start"><tspan x="776" dy="0">A code change. You merge</tspan><tspan x="776" dy="16">it once CI is green.</tspan></text><path d="M923,502 l5,5.5 l-5,5.5" class="line-work"/></g>
+<rect x="764" y="300" width="178" height="94" rx="10" class="card"/><text x="776" y="328" class="title" text-anchor="start"><tspan x="776" dy="0">Failed</tspan></text><text x="776" y="346" class="" text-anchor="start"><tspan x="776" dy="0">It could not start, it</tspan><tspan x="776" dy="16">died, or its checks</tspan><tspan x="776" dy="16">stayed red.</tspan></text><svg x="914" y="315" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="mark mark-failed" aria-hidden="true"><path d="M5 5L19 19M19 5L5 19" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/></svg>
+<rect x="764" y="400" width="178" height="78" rx="10" class="card-ok"/><text x="776" y="428" class="title" text-anchor="start"><tspan x="776" dy="0">A report</tspan></text><text x="776" y="446" class="" text-anchor="start"><tspan x="776" dy="0">A task that changes no</tspan><tspan x="776" dy="16">code. No pull request.</tspan></text><svg x="914" y="415" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="mark mark-done" aria-hidden="true"><path d="M4 12L9 17L20 5" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<g data-part="merge"><rect x="764" y="484" width="178" height="78" rx="10" class="card-ok"/><text x="776" y="512" class="title" text-anchor="start"><tspan x="776" dy="0">A pull request</tspan></text><text x="776" y="530" class="" text-anchor="start"><tspan x="776" dy="0">A code change. You merge</tspan><tspan x="776" dy="16">it once CI is green.</tspan></text><svg x="900" y="499" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="mark mark-done" aria-hidden="true"><path d="M4 12L9 17L20 5" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><path d="M923,502 l5,5.5 l-5,5.5" class="line-work"/></g>
 <path d="M148,80 L186,80" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(186,80) rotate(0)"/>
 <path d="M409,146 L409,168" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(409,168) rotate(90)"/>
 <path d="M322,232 L340,232" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(340,232) rotate(0)"/>

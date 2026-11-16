@@ -3,11 +3,18 @@ aside: false
 pageClass: wide-page
 kind: explanation
 ---
+<div class="home-hero">
+<div>
+
 # How orc works
 
 Orc takes work you describe, runs an AI agent on it on one of your machines, checks the result, and hands you a pull request or a report.
 
 [Open the interactive map](map/index.md){.map-open}
+
+</div>
+<img class="home-hero-art" src="./images/orc-hero-1120.webp" srcset="./images/orc-hero-640.webp 640w, ./images/orc-hero-1120.webp 1120w" sizes="(min-width: 860px) 560px, 90vw" width="1120" height="747" alt="A calm, grey-haired orc arranging three task tiles at a desk." fetchpriority="high">
+</div>
 
 ![How orc works: every part, and every way a task ends](diagrams/how-orc-works.svg)
 

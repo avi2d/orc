@@ -7,7 +7,7 @@ const desc =
 
 const question: Part = { title: "A question from a run", text: "The review raised it, or the agent asked it instead of guessing.", href: "checks" }
 const news: Part = { title: "News for you", ...bullets(["a run died", "a check went red", "a pull request is ready", "a hold is overdue", "a command keeps failing"]) }
-const queue: Part = { title: "The attention queue", text: "Everything that waits on someone, oldest first. `orc attention` lists it.", cls: "card-ask" }
+const queue: Part = { title: "The attention queue", text: "Everything that waits on someone, oldest first. `orc attention` lists it.", cls: "card-ask", mark: "attention" }
 const guarded: Part = {
   title: "Is it on a guarded topic?",
   cls: "card-ask",

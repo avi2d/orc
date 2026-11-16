@@ -8,7 +8,7 @@ const desc =
 const branch: Part = { title: "The branch", text: "Pi's commits, in the run's copy of the project.", href: "run" }
 const gate: Part = { title: "The checks", text: "The commands the project names in `.no-mistakes.yaml`.", cls: "card-work" }
 const fixer: Part = { title: "A fixer", text: "A second Pi gets the failing output and repairs it. Then the checks run again." }
-const failed: Part = { title: "The run fails", text: "A check is still red after 3 fixes. No pull request opens." }
+const failed: Part = { title: "The run fails", text: "A check is still red after 3 fixes. No pull request opens.", mark: "failed" }
 
 const review: Part = { title: "no-mistakes reviews the branch", text: "It gets the task as its intent, and marks each finding.", cls: "card-work" }
 const findings: Part = {
@@ -19,7 +19,8 @@ const question: Part = {
   title: "A question waits at the gate",
   text: "For 30 minutes. An answer in that time carries the run on. With none, the task parks on its branch, and resumes once every question has an answer.",
   cls: "card-ask",
-  href: "attention"
+  href: "attention",
+  mark: "attention"
 }
 const deliver: Part = { title: "no-mistakes delivers", text: "It pushes the branch, opens the pull request and waits for green CI." }
 
@@ -28,7 +29,7 @@ const modes: readonly Part[] = [
   { title: "`direct-PR`", text: "Checks, then orc pushes the branch and opens the pull request itself." },
   { title: "`no-mistakes-prod-only`", text: "`direct-PR` for a task marked internal, `no-mistakes` for the rest." }
 ]
-const pullRequest: Part = { title: "A pull request", text: "Checked and reviewed before it reaches you.", cls: "card-ok", href: "merge" }
+const pullRequest: Part = { title: "A pull request", text: "Checked and reviewed before it reaches you.", cls: "card-ok", href: "merge", mark: "done" }
 
 const wide = (): Drawing => {
   const body = [

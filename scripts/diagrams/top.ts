@@ -31,9 +31,9 @@ const backlog: Part = { step: "2", title: "The backlog", text: "One file per tas
 const quota: Part = { title: "Quota", text: "Room left on each account.", cls: "card-work", href: "quota", extra: (x, y) => bars(x, y), extraHeight: () => 30 }
 const beat: Part = { step: "3", title: "The beat", text: "Every few minutes, starts what can start.", href: "beat" }
 const decider: Part = { title: "The decider", text: "A small model. It answers a routine question by quoting a rule you wrote.", cls: "card-ask", href: "attention" }
-const attention: Part = { title: "The attention queue", text: "Every open question waits here.", cls: "card-ask", href: "attention" }
+const attention: Part = { title: "The attention queue", text: "Every open question waits here.", cls: "card-ask", href: "attention", mark: "attention" }
 const runner: Part = { step: "4", title: "The runner", text: "A queue on the machine, a few tasks at a time.", href: "runner" }
-const run: Part = { step: "5", title: "A run", text: "An agent writes the change in its own copy of the project, on a new branch.", href: "run" }
+const run: Part = { step: "5", title: "A run", text: "An agent writes the change in its own copy of the project, on a new branch.", href: "run", mark: "running" }
 const checks: Part = {
   step: "6",
   title: "Checks and review",
@@ -46,9 +46,9 @@ const checks: Part = {
 const dropped: Part = { title: "Dropped", text: "Before it started." }
 const answered: Part = { title: "Answered", text: "A decision never runs. Your answer closes it." }
 const stopped: Part = { title: "Stopped", text: "You stopped the run." }
-const failed: Part = { title: "Failed", text: "It could not start, it died, or its checks stayed red." }
-const report: Part = { title: "A report", text: "A task that changes no code. No pull request.", cls: "card-ok" }
-const pullRequest: Part = { title: "A pull request", text: "A code change. You merge it once CI is green.", cls: "card-ok", href: "merge" }
+const failed: Part = { title: "Failed", text: "It could not start, it died, or its checks stayed red.", mark: "failed" }
+const report: Part = { title: "A report", text: "A task that changes no code. No pull request.", cls: "card-ok", mark: "done" }
+const pullRequest: Part = { title: "A pull request", text: "A code change. You merge it once CI is green.", cls: "card-ok", href: "merge", mark: "done" }
 
 const wide = (): Drawing => {
   const body = [

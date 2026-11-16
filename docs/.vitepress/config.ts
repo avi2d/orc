@@ -155,7 +155,11 @@ export default defineConfig({
   title: "orc",
   description: "How orc runs AI agent tasks across your machines, and how to use it",
   base,
-  head: [["link", { rel: "icon", type: "image/svg+xml", href: base + "favicon.svg" }]],
+  head: [
+    ["link", { rel: "icon", type: "image/svg+xml", href: base + "favicon.svg" }],
+    ["meta", { name: "theme-color", content: "#f6f0e4", media: "(prefers-color-scheme: light)" }],
+    ["meta", { name: "theme-color", content: "#17120e", media: "(prefers-color-scheme: dark)" }]
+  ],
   cleanUrls: true,
   lastUpdated: true,
   rewrites: { "adr/README.md": "adr/index.md" },
@@ -172,6 +176,8 @@ export default defineConfig({
     }
   },
   themeConfig: {
+    logo: { light: "/orc-logo-light.svg", dark: "/orc-logo-dark.svg", alt: "orc" },
+    siteTitle: false,
     nav: [
       { text: "How orc works", link: "/" },
       { text: "Concepts", link: "/concepts/backlog" },
