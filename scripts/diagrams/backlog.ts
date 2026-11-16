@@ -1,4 +1,4 @@
-import { arrow, bullets, card, svg, tall, text, zone, type Part } from "./kit"
+import { arrow, bullets, card, svg, tall, text, zone, type Drawing, type Part } from "./kit"
 
 const title = "The backlog: where a task file sits, and how it moves"
 
@@ -29,7 +29,7 @@ const kinds: readonly Part[] = [
   { title: "`decision`", text: "Asks you a question and never runs. Ends with your answer." }
 ]
 
-const wide = (): void => {
+const wide = (): Drawing => {
   const body = [
     zone(8, 8, 170, 300, "You"),
     zone(198, 8, 754, 300, "The folder a task file sits in is its state"),
@@ -50,11 +50,11 @@ const wide = (): void => {
     text(575, 242, "`orc backlog send-back`: one more pass", "ask-text", "middle"),
     ...kinds.map((kind, index) => card(18 + index * 186.5, 356, 176, 122, kind))
   ]
-  svg("backlog", 960, 496, title, desc, body)
+  return svg("backlog", 960, 496, title, desc, body)
 }
 
-export const backlog = (): void => {
-  wide()
+export const backlog = (): readonly Drawing[] => [
+  wide(),
   tall("backlog", title, desc, [
     { label: "You", rows: [add, drop] },
     {
@@ -63,4 +63,4 @@ export const backlog = (): void => {
     },
     { label: "The kind of a task decides how it ends", rows: kinds }
   ])
-}
+]

@@ -8,7 +8,7 @@ export interface Rect extends Point {
   readonly height: number
 }
 
-export interface End {
+interface End {
   readonly id: string
   readonly rect: Rect
 }

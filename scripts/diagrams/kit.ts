@@ -1,6 +1,3 @@
-import { readFileSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
-
 export type Tone = "work" | "ask" | "mute"
 export type Point = readonly [number, number]
 
@@ -14,15 +11,18 @@ export interface Part {
   readonly extraHeight?: (w: number) => number
 }
 
-export type Row = Part | { readonly arrow: Tone; readonly note?: string } | { readonly note: string }
+type Row = Part | { readonly arrow: Tone; readonly note?: string } | { readonly note: string }
 
 export interface Zone {
   readonly label: string
   readonly rows: readonly Row[]
 }
 
-const out = join(import.meta.dir, "..", "..", "docs", "diagrams")
-const style = readFileSync(join(out, "diagram.css"), "utf8")
+export interface Drawing {
+  readonly name: string
+  readonly shortCards: readonly string[]
+  readonly markup: (style: string) => string
+}
 
 const esc = (value: string): string => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;")
 
@@ -54,8 +54,8 @@ const wrapWith = (value: string, width: number, plain: number, code: number): st
   return lines
 }
 
-export const wrapText = (value: string, width: number): string[] => wrapWith(value, width, 6.3, 7.1)
-export const wrapTitle = (value: string, width: number): string[] => wrapWith(value, width, 7.7, 8.2)
+const wrapText = (value: string, width: number): string[] => wrapWith(value, width, 6.3, 7.1)
+const wrapTitle = (value: string, width: number): string[] => wrapWith(value, width, 7.7, 8.2)
 
 export const text = (x: number, y: number, lines: string | readonly string[], cls = "", anchor = "start", lineHeight = 16): string => {
   const rows = typeof lines === "string" ? [lines] : lines
@@ -63,14 +63,14 @@ export const text = (x: number, y: number, lines: string | readonly string[], cl
   return '<text x="' + x + '" y="' + y + '" class="' + cls + '" text-anchor="' + anchor + '">' + spans + "</text>"
 }
 
-export const rect = (x: number, y: number, w: number, h: number, cls: string, r = 10): string =>
+const rect = (x: number, y: number, w: number, h: number, cls: string, r = 10): string =>
   '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + r + '" class="' + cls + '"/>'
 
-export const circle = (cx: number, cy: number, r: number, cls: string): string => '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" class="' + cls + '"/>'
+const circle = (cx: number, cy: number, r: number, cls: string): string => '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" class="' + cls + '"/>'
 
 export const path = (d: string, cls: string): string => '<path d="' + d + '" class="' + cls + '"/>'
 
-export const badge = (cx: number, cy: number, label: string, tone: "work" | "ask" = "work"): string =>
+const badge = (cx: number, cy: number, label: string, tone: "work" | "ask" = "work"): string =>
   circle(cx, cy, 11, "dot-" + tone) + text(cx, cy + 4.5, label, tone === "work" ? "num" : "num-ask", "middle")
 
 const head = (tip: Point, from: Point, tone: Tone): string => {
@@ -87,9 +87,6 @@ export const arrow = (points: readonly Point[], tone: Tone = "work", both = fals
   return path(d, tone === "mute" ? "line" : "line-" + tone) + head(last, before, tone) + (both ? head(first, second, tone) : "")
 }
 
-export const tick = (cx: number, cy: number): string =>
-  circle(cx, cy, 9, "dot-ok") + '<path d="M' + (cx - 4) + "," + cy + ' l3,3.2 l5.2,-6" class="tick"/>'
-
 export const zone = (x: number, y: number, w: number, h: number, label: string): string => rect(x, y, w, h, "zone", 14) + text(x + 12, y + 21, label, "label")
 
 export const chip = (x: number, y: number, w: number, label: string, cls = "card", h = 26): string =>
@@ -101,13 +98,16 @@ const cardLines = (part: Part, w: number): { title: string[]; body: string[]; in
   return { title: wrapTitle(part.title, room - indent), body: part.text === undefined ? [] : wrapText(part.text, w - 24), indent }
 }
 
-export const cardHeight = (part: Part, w: number): number => {
+const cardHeight = (part: Part, w: number): number => {
   const lines = cardLines(part, w)
   return 14 + lines.title.length * 18 + (lines.body.length === 0 ? 0 : 4 + lines.body.length * 16) + (part.extraHeight?.(w - 24) ?? 0) + 10
 }
 
+const shortMark = (reason: string): string => "<!--short " + esc(reason) + "-->"
+
+const shortMarks = /<!--short (.*?)-->/g
+
 export const card = (x: number, y: number, w: number, h: number, part: Part): string => {
-  if (cardHeight(part, w) > h) throw new Error(part.title + " needs " + cardHeight(part, w) + " and has " + h)
   const lines = cardLines(part, w)
   const bodyTop = y + 14 + lines.title.length * 18 + 14
   const inner = [
@@ -118,18 +118,23 @@ export const card = (x: number, y: number, w: number, h: number, part: Part): st
     ...(part.extra === undefined ? [] : part.extra(x + 12, bodyTop + lines.body.length * 16 - (lines.body.length === 0 ? 10 : 4), w - 24)),
     part.href === undefined ? "" : path("M" + (x + w - 19) + "," + (y + 18) + " l5,5.5 l-5,5.5", "line-work")
   ].join("")
-  return part.href === undefined ? inner : '<g data-part="' + part.href + '">' + inner + "</g>"
+  const short = cardHeight(part, w) > h ? shortMark(part.title + " needs " + cardHeight(part, w).toString() + " and has " + h.toString()) : ""
+  return short + (part.href === undefined ? inner : '<g data-part="' + part.href + '">' + inner + "</g>")
 }
 
-export const svg = (name: string, w: number, h: number, title: string, desc: string, body: readonly string[]): void => {
+export const svg = (name: string, w: number, h: number, title: string, desc: string, body: readonly string[]): Drawing => {
   const open = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + " " + h + '" class="orc-d" role="img" aria-labelledby="d-' + name + "-title d-" + name + '-desc">'
-  const all = [open, '<title id="d-' + name + '-title">' + esc(title) + "</title>", '<desc id="d-' + name + '-desc">' + esc(desc) + "</desc>", "<style>" + style + "</style>", ...body, "</svg>", ""]
-  writeFileSync(join(out, name + ".svg"), all.join("\n"))
+  const opening = [open, '<title id="d-' + name + '-title">' + esc(title) + "</title>", '<desc id="d-' + name + '-desc">' + esc(desc) + "</desc>"]
+  return {
+    name,
+    shortCards: body.flatMap((piece) => [...piece.matchAll(shortMarks)].map((mark) => mark[1])),
+    markup: (style) => [...opening, "<style>" + style + "</style>", ...body.map((piece) => piece.replaceAll(shortMarks, "")), "</svg>", ""].join("\n")
+  }
 }
 
 const isPart = (row: Row): row is Part => "title" in row
 
-export const tall = (name: string, title: string, desc: string, zones: readonly Zone[]): void => {
+export const tall = (name: string, title: string, desc: string, zones: readonly Zone[]): Drawing => {
   const body: string[] = []
   let y = 4
   zones.forEach((area, index) => {
@@ -159,7 +164,7 @@ export const tall = (name: string, title: string, desc: string, zones: readonly 
       y += 24
     }
   })
-  svg(name + "-tall", 360, y + 4, title, desc, body)
+  return svg(name + "-tall", 360, y + 4, title, desc, body)
 }
 
 export const bullets = (items: readonly string[]): Pick<Part, "extra" | "extraHeight"> => ({

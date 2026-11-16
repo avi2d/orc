@@ -11,7 +11,7 @@ const { isDark } = useData()
   <div class="orc-map">
     <header class="map-bar">
       <a class="map-back" :href="withBase('/')" aria-label="Back to the orc docs">←<span> Docs</span></a>
-      <h1>{{ mapTitle }}<small>Select a part to open it</small></h1>
+      <p class="map-title">{{ mapTitle }}<small>Select a part to open it</small></p>
       <button type="button" @click="$emit('openAll')">Open all</button>
       <button type="button" @click="$emit('foldAll')">Fold all</button>
       <button type="button" :aria-pressed="isDark" @click="isDark = !isDark">{{ isDark ? "Light" : "Dark" }}</button>
@@ -52,7 +52,7 @@ const { isDark } = useData()
   border-bottom: 1px solid var(--m-line);
   background: var(--m-card);
 }
-.map-bar h1 {
+.map-bar .map-title {
   flex: 1;
   min-width: 0;
   margin: 0;

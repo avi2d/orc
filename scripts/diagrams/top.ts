@@ -1,4 +1,4 @@
-import { arrow, bullets, card, chip, path, svg, tall, text, zone, type Part } from "./kit"
+import { arrow, bullets, card, chip, path, svg, tall, text, zone, type Drawing, type Part } from "./kit"
 
 const title = "How orc works: every part, and every way a task ends"
 
@@ -50,7 +50,7 @@ const failed: Part = { title: "Failed", text: "It could not start, it died, or i
 const report: Part = { title: "A report", text: "A task that changes no code. No pull request.", cls: "card-ok" }
 const pullRequest: Part = { title: "A pull request", text: "A code change. You merge it once CI is green.", cls: "card-ok", href: "merge" }
 
-const wide = (): void => {
+const wide = (): Drawing => {
   const body = [
     zone(8, 8, 150, 576, "You"),
     zone(178, 8, 308, 576, "The machine that plans"),
@@ -92,15 +92,15 @@ const wide = (): void => {
     arrow([[742, 514], [762, 514]], "work"),
     arrow([[148, 556], [168, 556], [168, 579], [742, 579], [742, 544], [762, 544]], "work")
   ]
-  svg("how-orc-works", 960, 592, title, desc, body)
+  return svg("how-orc-works", 960, 592, title, desc, body)
 }
 
-export const top = (): void => {
-  wide()
+export const top = (): readonly Drawing[] => [
+  wide(),
   tall("how-orc-works", title, desc, [
     { label: "You", rows: [chat, app, merge] },
     { label: "The machine that plans", rows: [backlog, { arrow: "work" }, beat, quota, attention, { arrow: "ask", note: "routine questions" }, decider, { note: "The rest wait for you." }] },
     { label: "A machine that works", rows: [runner, { arrow: "work" }, run, { arrow: "work" }, checks, { note: "A question the run cannot settle goes to the attention queue." }] },
     { label: "How a task ends", rows: [dropped, answered, stopped, failed, report, pullRequest] }
   ])
-}
+]

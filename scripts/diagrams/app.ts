@@ -1,4 +1,4 @@
-import { arrow, card, svg, tall, zone, type Part } from "./kit"
+import { arrow, card, svg, tall, zone, type Drawing, type Part } from "./kit"
 
 const title = "The app and the dashboard: two screens over the same commands"
 
@@ -18,7 +18,7 @@ const same: Part = { title: "Neither screen holds state of its own", text: "Both
 const dash: Part = { title: "`orc-dash`", text: "The same facts as panels: quota, session quota, resources, queues, schedules, dispatch, attention, tasks, alerts and ledger." }
 const alerts: Part = { title: "Its alert stream", text: "It watches quota pace, machine load and long tasks. The chat's alerts come from here.", href: "chat" }
 
-const wide = (): void => {
+const wide = (): Drawing => {
   const body = [
     zone(8, 8, 200, 480, "What both screens draw"),
     zone(228, 8, 484, 480, "The Herdr App"),
@@ -38,14 +38,14 @@ const wide = (): void => {
     card(742, 42, 200, 158, dash),
     card(742, 212, 200, 158, alerts)
   ]
-  svg("app", 960, 496, title, desc, body)
+  return svg("app", 960, 496, title, desc, body)
 }
 
-export const app = (): void => {
-  wide()
+export const app = (): readonly Drawing[] => [
+  wide(),
   tall("app", title, desc, [
     { label: "What both screens draw", rows: [state, { arrow: "work" }, commands, snapshot, same] },
     { label: "The Herdr App", rows: [board, agents, resources, drawer] },
     { label: "The terminal", rows: [dash, alerts] }
   ])
-}
+]

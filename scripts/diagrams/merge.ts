@@ -1,4 +1,4 @@
-import { arrow, card, svg, tall, text, zone, type Part } from "./kit"
+import { arrow, card, svg, tall, text, zone, type Drawing, type Part } from "./kit"
 
 const title = "The merge: what orc merge checks before it lands a pull request"
 
@@ -28,7 +28,7 @@ const word: readonly Part[] = [
   { title: "After the merge", text: "A later beat records it, the chat posts it, and a ship task that waited on it can start.", href: "beat" }
 ]
 
-const wide = (): void => {
+const wide = (): Drawing => {
   const body = [
     zone(8, 8, 190, 292, "Who asks"),
     zone(218, 8, 734, 292, "`orc merge` lands it once all four hold"),
@@ -42,14 +42,14 @@ const wide = (): void => {
     ...conditions.flatMap((_, index) => [arrow([[294 + index * 148, 172], [294 + index * 148, 216]], "ask"), text(302 + index * 148, 198, "no", "ask-text")]),
     ...word.map((item, index) => card(18 + index * 234, 348, 222, 130, item))
   ]
-  svg("merge", 960, 496, title, desc, body)
+  return svg("merge", 960, 496, title, desc, body)
 }
 
-export const merge = (): void => {
-  wide()
+export const merge = (): readonly Drawing[] => [
+  wide(),
   tall("merge", title, desc, [
     { label: "Who asks", rows: askers },
     { label: "`orc merge` lands it once all four hold", rows: [...conditions, { arrow: "work", note: "all four hold" }, merged, { note: "If one does not hold:" }, refused] },
     { label: "Whose word merges", rows: word }
   ])
-}
+]

@@ -1,4 +1,4 @@
-import { arrow, bullets, card, svg, tall, text, zone, type Part } from "./kit"
+import { arrow, bullets, card, svg, tall, text, zone, type Drawing, type Part } from "./kit"
 
 const title = "Accounts and quota: which account a run spends"
 
@@ -22,7 +22,7 @@ const kinds: readonly Part[] = [
   { title: "`none`", text: "Nothing. The provider's own package logs in." }
 ]
 
-const wide = (): void => {
+const wide = (): Drawing => {
   const body = [
     zone(8, 8, 170, 480, "You, once"),
     zone(198, 8, 474, 480, "Every beat, before it takes a task"),
@@ -43,14 +43,14 @@ const wide = (): void => {
     arrow([[554, 172], [554, 234]], "work"),
     arrow([[662, 280], [700, 280]], "work")
   ]
-  svg("quota", 960, 496, title, desc, body)
+  return svg("quota", 960, 496, title, desc, body)
 }
 
-export const quota = (): void => {
-  wide()
+export const quota = (): readonly Drawing[] => [
+  wide(),
   tall("quota", title, desc, [
     { label: "You, once", rows: [config] },
     { label: "Every beat, before it takes a task", rows: [command, { arrow: "work" }, read, { note: "No: this beat starts nothing." }, { arrow: "work", note: "yes" }, usable, { arrow: "work" }, most] },
     { label: "What the run is handed, by kind", rows: kinds }
   ])
-}
+]

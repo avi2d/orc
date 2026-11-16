@@ -1,4 +1,4 @@
-import { arrow, bullets, card, svg, tall, text, zone, type Part } from "./kit"
+import { arrow, bullets, card, svg, tall, text, zone, type Drawing, type Part } from "./kit"
 
 const title = "Checks and review: the two gates a code change passes"
 
@@ -30,7 +30,7 @@ const modes: readonly Part[] = [
 ]
 const pullRequest: Part = { title: "A pull request", text: "Checked and reviewed before it reaches you.", cls: "card-ok", href: "merge" }
 
-const wide = (): void => {
+const wide = (): Drawing => {
   const body = [
     zone(8, 8, 290, 482, "Gate 1: the project's checks"),
     zone(318, 8, 390, 482, "Gate 2: the review"),
@@ -59,14 +59,14 @@ const wide = (): void => {
     card(738, 384, 204, 96, pullRequest),
     arrow([[678, 456], [736, 456]], "work")
   ]
-  svg("checks", 960, 498, title, desc, body)
+  return svg("checks", 960, 498, title, desc, body)
 }
 
-export const checks = (): void => {
-  wide()
+export const checks = (): readonly Drawing[] => [
+  wide(),
   tall("checks", title, desc, [
     { label: "Gate 1: the project's checks", rows: [branch, { arrow: "work" }, gate, { arrow: "mute", note: "red" }, fixer, { arrow: "mute", note: "red after 3 fixes" }, failed] },
     { label: "Gate 2: the review", rows: [review, { arrow: "work" }, findings, { arrow: "ask", note: "ask-user" }, question, { arrow: "work" }, deliver, { arrow: "work" }, pullRequest] },
     { label: "A ship task, by the project's mode", rows: modes }
   ])
-}
+]

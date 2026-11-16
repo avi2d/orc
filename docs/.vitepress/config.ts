@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs"
+import { readdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { defineConfig, type DefaultTheme } from "vitepress"
 
@@ -29,7 +29,16 @@ const parts: readonly Part[] = [
   { id: "app", title: "The app and the dashboard", link: "concepts/app" }
 ]
 
-const drawn = (id: string): boolean => existsSync(join(diagrams, id + ".svg"))
+// markdown-it renders an image in a synchronous rule, so the drawings are read before the first page renders.
+const drawings = new Map(
+  await Promise.all(
+    (await readdir(diagrams))
+      .filter((file) => file.endsWith(".svg"))
+      .map((file) => readFile(join(diagrams, file), "utf8").then((markup) => [file, markup] as const))
+  )
+)
+
+const drawn = (id: string): boolean => drawings.has(id + ".svg")
 
 type Target = (part: Part) => string
 
@@ -48,14 +57,14 @@ const size = /viewBox="0 0 ([\d.]+) ([\d.]+)"/
 const percent = (value: string | undefined, of: string | undefined): string => ((Number(value) / Number(of)) * 100).toFixed(3) + "%"
 
 const layout = (name: string, kind: string, target: Target): string => {
-  const file = join(diagrams, name + (kind === "tall" ? "-tall" : "") + ".svg")
-  if (!existsSync(file)) return ""
-  const drawing = readFileSync(file, "utf8").replace(/<style>[\s\S]*?<\/style>/, "")
+  const source = drawings.get(name + (kind === "tall" ? "-tall" : "") + ".svg")
+  if (source === undefined) return ""
+  const drawing = source.replace(/<style>[\s\S]*?<\/style>/, "")
   const [, width, height] = size.exec(drawing) ?? []
   const links = [...drawing.matchAll(linked)].map(([, id, inner]) => {
     const part = parts.find((candidate) => candidate.id === id)
-    const [, x, y, w, h] = box.exec(inner ?? "") ?? []
-    const label = (heading.exec(inner ?? "")?.[1] ?? "").replaceAll(/<[^>]+>/g, "")
+    const [, x, y, w, h] = box.exec(inner) ?? []
+    const label = (heading.exec(inner)?.[1] ?? "").replaceAll(/<[^>]+>/g, "")
     if (part === undefined) return ""
     const place = "left:" + percent(x, width) + ";top:" + percent(y, height) + ";width:" + percent(w, width) + ";height:" + percent(h, height)
     return '<a class="map-link" href="' + target(part) + '" style="' + place + '" aria-label="' + label + '"></a>'

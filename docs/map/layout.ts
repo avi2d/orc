@@ -2,12 +2,12 @@ import { Graph, layout as rank } from "@dagrejs/dagre"
 import { childrenOf, folds, pathTo, shownLinks, type MapPart, type ShownLink } from "./orc-map"
 import { createRouter, touches, type Point, type Rect } from "./route"
 
-export interface Size {
+interface Size {
   readonly width: number
   readonly height: number
 }
 
-export interface PlacedPart {
+interface PlacedPart {
   readonly part: MapPart
   readonly rect: Rect
   readonly open: boolean
@@ -19,7 +19,7 @@ export interface PlacedLabel {
   readonly rect: Rect
 }
 
-export interface PlacedLink {
+interface PlacedLink {
   readonly link: ShownLink
   readonly points: readonly Point[]
   readonly label?: PlacedLabel

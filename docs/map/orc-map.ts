@@ -1,4 +1,4 @@
-export type Tone = "plain" | "work" | "ask" | "ok" | "end"
+type Tone = "plain" | "work" | "ask" | "ok" | "end"
 
 export interface MapPart {
   readonly id: string
@@ -248,7 +248,7 @@ export const pathTo = (id: string): readonly string[] => {
 }
 
 // The nearest part on screen: a part hidden inside a folded one stands as that folded part.
-export const shownAs = (id: string, open: ReadonlySet<string>): string => {
+const shownAs = (id: string, open: ReadonlySet<string>): string => {
   const chain = pathTo(id)
   const firstFolded = chain.findIndex((step, index) => index < chain.length - 1 && !open.has(step))
   return firstFolded === -1 ? id : (chain[firstFolded] ?? id)
@@ -265,7 +265,5 @@ export const shownLinks = (open: ReadonlySet<string>): readonly ShownLink[] => {
     return [{ from, to, tone: link.tone, ...(link.label === undefined ? {} : { label: link.label }) }]
   })
 }
-
-export const shownParts = (open: ReadonlySet<string>): readonly MapPart[] => parts.filter((part) => shownAs(part.id, open) === part.id)
 
 export const titleOf = (id: string): string => byId.get(id)?.title ?? id

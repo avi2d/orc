@@ -1,4 +1,4 @@
-import { arrow, bullets, card, svg, tall, zone, type Part } from "./kit"
+import { arrow, bullets, card, svg, tall, zone, type Drawing, type Part } from "./kit"
 
 const title = "A run: one attempt at one task"
 
@@ -30,7 +30,7 @@ const watch: Part = {
 const record: Part = { title: "`~/.orc/runs/<run-id>`", text: "The task, the logs, the Pi session and `report.md`. Read it with `orc runs`, `orc show` and `orc log`." }
 const resume: Part = { title: "Resume", text: "`orc run --branch <name>` skips the steps that passed, and Pi resumes its session." }
 
-const wide = (): void => {
+const wide = (): Drawing => {
   const body = [
     zone(8, 8, 170, 482, "Who starts it"),
     zone(198, 8, 754, 230, "The run, on a machine that works"),
@@ -47,15 +47,15 @@ const wide = (): void => {
     arrow([[575, 228], [575, 284]], "ask"),
     arrow([[875, 228], [875, 284]], "mute")
   ]
-  svg("run", 960, 498, title, desc, body)
+  return svg("run", 960, 498, title, desc, body)
 }
 
-export const run = (): void => {
-  wide()
+export const run = (): readonly Drawing[] => [
+  wide(),
   tall("run", title, desc, [
     { label: "Who starts it", rows: [byRunner, byHand] },
     { label: "The run, on a machine that works", rows: steps.flatMap((step, index) => (index === 0 ? [step] : [{ arrow: "work" as const }, step])) },
     { label: "Orc watches Pi while it works", rows: [watch] },
     { label: "The record", rows: [record, resume] }
   ])
-}
+]

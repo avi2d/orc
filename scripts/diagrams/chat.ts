@@ -1,4 +1,4 @@
-import { arrow, bullets, card, svg, tall, zone, type Part } from "./kit"
+import { arrow, bullets, card, svg, tall, zone, type Drawing, type Part } from "./kit"
 
 const title = "The chat: your words in, backlog commands out"
 
@@ -34,7 +34,7 @@ const answer: Part = {
 const land: Part = { title: "Merge", href: "merge", ...bullets(["`merge_task`: runs `orc merge`"]) }
 const backlog: Part = { title: "The backlog", text: "The chat starts nothing. The beat starts a task once it has a priority.", href: "backlog" }
 
-const wide = (): void => {
+const wide = (): Drawing => {
   const body = [
     zone(8, 8, 170, 482, "You"),
     zone(198, 8, 380, 482, "`orc chat`"),
@@ -53,15 +53,15 @@ const wide = (): void => {
     arrow([[606, 444], [570, 444]], "work"),
     arrow([[206, 380], [170, 380]], "work")
   ]
-  svg("chat", 960, 498, title, desc, body)
+  return svg("chat", 960, 498, title, desc, body)
 }
 
-export const chat = (): void => {
-  wide()
+export const chat = (): readonly Drawing[] => [
+  wide(),
   tall("chat", title, desc, [
     { label: "You", rows: [say] },
     { label: "`orc chat`", rows: [model, rules] },
     { label: "Eight tools, each one an `orc` command", rows: [shape, answer, land, { arrow: "work" }, backlog] },
     { label: "Back to you", rows: [posts, { arrow: "work" }, read] }
   ])
-}
+]

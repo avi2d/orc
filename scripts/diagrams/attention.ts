@@ -1,4 +1,4 @@
-import { arrow, bullets, card, svg, tall, text, zone, type Part } from "./kit"
+import { arrow, bullets, card, svg, tall, text, zone, type Drawing, type Part } from "./kit"
 
 const title = "The attention queue and the decider: who answers what"
 
@@ -18,7 +18,7 @@ const quote: Part = { title: "Can it quote a rule that settles it?", text: "It m
 const you: Part = { title: "You answer", text: "In the chat, in the app, or with `orc backlog answer`. Your answer replaces the decider's.", href: "chat" }
 const answered: Part = { title: "Answered", text: "The run carries on where it waited.", cls: "card-ok" }
 
-const wide = (): void => {
+const wide = (): Drawing => {
   const body = [
     zone(8, 8, 200, 480, "What opens an item"),
     zone(228, 8, 484, 480, "The machine that plans"),
@@ -46,11 +46,11 @@ const wide = (): void => {
     text(120, 452, "it waits for you", "ask-text"),
     arrow([[842, 226], [842, 128]], "work")
   ]
-  svg("attention", 960, 496, title, desc, body)
+  return svg("attention", 960, 496, title, desc, body)
 }
 
-export const attention = (): void => {
-  wide()
+export const attention = (): readonly Drawing[] => [
+  wide(),
   tall("attention", title, desc, [
     { label: "What opens an item", rows: [question, news, { note: "News waits for you. A question takes the path below." }] },
     {
@@ -59,4 +59,4 @@ export const attention = (): void => {
     },
     { label: "You", rows: [you, { arrow: "work" }, answered] }
   ])
-}
+]

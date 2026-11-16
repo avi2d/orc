@@ -1,4 +1,4 @@
-import { arrow, card, svg, tall, text, zone, type Part } from "./kit"
+import { arrow, card, svg, tall, text, zone, type Drawing, type Part } from "./kit"
 
 const title = "The beat: what lets a task start"
 
@@ -24,7 +24,7 @@ const also: readonly Part[] = [
   { title: "Watches", text: "Flags a run silent for 30 minutes. Records when a pull request turns green or merges." }
 ]
 
-const wide = (): void => {
+const wide = (): Drawing => {
   const body = [
     zone(8, 8, 944, 292, "A new task starts once all five hold, in priority order"),
     zone(8, 314, 944, 174, "Every beat also does this"),
@@ -36,13 +36,13 @@ const wide = (): void => {
     ...conditions.flatMap((_, index) => [arrow([[88 + index * 156, 184], [88 + index * 156, 226]], "ask"), text(96 + index * 156, 210, "no", "ask-text")]),
     ...also.map((item, index) => card(18 + index * 186.5, 348, 176, 130, item))
   ]
-  svg("beat", 960, 496, title, desc, body)
+  return svg("beat", 960, 496, title, desc, body)
 }
 
-export const beat = (): void => {
-  wide()
+export const beat = (): readonly Drawing[] => [
+  wide(),
   tall("beat", title, desc, [
     { label: "A new task starts once all five hold", rows: [...conditions, { arrow: "work", note: "all five hold" }, starts, { note: "If one does not hold:" }, waits] },
     { label: "Every beat also does this", rows: also }
   ])
-}
+]

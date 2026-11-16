@@ -1,4 +1,4 @@
-import { arrow, bullets, card, svg, tall, zone, type Part } from "./kit"
+import { arrow, bullets, card, svg, tall, zone, type Drawing, type Part } from "./kit"
 
 const title = "The runner: what keeps a run alive on its machine"
 
@@ -23,7 +23,7 @@ const commands: Part = {
   ])
 }
 
-const wide = (): void => {
+const wide = (): Drawing => {
   const body = [
     zone(8, 8, 200, 480, "The machine that plans"),
     zone(228, 8, 724, 480, "A machine that works"),
@@ -43,14 +43,14 @@ const wide = (): void => {
     arrow([[831, 162], [831, 194]], "mute"),
     arrow([[198, 410], [236, 410]], "work", true)
   ]
-  svg("runner", 960, 496, title, desc, body)
+  return svg("runner", 960, 496, title, desc, body)
 }
 
-export const runner = (): void => {
-  wide()
+export const runner = (): readonly Drawing[] => [
+  wide(),
   tall("runner", title, desc, [
     { label: "The machine that plans", rows: [beat] },
     { label: "A machine that works", rows: [start, far, { arrow: "work" }, queue, { arrow: "work" }, run, { arrow: "mute", note: "its test runs and builds" }, heavy] },
     { label: "The machine that plans, later", rows: [later, { arrow: "work" }, commands] }
   ])
-}
+]
