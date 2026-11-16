@@ -218,6 +218,7 @@ export interface ShownStep extends Step {
   readonly model: string | null
   readonly thinking: string | null
   readonly piSessionFile: string | null
+  readonly from: string | null
 }
 
 const shownStep: Guard<ShownStep> = (value, at) => {
@@ -231,7 +232,9 @@ const shownStep: Guard<ShownStep> = (value, at) => {
   if (thinking.kind === "refused") return thinking
   const piSessionFile = nullableString(record.value, "piSessionFile", at)
   if (piSessionFile.kind === "refused") return piSessionFile
-  return ok({ ...brief.value, model: model.value, thinking: thinking.value, piSessionFile: piSessionFile.value })
+  const from = nullableString(record.value, "from", at)
+  if (from.kind === "refused") return from
+  return ok({ ...brief.value, model: model.value, thinking: thinking.value, piSessionFile: piSessionFile.value, from: from.value })
 }
 
 const runStatuses = ["running", "succeeded", "failed", "stopped"] as const

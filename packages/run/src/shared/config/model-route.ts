@@ -18,6 +18,16 @@ export const providerEnvOf = (config: OrcConfig, model: string): Record<string, 
   return provider?.credential === "package" ? provider.env ?? {} : {}
 }
 
+export interface HandedModels {
+  readonly implementer: string | undefined
+  readonly fixer: string | undefined
+}
+
+export const configuredModels = (config: OrcConfig, handed: HandedModels): HandedModels => ({
+  implementer: handed.implementer ?? config.models?.implementer,
+  fixer: handed.fixer ?? config.models?.fixer
+})
+
 export const routeOfAgents = (
   config: OrcConfig,
   models: { readonly agent: string; readonly fixer: string },

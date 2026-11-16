@@ -2,6 +2,25 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.17.0
+
+Released 2026-11-15.
+
+### Features
+
+- **herdr-app:** open every Pi session step in Turns with numbered turns and calls [#227](https://github.com/avi2d/orc/pull/227)
+- **herdr-app:** show full backlog thread with answerable picture options [#219](https://github.com/avi2d/orc/pull/219)
+
+### Fixes
+
+- **herdr-app:** show queue position for tasks waiting in pueue [#229](https://github.com/avi2d/orc/pull/229)
+- **herdr-app:** open PR addresses in the default browser on click [#226](https://github.com/avi2d/orc/pull/226)
+- **herdr-app:** show Board task panel only for the selected card [#224](https://github.com/avi2d/orc/pull/224)
+- **run:** recover tasks left under grabbed names by killed processes [#222](https://github.com/avi2d/orc/pull/222)
+- **run:** park a re-asked question once so one answer resumes the task [#218](https://github.com/avi2d/orc/pull/218)
+- **run:** set orc pueue group parallel limit from machine slots [#223](https://github.com/avi2d/orc/pull/223)
+- **run:** guard look, legal and login questions and answer recommended options [#216](https://github.com/avi2d/orc/pull/216)
+
 ## 0.16.0
 
 Released 2026-11-15.
