@@ -1,10 +1,17 @@
 # orc
 
-Say what needs doing, and orc runs it with AI agents across your machines and reports back.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/public/orc-logo-dark.svg">
+  <img src="docs/public/orc-logo-light.svg" alt="orc logo" width="200">
+</picture>
 
-Orc is one orchestrator for all your agent work.
-You talk to it in a chat, it keeps the backlog, and it sends each task to a machine with room.
-A terminal dashboard shows every machine, queue and account at a glance.
+Use one chat to describe work and keep it in a backlog.
+Orc runs tasks across your machines with the models you configure.
+You can monitor tasks, runs and resources live in the terminal dashboard or the Herdr App dashboards.
+
+[Read the orc docs](https://avi2d.github.io/orc/).
+
+![An orc arranging task tiles at a desk](docs/images/orc-hero-640.webp)
 
 ## Before you begin
 
