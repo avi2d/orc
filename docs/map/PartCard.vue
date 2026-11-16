@@ -13,12 +13,12 @@ defineEmits<{ toggle: [] }>()
       <span class="part-title" :class="{ mono: part.mono }">{{ part.title }}</span>
     </button>
     <p v-else class="part-title" :class="{ mono: part.mono }">{{ part.title }}</p>
+    <a v-if="open && part.page" class="part-page nodrag nopan" :href="withBase('/' + part.page)">Read the page<span class="sr"> about {{ part.title }}</span></a>
     <template v-if="!open">
       <p v-if="part.text" class="part-text">{{ part.text }}</p>
       <ul v-if="part.points" class="part-points">
         <li v-for="point in part.points" :key="point">{{ point }}</li>
       </ul>
-      <a v-if="part.page" class="part-page nodrag nopan" :href="withBase('/' + part.page)">Read the page<span class="sr"> about {{ part.title }}</span></a>
     </template>
   </div>
 </template>
@@ -113,10 +113,9 @@ defineEmits<{ toggle: [] }>()
   list-style: disc;
 }
 .part-page {
-  position: relative;
-  z-index: 1;
-  display: inline-block;
-  margin-top: 6px;
+  position: absolute;
+  top: 10px;
+  right: 12px;
   color: var(--m-work);
   font-weight: 600;
   text-decoration: underline;

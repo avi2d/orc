@@ -2,7 +2,6 @@
 import { useData, withBase } from "vitepress"
 import { mapTitle } from "./orc-map"
 
-defineProps<{ draft: string }>()
 defineEmits<{ openAll: []; foldAll: [] }>()
 
 const { isDark } = useData()
@@ -12,7 +11,7 @@ const { isDark } = useData()
   <div class="orc-map">
     <header class="map-bar">
       <a class="map-back" :href="withBase('/')" aria-label="Back to the orc docs">←<span> Docs</span></a>
-      <h1>{{ mapTitle }}<small>{{ draft }}</small></h1>
+      <h1>{{ mapTitle }}<small>Select a part to open it</small></h1>
       <button type="button" @click="$emit('openAll')">Open all</button>
       <button type="button" @click="$emit('foldAll')">Fold all</button>
       <button type="button" :aria-pressed="isDark" @click="isDark = !isDark">{{ isDark ? "Light" : "Dark" }}</button>
@@ -29,6 +28,7 @@ const { isDark } = useData()
   --m-card: light-dark(#ffffff, #22252b);
   --m-zone: light-dark(#f3f4f6, #17191d);
   --m-page: light-dark(#fbfbfc, #101114);
+  --m-under-label: color-mix(in srgb, var(--m-zone) 70%, var(--m-page));
   --m-work: light-dark(#3451b2, #a8b1ff);
   --m-work-soft: light-dark(#e8ebfc, #272c52);
   --m-ask: light-dark(#8a5a00, #e9b949);

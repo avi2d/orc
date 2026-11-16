@@ -11,11 +11,15 @@ export interface MapPart {
   readonly mono?: true
 }
 
-export interface MapLink {
+export interface ShownLink {
   readonly from: string
   readonly to: string
   readonly label?: string
   readonly tone: "work" | "ask"
+}
+
+export interface MapLink extends ShownLink {
+  readonly side?: true
 }
 
 export const mapTitle = "How orc works"
@@ -28,12 +32,32 @@ export const parts: readonly MapPart[] = [
   { id: "ends", title: "How a task ends" },
 
   { id: "chat", inside: "you", title: "The chat", text: "Say the work. Answer questions.", page: "concepts/chat" },
+  { id: "chat-say", inside: "chat", title: "You say", points: ["the work, in plain words", "an answer to a question", "to merge a pull request"] },
+  { id: "chat-model", inside: "chat", title: "The orchestrator model", tone: "work", text: "A Pi session with eight tools and no others. It can change the backlog and nothing else." },
+  {
+    id: "chat-tools",
+    inside: "chat",
+    title: "Eight tools, each an orc command",
+    points: ["four shape the backlog: add, edit, priority and hold", "three read it and answer its questions", "one merges a pull request"]
+  },
+  {
+    id: "chat-posts",
+    inside: "chat",
+    title: "It posts what changed",
+    text: "It reads the backlog every 15 seconds.",
+    points: ["a task that closed, with its outcome", "a question that waits on you", "a stalled run", "a pull request that turned green or merged"]
+  },
+
   { id: "app", inside: "you", title: "The app and the dashboard", text: "Show it all. Hold no state.", page: "concepts/app" },
-  { id: "merge", mono: true, inside: "you", title: "orc merge", text: "Land a pull request once CI is green.", page: "concepts/merge" },
+  { id: "app-state", inside: "app", title: "The state", text: "Files in ~/.orc, and the pueue queues." },
+  { id: "app-commands", inside: "app", title: "The orc commands", tone: "work", text: "Both screens run them and draw what they print, so a screen and the command line never disagree." },
+  { id: "app-herdr", inside: "app", title: "The Herdr App", points: ["Board: the backlog as cards in five lanes", "Agents: the runs, step by step", "Resources: quota and machines", "a chat drawer on every tab"] },
+  { id: "app-dash", mono: true, inside: "app", title: "orc-dash", text: "The same facts as panels in a terminal. The chat's alerts come from its alert stream." },
 
   { id: "backlog", inside: "plans", title: "The backlog", text: "One file per task, in priority order.", page: "concepts/backlog" },
   {
-    id: "backlog-new", mono: true,
+    id: "backlog-new",
+    mono: true,
     inside: "backlog",
     title: "new",
     tone: "work",
@@ -42,7 +66,8 @@ export const parts: readonly MapPart[] = [
   },
   { id: "backlog-taken", mono: true, inside: "backlog", title: "taken", text: "A beat took it. Its run is queued or running on a machine." },
   {
-    id: "backlog-closed", mono: true,
+    id: "backlog-closed",
+    mono: true,
     inside: "backlog",
     title: "closed",
     text: "It keeps its outcome and the reason:",
@@ -56,7 +81,30 @@ export const parts: readonly MapPart[] = [
   { id: "kind-decision", mono: true, inside: "kinds", title: "decision", text: "Asks you a question and never runs. Ends with your answer." },
 
   { id: "quota", inside: "plans", title: "Quota", tone: "work", text: "Room left on each account.", page: "concepts/accounts-and-quota" },
+  { id: "quota-config", mono: true, inside: "quota", title: "dispatch.json", text: "You name the accounts, the floor and the quota command once." },
+  { id: "quota-command", inside: "quota", title: "The quota command", text: "Each beat runs it first. It prints the room left on each account." },
+  { id: "quota-read", inside: "quota", title: "Did the beat read it?", text: "Not when the command fails, runs past 15 seconds or prints anything else." },
+  { id: "quota-nothing", inside: "quota", title: "This beat starts nothing", tone: "end" },
+  { id: "quota-usable", inside: "quota", title: "Which accounts can run?", points: ["named in what the command printed", "room above 0%", "at or above the floor, when you set one"] },
+  { id: "quota-most", inside: "quota", title: "The one with the most room", tone: "work", text: "Every task this beat starts takes it." },
+
   { id: "beat", inside: "plans", title: "The beat", text: "Every few minutes, starts what can start.", page: "concepts/beat" },
+  { id: "beat-clock", inside: "beat", title: "Runs on a clock", text: "Cron or launchd runs orc beat every few minutes. Orc has no daemon." },
+  {
+    id: "beat-holds",
+    inside: "beat",
+    title: "Do all five hold?",
+    tone: "work",
+    points: ["the task has a priority", "no hold, and no question without an answer", "each task it depends on is done", "a machine with the checkout has a free slot", "an account has room"]
+  },
+  { id: "beat-waits", inside: "beat", title: "It waits for the next beat", text: "The beat prints the reason. A decision never starts." },
+  { id: "beat-starts", inside: "beat", title: "It starts", tone: "ok", text: "The beat takes the task and runs the machine's start command." },
+  {
+    id: "beat-also",
+    inside: "beat",
+    title: "Every beat also",
+    points: ["closes the runs that ended", "parks a task whose run stopped on a question", "resumes it once you answer", "carries questions and answers", "flags a run silent for 30 minutes"]
+  },
 
   { id: "attention", inside: "plans", title: "The attention queue", tone: "ask", text: "Every open question waits here.", page: "concepts/attention" },
   { id: "att-question", inside: "attention", title: "A question from a run", tone: "ask", text: "The review raised it, or the agent asked it instead of guessing." },
@@ -82,45 +130,109 @@ export const parts: readonly MapPart[] = [
   { id: "dec-quote", inside: "decider", title: "Can it quote a rule that settles it?", tone: "ask", text: "It may answer only by quoting your rule, word for word." },
 
   { id: "runner", inside: "works", title: "The runner", text: "A queue on the machine, a few tasks at a time.", page: "concepts/runner" },
-  { id: "run", inside: "works", title: "A run", text: "An agent writes the change in its own copy of the project, on a new branch.", page: "concepts/run" },
-  { id: "checks", inside: "works", title: "Checks and review", text: "The agent fixes what the checks refuse. Then a review reads the branch.", page: "concepts/checks-and-review" },
+  { id: "runner-start", mono: true, inside: "runner", title: "orc runner start", text: "Reads the task and queues the run. The beat never waits for it." },
+  { id: "runner-far", inside: "runner", title: "Another machine", text: "The task travels over SSH to orc runner queue there." },
+  { id: "runner-queue", inside: "runner", title: "The queue", tone: "work", text: "The pueue group orc. One slot per running task, and a full machine holds the task back." },
+  { id: "runner-heavy", inside: "runner", title: "One heavy slot", text: "The test runs and builds of every agent take turns, so they cannot overload the machine." },
+  { id: "runner-reach", inside: "runner", title: "A later beat asks the runner", points: ["the state of the run", "to hand it your answers", "to stop it"] },
 
-  { id: "dropped", inside: "ends", title: "Dropped", tone: "end", text: "Before it started." },
+  { id: "run", inside: "works", title: "A run", text: "An agent writes the change in its own copy of the project, on a new branch.", page: "concepts/run" },
+  { id: "run-copy", inside: "run", title: "A copy", text: "A git worktree on a new branch. Your own checkout is never touched." },
+  { id: "run-prepare", inside: "run", title: "Prepare", text: "The project's prepare command, such as an install." },
+  { id: "run-pi", inside: "run", title: "Pi works", tone: "work", text: "The agent writes the change and commits it." },
+  {
+    id: "run-watch",
+    inside: "run",
+    title: "Orc watches Pi",
+    tone: "ask",
+    points: ["silent for 45 minutes: orc stops it", "one command fails 3 times: you are told", "it fails 6 times: orc stops Pi and asks you", "Pi is unsure: it asks instead of guessing"]
+  },
+  { id: "run-record", inside: "run", title: "The record", text: "The task, the logs and the report, under ~/.orc/runs. A resumed run skips the steps that passed." },
+
+  { id: "checks", inside: "works", title: "Checks and review", text: "The agent fixes what the checks refuse. Then a review reads the branch.", page: "concepts/checks-and-review" },
+  { id: "chk-gate", inside: "checks", title: "The checks", tone: "work", text: "The commands the project names in .no-mistakes.yaml." },
+  { id: "chk-fixer", inside: "checks", title: "A fixer", text: "A second Pi gets the failing output and repairs it. Then the checks run again." },
+  { id: "chk-review", inside: "checks", title: "The review", tone: "work", text: "no-mistakes reads the branch, with the task as its intent, and marks each finding." },
+  { id: "chk-findings", inside: "checks", title: "What orc does with a finding", points: ["auto-fix: asks no-mistakes to fix it", "no-op: ignores it", "ask-user: a question that waits"] },
+  { id: "chk-wait", inside: "checks", title: "A question waits at the gate", tone: "ask", text: "For 30 minutes. With no answer the task parks on its branch, and resumes once you answer." },
+  { id: "chk-deliver", inside: "checks", title: "Deliver", text: "A code change is pushed and gets a pull request. Other kinds write a report." },
+
+  { id: "dropped", inside: "ends", title: "Dropped", tone: "end", text: "Before it started, with orc backlog drop." },
   { id: "answered", inside: "ends", title: "Answered", tone: "end", text: "A decision never runs. Your answer closes it." },
   { id: "stopped", inside: "ends", title: "Stopped", tone: "end", text: "You stopped the run." },
   { id: "failed", inside: "ends", title: "Failed", tone: "end", text: "It could not start, it died, or its checks stayed red." },
   { id: "report", inside: "ends", title: "A report", tone: "ok", text: "A task that changes no code. No pull request." },
-  { id: "pull-request", inside: "ends", title: "A pull request", tone: "ok", text: "A code change. You merge it once CI is green." }
+  { id: "pull-request", inside: "ends", title: "A pull request", tone: "ok", text: "A code change, checked and reviewed before it reaches you." },
+  { id: "merge", mono: true, inside: "ends", title: "orc merge", text: "You land the pull request once CI is green.", page: "concepts/merge" },
+  { id: "merge-ask", inside: "merge", title: "Who asks", points: ["you, with orc merge", "the chat, with its merge tool", "the app, with its Approve step"] },
+  { id: "merge-holds", inside: "merge", title: "Do all four hold?", tone: "work", points: ["the task names a pull request", "it is open", "every check reported green", "the branch is not behind its base"] },
+  { id: "merge-refused", inside: "merge", title: "Refused: nothing merges", tone: "end", text: "The refusal names every reason." },
+  { id: "merge-done", inside: "merge", title: "Squash merge", tone: "ok", text: "At the exact commit it checked." },
+  { id: "merge-word", inside: "merge", title: "Whose word merges", text: "Yours. The decider answers no question about merging." }
 ]
 
+// A label has to read true from the folded part too, because a folded part keeps the labels of its inner parts.
 export const links: readonly MapLink[] = [
-  { from: "chat", to: "backlog-new", label: "add a task", tone: "work" },
+  { from: "chat-say", to: "chat-model", tone: "work" },
+  { from: "chat-model", to: "chat-tools", tone: "work" },
+  { from: "chat-tools", to: "backlog-new", label: "add a task", tone: "work" },
+  { from: "app-state", to: "app-commands", tone: "work" },
+  { from: "app-commands", to: "app-herdr", tone: "work" },
+  { from: "app-commands", to: "app-dash", tone: "work" },
+
   { from: "backlog-new", to: "backlog-taken", label: "a beat takes it", tone: "work" },
   { from: "backlog-taken", to: "backlog-closed", label: "the run ends", tone: "work" },
   { from: "backlog-taken", to: "backlog-new", label: "its run stops on a question", tone: "ask" },
   { from: "backlog-closed", to: "backlog-new", label: "orc backlog send-back", tone: "ask" },
-  { from: "backlog-new", to: "beat", tone: "work" },
-  { from: "quota", to: "beat", tone: "work" },
-  { from: "beat", to: "runner", label: "starts a task", tone: "work" },
-  { from: "runner", to: "run", tone: "work" },
-  { from: "run", to: "checks", tone: "work" },
-  { from: "checks", to: "att-question", label: "a question", tone: "ask" },
+  { from: "backlog-new", to: "beat-holds", tone: "work" },
+
+  { from: "quota-config", to: "quota-command", tone: "work" },
+  { from: "quota-command", to: "quota-read", tone: "work" },
+  { from: "quota-read", to: "quota-nothing", label: "no", tone: "ask" },
+  { from: "quota-read", to: "quota-usable", label: "yes", tone: "work" },
+  { from: "quota-usable", to: "quota-most", tone: "work" },
+  { from: "quota-most", to: "beat-holds", tone: "work" },
+
+  { from: "beat-clock", to: "beat-holds", tone: "work" },
+  { from: "beat-holds", to: "beat-starts", label: "yes", tone: "work" },
+  { from: "beat-holds", to: "beat-waits", label: "no", tone: "ask" },
+  { from: "beat-starts", to: "runner-start", label: "starts a task", tone: "work" },
+
+  { from: "runner-start", to: "runner-queue", tone: "work" },
+  { from: "runner-start", to: "runner-far", tone: "work" },
+  { from: "runner-far", to: "runner-queue", tone: "work" },
+  { from: "runner-queue", to: "run-copy", tone: "work" },
+
+  { from: "run-copy", to: "run-prepare", tone: "work" },
+  { from: "run-prepare", to: "run-pi", tone: "work" },
+  { from: "run-pi", to: "chk-gate", tone: "work" },
+
+  { from: "chk-gate", to: "chk-fixer", label: "red", tone: "ask" },
+  { from: "chk-fixer", to: "chk-gate", label: "again", tone: "work" },
+  { from: "chk-gate", to: "chk-review", label: "green", tone: "work" },
+  { from: "chk-review", to: "chk-findings", tone: "work" },
+  { from: "chk-findings", to: "chk-wait", label: "ask-user", tone: "ask" },
+  { from: "chk-findings", to: "chk-deliver", tone: "work" },
+  { from: "chk-wait", to: "att-question", label: "a question", tone: "ask" },
+
   { from: "att-question", to: "att-guarded", tone: "ask" },
   { from: "att-guarded", to: "att-you", label: "yes", tone: "ask" },
-  { from: "att-guarded", to: "dec-reads", label: "no", tone: "ask" },
+  { from: "att-guarded", to: "dec-reads", label: "a routine question", tone: "ask" },
   { from: "dec-reads", to: "dec-quote", tone: "ask" },
-  { from: "dec-quote", to: "att-answered", label: "yes", tone: "ask" },
-  { from: "dec-quote", to: "att-you", label: "no", tone: "ask" },
+  { from: "dec-quote", to: "att-answered", label: "its answer", tone: "ask" },
+  { from: "dec-quote", to: "att-you", label: "it cannot answer", tone: "ask", side: true },
   { from: "att-news", to: "att-you", tone: "ask" },
-  { from: "att-you", to: "chat", label: "the rest wait for you", tone: "ask" },
+  { from: "att-you", to: "chat-posts", label: "the rest wait for you", tone: "ask", side: true },
   { from: "att-you", to: "att-answered", label: "you answer", tone: "work" },
-  { from: "backlog-new", to: "dropped", label: "orc backlog drop", tone: "work" },
-  { from: "kind-decision", to: "answered", tone: "work" },
-  { from: "run", to: "stopped", label: "orc backlog stop", tone: "work" },
-  { from: "checks", to: "failed", label: "red after three fixes", tone: "work" },
-  { from: "checks", to: "report", tone: "work" },
-  { from: "checks", to: "pull-request", tone: "work" },
-  { from: "merge", to: "pull-request", tone: "work" }
+
+  { from: "run-pi", to: "stopped", label: "orc backlog stop", tone: "ask" },
+  { from: "chk-fixer", to: "failed", label: "red after three fixes", tone: "ask" },
+  { from: "chk-deliver", to: "report", tone: "work" },
+  { from: "chk-deliver", to: "pull-request", tone: "work" },
+  { from: "pull-request", to: "merge-ask", tone: "work" },
+  { from: "merge-ask", to: "merge-holds", tone: "work" },
+  { from: "merge-holds", to: "merge-done", label: "yes", tone: "work" },
+  { from: "merge-holds", to: "merge-refused", label: "no", tone: "ask" }
 ]
 
 export const childrenOf = (id: string | undefined): readonly MapPart[] => parts.filter((part) => part.inside === id)
@@ -129,25 +241,31 @@ export const folds = (id: string): boolean => parts.some((part) => part.inside =
 
 const byId = new Map(parts.map((part) => [part.id, part]))
 
-// The nearest part on screen: a part hidden inside a folded one stands as that folded part.
-export const shownAs = (id: string, open: ReadonlySet<string>): string => {
+export const pathTo = (id: string): readonly string[] => {
   const chain: string[] = []
   for (let part = byId.get(id); part !== undefined; part = part.inside === undefined ? undefined : byId.get(part.inside)) chain.unshift(part.id)
+  return chain
+}
+
+// The nearest part on screen: a part hidden inside a folded one stands as that folded part.
+export const shownAs = (id: string, open: ReadonlySet<string>): string => {
+  const chain = pathTo(id)
   const firstFolded = chain.findIndex((step, index) => index < chain.length - 1 && !open.has(step))
   return firstFolded === -1 ? id : (chain[firstFolded] ?? id)
 }
 
-export const shownLinks = (open: ReadonlySet<string>): readonly MapLink[] => {
+export const shownLinks = (open: ReadonlySet<string>): readonly ShownLink[] => {
   const seen = new Set<string>()
   return links.flatMap((link) => {
     const from = shownAs(link.from, open)
     const to = shownAs(link.to, open)
     const key = from + ">" + to
-    if (from === to || seen.has(key)) return []
+    if (from === to || seen.has(key) || (link.side === true && from !== link.from)) return []
     seen.add(key)
-    const lifted = from !== link.from || to !== link.to
-    return [{ from, to, tone: link.tone, ...(lifted || link.label === undefined ? {} : { label: link.label }) }]
+    return [{ from, to, tone: link.tone, ...(link.label === undefined ? {} : { label: link.label }) }]
   })
 }
 
 export const shownParts = (open: ReadonlySet<string>): readonly MapPart[] => parts.filter((part) => shownAs(part.id, open) === part.id)
+
+export const titleOf = (id: string): string => byId.get(id)?.title ?? id

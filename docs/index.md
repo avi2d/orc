@@ -7,6 +7,8 @@ kind: explanation
 
 Orc takes work you describe, runs an AI agent on it on one of your machines, checks the result, and hands you a pull request or a report.
 
+[Open the interactive map](map/index.md){.map-open}
+
 ![How orc works: every part, and every way a task ends](diagrams/how-orc-works.svg)
 
 Solid arrows are the path of the work.
