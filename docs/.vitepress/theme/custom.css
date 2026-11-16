@@ -37,3 +37,80 @@
   display: block;
   overflow-x: auto;
 }
+
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+.diagram {
+  display: block;
+  margin: 20px 0;
+}
+
+.diagram svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.diagram-wide,
+.diagram-tall {
+  display: block;
+}
+
+.diagram-tall {
+  max-width: 420px;
+  margin-inline: auto;
+}
+
+@media (min-width: 720px) {
+  .diagram-wide + .diagram-tall {
+    display: none;
+  }
+}
+
+@media (max-width: 719.98px) {
+  .diagram-wide:has(+ .diagram-tall) {
+    display: none;
+  }
+}
+
+.wide-page .VPDoc .container,
+.wide-page .VPDoc .content,
+.wide-page .VPDoc .content-container {
+  max-width: none;
+}
+
+.wide-page .vp-doc > div > * {
+  max-width: 688px;
+}
+
+.wide-page .vp-doc > div > p:has(.diagram),
+.wide-page .vp-doc > div > .demo-variants {
+  max-width: none;
+}
+
+.demo-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.demo-switch button {
+  padding: 6px 14px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.demo-switch button[aria-pressed="true"] {
+  border-color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
+}

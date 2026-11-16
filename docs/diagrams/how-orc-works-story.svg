@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 952 464" class="orc-d" role="img" aria-labelledby="how-orc-works-story-title how-orc-works-story-desc">
+<title id="how-orc-works-story-title">How orc works: one task in six scenes</title>
+<desc id="how-orc-works-story-desc">You describe the work. The backlog keeps it as one file per task. The beat picks what starts, on a machine with a free slot and an account with room. The runner queues it, an agent writes the change, the checks and a review judge it, and a pull request opens that you merge. A run's question waits in the attention queue, where a small model answers the routine ones from your rules and you answer the rest.</desc>
+<style>.orc-d {
+  color-scheme: light dark;
+  --d-ink: light-dark(#1f2328, #e8eaed);
+  --d-mute: light-dark(#57606a, #a3abb5);
+  --d-line: light-dark(#c8cdd5, #474d57);
+  --d-card: light-dark(#ffffff, #22252b);
+  --d-zone: light-dark(#f3f4f6, #17191d);
+  --d-work: light-dark(#3451b2, #a8b1ff);
+  --d-work-soft: light-dark(#e8ebfc, #272c52);
+  --d-on-work: light-dark(#ffffff, #14162b);
+  --d-ask: light-dark(#8a5a00, #e9b949);
+  --d-ask-soft: light-dark(#fff3d1, #3a300f);
+  --d-ok: light-dark(#17794c, #48d597);
+  --d-ok-soft: light-dark(#def5e8, #12301f);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.orc-d text { fill: var(--d-mute); font-size: 12.5px; }
+.orc-d .title { fill: var(--d-ink); font-size: 14px; font-weight: 650; }
+.orc-d .big { fill: var(--d-ink); font-size: 15.5px; font-weight: 650; }
+.orc-d .label { fill: var(--d-mute); font-size: 12px; font-weight: 600; }
+.orc-d .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; fill: var(--d-ink); }
+.orc-d .ask-text { fill: var(--d-ask); font-weight: 600; }
+.orc-d .work-text { fill: var(--d-work); font-weight: 600; }
+.orc-d .ok-text { fill: var(--d-ok); font-weight: 600; }
+.orc-d .zone { fill: var(--d-zone); stroke: var(--d-line); }
+.orc-d .card { fill: var(--d-card); stroke: var(--d-line); }
+.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); }
+.orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); }
+.orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); }
+.orc-d .line { fill: none; stroke: var(--d-mute); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .line-work { fill: none; stroke: var(--d-work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .line-ask { fill: none; stroke: var(--d-ask); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
+.orc-d .line-ok { fill: none; stroke: var(--d-ok); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .faint { fill: none; stroke: var(--d-line); stroke-width: 3; stroke-linecap: round; }
+.orc-d .head-work { fill: var(--d-work); }
+.orc-d .head-ask { fill: var(--d-ask); }
+.orc-d .head-mute { fill: var(--d-mute); }
+.orc-d .dot-work { fill: var(--d-work); }
+.orc-d .dot-ask { fill: var(--d-ask); }
+.orc-d .dot-ok { fill: var(--d-ok); }
+.orc-d .dot-mute { fill: var(--d-line); }
+.orc-d .num { fill: var(--d-on-work); font-size: 13px; font-weight: 700; }
+.orc-d .num-ask { fill: var(--d-card); font-size: 13px; font-weight: 700; }
+</style>
+<rect x="8" y="8" width="304" height="218" rx="14" class="card"/>
+<rect x="20" y="20" width="280" height="112" rx="10" class="zone"/>
+<rect x="44" y="40" width="112" height="56" rx="14" class="card"/>
+<path d="M68,96 l-8,16 l24,-16" class="card"/>
+<path d="M60,58 h80" class="faint"/>
+<path d="M60,70 h80" class="faint"/>
+<path d="M60,82 h48" class="faint"/>
+<path d="M168,68 L200,68" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(200,68) rotate(0)"/>
+<rect x="210" y="32" width="70" height="88" rx="6" class="card-work"/>
+<text x="220" y="54" class="code" text-anchor="start"><tspan x="220" dy="0">orc-9</tspan></text>
+<path d="M220,70 h50" class="faint"/>
+<path d="M220,82 h50" class="faint"/>
+<path d="M220,94 h30" class="faint"/>
+<circle cx="34" cy="158" r="12" class="dot-work"/><text x="34" y="162.5" class="num" text-anchor="middle"><tspan x="34" dy="0">1</tspan></text>
+<text x="54" y="163" class="big" text-anchor="start"><tspan x="54" dy="0">You say what you want</tspan></text>
+<text x="22" y="191" class="" text-anchor="start"><tspan x="22" dy="0">Tell the chat, or add a task file.</tspan><tspan x="22" dy="17">Each task is one file in the backlog.</tspan></text>
+<rect x="324" y="8" width="304" height="218" rx="14" class="card"/>
+<rect x="336" y="20" width="280" height="112" rx="10" class="zone"/>
+<circle cx="390" cy="76" r="30" class="card"/>
+<path d="M390,76 V58 M390,76 H403.5" class="line"/>
+<rect x="448" y="30" width="150" height="26" rx="6" class="card-work"/>
+<text x="458" y="47.5" class="" text-anchor="start"><tspan x="458" dy="0">orc-9</tspan></text>
+<text x="588" y="47.5" class="work-text" text-anchor="end"><tspan x="588" dy="0">starts</tspan></text>
+<rect x="448" y="63" width="150" height="26" rx="6" class="card"/>
+<text x="458" y="80.5" class="" text-anchor="start"><tspan x="458" dy="0">orc-10</tspan></text>
+<text x="588" y="80.5" class="" text-anchor="end"><tspan x="588" dy="0">waits</tspan></text>
+<rect x="448" y="96" width="150" height="26" rx="6" class="card"/>
+<text x="458" y="113.5" class="" text-anchor="start"><tspan x="458" dy="0">orc-11</tspan></text>
+<text x="588" y="113.5" class="" text-anchor="end"><tspan x="588" dy="0">waits</tspan></text>
+<circle cx="350" cy="158" r="12" class="dot-work"/><text x="350" y="162.5" class="num" text-anchor="middle"><tspan x="350" dy="0">2</tspan></text>
+<text x="370" y="163" class="big" text-anchor="start"><tspan x="370" dy="0">The beat picks what can start</tspan></text>
+<text x="338" y="191" class="" text-anchor="start"><tspan x="338" dy="0">Every few minutes it looks for a free</tspan><tspan x="338" dy="17">machine and an account with room.</tspan></text>
+<rect x="640" y="8" width="304" height="218" rx="14" class="card"/>
+<rect x="652" y="20" width="280" height="112" rx="10" class="zone"/>
+<rect x="672" y="32" width="156" height="88" rx="8" class="card"/>
+<circle cx="684" cy="44" r="3" class="dot-mute"/>
+<circle cx="694" cy="44" r="3" class="dot-mute"/>
+<circle cx="704" cy="44" r="3" class="dot-mute"/>
+<path d="M684,64 l6,5 l-6,5" class="line-work"/>
+<path d="M698,69 h70" class="faint"/>
+<path d="M684,86 h110" class="faint"/>
+<path d="M684,100 h84" class="faint"/>
+<path d="M860,36 V116" class="line"/>
+<circle cx="860" cy="40" r="5" class="dot-mute"/>
+<circle cx="860" cy="108" r="5" class="dot-mute"/>
+<path d="M860,108 C860,80 896,96 896,70 V46" class="line-work"/>
+<circle cx="896" cy="70" r="5" class="dot-work"/>
+<circle cx="896" cy="46" r="5" class="dot-work"/>
+<circle cx="666" cy="158" r="12" class="dot-work"/><text x="666" y="162.5" class="num" text-anchor="middle"><tspan x="666" dy="0">3</tspan></text>
+<text x="686" y="163" class="big" text-anchor="start"><tspan x="686" dy="0">An agent writes the change</tspan></text>
+<text x="654" y="191" class="" text-anchor="start"><tspan x="654" dy="0">On that machine, in its own copy of</tspan><tspan x="654" dy="17">the project, on a new branch.</tspan></text>
+<rect x="8" y="238" width="304" height="218" rx="14" class="card"/>
+<rect x="20" y="250" width="280" height="112" rx="10" class="zone"/>
+<rect x="40" y="272" width="106" height="40" rx="8" class="card"/>
+<text x="54" y="297" class="title" text-anchor="start"><tspan x="54" dy="0">Checks</tspan></text>
+<circle cx="128" cy="292" r="9" class="dot-ok"/><path d="M124,292 l3,3.2 l5.2,-6" fill="none" stroke="var(--d-card)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M150,292 L172,292" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(172,292) rotate(0)"/>
+<rect x="176" y="272" width="106" height="40" rx="8" class="card"/>
+<text x="190" y="297" class="title" text-anchor="start"><tspan x="190" dy="0">Review</tspan></text>
+<circle cx="264" cy="292" r="9" class="dot-ok"/><path d="M260,292 l3,3.2 l5.2,-6" fill="none" stroke="var(--d-card)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M120,314 L120,336 L66,336 L66,316" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(66,316) rotate(-90)"/>
+<text x="132" y="340" class="ask-text" text-anchor="start"><tspan x="132" dy="0">refused: fix and run again</tspan></text>
+<circle cx="34" cy="388" r="12" class="dot-work"/><text x="34" y="392.5" class="num" text-anchor="middle"><tspan x="34" dy="0">4</tspan></text>
+<text x="54" y="393" class="big" text-anchor="start"><tspan x="54" dy="0">Checks and a review judge it</tspan></text>
+<text x="22" y="421" class="" text-anchor="start"><tspan x="22" dy="0">The agent fixes what the checks refuse.</tspan><tspan x="22" dy="17">Then a review reads the branch.</tspan></text>
+<rect x="324" y="238" width="304" height="218" rx="14" class="card"/>
+<rect x="336" y="250" width="280" height="112" rx="10" class="zone"/>
+<rect x="356" y="266" width="132" height="80" rx="8" class="card"/>
+<text x="368" y="290" class="title" text-anchor="start"><tspan x="368" dy="0">Pull request</tspan></text>
+<path d="M368,306 h96" class="faint"/>
+<circle cx="378" cy="326" r="9" class="dot-ok"/><path d="M374,326 l3,3.2 l5.2,-6" fill="none" stroke="var(--d-card)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="394" y="330.5" class="ok-text" text-anchor="start"><tspan x="394" dy="0">CI green</tspan></text>
+<path d="M494,306 L522,306" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(522,306) rotate(0)"/>
+<rect x="526" y="288" width="72" height="36" rx="18" class="card-ok"/>
+<text x="562" y="310.5" class="ok-text" text-anchor="middle"><tspan x="562" dy="0">merged</tspan></text>
+<circle cx="350" cy="388" r="12" class="dot-work"/><text x="350" y="392.5" class="num" text-anchor="middle"><tspan x="350" dy="0">5</tspan></text>
+<text x="370" y="393" class="big" text-anchor="start"><tspan x="370" dy="0">You merge the pull request</tspan></text>
+<text x="338" y="421" class="" text-anchor="start"><tspan x="338" dy="0">It opens after the review. <tspan class="code">orc merge</tspan></tspan><tspan x="338" dy="17">lands it once CI is green.</tspan></text>
+<rect x="640" y="238" width="304" height="218" rx="14" class="card"/>
+<rect x="652" y="250" width="280" height="112" rx="10" class="zone"/>
+<rect x="668" y="288" width="70" height="36" rx="8" class="card-ask"/>
+<text x="703" y="311" class="ask-text" text-anchor="middle"><tspan x="703" dy="0">orc-9  ?</tspan></text>
+<path d="M742,300 L764,300 L764,278 L786,278" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(786,278) rotate(0)"/>
+<path d="M742,312 L764,312 L764,334 L786,334" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(786,334) rotate(0)"/>
+<rect x="790" y="260" width="128" height="36" rx="8" class="card"/>
+<text x="854" y="283" class="" text-anchor="middle"><tspan x="854" dy="0">a small model</tspan></text>
+<rect x="790" y="316" width="128" height="36" rx="8" class="card"/>
+<text x="854" y="339" class="" text-anchor="middle"><tspan x="854" dy="0">you</tspan></text>
+<circle cx="666" cy="388" r="12" class="dot-work"/><text x="666" y="392.5" class="num" text-anchor="middle"><tspan x="666" dy="0">6</tspan></text>
+<text x="686" y="393" class="big" text-anchor="start"><tspan x="686" dy="0">A question stops only that task</tspan></text>
+<text x="654" y="421" class="" text-anchor="start"><tspan x="654" dy="0">A small model answers routine ones from</tspan><tspan x="654" dy="17">your rules. The rest come to you in the chat.</tspan></text>
+</svg>

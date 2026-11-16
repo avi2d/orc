@@ -1,4 +1,20 @@
+import { existsSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 import { defineConfig, type DefaultTheme } from "vitepress"
+
+const base = process.env["DOCS_BASE"] ?? "/orc/"
+
+const diagrams = join(import.meta.dirname, "..", "diagrams")
+
+const diagramFile = /(?:^|\/)diagrams\/([\w-]+)\.svg$/
+
+const inlineSvg = (file: string, layout: string): string =>
+  existsSync(file)
+    ? '<span class="diagram-' + layout + '">' + readFileSync(file, "utf8").replace(/<style>[\s\S]*?<\/style>/, "") + "</span>"
+    : ""
+
+const diagram = (name: string): string =>
+  '<span class="diagram" v-pre>' + inlineSvg(join(diagrams, name + ".svg"), "wide") + inlineSvg(join(diagrams, name + ".tall.svg"), "tall") + "</span>"
 
 const page = (text: string, link: string): DefaultTheme.SidebarItem => ({ text, link })
 
@@ -79,8 +95,9 @@ const isHtmlTag = (markup: string): boolean => htmlTags.has((/^<\/?([A-Za-z][\w-
 export default defineConfig({
   title: "orc",
   description: "How orc runs AI agent tasks across your machines, and how to use it",
-  base: "/orc/",
-  head: [["link", { rel: "icon", type: "image/svg+xml", href: "/orc/favicon.svg" }]],
+  base,
+  head: [["link", { rel: "icon", type: "image/svg+xml", href: base + "favicon.svg" }]],
+  srcExclude: process.env["DOCS_DEMO"] === undefined ? ["demo/**"] : [],
   cleanUrls: true,
   lastUpdated: true,
   rewrites: { "adr/README.md": "adr/index.md" },
@@ -94,6 +111,12 @@ export default defineConfig({
           return fence === undefined ? self.renderToken(tokens, index, options) : fence(tokens, index, options, env, self)
         }
         return "<MermaidDiagram code=\"" + encodeURIComponent(token.content) + "\" />"
+      }
+      const image = md.renderer.rules.image
+      md.renderer.rules.image = (tokens, index, options, env, self) => {
+        const name = diagramFile.exec(tokens.at(index)?.attrGet("src") ?? "")?.[1]
+        if (name !== undefined) return diagram(name)
+        return image === undefined ? self.renderToken(tokens, index, options) : image(tokens, index, options, env, self)
       }
       // Vue compiles each page as a template, so a placeholder such as <folder> in prose would be read as an unclosed element.
       md.renderer.rules.html_inline = (tokens, index) => {
