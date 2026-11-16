@@ -34,6 +34,6 @@ export const MermaidDiagram = defineComponent({
     return () =>
       svg.value === ""
         ? h("pre", { class: "mermaid-diagram mermaid-diagram-source" }, source)
-        : h("div", { class: "mermaid-diagram", role: "img", innerHTML: svg.value })
+        : h("div", { class: "mermaid-diagram", innerHTML: svg.value })
   }
 })

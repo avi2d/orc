@@ -69,13 +69,6 @@ const sessionQuota = [
 
 const repository = "https://github.com/avi2d/orc"
 
-// A link out of docs/ names a file of the repository, which the site does not hold.
-const leavesTheSite = /^(?:\.\.\/)+(?!docs\/)/
-
-const htmlTags = new Set(["a", "b", "br", "code", "details", "em", "i", "img", "kbd", "span", "strong", "sub", "summary", "sup"])
-
-const isHtmlTag = (markup: string): boolean => htmlTags.has((/^<\/?([A-Za-z][\w-]*)/.exec(markup)?.[1] ?? "").toLowerCase())
-
 export default defineConfig({
   title: "orc",
   description: "How orc runs AI agent tasks across your machines, and how to use it",
@@ -84,7 +77,6 @@ export default defineConfig({
   cleanUrls: true,
   lastUpdated: true,
   rewrites: { "adr/README.md": "adr/index.md" },
-  ignoreDeadLinks: [leavesTheSite],
   markdown: {
     config: (md) => {
       const fence = md.renderer.rules.fence
@@ -96,10 +88,7 @@ export default defineConfig({
         return "<MermaidDiagram code=\"" + encodeURIComponent(token.content) + "\" />"
       }
       // Vue compiles each page as a template, so a placeholder such as <folder> in prose would be read as an unclosed element.
-      md.renderer.rules.html_inline = (tokens, index) => {
-        const markup = tokens.at(index)?.content ?? ""
-        return isHtmlTag(markup) ? markup : md.utils.escapeHtml(markup)
-      }
+      md.renderer.rules.html_inline = (tokens, index) => md.utils.escapeHtml(tokens.at(index)?.content ?? "")
     }
   },
   themeConfig: {

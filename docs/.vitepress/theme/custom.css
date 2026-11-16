@@ -32,8 +32,3 @@
   font-size: 12px;
   white-space: pre-wrap;
 }
-
-.vp-doc table {
-  display: block;
-  overflow-x: auto;
-}
