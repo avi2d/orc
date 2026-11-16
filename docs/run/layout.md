@@ -184,7 +184,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/entities/backlog/runner-label.ts` | The task branch names, the run labels and the file keys the runner files use |
 | `packages/run/src/entities/backlog/task-kind.ts` | The task, run and report kinds, the agent report file name and the run folder |
 | `packages/run/src/entities/backlog/task-record-render.ts` | The task file rendering from a task record |
-| `packages/run/src/entities/backlog/task-record-answer.ts` | The answer to a parked question: the captain's or the decider's, and the decider's answer the captain's replaced |
+| `packages/run/src/entities/backlog/task-record-answer.ts` | The answer to a parked question: yours or the decider's, and the decider's answer yours replaced |
 | `packages/run/src/entities/backlog/notes.ts` | The task notes under `notes/`: one `<task-id>.jsonl` file per task, each note one appended line with its time, writer and text |
 
 ## entities/events
@@ -235,7 +235,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/entities/review-gate/no-mistakes.ts` | The no-mistakes step: the gate answers, the refusals and the findings it records |
-| `packages/run/src/entities/review-gate/answer-wait.ts` | The wait at a no-mistakes gate for the captain’s answers in the run folder |
+| `packages/run/src/entities/review-gate/answer-wait.ts` | The wait at a no-mistakes gate for your answers in the run folder |
 | `packages/run/src/entities/review-gate/no-mistakes-drive-log.ts` | The no-mistakes drive log: the run record it keeps and the ending it reports |
 | `packages/run/src/entities/review-gate/no-mistakes-gate.ts` | The no-mistakes gate output parsing: the findings, the open questions, the gate answers and the respond arguments |
 

@@ -12,7 +12,7 @@ Orc takes work you describe, runs an AI agent on it on one of your machines, che
 Solid arrows are the path of the work.
 Dotted arrows are the questions a run asks on the way and the answers that come back.
 
-You are the captain: you say what needs doing, you answer the questions only you can answer, and you say when a pull request lands.
+You say what needs doing, you answer the questions only you can answer, and you say when a pull request lands.
 
 ## The path of one task
 
@@ -78,7 +78,6 @@ Its state is files on disk and queues in pueue, so a restart picks up where it s
 
 | Word | What it means |
 | --- | --- |
-| Captain | You, the person who owns the work and gives the answers |
 | Task | One piece of work in the backlog, with an id such as `orc-9` |
 | Run | One attempt at a task by `orc run`, with its own branch and its own record |
 | Beat | One pass of `orc beat`, which starts what can start and closes what finished |

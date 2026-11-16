@@ -24,7 +24,7 @@ const wide = (): void => {
     zone(228, 8, 484, 480, "The machine that plans"),
     zone(732, 8, 220, 480, "You"),
     card(18, 42, 180, 120, question),
-    card(18, 212, 180, 150, news),
+    card(18, 212, 180, 172, news),
     card(240, 42, 216, 108, queue),
     card(240, 196, 216, 190, guarded),
     card(486, 42, 216, 124, decider),
@@ -42,7 +42,7 @@ const wide = (): void => {
     text(721, 324, "no", "ask-text", "middle"),
     arrow([[348, 386], [348, 426], [822, 426], [822, 368]], "ask"),
     text(360, 420, "yes: it goes straight to you", "ask-text"),
-    arrow([[108, 362], [108, 458], [876, 458], [876, 368]], "ask"),
+    arrow([[108, 384], [108, 458], [876, 458], [876, 368]], "ask"),
     text(120, 452, "it waits for you", "ask-text"),
     arrow([[842, 226], [842, 128]], "work")
   ]

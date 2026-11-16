@@ -1,38 +1,3 @@
-.mermaid-diagram {
-  margin: 20px 0;
-  padding: 16px 8px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 8px;
-  background: var(--vp-c-bg-soft);
-  text-align: center;
-  overflow: hidden;
-}
-
-.mermaid-diagram svg {
-  max-width: 100%;
-  height: auto;
-}
-
-.vp-doc .mermaid-diagram p {
-  margin: 0;
-  line-height: inherit;
-}
-
-@media (max-width: 640px) {
-  .vp-doc .mermaid-diagram {
-    margin-inline: -24px;
-    padding-inline: 4px;
-    border-inline: 0;
-    border-radius: 0;
-  }
-}
-
-.mermaid-diagram-source {
-  text-align: left;
-  font-size: 12px;
-  white-space: pre-wrap;
-}
-
 .vp-doc table {
   display: block;
   overflow-x: auto;

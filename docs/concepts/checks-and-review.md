@@ -1,4 +1,6 @@
 ---
+aside: false
+pageClass: wide-page
 kind: explanation
 ---
 # Checks and review
@@ -6,26 +8,7 @@ kind: explanation
 A code change passes two gates before you see it: the project's own checks, and a review.
 Both run inside the run, so a pull request that reaches you has already passed them.
 
-```mermaid
-flowchart TD
-  commit[Pi's commits on the branch]
-  checks{Checks from<br/>.no-mistakes.yaml}
-  fix[A fixer Pi repairs<br/>what failed]
-  failed([The run fails,<br/>no pull request opens])
-  review{no-mistakes reviews<br/>the branch}
-  auto[no-mistakes fixes<br/>the finding]
-  ask[The decider or<br/>you answer it]
-  pr([Pull request with green CI])
-  commit --> checks
-  checks -- red --> fix
-  fix -- checks again --> checks
-  fix -- red after 3 fixes --> failed
-  checks -- green --> review
-  review -- auto-fix --> auto
-  review -- ask-user --> ask
-  auto --> pr
-  ask --> pr
-```
+![Checks and review: the two gates a code change passes](../diagrams/checks.svg)
 
 ## The checks
 

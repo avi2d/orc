@@ -29,7 +29,7 @@ The chat's Pi has eight tools and no others:
 - `merge_task` lands a closed task's PR through `orc merge <task-id> --basis <basis>`, as [Merging a task's PR](merging-a-tasks-pr.md) shows.
 - `orc_decision_board` opens a decision board for one held task, one parked task, or one started task waiting at its gate, as [Decision boards](chat.md#decision-boards) shows.
 
-So a task from the chat waits until the captain gives it a priority with `orc backlog priority <task-id> <0-4>`.
+So a task from the chat waits until you give it a priority with `orc backlog priority <task-id> <0-4>`.
 When it starts and every 15 seconds after, the chat reads `orc backlog --json`.
 While Pi is idle, it posts each closed task that has no `postedAt`, with its outcome, its reason and its PR or report, as in `orc-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
 It posts a task whoever added it: this chat, an earlier chat or the command line.
@@ -57,7 +57,7 @@ The chat's Pi also takes the `env` of the orchestrator's provider, so the chat a
 Each card has its options and the option the chat recommends.
 A task held with a reason and no questions gets one card for the reason.
 The chat opens the page with `lavish-axi <board.html> --no-open --reopen` and posts its URL on this machine's LAN address, so another device on the same Wi-Fi opens it from the link.
-Anyone on the same network who holds the link can open the board and submit answers, which orc records as the captain's, because the page has no login.
+Anyone on the same network who holds the link can open the board and submit answers, which orc records as yours, because the page has no login.
 The board is never published through `lavish-axi share`, a third-party host, or a public tunnel.
 To name the address the board binds, set `ORC_BOARD_HOST` to a hostname or IP address.
 Orc passes it to `lavish-axi` as `LAVISH_AXI_HOST`, which binds that address plus loopback and prints the session link on it.

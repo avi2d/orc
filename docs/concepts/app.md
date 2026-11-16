@@ -1,4 +1,6 @@
 ---
+aside: false
+pageClass: wide-page
 kind: explanation
 ---
 # The app and the dashboard
@@ -6,22 +8,7 @@ kind: explanation
 Orc has two screens, a layout for the Herdr App and the `orc-dash` terminal dashboard, and neither holds any state of its own.
 Both only run the `orc` commands and draw what those commands print, so the screens and the command line never disagree.
 
-```mermaid
-flowchart TD
-  files[(Files in ~/.orc<br/>and the pueue queues)]
-  cli[orc backlog, orc runs,<br/>orc attention as JSON]
-  dash[orc-dash snapshot]
-  board[Board tab]
-  agents[Agents tab]
-  resources[Resources tab]
-  drawer[Chat drawer<br/>runs orc chat]
-  files --> cli
-  files --> dash
-  cli --> board
-  cli --> agents
-  dash --> resources
-  drawer -- backlog commands --> files
-```
+![The app and the dashboard: two screens over the same commands](../diagrams/app.svg)
 
 ## The Board tab
 

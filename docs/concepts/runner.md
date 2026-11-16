@@ -1,4 +1,6 @@
 ---
+aside: false
+pageClass: wide-page
 kind: explanation
 ---
 # The runner
@@ -6,22 +8,7 @@ kind: explanation
 The runner is the part of orc on each machine that keeps a run alive after the beat has gone.
 `orc runner start` is the start command the beat runs, and it hands the task to pueue, the queue on that machine.
 
-```mermaid
-flowchart TD
-  beat{{orc beat}}
-  start[orc runner start]
-  far[orc runner queue<br/>on the far machine]
-  pueue[(pueue group orc<br/>one slot per running task)]
-  run[orc run on branch<br/>orc/task-id]
-  result[orc runner result]
-  beat -- task in ORC_TASK variables --> start
-  start -- this machine --> pueue
-  start -- another machine,<br/>task as JSON over SSH --> far
-  far --> pueue
-  pueue --> run
-  run --> result
-  result -- read by a later beat --> beat
-```
+![The runner: what keeps a run alive on its machine](../diagrams/runner.svg)
 
 ## The hand-off
 

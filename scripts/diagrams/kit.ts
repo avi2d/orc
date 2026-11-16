@@ -54,7 +54,7 @@ const wrapWith = (value: string, width: number, plain: number, code: number): st
   return lines
 }
 
-export const wrapText = (value: string, width: number): string[] => wrapWith(value, width, 6.1, 7.1)
+export const wrapText = (value: string, width: number): string[] => wrapWith(value, width, 6.3, 7.1)
 export const wrapTitle = (value: string, width: number): string[] => wrapWith(value, width, 7.7, 8.2)
 
 export const text = (x: number, y: number, lines: string | readonly string[], cls = "", anchor = "start", lineHeight = 16): string => {
@@ -107,6 +107,7 @@ export const cardHeight = (part: Part, w: number): number => {
 }
 
 export const card = (x: number, y: number, w: number, h: number, part: Part): string => {
+  if (cardHeight(part, w) > h) throw new Error(part.title + " needs " + cardHeight(part, w) + " and has " + h)
   const lines = cardLines(part, w)
   const bodyTop = y + 14 + lines.title.length * 18 + 14
   const inner = [

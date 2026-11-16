@@ -1,4 +1,6 @@
 ---
+aside: false
+pageClass: wide-page
 kind: explanation
 ---
 # The chat
@@ -6,19 +8,7 @@ kind: explanation
 `orc chat` is the front door: you say the work in plain words, and it turns your words into backlog commands.
 The chat is a Pi session with eight tools and no others, so it can change the backlog and nothing else.
 
-```mermaid
-flowchart TD
-  you([You])
-  chat[orc chat<br/>the orchestrator model]
-  tools[Eight tools, each one<br/>an orc command]
-  backlog[(The backlog)]
-  news[Closed tasks, questions,<br/>alerts and PR events]
-  you -- say the work, answer,<br/>say merge --> chat
-  chat --> tools
-  tools --> backlog
-  backlog -- read every 15 seconds --> news
-  news -- posted to you --> chat
-```
+![The chat: your words in, backlog commands out](../diagrams/chat.svg)
 
 ## What the chat can do
 

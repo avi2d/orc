@@ -1,4 +1,6 @@
 ---
+aside: false
+pageClass: wide-page
 kind: explanation
 ---
 # A run
@@ -6,23 +8,7 @@ kind: explanation
 A run is one attempt at one task by `orc run`, from a task file to a pull request or a report.
 The beat starts most runs through the runner, and you can start one by hand in any clean checkout with `orc run <task-file>`.
 
-```mermaid
-flowchart TD
-  copy[Copy the project to a<br/>worktree on a new branch]
-  prepare[Run the prepare command]
-  pi[Pi works and commits,<br/>then prints ORC_COMPLETE]
-  checks{The project's checks}
-  fix[A fixer Pi repairs<br/>what failed]
-  deliver[Deliver: review,<br/>push and pull request]
-  record[(The run folder:<br/>logs, session, report)]
-  copy --> prepare
-  prepare --> pi
-  pi --> checks
-  checks -- red, up to 3 fixes --> fix
-  fix --> checks
-  checks -- green --> deliver
-  deliver --> record
-```
+![A run: one attempt at one task](../diagrams/run.svg)
 
 ## An isolated copy
 

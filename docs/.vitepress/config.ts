@@ -160,14 +160,6 @@ export default defineConfig({
   ignoreDeadLinks: [leavesTheSite],
   markdown: {
     config: (md) => {
-      const fence = md.renderer.rules.fence
-      md.renderer.rules.fence = (tokens, index, options, env, self) => {
-        const token = tokens.at(index)
-        if (token === undefined || token.info.trim() !== "mermaid") {
-          return fence === undefined ? self.renderToken(tokens, index, options) : fence(tokens, index, options, env, self)
-        }
-        return "<MermaidDiagram code=\"" + encodeURIComponent(token.content) + "\" />"
-      }
       const image = md.renderer.rules.image
       md.renderer.rules.image = (tokens, index, options, env, self) => {
         const name = diagramFile.exec(tokens.at(index)?.attrGet("src") ?? "")?.[1]

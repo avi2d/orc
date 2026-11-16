@@ -64,12 +64,10 @@
     "dependency-cruiser": "18.4.0",
     "effect": "4.0.0",
     "jscpd": "5.3.2",
-    "mermaid": "12.3.0",
     "oxlint": "1.83.0",
     "oxlint-tsgolint": "7.0.2002",
     "typescript": "7.0.2",
-    "vitepress": "1.6.4",
-    "vue": "3.5.45"
+    "vitepress": "1.6.4"
   },
   "overrides": {
     "@effect/platform-node-shared": "4.0.0",

@@ -1,4 +1,6 @@
 ---
+aside: false
+pageClass: wide-page
 kind: explanation
 ---
 # The beat
@@ -7,28 +9,7 @@ The beat is one pass of `orc beat`, the command that starts every task that can 
 Orc has no daemon of its own, so cron or launchd runs the beat every few minutes.
 Each beat reads the whole state from disk.
 
-```mermaid
-flowchart TD
-  task([A new task, in priority order])
-  priority{Has a priority?}
-  open{A hold or a question<br/>without an answer?}
-  deps{Everything it<br/>depends on done?}
-  slot{A machine with its checkout<br/>and a free slot?}
-  account{An account<br/>with room?}
-  start[Take the task and run<br/>the machine's start command]
-  wait([It waits for the next beat])
-  task --> priority
-  priority -- yes --> open
-  open -- no --> deps
-  deps -- yes --> slot
-  slot -- yes --> account
-  account -- yes --> start
-  priority -- no --> wait
-  open -- yes --> wait
-  deps -- no --> wait
-  slot -- no --> wait
-  account -- no --> wait
-```
+![The beat: what lets a task start](../diagrams/beat.svg)
 
 ## The five conditions
 

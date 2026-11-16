@@ -1,4 +1,6 @@
 ---
+aside: false
+pageClass: wide-page
 kind: explanation
 ---
 # The merge
@@ -6,25 +8,7 @@ kind: explanation
 Orc never lands a pull request on its own judgment: `orc merge <task-id>` merges a closed task's pull request, and only when it is safe.
 The command exists so that the chat, the App and you all merge through one set of refusals.
 
-```mermaid
-flowchart TD
-  ask([orc merge task-id])
-  has{Does the task<br/>name a pull request?}
-  open{Is it open?}
-  green{Has every check<br/>reported green?}
-  behind{Is the branch<br/>behind its base?}
-  refuse([Refused, and<br/>nothing merges])
-  merge[Squash merge at the<br/>commit it checked]
-  ask --> has
-  has -- yes --> open
-  open -- yes --> green
-  green -- yes --> behind
-  behind -- no --> merge
-  has -- no --> refuse
-  open -- no --> refuse
-  green -- no --> refuse
-  behind -- yes --> refuse
-```
+![The merge: what orc merge checks before it lands a pull request](../diagrams/merge.svg)
 
 ## What the merge refuses
 

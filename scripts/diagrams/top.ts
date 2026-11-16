@@ -25,7 +25,7 @@ const bars = (x: number, y: number): string[] => [
 const limits = bullets(["Still red after three fixes: the run fails.", "A question waits here 30 minutes. Then the task parks on its branch."])
 
 const chat: Part = { step: "1", title: "The chat", text: "Say the work. Answer questions.", href: "chat" }
-const app: Part = { title: "The app and the dashboard", text: "Watch it all. They only read.", href: "app" }
+const app: Part = { title: "The app and the dashboard", text: "Show it all. Hold no state.", href: "app" }
 const merge: Part = { title: "`orc merge`", text: "Land a pull request once CI is green.", href: "merge" }
 const backlog: Part = { step: "2", title: "The backlog", text: "One file per task, in priority order.", href: "backlog", extra: (x, y) => folders(x, y), extraHeight: () => 34 }
 const quota: Part = { title: "Quota", text: "Room left on each account.", cls: "card-work", href: "quota", extra: (x, y) => bars(x, y), extraHeight: () => 30 }

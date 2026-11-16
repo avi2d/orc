@@ -1,4 +1,6 @@
 ---
+aside: false
+pageClass: wide-page
 kind: explanation
 ---
 # Accounts and quota
@@ -6,22 +8,7 @@ kind: explanation
 Orc chooses the account a run spends by reading how much room each account has left, and it takes the one with the most.
 You name the accounts and the command that reads their room once, in the `quota` part of `dispatch.json`.
 
-```mermaid
-flowchart TD
-  command[/The quota command<br/>prints room per account/]
-  read{Did the beat<br/>read the document?}
-  none([The beat starts nothing])
-  usable{Is the account usable,<br/>above 0% and at the floor?}
-  out([The account is left out])
-  most[Take the account<br/>with the most room]
-  token[Hand the run its credential,<br/>by the account's kind]
-  command --> read
-  read -- no --> none
-  read -- yes --> usable
-  usable -- no --> out
-  usable -- yes --> most
-  most --> token
-```
+![Accounts and quota: which account a run spends](../diagrams/quota.svg)
 
 ## The quota command
 

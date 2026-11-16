@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 1334" class="orc-d" role="img" aria-labelledby="d-checks-tall-title d-checks-tall-desc">
+<title id="d-checks-tall-title">Checks and review: the two gates a code change passes</title>
+<desc id="d-checks-tall-desc">After Pi commits, orc runs the project's checks. When one fails, a fixer repairs it and the checks run again, and after three fixes with a check still red the run fails and no pull request opens. Once the checks are green, no-mistakes reviews the branch. Orc has it fix a finding marked auto-fix, ignores no-op, and treats ask-user as a question that waits at the gate for 30 minutes before the task parks on its branch. Then no-mistakes pushes the branch, opens the pull request and waits for green CI. The project's mode decides which of these a ship task goes through.</desc>
+<style>.orc-d {
+  color-scheme: light dark;
+  --d-ink: light-dark(#1f2328, #e8eaed);
+  --d-mute: light-dark(#57606a, #a3abb5);
+  --d-line: light-dark(#c8cdd5, #474d57);
+  --d-card: light-dark(#ffffff, #22252b);
+  --d-zone: light-dark(#f3f4f6, #17191d);
+  --d-work: light-dark(#3451b2, #a8b1ff);
+  --d-work-soft: light-dark(#e8ebfc, #272c52);
+  --d-on-work: light-dark(#ffffff, #14162b);
+  --d-ask: light-dark(#8a5a00, #e9b949);
+  --d-ask-soft: light-dark(#fff3d1, #3a300f);
+  --d-ok: light-dark(#17794c, #48d597);
+  --d-ok-soft: light-dark(#def5e8, #12301f);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.orc-d text { fill: var(--d-mute); font-size: 12.5px; }
+.orc-d .title { fill: var(--d-ink); font-size: 14px; font-weight: 650; }
+.orc-d .big { fill: var(--d-ink); font-size: 15.5px; font-weight: 650; }
+.orc-d .label { fill: var(--d-mute); font-size: 12px; font-weight: 600; }
+.orc-d .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; fill: var(--d-ink); }
+.orc-d .ask-text { fill: var(--d-ask); font-weight: 600; }
+.orc-d .work-text { fill: var(--d-work); font-weight: 600; }
+.orc-d .ok-text { fill: var(--d-ok); font-weight: 600; }
+.orc-d .zone { fill: var(--d-zone); stroke: var(--d-line); }
+.orc-d .card { fill: var(--d-card); stroke: var(--d-line); }
+.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); }
+.orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); }
+.orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); }
+.orc-d .line { fill: none; stroke: var(--d-mute); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .line-work { fill: none; stroke: var(--d-work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .line-ask { fill: none; stroke: var(--d-ask); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
+.orc-d .line-ok { fill: none; stroke: var(--d-ok); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .faint { fill: none; stroke: var(--d-line); stroke-width: 3; stroke-linecap: round; }
+.orc-d .head-work { fill: var(--d-work); }
+.orc-d .head-ask { fill: var(--d-ask); }
+.orc-d .head-mute { fill: var(--d-mute); }
+.orc-d .dot-work { fill: var(--d-work); }
+.orc-d .dot-ask { fill: var(--d-ask); }
+.orc-d .dot-ok { fill: var(--d-ok); }
+.orc-d .dot-mute { fill: var(--d-line); }
+.orc-d .num { fill: var(--d-on-work); font-size: 13px; font-weight: 700; }
+.orc-d .num-ask { fill: var(--d-card); font-size: 13px; font-weight: 700; }
+.orc-d .tick { fill: none; stroke: var(--d-card); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .dot-mute-strong { fill: var(--d-mute); }
+</style>
+<rect x="4" y="4" width="352" height="412" rx="14" class="zone"/><text x="16" y="25" class="label" text-anchor="start"><tspan x="16" dy="0">Gate 1: the project's checks</tspan></text>
+<g data-part="run"><rect x="16" y="36" width="328" height="62" rx="10" class="card"/><text x="28" y="64" class="title" text-anchor="start"><tspan x="28" dy="0">The branch</tspan></text><text x="28" y="82" class="" text-anchor="start"><tspan x="28" dy="0">Pi's commits, in the run's copy of the project.</tspan></text><path d="M325,54 l5,5.5 l-5,5.5" class="line-work"/></g>
+<path d="M180,100 L180,120" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,120) rotate(90)"/>
+<rect x="16" y="122" width="328" height="78" rx="10" class="card-work"/><text x="28" y="150" class="title" text-anchor="start"><tspan x="28" dy="0">The checks</tspan></text><text x="28" y="168" class="" text-anchor="start"><tspan x="28" dy="0">The commands the project names in</tspan><tspan x="28" dy="16"><tspan class="code">.no-mistakes.yaml</tspan>.</tspan></text>
+<path d="M180,202 L180,222" class="line"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-mute" transform="translate(180,222) rotate(90)"/>
+<text x="192" y="216" class="" text-anchor="start"><tspan x="192" dy="0">red</tspan></text>
+<rect x="16" y="224" width="328" height="78" rx="10" class="card"/><text x="28" y="252" class="title" text-anchor="start"><tspan x="28" dy="0">A fixer</tspan></text><text x="28" y="270" class="" text-anchor="start"><tspan x="28" dy="0">A second Pi gets the failing output and repairs</tspan><tspan x="28" dy="16">it. Then the checks run again.</tspan></text>
+<path d="M180,304 L180,324" class="line"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-mute" transform="translate(180,324) rotate(90)"/>
+<text x="192" y="318" class="" text-anchor="start"><tspan x="192" dy="0">red after 3 fixes</tspan></text>
+<rect x="16" y="326" width="328" height="78" rx="10" class="card"/><text x="28" y="354" class="title" text-anchor="start"><tspan x="28" dy="0">The run fails</tspan></text><text x="28" y="372" class="" text-anchor="start"><tspan x="28" dy="0">A check is still red after 3 fixes. No pull</tspan><tspan x="28" dy="16">request opens.</tspan></text>
+<path d="M180,419 L180,437" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,437) rotate(90)"/>
+<rect x="4" y="440" width="352" height="572" rx="14" class="zone"/><text x="16" y="461" class="label" text-anchor="start"><tspan x="16" dy="0">Gate 2: the review</tspan></text>
+<rect x="16" y="472" width="328" height="78" rx="10" class="card-work"/><text x="28" y="500" class="title" text-anchor="start"><tspan x="28" dy="0">no-mistakes reviews the branch</tspan></text><text x="28" y="518" class="" text-anchor="start"><tspan x="28" dy="0">It gets the task as its intent, and marks each</tspan><tspan x="28" dy="16">finding.</tspan></text>
+<path d="M180,552 L180,572" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,572) rotate(90)"/>
+<rect x="16" y="574" width="328" height="104" rx="10" class="card"/><text x="28" y="602" class="title" text-anchor="start"><tspan x="28" dy="0">What orc does with a finding</tspan></text><circle cx="31" cy="620" r="2" class="dot-mute-strong"/><text x="40" y="624" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">auto-fix</tspan>: asks no-mistakes to fix it</tspan></text><circle cx="31" cy="638" r="2" class="dot-mute-strong"/><text x="40" y="642" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">no-op</tspan>: ignores it</tspan></text><circle cx="31" cy="656" r="2" class="dot-mute-strong"/><text x="40" y="660" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">ask-user</tspan>: a question that waits for an answer</tspan></text>
+<path d="M180,680 L180,700" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(180,700) rotate(90)"/>
+<text x="192" y="694" class="ask-text" text-anchor="start"><tspan x="192" dy="0">ask-user</tspan></text>
+<g data-part="attention"><rect x="16" y="702" width="328" height="110" rx="10" class="card-ask"/><text x="28" y="730" class="title" text-anchor="start"><tspan x="28" dy="0">A question waits at the gate</tspan></text><text x="28" y="748" class="" text-anchor="start"><tspan x="28" dy="0">For 30 minutes. An answer in that time carries</tspan><tspan x="28" dy="16">the run on. With none, the task parks on its</tspan><tspan x="28" dy="16">branch, and resumes once every question has an</tspan><tspan x="28" dy="16">answer.</tspan></text><path d="M325,720 l5,5.5 l-5,5.5" class="line-work"/></g>
+<path d="M180,814 L180,834" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,834) rotate(90)"/>
+<rect x="16" y="836" width="328" height="78" rx="10" class="card"/><text x="28" y="864" class="title" text-anchor="start"><tspan x="28" dy="0">no-mistakes delivers</tspan></text><text x="28" y="882" class="" text-anchor="start"><tspan x="28" dy="0">It pushes the branch, opens the pull request and</tspan><tspan x="28" dy="16">waits for green CI.</tspan></text>
+<path d="M180,916 L180,936" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,936) rotate(90)"/>
+<g data-part="merge"><rect x="16" y="938" width="328" height="62" rx="10" class="card-ok"/><text x="28" y="966" class="title" text-anchor="start"><tspan x="28" dy="0">A pull request</tspan></text><text x="28" y="984" class="" text-anchor="start"><tspan x="28" dy="0">Checked and reviewed before it reaches you.</tspan></text><path d="M325,956 l5,5.5 l-5,5.5" class="line-work"/></g>
+<path d="M180,1015 L180,1033" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,1033) rotate(90)"/>
+<rect x="4" y="1036" width="352" height="294" rx="14" class="zone"/><text x="16" y="1057" class="label" text-anchor="start"><tspan x="16" dy="0">A ship task, by the project's mode</tspan></text>
+<rect x="16" y="1068" width="328" height="78" rx="10" class="card"/><text x="28" y="1096" class="title" text-anchor="start"><tspan x="28" dy="0"><tspan class="code">no-mistakes</tspan></tspan></text><text x="28" y="1114" class="" text-anchor="start"><tspan x="28" dy="0">The default. Checks, then the review, then a</tspan><tspan x="28" dy="16">pull request with green CI.</tspan></text>
+<rect x="16" y="1154" width="328" height="78" rx="10" class="card"/><text x="28" y="1182" class="title" text-anchor="start"><tspan x="28" dy="0"><tspan class="code">direct-PR</tspan></tspan></text><text x="28" y="1200" class="" text-anchor="start"><tspan x="28" dy="0">Checks, then orc pushes the branch and opens the</tspan><tspan x="28" dy="16">pull request itself.</tspan></text>
+<rect x="16" y="1240" width="328" height="78" rx="10" class="card"/><text x="28" y="1268" class="title" text-anchor="start"><tspan x="28" dy="0"><tspan class="code">no-mistakes-prod-only</tspan></tspan></text><text x="28" y="1286" class="" text-anchor="start"><tspan x="28" dy="0"><tspan class="code">direct-PR</tspan> for a task marked internal,</tspan><tspan x="28" dy="16"><tspan class="code">no-mistakes</tspan> for the rest.</tspan></text>
+</svg>
