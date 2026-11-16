@@ -129,3 +129,8 @@
   background: var(--vp-button-brand-hover-bg);
   color: var(--vp-button-brand-hover-text);
 }
+
+/* The map covers its page heading, so the heading's anchor link must not take a Tab stop nobody can see. */
+.map-heading .header-anchor {
+  visibility: hidden;
+}
