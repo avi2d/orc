@@ -12,6 +12,8 @@ Every other `orc backlog` command except `add` refuses with the same words.
 A task file sits in `new`, `taken` or `closed`, and the folder it sits in is its state.
 Two files beside the folders tell the beat where tasks may go.
 `dispatch.json` names each machine, its slots, its start command and its renew command, and the quota.
+A machine's slots cap the tasks the beat starts there.
+They also set the parallel limit of the pueue group `orc` on that machine each time `orc runner start` queues a task there.
 The quota names the provider its accounts belong to, the command that reads their room, and each account's credential kind.
 An account of kind `token-file` names a `tokenFile` and needs only a start command on each machine.
 An account of kind `token-command` names a `tokenCommand`, for a token that lives on the dispatching machine and rolls over, and every machine names a `renew` command beside its start command.
@@ -222,12 +224,14 @@ It refuses a task another open task waits on, until `orc backlog depend` changes
 The drop takes the task file by rename, so a drop and a beat taking the task at the same moment never both win.
 To record the machine and run of a task parked before orc recorded them, run `orc backlog origin <task-id> <machine> <run-id>`, as [Parked runs](parked-runs.md) shows.
 To send a closed task's open PR back for another pass, run `orc backlog send-back <task-id> <words>`, as in `orc backlog send-back orc-9 rename the flag`.
-It moves the task to `new`, parked on its branch `orc/<task-id>` with your words as the answer to the question `send-back`, and records the machine and run that closed it as the origin.
+It moves the task to `new`, parked on its branch `orc/<task-id>` with your words as the answer to the question `send-back`, and records the machine and run that closed it and its PR as the origin in `parked_origin`.
+A sent-back run that closes before its push still names that PR, so `orc merge` and another send-back find it.
 The next beat resumes that run on the same machine and branch.
 The implementer resumes the session it worked in with your words as the review, the checks run again, and the push updates the same PR.
 Orc refuses a task that is neither closed nor sent back, a task that names no PR, and a PR that is merged or closed.
 It also refuses when the runner holds no run of the task, since no session is left to resume.
 To add more words before the next beat starts it, run `orc backlog send-back` again on the new task, and the run gets every set of words in order.
+Orc refuses those words once the PR is merged or closed.
 The Agents tab offers the same as **Send back** beside a PR that awaits your approval.
 Add `--kind scout` or `--kind task` for a task that ends in a report instead of a PR, as [Task kinds](task-kinds.md) shows.
 To split a large task, add it with `--kind parent`, then add each part with `--parent <task-id>`, as [Parent tasks](task-kinds.md#parent-tasks) shows, or name a planner model so orc splits an over-budget request itself, as [Splitting at intake](task-kinds.md#splitting-at-intake) shows.

@@ -15,6 +15,7 @@ import {
 } from "../../entities/run-history/index"
 import { reportFileName } from "../../entities/run-history/index"
 import { runDirOf } from "./run-facts"
+import { carriedFrom } from "./step-log"
 
 const ShowSignalSchema = Schema.Struct({
   name: Schema.String,
@@ -45,6 +46,7 @@ const ShowStepSchema = Schema.Struct({
   piSessionFile: Schema.NullOr(Schema.String),
   model: Schema.NullOr(Schema.String),
   thinking: Schema.NullOr(Schema.String),
+  from: Schema.NullOr(Schema.String),
   signals: Schema.Array(ShowSignalSchema),
   score: Schema.NullOr(ShowScoreSchema),
   evidence: Schema.Array(ShowEvidenceSchema)
@@ -102,6 +104,14 @@ const ScoreSqlRowSchema = Schema.Struct({
 
 const reportPathForRunDir = (runDir: string): string => runDir + "/" + reportFileName
 
+// A resume carries checks and fixes only when it skips the implement step, so an implement step beside carried steps came from their run even when it names no log there.
+const carriedFirst = <S extends { readonly name: string; readonly from: string | null }>(steps: ReadonlyArray<S>): ReadonlyArray<S> => {
+  const origin = steps.find((step) => step.from !== null)?.from ?? null
+  const marked = steps.map((step) => origin !== null && step.name === "implement" && step.from === null ? { ...step, from: origin } : step)
+  const carried = marked.filter((step) => step.from !== null)
+  return [...carried.filter((step) => step.name === "implement"), ...carried.filter((step) => step.name !== "implement"), ...marked.filter((step) => step.from === null)]
+}
+
 export const readShow = (
   db: Database,
   runId: string
@@ -119,6 +129,7 @@ export const readShow = (
         }
         const runRow = yield* Schema.decodeUnknownEffect(RunSqlRowSchema)(run)
         const stepRows = yield* Schema.decodeUnknownEffect(Schema.Array(StepSqlRowSchema))(steps)
+        const runDir = runDirOf(runRow.task_file)
         const detailed = []
         for (const step of stepRows) {
           const [evidenceRows, signalRows, scoreRow] = yield* sqlite(() => [
@@ -142,6 +153,7 @@ export const readShow = (
             piSessionFile: step.pi_session_file,
             model: step.model,
             thinking: step.thinking,
+            from: carriedFrom(runDir, { status: step.status, out: evidence.filter((item) => item.direction === "out") }),
             signals: signals.map((signal) => ({ name: signal.name, value: signal.value })),
             score: score === null ? null : { score: score.score, note: score.note, scoredAt: score.scored_at },
             evidence: evidence.map((item) => ({
@@ -152,7 +164,7 @@ export const readShow = (
             }))
           })
         }
-        const report = reportPathForRunDir(runDirOf(runRow.task_file))
+        const report = reportPathForRunDir(runDir)
         return yield* Schema.decodeEffect(ShowJsonSchema)({
           schema: SHOW_JSON_SCHEMA,
           run: {
@@ -172,7 +184,7 @@ export const readShow = (
             machine: runRow.machine,
             worktree: runRow.worktree
           },
-          steps: detailed
+          steps: carriedFirst(detailed)
         })
       })
     )
@@ -194,6 +206,9 @@ export const formatShow = (document: ShowJsonDocument): string => {
   for (const step of document.steps) {
     lines.push("")
     lines.push("step " + step.name + " #" + step.attempt.toString() + ": " + step.status)
+    if (step.from !== null) {
+      lines.push("  from run " + step.from)
+    }
     lines.push("  agent: " + (step.agentFile === null ? "none" : toFileUrl(step.agentFile)))
     lines.push("  session: " + (step.piSessionFile === null ? "none" : toFileUrl(step.piSessionFile)))
     for (const signal of step.signals) {
