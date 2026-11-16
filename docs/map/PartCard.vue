@@ -53,7 +53,8 @@ defineEmits<{ toggle: [] }>()
 .part.tone-ok { border-color: var(--m-ok); background: var(--m-ok-soft); }
 .part.is-open,
 .part.is-group {
-  background: color-mix(in srgb, var(--m-zone) 70%, transparent);
+  background: var(--m-zone);
+  border-color: light-dark(#3a2a1f, #bca995);
   border-style: dashed;
 }
 .part.is-group { border-style: solid; }

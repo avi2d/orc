@@ -196,7 +196,10 @@ export const layoutMap = (measures: Measures): MapLayout => {
         measures
       )
     )
-    const stack = lineUp(blocks, stackGap, true)
+    const stack = measures.stacked ? lineUp(inner.flatMap((child) => {
+      const box = boxes.get(child.id)
+      return box === undefined ? [] : [box]
+    }), stackGap, true) : lineUp(blocks, stackGap, true)
     const header = titleWidth(part) + (part.page === undefined ? 0 : pageLink.width + pageLink.inset * 2)
     const whole = { width: Math.max(stack.size.width + edge * 2, header), height: stack.size.height + headRoom + edge }
     const body = moved(stack, (whole.width - stack.size.width) / 2, headRoom)

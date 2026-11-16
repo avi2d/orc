@@ -76,8 +76,8 @@ const layout = async (focus?: string): Promise<void> => {
   const room = { width: (stage?.clientWidth ?? 390) - 16, height: (stage?.clientHeight ?? 700) - 16 }
   const target = focus === undefined ? undefined : placed.value.parts.find((item) => item.part.id === focus)?.rect
   if (phone.value) {
-    const zoom = Math.min(1, Math.max(0.55, room.width / (target?.width ?? all.width)))
-    void setViewport({ x: 8 - (target?.x ?? all.x) * zoom, y: 8 - (target?.y ?? all.y) * zoom, zoom }, { duration: 250 })
+    const zoom = Math.min(1, room.width / all.width)
+    void setViewport({ x: 8 - all.x * zoom, y: 8 - (target?.y ?? all.y) * zoom, zoom }, { duration: 250 })
     return
   }
   const whole = Math.min(1, room.width / all.width, room.height / all.height)
@@ -94,7 +94,10 @@ const layout = async (focus?: string): Promise<void> => {
 const toggle = (id: string): void => {
   const opening = !open.value.has(id)
   const path = pathTo(id)
-  open.value = new Set([...groups, ...(opening ? path : path.slice(0, -1))])
+  const next = new Set(open.value)
+  if (opening) next.add(id)
+  else next.delete(id)
+  open.value = next
   void nextTick(() => layout(opening ? id : path.at(-2)))
 }
 
