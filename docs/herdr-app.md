@@ -74,6 +74,9 @@ To close the panel and clear the selection, select the selected card again, pres
 The panel also closes when the selected task leaves the backlog.
 The panel stays open or closed when you switch to another tab and back.
 Each lane lists its tasks oldest first.
+Each open lane scrolls on its own with the trackpad or the mouse wheel, and its header stays in place.
+To scroll a lane with the keyboard, click inside it first.
+Then press the up and down arrows, Page Up, Page Down, Home or End.
 
 ## Read a task
 
