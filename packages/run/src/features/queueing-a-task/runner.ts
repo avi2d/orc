@@ -20,7 +20,7 @@ import { encodeRenewal, encodeSecretJson, RenewRequest, type TokenEncodeError } 
 
 export type RunnerRequirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
 
-const queueRefusal = "the queue request on stdin is no task, checkout, provider and body with an optional tokenFile or an optional token and expiresAt"
+const queueRefusal = "the queue request on stdin is no task, checkout, provider and body with optional slots and an optional tokenFile or an optional token and expiresAt"
 
 const renewRefusal = "the renew request on stdin is no task with a token and an expiresAt"
 
@@ -118,6 +118,12 @@ const requireFolder = (checkout: string): Effect.Effect<void, RunnerError, FileS
     }
   })
 
+// pueue reads a parallel count of 0 as no limit, so a machine with 0 slots still runs one task at a time.
+const parallelCount = (slots: number): number => Math.max(1, slots)
+
+const matchSlots = (slots: number | undefined): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+  slots === undefined ? Effect.void : Effect.asVoid(pueue(["parallel", String(parallelCount(slots)), "--group", orcGroup]))
+
 const queuedGuardScript = "pueue wait \"$1\" && rm -rf -- \"$2\""
 
 const guardQueued = (home: string, id: string, dir: string): Effect.Effect<void, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
@@ -185,11 +191,15 @@ const buildRun = (
     const answers = (request.answers ?? []).flatMap((entry) => ["--answer", entry.question + "=" + entry.answer])
     const kind = request.kind === undefined ? [] : ["--kind", request.kind]
     const delivery = request.delivery === undefined ? [] : ["--delivery", request.delivery]
+    const models = [
+      ...(request.implementerModel === undefined ? [] : ["--implementer-model", request.implementerModel]),
+      ...(request.fixerModel === undefined ? [] : ["--fixer-model", request.fixerModel])
+    ]
     const instructions = request.instructions === undefined ? [] : ["--instructions", yield* writeInstructions(folder + "/" + key + ".instructions", request.instructions)]
     const resume = request.resumeRun === undefined ? [] : ["ORC_DISPATCH_RESUME_RUN=" + request.resumeRun]
     const assigned = [...resume, ...withClaimedMachine(request.machine)]
     const env = assigned.length === 0 ? [] : ["env", ...assigned]
-    return [...env, ...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...kind, ...delivery, ...instructions, ...answers]
+    return [...env, ...self, "run", taskFile, "--branch", request.branch ?? taskBranch(request.task), "--sandbox", "none", "--provider", request.provider, ...models, ...kind, ...delivery, ...instructions, ...answers]
   })
 
 const enqueueHeld = (
@@ -224,6 +234,7 @@ const queueTask = (
     const project = yield* resolveProjectDir(request.checkout)
     yield* requireResumeRun(home, project, request.branch ?? taskBranch(request.task), request.resumeRun)
     yield* ensureGroup(orcGroup)
+    yield* matchSlots(request.slots)
     const label = runLabel(home, request.task, request.kind, request.label)
     const key = fileKeyOf(home, request.task, label)
     const held = yield* readHeld(home, request.task, label)

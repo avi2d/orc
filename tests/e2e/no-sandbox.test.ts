@@ -247,6 +247,17 @@ describe("orc run on a token-file provider", () => {
     })
   }, 60_000)
 
+  test("with --implementer-model and --fixer-model from the pinned provider runs instead of refusing a model mismatch", async () => {
+    await withNoSandboxFixture(async (fixture) => {
+      await writeConfig(fixture.env, { providers: [loginProvider, keyedProvider], models: { implementer: "acme-go/coder-1", fixer: "acme-go/coder-1" } })
+      const env = { ...fixture.env, KEYED_TOKEN_FILE: await writeToken(fixture, "keyed-token", 0o600) }
+      const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none", "--provider", "keyed", "--implementer-model", keyedModel, "--fixer-model", keyedModel], fixture.repo, env)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect(result.stdout).toContain(prUrl)
+      expect(await Bun.file(join(fixture.fakeBin, "pi-cwd")).exists()).toBe(true)
+    })
+  }, 60_000)
+
   test("with the provider's variable unset is refused before Pi runs, naming the variable", async () => {
     await withNoSandboxFixture(async (fixture) => {
       const { KEYED_TOKEN_FILE: _unset, ...env } = await asTokenFileRun(fixture, 0o600)

@@ -43,6 +43,23 @@ describe("the Turns view of a recorded run's Agent step session", () => {
     expect(calls).toEqual([["read", "✓"], ["bash", "✗"], ["bash", "✓"]])
   })
 
+  test("numbers the turns 1, 2, 3 from the step's first turn, not unnumbered", async () => {
+    expect(turnsOf(await session).map((turn) => turn.number)).toEqual([1, 2, 3])
+  })
+
+  test("numbers each call by its turn and its place in it, not restarting at 1 for every turn", async () => {
+    expect(turnsOf(await session).flatMap((turn) => turn.calls.map((call) => call.number))).toEqual(["1.1", "2.1", "3.1"])
+  })
+
+  test("numbers two calls of one turn 2.1 and 2.2, not both by the turn alone", () => {
+    const usage = { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 }
+    const call = (id: string) => ({ type: "toolCall", id, name: "read", arguments: { path: id } })
+    const reply = (id: string, parentId: string | null, content: ReadonlyArray<unknown>) =>
+      JSON.stringify({ type: "message", id, parentId, message: { role: "assistant", content, usage, timestamp: 0 } })
+    const text = [reply("a", null, [call("c1")]), reply("b", "a", [call("c2"), call("c3")])].join("\n") + "\n"
+    expect(turnsOf(text).map((turn) => [turn.number, turn.calls.map((each) => each.number)])).toEqual([[1, ["1.1"]], [2, ["2.1", "2.2"]]])
+  })
+
   test("heads each turn with the tokens Pi recorded for it, not a running total", async () => {
     expect(turnsOf(await session).map(turnHeader)).toEqual([
       "in 2 · out 86 · cache read 2.0k · cache write 6.2k",
