@@ -10,5 +10,7 @@ export default defineConfig({
       "packages/run/src/entities/heavy-queue/heavy-standin-exec.ts",
       "packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts"
     ]
-  }
+  },
+  // A VitePress theme loads its stylesheet only through a bare import in its entry file.
+  overrides: [{ files: ["docs/.vitepress/theme/index.ts"], rules: { "import/no-unassigned-import": "off" } }]
 });

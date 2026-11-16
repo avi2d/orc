@@ -19,7 +19,7 @@ const below = (layer: string, above: string) => ({
 });
 
 export default defineConfig({
-  devOnly: [...DEV_ONLY, "^scripts/", "^packages/herdr-app/scripts/"],
+  devOnly: [...DEV_ONLY, "^scripts/", "^packages/herdr-app/scripts/", "^docs/\\.vitepress/"],
   orphans: ["^packages/herdr-app/scripts/"],
   options: { builtInModules: { add: ["bun", "gpui-kit", "gpui-base", "gpui-shell", "herdr"] } },
   forbidden: [

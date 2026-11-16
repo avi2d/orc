@@ -58,7 +58,7 @@ It is the same chat as in a terminal, with the same eight tools.
 
 ## The terminal dashboard
 
-`orc-dash` shows the same facts in a terminal, as panels for quota, session quota, resources, queues, dispatch, attention, tasks and alerts.
+`orc-dash` shows the same facts in a terminal, as panels for quota, session quota, resources, queues, schedules, dispatch, attention, tasks, alerts and ledger.
 It also watches quota pace, machine load and long tasks, and its alert stream is where the chat's alerts come from.
 
 ## Related topics

@@ -10,14 +10,17 @@ const entry = "packages/run/src/bin.ts"
 const page = "docs/reference/commands.md"
 
 const helpOf = (words: ReadonlyArray<string>): Effect.Effect<string, CommandsPageError> =>
-  Effect.try({
-    try: () => Bun.spawnSync([process.execPath, entry, ...words, "--help"], { stdout: "pipe", stderr: "pipe" }),
+  Effect.tryPromise({
+    try: () => {
+      const ran = Bun.spawn([process.execPath, entry, ...words, "--help"], { stdout: "pipe", stderr: "pipe" })
+      return Promise.all([ran.exited, new Response(ran.stdout).text(), new Response(ran.stderr).text()])
+    },
     catch: (cause) => new CommandsPageError({ message: "cannot run orc " + words.join(" ") + " --help: " + String(cause) })
   }).pipe(
-    Effect.flatMap((ran) =>
-      ran.exitCode === 0
-        ? Effect.succeed(ran.stdout.toString().trimEnd())
-        : Effect.fail(new CommandsPageError({ message: "orc " + words.join(" ") + " --help exited " + ran.exitCode.toString() + ": " + ran.stderr.toString().trim() }))
+    Effect.flatMap(([exitCode, stdout, stderr]) =>
+      exitCode === 0
+        ? Effect.succeed(stdout.trimEnd())
+        : Effect.fail(new CommandsPageError({ message: "orc " + words.join(" ") + " --help exited " + exitCode.toString() + ": " + stderr.trim() }))
     )
   )
 

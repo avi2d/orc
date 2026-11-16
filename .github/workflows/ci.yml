@@ -17,6 +17,7 @@ jobs:
           fetch-depth: 0
       - run: bun run build
       - run: git diff --exit-code
+      - run: bun run docs:build
       - uses: avi2d/workflows/actions/secrets-pack@v2
         with:
           pack: ${{ secrets.CHECKS_SECRETS_PACK }}

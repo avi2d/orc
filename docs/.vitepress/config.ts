@@ -80,6 +80,7 @@ export default defineConfig({
   title: "orc",
   description: "How orc runs AI agent tasks across your machines, and how to use it",
   base: "/orc/",
+  head: [["link", { rel: "icon", type: "image/svg+xml", href: "/orc/favicon.svg" }]],
   cleanUrls: true,
   lastUpdated: true,
   rewrites: { "adr/README.md": "adr/index.md" },
@@ -88,7 +89,7 @@ export default defineConfig({
     config: (md) => {
       const fence = md.renderer.rules.fence
       md.renderer.rules.fence = (tokens, index, options, env, self) => {
-        const token = tokens[index]
+        const token = tokens.at(index)
         if (token === undefined || token.info.trim() !== "mermaid") {
           return fence === undefined ? self.renderToken(tokens, index, options) : fence(tokens, index, options, env, self)
         }
@@ -96,7 +97,7 @@ export default defineConfig({
       }
       // Vue compiles each page as a template, so a placeholder such as <folder> in prose would be read as an unclosed element.
       md.renderer.rules.html_inline = (tokens, index) => {
-        const markup = tokens[index]?.content ?? ""
+        const markup = tokens.at(index)?.content ?? ""
         return isHtmlTag(markup) ? markup : md.utils.escapeHtml(markup)
       }
     }

@@ -46,8 +46,14 @@ It may answer only by quoting, word for word, the rule its answer rests on.
 An answer with no such quote goes to you instead.
 
 Some questions never reach the decider.
-Orc checks each question's words against a fixed list of topics: deleting, security, keys or credentials, merging, pushing, releasing, spending, anything that cannot be undone, a site's look, legal text, and logins.
-A question on that list goes straight to you.
+Orc checks each question's words against a fixed list of topics, and a question on that list goes straight to you.
+
+- Deleting, and anything that cannot be undone.
+- Security, keys or credentials, and logins.
+- Merging, pushing and releasing.
+- Spending.
+- A site's look, and legal text.
+
 The list is in the code, so no rule you write can widen what the decider answers.
 
 The decider never has the last word.

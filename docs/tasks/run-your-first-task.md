@@ -3,7 +3,7 @@ kind: how-to
 ---
 # Run your first task
 
-Run one task by hand in one project, to see a run from the task file to its pull request before you set up a backlog.
+Run one task by hand, to see a run from the task file to its pull request before you set up a backlog.
 
 ## Before you begin
 

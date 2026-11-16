@@ -4,7 +4,8 @@ kind: explanation
 # The beat
 
 The beat is one pass of `orc beat`, the command that starts every task that can start and closes every task whose run finished.
-Orc has no daemon of its own, so cron or launchd runs the beat every few minutes, and each beat reads the whole state from disk.
+Orc has no daemon of its own, so cron or launchd runs the beat every few minutes.
+Each beat reads the whole state from disk.
 
 ```mermaid
 flowchart TD

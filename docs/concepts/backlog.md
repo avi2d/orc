@@ -7,15 +7,18 @@ The backlog is the one list of everything orc has to do, kept as one Markdown fi
 It lives only on the machine that runs `orc beat`, and every other part of orc reads or changes it through the `orc backlog` commands.
 
 ```mermaid
-stateDiagram-v2
-  direction TB
-  [*] --> new: orc backlog add
-  new --> taken: a beat claims it
-  taken --> started: the start command runs
-  started --> closed: the run ends
-  started --> new: parked on a question
-  new --> closed: dropped, or a decision answered
-  closed --> new: orc backlog send-back
+flowchart TD
+  add([orc backlog add])
+  new[new]
+  taken[taken]
+  started[started]
+  closed[closed]
+  add --> new
+  new -- a beat claims it --> taken
+  taken -- the start command runs --> started
+  started -- the run ends --> closed
+  started -- parked on<br/>a question --> new
+  closed -- orc backlog<br/>send-back --> new
 ```
 
 ## A task and its states
@@ -41,7 +44,8 @@ The kind decides how a task ends.
 | `decision` | Asks you a question and never runs | Your answer |
 
 A request too large for one pull request becomes a parent with one child per slice.
-You can split it by hand, a planner model can split it when you add it, or a run can stop and propose the split itself.
+You can split it by hand, or a planner model can split it when you add it.
+A run can also stop and propose the split itself.
 
 ## What keeps a new task waiting
 

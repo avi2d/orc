@@ -20,7 +20,8 @@ export const MermaidDiagram = defineComponent({
             securityLevel: "strict",
             theme: isDark.value ? "dark" : "neutral",
             fontFamily: "inherit",
-            flowchart: { useMaxWidth: true, htmlLabels: true, curve: "basis" }
+            htmlLabels: true,
+            flowchart: { useMaxWidth: true, curve: "basis" }
           })
           return mermaid.render(id, source)
         })

@@ -3,7 +3,7 @@ kind: how-to
 ---
 # Run a backlog from the chat
 
-Hand orc a stream of work once one task runs by hand, so that it places each task on a machine and an account with room.
+Hand orc a stream of work, so that it places each task on a machine and an account with room.
 
 ## Before you begin
 

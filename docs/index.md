@@ -3,7 +3,8 @@ kind: explanation
 ---
 # How orc works
 
-Orc takes work you describe, runs an AI agent on it on one of your machines, checks and reviews the result, and hands you a pull request or a report.
+Orc takes work you describe and runs an AI agent on it on one of your machines.
+It checks and reviews the result, then hands you a pull request or a report.
 You are the captain: you say what needs doing, you answer the questions only you can answer, and you say when a pull request lands.
 
 ## The whole system
@@ -81,7 +82,8 @@ Two more parts sit beside that path.
 
 - **Attention and the chat.**
   A run that meets a question it cannot settle asks it.
-  The question lands in the attention queue, where a small model called the decider answers a routine one from your written rules, and any other one waits for you.
+  The question lands in the attention queue.
+  A small model called the decider answers a routine one from your written rules, and any other one waits for you.
   The chat posts each question that needs you and each task that closes.
   [The attention queue](concepts/attention.md) and [The chat](concepts/chat.md) show how.
 - **The App.**

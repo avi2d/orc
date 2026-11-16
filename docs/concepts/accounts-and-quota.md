@@ -26,7 +26,8 @@ flowchart TD
 ## The quota command
 
 Each beat runs the quota command with no input, before it takes any task.
-The command prints one JSON document that gives each account the percent of room left, from 0 to 100, or the reason the account cannot run.
+The command prints one JSON document with an entry for each account.
+The entry gives the percent of room left, from 0 to 100, or the reason the account cannot run.
 Orc reads two shapes: its own `orc.quota.v1` document, and the document `quota-axi --full --json --provider <id>` prints.
 A command that fails, runs past 15 seconds or prints anything else leaves the quota unread, and that beat starts nothing.
 

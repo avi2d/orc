@@ -10,23 +10,21 @@ Both run inside the run, so a pull request that reaches you has already passed t
 flowchart TD
   commit[Pi's commits on the branch]
   checks{Checks from<br/>.no-mistakes.yaml}
-  fix[Fixer Pi, at most<br/>3 attempts]
+  fix[A fixer Pi repairs<br/>what failed]
   failed([The run fails,<br/>no pull request opens])
-  review[no-mistakes reviews<br/>the branch]
-  finding{A finding}
-  auto[no-mistakes fixes it]
-  ask[A question for the<br/>decider or for you]
+  review{no-mistakes reviews<br/>the branch}
+  auto[no-mistakes fixes<br/>the finding]
+  ask[The decider or<br/>you answer it]
   pr([Pull request with green CI])
   commit --> checks
   checks -- red --> fix
-  fix --> checks
-  checks -- still red --> failed
+  fix -- checks again --> checks
+  fix -- red after 3 fixes --> failed
   checks -- green --> review
-  review --> finding
-  finding -- auto-fix --> auto
-  finding -- ask-user --> ask
+  review -- auto-fix --> auto
+  review -- ask-user --> ask
   auto --> pr
-  ask -- answered --> pr
+  ask --> pr
 ```
 
 ## The checks
