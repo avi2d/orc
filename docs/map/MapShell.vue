@@ -22,19 +22,19 @@ const { isDark } = useData()
 
 <style>
 .orc-map {
-  --m-ink: light-dark(#1f2328, #e8eaed);
-  --m-mute: light-dark(#57606a, #a3abb5);
-  --m-line: light-dark(#c8cdd5, #474d57);
-  --m-card: light-dark(#ffffff, #22252b);
-  --m-zone: light-dark(#f3f4f6, #17191d);
-  --m-page: light-dark(#fbfbfc, #101114);
+  --m-ink: var(--paint-ink);
+  --m-mute: var(--paint-muted);
+  --m-line: var(--paint-line);
+  --m-card: var(--paint-surface);
+  --m-zone: var(--paint-surface-2);
+  --m-page: var(--paint-bg);
   --m-under-label: color-mix(in srgb, var(--m-zone) 70%, var(--m-page));
-  --m-work: light-dark(#3451b2, #a8b1ff);
-  --m-work-soft: light-dark(#e8ebfc, #272c52);
-  --m-ask: light-dark(#8a5a00, #e9b949);
-  --m-ask-soft: light-dark(#fff3d1, #3a300f);
-  --m-ok: light-dark(#17794c, #48d597);
-  --m-ok-soft: light-dark(#def5e8, #12301f);
+  --m-work: var(--paint-work);
+  --m-work-soft: var(--paint-work-soft);
+  --m-ask: var(--paint-ask);
+  --m-ask-soft: var(--paint-ask-soft);
+  --m-ok: var(--paint-ok);
+  --m-ok-soft: var(--paint-ok-soft);
   position: fixed;
   inset: 0;
   display: grid;

@@ -112,7 +112,9 @@ const lineUp = (boxes: readonly Box[], gap: number, down: boolean): Box => {
   }
 }
 
-const titleWidth = (part: MapPart): number => 32 + part.title.length * (part.mono === true ? 9 : 8)
+const markWidth = 20
+
+const titleWidth = (part: MapPart): number => 32 + part.title.length * (part.mono === true ? 9 : 8) + (part.mark === undefined ? 0 : markWidth)
 
 const middle = (rect: Rect): Point => ({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 })
 

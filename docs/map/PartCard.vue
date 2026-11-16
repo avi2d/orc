@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { withBase } from "vitepress"
-import type { MapPart } from "./orc-map"
+import attention from "../marks/attention.svg?raw"
+import done from "../marks/done.svg?raw"
+import failed from "../marks/failed.svg?raw"
+import running from "../marks/running.svg?raw"
+import waiting from "../marks/waiting.svg?raw"
+import type { Mark, MapPart } from "./orc-map"
+
+const marks = { attention, done, failed, running, waiting } satisfies Record<Mark, string>
 
 defineProps<{ part: MapPart; folds: boolean; open: boolean }>()
 defineEmits<{ toggle: [] }>()
@@ -11,8 +18,11 @@ defineEmits<{ toggle: [] }>()
     <button v-if="folds" type="button" class="part-fold nodrag nopan" :aria-expanded="open" @click.stop="$emit('toggle')">
       <span class="part-chevron" aria-hidden="true" />
       <span class="part-title" :class="{ mono: part.mono }">{{ part.title }}</span>
+      <span v-if="part.mark" class="part-mark" :class="'mark-' + part.mark" aria-hidden="true" v-html="marks[part.mark]" />
     </button>
-    <p v-else class="part-title" :class="{ mono: part.mono }">{{ part.title }}</p>
+    <p v-else class="part-title" :class="{ mono: part.mono }">
+      {{ part.title }}<span v-if="part.mark" class="part-mark" :class="'mark-' + part.mark" aria-hidden="true" v-html="marks[part.mark]" />
+    </p>
     <a v-if="open && part.page" class="part-page nodrag nopan" :href="withBase('/' + part.page)">Read the page<span class="sr"> about {{ part.title }}</span></a>
     <template v-if="!open">
       <p v-if="part.text" class="part-text">{{ part.text }}</p>
@@ -57,8 +67,30 @@ defineEmits<{ toggle: [] }>()
   font-weight: 650;
   line-height: 1.3;
 }
+.part-mark {
+  flex: none;
+  align-self: center;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  vertical-align: -2px;
+}
+.part-fold > .part-mark {
+  margin-left: 0;
+}
+.part-mark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.part-mark.mark-running,
+.part-mark.mark-failed { color: var(--m-work); }
+.part-mark.mark-waiting { color: var(--m-mute); }
+.part-mark.mark-done { color: var(--m-ok); }
+.part-mark.mark-attention { color: var(--m-ask); }
 .part-title.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13px;
 }
 .part-fold {

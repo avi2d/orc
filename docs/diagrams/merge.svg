@@ -3,33 +3,38 @@
 <desc id="d-merge-desc">You, the chat and the app all merge through orc merge. It merges only when the task names a pull request, the pull request is open, every check has reported green, and the branch is not behind its base. Otherwise it refuses, names every reason, and merges nothing. It squash merges at the exact commit it checked. A merge always traces back to your word, and the decider never answers a question about merging.</desc>
 <style>.orc-d {
   color-scheme: light dark;
-  --d-ink: light-dark(#1f2328, #e8eaed);
-  --d-mute: light-dark(#57606a, #a3abb5);
-  --d-line: light-dark(#c8cdd5, #474d57);
-  --d-card: light-dark(#ffffff, #22252b);
-  --d-zone: light-dark(#f3f4f6, #17191d);
-  --d-work: light-dark(#3451b2, #a8b1ff);
-  --d-work-soft: light-dark(#e8ebfc, #272c52);
-  --d-on-work: light-dark(#ffffff, #14162b);
-  --d-ask: light-dark(#8a5a00, #e9b949);
-  --d-ask-soft: light-dark(#fff3d1, #3a300f);
-  --d-ok: light-dark(#17794c, #48d597);
-  --d-ok-soft: light-dark(#def5e8, #12301f);
+  --d-ink: light-dark(#221812, #f3e8d6);
+  --d-mute: light-dark(#5b4a3c, #bca995);
+  --d-line: light-dark(#d6c8b1, #43352a);
+  --d-edge: light-dark(#3a2a1f, #7a6655);
+  --d-card: light-dark(#fffbf2, #211a14);
+  --d-zone: light-dark(#eee5d4, #2c231b);
+  --d-work: light-dark(#a3160f, #f0624a);
+  --d-work-soft: light-dark(#f7e6de, #342019);
+  --d-on-work: light-dark(#fff8ec, #1a0b07);
+  --d-ask: light-dark(#774d00, #e6ac3f);
+  --d-ask-soft: light-dark(#ede4d3, #3b2d1a);
+  --d-ok: light-dark(#2d6220, #9dc56e);
+  --d-ok-soft: light-dark(#e6e9d9, #302f1f);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 .orc-d text { fill: var(--d-mute); font-size: 12.5px; }
 .orc-d .title { fill: var(--d-ink); font-size: 14px; font-weight: 650; }
 .orc-d .big { fill: var(--d-ink); font-size: 15.5px; font-weight: 650; }
 .orc-d .label { fill: var(--d-mute); font-size: 12px; font-weight: 600; }
-.orc-d .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; fill: var(--d-ink); }
+.orc-d .code { font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; fill: var(--d-ink); }
 .orc-d .ask-text { fill: var(--d-ask); font-weight: 600; }
 .orc-d .work-text { fill: var(--d-work); font-weight: 600; }
 .orc-d .ok-text { fill: var(--d-ok); font-weight: 600; }
 .orc-d .zone { fill: var(--d-zone); stroke: var(--d-line); }
-.orc-d .card { fill: var(--d-card); stroke: var(--d-line); }
-.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); }
-.orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); }
-.orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); }
+.orc-d .card { fill: var(--d-card); stroke: var(--d-edge); stroke-width: 1.5; }
+.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); stroke-width: 1.5; }
+.orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); stroke-width: 1.5; }
+.orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); stroke-width: 1.5; }
+.orc-d .mark-running, .orc-d .mark-failed { color: var(--d-work); }
+.orc-d .mark-waiting { color: var(--d-mute); }
+.orc-d .mark-done { color: var(--d-ok); }
+.orc-d .mark-attention { color: var(--d-ask); }
 .orc-d .line { fill: none; stroke: var(--d-mute); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .line-work { fill: none; stroke: var(--d-work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .line-ask { fill: none; stroke: var(--d-ask); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }

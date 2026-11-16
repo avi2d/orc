@@ -12,9 +12,10 @@ const fresh: Part = {
   title: "`new`",
   text: "Waiting to start, in priority order. It waits while:",
   cls: "card-work",
+  mark: "waiting",
   ...bullets(["it has no priority", "you hold it", "a question has no answer", "it depends on an open task", "no machine has a free slot", "no account has room"])
 }
-const taken: Part = { title: "`taken`", text: "A beat took it. Its run is queued or running on a machine.", href: "beat" }
+const taken: Part = { title: "`taken`", text: "A beat took it. Its run is queued or running on a machine.", href: "beat", mark: "running" }
 const closed: Part = {
   title: "`closed`",
   text: "It keeps its outcome and the reason:",

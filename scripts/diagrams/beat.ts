@@ -13,8 +13,8 @@ const conditions: readonly Part[] = [
   { title: "Room", text: "An account above 0% and at or above the floor.", href: "quota" }
 ]
 
-const starts: Part = { title: "It starts", text: "The beat takes the task and runs the machine's start command.", cls: "card-ok", href: "runner" }
-const waits: Part = { title: "It waits for the next beat", text: "The beat prints `waits <task-id>:` with the reason. A decision never starts." }
+const starts: Part = { title: "It starts", text: "The beat takes the task and runs the machine's start command.", cls: "card-ok", href: "runner", mark: "running" }
+const waits: Part = { title: "It waits for the next beat", text: "The beat prints `waits <task-id>:` with the reason. A decision never starts.", mark: "waiting" }
 
 const also: readonly Part[] = [
   { title: "Runs on a clock", text: "Cron or launchd runs `orc beat` every few minutes. Orc has no daemon." },

@@ -1,11 +1,14 @@
 type Tone = "plain" | "work" | "ask" | "ok" | "end"
 
+export type Mark = "running" | "waiting" | "done" | "failed" | "attention"
+
 export interface MapPart {
   readonly id: string
   readonly title: string
   readonly text?: string
   readonly points?: readonly string[]
   readonly tone?: Tone
+  readonly mark?: Mark
   readonly inside?: string
   readonly page?: string
   readonly mono?: true
@@ -61,10 +64,11 @@ export const parts: readonly MapPart[] = [
     inside: "backlog",
     title: "new",
     tone: "work",
+    mark: "waiting",
     text: "Waiting to start, in priority order. It waits while:",
     points: ["it has no priority", "you hold it", "a question has no answer", "it depends on an open task", "no machine has a free slot", "no account has room"]
   },
-  { id: "backlog-taken", mono: true, inside: "backlog", title: "taken", text: "A beat took it. Its run is queued or running on a machine." },
+  { id: "backlog-taken", mono: true, inside: "backlog", title: "taken", mark: "running", text: "A beat took it. Its run is queued or running on a machine." },
   {
     id: "backlog-closed",
     mono: true,
@@ -106,7 +110,7 @@ export const parts: readonly MapPart[] = [
     points: ["closes the runs that ended", "parks a task whose run stopped on a question", "resumes it once you answer", "carries questions and answers", "flags a run silent for 30 minutes"]
   },
 
-  { id: "attention", inside: "plans", title: "The attention queue", tone: "ask", text: "Every open question waits here.", page: "concepts/attention" },
+  { id: "attention", inside: "plans", title: "The attention queue", tone: "ask", mark: "attention", text: "Every open question waits here.", page: "concepts/attention" },
   { id: "att-question", inside: "attention", title: "A question from a run", tone: "ask", text: "The review raised it, or the agent asked it instead of guessing." },
   {
     id: "att-news",
@@ -136,7 +140,7 @@ export const parts: readonly MapPart[] = [
   { id: "runner-heavy", inside: "runner", title: "One heavy slot", text: "The test runs and builds of every agent take turns, so they cannot overload the machine." },
   { id: "runner-reach", inside: "runner", title: "A later beat asks the runner", points: ["the state of the run", "to hand it your answers", "to stop it"] },
 
-  { id: "run", inside: "works", title: "A run", text: "An agent writes the change in its own copy of the project, on a new branch.", page: "concepts/run" },
+  { id: "run", inside: "works", title: "A run", mark: "running", text: "An agent writes the change in its own copy of the project, on a new branch.", page: "concepts/run" },
   { id: "run-copy", inside: "run", title: "A copy", text: "A git worktree on a new branch. Your own checkout is never touched." },
   { id: "run-prepare", inside: "run", title: "Prepare", text: "The project's prepare command, such as an install." },
   { id: "run-pi", inside: "run", title: "Pi works", tone: "work", text: "The agent writes the change and commits it." },
@@ -160,9 +164,9 @@ export const parts: readonly MapPart[] = [
   { id: "dropped", inside: "ends", title: "Dropped", tone: "end", text: "Before it started, with orc backlog drop." },
   { id: "answered", inside: "ends", title: "Answered", tone: "end", text: "A decision never runs. Your answer closes it." },
   { id: "stopped", inside: "ends", title: "Stopped", tone: "end", text: "You stopped the run." },
-  { id: "failed", inside: "ends", title: "Failed", tone: "end", text: "It could not start, it died, or its checks stayed red." },
-  { id: "report", inside: "ends", title: "A report", tone: "ok", text: "A task that changes no code. No pull request." },
-  { id: "pull-request", inside: "ends", title: "A pull request", tone: "ok", text: "A code change, checked and reviewed before it reaches you." },
+  { id: "failed", inside: "ends", title: "Failed", tone: "end", mark: "failed", text: "It could not start, it died, or its checks stayed red." },
+  { id: "report", inside: "ends", title: "A report", tone: "ok", mark: "done", text: "A task that changes no code. No pull request." },
+  { id: "pull-request", inside: "ends", title: "A pull request", tone: "ok", mark: "done", text: "A code change, checked and reviewed before it reaches you." },
   { id: "merge", mono: true, inside: "ends", title: "orc merge", text: "You land the pull request once CI is green.", page: "concepts/merge" },
   { id: "merge-ask", inside: "merge", title: "Who asks", points: ["you, with orc merge", "the chat, with its merge tool", "the app, with its Approve step"] },
   { id: "merge-holds", inside: "merge", title: "Do all four hold?", tone: "work", points: ["the task names a pull request", "it is open", "every check reported green", "the branch is not behind its base"] },
