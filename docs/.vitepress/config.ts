@@ -88,7 +88,7 @@ export default defineConfig({
         return "<MermaidDiagram code=\"" + encodeURIComponent(token.content) + "\" />"
       }
       // Vue compiles each page as a template, so a placeholder such as <folder> in prose would be read as an unclosed element.
-      md.renderer.rules.html_inline = (tokens, index) => md.utils.escapeHtml(tokens.at(index)?.content ?? "")
+      md.renderer.rules.html_inline = (tokens, index) => { const markup = tokens.at(index)?.content ?? ""; return markup.startsWith("<") ? md.utils.escapeHtml(markup) : markup }
     }
   },
   themeConfig: {
