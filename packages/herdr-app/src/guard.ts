@@ -330,15 +330,15 @@ const attentionItem: Guard<AttentionItem> = (value, at) => {
   if (record.kind === "refused") return record
   const named = pair(record.value, at, "id", "kind", (id, kind) => ({ id, kind }))
   if (named.kind === "refused") return named
-  const task = string(record.value, "task", at)
-  if (task.kind === "refused") return task
+  const taskId = string(record.value, "task", at)
+  if (taskId.kind === "refused") return taskId
   const decision = record.value["decision"]
-  if (decision === undefined) return ok({ ...named.value, task: task.value, escalated: false })
+  if (decision === undefined) return ok({ ...named.value, task: taskId.value, escalated: false })
   const decided = fields(decision, child(at, "decision"))
   if (decided.kind === "refused") return decided
   const kind = string(decided.value, "kind", child(at, "decision"))
   if (kind.kind === "refused") return kind
-  return ok({ ...named.value, task: task.value, escalated: kind.value === "escalated" })
+  return ok({ ...named.value, task: taskId.value, escalated: kind.value === "escalated" })
 }
 
 export const attention: Guard<ReadonlyArray<AttentionItem>> = (value, at) => {
@@ -357,13 +357,13 @@ export interface AskingRun {
 const askingRun: Guard<AskingRun> = (value, at) => {
   const record = fields(value, at)
   if (record.kind === "refused") return record
-  const task = absentOrString(record.value, "task", at)
-  if (task.kind === "refused") return task
+  const taskId = absentOrString(record.value, "task", at)
+  if (taskId.kind === "refused") return taskId
   const branch = string(record.value, "branch", at)
   if (branch.kind === "refused") return branch
   const questions = number(record.value, "questions", at)
   if (questions.kind === "refused") return questions
-  return ok({ branch: branch.value, task: task.value, questions: questions.value })
+  return ok({ branch: branch.value, task: taskId.value, questions: questions.value })
 }
 
 export const askingRuns: Guard<ReadonlyArray<AskingRun>> = (value, at) => {
