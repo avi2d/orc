@@ -205,7 +205,7 @@ To pipe the task in instead, give `-` as the task file, as in `printf '# Fix the
 It reads stdin to its end and refuses a terminal.
 Add `--machine <name>` to run the task on that machine only, and `--depends-on <task-id>` once per task it waits for.
 To change what a new or held task waits for later, run `orc backlog depend <task-id> --on <task-id>,<task-id>`, which replaces its whole list, or `orc backlog depend <task-id> --clear` to empty it.
-Orc refuses a task the backlog does not hold, a task that is taken, started or closed, a task parked for the captain's answer, and a dependency on itself or one that would make two tasks wait on each other.
+Orc refuses a task the backlog does not hold, a task that is taken, started or closed, a task parked for your answer, and a dependency on itself or one that would make two tasks wait on each other.
 A hold stays as it was when the dependencies change.
 To change the text of a new task, run `orc backlog edit <task-id> <task-file>`, or give `-` to pipe the text in as `orc backlog add` takes it.
 It replaces the title and the body and keeps the id, kind, machine, parent, split mark, dependencies, priority, hold with its history and parked questions.
@@ -240,7 +240,7 @@ To see the backlog, run `orc backlog`.
 It prints the new, taken and closed tasks side by side with the project list and each machine's busy slots beside them.
 To print the same facts as JSON, run `orc backlog --json`, whose document names its version first as `orc.backlog.v1`.
 `orc backlog --json` gives every new task a `wait`, either `null` or the reason the beat will not start it.
-The reason is a decision for the captain, a missing priority, the hold, or the parked questions.
+The reason is a decision for you, a missing priority, the hold, or the parked questions.
 It is also the open children or the dependency the task waits on.
 That dependency includes a ship prerequisite whose PR has not merged.
 Taken, started and closed tasks carry `null` for `wait`.
@@ -256,8 +256,8 @@ Any other task starts only once five things hold:
 
 1. It has a priority.
 A task with no priority never starts, and each beat prints `waits <task-id>: no priority` for it.
-2. No hold or parked question for the captain waits on it unanswered.
-3. Every task it depends on closed done, and a decision closes done when the captain answers it.
+2. No hold or parked question for you waits on it unanswered.
+3. Every task it depends on closed done, and a decision closes done when you answer it.
 A ship task also waits for each ship prerequisite with a PR to merge, whether or not they share a parent.
 A parent task also waits for every scout and task child closed done and every ship child with a PR merged.
 4. Its project has a checkout on a machine with a free slot.
