@@ -11,6 +11,8 @@ Orc takes work you describe, runs an AI agent on it on one of your machines, che
 
 <img class="home-hero-art" src="./images/orc-hero-1120.webp" srcset="./images/orc-hero-640.webp 640w, ./images/orc-hero-1120.webp 1120w" sizes="(min-width: 860px) 560px, 90vw" width="1120" height="747" alt="A calm, grey-haired orc arranging three task tiles at a desk." fetchpriority="high">
 
+<div class="home-rest">
+
 ![How orc works: every part, and every way a task ends](diagrams/how-orc-works.svg)
 
 Solid arrows are the path of the work.
@@ -98,3 +100,5 @@ Its state is files on disk and queues in pueue, so a restart picks up where it s
 - [Run a backlog from the chat](tasks/run-a-backlog.md)
 - [Commands](reference/commands.md)
 - [What orc does](features.md)
+
+</div>

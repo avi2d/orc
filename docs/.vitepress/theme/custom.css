@@ -106,58 +106,68 @@
   border: 1px solid var(--paint-line);
 }
 
-.home-page .vp-doc > div {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  gap: 24px 40px;
-  align-items: center;
-}
-
 .home-page .vp-doc > div > h1 {
-  grid-column: 1;
-  grid-row: 1;
   font-size: clamp(2rem, 3.7vw, 3.2rem);
   line-height: 1.25;
 }
 
 .home-page .vp-doc > div > p:nth-child(2) {
-  grid-column: 1;
-  grid-row: 2;
   max-width: 46ch;
 }
 
-.home-page .vp-doc > div > p:nth-child(3) {
-  grid-column: 1;
-  grid-row: 3;
-}
-
-.home-page .vp-doc > div > img.home-hero-art:nth-child(4) {
-  grid-column: 2;
-  grid-row: 1 / span 3;
+.home-page .vp-doc > div > .home-hero-art {
+  display: block;
   width: 100%;
+  max-width: 520px;
   height: auto;
+  margin: 40px auto 0;
 }
 
-.home-page .vp-doc > div > :nth-child(n+5) {
-  grid-column: 1 / -1;
+.home-page .vp-doc > div > .home-rest {
+  max-width: none;
+  margin-top: 32px;
 }
 
-@media (max-width: 859.98px) {
+/* A grid item's margins do not collapse, so the rest of the page stays in one block, and the margins at its two ends are dropped where the block is a grid item. */
+@media (min-width: 860px) {
   .home-page .vp-doc > div {
-    grid-template-columns: minmax(0, 1fr);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    grid-template-rows: 1fr auto auto auto 1fr;
+    column-gap: 40px;
   }
 
-  .home-page .vp-doc > div > h1,
-  .home-page .vp-doc > div > p:nth-child(2),
-  .home-page .vp-doc > div > p:nth-child(3),
-  .home-page .vp-doc > div > img.home-hero-art:nth-child(4) {
+  .home-page .vp-doc > div > h1 {
+    grid-area: 2 / 1;
+  }
+
+  .home-page .vp-doc > div > p:nth-child(2) {
+    grid-area: 3 / 1;
+  }
+
+  .home-page .vp-doc > div > p:nth-child(3) {
+    grid-area: 4 / 1;
+    margin-top: 0;
+  }
+
+  .home-page .vp-doc > div > .home-hero-art {
+    grid-area: 1 / 2 / 6 / 3;
+    align-self: center;
+    max-width: none;
+    margin: 0;
+  }
+
+  .home-page .vp-doc > div > .home-rest {
     grid-column: 1 / -1;
-    grid-row: auto;
   }
 
-  .home-page .vp-doc > div > img.home-hero-art:nth-child(4) {
-    max-width: 520px;
-    margin-inline: auto;
+  .home-rest > :first-child,
+  .home-rest > :first-child > .diagram:first-child {
+    margin-top: 0;
+  }
+
+  .home-rest > :last-child {
+    margin-bottom: 0;
   }
 }
 
@@ -219,11 +229,13 @@
   max-width: none;
 }
 
-.wide-page .vp-doc > div > * {
+.wide-page .vp-doc > div > *,
+.home-rest > * {
   max-width: 688px;
 }
 
-.wide-page .vp-doc > div > p:has(.diagram) {
+.wide-page .vp-doc > div > p:has(.diagram),
+.home-rest > p:has(.diagram) {
   max-width: none;
 }
 
