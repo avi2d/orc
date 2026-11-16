@@ -38,16 +38,25 @@ export const parentLabel = (home: string, task: string): string => taskLabel(hom
 export interface QueuedTask {
   readonly task: string
   readonly held: PueueTask
+  readonly ahead: number
 }
 
-const isQueued = (candidate: PueueTask): boolean =>
-  Option.exists(Schema.decodeUnknownOption(PueueStatus)(candidate.status), (status) => "Queued" in status)
+const hasStatus = (candidate: PueueTask, names: ReadonlyArray<string>): boolean =>
+  Option.exists(Schema.decodeUnknownOption(PueueStatus)(candidate.status), (status) => names.some((name) => name in status))
+
+const isQueued = (candidate: PueueTask): boolean => hasStatus(candidate, ["Queued"])
+
+const isStarted = (candidate: PueueTask): boolean => hasStatus(candidate, ["Running", "Paused"])
+
+const aheadOf = (orcTasks: ReadonlyArray<PueueTask>, held: PueueTask): number =>
+  orcTasks.filter((other) => isStarted(other) || (isQueued(other) && other.id < held.id)).length
 
 export const queuedTasks = (state: PueueState, home: string): ReadonlyArray<QueuedTask> => {
   const labelPrefix = taskLabel(home, "")
-  return Object.values(state.tasks)
-    .filter((candidate) => candidate.group === orcGroup && isQueued(candidate))
-    .flatMap((held) => held.label !== null && held.label.startsWith(labelPrefix) ? [{ task: held.label.slice(labelPrefix.length), held }] : [])
+  const orcTasks = Object.values(state.tasks).filter((candidate) => candidate.group === orcGroup)
+  return orcTasks
+    .filter(isQueued)
+    .flatMap((held) => held.label !== null && held.label.startsWith(labelPrefix) ? [{ task: held.label.slice(labelPrefix.length), held, ahead: aheadOf(orcTasks, held) }] : [])
     .sort((left, right) => left.held.id - right.held.id)
 }
 

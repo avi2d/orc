@@ -1,5 +1,5 @@
-import type { BoardTask } from "./board"
-import { type Guard, type Guarded, arrayOf, boardKinds, child, fields, literal, ok, oneOf, prStates, projectName, schemaTasks, string, taskHead } from "./guard"
+import type { BoardTask, QueuedRun } from "./board"
+import { type Guard, type Guarded, arrayOf, boardKinds, child, fields, literal, nullableString, number, ok, oneOf, prStates, projectName, runsHead, schemaTasks, string, taskHead } from "./guard"
 
 const boardStatuses = ["new", "taken", "started", "closed"] as const
 
@@ -92,4 +92,23 @@ export const boardAttention: Guard<BoardAttention> = (value, at) => {
   if (schema.kind === "refused") return schema
   const items = arrayOf(record.value, "items", at, boardAttentionItem)
   return items.kind === "refused" ? items : ok({ items: items.value })
+}
+
+const queuedEntry: Guard<QueuedRun | null> = (value, at) => {
+  const record = fields(value, at)
+  if (record.kind === "refused") return record
+  if (record.value["state"] !== "queued") return ok(null)
+  const task = string(record.value, "task", at)
+  if (task.kind === "refused") return task
+  const machine = record.value["machine"] === undefined ? ok(null) : nullableString(record.value, "machine", at)
+  if (machine.kind === "refused") return machine
+  const ahead = record.value["ahead"] === undefined ? ok(null) : number(record.value, "ahead", at)
+  return ahead.kind === "refused" ? ahead : ok({ task: task.value, machine: machine.value, ahead: ahead.value })
+}
+
+export const boardQueue: Guard<ReadonlyArray<QueuedRun>> = (value, at) => {
+  const document = runsHead(value, at)
+  if (document.kind === "refused") return document
+  const listed = arrayOf(document.value.record, "runs", at, queuedEntry)
+  return listed.kind === "refused" ? listed : ok(listed.value.filter((entry) => entry !== null))
 }

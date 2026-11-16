@@ -82,7 +82,9 @@ const QueuedJsonEntrySchema = Schema.Struct({
   delivery: Schema.Null,
   task: Schema.String,
   machine,
-  worktree: Schema.Null
+  worktree: Schema.Null,
+  // Another machine on an older orc prints no ahead, and its whole runs list must still decode.
+  ahead: Schema.optionalKey(Schema.Int)
 })
 type QueuedJsonEntry = typeof QueuedJsonEntrySchema.Type
 
@@ -123,7 +125,7 @@ export const runsJson = (runs: ReadonlyArray<RunsJsonRun>): RunsJsonDocument => 
   machines: []
 })
 
-const queuedEntryOf = ({ task: taskId, held }: QueuedTask): QueuedJsonEntry => ({
+const queuedEntryOf = ({ task: taskId, held, ahead }: QueuedTask): QueuedJsonEntry => ({
   id: null,
   project: held.path,
   branch: taskBranch(taskId),
@@ -139,7 +141,8 @@ const queuedEntryOf = ({ task: taskId, held }: QueuedTask): QueuedJsonEntry => (
   delivery: null,
   task: taskId,
   machine: null,
-  worktree: null
+  worktree: null,
+  ahead
 })
 
 export const withQueued = (document: RunsJsonDocument, queued: ReadonlyArray<QueuedTask>): RunsJsonDocument => ({

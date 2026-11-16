@@ -61,10 +61,10 @@ export interface TaskRun {
 
 const empty = "—"
 
-const taskBranch = (task: string): string => `orc/${task}`
+const taskBranches = (task: string): ReadonlyArray<string> => [`orc/${task}`, `orc/${task}-parent`]
 
 export const runsOfTask = (runs: ReadonlyArray<TaskRun>, task: string): ReadonlyArray<TaskRun> =>
-  runs.filter((run) => run.branch === taskBranch(task)).sort((a, b) => b.id.localeCompare(a.id))
+  runs.filter((run) => taskBranches(task).includes(run.branch)).sort((a, b) => b.id.localeCompare(a.id))
 
 export const runToOpen = (runs: ReadonlyArray<TaskRun>, local: ReadonlySet<string>): string | null =>
   runs.find((run) => local.has(run.id))?.id ?? null
@@ -115,7 +115,7 @@ const infoValue = (task: TaskDetail, runs: ReadonlyArray<TaskRun>, label: InfoLa
   switch (label) {
     case "Account": return accountOf(task.state)
     case "Run": return runValue(runs)
-    case "Branch": return runs.length > 0 ? taskBranch(task.id) : task.parked?.branch ?? null
+    case "Branch": return runs.at(0)?.branch ?? task.parked?.branch ?? null
     case "PR": return prValue(task)
     case "Depends on": return task.dependsOn.length === 0 ? null : task.dependsOn.join(", ")
     case "Created": return shortTime(task.created)
@@ -144,43 +144,3 @@ export const answerArgv = (task: string, target: AnswerTarget, text: string): Re
 }
 
 export const mergeArgv = (task: string): ReadonlyArray<string> => ["merge", task, "--basis", "captain-word"]
-
-export interface ThreadEntry {
-  readonly key: string
-  readonly who: string
-  readonly what: string
-  readonly at: string | null
-  readonly text: string
-  readonly reply: AnswerTarget | null
-}
-
-const answerEntry = (key: string, what: string, answer: Answer): ThreadEntry =>
-  ({ key, who: "Answer", what, at: answer.at, text: answer.words, reply: null })
-
-const questionEntries = (prefix: string, who: string, questions: ReadonlyArray<Asked>, at: string | null, open: boolean): ReadonlyArray<ThreadEntry> =>
-  questions.flatMap((question) => {
-    const key = `${prefix}-${question.id}`
-    const asked: ThreadEntry = {
-      key, who, what: `Question ${question.id}`, at: question.asked ?? at, text: question.text,
-      reply: open && question.answer === null ? { kind: "question", id: question.id } : null
-    }
-    return question.answer === null ? [asked] : [asked, answerEntry(`${key}-answer`, `Answer to ${question.id}`, question.answer)]
-  })
-
-const holdEntries = (prefix: string, hold: TaskHold, openTask: boolean): ReadonlyArray<ThreadEntry> => {
-  const open = openTask && hold.answer === null
-  const reason: ThreadEntry = {
-    key: prefix, who: "orc", what: hold.until === null ? "Hold" : `Hold until ${shortTime(hold.until)}`, at: hold.at, text: hold.reason,
-    reply: open && hold.questions.length === 0 ? { kind: "hold" } : null
-  }
-  // With questions, hold.answer only joins the answers the questions already show.
-  const answer = hold.answer === null || hold.questions.length > 0 ? [] : [answerEntry(`${prefix}-answer`, "Answer", hold.answer)]
-  return [reason, ...questionEntries(prefix, "orc", hold.questions, hold.at, open), ...answer]
-}
-
-export const threadEntries = (task: TaskDetail): ReadonlyArray<ThreadEntry> => {
-  const open = task.state.status !== "closed"
-  const held = task.hold === null ? [] : holdEntries("hold", task.hold, open)
-  const parked = task.parked === null ? [] : questionEntries("parked", "Run", task.parked.questions, null, open)
-  return [...held, ...parked]
-}

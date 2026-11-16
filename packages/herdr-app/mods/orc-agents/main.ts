@@ -1,7 +1,7 @@
 import { type AsyncContext, type Context, type Element, View } from "gpui-kit"
 import { InputState, ScrollHandle, h_flex } from "gpui-base"
 import { layout, readTextFile, run, setShared, shared } from "herdr"
-import { type Card, type Filter, type RunAgent, buildCards, filterCards, goesOn, runAgent } from "../../src/agents"
+import { type Card, type Filter, type RunAgent, buildCards, filterCards, goesOn, opensTurns, runAgent } from "../../src/agents"
 import { type AgentsActions, type Chosen, type DetailShown, type Keyed, type Pane, approvalOf, askMerge, detailView, logLines, runsColumn, sendBackBar, stepsColumn, submitSendBack } from "../../src/agents-view"
 import { type Merge, mergeCommand, mergedNote, runMerge, watchMerges } from "../../src/agents-merge"
 import { type RunChanges, changesKey } from "../../src/changes"
@@ -286,7 +286,7 @@ export default class OrcAgents extends View {
   }
 
   showsTurns(step: ShownStep): boolean {
-    return step.name === "implement" && this.pane === "turns"
+    return opensTurns(step) && this.pane === "turns"
   }
 
   moveSelection(cx: Context, change: () => void): void {

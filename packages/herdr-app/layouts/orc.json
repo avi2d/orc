@@ -10,7 +10,7 @@
       "type": "row",
       "children": [
         { "id": "orc-board-lanes", "type": "block", "content": { "mod": "orc-board" } },
-        { "id": "orc-task", "type": "block", "size": { "px": 460 }, "min": 320, "content": { "mod": "orc-task" } }
+        { "id": "orc-task", "type": "block", "size": { "px": 460 }, "min": 320, "hidden": true, "content": { "mod": "orc-task" } }
       ]
     },
     { "id": "orc-resources", "type": "block", "content": { "mod": "orc-resources" } },

@@ -1,8 +1,9 @@
 import { type Color, type Context, type Element, div } from "gpui-kit"
 import { Input, type InputState, type ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { openOverlay, settings } from "herdr"
-import { type Card, type CardStatus, type Filter, type Mark, type RunAgent, type StepRow, agentLabel, approveRow, cardPlace, cardStatuses, filterCards, namedModels, projectsOf, railLabel, sendBackArgs, stepRows } from "./agents"
+import { type Card, type CardStatus, type Filter, type Mark, type RunAgent, type StepRow, agentLabel, approveRow, cardPlace, cardStatuses, filterCards, namedModels, opensTurns, projectsOf, railLabel, sendBackArgs, stepRows } from "./agents"
 import type { Show, ShownStep } from "./guard"
+import { linkedText } from "./links-view"
 import { type Reading, readText } from "./orc-read"
 import type { palette } from "./palette"
 import { type Turn } from "./turns"
@@ -183,7 +184,7 @@ const rowView = (t: Palette, row: StepRow, target: Chosen | null, model: string 
   const selected = opens !== null && target !== null && sameTarget(opens, target)
   const line = h_flex().id(`row-${row.key}`).px(8).py(4).gap(8).rounded(4).items_center()
     .bg(selected ? t.selected : t.surface)
-    .child(div().w(14).flex_shrink_0().text_color(markColor(t, row.mark)).child(row.mark))
+    .child(div().w(14).flex_shrink_0().text_color(row.mark === null ? t.dim : markColor(t, row.mark)).child(row.mark ?? ""))
     .child(div().flex_shrink_0().text_color(opens === null ? t.muted : t.foreground).child(row.label))
     .children(model === null ? [] : [div().flex_1().min_w_0().truncate().text_size(12).text_color(t.dim).child(model)])
   return opens === null
@@ -226,7 +227,7 @@ const stepBar = (t: Palette, step: ShownStep, title: string, source: string, pan
   return h_flex().px(16).h(40).gap(12).flex_shrink_0().items_center().border_b(1).border_color(t.border)
     .child(div().flex_shrink_0().font_semibold().child(title))
     .children(agent === null ? [] : [div().flex_shrink_0().text_size(12).text_color(t.muted).child(agent)])
-    .children(step.name === "implement"
+    .children(opensTurns(step)
       ? [h_flex().gap(2).flex_shrink_0().child(paneChoice(t, "turns", "Turns", pane === "turns", act)).child(paneChoice(t, "raw", "Raw", pane === "raw", act))]
       : [])
     .child(div().flex_1().min_w_0().truncate().text_right().text_size(12).text_color(t.dim).child(source))
@@ -248,7 +249,7 @@ const approvePane = (t: Palette, card: Card, approval: Approval, merge: MergeOut
       .child(div().font_semibold().child(`Approve ${approval.pr}`)),
     v_flex().p(16).gap(12).items_start()
       .child(div().child(card.title))
-      .child(div().text_color(t.muted).child(approval.link))
+      .child(div().text_color(t.muted).child(linkedText(`approve-${card.key}`, approval.link)))
       .child(div().text_color(t.muted).child(`The run passed and ${approval.pr} waits for your word. Merging runs orc merge ${card.id} --basis captain-word.`))
       .child(merging ? button : button.cursor_pointer().hover((style) => style.opacity(0.88)).on_click(() => act.askMerge(card, approval)))
       .children(merge?.kind === "failed" ? [div().text_color(t.ansi1).child(merge.reason)] : [])
@@ -368,7 +369,7 @@ export const detailView = (t: Palette, card: Card | null, act: AgentsActions, sh
     return detailNote(t, settled ? "This run ended before it recorded a step" : "No step has started yet")
   }
   const title = stepTitle(card, shown.steps, step.id)
-  if (step.name === "implement" && shown.pane === "turns") {
+  if (opensTurns(step) && shown.pane === "turns") {
     return detailPane(t, [...shown.back, stepBar(t, step, title, "Pi session", shown.pane, act),
       div().flex_1().min_h_0().child(turnsView(t, shown.turns, { thinking: shown.thinking, calls: shown.calls }, {
         toggleThinking: (turn, cx) => shown.flipThinking(turn, cx),

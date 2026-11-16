@@ -32,12 +32,13 @@ The command writes only names that start with `orc`, so Herdr's own mods and lay
 
 | Tab | Key | What it shows |
 | --- | --- | --- |
-| Board | `cmd-1` | The backlog tasks in five lanes, and the selected task beside them |
+| Board | `cmd-1` | The backlog tasks in five lanes, and the task panel for the selected card |
 | Resources | `cmd-2` | Each subscription's quota windows, and each machine's cores, load, memory, disk and running orc runs |
 | Agents | `cmd-3` | The runs and the queued tasks, and the selected run's steps, step output and changes |
 
-Board reads `orc backlog --json` and `orc attention --json` when shown and every 10 seconds while shown.
-The task panel beside it reads `orc backlog --json`, `orc runs --json` and `orc runs --json --local` on the same schedule.
+Board reads `orc backlog --json`, `orc attention --json` and `orc runs --json` when shown and every 10 seconds while shown.
+The task panel beside it reads `orc backlog --json`, `orc runs --json`, `orc runs --json --local` and `orc backlog thread <task> --json` for the selected task on the same schedule.
+It reads them again as soon as you select another card.
 Resources reads `orc-dash snapshot --json --only quota,resources,queues` when shown and every minute.
 Agents reads `orc runs --json --local` and `orc backlog --json` again every 4 seconds while it is the shown tab.
 It also reads the selected run with `orc show <run> --json`.
@@ -56,37 +57,64 @@ The Board groups tasks into Backlog, Planned, Awaiting you, Running, and Done.
 Backlog stays empty.
 Held tasks, tasks with unanswered parked questions, tasks with an open attention item for you, and closed tasks with an open PR appear in Awaiting you.
 Taken and started tasks appear in Running.
+A task that waits in a pueue queue with no run yet shows a line such as `Queued on winbox, 2 ahead` on its card.
+The line comes from the queued entries of `orc runs --json`, and names `this machine` for the machine the App runs on.
+The count ahead covers the running tasks and the earlier queued tasks of the `orc` pueue group, from every orc home on that machine, and leaves out other groups.
+An entry from an older orc that gives no count shows only `Queued on <machine>`.
+Once the run starts, the line goes.
 Other new tasks appear in Planned, and other closed tasks appear in Done.
 A closed task whose PR the beat has not read yet appears in Done.
 
 Select a lane header to fold or open it.
 Backlog and Done start folded.
 Select a project to filter the lanes, or select All to show every project.
-Select a card to show its task in the panel on the right.
+With no card selected the lanes fill the whole width.
+Select a card to open the task panel on the right with that task.
+To close the panel and clear the selection, select the selected card again, press Escape while the Board has focus, or select ✕ in the panel's header.
+The panel also closes when the selected task leaves the backlog.
+The panel stays open or closed when you switch to another tab and back.
 Each lane lists its tasks oldest first.
+Each open lane scrolls on its own with the trackpad or the mouse wheel, and its header stays in place.
+To scroll a lane with the keyboard, click inside it first.
+Then press the up and down arrows, Page Up, Page Down, Home or End.
 
 ## Read a task
 
 ![Task panel showing a held example task with one answered and one open question](images/herdr-task-held.png)
 
-The panel shows the id, the kind and the title of the selected task.
+The panel shows the id, the kind and the title of the selected task, and ✕ to close the panel.
 When `orc runs --json --local` lists a run of the task, Open run switches to the Agents tab with the newest such run selected.
 A run outside that list has no Open run, since the Agents tab shows those runs only.
-A run belongs to the task when its branch is `orc/<task id>`.
+While the task waits in a pueue queue, the header shows the card's `Queued on <machine>, <n> ahead` line in place of Open run.
+A run belongs to the task when its branch is `orc/<task id>` or, for a parent task's planning run, `orc/<task id>-parent`.
 
 The panel has three tabs:
 
 | Tab | What it shows |
 | --- | --- |
-| Thread | The hold reason, the hold's questions and the run's parked questions, each with who asked, what it is and when, and each answer below its question |
+| Thread | Every entry of `orc backlog thread`, oldest first, each headed by who, what it is and when |
 | Description | The task's body without its title line as markdown, or No description when nothing remains |
 | Info | Account, Run, Branch, PR, Depends on, Created, Started, Closed, Priority and Assets, in that order, with `—` for an empty row |
 
-Each unanswered question has an answer box.
-Press Enter or select Send to run `orc backlog answer <task> <question-id>=<text>`.
-A hold with no questions has one box, which runs `orc backlog answer <task> <text>`.
-When the command fails, the box shows the command and its error.
+A question shows its Context, Question, Options and Evidence.
+The panel reads them from the question's text, where `orc_ask` writes the context after `Context:` and each option as `A) <text> (picture: <path>)`.
+An option with a picture shows as a picture tile, and an option without one shows as a button.
+Evidence lists the picture file of each option that has one.
+A tile whose picture cannot load shows its path as text in place of the picture.
+A decision of the decider and a withdraw sit indented under the question they are about.
+An answer sits inside its question's card, and it shows Delivered once the thread holds the `delivered` entry for that question.
+
+Each unanswered question of a task that is not closed has an answer box.
+Select an option, or press Enter or select Send in the box, to run `orc backlog answer <task> <question-id>=<text>`.
+An option sends its text without its letter.
+The question id is the hold question id without its `hold-<n>/` part, or the parked question id inside the attention item id `<task>.<question-id>.<asked>`.
+A question the beat asks for a run event has no box, since `orc backlog answer` does not take it.
+The current hold with no questions has one box, which runs `orc backlog answer <task> <text>`.
+When the command fails, the card shows the command and its error.
 Assets shows the report file of a closed task when it has one.
+
+A PR address in the PR row or in a thread entry opens in your default browser when you select it.
+It shows a pointer and an underline when you hover over it.
 
 When the task's PR is open, the PR row has a Merge button.
 It asks first, and on Confirm runs `orc merge <task> --basis captain-word`.
@@ -140,13 +168,15 @@ The script refuses the login `HOME` and an `HC_SESSION` that does not start with
 It keeps the scratch App off the live core, and quits only the App and the core it started.
 The live core's processes and terminals read the same before and after.
 
-## Recapture the Board screenshot
+## Recapture the Board screenshots
 
-The committed shot is the proof of the two-line clip.
+The Board shot with the panel closed is the proof of the two-line clip.
 The garden-6 title wraps to three lines and shows exactly two, with no word cut.
 To recapture it, run `packages/herdr-app/scripts/capture-board.sh <fixture-dir> <output-png>` with a scratch `HOME` that has the layout installed.
 Use `tests/fixtures/herdr-board` as the fixture folder.
 Add `orc-resources` or `orc-agents` as a third argument to capture that tab instead of the Board.
+To capture the Board with the task panel open, pass `orc-board` and then a task id, such as `garden-6`.
+The script writes that id to `orc.board.selected` in the scratch App's `shared.json`, and removes the key when no id is given.
 The script starts the App through `with-scratch-app.sh`, so it takes no focus.
 It saves the window with the App's own `shot` command, which needs no screen-recording permission and works while the window is covered.
 
@@ -180,11 +210,16 @@ A report run shows only its Agent step.
 A ship run shows Agent, Checks, Fix when checks fail, and No mistakes for the standard delivery or PR for a direct PR delivery.
 A step shows ✓ when it passed, ✗ when it failed, ● while it runs, ◆ while it waits for you, and ○ when it has not started.
 A step names its model only when that model differs from the Agent step's.
+A resumed run lists the steps it carries from each earlier run first, under a `From run <run-id>` row for each origin run, in the order they ran there.
+Its own steps follow in the order they ran.
+A carried step opens the log the earlier run wrote.
 Select a step to show it on the right, under a bar that gives the step, its model and its thinking level.
-The Agent step opens in the Turns view, with one card for each reply of the model, as [Chat with orc](#chat-with-orc) describes.
+Every step that runs a Pi session opens in the Turns view, with one card for each reply of the model, as [Chat with orc](#chat-with-orc) describes.
+That covers the Agent step, the Fix step, and any other step that `orc show` gives a Pi session file.
+The Agent step opens in the Turns view even before Pi writes its session file.
 Turns reads the step's Pi session file, and follows new replies as Pi writes them.
 Select Raw in the bar to show the step's log instead, and select Turns to go back.
-Every other step shows its log: a Fix step shows what Pi writes as it works, and a Checks step shows the checks' output.
+A step with no Pi session, such as a Checks step, shows its log with the checks' output.
 The log shows in full and follows new lines as they are written.
 
 ![Agents tab with a running run's Agent step in the Turns view and its Changes column](images/herdr-agents-turns.png)
@@ -194,6 +229,8 @@ The log shows in full and follows new lines as they are written.
 A Code run whose PR waits for your word ends in an Approve step, and the tab opens on it.
 
 ![Agents tab on the Approve step of a run whose PR waits](images/herdr-agents-approve.png)
+
+The Approve step shows the PR address, and selecting it opens the PR in your default browser.
 
 To merge the PR:
 
@@ -227,7 +264,9 @@ In the Raw view Esc goes to Pi as an interrupt, so it never closes the drawer.
 Both views show the same bar: select Raw to go back to the terminal, select Turns to read, or select ✕ to close the drawer.
 Press Esc in the Turns view to close the drawer.
 Turns shows the same conversation read only, with one card for each reply of the model.
-A card gives the input, output, cache read and cache write tokens of that reply, and its time.
+A card gives its number, the input, output, cache read and cache write tokens of that reply, and its time.
+The first card of a step or a chat is 1, and the numbers run on through the whole session.
+Each tool call carries its number within the session, such as 3.2 for the second call of the third card.
 Select Thinking to show the thinking of the model.
 Each tool call shows ✓ when it succeeded, ✗ when it failed, and … while it runs.
 Beside the mark it shows running while it runs, and its line count once it finishes.

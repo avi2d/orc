@@ -7,7 +7,7 @@ import { answerWaitFromEnv } from "../../entities/review-gate/index"
 import { hostGitShim } from "../../shared/sandbox/index"
 import type { SandboxKind } from "../../shared/sandbox/index"
 import { defaultToolchainResolver, type HostTools, type ToolchainResolver, withInstallFolders, within } from "../../shared/sandbox/index"
-import { routeOfAgents } from "../../shared/config/index"
+import { configuredModels, routeOfAgents } from "../../shared/config/index"
 import { readOrcConfig } from "../../shared/config/index"
 import { planSandbox, type SandboxPlan } from "./sandbox-plan"
 import { type Checkout, openCheckout, parseRefuseMarkers } from "../../entities/task-copy/index"
@@ -45,6 +45,8 @@ export interface OrcRunRequest {
   readonly sandbox?: SandboxKind | undefined
   readonly tokenFile?: string | undefined
   readonly provider?: string | undefined
+  readonly implementerModel?: string | undefined
+  readonly fixerModel?: string | undefined
   readonly instructions?: string | undefined
   readonly allow?: ReadonlyArray<AllowWord> | undefined
   readonly answers?: ReadonlyArray<QuestionAnswer> | undefined
@@ -114,24 +116,25 @@ const prepareAgents = (
   instructionsFile: string | null,
   agentsDir: string | undefined,
   sandboxKind: SandboxKind,
-  pins: { readonly tokenFile: string | undefined; readonly provider: string | undefined }
+  pins: { readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly implementerModel: string | undefined; readonly fixerModel: string | undefined }
 ): Effect.Effect<PreparedAgents, OrcRunError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
     const config = yield* readOrcConfig(home).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read " + cause.file + ": " + cause.detail }))
     )
     const folders = yield* prepareRunFolders(fs, path, runDir, effectiveTaskFile, instructionsFile)
+    const configured = configuredModels(config, { implementer: pins.implementerModel, fixer: pins.fixerModel })
     const agent: AgentFile = yield* resolveAgentFile("implementer", {
       projectDir: checkout.projectDir,
       orcHome: home,
       agentsDir,
-      configModel: { file: config.file, model: config.models?.implementer }
+      configModel: { file: config.file, model: configured.implementer }
     }).pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
     const fixer: AgentFile = yield* resolveAgentFile("fixer", {
       projectDir: checkout.projectDir,
       orcHome: home,
       agentsDir,
-      configModel: { file: config.file, model: config.models?.fixer }
+      configModel: { file: config.file, model: configured.fixer }
     }).pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
     const piBinary = Bun.which("pi")
     const nodeBinary = Bun.which("node")
@@ -212,7 +215,7 @@ const openRun = (
 const prepareRunAgents = (opened: OpenedRun, request: OrcRunRequest) =>
   prepareAgents(
     opened.fs, opened.path, opened.spawner, opened.checkout, opened.home, opened.runDir, opened.effectiveTaskFile, opened.instructionsFile, request.agentsDir, opened.sandboxKind,
-    { tokenFile: request.tokenFile, provider: request.provider }
+    { tokenFile: request.tokenFile, provider: request.provider, implementerModel: request.implementerModel, fixerModel: request.fixerModel }
   )
 
 const piPacing = (idleTimeoutSeconds: number): PiPacing => ({ tickMillis: 60_000, idleMillis: idleTimeoutSeconds * 1000 })

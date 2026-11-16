@@ -68,6 +68,8 @@ const fakePueue = [
   "    rmdir \"$PUEUE_STATE/group-lock\"; echo \"$id\" ;;",
   "  wait)",
   "    printf '%s\\n' \"$2\" >> \"$PUEUE_STATE/wait-calls\"; if [ -f \"$PUEUE_STATE/wait-fails\" ]; then exit 1; fi; id=\"$2\"; while [ -f \"$PUEUE_STATE/live-$id\" ]; do sleep 0.05; done ;;",
+  "  parallel)",
+  "    printf '%s\\n' \"$@\" >> \"$PUEUE_STATE/parallel-calls\" ;;",
   "  kill)",
   "    id=\"$2\"; rm -f \"$PUEUE_STATE/live-$id\"; echo \"Killed $id\" ;;",
   "  *) echo \"fake pueue has no $1\" >&2; exit 2 ;;",

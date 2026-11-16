@@ -20,6 +20,14 @@ const readOriginRun = (id: string, home: string, label: string, machine: Machine
     Effect.timeoutOrElse({ duration: Duration.seconds(30), orElse: () => Effect.fail(new BacklogError({ detail: "orc backlog send-back refused: the runner did not answer within 30 seconds" })) })
   )
 
+const refuseUnlessOpen = (url: string) =>
+  Effect.gen(function*() {
+    const view = yield* readPullRequest(url).pipe(Effect.mapError((error) => new BacklogError({ detail: "orc backlog send-back refused: " + error.detail })))
+    if (view.state !== "OPEN") {
+      return yield* refuse(url + " is " + view.state.toLowerCase() + ", so no run can update it")
+    }
+  })
+
 export const sendBack = (
   root: string,
   home: string,
@@ -29,6 +37,10 @@ export const sendBack = (
   Effect.gen(function*() {
     const record = yield* findTask(root, args.id)
     if (record.state.kind === "new") {
+      const sentPr = record.parked?.origin?.pr
+      if (sentPr !== undefined) {
+        yield* refuseUnlessOpen(sentPr)
+      }
       const origin = yield* addSendBackWords(root, args.id, args.words, at)
       return "added the review to " + args.id + ", so the next beat resumes run " + origin.run + " on " + taskBranch(args.id) + " with every review sent back"
     }
@@ -39,10 +51,7 @@ export const sendBack = (
     if (url === null || !prPattern.test(url)) {
       return yield* refuse(args.id + " names no pull request to send back")
     }
-    const view = yield* readPullRequest(url).pipe(Effect.mapError((error) => new BacklogError({ detail: "orc backlog send-back refused: " + error.detail })))
-    if (view.state !== "OPEN") {
-      return yield* refuse(url + " is " + view.state.toLowerCase() + ", so no run can update it")
-    }
+    yield* refuseUnlessOpen(url)
     const claim = record.state.claim
     if (claim === null) {
       return yield* refuse(args.id + " closed without a run, so it has no branch to send back")

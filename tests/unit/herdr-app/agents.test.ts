@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { buildCards, cardPlace, filterCards, namedModels, projectsOf, railLabel, runAgent, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
+import { buildCards, cardPlace, filterCards, namedModels, opensTurns, projectsOf, railLabel, runAgent, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
 import type { Backlog, Run, Runs, Task } from "../../../packages/herdr-app/src/guard"
 
 const run = (id: string, fields: Partial<Run>): Run => ({
@@ -166,14 +166,14 @@ describe("the runs list", () => {
 describe("the selected run's steps", () => {
   test("a failed Checks step is marked ✗ and the steps still to come ○, not left out", () => {
     const rows = stepRows({ status: "Running" }, [
-      { id: 1, name: "implement", attempt: 1, status: "passed" },
-      { id: 2, name: "checks", attempt: 1, status: "failed" }
+      { id: 1, name: "implement", attempt: 1, status: "passed", from: null },
+      { id: 2, name: "checks", attempt: 1, status: "failed", from: null }
     ], "ship", null)
     expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["✓ Agent", "✗ Checks 1", "○ Fix 1", "○ Checks 2", "○ No mistakes"])
   })
 
   test("a running step that waits on an answer is ◆, not ●", () => {
-    const rows = stepRows({ status: "Awaiting you", waiting: { on: "answer" } }, [{ id: 1, name: "implement", attempt: 1, status: "running" }], "ship", null)
+    const rows = stepRows({ status: "Awaiting you", waiting: { on: "answer" } }, [{ id: 1, name: "implement", attempt: 1, status: "running", from: null }], "ship", null)
     expect(rows.map((row) => row.mark)).toEqual(["◆", "○", "○"])
   })
 
@@ -182,12 +182,12 @@ describe("the selected run's steps", () => {
   })
 
   test("a failed run lists no steps to come after the one that failed", () => {
-    const rows = stepRows({ status: "Failed" }, [{ id: 1, name: "implement", attempt: 1, status: "failed" }])
+    const rows = stepRows({ status: "Failed" }, [{ id: 1, name: "implement", attempt: 1, status: "failed", from: null }])
     expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["✗ Agent"])
   })
 
   test("a stopped run marks its running step ✗, not ●", () => {
-    const rows = stepRows({ status: "Failed" }, [{ id: 1, name: "implement", attempt: 1, status: "running" }], "ship", null)
+    const rows = stepRows({ status: "Failed" }, [{ id: 1, name: "implement", attempt: 1, status: "running", from: null }], "ship", null)
     expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["✗ Agent"])
   })
 
@@ -195,27 +195,52 @@ describe("the selected run's steps", () => {
     expect(stepRows({ status: "Queued" }, [], "scout", null).map((row) => row.label)).toEqual(["Agent"])
   })
 
+  test("a resumed run groups its carried steps under the earlier run before its own, not carried checks sorted before its own agent step", () => {
+    const rows = stepRows({ status: "Done" }, [
+      { id: 1, name: "implement", attempt: 1, status: "passed", from: "run-a" },
+      { id: 2, name: "checks", attempt: 1, status: "failed", from: "run-a" },
+      { id: 9, name: "no-mistakes", attempt: 1, status: "passed", from: null },
+      { id: 3, name: "fix", attempt: 1, status: "passed", from: "run-a" },
+      { id: 4, name: "checks", attempt: 2, status: "passed", from: "run-a" }
+    ], "ship", null)
+    expect(rows.map((row) => `${row.mark ?? "-"} ${row.label}`)).toEqual(["- From run run-a", "✓ Agent", "✗ Checks 1", "✓ Fix 1", "✓ Checks 2", "✓ No mistakes"])
+    expect(rows[0]?.stepId).toBeNull()
+  })
+
+  test("a resume of a resume groups carried steps under one row per origin run, not one row for both origins", () => {
+    const rows = stepRows({ status: "Done" }, [
+      { id: 1, name: "implement", attempt: 1, status: "passed", from: "run-a" },
+      { id: 2, name: "checks", attempt: 1, status: "passed", from: "run-a" },
+      { id: 9, name: "no-mistakes", attempt: 1, status: "passed", from: null },
+      { id: 3, name: "fix", attempt: 1, status: "passed", from: "run-a" },
+      { id: 4, name: "checks", attempt: 2, status: "passed", from: "run-b" },
+      { id: 5, name: "fix", attempt: 2, status: "passed", from: "run-b" }
+    ], "ship", null)
+    expect(rows.map((row) => `${row.mark ?? "-"} ${row.label}`)).toEqual(["- From run run-a", "✓ Agent", "✓ Checks 1", "✓ Fix 1", "- From run run-b", "✓ Checks 2", "✓ Fix 2", "✓ No mistakes"])
+    expect(rows[4]?.stepId).toBeNull()
+  })
+
   test("a restarted checks round predicts the next round from the restart, not the inherited maximum", () => {
     const rows = stepRows({ status: "Running" }, [
-      { id: 1, name: "implement", attempt: 1, status: "passed" },
-      { id: 2, name: "checks", attempt: 1, status: "failed" },
-      { id: 3, name: "checks", attempt: 2, status: "failed" },
-      { id: 4, name: "fix", attempt: 1, status: "passed" },
-      { id: 5, name: "fix", attempt: 2, status: "passed" },
-      { id: 6, name: "checks", attempt: 1, status: "failed" },
-      { id: 7, name: "fix", attempt: 3, status: "running" }
+      { id: 1, name: "implement", attempt: 1, status: "passed", from: null },
+      { id: 2, name: "checks", attempt: 1, status: "failed", from: null },
+      { id: 3, name: "checks", attempt: 2, status: "failed", from: null },
+      { id: 4, name: "fix", attempt: 1, status: "passed", from: null },
+      { id: 5, name: "fix", attempt: 2, status: "passed", from: null },
+      { id: 6, name: "checks", attempt: 1, status: "failed", from: null },
+      { id: 7, name: "fix", attempt: 3, status: "running", from: null }
     ], "ship", null)
     expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["\u2713 Agent", "\u2717 Checks 1", "\u2717 Checks 2", "\u2713 Fix 1", "\u2713 Fix 2", "\u2717 Checks 1", "\u25cf Fix 3", "\u25cb Checks 2", "\u25cb No mistakes"])
   })
 
   test("a restarted failed checks round numbers its fix after the inherited fixes", () => {
     const rows = stepRows({ status: "Running" }, [
-      { id: 1, name: "implement", attempt: 1, status: "passed" },
-      { id: 2, name: "checks", attempt: 1, status: "failed" },
-      { id: 3, name: "checks", attempt: 2, status: "failed" },
-      { id: 4, name: "fix", attempt: 1, status: "passed" },
-      { id: 5, name: "fix", attempt: 2, status: "passed" },
-      { id: 6, name: "checks", attempt: 1, status: "failed" }
+      { id: 1, name: "implement", attempt: 1, status: "passed", from: null },
+      { id: 2, name: "checks", attempt: 1, status: "failed", from: null },
+      { id: 3, name: "checks", attempt: 2, status: "failed", from: null },
+      { id: 4, name: "fix", attempt: 1, status: "passed", from: null },
+      { id: 5, name: "fix", attempt: 2, status: "passed", from: null },
+      { id: 6, name: "checks", attempt: 1, status: "failed", from: null }
     ], "ship", null)
     expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["\u2713 Agent", "\u2717 Checks 1", "\u2717 Checks 2", "\u2713 Fix 1", "\u2713 Fix 2", "\u2717 Checks 1", "\u25cb Fix 3", "\u25cb Checks 2", "\u25cb No mistakes"])
   })
@@ -243,6 +268,24 @@ describe("the model and effort of a run", () => {
   })
 })
 
+describe("the pane a step opens in", () => {
+  test("a Fix step with a Pi session opens in Turns, not as raw text", () => {
+    expect(opensTurns({ name: "fix", piSessionFile: "/home/me/.pi/sessions/fix-1.jsonl" })).toBe(true)
+  })
+
+  test("any agent step with a Pi session opens in Turns, not only Agent and Fix", () => {
+    expect(opensTurns({ name: "review", piSessionFile: "/home/me/.pi/sessions/review-1.jsonl" })).toBe(true)
+  })
+
+  test("a Checks step with no Pi session shows its log, not an empty Turns view", () => {
+    expect(opensTurns({ name: "checks", piSessionFile: null })).toBe(false)
+  })
+
+  test("a Fix step with no Pi session shows its log, not an empty Turns view", () => {
+    expect(opensTurns({ name: "fix", piSessionFile: null })).toBe(false)
+  })
+})
+
 describe("the Approve step and the Changes column of a run", () => {
   test("a Code run awaiting approval ends in Approve, not in its delivery step", () => {
     const cards = buildCards(
@@ -251,9 +294,9 @@ describe("the Approve step and the Changes column of a run", () => {
     )
     const standing = cards[0]?.standing ?? { status: "Queued" as const }
     const rows = stepRows(standing, [
-      { id: 1, name: "implement", attempt: 1, status: "passed" },
-      { id: 2, name: "checks", attempt: 1, status: "passed" },
-      { id: 3, name: "no-mistakes", attempt: 1, status: "passed" }
+      { id: 1, name: "implement", attempt: 1, status: "passed", from: null },
+      { id: 2, name: "checks", attempt: 1, status: "passed", from: null },
+      { id: 3, name: "no-mistakes", attempt: 1, status: "passed", from: null }
     ], "ship", null)
     expect(rows.map((row) => `${row.mark} ${row.label}`)).toEqual(["✓ Agent", "✓ Checks 1", "✓ No mistakes", "◆ Approve PR #48"])
   })
