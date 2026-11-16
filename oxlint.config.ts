@@ -10,5 +10,7 @@ export default defineConfig({
       "packages/run/src/entities/heavy-queue/heavy-standin-exec.ts",
       "packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts"
     ]
-  }
+  },
+  // A VitePress theme and a Vue component load a stylesheet only through a bare import.
+  overrides: [{ files: ["docs/.vitepress/theme/index.ts", "docs/map/MapFlow.vue"], rules: { "import/no-unassigned-import": "off" } }]
 });

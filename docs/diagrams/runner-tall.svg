@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 1076" class="orc-d" role="img" aria-labelledby="d-runner-tall-title d-runner-tall-desc">
+<title id="d-runner-tall-title">The runner: what keeps a run alive on its machine</title>
+<desc id="d-runner-tall-desc">The beat runs the machine's start command and never waits for it. orc runner start reads the task and queues the run in pueue, on this machine or over SSH on another. The pueue group orc gives each running task one slot and starts orc run. A second group, heavy, has one slot, so the test runs and builds of every agent take turns. A later beat reaches the run only through the orc runner commands.</desc>
+<style>.orc-d {
+  color-scheme: light dark;
+  --d-ink: light-dark(#1f2328, #e8eaed);
+  --d-mute: light-dark(#57606a, #a3abb5);
+  --d-line: light-dark(#c8cdd5, #474d57);
+  --d-card: light-dark(#ffffff, #22252b);
+  --d-zone: light-dark(#f3f4f6, #17191d);
+  --d-work: light-dark(#3451b2, #a8b1ff);
+  --d-work-soft: light-dark(#e8ebfc, #272c52);
+  --d-on-work: light-dark(#ffffff, #14162b);
+  --d-ask: light-dark(#8a5a00, #e9b949);
+  --d-ask-soft: light-dark(#fff3d1, #3a300f);
+  --d-ok: light-dark(#17794c, #48d597);
+  --d-ok-soft: light-dark(#def5e8, #12301f);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.orc-d text { fill: var(--d-mute); font-size: 12.5px; }
+.orc-d .title { fill: var(--d-ink); font-size: 14px; font-weight: 650; }
+.orc-d .big { fill: var(--d-ink); font-size: 15.5px; font-weight: 650; }
+.orc-d .label { fill: var(--d-mute); font-size: 12px; font-weight: 600; }
+.orc-d .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; fill: var(--d-ink); }
+.orc-d .ask-text { fill: var(--d-ask); font-weight: 600; }
+.orc-d .work-text { fill: var(--d-work); font-weight: 600; }
+.orc-d .ok-text { fill: var(--d-ok); font-weight: 600; }
+.orc-d .zone { fill: var(--d-zone); stroke: var(--d-line); }
+.orc-d .card { fill: var(--d-card); stroke: var(--d-line); }
+.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); }
+.orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); }
+.orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); }
+.orc-d .line { fill: none; stroke: var(--d-mute); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .line-work { fill: none; stroke: var(--d-work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .line-ask { fill: none; stroke: var(--d-ask); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
+.orc-d .line-ok { fill: none; stroke: var(--d-ok); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .faint { fill: none; stroke: var(--d-line); stroke-width: 3; stroke-linecap: round; }
+.orc-d .head-work { fill: var(--d-work); }
+.orc-d .head-ask { fill: var(--d-ask); }
+.orc-d .head-mute { fill: var(--d-mute); }
+.orc-d .dot-work { fill: var(--d-work); }
+.orc-d .dot-ask { fill: var(--d-ask); }
+.orc-d .dot-ok { fill: var(--d-ok); }
+.orc-d .dot-mute { fill: var(--d-line); }
+.orc-d .num { fill: var(--d-on-work); font-size: 13px; font-weight: 700; }
+.orc-d .num-ask { fill: var(--d-card); font-size: 13px; font-weight: 700; }
+.orc-d .tick { fill: none; stroke: var(--d-card); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .dot-mute-strong { fill: var(--d-mute); }
+</style>
+<rect x="4" y="4" width="352" height="122" rx="14" class="zone"/><text x="16" y="25" class="label" text-anchor="start"><tspan x="16" dy="0">The machine that plans</tspan></text>
+<g data-part="beat"><rect x="16" y="36" width="328" height="78" rx="10" class="card"/><text x="28" y="64" class="title" text-anchor="start"><tspan x="28" dy="0">The beat</tspan></text><text x="28" y="82" class="" text-anchor="start"><tspan x="28" dy="0">Runs the machine's start command, detached, and</tspan><tspan x="28" dy="16">never waits for it.</tspan></text><path d="M325,54 l5,5.5 l-5,5.5" class="line-work"/></g>
+<path d="M180,129 L180,147" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,147) rotate(90)"/>
+<rect x="4" y="150" width="352" height="546" rx="14" class="zone"/><text x="16" y="171" class="label" text-anchor="start"><tspan x="16" dy="0">A machine that works</tspan></text>
+<rect x="16" y="182" width="328" height="78" rx="10" class="card"/><text x="28" y="210" class="title" text-anchor="start"><tspan x="28" dy="0"><tspan class="code">orc runner start</tspan></tspan></text><text x="28" y="228" class="" text-anchor="start"><tspan x="28" dy="0">Reads the task from the <tspan class="code">ORC_TASK_*</tspan> variables</tspan><tspan x="28" dy="16">and queues the run.</tspan></text>
+<rect x="16" y="268" width="328" height="94" rx="10" class="card"/><text x="28" y="296" class="title" text-anchor="start"><tspan x="28" dy="0">Another machine</tspan></text><text x="28" y="314" class="" text-anchor="start"><tspan x="28" dy="0">The task travels as JSON over SSH to <tspan class="code">orc</tspan></tspan><tspan x="28" dy="16"><tspan class="code">runner queue</tspan> there. SSH can drop once pueue</tspan><tspan x="28" dy="16">holds the run.</tspan></text>
+<path d="M180,364 L180,384" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,384) rotate(90)"/>
+<rect x="16" y="386" width="328" height="78" rx="10" class="card-work"/><text x="28" y="414" class="title" text-anchor="start"><tspan x="28" dy="0">pueue, group <tspan class="code">orc</tspan></tspan></text><text x="28" y="432" class="" text-anchor="start"><tspan x="28" dy="0">One slot per running task, as <tspan class="code">dispatch.json</tspan></tspan><tspan x="28" dy="16">says. A full machine holds the task back.</tspan></text>
+<path d="M180,466 L180,486" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,486) rotate(90)"/>
+<g data-part="run"><rect x="16" y="488" width="328" height="78" rx="10" class="card"/><text x="28" y="516" class="title" text-anchor="start"><tspan x="28" dy="0"><tspan class="code">orc run</tspan></tspan></text><text x="28" y="534" class="" text-anchor="start"><tspan x="28" dy="0">On the host as your user, on the branch</tspan><tspan x="28" dy="16"><tspan class="code">orc/&lt;task-id></tspan>.</tspan></text><path d="M325,506 l5,5.5 l-5,5.5" class="line-work"/></g>
+<path d="M180,568 L180,588" class="line"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-mute" transform="translate(180,588) rotate(90)"/>
+<text x="192" y="582" class="" text-anchor="start"><tspan x="192" dy="0">its test runs and builds</tspan></text>
+<rect x="16" y="590" width="328" height="94" rx="10" class="card-work"/><text x="28" y="618" class="title" text-anchor="start"><tspan x="28" dy="0">pueue, group <tspan class="code">heavy</tspan></tspan></text><text x="28" y="636" class="" text-anchor="start"><tspan x="28" dy="0">One slot. The test runs and builds of every</tspan><tspan x="28" dy="16">agent take turns, so they cannot overload the</tspan><tspan x="28" dy="16">machine.</tspan></text>
+<path d="M180,699 L180,717" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,717) rotate(90)"/>
+<rect x="4" y="720" width="352" height="352" rx="14" class="zone"/><text x="16" y="741" class="label" text-anchor="start"><tspan x="16" dy="0">The machine that plans, later</tspan></text>
+<g data-part="beat"><rect x="16" y="752" width="328" height="62" rx="10" class="card"/><text x="28" y="780" class="title" text-anchor="start"><tspan x="28" dy="0">A later beat</tspan></text><text x="28" y="798" class="" text-anchor="start"><tspan x="28" dy="0">Never looks into pueue. It asks the runner.</tspan></text><path d="M325,770 l5,5.5 l-5,5.5" class="line-work"/></g>
+<path d="M180,816 L180,836" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,836) rotate(90)"/>
+<rect x="16" y="838" width="328" height="222" rx="10" class="card"/><text x="28" y="866" class="title" text-anchor="start"><tspan x="28" dy="0">The commands a beat reaches a run</tspan><tspan x="28" dy="18">through</tspan></text><circle cx="31" cy="902" r="2" class="dot-mute-strong"/><text x="40" y="906" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">orc runner result</tspan>: the state of the run, and</tspan><tspan x="40" dy="16">its pull request</tspan></text><circle cx="31" cy="936" r="2" class="dot-mute-strong"/><text x="40" y="940" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">orc runner answer</tspan>: your answers, for a run</tspan><tspan x="40" dy="16">that waits at its gate</tspan></text><circle cx="31" cy="970" r="2" class="dot-mute-strong"/><text x="40" y="974" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">orc runner renew</tspan>: a fresh token</tspan></text><circle cx="31" cy="988" r="2" class="dot-mute-strong"/><text x="40" y="992" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">orc runner kill</tspan>: stops the run, and the next</tspan><tspan x="40" dy="16">beat closes the task stopped</tspan></text><circle cx="31" cy="1022" r="2" class="dot-mute-strong"/><text x="40" y="1026" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">orc runner load</tspan>: the load a load limit is</tspan><tspan x="40" dy="16">compared against</tspan></text>
+</svg>
