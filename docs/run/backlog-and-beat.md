@@ -64,6 +64,17 @@ Orc runs the quota command with no input and reads its standard output as this d
 
 Each entry gives the percent of room left, from 0 to 100, or the reason the account cannot run.
 An account the document does not name cannot run.
+A Claude quota read through claude-bridge prints this document.
+
+The quota command may instead print the document of `quota-axi --full --json --provider <id>`, such as `["quota-axi", "--full", "--json", "--provider", "codex"]`.
+Orc reads a document with a `providers` key this way.
+An account named in `dispatch.json` reads the provider entry whose `accountKey` or `accountKeys` names it.
+The account's room is the `effectivePercentRemaining` of the entry's `all_models` scope under `quotaSemantics`, so a Codex code review window does not count.
+The account's reset time is the `resetsAt` of the scope's limiting window, the latest one when several tie, and the beat line prints it after the room.
+When no limiting window names a reset time, the account reads usable with no reset time.
+An entry with no window or no `all_models` percent cannot run, and the reason names its quota-axi state when that state is not fresh, with the error after a colon when the state carries one.
+A quota-axi document that names no window at all, or names one account key twice, leaves the quota unread.
+
 A command that exits non-zero, runs past 15 seconds or prints any other document leaves the quota unread, and the beat starts nothing.
 
 A quota with a token command account then looks like this:
