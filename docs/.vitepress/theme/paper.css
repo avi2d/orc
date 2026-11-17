@@ -445,6 +445,14 @@ html:not(.dark) .vp-doc .vp-code span {
   background: var(--paint-work-strong);
   color: var(--paint-on);
 }
+
+.vp-doc a.map-open:focus-visible {
+  background: var(--paint-work-strong);
+  color: var(--paint-on);
+  text-decoration: underline;
+  text-underline-offset: 0.22em;
+  outline: none;
+}
 .paper-marks {
   display: flex;
   flex-wrap: wrap;
