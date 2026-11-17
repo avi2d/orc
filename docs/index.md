@@ -1,9 +1,10 @@
 ---
+description: "Orc is the orchestrator for your agent work: one chat runs it on all your machines and models, with a backlog, live monitoring and dashboards."
 aside: false
 pageClass: wide-page home-page
 kind: explanation
 ---
-# How orc works
+# Orc for your agent work
 
 One chat to run your AI agent work on all your machines and models, with a backlog, live monitoring and Herdr App dashboards.
 
