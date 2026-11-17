@@ -10,10 +10,10 @@
   --d-card: light-dark(#fffbf2, #211a14);
   --d-zone: light-dark(#eee5d4, #2c231b);
   --d-work: light-dark(#a3160f, #f0624a);
-  --d-work-soft: light-dark(#f7e6de, #342019);
   --d-on-work: light-dark(#fff8ec, #1a0b07);
   --d-ask: light-dark(#774d00, #e6ac3f);
-  --d-ask-soft: light-dark(#ede4d3, #3b2d1a);
+  --d-ask-soft: light-dark(#fbe7ae, #4d3b12);
+  --d-end-soft: light-dark(#d9d5cf, #45403b);
   --d-ok: light-dark(#2d6220, #9dc56e);
   --d-ok-soft: light-dark(#e6e9d9, #302f1f);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -28,21 +28,19 @@
 .orc-d .ok-text { fill: var(--d-ok); font-weight: 600; }
 .orc-d .zone { fill: var(--d-zone); stroke: var(--d-line); }
 .orc-d .card { fill: var(--d-card); stroke: var(--d-edge); stroke-width: 1.5; }
-.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); stroke-width: 1.5; }
 .orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); stroke-width: 1.5; }
 .orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); stroke-width: 1.5; }
-.orc-d .mark-running, .orc-d .mark-failed { color: var(--d-work); }
-.orc-d .mark-waiting { color: var(--d-mute); }
-.orc-d .mark-done { color: var(--d-ok); }
-.orc-d .mark-attention { color: var(--d-ask); }
-.orc-d .line { fill: none; stroke: var(--d-mute); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .card-end { fill: var(--d-end-soft); stroke: var(--d-mute); stroke-width: 1.5; }
+.orc-d .line-aside { fill: none; stroke: var(--d-mute); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .chevron { fill: none; stroke: var(--d-mute); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .bar { fill: none; stroke: var(--d-mute); stroke-width: 3; stroke-linecap: round; }
 .orc-d .line-work { fill: none; stroke: var(--d-work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .line-ask { fill: none; stroke: var(--d-ask); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
 .orc-d .line-ok { fill: none; stroke: var(--d-ok); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .faint { fill: none; stroke: var(--d-line); stroke-width: 3; stroke-linecap: round; }
 .orc-d .head-work { fill: var(--d-work); }
 .orc-d .head-ask { fill: var(--d-ask); }
-.orc-d .head-mute { fill: var(--d-mute); }
+.orc-d .head-aside { fill: var(--d-mute); }
 .orc-d .dot-work { fill: var(--d-work); }
 .orc-d .dot-ask { fill: var(--d-ask); }
 .orc-d .dot-ok { fill: var(--d-ok); }
@@ -60,15 +58,15 @@
 <rect x="210" y="196" width="216" height="110" rx="10" class="card"/><text x="222" y="224" class="title" text-anchor="start"><tspan x="222" dy="0">Did the beat read it?</tspan></text><text x="222" y="242" class="" text-anchor="start"><tspan x="222" dy="0">Not when the command fails,</tspan><tspan x="222" dy="16">runs past 15 seconds or prints</tspan><tspan x="222" dy="16">anything else.</tspan></text>
 <rect x="210" y="370" width="216" height="60" rx="10" class="card"/><text x="222" y="398" class="title" text-anchor="start"><tspan x="222" dy="0">This beat starts nothing</tspan></text>
 <rect x="446" y="42" width="216" height="130" rx="10" class="card"/><text x="458" y="70" class="title" text-anchor="start"><tspan x="458" dy="0">Which accounts can run?</tspan></text><circle cx="461" cy="88" r="2" class="dot-mute-strong"/><text x="470" y="92" class="" text-anchor="start"><tspan x="470" dy="0">named in the document</tspan></text><circle cx="461" cy="106" r="2" class="dot-mute-strong"/><text x="470" y="110" class="" text-anchor="start"><tspan x="470" dy="0">room above 0%</tspan></text><circle cx="461" cy="124" r="2" class="dot-mute-strong"/><text x="470" y="128" class="" text-anchor="start"><tspan x="470" dy="0">at or above <tspan class="code">floorPercent</tspan>,</tspan><tspan x="470" dy="16">when you set one</tspan></text>
-<rect x="446" y="236" width="216" height="96" rx="10" class="card-work"/><text x="458" y="264" class="title" text-anchor="start"><tspan x="458" dy="0">The one with the most</tspan><tspan x="458" dy="18">room</tspan></text><text x="458" y="300" class="" text-anchor="start"><tspan x="458" dy="0">Every task this beat starts</tspan><tspan x="458" dy="16">takes it.</tspan></text>
+<rect x="446" y="236" width="216" height="96" rx="10" class="card"/><text x="458" y="264" class="title" text-anchor="start"><tspan x="458" dy="0">The one with the most</tspan><tspan x="458" dy="18">room</tspan></text><text x="458" y="300" class="" text-anchor="start"><tspan x="458" dy="0">Every task this beat starts</tspan><tspan x="458" dy="16">takes it.</tspan></text>
 <rect x="702" y="42" width="240" height="100" rx="10" class="card"/><text x="714" y="70" class="title" text-anchor="start"><tspan x="714" dy="0"><tspan class="code">token-file</tspan></tspan></text><text x="714" y="88" class="" text-anchor="start"><tspan x="714" dy="0">The path of a token file on the</tspan><tspan x="714" dy="16">machine, never the token.</tspan></text>
 <rect x="702" y="152" width="240" height="100" rx="10" class="card"/><text x="714" y="180" class="title" text-anchor="start"><tspan x="714" dy="0"><tspan class="code">token-command</tspan></tspan></text><text x="714" y="198" class="" text-anchor="start"><tspan x="714" dy="0">A token the command prints, sent</tspan><tspan x="714" dy="16">on standard input and renewed each</tspan><tspan x="714" dy="16">beat.</tspan></text>
 <rect x="702" y="262" width="240" height="100" rx="10" class="card"/><text x="714" y="290" class="title" text-anchor="start"><tspan x="714" dy="0"><tspan class="code">claude-config</tspan></tspan></text><text x="714" y="308" class="" text-anchor="start"><tspan x="714" dy="0">The path of that account's Claude</tspan><tspan x="714" dy="16">config directory.</tspan></text>
 <rect x="702" y="372" width="240" height="100" rx="10" class="card"/><text x="714" y="400" class="title" text-anchor="start"><tspan x="714" dy="0"><tspan class="code">none</tspan></tspan></text><text x="714" y="418" class="" text-anchor="start"><tspan x="714" dy="0">Nothing. The provider's own</tspan><tspan x="714" dy="16">package logs in.</tspan></text>
 <path d="M168,90 L208,90" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(208,90) rotate(0)"/>
 <path d="M318,152 L318,194" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(318,194) rotate(90)"/>
-<path d="M318,306 L318,368" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(318,368) rotate(90)"/>
-<text x="328" y="342" class="ask-text" text-anchor="start"><tspan x="328" dy="0">no</tspan></text>
+<path d="M318,306 L318,368" class="line-aside"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-aside" transform="translate(318,368) rotate(90)"/>
+<text x="328" y="342" class="" text-anchor="start"><tspan x="328" dy="0">no</tspan></text>
 <path d="M426,250 L436,250 L436,100 L444,100" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(444,100) rotate(0)"/>
 <text x="442" y="210" class="" text-anchor="start"><tspan x="442" dy="0">yes</tspan></text>
 <path d="M554,172 L554,234" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(554,234) rotate(90)"/>

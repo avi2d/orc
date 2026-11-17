@@ -7,10 +7,10 @@
   --d-card: light-dark(#fffbf2, #211a14);
   --d-zone: light-dark(#eee5d4, #2c231b);
   --d-work: light-dark(#a3160f, #f0624a);
-  --d-work-soft: light-dark(#f7e6de, #342019);
   --d-on-work: light-dark(#fff8ec, #1a0b07);
   --d-ask: light-dark(#774d00, #e6ac3f);
-  --d-ask-soft: light-dark(#ede4d3, #3b2d1a);
+  --d-ask-soft: light-dark(#fbe7ae, #4d3b12);
+  --d-end-soft: light-dark(#d9d5cf, #45403b);
   --d-ok: light-dark(#2d6220, #9dc56e);
   --d-ok-soft: light-dark(#e6e9d9, #302f1f);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -25,21 +25,19 @@
 .orc-d .ok-text { fill: var(--d-ok); font-weight: 600; }
 .orc-d .zone { fill: var(--d-zone); stroke: var(--d-line); }
 .orc-d .card { fill: var(--d-card); stroke: var(--d-edge); stroke-width: 1.5; }
-.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); stroke-width: 1.5; }
 .orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); stroke-width: 1.5; }
 .orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); stroke-width: 1.5; }
-.orc-d .mark-running, .orc-d .mark-failed { color: var(--d-work); }
-.orc-d .mark-waiting { color: var(--d-mute); }
-.orc-d .mark-done { color: var(--d-ok); }
-.orc-d .mark-attention { color: var(--d-ask); }
-.orc-d .line { fill: none; stroke: var(--d-mute); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .card-end { fill: var(--d-end-soft); stroke: var(--d-mute); stroke-width: 1.5; }
+.orc-d .line-aside { fill: none; stroke: var(--d-mute); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .chevron { fill: none; stroke: var(--d-mute); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .bar { fill: none; stroke: var(--d-mute); stroke-width: 3; stroke-linecap: round; }
 .orc-d .line-work { fill: none; stroke: var(--d-work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .line-ask { fill: none; stroke: var(--d-ask); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
 .orc-d .line-ok { fill: none; stroke: var(--d-ok); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .faint { fill: none; stroke: var(--d-line); stroke-width: 3; stroke-linecap: round; }
 .orc-d .head-work { fill: var(--d-work); }
 .orc-d .head-ask { fill: var(--d-ask); }
-.orc-d .head-mute { fill: var(--d-mute); }
+.orc-d .head-aside { fill: var(--d-mute); }
 .orc-d .dot-work { fill: var(--d-work); }
 .orc-d .dot-ask { fill: var(--d-ask); }
 .orc-d .dot-ok { fill: var(--d-ok); }

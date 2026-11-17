@@ -10,10 +10,10 @@
   --d-card: light-dark(#fffbf2, #211a14);
   --d-zone: light-dark(#eee5d4, #2c231b);
   --d-work: light-dark(#a3160f, #f0624a);
-  --d-work-soft: light-dark(#f7e6de, #342019);
   --d-on-work: light-dark(#fff8ec, #1a0b07);
   --d-ask: light-dark(#774d00, #e6ac3f);
-  --d-ask-soft: light-dark(#ede4d3, #3b2d1a);
+  --d-ask-soft: light-dark(#fbe7ae, #4d3b12);
+  --d-end-soft: light-dark(#d9d5cf, #45403b);
   --d-ok: light-dark(#2d6220, #9dc56e);
   --d-ok-soft: light-dark(#e6e9d9, #302f1f);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -28,21 +28,19 @@
 .orc-d .ok-text { fill: var(--d-ok); font-weight: 600; }
 .orc-d .zone { fill: var(--d-zone); stroke: var(--d-line); }
 .orc-d .card { fill: var(--d-card); stroke: var(--d-edge); stroke-width: 1.5; }
-.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); stroke-width: 1.5; }
 .orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); stroke-width: 1.5; }
 .orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); stroke-width: 1.5; }
-.orc-d .mark-running, .orc-d .mark-failed { color: var(--d-work); }
-.orc-d .mark-waiting { color: var(--d-mute); }
-.orc-d .mark-done { color: var(--d-ok); }
-.orc-d .mark-attention { color: var(--d-ask); }
-.orc-d .line { fill: none; stroke: var(--d-mute); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .card-end { fill: var(--d-end-soft); stroke: var(--d-mute); stroke-width: 1.5; }
+.orc-d .line-aside { fill: none; stroke: var(--d-mute); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .chevron { fill: none; stroke: var(--d-mute); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .bar { fill: none; stroke: var(--d-mute); stroke-width: 3; stroke-linecap: round; }
 .orc-d .line-work { fill: none; stroke: var(--d-work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .line-ask { fill: none; stroke: var(--d-ask); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
 .orc-d .line-ok { fill: none; stroke: var(--d-ok); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .faint { fill: none; stroke: var(--d-line); stroke-width: 3; stroke-linecap: round; }
 .orc-d .head-work { fill: var(--d-work); }
 .orc-d .head-ask { fill: var(--d-ask); }
-.orc-d .head-mute { fill: var(--d-mute); }
+.orc-d .head-aside { fill: var(--d-mute); }
 .orc-d .dot-work { fill: var(--d-work); }
 .orc-d .dot-ask { fill: var(--d-ask); }
 .orc-d .dot-ok { fill: var(--d-ok); }
@@ -57,28 +55,28 @@
 <rect x="18" y="42" width="140" height="142" rx="10" class="card"/><text x="30" y="70" class="title" text-anchor="start"><tspan x="30" dy="0">A priority</tspan></text><text x="30" y="88" class="" text-anchor="start"><tspan x="30" dy="0">Priority 0 goes</tspan><tspan x="30" dy="16">first, then the</tspan><tspan x="30" dy="16">oldest task.</tspan></text>
 <rect x="174" y="42" width="140" height="142" rx="10" class="card"/><text x="186" y="70" class="title" text-anchor="start"><tspan x="186" dy="0">Nothing open</tspan></text><text x="186" y="88" class="" text-anchor="start"><tspan x="186" dy="0">No hold, and no</tspan><tspan x="186" dy="16">question without</tspan><tspan x="186" dy="16">an answer.</tspan></text>
 <rect x="330" y="42" width="140" height="142" rx="10" class="card"/><text x="342" y="70" class="title" text-anchor="start"><tspan x="342" dy="0">Nothing ahead</tspan></text><text x="342" y="88" class="" text-anchor="start"><tspan x="342" dy="0">Each task it</tspan><tspan x="342" dy="16">depends on closed</tspan><tspan x="342" dy="16">done. A ship task</tspan><tspan x="342" dy="16">also waits for</tspan><tspan x="342" dy="16">their pull</tspan><tspan x="342" dy="16">requests to merge.</tspan></text>
-<g data-part="runner"><rect x="486" y="42" width="140" height="142" rx="10" class="card"/><text x="498" y="70" class="title" text-anchor="start"><tspan x="498" dy="0">A free slot</tspan></text><text x="498" y="88" class="" text-anchor="start"><tspan x="498" dy="0">On a machine that</tspan><tspan x="498" dy="16">holds the</tspan><tspan x="498" dy="16">project's</tspan><tspan x="498" dy="16">checkout.</tspan></text><path d="M607,60 l5,5.5 l-5,5.5" class="line-work"/></g>
-<g data-part="quota"><rect x="642" y="42" width="140" height="142" rx="10" class="card"/><text x="654" y="70" class="title" text-anchor="start"><tspan x="654" dy="0">Room</tspan></text><text x="654" y="88" class="" text-anchor="start"><tspan x="654" dy="0">An account above</tspan><tspan x="654" dy="16">0% and at or above</tspan><tspan x="654" dy="16">the floor.</tspan></text><path d="M763,60 l5,5.5 l-5,5.5" class="line-work"/></g>
+<g data-part="runner"><rect x="486" y="42" width="140" height="142" rx="10" class="card"/><text x="498" y="70" class="title" text-anchor="start"><tspan x="498" dy="0">A free slot</tspan></text><text x="498" y="88" class="" text-anchor="start"><tspan x="498" dy="0">On a machine that</tspan><tspan x="498" dy="16">holds the</tspan><tspan x="498" dy="16">project's</tspan><tspan x="498" dy="16">checkout.</tspan></text><path d="M607,60 l5,5.5 l-5,5.5" class="chevron"/></g>
+<g data-part="quota"><rect x="642" y="42" width="140" height="142" rx="10" class="card"/><text x="654" y="70" class="title" text-anchor="start"><tspan x="654" dy="0">Room</tspan></text><text x="654" y="88" class="" text-anchor="start"><tspan x="654" dy="0">An account above</tspan><tspan x="654" dy="16">0% and at or above</tspan><tspan x="654" dy="16">the floor.</tspan></text><path d="M763,60 l5,5.5 l-5,5.5" class="chevron"/></g>
 <path d="M158,96 L172,96" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(172,96) rotate(0)"/>
 <path d="M314,96 L328,96" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(328,96) rotate(0)"/>
 <path d="M470,96 L484,96" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(484,96) rotate(0)"/>
 <path d="M626,96 L640,96" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(640,96) rotate(0)"/>
 <path d="M782,96 L798,96" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(798,96) rotate(0)"/>
-<g data-part="runner"><rect x="800" y="42" width="142" height="142" rx="10" class="card-ok"/><text x="812" y="70" class="title" text-anchor="start"><tspan x="812" dy="0">It starts</tspan></text><text x="812" y="88" class="" text-anchor="start"><tspan x="812" dy="0">The beat takes the</tspan><tspan x="812" dy="16">task and runs the</tspan><tspan x="812" dy="16">machine's start</tspan><tspan x="812" dy="16">command.</tspan></text><svg x="887.3" y="57" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="mark mark-running" aria-hidden="true"><path d="M10 4.5Q10 2.7 11.7 3.7L22 10.3Q24 11.7 22 13.1L11.7 20Q10 21 10 19.2Z"/></svg><path d="M923,60 l5,5.5 l-5,5.5" class="line-work"/></g>
-<rect x="18" y="228" width="764" height="66" rx="10" class="card"/><text x="30" y="256" class="title" text-anchor="start"><tspan x="30" dy="0">It waits for the next beat</tspan></text><text x="30" y="274" class="" text-anchor="start"><tspan x="30" dy="0">The beat prints <tspan class="code">waits &lt;task-id>:</tspan> with the reason. A decision never starts.</tspan></text><svg x="236.20000000000002" y="243" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="mark mark-waiting" aria-hidden="true"><rect x="5" y="3" width="5" height="18" rx="2.5"/><rect x="14" y="3" width="5" height="18" rx="2.5"/></svg>
-<path d="M88,184 L88,226" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(88,226) rotate(90)"/>
-<text x="96" y="210" class="ask-text" text-anchor="start"><tspan x="96" dy="0">no</tspan></text>
-<path d="M244,184 L244,226" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(244,226) rotate(90)"/>
-<text x="252" y="210" class="ask-text" text-anchor="start"><tspan x="252" dy="0">no</tspan></text>
-<path d="M400,184 L400,226" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(400,226) rotate(90)"/>
-<text x="408" y="210" class="ask-text" text-anchor="start"><tspan x="408" dy="0">no</tspan></text>
-<path d="M556,184 L556,226" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(556,226) rotate(90)"/>
-<text x="564" y="210" class="ask-text" text-anchor="start"><tspan x="564" dy="0">no</tspan></text>
-<path d="M712,184 L712,226" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(712,226) rotate(90)"/>
-<text x="720" y="210" class="ask-text" text-anchor="start"><tspan x="720" dy="0">no</tspan></text>
+<g data-part="runner"><rect x="800" y="42" width="142" height="142" rx="10" class="card"/><text x="812" y="70" class="title" text-anchor="start"><tspan x="812" dy="0">It starts</tspan></text><text x="812" y="88" class="" text-anchor="start"><tspan x="812" dy="0">The beat takes the</tspan><tspan x="812" dy="16">task and runs the</tspan><tspan x="812" dy="16">machine's start</tspan><tspan x="812" dy="16">command.</tspan></text><path d="M923,60 l5,5.5 l-5,5.5" class="chevron"/></g>
+<rect x="18" y="228" width="764" height="66" rx="10" class="card"/><text x="30" y="256" class="title" text-anchor="start"><tspan x="30" dy="0">It waits for the next beat</tspan></text><text x="30" y="274" class="" text-anchor="start"><tspan x="30" dy="0">The beat prints <tspan class="code">waits &lt;task-id>:</tspan> with the reason. A decision never starts.</tspan></text>
+<path d="M88,184 L88,226" class="line-aside"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-aside" transform="translate(88,226) rotate(90)"/>
+<text x="96" y="210" class="" text-anchor="start"><tspan x="96" dy="0">no</tspan></text>
+<path d="M244,184 L244,226" class="line-aside"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-aside" transform="translate(244,226) rotate(90)"/>
+<text x="252" y="210" class="" text-anchor="start"><tspan x="252" dy="0">no</tspan></text>
+<path d="M400,184 L400,226" class="line-aside"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-aside" transform="translate(400,226) rotate(90)"/>
+<text x="408" y="210" class="" text-anchor="start"><tspan x="408" dy="0">no</tspan></text>
+<path d="M556,184 L556,226" class="line-aside"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-aside" transform="translate(556,226) rotate(90)"/>
+<text x="564" y="210" class="" text-anchor="start"><tspan x="564" dy="0">no</tspan></text>
+<path d="M712,184 L712,226" class="line-aside"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-aside" transform="translate(712,226) rotate(90)"/>
+<text x="720" y="210" class="" text-anchor="start"><tspan x="720" dy="0">no</tspan></text>
 <rect x="18" y="348" width="176" height="130" rx="10" class="card"/><text x="30" y="376" class="title" text-anchor="start"><tspan x="30" dy="0">Runs on a clock</tspan></text><text x="30" y="394" class="" text-anchor="start"><tspan x="30" dy="0">Cron or launchd runs</tspan><tspan x="30" dy="16"><tspan class="code">orc beat</tspan> every few</tspan><tspan x="30" dy="16">minutes. Orc has no</tspan><tspan x="30" dy="16">daemon.</tspan></text>
-<g data-part="backlog"><rect x="204.5" y="348" width="176" height="130" rx="10" class="card"/><text x="216.5" y="376" class="title" text-anchor="start"><tspan x="216.5" dy="0">Closes runs</tspan></text><text x="216.5" y="394" class="" text-anchor="start"><tspan x="216.5" dy="0">Done, failed or stopped,</tspan><tspan x="216.5" dy="16">as <tspan class="code">orc runner result</tspan></tspan><tspan x="216.5" dy="16">says.</tspan></text><path d="M361.5,366 l5,5.5 l-5,5.5" class="line-work"/></g>
+<g data-part="backlog"><rect x="204.5" y="348" width="176" height="130" rx="10" class="card"/><text x="216.5" y="376" class="title" text-anchor="start"><tspan x="216.5" dy="0">Closes runs</tspan></text><text x="216.5" y="394" class="" text-anchor="start"><tspan x="216.5" dy="0">Done, failed or stopped,</tspan><tspan x="216.5" dy="16">as <tspan class="code">orc runner result</tspan></tspan><tspan x="216.5" dy="16">says.</tspan></text><path d="M361.5,366 l5,5.5 l-5,5.5" class="chevron"/></g>
 <rect x="391" y="348" width="176" height="130" rx="10" class="card"/><text x="403" y="376" class="title" text-anchor="start"><tspan x="403" dy="0">Parks and resumes</tspan></text><text x="403" y="394" class="" text-anchor="start"><tspan x="403" dy="0">Parks a task whose run</tspan><tspan x="403" dy="16">stopped on a question.</tspan><tspan x="403" dy="16">Resumes it once you</tspan><tspan x="403" dy="16">answer.</tspan></text>
-<g data-part="attention"><rect x="577.5" y="348" width="176" height="130" rx="10" class="card"/><text x="589.5" y="376" class="title" text-anchor="start"><tspan x="589.5" dy="0">Carries questions</tspan></text><text x="589.5" y="394" class="" text-anchor="start"><tspan x="589.5" dy="0">Opens attention items,</tspan><tspan x="589.5" dy="16">gives the decider its</tspan><tspan x="589.5" dy="16">questions, hands answers</tspan><tspan x="589.5" dy="16">to a waiting run.</tspan></text><path d="M734.5,366 l5,5.5 l-5,5.5" class="line-work"/></g>
+<g data-part="attention"><rect x="577.5" y="348" width="176" height="130" rx="10" class="card"/><text x="589.5" y="376" class="title" text-anchor="start"><tspan x="589.5" dy="0">Carries questions</tspan></text><text x="589.5" y="394" class="" text-anchor="start"><tspan x="589.5" dy="0">Opens attention items,</tspan><tspan x="589.5" dy="16">gives the decider its</tspan><tspan x="589.5" dy="16">questions, hands answers</tspan><tspan x="589.5" dy="16">to a waiting run.</tspan></text><path d="M734.5,366 l5,5.5 l-5,5.5" class="chevron"/></g>
 <rect x="764" y="348" width="176" height="130" rx="10" class="card"/><text x="776" y="376" class="title" text-anchor="start"><tspan x="776" dy="0">Watches</tspan></text><text x="776" y="394" class="" text-anchor="start"><tspan x="776" dy="0">Flags a run silent for</tspan><tspan x="776" dy="16">30 minutes. Records when</tspan><tspan x="776" dy="16">a pull request turns</tspan><tspan x="776" dy="16">green or merges.</tspan></text>
 </svg>

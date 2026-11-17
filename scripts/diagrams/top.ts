@@ -6,20 +6,20 @@ const desc =
   "You say the work in the chat. The backlog keeps one file per task. The beat reads the quota and starts a task on a machine with a free slot. The runner queues it, an agent writes the change, and the checks and a review judge it. A question waits in the attention queue, where the decider answers the routine ones and you answer the rest. A task ends dropped, answered, stopped, failed, with a report, or with a pull request that you merge."
 
 const folders = (x: number, y: number): string[] => [
-  chip(x, y, 68, "`new`", "card-work"),
-  arrow([[x + 71, y + 13], [x + 95, y + 13]], "mute"),
+  chip(x, y, 68, "`new`"),
+  arrow([[x + 71, y + 13], [x + 95, y + 13]], "work"),
   chip(x + 98, y, 68, "`taken`"),
-  arrow([[x + 169, y + 13], [x + 193, y + 13]], "mute"),
+  arrow([[x + 169, y + 13], [x + 193, y + 13]], "work"),
   chip(x + 196, y, 68, "`closed`")
 ]
 
-const gates = (x: number, y: number): string[] => [chip(x, y, 82, "Checks", "card-work", 32), arrow([[x + 85, y + 16], [x + 95, y + 16]], "work"), chip(x + 98, y, 82, "Review", "card-work", 32)]
+const gates = (x: number, y: number): string[] => [chip(x, y, 82, "Checks", "card", 32), arrow([[x + 85, y + 16], [x + 95, y + 16]], "work"), chip(x + 98, y, 82, "Review", "card", 32)]
 
 const bars = (x: number, y: number): string[] => [
   path("M" + x + "," + (y + 8) + " h110", "faint"),
-  path("M" + x + "," + (y + 8) + " h82", "line-work"),
+  path("M" + x + "," + (y + 8) + " h82", "bar"),
   path("M" + x + "," + (y + 20) + " h110", "faint"),
-  path("M" + x + "," + (y + 20) + " h30", "line-work")
+  path("M" + x + "," + (y + 20) + " h30", "bar")
 ]
 
 const limits = bullets(["Still red after three fixes: the run fails.", "A question waits here 30 minutes. Then the task parks on its branch."])
@@ -28,12 +28,12 @@ const chat: Part = { step: "1", title: "The chat", text: "Say the work. Answer q
 const app: Part = { title: "The app and the dashboard", text: "Show it all. Hold no state.", href: "app" }
 const merge: Part = { title: "`orc merge`", text: "Land a pull request once CI is green.", href: "merge" }
 const backlog: Part = { step: "2", title: "The backlog", text: "One file per task, in priority order.", href: "backlog", extra: (x, y) => folders(x, y), extraHeight: () => 34 }
-const quota: Part = { title: "Quota", text: "Room left on each account.", cls: "card-work", href: "quota", extra: (x, y) => bars(x, y), extraHeight: () => 30 }
+const quota: Part = { title: "Quota", text: "Room left on each account.", href: "quota", extra: (x, y) => bars(x, y), extraHeight: () => 30 }
 const beat: Part = { step: "3", title: "The beat", text: "Every few minutes, starts what can start.", href: "beat" }
 const decider: Part = { title: "The decider", text: "A model answers routine questions from written instructions, or asks you.", cls: "card-ask", href: "attention" }
-const attention: Part = { title: "The attention queue", text: "Every open question waits here.", cls: "card-ask", href: "attention", mark: "attention" }
+const attention: Part = { title: "The attention queue", text: "Every open question waits here.", cls: "card-ask", href: "attention" }
 const runner: Part = { step: "4", title: "The runner", text: "A queue on the machine, a few tasks at a time.", href: "runner" }
-const run: Part = { step: "5", title: "A run", text: "Pi works on the task. A ship task gets its own branch and worktree.", href: "run", mark: "running" }
+const run: Part = { step: "5", title: "A run", text: "Pi works on the task. A ship task gets its own branch and worktree.", href: "run" }
 const checks: Part = {
   step: "6",
   title: "Checks and review",
@@ -43,12 +43,12 @@ const checks: Part = {
   extraHeight: (w) => 46 + (limits.extraHeight?.(w) ?? 0)
 }
 
-const dropped: Part = { title: "Dropped", text: "Before it started." }
-const answered: Part = { title: "Answered", text: "A decision never runs. Your answer closes it." }
-const stopped: Part = { title: "Stopped", text: "You stopped the run." }
-const failed: Part = { title: "Failed", text: "It could not start, it died, or its checks stayed red.", mark: "failed" }
-const report: Part = { title: "A report", text: "A scout or task run ends with a report, not a pull request.", cls: "card-ok", mark: "done" }
-const pullRequest: Part = { title: "A pull request", text: "A code change. You merge it once CI is green.", cls: "card-ok", href: "merge", mark: "done" }
+const dropped: Part = { title: "Dropped", text: "Before it started.", cls: "card-end" }
+const answered: Part = { title: "Answered", text: "A decision never runs. Your answer closes it.", cls: "card-end" }
+const stopped: Part = { title: "Stopped", text: "You stopped the run.", cls: "card-end" }
+const failed: Part = { title: "Failed", text: "It could not start, it died, or its checks stayed red.", cls: "card-end" }
+const report: Part = { title: "A report", text: "A scout or task run ends with a report, not a pull request.", cls: "card-ok" }
+const pullRequest: Part = { title: "A pull request", text: "A code change. You merge it once CI is green.", cls: "card-ok", href: "merge" }
 
 const wide = (): Drawing => {
   const body = [
@@ -85,9 +85,10 @@ const wide = (): Drawing => {
     arrow([[340, 489], [324, 489]], "ask", true),
     arrow([[409, 402], [409, 350], [168, 350], [168, 120], [150, 120]], "ask", true),
     text(182, 343, "the rest wait for you", "ask-text"),
-    path("M720,432 H742 M742,263 V514", "line-work"),
-    arrow([[742, 263], [762, 263]], "work"),
-    arrow([[742, 347], [762, 347]], "work"),
+    path("M742,432 V263", "line-aside"),
+    arrow([[742, 263], [762, 263]], "aside"),
+    arrow([[742, 347], [762, 347]], "aside"),
+    path("M720,432 H742 V514", "line-work"),
     arrow([[742, 439], [762, 439]], "work"),
     arrow([[742, 514], [762, 514]], "work"),
     arrow([[148, 556], [168, 556], [168, 579], [742, 579], [742, 544], [762, 544]], "work")

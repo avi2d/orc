@@ -9,9 +9,9 @@ const beat: Part = { title: "The beat", text: "Runs the machine's start command,
 const later: Part = { title: "A later beat", text: "Never looks into pueue. It asks the runner.", href: "beat" }
 const start: Part = { title: "`orc runner start`", text: "Reads the task from the `ORC_TASK_*` variables and queues the run." }
 const far: Part = { title: "Another machine", text: "The task travels as JSON over SSH to `orc runner queue` there. SSH can drop once pueue holds the run." }
-const queue: Part = { title: "pueue, group `orc`", text: "One slot per running task, as `dispatch.json` says. A full machine holds the task back.", cls: "card-work" }
+const queue: Part = { title: "pueue, group `orc`", text: "One slot per running task, as `dispatch.json` says. A full machine holds the task back." }
 const run: Part = { title: "`orc run`", text: "On the host as your user, on the branch `orc/<task-id>`.", href: "run" }
-const heavy: Part = { title: "pueue, group `heavy`", text: "One slot. The test runs and builds of every agent take turns, so they cannot overload the machine.", cls: "card-work" }
+const heavy: Part = { title: "pueue, group `heavy`", text: "One slot. The test runs and builds of every agent take turns, so they cannot overload the machine." }
 const commands: Part = {
   title: "The commands a beat reaches a run through",
   ...bullets([
@@ -40,7 +40,7 @@ const wide = (): Drawing => {
     arrow([[701, 90], [718, 90]], "work"),
     arrow([[349, 162], [349, 194]], "work"),
     arrow([[460, 258], [469, 258], [469, 130], [477, 130]], "work"),
-    arrow([[831, 162], [831, 194]], "mute"),
+    arrow([[831, 162], [831, 194]], "aside"),
     arrow([[198, 410], [236, 410]], "work", true)
   ]
   return svg("runner", 960, 496, title, desc, body)
@@ -50,7 +50,7 @@ export const runner = (): readonly Drawing[] => [
   wide(),
   tall("runner", title, desc, [
     { label: "The machine that plans", rows: [beat] },
-    { label: "A machine that works", rows: [start, far, { arrow: "work" }, queue, { arrow: "work" }, run, { arrow: "mute", note: "its test runs and builds" }, heavy] },
+    { label: "A machine that works", rows: [start, far, { arrow: "work" }, queue, { arrow: "work" }, run, { arrow: "aside", note: "its test runs and builds" }, heavy] },
     { label: "The machine that plans, later", rows: [later, { arrow: "work" }, commands] }
   ])
 ]

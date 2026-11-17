@@ -13,7 +13,7 @@ const board: Part = { title: "Board", text: "The backlog as cards in five lanes:
 const agents: Part = { title: "Agents", text: "The runs and the queued tasks. Each step, the agent's turns and the changes. The Approve step merges through `orc merge`.", href: "run" }
 const resources: Part = { title: "Resources", text: "Each account's quota windows. Each machine's cores, load, memory, disk and running runs.", href: "quota" }
 const drawer: Part = { title: "The chat drawer", text: "`cmd-k` on any tab. The same `orc chat` as in a terminal, with the same eight tools.", href: "chat" }
-const same: Part = { title: "Neither screen holds state of its own", text: "Both run the `orc` commands and draw what those print, so a screen and the command line never disagree.", cls: "card-work" }
+const same: Part = { title: "Neither screen holds state of its own", text: "Both run the `orc` commands and draw what those print, so a screen and the command line never disagree." }
 
 const dash: Part = { title: "`orc-dash`", text: "The same facts as panels: quota, session quota, resources, queues, schedules, dispatch, attention, tasks, alerts and ledger." }
 const alerts: Part = { title: "Its alert stream", text: "It watches quota pace, machine load and long tasks. The chat's alerts come from here.", href: "chat" }
