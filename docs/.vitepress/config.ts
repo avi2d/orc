@@ -151,7 +151,6 @@ export default defineConfig({
   ],
   cleanUrls: true,
   lastUpdated: true,
-  rewrites: { "adr/README.md": "adr/index.md" },
   markdown: {
     config: (md) => {
       const image = md.renderer.rules.image
@@ -178,8 +177,7 @@ export default defineConfig({
       { text: "Concepts", items: concepts },
       { text: "Tasks", items: tasks },
       { text: "Reference", items: reference },
-      { text: "Session quota panel", collapsed: true, items: sessionQuota },
-      { text: "Decisions", collapsed: true, items: [page("Decision records", "/adr/")] }
+      { text: "Session quota panel", collapsed: true, items: sessionQuota }
     ],
     outline: { level: [2, 3] },
     search: { provider: "local" },
