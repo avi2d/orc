@@ -57,6 +57,8 @@ import { arrowMeanings, blockMeanings } from "./orc-map"
   border-radius: 6px;
   background: var(--paint-surface-2);
 }
+.orc-map .key-block.key-plain { border: 1px solid var(--m-line); }
+.home-page .key-block.key-area { border-color: var(--paint-edge); }
 .key-arrow {
   flex: none;
   width: 34px;
