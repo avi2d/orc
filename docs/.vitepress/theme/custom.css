@@ -196,34 +196,8 @@
   padding-block: 6px;
 }
 
-.map,
-.map-deep {
+.map {
   scroll-margin-top: 80px;
-}
-
-.map-top {
-  display: block;
-}
-
-.map-deep {
-  display: none;
-}
-
-.map-deep:target {
-  display: block;
-}
-
-.map:has(.map-deep:target) .map-top {
-  display: none;
-}
-
-.vp-doc a.map-open {
-  display: inline-block;
-  min-height: 44px;
-  box-sizing: border-box;
-  font-weight: 600;
-  line-height: 24px;
-  text-decoration: none;
 }
 
 /* The map covers its page heading, so the heading's anchor link must not take a Tab stop nobody can see. */
