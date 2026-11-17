@@ -49,6 +49,10 @@
   line-height: 1.25;
 }
 
+.home-page .vp-doc > div > h1 .header-anchor {
+  display: none;
+}
+
 .home-page .vp-doc > div > p:nth-child(2) {
   max-width: 46ch;
 }
@@ -85,7 +89,6 @@
 
   .home-page .vp-doc > div > p:nth-child(3) {
     grid-area: 4 / 1;
-    margin-top: 0;
   }
 
   .home-page .vp-doc > div > .home-hero-art {
