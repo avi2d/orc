@@ -38,13 +38,9 @@ const drawings = new Map(
   )
 )
 
-const drawn = (id: string): boolean => drawings.has(id + ".svg")
-
 type Target = (part: Part) => string
 
 const pageOf: Target = (part) => base + part.link
-
-const mapOrPageOf: Target = (part) => (drawn(part.id) ? "#map-" + part.id : pageOf(part))
 
 const linked = /<g data-part="([\w-]+)">([\s\S]*?)<\/g>/g
 
@@ -64,7 +60,7 @@ const layout = (name: string, kind: string, target: Target): string => {
   const links = [...drawing.matchAll(linked)].map(([, id, inner]) => {
     const part = parts.find((candidate) => candidate.id === id)
     const [, x, y, w, h] = box.exec(inner) ?? []
-    const label = (heading.exec(inner)?.[1] ?? "").replaceAll(/<[^>]+>/g, "")
+    const label = (heading.exec(inner)?.[1] ?? "").replaceAll(/<[^>]+>/g, " ").replaceAll(/\s+/g, " ").trim()
     if (part === undefined) return ""
     const place = "left:" + percent(x, width) + ";top:" + percent(y, height) + ";width:" + percent(w, width) + ";height:" + percent(h, height)
     return '<a class="map-link" href="' + target(part) + '" style="' + place + '" aria-label="' + label + '"></a>'
@@ -79,18 +75,10 @@ const bar = (inner: string): string => '<span class="map-bar">' + inner + "</spa
 const diagram = (name: string): string =>
   '<span class="diagram vp-raw" v-pre>' + (parts.some((part) => part.id === name) ? bar('<a href="' + base + '#map">← The whole map</a>') : "") + layouts(name, pageOf) + "</span>"
 
-const deeper = (part: Part): string =>
-  '<span class="map-deep" id="map-' + part.id + '">' +
-  bar('<a href="#map">← The whole map</a><strong>' + part.title + '</strong><a href="' + pageOf(part) + '">Read the page →</a>') +
-  layouts(part.id, mapOrPageOf) +
-  "</span>"
-
 const explorer = (): string =>
-  '<span class="diagram map vp-raw" id="map" v-pre><span class="map-top">' +
-  bar("Select a part to see how it works.") +
-  layouts(topMap, mapOrPageOf) +
-  "</span>" +
-  parts.filter((part) => drawn(part.id)).map(deeper).join("") +
+  '<span class="diagram map vp-raw" id="map" v-pre>' +
+  bar('<span>Click a part to read its docs, or explore it in the <a href="' + base + 'map/">interactive map</a></span>') +
+  layouts(topMap, pageOf) +
   "</span>"
 
 const page = (text: string, link: string): DefaultTheme.SidebarItem => ({ text, link })
@@ -153,9 +141,14 @@ const repository = "https://github.com/avi2d/orc"
 
 export default defineConfig({
   title: "orc",
-  description: "How orc runs AI agent tasks across your machines, and how to use it",
+  description: "One chat to run your AI agent work on all your machines and models, with a backlog, live monitoring and Herdr App dashboards.",
   base,
-  head: [["link", { rel: "icon", type: "image/svg+xml", href: base + "favicon.svg" }]],
+  head: [
+    ["link", { rel: "icon", type: "image/svg+xml", href: base + "favicon.svg" }],
+    ["link", { rel: "preload", as: "font", type: "font/woff2", href: base + "paper/fonts/alfa-slab-one-latin-400-normal.woff2", crossorigin: "" }],
+    ["meta", { name: "theme-color", content: "#f6f0e4", media: "(prefers-color-scheme: light)" }],
+    ["meta", { name: "theme-color", content: "#17120e", media: "(prefers-color-scheme: dark)" }]
+  ],
   cleanUrls: true,
   lastUpdated: true,
   rewrites: { "adr/README.md": "adr/index.md" },
@@ -172,6 +165,8 @@ export default defineConfig({
     }
   },
   themeConfig: {
+    logo: { light: "/orc-logo-light.svg", dark: "/orc-logo-dark.svg", alt: "orc" },
+    siteTitle: false,
     nav: [
       { text: "How orc works", link: "/" },
       { text: "Concepts", link: "/concepts/backlog" },

@@ -3,47 +3,50 @@
 <desc id="d-quota-tall-desc">You name the accounts and the quota command once in dispatch.json. Each beat runs the command before it takes a task. When the command fails or prints something else, the beat starts nothing. Otherwise the accounts above 0% and at or above the floor can run, and the beat takes the one with the most room. The account's kind decides how its credential reaches the run.</desc>
 <style>.orc-d {
   color-scheme: light dark;
-  --d-ink: light-dark(#1f2328, #e8eaed);
-  --d-mute: light-dark(#57606a, #a3abb5);
-  --d-line: light-dark(#c8cdd5, #474d57);
-  --d-card: light-dark(#ffffff, #22252b);
-  --d-zone: light-dark(#f3f4f6, #17191d);
-  --d-work: light-dark(#3451b2, #a8b1ff);
-  --d-work-soft: light-dark(#e8ebfc, #272c52);
-  --d-on-work: light-dark(#ffffff, #14162b);
-  --d-ask: light-dark(#8a5a00, #e9b949);
-  --d-ask-soft: light-dark(#fff3d1, #3a300f);
-  --d-ok: light-dark(#17794c, #48d597);
-  --d-ok-soft: light-dark(#def5e8, #12301f);
+  --d-ink: light-dark(#221812, #f3e8d6);
+  --d-mute: light-dark(#5b4a3c, #bca995);
+  --d-line: light-dark(#d6c8b1, #43352a);
+  --d-edge: light-dark(#3a2a1f, #7a6655);
+  --d-card: light-dark(#fffbf2, #211a14);
+  --d-zone: light-dark(#eee5d4, #2c231b);
+  --d-work: light-dark(#a3160f, #f0624a);
+  --d-on-work: light-dark(#fff8ec, #1a0b07);
+  --d-ask: light-dark(#774d00, #e6ac3f);
+  --d-ask-soft: light-dark(#fbe7ae, #4d3b12);
+  --d-end-soft: light-dark(#d9d5cf, #45403b);
+  --d-ok: light-dark(#2d6220, #9dc56e);
+  --d-ok-soft: light-dark(#e6e9d9, #302f1f);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 .orc-d text { fill: var(--d-mute); font-size: 12.5px; }
 .orc-d .title { fill: var(--d-ink); font-size: 14px; font-weight: 650; }
 .orc-d .big { fill: var(--d-ink); font-size: 15.5px; font-weight: 650; }
 .orc-d .label { fill: var(--d-mute); font-size: 12px; font-weight: 600; }
-.orc-d .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; fill: var(--d-ink); }
+.orc-d .code { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; fill: var(--d-ink); }
 .orc-d .ask-text { fill: var(--d-ask); font-weight: 600; }
 .orc-d .work-text { fill: var(--d-work); font-weight: 600; }
 .orc-d .ok-text { fill: var(--d-ok); font-weight: 600; }
 .orc-d .zone { fill: var(--d-zone); stroke: var(--d-line); }
-.orc-d .card { fill: var(--d-card); stroke: var(--d-line); }
-.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); }
-.orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); }
-.orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); }
-.orc-d .line { fill: none; stroke: var(--d-mute); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .card { fill: var(--d-card); stroke: var(--d-edge); stroke-width: 1.5; }
+.orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); stroke-width: 1.5; }
+.orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); stroke-width: 1.5; }
+.orc-d .card-end { fill: var(--d-end-soft); stroke: var(--d-mute); stroke-width: 1.5; }
+.orc-d .line-aside { fill: none; stroke: var(--d-mute); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .chevron { fill: none; stroke: var(--d-mute); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .bar { fill: none; stroke: var(--d-mute); stroke-width: 3; stroke-linecap: round; }
 .orc-d .line-work { fill: none; stroke: var(--d-work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .line-ask { fill: none; stroke: var(--d-ask); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
 .orc-d .line-ok { fill: none; stroke: var(--d-ok); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .faint { fill: none; stroke: var(--d-line); stroke-width: 3; stroke-linecap: round; }
 .orc-d .head-work { fill: var(--d-work); }
 .orc-d .head-ask { fill: var(--d-ask); }
-.orc-d .head-mute { fill: var(--d-mute); }
+.orc-d .head-aside { fill: var(--d-mute); }
 .orc-d .dot-work { fill: var(--d-work); }
 .orc-d .dot-ask { fill: var(--d-ask); }
 .orc-d .dot-ok { fill: var(--d-ok); }
 .orc-d .dot-mute { fill: var(--d-line); }
-.orc-d .num { fill: var(--d-on-work); font-size: 13px; font-weight: 700; }
-.orc-d .num-ask { fill: var(--d-card); font-size: 13px; font-weight: 700; }
+.orc-d .num { fill: var(--d-on-work); font-size: 11px; font-weight: 700; }
+.orc-d .num-ask { fill: var(--d-card); font-size: 11px; font-weight: 700; }
 .orc-d .tick { fill: none; stroke: var(--d-card); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .dot-mute-strong { fill: var(--d-mute); }
 </style>
@@ -54,12 +57,12 @@
 <rect x="16" y="182" width="328" height="78" rx="10" class="card"/><text x="28" y="210" class="title" text-anchor="start"><tspan x="28" dy="0">The quota command</tspan></text><text x="28" y="228" class="" text-anchor="start"><tspan x="28" dy="0">Prints one JSON document: for each account, the</tspan><tspan x="28" dy="16">percent of room left, or why it cannot run.</tspan></text>
 <path d="M180,262 L180,282" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,282) rotate(90)"/>
 <rect x="16" y="284" width="328" height="78" rx="10" class="card"/><text x="28" y="312" class="title" text-anchor="start"><tspan x="28" dy="0">Did the beat read it?</tspan></text><text x="28" y="330" class="" text-anchor="start"><tspan x="28" dy="0">Not when the command fails, runs past 15 seconds</tspan><tspan x="28" dy="16">or prints anything else.</tspan></text>
-<text x="20" y="380" class="ask-text" text-anchor="start"><tspan x="20" dy="0">No: this beat starts nothing.</tspan></text>
+<text x="20" y="380" class="label" text-anchor="start"><tspan x="20" dy="0">No: this beat starts nothing.</tspan></text>
 <path d="M180,388 L180,408" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,408) rotate(90)"/>
 <text x="192" y="402" class="" text-anchor="start"><tspan x="192" dy="0">yes</tspan></text>
 <rect x="16" y="410" width="328" height="104" rx="10" class="card"/><text x="28" y="438" class="title" text-anchor="start"><tspan x="28" dy="0">Which accounts can run?</tspan></text><circle cx="31" cy="456" r="2" class="dot-mute-strong"/><text x="40" y="460" class="" text-anchor="start"><tspan x="40" dy="0">named in the document</tspan></text><circle cx="31" cy="474" r="2" class="dot-mute-strong"/><text x="40" y="478" class="" text-anchor="start"><tspan x="40" dy="0">room above 0%</tspan></text><circle cx="31" cy="492" r="2" class="dot-mute-strong"/><text x="40" y="496" class="" text-anchor="start"><tspan x="40" dy="0">at or above <tspan class="code">floorPercent</tspan>, when you set one</tspan></text>
 <path d="M180,516 L180,536" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,536) rotate(90)"/>
-<rect x="16" y="538" width="328" height="62" rx="10" class="card-work"/><text x="28" y="566" class="title" text-anchor="start"><tspan x="28" dy="0">The one with the most room</tspan></text><text x="28" y="584" class="" text-anchor="start"><tspan x="28" dy="0">Every task this beat starts takes it.</tspan></text>
+<rect x="16" y="538" width="328" height="62" rx="10" class="card"/><text x="28" y="566" class="title" text-anchor="start"><tspan x="28" dy="0">The one with the most room</tspan></text><text x="28" y="584" class="" text-anchor="start"><tspan x="28" dy="0">Every task this beat starts takes it.</tspan></text>
 <path d="M180,615 L180,633" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,633) rotate(90)"/>
 <rect x="4" y="636" width="352" height="364" rx="14" class="zone"/><text x="16" y="657" class="label" text-anchor="start"><tspan x="16" dy="0">What the run is handed, by kind</tspan></text>
 <rect x="16" y="668" width="328" height="78" rx="10" class="card"/><text x="28" y="696" class="title" text-anchor="start"><tspan x="28" dy="0"><tspan class="code">token-file</tspan></tspan></text><text x="28" y="714" class="" text-anchor="start"><tspan x="28" dy="0">The path of a token file on the machine, never</tspan><tspan x="28" dy="16">the token.</tspan></text>

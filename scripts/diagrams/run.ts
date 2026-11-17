@@ -23,7 +23,7 @@ const watch: Part = {
   ...bullets([
     "Pi prints nothing for 45 minutes with no tool running: orc stops it.",
     "Pi fails one command 3 times in a row: you are told.",
-    "Pi fails it 6 times in a row: orc stops Pi and asks you whether to continue.",
+    "Pi fails it 6 times in a row: orc pauses the run and asks you whether to continue.",
     "Pi is unsure: it asks you a question instead of guessing."
   ])
 }
@@ -45,7 +45,7 @@ const wide = (): Drawing => {
     card(668, 388, 274, 94, resume),
     arrow([[168, 90], [206, 90]], "work"),
     arrow([[575, 228], [575, 284]], "ask"),
-    arrow([[875, 228], [875, 284]], "mute")
+    arrow([[875, 228], [875, 284]], "aside")
   ]
   return svg("run", 960, 498, title, desc, body)
 }

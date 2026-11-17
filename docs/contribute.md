@@ -20,7 +20,7 @@ To update the command reference:
 The reference page is generated.
 Change the help in `packages/run/src/app` and never the page.
 The same build regenerates the drawings under `docs/diagrams`.
-Change `scripts/diagrams` and never the SVGs.
+Change `scripts/diagrams`, and never the drawings.
 
 ## Preview the docs site
 

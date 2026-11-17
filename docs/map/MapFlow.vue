@@ -24,11 +24,11 @@ const { setViewport } = useVueFlow("orc-map")
 
 const nodes = computed(() =>
   placed.value.parts.map(
-    (item): Node<{ part: MapPart; open: boolean }> => ({
+    (item): Node<{ part: MapPart; open: boolean; depth: number }> => ({
       id: item.part.id,
       type: "part",
       position: { x: item.rect.x, y: item.rect.y },
-      data: { part: item.part, open: item.open },
+      data: { part: item.part, open: item.open, depth: item.depth },
       zIndex: item.open ? item.depth : 1000,
       style: { width: item.rect.width.toString() + "px", height: item.rect.height.toString() + "px" }
     })
@@ -36,7 +36,7 @@ const nodes = computed(() =>
 )
 
 const edges = computed(() => {
-  const ink = { work: isDark.value ? "#a8b1ff" : "#3451b2", ask: isDark.value ? "#e9b949" : "#8a5a00" }
+  const ink = isDark.value ? { work: "#f7876f", aside: "#cbb8a2", ask: "#e6ac3f" } : { work: "#a3160f", aside: "#5b4a3c", ask: "#774d00" }
   return placed.value.links.map((item): Edge<{ path: string; label?: PlacedLabel }> => {
     const touched = hovered.value !== undefined && (item.link.from === hovered.value || item.link.to === hovered.value)
     return {
@@ -45,7 +45,7 @@ const edges = computed(() => {
       target: item.link.to,
       type: "wire",
       zIndex: 500,
-      class: "link-" + item.link.tone + (hovered.value === undefined ? "" : touched ? " is-lit" : " is-dim"),
+      class: "link-" + item.link.tone + (hovered.value === undefined || touched ? "" : " is-dim"),
       markerEnd: { type: MarkerType.ArrowClosed, color: ink[item.link.tone], width: 16, height: 16 },
       data: { path: roundedPath(item.points, 10), ...(item.label === undefined ? {} : { label: item.label }) }
     }
@@ -76,8 +76,8 @@ const layout = async (focus?: string): Promise<void> => {
   const room = { width: (stage?.clientWidth ?? 390) - 16, height: (stage?.clientHeight ?? 700) - 16 }
   const target = focus === undefined ? undefined : placed.value.parts.find((item) => item.part.id === focus)?.rect
   if (phone.value) {
-    const zoom = Math.min(1, Math.max(0.55, room.width / (target?.width ?? all.width)))
-    void setViewport({ x: 8 - (target?.x ?? all.x) * zoom, y: 8 - (target?.y ?? all.y) * zoom, zoom }, { duration: 250 })
+    const zoom = Math.min(1, room.width / all.width)
+    void setViewport({ x: 8 - all.x * zoom, y: 8 - (target?.y ?? all.y) * zoom, zoom }, { duration: 250 })
     return
   }
   const whole = Math.min(1, room.width / all.width, room.height / all.height)
@@ -94,7 +94,10 @@ const layout = async (focus?: string): Promise<void> => {
 const toggle = (id: string): void => {
   const opening = !open.value.has(id)
   const path = pathTo(id)
-  open.value = new Set([...groups, ...(opening ? path : path.slice(0, -1))])
+  const next = new Set(open.value)
+  if (opening) next.add(id)
+  else next.delete(id)
+  open.value = next
   void nextTick(() => layout(opening ? id : path.at(-2)))
 }
 
@@ -110,11 +113,26 @@ const onWidth = (): void => {
   void nextTick(() => layout())
 }
 
+let fitWidth: number | undefined
+// A phone changes the stage height each time its address bar hides, and a refit there would drop the reader's place.
+const stageWidth = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(([stage]) => {
+  const width = stage?.contentRect.width
+  if (width === undefined || width === fitWidth) return
+  const first = fitWidth === undefined
+  fitWidth = width
+  if (!first) void layout()
+})
+
 onMounted(() => {
   narrow?.addEventListener("change", onWidth)
   void document.fonts.ready.then(onWidth)
+  const stage = measure.value?.parentElement
+  if (stage != null) stageWidth?.observe(stage)
 })
-onBeforeUnmount(() => narrow?.removeEventListener("change", onWidth))
+onBeforeUnmount(() => {
+  narrow?.removeEventListener("change", onWidth)
+  stageWidth?.disconnect()
+})
 </script>
 
 <template>
@@ -141,7 +159,7 @@ onBeforeUnmount(() => narrow?.removeEventListener("change", onWidth))
       @node-mouse-leave="hovered = undefined"
     >
       <template #node-part="{ id, data }">
-        <PartCard :part="data.part" :folds="data.part.inside !== undefined && folds(id)" :open="data.open" @toggle="toggle(id)" />
+        <PartCard :part="data.part" :folds="data.part.inside !== undefined && folds(id)" :open="data.open" :depth="data.depth" @toggle="toggle(id)" />
         <Handle type="source" :position="Position.Bottom" :connectable="false" />
         <Handle type="target" :position="Position.Top" :connectable="false" />
       </template>
@@ -219,10 +237,10 @@ onBeforeUnmount(() => narrow?.removeEventListener("change", onWidth))
   stroke-width: 1.75;
 }
 .orc-map .link-work .vue-flow__edge-path { stroke: var(--m-work); }
+.orc-map .link-aside .vue-flow__edge-path { stroke: var(--m-mute); }
 .orc-map .link-ask .vue-flow__edge-path { stroke: var(--m-ask); stroke-dasharray: 5 4; }
 .orc-map .vue-flow__edge { transition: opacity 0.15s ease; }
 .orc-map .vue-flow__edge.is-dim { opacity: 0.18; }
-.orc-map .vue-flow__edge.is-lit .vue-flow__edge-path { stroke-width: 2.75; }
 @media (prefers-reduced-motion: reduce) {
   .orc-map .vue-flow__node { transition: none; }
 }

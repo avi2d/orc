@@ -1,12 +1,12 @@
 ---
 aside: false
-pageClass: wide-page
+pageClass: wide-page part-attention
 kind: explanation
 ---
 # The attention queue and the decider
 
 Everything that waits on someone is one item in one queue, so you have a single place to look.
-Each item names who must answer it, and a small model called the decider takes the routine ones off your hands.
+Each item names who must answer it, and a model called the decider takes the routine ones off your hands.
 
 ![The attention queue and the decider: who answers what](../diagrams/attention.svg)
 
@@ -28,9 +28,9 @@ An open item is overdue once more than 5 minutes have passed since it was asked.
 ## The decider
 
 Each beat hands every open item the decider owns to the decider, one short model call per question, with no tools.
-The decider reads your rules in `~/.orc/orchestrator.md`, the instructions file of the task's project, and the task itself.
-It may answer only by quoting, word for word, the rule its answer rests on.
-An answer with no such quote goes to you instead.
+The decider reads your rules in `~/.orc/orchestrator.md`, the instructions file of the task's project, the task itself, and earlier answers.
+It can quote a rule, the task or its policy, reuse an earlier answer, or ask the worker for more detail.
+Anything else goes to you instead.
 
 Some questions never reach the decider.
 Orc checks each question's words against a fixed list of topics, and a question on that list goes straight to you.

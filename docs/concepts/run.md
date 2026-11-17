@@ -1,6 +1,6 @@
 ---
 aside: false
-pageClass: wide-page
+pageClass: wide-page part-run
 kind: explanation
 ---
 # A run
@@ -13,8 +13,8 @@ The beat starts most runs through the runner, and you can start one by hand in a
 ## An isolated copy
 
 Orc refuses a checkout with uncommitted changes.
-It then makes a git worktree of the project on a new branch under `~/.orc/worktrees`, so the agent never touches your own checkout.
-Before Pi starts, orc runs the `prepare` command from the project's `.no-mistakes.yaml`, such as an install.
+A ship run then makes a git worktree of the project on a new branch under `~/.orc/worktrees`, so the agent never touches your own checkout.
+Before Pi starts, a ship run runs the `prepare` command from the project's `.no-mistakes.yaml`, such as an install.
 
 ## The agent
 
@@ -27,7 +27,7 @@ Orc watches Pi while it works.
 
 - It stops a Pi that has printed nothing for 45 minutes with no tool running.
 - When Pi fails one command 3 times in a row, orc tells you through the attention queue.
-- When Pi fails one command 6 times in a row, orc stops Pi and asks you whether to continue.
+- When Pi fails one command 6 times in a row, orc pauses the run and asks you whether to continue.
 - Pi can ask you a question mid-run with its `orc_ask` tool instead of guessing.
 
 ## When a run counts as done
@@ -49,7 +49,7 @@ Each run keeps its task, its logs, its Pi session and its `report.md` in `~/.orc
 
 ## Stopping and resuming
 
-A run that stops can resume on its branch with `orc run --branch <name>`.
+A ship run that stops can resume on its branch with `orc run --branch <name>`.
 Orc skips the steps the record marks passed, and Pi resumes its earlier session.
 A run whose session reaches 300 turns or 5 compactions writes `handover.md`, so the next run on the branch starts from that note.
 

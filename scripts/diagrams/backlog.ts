@@ -11,7 +11,6 @@ const drop: Part = { title: "Change your mind", text: "`orc backlog drop` closes
 const fresh: Part = {
   title: "`new`",
   text: "Waiting to start, in priority order. It waits while:",
-  cls: "card-work",
   ...bullets(["it has no priority", "you hold it", "a question has no answer", "it depends on an open task", "no machine has a free slot", "no account has room"])
 }
 const taken: Part = { title: "`taken`", text: "A beat took it. Its run is queued or running on a machine.", href: "beat" }
@@ -46,8 +45,8 @@ const wide = (): Drawing => {
     text(710, 62, ["the run", "ends"], "", "middle", 14),
     arrow([[480, 126], [412, 126]], "ask"),
     text(446, 146, ["its run", "stops on a", "question"], "ask-text", "middle", 14),
-    arrow([[738, 250], [412, 250]], "ask"),
-    text(575, 242, "`orc backlog send-back`: one more pass", "ask-text", "middle"),
+    arrow([[738, 250], [412, 250]], "aside"),
+    text(575, 242, "`orc backlog send-back`: one more pass", "", "middle"),
     ...kinds.map((kind, index) => card(18 + index * 186.5, 356, 176, 122, kind))
   ]
   return svg("backlog", 960, 496, title, desc, body)
