@@ -1,9 +1,6 @@
-<div align="center">
+# <picture><source media="(prefers-color-scheme: dark)" srcset="docs/public/orc-logo-dark.svg"><img src="docs/public/orc-logo-light.svg" alt="orc" width="200"></picture>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/public/orc-logo-dark.svg">
-  <img src="docs/public/orc-logo-light.svg" alt="orc" width="200">
-</picture>
+<div align="center">
 
 One chat to run your AI agent work on all your machines and models, with a backlog, live monitoring and Herdr App dashboards.
 
