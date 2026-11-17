@@ -36,7 +36,7 @@ const nodes = computed(() =>
 )
 
 const edges = computed(() => {
-  const ink = { work: isDark.value ? "#f0624a" : "#a3160f", ask: isDark.value ? "#e6ac3f" : "#774d00" }
+  const ink = isDark.value ? { work: "#f7876f", aside: "#cbb8a2", ask: "#e6ac3f" } : { work: "#a3160f", aside: "#5b4a3c", ask: "#774d00" }
   return placed.value.links.map((item): Edge<{ path: string; label?: PlacedLabel }> => {
     const touched = hovered.value !== undefined && (item.link.from === hovered.value || item.link.to === hovered.value)
     return {
@@ -45,7 +45,7 @@ const edges = computed(() => {
       target: item.link.to,
       type: "wire",
       zIndex: 500,
-      class: "link-" + item.link.tone + (hovered.value === undefined ? "" : touched ? " is-lit" : " is-dim"),
+      class: "link-" + item.link.tone + (hovered.value === undefined || touched ? "" : " is-dim"),
       markerEnd: { type: MarkerType.ArrowClosed, color: ink[item.link.tone], width: 16, height: 16 },
       data: { path: roundedPath(item.points, 10), ...(item.label === undefined ? {} : { label: item.label }) }
     }
@@ -113,11 +113,26 @@ const onWidth = (): void => {
   void nextTick(() => layout())
 }
 
+let fitWidth: number | undefined
+// A phone changes the stage height each time its address bar hides, and a refit there would drop the reader's place.
+const stageWidth = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(([stage]) => {
+  const width = stage?.contentRect.width
+  if (width === undefined || width === fitWidth) return
+  const first = fitWidth === undefined
+  fitWidth = width
+  if (!first) void layout()
+})
+
 onMounted(() => {
   narrow?.addEventListener("change", onWidth)
   void document.fonts.ready.then(onWidth)
+  const stage = measure.value?.parentElement
+  if (stage != null) stageWidth?.observe(stage)
 })
-onBeforeUnmount(() => narrow?.removeEventListener("change", onWidth))
+onBeforeUnmount(() => {
+  narrow?.removeEventListener("change", onWidth)
+  stageWidth?.disconnect()
+})
 </script>
 
 <template>
@@ -222,10 +237,10 @@ onBeforeUnmount(() => narrow?.removeEventListener("change", onWidth))
   stroke-width: 1.75;
 }
 .orc-map .link-work .vue-flow__edge-path { stroke: var(--m-work); }
+.orc-map .link-aside .vue-flow__edge-path { stroke: var(--m-mute); }
 .orc-map .link-ask .vue-flow__edge-path { stroke: var(--m-ask); stroke-dasharray: 5 4; }
 .orc-map .vue-flow__edge { transition: opacity 0.15s ease; }
 .orc-map .vue-flow__edge.is-dim { opacity: 0.18; }
-.orc-map .vue-flow__edge.is-lit .vue-flow__edge-path { stroke-width: 2.75; }
 @media (prefers-reduced-motion: reduce) {
   .orc-map .vue-flow__node { transition: none; }
 }

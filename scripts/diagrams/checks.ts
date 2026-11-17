@@ -6,11 +6,11 @@ const desc =
   "After Pi commits, orc runs the project's checks. When one fails, a fixer repairs it and the checks run again, and after three fixes with a check still red the run fails and no pull request opens. Once the checks are green, no-mistakes reviews the branch. Orc has it fix a finding marked auto-fix, ignores no-op, and treats ask-user as a question that waits at the gate for 30 minutes before the task parks on its branch. Then no-mistakes pushes the branch, opens the pull request and waits for green CI. The project's mode decides which of these a ship task goes through."
 
 const branch: Part = { title: "The branch", text: "Pi's commits, in the run's copy of the project.", href: "run" }
-const gate: Part = { title: "The checks", text: "The commands the project names in `.no-mistakes.yaml`.", cls: "card-work" }
+const gate: Part = { title: "The checks", text: "The commands the project names in `.no-mistakes.yaml`." }
 const fixer: Part = { title: "A fixer", text: "A second Pi gets the failing output and repairs it. Then the checks run again." }
-const failed: Part = { title: "The run fails", text: "A check is still red after 3 fixes. No pull request opens.", mark: "failed" }
+const failed: Part = { title: "The run fails", text: "A check is still red after 3 fixes. No pull request opens.", cls: "card-end" }
 
-const review: Part = { title: "no-mistakes reviews the branch", text: "It gets the task as its intent, and marks each finding.", cls: "card-work" }
+const review: Part = { title: "no-mistakes reviews the branch", text: "It gets the task as its intent, and marks each finding." }
 const findings: Part = {
   title: "What orc does with a finding",
   ...bullets(["`auto-fix`: asks no-mistakes to fix it", "`no-op`: ignores it", "`ask-user`: a question that waits for an answer"])
@@ -20,7 +20,6 @@ const question: Part = {
   text: "For 30 minutes. An answer in that time carries the run on. With none, the task parks on its branch, and resumes once every question has an answer.",
   cls: "card-ask",
   href: "attention",
-  mark: "attention"
 }
 const deliver: Part = { title: "no-mistakes delivers", text: "It pushes the branch, opens the pull request and waits for green CI." }
 
@@ -29,7 +28,7 @@ const modes: readonly Part[] = [
   { title: "`direct-PR`", text: "Checks, then orc pushes the branch and opens the pull request itself." },
   { title: "`no-mistakes-prod-only`", text: "`direct-PR` for a task marked internal, `no-mistakes` for the rest." }
 ]
-const pullRequest: Part = { title: "A pull request", text: "A code change, checked before it reaches you. Delivery may include review.", cls: "card-ok", href: "merge", mark: "done" }
+const pullRequest: Part = { title: "A pull request", text: "A code change, checked before it reaches you. Delivery may include review.", cls: "card-ok", href: "merge" }
 
 const wide = (): Drawing => {
   const body = [
@@ -41,11 +40,11 @@ const wide = (): Drawing => {
     card(18, 282, 270, 96, fixer),
     card(18, 404, 270, 78, failed),
     arrow([[153, 122], [153, 148]], "work"),
-    arrow([[100, 230], [100, 280]], "mute"),
+    arrow([[100, 230], [100, 280]], "aside"),
     text(92, 260, "red", "", "end"),
-    arrow([[206, 280], [206, 232]], "mute"),
+    arrow([[206, 280], [206, 232]], "aside"),
     text(214, 260, "again"),
-    arrow([[153, 378], [153, 402]], "mute"),
+    arrow([[153, 378], [153, 402]], "aside"),
     card(328, 42, 350, 78, review),
     card(328, 144, 350, 106, findings),
     card(328, 276, 350, 96, question),
@@ -66,7 +65,7 @@ const wide = (): Drawing => {
 export const checks = (): readonly Drawing[] => [
   wide(),
   tall("checks", title, desc, [
-    { label: "Gate 1: the project's checks", rows: [branch, { arrow: "work" }, gate, { arrow: "mute", note: "red" }, fixer, { arrow: "mute", note: "red after 3 fixes" }, failed] },
+    { label: "Gate 1: the project's checks", rows: [branch, { arrow: "work" }, gate, { arrow: "aside", note: "red" }, fixer, { arrow: "aside", note: "red after 3 fixes" }, failed] },
     { label: "Gate 2: the review", rows: [review, { arrow: "work" }, findings, { arrow: "ask", note: "ask-user" }, question, { arrow: "work" }, deliver, { arrow: "work" }, pullRequest] },
     { label: "A ship task, by the project's mode", rows: modes }
   ])

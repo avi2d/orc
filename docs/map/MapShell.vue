@@ -1,22 +1,29 @@
 <script setup lang="ts">
 import { useData, withBase } from "vitepress"
+import MapLegend from "./MapLegend.vue"
 import { mapTitle } from "./orc-map"
 
 defineEmits<{ openAll: []; foldAll: [] }>()
 
 const { isDark } = useData()
+
+const legendOpen = typeof window !== "undefined" && window.matchMedia("(min-width: 721px)").matches
 </script>
 
 <template>
   <div class="orc-map">
     <header class="orc-map-bar">
-      <a class="map-back" :href="withBase('/')" aria-label="Back to the orc docs">←<span> Docs</span></a>
+      <a class="map-back" :href="withBase('/')" aria-label="Back to the orc docs"><span aria-hidden="true">←</span><span class="map-back-word">Docs</span></a>
       <p class="map-title">{{ mapTitle }}<small>Select a part to open it</small></p>
       <button type="button" @click="$emit('openAll')">Open all</button>
       <button type="button" @click="$emit('foldAll')">Fold all</button>
       <button type="button" :aria-pressed="isDark" @click="isDark = !isDark">{{ isDark ? "Light" : "Dark" }}</button>
     </header>
     <main class="map-stage"><slot /></main>
+    <details class="map-legend" :open="legendOpen">
+      <summary>Legend</summary>
+      <MapLegend />
+    </details>
   </div>
 </template>
 
@@ -31,7 +38,8 @@ const { isDark } = useData()
   --m-grain: var(--p-grain) 0 0 / 512px 512px;
   --m-under-label: color-mix(in srgb, var(--m-zone) 70%, var(--m-page));
   --m-work: var(--paint-work);
-  --m-work-soft: var(--paint-work-soft);
+  --m-area-edge: var(--paint-area-edge);
+  --m-end-soft: var(--paint-end-soft);
   --m-ask: var(--paint-ask);
   --m-ask-soft: var(--paint-ask-soft);
   --m-ok: var(--paint-ok);
@@ -39,7 +47,7 @@ const { isDark } = useData()
   position: fixed;
   inset: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   background: var(--m-page) var(--m-grain);
   color: var(--m-ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -84,22 +92,56 @@ const { isDark } = useData()
 }
 .orc-map-bar a,
 .orc-map-bar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  box-sizing: border-box;
   min-height: 36px;
   padding: 0 10px;
   border: 1px solid var(--m-line);
   border-radius: 8px;
   background: var(--m-card);
   color: var(--m-ink);
-  font: 600 13px/34px inherit;
   font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  text-rendering: optimizeLegibility;
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
 }
 .orc-map-bar a:focus-visible,
-.orc-map-bar button:focus-visible {
-  outline: 2px solid var(--m-work);
+.orc-map-bar button:focus-visible,
+.map-legend summary:focus-visible {
+  outline: 2px solid var(--m-ink);
   outline-offset: 2px;
+}
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 18px;
+  padding: 6px 12px;
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--m-line);
+  background: var(--m-card);
+}
+.map-legend summary {
+  min-height: 28px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 28px;
+  cursor: pointer;
+}
+.map-legend[open] summary {
+  float: left;
+  margin-right: 18px;
+}
+.map-legend .map-key {
+  min-height: 28px;
+  align-items: center;
 }
 .map-stage {
   position: relative;
@@ -108,7 +150,7 @@ const { isDark } = useData()
 }
 @media (max-width: 520px) {
   .orc-map-bar small,
-  .map-back span {
+  .map-back-word {
     display: none;
   }
   .orc-map-bar a,

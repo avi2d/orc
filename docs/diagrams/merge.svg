@@ -10,10 +10,10 @@
   --d-card: light-dark(#fffbf2, #211a14);
   --d-zone: light-dark(#eee5d4, #2c231b);
   --d-work: light-dark(#a3160f, #f0624a);
-  --d-work-soft: light-dark(#f7e6de, #342019);
   --d-on-work: light-dark(#fff8ec, #1a0b07);
   --d-ask: light-dark(#774d00, #e6ac3f);
-  --d-ask-soft: light-dark(#ede4d3, #3b2d1a);
+  --d-ask-soft: light-dark(#fbe7ae, #4d3b12);
+  --d-end-soft: light-dark(#d9d5cf, #45403b);
   --d-ok: light-dark(#2d6220, #9dc56e);
   --d-ok-soft: light-dark(#e6e9d9, #302f1f);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -28,21 +28,19 @@
 .orc-d .ok-text { fill: var(--d-ok); font-weight: 600; }
 .orc-d .zone { fill: var(--d-zone); stroke: var(--d-line); }
 .orc-d .card { fill: var(--d-card); stroke: var(--d-edge); stroke-width: 1.5; }
-.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); stroke-width: 1.5; }
 .orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); stroke-width: 1.5; }
 .orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); stroke-width: 1.5; }
-.orc-d .mark-running, .orc-d .mark-failed { color: var(--d-work); }
-.orc-d .mark-waiting { color: var(--d-mute); }
-.orc-d .mark-done { color: var(--d-ok); }
-.orc-d .mark-attention { color: var(--d-ask); }
-.orc-d .line { fill: none; stroke: var(--d-mute); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .card-end { fill: var(--d-end-soft); stroke: var(--d-mute); stroke-width: 1.5; }
+.orc-d .line-aside { fill: none; stroke: var(--d-mute); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .chevron { fill: none; stroke: var(--d-mute); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .bar { fill: none; stroke: var(--d-mute); stroke-width: 3; stroke-linecap: round; }
 .orc-d .line-work { fill: none; stroke: var(--d-work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .line-ask { fill: none; stroke: var(--d-ask); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
 .orc-d .line-ok { fill: none; stroke: var(--d-ok); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .faint { fill: none; stroke: var(--d-line); stroke-width: 3; stroke-linecap: round; }
 .orc-d .head-work { fill: var(--d-work); }
 .orc-d .head-ask { fill: var(--d-ask); }
-.orc-d .head-mute { fill: var(--d-mute); }
+.orc-d .head-aside { fill: var(--d-mute); }
 .orc-d .dot-work { fill: var(--d-work); }
 .orc-d .dot-ask { fill: var(--d-ask); }
 .orc-d .dot-ok { fill: var(--d-ok); }
@@ -56,8 +54,8 @@
 <rect x="218" y="8" width="734" height="292" rx="14" class="zone"/><text x="230" y="29" class="label" text-anchor="start"><tspan x="230" dy="0"><tspan class="code">orc merge</tspan> lands it once all four hold</tspan></text>
 <rect x="8" y="314" width="944" height="174" rx="14" class="zone"/><text x="20" y="335" class="label" text-anchor="start"><tspan x="20" dy="0">Whose word merges</tspan></text>
 <rect x="18" y="42" width="170" height="76" rx="10" class="card"/><text x="30" y="70" class="title" text-anchor="start"><tspan x="30" dy="0">You</tspan></text><text x="30" y="88" class="" text-anchor="start"><tspan x="30" dy="0"><tspan class="code">orc merge &lt;task-id></tspan></tspan></text>
-<g data-part="chat"><rect x="18" y="126" width="170" height="76" rx="10" class="card"/><text x="30" y="154" class="title" text-anchor="start"><tspan x="30" dy="0">The chat</tspan></text><text x="30" y="172" class="" text-anchor="start"><tspan x="30" dy="0">Its <tspan class="code">merge_task</tspan> tool.</tspan></text><path d="M169,144 l5,5.5 l-5,5.5" class="line-work"/></g>
-<g data-part="app"><rect x="18" y="210" width="170" height="76" rx="10" class="card"/><text x="30" y="238" class="title" text-anchor="start"><tspan x="30" dy="0">The app</tspan></text><text x="30" y="256" class="" text-anchor="start"><tspan x="30" dy="0">Its Approve step.</tspan></text><path d="M169,228 l5,5.5 l-5,5.5" class="line-work"/></g>
+<g data-part="chat"><rect x="18" y="126" width="170" height="76" rx="10" class="card"/><text x="30" y="154" class="title" text-anchor="start"><tspan x="30" dy="0">The chat</tspan></text><text x="30" y="172" class="" text-anchor="start"><tspan x="30" dy="0">Its <tspan class="code">merge_task</tspan> tool.</tspan></text><path d="M169,144 l5,5.5 l-5,5.5" class="chevron"/></g>
+<g data-part="app"><rect x="18" y="210" width="170" height="76" rx="10" class="card"/><text x="30" y="238" class="title" text-anchor="start"><tspan x="30" dy="0">The app</tspan></text><text x="30" y="256" class="" text-anchor="start"><tspan x="30" dy="0">Its Approve step.</tspan></text><path d="M169,228 l5,5.5 l-5,5.5" class="chevron"/></g>
 <path d="M188,80 L226,80" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(226,80) rotate(0)"/>
 <rect x="228" y="42" width="132" height="130" rx="10" class="card"/><text x="240" y="70" class="title" text-anchor="start"><tspan x="240" dy="0">A pull request</tspan></text><text x="240" y="88" class="" text-anchor="start"><tspan x="240" dy="0">The task names</tspan><tspan x="240" dy="16">one.</tspan></text>
 <rect x="376" y="42" width="132" height="130" rx="10" class="card"/><text x="388" y="70" class="title" text-anchor="start"><tspan x="388" dy="0">Open</tspan></text><text x="388" y="88" class="" text-anchor="start"><tspan x="388" dy="0">It is not closed,</tspan><tspan x="388" dy="16">and not merged</tspan><tspan x="388" dy="16">yet.</tspan></text>
@@ -69,16 +67,16 @@
 <path d="M804,96 L818,96" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(818,96) rotate(0)"/>
 <rect x="820" y="42" width="122" height="130" rx="10" class="card-ok"/><text x="832" y="70" class="title" text-anchor="start"><tspan x="832" dy="0">Squash merge</tspan></text><text x="832" y="88" class="" text-anchor="start"><tspan x="832" dy="0">At the exact</tspan><tspan x="832" dy="16">commit it</tspan><tspan x="832" dy="16">checked. A push</tspan><tspan x="832" dy="16">after the check</tspan><tspan x="832" dy="16">merges nothing.</tspan></text>
 <rect x="228" y="218" width="576" height="66" rx="10" class="card"/><text x="240" y="246" class="title" text-anchor="start"><tspan x="240" dy="0">Refused: nothing merges</tspan></text><text x="240" y="264" class="" text-anchor="start"><tspan x="240" dy="0">The refusal names every reason.</tspan></text>
-<path d="M294,172 L294,216" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(294,216) rotate(90)"/>
-<text x="302" y="198" class="ask-text" text-anchor="start"><tspan x="302" dy="0">no</tspan></text>
-<path d="M442,172 L442,216" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(442,216) rotate(90)"/>
-<text x="450" y="198" class="ask-text" text-anchor="start"><tspan x="450" dy="0">no</tspan></text>
-<path d="M590,172 L590,216" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(590,216) rotate(90)"/>
-<text x="598" y="198" class="ask-text" text-anchor="start"><tspan x="598" dy="0">no</tspan></text>
-<path d="M738,172 L738,216" class="line-ask"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-ask" transform="translate(738,216) rotate(90)"/>
-<text x="746" y="198" class="ask-text" text-anchor="start"><tspan x="746" dy="0">no</tspan></text>
+<path d="M294,172 L294,216" class="line-aside"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-aside" transform="translate(294,216) rotate(90)"/>
+<text x="302" y="198" class="" text-anchor="start"><tspan x="302" dy="0">no</tspan></text>
+<path d="M442,172 L442,216" class="line-aside"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-aside" transform="translate(442,216) rotate(90)"/>
+<text x="450" y="198" class="" text-anchor="start"><tspan x="450" dy="0">no</tspan></text>
+<path d="M590,172 L590,216" class="line-aside"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-aside" transform="translate(590,216) rotate(90)"/>
+<text x="598" y="198" class="" text-anchor="start"><tspan x="598" dy="0">no</tspan></text>
+<path d="M738,172 L738,216" class="line-aside"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-aside" transform="translate(738,216) rotate(90)"/>
+<text x="746" y="198" class="" text-anchor="start"><tspan x="746" dy="0">no</tspan></text>
 <rect x="18" y="348" width="222" height="130" rx="10" class="card"/><text x="30" y="376" class="title" text-anchor="start"><tspan x="30" dy="0">Your word</tspan></text><text x="30" y="394" class="" text-anchor="start"><tspan x="30" dy="0">The default basis. You said to</tspan><tspan x="30" dy="16">merge that pull request.</tspan></text>
 <rect x="252" y="348" width="222" height="130" rx="10" class="card"/><text x="264" y="376" class="title" text-anchor="start"><tspan x="264" dy="0"><tspan class="code">yolo-green</tspan></tspan></text><text x="264" y="394" class="" text-anchor="start"><tspan x="264" dy="0">The project has <tspan class="code">"yolo": true</tspan>,</tspan><tspan x="264" dy="16">and you ask the chat to merge</tspan><tspan x="264" dy="16">its green pull request.</tspan></text>
-<g data-part="attention"><rect x="486" y="348" width="222" height="130" rx="10" class="card"/><text x="498" y="376" class="title" text-anchor="start"><tspan x="498" dy="0">Never the decider</tspan></text><text x="498" y="394" class="" text-anchor="start"><tspan x="498" dy="0">It answers no question about</tspan><tspan x="498" dy="16">merging, so a merge always</tspan><tspan x="498" dy="16">traces back to you.</tspan></text><path d="M689,366 l5,5.5 l-5,5.5" class="line-work"/></g>
-<g data-part="beat"><rect x="720" y="348" width="222" height="130" rx="10" class="card"/><text x="732" y="376" class="title" text-anchor="start"><tspan x="732" dy="0">After the merge</tspan></text><text x="732" y="394" class="" text-anchor="start"><tspan x="732" dy="0">A later beat records it, the</tspan><tspan x="732" dy="16">chat posts it, and a ship task</tspan><tspan x="732" dy="16">that waited on it can start.</tspan></text><path d="M923,366 l5,5.5 l-5,5.5" class="line-work"/></g>
+<g data-part="attention"><rect x="486" y="348" width="222" height="130" rx="10" class="card"/><text x="498" y="376" class="title" text-anchor="start"><tspan x="498" dy="0">Never the decider</tspan></text><text x="498" y="394" class="" text-anchor="start"><tspan x="498" dy="0">It answers no question about</tspan><tspan x="498" dy="16">merging, so a merge always</tspan><tspan x="498" dy="16">traces back to you.</tspan></text><path d="M689,366 l5,5.5 l-5,5.5" class="chevron"/></g>
+<g data-part="beat"><rect x="720" y="348" width="222" height="130" rx="10" class="card"/><text x="732" y="376" class="title" text-anchor="start"><tspan x="732" dy="0">After the merge</tspan></text><text x="732" y="394" class="" text-anchor="start"><tspan x="732" dy="0">A later beat records it, the</tspan><tspan x="732" dy="16">chat posts it, and a ship task</tspan><tspan x="732" dy="16">that waited on it can start.</tspan></text><path d="M923,366 l5,5.5 l-5,5.5" class="chevron"/></g>
 </svg>

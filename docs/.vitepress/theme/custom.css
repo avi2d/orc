@@ -12,7 +12,9 @@
   --paint-ok: light-dark(#2d6220, #9dc56e);
   --paint-on: light-dark(#fff8ec, #1a0b07);
   --paint-work-soft: color-mix(in srgb, var(--paint-work) 9%, var(--paint-surface));
-  --paint-ask-soft: color-mix(in srgb, var(--paint-ask) 13%, var(--paint-surface));
+  --paint-ask-soft: light-dark(#fbe7ae, #4d3b12);
+  --paint-end-soft: light-dark(#d9d5cf, #45403b);
+  --paint-area-edge: light-dark(#3a2a1f, #bca995);
   --paint-ok-soft: color-mix(in srgb, var(--paint-ok) 12%, var(--paint-surface));
   --paint-work-strong: color-mix(in srgb, var(--paint-work) 82%, var(--paint-ink));
   --paint-display: "Alfa Slab One", Rockwell, "Roboto Slab", serif;
