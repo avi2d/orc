@@ -185,18 +185,23 @@ export const layoutMap = (measures: Measures): MapLayout => {
       seen.add(from + ">" + to)
       return [{ from, to, ...(from === link.from && to === link.to ? { link } : {}) }]
     })
-    const blocks = groupsOf(
-      inner.map((child) => child.id),
-      wires
-    ).map((members) =>
-      ranked(
-        members,
-        wires.filter((wire) => members.includes(wire.from)),
-        boxes,
-        measures
-      )
-    )
-    const stack = lineUp(blocks, stackGap, true)
+    const stack = measures.stacked
+      ? lineUp([...boxes.values()], stackGap, true)
+      : lineUp(
+          groupsOf(
+            inner.map((child) => child.id),
+            wires
+          ).map((members) =>
+            ranked(
+              members,
+              wires.filter((wire) => members.includes(wire.from)),
+              boxes,
+              measures
+            )
+          ),
+          stackGap,
+          true
+        )
     const header = titleWidth(part) + (part.page === undefined ? 0 : pageLink.width + pageLink.inset * 2)
     const whole = { width: Math.max(stack.size.width + edge * 2, header), height: stack.size.height + headRoom + edge }
     const body = moved(stack, (whole.width - stack.size.width) / 2, headRoom)

@@ -8,6 +8,6 @@ kind: explanation
 - **Runs where there is room.** `orc beat` places each task on a machine with a free slot and an account with quota left.
 - **Asks only when it must.** A task that needs your call waits with its question, and your answer starts it again.
   The chat can put a task's open questions on a local decision board, one card each with its options and a pick.
-- **Reviewed before you see it.** A code change passes your checks and lands as a pull request after the review [Pick a delivery mode](pick-a-delivery-mode.md) names.
+- **Reviewed before you see it.** A code change passes your checks and lands as a pull request after the review [Pick a delivery mode](pick-a-delivery-mode.md) names for it.
 - **Never loses work.** The backlog, the run history and the queues live on disk, so a restart picks up where it stopped.
 - **See it all.** `orc-dash` shows quota, machines, queues, tasks and alerts in one terminal screen.

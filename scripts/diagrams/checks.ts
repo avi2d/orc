@@ -29,7 +29,7 @@ const modes: readonly Part[] = [
   { title: "`direct-PR`", text: "Checks, then orc pushes the branch and opens the pull request itself." },
   { title: "`no-mistakes-prod-only`", text: "`direct-PR` for a task marked internal, `no-mistakes` for the rest." }
 ]
-const pullRequest: Part = { title: "A pull request", text: "Checked and reviewed before it reaches you.", cls: "card-ok", href: "merge", mark: "done" }
+const pullRequest: Part = { title: "A pull request", text: "A code change, checked before it reaches you. Delivery may include review.", cls: "card-ok", href: "merge", mark: "done" }
 
 const wide = (): Drawing => {
   const body = [
