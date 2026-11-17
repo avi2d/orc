@@ -11,10 +11,6 @@ import MapLegend from "./map/MapLegend.vue"
 
 One chat to run your AI agent work on all your machines and models, with a backlog, live monitoring and Herdr App dashboards.
 
-Use one chat to describe work and keep it in a backlog.
-Orc runs tasks across your machines with the models you configure.
-You can monitor tasks, runs and resources live in the terminal dashboard or the Herdr App dashboards.
-
 <img class="home-hero-art" src="./images/orc-hero-1120.webp" srcset="./images/orc-hero-640.webp 640w, ./images/orc-hero-1120.webp 1120w" sizes="(min-width: 860px) 560px, 90vw" width="1120" height="747" alt="A calm, grey-haired orc arranging three task tiles at a desk." fetchpriority="high">
 
 <div class="home-rest">

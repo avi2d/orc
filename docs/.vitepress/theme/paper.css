@@ -113,7 +113,11 @@ body {
 }
 
 .vp-doc .header-anchor {
-  color: var(--paint-muted);
+  color: var(--paint-ink);
+}
+
+.vp-doc h2 .header-anchor {
+  top: auto;
 }
 
 .VPNavBarMenuLink,
