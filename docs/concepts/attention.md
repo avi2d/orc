@@ -1,6 +1,6 @@
 ---
 aside: false
-pageClass: wide-page
+pageClass: wide-page part-attention
 kind: explanation
 ---
 # The attention queue and the decider

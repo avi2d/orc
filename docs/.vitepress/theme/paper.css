@@ -1,0 +1,213 @@
+@font-face {
+  font-family: "Alfa Slab One";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url(/paper/fonts/alfa-slab-one-latin-400-normal.woff2) format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+  src: url(/paper/fonts/jetbrains-mono-latin-wght-normal.woff2) format("woff2");
+}
+
+:root {
+  --p-term: #17120e;
+  --p-term-ink: #f3e8d6;
+  --p-grain: url(/paper/paper-light.webp);
+  --p-frame: url(/paper/frame-light.png);
+  --p-wash-opacity: 0.5;
+  --p-art-filter: none;
+
+  --stroke-wavy: url(/paper/stroke-wavy.webp);
+  --stroke-dry: url(/paper/stroke-dry.webp);
+  --stroke-hair: url(/paper/stroke-hair.webp);
+  --stroke-flat: url(/paper/stroke-flat.webp);
+  --stroke-scribble: url(/paper/stroke-scribble.webp);
+
+  --vp-c-bg: var(--paint-bg);
+  --vp-c-bg-alt: var(--paint-bg);
+  --vp-c-bg-soft: var(--paint-surface-2);
+  --vp-c-bg-elv: var(--paint-surface);
+  --vp-c-text-1: var(--paint-ink);
+  --vp-c-text-2: var(--paint-muted);
+  --vp-c-text-3: var(--paint-muted);
+  --vp-c-divider: var(--paint-line);
+  --vp-c-gutter: var(--paint-line);
+  --vp-c-border: var(--paint-edge);
+  --vp-c-brand-1: var(--paint-work);
+  --vp-c-brand-2: var(--paint-work-strong);
+  --vp-c-brand-3: var(--paint-work);
+  --vp-c-brand-soft: var(--paint-work-soft);
+  --vp-c-tip-1: var(--paint-ok);
+  --vp-c-tip-soft: var(--paint-ok-soft);
+  --vp-c-warning-1: var(--paint-ask);
+  --vp-c-warning-soft: var(--paint-ask-soft);
+  --vp-c-danger-1: var(--paint-work);
+  --vp-c-danger-soft: var(--paint-work-soft);
+  --vp-button-brand-bg: var(--paint-work);
+  --vp-button-brand-text: var(--paint-on);
+  --vp-button-brand-hover-bg: var(--paint-work-strong);
+  --vp-button-brand-hover-text: var(--paint-on);
+  --vp-font-family-base: Inter, system-ui, sans-serif;
+  --vp-font-family-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --vp-code-color: var(--paint-ink);
+  --vp-code-bg: var(--paint-surface-2);
+  --vp-code-block-bg: var(--p-term);
+  --vp-code-block-color: var(--p-term-ink);
+  --vp-code-lang-color: #bca995;
+  --vp-code-copy-code-bg: #2c231b;
+  --vp-code-copy-code-hover-bg: #43352a;
+  --vp-code-copy-code-border-color: #7a6655;
+  --vp-code-copy-code-hover-border-color: #bca995;
+  --vp-code-copy-code-active-text: #f3e8d6;
+  --vp-nav-bg-color: var(--paint-bg);
+  --vp-sidebar-bg-color: var(--paint-bg);
+  --vp-local-nav-bg-color: var(--paint-bg);
+  --vp-custom-block-tip-text: var(--paint-ink);
+  --vp-custom-block-info-text: var(--paint-ink);
+  --vp-custom-block-warning-text: var(--paint-ink);
+  --vp-custom-block-danger-text: var(--paint-ink);
+}
+
+.dark {
+  --p-grain: url(/paper/paper-dark.webp);
+  --p-frame: url(/paper/frame-dark.png);
+  --p-wash-opacity: 0.34;
+  --p-art-filter: brightness(0.9);
+}
+
+body {
+  background: var(--paint-bg) var(--p-grain) 0 0 / 512px 512px;
+}
+
+.VPContent,
+.VPDoc {
+  background: transparent;
+}
+
+.VPNavBar .divider {
+  display: none;
+}
+
+.VPNav::after,
+.VPLocalNav::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 -5px 0;
+  height: 9px;
+  background: var(--paint-edge);
+  mask: var(--stroke-wavy) center / 100% 100% no-repeat;
+  pointer-events: none;
+}
+
+.VPLocalNav {
+  border-bottom: 0;
+}
+
+.VPNavBarTitle .logo {
+  height: 38px;
+}
+
+.vp-doc .header-anchor {
+  color: var(--paint-muted);
+}
+
+.VPNavBarMenuLink,
+.VPSidebarItem .text {
+  position: relative;
+}
+
+.VPNavBarMenuLink.active::after {
+  content: "";
+  position: absolute;
+  inset: auto 8px 12px 8px;
+  height: 7px;
+  background: var(--paint-work);
+  mask: var(--stroke-scribble) center / 100% 100% no-repeat;
+}
+
+.VPSidebar {
+  border-right: 0;
+}
+
+.VPSidebarItem.level-0 > .item > .text,
+.VPSidebarItem.level-0 > .item .text {
+  font-weight: 700;
+}
+
+.VPSidebarItem.level-1.is-active > .item > .link > .text {
+  color: var(--paint-work-strong);
+  font-weight: 600;
+}
+
+.VPSidebarItem.level-1.is-active > .item {
+  position: relative;
+  isolation: isolate;
+}
+
+.VPSidebarItem.level-1.is-active > .item::before {
+  content: "";
+  position: absolute;
+  inset: 3px -10px 3px -12px;
+  z-index: -1;
+  background: var(--paint-work-soft);
+  mask: var(--stroke-flat) center / 100% 100% no-repeat;
+}
+
+.VPSidebar .group + .group {
+  border-top: 0;
+  position: relative;
+}
+
+.VPSidebar .group + .group::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--paint-muted);
+  mask: var(--stroke-hair) center / 100% 100% no-repeat;
+}
+
+.VPDoc {
+  position: relative;
+  isolation: isolate;
+}
+
+.VPDoc::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 2px;
+  left: 50%;
+  width: min(100%, 1100px);
+  height: 150px;
+  translate: -50% 0;
+  background: url(/paper/wash-ask.webp) center / 100% 100% no-repeat;
+  opacity: var(--p-wash-opacity);
+  pointer-events: none;
+}
+
+.VPDoc .content-container {
+  box-sizing: border-box;
+  padding: 36px clamp(16px, 4vw, 48px) 28px;
+  background: var(--paint-surface);
+  border: 10px solid transparent;
+  border-image: var(--p-frame) 70 / 18px / 6px stretch;
+}
+
+.VPDoc .aside-curtain {
+  display: none;
+}
+
+.VPDoc .aside-container {
+  background: transparent;
+}
+
+.VPDocAsideOutline .content {
+  border-left: 0;
+  position: relative;
+}
