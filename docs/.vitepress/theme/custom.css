@@ -4,10 +4,10 @@
   --paint-surface: light-dark(#fffbf2, #211a14);
   --paint-surface-2: light-dark(#eee5d4, #2c231b);
   --paint-ink: light-dark(#221812, #f3e8d6);
-  --paint-muted: light-dark(#5b4a3c, #bca995);
+  --paint-muted: light-dark(#5b4a3c, #cbb8a2);
   --paint-edge: light-dark(#3a2a1f, #7a6655);
   --paint-line: light-dark(#d6c8b1, #43352a);
-  --paint-work: light-dark(#a3160f, #f0624a);
+  --paint-work: light-dark(#a3160f, #f7876f);
   --paint-ask: light-dark(#774d00, #e6ac3f);
   --paint-ok: light-dark(#2d6220, #9dc56e);
   --paint-on: light-dark(#fff8ec, #1a0b07);
@@ -25,85 +25,23 @@
 /* The default theme sets its dark colours on .dark, so a value set on :root alone loses to it in the dark theme. */
 :root,
 .dark {
-  --vp-c-bg: var(--paint-bg);
-  --vp-c-bg-alt: var(--paint-surface-2);
-  --vp-c-bg-elv: var(--paint-surface);
-  --vp-c-bg-soft: var(--paint-surface-2);
-  --vp-c-text-1: var(--paint-ink);
-  --vp-c-text-2: var(--paint-muted);
-  --vp-c-text-3: var(--paint-muted);
-  --vp-c-border: var(--paint-line);
-  --vp-c-divider: var(--paint-line);
-  --vp-c-gutter: var(--paint-line);
   --vp-c-default-1: var(--paint-line);
   --vp-c-default-2: var(--paint-line);
   --vp-c-default-3: var(--paint-surface-2);
   --vp-c-default-soft: color-mix(in srgb, var(--paint-ink) 8%, transparent);
-  --vp-c-brand-1: var(--paint-work);
-  --vp-c-brand-2: var(--paint-work-strong);
-  --vp-c-brand-3: var(--paint-work);
-  --vp-c-brand-soft: color-mix(in srgb, var(--paint-work) 12%, transparent);
-  --vp-c-tip-1: var(--paint-ok);
   --vp-c-tip-2: var(--paint-ok);
   --vp-c-tip-3: var(--paint-ok);
-  --vp-c-tip-soft: color-mix(in srgb, var(--paint-ok) 12%, transparent);
-  --vp-c-warning-1: var(--paint-ask);
   --vp-c-warning-2: var(--paint-ask);
   --vp-c-warning-3: var(--paint-ask);
-  --vp-c-warning-soft: color-mix(in srgb, var(--paint-ask) 13%, transparent);
-  --vp-c-danger-1: var(--paint-work);
   --vp-c-danger-2: var(--paint-work);
   --vp-c-danger-3: var(--paint-work);
-  --vp-c-danger-soft: color-mix(in srgb, var(--paint-work) 9%, transparent);
-  --vp-button-brand-text: var(--paint-on);
-  --vp-button-brand-hover-text: var(--paint-on);
   --vp-button-brand-active-text: var(--paint-on);
-  --vp-button-brand-hover-bg: var(--paint-work-strong);
   --vp-button-brand-active-bg: var(--paint-work-strong);
-  --vp-code-color: var(--paint-ink);
-  --vp-code-block-bg: light-dark(#fffdf9, #211a14);
   --vp-code-block-divider-color: var(--paint-line);
-  --vp-code-lang-color: var(--paint-muted);
   --vp-code-line-number-color: var(--paint-muted);
-  --vp-code-copy-code-bg: var(--paint-surface-2);
-  --vp-code-copy-code-border-color: var(--paint-line);
-  --vp-code-copy-code-hover-bg: var(--paint-surface);
-  --vp-code-copy-code-hover-border-color: var(--paint-edge);
   --vp-local-search-bg: var(--paint-surface);
   --vp-local-search-result-bg: var(--paint-surface);
-  --vp-font-family-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --vp-nav-logo-height: 40px;
-}
-
-.vp-doc h1,
-.vp-doc h2 {
-  font-family: var(--paint-display);
-  font-weight: 400;
-  letter-spacing: 0;
-}
-
-.vp-doc h1 {
-  line-height: 1.3;
-}
-
-.vp-doc h2 {
-  padding-top: 0;
-  border-top: 0;
-  line-height: 1.35;
-}
-
-.vp-doc h2::after {
-  content: "";
-  display: block;
-  width: 140px;
-  height: 7px;
-  margin-top: 8px;
-  background: var(--paint-work);
-  clip-path: polygon(0 40%, 30% 0, 70% 30%, 100% 5%, 97% 70%, 45% 100%, 2% 80%);
-}
-
-.vp-doc div[class*="language-"] {
-  border: 1px solid var(--paint-line);
 }
 
 .home-page .vp-doc > div > h1 {
@@ -283,17 +221,9 @@
   display: inline-block;
   min-height: 44px;
   box-sizing: border-box;
-  padding: 10px 18px;
-  border-radius: 8px;
-  background: var(--vp-button-brand-bg);
-  color: var(--vp-button-brand-text);
   font-weight: 600;
   line-height: 24px;
   text-decoration: none;
-}
-.vp-doc a.map-open:hover {
-  background: var(--vp-button-brand-hover-bg);
-  color: var(--vp-button-brand-hover-text);
 }
 
 /* The map covers its page heading, so the heading's anchor link must not take a Tab stop nobody can see. */

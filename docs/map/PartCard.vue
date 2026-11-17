@@ -51,6 +51,11 @@ defineEmits<{ toggle: [] }>()
 .part.tone-work { border-color: var(--m-work); background: var(--m-work-soft); }
 .part.tone-ask { border-color: var(--m-ask); background: var(--m-ask-soft); }
 .part.tone-ok { border-color: var(--m-ok); background: var(--m-ok-soft); }
+.part.tone-work,
+.part.tone-ask,
+.part.tone-ok {
+  color: var(--m-ink);
+}
 .part.is-open,
 .part.is-group {
   background: color-mix(in srgb, var(--m-zone) 70%, transparent);
@@ -90,7 +95,7 @@ defineEmits<{ toggle: [] }>()
 .part-mark.mark-done { color: var(--m-ok); }
 .part-mark.mark-attention { color: var(--m-ask); }
 .part-title.mono {
-  font-family: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--vp-font-family-mono);
   font-size: 13px;
 }
 .part-fold {
