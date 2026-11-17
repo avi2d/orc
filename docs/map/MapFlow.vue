@@ -24,11 +24,11 @@ const { setViewport } = useVueFlow("orc-map")
 
 const nodes = computed(() =>
   placed.value.parts.map(
-    (item): Node<{ part: MapPart; open: boolean }> => ({
+    (item): Node<{ part: MapPart; open: boolean; depth: number }> => ({
       id: item.part.id,
       type: "part",
       position: { x: item.rect.x, y: item.rect.y },
-      data: { part: item.part, open: item.open },
+      data: { part: item.part, open: item.open, depth: item.depth },
       zIndex: item.open ? item.depth : 1000,
       style: { width: item.rect.width.toString() + "px", height: item.rect.height.toString() + "px" }
     })
@@ -144,7 +144,7 @@ onBeforeUnmount(() => narrow?.removeEventListener("change", onWidth))
       @node-mouse-leave="hovered = undefined"
     >
       <template #node-part="{ id, data }">
-        <PartCard :part="data.part" :folds="data.part.inside !== undefined && folds(id)" :open="data.open" @toggle="toggle(id)" />
+        <PartCard :part="data.part" :folds="data.part.inside !== undefined && folds(id)" :open="data.open" :depth="data.depth" @toggle="toggle(id)" />
         <Handle type="source" :position="Position.Bottom" :connectable="false" />
         <Handle type="target" :position="Position.Top" :connectable="false" />
       </template>

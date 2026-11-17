@@ -9,12 +9,12 @@ import type { Mark, MapPart } from "./orc-map"
 
 const marks = { attention, done, failed, running, waiting } satisfies Record<Mark, string>
 
-defineProps<{ part: MapPart; folds: boolean; open: boolean }>()
+defineProps<{ part: MapPart; folds: boolean; open: boolean; depth?: number }>()
 defineEmits<{ toggle: [] }>()
 </script>
 
 <template>
-  <div class="part" :class="['tone-' + (part.tone ?? 'plain'), { 'is-open': open, 'is-group': part.inside === undefined }]">
+  <div class="part" :class="['tone-' + (part.tone ?? 'plain'), { 'is-open': open, 'is-group': part.inside === undefined }]" :data-depth="depth ?? 0">
     <button v-if="folds" type="button" class="part-fold nodrag nopan" :aria-expanded="open" @click.stop="$emit('toggle')">
       <span class="part-chevron" aria-hidden="true" />
       <span class="part-title" :class="{ mono: part.mono }">{{ part.title }}</span>
@@ -58,6 +58,11 @@ defineEmits<{ toggle: [] }>()
   border-style: dashed;
 }
 .part.is-group { border-style: solid; }
+.part.is-open[data-depth="1"] { background: color-mix(in srgb, var(--m-zone) 84%, var(--m-line)); }
+.part.is-open[data-depth="2"] { background: color-mix(in srgb, var(--m-zone) 68%, var(--m-line)); }
+.part.is-open[data-depth="3"],
+.part.is-open[data-depth="4"],
+.part.is-open[data-depth="5"] { background: color-mix(in srgb, var(--m-zone) 52%, var(--m-line)); }
 .part p,
 .part ul {
   margin: 0;
