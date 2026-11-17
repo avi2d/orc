@@ -23,7 +23,7 @@ const watch: Part = {
   ...bullets([
     "Pi prints nothing for 45 minutes with no tool running: orc stops it.",
     "Pi fails one command 3 times in a row: you are told.",
-    "Pi fails it 6 times in a row: orc stops Pi and asks you whether to continue.",
+    "Pi fails it 6 times in a row: orc pauses the run and asks you whether to continue.",
     "Pi is unsure: it asks you a question instead of guessing."
   ])
 }

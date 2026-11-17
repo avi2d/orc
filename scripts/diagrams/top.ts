@@ -30,10 +30,10 @@ const merge: Part = { title: "`orc merge`", text: "Land a pull request once CI i
 const backlog: Part = { step: "2", title: "The backlog", text: "One file per task, in priority order.", href: "backlog", extra: (x, y) => folders(x, y), extraHeight: () => 34 }
 const quota: Part = { title: "Quota", text: "Room left on each account.", cls: "card-work", href: "quota", extra: (x, y) => bars(x, y), extraHeight: () => 30 }
 const beat: Part = { step: "3", title: "The beat", text: "Every few minutes, starts what can start.", href: "beat" }
-const decider: Part = { title: "The decider", text: "A small model. It answers a routine question by quoting a rule you wrote.", cls: "card-ask", href: "attention" }
+const decider: Part = { title: "The decider", text: "A model answers routine questions from written instructions, or asks you.", cls: "card-ask", href: "attention" }
 const attention: Part = { title: "The attention queue", text: "Every open question waits here.", cls: "card-ask", href: "attention", mark: "attention" }
 const runner: Part = { step: "4", title: "The runner", text: "A queue on the machine, a few tasks at a time.", href: "runner" }
-const run: Part = { step: "5", title: "A run", text: "An agent writes the change in its own copy of the project, on a new branch.", href: "run", mark: "running" }
+const run: Part = { step: "5", title: "A run", text: "Pi works on the task. A ship task gets its own branch and worktree.", href: "run", mark: "running" }
 const checks: Part = {
   step: "6",
   title: "Checks and review",
@@ -47,7 +47,7 @@ const dropped: Part = { title: "Dropped", text: "Before it started." }
 const answered: Part = { title: "Answered", text: "A decision never runs. Your answer closes it." }
 const stopped: Part = { title: "Stopped", text: "You stopped the run." }
 const failed: Part = { title: "Failed", text: "It could not start, it died, or its checks stayed red.", mark: "failed" }
-const report: Part = { title: "A report", text: "A task that changes no code. No pull request.", cls: "card-ok", mark: "done" }
+const report: Part = { title: "A report", text: "A scout or task run ends with a report, not a pull request.", cls: "card-ok", mark: "done" }
 const pullRequest: Part = { title: "A pull request", text: "A code change. You merge it once CI is green.", cls: "card-ok", href: "merge", mark: "done" }
 
 const wide = (): Drawing => {
@@ -73,8 +73,8 @@ const wide = (): Drawing => {
     text(766, 224, "After a run", "label"),
     card(764, 232, 178, 62, stopped),
     card(764, 300, 178, 94, failed),
-    card(764, 400, 178, 78, report),
-    card(764, 484, 178, 78, pullRequest),
+    card(764, 400, 178, 94, report),
+    card(764, 500, 178, 78, pullRequest),
     arrow([[148, 80], [186, 80]], "work"),
     arrow([[409, 146], [409, 168]], "work"),
     arrow([[322, 232], [340, 232]], "work"),

@@ -76,7 +76,7 @@ const circle = (cx: number, cy: number, r: number, cls: string): string => '<cir
 export const path = (d: string, cls: string): string => '<path d="' + d + '" class="' + cls + '"/>'
 
 const badge = (cx: number, cy: number, label: string, tone: "work" | "ask" = "work"): string =>
-  circle(cx, cy, 11, "dot-" + tone) + text(cx, cy + 4.5, label, tone === "work" ? "num" : "num-ask", "middle")
+  circle(cx, cy, 8, "dot-" + tone) + text(cx, cy + 3.5, label, tone === "work" ? "num" : "num-ask", "middle")
 
 const head = (tip: Point, from: Point, tone: Tone): string => {
   const angle = (Math.atan2(tip[1] - from[1], tip[0] - from[0]) * 180) / Math.PI
@@ -109,7 +109,7 @@ const mark = (x: number, y: number, name: Mark): string =>
   '<svg x="' + x + '" y="' + y + '" width="' + markSize + '" height="' + markSize + '" viewBox="0 0 24 24" fill="currentColor" class="mark mark-' + name + '" aria-hidden="true">' + markSlot(name) + "</svg>"
 
 const cardLines = (part: Part, w: number): { title: string[]; body: string[]; indent: number } => {
-  const indent = part.step === undefined ? 0 : 28
+  const indent = part.step === undefined ? 0 : 22
   const room = w - 24 - (part.href === undefined ? 0 : 14) - (part.mark === undefined ? 0 : markSize + 6)
   return { title: wrapTitle(part.title, room - indent), body: part.text === undefined ? [] : wrapText(part.text, w - 24), indent }
 }
@@ -128,11 +128,11 @@ export const card = (x: number, y: number, w: number, h: number, part: Part): st
   const bodyTop = y + 14 + lines.title.length * 18 + 14
   const inner = [
     rect(x, y, w, h, part.cls ?? "card"),
-    part.step === undefined ? "" : badge(x + 23, y + 23, part.step),
+    part.step === undefined ? "" : badge(x + 20, y + 22, part.step),
     text(x + 12 + lines.indent, y + 28, lines.title, "title", "start", 18),
     lines.body.length === 0 ? "" : text(x + 12, bodyTop, lines.body),
     ...(part.extra === undefined ? [] : part.extra(x + 12, bodyTop + lines.body.length * 16 - (lines.body.length === 0 ? 10 : 4), w - 24)),
-    part.mark === undefined ? "" : mark(x + w - 12 - markSize - (part.href === undefined ? 0 : 14), y + 15, part.mark),
+    part.mark === undefined ? "" : mark(x + 12 + lines.indent + widthOf(lines.title[0] ?? "", 7.7, 8.2) + 6, y + 15, part.mark),
     part.href === undefined ? "" : path("M" + (x + w - 19) + "," + (y + 18) + " l5,5.5 l-5,5.5", "line-work")
   ].join("")
   const short = cardHeight(part, w) > h ? shortMark(part.title + " needs " + cardHeight(part, w).toString() + " and has " + h.toString()) : ""
