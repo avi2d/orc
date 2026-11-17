@@ -6,7 +6,7 @@ kind: explanation
 # The attention queue and the decider
 
 Everything that waits on someone is one item in one queue, so you have a single place to look.
-Each item names who must answer it, and a small model called the decider takes the routine ones off your hands.
+Each item names who must answer it, and a model called the decider takes the routine ones off your hands.
 
 ![The attention queue and the decider: who answers what](../diagrams/attention.svg)
 
