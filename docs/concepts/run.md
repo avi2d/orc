@@ -27,7 +27,7 @@ Orc watches Pi while it works.
 
 - It stops a Pi that has printed nothing for 45 minutes with no tool running.
 - When Pi fails one command 3 times in a row, orc tells you through the attention queue.
-- When Pi fails one command 6 times in a row, orc stops Pi and asks you whether to continue.
+- When Pi fails one command 6 times in a row, orc pauses the run and asks you whether to continue.
 - Pi can ask you a question mid-run with its `orc_ask` tool instead of guessing.
 
 ## When a run counts as done

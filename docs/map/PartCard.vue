@@ -60,9 +60,6 @@ defineEmits<{ toggle: [] }>()
 .part.is-group { border-style: solid; }
 .part.is-open[data-depth="1"] { background: color-mix(in srgb, var(--m-zone) 84%, var(--m-line)); }
 .part.is-open[data-depth="2"] { background: color-mix(in srgb, var(--m-zone) 68%, var(--m-line)); }
-.part.is-open[data-depth="3"],
-.part.is-open[data-depth="4"],
-.part.is-open[data-depth="5"] { background: color-mix(in srgb, var(--m-zone) 52%, var(--m-line)); }
 .part p,
 .part ul {
   margin: 0;
