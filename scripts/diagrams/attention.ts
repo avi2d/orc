@@ -3,9 +3,9 @@ import { arrow, bullets, card, svg, tall, text, zone, type Drawing, type Part } 
 const title = "The attention queue and the decider: who answers what"
 
 const desc =
-  "A question from a run and news for you both open an item in the attention queue. A question on a guarded topic goes straight to you. Any other question goes to the decider, a small model that may answer only by quoting a rule you wrote. When no rule settles it, the question goes to you. Your answer replaces the decider's, and the run carries on."
+  "A question from a run and news for you both open an item in the attention queue. A question on a guarded topic goes straight to you. Any other question goes to the decider, a model that answers routine questions from written instructions, or asks you. When it cannot answer, the question goes to you. Your answer replaces the decider's, and the run carries on."
 
-const question: Part = { title: "A question from a run", text: "The review raised it, or the agent asked it instead of guessing.", href: "checks" }
+const question: Part = { title: "A question from a run", text: "The worker, fixer, or review can ask. A worker question can block or leave the run working.", href: "checks" }
 const news: Part = { title: "News for you", ...bullets(["a run died", "a check went red", "a pull request is ready", "a hold is overdue", "a command keeps failing"]) }
 const queue: Part = { title: "The attention queue", text: "Everything that waits on someone, oldest first. `orc attention` lists it.", cls: "card-ask", mark: "attention" }
 const guarded: Part = {
@@ -13,8 +13,8 @@ const guarded: Part = {
   cls: "card-ask",
   ...bullets(["deleting, or anything that cannot be undone", "security, keys and logins", "merging, pushing, releasing", "spending", "a site's look, and legal text"])
 }
-const decider: Part = { title: "The decider", text: "A small model with no tools. It reads your rules, the project's instructions and the task.", cls: "card-ask" }
-const quote: Part = { title: "Can it quote a rule that settles it?", text: "It may answer only by quoting your rule, word for word.", cls: "card-ask" }
+const decider: Part = { title: "The decider", text: "A model answers routine questions from written instructions, or asks you.", cls: "card-ask" }
+const quote: Part = { title: "Can it answer?", text: "It can quote a rule, the task or its policy, reuse an earlier answer, or ask the worker for more detail.", cls: "card-ask" }
 const you: Part = { title: "You answer", text: "In the chat, in the app, or with `orc backlog answer`. Your answer replaces the decider's.", href: "chat" }
 const answered: Part = { title: "Answered", text: "The run carries on where it waited.", cls: "card-ok" }
 
@@ -23,12 +23,12 @@ const wide = (): Drawing => {
     zone(8, 8, 200, 480, "What opens an item"),
     zone(228, 8, 484, 480, "The machine that plans"),
     zone(732, 8, 220, 480, "You"),
-    card(18, 42, 180, 120, question),
+    card(18, 42, 180, 128, question),
     card(18, 212, 180, 172, news),
     card(240, 42, 216, 108, queue),
     card(240, 196, 216, 190, guarded),
     card(486, 42, 216, 124, decider),
-    card(486, 226, 216, 108, quote),
+    card(486, 226, 216, 110, quote),
     card(742, 42, 200, 84, answered),
     card(742, 226, 200, 140, you),
     arrow([[198, 90], [238, 90]], "ask"),

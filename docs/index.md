@@ -43,15 +43,15 @@ Each step below is one part of orc, and each has its own page.
    From then on the run belongs to that machine and outlives the beat and any SSH link.
    [The runner](concepts/runner.md) shows what the machine holds.
 1. **The run does the work.**
-   `orc run` makes a copy of the project on a new branch and starts the Pi agent in it.
-   Pi writes the change and commits it.
+   For a ship task, `orc run` makes a copy of the project on a new branch and starts the Pi agent in it.
+   Pi writes the change and commits it, while a scout or task run writes a report instead.
    [A run](concepts/run.md) follows it step by step.
 1. **The checks and the review judge it.**
    Orc runs the project's own checks, and Pi fixes what they refuse.
-   Then no-mistakes reviews the branch, pushes it, opens the pull request and waits for green CI.
+   The delivery mode then decides whether no-mistakes reviews the branch before orc opens the pull request.
    [Checks and review](concepts/checks-and-review.md) shows both gates.
 1. **You merge it.**
-   The task closes done with its pull request, and `orc merge <task-id>` lands it once every check is green.
+   For a ship task, the task closes done with its pull request, and `orc merge <task-id>` lands it once every check is green.
    [The merge](concepts/merge.md) lists what the merge refuses.
 
 Two more parts sit beside that path.
@@ -59,7 +59,7 @@ Two more parts sit beside that path.
 - **Attention and the chat.**
   A run that meets a question it cannot settle asks it.
   The question lands in the attention queue.
-  A small model called the decider answers a routine one from your written rules, and any other one waits for you.
+  A model called the decider answers a routine one from written instructions, and any other one waits for you.
   The chat posts each question that needs you and each task that closes.
   [The attention queue](concepts/attention.md) and [The chat](concepts/chat.md) show how.
 - **The App.**
@@ -87,14 +87,14 @@ Its state is files on disk and queues in pueue, so a restart picks up where it s
 | Word | What it means |
 | --- | --- |
 | Task | One piece of work in the backlog, with an id such as `orc-9` |
-| Run | One attempt at a task by `orc run`, with its own branch and its own record |
+| Run | One attempt at a task by `orc run`, with its own record, and its own branch for a ship task |
 | Beat | One pass of `orc beat`, which starts what can start and closes what finished |
 | Slot | One place for a running task on a machine, counted in `dispatch.json` |
 | Pi | The coding agent orc runs, and the only one |
 | no-mistakes | The review tool that takes a checked branch to a pull request with green CI |
 | pueue | The queue on each machine that holds the runs |
 | nono | The sandbox a run you start by hand works in by default |
-| Decider | The small model that answers a run's routine questions from your rules |
+| Decider | The model that answers a run's routine questions from written instructions |
 
 ## Related topics
 
