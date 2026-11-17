@@ -4,10 +4,10 @@
   --paint-surface: light-dark(#fffbf2, #211a14);
   --paint-surface-2: light-dark(#eee5d4, #2c231b);
   --paint-ink: light-dark(#221812, #f3e8d6);
-  --paint-muted: light-dark(#5b4a3c, #bca995);
+  --paint-muted: light-dark(#5b4a3c, #cbb8a2);
   --paint-edge: light-dark(#3a2a1f, #7a6655);
   --paint-line: light-dark(#d6c8b1, #43352a);
-  --paint-work: light-dark(#a3160f, #f0624a);
+  --paint-work: light-dark(#a3160f, #f7876f);
   --paint-ask: light-dark(#774d00, #e6ac3f);
   --paint-ok: light-dark(#2d6220, #9dc56e);
   --paint-on: light-dark(#fff8ec, #1a0b07);
@@ -90,20 +90,6 @@
   padding-top: 0;
   border-top: 0;
   line-height: 1.35;
-}
-
-.vp-doc h2::after {
-  content: "";
-  display: block;
-  width: 140px;
-  height: 7px;
-  margin-top: 8px;
-  background: var(--paint-work);
-  clip-path: polygon(0 40%, 30% 0, 70% 30%, 100% 5%, 97% 70%, 45% 100%, 2% 80%);
-}
-
-.vp-doc div[class*="language-"] {
-  border: 1px solid var(--paint-line);
 }
 
 .home-page .vp-doc > div > h1 {

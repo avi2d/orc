@@ -157,6 +157,7 @@ export default defineConfig({
   base,
   head: [
     ["link", { rel: "icon", type: "image/svg+xml", href: base + "favicon.svg" }],
+    ["link", { rel: "preload", as: "font", type: "font/woff2", href: base + "paper/fonts/alfa-slab-one-latin-400-normal.woff2", crossorigin: "" }],
     ["meta", { name: "theme-color", content: "#f6f0e4", media: "(prefers-color-scheme: light)" }],
     ["meta", { name: "theme-color", content: "#17120e", media: "(prefers-color-scheme: dark)" }]
   ],

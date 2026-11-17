@@ -1,6 +1,6 @@
 ---
 aside: false
-pageClass: wide-page
+pageClass: wide-page part-chat
 kind: explanation
 ---
 # The chat

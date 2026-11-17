@@ -28,6 +28,7 @@ const { isDark } = useData()
   --m-card: var(--paint-surface);
   --m-zone: var(--paint-surface-2);
   --m-page: var(--paint-bg);
+  --m-grain: var(--p-grain) 0 0 / 512px 512px;
   --m-under-label: color-mix(in srgb, var(--m-zone) 70%, var(--m-page));
   --m-work: var(--paint-work);
   --m-work-soft: var(--paint-work-soft);
@@ -39,11 +40,12 @@ const { isDark } = useData()
   inset: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  background: var(--m-page);
+  background: var(--m-page) var(--m-grain);
   color: var(--m-ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 .orc-map-bar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -52,12 +54,23 @@ const { isDark } = useData()
   border-bottom: 1px solid var(--m-line);
   background: var(--m-card);
 }
+.orc-map-bar::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: auto 0 -5px 0;
+  height: 9px;
+  background: var(--p-edge);
+  mask: var(--stroke-wavy) center / 100% 100% no-repeat;
+  pointer-events: none;
+}
 .orc-map-bar .map-title {
   flex: 1;
   min-width: 0;
   margin: 0;
+  font-family: var(--p-display);
   font-size: 15px;
-  font-weight: 650;
+  font-weight: 400;
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
