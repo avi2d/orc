@@ -219,26 +219,6 @@ html:not(.dark) .vp-doc .vp-code span {
   --d-ok-soft: var(--paint-ok-soft);
 }
 
-.vp-doc a.map-open {
-  border-radius: 0;
-  padding: 12px 34px;
-  background: var(--paint-work);
-  color: var(--paint-on);
-  mask: var(--stroke-flat) center / 100% 100% no-repeat;
-}
-
-.vp-doc a.map-open:hover {
-  background: var(--paint-work-strong);
-  color: var(--paint-on);
-}
-
-.vp-doc a.map-open:focus-visible {
-  background: var(--paint-work-strong);
-  color: var(--paint-on);
-  text-decoration: underline;
-  text-underline-offset: 0.22em;
-  outline: none;
-}
 .paper-marks {
   display: flex;
   flex-wrap: wrap;
