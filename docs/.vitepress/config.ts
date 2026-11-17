@@ -153,10 +153,11 @@ const repository = "https://github.com/avi2d/orc"
 
 export default defineConfig({
   title: "orc",
-  description: "How orc runs AI agent tasks across your machines, and how to use it",
+  description: "One chat to run your AI agent work on all your machines and models, with a backlog, live monitoring and Herdr App dashboards.",
   base,
   head: [
     ["link", { rel: "icon", type: "image/svg+xml", href: base + "favicon.svg" }],
+    ["link", { rel: "preload", as: "font", type: "font/woff2", href: base + "paper/fonts/alfa-slab-one-latin-400-normal.woff2", crossorigin: "" }],
     ["meta", { name: "theme-color", content: "#f6f0e4", media: "(prefers-color-scheme: light)" }],
     ["meta", { name: "theme-color", content: "#17120e", media: "(prefers-color-scheme: dark)" }]
   ],
