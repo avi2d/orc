@@ -11,7 +11,6 @@ import { merge } from "./diagrams/merge"
 import { quota } from "./diagrams/quota"
 import { run } from "./diagrams/run"
 import { runner } from "./diagrams/runner"
-import type { Mark } from "./diagrams/kit"
 import { top } from "./diagrams/top"
 
 class DiagramsError extends Data.TaggedError("DiagramsError")<{
@@ -19,10 +18,6 @@ class DiagramsError extends Data.TaggedError("DiagramsError")<{
 }> {}
 
 const folder = "docs/diagrams"
-
-const marksFolder = "docs/marks"
-
-const shapes = /^<svg[^>]*>([\s\S]*)<\/svg>\s*$/
 
 const program = Effect.gen(function*() {
   const fs = yield* FileSystem.FileSystem
@@ -32,14 +27,7 @@ const program = Effect.gen(function*() {
     return yield* new DiagramsError({ message: "a card is too short for its text:\n" + short.join("\n") })
   }
   const style = yield* fs.readFileString(folder + "/diagram.css")
-  const shapeOf = Effect.fn(function*(name: Mark) {
-    const file = marksFolder + "/" + name + ".svg"
-    const inner = shapes.exec(yield* fs.readFileString(file))?.[1]
-    if (inner === undefined) return yield* new DiagramsError({ message: file + " is not one svg element" })
-    return inner
-  })
-  const marks = yield* Effect.all({ running: shapeOf("running"), waiting: shapeOf("waiting"), done: shapeOf("done"), failed: shapeOf("failed"), attention: shapeOf("attention") })
-  yield* Effect.forEach(drawings, (drawing) => fs.writeFileString(folder + "/" + drawing.name + ".svg", drawing.markup(style, marks)))
+  yield* Effect.forEach(drawings, (drawing) => fs.writeFileString(folder + "/" + drawing.name + ".svg", drawing.markup(style)))
   yield* Console.log("docs-diagrams: wrote " + drawings.length.toString() + " drawings")
 }).pipe(Effect.provide(BunServices.layer))
 

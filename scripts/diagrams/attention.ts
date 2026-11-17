@@ -7,7 +7,7 @@ const desc =
 
 const question: Part = { title: "A question from a run", text: "The worker, fixer, or review can ask. A worker question can block or leave the run working.", href: "checks" }
 const news: Part = { title: "News for you", ...bullets(["a run died", "a check went red", "a pull request is ready", "a hold is overdue", "a command keeps failing"]) }
-const queue: Part = { title: "The attention queue", text: "Everything that waits on someone, oldest first. `orc attention` lists it.", cls: "card-ask", mark: "attention" }
+const queue: Part = { title: "The attention queue", text: "Everything that waits on someone, oldest first. `orc attention` lists it.", cls: "card-ask" }
 const guarded: Part = {
   title: "Is it on a guarded topic?",
   cls: "card-ask",
@@ -16,7 +16,7 @@ const guarded: Part = {
 const decider: Part = { title: "The decider", text: "A model answers routine questions from written instructions, or asks you.", cls: "card-ask" }
 const quote: Part = { title: "Can it answer?", text: "It can quote a rule, the task or its policy, reuse an earlier answer, or ask the worker for more detail.", cls: "card-ask" }
 const you: Part = { title: "You answer", text: "In the chat, in the app, or with `orc backlog answer`. Your answer replaces the decider's.", href: "chat" }
-const answered: Part = { title: "Answered", text: "The run carries on where it waited.", cls: "card-ok" }
+const answered: Part = { title: "Answered", text: "The run carries on where it waited." }
 
 const wide = (): Drawing => {
   const body = [
@@ -44,7 +44,7 @@ const wide = (): Drawing => {
     text(360, 420, "yes: it goes straight to you", "ask-text"),
     arrow([[108, 384], [108, 458], [876, 458], [876, 368]], "ask"),
     text(120, 452, "it waits for you", "ask-text"),
-    arrow([[842, 226], [842, 128]], "work")
+    arrow([[842, 226], [842, 128]], "ask")
   ]
   return svg("attention", 960, 496, title, desc, body)
 }
@@ -57,6 +57,6 @@ export const attention = (): readonly Drawing[] => [
       label: "The machine that plans",
       rows: [queue, { arrow: "ask" }, guarded, { note: "Yes: it goes straight to you." }, { arrow: "ask", note: "no" }, decider, { arrow: "ask" }, quote, { note: "Yes: answered. No: it goes to you." }]
     },
-    { label: "You", rows: [you, { arrow: "work" }, answered] }
+    { label: "You", rows: [you, { arrow: "ask" }, answered] }
   ])
 ]

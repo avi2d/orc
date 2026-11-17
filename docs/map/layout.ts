@@ -70,7 +70,7 @@ const ranked = (members: readonly string[], wires: readonly Wire[], boxes: Reado
   for (const [id, centre] of centres) graph.setNode(id, centre)
   wires.forEach((wire, index) => {
     const label = wire.link?.label === undefined ? { width: 0, height: 0 } : measures.labelSize(wire.link.label)
-    graph.setEdge(wire.from, wire.to, { ...label, labelpos: "c", weight: wire.link?.tone === "ask" ? 1 : 4 }, index.toString())
+    graph.setEdge(wire.from, wire.to, { ...label, labelpos: "c", weight: wire.link === undefined || wire.link.tone === "work" ? 4 : 1 }, index.toString())
   })
   rank(graph, { constraints: members.slice(1).map((right, index) => ({ left: members[index] ?? right, right })) })
   const parts = members.flatMap((id) => {
@@ -112,9 +112,7 @@ const lineUp = (boxes: readonly Box[], gap: number, down: boolean): Box => {
   }
 }
 
-const markWidth = 20
-
-const titleWidth = (part: MapPart): number => 32 + part.title.length * (part.mono === true ? 9 : 8) + (part.mark === undefined ? 0 : markWidth)
+const titleWidth = (part: MapPart): number => 32 + part.title.length * (part.mono === true ? 9 : 8)
 
 const middle = (rect: Rect): Point => ({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 })
 

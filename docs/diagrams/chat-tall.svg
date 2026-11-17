@@ -10,10 +10,10 @@
   --d-card: light-dark(#fffbf2, #211a14);
   --d-zone: light-dark(#eee5d4, #2c231b);
   --d-work: light-dark(#a3160f, #f0624a);
-  --d-work-soft: light-dark(#f7e6de, #342019);
   --d-on-work: light-dark(#fff8ec, #1a0b07);
   --d-ask: light-dark(#774d00, #e6ac3f);
-  --d-ask-soft: light-dark(#ede4d3, #3b2d1a);
+  --d-ask-soft: light-dark(#fbe7ae, #4d3b12);
+  --d-end-soft: light-dark(#d9d5cf, #45403b);
   --d-ok: light-dark(#2d6220, #9dc56e);
   --d-ok-soft: light-dark(#e6e9d9, #302f1f);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -28,21 +28,19 @@
 .orc-d .ok-text { fill: var(--d-ok); font-weight: 600; }
 .orc-d .zone { fill: var(--d-zone); stroke: var(--d-line); }
 .orc-d .card { fill: var(--d-card); stroke: var(--d-edge); stroke-width: 1.5; }
-.orc-d .card-work { fill: var(--d-work-soft); stroke: var(--d-work); stroke-width: 1.5; }
 .orc-d .card-ask { fill: var(--d-ask-soft); stroke: var(--d-ask); stroke-width: 1.5; }
 .orc-d .card-ok { fill: var(--d-ok-soft); stroke: var(--d-ok); stroke-width: 1.5; }
-.orc-d .mark-running, .orc-d .mark-failed { color: var(--d-work); }
-.orc-d .mark-waiting { color: var(--d-mute); }
-.orc-d .mark-done { color: var(--d-ok); }
-.orc-d .mark-attention { color: var(--d-ask); }
-.orc-d .line { fill: none; stroke: var(--d-mute); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .card-end { fill: var(--d-end-soft); stroke: var(--d-mute); stroke-width: 1.5; }
+.orc-d .line-aside { fill: none; stroke: var(--d-mute); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .chevron { fill: none; stroke: var(--d-mute); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.orc-d .bar { fill: none; stroke: var(--d-mute); stroke-width: 3; stroke-linecap: round; }
 .orc-d .line-work { fill: none; stroke: var(--d-work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .line-ask { fill: none; stroke: var(--d-ask); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; }
 .orc-d .line-ok { fill: none; stroke: var(--d-ok); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .orc-d .faint { fill: none; stroke: var(--d-line); stroke-width: 3; stroke-linecap: round; }
 .orc-d .head-work { fill: var(--d-work); }
 .orc-d .head-ask { fill: var(--d-ask); }
-.orc-d .head-mute { fill: var(--d-mute); }
+.orc-d .head-aside { fill: var(--d-mute); }
 .orc-d .dot-work { fill: var(--d-work); }
 .orc-d .dot-ask { fill: var(--d-ask); }
 .orc-d .dot-ok { fill: var(--d-ok); }
@@ -56,15 +54,15 @@
 <rect x="16" y="36" width="328" height="104" rx="10" class="card"/><text x="28" y="64" class="title" text-anchor="start"><tspan x="28" dy="0">You say</tspan></text><circle cx="31" cy="82" r="2" class="dot-mute-strong"/><text x="40" y="86" class="" text-anchor="start"><tspan x="40" dy="0">the work, in plain words</tspan></text><circle cx="31" cy="100" r="2" class="dot-mute-strong"/><text x="40" y="104" class="" text-anchor="start"><tspan x="40" dy="0">an answer to a question</tspan></text><circle cx="31" cy="118" r="2" class="dot-mute-strong"/><text x="40" y="122" class="" text-anchor="start"><tspan x="40" dy="0">to merge a pull request</tspan></text>
 <path d="M180,155 L180,173" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,173) rotate(90)"/>
 <rect x="4" y="176" width="352" height="224" rx="14" class="zone"/><text x="16" y="197" class="label" text-anchor="start"><tspan x="16" dy="0"><tspan class="code">orc chat</tspan></tspan></text>
-<rect x="16" y="208" width="328" height="78" rx="10" class="card-work"/><text x="28" y="236" class="title" text-anchor="start"><tspan x="28" dy="0">The orchestrator model</tspan></text><text x="28" y="254" class="" text-anchor="start"><tspan x="28" dy="0">A Pi session with eight tools and no others. It</tspan><tspan x="28" dy="16">can change the backlog and nothing else.</tspan></text>
-<g data-part="attention"><rect x="16" y="294" width="328" height="94" rx="10" class="card"/><text x="28" y="322" class="title" text-anchor="start"><tspan x="28" dy="0">Your rules</tspan></text><text x="28" y="340" class="" text-anchor="start"><tspan x="28" dy="0"><tspan class="code">~/.orc/orchestrator.md</tspan>, and each project's</tspan><tspan x="28" dy="16">instructions file. The decider reads the same</tspan><tspan x="28" dy="16">files.</tspan></text><path d="M325,312 l5,5.5 l-5,5.5" class="line-work"/></g>
+<rect x="16" y="208" width="328" height="78" rx="10" class="card"/><text x="28" y="236" class="title" text-anchor="start"><tspan x="28" dy="0">The orchestrator model</tspan></text><text x="28" y="254" class="" text-anchor="start"><tspan x="28" dy="0">A Pi session with eight tools and no others. It</tspan><tspan x="28" dy="16">can change the backlog and nothing else.</tspan></text>
+<g data-part="attention"><rect x="16" y="294" width="328" height="94" rx="10" class="card"/><text x="28" y="322" class="title" text-anchor="start"><tspan x="28" dy="0">Your rules</tspan></text><text x="28" y="340" class="" text-anchor="start"><tspan x="28" dy="0"><tspan class="code">~/.orc/orchestrator.md</tspan>, and each project's</tspan><tspan x="28" dy="16">instructions file. The decider reads the same</tspan><tspan x="28" dy="16">files.</tspan></text><path d="M325,312 l5,5.5 l-5,5.5" class="chevron"/></g>
 <path d="M180,403 L180,421" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,421) rotate(90)"/>
 <rect x="4" y="424" width="352" height="520" rx="14" class="zone"/><text x="16" y="445" class="label" text-anchor="start"><tspan x="16" dy="0">Eight tools, each one an <tspan class="code">orc</tspan> command</tspan></text>
 <rect x="16" y="456" width="328" height="138" rx="10" class="card"/><text x="28" y="484" class="title" text-anchor="start"><tspan x="28" dy="0">Shape the backlog</tspan></text><circle cx="31" cy="502" r="2" class="dot-mute-strong"/><text x="40" y="506" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">orc_backlog_add</tspan>: adds a task</tspan></text><circle cx="31" cy="520" r="2" class="dot-mute-strong"/><text x="40" y="524" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">orc_backlog_edit</tspan>: replaces its title and</tspan><tspan x="40" dy="16">body</tspan></text><circle cx="31" cy="554" r="2" class="dot-mute-strong"/><text x="40" y="558" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">orc_backlog_priority</tspan>: sets its priority</tspan></text><circle cx="31" cy="572" r="2" class="dot-mute-strong"/><text x="40" y="576" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">orc_backlog_hold</tspan>: holds it for your decision</tspan></text>
 <rect x="16" y="602" width="328" height="152" rx="10" class="card"/><text x="28" y="630" class="title" text-anchor="start"><tspan x="28" dy="0">Read and answer</tspan></text><circle cx="31" cy="648" r="2" class="dot-mute-strong"/><text x="40" y="652" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">orc_backlog</tspan>: reads every project, machine</tspan><tspan x="40" dy="16">and task</tspan></text><circle cx="31" cy="682" r="2" class="dot-mute-strong"/><text x="40" y="686" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">orc_backlog_answer</tspan>: answers a held or parked</tspan><tspan x="40" dy="16">task, a decision, or a run at its gate</tspan></text><circle cx="31" cy="716" r="2" class="dot-mute-strong"/><text x="40" y="720" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">orc_decision_board</tspan>: opens a page with one</tspan><tspan x="40" dy="16">card per open question</tspan></text>
-<g data-part="merge"><rect x="16" y="762" width="328" height="68" rx="10" class="card"/><text x="28" y="790" class="title" text-anchor="start"><tspan x="28" dy="0">Merge</tspan></text><circle cx="31" cy="808" r="2" class="dot-mute-strong"/><text x="40" y="812" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">merge_task</tspan>: runs <tspan class="code">orc merge</tspan></tspan></text><path d="M325,780 l5,5.5 l-5,5.5" class="line-work"/></g>
+<g data-part="merge"><rect x="16" y="762" width="328" height="68" rx="10" class="card"/><text x="28" y="790" class="title" text-anchor="start"><tspan x="28" dy="0">Merge</tspan></text><circle cx="31" cy="808" r="2" class="dot-mute-strong"/><text x="40" y="812" class="" text-anchor="start"><tspan x="40" dy="0"><tspan class="code">merge_task</tspan>: runs <tspan class="code">orc merge</tspan></tspan></text><path d="M325,780 l5,5.5 l-5,5.5" class="chevron"/></g>
 <path d="M180,832 L180,852" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,852) rotate(90)"/>
-<g data-part="backlog"><rect x="16" y="854" width="328" height="78" rx="10" class="card"/><text x="28" y="882" class="title" text-anchor="start"><tspan x="28" dy="0">The backlog</tspan></text><text x="28" y="900" class="" text-anchor="start"><tspan x="28" dy="0">The chat starts nothing. The beat starts a task</tspan><tspan x="28" dy="16">once it has a priority.</tspan></text><path d="M325,872 l5,5.5 l-5,5.5" class="line-work"/></g>
+<g data-part="backlog"><rect x="16" y="854" width="328" height="78" rx="10" class="card"/><text x="28" y="882" class="title" text-anchor="start"><tspan x="28" dy="0">The backlog</tspan></text><text x="28" y="900" class="" text-anchor="start"><tspan x="28" dy="0">The chat starts nothing. The beat starts a task</tspan><tspan x="28" dy="16">once it has a priority.</tspan></text><path d="M325,872 l5,5.5 l-5,5.5" class="chevron"/></g>
 <path d="M180,947 L180,965" class="line-work"/><path d="M0,0 L-9,-4.5 L-9,4.5 z" class="head-work" transform="translate(180,965) rotate(90)"/>
 <rect x="4" y="968" width="352" height="320" rx="14" class="zone"/><text x="16" y="989" class="label" text-anchor="start"><tspan x="16" dy="0">Back to you</tspan></text>
 <rect x="16" y="1000" width="328" height="190" rx="10" class="card"/><text x="28" y="1028" class="title" text-anchor="start"><tspan x="28" dy="0">It posts what changed</tspan></text><text x="28" y="1046" class="" text-anchor="start"><tspan x="28" dy="0">It reads <tspan class="code">orc backlog --json</tspan> every 15 seconds.</tspan></text><circle cx="31" cy="1068" r="2" class="dot-mute-strong"/><text x="40" y="1072" class="" text-anchor="start"><tspan x="40" dy="0">each task that closed, with its outcome and</tspan><tspan x="40" dy="16">its pull request or report</tspan></text><circle cx="31" cy="1102" r="2" class="dot-mute-strong"/><text x="40" y="1106" class="" text-anchor="start"><tspan x="40" dy="0">each held task and each parked question that</tspan><tspan x="40" dy="16">waits on you</tspan></text><circle cx="31" cy="1136" r="2" class="dot-mute-strong"/><text x="40" y="1140" class="" text-anchor="start"><tspan x="40" dy="0">a stalled run, and a pull request that turned</tspan><tspan x="40" dy="16">green, merged or closed</tspan></text><circle cx="31" cy="1170" r="2" class="dot-mute-strong"/><text x="40" y="1174" class="" text-anchor="start"><tspan x="40" dy="0">each alert from the dashboard</tspan></text>

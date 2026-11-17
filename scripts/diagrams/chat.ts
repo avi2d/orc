@@ -7,7 +7,7 @@ const desc =
 
 const say: Part = { title: "You say", ...bullets(["the work, in plain words", "an answer to a question", "to merge a pull request"]) }
 const read: Part = { title: "You read", text: "Each change, posted as it happens." }
-const model: Part = { title: "The orchestrator model", text: "A Pi session with eight tools and no others. It can change the backlog and nothing else.", cls: "card-work" }
+const model: Part = { title: "The orchestrator model", text: "A Pi session with eight tools and no others. It can change the backlog and nothing else." }
 const rules: Part = { title: "Your rules", text: "`~/.orc/orchestrator.md`, and each project's instructions file. The decider reads the same files.", href: "attention" }
 const posts: Part = {
   title: "It posts what changed",

@@ -45,7 +45,7 @@ const wide = (): Drawing => {
     card(668, 388, 274, 94, resume),
     arrow([[168, 90], [206, 90]], "work"),
     arrow([[575, 228], [575, 284]], "ask"),
-    arrow([[875, 228], [875, 284]], "mute")
+    arrow([[875, 228], [875, 284]], "aside")
   ]
   return svg("run", 960, 498, title, desc, body)
 }

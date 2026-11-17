@@ -1,9 +1,5 @@
-export type Tone = "work" | "ask" | "mute"
+export type Tone = "work" | "aside" | "ask"
 export type Point = readonly [number, number]
-
-const markNames = ["running", "waiting", "done", "failed", "attention"] as const
-export type Mark = (typeof markNames)[number]
-type MarkShapes = Readonly<Record<Mark, string>>
 
 export interface Part {
   readonly title: string
@@ -11,7 +7,6 @@ export interface Part {
   readonly cls?: string
   readonly href?: string
   readonly step?: string
-  readonly mark?: Mark
   readonly extra?: (x: number, y: number, w: number) => readonly string[]
   readonly extraHeight?: (w: number) => number
 }
@@ -26,7 +21,7 @@ export interface Zone {
 export interface Drawing {
   readonly name: string
   readonly shortCards: readonly string[]
-  readonly markup: (style: string, marks: MarkShapes) => string
+  readonly markup: (style: string) => string
 }
 
 const esc = (value: string): string => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;")
@@ -89,7 +84,7 @@ export const arrow = (points: readonly Point[], tone: Tone = "work", both = fals
   const last = points.at(-1) ?? first
   const before = points.at(-2) ?? first
   const d = points.map(([x, y], index) => (index === 0 ? "M" : "L") + x + "," + y).join(" ")
-  return path(d, tone === "mute" ? "line" : "line-" + tone) + head(last, before, tone) + (both ? head(first, second, tone) : "")
+  return path(d, "line-" + tone) + head(last, before, tone) + (both ? head(first, second, tone) : "")
 }
 
 export const zone = (x: number, y: number, w: number, h: number, label: string): string => rect(x, y, w, h, "zone", 14) + text(x + 12, y + 21, label, "label")
@@ -97,20 +92,9 @@ export const zone = (x: number, y: number, w: number, h: number, label: string):
 export const chip = (x: number, y: number, w: number, label: string, cls = "card", h = 26): string =>
   rect(x, y, w, h, cls, 6) + text(x + w / 2, y + h / 2 + 4.5, label, "", "middle")
 
-const markSize = 16
-
-const markSlot = (name: Mark): string => "<!--mark " + name + "-->"
-
-const markSlots = /<!--mark (\w+)-->/g
-
-const isMark = (name: string | undefined): name is Mark => markNames.some((known) => known === name)
-
-const mark = (x: number, y: number, name: Mark): string =>
-  '<svg x="' + x + '" y="' + y + '" width="' + markSize + '" height="' + markSize + '" viewBox="0 0 24 24" fill="currentColor" class="mark mark-' + name + '" aria-hidden="true">' + markSlot(name) + "</svg>"
-
 const cardLines = (part: Part, w: number): { title: string[]; body: string[]; indent: number } => {
   const indent = part.step === undefined ? 0 : 22
-  const room = w - 24 - (part.href === undefined ? 0 : 14) - (part.mark === undefined ? 0 : markSize + 6)
+  const room = w - 24 - (part.href === undefined ? 0 : 14)
   return { title: wrapTitle(part.title, room - indent), body: part.text === undefined ? [] : wrapText(part.text, w - 24), indent }
 }
 
@@ -132,8 +116,7 @@ export const card = (x: number, y: number, w: number, h: number, part: Part): st
     text(x + 12 + lines.indent, y + 28, lines.title, "title", "start", 18),
     lines.body.length === 0 ? "" : text(x + 12, bodyTop, lines.body),
     ...(part.extra === undefined ? [] : part.extra(x + 12, bodyTop + lines.body.length * 16 - (lines.body.length === 0 ? 10 : 4), w - 24)),
-    part.mark === undefined ? "" : mark(x + 12 + lines.indent + widthOf(lines.title[0] ?? "", 7.7, 8.2) + 6, y + 15, part.mark),
-    part.href === undefined ? "" : path("M" + (x + w - 19) + "," + (y + 18) + " l5,5.5 l-5,5.5", "line-work")
+    part.href === undefined ? "" : path("M" + (x + w - 19) + "," + (y + 18) + " l5,5.5 l-5,5.5", "chevron")
   ].join("")
   const short = cardHeight(part, w) > h ? shortMark(part.title + " needs " + cardHeight(part, w).toString() + " and has " + h.toString()) : ""
   return short + (part.href === undefined ? inner : '<g data-part="' + part.href + '">' + inner + "</g>")
@@ -145,8 +128,7 @@ export const svg = (name: string, w: number, h: number, title: string, desc: str
   return {
     name,
     shortCards: body.flatMap((piece) => [...piece.matchAll(shortMarks)].map((found) => found[1])),
-    markup: (style, marks) =>
-      [...opening, "<style>" + style + "</style>", ...body.map((piece) => piece.replaceAll(shortMarks, "").replaceAll(markSlots, (slot, slotName?: string) => (isMark(slotName) ? marks[slotName] : slot))), "</svg>", ""].join("\n")
+    markup: (style) => [...opening, "<style>" + style + "</style>", ...body.map((piece) => piece.replaceAll(shortMarks, "")), "</svg>", ""].join("\n")
   }
 }
 
@@ -171,7 +153,7 @@ export const tall = (name: string, title: string, desc: string, zones: readonly 
         y += 22
       } else {
         const lines = wrapText(row.note, 320)
-        inner.push(text(20, y + 10, lines, "ask-text"))
+        inner.push(text(20, y + 10, lines, "label"))
         y += lines.length * 16 + 8
       }
     }
