@@ -80,7 +80,7 @@ To hand orc a stream of work:
 Once a task closes, the chat posts it with its outcome and its reason.
 The post carries the PR, or the report for a scout or task.
 The chat also posts each alert once.
-It posts an event when a task's run stalls, and when a closed task's PR turns green, merges or closes without merging.
+It posts an event when a task's run stalls, when a closed task's PR turns green, merges or closes without merging, and when a worker split proposal lands.
 [The backlog and the beat](docs/run/backlog-and-beat.md) shows both files and every option.
 
 ## Open the dashboard
