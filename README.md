@@ -8,10 +8,6 @@ One chat to run your AI agent work on all your machines and models, with a backl
 
 </div>
 
-Use one chat to describe work and keep it in a backlog.
-Orc runs tasks across your machines with the models you configure.
-You can monitor tasks, runs and resources live in the terminal dashboard or the Herdr App dashboards.
-
 <div align="center">
 
 <img src="docs/images/orc-hero-640.webp" alt="An orc arranging task tiles at a desk" width="360">
