@@ -1,25 +1,27 @@
-# orc
+# <picture><source media="(prefers-color-scheme: dark)" srcset="docs/public/orc-logo-dark.svg"><img src="docs/public/orc-logo-light.svg" alt="orc" width="200"></picture>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/public/orc-logo-dark.svg">
-  <img src="docs/public/orc-logo-light.svg" alt="orc logo" width="200">
-</picture>
+<div align="center">
 
-Use one chat to describe work and keep it in a backlog.
-Orc runs tasks across your machines with the models you configure.
-You can monitor tasks, runs and resources live in the terminal dashboard or the Herdr App dashboards.
+One chat to run your AI agent work on all your machines and models, with a backlog, live monitoring and Herdr App dashboards.
 
-[Read the orc docs](https://avi2d.github.io/orc/).
+[Docs](https://avi2d.github.io/orc/) • [Install](#install) • [Run your first task](#run-your-first-task)
 
-![An orc arranging task tiles at a desk](docs/images/orc-hero-640.webp)
+</div>
+
+<div align="center">
+
+<img src="docs/images/orc-hero-640.webp" alt="An orc arranging task tiles at a desk" width="360">
+
+</div>
 
 ## Before you begin
 
 - Bun, at the version `.bun-version` pins.
 - Git 2.48 or later.
 - Node, which the agent runs on.
+- nono from https://nono.sh, for the default sandbox.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, logged in to a model provider.
-- no-mistakes, installed as [Installing no-mistakes](docs/run/installing-no-mistakes.md) says, for every run except `direct-PR`.
+- no-mistakes v1.90.0 or later, installed as [Installing no-mistakes](docs/run/installing-no-mistakes.md) says, for every run except `direct-PR`.
 - pueue, to queue runs on each machine, with its daemon started by `pueued -d`.
 
 ## Install
@@ -39,7 +41,7 @@ To run one task in a project:
 
 1. Save `~/.orc/config.json` with the provider and models orc may run.
 1. In the project, commit a `.no-mistakes.yaml` that names its checks.
-1. Write the task in Markdown outside the project, such as `~/task.md`.
+1. Write the task in Markdown outside the project, such as `~/task.md`, with a `#` title line and what you want done.
 1. In a clean checkout of the project, run `orc run ~/task.md --sandbox none`.
 
 ```json
@@ -68,9 +70,10 @@ To hand orc a stream of work:
 1. Run `orc beat` from cron or launchd every few minutes.
 1. Run `orc backlog` to see each task new, taken or closed.
 
-Once a task the chat added closes, the chat posts it with its outcome and its reason.
+Once a task closes, the chat posts it with its outcome and its reason.
 The post carries the PR, or the report for a scout or task.
-The chat also posts each alert once, and when any task's PR turns green, merges, closes or its run stalls.
+The chat also posts each alert once.
+It posts an event when a task's run stalls, when a closed task's PR turns green, merges or closes without merging, and when a worker split proposal lands.
 [The backlog and the beat](docs/run/backlog-and-beat.md) shows both files and every option.
 
 ## Open the dashboard
@@ -85,10 +88,10 @@ To open the dashboard, run `bun run dashboard` from the repository root.
 | `packages/run` | The orc command |
 | `packages/cli` | The `orc-dash` command, which composes the panels into the dashboard |
 | `packages/dashboard` | The dashboard host, which lays out the panels it is given |
-| `packages/schema`, `packages/ui` | The dashboard's shared decoders, view models, theme and screen runner |
-| `packages/alerts`, `packages/attention`, `packages/dispatch`, `packages/ledger`, `packages/queues`, `packages/quota`, `packages/resources`, `packages/schedules`, `packages/session-quota`, `packages/tasks` | One dashboard panel each |
+| `packages/schema`, `packages/ui` | The dashboard's shared decoders and view models, and its OpenTUI theme and layout helpers |
+| `packages/alerts`, `packages/attention`, `packages/dispatch`, `packages/ledger`, `packages/queues`, `packages/quota`, `packages/resources`, `packages/schedules`, `packages/session-quota`, `packages/tasks` | One panel, box or tool of the dashboard each |
 | `packages/herdr-app` | The Herdr App mods and layout, which `orc app install` copies into the App |
-| `dependency-cruiser.config.ts` | The panel border the lint holds every import to |
+| `dependency-cruiser.config.ts` | The import rules the lint enforces between packages |
 | `docs/adr` | The decision records |
 
 ## Related topics
