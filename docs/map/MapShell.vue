@@ -60,7 +60,7 @@ const { isDark } = useData()
   z-index: 1;
   inset: auto 0 -5px 0;
   height: 9px;
-  background: var(--p-edge);
+  background: var(--paint-edge);
   mask: var(--stroke-wavy) center / 100% 100% no-repeat;
   pointer-events: none;
 }
@@ -68,7 +68,7 @@ const { isDark } = useData()
   flex: 1;
   min-width: 0;
   margin: 0;
-  font-family: var(--p-display);
+  font-family: var(--paint-display);
   font-size: 15px;
   font-weight: 400;
   line-height: 1.2;

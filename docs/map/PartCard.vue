@@ -95,7 +95,7 @@ defineEmits<{ toggle: [] }>()
 .part-mark.mark-done { color: var(--m-ok); }
 .part-mark.mark-attention { color: var(--m-ask); }
 .part-title.mono {
-  font-family: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--vp-font-family-mono);
   font-size: 13px;
 }
 .part-fold {
