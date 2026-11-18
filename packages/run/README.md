@@ -1,5 +1,5 @@
 # orc
-Orc keeps a backlog of agent tasks and starts each on a machine with room.
+One chat to run your AI agent work on all your machines and models, with a backlog, live monitoring and Herdr App dashboards.
 You say a task in `orc chat` to Pi on the orchestrator model, or add one with `orc backlog add`.
 Each `orc beat` starts the tasks that can start, and `orc runner start` queues each run in pueue on its machine.
 The beat later closes the task done, failed or stopped, with the PR link when its run opened one.

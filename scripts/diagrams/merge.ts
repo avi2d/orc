@@ -39,7 +39,7 @@ const wide = (): Drawing => {
     ...conditions.map((_, index) => arrow([[360 + index * 148, 96], [374 + index * 148, 96]], "work")),
     card(820, 42, 122, 130, merged),
     card(228, 218, 576, 66, refused),
-    ...conditions.flatMap((_, index) => [arrow([[294 + index * 148, 172], [294 + index * 148, 216]], "ask"), text(302 + index * 148, 198, "no", "ask-text")]),
+    ...conditions.flatMap((_, index) => [arrow([[294 + index * 148, 172], [294 + index * 148, 216]], "aside"), text(302 + index * 148, 198, "no")]),
     ...word.map((item, index) => card(18 + index * 234, 348, 222, 130, item))
   ]
   return svg("merge", 960, 496, title, desc, body)

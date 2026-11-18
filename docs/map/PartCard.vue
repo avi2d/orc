@@ -2,12 +2,12 @@
 import { withBase } from "vitepress"
 import type { MapPart } from "./orc-map"
 
-defineProps<{ part: MapPart; folds: boolean; open: boolean }>()
+defineProps<{ part: MapPart; folds: boolean; open: boolean; depth?: number }>()
 defineEmits<{ toggle: [] }>()
 </script>
 
 <template>
-  <div class="part" :class="['tone-' + (part.tone ?? 'plain'), { 'is-open': open, 'is-group': part.inside === undefined }]">
+  <div class="part" :class="['tone-' + (part.tone ?? 'plain'), { 'is-open': open, 'is-group': part.inside === undefined }]" :data-depth="depth ?? 0">
     <button v-if="folds" type="button" class="part-fold nodrag nopan" :aria-expanded="open" @click.stop="$emit('toggle')">
       <span class="part-chevron" aria-hidden="true" />
       <span class="part-title" :class="{ mono: part.mono }">{{ part.title }}</span>
@@ -38,15 +38,20 @@ defineEmits<{ toggle: [] }>()
   line-height: 1.4;
   text-align: left;
 }
-.part.tone-work { border-color: var(--m-work); background: var(--m-work-soft); }
 .part.tone-ask { border-color: var(--m-ask); background: var(--m-ask-soft); }
 .part.tone-ok { border-color: var(--m-ok); background: var(--m-ok-soft); }
+.part.tone-end { border-color: var(--m-mute); background: var(--m-end-soft); }
+.part.tone-ask,
+.part.tone-ok {
+  color: var(--m-ink);
+}
 .part.is-open,
 .part.is-group {
-  background: color-mix(in srgb, var(--m-zone) 70%, transparent);
-  border-style: dashed;
+  background: var(--m-zone);
+  border-color: var(--m-area-edge);
 }
-.part.is-group { border-style: solid; }
+.part.is-open[data-depth="1"] { background: color-mix(in srgb, var(--m-zone) 84%, var(--m-line)); }
+.part.is-open[data-depth="2"] { background: color-mix(in srgb, var(--m-zone) 68%, var(--m-line)); }
 .part p,
 .part ul {
   margin: 0;
@@ -58,7 +63,7 @@ defineEmits<{ toggle: [] }>()
   line-height: 1.3;
 }
 .part-title.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--vp-font-family-mono);
   font-size: 13px;
 }
 .part-fold {
@@ -89,7 +94,7 @@ defineEmits<{ toggle: [] }>()
 }
 .part:has(> .part-fold:focus-visible),
 .part-page:focus-visible {
-  outline: 2px solid var(--m-work);
+  outline: 2px solid var(--m-ink);
   outline-offset: 2px;
 }
 .part-chevron {
@@ -116,7 +121,7 @@ defineEmits<{ toggle: [] }>()
   position: absolute;
   top: 10px;
   right: 12px;
-  color: var(--m-work);
+  color: var(--m-ink);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 2px;

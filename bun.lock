@@ -492,6 +492,8 @@
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.21.5", "", { "os": "win32", "cpu": "x64" }, "sha512-tQd/1efJuzPC6rCFwEvLtci/xNFcTZknmXs98FYDfGE4wP9ClFV98nyKrzJKVPMhdDnjzLhdUyMX4PsQAPjwIw=="],
 
+
+
     "@hughescr/stryker-bun-runner": ["@hughescr/stryker-bun-runner@1.4.0", "", { "dependencies": { "@stryker-mutator/api": "^9.0.0 || ^10.0.0", "smol-toml": "1.7.0", "tinyglobby": "0.2.17", "ws": "8.21.0" }, "peerDependencies": { "@stryker-mutator/core": "^9.0.0 || ^10.0.0" } }, "sha512-yQmjwGgq21RcV/Ip1cvUjZNPp1qlmQkyQNqahZxL4CIb+SIxne6toOWng7JmSDei71wiggYrtQoKFHjCuwzNew=="],
 
     "@iconify-json/simple-icons": ["@iconify-json/simple-icons@1.2.102", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-IwbAj1ZI6LBy+qU7sVYxB1wgbSSIDKjY9I0BnnpjfIdlqfXoYnBb80UvYA0WkodUFWfQyL4AjaKMg48fqX8sIw=="],
