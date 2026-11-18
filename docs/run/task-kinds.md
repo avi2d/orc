@@ -10,6 +10,9 @@ Orc refuses any other kind, from `orc backlog add --kind` or in a task file, wit
 A `ship` task runs as [Running a task](running-a-task.md) shows and ends in a PR.
 A `scout` reads the checkout and changes nothing, and a `task` does what it asks and puts its evidence in the report.
 The runner queues a scout or task as `orc run <task-file> --kind <scout|task> --sandbox none`.
+
+## Run a report task
+
 To run one directly, enter a clean checkout of the target project and run the same command.
 That run skips no-mistakes and the PR and creates no branch.
 It starts Pi on the host in `~/.orc/runs/<run-id>`, tells it where the task and the checkout are, and asks it to write `agent-report.md` there.
@@ -67,6 +70,8 @@ Orc refuses a parent given a parent and a child that waits on a task already wai
 Until every scout and task child closes done and every ship child with a PR merges, each beat prints `waits <task-id>: waits on its children, <done> of <total> done`, or `waits for its first child` while it has none.
 A failed child keeps its parent waiting.
 `orc backlog` shows the count on the parent's line, as in `orc-1 parent orc 3 of 5 done Ship the whole feature`.
+
+### Run the final check
 
 When every scout and task child closed done and every ship child with a PR merged, the beat starts the parent's final check once, and only when the parent has a priority.
 The runner queues it as `orc run <task-file> --branch orc/<task-id>-parent --kind parent --sandbox none`, which reviews no code and changes nothing in the checkout.

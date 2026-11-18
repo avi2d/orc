@@ -2,59 +2,41 @@
 kind: reference
 ---
 # The attention queue
-Everything that waits on someone is one item in one queue, kept beside the backlog in `~/.orc/backlog/attention`.
-Each item is one JSON file with its `kind`, its `task`, its `text`, the time it was `asked`, its `owner` and its `state`.
-The owner names who must answer it, `decider` or `user`.
-The state starts as `open`.
-An answer makes it `closed`, and a closed item keeps the answer words and time.
-A review question, a worker question or an overdue wait turns `withdrawn` with its reason and time when its task closes or when it is no longer asked.
-A review question, a worker question or an overdue wait that a beat reads as still asked opens again, with its current text, and a question keeps the owner and decision it had.
-An answer to that item closes it with the answer words and time.
-Showing an item never closes it.
-An open item is overdue once more than 5 minutes have passed since it was asked.
 
-A review question a run asks is an item of kind `review-question`, owned by the decider.
-A question Pi asks mid-run with `orc_ask` is an item of kind `worker-question`, owned by the decider, as [A worker question](parked-runs.md#a-worker-question) shows.
-Its item carries the question's `options` when Pi gave any, each with its `text` and an optional `picture`.
-The `looping` question a run asks when Pi fails one command 6 times in a row is owned by you, as [A looping run](parked-runs.md#a-looping-run) shows.
-A running run whose Pi has failed one command 3 times in a row opens an item of kind `failing-command` for you, which only tells you.
-It is withdrawn once a beat reads the run with that command no longer failing, or the run ends.
-The beat that writes the question into the task's `parked_questions`, as [Parked runs](parked-runs.md) shows, opens its item.
+Run `orc attention` to see questions and events that need an answer.
+The queue is kept in `~/.orc/backlog/attention`.
+Each item names its task, kind, owner, text, and age.
+An open item becomes overdue after five minutes.
+
+Review and worker questions start with the decider.
+Looping runs, failing commands, overdue holds, and run or PR events need you.
+Three consecutive failures of one command open a notification, and six open a looping question.
+See [Parked runs](parked-runs.md) for worker questions and looping runs.
 
 ## The decider
-The same beat hands each open item the decider owns to the decider, one short Pi call per question.
-The call runs on `models.decider` in `config.json`, as [Configuring providers](configuring-providers.md) shows, with no tools.
-Its system prompt is the written policy in `packages/run/agents/decider-policy.md`.
-Its prompt holds the rules it reads, each under a label that names its file, then the task’s title and body, which hold its intent, then the earlier answers and asked-back questions of that task when any exist, then the question.
-The rules are your rules in `<ORC_HOME>/orchestrator.md` and the instructions file of the task's project in `projects.json`, each when it exists.
 
-Some questions never reach the decider.
-Before the call, orc checks the question's words against a fixed list of topics: deleting, security, keys or credentials, merging, pushing, releasing, spending, anything that cannot be undone, a site's look, legal text, and logins.
-Deleting matches delete, remove, drop, erase, wipe, purge, destroy and rm.
-A site's look matches look, appearance, visual, screenshot and preview.
-Legal text matches legal, law, privacy policy, terms of use, consent and offer.
-Logins match login, log in, sign in, auth, authentication, authorization and oauth.
-A question on that list goes to you, and its `decision` is `escalated` with the topic and the word that matched as its reason.
-The list is in the code, so neither your rules nor the policy can widen what the decider answers.
+The beat sends each open question owned by the decider to `models.decider`.
+The call has no tools.
+It receives the task, earlier answers, the question, `<ORC_HOME>/orchestrator.md`, and the project's instructions when present.
+Its policy is in `packages/run/agents/decider-policy.md`.
 
-The decider takes one of four actions, and the item keeps it as a `decision` with its time:
+Orc sends questions about deletion, security, credentials, merging, pushing, releasing, spending, irreversible actions, site appearance, legal text, and logins to you instead.
+The topic check uses the fixed word list in `packages/run/src/features/decider/decider-guard.ts`.
+Rules and policy do not widen it.
 
-- **answer**: the reply names the answer, the reason and the `rule` it rests on, quoted word for word from your rules, the project's instructions, the policy or the task's body.
+The decider can:
+
+- **Answer** with a reason and an exact rule from the task, your rules, project instructions, or policy.
   Orc escalates an answer whose quote is no whole clause of them, after whitespace is collapsed and surrounding quotes and a leading list or quote marker are stripped on both sides.
   A quote matches a whole line, a sentence within a line, a whole paragraph joined across its lines, a sentence of that joined paragraph, where the quote starts at the start or after a period, exclamation mark, question mark, colon or semicolon and ends at the end, just before one of those marks, or on one of those marks.
-  The answer goes to the task as `orc backlog answer` would give it, so the item closes with the answer's words.
-  The `decision` is `answered` with the reason and the `rule`, which holds the `quote` and the `source` file it came from.
-- **ask back**: for a `worker-question`, the decider may put one question to the worker instead of answering.
-  The worker gets that question as the result of its `orc_ask` call, and the item stays open.
-  A follow-up worker question carries the earlier asked-back question and the decider's question back in its prompt, and settling the follow-up closes the earlier asked-back item.
-  The `decision` is `asked-back` with the decider's `question`.
-  An ask back on a `review-question` escalates, because the run that asked it has stopped.
-- **link a duplicate**: the decider may name an earlier answered question of the same task by its item id.
-  Orc checks that the earlier item exists and has an answer, gives that answer, and records the `decision` as `duplicate` with the earlier item's id in `of`.
-  A link to an item that does not exist or has no answer escalates.
-- **escalate**: the item goes to you and stays open, and the `decision` is `escalated` with the decider's reason as its note to you.
+- **Ask back** to a worker question.
+  The worker receives the question and the item stays open.
+  A review question cannot be asked back and is escalated instead.
+- **Link a duplicate** to an earlier answered question on the same task.
+  Orc escalates a link to a missing or unanswered item.
+- **Escalate** to you, with a reason.
 
-A reply orc cannot read, a call that fails, a missing `models.decider` or a rules file orc cannot read escalates the item with that as its reason.
+A failed call, unreadable reply or rules file, or missing decider model also escalates the item.
 
 ## Overturning a decider answer
 The decider never has the last word.
@@ -90,37 +72,27 @@ It refuses a review question, a worker question or an overdue wait and names the
 A held task whose `--until` date has passed opens an `overdue-wait` item, owned by the user and asked at the start of the next day on the machine local clock.
 Answering the hold closes the item with the hold's answer.
 
-Each beat reads the queue before it starts a new task, and prints one `needs the <owner> <item-id>: <text>` line per open item, oldest first, with `, overdue` after the owner for an overdue one.
-
 ## Seeing the queue
-To see every open item, oldest first, run `orc attention`.
-It prints each item's id, kind, task, owner, age and text, and marks an overdue one `overdue`.
-It then prints each item the decider answered under a `Decided:` heading as `answered <id>: <words> (<reason>)`.
-The reason of an answer on a rule ends with `, quoting <source>: "<quote>"`, and a duplicate shows `the same question as <item-id>`.
-An answer you replaced shows `(the captain replaced the decider's answer "<words>")`.
-An open item the decider asked back shows `(asked the worker back: <question>)` after its text.
-An item the decider escalated carries its `decision` in `items`.
-An item the decider answered stays visible under `decided` with its answer and its `decision` in the JSON.
-An answered item leaves `decided` once its task closes.
-With no open item it prints `nothing needs anyone`.
-To print the same facts as JSON, run `orc attention --json`, whose document names its version first as `orc.attention.v1`:
 
-```json
-{
-  "schema": "orc.attention.v1",
-  "at": "2026-11-02T10:10:00.000Z",
-  "items": [
-    { "id": "orc-1.r2.2026-11-02T10_00_00_000Z", "kind": "review-question", "task": "orc-1", "text": "Keep the old flag?", "asked": "2026-11-02T10:00:00.000Z", "owner": "decider", "ageSeconds": 600, "overdue": true }
-  ],
-  "decided": [
-    { "id": "orc-1.r3.2026-11-02T09_50_00_000Z", "kind": "review-question", "task": "orc-1", "text": "Keep the old flag?", "asked": "2026-11-02T09:50:00.000Z", "owner": "decider", "decision": { "kind": "answered", "reason": "the intent keeps the old flag", "rule": { "quote": "Keep the old flag for one release.", "source": "task orc-1" }, "at": "2026-11-02T10:00:00.000Z" }, "answer": { "words": "Keep it", "at": "2026-11-02T10:00:00.000Z" } }
-  ]
-}
-```
+Each beat reads the queue before it starts a new task, and prints one `needs the <owner> <item-id>: <text>` line per open item, oldest first, with `, overdue` after the owner for an overdue one.
+Run `orc attention` to see open items in age order.
+The text view shows the decider's answers under `Decided:`.
+Run `orc attention --json` for an `orc.attention.v1` document with `at`, `items`, and `decided`.
+The output shape is in `packages/run/src/features/attention-list/attention-view.ts`.
+An answered item leaves `decided` when its task closes.
 
-`at` is the time the queue was read, and each item's age and overdue flag are taken at that time.
-To watch the open items in a terminal, run `orc-dash panel attention`, as [orc-dash](../dash.md#run-the-attention-tool) shows.
-On a machine with no backlog folder, `orc attention` prints `no backlog at <path>`, and `orc attention --json` prints an empty queue.
+Run `orc backlog thread <task-id>` to see one task's items alongside its holds, questions, answers, and notes.
+On a machine without a backlog, the JSON command prints an empty queue.
 
-The queue holds every task's items.
-To see one task's items in order with its holds, questions, answers and notes, run `orc backlog thread <task-id>`, the per-task view [Backlog and beat](backlog-and-beat.md) describes.
+## Run the attention tool
+
+To run the live attention panel, run `orc-dash panel attention`.
+It runs alone in a plain terminal or in a Herdr pane.
+The panel reads `orc attention --json` on the machine it runs on and nothing else, and paints again every 10 seconds.
+The dashboard shows it by default, above the resources panel in a wide layout and second in the narrow glance, as [Lay out the dashboard](../dash-dashboard.md#lay-out-the-dashboard) shows.
+It shows each open item oldest first, with its task, its owner, its age and its kind, and its text below.
+An overdue item starts with `!` and says `overdue` after its age.
+The head counts the open items and the overdue ones.
+With no open item, it says `nothing needs anyone`.
+Without `orc` on the `PATH`, it says `orc` is not installed.
+To print one frame of plain text instead, run `orc-dash panel attention --print`.

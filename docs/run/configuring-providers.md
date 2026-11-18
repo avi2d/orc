@@ -30,6 +30,8 @@ This example names opencode-go through a Pi login, anthropic through a token fil
 
 `models.planner` names the model `orc backlog add` asks to split a request over budget, through your own Pi with no tools, as [Splitting at intake](task-kinds.md#splitting-at-intake) shows, and without it orc splits nothing.
 
+## Provider credentials
+
 Each provider names its Pi provider `id`, the part of a model name before the `/`, and its `credential`:
 
 - `pi-login` checks the Pi login for that provider before the run, as [Running a task](running-a-task.md) describes.
@@ -41,13 +43,20 @@ Each provider names its Pi provider `id`, the part of a model name before the `/
 - `token-file` reads the token from a file, whose absolute path `tokenFile` takes from the variable `env` names or from `path`.
   `orc run --token-file <path>` takes the path from the flag instead.
   The nono sandbox carries only a Pi login, so a token file provider runs only with `--sandbox none`.
-- `package` hands the run no key, since the provider's own Pi package reaches its service.
-  `packages` lists the Pi package sources, in the form Pi's `settings.json` takes: `npm:`, `git:`, a git URL or an absolute path.
-  Orc writes them into the run's Pi folder, `session/agent/settings.json`, so the run's Pi loads the package your Pi loads.
-  Pi installs an `npm:` or `git:` source into the run's folder on the first model list, so each run fetches it again.
-  An absolute path to a package already on the machine, such as one under `~/.pi/agent/git`, loads without the fetch.
-  `env` names variables orc sets for the run's Pi over your environment, for the chat's Pi when `models.orchestrator` names this provider, for the planner's Pi when `models.planner` does, and for the decider's Pi when `models.decider` does, such as the `CLAUDE_CONFIG_DIR` of the account a Claude Code package runs on.
-  The nono sandbox carries only a Pi login, so a package provider runs only with `--sandbox none`.
+
+## Package providers
+
+A `package` provider hands the run no key, since the provider's own Pi package reaches its service.
+It takes no `tokenFile` or `tokenCommand`, so it completes the `credential` list beside `pi-login` and `token-file`:
+
+- `packages` lists the Pi package sources, in the form Pi's `settings.json` takes: `npm:`, `git:`, a git URL or an absolute path.
+- Orc writes them into the run's Pi folder, `session/agent/settings.json`, so the run's Pi loads the package your Pi loads.
+- Pi installs an `npm:` or `git:` source into the run's folder on the first model list, so each run fetches it again.
+- An absolute path to a package already on the machine, such as one under `~/.pi/agent/git`, loads without the fetch.
+- `env` names variables orc sets for the run's Pi over your environment, for the chat's Pi when `models.orchestrator` names this provider, for the planner's Pi when `models.planner` does, and for the decider's Pi when `models.decider` does, such as the `CLAUDE_CONFIG_DIR` of the account a Claude Code package runs on.
+- The nono sandbox carries only a Pi login, so a package provider runs only with `--sandbox none`.
+
+## Validation and token files
 
 Orc refuses a `config.json` key it does not know, so a misspelled key never drops a provider unnoticed.
 Orc refuses `--token-file` on a provider that takes a Pi login or Pi packages.

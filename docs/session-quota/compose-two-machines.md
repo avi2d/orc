@@ -18,6 +18,8 @@ With `ORC_DASH_REMOTE_SESSION_QUOTA` unset or blank, the panel reads this machin
 The command runs through `sh -c` with a 90 second limit, beside this machine's own read.
 Its stdout must be that report alone, whitespace aside, so a login banner or anything else the command prints goes to stderr.
 
+## Merge two machines
+
 Two machines' accounts of one provider are one account when they share any key either carries.
 Those keys are the `accountKey`, the `credentialKey`, the `accountKeys` and the key of each `credential-key` join.
 Accounts linked through a chain of shared keys are one account too.
@@ -32,6 +34,8 @@ An account or window that only one machine reads shows as that machine read it.
 Every flag in the other machine's report is judged again by the fair share rule above.
 So a report flagging by an older rule shows only the sessions over their fair share of a window running out before its reset.
 A window the other machine read in another cycle, around a reset, keeps this machine's calls alone and reads, for example, `south read another cycle`.
+
+## Read rows and warnings
 
 Each session row starts with its machine's name, because pane ids repeat across machines.
 A row too narrow for the whole name keeps the letters that tell the machines apart.

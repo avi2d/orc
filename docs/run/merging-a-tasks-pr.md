@@ -23,6 +23,8 @@ It stops waiting early once a check on the new head is red.
 It reads the new head's parents and treats a head that leaves out the checked head as changed after the approval.
 Once the new head is green and no longer behind, orc runs `gh pr merge <url> --squash --match-head-commit <new sha>`.
 
+## When an update fails
+
 Orc merges nothing and refuses when any of these holds:
 
 - update-branch reports a merge conflict.
@@ -33,8 +35,10 @@ Orc merges nothing and refuses when any of these holds:
 - Orc still cannot read the PR when the 20 minutes end, so it cannot tell what the new head holds.
 - The new head is still behind its base, because the base moved again.
 
-After a merge conflict or a red check on the new head, orc also sends the task back as [`orc backlog send-back`](backlog-and-beat.md) does, with words that name the conflict or the red check.
+After a merge conflict or a red check on the new head, orc also sends the task back as [`orc backlog send-back`](backlog-tasks.md#send-a-task-back) does, with words that name the conflict or the red check.
 The next beat resumes the task's run on its branch for a fix pass.
+
+## Choose a merge basis
 
 A project in `projects.json` may add `"yolo": true`, and a project with no `yolo` reads as `false`.
 Orc refuses any `yolo` other than `true` or `false` with `the project <name> names yolo <value>, which is not true or false`.
