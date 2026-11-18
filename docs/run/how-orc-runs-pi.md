@@ -29,7 +29,7 @@ Orc tracks one bash command that keeps failing.
 
 ## Finish a step
 
-A step ends only on its completion marker.
+A step can end on its completion marker, an idle timeout, or a failure.
 
 - Orc counts the step complete only when the session’s final assistant message stopped with `stop` and holds `ORC_COMPLETE` on its own line.
 - A valid `ORC_SPLIT` proposal records the run as failed without running checks or opening a PR.
