@@ -28,10 +28,10 @@ const r3Item = "orc-1.r3.2026-11-02T10_20_00_000Z"
 
 type AskedQuestion = { readonly id: string; readonly text: string }
 
-const withAskingTask = async (body: (root: string) => Promise<void>, questions: readonly [AskedQuestion, ...ReadonlyArray<AskedQuestion>] = [r2, r3]): Promise<void> => {
+const withAskingTask = async (body: (root: string) => Promise<void>, questions: readonly [AskedQuestion, ...ReadonlyArray<AskedQuestion>] = [r2, r3], taskBody: string = intent): Promise<void> => {
   const root = await mkdtemp(join(tmpdir(), "orc-decider-"))
   try {
-    const record = await run(addTask(root, spec))
+    const record = await run(addTask(root, { ...spec, body: taskBody }))
     await run(claimTask(root, record.spec.id))
     await run(writeTaken(root, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-11-02T10:02:00.000Z", log: root + "/logs/orc-1.log" } } }))
     await run(askStartedTask(root, "orc-1", { asked, questions }))
@@ -357,6 +357,37 @@ describe("the decider", () => {
       await decide(root, replies({ [r2.text]: JSON.stringify({ decision: "answer", answer: "Two retries", rule: "twice", reason: "the intent says twice" }) }))
       expect(await itemFile(root, r2Item)).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
     }, [r2])
+  })
+
+  const turnsIntent = [
+    "# Fix by name opens empty turns",
+    "In the Agents tab a Fix step opens as a plain monospace log with no color.",
+    "",
+    "Fix: every step that ran a Pi session, Fix and any other agent step",
+    "included, opens in the same Turns view as Agent, with Raw beside it showing the log as today. Each turn card carries its number.",
+    ""
+  ].join("\n")
+  const turnsQuestion = { id: "r4", text: "fix-by-name-opens-empty-turns: should only the Fix step open in Turns, or every Pi step? Recommended: every Pi step." }
+  const turnsItem = "orc-1.r4.2026-11-02T10_20_00_000Z"
+  const turnsRule = "every step that ran a Pi session, Fix and any other agent step included, opens in the same Turns view as Agent, with Raw beside it showing the log as today."
+
+  test("the orc-64 answer quoting a clause inside a longer intent line is answered, instead of escalated for not being a whole line", async () => {
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [turnsQuestion.text]: JSON.stringify({ decision: "answer", answer: "Every Pi step opens in Turns", rule: turnsRule, reason: "the intent names every Pi step" }) }))
+      expect(await itemFile(root, turnsItem)).toMatchObject({
+        owner: "decider",
+        decision: { kind: "answered", rule: { quote: turnsRule, source: "task orc-1" } },
+        state: { kind: "closed", answer: { words: "Every Pi step opens in Turns" } }
+      })
+    }, [turnsQuestion], turnsIntent)
+  })
+
+  test("an answer on an invented rule worded like the orc-64 intent escalates, instead of being accepted", async () => {
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [turnsQuestion.text]: JSON.stringify({ decision: "answer", answer: "Only Fix opens in Turns", rule: "only the Fix step opens in the same Turns view as Agent.", reason: "the intent names Fix" }) }))
+      expect(await itemFile(root, turnsItem)).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+      expect(filedAt(await itemFile(root, turnsItem), "decision", "reason")).toContain("in none of the rules it read")
+    }, [turnsQuestion], turnsIntent)
   })
 
   test("the owner's rules and the project's instructions reach the prompt labelled, and an answer on the owner's rule keeps its quote and file, instead of a free reason", async () => {
