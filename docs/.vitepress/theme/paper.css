@@ -122,8 +122,8 @@ body {
   margin-inline: 20px;
 }
 
-.VPNavBar .VPNavBarSocialLinks {
-  margin-left: 0;
+.VPNavBar.has-sidebar .content:has(.VPFlyout:hover, .VPFlyout:focus-within, .VPFlyout .button[aria-expanded="true"]) {
+  z-index: 2;
 }
 
 .VPNav .VPNavBar :is(.VPNavBarAppearance, .VPNavBarSocialLinks)::before {
