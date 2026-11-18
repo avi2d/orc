@@ -30,6 +30,8 @@ This example names opencode-go through a Pi login, anthropic through a token fil
 
 `models.planner` names the model `orc backlog add` asks to split a request over budget, through your own Pi with no tools, as [Splitting at intake](task-kinds.md#splitting-at-intake) shows, and without it orc splits nothing.
 
+## Provider credentials
+
 Each provider names its Pi provider `id`, the part of a model name before the `/`, and its `credential`:
 
 - `pi-login` checks the Pi login for that provider before the run, as [Running a task](running-a-task.md) describes.
@@ -48,6 +50,8 @@ Each provider names its Pi provider `id`, the part of a model name before the `/
   An absolute path to a package already on the machine, such as one under `~/.pi/agent/git`, loads without the fetch.
   `env` names variables orc sets for the run's Pi over your environment, for the chat's Pi when `models.orchestrator` names this provider, for the planner's Pi when `models.planner` does, and for the decider's Pi when `models.decider` does, such as the `CLAUDE_CONFIG_DIR` of the account a Claude Code package runs on.
   The nono sandbox carries only a Pi login, so a package provider runs only with `--sandbox none`.
+
+## Validation and token files
 
 Orc refuses a `config.json` key it does not know, so a misspelled key never drops a provider unnoticed.
 Orc refuses `--token-file` on a provider that takes a Pi login or Pi packages.

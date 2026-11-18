@@ -6,6 +6,8 @@ To print the report once, run `orc-dash report session-quota`.
 The report is one JSON object on one line, and `SessionQuotaReport` in `packages/schema/src/entities/session-quota/contract/session-quota.ts` decodes it.
 A reader checks `schemaVersion` first, and version 1 is the only version.
 
+## Report fields
+
 | Field | What it holds |
 | --- | --- |
 | `schemaVersion` | `1` |
@@ -33,6 +35,8 @@ A reader checks `schemaVersion` first, and version 1 is the only version.
 | `unmatchedProcesses` | Each log folder whose headless processes no log could be matched to, with its `harness`, `cwd`, `place` and `pids` |
 | `flags` | Each flagged session with its account, window, priced points per hour, fair points per hour and both shares |
 | `unmetered` | Calls on routes no subscription meters, such as an API key, with their tokens |
+
+## Older reports
 
 A report written before window sources and credential keys has no `windows[].source`, `accounts[].credentialKey` or `accounts[].accountKeys`, and still reads.
 Its windows count as read by quota-axi at its `generatedAt`.

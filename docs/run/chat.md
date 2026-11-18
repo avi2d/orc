@@ -2,77 +2,94 @@
 kind: reference
 ---
 # Adding tasks from a chat
-To say tasks in a chat instead of writing task files, run `orc chat`.
-It starts Pi on the model `models.orchestrator` names in `config.json`, and refuses to start when it names none.
-To keep the chat in a session file you choose, run `orc chat --session <file>`.
-Orc makes the path absolute and passes it to Pi's `--session`.
-When the file is missing, Pi starts a new chat and writes it there after the first reply.
-When the file exists, the chat resumes it.
-So a program that starts the chat knows the one file that holds its turns.
-When `<ORC_HOME>/orchestrator.md` exists, the chat adds it to Pi's system prompt as the orchestrator's rules.
-It also adds the instructions file of each project in `projects.json` that names one, labelled with the project's name.
-Its first line of output names the rules file it loaded, or says it found none, and then names each instructions file.
-The same rules file and the instructions file of a task's project also feed the decider, as [The decider](attention-queue.md#the-decider) shows.
-The chat's Pi has eight tools and no others:
 
-- `orc_backlog_add` adds one task through `orc backlog add <project> -`, with the project and the task's Markdown.
-  It may add a kind, an internal mark, a machine, a parent, the ids the task depends on and a priority from 0 to 4, where 0 starts first.
-  A decision takes `kind: "decision"` and no priority or machine, as [Decisions](task-kinds.md#decisions) shows.
-  When `models.planner` names a model and a ship add names no parent, an over budget request lands as a parent with one child per slice, as [Splitting at intake](task-kinds.md#splitting-at-intake) shows.
-- `orc_backlog` reads `orc backlog --json`, so the chat knows the projects, the machines and each task's state and PR.
-- `orc_backlog_hold` holds one new task except a decision through `orc backlog hold`, with the reason, an optional date and optional questions.
-- `orc_backlog_priority` sets or clears one new task's priority through `orc backlog priority <task-id> <0-4|none>`, which orders the beat's starts.
-  It refuses a decision and a task that is taken, started or closed.
-- `orc_backlog_edit` replaces the title and the body of one new task through `orc backlog edit <task-id> -`, and keeps its hold, dependencies and parked questions.
-- `orc_backlog_answer` answers a held task, a parked task, a decision, or a started task waiting at its gate through `orc backlog answer`.
-  It passes your words as you said them, or answers one open question when it names the question's id.
-- `merge_task` lands a closed task's PR through `orc merge <task-id> --basis <basis>`, as [Merging a task's PR](merging-a-tasks-pr.md) shows.
-- `orc_decision_board` opens a decision board for one held task, one parked task, or one started task waiting at its gate, as [Decision boards](chat.md#decision-boards) shows.
+Run `orc chat` to add and manage tasks in a Pi session.
+The chat uses `models.orchestrator` from `config.json` and refuses to start if no model is set.
 
-So a task from the chat waits until you give it a priority with `orc backlog priority <task-id> <0-4>`.
-When it starts and every 15 seconds after, the chat reads `orc backlog --json`.
-While Pi is idle, it posts each closed task that has no `postedAt`, with its outcome, its reason and its PR or report, as in `orc-1 Fix the typo closed done, PR https://github.com/acme/orc/pull/7`.
-It posts a task whoever added it: this chat, an earlier chat or the command line.
-It posts each close then runs `orc backlog posted <task-id>`, which writes `posted_at` into the closed task file, so a task closed while no chat ran is posted by the next chat to start, and every close is posted, with a close repeated at most when the chat stops between its post and its mark, or when two chats post the same close in the same moment.
-It posts each event the same way, then runs `orc backlog posted <event-key>`.
-The beat records an event when a task's run stalls, when a closed task's PR turns green, merges or closes without merging, and when a worker split proposal lands, as [A worker split proposal](task-kinds.md#a-worker-split-proposal) shows.
-Each event file under `events/` is named for the event, so a beat records it once.
-A second stall of one task is a new event.
-`orc backlog --json` also lists each alert fire from `alerts.jsonl` in the backlog folder, and the chat posts each fire once.
-The alert stream that `orc runner start` queues writes that file, as [The runner](runner.md) shows.
-When it cannot read or mark the backlog, it posts orc's error once Pi is idle and keeps polling.
-Each time the chat starts, it posts one line per held task you have not answered, once Pi is idle, as in `orc-2 Pick the API is held for the captain: REST or gRPC, until 2026-12-01`.
-It posts one line per parked question the attention queue owns for you each time it starts, and once more when a task parks while it runs, as in `orc-3 Fix the retries is parked on orc/orc-3 for the captain's answer to question-4: Which retries are allowed?`.
-It skips a parked question the attention queue still owns for the decider.
-Questions from a run waiting at its gate post the same way, as [Parked runs](parked-runs.md) shows.
-A question the run asks again at a later wait posts again.
-A question whose line a failed read or a busy Pi kept back is posted on a later poll.
-The chat's Pi loads your Pi settings and packages, so a provider a package adds works as it does in your Pi.
-The chat's Pi also takes the `env` of the orchestrator's provider, so the chat and the runs of that provider use the same account whatever your shell exports.
-`ORC_HOME` reaches the tools from the shell that runs `orc chat`.
+## Session and instructions
+
+Use `orc chat --session <file>` to choose a session file.
+Orc passes its absolute path to Pi.
+If the file exists, Pi resumes it.
+Otherwise, Pi creates it after the first reply.
+
+When present, `<ORC_HOME>/orchestrator.md` supplies the orchestrator's system instructions.
+The chat also loads each instructions file named in `projects.json`, labelled by project.
+Its first output line lists the loaded files or says that no orchestrator rules were found.
+The same orchestrator rules and the task project's instructions also go to [the decider](attention-queue.md#the-decider).
+
+## Chat tools
+
+The chat gives Pi these tools:
+
+| Tool | Action |
+| --- | --- |
+| `orc_backlog_add` | Add a task with a project and Markdown body. Decisions have no priority or machine. |
+| `orc_backlog` | Read projects, machines, tasks, and their states. |
+| `orc_backlog_hold` | Hold a new task other than a decision, with a reason, date, or questions. |
+| `orc_backlog_priority` | Set or clear a new task's priority from 0 to 4. |
+| `orc_backlog_edit` | Replace a new task's title and body without losing its hold or dependencies. |
+| `orc_backlog_answer` | Answer a hold, parked question, decision, or gate. |
+| `merge_task` | [Merge a closed task's PR](merging-a-tasks-pr.md). |
+| `orc_decision_board` | Open a board for a task waiting on you. |
+
+A configured planner can split an over-budget ship task at intake.
+See [Splitting at intake](task-kinds.md#splitting-at-intake).
+
+## Backlog updates
+
+A task without a priority waits until you set one with `orc backlog priority <task-id> <0-4>`.
+The chat polls the backlog every 15 seconds and posts closed tasks, events, and alerts when Pi is idle.
+It marks posted closes and events so a later chat can report what happened while no chat was running.
+A close can repeat if a chat stops before marking it or two chats post at once.
+When a read or mark fails, the chat reports the error and keeps polling.
+
+## Questions for you
+
+At startup the chat posts unanswered holds and parked questions that need your answer.
+It also posts new parked questions and questions at a run's gate.
+Questions assigned to the decider are not posted to you.
+See [Parked runs](parked-runs.md) for run questions.
+
+## Pi configuration
+
+The chat loads your Pi settings and packages, including their providers.
+It also uses the orchestrator provider's `env`, so the chat and that provider's runs use the same account regardless of shell exports.
+The tools receive `ORC_HOME` from the shell running `orc chat`.
 
 ## Decision boards
 
-`orc_decision_board` writes one card per open question on a held task, a parked task, or a started task waiting at its gate into `<ORC_HOME>/boards/<task-id>/board.html`.
-Each card has its options and the option the chat recommends.
-A task held with a reason and no questions gets one card for the reason.
-The chat opens the page with `lavish-axi <board.html> --no-open --reopen` and posts its URL on this machine's LAN address, so another device on the same Wi-Fi opens it from the link.
-Anyone on the same network who holds the link can open the board and submit answers, which orc records as yours, because the page has no login.
-The board is never published through `lavish-axi share`, a third-party host, or a public tunnel.
-To name the address the board binds, set `ORC_BOARD_HOST` to a hostname or IP address.
-Orc passes it to `lavish-axi` as `LAVISH_AXI_HOST`, which binds that address plus loopback and prints the session link on it.
-An unset `ORC_BOARD_HOST` binds this machine's private LAN IPv4 address, preferring 192.168.0.0/16, then 10.0.0.0/8, then 172.16.0.0/12, and never the 100.64.0.0/10 tailnet range, and `127.0.0.1` keeps boards on this machine.
-When no LAN address exists and the setting is unset, the board opens only on this machine.
-When `lavish-axi` reports the address could not be bound, the chat passes its warning on in the opened line.
-The page loads the Tailwind and DaisyUI styles Lavish recommends from the jsDelivr CDN.
-Each card you answer is recorded through `orc backlog answer`, word for word as the option reads.
-Words you add on the card follow the option after ` — `, as you wrote them.
-The chat and the board's Conversation panel both show what orc recorded.
-The page then shows that card as recorded, and the task stays waiting on you until every card has an answer.
-Once the task no longer waits on you, the chat writes the recorded answers into the page and ends the board's Lavish session.
-Answers recorded outside the board are picked up on the next refresh, which writes the page and ends the session the same way.
-An answer sent from an earlier board records nothing, since each board answers only its own cards.
-Each time the chat starts, it posts one line per board whose task still waits on you.
-The line names the time the board opened and the questions it waits on.
-Open the board again with `orc_decision_board` to answer the rest, which reads only a board opened that way.
-The boards need `lavish-axi` on the PATH of the shell that runs `orc chat`.
+`orc_decision_board` opens a board for a held or parked task, or a started task waiting at its gate.
+It writes `<ORC_HOME>/boards/<task-id>/board.html`, with a card for each open question and its options and recommended answer.
+A hold with a reason but no questions gets one card for the reason.
+
+The board has no login.
+Anyone on the same network with its link can submit answers that orc records as yours.
+The chat opens it with `lavish-axi <board.html> --no-open --reopen` and posts a LAN URL.
+The board is not published through `lavish-axi share`, a third-party host, or a public tunnel.
+The page loads Tailwind and DaisyUI styles from the jsDelivr CDN.
+The shell running `orc chat` must have `lavish-axi` on its `PATH`.
+
+### Board address
+
+Set `ORC_BOARD_HOST` to a hostname or IP address to choose the address.
+Orc passes it as `LAVISH_AXI_HOST`, and Lavish binds that address and loopback and prints the session link.
+Use `127.0.0.1` to keep the board on this machine.
+
+Without `ORC_BOARD_HOST`, orc selects a private LAN IPv4 address, preferring 192.168.0.0/16, then 10.0.0.0/8, then 172.16.0.0/12.
+It never selects the 100.64.0.0/10 tailnet range.
+Without a LAN address, the board opens only on this machine.
+If Lavish cannot bind the address, the chat includes its warning in the opened line.
+
+### Answer a board
+
+Each card answer is recorded through `orc backlog answer` with the option's exact text.
+Any words you add follow the option after ` — `.
+The chat and the board's Conversation panel show the recorded answer, and the card shows that it was recorded.
+A task waits until all cards are answered.
+
+Once the task no longer waits, the chat writes the answers to the page and ends the Lavish session.
+Answers made outside the board are picked up at the next refresh in the same way.
+An earlier board cannot answer a later board's cards.
+At startup, the chat lists boards whose tasks still wait on you, with the opening time and outstanding questions.
+Open one again with `orc_decision_board` to answer the rest.

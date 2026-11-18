@@ -2,85 +2,89 @@
 kind: reference
 ---
 # The runner
-`orc runner start` is the start command that hands a task to pueue on its machine.
-The run then outlives the beat, the dispatcher and any SSH link to it.
-It reads the task from the beat's `ORC_TASK_*` variables and queues `orc run` in the checkout on branch `orc/<task-id>`, or `orc/<task-id>-parent` for a parent task, in the pueue group `orc`.
-The run takes `--sandbox none --provider <provider> --token-file <path>` when the account holds a token file or token, and `--sandbox none --provider <provider>` with no token file when the account is kind `none`, so it runs on the picked account and refuses an implementer on any other provider.
-When the beat sets `ORC_TASK_IMPLEMENTER_MODEL` or `ORC_TASK_FIXER_MODEL`, the run also takes `--implementer-model <model>` or `--fixer-model <model>`.
-The run then uses that model instead of the one `models` in `~/.orc/config.json` names.
-So the beat can hand a run models from the provider of the account it picked.
-The run is then not refused for a model mismatch.
-An agent file that names its own model still wins over a handed model.
-With neither variable set, the run takes its models from the config or agent files.
-When the run starts, it fast-forwards the checkout's default branch from its remote, or says in its output why not.
-The refresh needs Git 2.48 or later.
-The group's parallel limit caps the orc runs on that machine, and they never wait behind other groups.
-The runner creates the `orc` group when the machine lacks it.
-Each time it queues a task, the runner runs `pueue parallel <slots> --group orc` with the machine's slots from `dispatch.json`.
-It reads the machine named in `ORC_TASK_MACHINE`, so a change to the slots takes effect at the next task queued there.
-A machine with 0 slots gets a limit of 1, because pueue reads 0 as no limit.
-The task file goes to `~/.orc/runner/<task-id>.md` on that machine, and the run reads it from there.
-When the task names instructions, the queued `orc run` gets `--instructions` pointing at a copy in `~/.orc/runner/<task-id>.instructions/<file name>` on that machine.
-A task queued for another home keeps a scoped file instead, so two homes holding the same task id never share one file.
-A task this home already holds queued or running in group `orc` is not queued again, and a task whose earlier run is done there is queued again, as a parked task is once answered.
 
-When `orc-dash` is on its PATH, `orc runner start` also queues `orc-dash alerts --json` in pueue on the machine it runs on, with its output appended to `~/.orc/backlog/alerts.jsonl`.
-It queues that stream once, in a group of its own home that runs one task at a time, so a stream already queued or running is not queued again, and one that ended is queued again at the next start.
-When pueue refuses the stream, the start prints why on standard error and still queues the task.
+Run `orc runner start` to queue a task from the beat in pueue.
+The run survives the beat and a dropped SSH connection.
 
-To start on another machine, put the command that runs orc there after `--`, as in `orc runner start -- ssh linux-box orc`.
-That runs `orc runner queue` on the far side and sends it the task as JSON on stdin, so the task text never passes through a remote shell.
-The JSON carries the machine's slots, and the far side sets its `orc` group's parallel limit from them.
-SSH can drop once pueue holds the run, since pueue on that machine owns it.
-Pueue runs the task with the environment of the command that queued it.
-So the command after `--` must give orc the `PATH` its runs need on that machine.
-Unsandboxed agents and checks keep that machine's `XDG_RUNTIME_DIR`, when set, so their pueue clients reach its user service socket.
-The queue records the resolved absolute `ORC_HOME` with the task.
+## Queue a task
 
-A task that comes with a token instead of a token file keeps it in `~/.orc/runner/tokens/<task-id>/token`, readable only by its owner, beside the expiry in `expires-at`.
-A task queued for another home keeps its token under a scoped folder instead, so two homes holding the same task id never share one token.
-Pueue then runs `orc runner hold <task-id> -- orc run ... --token-file <that file>`, and the hold runs the run.
-The hold starts the run only while the token is live, and otherwise waits for a fresh one.
-Pi reads the token once per process.
-So a run that fails after its token ran out starts again on the fresh token instead of failing the task.
-The queue starts a detached guard that waits for the pueue task to finish and then removes the token folder.
-The guard covers the whole queued life of the task.
-It removes the folder when the run succeeds, fails, is killed, or never starts.
-It leaves the folder when pueue itself is unreachable, so the run still has its token after a daemon restart.
-A `pueue kill` gives the hold no time to clean up, so the guard removes the folder after pueue reports the task done.
+The runner reads the beat's `ORC_TASK_*` variables and queues `orc run` in the `orc` pueue group.
+It uses `orc/<task-id>`, or `orc/<task-id>-parent` for a parent.
+The run uses `--sandbox none` and the selected provider.
+A token account also supplies `--token-file`.
 
-`orc runner renew` reads a task and its fresh token as JSON on standard input and replaces the token the task holds.
-Add `--` and the command that runs orc on another machine to send it there, as with `orc runner start`.
-A renewal for a task pueue no longer runs for that home is refused and removes that task's token folder.
+### Select models
 
-To stop a run yourself, run `orc runner kill <task-id>` on its machine.
-It kills the running pueue task that carries the label, or removes one still queued, and marks the running orc runs on `orc/<task-id>` and `orc/<task-id>-parent` stopped.
-A parent task’s final check runs under its own label, so killing it never touches the worker run it replaced.
-Removing a queued task records a stopped run on the branch its label runs on when no run of either branch is still running, since the run never started.
-The next beat then closes the task stopped with the run's end reason.
-A kill for a task pueue never queued is refused, as a kill for a task already done is.
+`ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` select the run's models.
+A model in an agent file takes precedence.
+Without the variables, the run uses its config or agent files.
 
-To read how a task's run went, run `orc runner result <task-id>` on its machine, or `orc runner result <task-id> -- ssh linux-box orc` from another.
-The forwarded read defaults to that home’s label, and `orc runner result <task-id> --label <label>` reads another home’s run instead.
-For a parent task the default label is the parent’s own, so the read names its final check instead of the worker run it replaced.
-The forwarded read carries the label as JSON on standard input, past any remote shell the reach uses, and marks the far command with `--stdin-label` so only a marked read waits on standard input.
-A plain `orc runner result <task-id>` never reads standard input, so a pipe that never closes cannot hang it.
-Piping that document into `orc runner result <task-id> --stdin-label` yourself reads that home's run.
-It names pueue's state for the task and the latest orc run on `orc/<task-id>` or `orc/<task-id>-parent` with its PR.
-A task is queued, stashed, running, paused, succeeded or failed, or unknown when no pueue task in group `orc` carries that home's label.
-An unknown task with a stopped run still names that run with its end reason.
-To print the same facts as JSON, add `--json`, whose document names its version first as `orc.runner.v1`.
-The beat and the runner and the run on one task must share one orc version.
-To hand answers to a run waiting at its no-mistakes gate, pipe a JSON document into `orc runner answer <task-id>` on its machine.
-The document reads `{"label": "<label>", "asking": "<asked>", "answers": [{"question": "<id>", "answer": "<text>"}]}`, where the label is optional.
-Its `asking` is the time the run asked, as `orc runner result --json` shows it.
-It writes them into that run's `answers.json`.
-It refuses a task whose run waits for no answer, or waits on an asking other than the one named.
-To print the five minute load average the beat compares against a load limit, run `orc runner load` on that machine.
-Without `through` set, its second line counts the calls queued in that machine's heavy queue and the bypasses logged in the last 7 days.
-With `through` set, its second line reports the heavy queue as unread.
+### Queue limits and files
+
+The runner updates the checkout's default branch and needs Git 2.48 or later.
+It sets the pueue group's limit from the machine's slots.
+Zero slots becomes one because pueue treats zero as unlimited.
+A task already queued or running for this home is not queued again.
+A completed task can be queued again.
+
+### Alert stream
+
+When `orc-dash` is on `PATH`, the runner queues `orc-dash alerts --json` and appends its output to `~/.orc/backlog/alerts.jsonl`.
+A running stream is not duplicated.
+If pueue refuses the stream, the runner reports the error and still queues the task.
+
+## Queue on another machine
+
+Run `orc runner start -- ssh linux-box orc` to queue on another machine.
+The remote command must have the run's tools on its `PATH`.
+Unsandboxed agents and checks retain the remote `XDG_RUNTIME_DIR` when set, so pueue clients can reach the user service.
+
+## Token storage and renewal
+
+The runner stores a supplied token under `~/.orc/runner/tokens/<task-id>/token`, readable only by its owner.
+The hold waits for a live token before starting and can restart a run after token expiry.
+A guard removes the token folder after the queued task ends.
+If pueue is unreachable, it keeps the folder so the run can use the token after a daemon restart.
+
+`orc runner renew` reads a task and fresh token as JSON on standard input.
+Add `--` and the remote orc command to renew on another machine.
+A renewal for a task that is no longer running is refused and removes its token folder.
+
+## Stop a run
+
+Run `orc runner kill <task-id>` on the task's machine.
+It removes the task from pueue or stops it and marks its orc runs stopped.
+The next beat closes the task stopped.
+Orc refuses a task that was never queued or is already done.
+
+## Read a result
+
+Run `orc runner result <task-id>` on the task's machine, or add `-- ssh linux-box orc` for another machine.
+Add `--json` for an `orc.runner.v1` document.
+The beat, runner, and run must use the same orc version.
+
+The result reports the pueue state and latest run, including its PR.
+Use `--label <label>` to read another home's run.
+A parent defaults to its final check.
+
+## Answer a waiting run
+
+Pipe JSON to `orc runner answer <task-id>` on its machine:
+
+```json
+{"label":"<label>","asking":"<asked>","answers":[{"question":"<id>","answer":"<text>"}]}
+```
+
+The label is optional.
+Get `asking` from `orc runner result --json`.
+Orc refuses a run that is not waiting or whose asking time differs.
+
+## Read machine load
+
+Run `orc runner load` to print the five-minute load the beat compares with the machine's limit.
+It also reports the heavy queue unless `through` is set.
 
 ## Queue heavy calls
-`orc runner start` writes stand ins for heavy tools and arms the watchdog beside the alert stream unless `through` is set.
-`orc run` puts the stand in folder first on `PATH` for the agent it starts.
-[The heavy queue](heavy-queue.md) names the queued tools, the bypass, the check command and the tuning keys.
+
+The runner sets up the heavy queue unless `through` is set.
+See [The heavy queue](heavy-queue.md) for tools, bypasses, checks, and settings.

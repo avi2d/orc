@@ -6,6 +6,12 @@ commands:
   test: bunx checks-test --changed --parallel=3
 review:
   path_instructions:
+    - path: "docs/**"
+      instructions: |
+        Review each changed page for a reader's task or question, not just factual coverage.
+        Flag a page that mixes unrelated topics, buries its main point, repeats itself, or uses vague and inflated prose.
+        Ask for short sections with descriptive headings and links to separate reference details, while preserving facts readers need.
+        Generated references and decision records need their own structure rather than an arbitrary word limit.
     - path: "packages/run/**"
       instructions: |
         The run package ships the orc command.
