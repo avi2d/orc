@@ -71,11 +71,11 @@ It refuses a review question, a worker question or an overdue wait and names the
 A held task whose `--until` date has passed opens an `overdue-wait` item, owned by the user and asked at the start of the next day on the machine local clock.
 Answering the hold closes the item with the hold's answer.
 
-Each beat reads the queue before it starts a new task, and prints one `needs the <owner> <item-id>: <text>` line per open item, oldest first, with `, overdue` after the owner for an overdue one.
-
 ## Seeing the queue
 
-Run `orc attention` to see open items in age order and the decider's answers under `Decided:`.
+Each beat reads the queue before it starts a new task, and prints one `needs the <owner> <item-id>: <text>` line per open item, oldest first, with `, overdue` after the owner for an overdue one.
+Run `orc attention` to see open items in age order.
+The text view shows the decider's answers under `Decided:`.
 Run `orc attention --json` for an `orc.attention.v1` document with `at`, `items`, and `decided`.
 The output shape is in `packages/run/src/features/attention-list/attention-view.ts`.
 An answered item leaves `decided` when its task closes.

@@ -1,17 +1,9 @@
 ---
 kind: how-to
 ---
-# Snapshots and alerts
+# Alerts panel
 
-`orc-dash` can print snapshots and watch for alert events.
-
-## Take a snapshot
-
-See [Take a snapshot](dash-snapshot.md).
-
-### Read the snapshot
-
-See [Read the snapshot](dash-snapshot.md#read-the-snapshot).
+`orc-dash` can watch for alert events.
 
 ## Watch for alerts
 
@@ -51,11 +43,20 @@ A key the command does not know, or a value out of range, stops the command with
 | `heavyLoad.sustainedMinutes` | How long every sample must stay over a limit before the rule fires | `5` |
 | `heavyLoad.topProcesses` | How many processes the event lists by CPU and by memory | `5` |
 | `heavyLoad.machines` | Each machine's `name`, its `loadAtLeast` and its `memory` limit, either `usedAtLeastPercent` or `availableUnderPercent` | `local` at load 10 or 90 percent used, `remote` at load 16 or under 15 percent available |
+
+### Set the long-task alert
+
+The task rule watches a task that goes quiet.
+
+| Key | What it holds | Default |
+| --- | --- | --- |
 | `longTask.everySeconds` | The seconds between two reads of the tasks source | `30` |
 | `longTask.quietMinutes` | The minutes without a milestone before the first event | `15` |
 | `longTask.repeatMinutes` | The minutes between two events while the task stays without one | `15` |
 | `longTask.totalHours` | The hours from the task's first start to its total event | `2` |
 | `longTask.states` | The task states the rule watches | `working`, `waiting` and `blocked` |
+
+### Name the watched machines
 
 A machine name is the one `ORC_DASH_MACHINE` or `ORC_DASH_REMOTE_MACHINE` gives it, and a machine the list does not name has no heavy load rule.
 A list in the file replaces the default list whole.

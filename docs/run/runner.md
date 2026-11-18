@@ -42,7 +42,7 @@ Unsandboxed agents and checks retain the remote `XDG_RUNTIME_DIR` when set, so p
 ## Token storage and renewal
 
 The runner stores a supplied token under `~/.orc/runner/tokens/<task-id>/token`, readable only by its owner.
-The hold waits for a live token before starting and can restart a run after token expiry.
+The run waits for a live token before starting and can restart a run after token expiry.
 A guard removes the token folder after the queued task ends.
 If pueue is unreachable, it keeps the folder so the run can use the token after a daemon restart.
 

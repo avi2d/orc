@@ -14,6 +14,8 @@ Its fields are defined in `packages/run/src/widgets/beat/board.ts`.
 A new task's `wait` gives its reason for waiting, or `null`.
 Reasons include priority, an unanswered question, a dependency, or a child.
 Its `waiting` field also reports machine or account room from the last beat.
+Each beat replaces `~/.orc/backlog/waits.json` with the reasons it gave those tasks.
+A `room` wait carries the last beat's reason as `detail` and that beat's time as `at`, or `null` for both when the last beat gave the task no reason.
 
 ## Add and change tasks
 
@@ -113,7 +115,7 @@ The hold stays open until all questions are answered, and the final answer write
 Repeating the same questions keeps the hold, but different questions are refused until the open ones are answered.
 
 You can hold the task again after answering and before it starts.
-Earlier holds remain in the task's history.
+Earlier holds remain in the task's `hold_history`, where each entry names its time as `at`.
 
 ## Task notes
 

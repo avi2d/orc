@@ -1,21 +1,9 @@
 ---
 kind: how-to
 ---
-# Queues, dispatch, attention, and tasks panels
+# Tasks panel
 
-These panels show queued work, dispatch, attention items, and task history.
-
-## Run the queues tool
-
-See [Run the queues panel](dash-queues.md).
-
-## Run the dispatch tool
-
-See [Run the dispatch panel](dash-dispatch.md).
-
-## Run the attention tool
-
-See [Run the attention tool](run/attention-queue.md#run-the-attention-tool).
+The tasks panel shows projects, tasks, and a selected task.
 
 ## Run the tasks tool
 
@@ -97,6 +85,8 @@ To read the report, set these variables where the reader runs.
 | `ORC_DASH_REMOTE_MACHINE` | The other machine's name on its readings, `remote` when unset |
 
 Each command runs through `sh -c`.
+
+## Rerun the tasks report
 
 The other machine's command has a 15 second limit.
 This machine's has 5 seconds in the resources report and 2 minutes in the tasks tool.

@@ -15,7 +15,8 @@ For no-mistakes delivery, use version 1.90.0 or later.
 Configure the provider and models as [Configuring providers](configuring-providers.md) describes.
 If the provider uses a Pi login, check it with `pi auth check --provider <id>`.
 A key held only in the keychain or an environment variable is not available to the run.
-Store it in Pi's auth file instead.
+A login Pi's `/login` stores in `~/.pi/agent/auth.json` works, so write a key held only in an environment variable to that file first.
+nono reads that login with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE` and `TERM` set.
 No `ORC_` variable reaches Pi or the checks.
 
 Commit a `.no-mistakes.yaml` at the project root with at least one named check for a ship run.
@@ -54,6 +55,8 @@ Run `orc runs` to list runs and `orc show <run-id>` to inspect the steps.
 See [Seeing runs](seeing-runs.md) for logs and JSON output.
 The run folder under `$ORC_HOME/runs/<run-id>` holds the task, agent log, session, evidence, and report.
 When `ORC_HOME` is unset, the folder is under `~/.orc/runs`.
+At 300 turns or 5 compactions, an implementation session records a `long-session` warning and writes `handover.md` in the run folder.
+The handover names the commits made and why the run stopped, so a later run on the branch can continue from it.
 
 A ship run stops Pi after 45 minutes without output when no tool is running.
 Set `ORC_IDLE_TIMEOUT_SECONDS` to a positive whole number to change that limit.
@@ -95,6 +98,9 @@ Orc loads the implementer agent from `$ORC_HOME/agents/implementer.md`, then the
 An agent's model comes from its file, its role's model flag, or `config.json`, in that order.
 Both agents must use a configured provider, and the implementer and fixer must use the same provider.
 Orc refuses models absent from Pi or with a context window of 150,000 tokens or less.
+Pi compacts context at 150,000 tokens in the default sandbox.
+For `--sandbox none` with a Pi login provider, Pi uses your own compaction settings.
+With the default sandbox, orc pins each agent model window in `models.json` as that provider model override `contextWindow`.
 
-Orc puts its worktrees under `$ORC_HOME/worktrees` and distinguishes projects by a hash of the checkout path.
+Orc puts its worktrees under `$ORC_HOME/worktrees/<project>-<hash>/<branch>`, where `<hash>` is the first 8 hex digits of the SHA-256 of the checkout path.
 A resumed run can also reuse an older worktree found by Git.

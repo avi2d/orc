@@ -5,11 +5,7 @@ kind: reference
 
 Run `orc beat` every few minutes from launchd or cron to start eligible tasks and close finished runs.
 The beat has no dry-run option.
-To inspect tasks and the last recorded wait reasons without starting work, run `orc backlog`.
-
-## Inspect the backlog
-
-See [Inspect the backlog](backlog-tasks.md#inspect-the-backlog) for task status and wait reasons.
+To inspect tasks and the last recorded wait reasons without starting work, run `orc backlog`, as [Inspect the backlog](backlog-tasks.md#inspect-the-backlog) describes.
 
 ## Start tasks with the beat
 
@@ -22,10 +18,7 @@ The project's machine needs a checkout and a free slot.
 An account needs room above zero and at or above the configured floor.
 The beat chooses the account with the most room.
 A task restricted to a machine waits for a slot there.
-
-### Priority
-
-See [Set priority](backlog-tasks.md#set-priority) to order tasks.
+New tasks start in priority order, as [Set priority](backlog-tasks.md#set-priority) describes.
 
 ## Starting and closing runs
 
@@ -37,6 +30,7 @@ See [Parked runs](parked-runs.md) and [A worker split proposal](task-kinds.md#a-
 A runner task with no pueue record after 10 minutes closes failed.
 A result that remains unreadable for 10 minutes also closes failed.
 A run still waiting for an answer stays started and the beat relays the answer.
+To stop a task yourself, run `orc backlog stop <task-id>` where the backlog lives, as [Stop a task](backlog-tasks.md#stop-a-task) describes.
 
 Custom start commands receive `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`, `ORC_TASK_CHECKOUT`, `ORC_TASK_DELIVERY`, `ORC_TASK_MACHINE`, `ORC_TASK_PROVIDER`, `ORC_TASK_ACCOUNT`, `ORC_TASK_TOKEN_FILE`, `ORC_TASK_CLAUDE_CONFIG_DIR`, and `ORC_TASK_INSTRUCTIONS`.
 `ORC_TASK_LOG` names the log path, and `ORC_RUN_MACHINE` names the machine.
@@ -44,10 +38,6 @@ Custom start commands receive `ORC_TASK_ID`, `ORC_TASK_FILE`, `ORC_TASK_PROJECT`
 For a token-command account, the token arrives as `orc.token.v1` on standard input.
 For a `none` account, standard input is empty.
 For a `claude-config` account, `ORC_TASK_CLAUDE_CONFIG_DIR` names the selected directory.
-
-### Stop a task
-
-See [Stop a task](backlog-tasks.md#stop-a-task) for the stop command and PR state.
 
 ### Custom start commands and stalls
 

@@ -46,6 +46,7 @@ Set a machine's `loadLimit` above zero to pause starts while its five-minute loa
 The start command must run `orc runner start`.
 
 On a machine whose start command runs `orc runner start`, the beat also pauses starts when its heavy queue has at least three calls.
+An unread heavy queue does not hold starts.
 
 The provider must be defined in `config.json` on each machine that runs tasks.
 Token file paths in `dispatch.json` must exist on those machines.
@@ -68,7 +69,8 @@ An account missing from the document cannot run.
 ### Quota from quota-axi
 
 The quota command may instead print the document of `quota-axi --full --json --provider <id>`, such as `["quota-axi", "--full", "--json", "--provider", "codex"]`.
-Orc matches each account to `accountKey` or `accountKeys` and reads the `all_models` remaining percentage.
+Orc matches each account to `accountKey` or `accountKeys` and reads the `effectivePercentRemaining` of the entry's `all_models` scope under `quotaSemantics`, so a Codex code review window does not count.
+The account's reset time is the `resetsAt` of the scope's limiting window, the latest one when several tie, and the beat line prints it after the room.
 An account without a window or percentage cannot run.
 A document with no windows or duplicate account keys leaves the quota unread.
 

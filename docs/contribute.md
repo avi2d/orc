@@ -28,7 +28,7 @@ Start with the reader's task or question and give the answer first.
 Keep one topic on a page, use short sections with descriptive headings, and move separate details to linked pages.
 Keep facts and examples readers need, but remove repetition and vague or promotional language.
 Read the rendered page as well as the source, and follow its links.
-`bun run docs:check` requires a heading below the title on pages longer than 400 words.
+`bun run docs:check` requires at most 300 words between consecutive headings.
 The check does not scan decision records.
 The check cannot judge whether the prose is clear, so review the text as well.
 Generated references and decision records keep the structure their content needs.

@@ -1,7 +1,7 @@
 ---
 kind: how-to
 ---
-# Configure the dashboard
+# Run and configure the dashboard
 
 The dashboard combines panels in a layout that you can configure.
 
