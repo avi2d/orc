@@ -1,8 +1,6 @@
-import { basename, join, relative } from "node:path"
-import { Console, Data, Effect, FileSystem } from "effect"
+import { Console, Data, Effect, FileSystem, Path } from "effect"
 import { BunServices } from "@effect/platform-bun"
 
-const docs = join(import.meta.dir, "..", "docs")
 const limit = 300
 const exempt = new Set(["index.md", "map/index.md"])
 const headingPattern = /^#{1,6}\s+\S.*$/
@@ -11,21 +9,29 @@ class CheckDocSectionsError extends Data.TaggedError("CheckDocSectionsError")<{
   readonly message: string
 }> {}
 
-const listedOf = (fs: FileSystem.FileSystem, path: string): Effect.Effect<Array<string>, CheckDocSectionsError> =>
-  fs.stat(path).pipe(
-    Effect.mapError((cause) => new CheckDocSectionsError({ message: "cannot stat " + path + ": " + String(cause) })),
+const listedOf = (
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  target: string
+): Effect.Effect<Array<string>, CheckDocSectionsError> =>
+  fs.stat(target).pipe(
+    Effect.mapError((cause) => new CheckDocSectionsError({ message: "cannot stat " + target + ": " + String(cause) })),
     Effect.flatMap((info) => {
       if (info.type === "Directory") {
-        const base = basename(path)
-        return base === "adr" || base.startsWith(".") ? Effect.succeed([]) : markdownFiles(fs, path)
+        const base = path.basename(target)
+        return base === "adr" || base.startsWith(".") ? Effect.succeed([]) : markdownFiles(fs, path, target)
       }
-      return Effect.succeed(info.type === "File" && path.endsWith(".md") ? [path] : [])
+      return Effect.succeed(info.type === "File" && target.endsWith(".md") ? [target] : [])
     })
   )
-const markdownFiles = (fs: FileSystem.FileSystem, directory: string): Effect.Effect<Array<string>, CheckDocSectionsError> =>
+const markdownFiles = (
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  directory: string
+): Effect.Effect<Array<string>, CheckDocSectionsError> =>
   fs.readDirectory(directory).pipe(
     Effect.mapError((cause) => new CheckDocSectionsError({ message: "cannot list " + directory + ": " + String(cause) })),
-    Effect.flatMap((names) => Effect.forEach(names, (name) => listedOf(fs, join(directory, name)))),
+    Effect.flatMap((names) => Effect.forEach(names, (name) => listedOf(fs, path, path.join(directory, name)))),
     Effect.map((groups) => groups.flat())
   )
 const wordsOf = (value: string): number => {
@@ -61,15 +67,17 @@ const failuresOf = (name: string, source: string): Array<string> => {
 }
 const program = Effect.gen(function*() {
   const fs = yield* FileSystem.FileSystem
-  const files = yield* markdownFiles(fs, docs)
+  const path = yield* Path.Path
+  const docs = path.join(import.meta.dir, "..", "docs")
+  const files = yield* markdownFiles(fs, path, docs)
   if (files.length === 0) {
     return yield* new CheckDocSectionsError({ message: "No documentation pages found" })
   }
-  const wanted = files.filter((file) => !exempt.has(relative(docs, file)))
+  const wanted = files.filter((file) => !exempt.has(path.relative(docs, file)))
   const sections = yield* Effect.forEach(wanted, (file) =>
     fs.readFileString(file).pipe(
       Effect.mapError((cause) => new CheckDocSectionsError({ message: "cannot read " + file + ": " + String(cause) })),
-      Effect.map((source) => failuresOf(relative(docs, file), source))
+      Effect.map((source) => failuresOf(path.relative(docs, file), source))
     ))
   const failures = sections.flat()
   if (failures.length > 0) {
