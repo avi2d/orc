@@ -22,7 +22,8 @@ export const attentionActions = (
     const attention = yield* readAttention(root, tasks)
     const deciderOwns = deciderOwnership(attention)
     const ownedByDecider = (task: string) => (id: string): boolean => {
-      const question = tasks.find((entry) => entry.spec.id === task)?.parked?.questions.find((entry) => entry.id === id)
+      const named = tasks.find((entry) => entry.spec.id === task)?.parked?.questions.filter((entry) => entry.id === id)
+      const question = named?.find((entry) => entry.answer === null) ?? named?.at(0)
       return question !== undefined && deciderOwns(task, question)
     }
     const reported = actions.flatMap((action): ReadonlyArray<BeatAction> => {

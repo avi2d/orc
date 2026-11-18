@@ -63,7 +63,7 @@ const cardsFor = (task: Decision, cards: BoardInput["cards"]): Effect.Effect<Boa
 }
 
 const recordedWords = (task: Decision) => (card: BoardCardRecord): string | null =>
-  card.target.kind === "reason" ? null : task.questions.find((question) => question.id === cardKey(card.target))?.answer?.words ?? null
+  card.target.kind === "reason" ? null : (task.questions.find((question) => question.id === cardKey(card.target) && question.answer === null) ?? task.questions.find((question) => question.id === cardKey(card.target)))?.answer?.words ?? null
 
 const waitingOn = (record: BoardRecord, task: Decision): string =>
   record.cards.filter((card) => recordedWords(task)(card) === null).map((card) => cardKey(card.target)).join(", ")

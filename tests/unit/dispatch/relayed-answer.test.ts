@@ -4,8 +4,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { addTask, claimTask, listTasks, writeTaken, type TaskRecord } from "../../../packages/run/src/entities/backlog/index"
+import { addTask, answerWait, claimTask, listTasks, renderTaskFile, writeTaken, type TaskRecord } from "../../../packages/run/src/entities/backlog/index"
 import { answersFor, answerTask, askStartedTask, handAnswersToResume, markAnswersRelayed, parkStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
+import { readRequest } from "../../../packages/run/src/features/queueing-a-task/runner-request"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -106,6 +107,19 @@ describe("a relayed answer", () => {
       expect(await run(answerTask(root, "orc-1", "r2=Restore it", "2026-10-27T10:36:00.000Z"))).toMatchObject({ kind: "question", question: "r2", open: [] })
     })
   })
+  test("a parked task holding an answered and an open entry of one id takes the answer on the open entry instead of refusing it", async () => {
+    await withBacklog(async (root) => {
+      const added = await run(addTask(root, spec))
+      const kept = { ...r2, asked: first, blocks: true, answer: { words: "keep", at: "2026-10-27T10:05:00.000Z", relayedTo: first } }
+      const repeated = { ...r2, asked: second, blocks: true, answer: null }
+      await writeFile(join(root, "new", "orc-1.md"), renderTaskFile({ ...added, parked: { branch: "orc/orc-1", questions: [kept, repeated] } }))
+      expect(answerWait(await current(root), () => false)).toBe("parked on orc/orc-1 for the captain's answer to r2")
+      expect(await run(answerTask(root, "orc-1", "r2=drop", "2026-10-27T10:36:00.000Z"))).toMatchObject({ kind: "question", question: "r2", open: [] })
+      const answered = await current(root)
+      expect(answered.parked?.questions).toEqual([kept, { ...repeated, answer: { words: "drop", at: "2026-10-27T10:36:00.000Z", relayedTo: null } }])
+      expect(answerWait(answered, () => false)).toBeNull()
+    })
+  })
   test("a question parked with no wait is stamped with the park time instead of left with no asking", async () => {
     await withBacklog(async (root) => {
       await startStarted(root)
@@ -141,5 +155,47 @@ describe("a relayed answer", () => {
     const resumed = handAnswersToResume(record)
     expect(resumed.parked?.questions.map((question) => question.answer?.relayedTo)).toEqual([first, second])
     expect(answersFor(resumed, { asked: "2026-10-27T11:00:00.000Z", questions: [r2, r3] })).toEqual([])
+  })
+  test("a resumed task holding two answered entries of one id sends only the latest answer instead of a duplicate the run refuses", async () => {
+    await withBacklog(async (root) => {
+      const added = await run(addTask(root, spec))
+      const kept = { ...r2, asked: first, blocks: true, answer: { words: "keep", at: "2026-10-27T10:05:00.000Z", relayedTo: null } }
+      const repeated = { ...r2, asked: second, blocks: true, answer: { words: "drop", at: "2026-10-27T10:36:00.000Z", relayedTo: null } }
+      await writeFile(join(root, "new", "orc-1.md"), renderTaskFile({ ...added, parked: { branch: "orc/orc-1", origin: { machine: "mac", run: "run-1" }, questions: [kept, repeated] } }))
+      await run(claimTask(root, "orc-1"))
+      await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:40:00.000Z", log: root + "/logs/orc-1.log" } } }))
+      const request = await run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: join(root, "taken", "orc-1.md"), ORC_TASK_CHECKOUT: "/checkout", ORC_TASK_PROVIDER: "keyed" }, Effect.succeed("")))
+      expect(request.answers).toEqual([{ question: "r2", answer: "drop" }])
+    })
+  })
+  test("a live asking over two answered entries of one id relays only the latest answer instead of both", () => {
+    const record: TaskRecord = {
+      spec: { ...spec, id: "orc-1", kind: "ship", internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: null, created: "2026-10-27" },
+      hold: null,
+      parked: {
+        branch: "orc/orc-1",
+        questions: [
+          { ...r2, asked: first, blocks: true, answer: { words: "keep", at: "2026-10-27T10:05:00.000Z", relayedTo: null } },
+          { ...r2, asked: second, blocks: true, answer: { words: "drop", at: "2026-10-27T10:36:00.000Z", relayedTo: null } }
+        ]
+      },
+      state: { kind: "started", claim, started: { at: "2026-10-27T10:40:00.000Z", log: "/logs/orc-1.log" } }
+    }
+    expect(answersFor(record, { asked: "2026-10-27T11:00:00.000Z", questions: [r2] })).toEqual([
+      { ...r2, asked: second, blocks: true, answer: { words: "drop", at: "2026-10-27T10:36:00.000Z", relayedTo: null } }
+    ])
+  })
+  test("a captain answer to an id holding a captain answer and a later decider answer overturns the decider's instead of refusing it", async () => {
+    await withBacklog(async (root) => {
+      const added = await run(addTask(root, spec))
+      const captainKept = { ...r2, asked: first, blocks: true, answer: { words: "keep", at: "2026-10-27T10:05:00.000Z", relayedTo: first } }
+      const deciderDrop = { ...r2, asked: second, blocks: true, answer: { words: "drop", at: "2026-10-27T10:25:00.000Z", relayedTo: second, by: "decider" as const } }
+      await writeFile(join(root, "new", "orc-1.md"), renderTaskFile({ ...added, parked: { branch: "orc/orc-1", questions: [captainKept, deciderDrop] } }))
+      expect(await run(answerTask(root, "orc-1", "r2=final", "2026-10-27T10:36:00.000Z"))).toMatchObject({ kind: "question", question: "r2", open: [] })
+      expect((await current(root)).parked?.questions).toEqual([
+        captainKept,
+        { ...deciderDrop, answer: { words: "final", at: "2026-10-27T10:36:00.000Z", relayedTo: null, overturned: deciderDrop.answer } }
+      ])
+    })
   })
 })
