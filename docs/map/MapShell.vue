@@ -14,10 +14,12 @@ const legendOpen = typeof window !== "undefined" && window.matchMedia("(min-widt
   <div class="orc-map">
     <header class="orc-map-bar">
       <a class="map-back" :href="withBase('/')" aria-label="Back to the orc docs"><span aria-hidden="true">←</span><span class="map-back-word">Docs</span></a>
-      <p class="map-title">{{ mapTitle }}<small>Select a part to open it</small></p>
-      <button type="button" @click="$emit('openAll')">Open all</button>
-      <button type="button" @click="$emit('foldAll')">Fold all</button>
-      <button type="button" :aria-pressed="isDark" @click="isDark = !isDark">{{ isDark ? "Light" : "Dark" }}</button>
+      <p class="map-title">{{ mapTitle }}</p>
+      <div class="map-actions">
+        <button type="button" @click="$emit('openAll')">Open all</button>
+        <button type="button" @click="$emit('foldAll')">Fold all</button>
+        <button type="button" :aria-pressed="isDark" @click="isDark = !isDark">{{ isDark ? "Light" : "Dark" }}</button>
+      </div>
     </header>
     <main class="map-stage"><slot /></main>
     <details class="map-legend" :open="legendOpen">
@@ -54,26 +56,25 @@ const legendOpen = typeof window !== "undefined" && window.matchMedia("(min-widt
 }
 .orc-map-bar {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
   padding-top: max(8px, env(safe-area-inset-top));
   border-bottom: 1px solid var(--m-line);
-  background: var(--m-card);
+  background: var(--vp-nav-bg-color);
 }
-.orc-map-bar::after {
-  content: "";
-  position: absolute;
-  z-index: 1;
-  inset: auto 0 -5px 0;
-  height: 9px;
-  background: var(--paint-edge);
-  mask: var(--stroke-wavy) center / 100% 100% no-repeat;
-  pointer-events: none;
+.orc-map-bar .map-back {
+  justify-self: start;
+}
+.orc-map-bar .map-actions {
+  display: flex;
+  justify-self: end;
+  gap: 8px;
 }
 .orc-map-bar .map-title {
-  flex: 1;
+  text-align: center;
   min-width: 0;
   margin: 0;
   font-family: var(--paint-display);
@@ -83,12 +84,6 @@ const legendOpen = typeof window !== "undefined" && window.matchMedia("(min-widt
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.orc-map-bar small {
-  margin-left: 8px;
-  color: var(--m-mute);
-  font-size: 12px;
-  font-weight: 500;
 }
 .orc-map-bar a,
 .orc-map-bar button {
@@ -149,13 +144,21 @@ const legendOpen = typeof window !== "undefined" && window.matchMedia("(min-widt
   overflow: hidden;
 }
 @media (max-width: 520px) {
-  .orc-map-bar small,
   .map-back-word {
     display: none;
   }
   .orc-map-bar a,
   .orc-map-bar button {
     padding: 0 8px;
+  }
+}
+@media (max-width: 720px) {
+  .orc-map-bar {
+    row-gap: 4px;
+  }
+  .orc-map-bar .map-actions {
+    grid-column: 1 / -1;
+    justify-self: center;
   }
 }
 </style>
