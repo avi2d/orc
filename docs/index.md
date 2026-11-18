@@ -1,9 +1,10 @@
 ---
+description: "Orc is the orchestrator for your agent work: one chat runs it on all your machines and models, with a backlog, live monitoring and dashboards."
 aside: false
 pageClass: wide-page home-page
 kind: explanation
 ---
-# How orc works
+# Orc for your agent work
 
 <script setup>
 import MapLegend from "./map/MapLegend.vue"

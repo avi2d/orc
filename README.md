@@ -92,7 +92,6 @@ To open the dashboard, run `bun run dashboard` from the repository root.
 | `packages/alerts`, `packages/attention`, `packages/dispatch`, `packages/ledger`, `packages/queues`, `packages/quota`, `packages/resources`, `packages/schedules`, `packages/session-quota`, `packages/tasks` | One panel, box or tool of the dashboard each |
 | `packages/herdr-app` | The Herdr App mods and layout, which `orc app install` copies into the App |
 | `dependency-cruiser.config.ts` | The import rules the lint enforces between packages |
-| `docs/adr` | The decision records |
 
 ## Related topics
 

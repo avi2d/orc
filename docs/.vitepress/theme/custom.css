@@ -51,7 +51,7 @@
   line-height: 1.25;
 }
 
-.home-page .vp-doc > div > h1 .header-anchor {
+h1 .header-anchor {
   display: none;
 }
 
