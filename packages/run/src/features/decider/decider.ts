@@ -265,7 +265,7 @@ const settle = (root: string, task: TaskRecord, question: ParkedQuestion, entry:
       return verdict
     }
     const fresh = yield* findTask(root, task.spec.id)
-    const stored = fresh.parked?.questions.find((candidate) => candidate.id === question.id)?.answer
+    const stored = (fresh.parked?.questions.find((candidate) => candidate.id === question.id && candidate.asked === question.asked) ?? fresh.parked?.questions.find((candidate) => candidate.id === question.id))?.answer
     if (stored !== null && stored !== undefined) {
       yield* routeTaskItems(root, [fresh], at)
       return verdict

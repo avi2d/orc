@@ -25,8 +25,10 @@ A question the attention queue owns for the decider shows as `the decider's answ
 Each later beat prints `waits <task-id>: parked on <branch> for the captain's answer to <question-ids>` and never starts it.
 That line names a question the attention queue owns for the decider the same way, as `the decider's answer to <question-ids>`, and so does the `wait` that `orc backlog --json` gives the task.
 To answer one question, run `orc backlog answer <task-id> <question-id>=<text>`.
+When a later round asks an id it already asked, the answer goes to the entry that is still open.
 The task file keeps your text and its time on that question, and the other questions stay parked.
-Once every question has an answer, the next beat resumes the task on its original machine and branch with `--answer <question-id>=<text>` for each one.
+Once every question has an answer, the next beat resumes the task on its original machine and branch with `--answer <question-id>=<text>` for each id.
+When an id was asked more than once, the resume hands the latest answer for that id.
 A machine with more room cannot take that resume.
 The beat waits if the original machine has no room or no configured checkout, or if the runner cannot find the recorded run.
 A task parked before its origin was recorded also waits rather than guessing a machine.
