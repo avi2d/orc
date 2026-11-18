@@ -211,7 +211,7 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
     name: "merge_task",
     label: "Merge an orc task's PR",
     description:
-      "Squash-merges a closed task's PR through orc merge, which merges nothing and says why when the PR is not open, a check is red or has not reported, or the branch is behind its base. Call it only when asked to merge that PR, with basis captain-word on the captain's explicit word, or with basis yolo-green when asked about a yolo project's PR and the PR is green. orc refuses yolo-green for a project without yolo true.",
+      "Squash-merges a closed task's PR through orc merge, which merges nothing and says why when the PR is not open, a check is red or has not reported, or the branch is behind its base. Call it only when asked to merge that PR, with basis captain-word on the captain's explicit word, or with basis yolo-green when asked about a yolo project's PR and the PR is green. orc refuses yolo-green for a project without yolo true, and for a release, a deletion, a workflow file change or a secret change, which wait for the captain's merge word.",
     parameters: Schema.toJsonSchemaDocument(MergeInput).schema,
     execute: (_toolCallId, params) =>
       runTool(MergeInput, "merge_task", params, env, (input) => ["merge", input.id, "--basis", input.basis])

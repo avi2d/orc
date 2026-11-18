@@ -363,7 +363,14 @@ const openOrReopenPrItem = (root: string, id: string, asked: Asked): Effect.Effe
   })
 
 // Each head commit gets its own items, so a fix pushed after a red check opens anew.
-export const routePullRequest = (root: string, task: string, pr: string, view: PullRequestView, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+export const routePullRequest = (
+  root: string,
+  task: string,
+  pr: string,
+  view: PullRequestView,
+  at: string,
+  waits: ReadonlyArray<string>
+): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const ended = view.state === "MERGED" ? "merged" : view.state === "CLOSED" ? "closed without merging" : null
     const refusals = checkRefusals(view)
@@ -383,7 +390,7 @@ export const routePullRequest = (root: string, task: string, pr: string, view: P
     if (red.length > 0) {
       yield* openOrReopenPrItem(root, itemId(task, "check-red", view.headRefOid), { kind: "check-red", task, text: pr + ": the check " + red.join(", ") + " is red", asked: at, owner: "user" })
     } else if (refusals.length === 0) {
-      yield* openOrReopenPrItem(root, itemId(task, "pr-ready", view.headRefOid), { kind: "pr-ready", task, text: pr + " is ready to merge, checks green: " + greenChecks(view).join(", "), asked: at, owner: "user" })
+      yield* openOrReopenPrItem(root, itemId(task, "pr-ready", view.headRefOid), { kind: "pr-ready", task, text: pr + " is ready to merge, checks green: " + greenChecks(view).join(", ") + waits.map((wait) => "; it " + wait).join(""), asked: at, owner: "user" })
     }
   })
 

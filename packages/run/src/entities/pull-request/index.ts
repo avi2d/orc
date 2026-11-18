@@ -4,3 +4,5 @@ export { readPullRequest, checkRefusals, gh, prPattern, greenChecks, redChecks }
 export type { PullRequestView } from "./pr-view"
 export type { DirectPrRecord, PullRequestOpener } from "./direct-pr"
 export { subprocessPullRequestOpener, openDirectPr } from "./direct-pr"
+export { ownerWordChanges, readChangedFiles } from "./changed-files"
+export type { ChangedFile } from "./changed-files"

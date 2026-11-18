@@ -1,4 +1,4 @@
-import { Duration, Effect, type FileSystem, Option, Result } from "effect"
+import { Duration, Effect, type FileSystem, Option, type Path, Result } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { BacklogError, taskPr, type TaskRecord } from "../../entities/backlog/index"
 import type { BeatAction, StalledAction } from "../../entities/attention/index"
@@ -7,10 +7,11 @@ import { routePullRequest } from "../../entities/attention/index"
 import { eventRecorded, readPrState, recordEvent, writePrState } from "../../entities/events/index"
 import { checkRefusals, greenChecks, type PullRequestView } from "../../entities/pull-request/index"
 import type { RunnerError } from "../../shared/process/index"
+import { ownerWaits, yoloMerge } from "./yolo-merge"
 
 export type ReadPullRequest = (url: string) => Effect.Effect<PullRequestView, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner>
 
-type Requirements = FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
+type Requirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
 
 const prSeconds = 30
 
@@ -56,7 +57,8 @@ export const prEvents = (
   root: string,
   task: TaskRecord,
   read: ReadPullRequest,
-  at: string
+  at: string,
+  yolo: boolean
 ): Effect.Effect<Option.Option<BeatAction>, BacklogError, Requirements> =>
   Effect.gen(function*() {
     const pr = taskPr(task)
@@ -81,11 +83,15 @@ export const prEvents = (
       yield* writePrState(root, id, pr, prState)
       return Option.none()
     }
-    yield* routePullRequest(root, id, pr, view.success, at)
+    const waits = yield* Effect.result(ownerWaits(pr, view.success, yolo))
+    yield* routePullRequest(root, id, pr, view.success, at, Result.isSuccess(waits) ? waits.success ?? [] : [])
     const event = prEvent(task, pr, view.success, at, yield* eventRecorded(root, id + ".pr-ready"))
     if (event !== null) {
       yield* recordEvent(root, event)
     }
     yield* writePrState(root, id, pr, prState)
-    return Option.none()
+    if (Result.isFailure(waits)) {
+      return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: waits.failure.detail })
+    }
+    return waits.success === null || waits.success.length > 0 ? Option.none() : Option.some(yield* yoloMerge(root, id, pr))
   })

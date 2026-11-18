@@ -383,12 +383,14 @@ A start older than 30 minutes whose log has not grown for 30 minutes closes fail
 The quiet log closes the task before the 30 minute stall flag can fire.
 A started run whose output has not grown for 30 minutes prints `stalled <task-id> on <machine>: no output since <time>` once, and again after new output stalls anew.
 A PR the beat cannot read for the chat prints `cannot read the PR of <task-id> for the chat: <reason>`.
+On a project with `"yolo": true`, the beat merges a closed ship task's open PR once every check is green, through `orc merge` with `yolo-green`, as [Merging a task's PR](merging-a-tasks-pr.md) shows.
+It prints `merged <task-id> <url> on yolo-green`, or `did not merge <task-id> on yolo-green: <reason>` when `orc merge` refuses.
 A missing start command exits 127 into its log, and the task stays started until the 10 minute no-record grace or the 30 minute quiet-log grace closes it.
 Only a failure to spawn the log wrapper closes the task as `start-failed`.
 To print the beat as JSON, run `orc beat --json`, whose document names its version first as `orc.beat.v1`.
 It carries the endings as `closed`, `close-failed`, `parked` and `split` actions, and a run waiting for your answer as `asking`, `answered` or `answer-failed`.
 An `asking` action names only the questions the attention queue owns for you.
 A `parked` action names those in `questions` and the ones the decider owns in `decider`.
-It carries a stall as `stalled`, a PR the beat cannot read as `pr-unread`, and an upstream contribution as `upstream-seen`, `upstream-changed` or `upstream-unread`.
+It carries a stall as `stalled`, a PR the beat cannot read as `pr-unread`, its yolo merge as `yolo-merged` or `merge-refused`, and an upstream contribution as `upstream-seen`, `upstream-changed` or `upstream-unread`.
 It carries each open queue item as an `attention` action, as [The attention queue](attention-queue.md) shows.
 On a token command account, each beat first sends every started task its account's current token through its machine's `renew` command, as JSON on standard input.

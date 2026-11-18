@@ -5,7 +5,7 @@ import { isYolo, readDispatchConfig, readProjects } from "../../shared/config/in
 import type { ConfigError } from "../../shared/config/index"
 import type { RunnerError } from "../../shared/process/index"
 import type { MergeBasis } from "../../entities/pull-request/index"
-import { checkRefusals, gh, prPattern, type PullRequestView, readPullRequest } from "../../entities/pull-request/index"
+import { checkRefusals, gh, ownerWordChanges, prPattern, type PullRequestView, readChangedFiles, readPullRequest } from "../../entities/pull-request/index"
 
 const refuse = (detail: string) => Effect.fail(new BacklogError({ detail }))
 
@@ -66,6 +66,9 @@ export const mergeTask = (
       return yield* refuse(refusal(id, url, ["is " + view.state.toLowerCase() + ", not open"]))
     }
     const reasons = [...checkRefusals(view)]
+    if (basis === "yolo-green") {
+      reasons.push(...ownerWordChanges(yield* readChangedFiles(url).pipe(Effect.mapError((error) => new BacklogError({ detail: "orc merge " + error.detail })))))
+    }
     const behind = yield* behindBy(id, url, view)
     if (behind > 0) {
       reasons.push("is " + String(behind) + " commit" + (behind === 1 ? "" : "s") + " behind " + view.baseRefName + ", so update the branch and let its checks run again")

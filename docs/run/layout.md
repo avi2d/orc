@@ -32,6 +32,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/widgets/beat/load.ts` | The five minute load reading and the overloaded machines |
 | `packages/run/src/widgets/beat/stall.ts` | The stalled run flag kept in the backlog logs |
 | `packages/run/src/widgets/beat/task-events.ts` | The stall and PR events the beat records for every task |
+| `packages/run/src/widgets/beat/yolo-merge.ts` | The beat's merge of a yolo project's green PR through `orc merge` |
 | `packages/run/src/widgets/beat/board.ts` | The terminal board and the `orc.backlog.v1` and `orc.beat.v1` JSON |
 | `packages/run/src/widgets/beat/upstream.ts` | The beat’s read of each project’s upstream contributions and the scout task a change adds |
 | `packages/run/src/widgets/beat/beat-attention.ts` | The beat attention pass: the actions it reports and queues and the questions the decider owns |
@@ -227,6 +228,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/entities/pull-request/pr-view.ts` | The `gh pr view` reading of a task's PR and its check verdicts |
+| `packages/run/src/entities/pull-request/changed-files.ts` | The PR's changed files from the GitHub files API and the changes that wait for the captain's merge word |
 | `packages/run/src/entities/pull-request/merge-basis.ts` | The `captain-word` and `yolo-green` bases `orc merge` takes |
 | `packages/run/src/entities/pull-request/direct-pr.ts` | The direct PR opener: the push, the existing check and the create, and the opened or failed record |
 

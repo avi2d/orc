@@ -7,6 +7,8 @@ Orc squash-merges the PR only when it is open, every check is green and the bran
 Otherwise it merges nothing and says why.
 
 The chat merges on your word.
-To let it merge a yolo project's PR when you ask and the PR is green, add `"yolo": true` to that project in `projects.json`.
+To let orc merge a project's green PRs by itself, add `"yolo": true` to that project in `projects.json`.
+The beat then merges a closed task's PR once every check is green, and the chat merges one when you ask.
+A release, a deletion, a workflow file change or a secret change still waits for your word and shows in `orc attention`.
 Orc refuses a `yolo` that is not `true` or `false`, and a project with no `yolo` waits for your word.
 [Merging a task's PR](run/merging-a-tasks-pr.md) names every refusal.

@@ -2,7 +2,7 @@ import { DateTime, Duration, Effect, FileSystem, Option, type Path, Stream } fro
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { backlogPaths, type BacklogError, claimUnheld, ensureBacklog, listTasks, publishClosed, releaseTask, writeTaken, type Claim, type DeciderOwns, type TaskFileError, type TaskRecord, runLabel } from "../../entities/backlog/index"
 import type { ConfigError } from "../../shared/config/index"
-import { type Account, type DispatchConfig, type Machine, type Project, readDispatchConfig, readProjects } from "../../shared/config/index"
+import { type Account, type DispatchConfig, isYolo, type Machine, type Project, readDispatchConfig, readProjects } from "../../shared/config/index"
 import { type MachineRoom, type Placed, placeTask, readRoom, startOrder, taskWait } from "./beat-place"
 import { type QuotaReading, readQuota } from "./quota"
 import { encodeRenewal, encodeToken, type RunToken } from "../../entities/token/index"
@@ -369,7 +369,8 @@ export const runBeat = (
     const renewals = yield* Effect.forEach(latest, (task) => renewTask(fresh, task))
     const actions = yield* Effect.forEach(queued, (task) => considerTask(fresh, deciderOwns, task))
     yield* openRunDeaths(root, actions, at).pipe(Effect.andThen(writeBeatWaits(root, at, roomWaits(queued, actions, fresh.tasks, fresh.merged, deciderOwns))))
-    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at))
+    const yolo = (task: TaskRecord): boolean => projects.some((project) => project.name === task.spec.project && isYolo(project))
+    const prs = yield* Effect.forEach(latest, (task) => prEvents(root, task, sources.readPullRequest, at, yolo(task)))
     return { beat, at, quota, room: readRoom(config.machines, latest), actions: [
         ...reported,
         ...stalls.flatMap(Option.toArray),

@@ -17,6 +17,7 @@ interface Forge {
   readonly state?: "OPEN" | "CLOSED" | "MERGED"
   readonly checks?: ReadonlyArray<Rollup>
   readonly behind?: number
+  readonly files?: ReadonlyArray<string>
 }
 
 const ghCalls = (fixture: Fixture): string => join(fixture.dir, "gh-calls")
@@ -31,6 +32,10 @@ const stubGh = async (fixture: Fixture, forge: Forge): Promise<void> => {
     view,
     "J",
     "exit 0; fi",
+    "case \"$*\" in *'/files '*) cat <<'J'",
+    ...(forge.files ?? []).map((path) => JSON.stringify({ status: "modified", path, version: false })),
+    "J",
+    "exit 0;; esac",
     "if [ \"$1\" = api ]; then echo " + String(forge.behind ?? 0) + "; exit 0; fi",
     "if [ \"$1 $2\" = \"pr merge\" ]; then exit 0; fi",
     "echo 'unexpected gh call' >&2",
@@ -176,6 +181,16 @@ describe("the merge_task chat tool", () => {
       await stubGh(fixture, {})
       expect(await sessionFor(fixture).call("merge_task", { id: "orc-1", basis: "yolo-green" })).toBe("merged orc-1 " + prUrl)
       expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + head])
+    })
+  }, 60_000)
+
+  test("yolo-green on a yolo project's workflow change is refused instead of merged", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await writeProject(fixture, { yolo: true })
+      await closedWithPr(fixture)
+      await stubGh(fixture, { files: [".github/workflows/ci.yml"] })
+      expect(await rejection(sessionFor(fixture).call("merge_task", { id: "orc-1", basis: "yolo-green" }))).toContain("changes the workflow file .github/workflows/ci.yml, which waits for the captain's merge word")
+      expect(await mergeCalls(fixture)).toEqual([])
     })
   }, 60_000)
 
