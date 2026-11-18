@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { buildCards, cardPlace, filterCards, namedModels, opensTurns, railLabel, runAgent, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
+import { buildCards, cardPlace, filterCards, namedModels, opensTurns, projectsOf, railLabel, runAgent, sendBackArgs, stepRows } from "../../../packages/herdr-app/src/agents"
 import type { Backlog, Run, Runs, Task } from "../../../packages/herdr-app/src/guard"
 
 const run = (id: string, fields: Partial<Run>): Run => ({
@@ -7,11 +7,11 @@ const run = (id: string, fields: Partial<Run>): Run => ({
 })
 
 const task = (id: string, fields: Partial<Task>): Task => ({
-  id, title: `task ${id}`, project: "orc", kind: "ship", status: "new", hold: null, parked: null, parkedOrigin: null, reason: null, ...fields
+  id, title: `task ${id}`, project: "orc", kind: "ship", status: "new", hold: null, parked: null, parkedOrigin: null, reason: null, prState: null, ...fields
 })
 
 const runs = (list: ReadonlyArray<Run>): Runs => ({ schema: "orc.runs.v1", runs: list })
-const backlog = (tasks: ReadonlyArray<Task>, merged: ReadonlyArray<string> = []): Backlog => ({ schema: "orc.backlog.v1", tasks, merged })
+const backlog = (tasks: ReadonlyArray<Task>, merged: ReadonlyArray<string> = [], projects: ReadonlyArray<string> | null = null, projectCheckouts: Backlog["projectCheckouts"] = []): Backlog => ({ schema: "orc.backlog.v1", tasks, merged, projects, projectCheckouts })
 
 const board = buildCards(
   runs([
@@ -108,7 +108,7 @@ describe("the runs list", () => {
       backlog([task("orc-7", { status: "new", hold: 1 })])
     )
     expect(cards.map((card) => [card.id, card.runId, card.standing.status])).toEqual([["orc-7", null, "Awaiting you"], ["orc-7", "20261113-090000-aaaaaa", "Failed"]])
-    expect(filterCards(cards, { project: null, status: "Awaiting you" }).map((card) => card.where)).toEqual(["Question 1"])
+    expect(filterCards(cards, { project: null, status: "Awaiting you", allRuns: false }).map((card) => card.where)).toEqual(["Question 1"])
   })
 
   test("a merged PR's run is Done, not still awaiting approval", () => {
@@ -117,6 +117,25 @@ describe("the runs list", () => {
       backlog([task("orc-48", { status: "closed" })], ["orc-48"])
     )
     expect(cards.map((card) => [card.standing.status, card.where])).toEqual([["Done", "Merged PR #48"]])
+  })
+
+  test("a run whose PR merged outside orc is Done, not Awaiting you", () => {
+    const cards = buildCards(
+      runs([run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-46", prLink: "https://github.com/o/r/pull/46" })]),
+      backlog([task("orc-46", { status: "closed", prState: "merged" })])
+    )
+    expect(cards.map((card) => [card.standing.status, card.where])).toEqual([["Done", "Merged PR #46"]])
+  })
+
+  test("a run whose PR closed unmerged on GitHub is Failed, whatever the run recorded, not Awaiting you or Done", () => {
+    const cards = buildCards(
+      runs([
+        run("20261113-090000-aaaaaa", { status: "succeeded", branch: "orc/orc-46", prLink: "https://github.com/o/r/pull/46" }),
+        run("20261113-090000-bbbbbb", { status: "stopped", branch: "orc/orc-48", prLink: "https://github.com/o/r/pull/48", endReason: "stopped" })
+      ]),
+      backlog([task("orc-46", { status: "closed", prState: "closed" }), task("orc-48", { status: "closed", prState: "merged" })])
+    )
+    expect(cards.map((card) => [card.id, card.standing.status, card.where])).toEqual([["orc-46", "Failed", "Closed PR #46"], ["orc-48", "Done", "Merged PR #48"]])
   })
 
   test("a task rerun three times shows every run, not only its newest run", () => {
@@ -132,15 +151,15 @@ describe("the runs list", () => {
   })
 
   test("the Status filter keeps only Failed runs, not the Done ones beside them", () => {
-    expect(filterCards(board, { project: null, status: "Failed" }).map((card) => card.where)).toEqual(["orc exited 1"])
+    expect(filterCards(board, { project: null, status: "Failed", allRuns: false }).map((card) => card.where)).toEqual(["orc exited 1"])
   })
 
   test("the Project filter keeps one project's runs, not every project's", () => {
-    expect(filterCards(board, { project: "herdr", status: null }).map((card) => card.where)).toEqual(["Question 1"])
+    expect(filterCards(board, { project: "herdr", status: null, allRuns: false }).map((card) => card.where)).toEqual(["Question 1"])
   })
 
   test("both filters together keep runs that match both, not either", () => {
-    expect(filterCards(board, { project: "herdr", status: "Running" })).toEqual([])
+    expect(filterCards(board, { project: "herdr", status: "Running", allRuns: false })).toEqual([])
   })
 })
 
@@ -288,5 +307,64 @@ describe("the Approve step and the Changes column of a run", () => {
       run("20261113-080000-bbbbbb", { branch: "orc/orc-8" })
     ]), backlog([]))
     expect(cards.map((card) => card.checkout)).toEqual([{ worktree: "/home/sam/.orc/worktrees/orc-1/orc/orc-7", branch: "orc/orc-7" }, null])
+  })
+})
+
+describe("the Project row", () => {
+  const mixed = buildCards(
+    runs([
+      run("20261113-090000-aaaaaa", { status: "failed", endReason: "known failure" }),
+      run("20261113-080000-bbbbbb", { status: "failed", endReason: "clone failure", project: "/work/orc-clone" })
+    ]),
+    backlog([task("orc-7", { project: "tui-dash" })], [], ["orc"])
+  )
+
+  test("a run of a project orc does not know is hidden by default, not counted in the list", () => {
+    expect(filterCards(mixed, { project: null, status: null, allRuns: false }).map((card) => card.where)).toEqual(["known failure"])
+  })
+
+  test("All runs still shows the runs of projects orc does not know, not only the known ones", () => {
+    expect(filterCards(mixed, { project: null, status: null, allRuns: true }).map((card) => card.project)).toEqual(["tui-dash", "orc", "orc-clone"])
+  })
+
+  test("the Project row offers only projects in orc's projects file, not every project a run names", () => {
+    expect(projectsOf(mixed)).toEqual(["orc"])
+  })
+
+  test("an unread projects file hides no project rather than every one", () => {
+    const cards = buildCards(runs([run("20261113-080000-bbbbbb", { status: "failed", project: "/work/orc-clone" })]), backlog([]))
+    expect(projectsOf(cards)).toEqual(["orc-clone"])
+  })
+
+  test("a taskless run in a known checkout is shown by default, not hidden as an unknown project", () => {
+    const cards = buildCards(
+      runs([run("20261113-090000-aaaaaa", { status: "failed", project: "/work/herdr-app", branch: "orc/20261113-090000-aaaaaa", endReason: "boom" })]),
+      backlog([], [], ["herdr"], [{ name: "herdr", paths: ["/work/herdr-app"] }])
+    )
+    expect(cards.map((card) => [card.project, card.known])).toEqual([["herdr", true]])
+    expect(filterCards(cards, { project: null, status: null, allRuns: false }).map((card) => card.key)).toEqual(["20261113-090000-aaaaaa"])
+  })
+
+  test("a taskless run in no known checkout keeps its folder name, not another project's", () => {
+    const cards = buildCards(
+      runs([run("20261113-090000-aaaaaa", { status: "failed", project: "/work/stranger-app", branch: "orc/20261113-090000-aaaaaa", endReason: "boom" })]),
+      backlog([], [], ["herdr"], [{ name: "herdr", paths: ["/work/herdr-app"] }])
+    )
+    expect(cards.map((card) => [card.project, card.known])).toEqual([["stranger-app", false]])
+    expect(filterCards(cards, { project: null, status: null, allRuns: false })).toEqual([])
+  })
+
+  test("the selected unknown run stays listed, not replaced by the first known run", () => {
+    const cards = buildCards(
+      runs([
+        run("20261113-090000-aaaaaa", { status: "failed", endReason: "known failure" }),
+        run("20261113-080000-bbbbbb", { status: "failed", endReason: "clone failure", project: "/work/orc-clone" })
+      ]),
+      backlog([task("orc-7", { project: "tui-dash" })], [], ["orc"])
+    )
+    const unknown = cards.find((card) => card.key === "20261113-080000-bbbbbb") ?? null
+    expect(unknown?.known).toBe(false)
+    const visible = filterCards(cards, { project: null, status: null, allRuns: false }, unknown?.key ?? null)
+    expect(visible.map((card) => card.key)).toContain("20261113-080000-bbbbbb")
   })
 })

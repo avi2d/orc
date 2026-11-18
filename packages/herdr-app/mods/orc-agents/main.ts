@@ -29,7 +29,7 @@ const readingOf = <A>(keyed: Keyed<A> | null, of: string | null): Reading<A> =>
 
 export default class OrcAgents extends View {
   cards: Reading<ReadonlyArray<Card>> = { kind: "reading" }
-  filter: Filter = { project: null, status: null }
+  filter: Filter = { project: null, status: null, allRuns: false }
   selectedKey: string | null = null
   chosen: Chosen | null = null
   pane: Pane = "turns"
@@ -236,7 +236,7 @@ export default class OrcAgents extends View {
   }
 
   visibleCards(): ReadonlyArray<Card> {
-    return this.cards.kind === "ok" ? filterCards(this.cards.value, this.filter) : []
+    return this.cards.kind === "ok" ? filterCards(this.cards.value, this.filter, this.selectedKey) : []
   }
 
   selectedCard(): Card | null {
@@ -342,7 +342,7 @@ export default class OrcAgents extends View {
     const asked = openAsk(shared(agentsOpenKey))
     if (asked === null || asked.at === this.opened) return
     this.opened = asked.at
-    this.filter = { project: null, status: null }
+    this.filter = { project: null, status: null, allRuns: false }
     this.select(cx, asked.run)
     setShared(agentsOpenKey, null)
   }

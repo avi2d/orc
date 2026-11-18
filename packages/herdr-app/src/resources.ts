@@ -1,4 +1,4 @@
-import { type Guard, type Guarded, arrayOf, child, fields, literal, number, ok, string } from "./guard"
+import { type Guard, type Guarded, arrayOf, child, fields, literal, namedFields, number, ok, string } from "./guard"
 
 export type Known<A> =
   | { readonly kind: "ok"; readonly value: A }
@@ -137,13 +137,11 @@ export interface Named<A> {
 }
 
 const named = <A>(key: string, body: Guard<A>): Guard<Named<A>> => (value, at) => {
-  const record = fields(value, at)
-  if (record.kind === "refused") return record
-  const name = string(record.value, "name", at)
-  if (name.kind === "refused") return name
-  const reading = outcome(record.value, key, at, body)
+  const namedRecord = namedFields(value, at)
+  if (namedRecord.kind === "refused") return namedRecord
+  const reading = outcome(namedRecord.value.record, key, at, body)
   if (reading.kind === "refused") return reading
-  return ok({ name: name.value, reading: reading.value })
+  return ok({ name: namedRecord.value.name, reading: reading.value })
 }
 
 const group: Guard<string> = (value, at) => {
