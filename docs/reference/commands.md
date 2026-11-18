@@ -497,7 +497,11 @@ Examples:
 Usage: orc merge <task-id> [--basis <captain-word|yolo-green>]
 
 Merges the PR of a closed task with a squash at the head it checked, and refuses
-a PR that is not open, not green or behind its base.
+a PR that is not open or not green. When the PR is behind its base, runs
+GitHub's update-branch at the checked head, waits up to 20 minutes for the
+checks on the new head and merges it once they are green. When update-branch
+reports a merge conflict or a check on the new head is red, merges nothing and
+sends the task back for a fix as orc backlog send-back does.
 
 Options:
   --basis <captain-word|yolo-green>
