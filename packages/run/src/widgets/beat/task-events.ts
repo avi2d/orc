@@ -1,6 +1,6 @@
 import { Duration, Effect, type FileSystem, Option, type Path, Result } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { BacklogError, taskPr, type TaskRecord } from "../../entities/backlog/index"
+import { BacklogError, ranClosing, taskPr, type TaskRecord } from "../../entities/backlog/index"
 import type { BeatAction, StalledAction } from "../../entities/attention/index"
 import type { ChatEvent, PrState } from "../../entities/events/index"
 import { routePullRequest } from "../../entities/attention/index"
@@ -93,5 +93,11 @@ export const prEvents = (
     if (Result.isFailure(waits)) {
       return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: waits.failure.detail })
     }
-    return waits.success === null || waits.success.length > 0 ? Option.none() : Option.some(yield* yoloMerge(root, id, pr))
+    if (waits.success === null || waits.success.length > 0) {
+      return Option.none()
+    }
+    if (ranClosing(task)?.outcome !== "done") {
+      return Option.none()
+    }
+    return Option.some(yield* yoloMerge(root, id, pr))
   })

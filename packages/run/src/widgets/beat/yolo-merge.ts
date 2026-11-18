@@ -6,18 +6,15 @@ import { checkRefusals, ownerWordChanges, type PullRequestView, readChangedFiles
 import { mergeTask } from "../../features/merging-a-pr/index"
 import type { RunnerError } from "../../shared/process/index"
 
-export const beatMergeWaits = (yolo: boolean, view: PullRequestView): ReadonlyArray<string> => [
-  ...(yolo ? [] : ["the project has no yolo true, so its PRs merge only on the captain's word"]),
-  ...(view.state === "OPEN" ? [] : ["is " + view.state.toLowerCase() + ", not open"]),
-  ...checkRefusals(view)
-]
+export const beatReady = (yolo: boolean, view: PullRequestView): boolean =>
+  yolo && view.state === "OPEN" && checkRefusals(view).length === 0
 
 export const ownerWaits = (
   pr: string,
   view: PullRequestView,
   yolo: boolean
 ): Effect.Effect<ReadonlyArray<string> | null, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
-  beatMergeWaits(yolo, view).length > 0 ? Effect.succeed(null) : readChangedFiles(pr).pipe(Effect.map(ownerWordChanges))
+  beatReady(yolo, view) ? readChangedFiles(pr).pipe(Effect.map(ownerWordChanges)) : Effect.succeed(null)
 
 export const yoloMerge = (
   root: string,

@@ -177,12 +177,12 @@ export const parts: readonly MapPart[] = [
   { id: "failed", inside: "ends", title: "Failed", tone: "end", text: "It could not start, it died, or its checks stayed red." },
   { id: "report", inside: "ends", title: "A report", tone: "ok", text: "A scout or task run ends with a report, not a pull request." },
   { id: "pull-request", inside: "ends", title: "A pull request", tone: "ok", text: "A code change, checked before it reaches you. Delivery may include review." },
-  { id: "merge", mono: true, inside: "ends", title: "orc merge", text: "You land the pull request once CI is green.", page: "concepts/merge" },
-  { id: "merge-ask", inside: "merge", title: "Who asks", points: ["you, with orc merge", "the chat, with its merge tool", "the app, with its Approve step"] },
+  { id: "merge", mono: true, inside: "ends", title: "orc merge", text: "You land the pull request once CI is green, or the beat lands it on a yolo project.", page: "concepts/merge" },
+  { id: "merge-ask", inside: "merge", title: "Who asks", points: ["you, with orc merge", "the chat, with its merge tool", "the app, with its Approve step", "the beat, by itself on a yolo project"] },
   { id: "merge-holds", inside: "merge", title: "Do all four hold?", points: ["the task names a pull request", "it is open", "every check reported green", "the branch is not behind its base"] },
   { id: "merge-refused", inside: "merge", title: "Refused: nothing merges", text: "The refusal names every reason." },
   { id: "merge-done", inside: "merge", title: "Squash merge", tone: "ok", text: "At the exact commit it checked." },
-  { id: "merge-word", inside: "merge", title: "Whose word merges", text: "Yours. The decider answers no question about merging." }
+  { id: "merge-word", inside: "merge", title: "Whose word merges", text: "Yours, or the yolo you set. The decider answers no question about merging." }
 ]
 
 // A label has to read true from the folded part too, because a folded part keeps the labels of its inner parts.
