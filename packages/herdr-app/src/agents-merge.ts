@@ -9,14 +9,17 @@ export interface Merge {
 
 export const mergeCommand = "merge:"
 
-const mergeTimeoutMs = 600_000
+const mergeTimeoutMs = 25 * 60 * 1000
 
 const firstLine = (text: string): string => text.trim().split("\n")[0] ?? ""
 
 export const runMerge = (task: string): Promise<string | null> =>
   exec("orc", ["merge", task, "--basis", "captain-word"], { timeout: mergeTimeoutMs }).then(
     (result) => result.code === 0 ? null : `orc merge ${task} exited ${result.code}: ${firstLine(result.stderr) || firstLine(result.stdout)}`,
-    () => `orc merge ${task} did not finish. Check that orc is on PATH.`
+    (reason: unknown) => {
+      const said = reason instanceof Error ? reason.message : String(reason)
+      return /timed? ?out/i.test(said) ? `orc merge ${task} timed out waiting for checks.` : `orc merge ${task} did not finish: ${said}.`
+    }
   )
 
 export const mergedNote = (task: string): void => {
