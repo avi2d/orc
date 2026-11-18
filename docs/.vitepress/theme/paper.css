@@ -94,9 +94,11 @@ body {
 }
 
 .VPNav::after,
-.VPLocalNav::after {
+.VPLocalNav::after,
+.orc-map-bar::after {
   content: "";
   position: absolute;
+  z-index: 1;
   inset: auto 0 -5px 0;
   height: 9px;
   background: var(--paint-edge);
@@ -110,6 +112,14 @@ body {
 
 .VPNavBarTitle .logo {
   height: 38px;
+}
+
+.VPNav .VPNavBarTitle.has-sidebar .title {
+  border-bottom: 0;
+}
+
+.VPNav .VPNavBar :is(.appearance, .social-links)::before {
+  display: none;
 }
 
 .vp-doc .header-anchor {
