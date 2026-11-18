@@ -179,9 +179,9 @@ export const parts: readonly MapPart[] = [
   { id: "pull-request", inside: "ends", title: "A pull request", tone: "ok", text: "A code change, checked before it reaches you. Delivery may include review." },
   { id: "merge", mono: true, inside: "ends", title: "orc merge", text: "You land the pull request once CI is green.", page: "concepts/merge" },
   { id: "merge-ask", inside: "merge", title: "Who asks", points: ["you, with orc merge", "the chat, with its merge tool", "the app, with its Approve step"] },
-  { id: "merge-holds", inside: "merge", title: "Do all four hold?", points: ["the task names a pull request", "it is open", "every check reported green", "the branch is not behind its base"] },
+  { id: "merge-holds", inside: "merge", title: "Do all three hold?", points: ["the task names a pull request", "it is open", "every check reported green"] },
   { id: "merge-refused", inside: "merge", title: "Refused: nothing merges", text: "The refusal names every reason." },
-  { id: "merge-done", inside: "merge", title: "Squash merge", tone: "ok", text: "At the exact commit it checked." },
+  { id: "merge-done", inside: "merge", title: "Squash merge", tone: "ok", text: "At the exact commit it checked, updating a branch behind its base first." },
   { id: "merge-word", inside: "merge", title: "Whose word merges", text: "Yours. The decider answers no question about merging." }
 ]
 

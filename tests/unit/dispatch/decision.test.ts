@@ -124,7 +124,7 @@ describe("a decision", () => {
       await decisionBacklog(root)
       const refusal = "is a decision, so it takes no "
       expect(await failureDetail(holdTask(root, "orc-1", { reason: "wait", until: null, questions: [] }))).toContain("orc-1 " + refusal + "hold")
-      expect(await failureDetail(mergeTask(root, "orc-1", "captain-word"))).toContain("orc-1 " + refusal + "merge")
+      expect(await failureDetail(mergeTask(root, "orc-1", "captain-word", () => Effect.succeed("sent back")))).toContain("orc-1 " + refusal + "merge")
       expect(await backlogStates(root)).toEqual(["orc-1:new"])
     })
   })
