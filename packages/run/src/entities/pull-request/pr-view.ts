@@ -39,24 +39,33 @@ const runVerdict = (run: CheckRun): CheckVerdict => {
 }
 
 // GitHub keeps a cancelled run beside its re-run under one run and name, so only the newest run of each run and name speaks for the check.
-const runScope = (run: CheckRun): string => run.detailsUrl?.match(/\/actions\/runs\/(\d+)(?:\/|$)/)?.[1] ?? run.workflowName ?? ""
+const runId = (run: CheckRun): string | null => run.detailsUrl?.match(/\/actions\/runs\/(\d+)(?:\/|$)/)?.[1] ?? null
+const runScope = (run: CheckRun): string => runId(run) ?? run.workflowName ?? ""
 const newestRuns = (runs: ReadonlyArray<CheckRun>): ReadonlyArray<CheckRun> => {
   const newest = new Map<string, CheckRun>()
   for (const run of runs) {
     const key = runScope(run) + "\0" + run.name
     const seen = newest.get(key)
-    if (seen === undefined || run.startedAt > seen.startedAt) {
+    if (seen === undefined) {
+      newest.set(key, run)
+    } else if ((seen.status === "COMPLETED") !== (run.status === "COMPLETED")) {
+      if (run.status !== "COMPLETED") {
+        newest.set(key, run)
+      }
+    } else if (run.startedAt > seen.startedAt) {
       newest.set(key, run)
     }
   }
   return [...newest.values()]
 }
 
+const runName = (run: CheckRun): string => run.workflowName === undefined || run.workflowName === "" ? run.name : run.workflowName + "/" + run.name
+
 const checkVerdicts = (view: PullRequestView): ReadonlyArray<NamedVerdict> => {
   const runs = view.statusCheckRollup.filter((entry) => "status" in entry)
   const contexts = view.statusCheckRollup.filter((entry) => "context" in entry)
   return [
-    ...newestRuns(runs).map((run) => ({ name: run.workflowName === undefined || run.workflowName === "" ? run.name : run.workflowName + "/" + run.name, verdict: runVerdict(run) })),
+    ...newestRuns(runs).map((run) => ({ name: runName(run), verdict: runVerdict(run) })),
     ...contexts.map((context): NamedVerdict => ({
       name: context.context,
       verdict: context.state === "SUCCESS" ? "green" : unreportedStates.has(context.state) ? "unreported" : "red"
@@ -70,6 +79,18 @@ const namesWith = (verdicts: ReadonlyArray<NamedVerdict>, verdict: CheckVerdict)
 export const greenChecks = (view: PullRequestView): ReadonlyArray<string> => namesWith(checkVerdicts(view), "green")
 
 export const redChecks = (view: PullRequestView): ReadonlyArray<string> => namesWith(checkVerdicts(view), "red")
+
+export interface RedRun {
+  readonly name: string
+  readonly run: string
+  readonly detailsUrl: string
+}
+
+export const redRuns = (view: PullRequestView): ReadonlyArray<RedRun> =>
+  newestRuns(view.statusCheckRollup.filter((entry) => "status" in entry)).flatMap((run) => {
+    const id = runId(run)
+    return runVerdict(run) === "red" && id !== null && run.detailsUrl !== undefined ? [{ name: runName(run), run: id, detailsUrl: run.detailsUrl }] : []
+  })
 
 export const checkRefusals = (view: PullRequestView): ReadonlyArray<string> => {
   const verdicts = checkVerdicts(view)

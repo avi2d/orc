@@ -58,7 +58,10 @@ The beat opens an item for each run event, owned by the user:
 
 - A run that died opens a `run-died` item, when its task closes failed or its start fails.
   A run that ends done or that you stop opens none.
-- A red check on a closed ship task's PR opens a `check-red` item for the PR's head commit.
+- A red check on a closed ship task's PR first makes orc run `gh run rerun <run-id> --failed` once for that PR.
+  orc records the rerun as `ci_rerun` in the task file and posts a chat event, and opens no item yet.
+  A check with no GitHub Actions run link skips the rerun.
+- A red check after that rerun opens a `check-red` item for the PR's head commit, with the failed check's link in its text.
   Checks that turn green on that commit, or a new commit, withdraw it.
   Merging the PR or closing it without merging withdraws it.
 - A closed ship task's PR with every check reporting green opens a `pr-ready` item for its head commit.

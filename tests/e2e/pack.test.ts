@@ -112,6 +112,7 @@ const expectedFiles = [
   "src/features/decider/decider-guard.ts",
   "src/entities/attention/attention-item.ts",
   "src/entities/attention/failing-command.ts",
+  "src/entities/attention/pull-request-items.ts",
   "src/entities/backlog/task-record-answer.ts",
   "src/features/queueing-a-task/runner-answer.ts",
   "src/entities/orc-rules/orc-rules.ts",

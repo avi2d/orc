@@ -1,5 +1,6 @@
 export { decisionText } from "./attention-item"
-export { reviewQuestionId, answerItem, readAttention, openRunDeaths, routeTaskItems, deciderTimeoutMillis, claimDeciding, openItems, taskItems, recordDecision, openReviewQuestions, routePullRequest } from "./attention"
+export { reviewQuestionId, answerItem, readAttention, openRunDeaths, routeTaskItems, deciderTimeoutMillis, claimDeciding, openItems, taskItems, recordDecision, openReviewQuestions } from "./attention"
+export { routePullRequest } from "./pull-request-items"
 export { ageMillis, isOverdue } from "./attention-overdue"
 export type { AttentionItem, Decision } from "./attention-item"
 export type { DecidedItem, OpenItem, AttentionSnapshot } from "./attention"
