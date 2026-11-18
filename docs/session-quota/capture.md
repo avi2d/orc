@@ -76,6 +76,13 @@ That keeps the start of a 31 day month window in the ledger.
 | `provider` and `model` | For `pi-call`, the names Pi gave them |
 | `messageAt` | For `pi-call`, the ISO instant Pi stamped on the message |
 | `tokens` | For `pi-call`, `input`, `output`, `cacheRead` and `cacheWrite` |
+
+## Read Claude readings
+
+The Claude rows detail readings from the statusline and headless processes.
+
+| Field | What it holds |
+| --- | --- |
 | `claudeHome` | For `claude-code-reading` and `claude-headless-reading`, the Claude home or config folder it was taken under |
 | `totalApiDurationMs` | For `claude-code-reading`, Claude Code's API time so far, which grows only when a response arrives |
 | `windows` | For `claude-code-reading` and `claude-headless-reading`, each window's `window`, `usedPercent` and ISO `resetsAt` |

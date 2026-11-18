@@ -103,9 +103,24 @@ const sentencesAndLinesOf = (text: string): ReadonlyArray<string> => {
   return out
 }
 
+const opensClause = (before: string): boolean => before === "" || /[.!?:;]["'”’)]*\s$/.test(before)
+
+const closesClause = (wanted: string, after: string): boolean =>
+  after === "" || (/[.!?:;]["'”’)]*$/.test(wanted) && /^\s/.test(after)) || /^["'”’)]*[.!?:;](?:["'”’)]*\s|["'”’)]*$)/.test(after)
+
+// A quote holding only a word or two of a sentence must not pass as a rule, so its ends have to sit on clause marks.
+const holdsClause = (segment: string, wanted: string): boolean => {
+  for (let at = segment.indexOf(wanted); at !== -1; at = segment.indexOf(wanted, at + 1)) {
+    if (opensClause(segment.slice(0, at)) && closesClause(wanted, segment.slice(at + wanted.length))) {
+      return true
+    }
+  }
+  return false
+}
+
 const quotedSource = (quote: string, sources: ReadonlyArray<RuleSource>): RuleSource | undefined => {
   const wanted = stripMarker(unquoted(quote))
-  return wanted === "" ? undefined : sources.find((source) => sentencesAndLinesOf(source.text).includes(wanted))
+  return wanted === "" ? undefined : sources.find((source) => sentencesAndLinesOf(source.text).some((segment) => holdsClause(segment, wanted)))
 }
 
 interface Earlier {
@@ -140,7 +155,7 @@ const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlie
     case "answer": {
       const found = quotedSource(reply.rule, sources)
       return found === undefined
-        ? { kind: "escalated", reason: "the decider answered " + JSON.stringify(reply.answer) + " on a rule in none of the rules it read as a whole sentence or line: " + JSON.stringify(reply.rule) }
+        ? { kind: "escalated", reason: "the decider answered " + JSON.stringify(reply.answer) + " on a rule in none of the rules it read word for word from a clause start to a clause end: " + JSON.stringify(reply.rule) }
         : { kind: "answered", words: reply.answer.trim(), basis: { kind: "rule", quote: stripMarker(unquoted(reply.rule)), source: found.source, reason: reply.reason } }
     }
     case "duplicate": {
@@ -250,7 +265,7 @@ const settle = (root: string, task: TaskRecord, question: ParkedQuestion, entry:
       return verdict
     }
     const fresh = yield* findTask(root, task.spec.id)
-    const stored = fresh.parked?.questions.find((candidate) => candidate.id === question.id)?.answer
+    const stored = (fresh.parked?.questions.find((candidate) => candidate.id === question.id && candidate.asked === question.asked) ?? fresh.parked?.questions.find((candidate) => candidate.id === question.id))?.answer
     if (stored !== null && stored !== undefined) {
       yield* routeTaskItems(root, [fresh], at)
       return verdict

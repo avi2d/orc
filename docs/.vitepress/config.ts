@@ -102,14 +102,32 @@ const tasks = [
   page("Install no-mistakes", "/run/installing-no-mistakes"),
   page("Choose the no-mistakes binary", "/run/choosing-the-no-mistakes-binary"),
   page("Grant toolchain folders to the sandbox", "/run/toolchain-folders"),
-  page("Show orc in the Herdr App", "/herdr-app"),
-  page("Open orc-dash", "/dash"),
+  { text: "Show orc in the Herdr App", link: "/herdr-app", items: [
+    page("Read the Board and Resources tabs", "/herdr-app-board"),
+    page("Follow runs and chat in the Herdr App", "/herdr-app-agents"),
+    page("Develop the orc Herdr App mods", "/herdr-app-development")
+  ] },
+  { text: "Open orc-dash", link: "/dash", items: [
+    page("Run and configure the dashboard", "/dash-dashboard"),
+    page("Run the quota panel", "/dash-quota"),
+    page("Run the resources panel", "/dash-resources"),
+    page("Run the queues panel", "/dash-queues"),
+    page("Run the dispatch panel", "/dash-dispatch"),
+    page("Tasks panel", "/dash-tasks"),
+    page("Alerts panel", "/dash-reports"),
+    page("Take a dashboard snapshot", "/dash-snapshot"),
+    page("Develop orc-dash", "/dash-development")
+  ] },
   page("Contribute", "/contribute")
 ]
 
 const reference = [
   page("Commands", "/reference/commands"),
-  page("The backlog and the beat", "/run/backlog-and-beat"),
+  { text: "The backlog and the beat", link: "/run/backlog-and-beat", items: [
+    page("Backlog configuration", "/run/backlog-configuration"),
+    page("Manage backlog tasks", "/run/backlog-tasks"),
+    page("The beat and task runs", "/run/beat-runs")
+  ] },
   page("Task kinds", "/run/task-kinds"),
   page("Delivery modes", "/run/delivery-modes"),
   page("Running a task", "/run/running-a-task"),
