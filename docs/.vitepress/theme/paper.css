@@ -118,7 +118,15 @@ body {
   border-bottom: 0;
 }
 
-.VPNav .VPNavBar :is(.appearance, .social-links)::before {
+.VPNavBar .VPNavBarAppearance {
+  margin-inline: 20px;
+}
+
+.VPNavBar .VPNavBarSocialLinks {
+  margin-left: 0;
+}
+
+.VPNav .VPNavBar :is(.VPNavBarAppearance, .VPNavBarSocialLinks)::before {
   display: none;
 }
 
