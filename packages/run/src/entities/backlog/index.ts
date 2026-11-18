@@ -29,6 +29,7 @@ export {
   closeStartedTask,
   answeredOnly,
   markPosted,
+  markCiRerun,
   rewriteNew,
   rewriteTaken,
   findTask,
@@ -92,6 +93,7 @@ export type {
   Hold,
   Parked,
   TaskRecord,
+  CiRerun,
   TaskPriority,
   DeciderOwns,
 } from "./task-record"

@@ -86,7 +86,8 @@ const stateFields = (record: TaskRecord): ReadonlyArray<string> => {
         field("reason", state.closing.reason),
         ...(answer === null ? [] : [field("answer", answer.words), field("answered_at", answer.at)]),
         ...ran.pr,
-        ...(state.postedAt === null ? [] : [field("posted_at", state.postedAt)])
+        ...(state.postedAt === null ? [] : [field("posted_at", state.postedAt)]),
+        ...(state.ciRerun === undefined ? [] : [field("ci_rerun", state.ciRerun)])
       ]
     }
   }

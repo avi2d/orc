@@ -95,7 +95,10 @@ export interface RanClosing {
 
 type Closing = { readonly outcome: "start-failed"; readonly reason: string } | RanClosing
 
-type ClosedState = { readonly kind: "closed"; readonly closedAt: string; readonly postedAt: string | null } & (
+const CiRerun = Schema.Struct({ pr: Schema.String, runs: Schema.Array(Schema.String), at: Schema.String })
+export type CiRerun = typeof CiRerun.Type
+
+type ClosedState = { readonly kind: "closed"; readonly closedAt: string; readonly postedAt: string | null; readonly ciRerun?: CiRerun } & (
   | { readonly claim: Claim; readonly closing: Closing }
   | { readonly claim: null; readonly closing: { readonly outcome: "dropped"; readonly reason: string } | AnsweredClosing }
 )
@@ -212,7 +215,8 @@ const Frontmatter = Schema.Struct({
   reason: Schema.optional(Schema.String),
   pr: Schema.optional(Schema.String),
   report: Schema.optional(Schema.String),
-  posted_at: Schema.optional(Schema.String)
+  posted_at: Schema.optional(Schema.String),
+  ci_rerun: Schema.optional(CiRerun)
 })
 type Frontmatter = typeof Frontmatter.Type
 
@@ -319,7 +323,7 @@ const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => 
   if (claim === null || closing === null || front.closed_at === undefined) {
     return "a closed task names no claim, outcome or close time"
   }
-  return { kind: "closed", claim, closing, closedAt: front.closed_at, postedAt: front.posted_at ?? null }
+  return { kind: "closed", claim, closing, closedAt: front.closed_at, postedAt: front.posted_at ?? null, ...(front.ci_rerun === undefined ? {} : { ciRerun: front.ci_rerun }) }
 }
 
 const splitFrontmatter = (text: string): { readonly head: string; readonly body: string } | null => {

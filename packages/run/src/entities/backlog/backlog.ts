@@ -1,5 +1,5 @@
 import { Array as Arr, Effect, FileSystem, Schema } from "effect"
-import { answerWait, type DeciderOwns, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
+import { answerWait, type CiRerun, type DeciderOwns, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 import { renderTaskFile } from "./task-record-render"
 import { BacklogError, backlogPaths, grabIn, platformFailure, publishOnce, readNames, recoverGrabs, scratchName, takenGrab } from "./backlog-write"
 
@@ -284,18 +284,22 @@ const readClosed = (root: string, id: string): Effect.Effect<TaskRecord, Backlog
     Effect.filterOrFail((record) => record !== null, () => new BacklogError({ detail: "the backlog holds no closed " + id }))
   )
 
-const writePosted = (root: string, id: string, postedAt: string): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+type ClosedRecord = TaskRecord & { readonly state: Extract<TaskRecord["state"], { readonly kind: "closed" }> }
+
+const isClosed = (record: TaskRecord): record is ClosedRecord => record.state.kind === "closed"
+
+const rewriteClosed = (root: string, id: string, change: (record: ClosedRecord) => TaskRecord | null): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const paths = backlogPaths(root)
     const record = yield* readClosed(root, id)
-    if (record.state.kind !== "closed" || record.state.postedAt !== null) {
+    const changed = isClosed(record) ? change(record) : null
+    if (changed === null) {
       return false
     }
-    const posted: TaskRecord = { ...record, state: { ...record.state, postedAt } }
     const file = paths.taskFile("closed", id)
     const scratch = scratchName(paths.folder("closed"), id)
-    yield* fs.writeFileString(scratch, renderTaskFile(posted)).pipe(Effect.mapError(platformFailure("write " + scratch)))
+    yield* fs.writeFileString(scratch, renderTaskFile(changed)).pipe(Effect.mapError(platformFailure("write " + scratch)))
     yield* fs.rename(scratch, file).pipe(Effect.mapError(platformFailure("write " + file)))
     return true
   })
@@ -304,7 +308,15 @@ export const markPosted = (
   root: string,
   id: string,
   postedAt: string
-): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> => writePosted(root, id, postedAt)
+): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  rewriteClosed(root, id, (record) => record.state.postedAt !== null ? null : { ...record, state: { ...record.state, postedAt } })
+
+export const markCiRerun = (
+  root: string,
+  id: string,
+  rerun: CiRerun
+): Effect.Effect<boolean, BacklogError | TaskFileError, FileSystem.FileSystem> =>
+  rewriteClosed(root, id, (record) => record.state.ciRerun?.pr === rerun.pr ? null : { ...record, state: { ...record.state, ciRerun: rerun } })
 
 export type Rewrite<A> = { readonly kind: "write"; readonly record: TaskRecord; readonly result: A } | { readonly kind: "keep"; readonly result: A }
 

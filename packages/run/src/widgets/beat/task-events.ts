@@ -81,7 +81,7 @@ export const prEvents = (
       yield* writePrState(root, id, pr, prState)
       return Option.none()
     }
-    yield* routePullRequest(root, id, pr, view.success, at)
+    yield* routePullRequest(root, task, pr, view.success, at)
     const event = prEvent(task, pr, view.success, at, yield* eventRecorded(root, id + ".pr-ready"))
     if (event !== null) {
       yield* recordEvent(root, event)
