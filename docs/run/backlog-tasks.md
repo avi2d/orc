@@ -30,6 +30,7 @@ For a parent task or automatic splitting, see [Task kinds](task-kinds.md).
 Use `--internal` for a ship task that is internal-only in a `no-mistakes-prod-only` project.
 
 Orc assigns a unique `<project>-<n>` ID.
+
 ### Set priority
 
 The beat considers new tasks in priority order, from 0 first to 4 last.
@@ -49,18 +50,21 @@ Run `orc backlog depend <task-id> --on <task-id>,<task-id>` to replace a new or 
 Use `--clear` instead to remove them.
 Changing dependencies does not change a hold.
 Orc refuses unknown, taken, started, closed, or parked tasks, self-dependencies, and dependency cycles.
+
 ### Edit a task
 
 Run `orc backlog edit <task-id> <task-file>` to replace a new task's title and body.
 Use `-` to read from a pipe, as with `add`.
 The edit preserves task metadata and works on held, parked, and parent tasks.
 Orc refuses text without a title and tasks that have already been taken.
+
 ### Drop a task
 
 Run `orc backlog drop <task-id> <reason>` to withdraw a new task, including a held or parked task.
 Orc records the reason, withdraws attention items, and posts the close in chat.
 Use `orc backlog stop` for a taken or started task and `orc backlog plan <parent> --drop <child>` for a child.
 A parent with an open child or a task another open task depends on cannot be dropped.
+
 ### Send a task back
 
 Run `orc backlog send-back <task-id> <words>` to request another pass on a closed task's open PR.

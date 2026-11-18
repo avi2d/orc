@@ -17,7 +17,10 @@ If the provider uses a Pi login, check it with `pi auth check --provider <id>`.
 A key held only in the keychain or an environment variable is not available to the run.
 A login Pi's `/login` stores in `~/.pi/agent/auth.json` works, so write a key held only in an environment variable to that file first.
 nono reads that login with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE` and `TERM` set.
+In the sandbox, Pi and the checks get those same variables beside the temp folder, git config and Pi folder orc sets for the run.
+On the host they get a short list that adds the shell, the temp folder, `XDG_RUNTIME_DIR` and the proxy and the certificate variables.
 No `ORC_` variable reaches Pi or the checks.
+With the default sandbox, if nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc names that error in the result.
 
 Commit a `.no-mistakes.yaml` at the project root with at least one named check for a ship run.
 For example:

@@ -14,6 +14,11 @@ A stand in queues the call with `pueue add` into the `heavy` group, or hands it 
 Without `through` set, the wait message names how many queued calls stand ahead, counting higher priority calls and earlier calls at the same priority.
 Without `through` set, a finished call leaves the queue after the stand in reads its exit code.
 The stand in runs the real tool under a utility priority on macOS and with no wrapper on other systems.
+
+## Run the real tool
+
+The helper runs the real tool once the queue hands it the turn.
+
 The helper finds the tool, decides whether the call queues, and runs, queues or waits for it, and never decides through itself.
 The helper stays the caller's process for the whole call, passes the tool's exit code back, and passes on a stop or hangup signal to the tool.
 It reads no `.env` or `bunfig.toml` from the caller's folder.

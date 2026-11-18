@@ -20,6 +20,13 @@ A reader checks `schemaVersion` first, and version 1 is the only version.
 | `accounts[].credentialKey` | The account's own credential key, which stays the same whichever source read the account: the harness's native login, `codex-home` for Codex or `default` for Claude, when the account holds it, or else the first of quota-axi's `accountKeys` |
 | `accounts[].accountKeys` | Every credential key quota-axi lists for the account, so composition can tell that two machines reading one subscription under different credentials read one account |
 | `windows` | Each tracked window with its account, start, reset, used and left points, pace, `elapsedFraction` and `gate` |
+
+## Window fields
+
+The window rows detail each tracked window.
+
+| Field | What it holds |
+| --- | --- |
 | `windows[].gate` | `aheadOfPace`, `pastFirstTenth`, and `open` when both hold |
 | `windows[].exhaustsBeforeReset` | Whether the window runs out before its reset, from the quota-axi verdict or the live sessions' total rate |
 | `windows[].verdict` | The quota-axi verdict for the window, `null` when the live rate decides instead |

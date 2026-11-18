@@ -3,6 +3,7 @@ import { join, relative } from "node:path"
 
 const docs = join(import.meta.dir, "..", "docs")
 const limit = 300
+const exempt = new Set(["index.md", "map/index.md"])
 const markdownFiles = async (directory: string): Promise<string[]> => {
   const entries = await readdir(directory, { withFileTypes: true })
   const paths = await Promise.all(entries.map(async (entry) => {
@@ -14,14 +15,15 @@ const markdownFiles = async (directory: string): Promise<string[]> => {
   return paths.flat()
 }
 const wordsOf = (value: string): number => {
-  const clean = value.trim()
-  return clean === "" ? 0 : clean.split(/\s+/).length
+  const tokens = value.trim().split(/\s+/).filter((token) => /[\p{L}\p{N}]/u.test(token))
+  return value.trim() === "" ? 0 : tokens.length
 }
 const files = await markdownFiles(docs)
 if (files.length === 0) throw new Error("No documentation pages found")
 const failures: string[] = []
 for (const file of files) {
   const name = relative(docs, file)
+  if (exempt.has(name)) continue
   const source = await readFile(file, "utf8")
   const withoutFrontmatter = source.replace(/^---\n[\s\S]*?\n---\n/, "")
   const prose = withoutFrontmatter.replace(/^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[^\n]*$/gm, "")

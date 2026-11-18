@@ -16,6 +16,8 @@ It prints `handed <question-ids> to the run of <task-id> on <machine>`, and the 
 A wait on several questions gets every answer given so far each time the beat hands one more.
 A question the run asks again at a later wait is open again, and the chat posts it once more when the attention queue owns it for you.
 
+## Park a task
+
 A run whose wait ends with a question unanswered parks its task instead of closing it failed.
 The beat moves the task back to `new` with `parked_branch`, `parked_origin`, and `parked_questions` in its file.
 The origin records the machine and run id.
@@ -24,6 +26,9 @@ It prints `parked <task-id> on <branch> for the captain's answer to <question-id
 A question the attention queue owns for the decider shows as `the decider's answer to <question-ids>` instead, after an `and` when you answer the others.
 Each later beat prints `waits <task-id>: parked on <branch> for the captain's answer to <question-ids>` and never starts it.
 That line names a question the attention queue owns for the decider the same way, as `the decider's answer to <question-ids>`, and so does the `wait` that `orc backlog --json` gives the task.
+
+## Resume a parked task
+
 To answer one question, run `orc backlog answer <task-id> <question-id>=<text>`.
 The task file keeps your text and its time on that question, and the other questions stay parked.
 Once every question has an answer, the next beat resumes the task on its original machine and branch with `--answer <question-id>=<text>` for each one.
@@ -32,6 +37,9 @@ The beat waits if the original machine has no room or no configured checkout, or
 A task parked before its origin was recorded also waits rather than guessing a machine.
 Its wait reads `the parked task has no recorded machine and run; record them with orc backlog origin <task-id> <machine> <run-id> before resuming`.
 Find the run id in `orc runs --json` on that machine, then run `orc backlog origin <task-id> <machine> <run-id>` to record it, and the next beat resumes the task there.
+
+## Check the resume
+
 Orc refuses a machine `dispatch.json` does not name, a task that is not parked, and a task that already has an origin.
 It reads the task's run on that machine the way the resume check does, and refuses a run id the runner does not report for that task.
 The command takes the task file by rename the way `orc backlog hold` does, so it and a beat never both win.
@@ -71,6 +79,8 @@ A ship run then parks its task on its branch for every open question.
 Answer it with `orc backlog answer <task-id> ask-<n>=<text>`, and the beat resumes the task on the same machine and branch.
 The resumed run hands your answer to the same Pi session as `The captain answered your question ask-<n>: <text>`.
 A scout or task run has no branch to park on, so it ends failed with the question in its end reason.
+
+### Ask without blocking
 
 A non-blocking question returns at once, and Pi carries on.
 An answer that reaches the run while Pi runs is added to the result of Pi's next tool call.

@@ -15,6 +15,7 @@ Heights under eight rows are not a supported layout, so there that line can be c
 The dashboard shows only the flags, each naming the agent's project, the account and the limit.
 Press `q` or Control C to quit.
 To print one frame of plain text instead, run `orc-dash panel session-quota --print`, and add `--width 40` for a narrow frame.
+
 ## Session logs and flags
 
 The session panel reads the Pi logs under `HOME`, the Codex logs under `CODEX_HOME`, or `~/.codex`, and the Claude Code logs under `CLAUDE_CONFIG_DIR`, or `~/.claude`.
@@ -29,6 +30,7 @@ A runway naming another window means this one runs to its reset.
 A harvested window or one with no runway reads its pace from its live sessions' total rate against the sustainable rate.
 A window with nothing left runs out before its reset.
 A session's fair share is what its window has left an hour, split evenly among the live sessions that spent in the trailing hour.
+
 ## Accounts and readings
 
 The session panel also reads the capture ledger that its writer appends to from a Pi hook and the Claude Code statusline.
@@ -42,6 +44,7 @@ An account read from a harness log stands for the credential that log ran under.
 A call keyed to another credential of that provider joins no account.
 When quota-axi fails, each provider it was asked about shows the failure under its own heading.
 The accounts read from harness logs keep their windows and flags.
+
 ## Read a window
 
 Each quota window lists its sessions ranked by price weighted share, with the raw share, the upper bound in points and the points per hour.
@@ -59,6 +62,7 @@ Such a window reads 7d window read 13h 0m ago, for example.
 Its sessions keep their shares, drop the points and points per hour, and none is flagged.
 The trailing hour is the hour before the read, its first instant included.
 A window past its reset holds no trailing-hour spend once that reset is an hour past.
+
 ## Headless processes
 
 A headless process takes its folder's newest log only when it is the only process of its harness there.
