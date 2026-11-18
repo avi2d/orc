@@ -122,7 +122,8 @@ body {
   margin-inline: 20px;
 }
 
-.VPNavBar.has-sidebar .content:has(.VPFlyout:hover, .VPFlyout:focus-within, .VPFlyout .button[aria-expanded="true"]) {
+.VPNavBar .content:has(.VPFlyout:hover, .VPFlyout .button[aria-expanded="true"]) {
+  position: relative;
   z-index: 2;
 }
 
