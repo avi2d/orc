@@ -13,7 +13,12 @@ Its last line counts the rest and names the repository root's `session-quota-jso
 A terminal too narrow for that line on one row wraps it onto two.
 Heights under eight rows are not a supported layout, so there that line can be cut, and the script still lists every flag.
 The dashboard shows only the flags, each naming the agent's project, the account and the limit.
-It reads the Pi logs under `HOME`, the Codex logs under `CODEX_HOME`, or `~/.codex`, and the Claude Code logs under `CLAUDE_CONFIG_DIR`, or `~/.claude`.
+Press `q` or Control C to quit.
+To print one frame of plain text instead, run `orc-dash panel session-quota --print`, and add `--width 40` for a narrow frame.
+
+## Session logs and flags
+
+The session panel reads the Pi logs under `HOME`, the Codex logs under `CODEX_HOME`, or `~/.codex`, and the Claude Code logs under `CLAUDE_CONFIG_DIR`, or `~/.claude`.
 Those are the homes of the logins `quota-axi` reads.
 It counts each model call once.
 It splits a window's used points across the sessions that made those calls.
@@ -25,7 +30,10 @@ A runway naming another window means this one runs to its reset.
 A harvested window or one with no runway reads its pace from its live sessions' total rate against the sustainable rate.
 A window with nothing left runs out before its reset.
 A session's fair share is what its window has left an hour, split evenly among the live sessions that spent in the trailing hour.
-It also reads the capture ledger that its writer appends to from a Pi hook and the Claude Code statusline.
+
+## Accounts and readings
+
+The session panel also reads the capture ledger that its writer appends to from a Pi hook and the Claude Code statusline.
 The bridge appends headless readings to the same ledger.
 It can merge a second machine's report, so an account both machines spend shows one estimate instead of two upper bounds.
 Each account opens with the assumption that joined its calls to it, such as joined by credential key or assumed the only login.
@@ -36,14 +44,17 @@ An account read from a harness log stands for the credential that log ran under.
 A call keyed to another credential of that provider joins no account.
 When quota-axi fails, each provider it was asked about shows the failure under its own heading.
 The accounts read from harness logs keep their windows and flags.
-Each window lists its sessions ranked by price weighted share, with the raw share, the upper bound in points and the points per hour.
+
+## Read a window
+
+Each quota window lists its sessions ranked by price weighted share, with the raw share, the upper bound in points and the points per hour.
 Points per hour above 999 read >999, and the JSON report holds the exact rate.
 A live session reads ● and an ended one ○, and a flagged session reads ⚑.
 A window with a flagged session reads over fair share flagged.
-It reads lasts to reset instead when the window is not running out before its reset.
-It reads none over fair share when the window runs out but no session carries a flag.
+A window that is not running out before its reset reads lasts to reset instead.
+A window that runs out with no flagged session reads none over fair share.
 A session that has ended is never flagged.
-It never pauses, stops or reroutes a session.
+The session panel never pauses, stops or reroutes a session.
 A window with no local calls reads none logged here, and its used points count as unattributed.
 A window quota-axi still reports after its reset reads unknown pace, shows no fair share, counts only the calls before its reset, and flags nobody.
 A window read an hour old or more reads its age instead of its used points, fair share and pace.
@@ -51,9 +62,16 @@ Such a window reads 7d window read 13h 0m ago, for example.
 Its sessions keep their shares, drop the points and points per hour, and none is flagged.
 The trailing hour is the hour before the read, its first instant included.
 A window past its reset holds no trailing-hour spend once that reset is an hour past.
+
+## Headless processes
+
 A headless process takes its folder's newest log only when it is the only process of its harness there.
 It also needs no Herdr pane of that harness to name a log there or run there.
 Otherwise the panel names the processes that share the folder, and the folder's logs read as ended.
-Press `q` or Control C to quit.
 
-To print one frame of plain text instead, run `orc-dash panel session-quota --print`, and add `--width 40` for a narrow frame.
+## Print reports and alerts
+
+To print the versioned JSON report, run `bun run session-quota-json`.
+To print the report merged with a second machine's, run `bun run session-quota-composed-json`.
+To stream flag alerts as JSON lines, run `bun run session-quota-alerts`.
+[Read the JSON report](json-report.md), [Compose two machines](compose-two-machines.md) and [Tail the alert stream](alert-stream.md) document both reports, the alert stream and how to configure the second machine.

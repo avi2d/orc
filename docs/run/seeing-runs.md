@@ -2,35 +2,50 @@
 kind: reference
 ---
 # Seeing runs
-To list recent runs, run `orc runs`.
-Orc keeps its records in `~/.orc`, outside every project repo.
-Set `ORC_HOME` to keep them somewhere else.
-To print the same facts as JSON, run `orc runs --json`.
-Every JSON document names its version first as `schema`, starting at `orc.runs.v1`.
+
+Run `orc runs` to list recent runs, or `orc runs --json` for an `orc.runs.v1` document.
+Orc stores records in `~/.orc`, outside project repositories.
+Set `ORC_HOME` to change that location.
+
+## Runs on other machines
+
 `orc runs --json` also reads the runs of each other machine in `dispatch.json` and adds them to `runs`.
 It reads each machine with the command that reaches it, as `orc runner result` does, and asks it for `orc runs --json --local`.
 A machine whose `start` names no reach command, such as `orc runner start` with nothing after `--`, is not read.
 A machine that fails, does not answer within 10 seconds, or prints JSON orc cannot read adds no runs.
 It is named in `machines` with its `machine` and its `error`, what it printed or why its answer did not read, and the command still exits 0.
 `machines` is empty when every machine answers, when `dispatch.json` names none, or when `dispatch.json` cannot be read, and the reason is on stderr.
+
+## Local runs and queued tasks
+
 To print only this machine's runs, run `orc runs --json --local`.
 Poll with `--local` when you read every few seconds.
-Each run in it also gives `title`, the first line of its task file, and `endReason`, the reason it ended.
-Its `step` is the step running now, else the step that started last, as an id, name, attempt and status, and `null` before the first step.
-Its `state` is `waiting` while a running run's folder holds `asking.json`, else `running`, `succeeded` or `failed` from its status, and a stopped run reads `failed`.
+Each run in the `--local` report also gives `title`, the first line of its task file, and `endReason`, the reason it ended.
+Each run's `step` is the step running now, else the step that started last, as an id, name, attempt and status, and `null` before the first step.
+Each run's `state` is `waiting` while a running run's folder holds `asking.json`, else `running`, `succeeded` or `failed` from its status, and a stopped run reads `failed`.
+
+### Queued tasks
+
 Each backlog task that waits in the runner's `orc` pueue group for this `ORC_HOME` adds one entry with `state` `queued`, listed before the recorded runs.
 A `queued` entry gives the backlog id as `task`, its `orc/<task-id>` branch, the checkout it will run in as `project`, and 0 `questions`.
-Its `id`, `status` and every other fact a run gains once it starts are `null`.
+The queued entry's `id`, `status` and every other fact a run gains once it starts are `null`.
 When pueue cannot be reached, `orc runs --json` adds no `queued` entry and still prints the recorded runs.
-Its `currentStep` gives the name and attempt of the step running now, and `null` when no step runs or the run has ended.
-Its `questions` counts the questions a running run waits on you to answer, and is 0 otherwise.
-Its `task` is the backlog task id its `orc/<task-id>` or `orc/<task-id>-parent` branch names, and `null` on any other branch.
-Its `machine` is the dispatch machine the beat claimed for the run, which reaches `orc run` as `ORC_RUN_MACHINE`.
+
+### Run fields
+
+Each run in `orc runs --json` carries the same extra fields.
+Each run's `currentStep` gives the name and attempt of the step running now, and `null` when no step runs or the run has ended.
+Each run's `questions` counts the questions a running run waits on you to answer, and is 0 otherwise.
+Each run's `task` is the backlog task id its `orc/<task-id>` or `orc/<task-id>-parent` branch names, and `null` on any other branch.
+Each run's `machine` is the dispatch machine the beat claimed for the run, which reaches `orc run` as `ORC_RUN_MACHINE`.
 A run you start by hand on this machine without `ORC_RUN_MACHINE` shows `null`.
 A run from another machine names that machine when its own record names none.
 The Agents tab and orc-dash read with `--local`, so they show only this machine's runs.
-Its `worktree` is the checkout the run works in: the task copy for a ship run, the project checkout for a report run.
+Each run's `worktree` is the checkout the run works in: the task copy for a ship run, the project checkout for a report run.
 Runs recorded before these facts show each as `null`.
+
+## Inspect one run
+
 To see one run step by step, run `orc show <run-id>`.
 It lists each step with its agent, session, signals, latest score and evidence, every file as a full link.
 To print the same facts as JSON, run `orc show <run-id> --json`.
@@ -42,18 +57,27 @@ The implement step comes first and the rest follow in the order they ran there.
 Each carried step gives the id of the run it ran in as `from`, read from the folder its evidence names, and every other step gives `null`.
 An implement step beside carried steps gives their run even when its own evidence names this run.
 `orc show <run-id>` prints `from run <run-id>` under each carried step.
+
+## Read a step's output
+
 To print one step's output, run `orc log <run-id> <step-id>` with the step's `id` from that JSON.
 An implement step prints `agent.log` and a fix step its `fix-<attempt>.log`, which Pi appends to as it works.
 A checks or no-mistakes step prints the file it wrote.
 A step whose output is not written yet prints nothing.
 A carried step prints the log from the evidence path it records.
 A carried step recorded without a log path prints the log from the run named by its `from`.
+
+## Score a step
+
 To score a step, run `orc score <run-id> <step> <1 to 5> [note]`.
 Use fix#1 to score the first fix attempt and plain fix scores the latest attempt in execution order.
 Use the step id from orc show JSON to score one resumed checks row when an attempt ran twice.
 Orc score refuses a score outside 1 to 5 with no write.
 Orc score refuses an unknown run or an unknown step with no write.
 Orc score keeps one row per score and orc show prints the latest score beside the signals.
+
+## Count refusals
+
 To count the gates and rules past runs kept hitting, run `orc refusals`.
 To print the same facts as JSON, run `orc refusals --json`.
 Its JSON document names its version first as `schema`, starting at `orc.refusals.v1`.

@@ -6,6 +6,8 @@ To print the report once, run `orc-dash report session-quota`.
 The report is one JSON object on one line, and `SessionQuotaReport` in `packages/schema/src/entities/session-quota/contract/session-quota.ts` decodes it.
 A reader checks `schemaVersion` first, and version 1 is the only version.
 
+## Report fields
+
 | Field | What it holds |
 | --- | --- |
 | `schemaVersion` | `1` |
@@ -18,6 +20,13 @@ A reader checks `schemaVersion` first, and version 1 is the only version.
 | `accounts[].credentialKey` | The account's own credential key, which stays the same whichever source read the account: the harness's native login, `codex-home` for Codex or `default` for Claude, when the account holds it, or else the first of quota-axi's `accountKeys` |
 | `accounts[].accountKeys` | Every credential key quota-axi lists for the account, so composition can tell that two machines reading one subscription under different credentials read one account |
 | `windows` | Each tracked window with its account, start, reset, used and left points, pace, `elapsedFraction` and `gate` |
+
+## Window fields
+
+The window rows detail each tracked window.
+
+| Field | What it holds |
+| --- | --- |
 | `windows[].gate` | `aheadOfPace`, `pastFirstTenth`, and `open` when both hold |
 | `windows[].exhaustsBeforeReset` | Whether the window runs out before its reset, from the quota-axi verdict or the live sessions' total rate |
 | `windows[].verdict` | The quota-axi verdict for the window, `null` when the live rate decides instead |
@@ -33,6 +42,8 @@ A reader checks `schemaVersion` first, and version 1 is the only version.
 | `unmatchedProcesses` | Each log folder whose headless processes no log could be matched to, with its `harness`, `cwd`, `place` and `pids` |
 | `flags` | Each flagged session with its account, window, priced points per hour, fair points per hour and both shares |
 | `unmetered` | Calls on routes no subscription meters, such as an API key, with their tokens |
+
+## Older reports
 
 A report written before window sources and credential keys has no `windows[].source`, `accounts[].credentialKey` or `accounts[].accountKeys`, and still reads.
 Its windows count as read by quota-axi at its `generatedAt`.
