@@ -1,5 +1,5 @@
 ---
-kind: how-to
+kind: reference
 ---
 # Read the Board and Resources tabs
 

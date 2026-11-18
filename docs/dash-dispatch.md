@@ -1,7 +1,9 @@
 ---
-kind: how-to
+kind: reference
 ---
 # Run the dispatch panel
+
+The dispatch panel shows the backlog and machine slots.
 
 ## Run the dispatch tool
 

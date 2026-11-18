@@ -1,7 +1,9 @@
 ---
-kind: how-to
+kind: reference
 ---
 # Run the queues panel
+
+The queues panel shows pueue and GitHub Actions runs.
 
 ## Run the queues tool
 

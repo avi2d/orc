@@ -1,7 +1,9 @@
 ---
-kind: how-to
+kind: reference
 ---
 # Run the resources panel
+
+The resources panel shows machine usage.
 
 ## Run the resources tool
 

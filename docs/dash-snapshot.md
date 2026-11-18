@@ -1,7 +1,9 @@
 ---
-kind: how-to
+kind: reference
 ---
 # Take a dashboard snapshot
+
+The snapshot reads every source once and prints one JSON object.
 
 ## Take a snapshot
 

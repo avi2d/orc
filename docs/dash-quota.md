@@ -1,7 +1,9 @@
 ---
-kind: how-to
+kind: reference
 ---
 # Run the quota panel
+
+The quota panel shows account limits.
 
 ## Run the quota tool
 

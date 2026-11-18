@@ -1,5 +1,5 @@
 ---
-kind: how-to
+kind: reference
 ---
 # Run and configure the dashboard
 

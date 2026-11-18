@@ -1,5 +1,5 @@
 ---
-kind: how-to
+kind: reference
 ---
 # Alerts panel
 
