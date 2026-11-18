@@ -9,7 +9,7 @@ Hand orc a stream of work, so that it places each task on a machine and an accou
 
 - A task that ran by hand, as [Run your first task](run-your-first-task.md) shows.
 - pueue on each machine that runs tasks, with its daemon started by `pueued -d`.
-- A command that prints each account's room, or one login and the always-room command [The backlog and the beat](../run/backlog-and-beat.md) shows.
+- A command that prints each account's room, or one login and the always-room command [Backlog configuration](../run/backlog-configuration.md#one-login-without-a-quota-reader) shows.
 
 ## Name the machines and the accounts
 
@@ -82,7 +82,7 @@ To keep the work moving:
 ### The beat starts nothing
 
 A quota command that fails or prints a document orc cannot read leaves the quota unread, and the beat then starts nothing.
-Run the quota command by hand and compare its output with the document [The backlog and the beat](../run/backlog-and-beat.md) shows.
+Run the quota command by hand and compare its output with the document [Backlog configuration](../run/backlog-configuration.md#dispatch-configuration) shows.
 
 ## Related topics
 
