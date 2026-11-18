@@ -25,7 +25,7 @@ The beat that writes the question into the task's `parked_questions`, as [Parked
 The same beat hands each open item the decider owns to the decider, one short Pi call per question.
 The call runs on `models.decider` in `config.json`, as [Configuring providers](configuring-providers.md) shows, with no tools.
 Its system prompt is the written policy in `packages/run/agents/decider-policy.md`.
-Its prompt holds the rules it reads, each under a label that names its file, then the task's title and body, which hold its intent, then the question.
+Its prompt holds the rules it reads, each under a label that names its file, then the task’s title and body, which hold its intent, then the earlier answers and asked-back questions of that task when any exist, then the question.
 The rules are your rules in `<ORC_HOME>/orchestrator.md` and the instructions file of the task's project in `projects.json`, each when it exists.
 
 Some questions never reach the decider.

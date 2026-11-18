@@ -1,6 +1,6 @@
 ---
 aside: false
-pageClass: wide-page
+pageClass: wide-page part-merge
 kind: explanation
 ---
 # The merge

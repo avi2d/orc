@@ -1,12 +1,13 @@
 ---
 aside: false
-pageClass: wide-page
+pageClass: wide-page part-checks
 kind: explanation
 ---
 # Checks and review
 
-A code change passes two gates before you see it: the project's own checks, and a review.
-Both run inside the run, so a pull request that reaches you has already passed them.
+A code change passes the project's own checks before you see it.
+Most code changes also pass a review.
+Each runs inside the run, so a pull request that reaches you has already passed what its delivery mode names.
 
 ![Checks and review: the two gates a code change passes](../diagrams/checks.svg)
 

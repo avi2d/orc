@@ -13,7 +13,7 @@ const usable: Part = {
   title: "Which accounts can run?",
   ...bullets(["named in the document", "room above 0%", "at or above `floorPercent`, when you set one"])
 }
-const most: Part = { title: "The one with the most room", text: "Every task this beat starts takes it.", cls: "card-work" }
+const most: Part = { title: "The one with the most room", text: "Every task this beat starts takes it." }
 
 const kinds: readonly Part[] = [
   { title: "`token-file`", text: "The path of a token file on the machine, never the token." },
@@ -36,8 +36,8 @@ const wide = (): Drawing => {
     ...kinds.map((kind, index) => card(702, 42 + index * 110, 240, 100, kind)),
     arrow([[168, 90], [208, 90]], "work"),
     arrow([[318, 152], [318, 194]], "work"),
-    arrow([[318, 306], [318, 368]], "ask"),
-    text(328, 342, "no", "ask-text"),
+    arrow([[318, 306], [318, 368]], "aside"),
+    text(328, 342, "no"),
     arrow([[426, 250], [436, 250], [436, 100], [444, 100]], "work"),
     text(442, 210, "yes"),
     arrow([[554, 172], [554, 234]], "work"),

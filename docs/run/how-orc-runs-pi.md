@@ -18,7 +18,7 @@ Orc runs only Pi, and it starts Pi itself as `pi -p --mode json` in the task cop
 - At 3 failures of one command in a row orc logs `orc: pi failed <command> 3 times in a row` and writes `failing.json` to the run folder, with the command and the time.
   The beat opens an attention item for you on it, as [The attention queue](attention-queue.md) shows, and Pi carries on.
   Orc removes the file when the count starts over or Pi ends.
-- At 6 failures of one command in a row orc logs `orc: stopped pi, it failed <command> 6 times in a row`, stops Pi and asks you to continue or stop, as [A looping run](parked-runs.md#a-looping-run) shows.
+- At 6 failures of one command in a row orc logs `orc: stopped pi, it failed <command> 6 times in a row`, pauses the run and asks you to continue or stop, as [A looping run](parked-runs.md#a-looping-run) shows.
 - Orc counts the step complete only when the session’s final assistant message stopped with `stop` and holds `ORC_COMPLETE` on its own line.
 - A valid `ORC_SPLIT` proposal records the run as failed without running checks or opening a PR.
 - The beat then turns the task into a parent and starts its children.

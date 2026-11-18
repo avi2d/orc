@@ -1,18 +1,26 @@
 ---
+description: "Orc is the orchestrator for your agent work: one chat runs it on all your machines and models, with a backlog, live monitoring and dashboards."
 aside: false
-pageClass: wide-page
+pageClass: wide-page home-page
 kind: explanation
 ---
-# How orc works
+# Orc for your agent work
 
-Orc takes work you describe, runs an AI agent on it on one of your machines, checks the result, and hands you a pull request or a report.
+<script setup>
+import MapLegend from "./map/MapLegend.vue"
+</script>
 
-[Open the interactive map](map/index.md){.map-open}
+One chat to run your AI agent work on all your machines and models, with a backlog, live monitoring and Herdr App dashboards.
+
+<img class="home-hero-art" src="./images/orc-hero-1120.webp" srcset="./images/orc-hero-640.webp 640w, ./images/orc-hero-1120.webp 1120w" sizes="(min-width: 860px) 560px, 90vw" width="1120" height="747" alt="A calm, grey-haired orc arranging three task tiles at a desk." fetchpriority="high">
+
+<div class="home-rest">
 
 ![How orc works: every part, and every way a task ends](diagrams/how-orc-works.svg)
 
-Solid arrows are the path of the work.
-Dotted arrows are the questions a run asks on the way and the answers that come back.
+<div>
+<MapLegend />
+</div>
 
 You say what needs doing, you answer the questions only you can answer, and you say when a pull request lands.
 
@@ -37,15 +45,15 @@ Each step below is one part of orc, and each has its own page.
    From then on the run belongs to that machine and outlives the beat and any SSH link.
    [The runner](concepts/runner.md) shows what the machine holds.
 1. **The run does the work.**
-   `orc run` makes a copy of the project on a new branch and starts the Pi agent in it.
-   Pi writes the change and commits it.
+   For a ship task, `orc run` makes a copy of the project on a new branch and starts the Pi agent in it.
+   Pi writes the change and commits it, while a scout or task run writes a report instead.
    [A run](concepts/run.md) follows it step by step.
 1. **The checks and the review judge it.**
    Orc runs the project's own checks, and Pi fixes what they refuse.
-   Then no-mistakes reviews the branch, pushes it, opens the pull request and waits for green CI.
+   The delivery mode then decides whether no-mistakes reviews the branch before orc opens the pull request.
    [Checks and review](concepts/checks-and-review.md) shows both gates.
 1. **You merge it.**
-   The task closes done with its pull request, and `orc merge <task-id>` lands it once every check is green.
+   For a ship task, the task closes done with its pull request, and `orc merge <task-id>` lands it once every check is green.
    [The merge](concepts/merge.md) lists what the merge refuses.
 
 Two more parts sit beside that path.
@@ -53,7 +61,7 @@ Two more parts sit beside that path.
 - **Attention and the chat.**
   A run that meets a question it cannot settle asks it.
   The question lands in the attention queue.
-  A small model called the decider answers a routine one from your written rules, and any other one waits for you.
+  A model called the decider answers a routine one from written instructions, and any other one waits for you.
   The chat posts each question that needs you and each task that closes.
   [The attention queue](concepts/attention.md) and [The chat](concepts/chat.md) show how.
 - **The App.**
@@ -74,21 +82,21 @@ Its state is files on disk and queues in pueue, so a restart picks up where it s
 | The record of each run | `~/.orc/runs/<run-id>` on the machine that ran it |
 | Your rules for the chat and the decider | `~/.orc/orchestrator.md` |
 
-`ORC_HOME` moves `~/.orc` elsewhere when set.
+<div class="tip custom-block"><p><code>ORC_HOME</code> moves <code>~/.orc</code> elsewhere when set.</p></div>
 
 ## The words orc uses
 
 | Word | What it means |
 | --- | --- |
 | Task | One piece of work in the backlog, with an id such as `orc-9` |
-| Run | One attempt at a task by `orc run`, with its own branch and its own record |
+| Run | One attempt at a task by `orc run`, with its own record, and its own branch for a ship task |
 | Beat | One pass of `orc beat`, which starts what can start and closes what finished |
 | Slot | One place for a running task on a machine, counted in `dispatch.json` |
 | Pi | The coding agent orc runs, and the only one |
 | no-mistakes | The review tool that takes a checked branch to a pull request with green CI |
 | pueue | The queue on each machine that holds the runs |
 | nono | The sandbox a run you start by hand works in by default |
-| Decider | The small model that answers a run's routine questions from your rules |
+| Decider | The model that answers a run's routine questions from written instructions |
 
 ## Related topics
 
@@ -96,3 +104,5 @@ Its state is files on disk and queues in pueue, so a restart picks up where it s
 - [Run a backlog from the chat](tasks/run-a-backlog.md)
 - [Commands](reference/commands.md)
 - [What orc does](features.md)
+
+</div>

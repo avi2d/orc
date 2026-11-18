@@ -86,7 +86,7 @@ Run the quota command by hand and compare its output with the document [The back
 
 ## Related topics
 
-- [How orc works](../index.md)
+- [Orc for your agent work](../index.md)
 - [The beat](../concepts/beat.md)
 - [Accounts and quota](../concepts/accounts-and-quota.md)
 - [The chat](../concepts/chat.md)

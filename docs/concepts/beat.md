@@ -1,6 +1,6 @@
 ---
 aside: false
-pageClass: wide-page
+pageClass: wide-page part-beat
 kind: explanation
 ---
 # The beat

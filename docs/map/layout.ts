@@ -70,7 +70,7 @@ const ranked = (members: readonly string[], wires: readonly Wire[], boxes: Reado
   for (const [id, centre] of centres) graph.setNode(id, centre)
   wires.forEach((wire, index) => {
     const label = wire.link?.label === undefined ? { width: 0, height: 0 } : measures.labelSize(wire.link.label)
-    graph.setEdge(wire.from, wire.to, { ...label, labelpos: "c", weight: wire.link?.tone === "ask" ? 1 : 4 }, index.toString())
+    graph.setEdge(wire.from, wire.to, { ...label, labelpos: "c", weight: wire.link === undefined || wire.link.tone === "work" ? 4 : 1 }, index.toString())
   })
   rank(graph, { constraints: members.slice(1).map((right, index) => ({ left: members[index] ?? right, right })) })
   const parts = members.flatMap((id) => {
@@ -183,18 +183,23 @@ export const layoutMap = (measures: Measures): MapLayout => {
       seen.add(from + ">" + to)
       return [{ from, to, ...(from === link.from && to === link.to ? { link } : {}) }]
     })
-    const blocks = groupsOf(
-      inner.map((child) => child.id),
-      wires
-    ).map((members) =>
-      ranked(
-        members,
-        wires.filter((wire) => members.includes(wire.from)),
-        boxes,
-        measures
-      )
-    )
-    const stack = lineUp(blocks, stackGap, true)
+    const stack = measures.stacked
+      ? lineUp([...boxes.values()], stackGap, true)
+      : lineUp(
+          groupsOf(
+            inner.map((child) => child.id),
+            wires
+          ).map((members) =>
+            ranked(
+              members,
+              wires.filter((wire) => members.includes(wire.from)),
+              boxes,
+              measures
+            )
+          ),
+          stackGap,
+          true
+        )
     const header = titleWidth(part) + (part.page === undefined ? 0 : pageLink.width + pageLink.inset * 2)
     const whole = { width: Math.max(stack.size.width + edge * 2, header), height: stack.size.height + headRoom + edge }
     const body = moved(stack, (whole.width - stack.size.width) / 2, headRoom)

@@ -13,7 +13,7 @@ const conditions: readonly Part[] = [
   { title: "Room", text: "An account above 0% and at or above the floor.", href: "quota" }
 ]
 
-const starts: Part = { title: "It starts", text: "The beat takes the task and runs the machine's start command.", cls: "card-ok", href: "runner" }
+const starts: Part = { title: "It starts", text: "The beat takes the task and runs the machine's start command.", href: "runner" }
 const waits: Part = { title: "It waits for the next beat", text: "The beat prints `waits <task-id>:` with the reason. A decision never starts." }
 
 const also: readonly Part[] = [
@@ -33,7 +33,7 @@ const wide = (): Drawing => {
     arrow([[782, 96], [798, 96]], "work"),
     card(800, 42, 142, 142, starts),
     card(18, 228, 764, 66, waits),
-    ...conditions.flatMap((_, index) => [arrow([[88 + index * 156, 184], [88 + index * 156, 226]], "ask"), text(96 + index * 156, 210, "no", "ask-text")]),
+    ...conditions.flatMap((_, index) => [arrow([[88 + index * 156, 184], [88 + index * 156, 226]], "aside"), text(96 + index * 156, 210, "no")]),
     ...also.map((item, index) => card(18 + index * 186.5, 348, 176, 130, item))
   ]
   return svg("beat", 960, 496, title, desc, body)

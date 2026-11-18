@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test"
 const syllables = ["t", "u", "i", "[-_]?", "d", "a", "s", "h"]
 const retired = new RegExp(syllables.join(""), "i")
 
-const isHistory = (file: string) => file === "CHANGELOG.md" || file.startsWith("docs/adr/")
+const isHistory = (file: string) => file === "CHANGELOG.md"
 const flagged = (files: readonly string[]) => files.filter((file) => !isHistory(file) && retired.test(file))
 
 describe("the retired dashboard name", () => {
@@ -14,7 +14,7 @@ describe("the retired dashboard name", () => {
     if (!listed.success) throw new Error("git ls-files refused to list the tracked files")
     const files = Buffer.from(listed.stdout).toString("utf8").split("\0").filter((file) => file.length > 0)
     expect(flagged(files)).toEqual([])
-    const searched = Bun.spawnSync(["git", "grep", "-l", "-i", "-E", syllables.join(""), "--", ".", ":(exclude)CHANGELOG.md", ":(exclude)docs/adr"], {
+    const searched = Bun.spawnSync(["git", "grep", "-l", "-i", "-E", syllables.join(""), "--", ".", ":(exclude)CHANGELOG.md"], {
       cwd: root,
     })
     if (searched.exitCode === 0) {
@@ -22,10 +22,5 @@ describe("the retired dashboard name", () => {
     } else {
       expect(searched.exitCode).toBe(1)
     }
-  })
-
-  test("the path check still flags the retired name in a path outside docs/adr", () => {
-    const name = syllables.join("").replace("[-_]?", "-")
-    expect(flagged([`docs/notes/${name}.md`, `docs/adr/0108-${name}.md`])).toEqual([`docs/notes/${name}.md`])
   })
 })

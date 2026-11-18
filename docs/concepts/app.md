@@ -1,6 +1,6 @@
 ---
 aside: false
-pageClass: wide-page
+pageClass: wide-page part-app
 kind: explanation
 ---
 # The app and the dashboard
