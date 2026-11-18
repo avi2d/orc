@@ -34,7 +34,7 @@ Add `--width 120 --height 30` to set its size.
 Configure task report commands as [Read the tasks report](#read-the-tasks-report) describes.
 With `ORC_DASH_TASKS` unset, the screen shows only saved task samples.
 
-### Follow a task's stages
+### Follow the stages of a task
 
 The panel shows stages for `full review fix`, `quick fix`, `local only`, `scout`, and `orc run` tasks.
 

@@ -66,7 +66,7 @@ Configure [saved profiles](dash-quota.md#show-saved-profiles) or [Claude account
 <div id="run-the-resources-tool"><span id="show-a-second-machine-s-resources"></span><span id="read-the-resources-report"></span><span id="read-the-tasks-block"></span></div>
 
 [Resources](dash-resources.md) shows machine usage.
-See [the second machine](dash-resources.md#show-a-second-machines-resources), [the resources report](dash-resources.md#read-the-resources-report), and [its tasks block](dash-resources.md#read-the-tasks-block).
+See [the second machine](dash-resources.md#show-the-resources-of-a-second-machine), [the resources report](dash-resources.md#read-the-resources-report), and [its tasks block](dash-resources.md#read-the-tasks-block).
 
 <div id="run-the-queues-tool"><span id="run-the-dispatch-tool"></span></div>
 
@@ -80,7 +80,7 @@ See [the second machine](dash-resources.md#show-a-second-machines-resources), [t
 <div id="run-the-tasks-tool"><span id="read-the-tasks-report"></span><span id="follow-a-task-s-stages"></span><span id="keep-the-task-history"></span></div>
 
 [Tasks](dash-tasks.md) shows projects and tasks.
-See [stages](dash-tasks.md#follow-a-tasks-stages), [history](dash-tasks.md#keep-the-task-history), and [the tasks report](dash-tasks.md#read-the-tasks-report).
+See [stages](dash-tasks.md#follow-the-stages-of-a-task), [history](dash-tasks.md#keep-the-task-history), and [the tasks report](dash-tasks.md#read-the-tasks-report).
 
 <div id="run-the-dashboard"><span id="use-a-wide-screen"></span><span id="follow-the-ledger"></span><span id="fill-the-ledger"></span><span id="configure-the-dashboard"></span><span id="lay-out-the-dashboard"></span><span id="set-the-colours"></span></div>
 

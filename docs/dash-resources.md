@@ -15,7 +15,7 @@ Press `q` or Control C to quit.
 To print one frame of plain text instead, run `orc-dash panel resources --print`.
 To print the versioned JSON report, run `bun run resources-json`.
 
-### Show a second machine's resources
+### Show the resources of a second machine
 
 The resources panel and the dashboard show a second machine's resources when a command that prints its report is configured.
 The command runs on this machine and prints the other machine's `bun run resources-json` report.
