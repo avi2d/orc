@@ -93,7 +93,6 @@ export type {
   Hold,
   Parked,
   TaskRecord,
-  CiRerun,
   TaskPriority,
   DeciderOwns,
 } from "./task-record"
