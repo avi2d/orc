@@ -47,13 +47,12 @@ const readFailure = (url: string, cause: unknown): string =>
 const readLatest = (registry: string): Effect.Effect<string, string> => {
   const url = registry + "/" + packageName + "/latest"
   return Effect.tryPromise({
-    try: async (signal) => {
-      const response = await fetch(url, { signal: AbortSignal.any([signal, AbortSignal.timeout(registryTimeoutMs)]) })
-      return { ok: response.ok, status: response.status, body: response.ok ? (await response.json()) as unknown : null }
-    },
+    try: (signal) => fetch(url, { signal: AbortSignal.any([signal, AbortSignal.timeout(registryTimeoutMs)]) }),
     catch: (cause) => readFailure(url, cause)
   }).pipe(
-    Effect.flatMap((answer) => answer.ok ? Effect.succeed(answer.body) : Effect.fail(url + " answered " + String(answer.status))),
+    Effect.flatMap((response) => response.ok
+      ? Effect.tryPromise({ try: (): Promise<unknown> => response.json(), catch: (cause) => readFailure(url, cause) })
+      : Effect.fail(url + " answered " + String(response.status))),
     Effect.flatMap((body) => Schema.decodeUnknownEffect(LatestManifest)(body).pipe(
       Effect.mapError(() => url + " answered with no version orc can read")
     )),
