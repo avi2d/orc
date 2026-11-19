@@ -95,3 +95,11 @@ export const appInstallHelp: HelpEntry = {
   options: [],
   examples: ["orc app install"]
 }
+
+export const updateHelp: HelpEntry = {
+  usage: ["orc update [--json]"],
+  summary: "Install the newest published orc when it is newer than this one",
+  about: "Reads the newest version of @avi2dg/orc from the npm registry and installs it only when it is newer than the running orc. The install runs bun add -g @avi2dg/orc@<version>, or the update.command config.json names. A registry read that fails or takes more than 15 seconds leaves orc as it is.",
+  options: [{ flag: "--json", meaning: "Print the result as an orc.update.v1 JSON document." }],
+  examples: ["orc update", "orc update --json"]
+}

@@ -16,7 +16,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/app/dispatch-args-heavy.ts` | The `orc heavy` verb parsing |
 | `packages/run/src/app/help.ts` | The help pages: the overview, the per-command help, the usage error text and the closest-command suggestion |
 | `packages/run/src/app/help-format.ts` | The help layout: wrapping to 80 columns, the usage block and the name and text tables |
-| `packages/run/src/app/help-entries-run.ts` | The help entries for `orc run`, the run history commands, `orc chat` and `orc app` |
+| `packages/run/src/app/help-entries-run.ts` | The help entries for `orc run`, the run history commands, `orc chat`, `orc app` and `orc update` |
 | `packages/run/src/app/help-entries-backlog.ts` | The help entries for `orc backlog` and its subcommands, `orc attention`, `orc beat` and `orc merge` |
 | `packages/run/src/app/help-entries-runner.ts` | The help entries for `orc runner` and `orc heavy` and their subcommands |
 
@@ -151,6 +151,12 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/seeing-runs/run-scores.ts` | The `orc score` step score writes: the 1 to 5 check, the note and the unknown run and step errors |
 | `packages/run/src/features/seeing-runs/other-machines.ts` | The other dispatch machines' runs `orc runs --json` adds, and the `machines` it names for those that fail |
 
+## features/updating-orc
+
+| Path | What it holds |
+| --- | --- |
+| `packages/run/src/features/updating-orc/update.ts` | The `orc update` registry read, version comparison, install command and its `orc.update.v1` JSON |
+
 ## entities/agent
 
 | Path | What it holds |
@@ -268,7 +274,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 
 | Path | What it holds |
 | --- | --- |
-| `packages/run/src/shared/config/orc-config.ts` | The reading of `config.json`: the providers, the heavy queue tuning and the implementer, fixer, orchestrator, planner and decider models |
+| `packages/run/src/shared/config/orc-config.ts` | The reading of `config.json`: the providers, the heavy queue tuning, the `orc update` install command and the implementer, fixer, orchestrator, planner and decider models |
 | `packages/run/src/shared/config/json-file.ts` | The JSON config file reading and its `ConfigError` |
 | `packages/run/src/shared/config/model-route.ts` | The choice of the configured provider for the agent models and the check of a token file |
 | `packages/run/src/shared/config/dispatch-config.ts` | The reading of `dispatch.json` and `projects.json` |

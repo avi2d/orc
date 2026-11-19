@@ -39,6 +39,9 @@ Chat and the app:
   chat       Talk to the orchestrator, which adds, holds and answers tasks
   app        Install the orc mods and layout into the Herdr App
 
+Updating orc:
+  update     Install the newest published orc when it is newer than this one
+
 Run orc <command> --help to learn what a command does and the options it takes.
 ```
 
@@ -802,4 +805,24 @@ upgrade.
 
 Examples:
   orc app install
+```
+
+## Updating orc
+
+### orc update
+
+```text
+Usage: orc update [--json]
+
+Reads the newest version of @avi2dg/orc from the npm registry and installs it
+only when it is newer than the running orc. The install runs bun add -g
+@avi2dg/orc@<version>, or the update.command config.json names. A registry read
+that fails or takes more than 15 seconds leaves orc as it is.
+
+Options:
+  --json  Print the result as an orc.update.v1 JSON document.
+
+Examples:
+  orc update
+  orc update --json
 ```

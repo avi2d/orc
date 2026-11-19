@@ -79,5 +79,5 @@ An unknown command or subcommand that is one or two typos away from exactly one 
 - [Adding tasks from a chat](https://github.com/avi2d/orc/blob/main/docs/run/chat.md)
 - [The runner](https://github.com/avi2d/orc/blob/main/docs/run/runner.md)
 - [The heavy queue](https://github.com/avi2d/orc/blob/main/docs/run/heavy-queue.md)
-- [Move an old launcher to the run package](https://github.com/avi2d/orc/blob/main/docs/run/move-an-old-launcher.md)
+- [Updating orc](https://github.com/avi2d/orc/blob/main/docs/run/updating-orc.md)
 - [Where every source file is](https://github.com/avi2d/orc/blob/main/docs/run/layout.md)

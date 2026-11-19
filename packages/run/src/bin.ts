@@ -8,6 +8,7 @@ import packageJson from "../package.json" with { type: "json" }
 import { appHomeDir, bundledAppDir, formatAppInstall, herdrAppSourceDir, installApp, readyBundledApp } from "./features/installing-the-app/index"
 import { type OrcArgs, parseArgs } from "./app/args"
 import { runChat } from "./features/chat/index"
+import { encodeUpdateJson, formatUpdate, runUpdate } from "./features/updating-orc/index"
 import { helpText, overview, usageErrorText } from "./app/help"
 import { runDispatch } from "./app/dispatch-cli"
 import { decodeJson, pueue, PueueState, queuedTasks, RunnerError } from "./shared/process/index"
@@ -196,6 +197,15 @@ const runInstallApp = Effect.gen(function*() {
   yield* Console.log(formatAppInstall(result))
 })
 
+const update = (args: Extract<OrcArgs, { readonly kind: "Update" }>) =>
+  Effect.gen(function*() {
+    const result = yield* runUpdate({ home: orcHomeDir(Bun.env.ORC_HOME), env: Bun.env, running: packageJson.version }).pipe(Effect.provide(BunServices.layer))
+    yield* Console.log(args.json ? yield* encodeUpdateJson(result) : formatUpdate(result))
+    if (result.outcome === "failed") {
+      return yield* Effect.fail("orc update failed")
+    }
+  })
+
 const program = Effect.gen(function*() {
   const words = Bun.argv.slice(2)
   const args = parseArgs(words)
@@ -238,6 +248,9 @@ const program = Effect.gen(function*() {
     }
     case "Chat": {
       return yield* chat(args.sessionFile)
+    }
+    case "Update": {
+      return yield* update(args)
     }
     case "UsageError": {
       yield* Console.error(usageErrorText(args.detail, words))
