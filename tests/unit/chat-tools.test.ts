@@ -147,4 +147,35 @@ describe("the chat's backlog tools", () => {
   test("orc_backlog_priority passes none to orc backlog priority instead of dropping the clear", async () => {
     expect(await orcArgv("orc_backlog_priority", { id: "orc-1", priority: "none" })).toEqual(["backlog", "priority", "orc-1", "none"])
   })
+
+  const fakeOrc = { [orcCommandVar]: JSON.stringify(["sh", "-c", 'printf "%s\\n" "$@"; printf "stdin:"; cat', "orc"]) }
+  const toolNamed = (name: string) => {
+    const tool = chatSession(fakeOrc, () => false, () => undefined).tools.find((candidate) => candidate.name === name)
+    if (tool === undefined) {
+      throw new Error(name + " is not a chat tool")
+    }
+    return tool
+  }
+  const calls = [
+    { name: "orc_backlog_stop", params: { id: "orc-9" }, argv: ["backlog", "stop", "orc-9"] },
+    { name: "orc_backlog_drop", params: { id: "orc-9", reason: "duplicate of orc-12" }, argv: ["backlog", "drop", "orc-9", "duplicate of orc-12"] },
+    { name: "orc_backlog_send_back", params: { id: "orc-9", words: "rename the flag to --dry-run" }, argv: ["backlog", "send-back", "orc-9", "rename the flag to --dry-run"] },
+    { name: "orc_backlog_note", params: { id: "orc-9", words: "the login page moved to /auth" }, argv: ["backlog", "note", "orc-9", "the login page moved to /auth"] },
+    { name: "orc_backlog_depend", params: { id: "orc-9", on: ["orc-7", "orc-8"] }, argv: ["backlog", "depend", "orc-9", "--on", "orc-7,orc-8"] },
+    { name: "orc_backlog_depend", params: { id: "orc-9", on: [] }, argv: ["backlog", "depend", "orc-9", "--clear"] },
+    { name: "orc_backlog_thread", params: { id: "orc-9" }, argv: ["backlog", "thread", "orc-9"] }
+  ] as const
+
+  for (const call of calls) {
+    test(call.name + " runs " + call.argv.join(" ") + " with no stdin and returns what orc prints", async () => {
+      const result = await toolNamed(call.name).execute("call-1", call.params)
+      expect(result.content).toEqual([{ type: "text", text: [...call.argv, "stdin:"].join("\n") }])
+    })
+  }
+
+  for (const call of calls.filter((candidate, index) => calls.findIndex((first) => first.name === candidate.name) === index)) {
+    test(call.name + " refuses an extra parameter instead of dropping it", async () => {
+      await expect(toolNamed(call.name).execute("call-1", { ...call.params, force: true })).rejects.toThrow(call.name + " takes")
+    })
+  }
 })
