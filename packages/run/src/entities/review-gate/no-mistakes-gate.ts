@@ -120,8 +120,10 @@ const orcActions = new Set(["auto-fix", "no-op"])
 
 const isAskUser = (finding: NoMistakesFinding): boolean => !orcActions.has(finding.action) && !isQuestion(finding)
 
+const isUnknownAction = (finding: NoMistakesFinding): boolean => isAskUser(finding) && finding.action !== "ask-user"
+
 export const askUserFindings = (findings: ReadonlyArray<NoMistakesFinding>, allow: ReadonlyArray<AllowWord>): ReadonlyArray<NoMistakesFinding> =>
-  allow.includes(askUserWord) ? [] : findings.filter(isAskUser)
+  allow.includes(askUserWord) ? findings.filter(isUnknownAction) : findings.filter(isAskUser)
 
 const questionReason = (question: NoMistakesFinding): string => {
   const quoted = question.description === "" ? "" : ` "${question.description}"`
