@@ -160,7 +160,7 @@ const stopOnRejection = (input: NoMistakesInput, log: DriveLog, sent: Sent, comm
   }))
 }
 
-export const gateCapQuestionId = "gate-cap"
+const gateCapQuestionId = "gate-cap"
 
 const gateCapQuestion = (gate: ParkedGate): NoMistakesFinding => ({
   id: gateCapQuestionId,
