@@ -1,10 +1,12 @@
+import { strict as assert } from "node:assert"
 import { describe, expect, test } from "bun:test"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect } from "effect"
 import { parkedListing } from "../../packages/run/src/features/chat/chat-parked"
-import { chatSession, orcCommandVar } from "../../packages/run/src/features/chat/chat-tools"
+import { orcCommandVar } from "../../packages/run/src/features/chat/chat-run"
+import { chatSession } from "../../packages/run/src/features/chat/chat-tools"
 
 describe("the parked-question listing", () => {
   test("polling does not post a decider-owned question while posting a user-owned question", async () => {
@@ -175,7 +177,7 @@ describe("the chat's backlog tools", () => {
 
   for (const call of calls.filter((candidate, index) => calls.findIndex((first) => first.name === candidate.name) === index)) {
     test(call.name + " refuses an extra parameter instead of dropping it", async () => {
-      await expect(toolNamed(call.name).execute("call-1", { ...call.params, force: true })).rejects.toThrow(call.name + " takes")
+      await assert.rejects(toolNamed(call.name).execute("call-1", { ...call.params, force: true }), (error: Error) => error.message.startsWith(call.name + " takes"))
     })
   }
 })

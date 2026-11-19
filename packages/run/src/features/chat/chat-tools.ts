@@ -1,41 +1,14 @@
 import { Effect, Schema } from "effect"
 import { isOpenHeld, type OpenHeld } from "./chat-backlog"
 import { type BoardHost, type Boards, boardsVar, decisionBoards } from "./chat-board"
-import { type Env, runCommand } from "./chat-command"
+import type { Env } from "./chat-command"
 import { ChatToolError } from "./chat-error"
 import { type Deliver, postUnposted, type PostState, readBacklog } from "./chat-posts"
-import {
-  AddTaskInput,
-  AnswerInput,
-  BoardInput,
-  DependInput,
-  DropInput,
-  EditInput,
-  HoldInput,
-  MergeInput,
-  NoteInput,
-  PriorityInput,
-  SendBackInput,
-  StopInput,
-  ThreadInput
-} from "./chat-inputs"
+import { AddTaskInput, AnswerInput, BoardInput, EditInput, HoldInput, MergeInput } from "./chat-inputs"
 import { lavishLauncher } from "./chat-lavish"
 import { AttentionJson, parkedListing } from "./chat-parked"
-
-export const orcCommandVar = "ORC_CHAT_ORC"
-
-interface TextResult {
-  readonly content: ReadonlyArray<{ readonly type: "text"; readonly text: string }>
-  readonly details: undefined
-}
-
-export interface ChatTool {
-  readonly name: string
-  readonly label: string
-  readonly description: string
-  readonly parameters: unknown
-  readonly execute: (toolCallId: string, params: unknown) => Promise<TextResult>
-}
+import { type ChatTool, decodeInput, runOrc, runTool, textResult } from "./chat-run"
+import { priorityTool, taskTools } from "./chat-task-tools"
 
 export interface ChatSession {
   readonly tools: ReadonlyArray<ChatTool>
@@ -71,27 +44,10 @@ interface ChatHost {
   readonly sendMessage: (message: { readonly customType: string; readonly content: string; readonly display: boolean }, options?: { readonly triggerTurn?: boolean }) => void
 }
 
-const OrcCommand = Schema.fromJsonString(Schema.NonEmptyArray(Schema.String))
-
 // Effect writes an empty struct as {"not":{"type":"null"}}, and Pi takes only an object schema.
 const noParameters = { type: "object", properties: {}, additionalProperties: false } as const
 
 const closedPollMillis = 15_000
-
-const runOrc = (env: Env, args: ReadonlyArray<string>, stdin: string | null): Effect.Effect<string, ChatToolError> =>
-  Effect.gen(function*() {
-    const command = yield* Schema.decodeEffect(OrcCommand)(env[orcCommandVar] ?? "").pipe(
-      Effect.mapError(() => new ChatToolError({ message: "the orc chat tools run only inside orc chat, which names its orc in " + orcCommandVar }))
-    )
-    return yield* runCommand([...command, ...args], stdin, env)
-  })
-
-const textResult = (text: string): TextResult => ({ content: [{ type: "text", text }], details: undefined })
-
-const decodeInput = <A>(schema: Schema.Decoder<A>, tool: string, params: unknown): Effect.Effect<A, ChatToolError> =>
-  Schema.decodeUnknownEffect(schema)(params, { onExcessProperty: "error" }).pipe(
-    Effect.mapError((error) => new ChatToolError({ message: tool + " takes " + error.message }))
-  )
 
 const heldLine = (task: OpenHeld): string =>
   task.id + " " + task.title + " is held for the captain: " + task.hold.reason + (task.hold.until === null ? "" : ", until " + task.hold.until)
@@ -125,77 +81,6 @@ const postOpenHeld = (env: Env, deliver: Deliver, state: PostState): Effect.Effe
       })
     )
   )
-
-const runTool = <A>(schema: Schema.Decoder<A>, name: string, params: unknown, env: Env, args: (input: A) => ReadonlyArray<string>): Promise<TextResult> =>
-  Effect.runPromise(
-    decodeInput(schema, name, params).pipe(
-      Effect.flatMap((input) => runOrc(env, args(input), null)),
-      Effect.map(textResult)
-    )
-  )
-
-const priorityTool = (env: Env): ChatTool => ({
-  name: "orc_backlog_priority",
-  label: "Set an orc task's priority",
-  description:
-    "Sets or clears the priority of one new task through orc backlog priority, which orders the beat's starts: 0 starts first, 4 starts after the other priorities, and none clears it. orc refuses a task that is taken, started or closed.",
-  parameters: Schema.toJsonSchemaDocument(PriorityInput).schema,
-  execute: (_toolCallId, params) =>
-    runTool(PriorityInput, "orc_backlog_priority", params, env, (input) => ["backlog", "priority", input.id, String(input.priority)])
-})
-
-const taskTools = (env: Env): ReadonlyArray<ChatTool> => [
-  {
-    name: "orc_backlog_stop",
-    label: "Stop an orc task's run",
-    description:
-      "Kills a started task's run through the machine that started it with orc backlog stop, and closes the task stopped. orc refuses a task that is not started, and a task on a machine it cannot reach, which the captain closes by hand. A new task ends with orc_backlog_drop instead.",
-    parameters: Schema.toJsonSchemaDocument(StopInput).schema,
-    execute: (_toolCallId, params) => runTool(StopInput, "orc_backlog_stop", params, env, (input) => ["backlog", "stop", input.id])
-  },
-  {
-    name: "orc_backlog_drop",
-    label: "Drop a new orc task",
-    description:
-      "Closes a new task as dropped with the reason it never runs, through orc backlog drop. orc refuses a taken or started task, which ends with orc_backlog_stop instead, and a task that is already closed.",
-    parameters: Schema.toJsonSchemaDocument(DropInput).schema,
-    execute: (_toolCallId, params) => runTool(DropInput, "orc_backlog_drop", params, env, (input) => ["backlog", "drop", input.id, input.reason])
-  },
-  {
-    name: "orc_backlog_send_back",
-    label: "Send an orc task's PR back",
-    description:
-      "Moves a closed task whose PR is still open back to new through orc backlog send-back, parked on its branch with the captain's words as the review. The next beat resumes its run on that branch, and the push updates the same PR. Sending it back again before the beat starts it adds more words. orc refuses a task that is neither closed nor sent back, names no PR, or whose PR is merged or closed.",
-    parameters: Schema.toJsonSchemaDocument(SendBackInput).schema,
-    execute: (_toolCallId, params) => runTool(SendBackInput, "orc_backlog_send_back", params, env, (input) => ["backlog", "send-back", input.id, input.words])
-  },
-  {
-    name: "orc_backlog_note",
-    label: "Leave a note on an orc task",
-    description:
-      "Appends a note to a task's notes file through orc backlog note. A note holds nothing and answers nothing, so it never changes when the beat starts the task. orc refuses an id the backlog does not hold.",
-    parameters: Schema.toJsonSchemaDocument(NoteInput).schema,
-    execute: (_toolCallId, params) => runTool(NoteInput, "orc_backlog_note", params, env, (input) => ["backlog", "note", input.id, input.words])
-  },
-  {
-    name: "orc_backlog_depend",
-    label: "Change the tasks an orc task waits for",
-    description:
-      "Replaces the whole list of tasks a new or held task waits for through orc backlog depend, or empties it. orc refuses a task that is taken, started, closed or parked for the captain's answer, an id the backlog does not hold, and a dependency that would wait on itself in a loop.",
-    parameters: Schema.toJsonSchemaDocument(DependInput).schema,
-    execute: (_toolCallId, params) =>
-      runTool(DependInput, "orc_backlog_depend", params, env, (input) =>
-        ["backlog", "depend", input.id, ...(input.on.length === 0 ? ["--clear"] : ["--on", input.on.join(",")])])
-  },
-  {
-    name: "orc_backlog_thread",
-    label: "Read an orc task's conversation",
-    description:
-      "Returns orc backlog thread: a task's holds, questions, decisions, answers, deliveries, withdrawals and notes, oldest first. It works on a closed task too, and orc refuses an id the backlog does not hold.",
-    parameters: Schema.toJsonSchemaDocument(ThreadInput).schema,
-    execute: (_toolCallId, params) => runTool(ThreadInput, "orc_backlog_thread", params, env, (input) => ["backlog", "thread", input.id])
-  }
-]
 
 const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
   {
