@@ -5,16 +5,18 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect, Exit } from "effect"
 import { parseArgs } from "../../packages/run/src/app/args"
-import { decodeVersionJson, formatMachinesTable, readMachineVersions } from "../../packages/run/src/features/seeing-runs/index"
+import { decodeVersionJson, readMachineVersions } from "../../packages/run/src/features/seeing-runs/index"
 
 const quota = { provider: "example", command: ["example-quota"], accounts: [{ name: "main", kind: "none" }] }
 
 describe("orc version and orc machines", () => {
-  test("the parser takes version with --json and --local, and machines with --json", () => {
-    expect(parseArgs(["version"])).toEqual({ kind: "ShowVersion", json: false })
-    expect(parseArgs(["version", "--json", "--local"])).toEqual({ kind: "ShowVersion", json: true })
+  test("the parser takes version --json with --local, and machines --json, and refuses each plain form", () => {
+    expect(parseArgs(["version", "--json"])).toEqual({ kind: "ShowVersion" })
+    expect(parseArgs(["version", "--json", "--local"])).toEqual({ kind: "ShowVersion" })
+    expect(parseArgs(["version"])).toEqual({ kind: "UsageError", detail: "orc version takes --json" })
     expect(parseArgs(["version", "--local"])).toEqual({ kind: "UsageError", detail: "unexpected argument: --local" })
-    expect(parseArgs(["machines", "--json"])).toEqual({ kind: "ListMachines", json: true })
+    expect(parseArgs(["machines", "--json"])).toEqual({ kind: "ListMachines" })
+    expect(parseArgs(["machines"])).toEqual({ kind: "UsageError", detail: "orc machines takes --json" })
   })
 
   test("the version decoder reads an orc.version.v1 document and refuses one without a version", () => {
@@ -37,7 +39,6 @@ describe("orc version and orc machines", () => {
       const document = await Effect.runPromise(readMachineVersions(dispatchFile, "1.0.0").pipe(Effect.provide(BunServices.layer)))
       expect(document.machines[0]).toEqual({ machine: "mac", version: "1.0.0" })
       expect(document.machines[1]).toEqual({ machine: "box", error: expect.stringContaining("exited 3: orc: not installed") })
-      expect(formatMachinesTable(document)).toContain("box      error: ")
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

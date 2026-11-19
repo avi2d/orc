@@ -1,7 +1,6 @@
 import { Effect, type FileSystem, Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { type Command, type ConfigError, type Machine, ownedBySweep, throughFor } from "../../shared/config/index"
-import { formatTable } from "../../shared/lib/index"
 import { askMachine, readDispatchMachines } from "./other-machines"
 
 const VersionJsonSchema = Schema.Struct({
@@ -28,7 +27,6 @@ export const decodeVersionJson = (value: unknown): Effect.Effect<typeof VersionJ
 export const encodeMachinesJson = (document: MachinesJsonDocument): Effect.Effect<string, Schema.SchemaError> =>
   Schema.encodeEffect(MachinesJsonSchema)(document).pipe(Effect.map((encoded) => JSON.stringify(encoded)))
 
-// Without --local the other machine would read its own dispatch machines, as orc runs --json does.
 const localVersionOf = (through: Command): Command => [...through, "version", "--json", "--local"]
 
 const versionOf = (machine: Machine, localVersion: string): Effect.Effect<ReadonlyArray<MachineVersion>, never, ChildProcessSpawner.ChildProcessSpawner> => {
@@ -48,5 +46,4 @@ export const readMachineVersions = (dispatchFile: string, localVersion: string):
     Effect.map((rows) => ({ schema: "orc.machines.v1", machines: rows.flat() }))
   )
 
-export const formatMachinesTable = (document: MachinesJsonDocument): string =>
-  formatTable(["MACHINE", "VERSION"], document.machines.map((row): ReadonlyArray<string> => [row.machine, "version" in row ? row.version : "error: " + row.error]), "no dispatch machines")
+

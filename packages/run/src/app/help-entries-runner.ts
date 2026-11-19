@@ -94,22 +94,22 @@ export const heavyHelp: HelpEntry = {
 }
 
 export const versionHelp: HelpEntry = {
-  usage: ["orc version [--json [--local]]"],
+  usage: ["orc version --json [--local]"],
   summary: "Print the orc version this machine runs",
   about: "Prints the version of the orc package installed on this machine.",
   options: [
     { flag: "--json", meaning: "Print the version as an orc.version.v1 JSON document." },
-    { flag: "--local", meaning: "With --json, read only this machine, as orc machines asks each machine." }
+    { flag: "--local", meaning: "Accepted with --json. orc machines passes it." }
   ],
-  examples: ["orc version", "orc version --json"]
+  examples: ["orc version --json"]
 }
 
 export const machinesHelp: HelpEntry = {
-  usage: ["orc machines [--json]"],
+  usage: ["orc machines --json"],
   summary: "List the orc version each dispatch machine runs",
   about: "Reads the machines in dispatch.json. A machine that starts orc runner start here shows this orc's version. A machine reached through orc runner start -- <command> is asked through that command with orc version --json --local, and shows its error when it does not answer within 10 seconds.",
   options: [{ flag: "--json", meaning: "Print the machines as an orc.machines.v1 JSON document." }],
-  examples: ["orc machines", "orc machines --json"]
+  examples: ["orc machines --json"]
 }
 
 export const heavyVerbHelp: Record<HeavyWord, HelpEntry> = {

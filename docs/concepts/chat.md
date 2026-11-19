@@ -20,6 +20,7 @@ Each tool runs one `orc` command, the same one you could type.
 | `orc_backlog` | Reads the backlog, with every project, machine and task |
 | `orc_backlog_hold` | Holds a new task for your decision, with a reason and questions |
 | `orc_backlog_priority` | Sets or clears a new task's priority |
+| `orc_machines` | Reads the orc version each dispatch machine runs |
 | `orc_backlog_edit` | Replaces the title and the body of a new task |
 | `orc_backlog_answer` | Answers a held task, a parked task, a decision or a run waiting at its gate |
 | `merge_task` | Lands a closed task's pull request through `orc merge` |

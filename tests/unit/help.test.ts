@@ -50,7 +50,7 @@ const invocations: ReadonlyArray<Invocation> = [
   call(["heavy", "watch"]),
   call(["heavy", "watch-once"]),
   call(["version"], [], ["--json"]),
-  call(["machines"]),
+  call(["machines"], [], ["--json"]),
   call(["chat"]),
   call(["app", "install"])
 ]

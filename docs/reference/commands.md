@@ -758,24 +758,22 @@ Examples:
 ### orc version
 
 ```text
-Usage: orc version [--json [--local]]
+Usage: orc version --json [--local]
 
 Prints the version of the orc package installed on this machine.
 
 Options:
   --json   Print the version as an orc.version.v1 JSON document.
-  --local  With --json, read only this machine, as orc machines asks each
-           machine.
+  --local  Accepted with --json. orc machines passes it.
 
 Examples:
-  orc version
   orc version --json
 ```
 
 ### orc machines
 
 ```text
-Usage: orc machines [--json]
+Usage: orc machines --json
 
 Reads the machines in dispatch.json. A machine that starts orc runner start here
 shows this orc's version. A machine reached through orc runner start --
@@ -786,7 +784,6 @@ Options:
   --json  Print the machines as an orc.machines.v1 JSON document.
 
 Examples:
-  orc machines
   orc machines --json
 ```
 
