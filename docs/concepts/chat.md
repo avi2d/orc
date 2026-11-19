@@ -22,6 +22,8 @@ Each tool runs one `orc` command, the same one you could type.
 | `orc_backlog_priority` | Sets or clears a new task's priority |
 | `orc_backlog_edit` | Replaces the title and the body of a new task |
 | `orc_backlog_answer` | Answers a held task, a parked task, a decision or a run waiting at its gate |
+| `orc_attention` | Reads the attention queue through `orc attention --json` |
+| `orc_attention_answer` | Answers a `check-red`, `run-died` or `pr-ready` item through `orc attention answer` |
 | `merge_task` | Lands a closed task's pull request through `orc merge` |
 | `orc_decision_board` | Opens a local page with one card per open question |
 

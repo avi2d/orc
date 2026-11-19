@@ -48,6 +48,13 @@ export const AnswerInput = Schema.Struct({
   words: Schema.String.annotate({ description: "The captain's answer, word for word" })
 })
 
+export const AttentionAnswerInput = Schema.Struct({
+  id: Schema.String.check(Schema.isNonEmpty()).annotate({
+    description: "The id of the open attention item, as orc_attention returns it, such as orc-9.run-died"
+  }),
+  words: Schema.String.check(Schema.isNonEmpty()).annotate({ description: "The captain's answer, word for word" })
+})
+
 const BoardCard = Schema.Struct({
   question: Schema.optionalKey(Schema.String.annotate({
     description: "The id of the held or parked question this card answers, such as question-2; leave it out when the task was held with a reason and no questions"

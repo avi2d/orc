@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect } from "effect"
 import { parkedListing } from "../../packages/run/src/features/chat/chat-parked"
-import { chatSession, orcCommandVar } from "../../packages/run/src/features/chat/chat-tools"
+import { chatSession, chatToolNames, orcCommandVar } from "../../packages/run/src/features/chat/chat-tools"
 
 describe("the parked-question listing", () => {
   test("polling does not post a decider-owned question while posting a user-owned question", async () => {
@@ -146,5 +146,18 @@ describe("the chat's backlog tools", () => {
 
   test("orc_backlog_priority passes none to orc backlog priority instead of dropping the clear", async () => {
     expect(await orcArgv("orc_backlog_priority", { id: "orc-1", priority: "none" })).toEqual(["backlog", "priority", "orc-1", "none"])
+  })
+
+  test("orc_attention runs orc attention --json", async () => {
+    expect(await orcArgv("orc_attention", {})).toEqual(["attention", "--json"])
+  })
+
+  test("orc_attention_answer passes the captain's words as one argument instead of splitting them", async () => {
+    expect(await orcArgv("orc_attention_answer", { id: "orc-9.run-died", words: "restarted it  by hand" })).toEqual(["attention", "answer", "orc-9.run-died", "restarted it  by hand"])
+  })
+
+  test("chatToolNames lists orc_attention and orc_attention_answer so orc chat registers them", () => {
+    expect(chatToolNames).toContain("orc_attention")
+    expect(chatToolNames).toContain("orc_attention_answer")
   })
 })

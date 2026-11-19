@@ -30,6 +30,8 @@ The chat gives Pi these tools:
 | `orc_backlog_priority` | Set or clear a new task's priority from 0 to 4. |
 | `orc_backlog_edit` | Replace a new task's title and body without losing its hold or dependencies. |
 | `orc_backlog_answer` | Answer a hold, parked question, decision, or gate. |
+| `orc_attention` | Read the attention queue. |
+| `orc_attention_answer` | Answer a `check-red`, `run-died` or `pr-ready` item. |
 | `merge_task` | [Merge a closed task's PR](merging-a-tasks-pr.md). |
 | `orc_decision_board` | Open a board for a task waiting on you. |
 
