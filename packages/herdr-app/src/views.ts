@@ -16,7 +16,8 @@ export const openAsk = (value: unknown): OpenAsk | null =>
 export const views = [
   { id: "orc-board", label: "Board", key: "⌘1" },
   { id: "orc-resources", label: "Resources", key: "⌘2" },
-  { id: "orc-agents", label: "Agents", key: "⌘3" }
+  { id: "orc-agents", label: "Agents", key: "⌘3" },
+  { id: "orc-inbox", label: "Inbox", key: "⌘4" }
 ] as const
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
