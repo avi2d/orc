@@ -41,7 +41,7 @@ The Resources tab shows each account's quota windows and each machine's cores, l
 ## The chat drawer
 
 Pressing `cmd-k` on any tab opens a drawer that runs `orc chat`.
-It is the same chat as in a terminal, with the same eight tools.
+It is the same chat as in a terminal.
 
 ## The terminal dashboard
 

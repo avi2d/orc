@@ -6,7 +6,7 @@ kind: explanation
 # The chat
 
 `orc chat` is the front door: you say the work in plain words, and it turns your words into backlog commands.
-The chat is a Pi session with eight tools and no others, so it can change the backlog and nothing else.
+The chat is a Pi session with ten tools and no others, so it can change the backlog and nothing else.
 
 ![The chat: your words in, backlog commands out](../diagrams/chat.svg)
 
