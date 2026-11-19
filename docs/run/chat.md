@@ -28,6 +28,7 @@ The chat gives Pi these tools:
 | `orc_backlog` | Read projects, machines, tasks, and their states. |
 | `orc_backlog_hold` | Hold a new task other than a decision, with a reason, date, or questions. |
 | `orc_backlog_priority` | Set or clear a new task's priority from 0 to 4. |
+| `orc_machines` | Read the orc version each dispatch machine runs, through `orc machines --json`. |
 | `orc_backlog_edit` | Replace a new task's title and body without losing its hold or dependencies. |
 | `orc_backlog_answer` | Answer a hold, parked question, decision, or gate. |
 | `merge_task` | [Merge a closed task's PR](merging-a-tasks-pr.md). |

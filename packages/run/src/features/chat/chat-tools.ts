@@ -130,6 +130,14 @@ const priorityTool = (env: Env): ChatTool => ({
     runTool(PriorityInput, "orc_backlog_priority", params, env, (input) => ["backlog", "priority", input.id, String(input.priority)])
 })
 
+const machinesTool = (env: Env): ChatTool => ({
+  name: "orc_machines",
+  label: "Read the orc version on each machine",
+  description: "Returns orc machines --json: each dispatch machine with the orc version it runs, or the error for a machine that did not answer orc version --json --local through its start command within 10 seconds.",
+  parameters: noParameters,
+  execute: () => Effect.runPromise(runOrc(env, ["machines", "--json"], null).pipe(Effect.map(textResult)))
+})
+
 const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
   {
     name: "orc_backlog_add",
@@ -183,6 +191,7 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
       ])
   },
   priorityTool(env),
+  machinesTool(env),
   {
     name: "orc_backlog_edit",
     label: "Edit an orc task's text",

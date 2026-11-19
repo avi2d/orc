@@ -34,6 +34,8 @@ The backlog and the beat:
 The runner:
   runner     Queue, renew, read and stop task runs through pueue
   heavy      Check and watch the queue of heavy tool calls
+  version    Print the orc version this machine runs
+  machines   List the orc version each dispatch machine runs
 
 Chat and the app:
   chat       Talk to the orchestrator, which adds, holds and answers tasks
@@ -751,6 +753,41 @@ Runs one pass of the heavy queue watchdog and prints what it counted.
 
 Examples:
   orc heavy watch-once
+```
+
+### orc version
+
+```text
+Usage: orc version [--json [--local]]
+
+Prints the version of the orc package installed on this machine.
+
+Options:
+  --json   Print the version as an orc.version.v1 JSON document.
+  --local  With --json, read only this machine, as orc machines asks each
+           machine.
+
+Examples:
+  orc version
+  orc version --json
+```
+
+### orc machines
+
+```text
+Usage: orc machines [--json]
+
+Reads the machines in dispatch.json. A machine that starts orc runner start here
+shows this orc's version. A machine reached through orc runner start --
+<command> is asked through that command with orc version --json --local, and
+shows its error when it does not answer within 10 seconds.
+
+Options:
+  --json  Print the machines as an orc.machines.v1 JSON document.
+
+Examples:
+  orc machines
+  orc machines --json
 ```
 
 ## Chat and the app
