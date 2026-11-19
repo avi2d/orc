@@ -273,6 +273,15 @@ describe("answerForGate refuses only what needs your word", () => {
     }
   })
 
+  test("an answered finding with an action orc does not know is fixed with the answer instead of refused", () => {
+    expect(answerForGate(approvalGate, [stubFinding("r1", "manual")], [], [{ question: "r1", answer: "Rename it" }])).toEqual({
+      kind: "fix",
+      ids: ["r1"],
+      ignore: [],
+      instructions: "The captain answered these findings; fix each as the answer says:\nr1: Rename it"
+    })
+  })
+
   test("a finding with no action is refused rather than fixed", () => {
     const answer = answerForGate(approvalGate, [stubFinding("r1", "auto-fix"), stubFinding("r2", "")])
     expect(answer.kind).toBe("refuse")
@@ -574,6 +583,48 @@ describe("driveNoMistakes", () => {
     const { record } = await driveIn(asking, [], [], () => Effect.succeed({ asked, answers: [] }))
     expect(sent).toEqual([])
     expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior", asked }])
+  })
+
+  test("a finding with an action orc does not know parks as an open question instead of failing the run", async () => {
+    const manual = parked.replace("r2,error,b.go,,ask-user,changes product behavior", "r2,error,b.go,,manual,needs a human")
+    const asking: NoMistakesRunner = { ...endedFailed, start: () => Effect.succeed({ stdout: manual, stderr: "", exitCode: 0 }) }
+    const { record } = await driveIn(asking)
+    expect(record.status).toBe("refused")
+    expect(record.openQuestions).toEqual([{ id: "r2", text: "needs a human" }])
+    expect(record.result).toContain("--answer r2=")
+  })
+
+  const autoFixOnly = parked.replace("r2,error,b.go,,ask-user,changes product behavior", "r2,warning,b.go,,auto-fix,ignored error")
+  const endlessGates = (sent: Array<GateResponse>, until: number): NoMistakesRunner => ({
+    ...endedFailed,
+    start: () => Effect.succeed({ stdout: autoFixOnly, stderr: "", exitCode: 0 }),
+    respond: (response) => {
+      sent.push(response)
+      return Effect.succeed({ stdout: sent.length >= until ? failedRun : autoFixOnly, stderr: "", exitCode: 0 })
+    }
+  })
+
+  test("reaching the gate cap parks the task with the cap as an open question instead of failing it", async () => {
+    const sent: Array<GateResponse> = []
+    const { record } = await driveIn(endlessGates(sent, 100))
+    expect(sent.length).toBe(20)
+    expect(record.status).toBe("refused")
+    expect(record.openQuestions.map((question) => question.id)).toEqual(["gate-cap"])
+    expect(record.openQuestions[0]?.text).toContain("20 no-mistakes gates")
+  })
+
+  test("an answer to the gate cap lets orc answer more gates at the same run", async () => {
+    const sent: Array<GateResponse> = []
+    const waitedOn: Array<ReadonlyArray<string>> = []
+    const wait: Wait = (missing) => {
+      waitedOn.push(missing.map((finding) => finding.id))
+      return Effect.succeed({ asked, answers: [{ question: "gate-cap", answer: "keep going" }] })
+    }
+    const { record } = await driveIn(endlessGates(sent, 25), [], [], wait)
+    expect(waitedOn).toEqual([["gate-cap"]])
+    expect(sent.length).toBe(25)
+    expect(record.openQuestions).toEqual([])
+    expect(record.gatesAnswered).toBe(25)
   })
 
   test("a gate that answers without parking leaves a running line instead of silence", async () => {
