@@ -190,7 +190,7 @@ const stubNoMistakes = async (replies: ReadonlyArray<NoMistakesReply>): Promise<
 
 export const ghPrLink = "https://github.com/o/r/pull/9"
 
-export const noCheckRuns = "{\"total_count\":0,\"check_runs\":[]}"
+const noCheckRuns = "{\"total_count\":0,\"check_runs\":[]}"
 
 const stubGh = async (checkRuns: string): Promise<{ readonly dir: string; readonly calls: string }> => {
   const dir = await mkdtemp(join(tmpdir(), "orc-gh-stub-"))

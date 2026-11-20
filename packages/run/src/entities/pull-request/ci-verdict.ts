@@ -71,7 +71,7 @@ export const ciVerdictLine = (verdict: CiVerdict): string => {
 
 const checkRunsPath = (prLink: string, headSha: string): { readonly hostname: string; readonly apiPath: string } | null => {
   const matched = prPattern.exec(prLink)
-  return matched === null ? null : { hostname: matched[1] ?? "", apiPath: "repos/" + matched[2] + "/" + matched[3] + "/commits/" + headSha + "/check-runs?per_page=100" }
+  return matched === null ? null : { hostname: matched[1], apiPath: "repos/" + matched[2] + "/" + matched[3] + "/commits/" + headSha + "/check-runs?per_page=100" }
 }
 
 export const readCiVerdict = (read: CheckRunsReader, prLink: string, headSha: string): Effect.Effect<CiVerdict> =>
