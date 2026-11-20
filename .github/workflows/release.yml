@@ -12,10 +12,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: avi2d/workflows/actions/setup@v2
+      - uses: avi2d/workflows/actions/setup@v3
         with:
           fetch-depth: 0
-      - uses: avi2d/workflows/actions/secrets-pack@v2
+      - uses: avi2d/workflows/actions/secrets-pack@v3
         with:
           pack: ${{ secrets.CHECKS_SECRETS_PACK }}
       - run: bun run lint

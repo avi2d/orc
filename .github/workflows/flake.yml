@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: avi2d/workflows/setup@v1
+      - uses: avi2d/workflows/setup@v3
       - run: bunx checks-flake --runs 10 --report flake-report.json
       - uses: actions/upload-artifact@v7
         if: failure()
