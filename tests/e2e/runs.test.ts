@@ -339,3 +339,23 @@ describe("orc runs", () => {
     })
   }, 60_000)
 })
+
+describe("orc machines", () => {
+  test("machines --json lists this machine's version and the version a stand-in through command answers with", async () => {
+    await withHome(async (home) => {
+      const fake = await writeFakeMachine(home, { stdout: JSON.stringify({ schema: "orc.version.v1", version: "0.0.1-box" }) })
+      await mkdir(join(home, ".orc", "backlog"), { recursive: true })
+      await writeFile(join(home, ".orc", "backlog", "dispatch.json"), JSON.stringify({
+        machines: [{ name: "mac", slots: 1, start: ["orc", "runner", "start"] }, { name: "box", slots: 1, start: ["orc", "runner", "start", "--", "sh", fake.script] }],
+        quota: { provider: "example", command: ["example-quota"], accounts: [{ name: "main", kind: "none" }] }
+      }))
+      const local = Schema.decodeUnknownSync(Schema.Struct({ schema: Schema.Literal("orc.version.v1"), version: Schema.String }))(JSON.parse((await runOrc(["version", "--json"], home)).stdout))
+      const result = await runOrc(["machines", "--json"], home)
+      expect(result.exitCode).toBe(0)
+      expect(result.stderr).toBe("")
+      expect(await readFile(fake.argv, "utf8")).toBe("version --json --local\n")
+      expect(JSON.parse(result.stdout)).toEqual({ schema: "orc.machines.v1", machines: [{ machine: "mac", version: local.version }, { machine: "box", version: "0.0.1-box" }] })
+      expect(local.version).not.toBe("0.0.1-box")
+    })
+  }, 60_000)
+})

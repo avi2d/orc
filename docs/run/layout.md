@@ -18,7 +18,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/app/help-format.ts` | The help layout: wrapping to 80 columns, the usage block and the name and text tables |
 | `packages/run/src/app/help-entries-run.ts` | The help entries for `orc run`, the run history commands, `orc chat`, `orc app` and `orc update` |
 | `packages/run/src/app/help-entries-backlog.ts` | The help entries for `orc backlog` and its subcommands, `orc attention`, `orc beat` and `orc merge` |
-| `packages/run/src/app/help-entries-runner.ts` | The help entries for `orc runner` and `orc heavy` and their subcommands |
+| `packages/run/src/app/help-entries-runner.ts` | The help entries for `orc runner` and `orc heavy` and their subcommands, and for `orc version` and `orc machines` |
 
 ## widgets/beat
 
@@ -149,7 +149,8 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/seeing-runs/run-facts.ts` | The facts `orc runs --json` reads beside each run: its title, latest step and open questions |
 | `packages/run/src/features/seeing-runs/step-log.ts` | The `orc log` reading of one step's output file |
 | `packages/run/src/features/seeing-runs/run-scores.ts` | The `orc score` step score writes: the 1 to 5 check, the note and the unknown run and step errors |
-| `packages/run/src/features/seeing-runs/other-machines.ts` | The other dispatch machines' runs `orc runs --json` adds, and the `machines` it names for those that fail |
+| `packages/run/src/features/seeing-runs/other-machines.ts` | The other dispatch machines’ runs `orc runs --json` adds, and the `machines` it names for those that fail |
+| `packages/run/src/features/seeing-runs/machine-versions.ts` | The `orc version --json` and `orc machines --json` version reading of each dispatch machine, and the error for a machine that does not answer |
 
 ## features/updating-orc
 
