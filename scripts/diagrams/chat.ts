@@ -3,11 +3,11 @@ import { arrow, bullets, card, svg, tall, zone, type Drawing, type Part } from "
 const title = "The chat: your words in, backlog commands out"
 
 const desc =
-  "You say the work, an answer or a merge in orc chat. The chat is a Pi session with eight tools, each one an orc command, so it can change the backlog and nothing else. It starts nothing itself: the beat starts the tasks. Every 15 seconds it reads the backlog and posts what changed: closed tasks, questions that wait on you, pull request events and alerts. Your rules file steers both the chat and the decider."
+  "You say the work, an answer or a merge in orc chat. The chat is a Pi session with fourteen tools, each one an orc command, so it can change the backlog and nothing else. It starts nothing itself: the beat starts the tasks. Every 15 seconds it reads the backlog and posts what changed: closed tasks, questions that wait on you, pull request events and alerts. Your rules file steers both the chat and the decider."
 
 const say: Part = { title: "You say", ...bullets(["the work, in plain words", "an answer to a question", "to merge a pull request"]) }
 const read: Part = { title: "You read", text: "Each change, posted as it happens." }
-const model: Part = { title: "The orchestrator model", text: "A Pi session with eight tools and no others. It can change the backlog and nothing else." }
+const model: Part = { title: "The orchestrator model", text: "A Pi session with fourteen tools and no others. It can change the backlog and nothing else." }
 const rules: Part = { title: "Your rules", text: "`~/.orc/orchestrator.md`, and each project's instructions file. The decider reads the same files.", href: "attention" }
 const posts: Part = {
   title: "It posts what changed",
@@ -38,7 +38,7 @@ const wide = (): Drawing => {
   const body = [
     zone(8, 8, 170, 482, "You"),
     zone(198, 8, 380, 482, "`orc chat`"),
-    zone(598, 8, 354, 482, "Eight tools, each one an `orc` command"),
+    zone(598, 8, 354, 482, "Fourteen tools, each one an `orc` command"),
     card(18, 42, 150, 160, say),
     card(18, 330, 150, 100, read),
     card(208, 42, 360, 96, model),
@@ -61,7 +61,7 @@ export const chat = (): readonly Drawing[] => [
   tall("chat", title, desc, [
     { label: "You", rows: [say] },
     { label: "`orc chat`", rows: [model, rules] },
-    { label: "Eight tools, each one an `orc` command", rows: [shape, answer, land, { arrow: "work" }, backlog] },
+    { label: "Fourteen tools, each one an `orc` command", rows: [shape, answer, land, { arrow: "work" }, backlog] },
     { label: "Back to you", rows: [posts, { arrow: "work" }, read] }
   ])
 ]

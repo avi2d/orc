@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test"
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { Schema } from "effect"
-import { chatExtension, chatSession, type ChatTool } from "../../packages/run/src/features/chat/chat-tools"
+import type { ChatTool } from "../../packages/run/src/features/chat/chat-run"
+import { chatExtension, chatSession } from "../../packages/run/src/features/chat/chat-tools"
 import { binPath, chatEnv, closeTask, type Fixture, orchestratorConfig, ranClosing, runOrc, sessionFor, withFixture } from "./chat-helpers"
 
 const chatToolsPath = new URL("../../packages/run/src/features/chat/chat-tools.ts", import.meta.url).pathname
@@ -89,7 +90,7 @@ describe("orc chat", () => {
         "--extension",
         chatToolsPath,
         "--tools",
-        "orc_backlog_add,orc_backlog,orc_backlog_hold,orc_backlog_priority,orc_machines,orc_backlog_edit,orc_backlog_answer,merge_task,orc_decision_board",
+"orc_backlog_add,orc_backlog,orc_backlog_hold,orc_backlog_priority,orc_machines,orc_backlog_stop,orc_backlog_drop,orc_backlog_send_back,orc_backlog_note,orc_backlog_depend,orc_backlog_thread,orc_backlog_edit,orc_backlog_answer,merge_task,orc_decision_board",
         "ORC_CHAT_ORC=" + JSON.stringify([process.execPath, binPath]),
         "ORC_CHAT_BOARDS=" + join(fixture.home, "boards")
       ])

@@ -1,27 +1,14 @@
 import { Effect, Schema } from "effect"
 import { isOpenHeld, type OpenHeld } from "./chat-backlog"
 import { type BoardHost, type Boards, boardsVar, decisionBoards } from "./chat-board"
-import { type Env, runCommand } from "./chat-command"
+import type { Env } from "./chat-command"
 import { ChatToolError } from "./chat-error"
 import { type Deliver, postUnposted, type PostState, readBacklog } from "./chat-posts"
-import { AddTaskInput, AnswerInput, BoardInput, EditInput, HoldInput, MergeInput, PriorityInput } from "./chat-inputs"
+import { AddTaskInput, AnswerInput, BoardInput, EditInput, HoldInput, MergeInput } from "./chat-inputs"
 import { lavishLauncher } from "./chat-lavish"
 import { AttentionJson, parkedListing } from "./chat-parked"
-
-export const orcCommandVar = "ORC_CHAT_ORC"
-
-interface TextResult {
-  readonly content: ReadonlyArray<{ readonly type: "text"; readonly text: string }>
-  readonly details: undefined
-}
-
-export interface ChatTool {
-  readonly name: string
-  readonly label: string
-  readonly description: string
-  readonly parameters: unknown
-  readonly execute: (toolCallId: string, params: unknown) => Promise<TextResult>
-}
+import { type ChatTool, decodeInput, runOrc, runTool, textResult } from "./chat-run"
+import { priorityTool, taskTools } from "./chat-task-tools"
 
 export interface ChatSession {
   readonly tools: ReadonlyArray<ChatTool>
@@ -57,27 +44,10 @@ interface ChatHost {
   readonly sendMessage: (message: { readonly customType: string; readonly content: string; readonly display: boolean }, options?: { readonly triggerTurn?: boolean }) => void
 }
 
-const OrcCommand = Schema.fromJsonString(Schema.NonEmptyArray(Schema.String))
-
 // Effect writes an empty struct as {"not":{"type":"null"}}, and Pi takes only an object schema.
 const noParameters = { type: "object", properties: {}, additionalProperties: false } as const
 
 const closedPollMillis = 15_000
-
-const runOrc = (env: Env, args: ReadonlyArray<string>, stdin: string | null): Effect.Effect<string, ChatToolError> =>
-  Effect.gen(function*() {
-    const command = yield* Schema.decodeEffect(OrcCommand)(env[orcCommandVar] ?? "").pipe(
-      Effect.mapError(() => new ChatToolError({ message: "the orc chat tools run only inside orc chat, which names its orc in " + orcCommandVar }))
-    )
-    return yield* runCommand([...command, ...args], stdin, env)
-  })
-
-const textResult = (text: string): TextResult => ({ content: [{ type: "text", text }], details: undefined })
-
-const decodeInput = <A>(schema: Schema.Decoder<A>, tool: string, params: unknown): Effect.Effect<A, ChatToolError> =>
-  Schema.decodeUnknownEffect(schema)(params, { onExcessProperty: "error" }).pipe(
-    Effect.mapError((error) => new ChatToolError({ message: tool + " takes " + error.message }))
-  )
 
 const heldLine = (task: OpenHeld): string =>
   task.id + " " + task.title + " is held for the captain: " + task.hold.reason + (task.hold.until === null ? "" : ", until " + task.hold.until)
@@ -111,24 +81,6 @@ const postOpenHeld = (env: Env, deliver: Deliver, state: PostState): Effect.Effe
       })
     )
   )
-
-const runTool = <A>(schema: Schema.Decoder<A>, name: string, params: unknown, env: Env, args: (input: A) => ReadonlyArray<string>): Promise<TextResult> =>
-  Effect.runPromise(
-    decodeInput(schema, name, params).pipe(
-      Effect.flatMap((input) => runOrc(env, args(input), null)),
-      Effect.map(textResult)
-    )
-  )
-
-const priorityTool = (env: Env): ChatTool => ({
-  name: "orc_backlog_priority",
-  label: "Set an orc task's priority",
-  description:
-    "Sets or clears the priority of one new task through orc backlog priority, which orders the beat's starts: 0 starts first, 4 starts after the other priorities, and none clears it. orc refuses a task that is taken, started or closed.",
-  parameters: Schema.toJsonSchemaDocument(PriorityInput).schema,
-  execute: (_toolCallId, params) =>
-    runTool(PriorityInput, "orc_backlog_priority", params, env, (input) => ["backlog", "priority", input.id, String(input.priority)])
-})
 
 const machinesTool = (env: Env): ChatTool => ({
   name: "orc_machines",
@@ -192,6 +144,7 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
   },
   priorityTool(env),
   machinesTool(env),
+  ...taskTools(env),
   {
     name: "orc_backlog_edit",
     label: "Edit an orc task's text",
