@@ -3,6 +3,7 @@ import { askUserWord, type QuestionAnswer } from "../entities/review-gate/index"
 import { isRunKind, type RunKind, unknownRunKind } from "../entities/backlog/index"
 import { isRunDelivery, type RunDelivery, runDeliveries } from "../shared/config/index"
 import { sandboxKinds, type SandboxKind } from "../shared/sandbox/index"
+import { isThinkingLevel, piThinkingLevels, type PiThinkingLevel } from "../entities/agent/index"
 export type OrcArgs =
   | { readonly kind: "PrintVersion" }
   | { readonly kind: "PrintHelp"; readonly words: ReadonlyArray<string> }
@@ -12,7 +13,7 @@ export type OrcArgs =
   | { readonly kind: "ShowRun"; readonly id: string; readonly json: boolean }
   | { readonly kind: "ShowStepLog"; readonly runId: string; readonly stepId: number }
   | { readonly kind: "ScoreStep"; readonly runId: string; readonly step: string; readonly score: number; readonly note: string }
-  | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly taskKind: RunKind; readonly delivery: RunDelivery; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly implementerModel: string | undefined; readonly fixerModel: string | undefined; readonly instructions: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
+  | { readonly kind: "RunAgent"; readonly taskFile: string | null; readonly taskKind: RunKind; readonly delivery: RunDelivery; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly implementerModel: string | undefined; readonly fixerModel: string | undefined; readonly implementerThinking: PiThinkingLevel | undefined; readonly fixerThinking: PiThinkingLevel | undefined; readonly instructions: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer> }
   | { readonly kind: "Dispatch"; readonly args: Exclude<DispatchArgs, { readonly kind: "UsageError" }> }
   | { readonly kind: "Chat"; readonly sessionFile: string | null }
   | { readonly kind: "InstallApp" }
@@ -62,7 +63,7 @@ const parseScoreArgs = (rest: readonly string[]): OrcArgs => {
 }
 
 type RunSplit =
-  | { readonly kind: "ok"; readonly taskKind: RunKind; readonly delivery: RunDelivery; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly implementerModel: string | undefined; readonly fixerModel: string | undefined; readonly instructions: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer>; readonly kept: ReadonlyArray<string> }
+  | { readonly kind: "ok"; readonly taskKind: RunKind; readonly delivery: RunDelivery; readonly branch: string | undefined; readonly sandbox: SandboxKind | undefined; readonly tokenFile: string | undefined; readonly provider: string | undefined; readonly implementerModel: string | undefined; readonly fixerModel: string | undefined; readonly implementerThinking: PiThinkingLevel | undefined; readonly fixerThinking: PiThinkingLevel | undefined; readonly instructions: string | undefined; readonly allow: ReadonlyArray<typeof askUserWord>; readonly answers: ReadonlyArray<QuestionAnswer>; readonly kept: ReadonlyArray<string> }
   | { readonly kind: "error"; readonly detail: string }
 type AnswerParse =
   | { readonly kind: "ok"; readonly value: QuestionAnswer }
@@ -128,6 +129,8 @@ interface RunFlags {
   provider: string | undefined
   implementerModel: string | undefined
   fixerModel: string | undefined
+  implementerThinking: PiThinkingLevel | undefined
+  fixerThinking: PiThinkingLevel | undefined
   instructions: string | undefined
   readonly allow: Array<typeof askUserWord>
   readonly answers: Array<QuestionAnswer>
@@ -143,7 +146,11 @@ const stringFlags: ReadonlyArray<{ readonly flag: string; readonly key: StringFl
   { flag: "--fixer-model", key: "fixerModel", detail: "orc run takes --fixer-model once, with a model" },
   { flag: "--instructions", key: "instructions", detail: "orc run takes --instructions once, with a file path" }
 ]
-const valueFlags = new Set(["--kind", "--delivery", "--sandbox", "--allow", "--answer", ...stringFlags.map((entry) => entry.flag)])
+const thinkingFlags: ReadonlyArray<{ readonly flag: string; readonly key: "implementerThinking" | "fixerThinking" }> = [
+  { flag: "--implementer-thinking", key: "implementerThinking" },
+  { flag: "--fixer-thinking", key: "fixerThinking" }
+]
+const valueFlags = new Set(["--kind", "--delivery", "--sandbox", "--allow", "--answer", ...stringFlags.map((entry) => entry.flag), ...thinkingFlags.map((entry) => entry.flag)])
 const takeTaskKind = (rest: readonly string[], index: number, flags: RunFlags): FlagTake => {
   const word = rest[index + 1] ?? ""
   if (flags.taskKind !== undefined || word === "" || word.startsWith("--")) {
@@ -171,6 +178,15 @@ const takeValueFlag = (rest: readonly string[], index: number, flags: RunFlags):
       return { kind: "error", detail: named.detail }
     }
     flags[named.key] = value
+    return { kind: "taken" }
+  }
+  const thinking = thinkingFlags.find((entry) => entry.flag === rest[index])
+  if (thinking !== undefined) {
+    const level = takeFlagValue(rest, index, flags[thinking.key])
+    if (level === null || !isThinkingLevel(level)) {
+      return { kind: "error", detail: "orc run takes " + thinking.flag + " once, with " + piThinkingLevels.join(", ") }
+    }
+    flags[thinking.key] = level
     return { kind: "taken" }
   }
   if (rest[index] === "--kind") {
@@ -203,7 +219,7 @@ const takeValueFlag = (rest: readonly string[], index: number, flags: RunFlags):
   return { kind: "taken" }
 }
 const splitRunArgs = (rest: readonly string[]): RunSplit => {
-  const flags: RunFlags = { taskKind: undefined, delivery: undefined, branch: undefined, sandbox: undefined, tokenFile: undefined, provider: undefined, implementerModel: undefined, fixerModel: undefined, instructions: undefined, allow: [], answers: [], seen: new Set() }
+  const flags: RunFlags = { taskKind: undefined, delivery: undefined, branch: undefined, sandbox: undefined, tokenFile: undefined, provider: undefined, implementerModel: undefined, fixerModel: undefined, implementerThinking: undefined, fixerThinking: undefined, instructions: undefined, allow: [], answers: [], seen: new Set() }
   const kept: Array<string> = []
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index] ?? ""
@@ -217,7 +233,7 @@ const splitRunArgs = (rest: readonly string[]): RunSplit => {
     }
     index += 1
   }
-  return { kind: "ok", taskKind: flags.taskKind ?? "ship", delivery: flags.delivery ?? "no-mistakes", branch: flags.branch, sandbox: flags.sandbox, tokenFile: flags.tokenFile, provider: flags.provider, implementerModel: flags.implementerModel, fixerModel: flags.fixerModel, instructions: flags.instructions, allow: flags.allow, answers: flags.answers, kept }
+  return { kind: "ok", taskKind: flags.taskKind ?? "ship", delivery: flags.delivery ?? "no-mistakes", branch: flags.branch, sandbox: flags.sandbox, tokenFile: flags.tokenFile, provider: flags.provider, implementerModel: flags.implementerModel, fixerModel: flags.fixerModel, implementerThinking: flags.implementerThinking, fixerThinking: flags.fixerThinking, instructions: flags.instructions, allow: flags.allow, answers: flags.answers, kept }
 }
 const parseRunArgs = (rest: readonly string[]): OrcArgs => {
   const split = splitRunArgs(rest)
@@ -237,7 +253,7 @@ const parseRunArgs = (rest: readonly string[]): OrcArgs => {
     return { kind: "UsageError", detail: "orc run --kind " + split.taskKind + " ends in a report, so it takes no --delivery" }
   }
   const taskFile = split.kept.length === 1 ? split.kept[0] : null
-  return { kind: "RunAgent", taskFile, taskKind: split.taskKind, delivery: split.delivery, branch: split.branch, sandbox: split.sandbox, tokenFile: split.tokenFile, provider: split.provider, implementerModel: split.implementerModel, fixerModel: split.fixerModel, instructions: split.instructions, allow: split.allow, answers: split.answers }
+  return { kind: "RunAgent", taskFile, taskKind: split.taskKind, delivery: split.delivery, branch: split.branch, sandbox: split.sandbox, tokenFile: split.tokenFile, provider: split.provider, implementerModel: split.implementerModel, fixerModel: split.fixerModel, implementerThinking: split.implementerThinking, fixerThinking: split.fixerThinking, instructions: split.instructions, allow: split.allow, answers: split.answers }
 }
 const parseJsonListArgs = (rest: readonly string[], kind: "ListRefusals"): OrcArgs => {
   if (rest.length === 0) {
