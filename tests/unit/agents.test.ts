@@ -23,7 +23,7 @@ const good = [
 
 const noConfigModel = { file: "/orc-home/config.json", model: undefined }
 
-const resolved = (kind: "implementer" | "fixer", options: Parameters<typeof resolveAgentFile>[1]) =>
+const resolved = (kind: "implementer" | "fixer" | "reviewer", options: Parameters<typeof resolveAgentFile>[1]) =>
   Effect.runPromise(resolveAgentFile(kind, options).pipe(
     Effect.provide(BunServices.layer),
     Effect.catchTag("AgentFileError", (cause) => Effect.succeed("refused: " + cause.message))
@@ -175,6 +175,32 @@ describe("resolveAgentFile", () => {
       await writeAgent(join(project, ".orc", "agents"), "implementer.md")
       const found = await resolved("implementer", { projectDir: project, orcHome: root, agentsDir: join(root, "none"), configModel: { file: "/orc-home/config.json", model: "acme/configured" } })
       expect(typeof found === "string" ? found : found.model).toBe("acme/coder")
+    })
+  })
+
+  test("a personal reviewer file is used instead of the project or bundled reviewer file", async () => {
+    await withDirs(async (root) => {
+      const home = join(root, "orc-home")
+      const project = join(root, "project")
+      const bundled = join(root, "bundled")
+      await writeAgent(join(home, "agents"), "reviewer.md", good.replace("coder", "personal-model"))
+      await writeAgent(join(project, ".orc", "agents"), "reviewer.md", good.replace("coder", "project-model"))
+      await writeAgent(bundled, "reviewer.md", good.replace("coder", "bundled-model"))
+      const found = await resolved("reviewer", { projectDir: project, orcHome: home, agentsDir: bundled, configModel: noConfigModel })
+      expect(typeof found === "string" ? found : [found.source, found.model]).toEqual(["personal", "acme/personal-model"])
+    })
+  })
+
+  test("the bundled reviewer file loads with no override instead of the reviewer being refused", async () => {
+    await withDirs(async (root) => {
+      const found = await resolved("reviewer", { projectDir: join(root, "project"), orcHome: join(root, "orc-home"), configModel: { file: "/orc-home/config.json", model: "acme/configured" } })
+      if (typeof found === "string") {
+        throw new Error(found)
+      }
+      expect(found.source).toBe("bundled")
+      expect(found.path).toBe(join(bundledAgentsDir(), "reviewer.md"))
+      expect(found.tools).toEqual(["read", "bash"])
+      expect(found.body).toContain("id, file, line, severity, action and description")
     })
   })
 
