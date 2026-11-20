@@ -17,6 +17,7 @@ type Palette = ReturnType<typeof palette>
 interface InboxDocuments {
   readonly items: ReadonlyArray<InboxItem>
   readonly unread: ReadonlyArray<string>
+  readonly failed: ReadonlyArray<string>
 }
 
 const kindLabels: Readonly<Record<InboxItem["kind"], string>> = { question: "Question", decision: "Decision", hold: "Hold", pr: "PR" }
@@ -44,10 +45,11 @@ export default class OrcInbox extends View {
       if (asked.kind !== "ok") return asked
       if (runs.kind !== "ok") return runs
       const sources = { backlog: backlog.value, attention: asked.value, runs: runs.value }
-      return Promise.all(inboxTasks(sources).map((id) => readJson("orc", ["backlog", "thread", id, "--json"], thread))).then((told) => {
-        const threads = new Map<string, Thread>(told.flatMap((reading) => reading.kind === "ok" ? [[reading.value.task, reading.value] as const] : []))
-        const unread = told.flatMap((reading) => reading.kind === "failed" ? [reading.reason] : [])
-        return { kind: "ok", value: { items: inboxItems({ ...sources, threads }), unread } }
+      return Promise.all(inboxTasks(sources).map((id) => readJson("orc", ["backlog", "thread", id, "--json"], thread).then((reading) => ({ id, reading })))).then((told) => {
+        const threads = new Map<string, Thread>(told.flatMap(({ reading }) => reading.kind === "ok" ? [[reading.value.task, reading.value] as const] : []))
+        const unread = told.flatMap(({ reading }) => reading.kind === "failed" ? [reading.reason] : [])
+        const failed = told.flatMap(({ id, reading }) => reading.kind === "failed" ? [id] : [])
+        return { kind: "ok", value: { items: inboxItems({ ...sources, threads }), unread, failed } }
       })
     })
 
@@ -90,9 +92,12 @@ export default class OrcInbox extends View {
     if (this.reading.kind !== "ok") return
     const items = this.reading.value.items
     const wanted = new Set(items.flatMap((item) => answerTarget(item) === null ? [] : [item.key]))
+    const missing = new Set(this.reading.value.failed)
     let changed = false
     for (const [key, box] of this.boxes) {
       if (wanted.has(key)) continue
+      const slash = key.indexOf("/")
+      if (slash !== -1 && missing.has(key.slice(0, slash))) continue
       box.release()
       this.boxes.delete(key)
       changed = true
@@ -116,9 +121,8 @@ export default class OrcInbox extends View {
     const { items, unread } = this.reading.value
     const body = v_flex().id("items").flex_1().min_h_0().overflow_y_scrollbar().p(16).gap(12)
       .children(unread.map((reason) => div().text_color(t.blocked).child(reason)))
-    return root.child(items.length === 0
-      ? body.child(div().text_color(t.muted).child("No task awaits you"))
-      : body.children(items.map((item) => this.item(t, item))))
+    if (items.length === 0) return root.child(unread.length === 0 ? body.child(div().text_color(t.muted).child("No task awaits you")) : body)
+    return root.child(body.children(items.map((item) => this.item(t, item))))
   }
 
   item(t: Palette, item: InboxItem): Element {
