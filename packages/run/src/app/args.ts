@@ -5,6 +5,8 @@ import { isRunDelivery, type RunDelivery, runDeliveries } from "../shared/config
 import { sandboxKinds, type SandboxKind } from "../shared/sandbox/index"
 export type OrcArgs =
   | { readonly kind: "PrintVersion" }
+  | { readonly kind: "ShowVersion" }
+  | { readonly kind: "ListMachines" }
   | { readonly kind: "PrintHelp"; readonly words: ReadonlyArray<string> }
   | { readonly kind: "NoCommand" }
   | { readonly kind: "ListRuns"; readonly json: boolean; readonly local: boolean }
@@ -268,6 +270,24 @@ const parseRunsArgs = (rest: readonly string[]): OrcArgs => {
   }
   return { kind: "UsageError", detail: `unexpected argument: ${extra[0]}` }
 }
+const parseVersionArgs = (rest: readonly string[]): OrcArgs => {
+  if (rest[0] !== "--json") {
+    return rest.length === 0 ? { kind: "UsageError", detail: "orc version takes --json" } : { kind: "UsageError", detail: `unexpected argument: ${rest[0]}` }
+  }
+  if (rest.length === 1) {
+    return { kind: "ShowVersion" }
+  }
+  if (rest.length === 2 && rest[1] === "--local") {
+    return { kind: "ShowVersion" }
+  }
+  return { kind: "UsageError", detail: `unexpected argument: ${rest[1] === "--local" ? rest[2] : rest[1]}` }
+}
+const parseMachinesArgs = (rest: readonly string[]): OrcArgs => {
+  if (rest.length === 1 && rest[0] === "--json") {
+    return { kind: "ListMachines" }
+  }
+  return rest.length === 0 ? { kind: "UsageError", detail: "orc machines takes --json" } : { kind: "UsageError", detail: `unexpected argument: ${rest[0] === "--json" ? rest[1] : rest[0]}` }
+}
 const helpFlags = new Set(["--help", "-h"])
 const holdValueFlags = new Set(["--reason", "--until"])
 const scanWords = (rest: readonly string[]): readonly string[] => {
@@ -329,7 +349,9 @@ const topLevelParsers = {
   beat: (rest: readonly string[]): OrcArgs => toDispatch("beat", rest),
   runner: (rest: readonly string[]): OrcArgs => toDispatch("runner", rest),
   merge: (rest: readonly string[]): OrcArgs => toDispatch("merge", rest),
-  heavy: (rest: readonly string[]): OrcArgs => toDispatch("heavy", rest)
+  heavy: (rest: readonly string[]): OrcArgs => toDispatch("heavy", rest),
+  version: parseVersionArgs,
+  machines: parseMachinesArgs
 } satisfies Record<string, (rest: readonly string[]) => OrcArgs>
 
 export type CommandWord = keyof typeof topLevelParsers
