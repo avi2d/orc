@@ -342,7 +342,8 @@ Usage: orc backlog answer <task-id> [--expect <held|parked>] [--generation <n>]
 Answers a held task, a parked run's question, a run waiting at its gate or a
 decision. Give question-id=text to answer one open question, or plain words to
 answer the hold. Answering a decision closes it done, and its question and
-answer go into the run of each task that depends on it.
+answer go into the run of each task that depends on it. A word that starts with
+a dash is read as a flag, so put -- before words that start with one.
 
 Options:
   --expect <held|parked>  Answer only when the task waits in this decision, so a
@@ -353,6 +354,7 @@ Options:
 Examples:
   orc backlog answer orc-9 use the REST API
   orc backlog answer orc-9 question-1=REST
+  orc backlog answer orc-9 -- -1 retry is enough
 ```
 
 #### orc backlog send-back
