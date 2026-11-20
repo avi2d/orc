@@ -110,10 +110,52 @@ const grabbedFile = (
   read: fs.readFileString(grabbed).pipe(Effect.mapError(platformFailure("read " + grabbed)))
 })
 
-// The owner's pid sits in the name, so a later reader can tell a grab a killed process left from one still held.
-const grabName = (folder: string, id: string): string => folder + "/." + id + ".grab-" + process.pid + "-" + crypto.randomUUID() + ".tmp"
+const starttimeOf = (stat: string): string | null => {
+  const end = stat.lastIndexOf(")")
+  if (end === -1) return null
+  const starttime = stat.slice(end + 2).split(" ").at(19)
+  return starttime === undefined || starttime === "" ? null : starttime
+}
 
-const grabPattern = /^\.(.+)\.grab-(\d+)-[0-9a-f-]+\.tmp$/
+const procStarttime = (pid: number): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
+  FileSystem.FileSystem.pipe(
+    Effect.flatMap((fs) => fs.readFileString("/proc/" + pid + "/stat")),
+    Effect.map(starttimeOf),
+    Effect.orElseSucceed(() => null)
+  )
+
+const psStart = (pid: number): Effect.Effect<string | null> =>
+  Effect.tryPromise({
+    try: () => {
+      const child = Bun.spawn(["ps", "-o", "lstart=", "-p", String(pid)], {
+        stdout: "pipe",
+        stderr: "ignore",
+        env: { ...Bun.env, LC_ALL: "C", TZ: "UTC" }
+      })
+      return child.exited.then((code) => code === 0 ? new Response(child.stdout).text() : "")
+    },
+    catch: () => new BacklogError({ detail: "ps did not run" })
+  }).pipe(
+    Effect.map((start) => {
+      const text = start.trim()
+      return text === "" ? null : Buffer.from(text).toString("hex")
+    }),
+    Effect.orElseSucceed(() => null)
+  )
+
+const processStart = (pid: number): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const ticks = yield* procStarttime(pid)
+    if (ticks !== null) return ticks
+    const fs = yield* FileSystem.FileSystem
+    const self = yield* fs.readFileString("/proc/self/stat").pipe(Effect.orElseSucceed(() => null))
+    if (self !== null) return null
+    return yield* psStart(pid)
+  })
+
+const grabName = (folder: string, id: string, start: string): string => folder + "/." + id + ".grab-" + process.pid + "-" + start + "-" + crypto.randomUUID() + ".tmp"
+
+const grabPattern = /^\.(.+)\.grab-(\d+)-(?:([0-9a-f]+)-)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.tmp$/
 
 class SignalRefused extends Data.TaggedError("SignalRefused")<{
   readonly ownedByAnotherUser: boolean
@@ -137,17 +179,26 @@ export const readNames = (folder: string): Effect.Effect<ReadonlyArray<string>, 
     )
   })
 
-const grabOwner = (name: string): { readonly id: string; readonly pid: number } | null => {
+const grabOwner = (name: string): { readonly id: string; readonly pid: number; readonly start: string | undefined } | null => {
   const grab = grabPattern.exec(name)
-  return grab === null ? null : { id: grab[1], pid: Number(grab[2]) }
+  return grab === null ? null : { id: grab[1], pid: Number(grab[2]), start: grab[3] }
 }
+
+const grabOwnerAlive = (owner: { readonly pid: number; readonly start: string | undefined }): Effect.Effect<boolean, never, FileSystem.FileSystem> =>
+  Effect.flatMap(ownerAlive(owner.pid), (alive) => {
+    if (!alive || owner.start === undefined) {
+      return Effect.succeed(alive)
+    }
+    const start = owner.start
+    return Effect.map(processStart(owner.pid), (current) => current === null || current === start)
+  })
 
 const grabAlive = (paths: BacklogPaths, id: string): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     for (const folder of taskFolders) {
       for (const name of yield* readNames(paths.folder(folder))) {
         const owner = grabOwner(name)
-        if (owner !== null && owner.id === id && (yield* ownerAlive(owner.pid))) {
+        if (owner !== null && owner.id === id && (yield* grabOwnerAlive(owner))) {
           return true
         }
       }
@@ -190,7 +241,7 @@ export const recoverGrabs = (root: string): Effect.Effect<void, BacklogError, Fi
     for (const folder of taskFolders) {
       for (const name of yield* readNames(paths.folder(folder))) {
         const owner = grabOwner(name)
-        if (owner !== null && !(yield* ownerAlive(owner.pid))) {
+        if (owner !== null && !(yield* grabOwnerAlive(owner))) {
           yield* recoverGrab(fs, paths, folder, paths.folder(folder) + "/" + name, owner.id)
         }
       }
@@ -216,7 +267,11 @@ export const grabIn = (
     const fs = yield* FileSystem.FileSystem
     const paths = backlogPaths(root)
     const file = paths.taskFile(folder, id)
-    const grabbed = grabName(paths.folder(folder), id)
+    const start = yield* processStart(process.pid)
+    if (start === null) {
+      return yield* new BacklogError({ detail: "cannot read the current process start time" })
+    }
+    const grabbed = grabName(paths.folder(folder), id, start)
     if (!(yield* takeFile(fs, file, grabbed, id))) {
       return yield* missed
     }
