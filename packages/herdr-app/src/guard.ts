@@ -326,6 +326,7 @@ export interface AttentionItem {
   readonly kind: string
   readonly task: string
   readonly escalated: boolean
+  readonly recommendation: string | null
 }
 
 const attentionItem: Guard<AttentionItem> = (value, at) => {
@@ -336,12 +337,14 @@ const attentionItem: Guard<AttentionItem> = (value, at) => {
   const taskId = string(record.value, "task", at)
   if (taskId.kind === "refused") return taskId
   const decision = record.value["decision"]
-  if (decision === undefined) return ok({ ...named.value, task: taskId.value, escalated: false })
+  if (decision === undefined) return ok({ ...named.value, task: taskId.value, escalated: false, recommendation: null })
   const decided = fields(decision, child(at, "decision"))
   if (decided.kind === "refused") return decided
   const kind = string(decided.value, "kind", child(at, "decision"))
   if (kind.kind === "refused") return kind
-  return ok({ ...named.value, task: taskId.value, escalated: kind.value === "escalated" })
+  const recommendation = absentOrString(decided.value, "recommendation", child(at, "decision"))
+  if (recommendation.kind === "refused") return recommendation
+  return ok({ ...named.value, task: taskId.value, escalated: kind.value === "escalated", recommendation: recommendation.value })
 }
 
 export const attention: Guard<ReadonlyArray<AttentionItem>> = (value, at) => {

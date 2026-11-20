@@ -34,4 +34,8 @@ Duplicate, when an answered question of this task already asked the same thing. 
 
 Escalate, for everything else:
 
-{"decision":"escalate","reason":"<the note the owner reads with the question>"}
+{"decision":"escalate","reason":"<the note the owner reads with the question>","recommendation":"<the option you recommend>"}
+
+Give recommendation only when the question lists lettered options and you recommend one of them.
+Copy the text of that option word for word, without its letter.
+Orc drops a recommendation that is no option of the question.

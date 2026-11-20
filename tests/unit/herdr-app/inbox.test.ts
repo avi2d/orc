@@ -59,6 +59,15 @@ test("lists an escalated question as a decision instead of a plain question", ()
   expect(inboxItems(sources([ask], { attention: items.value, runs: [] })).map((item) => item.kind)).toEqual(["decision"])
 })
 
+test("carries the decider's recommended option into an escalated decision instead of dropping it", () => {
+  const document = JSON.stringify({ schema: "orc.attention.v1", at: "2026-11-13T12:00:00.000Z", items: [{ id: askId, kind: "worker-question", task: "orc-60", text: "Which layout?", asked: "2026-11-13T11:00:00.000Z", owner: "user", decision: { kind: "escalated", reason: "taste", recommendation: "Narrow", at: "2026-11-13T11:01:00.000Z" }, ageSeconds: 60, overdue: false }] })
+  const items = guardJson(document, attention)
+  if (items.kind !== "ok") throw new Error(items.reason)
+  const [item] = inboxItems(sources([ask], { attention: items.value, runs: [] }))
+  expect(item).toMatchObject({ kind: "decision", recommendation: "Narrow" })
+  expect(item.ask.options.filter((option) => option.text === item.recommendation).map((option) => option.letter)).toEqual(["B"])
+})
+
 const delivered = (pr: TaskDetail["prState"]): TaskDetail => ({
   ...started,
   id: "orc-61",
@@ -67,7 +76,7 @@ const delivered = (pr: TaskDetail["prState"]): TaskDetail => ({
 })
 
 test("drops a merged PR instead of still asking to merge it", () => {
-  const ready: AttentionItem = { id: "orc-61.pr-ready", kind: "pr-ready", task: "orc-61", escalated: false }
+  const ready: AttentionItem = { id: "orc-61.pr-ready", kind: "pr-ready", task: "orc-61", escalated: false, recommendation: null }
   const readyLine = line("question", "beat", "orc-61.pr-ready", "https://github.com/o/r/pull/9 is ready to merge, checks green: ci", "2026-11-13T12:00:00.000Z")
   expect(inboxItems({ backlog: [delivered("merged")], attention: [ready], runs: [], threads: new Map([["orc-61", { task: "orc-61", entries: [readyLine] }]]) })).toEqual([])
   expect(inboxItems({ backlog: [delivered("merged")], attention: [], runs: [], threads: new Map() })).toEqual([])
@@ -88,7 +97,7 @@ test("sorts items oldest first instead of by task", () => {
 })
 
 test("reads no thread for a task nothing flags instead of every task", () => {
-  const quiet: AttentionItem = { id: "x", kind: "run-died", task: "orc-60", escalated: false }
+  const quiet: AttentionItem = { id: "x", kind: "run-died", task: "orc-60", escalated: false, recommendation: null }
   expect(inboxTasks({ backlog: [started], attention: [quiet], runs: [] })).toEqual([])
   expect(inboxItems(sources([line("question", "beat", "x", "the run on mac died: boom")]))).toEqual([])
 })

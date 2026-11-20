@@ -16,6 +16,7 @@ interface ThreadEntry {
   readonly kind: ThreadKind
   readonly id: string | null
   readonly text: string
+  readonly recommendation?: string
 }
 
 interface ThreadJson {
@@ -96,7 +97,10 @@ const itemExchanges = (mirrored: ReadonlySet<string>) => (item: OpenItem): Reado
   const { id, item: { decision, state } } = item
   const told = mirrored.has(id)
   const asked = told ? [] : [[entry(item.item.asked, askerOf(item), "question", id, item.item.text)]]
-  const decided = decision === undefined ? [] : [[entry(decision.at, "decider", "decision", id, decision.kind + ": " + decisionText(decision))]]
+  const decided = decision === undefined ? [] : [[{
+    ...entry(decision.at, "decider", "decision", id, decision.kind + ": " + decisionText(decision)),
+    ...(decision.kind === "escalated" && decision.recommendation !== undefined ? { recommendation: decision.recommendation } : {})
+  }]]
   const beatClosure = item.item.kind === "pr-ready" && state.kind === "closed" && (state.answer.words === "merged" || state.answer.words === "closed without merging")
   const settled = state.kind === "withdrawn"
     ? [[entry(state.at, "beat", "withdrawn", id, state.reason)]]

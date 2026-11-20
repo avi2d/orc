@@ -46,6 +46,7 @@ Select **Inbox** or press `cmd-4` to see everything that waits for you in one li
 The Inbox reads `orc backlog --json`, `orc attention --json`, `orc runs --json`, and `orc backlog thread <task> --json` for each task that waits.
 Each item shows its task, who asks, the question, and its options.
 An option with a picture shows as a tile, and any other option shows as a button.
+On a decision the decider escalated, the option it recommends is outlined and its recommendation shows below the options.
 
 To answer a question or a hold:
 
