@@ -74,7 +74,8 @@ If the wait ends without an answer, the task parks.
 
 To resume a refused gate, pass `--answer question-<id>="<text>"`.
 To give no-mistakes guidance for a finding, use `--answer <finding-id>="<text>"`.
-Use `--allow ask-user` to decline the questions and accept the other findings.
+Use `--allow ask-user` to decline findings marked exactly `ask-user`.
+Findings with any other action still wait as questions.
 For another refusal, rerun with `--allow` and the kind named in the report.
 
 ## Resume a run

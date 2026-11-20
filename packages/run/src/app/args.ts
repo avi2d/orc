@@ -5,6 +5,8 @@ import { isRunDelivery, type RunDelivery, runDeliveries } from "../shared/config
 import { sandboxKinds, type SandboxKind } from "../shared/sandbox/index"
 export type OrcArgs =
   | { readonly kind: "PrintVersion" }
+  | { readonly kind: "ShowVersion" }
+  | { readonly kind: "ListMachines" }
   | { readonly kind: "PrintHelp"; readonly words: ReadonlyArray<string> }
   | { readonly kind: "NoCommand" }
   | { readonly kind: "ListRuns"; readonly json: boolean; readonly local: boolean }
@@ -16,6 +18,7 @@ export type OrcArgs =
   | { readonly kind: "Dispatch"; readonly args: Exclude<DispatchArgs, { readonly kind: "UsageError" }> }
   | { readonly kind: "Chat"; readonly sessionFile: string | null }
   | { readonly kind: "InstallApp" }
+  | { readonly kind: "Update"; readonly json: boolean }
   | { readonly kind: "UsageError"; readonly detail: string }
 const parseShowArgs = (rest: readonly string[]): OrcArgs => {
   if (rest.length === 0) {
@@ -239,7 +242,7 @@ const parseRunArgs = (rest: readonly string[]): OrcArgs => {
   const taskFile = split.kept.length === 1 ? split.kept[0] : null
   return { kind: "RunAgent", taskFile, taskKind: split.taskKind, delivery: split.delivery, branch: split.branch, sandbox: split.sandbox, tokenFile: split.tokenFile, provider: split.provider, implementerModel: split.implementerModel, fixerModel: split.fixerModel, instructions: split.instructions, allow: split.allow, answers: split.answers }
 }
-const parseJsonListArgs = (rest: readonly string[], kind: "ListRefusals"): OrcArgs => {
+const parseJsonListArgs = (rest: readonly string[], kind: "ListRefusals" | "Update"): OrcArgs => {
   if (rest.length === 0) {
     return { kind, json: false }
   }
@@ -267,6 +270,24 @@ const parseRunsArgs = (rest: readonly string[]): OrcArgs => {
     return { kind: "ListRuns", json: true, local: true }
   }
   return { kind: "UsageError", detail: `unexpected argument: ${extra[0]}` }
+}
+const parseVersionArgs = (rest: readonly string[]): OrcArgs => {
+  if (rest[0] !== "--json") {
+    return rest.length === 0 ? { kind: "UsageError", detail: "orc version takes --json" } : { kind: "UsageError", detail: `unexpected argument: ${rest[0]}` }
+  }
+  if (rest.length === 1) {
+    return { kind: "ShowVersion" }
+  }
+  if (rest.length === 2 && rest[1] === "--local") {
+    return { kind: "ShowVersion" }
+  }
+  return { kind: "UsageError", detail: `unexpected argument: ${rest[1] === "--local" ? rest[2] : rest[1]}` }
+}
+const parseMachinesArgs = (rest: readonly string[]): OrcArgs => {
+  if (rest.length === 1 && rest[0] === "--json") {
+    return { kind: "ListMachines" }
+  }
+  return rest.length === 0 ? { kind: "UsageError", detail: "orc machines takes --json" } : { kind: "UsageError", detail: `unexpected argument: ${rest[0] === "--json" ? rest[1] : rest[0]}` }
 }
 const helpFlags = new Set(["--help", "-h"])
 const holdValueFlags = new Set(["--reason", "--until"])
@@ -324,12 +345,15 @@ const topLevelParsers = {
   refusals: (rest: readonly string[]): OrcArgs => parseJsonListArgs(rest, "ListRefusals"),
   chat: parseChatArgs,
   app: parseAppArgs,
+  update: (rest: readonly string[]): OrcArgs => parseJsonListArgs(rest, "Update"),
   backlog: (rest: readonly string[]): OrcArgs => toDispatch("backlog", rest),
   attention: (rest: readonly string[]): OrcArgs => toDispatch("attention", rest),
   beat: (rest: readonly string[]): OrcArgs => toDispatch("beat", rest),
   runner: (rest: readonly string[]): OrcArgs => toDispatch("runner", rest),
   merge: (rest: readonly string[]): OrcArgs => toDispatch("merge", rest),
-  heavy: (rest: readonly string[]): OrcArgs => toDispatch("heavy", rest)
+  heavy: (rest: readonly string[]): OrcArgs => toDispatch("heavy", rest),
+  version: parseVersionArgs,
+  machines: parseMachinesArgs
 } satisfies Record<string, (rest: readonly string[]) => OrcArgs>
 
 export type CommandWord = keyof typeof topLevelParsers
