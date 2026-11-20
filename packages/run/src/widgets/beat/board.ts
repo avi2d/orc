@@ -1,7 +1,7 @@
 import { type BeatAction, type BeatReport, type MachineRoom } from "./beat"
 import type { BeatWaits } from "./beat-waits"
 import { type TaskWait, taskWaiting } from "./beat-place"
-import { type ChildCount, childCount, decisionAnswer, dependencyWaits, type TaskKind, type TaskPriority, answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, ranClosing, type SplitMark, type Started, type TaskRecord } from "../../entities/backlog/index"
+import { type ChildCount, childCount, decisionAnswer, dependencyWaits, fullPrUrl, type TaskKind, type TaskPriority, answersAwaited, type Claim, type DeciderOwns, type Hold, isHeld, openQuestions, type Parked, ranClosing, type SplitMark, type Started, type TaskRecord } from "../../entities/backlog/index"
 import type { Project } from "../../shared/config/index"
 import { describeQuota } from "./quota"
 import type { ChatEvent, PrState } from "../../entities/events/index"
@@ -112,7 +112,7 @@ const claimJson = (record: TaskRecord): TaskStatusJson => {
         started: ran?.started ?? null,
         outcome: state.closing.outcome,
         reason: state.closing.reason,
-        pr: ran?.pr ?? null,
+        pr: fullPrUrl(ran?.pr) ?? fullPrUrl(record.parked?.origin?.pr),
         report: ran?.report ?? null,
         answer: decisionAnswer(record),
         closedAt: state.closedAt,

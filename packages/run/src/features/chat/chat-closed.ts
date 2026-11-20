@@ -28,8 +28,10 @@ const deliveredPart = (task: ClosedTask): string => {
   if (task.kind !== "ship") {
     return task.report === null ? ", with no report" : ", report " + task.report
   }
-  return task.pr === null ? ", with no PR" : ", PR " + task.pr
+  return task.pr === null ? ", with no PR" : ""
 }
 
+const prPart = (task: ClosedTask): string => task.pr === null ? "" : ", PR " + task.pr
+
 export const closedLine = (task: ClosedTask): string =>
-  task.id + " " + task.title + " closed " + task.outcome + (task.reason === "" ? "" : ": " + task.reason) + deliveredPart(task)
+  task.id + " " + task.title + " closed " + task.outcome + (task.reason === "" ? "" : ": " + task.reason) + deliveredPart(task) + prPart(task)
