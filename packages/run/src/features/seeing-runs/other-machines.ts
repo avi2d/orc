@@ -1,4 +1,4 @@
-import { Duration, Effect, FileSystem } from "effect"
+import { Duration, Effect, FileSystem, type Schema } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { type Command, ConfigError, type Machine, readDispatchConfig, throughFor } from "../../shared/config/index"
 import { capture, RunnerError } from "../../shared/process/index"
@@ -21,39 +21,37 @@ const answerWait = Duration.seconds(answerSeconds)
 // Without --local the other machine reads its own dispatch machines and could reach this one back.
 const localRunsOf = (through: Command): Command => [...through, "runs", "--json", "--local"]
 
-const decodeAnswer = (command: Command, stdout: string): Effect.Effect<RunsJsonDocument, RunnerError> =>
+const decodeAnswer = <A>(command: Command, stdout: string, decode: (value: unknown) => Effect.Effect<A, Schema.SchemaError>): Effect.Effect<A, RunnerError> =>
   Effect.try({
     try: (): unknown => JSON.parse(stdout),
     catch: () => new RunnerError({ detail: command.join(" ") + " printed no JSON" })
   }).pipe(
     Effect.flatMap((value) =>
-      decodeRunsJson(value).pipe(
+      decode(value).pipe(
         Effect.mapError((error) => new RunnerError({ detail: command.join(" ") + " printed JSON orc cannot read: " + error.message }))
       )
     )
   )
 
-const answerOf = (command: Command): Effect.Effect<RunsJsonDocument, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
+export const askMachine = <A>(command: Command, decode: (value: unknown) => Effect.Effect<A, Schema.SchemaError>): Effect.Effect<A, RunnerError, ChildProcessSpawner.ChildProcessSpawner> =>
   capture(command, null).pipe(
     Effect.flatMap((result) => {
       const printed = result.stderr.trim() !== "" ? result.stderr.trim() : result.stdout.trim()
       return result.exitCode === 0
-        ? decodeAnswer(command, result.stdout)
+        ? decodeAnswer(command, result.stdout, decode)
         : Effect.fail(new RunnerError({ detail: command.join(" ") + " exited " + result.exitCode + ": " + printed }))
-    })
-  )
-
-const readMachine = (name: string, through: Command): Effect.Effect<Reading, never, ChildProcessSpawner.ChildProcessSpawner> => {
-  const command = localRunsOf(through)
-  return answerOf(command).pipe(
+    }),
     Effect.timeoutOrElse({
       duration: answerWait,
       orElse: () => Effect.fail(new RunnerError({ detail: command.join(" ") + " did not answer within " + answerSeconds + " seconds" }))
-    }),
+    })
+  )
+
+const readMachine = (name: string, through: Command): Effect.Effect<Reading, never, ChildProcessSpawner.ChildProcessSpawner> =>
+  askMachine(localRunsOf(through), decodeRunsJson).pipe(
     Effect.map((document): Reading => ({ kind: "answered", runs: document.runs.map((run) => run.machine === null ? { ...run, machine: name } : run) })),
     Effect.catch((error) => Effect.succeed<Reading>({ kind: "failed", failure: { machine: name, error: error.detail } }))
   )
-}
 
 const readOtherMachines = (machines: ReadonlyArray<Machine>): Effect.Effect<OtherMachines, never, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.forEach(
@@ -70,18 +68,17 @@ const readOtherMachines = (machines: ReadonlyArray<Machine>): Effect.Effect<Othe
     }))
   )
 
-export const readOtherMachinesFrom = (dispatchFile: string): Effect.Effect<OtherMachines, ConfigError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+export const readDispatchMachines = (dispatchFile: string): Effect.Effect<ReadonlyArray<Machine>, ConfigError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const present = yield* fs.exists(dispatchFile).pipe(
       Effect.mapError(() => new ConfigError({ file: dispatchFile, detail: "cannot look for the file" }))
     )
-    if (!present) {
-      return { runs: [], machines: [] }
-    }
-    const config = yield* readDispatchConfig(dispatchFile)
-    return yield* readOtherMachines(config.machines)
+    return present ? (yield* readDispatchConfig(dispatchFile)).machines : []
   })
+
+export const readOtherMachinesFrom = (dispatchFile: string): Effect.Effect<OtherMachines, ConfigError, FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner> =>
+  readDispatchMachines(dispatchFile).pipe(Effect.flatMap(readOtherMachines))
 
 export const withOtherMachines = (document: RunsJsonDocument, others: OtherMachines): RunsJsonDocument => ({
   ...document,
