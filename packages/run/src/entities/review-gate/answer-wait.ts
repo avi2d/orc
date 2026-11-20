@@ -7,7 +7,7 @@ export const askingFileName = "asking.json"
 export const answersFileName = "answers.json"
 export const correctionsFileName = "corrections.json"
 
-export const AskOption = Schema.Struct({ text: Schema.String, picture: Schema.optionalKey(Schema.String) })
+export const AskOption = Schema.Struct({ text: Schema.String, outcome: Schema.optionalKey(Schema.String), picture: Schema.optionalKey(Schema.String) })
 
 export type AskOption = typeof AskOption.Type
 
@@ -15,6 +15,7 @@ const AskingQuestion = Schema.Struct({
   id: Schema.String,
   text: Schema.String,
   options: Schema.optionalKey(Schema.Array(AskOption)),
+  recommendation: Schema.optionalKey(Schema.String),
   blocks: Schema.optional(Schema.Boolean),
   asked: Schema.optional(Schema.String)
 })

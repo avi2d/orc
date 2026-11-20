@@ -143,14 +143,16 @@ const parameters = {
         type: "object",
         properties: {
           text: { type: "string", description: "What this option means" },
+          outcome: { type: "string", description: "What choosing this option leads to" },
           picture: { type: "string", description: "A path to a picture that shows this option" }
         },
-        required: ["text"]
+        required: ["text", "outcome"]
       }
     },
+    recommendation: { type: "string", description: "The text of the option you recommend, exactly as it appears in options" },
     blocks: { type: "boolean", description: "true when you cannot go on without the answer, false when you can carry on and take the answer later" }
   },
-  required: ["question", "blocks"]
+  required: ["question", "options", "recommendation", "blocks"]
 }
 
 const description = [
@@ -159,43 +161,64 @@ const description = [
   "With blocks false the tool returns at once, and the answer is added to the result of a later tool call."
 ].join(" ")
 
+interface AskOptionParams {
+  readonly text: string
+  readonly outcome: string
+  readonly picture?: string | undefined
+}
+
 interface AskParams {
   readonly question: string
   readonly context?: string | undefined
-  readonly options?: ReadonlyArray<{ readonly text: string; readonly picture?: string | undefined }> | undefined
+  readonly options: ReadonlyArray<AskOptionParams>
+  readonly recommendation: string
   readonly blocks: boolean
-}
-
-const askOptions = (value: unknown): AskParams["options"] => {
-  if (!Array.isArray(value)) {
-    return []
-  }
-  return value.flatMap((item) => {
-    if (typeof item !== "object" || item === null || !("text" in item) || typeof item.text !== "string" || item.text.trim() === "") {
-      return []
-    }
-    const picture = "picture" in item && typeof item.picture === "string" && item.picture.trim() !== "" ? item.picture : undefined
-    return [{ text: item.text.trim(), ...(picture === undefined ? {} : { picture }) }]
-  })
 }
 
 const isAskRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null
 
-const normalizeAsk = (params: unknown): AskParams | null => {
-  if (!isAskRecord(params)) {
-    return null
+const trimmed = (value: unknown): string => typeof value === "string" ? value.trim() : ""
+
+const askOption = (item: unknown, index: number): AskOptionParams | string => {
+  if (!isAskRecord(item) || trimmed(item.text) === "") {
+    return "option " + String(index + 1) + " has no text"
   }
-  const record = params
-  if (typeof record.question !== "string" || record.question.trim() === "" || typeof record.blocks !== "boolean") {
-    return null
+  const text = trimmed(item.text)
+  const outcome = trimmed(item.outcome)
+  if (outcome === "") {
+    return "option " + JSON.stringify(text) + " has no outcome"
   }
-  const context = typeof record.context === "string" && record.context.trim() !== "" ? record.context.trim() : undefined
+  const picture = trimmed(item.picture)
+  return { text, outcome, ...(picture === "" ? {} : { picture }) }
+}
+
+const normalizeAsk = (params: unknown): AskParams | string => {
+  if (!isAskRecord(params) || trimmed(params.question) === "" || typeof params.blocks !== "boolean") {
+    return "it has no question or no blocks"
+  }
+  if (!Array.isArray(params.options) || params.options.length === 0) {
+    return "it lists no options"
+  }
+  const options: Array<AskOptionParams> = []
+  for (const [index, item] of params.options.entries()) {
+    const option = askOption(item, index)
+    if (typeof option === "string") {
+      return option
+    }
+    options.push(option)
+  }
+  const recommendation = trimmed(params.recommendation)
+  if (!options.some((option) => option.text === recommendation)) {
+    return "the recommendation " + JSON.stringify(recommendation) + " names none of the listed options"
+  }
+  const context = trimmed(params.context)
   return {
-    question: record.question.trim(),
-    blocks: record.blocks,
-    ...(context === undefined ? {} : { context }),
-    options: askOptions(record.options)
+    question: trimmed(params.question),
+    blocks: params.blocks,
+    ...(context === "" ? {} : { context }),
+    options,
+    recommendation
   }
 }
 
@@ -217,8 +240,8 @@ export default (pi: AskHost): void => {
         throw new Error("Pi started without --" + askDirFlag + ", so no one can answer")
       }
       const normalized = normalizeAsk(params)
-      if (normalized === null) {
-        return textResult("orc could not read the question, so it was not asked. Carry on with the task.")
+      if (typeof normalized === "string") {
+        return textResult("orc did not ask the question, because " + normalized + ". Each option needs text and an outcome, and the recommendation must repeat one option's text. Ask again with that fixed.")
       }
       const stem = askFileStem(toolCallId)
       writeFileSync(join(dir, stem + askSuffix), JSON.stringify(normalized))

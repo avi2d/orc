@@ -7,8 +7,8 @@ import type { FailingMark } from "../../entities/agent/index"
 import type { DispatchConfig } from "../../shared/config/index"
 import { ownedBySweep, throughFor } from "../../shared/config/index"
 import { logWrittenAt, stallMillis } from "./stall"
-import { answersFor, askStartedTask, correctionsDue, markAnswersRelayed, markCorrectionsRelayed, parkStartedTask } from "../../entities/parked-runs/index"
-import { Asking, askingFileName, hasBlockingQuestion, type OpenQuestion, type QuestionAnswer } from "../../entities/review-gate/index"
+import { answersFor, askStartedTask, type AskedQuestion, correctionsDue, markAnswersRelayed, markCorrectionsRelayed, parkStartedTask } from "../../entities/parked-runs/index"
+import { Asking, askingFileName, hasBlockingQuestion, type QuestionAnswer } from "../../entities/review-gate/index"
 import { readJsonFileIfPresent } from "../../shared/config/index"
 import { type RunnerRequirements } from "../../features/queueing-a-task/index"
 import { type RunnerError } from "../../shared/process/index"
@@ -80,10 +80,10 @@ const endParked = (
     const id = task.spec.id
     const branch = task.parked?.branch ?? taskBranch(id)
     const live = yield* (run === undefined
-      ? Effect.succeed<ReadonlyArray<OpenQuestion>>([])
+      ? Effect.succeed<ReadonlyArray<AskedQuestion>>([])
       : readJsonFileIfPresent(runDirFor(home, run) + "/" + askingFileName, Asking).pipe(
-        Effect.map((asking) => asking === null ? [] as ReadonlyArray<OpenQuestion> : [...asking.questions]),
-        Effect.orElseSucceed(() => [] as ReadonlyArray<OpenQuestion>)
+        Effect.map((asking) => asking === null ? [] as ReadonlyArray<AskedQuestion> : [...asking.questions]),
+        Effect.orElseSucceed(() => [] as ReadonlyArray<AskedQuestion>)
       ))
     const open = Arr.appendAll(ending.questions, live.filter((question) => !ending.questions.some((known) => known.id === question.id)))
     const parked = yield* parkStartedTask(root, id, branch, open, yield* nowIso, run).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))

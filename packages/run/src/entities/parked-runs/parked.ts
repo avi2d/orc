@@ -6,8 +6,10 @@ import { answerDecision, findTask, grabIn, ranClosing, type Rewrite, rewriteNew,
 // An answer handed to an asking that ended went into the run, so only one never handed out or handed to this asking still answers it.
 const answersAsking = (answer: ParkedAnswer, asking: string | null): boolean => answer.relayedTo === null || answer.relayedTo === asking
 
+export type AskedQuestion = OpenQuestion & { readonly options?: ReadonlyArray<AskOption>; readonly recommendation?: string }
+
 const parkedQuestions = (
-  open: Arr.NonEmptyReadonlyArray<OpenQuestion>,
+  open: Arr.NonEmptyReadonlyArray<AskedQuestion>,
   prior: ReadonlyArray<ParkedQuestion>,
   asking: string | null,
   askedOf: (question: OpenQuestion) => string
@@ -19,13 +21,21 @@ const parkedQuestions = (
   return Arr.appendAll(
     Arr.map(open, (question): ParkedQuestion =>
       prior.find((known) => stillAsked(known, question)) ??
-      { id: question.id, text: question.text, asked: askedOf(question), blocks: question.blocks ?? true, answer: null }),
+      ({
+        id: question.id,
+        text: question.text,
+        asked: askedOf(question),
+        blocks: question.blocks ?? true,
+        ...(question.options === undefined ? {} : { options: question.options }),
+        ...(question.recommendation === undefined ? {} : { recommendation: question.recommendation }),
+        answer: null
+      })),
     kept
   )
 }
 
 // A resumed run carries the open-question signals of the run it resumes, so one id can come back from an earlier asking beside the latest one.
-const latestAskings = (open: Arr.NonEmptyReadonlyArray<OpenQuestion>): Arr.NonEmptyReadonlyArray<OpenQuestion> =>
+const latestAskings = (open: Arr.NonEmptyReadonlyArray<AskedQuestion>): Arr.NonEmptyReadonlyArray<AskedQuestion> =>
   Arr.dedupeWith(
     Arr.map(open, (question) => open.reduce((latest, other) => other.id === latest.id && (other.asked ?? "") >= (latest.asked ?? "") ? other : latest, question)),
     (left, right) => left.id === right.id
@@ -36,7 +46,7 @@ const sameQuestions = (left: ReadonlyArray<ParkedQuestion>, right: ReadonlyArray
 
 export interface LiveAsking {
   readonly asked: string
-  readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion & { readonly options?: ReadonlyArray<AskOption> }>
+  readonly questions: Arr.NonEmptyReadonlyArray<AskedQuestion>
 }
 
 // The live run keeps its claim, so its questions sit on the started task and orc backlog answer reaches them there.
@@ -103,7 +113,7 @@ export const parkStartedTask = (
   root: string,
   id: string,
   branch: string,
-  asked: Arr.NonEmptyReadonlyArray<OpenQuestion>,
+  asked: Arr.NonEmptyReadonlyArray<AskedQuestion>,
   at: string,
   run?: string
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>

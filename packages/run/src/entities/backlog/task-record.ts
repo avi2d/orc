@@ -49,11 +49,16 @@ export interface Started {
   readonly log: string
 }
 
+const ParkedOption = Schema.Struct({ text: Schema.String, outcome: Schema.optionalKey(Schema.String), picture: Schema.optionalKey(Schema.String) })
+export type ParkedOption = typeof ParkedOption.Type
+
 export interface ParkedQuestion {
   readonly id: string
   readonly text: string
   readonly asked: string
   readonly blocks: boolean
+  readonly options?: ReadonlyArray<ParkedOption>
+  readonly recommendation?: string
   readonly answer: ParkedAnswer | null
 }
 
@@ -177,6 +182,8 @@ const QuestionFront = Schema.Struct({
   answered_at: Schema.optional(Schema.String),
   asked_at: Schema.optional(Schema.String),
   blocks: Schema.optional(Schema.Boolean),
+  options: Schema.optional(Schema.Array(ParkedOption)),
+  recommendation: Schema.optional(Schema.String),
   relayed_to: Schema.optional(Schema.String),
   used: Schema.optional(Schema.Boolean),
   answered_by: Schema.optional(Schema.Literals(deciderAnswerKinds)),
@@ -256,6 +263,8 @@ const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: str
     text: question.text,
     asked: question.asked_at ?? "",
     blocks: question.blocks ?? true,
+    ...(question.options === undefined ? {} : { options: question.options }),
+    ...(question.recommendation === undefined ? {} : { recommendation: question.recommendation }),
     answer: answer === null ? null : parkedAnswerOf(question, answer)
   }))
 

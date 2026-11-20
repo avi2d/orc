@@ -69,10 +69,13 @@ A report run has no branch to park on, so a wait that ends unanswered ends it fa
 
 ## A worker question
 Pi asks you a question mid-run with the `orc_ask` tool, as [How orc runs Pi](how-orc-runs-pi.md) shows.
-The tool takes the `question`, an optional `context`, optional `options` each with a `text` and an optional `picture`, and `blocks`.
+The tool takes the `question`, an optional `context`, the `options` each with a `text`, an `outcome` and an optional `picture`, a `recommendation`, and `blocks`.
+The `outcome` says what choosing that option leads to, and the `recommendation` repeats the text of the option Pi recommends.
+The tool refuses a question with no options, an option with no outcome, or a recommendation that names none of the options, and tells Pi why so it can ask again.
 Pi sets `blocks` to true when it cannot go on without the answer.
 Orc names each question `ask-<n>`, numbering from the highest id the task ever asked, and writes it to the run's `asking.json` beside the gate and loop questions.
-The question's text holds the question, then `Context:` and the context, then each option lettered `A)`, `B)` and on.
+The question's text holds the question, then `Context:` and the context, then each option lettered `A)`, `B)` and on with `Leads to:` and its outcome, then `Recommended:` and the recommended option.
+The parked question in the task record keeps the options and the recommendation beside the text.
 The beat opens a `worker-question` item for it, as [The attention queue](attention-queue.md) shows, and hands its answer to the run the way it does at a gate.
 
 A blocking question holds Pi for 10 minutes, or for the `ORC_ANSWER_WAIT_SECONDS` its machine sets when that is shorter.

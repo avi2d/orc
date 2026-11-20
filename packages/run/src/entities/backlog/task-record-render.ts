@@ -25,6 +25,8 @@ const questionFronts = (questions: ReadonlyArray<ParkedQuestion>) =>
     text: question.text,
     asked_at: question.asked,
     ...(question.blocks ? {} : { blocks: false }),
+    ...(question.options === undefined ? {} : { options: question.options }),
+    ...(question.recommendation === undefined ? {} : { recommendation: question.recommendation }),
     ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at, ...answerFronts(question.answer) }),
     ...(question.answer?.relayedTo == null ? {} : { relayed_to: question.answer.relayedTo })
   }))
