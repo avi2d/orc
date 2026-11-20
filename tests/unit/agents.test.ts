@@ -200,7 +200,7 @@ describe("resolveAgentFile", () => {
       expect(found.source).toBe("bundled")
       expect(found.path).toBe(join(bundledAgentsDir(), "reviewer.md"))
       expect(found.tools).toEqual(["read", "bash"])
-      expect(found.body).toContain("id, file, line, severity, action and description")
+      expect(found.model).toBe("acme/configured")
     })
   })
 
