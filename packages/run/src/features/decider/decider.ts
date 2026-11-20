@@ -27,7 +27,7 @@ const Reply = Schema.Union([
   Schema.Struct({ decision: Schema.Literal("answer"), answer: Words, rule: Words, reason: Words }),
   Schema.Struct({ decision: Schema.Literal("ask-back"), question: Words }),
   Schema.Struct({ decision: Schema.Literal("duplicate"), of: Words }),
-  Schema.Struct({ decision: Schema.Literal("escalate"), reason: Words, recommendation: Schema.optionalKey(Words) })
+  Schema.Struct({ decision: Schema.Literal("escalate"), reason: Words, recommendation: Schema.optionalKey(Schema.Unknown) })
 ])
 
 type Reply = typeof Reply.Type
@@ -157,8 +157,8 @@ const optionTexts = (question: string): ReadonlyArray<string> =>
   })
 
 const escalation = (reply: Extract<Reply, { readonly decision: "escalate" }>, question: string): Verdict => {
-  const recommended = reply.recommendation?.trim()
-  return recommended !== undefined && optionTexts(question).includes(recommended)
+  const recommended = typeof reply.recommendation === "string" ? reply.recommendation.trim() : undefined
+  return recommended !== undefined && recommended !== "" && optionTexts(question).includes(recommended)
     ? { kind: "escalated", reason: reply.reason, recommendation: recommended }
     : { kind: "escalated", reason: reply.reason }
 }
