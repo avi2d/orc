@@ -21,7 +21,7 @@ export const runHelp: HelpEntry = {
     { flag: "--implementer-model <model>", meaning: "The implementer model, used instead of the one config.json names." },
     { flag: "--fixer-model <model>", meaning: "The fixer model, used instead of the one config.json names." },
     { flag: "--instructions <path>", meaning: "A project instructions file handed to Pi." },
-    { flag: "--allow " + askUserWord, meaning: "Decline every ask-user finding of the review and accept the rest, on a resume." },
+    { flag: "--allow " + askUserWord, meaning: "Decline findings marked exactly ask-user, on a resume. Findings with any other action still wait as questions." },
     { flag: "--answer <id>=<text>", meaning: "Answer a review question or an ask-user finding by its id, on a resume. Give it once per answer." }
   ],
   examples: [
@@ -103,4 +103,12 @@ export const loginHelp: HelpEntry = {
   about: "Makes the account's folder under ~/.orc/accounts if it is missing and runs the vendor's sign-in with its config folder set to it, so orc never reads or copies the credential. Only claude-main signs in today, through claude auth login with CLAUDE_CONFIG_DIR set. On a machine with no browser, Claude prints a link and takes back the code the page shows.",
   options: [],
   examples: ["orc login claude-main"]
+}
+
+export const updateHelp: HelpEntry = {
+  usage: ["orc update [--json]"],
+  summary: "Install the newest published orc when it is newer than this one",
+  about: "Reads the newest version of @avi2dg/orc from the npm registry and installs it only when it is newer than the running orc. The install runs bun add -g @avi2dg/orc@<version>, or the update.command config.json names. A registry read that fails or takes more than 15 seconds leaves orc as it is.",
+  options: [{ flag: "--json", meaning: "Print the result as an orc.update.v1 JSON document." }],
+  examples: ["orc update", "orc update --json"]
 }

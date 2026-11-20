@@ -143,7 +143,7 @@ const reference = [
   page("Merging a task's PR", "/run/merging-a-tasks-pr"),
   page("Seeing runs", "/run/seeing-runs"),
   page("What the no-mistakes fork adds", "/run/no-mistakes-fork"),
-  page("Move an old launcher", "/run/move-an-old-launcher"),
+  page("Updating orc", "/run/updating-orc"),
   page("Where things are in the run package", "/run/layout")
 ]
 

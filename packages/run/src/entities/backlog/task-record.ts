@@ -133,6 +133,10 @@ export const decisionWait = "decision for the captain"
 
 export const taskPr = (task: TaskRecord): string | null => ranClosing(task)?.pr ?? null
 
+const prUrlPattern = /^https:\/\/[^/]+\/[^/]+\/[^/]+\/pull\/\d+$/
+
+export const fullPrUrl = (pr: string | null | undefined): string | null => pr !== null && pr !== undefined && prUrlPattern.test(pr) ? pr : null
+
 export type DeciderOwns = (task: string, question: ParkedQuestion) => boolean
 
 export const answersAwaited = (captain: ReadonlyArray<string>, decider: ReadonlyArray<string>): string =>

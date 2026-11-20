@@ -20,6 +20,7 @@ export type OrcArgs =
   | { readonly kind: "Chat"; readonly sessionFile: string | null }
   | { readonly kind: "InstallApp" }
   | { readonly kind: "Login"; readonly account: AccountName }
+  | { readonly kind: "Update"; readonly json: boolean }
   | { readonly kind: "UsageError"; readonly detail: string }
 const parseShowArgs = (rest: readonly string[]): OrcArgs => {
   if (rest.length === 0) {
@@ -243,7 +244,7 @@ const parseRunArgs = (rest: readonly string[]): OrcArgs => {
   const taskFile = split.kept.length === 1 ? split.kept[0] : null
   return { kind: "RunAgent", taskFile, taskKind: split.taskKind, delivery: split.delivery, branch: split.branch, sandbox: split.sandbox, tokenFile: split.tokenFile, provider: split.provider, implementerModel: split.implementerModel, fixerModel: split.fixerModel, instructions: split.instructions, allow: split.allow, answers: split.answers }
 }
-const parseJsonListArgs = (rest: readonly string[], kind: "ListRefusals"): OrcArgs => {
+const parseJsonListArgs = (rest: readonly string[], kind: "ListRefusals" | "Update"): OrcArgs => {
   if (rest.length === 0) {
     return { kind, json: false }
   }
@@ -353,6 +354,7 @@ const topLevelParsers = {
   chat: parseChatArgs,
   app: parseAppArgs,
   login: parseLoginArgs,
+  update: (rest: readonly string[]): OrcArgs => parseJsonListArgs(rest, "Update"),
   backlog: (rest: readonly string[]): OrcArgs => toDispatch("backlog", rest),
   attention: (rest: readonly string[]): OrcArgs => toDispatch("attention", rest),
   beat: (rest: readonly string[]): OrcArgs => toDispatch("beat", rest),

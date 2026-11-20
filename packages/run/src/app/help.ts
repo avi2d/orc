@@ -1,11 +1,11 @@
 import { type AppWord, type CommandWord, commandWords, isCommandWord } from "./args"
 import type { AttentionWord } from "./dispatch-args"
-import { appHelp, appInstallHelp, chatHelp, logHelp, loginHelp, refusalsHelp, runHelp, runsHelp, scoreHelp, showHelp } from "./help-entries-run"
+import { appHelp, appInstallHelp, chatHelp, logHelp, loginHelp, refusalsHelp, runHelp, runsHelp, scoreHelp, showHelp, updateHelp } from "./help-entries-run"
 import { attentionAnswerHelp, attentionHelp, backlogHelp, backlogVerbHelp, beatHelp, mergeHelp } from "./help-entries-backlog"
 import { heavyHelp, heavyVerbHelp, machinesHelp, runnerHelp, runnerVerbHelp, versionHelp } from "./help-entries-runner"
 import { formatHelp, formatOverview, type HelpEntry, type OverviewGroup, type Row, usageBlock, wrap, terminalWidth } from "./help-format"
 
-const groups = ["Run a task:", "Runs and their results:", "The backlog and the beat:", "The runner:", "Chat and the app:", "Accounts:"] as const
+const groups = ["Run a task:", "Runs and their results:", "The backlog and the beat:", "The runner:", "Chat and the app:", "Accounts:", "Updating orc:"] as const
 type Group = typeof groups[number]
 
 const commandGroup: Record<CommandWord, Group> = {
@@ -25,7 +25,8 @@ const commandGroup: Record<CommandWord, Group> = {
   machines: "The runner:",
   chat: "Chat and the app:",
   app: "Chat and the app:",
-  login: "Accounts:"
+  login: "Accounts:",
+  update: "Updating orc:"
 }
 
 const commandHelp: Record<CommandWord, HelpEntry> = {
@@ -45,7 +46,8 @@ const commandHelp: Record<CommandWord, HelpEntry> = {
   machines: machinesHelp,
   chat: chatHelp,
   app: appHelp,
-  login: loginHelp
+  login: loginHelp,
+  update: updateHelp
 }
 
 const attentionSubcommandHelp: Record<AttentionWord, HelpEntry> = { answer: attentionAnswerHelp }
