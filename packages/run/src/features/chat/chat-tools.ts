@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect"
 import { isOpenHeld, type OpenHeld } from "./chat-backlog"
 import { type BoardHost, type Boards, boardsVar, decisionBoards } from "./chat-board"
+import { answerArgs } from "./chat-board-page"
 import type { Env } from "./chat-command"
 import { ChatToolError } from "./chat-error"
 import { type Deliver, postUnposted, type PostState, readBacklog } from "./chat-posts"
@@ -186,10 +187,8 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
       "Records the captain's words through orc backlog answer, word for word. On a held task it releases the task for the next beat, or on a hold with questions answers the one named and releases the task once every question is answered. On a parked task it answers the one question named, and the beat resumes the run on its branch once every question is answered. On a decision it closes the decision done with the answer, and the tasks that depend on it may start with its question and answer in their run.",
     parameters: Schema.toJsonSchemaDocument(AnswerInput).schema,
     execute: (_toolCallId, params) =>
-      runTool(AnswerInput, "orc_backlog_answer", params, env, (input) => {
-        const said = input.question === undefined ? input.words : input.question + "=" + input.words
-        return ["backlog", "answer", input.id, ...(said.startsWith("-") ? ["--"] : []), said]
-      })
+      runTool(AnswerInput, "orc_backlog_answer", params, env, (input) =>
+        answerArgs(input.id, input.question === undefined ? { kind: "reason" } : { kind: "question", id: input.question }, input.words))
   },
   ...attentionTools(env),
   {
