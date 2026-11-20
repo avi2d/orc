@@ -46,6 +46,22 @@ describe("a pinned scout or task", () => {
   })
 })
 
+describe("a project's priority floor", () => {
+  const config: DispatchConfig = { machines: [{ name: "mac", slots: 1, start: ["true"] }], quota }
+  const room = [{ machine: "mac", slots: 1, busy: 0 }]
+  const floored: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Users/a/orc" }, floor: 1 }]
+  const task = (priority: 0 | 1 | 2): TaskRecord => ({ spec: { ...spec, id: "task-1", priority }, hold: null, parked: null, state: { kind: "new" } })
+  test("waits on a task less urgent than the floor and names the floor", () => {
+    expect(placeTask(task(2), config, floored, room)).toEqual({ kind: "waits", reason: "P2 is under the floor P1 of the project orc" })
+  })
+  test("starts a task at or above the floor", () => {
+    expect([placeTask(task(1), config, floored, room).kind, placeTask(task(0), config, floored, room).kind]).toEqual(["place", "place"])
+  })
+  test("starts any priority in a project with no floor", () => {
+    expect(placeTask(task(2), config, [{ name: "orc", checkouts: { mac: "/Users/a/orc" } }], room).kind).toBe("place")
+  })
+})
+
 const quotaReply = JSON.stringify({ schema: "orc.quota.v1", accounts: [{ name: "main", remainingPercent: 80 }] })
 
 const pueueDone = (root: string): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner> => {
