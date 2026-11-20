@@ -69,3 +69,33 @@ export const MergeInput = Schema.Struct({
     description: "captain-word when the captain explicitly said to merge this PR. yolo-green when asked to merge a yolo project's PR and the PR is green"
   })
 })
+
+export const StopInput = Schema.Struct({
+  id: Schema.String.annotate({ description: "The id of the started task whose run ends" })
+})
+
+export const DropInput = Schema.Struct({
+  id: Schema.String.annotate({ description: "The id of the new task that never runs" }),
+  reason: Schema.String.check(Schema.isNonEmpty()).annotate({ description: "The reason the task is dropped" })
+})
+
+export const SendBackInput = Schema.Struct({
+  id: Schema.String.annotate({ description: "The id of the closed task whose open PR goes back for another pass" }),
+  words: Schema.String.check(Schema.isNonEmpty()).annotate({ description: "The captain's review, word for word" })
+})
+
+export const NoteInput = Schema.Struct({
+  id: Schema.String.annotate({ description: "The id of the task the note is on" }),
+  words: Schema.String.check(Schema.isNonEmpty()).annotate({ description: "The note, word for word" })
+})
+
+export const DependInput = Schema.Struct({
+  id: Schema.String.annotate({ description: "The id of the new or held task whose dependencies change" }),
+  on: Schema.Array(Schema.String.check(Schema.isNonEmpty())).annotate({
+    description: "The ids of every task it waits for, which replace the whole list; an empty list makes it wait for none"
+  })
+})
+
+export const ThreadInput = Schema.Struct({
+  id: Schema.String.annotate({ description: "The id of the task whose conversation is read" })
+})

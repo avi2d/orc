@@ -1,5 +1,5 @@
 import { Array as Arr, Effect, FileSystem, Schema } from "effect"
-import { answerWait, type DeciderOwns, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
+import { answerWait, type DeciderOwns, fullPrUrl, type Parked, parseTaskFile, type TaskFileError, type TaskFolder, taskFolders, type TaskRecord, type TaskSpec } from "./task-record"
 import { renderTaskFile } from "./task-record-render"
 import { BacklogError, backlogPaths, grabIn, platformFailure, publishOnce, readNames, recoverGrabs, scratchName, takenGrab } from "./backlog-write"
 
@@ -254,7 +254,7 @@ export const closeStartedTask = (
     ...fresh,
     spec: reshape(fresh.spec),
     parked: answeredOnly(fresh.parked),
-    state: { kind: "closed", claim: fresh.state.claim, closing: { outcome, started: fresh.state.started, reason, pr: delivered.pr ?? fresh.parked?.origin?.pr ?? null, report: delivered.report }, closedAt, postedAt: null }
+    state: { kind: "closed", claim: fresh.state.claim, closing: { outcome, started: fresh.state.started, reason, pr: fullPrUrl(delivered.pr) ?? fullPrUrl(fresh.parked?.origin?.pr), report: delivered.report }, closedAt, postedAt: null }
   }))
 
 export const reopenStartedTask = (

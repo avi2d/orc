@@ -11,7 +11,8 @@ const prUrl = "https://github.com/acme/orc/pull/8"
 const captureRunQueue = async (fixture: Fixture) => {
   const program = join(fixture.dir, "bin", "pueue")
   await rename(program, program + "-base")
-  await writeFile(program, '#!/bin/sh\nif [ "$1" = add ] && [ "$3" = orc ]; then printf "%s\\n" "$@" > "$PUEUE_STATE/run-args"; fi\nexec "$0-base" "$@"\n')
+  // The detached start command writes this file while queuedRun polls it, so it is renamed into place whole rather than read empty after the shell creates it.
+  await writeFile(program, '#!/bin/sh\nif [ "$1" = add ] && [ "$3" = orc ]; then printf "%s\\n" "$@" > "$PUEUE_STATE/run-args.tmp" && mv "$PUEUE_STATE/run-args.tmp" "$PUEUE_STATE/run-args"; fi\nexec "$0-base" "$@"\n')
   await chmod(program, 0o755)
 }
 
