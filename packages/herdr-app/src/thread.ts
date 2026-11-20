@@ -44,7 +44,7 @@ const kindLabels: Readonly<Record<ThreadLine["kind"], string>> = {
   hold: "Hold", question: "Question", decision: "Decision", answer: "Answer", delivered: "Delivered", withdrawn: "Withdrawn", note: "Note"
 }
 
-export const whoLabel = (line: ThreadLine): string => whoLabels[line.who]
+export const whoLabel = (line: Pick<ThreadLine, "who">): string => whoLabels[line.who]
 
 export const lineLabel = (line: ThreadLine): string => kindLabels[line.kind]
 
