@@ -6,12 +6,13 @@ import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
 import { subprocessNoMistakesRunner, type QuestionAnswer } from "../../packages/run/src/entities/review-gate/no-mistakes"
+import type { OpenQuestion } from "../../packages/run/src/entities/review-gate/index"
 import { subprocessPullRequestOpener } from "../../packages/run/src/entities/pull-request/direct-pr"
 import { hostGitShim } from "../../packages/run/src/shared/sandbox/host"
 import { askSetupFor, orcCompletionLine } from "../../packages/run/src/entities/agent/index"
 import { runWithHistory } from "../../packages/run/src/features/running-a-task/run"
 import type { OrcRunReport, RunDeliverer } from "../../packages/run/src/features/running-a-task/run-record"
-import { listRuns, openDatabase, type RunRecord } from "../../packages/run/src/entities/run-history/index"
+import { listRuns, openDatabase, openQuestionsForRun, type RunRecord } from "../../packages/run/src/entities/run-history/index"
 import { type FakeAgent, type FakeCheck, fakeOps } from "../lib/fake-ops"
 
 export const git = (dir: string, args: ReadonlyArray<string>): string => {
@@ -98,6 +99,7 @@ export interface StepOutcome {
   readonly run: RunRecord | undefined
   readonly steps: unknown
   readonly signals: unknown
+  readonly runSignals: unknown
   readonly evidence: string
   readonly stepAgents: unknown
 }
@@ -231,13 +233,25 @@ export const runDirectPrStep = async (dir: string, home: string, sandbox: FakeAg
   }
 }
 
-const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, nmReplies: ReadonlyArray<NoMistakesReply>, answers: ReadonlyArray<QuestionAnswer>, deliver: DelivererFor, extraPath: string, facts: RunFacts = handRunFacts): Promise<StepOutcome & { readonly nmCalls: string }> =>
+export const runDirectPrResume = async (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, checkRuns: string, answers: ReadonlyArray<QuestionAnswer>): Promise<StepOutcome & { readonly nmCalls: string; readonly ghCalls: string }> => {
+  const gh = await stubGh(checkRuns)
+  try {
+    const outcome = await runStepWith(dir, home, sandbox, execCheck, unexpectedNoMistakes, answers, (spawner, hostGit, pathEnv, worktreeDir) =>
+      ({ kind: "direct-PR", opener: subprocessPullRequestOpener({ spawner, git: hostGit, gh: "gh", pathEnv, worktreeDir, branch: "orc/test" }) }), gh.dir + ":", handRunFacts, { runId: "step-run-2", resumeRun: "step-run-1" })
+    return { ...outcome, ghCalls: await Bun.file(gh.calls).text() }
+  } finally {
+    await rm(gh.dir, { recursive: true, force: true })
+  }
+}
+
+const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: FakeCheck, nmReplies: ReadonlyArray<NoMistakesReply>, answers: ReadonlyArray<QuestionAnswer>, deliver: DelivererFor, extraPath: string, facts: RunFacts = handRunFacts, resume: { readonly runId: string; readonly resumeRun: string } | null = null): Promise<StepOutcome & { readonly nmCalls: string }> =>
   Effect.runPromise(
     Effect.gen(function*() {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-      const runDir = path.join(home, "runs", "step-run-1")
+      const runId = resume?.runId ?? "step-run-1"
+      const runDir = path.join(home, "runs", runId)
       yield* fs.makeDirectory(path.join(runDir, "sessions"), { recursive: true })
       const stub = yield* Effect.promise(() => stubNoMistakes(nmReplies))
       yield* fs.writeFileString(path.join(runDir, "task.md"), "Do the thing.\n")
@@ -246,22 +260,27 @@ const runStepWith = (dir: string, home: string, sandbox: FakeAgent, execCheck: F
         openDatabase(home),
         (db) =>
           Effect.gen(function*() {
+            let priorOpen: ReadonlyArray<OpenQuestion> = []
+            if (resume !== null) {
+              priorOpen = yield* openQuestionsForRun(db, resume.resumeRun)
+            }
             const report = yield* runWithHistory(db, {
-              fs, path, spawner, git: hostGit, projectDir: dir, runId: "step-run-1", runDir,
+              fs, path, spawner, git: hostGit, projectDir: dir, runId, runDir, resumeRun: resume?.resumeRun,
               piSessionDir: path.join(runDir, "session"), hostSessionsDir: path.join(runDir, "sessions"),
               taskPath: path.join(runDir, "task.md"), instructions: null, agent: implementer, fixer, branch: facts.branch, sandbox: "nono", started: "2026-10-19T10:00:00.000Z",
-              asks: askSetupFor(runDir, path.join(runDir, "session"), 600, answers, []),
+              asks: askSetupFor(runDir, path.join(runDir, "session"), 600, answers, priorOpen),
               worktreeDir: facts.worktreeDir ?? dir, machine: facts.machine,
               delivery: deliver(spawner, hostGit, extraPath + stub.dir + ":" + (process.env.PATH ?? ""), dir),
               answers
             }, fakeOps({ runAgent: sandbox, execCheck }, path.join(runDir, "sessions")))
             const runs = yield* listRuns(db)
-            const steps = db.query("SELECT name, status FROM steps WHERE run_id = ?").all("step-run-1")
+            const steps = db.query("SELECT name, status FROM steps WHERE run_id = ?").all(runId)
             const signals = db.query("SELECT name, value FROM signals ORDER BY name").all()
-            const stepAgents = db.query("SELECT name, model, thinking FROM steps WHERE run_id = ? ORDER BY id").all("step-run-1")
+            const runSignals = db.query("SELECT signals.name AS name, signals.value AS value FROM signals JOIN steps ON signals.step_id = steps.id WHERE steps.run_id = ? ORDER BY signals.id").all(runId)
+            const stepAgents = db.query("SELECT name, model, thinking FROM steps WHERE run_id = ? ORDER BY id").all(runId)
             const evidence = yield* fs.readFileString(path.join(runDir, "implement-1.md"))
             const nmCalls = yield* fs.readFileString(stub.calls)
-            return { report, run: runs.find((run) => run.id === "step-run-1"), steps, signals, evidence, stepAgents, nmCalls }
+            return { report, run: runs.find((run) => run.id === runId), steps, signals, runSignals, evidence, stepAgents, nmCalls }
           }),
         (db) => Effect.sync(() => db.close())
       )

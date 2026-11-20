@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { capturedSession, cleanFinish, commitOnBranch, ghPrLink, git, readyToCheck, runDirectPrStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
+import { runStatus } from "../../packages/run/src/entities/run-history/index"
+import { capturedSession, cleanFinish, commitOnBranch, ghPrLink, git, readyToCheck, runDirectPrResume, runDirectPrStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
+
+const isNamedSignal = (value: unknown): value is { readonly name: string } =>
+  typeof value === "object" && value !== null && "name" in value && typeof value.name === "string"
 
 const withOrigin = async (dir: string, use: (origin: string) => Promise<void>): Promise<void> => {
   const origin = await mkdtemp(join(tmpdir(), "orc-origin-"))
@@ -87,7 +91,28 @@ describe("a direct-PR run opens its own PR after the checks", () => {
           expect(outcome.report.waitingOnCi).toBe(false)
           expect(outcome.run?.status).toBe("failed")
           expect(outcome.run?.endReason).toContain("CI verdict for " + sha.slice(0, 12) + ": failed, the check test failed.")
+          expect(runStatus(outcome.report)).toBe("CI failed")
           expect(outcome.signals).not.toContainEqual(expect.objectContaining({ name: "open-question" }))
+        })
+      })
+    })
+  })
+
+  test("a resumed run that finds failed CI closes failed without keeping the waiting question", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        await withOrigin(dir, async () => {
+          const sha = await readyToCheck(dir, home)
+          const first = await runDirectPrStep(dir, home, sandboxResult(sha), lintPasses)
+          expect(first.run?.status).toBe("running")
+          const failedRuns = JSON.stringify({ total_count: 1, check_runs: [{ id: 1, name: "test", head_sha: sha, status: "completed", conclusion: "failure" }] })
+          const second = await runDirectPrResume(dir, home, sandboxResult(sha), lintPasses, failedRuns, [{ question: "ci-waiting", answer: "CI finished, read the verdict again" }])
+          expect(second.report.completed).toBe(false)
+          expect(second.report.waitingOnCi).toBe(false)
+          expect(second.run?.status).toBe("failed")
+          expect(second.run?.endReason).toContain("CI verdict for " + sha.slice(0, 12) + ": failed, the check test failed.")
+          const rows = Array.isArray(second.runSignals) ? second.runSignals : []
+          expect(rows.filter(isNamedSignal).filter((signal) => signal.name === "open-question")).toEqual([])
         })
       })
     })

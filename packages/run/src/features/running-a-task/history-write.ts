@@ -9,7 +9,7 @@ import { OrcRunError } from "../../shared/lib/index"
 import { historyFailure, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, sqlite, stepIdFor, updateRun, updateStep } from "../../entities/run-history/index"
 import type { EvidenceInput, SignalInput, StepInput } from "../../entities/run-history/index"
 import { measuredSignals, noMistakesSignals, openQuestionSignal } from "../../entities/run-history/index"
-import type { AgentStep, ResumePlan, RunCheckpoints } from "./run-ops"
+import { ciWaitingQuestionId, type AgentStep, type ResumePlan, type RunCheckpoints } from "./run-ops"
 import type { AgentFile } from "../../entities/agent/index"
 import { liveAskQuestions, type AskSetup } from "../../entities/agent/index"
 import { taskOfBranch } from "../../entities/backlog/index"
@@ -210,7 +210,8 @@ export const recordOpenAsks = (
 ): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
     const seen = new Set<string>()
-    for (const question of [...seed, ...liveAskQuestions(setup), ...setup.priorOpen]) {
+    const inherited = setup.priorOpen.filter((prior) => prior.id !== ciWaitingQuestionId)
+    for (const question of [...seed, ...liveAskQuestions(setup), ...inherited]) {
       if (seen.has(question.id) || setup.state.recorded.has(question.id)) {
         continue
       }

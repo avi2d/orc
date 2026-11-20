@@ -216,7 +216,7 @@ export const runStatus = (report: OrcRunReport): string => {
     return "checks failed"
   }
   if (report.noMistakes === null && report.prLink !== null) {
-    return "PR open without no-mistakes"
+    return "CI failed"
   }
   return "no-mistakes " + (report.noMistakes?.status ?? "never ran") + (report.prLink === null ? ", no PR" : ", PR open")
 }
