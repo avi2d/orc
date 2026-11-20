@@ -66,6 +66,8 @@ The beat opens an item for each run event, owned by the user:
   Merging the PR closes it with the answer `merged`.
   Closing the PR without merging closes it with the answer `closed without merging`.
 
+## Recording a choice
+
 Each item the beat opens names its `subject` and lists its `options`, each with the `outcome` it leads to, and its `recommendation` names one of them:
 
 - A `run-died` item offers `rerun` or `close`, and recommends `rerun`.
