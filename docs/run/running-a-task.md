@@ -92,7 +92,7 @@ It also leaves a reused worktree outside `$ORC_HOME` in place.
 ## Results
 
 A no-mistakes ship run succeeds when Pi completes with `ORC_COMPLETE` on its own line, the branch has a new commit, the checks pass, and no-mistakes opens the PR and reports green CI.
-A direct-PR run succeeds when Pi completes, the branch has a new commit, the checks pass, and the PR opens.
+A direct-PR run succeeds when Pi completes, the branch has a new commit, the checks pass, the PR opens, and the GitHub CI verdict on the pushed head is not `failed`.
 A stopped or failed run exits with status 1 and records the reason.
 See [Merging a task's PR](merging-a-tasks-pr.md) for what follows.
 

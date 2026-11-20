@@ -36,9 +36,11 @@ describe("a direct-PR run opens its own PR after the checks", () => {
           expect(branchOn(origin)).toBe(sha)
           expect(callLines(outcome.ghCalls)).toEqual([
             "pr list --head orc/test --state open --json url --jq .[0].url // empty",
-            "pr create --head orc/test --title work --body-file " + bodyFile
+            "pr create --head orc/test --title work --body-file " + bodyFile,
+            "api --hostname github.com repos/o/r/commits/" + sha + "/check-runs?per_page=100"
           ])
           expect(outcome.report.completed).toBe(true)
+          expect(outcome.report.endReason).toContain("CI verdict for " + sha.slice(0, 12) + ": pending, waiting on CI because no check run has reported on " + sha + " yet.")
           expect(outcome.report.noMistakes).toBeNull()
           expect(outcome.report.prLink).toBe(ghPrLink)
           expect(outcome.run?.prLink).toBe(ghPrLink)
@@ -64,6 +66,22 @@ describe("a direct-PR run opens its own PR after the checks", () => {
           expect(callLines(outcome.ghCalls).some((line) => line.startsWith("pr create --head orc/test"))).toBe(true)
           expect(outcome.report.prLink).toBe(ghPrLink)
           expect(outcome.report.completed).toBe(true)
+        })
+      })
+    })
+  })
+
+  test("a failed CI check run on the pushed head ends the run failed with the check's name", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        await withOrigin(dir, async () => {
+          const sha = await readyToCheck(dir, home)
+          const checkRuns = JSON.stringify({ total_count: 1, check_runs: [{ id: 1, name: "test", head_sha: sha, status: "completed", conclusion: "failure" }] })
+          const outcome = await runDirectPrStep(dir, home, sandboxResult(sha), lintPasses, checkRuns)
+          expect(outcome.report.prLink).toBe(ghPrLink)
+          expect(outcome.report.completed).toBe(false)
+          expect(outcome.run?.status).toBe("failed")
+          expect(outcome.run?.endReason).toContain("CI verdict for " + sha.slice(0, 12) + ": failed, the check test failed.")
         })
       })
     })

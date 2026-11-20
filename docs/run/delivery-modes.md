@@ -18,3 +18,7 @@ To resume a direct-PR run, add `--delivery direct-PR` to the resume command, and
 Orc keeps that body as `pr-body.md` in the run folder and records the step as `pr`.
 The run succeeds with the PR link, so the task closes done with it as `pr` and the chat posts it as it posts any PR.
 A failed check, a failed push or a failed `gh pr create` ends the run failed with no PR, and the task closes failed.
+Once the PR opens, orc reads the GitHub check runs of the pushed head with `gh api repos/<owner>/<repo>/commits/<sha>/check-runs` and adds a `CI verdict for <sha>:` line to the end reason.
+The verdict is `passed` when every check run on that head is green, `failed` with the names of the red check runs, or `pending` while a check run is unfinished or none has reported on that head.
+A check run on another head never counts toward the verdict.
+A `failed` verdict ends the run failed, and a `pending` verdict leaves the run as the PR left it, waiting on CI.
