@@ -30,6 +30,8 @@ export interface DriveLog {
   readonly runId: () => string
   readonly gatesAnswered: () => number
   readonly countGate: () => void
+  readonly gatesSinceCap: () => number
+  readonly liftCap: () => void
   readonly refuse: (gate: ParkedGate | null, reason: string) => Ending
   readonly awaitAnswers: (gate: ParkedGate, missing: ReadonlyArray<NoMistakesFinding>, asked: string | null) => Ending
   readonly fail: (reason: string) => Ending
@@ -53,6 +55,7 @@ export const openDriveLog = (started: string): DriveLog => {
   const findings: Array<NoMistakesFinding> = []
   const known = new Set<string>()
   let gatesAnswered = 0
+  let capLifted = 0
   let prLink: string | null = null
   let runId = ""
   let reviewer: string | null = null
@@ -88,6 +91,10 @@ export const openDriveLog = (started: string): DriveLog => {
     gatesAnswered: () => gatesAnswered,
     countGate: () => {
       gatesAnswered += 1
+    },
+    gatesSinceCap: () => gatesAnswered - capLifted,
+    liftCap: () => {
+      capLifted = gatesAnswered
     },
     refuse,
     awaitAnswers: (gate, missing, asked) => ({

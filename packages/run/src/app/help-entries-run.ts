@@ -20,7 +20,7 @@ export const runHelp: HelpEntry = {
     { flag: "--implementer-model <model>", meaning: "The implementer model, used instead of the one config.json names." },
     { flag: "--fixer-model <model>", meaning: "The fixer model, used instead of the one config.json names." },
     { flag: "--instructions <path>", meaning: "A project instructions file handed to Pi." },
-    { flag: "--allow " + askUserWord, meaning: "Decline every ask-user finding of the review and accept the rest, on a resume." },
+    { flag: "--allow " + askUserWord, meaning: "Decline findings marked exactly ask-user, on a resume. Findings with any other action still wait as questions." },
     { flag: "--answer <id>=<text>", meaning: "Answer a review question or an ask-user finding by its id, on a resume. Give it once per answer." }
   ],
   examples: [

@@ -3,7 +3,7 @@ import { arrow, bullets, card, svg, tall, text, zone, type Drawing, type Part } 
 const title = "Checks and review: the two gates a code change passes"
 
 const desc =
-  "After Pi commits, orc runs the project's checks. When one fails, a fixer repairs it and the checks run again, and after three fixes with a check still red the run fails and no pull request opens. Once the checks are green, no-mistakes reviews the branch. Orc has it fix a finding marked auto-fix, ignores no-op, and treats ask-user as a question that waits at the gate for 30 minutes before the task parks on its branch. Then no-mistakes pushes the branch, opens the pull request and waits for green CI. The project's mode decides which of these a ship task goes through."
+  "After Pi commits, orc runs the project's checks. When one fails, a fixer repairs it and the checks run again, and after three fixes with a check still red the run fails and no pull request opens. Once the checks are green, no-mistakes reviews the branch. Orc has it fix a finding marked auto-fix, ignores no-op, and treats a finding marked ask-user or with any other action as a question that waits at the gate for 30 minutes before the task parks on its branch. After orc answers 20 gates without an outcome it asks gate-cap before it answers more. Then no-mistakes pushes the branch, opens the pull request and waits for green CI. The project's mode decides which of these a ship task goes through."
 
 const branch: Part = { title: "The branch", text: "Pi's commits, in the run's copy of the project.", href: "run" }
 const gate: Part = { title: "The checks", text: "The commands the project names in `.no-mistakes.yaml`." }
@@ -13,11 +13,11 @@ const failed: Part = { title: "The run fails", text: "A check is still red after
 const review: Part = { title: "no-mistakes reviews the branch", text: "It gets the task as its intent, and marks each finding." }
 const findings: Part = {
   title: "What orc does with a finding",
-  ...bullets(["`auto-fix`: asks no-mistakes to fix it", "`no-op`: ignores it", "`ask-user`: a question that waits for an answer"])
+  ...bullets(["`auto-fix`: asks no-mistakes to fix it", "`no-op`: ignores it", "`ask-user` or any other action: a question that waits for an answer"])
 }
 const question: Part = {
   title: "A question waits at the gate",
-  text: "For 30 minutes. An answer in that time carries the run on. With none, the task parks on its branch, and resumes once every question has an answer.",
+  text: "For 30 minutes. An answer in that time carries the run on. With none, the task parks on its branch, and resumes once every question has an answer. After 20 gates without an outcome orc asks gate-cap and waits the same way.",
   cls: "card-ask",
   href: "attention",
 }
@@ -32,9 +32,9 @@ const pullRequest: Part = { title: "A pull request", text: "A code change, check
 
 const wide = (): Drawing => {
   const body = [
-    zone(8, 8, 290, 482, "Gate 1: the project's checks"),
-    zone(318, 8, 390, 482, "Gate 2: the review"),
-    zone(728, 8, 224, 482, "A ship task, by the project's mode"),
+    zone(8, 8, 290, 530, "Gate 1: the project's checks"),
+    zone(318, 8, 390, 530, "Gate 2: the review"),
+    zone(728, 8, 224, 530, "A ship task, by the project's mode"),
     card(18, 42, 270, 80, branch),
     card(18, 150, 270, 80, gate),
     card(18, 282, 270, 96, fixer),
@@ -46,27 +46,27 @@ const wide = (): Drawing => {
     text(214, 260, "again"),
     arrow([[153, 378], [153, 402]], "aside"),
     card(328, 42, 350, 78, review),
-    card(328, 144, 350, 106, findings),
-    card(328, 276, 350, 96, question),
-    card(328, 398, 350, 80, deliver),
+    card(328, 144, 350, 122, findings),
+    card(328, 292, 350, 128, question),
+    card(328, 446, 350, 80, deliver),
     arrow([[288, 190], [303, 190], [303, 76], [326, 76]], "work"),
     text(298, 140, "green", "", "end"),
     arrow([[503, 120], [503, 142]], "work"),
-    arrow([[430, 250], [430, 274]], "ask"),
-    arrow([[503, 372], [503, 396]], "work"),
-    arrow([[678, 196], [692, 196], [692, 420], [680, 420]], "work"),
+    arrow([[430, 266], [430, 290]], "ask"),
+    arrow([[503, 420], [503, 444]], "work"),
+    arrow([[678, 196], [692, 196], [692, 468], [680, 468]], "work"),
     ...modes.map((mode, index) => card(738, 42 + index * 104, 204, 96, mode)),
-    card(738, 384, 204, 96, pullRequest),
-    arrow([[678, 456], [736, 456]], "work")
+    card(738, 432, 204, 96, pullRequest),
+    arrow([[678, 504], [736, 504]], "work")
   ]
-  return svg("checks", 960, 498, title, desc, body)
+  return svg("checks", 960, 546, title, desc, body)
 }
 
 export const checks = (): readonly Drawing[] => [
   wide(),
   tall("checks", title, desc, [
     { label: "Gate 1: the project's checks", rows: [branch, { arrow: "work" }, gate, { arrow: "aside", note: "red" }, fixer, { arrow: "aside", note: "red after 3 fixes" }, failed] },
-    { label: "Gate 2: the review", rows: [review, { arrow: "work" }, findings, { arrow: "ask", note: "ask-user" }, question, { arrow: "work" }, deliver, { arrow: "work" }, pullRequest] },
+    { label: "Gate 2: the review", rows: [review, { arrow: "work" }, findings, { arrow: "ask", note: "a question" }, question, { arrow: "work" }, deliver, { arrow: "work" }, pullRequest] },
     { label: "A ship task, by the project's mode", rows: modes }
   ])
 ]
