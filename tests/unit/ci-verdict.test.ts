@@ -46,12 +46,12 @@ describe("the CI verdict read from GitHub check runs", () => {
     expect(verdict.kind).toBe("pending")
   })
 
-  test("a re-run that passed speaks for the check over its earlier failure", () => {
+  test("an independent same-name success does not hide a same-name failure", () => {
     const runs = JSON.stringify({ total_count: 2, check_runs: [
-      { id: 7, name: "test", head_sha: head, status: "completed", conclusion: "failure" },
-      { id: 9, name: "test", head_sha: head, status: "completed", conclusion: "success" }
+      { id: 7, name: "test", head_sha: head, status: "completed", conclusion: "failure", check_suite: { id: 11 }, app: { id: 1, slug: "ci-one" } },
+      { id: 9, name: "test", head_sha: head, status: "completed", conclusion: "success", check_suite: { id: 12 }, app: { id: 2, slug: "ci-two" } }
     ] })
-    expect(ciVerdictOf(runs, head)).toEqual(Result.succeed({ kind: "passed", headSha: head, checks: ["test"] }))
+    expect(ciVerdictOf(runs, head)).toEqual(Result.succeed({ kind: "failed", headSha: head, failing: ["test"] }))
   })
 
   test("a payload that is no check-run list is refused", () => {
@@ -73,5 +73,41 @@ describe("the CI verdict read from GitHub check runs", () => {
     const verdict = await Effect.runPromise(readCiVerdict(() => Effect.succeed({ stdout: "", stderr: "HTTP 404", exitCode: 1 }), "https://github.com/o/r/pull/9", head))
     expect(verdict.kind).toBe("pending")
     expect(ciVerdictLine(verdict)).toContain("orc could not read the check runs: gh api exited 1: HTTP 404")
+  })
+
+  test("a partial check-run list stays pending instead of passing on the runs seen", () => {
+    const runs = JSON.stringify({ total_count: 2, check_runs: [
+      { id: 1, name: "lint", head_sha: head, status: "completed", conclusion: "success" }
+    ] })
+    expect(ciVerdictOf(runs, head)).toEqual(Result.succeed({ kind: "pending", headSha: head, waiting: [], reason: "orc read 1 of 2 check runs for " + head }))
+  })
+
+  test("a failed check run on a later page fails the verdict instead of passing the first page", async () => {
+    const first = JSON.stringify({ total_count: 3, check_runs: [
+      { id: 1, name: "lint", head_sha: head, status: "completed", conclusion: "success" },
+      { id: 2, name: "docs", head_sha: head, status: "completed", conclusion: "success" }
+    ] })
+    const second = JSON.stringify({ total_count: 3, check_runs: [
+      { id: 3, name: "test", head_sha: head, status: "completed", conclusion: "failure" }
+    ] })
+    const asked: Array<string> = []
+    const verdict = await Effect.runPromise(readCiVerdict((_hostname, apiPath) => {
+      asked.push(apiPath)
+      return Effect.succeed(apiPath.includes("page=2") ? { stdout: second, stderr: "", exitCode: 0 } : { stdout: first, stderr: "", exitCode: 0 })
+    }, "https://github.com/o/r/pull/9", head))
+    expect(asked).toEqual(["repos/o/r/commits/" + head + "/check-runs?per_page=100", "repos/o/r/commits/" + head + "/check-runs?per_page=100&page=2"])
+    expect(verdict).toEqual({ kind: "failed", headSha: head, failing: ["test"] })
+  })
+
+  test("a gh api failure on a later page stays pending instead of passing the first page", async () => {
+    const first = JSON.stringify({ total_count: 2, check_runs: [
+      { id: 1, name: "lint", head_sha: head, status: "completed", conclusion: "success" }
+    ] })
+    const verdict = await Effect.runPromise(readCiVerdict((_hostname, apiPath) =>
+      apiPath.includes("page=2")
+        ? Effect.succeed({ stdout: "", stderr: "HTTP 500", exitCode: 1 })
+        : Effect.succeed({ stdout: first, stderr: "", exitCode: 0 }), "https://github.com/o/r/pull/9", head))
+    expect(verdict.kind).toBe("pending")
+    expect(ciVerdictLine(verdict)).toContain("orc could not read the check runs: gh api exited 1: HTTP 500")
   })
 })

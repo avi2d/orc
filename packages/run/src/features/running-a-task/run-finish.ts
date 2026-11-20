@@ -17,7 +17,7 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
         return { ...settled, completed: false, prLink: pr.prLink, endReason: checked + pr.result }
       }
       const ci = yield* ciVerdictOfHead(run, run.delivery.opener, pr.prLink)
-      return { ...settled, completed: ci.kind !== "failed", prLink: pr.prLink, endReason: checked + pr.result + " " + ciVerdictLine(ci) }
+      return { ...settled, completed: ci.kind === "passed", prLink: pr.prLink, endReason: checked + pr.result + " " + ciVerdictLine(ci) }
     }
     yield* checkpoints.noMistakesStart(new Date().toISOString())
     const waitSeconds = run.answerWaitSeconds ?? 0

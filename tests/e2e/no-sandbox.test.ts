@@ -174,7 +174,7 @@ describe("orc run --sandbox none", () => {
         "echo " + directPrUrl
       ])
       const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none", "--delivery", "direct-PR"], repo, env)
-      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: expect.any(String) })
+      expect(result.exitCode).not.toBe(0)
       expect(result.stdout).toContain(directPrUrl)
       const piCwd = (await readFile(join(fakeBin, "pi-cwd"), "utf8")).trim()
       expect(git(origin, ["log", "orc/test", "--format=%s"], env).split("\n")).toEqual(["add greeting", "task"])

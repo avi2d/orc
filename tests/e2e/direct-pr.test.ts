@@ -39,12 +39,12 @@ describe("a direct-PR run opens its own PR after the checks", () => {
             "pr create --head orc/test --title work --body-file " + bodyFile,
             "api --hostname github.com repos/o/r/commits/" + sha + "/check-runs?per_page=100"
           ])
-          expect(outcome.report.completed).toBe(true)
+          expect(outcome.report.completed).toBe(false)
           expect(outcome.report.endReason).toContain("CI verdict for " + sha.slice(0, 12) + ": pending, waiting on CI because no check run has reported on " + sha + " yet.")
           expect(outcome.report.noMistakes).toBeNull()
           expect(outcome.report.prLink).toBe(ghPrLink)
           expect(outcome.run?.prLink).toBe(ghPrLink)
-          expect(outcome.run?.status).toBe("succeeded")
+          expect(outcome.run?.status).toBe("failed")
           expect(outcome.steps).toContainEqual({ name: "pr", status: "passed" })
           expect(outcome.steps).not.toContainEqual(expect.objectContaining({ name: "no-mistakes" }))
           const body = await readFile(bodyFile, "utf8")
@@ -65,7 +65,7 @@ describe("a direct-PR run opens its own PR after the checks", () => {
           expect(callLines(outcome.ghCalls)[0]).toBe("pr list --head orc/test --state open --json url --jq .[0].url // empty")
           expect(callLines(outcome.ghCalls).some((line) => line.startsWith("pr create --head orc/test"))).toBe(true)
           expect(outcome.report.prLink).toBe(ghPrLink)
-          expect(outcome.report.completed).toBe(true)
+          expect(outcome.report.completed).toBe(false)
         })
       })
     })
