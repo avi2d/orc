@@ -22,7 +22,7 @@ A question the run asks again at a later wait is open again, and the chat posts 
 A run whose wait ends with a question unanswered parks its task instead of closing it failed.
 The beat moves the task back to `new` with `parked_branch`, `parked_origin`, and `parked_questions` in its file.
 The origin records the machine and run id.
-Each question keeps its id, text, and the time it was asked.
+Each question keeps its id, text, blocking flag, and the time it was asked.
 It prints `parked <task-id> on <branch> for the captain's answer to <question-ids>`.
 A question the attention queue owns for the decider shows as `the decider's answer to <question-ids>` instead, after an `and` when you answer the others.
 Each later beat prints `waits <task-id>: parked on <branch> for the captain's answer to <question-ids>` and never starts it.
@@ -54,7 +54,7 @@ If the resumed run stops on new questions, the task parks again with those besid
 An answer given after the beat last read the waiting run is kept too.
 A task whose every blocking question has an answer can resume when its original machine and run are available.
 `orc backlog` shows a parked task as `parked (<question-ids>)`.
-`orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times, their blocking flag and their answers.
+`orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times, their blocking flag, their answers, and for a worker question its options and recommendation.
 Older parked records have no `origin` field.
 
 ## A looping run
