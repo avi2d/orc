@@ -183,6 +183,11 @@ Set `instructions` to a Markdown file for the project's runs and chat.
 Use an absolute path or a path relative to `projects.json`.
 The file must exist and replaces a discovered APPEND_SYSTEM.md.
 
+Set `floor` to a priority from 0 to 4 to start only the project's tasks at that priority or a more urgent one.
+With `"floor": 1`, the beat starts P0 and P1 tasks and waits on P2, P3 and P4 tasks with the reason `P2 is under the floor P1 of the project orc`.
+A project without `floor` starts tasks of every priority.
+Orc refuses a floor that is not a whole number from 0 to 4.
+
 ### Upstream contributions
 
 Add `upstream` to a project to watch GitHub issue and PR URLs.

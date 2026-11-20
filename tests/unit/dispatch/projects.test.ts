@@ -105,10 +105,24 @@ describe("readProjects", () => {
       expect(await readProjectList(root, [{ ...projects[0], upstream: ["https://github.com/acme/orc/pull/7", again] }])).toBe("the project orc names the upstream URL " + again + " twice")
     })
   })
+  test("reads a priority floor from 0 to 4 onto the project", async () => {
+    await withBacklog(async (root) => {
+      expect(await readProjectList(root, [{ ...projects[0], floor: 0 }])).toEqual([{ ...projects[0], floor: 0 }])
+      expect(await readProjectList(root, [{ ...projects[0], floor: 4 }])).toEqual([{ ...projects[0], floor: 4 }])
+    })
+  })
+  test.each([5, -1, 1.5, "2", null])("refuses the floor %p instead of starting every task", async (floor) => {
+    await withBacklog(async (root) => {
+      expect(await readProjectList(root, [{ ...projects[0], floor }])).toBe(
+        "the project orc names the floor " + JSON.stringify(floor) + ", which is not a priority from 0 to 4"
+      )
+    })
+  })
   test("reads a project without the key unchanged, with no instructions or upstream field", async () => {
     await withBacklog(async (root) => {
       expect(await readProjectList(root, projects)).toEqual(projects)
       expect((await readProjectList(root, projects))[0]).not.toHaveProperty("upstream")
+      expect((await readProjectList(root, projects))[0]).not.toHaveProperty("floor")
     })
   })
 })
