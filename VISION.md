@@ -14,7 +14,7 @@ It owns the loop from backlog to dashboard: a task waits, a machine with room ru
 
 ## The captain decides
 
-- Orc opens the proposal and records the refusal, and only the captain merges, pushes or deletes, and that caution costs a click on every landing.
+- Orc pushes the task branch, opens the proposal and records the refusal, and only the captain merges, pushes to main or deletes, and that caution costs a click on every landing.
 
 ## Small units that each end in a check
 
@@ -22,7 +22,7 @@ It owns the loop from backlog to dashboard: a task waits, a machine with room ru
 
 ## Scope
 
-- Agent runtimes belong to Pi, no-mistakes and the model providers, and orc schedules their work without reimplementing them.
+- Orc owns its review and delivery, and agent runtimes belong to Pi and the model providers, which orc schedules without rebuilding them.
 - Machine setup belongs to the shell and the OS, and orc only asks a machine with room to take the next task.
 
 A change aligns when it shortens the path from saying what needs doing to seeing it done.
