@@ -37,7 +37,7 @@ export const installCommand = (configured: Command | undefined, version: string)
 }
 
 export const registryOf = (env: Readonly<Record<string, string | undefined>>): string =>
-  (env.npm_config_registry ?? env.NPM_CONFIG_REGISTRY ?? defaultRegistry).replace(/\/+$/, "")
+  (env.npm_config_registry ?? defaultRegistry).replace(/\/+$/, "")
 
 const readFailure = (url: string, cause: unknown): string =>
   cause instanceof Error && cause.name === "TimeoutError"

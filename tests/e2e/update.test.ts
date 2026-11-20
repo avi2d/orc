@@ -35,7 +35,7 @@ const runUpdate = async (home: string, registry: string): Promise<{ exitCode: nu
   const proc = Bun.spawn([process.execPath, binPath, "update", "--json"], {
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, ORC_HOME: home, npm_config_registry: registry, NPM_CONFIG_REGISTRY: undefined }
+    env: { ...process.env, ORC_HOME: home, npm_config_registry: registry }
   })
   const [stdout, stderr, exitCode] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
   return { exitCode, stdout, stderr }
