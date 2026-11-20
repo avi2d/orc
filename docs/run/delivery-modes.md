@@ -22,3 +22,5 @@ Once the PR opens, orc reads the GitHub check runs of the pushed head with `gh a
 The verdict is `passed` when every check run on that head is green, `failed` with the names of the red check runs, or `pending` while a check run is unfinished or none has reported on that head.
 A check run on another head never counts toward the verdict.
 A `failed` verdict ends the run failed, and a `pending` verdict ends the run waiting on CI without success, leaving the PR open.
+While the run waits, it records an open `ci-waiting` question and keeps its history row running, so the task parks with that question instead of closing failed or done.
+Answering the question resumes the run, which reads the verdict again for the same head.

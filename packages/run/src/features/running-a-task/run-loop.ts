@@ -263,7 +263,7 @@ const retryParkedFix = (run: HistoryRun, ops: SandboxOps, base: ImplementBase, r
     fixes.push(retried.fix)
     yield* checkpoints.fixDone(retried.fix)
     commits.push(...retried.commits)
-    return retried.paused === null ? null : { ...base, commits, completed: false, checksRounds: rounds, fixes, fixAttempts: fixes.length, endReason: retried.paused }
+    return retried.paused === null ? null : { ...base, commits, completed: false, waitingOnCi: false, checksRounds: rounds, fixes, fixAttempts: fixes.length, endReason: retried.paused }
   })
 
 const runChecksFixLoop = (
@@ -310,6 +310,7 @@ const runChecksFixLoop = (
           ...base,
           commits,
           completed: false,
+          waitingOnCi: false,
           checksRounds: rounds,
           fixes,
           fixAttempts: fixes.length,
@@ -323,7 +324,7 @@ const runChecksFixLoop = (
       yield* checkpoints.fixDone(fixed.fix)
       commits.push(...fixed.commits)
       if (fixed.paused !== null) {
-        return { ...base, commits, completed: false, checksRounds: rounds, fixes, fixAttempts: fixes.length, endReason: fixed.paused }
+        return { ...base, commits, completed: false, waitingOnCi: false, checksRounds: rounds, fixes, fixAttempts: fixes.length, endReason: fixed.paused }
       }
     }
     return yield* new OrcRunError({ message: "orc: the checks loop ended without a result" })
@@ -362,7 +363,7 @@ const runFullReport = (run: HistoryRun, ops: SandboxOps, resume: ResumePlan, tra
       noMistakes: null
     }
     if (!done.completed) {
-      return { ...base, commits: done.commits, completed: false, checksRounds: null, fixes: [], fixAttempts: 0, endReason: done.endReason }
+      return { ...base, commits: done.commits, completed: false, waitingOnCi: false, checksRounds: null, fixes: [], fixAttempts: 0, endReason: done.endReason }
     }
     const rounds: Array<ChecksRoundSummary> = [...plan.inheritedRounds]
     const fixes: Array<RecordedFixAttempt> = [...plan.inheritedFixes]

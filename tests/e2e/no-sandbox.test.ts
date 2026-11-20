@@ -176,6 +176,8 @@ describe("orc run --sandbox none", () => {
       const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none", "--delivery", "direct-PR"], repo, env)
       expect(result.exitCode).not.toBe(0)
       expect(result.stdout).toContain(directPrUrl)
+      expect(result.stdout).toContain("status: waiting on CI")
+      expect(result.stdout).toContain("pending, waiting on CI because no check run has reported on")
       const piCwd = (await readFile(join(fakeBin, "pi-cwd"), "utf8")).trim()
       expect(git(origin, ["log", "orc/test", "--format=%s"], env).split("\n")).toEqual(["add greeting", "task"])
       const ghCalls = (await readFile(join(fakeBin, "gh-calls"), "utf8")).split("\n").filter((line) => line !== "")

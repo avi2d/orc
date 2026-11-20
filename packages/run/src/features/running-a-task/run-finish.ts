@@ -1,11 +1,12 @@
 import { Effect, FileSystem } from "effect"
-import { driveNoMistakes, waitForAnswers, type AllowWord, type QuestionAnswer } from "../../entities/review-gate/index"
+import { driveNoMistakes, waitForAnswers, type AllowWord, type OpenQuestion, type QuestionAnswer } from "../../entities/review-gate/index"
 import { ciVerdictLine, type CiVerdict, type DirectPrRecord, openDirectPr, type PullRequestOpener, readCiVerdict } from "../../entities/pull-request/index"
 import { branchCommits, runGit } from "../../shared/process/index"
 import { OrcRunError } from "../../shared/lib/index"
 import type { LongSessionCounts, PiTokenUse } from "../../entities/agent/index"
 import { prBodyFileName, type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 import type { RunCheckpoints } from "./run-ops"
+import { recordOpenAsks } from "./history-write"
 
 export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
@@ -14,10 +15,13 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
     if (run.delivery.kind === "direct-PR") {
       const pr = yield* openPullRequest(run, run.delivery.opener, rounds, checkpoints)
       if (pr.status !== "opened") {
-        return { ...settled, completed: false, prLink: pr.prLink, endReason: checked + pr.result }
+        return { ...settled, completed: false, waitingOnCi: false, prLink: pr.prLink, endReason: checked + pr.result }
       }
       const ci = yield* ciVerdictOfHead(run, run.delivery.opener, pr.prLink)
-      return { ...settled, completed: ci.kind === "passed", prLink: pr.prLink, endReason: checked + pr.result + " " + ciVerdictLine(ci) }
+      if (ci.kind === "pending") {
+        yield* recordOpenAsks(checkpoints.questionAsked, run.asks, { name: "pr", attempt: 1 }, [ciWaitingQuestion(ci, pr.prLink)])
+      }
+      return { ...settled, completed: ci.kind === "passed", waitingOnCi: ci.kind === "pending", prLink: pr.prLink, endReason: checked + pr.result + " " + ciVerdictLine(ci) }
     }
     yield* checkpoints.noMistakesStart(new Date().toISOString())
     const waitSeconds = run.answerWaitSeconds ?? 0
@@ -26,8 +30,13 @@ export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: strin
       Effect.provideService(FileSystem.FileSystem, run.fs)
     )
     yield* checkpoints.noMistakesDone(noMistakes)
-    return { ...settled, completed: noMistakes.status === "passed", prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
+    return { ...settled, completed: noMistakes.status === "passed", waitingOnCi: false, prLink: noMistakes.prLink, noMistakes, endReason: checked + noMistakes.result }
   })
+
+const ciWaitingQuestion = (ci: Extract<CiVerdict, { readonly kind: "pending" }>, prLink: string): OpenQuestion => ({
+  id: "ci-waiting",
+  text: "GitHub CI has not finished on " + ci.headSha + " for " + prLink + ": " + ci.reason + ". The PR stays open while the run waits on CI."
+})
 
 const ciVerdictOfHead = (run: HistoryRun, opener: PullRequestOpener, prLink: string): Effect.Effect<CiVerdict> =>
   Effect.gen(function*() {

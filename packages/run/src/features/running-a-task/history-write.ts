@@ -163,10 +163,16 @@ export const recordResumePublish = (db: Database, run: HistoryRun, resume: Resum
     catch: (cause) => historyFailure("publish the resumed run in", cause)
   })
 
-export const finishRun = (db: Database, runId: string, report: OrcRunReport, ended: string): Effect.Effect<void, OrcRunError> =>
-  updateRun(db, runId, { status: report.completed ? "succeeded" : "failed", ended, prLink: report.prLink, endReason: report.endReason }).pipe(
+export const finishRun = (db: Database, runId: string, report: OrcRunReport, ended: string): Effect.Effect<void, OrcRunError> => {
+  if (report.waitingOnCi) {
+    return updateRun(db, runId, { status: "running", ended, prLink: report.prLink, endReason: report.endReason }).pipe(
+      Effect.mapError((cause) => historyFailure("record the waiting run in", cause))
+    )
+  }
+  return updateRun(db, runId, { status: report.completed ? "succeeded" : "failed", ended, prLink: report.prLink, endReason: report.endReason }).pipe(
     Effect.mapError((cause) => historyFailure("record the run in", cause))
   )
+}
 
 export const recordImplementStart = (db: Database, run: HistoryRun, started: string, piSessionFile?: string | null): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {

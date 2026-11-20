@@ -67,4 +67,4 @@ export interface RunCheckpoints {
   readonly questionAsked: (step: AgentStep, question: OpenQuestion) => Effect.Effect<void, OrcRunError>
 }
 
-export type AgentStep = { readonly name: "implement"; readonly attempt: 1 } | { readonly name: "fix"; readonly attempt: number }
+export type AgentStep = { readonly name: "implement"; readonly attempt: 1 } | { readonly name: "fix"; readonly attempt: number } | { readonly name: "pr"; readonly attempt: 1 }
