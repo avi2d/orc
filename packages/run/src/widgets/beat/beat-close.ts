@@ -85,7 +85,19 @@ const endParked = (
         Effect.map((asking) => asking === null ? [] as ReadonlyArray<AskedQuestion> : [...asking.questions]),
         Effect.orElseSucceed(() => [] as ReadonlyArray<AskedQuestion>)
       ))
-    const open = Arr.appendAll(ending.questions, live.filter((question) => !ending.questions.some((known) => known.id === question.id)))
+    const liveById = new Map(live.map((question) => [question.id, question] as const))
+    const merged = Arr.map(ending.questions, (question) => {
+      const rich = liveById.get(question.id)
+      if (rich === undefined) {
+        return question
+      }
+      return {
+        ...question,
+        ...(rich.options !== undefined ? { options: rich.options } : {}),
+        ...(rich.recommendation !== undefined ? { recommendation: rich.recommendation } : {})
+      }
+    })
+    const open = Arr.appendAll(merged, live.filter((question) => !ending.questions.some((known) => known.id === question.id)))
     const parked = yield* parkStartedTask(root, id, branch, open, yield* nowIso, run).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
     return parked === null
       ? Option.none()

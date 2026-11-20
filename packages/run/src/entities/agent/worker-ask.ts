@@ -110,7 +110,9 @@ export const liveAskQuestions = (setup: AskSetup): ReadonlyArray<OpenQuestion> =
     id: ask.id,
     text: ask.text,
     asked: ask.askedAt,
-    blocks: ask.deadline !== null
+    blocks: ask.deadline !== null,
+    ...(ask.options === undefined ? {} : { options: [...ask.options] }),
+    ...(ask.recommendation === undefined ? {} : { recommendation: ask.recommendation })
   }))
 
 export interface WorkerAsks {
@@ -277,7 +279,14 @@ export const openWorkerAsks = (fs: FileSystem.FileSystem, setup: AskSetup): Work
   tick: Effect.andThen(serveAsks(fs, setup), relayCorrections(fs, setup)),
   timedOut: () => {
     const timedOut = setup.state.timedOut
-    return timedOut === null ? null : { id: timedOut.id, text: timedOut.text, asked: timedOut.askedAt }
+    return timedOut === null ? null : {
+      id: timedOut.id,
+      text: timedOut.text,
+      asked: timedOut.askedAt,
+      blocks: timedOut.deadline !== null,
+      ...(timedOut.options === undefined ? {} : { options: [...timedOut.options] }),
+      ...(timedOut.recommendation === undefined ? {} : { recommendation: timedOut.recommendation })
+    }
   }
 })
 
