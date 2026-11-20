@@ -7,7 +7,7 @@ import { isWorkerQuestion, loopQuestionId } from "../agent/index"
 export const deciderTimeoutMillis = 180 * 1000
 const deciderClaimMillis = deciderTimeoutMillis + 60 * 1000
 
-import { AttentionItem, type Asked, type Decision, type ItemAnswer } from "./attention-item"
+import { AttentionItem, type Asked, type AttentionOption, type Decision, type ItemAnswer } from "./attention-item"
 import { AskOption } from "../review-gate/index"
 
 export type { Asked }
@@ -47,6 +47,18 @@ const writeItem = (root: string, id: string, item: AttentionItem): Effect.Effect
 
 // The same parts always name one file, so routing an item again opens nothing new.
 export const itemId = (...parts: ReadonlyArray<string>): string => parts.map((part) => part.replace(/[^A-Za-z0-9_-]/g, "_")).join(".")
+
+type Choice = Pick<Asked, "subject" | "options" | "recommendation">
+
+// The recommended option comes first, so an item cannot recommend an option it does not list.
+export const choice = (subject: string, recommended: AttentionOption, ...others: ReadonlyArray<AttentionOption>): Choice =>
+  ({ subject, options: [recommended, ...others], recommendation: recommended.text })
+
+const choiceOf = (asked: Asked): Choice => ({
+  ...(asked.subject === undefined ? {} : { subject: asked.subject }),
+  ...(asked.options === undefined ? {} : { options: asked.options }),
+  ...(asked.recommendation === undefined ? {} : { recommendation: asked.recommendation })
+})
 
 export const reviewQuestionId = (task: string, question: string, asked: string): string => itemId(task, question, asked)
 
@@ -227,7 +239,12 @@ const overdueWait = (task: TaskRecord, at: string): { readonly id: string; reado
   const generation = hold.history?.length ?? 0
   const id = generation === 0 ? itemId(task.spec.id, "overdue-wait", hold.until) : itemId(task.spec.id, "overdue-wait", hold.until, String(generation))
   const text = "held for the captain: " + hold.reason + ", until " + hold.until + " passed"
-  const asked: Asked | null = Date.parse(at) >= passed ? { kind: "overdue-wait", task: task.spec.id, text, asked: new Date(passed).toISOString(), owner: "user" } : null
+  const options = choice(
+    "the hold on " + task.spec.id + ": " + hold.reason,
+    { text: "answer", outcome: "orc backlog answer " + task.spec.id + " <words> answers the hold, and the task can start" },
+    { text: "drop", outcome: "orc backlog drop " + task.spec.id + " <reason> drops the task, and it never starts" }
+  )
+  const asked: Asked | null = Date.parse(at) >= passed ? { kind: "overdue-wait", task: task.spec.id, text, ...options, asked: new Date(passed).toISOString(), owner: "user" } : null
   return { id, asked, answer: hold.answer }
 }
 
@@ -239,7 +256,7 @@ const openOrReopenTaskItem = (root: string, id: string, asked: Asked): Effect.Ef
     }
     const existing = yield* readExistingItem(root, id)
     if (existing !== null && existing.item.state.kind === "withdrawn") {
-      yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...existing.item, text: asked.text, state: { kind: "open" } }))
+      yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...existing.item, text: asked.text, ...choiceOf(asked), state: { kind: "open" } }))
     }
   })
 
@@ -347,7 +364,18 @@ export const routeTaskItems = (root: string, tasks: ReadonlyArray<TaskRecord>, a
 export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.forEach(actions, (action) =>
     (action.kind === "closed" && action.outcome === "failed") || action.kind === "start-failed"
-      ? Effect.asVoid(openItem(root, itemId(action.task, "run-died"), { kind: "run-died", task: action.task, text: "the run on " + action.machine + " died: " + action.reason, asked: at, owner: "user" }))
+      ? Effect.asVoid(openItem(root, itemId(action.task, "run-died"), {
+        kind: "run-died",
+        task: action.task,
+        text: "the run on " + action.machine + " died: " + action.reason,
+        ...choice(
+          "the run of " + action.task + " on " + action.machine,
+          { text: "rerun", outcome: "orc backlog add queues the task again, and the next beat starts a new run" },
+          { text: "close", outcome: "the task stays closed failed, and no run starts" }
+        ),
+        asked: at,
+        owner: "user"
+      }))
       : Effect.void, { discard: true })
 
 const openOrReopenPrItem = (root: string, id: string, asked: Asked): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
@@ -381,9 +409,31 @@ export const routePullRequest = (root: string, task: string, pr: string, view: P
       return
     }
     if (red.length > 0) {
-      yield* openOrReopenPrItem(root, itemId(task, "check-red", view.headRefOid), { kind: "check-red", task, text: pr + ": the check " + red.join(", ") + " is red", asked: at, owner: "user" })
+      yield* openOrReopenPrItem(root, itemId(task, "check-red", view.headRefOid), {
+        kind: "check-red",
+        task,
+        text: pr + ": the check " + red.join(", ") + " is red",
+        ...choice(
+          "the PR " + pr + " of " + task,
+          { text: "send back", outcome: "orc backlog send-back " + task + " <words> sends the PR back for another pass on the red check" },
+          { text: "close", outcome: "the PR stays open with the red check, and nothing merges" }
+        ),
+        asked: at,
+        owner: "user"
+      })
     } else if (refusals.length === 0) {
-      yield* openOrReopenPrItem(root, itemId(task, "pr-ready", view.headRefOid), { kind: "pr-ready", task, text: pr + " is ready to merge, checks green: " + greenChecks(view).join(", "), asked: at, owner: "user" })
+      yield* openOrReopenPrItem(root, itemId(task, "pr-ready", view.headRefOid), {
+        kind: "pr-ready",
+        task,
+        text: pr + " is ready to merge, checks green: " + greenChecks(view).join(", "),
+        ...choice(
+          "the PR " + pr + " of " + task,
+          { text: "merge", outcome: "orc merge " + task + " merges the PR into main, and the item closes with the answer merged" },
+          { text: "hold", outcome: "the PR stays open and unmerged, and the item stays open" }
+        ),
+        asked: at,
+        owner: "user"
+      })
     }
   })
 
