@@ -80,8 +80,9 @@ Options:
   --fixer-model <model>     The fixer model, used instead of the one config.json
                             names.
   --instructions <path>     A project instructions file handed to Pi.
-  --allow ask-user          Decline every ask-user finding of the review and
-                            accept the rest, on a resume.
+  --allow ask-user          Decline findings marked exactly ask-user, on a
+                            resume. Findings with any other action still wait as
+                            questions.
   --answer <id>=<text>      Answer a review question or an ask-user finding by
                             its id, on a resume. Give it once per answer.
 
