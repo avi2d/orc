@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process"
+import { readFileSync } from "node:fs"
 import { Data, Effect, FileSystem, Predicate } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { type TaskFileError, type TaskFolder, taskFolders } from "./task-record"
@@ -111,10 +112,33 @@ const grabbedFile = (
   read: fs.readFileString(grabbed).pipe(Effect.mapError(platformFailure("read " + grabbed)))
 })
 
-const processStart = (pid: number): string | null => {
+const procStarttime = (pid: number): string | null => {
+  try {
+    const stat = readFileSync("/proc/" + pid + "/stat", "utf8")
+    const end = stat.lastIndexOf(")")
+    if (end === -1) return null
+    const starttime = stat.slice(end + 2).split(" ")[19]
+    return starttime === undefined || starttime === "" ? null : starttime
+  } catch {
+    return null
+  }
+}
+
+const psStart = (pid: number): string | null => {
   const result = spawnSync("ps", ["-o", "lstart=", "-p", String(pid)], { encoding: "utf8", env: { ...process.env, LC_ALL: "C", TZ: "UTC" } })
   const start = result.status === 0 ? result.stdout.trim() : ""
   return start === "" ? null : Buffer.from(start).toString("hex")
+}
+
+const processStart = (pid: number): string | null => {
+  const ticks = procStarttime(pid)
+  if (ticks !== null) return ticks
+  try {
+    readFileSync("/proc/self/stat", "utf8")
+    return null
+  } catch {
+    return psStart(pid)
+  }
 }
 
 const grabName = (folder: string, id: string, start: string): string => folder + "/." + id + ".grab-" + process.pid + "-" + start + "-" + crypto.randomUUID() + ".tmp"
