@@ -129,6 +129,9 @@ export const placeTask = (
   if (project === undefined) {
     return { kind: "waits", reason: "the project " + task.spec.project + " is not in the project list" }
   }
+  if (project.floor !== undefined && task.spec.priority !== null && task.spec.priority > project.floor) {
+    return { kind: "waits", reason: "P" + task.spec.priority + " is under the floor P" + project.floor + " of the project " + project.name }
+  }
   const originWait = parkedOriginWait(task)
   if (originWait !== null) {
     return { kind: "waits", reason: originWait }
