@@ -2,7 +2,9 @@ import { isTaskId } from "../entities/backlog/index"
 import type { SendBack } from "../features/queueing-a-task/index"
 import type { DispatchArgs } from "./dispatch-args-runner"
 
-type AnswerOptions = { readonly expect: "held" | "parked" | undefined; readonly generation: string | undefined; readonly cursor: ReadonlyArray<string> }
+type FlagValues = { readonly expect: "held" | "parked" | undefined; readonly generation: string | undefined }
+
+type AnswerOptions = FlagValues & { readonly cursor: ReadonlyArray<string> }
 
 const checkExpectFlag = (value: string): { readonly expect: "held" | "parked" } | { readonly detail: string } =>
   value === "held" || value === "parked" ? { expect: value } : { detail: "orc backlog answer takes held or parked after --expect, got \"" + value + "\"" }
@@ -10,29 +12,24 @@ const checkExpectFlag = (value: string): { readonly expect: "held" | "parked" } 
 const checkGenerationFlag = (value: string): { readonly generation: string } | { readonly detail: string } =>
   /^\d+$/.test(value) ? { generation: value } : { detail: "orc backlog answer takes a hold generation after --generation, got \"" + value + "\"" }
 
+const takeFlag = (flag: string, value: string, taken: FlagValues): FlagValues | { readonly detail: string } => {
+  const checked = flag === "--expect" ? checkExpectFlag(value) : checkGenerationFlag(value)
+  return "detail" in checked ? checked : { ...taken, ...checked }
+}
+
 const takeAnswerOptions = (after: ReadonlyArray<string>): AnswerOptions | { readonly detail: string } => {
-  let expect: "held" | "parked" | undefined
-  let generation: string | undefined
+  let taken: FlagValues = { expect: undefined, generation: undefined }
   let cursor = after
   while (cursor[0] === "--expect" || cursor[0] === "--generation") {
-    const flag = cursor[0]
     const value = cursor.at(1)
     if (value === undefined) {
       return { detail: "orc backlog answer takes a decision kind after --expect and a hold generation after --generation" }
     }
-    if (flag === "--expect") {
-      const checked = checkExpectFlag(value)
-      if ("detail" in checked) {
-        return checked
-      }
-      expect = checked.expect
-    } else {
-      const checked = checkGenerationFlag(value)
-      if ("detail" in checked) {
-        return checked
-      }
-      generation = checked.generation
+    const next = takeFlag(cursor[0], value, taken)
+    if ("detail" in next) {
+      return next
     }
+    taken = next
     cursor = cursor.slice(2)
   }
   const end = cursor.indexOf("--")
@@ -41,7 +38,7 @@ const takeAnswerOptions = (after: ReadonlyArray<string>): AnswerOptions | { read
   if (flag !== undefined) {
     return { detail: "orc backlog answer takes no flag " + flag + " among the words, so put -- before words that start with a dash" }
   }
-  return { expect, generation, cursor: end === -1 ? cursor : [...before, ...cursor.slice(end + 1)] }
+  return { ...taken, cursor: end === -1 ? cursor : [...before, ...cursor.slice(end + 1)] }
 }
 
 const finishAnswer = (id: string, options: AnswerOptions): DispatchArgs => {

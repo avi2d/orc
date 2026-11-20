@@ -274,7 +274,7 @@ describe("parseArgs run flags", () => {
     expect(parseArgs(["backlog", "answer", "task-1", "--expect", "held", "--generation", "2", "yes", "--help"])).toMatchObject({ kind: "PrintHelp" })
   })
   test("answer rejects an unknown flag instead of recording it as answer words", () => {
-    const refusal = { kind: "UsageError", detail: "orc backlog answer takes no flag --force among the words, so put -- before words that start with a dash" }
+    const refusal = { kind: "UsageError", detail: "orc backlog answer takes no flag --force among the words, so put -- before words that start with a dash" } as const
     expect(parseArgs(["backlog", "answer", "task-1", "--force"])).toEqual(refusal)
     expect(parseArgs(["backlog", "answer", "task-1", "yes", "--force"])).toEqual(refusal)
     expect(parseArgs(["backlog", "answer", "task-1", "--expect", "parked", "--force", "question-1=yes"])).toEqual(refusal)
