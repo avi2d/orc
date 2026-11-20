@@ -50,7 +50,7 @@ An option with a picture shows as a tile, and any other option shows as a button
 To answer a question or a hold:
 
 1. Click an option, or type into the answer box and press Enter or **Send**.
-1. The Inbox runs `orc backlog answer <task> <id>=<answer>`, as the Board task panel does, and drops the item once the answer is recorded.
+1. The Inbox runs `orc backlog answer <task> <id>=<answer>` for a question and `orc backlog answer <task> <answer>` for a hold, as the Board task panel does, and drops the item once the answer is recorded.
 
 To merge a PR that waits:
 
