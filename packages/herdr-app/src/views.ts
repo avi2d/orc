@@ -1,4 +1,4 @@
-import type { AsyncContext } from "gpui-kit"
+import type { AsyncContext, Context } from "gpui-kit"
 import { layout } from "herdr"
 
 export const viewsStack = "orc-views"
@@ -16,13 +16,14 @@ export const openAsk = (value: unknown): OpenAsk | null =>
 export const views = [
   { id: "orc-board", label: "Board", key: "⌘1" },
   { id: "orc-resources", label: "Resources", key: "⌘2" },
-  { id: "orc-agents", label: "Agents", key: "⌘3" }
+  { id: "orc-agents", label: "Agents", key: "⌘3" },
+  { id: "orc-inbox", label: "Inbox", key: "⌘4" }
 ] as const
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
-interface ShownRefresh<T> {
+export interface ShownRefresh<T> {
   visible: boolean
   lastRead: number
   busy: boolean
@@ -60,6 +61,23 @@ export const refreshWhenShown = <T>(view: string, everyMs: number, cx: AsyncCont
     host.visible = true
     refresh(cx)
   }
+}
+
+export const reloadNow = <T>(cx: Context, host: ShownRefresh<T>): void => {
+  if (host.busy) {
+    host.stale = true
+    return
+  }
+  host.busy = true
+  cx.spawn((task) => host.load().then((reading) => {
+    host.reading = reading
+    host.busy = false
+    if (host.stale === true) {
+      host.stale = false
+      reloadNow(task, host)
+    }
+    task.notify()
+  }))
 }
 
 export const activeChild = (node: unknown, stack: string): string | null => {

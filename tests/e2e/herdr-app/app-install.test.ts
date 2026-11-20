@@ -15,15 +15,16 @@ test("does not refuse a fresh checkout that has the sources but no build", async
     await writeFile(join(home, "keys.json"), "{}")
     const ready = await Effect.runPromise(readyBundledApp(herdrAppSourceDir(), bundled).pipe(Effect.provide(BunServices.layer)))
     const result = await Effect.runPromise(installApp(ready, home).pipe(Effect.provide(BunServices.layer)))
-    expect(result.mods).toEqual(["orc-agents", "orc-board", "orc-changes", "orc-drawer", "orc-resources", "orc-tabs", "orc-task"])
+    expect(result.mods).toEqual(["orc-agents", "orc-board", "orc-changes", "orc-drawer", "orc-inbox", "orc-resources", "orc-tabs", "orc-task"])
     expect(result.layouts).toEqual(["orc.json", "orc.svg"])
     expect(result.added).toEqual([
       { section: "layout:orc", key: "cmd-1" },
       { section: "layout:orc", key: "cmd-2" },
       { section: "layout:orc", key: "cmd-3" },
+      { section: "layout:orc", key: "cmd-4" },
       { section: "layout:orc", key: "cmd-k" }
     ])
-    expect((await readdir(join(home, "mods"))).sort()).toEqual(["orc-agents", "orc-board", "orc-changes", "orc-drawer", "orc-resources", "orc-tabs", "orc-task"])
+    expect((await readdir(join(home, "mods"))).sort()).toEqual(["orc-agents", "orc-board", "orc-changes", "orc-drawer", "orc-inbox", "orc-resources", "orc-tabs", "orc-task"])
     expect((await readdir(join(home, "layouts"))).sort()).toEqual(["orc.json", "orc.svg"])
     const keys: unknown = JSON.parse(await readFile(join(home, "keys.json"), "utf8"))
     expect(keys).toEqual({
@@ -31,6 +32,7 @@ test("does not refuse a fresh checkout that has the sources but no build", async
         "cmd-1": { command: "layout.select", args: { stack: "orc-views", child: "orc-board" } },
         "cmd-2": { command: "layout.select", args: { stack: "orc-views", child: "orc-resources" } },
         "cmd-3": { command: "layout.select", args: { stack: "orc-views", child: "orc-agents" } },
+        "cmd-4": { command: "layout.select", args: { stack: "orc-views", child: "orc-inbox" } },
         "cmd-k": "orc-drawer.toggle"
       }
     })

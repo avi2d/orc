@@ -39,6 +39,29 @@ test("keeps a ⌘K the person already bound instead of the chat drawer's", async
   }
 })
 
+test("binds cmd-4 to the Inbox instead of leaving it without a key", async () => {
+  const root = await mkdtemp(join(tmpdir(), "orc-app-test-"))
+  try {
+    const source = join(root, "source")
+    const home = join(root, "home")
+    await mkdir(join(source, "mods", "orc-inbox"), { recursive: true })
+    await mkdir(join(source, "layouts"), { recursive: true })
+    await mkdir(home, { recursive: true })
+    await writeFile(join(source, "mods", "orc-inbox", "main.js"), "orc")
+    await writeFile(join(source, "layouts", "orc.json"), "{}")
+    await copyFile(join(import.meta.dir, "../../../packages/herdr-app/keys.json"), join(source, "keys.json"))
+    await writeFile(join(home, "keys.json"), "{}")
+    const install = await Effect.runPromise(installApp(source, home).pipe(Effect.provide(BunServices.layer)))
+    const installed: unknown = JSON.parse(await readFile(join(home, "keys.json"), "utf8"))
+    const section: unknown = isRecord(installed) ? installed["layout:orc"] : undefined
+    expect(isRecord(section) ? section["cmd-4"] : undefined).toEqual({ command: "layout.select", args: { stack: "orc-views", child: "orc-inbox" } })
+    expect(install.added).toContainEqual({ section: "layout:orc", key: "cmd-4" })
+    expect(install.mods).toEqual(["orc-inbox"])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test("installs only orc names without touching personal files", async () => {
   const root = await mkdtemp(join(tmpdir(), "orc-app-test-"))
   try {

@@ -30,6 +30,8 @@ const expectedFiles = [
   "dist/herdr-app/mods/orc-changes/mod.json",
   "dist/herdr-app/mods/orc-drawer/main.js",
   "dist/herdr-app/mods/orc-drawer/mod.json",
+  "dist/herdr-app/mods/orc-inbox/main.js",
+  "dist/herdr-app/mods/orc-inbox/mod.json",
   "dist/herdr-app/mods/orc-resources/main.js",
   "dist/herdr-app/mods/orc-resources/mod.json",
   "dist/herdr-app/mods/orc-tabs/main.js",
