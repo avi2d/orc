@@ -34,10 +34,15 @@ The backlog and the beat:
 The runner:
   runner     Queue, renew, read and stop task runs through pueue
   heavy      Check and watch the queue of heavy tool calls
+  version    Print the orc version this machine runs
+  machines   List the orc version each dispatch machine runs
 
 Chat and the app:
   chat       Talk to the orchestrator, which adds, holds and answers tasks
   app        Install the orc mods and layout into the Herdr App
+
+Updating orc:
+  update     Install the newest published orc when it is newer than this one
 
 Run orc <command> --help to learn what a command does and the options it takes.
 ```
@@ -78,8 +83,9 @@ Options:
   --fixer-model <model>     The fixer model, used instead of the one config.json
                             names.
   --instructions <path>     A project instructions file handed to Pi.
-  --allow ask-user          Decline every ask-user finding of the review and
-                            accept the rest, on a resume.
+  --allow ask-user          Decline findings marked exactly ask-user, on a
+                            resume. Findings with any other action still wait as
+                            questions.
   --answer <id>=<text>      Answer a review question or an ask-user finding by
                             its id, on a resume. Give it once per answer.
 
@@ -753,6 +759,38 @@ Examples:
   orc heavy watch-once
 ```
 
+### orc version
+
+```text
+Usage: orc version --json [--local]
+
+Prints the version of the orc package installed on this machine.
+
+Options:
+  --json   Print the version as an orc.version.v1 JSON document.
+  --local  Accepted with --json. orc machines passes it.
+
+Examples:
+  orc version --json
+```
+
+### orc machines
+
+```text
+Usage: orc machines --json
+
+Reads the machines in dispatch.json. A machine that starts orc runner start here
+shows this orc's version. A machine reached through orc runner start --
+<command> is asked through that command with orc version --json --local, and
+shows its error when it does not answer within 10 seconds.
+
+Options:
+  --json  Print the machines as an orc.machines.v1 JSON document.
+
+Examples:
+  orc machines --json
+```
+
 ## Chat and the app
 
 ### orc chat
@@ -802,4 +840,24 @@ upgrade.
 
 Examples:
   orc app install
+```
+
+## Updating orc
+
+### orc update
+
+```text
+Usage: orc update [--json]
+
+Reads the newest version of @avi2dg/orc from the npm registry and installs it
+only when it is newer than the running orc. The install runs bun add -g
+@avi2dg/orc@<version>, or the update.command config.json names. A registry read
+that fails or takes more than 15 seconds leaves orc as it is.
+
+Options:
+  --json  Print the result as an orc.update.v1 JSON document.
+
+Examples:
+  orc update
+  orc update --json
 ```

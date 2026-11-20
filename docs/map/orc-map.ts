@@ -49,12 +49,12 @@ export const parts: readonly MapPart[] = [
 
   { id: "chat", inside: "you", title: "The chat", text: "Say the work. Answer questions.", page: "concepts/chat" },
   { id: "chat-say", inside: "chat", title: "You say", points: ["the work, in plain words", "an answer to a question", "to merge a pull request"] },
-  { id: "chat-model", inside: "chat", title: "The orchestrator model", text: "A Pi session with fourteen tools and no others. It can change the backlog and nothing else." },
+  { id: "chat-model", inside: "chat", title: "The orchestrator model", text: "A Pi session with sixteen tools and no others. It can change the backlog and nothing else." },
   {
     id: "chat-tools",
     inside: "chat",
-    title: "Fourteen tools, each an orc command",
-    points: ["four shape the backlog: add, edit, priority and hold", "six move a task along: stop, drop, send back, note, depend and thread", "three read it and answer its questions", "one merges a pull request"]
+    title: "Sixteen tools, each an orc command",
+    points: ["four shape the backlog: add, edit, priority and hold", "six move a task along: stop, drop, send back, note, depend and thread", "five read it and answer: backlog, backlog answer, attention, attention answer and board", "one merges a pull request"]
   },
   {
     id: "chat-posts",
@@ -167,7 +167,7 @@ export const parts: readonly MapPart[] = [
   { id: "chk-gate", inside: "checks", title: "The checks", text: "The commands the project names in .no-mistakes.yaml." },
   { id: "chk-fixer", inside: "checks", title: "A fixer", text: "A second Pi gets the failing output and repairs it. Then the checks run again." },
   { id: "chk-review", inside: "checks", title: "The review", text: "When configured, no-mistakes reads the branch with the task as its intent." },
-  { id: "chk-findings", inside: "checks", title: "What orc does with a finding", points: ["auto-fix: asks no-mistakes to fix it", "no-op: ignores it", "ask-user: a question that waits"] },
+  { id: "chk-findings", inside: "checks", title: "What orc does with a finding", points: ["auto-fix: asks no-mistakes to fix it", "no-op: ignores it", "ask-user or any other action: a question that waits", "gate-cap after 20 gates: a question that waits"] },
   { id: "chk-wait", inside: "checks", title: "A question waits at the gate", tone: "ask", text: "By default, for 30 minutes. With no answer the task parks on its branch, and resumes on an answer." },
   { id: "chk-deliver", inside: "checks", title: "Deliver", text: "A code change is pushed and gets a pull request. Report tasks follow a separate path." },
 
@@ -228,7 +228,7 @@ export const links: readonly MapLink[] = [
   { from: "chk-gate", to: "chk-review", label: "green", tone: "work" },
   { from: "chk-gate", to: "chk-deliver", label: "direct PR", tone: "work" },
   { from: "chk-review", to: "chk-findings", tone: "work" },
-  { from: "chk-findings", to: "chk-wait", label: "ask-user", tone: "ask" },
+  { from: "chk-findings", to: "chk-wait", label: "a question", tone: "ask" },
   { from: "chk-findings", to: "chk-deliver", tone: "work" },
   { from: "chk-wait", to: "att-question", label: "a question", tone: "ask" },
 
