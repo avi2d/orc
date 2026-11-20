@@ -16,7 +16,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/app/dispatch-args-heavy.ts` | The `orc heavy` verb parsing |
 | `packages/run/src/app/help.ts` | The help pages: the overview, the per-command help, the usage error text and the closest-command suggestion |
 | `packages/run/src/app/help-format.ts` | The help layout: wrapping to 80 columns, the usage block and the name and text tables |
-| `packages/run/src/app/help-entries-run.ts` | The help entries for `orc run`, the run history commands, `orc chat` and `orc app` |
+| `packages/run/src/app/help-entries-run.ts` | The help entries for `orc run`, the run history commands, `orc chat`, `orc app` and `orc login` |
 | `packages/run/src/app/help-entries-backlog.ts` | The help entries for `orc backlog` and its subcommands, `orc attention`, `orc beat` and `orc merge` |
 | `packages/run/src/app/help-entries-runner.ts` | The help entries for `orc runner` and `orc heavy` and their subcommands |
 
@@ -101,6 +101,12 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/features/installing-the-app/app-install.ts` | The `orc app install` copy of the built Herdr App mods, layout and keys merge |
+
+## features/signing-in
+
+| Path | What it holds |
+| --- | --- |
+| `packages/run/src/features/signing-in/sign-in.ts` | The `orc login` account set, the account folder and the vendor sign-in it runs there |
 
 ## features/merging-a-pr
 
