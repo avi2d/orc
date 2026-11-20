@@ -35,7 +35,13 @@ const takeAnswerOptions = (after: ReadonlyArray<string>): AnswerOptions | { read
     }
     cursor = cursor.slice(2)
   }
-  return { expect, generation, cursor }
+  const end = cursor.indexOf("--")
+  const before = end === -1 ? cursor : cursor.slice(0, end)
+  const flag = before.find((word) => word.length > 1 && word.startsWith("-"))
+  if (flag !== undefined) {
+    return { detail: "orc backlog answer takes no flag " + flag + " among the words, so put -- before words that start with a dash" }
+  }
+  return { expect, generation, cursor: end === -1 ? cursor : [...before, ...cursor.slice(end + 1)] }
 }
 
 const finishAnswer = (id: string, options: AnswerOptions): DispatchArgs => {

@@ -270,12 +270,13 @@ const parseRunsArgs = (rest: readonly string[]): OrcArgs => {
 }
 const helpFlags = new Set(["--help", "-h"])
 const holdValueFlags = new Set(["--reason", "--until"])
+const answerValueFlags = new Set(["--expect", "--generation"])
 const scanWords = (rest: readonly string[]): readonly string[] => {
   if (rest[0] === "hold") {
     return rest.filter((_word, index) => index < 1 || !holdValueFlags.has(rest[index - 1] ?? ""))
   }
   if (rest[0] === "answer") {
-    return rest.slice(0, 2)
+    return rest.filter((_word, index) => index < 2 || !answerValueFlags.has(rest[index - 1] ?? ""))
   }
   return rest
 }

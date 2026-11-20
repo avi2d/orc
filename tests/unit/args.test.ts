@@ -268,15 +268,21 @@ describe("parseArgs run flags", () => {
   test("run rejects a second token-file flag instead of keeping the last", () => {
     expect(parseArgs(["run", "task.md", "--token-file", "/a", "--token-file", "/b"])).toEqual({ kind: "UsageError", detail: "orc run takes --token-file once, with a path" })
   })
-  test("an answer of --help is recorded instead of printing usage", () => {
-    expect(parseArgs(["backlog", "answer", "task-1", "--help"])).toEqual({
-      kind: "Dispatch",
-      args: { kind: "AnswerTask", id: "task-1", words: "--help" }
-    })
-    expect(parseArgs(["backlog", "answer", "task-1", "-h"])).toEqual({
-      kind: "Dispatch",
-      args: { kind: "AnswerTask", id: "task-1", words: "-h" }
-    })
+  test("answer --help after a task id prints usage instead of recording --help as the answer", () => {
+    expect(parseArgs(["backlog", "answer", "task-1", "--help"])).toEqual({ kind: "PrintHelp", words: ["backlog", "answer", "task-1"] })
+    expect(parseArgs(["backlog", "answer", "task-1", "-h"])).toEqual({ kind: "PrintHelp", words: ["backlog", "answer", "task-1"] })
+    expect(parseArgs(["backlog", "answer", "task-1", "--expect", "held", "--generation", "2", "yes", "--help"])).toMatchObject({ kind: "PrintHelp" })
+  })
+  test("answer rejects an unknown flag instead of recording it as answer words", () => {
+    const refusal = { kind: "UsageError", detail: "orc backlog answer takes no flag --force among the words, so put -- before words that start with a dash" }
+    expect(parseArgs(["backlog", "answer", "task-1", "--force"])).toEqual(refusal)
+    expect(parseArgs(["backlog", "answer", "task-1", "yes", "--force"])).toEqual(refusal)
+    expect(parseArgs(["backlog", "answer", "task-1", "--expect", "parked", "--force", "question-1=yes"])).toEqual(refusal)
+  })
+  test("answer records words after -- word for word instead of reading them as flags", () => {
+    expect(parseArgs(["backlog", "answer", "task-1", "--", "--help"])).toEqual({ kind: "Dispatch", args: { kind: "AnswerTask", id: "task-1", words: "--help" } })
+    expect(parseArgs(["backlog", "answer", "task-1", "keep", "--", "-1", "retry"])).toEqual({ kind: "Dispatch", args: { kind: "AnswerTask", id: "task-1", words: "keep -1 retry" } })
+    expect(parseArgs(["backlog", "answer", "task-1", "ship", "-", "now"])).toEqual({ kind: "Dispatch", args: { kind: "AnswerTask", id: "task-1", words: "ship - now" } })
   })
   test("a hold reason of --help is recorded instead of printing usage", () => {
     expect(parseArgs(["backlog", "hold", "task-1", "--reason", "--help"])).toEqual({
