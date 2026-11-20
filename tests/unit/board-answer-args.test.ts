@@ -24,6 +24,12 @@ describe("board answer arguments", () => {
     )
   })
 
+  test("a reason answer that starts with a dash goes after -- instead of as a flag", async () => {
+    expect(answerArgs("orc-1", { kind: "reason" }, "-1 retry", { kind: "parked" })).toEqual(
+      ["backlog", "answer", "orc-1", "--expect", "parked", "--", "-1 retry"]
+    )
+  })
+
   test("an unguarded answer keeps the plain words", async () => {
     expect(answerArgs("orc-1", { kind: "question", id: "question-1" }, "gRPC")).toEqual(
       ["backlog", "answer", "orc-1", "question-1=gRPC"]

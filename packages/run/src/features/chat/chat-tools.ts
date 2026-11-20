@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect"
 import { isOpenHeld, type OpenHeld } from "./chat-backlog"
 import { type BoardHost, type Boards, boardsVar, decisionBoards } from "./chat-board"
+import { answerArgs } from "./chat-board-page"
 import type { Env } from "./chat-command"
 import { ChatToolError } from "./chat-error"
 import { type Deliver, postUnposted, type PostState, readBacklog } from "./chat-posts"
@@ -187,7 +188,7 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
     parameters: Schema.toJsonSchemaDocument(AnswerInput).schema,
     execute: (_toolCallId, params) =>
       runTool(AnswerInput, "orc_backlog_answer", params, env, (input) =>
-        ["backlog", "answer", input.id, input.question === undefined ? input.words : input.question + "=" + input.words])
+        answerArgs(input.id, input.question === undefined ? { kind: "reason" } : { kind: "question", id: input.question }, input.words))
   },
   ...attentionTools(env),
   {

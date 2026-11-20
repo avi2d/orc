@@ -82,12 +82,12 @@ export const backlogVerbHelp: Record<BacklogVerb, HelpEntry> = {
   answer: {
     usage: ["orc backlog answer <task-id> [--expect <held|parked>] [--generation <n>] <words|question-id=text>"],
     summary: "Answer a held, parked or decision task",
-    about: "Answers a held task, a parked run's question, a run waiting at its gate or a decision. Give question-id=text to answer one open question, or plain words to answer the hold. Answering a decision closes it done, and its question and answer go into the run of each task that depends on it.",
+    about: "Answers a held task, a parked run's question, a run waiting at its gate or a decision. Give question-id=text to answer one open question, or plain words to answer the hold. Answering a decision closes it done, and its question and answer go into the run of each task that depends on it. A word that starts with a dash is read as a flag, so put -- before words that start with one.",
     options: [
       { flag: "--expect <held|parked>", meaning: "Answer only when the task waits in this decision, so a stale answer is refused." },
       { flag: "--generation <n>", meaning: "The hold generation the answer is for. Needed with --expect held." }
     ],
-    examples: ["orc backlog answer orc-9 use the REST API", "orc backlog answer orc-9 question-1=REST"]
+    examples: ["orc backlog answer orc-9 use the REST API", "orc backlog answer orc-9 question-1=REST", "orc backlog answer orc-9 -- -1 retry is enough"]
   },
   "send-back": {
     usage: ["orc backlog send-back <task-id> <words>"],
