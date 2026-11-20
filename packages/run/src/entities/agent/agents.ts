@@ -5,7 +5,7 @@ export class AgentFileError extends Data.TaggedError("AgentFileError")<{
   readonly message: string
 }> {}
 
-export type AgentKind = "implementer" | "fixer"
+export type AgentKind = "implementer" | "fixer" | "reviewer"
 
 type AgentSource = "personal" | "project" | "bundled"
 

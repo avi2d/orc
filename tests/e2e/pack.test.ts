@@ -18,6 +18,7 @@ const expectedFiles = [
   "agents/decider-policy.md",
   "agents/fixer.md",
   "agents/implementer.md",
+  "agents/reviewer.md",
   "dist/herdr-app/keys.json",
   "dist/herdr-app/layouts/orc.json",
   "dist/herdr-app/layouts/orc.svg",
