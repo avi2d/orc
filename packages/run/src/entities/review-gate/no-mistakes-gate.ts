@@ -179,7 +179,7 @@ export const answerForGate = (
   }
   const worded = asked.filter((finding) => !answers.some((entry) => entry.question === finding.id))
   const rest = findings.filter((finding) => !isAskUser(finding))
-  const other = ownerFindingsIn(findings).find((finding) => !answers.some((entry) => entry.question === finding.id))
+  const other = rest.find((finding) => finding.action !== "auto-fix" && finding.action !== "no-op")
   if (other !== undefined) {
     return { kind: "refuse", reason: "finding " + other.id + " needs an answer orc cannot give" }
   }
