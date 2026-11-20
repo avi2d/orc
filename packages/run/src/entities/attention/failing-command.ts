@@ -1,7 +1,7 @@
 import { Effect, type FileSystem } from "effect"
 import type { BacklogError } from "../backlog/index"
 import { type FailingMark, failingText, pauseAfterFailures } from "../agent/index"
-import { itemId, openItem, openItems, withdrawItem } from "./attention"
+import { choice, itemId, openItem, openItems, withdrawItem } from "./attention"
 
 export interface FailingRead {
   readonly task: string
@@ -19,7 +19,18 @@ export const routeFailingCommands = (root: string, reads: ReadonlyArray<FailingR
       if (read.failing !== null) {
         const id = itemId(read.task, "failing-command", read.failing.since)
         live.add(id)
-        yield* openItem(root, id, { kind: "failing-command", task: read.task, text: failingCommandText(read.failing), asked: read.failing.since, owner: "user" })
+        yield* openItem(root, id, {
+          kind: "failing-command",
+          task: read.task,
+          text: failingCommandText(read.failing),
+          ...choice(
+            "the command " + read.failing.label + " in the run of " + read.task,
+            { text: "continue", outcome: "the run carries on, and orc pauses it to ask if the command fails " + pauseAfterFailures.toString() + " times in a row" },
+            { text: "stop", outcome: "orc backlog stop " + read.task + " kills the run and closes the task stopped" }
+          ),
+          asked: read.failing.since,
+          owner: "user"
+        })
       }
     }
     const readTasks = new Set(reads.map((read) => read.task))

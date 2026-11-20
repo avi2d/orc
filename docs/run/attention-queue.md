@@ -66,7 +66,19 @@ The beat opens an item for each run event, owned by the user:
   Merging the PR closes it with the answer `merged`.
   Closing the PR without merging closes it with the answer `closed without merging`.
 
-To answer one of these, run `orc attention answer <item-id> <words>`.
+## Recording a choice
+
+Each item the beat opens names its `subject` and lists its `options`, each with the `outcome` it leads to, and its `recommendation` names one of them:
+
+- A `run-died` item offers `rerun` or `close`, and recommends `rerun`.
+- A `check-red` item offers `send back` or `close`, and recommends `send back`.
+- A `pr-ready` item offers `merge` or `hold`, and recommends `merge`.
+- A `failing-command` item offers `continue` or `stop`, and recommends `continue`.
+- An `overdue-wait` item offers `answer` or `drop`, and recommends `answer`.
+
+To record a choice on a `run-died`, `check-red`, `pr-ready` or `failing-command` item, run `orc attention answer <item-id> <words>`.
+Run the command the outcome names to carry out the option.
+`orc attention answer` only records the choice and closes the item.
 It refuses a review question, a worker question or an overdue wait and names the task to answer with `orc backlog answer` instead.
 
 A held task whose `--until` date has passed opens an `overdue-wait` item, owned by the user and asked at the start of the next day on the machine local clock.
@@ -78,6 +90,7 @@ Each beat reads the queue before it starts a new task, and prints one `needs the
 Run `orc attention` to see open items in age order.
 The text view shows the decider's answers under `Decided:`.
 Run `orc attention --json` for an `orc.attention.v1` document with `at`, `items`, and `decided`.
+An open item in `items` carries its `subject`, `options` and `recommendation` when it has them.
 The output shape is in `packages/run/src/features/attention-list/attention-view.ts`.
 An answered item leaves `decided` when its task closes.
 

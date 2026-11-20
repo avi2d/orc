@@ -7,7 +7,8 @@ import { Effect, Layer } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { TestClock } from "effect/testing"
 import { parseDispatchArgs } from "../../../packages/run/src/app/dispatch-args"
-import { answerItem, openItem, openItems, openRunDeaths, routeTaskItems } from "../../../packages/run/src/entities/attention/attention"
+import { answerItem, openItem, openItems, routeTaskItems } from "../../../packages/run/src/entities/attention/attention"
+import { openRunDeaths } from "../../../packages/run/src/entities/attention/beat-items"
 import { addTask, claimTask, closeStartedTask, writeTaken, type TaskRecord } from "../../../packages/run/src/entities/backlog/index"
 import { runBeat } from "../../../packages/run/src/widgets/beat/beat"
 import { formatBeat } from "../../../packages/run/src/widgets/beat/board"
@@ -147,7 +148,7 @@ describe("overdue waits in the attention queue", () => {
         await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-01T23:59:00.000Z"))
         expect(await run(openItems(root))).toEqual([])
         await run(routeTaskItems(root, [heldTask("2026-12-01", null)], "2026-12-02T00:01:00.000Z"))
-        expect((await run(openItems(root))).map(({ item }) => item)).toEqual([{
+        expect((await run(openItems(root))).map(({ item }) => item)).toMatchObject([{
           kind: "overdue-wait", task: "orc-2", text: "held for the captain: REST or gRPC, until 2026-12-01 passed", asked: "2026-12-02T00:00:00.000Z", owner: "user", state: { kind: "open" }
         }])
       })
