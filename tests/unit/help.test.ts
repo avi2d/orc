@@ -66,9 +66,9 @@ const entryOf = (invocation: Invocation) => {
   return topic.entry
 }
 
-const parserFlags = ["--json", "--local", "--kind", "--delivery", "--branch", "--sandbox", "--token-file", "--provider", "--implementer-model", "--fixer-model", "--instructions", "--allow", "--answer", "--internal", "--machine", "--parent", "--depends-on", "--reason", "--until", "--question", "--expect", "--generation", "--on", "--clear", "--drop", "--basis", "--priority", "--label", "--stdin-label", "--force", "--dry-run", "--all", "--verbose", "--session"]
+const parserFlags = ["--json", "--local", "--kind", "--delivery", "--branch", "--sandbox", "--token-file", "--provider", "--implementer-model", "--fixer-model", "--implementer-thinking", "--fixer-thinking", "--instructions", "--allow", "--answer", "--internal", "--machine", "--parent", "--depends-on", "--reason", "--until", "--question", "--expect", "--generation", "--on", "--clear", "--drop", "--basis", "--priority", "--label", "--stdin-label", "--force", "--dry-run", "--all", "--verbose", "--session"]
 
-const values = ["", "x", "1", "orc-1", "q=1", "2026-12-01", "ship", "no-mistakes", "none", "ask-user", "parked", "yolo-green"]
+const values = ["", "x", "1", "orc-1", "q=1", "2026-12-01", "ship", "no-mistakes", "none", "ask-user", "parked", "yolo-green", "high"]
 
 const flagPlacements = (invocation: Invocation, probe: ReadonlyArray<string>): Array<Array<string>> => {
   const [first = "", ...rest] = invocation.positionals

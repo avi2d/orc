@@ -2,7 +2,7 @@ import { Console, Effect, FileSystem, Path, type Scope } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { Database } from "bun:sqlite"
 import { homedir } from "node:os"
-import { resolveAgentFile, type AgentFile, type PiThinkingLevel } from "../../entities/agent/index"
+import { resolveAgentFile, type AgentFile, type AgentKind, type PiThinkingLevel } from "../../entities/agent/index"
 import { answerWaitFromEnv } from "../../entities/review-gate/index"
 import { hostGitShim } from "../../shared/sandbox/index"
 import type { SandboxKind } from "../../shared/sandbox/index"
@@ -126,20 +126,11 @@ const prepareAgents = (
     )
     const folders = yield* prepareRunFolders(fs, path, runDir, effectiveTaskFile, instructionsFile)
     const configured = configuredModels(config, { implementer: pins.implementerModel, fixer: pins.fixerModel })
-    const agent: AgentFile = yield* resolveAgentFile("implementer", {
-      projectDir: checkout.projectDir,
-      orcHome: home,
-      agentsDir,
-      configModel: { file: config.file, model: configured.implementer },
-      thinking: pins.implementerThinking
-    }).pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
-    const fixer: AgentFile = yield* resolveAgentFile("fixer", {
-      projectDir: checkout.projectDir,
-      orcHome: home,
-      agentsDir,
-      configModel: { file: config.file, model: configured.fixer },
-      thinking: pins.fixerThinking
-    }).pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
+    const resolveRole = (kind: AgentKind, model: string | undefined, thinking: PiThinkingLevel | undefined) =>
+      resolveAgentFile(kind, { projectDir: checkout.projectDir, orcHome: home, agentsDir, configModel: { file: config.file, model }, thinking })
+        .pipe(Effect.mapError((cause) => new OrcRunError({ message: cause.message })))
+    const agent: AgentFile = yield* resolveRole("implementer", configured.implementer, pins.implementerThinking)
+    const fixer: AgentFile = yield* resolveRole("fixer", configured.fixer, pins.fixerThinking)
     const piBinary = Bun.which("pi")
     const nodeBinary = Bun.which("node")
     const models = { agent: agent.model, fixer: fixer.model }

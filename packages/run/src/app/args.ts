@@ -170,53 +170,67 @@ const takeDelivery = (rest: readonly string[], index: number, flags: RunFlags): 
   flags.delivery = word
   return { kind: "taken" }
 }
-const takeValueFlag = (rest: readonly string[], index: number, flags: RunFlags): FlagTake => {
-  const named = stringFlags.find((entry) => entry.flag === rest[index])
-  if (named !== undefined) {
-    const value = takeFlagValue(rest, index, flags[named.key])
-    if (value === null) {
-      return { kind: "error", detail: named.detail }
-    }
-    flags[named.key] = value
-    return { kind: "taken" }
+const takeStringFlag = (rest: readonly string[], index: number, flags: RunFlags, named: (typeof stringFlags)[number]): FlagTake => {
+  const value = takeFlagValue(rest, index, flags[named.key])
+  if (value === null) {
+    return { kind: "error", detail: named.detail }
   }
-  const thinking = thinkingFlags.find((entry) => entry.flag === rest[index])
-  if (thinking !== undefined) {
-    const level = takeFlagValue(rest, index, flags[thinking.key])
-    if (level === null || !isThinkingLevel(level)) {
-      return { kind: "error", detail: "orc run takes " + thinking.flag + " once, with " + piThinkingLevels.join(", ") }
-    }
-    flags[thinking.key] = level
-    return { kind: "taken" }
+  flags[named.key] = value
+  return { kind: "taken" }
+}
+const takeThinkingFlag = (rest: readonly string[], index: number, flags: RunFlags, thinking: (typeof thinkingFlags)[number]): FlagTake => {
+  const level = takeFlagValue(rest, index, flags[thinking.key])
+  if (level === null || !isThinkingLevel(level)) {
+    return { kind: "error", detail: "orc run takes " + thinking.flag + " once, with " + piThinkingLevels.join(", ") }
   }
-  if (rest[index] === "--kind") {
-    return takeTaskKind(rest, index, flags)
+  flags[thinking.key] = level
+  return { kind: "taken" }
+}
+const takeSandbox = (rest: readonly string[], index: number, flags: RunFlags): FlagTake => {
+  const kind = takeSandboxKind(rest, index, flags.sandbox)
+  if (kind === null) {
+    return { kind: "error", detail: "orc run takes --sandbox once, with " + sandboxKinds.join(" or ") }
   }
-  if (rest[index] === "--delivery") {
-    return takeDelivery(rest, index, flags)
+  flags.sandbox = kind
+  return { kind: "taken" }
+}
+const takeAllow = (rest: readonly string[], index: number, flags: RunFlags): FlagTake => {
+  const taken = takeAllowWord(rest, index)
+  if (taken.kind === "error") {
+    return taken
   }
-  if (rest[index] === "--sandbox") {
-    const kind = takeSandboxKind(rest, index, flags.sandbox)
-    if (kind === null) {
-      return { kind: "error", detail: "orc run takes --sandbox once, with " + sandboxKinds.join(" or ") }
-    }
-    flags.sandbox = kind
-    return { kind: "taken" }
-  }
-  if (rest[index] === "--allow") {
-    const taken = takeAllowWord(rest, index)
-    if (taken.kind === "error") {
-      return taken
-    }
-    flags.allow.push(taken.word)
-    return { kind: "taken" }
-  }
+  flags.allow.push(taken.word)
+  return { kind: "taken" }
+}
+const takeAnswer = (rest: readonly string[], index: number, flags: RunFlags): FlagTake => {
   const taken = takeAnswerValue(rest, index, flags.seen)
   if (taken.kind === "error") {
     return taken
   }
   flags.answers.push(taken.value)
   return { kind: "taken" }
+}
+const takeValueFlag = (rest: readonly string[], index: number, flags: RunFlags): FlagTake => {
+  const named = stringFlags.find((entry) => entry.flag === rest[index])
+  if (named !== undefined) {
+    return takeStringFlag(rest, index, flags, named)
+  }
+  const thinking = thinkingFlags.find((entry) => entry.flag === rest[index])
+  if (thinking !== undefined) {
+    return takeThinkingFlag(rest, index, flags, thinking)
+  }
+  switch (rest[index]) {
+    case "--kind":
+      return takeTaskKind(rest, index, flags)
+    case "--delivery":
+      return takeDelivery(rest, index, flags)
+    case "--sandbox":
+      return takeSandbox(rest, index, flags)
+    case "--allow":
+      return takeAllow(rest, index, flags)
+    default:
+      return takeAnswer(rest, index, flags)
+  }
 }
 const splitRunArgs = (rest: readonly string[]): RunSplit => {
   const flags: RunFlags = { taskKind: undefined, delivery: undefined, branch: undefined, sandbox: undefined, tokenFile: undefined, provider: undefined, implementerModel: undefined, fixerModel: undefined, implementerThinking: undefined, fixerThinking: undefined, instructions: undefined, allow: [], answers: [], seen: new Set() }
