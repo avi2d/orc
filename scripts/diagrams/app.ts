@@ -12,7 +12,7 @@ const snapshot: Part = { title: "`orc-dash snapshot`", text: "What the Resources
 const board: Part = { title: "Board", text: "The backlog as cards in five lanes: Backlog, Planned, Awaiting you, Running and Done. A card opens the task, with its open questions to answer.", href: "backlog" }
 const agents: Part = { title: "Agents", text: "The runs and the queued tasks. Each step, the agent's turns and the changes. The Approve step merges through `orc merge`.", href: "run" }
 const resources: Part = { title: "Resources", text: "Each account's quota windows. Each machine's cores, load, memory, disk and running runs.", href: "quota" }
-const drawer: Part = { title: "The chat drawer", text: "`cmd-k` on any tab. The same `orc chat` as in a terminal, with the same ten tools.", href: "chat" }
+const drawer: Part = { title: "The chat drawer", text: "`cmd-k` on any tab. The same `orc chat` as in a terminal, with the same sixteen tools.", href: "chat" }
 const same: Part = { title: "Neither screen holds state of its own", text: "Both run the `orc` commands and draw what those print, so a screen and the command line never disagree." }
 
 const dash: Part = { title: "`orc-dash`", text: "The same facts as panels: quota, session quota, resources, queues, schedules, dispatch, attention, tasks, alerts and ledger." }

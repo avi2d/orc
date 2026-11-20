@@ -1,10 +1,12 @@
+import { strict as assert } from "node:assert"
 import { describe, expect, test } from "bun:test"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Effect } from "effect"
 import { parkedListing } from "../../packages/run/src/features/chat/chat-parked"
-import { chatSession, chatToolNames, orcCommandVar } from "../../packages/run/src/features/chat/chat-tools"
+import { orcCommandVar } from "../../packages/run/src/features/chat/chat-run"
+import { chatSession, chatToolNames } from "../../packages/run/src/features/chat/chat-tools"
 
 describe("the parked-question listing", () => {
   test("polling does not post a decider-owned question while posting a user-owned question", async () => {
@@ -160,4 +162,35 @@ describe("the chat's backlog tools", () => {
     expect(chatToolNames).toContain("orc_attention")
     expect(chatToolNames).toContain("orc_attention_answer")
   })
+
+  const fakeOrc = { [orcCommandVar]: JSON.stringify(["sh", "-c", 'printf "%s\\n" "$@"; printf "stdin:"; cat', "orc"]) }
+  const toolNamed = (name: string) => {
+    const tool = chatSession(fakeOrc, () => false, () => undefined).tools.find((candidate) => candidate.name === name)
+    if (tool === undefined) {
+      throw new Error(name + " is not a chat tool")
+    }
+    return tool
+  }
+  const calls = [
+    { name: "orc_backlog_stop", params: { id: "orc-9" }, argv: ["backlog", "stop", "orc-9"] },
+    { name: "orc_backlog_drop", params: { id: "orc-9", reason: "duplicate of orc-12" }, argv: ["backlog", "drop", "orc-9", "duplicate of orc-12"] },
+    { name: "orc_backlog_send_back", params: { id: "orc-9", words: "rename the flag to --dry-run" }, argv: ["backlog", "send-back", "orc-9", "rename the flag to --dry-run"] },
+    { name: "orc_backlog_note", params: { id: "orc-9", words: "the login page moved to /auth" }, argv: ["backlog", "note", "orc-9", "the login page moved to /auth"] },
+    { name: "orc_backlog_depend", params: { id: "orc-9", on: ["orc-7", "orc-8"] }, argv: ["backlog", "depend", "orc-9", "--on", "orc-7,orc-8"] },
+    { name: "orc_backlog_depend", params: { id: "orc-9", on: [] }, argv: ["backlog", "depend", "orc-9", "--clear"] },
+    { name: "orc_backlog_thread", params: { id: "orc-9" }, argv: ["backlog", "thread", "orc-9"] }
+  ] as const
+
+  for (const call of calls) {
+    test(call.name + " runs " + call.argv.join(" ") + " with no stdin and returns what orc prints", async () => {
+      const result = await toolNamed(call.name).execute("call-1", call.params)
+      expect(result.content).toEqual([{ type: "text", text: [...call.argv, "stdin:"].join("\n") }])
+    })
+  }
+
+  for (const call of calls.filter((candidate, index) => calls.findIndex((first) => first.name === candidate.name) === index)) {
+    test(call.name + " refuses an extra parameter instead of dropping it", async () => {
+      await assert.rejects(toolNamed(call.name).execute("call-1", { ...call.params, force: true }), (error: Error) => error.message.startsWith(call.name + " takes"))
+    })
+  }
 })

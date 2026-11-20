@@ -28,6 +28,12 @@ The chat gives Pi these tools:
 | `orc_backlog` | Read projects, machines, tasks, and their states. |
 | `orc_backlog_hold` | Hold a new task other than a decision, with a reason, date, or questions. |
 | `orc_backlog_priority` | Set or clear a new task's priority from 0 to 4. |
+| `orc_backlog_stop` | Kill a started task's run and close the task stopped. |
+| `orc_backlog_drop` | Close a new task as dropped, with a reason. |
+| `orc_backlog_send_back` | Send a closed task's open PR back with your review. |
+| `orc_backlog_note` | Leave a note on a task. |
+| `orc_backlog_depend` | Replace or clear the tasks a new or held task waits for. |
+| `orc_backlog_thread` | Read a task's conversation, oldest first. |
 | `orc_backlog_edit` | Replace a new task's title and body without losing its hold or dependencies. |
 | `orc_backlog_answer` | Answer a hold, parked question, decision, or gate. |
 | `orc_attention` | Read the attention queue. |

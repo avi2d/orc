@@ -49,12 +49,12 @@ export const parts: readonly MapPart[] = [
 
   { id: "chat", inside: "you", title: "The chat", text: "Say the work. Answer questions.", page: "concepts/chat" },
   { id: "chat-say", inside: "chat", title: "You say", points: ["the work, in plain words", "an answer to a question", "to merge a pull request"] },
-  { id: "chat-model", inside: "chat", title: "The orchestrator model", text: "A Pi session with ten tools and no others. It can change the backlog and nothing else." },
+  { id: "chat-model", inside: "chat", title: "The orchestrator model", text: "A Pi session with sixteen tools and no others. It can change the backlog and nothing else." },
   {
     id: "chat-tools",
     inside: "chat",
-    title: "Ten tools, each an orc command",
-    points: ["four shape the backlog: add, edit, priority and hold", "five read it and answer: backlog, backlog answer, attention, attention answer and board", "one merges a pull request"]
+    title: "Sixteen tools, each an orc command",
+    points: ["four shape the backlog: add, edit, priority and hold", "six move a task along: stop, drop, send back, note, depend and thread", "five read it and answer: backlog, backlog answer, attention, attention answer and board", "one merges a pull request"]
   },
   {
     id: "chat-posts",

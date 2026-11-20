@@ -60,6 +60,8 @@ const expectedFiles = [
   "src/features/chat/chat-lavish.ts",
   "src/features/chat/chat-parked.ts",
   "src/features/chat/chat-posts.ts",
+  "src/features/chat/chat-run.ts",
+  "src/features/chat/chat-task-tools.ts",
   "src/features/chat/chat-tools.ts",
   "src/features/chat/chat.ts",
   "src/features/running-a-task/checks.ts",
