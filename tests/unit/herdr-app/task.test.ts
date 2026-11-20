@@ -33,6 +33,10 @@ test("answers a question as id=text and a bare hold as plain words instead of on
   expect(answerArgv("orc-34", { kind: "hold" }, "start it")).toEqual(["backlog", "answer", "orc-34", "start it"])
 })
 
+test("puts -- before words that start with a dash instead of sending them as a flag", () => {
+  expect(answerArgv("orc-34", { kind: "hold" }, "--help")).toEqual(["backlog", "answer", "orc-34", "--", "--help"])
+})
+
 test("sends no answer for a blank box instead of an empty one", () => {
   expect(answerArgv("orc-34", { kind: "hold" }, "   ")).toBeNull()
 })

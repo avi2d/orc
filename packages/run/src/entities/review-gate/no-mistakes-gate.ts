@@ -116,16 +116,23 @@ export const parseRun = (output: string): ParsedRun => {
 
 const isQuestion = (finding: NoMistakesFinding): boolean => finding.id.startsWith("question-")
 
-const isAskUser = (finding: NoMistakesFinding): boolean => finding.action === "ask-user" && !isQuestion(finding)
+const orcActions = new Set(["auto-fix", "no-op"])
+
+const isAskUser = (finding: NoMistakesFinding): boolean => !orcActions.has(finding.action) && !isQuestion(finding)
+
+const isUnknownAction = (finding: NoMistakesFinding): boolean => isAskUser(finding) && finding.action !== "ask-user"
 
 export const askUserFindings = (findings: ReadonlyArray<NoMistakesFinding>, allow: ReadonlyArray<AllowWord>): ReadonlyArray<NoMistakesFinding> =>
-  allow.includes(askUserWord) ? [] : findings.filter(isAskUser)
+  allow.includes(askUserWord) ? findings.filter(isUnknownAction) : findings.filter(isAskUser)
 
 const questionReason = (question: NoMistakesFinding): string => {
   const quoted = question.description === "" ? "" : ` "${question.description}"`
-  return isQuestion(question)
-    ? `finding ${question.id} is a question${quoted} and needs your answer on a rerun with --answer ${question.id}="<answer>"`
-    : `finding ${question.id} is marked ask-user${quoted} and needs your word on a rerun with --answer ${question.id}="<answer>" or --allow ask-user`
+  if (isQuestion(question)) {
+    return `finding ${question.id} is a question${quoted} and needs your answer on a rerun with --answer ${question.id}="<answer>"`
+  }
+  return question.action === "ask-user"
+    ? `finding ${question.id} is marked ask-user${quoted} and needs your word on a rerun with --answer ${question.id}="<answer>" or --allow ask-user`
+    : `finding ${question.id}${quoted} needs an answer orc cannot give, so it needs your word on a rerun with --answer ${question.id}="<answer>"`
 }
 
 export const missingReason = (missing: ReadonlyArray<NoMistakesFinding>): string =>
@@ -174,10 +181,6 @@ export const answerForGate = (
   }
   const worded = asked.filter((finding) => !answers.some((entry) => entry.question === finding.id))
   const rest = findings.filter((finding) => !isAskUser(finding))
-  const other = rest.find((finding) => finding.action !== "auto-fix" && finding.action !== "no-op")
-  if (other !== undefined) {
-    return { kind: "refuse", reason: "finding " + other.id + " needs an answer orc cannot give" }
-  }
   const fixable = [...rest.filter((finding) => finding.action === "auto-fix"), ...settled]
   const ignore = [...rest.filter((finding) => finding.action === "no-op"), ...worded].map((finding) => finding.id)
   if (gate.stage === "fix-review") {

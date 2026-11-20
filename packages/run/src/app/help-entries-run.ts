@@ -20,7 +20,7 @@ export const runHelp: HelpEntry = {
     { flag: "--implementer-model <model>", meaning: "The implementer model, used instead of the one config.json names." },
     { flag: "--fixer-model <model>", meaning: "The fixer model, used instead of the one config.json names." },
     { flag: "--instructions <path>", meaning: "A project instructions file handed to Pi." },
-    { flag: "--allow " + askUserWord, meaning: "Decline every ask-user finding of the review and accept the rest, on a resume." },
+    { flag: "--allow " + askUserWord, meaning: "Decline findings marked exactly ask-user, on a resume. Findings with any other action still wait as questions." },
     { flag: "--answer <id>=<text>", meaning: "Answer a review question or an ask-user finding by its id, on a resume. Give it once per answer." }
   ],
   examples: [
@@ -94,4 +94,12 @@ export const appInstallHelp: HelpEntry = {
   about: "Builds the orc mods from this checkout when it has their sources, and copies them and the layout into ~/.config/herdr-app. Run it again after each orc upgrade.",
   options: [],
   examples: ["orc app install"]
+}
+
+export const updateHelp: HelpEntry = {
+  usage: ["orc update [--json]"],
+  summary: "Install the newest published orc when it is newer than this one",
+  about: "Reads the newest version of @avi2dg/orc from the npm registry and installs it only when it is newer than the running orc. The install runs bun add -g @avi2dg/orc@<version>, or the update.command config.json names. A registry read that fails or takes more than 15 seconds leaves orc as it is.",
+  options: [{ flag: "--json", meaning: "Print the result as an orc.update.v1 JSON document." }],
+  examples: ["orc update", "orc update --json"]
 }
