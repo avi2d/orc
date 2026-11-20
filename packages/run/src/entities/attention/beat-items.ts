@@ -14,7 +14,7 @@ export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, 
         text: "the run on " + action.machine + " died: " + action.reason,
         ...choice(
           "the run of " + action.task + " on " + action.machine,
-          { text: "rerun", outcome: "orc backlog add queues the task again, and the next beat starts a new run" },
+          { text: "rerun", outcome: "orc backlog add <project> <task-file> adds the task again under a new id, and the next beat starts it" },
           { text: "close", outcome: "the task stays closed failed, and no run starts" }
         ),
         asked: at,
@@ -73,7 +73,7 @@ export const routePullRequest = (root: string, task: string, pr: string, view: P
         ...choice(
           "the PR " + pr + " of " + task,
           { text: "merge", outcome: "orc merge " + task + " merges the PR into main, and the item closes with the answer merged" },
-          { text: "hold", outcome: "the PR stays open and unmerged, and the item stays open" }
+          { text: "hold", outcome: "the PR stays open and unmerged, and the item closes" }
         ),
         asked: at,
         owner: "user"

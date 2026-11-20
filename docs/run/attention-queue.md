@@ -74,7 +74,9 @@ Each item the beat opens names its `subject` and lists its `options`, each with 
 - A `failing-command` item offers `continue` or `stop`, and recommends `continue`.
 - An `overdue-wait` item offers `answer` or `drop`, and recommends `answer`.
 
-To answer one of these, run `orc attention answer <item-id> <words>`.
+To record a choice on a `run-died`, `check-red`, `pr-ready` or `failing-command` item, run `orc attention answer <item-id> <words>`.
+Run the command the outcome names to carry out the option.
+`orc attention answer` only records the choice and closes the item.
 It refuses a review question, a worker question or an overdue wait and names the task to answer with `orc backlog answer` instead.
 
 A held task whose `--until` date has passed opens an `overdue-wait` item, owned by the user and asked at the start of the next day on the machine local clock.
