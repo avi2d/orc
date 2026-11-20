@@ -6,13 +6,14 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, Layer } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { addTask, claimTask, findTask, listTasks, writeTaken } from "../../packages/run/src/entities/backlog/index"
-import { answerTask, handAnswersToResume } from "../../packages/run/src/entities/parked-runs/index"
+import { answerTask, askStartedTask, handAnswersToResume } from "../../packages/run/src/entities/parked-runs/index"
+import { decideReviewQuestions, type AskDecider, type DeciderRequest } from "../../packages/run/src/features/decider/index"
 import { askSetupFor } from "../../packages/run/src/entities/agent/index"
 import { driveNoMistakes, type NoMistakesRecord, type NoMistakesReply, type NoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
 import type { GateResponse } from "../../packages/run/src/entities/review-gate/no-mistakes-gate"
 import { openDatabase, openQuestionsForRun, recordRun, recordSignal, recordStep } from "../../packages/run/src/entities/run-history/index"
 import { recordOpenAsks } from "../../packages/run/src/features/running-a-task/history-write"
-import { openItems } from "../../packages/run/src/entities/attention/index"
+import { openItems, routeTaskItems } from "../../packages/run/src/entities/attention/index"
 import { runBeat } from "../../packages/run/src/widgets/beat/beat"
 import { taskLabel } from "../../packages/run/src/shared/process/pueue-status"
 import type { DispatchConfig, Project } from "../../packages/run/src/shared/config/dispatch-config"
@@ -62,9 +63,17 @@ const pueueStub = (statusJson: string): Layer.Layer<ChildProcessSpawner.ChildPro
 const doneStatus = (root: string, start: string, end: string): string =>
   JSON.stringify({ tasks: { "11": { id: 11, label: taskLabel(root, "orc-1"), group: "orc", path: "/checkout", status: { Done: { start, end, result: { Failed: 3 } } } } } })
 
-const beatWith = (root: string, statusJson: string) => {
+const answeringDecider = (rule: string, heard: Array<DeciderRequest>): AskDecider => ({
+  home: "/nonexistent/orc-home",
+  ask: (request) => {
+    heard.push(request)
+    return Effect.succeed(JSON.stringify({ decision: "answer", answer: "Table B", rule, reason: "the intent names it" }))
+  }
+})
+
+const beatWith = (root: string, statusJson: string, sources = quietSources()) => {
   const spawner = pueueStub(statusJson).pipe(Layer.provide(BunServices.layer))
-  return Effect.runPromise(runBeat(root, root, quietSources()).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
+  return Effect.runPromise(runBeat(root, root, sources).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
 }
 
 const driveGate = async (runs: string, name: string, overrides: { start: string; respond?: (response: GateResponse) => Effect.Effect<NoMistakesReply>; answers: ReadonlyArray<{ question: string; answer: string }> }): Promise<NoMistakesRecord> => {
@@ -169,7 +178,7 @@ describe("a run parked on a gate orc cannot answer", () => {
       expect(answersB).toEqual([{ question: "q1", answer: "Table B" }])
       expect((await readOpen(root, "run-1")).map((question) => question.id)).toEqual(["q1"])
       const runB = await driveGate(runs, "run-2", { start: parkedB, answers: answersB })
-      expect(runB.openQuestions).toEqual([{ id: "review-1", text: "needs a human" }])
+      expect(runB.openQuestions).toEqual([{ id: "review-1", text: "needs a human", owner: "user" }])
       await recordGateRun(root, "run-2", "2026-11-18T10:03:00.000Z", runB, runB.result)
       expect((await readOpen(root, "run-2")).map((question) => question.id)).toEqual(["review-1"])
       await restartOrc1(root, "beat-2", "2026-11-18T10:03:00.000Z")
@@ -237,6 +246,55 @@ describe("a run parked on a gate orc cannot answer", () => {
         expect(closed.state.closing.outcome).toEqual("failed")
         expect(closed.state.closing.reason).toContain("needs an answer orc cannot give")
       }
+    })
+  })
+
+  test("a decider answer to a finding orc cannot answer leaves the gate waiting for the owner", async () => {
+    const control = await mkdtemp(join(tmpdir(), "orc-owner-control-"))
+    try {
+      await run(addTask(control, { ...spec, body: "# Fix the thing\n" }))
+      await run(claimTask(control, "orc-1"))
+      const taken = (await run(listTasks(control))).find((task) => task.spec.id === "orc-1")
+      if (taken === undefined) {
+        throw new Error("the backlog holds no orc-1")
+      }
+      await run(writeTaken(control, { spec: taken.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-11-18T10:00:00.000Z", log: control + "/logs/orc-1.log" } } }))
+      await run(askStartedTask(control, "orc-1", { asked: "2026-11-18T10:01:00.000Z", questions: [{ id: "q9", text: "Which table?", asked: "2026-11-18T10:01:00.000Z" }] }))
+      await run(routeTaskItems(control, await run(listTasks(control)), "2026-11-18T10:01:00.000Z"))
+      const heardControl: Array<DeciderRequest> = []
+      const decided = await run(decideReviewQuestions(control, await run(listTasks(control)), answeringDecider("# Fix the thing", heardControl)))
+      expect(heardControl).toHaveLength(1)
+      expect(decided.map((entry) => entry.verdict.kind)).toEqual(["answered"])
+      expect((await run(listTasks(control))).find((task) => task.spec.id === "orc-1")?.parked?.questions.map((question) => question.answer?.words ?? null)).toEqual(["Table B"])
+    } finally {
+      await rm(control, { recursive: true, force: true })
+    }
+    await withDirs(async (root, runs) => {
+      const runA = await driveGate(runs, "run-1", { start: parkedTable(["review-1,warning,,,manual,needs a human"]), answers: [] })
+      expect(runA.openQuestions).toEqual([{ id: "review-1", text: "needs a human", owner: "user" }])
+      await recordGateRun(root, "run-1", "2026-11-18T10:00:00.000Z", runA, runA.result)
+      await startOrc1(root, "2026-11-18T10:00:00.000Z")
+      const parked = await beatWith(root, doneStatus(root, "2026-11-18T10:00:00.000Z", "2026-11-18T10:01:00.000Z"))
+      expect(actionKinds(parked.actions)).toContain("parked:orc-1")
+      expect((await run(findTask(root, "orc-1")))?.parked?.questions.map((question) => question.owner ?? null)).toEqual(["user"])
+      const stored = await run(openItems(root))
+      const review = stored.filter((entry) => entry.item.kind === "review-question" && entry.item.task === "orc-1")
+      expect(review.map((entry) => entry.item.owner)).toEqual(["user"])
+      expect(review.map((entry) => entry.item.state.kind)).toEqual(["open"])
+      const heard: Array<DeciderRequest> = []
+      const sources = { ...quietSources(), askDecider: answeringDecider("# Fix the thing", heard) }
+      for (const [start, end] of [["2026-11-18T10:01:00.000Z", "2026-11-18T10:03:00.000Z"], ["2026-11-18T10:03:00.000Z", "2026-11-18T10:05:00.000Z"]] as const) {
+        const waiting = await beatWith(root, doneStatus(root, start, end), sources)
+        const kinds = actionKinds(waiting.actions)
+        expect(kinds.filter((kind) => kind === "started:orc-1")).toEqual([])
+        expect(kinds).toContain("waits:orc-1")
+        const waits = waiting.actions.flatMap((action) => action.kind === "waits" && action.task === "orc-1" ? [action.reason] : [])
+        expect(waits).toEqual(["parked on orc/orc-1 for the captain's answer to review-1"])
+        expect(waiting.actions.filter((action) => action.kind === "attention" && action.task === "orc-1")).toHaveLength(1)
+      }
+      expect(heard).toEqual([])
+      expect((await run(findTask(root, "orc-1")))?.parked?.questions.map((question) => question.answer)).toEqual([null])
+      expect(await openReviewItems(root)).toHaveLength(1)
     })
   })
 })

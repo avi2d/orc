@@ -52,7 +52,7 @@ The resumed attempt keeps the earlier completed steps and hands your answers to 
 If the resumed run stops on new questions, the task parks again with those beside the questions it kept, and it keeps the answers it already has.
 An answer given after the beat last read the waiting run is kept too.
 The resumed run records only the earlier questions that no `--answer` settled.
-A gate finding orc can neither fix nor ask about waits as a question for the owner.
+A gate finding orc can neither fix nor ask about waits as a question for the owner, and the attention queue owns that question for the owner so the decider never answers it.
 When the resumed run stops on one, the task parks again with that question beside the questions it kept, and it keeps the answers it already has.
 The next beat waits on the recorded run instead of starting it again.
 The gate keeps the attention item it opened, so the owner reads it once.

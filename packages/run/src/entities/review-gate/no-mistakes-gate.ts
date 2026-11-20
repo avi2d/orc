@@ -12,6 +12,7 @@ export interface OpenQuestion {
   readonly text: string
   readonly asked?: string | undefined
   readonly blocks?: boolean | undefined
+  readonly owner?: "user" | undefined
 }
 
 export interface NoMistakesFinding {
@@ -145,7 +146,7 @@ export const openQuestionsIn = (findings: ReadonlyArray<NoMistakesFinding>, omit
   return [...rendered, ...omitted]
 }
 
-export const ownerFindingsIn = (findings: ReadonlyArray<NoMistakesFinding>): ReadonlyArray<NoMistakesFinding> =>
+export const ownerFindingsIn = (findings: ReadonlyArray<Pick<NoMistakesFinding, "id" | "action">>): ReadonlyArray<Pick<NoMistakesFinding, "id" | "action">> =>
   findings.filter((finding) => !isQuestion(finding) && !isAskUser(finding) && finding.action !== "auto-fix" && finding.action !== "no-op")
 
 export const answerArgsFor = (question: string, answer: string): ReadonlyArray<string> =>

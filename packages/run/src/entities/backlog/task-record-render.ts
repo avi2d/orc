@@ -26,7 +26,8 @@ const questionFronts = (questions: ReadonlyArray<ParkedQuestion>) =>
     asked_at: question.asked,
     ...(question.blocks ? {} : { blocks: false }),
     ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at, ...answerFronts(question.answer) }),
-    ...(question.answer?.relayedTo == null ? {} : { relayed_to: question.answer.relayedTo })
+    ...(question.answer?.relayedTo == null ? {} : { relayed_to: question.answer.relayedTo }),
+    ...(question.owner === undefined ? {} : { owner: question.owner })
   }))
 
 const holdQuestionFronts = (questions: ReadonlyArray<HoldQuestion>) =>

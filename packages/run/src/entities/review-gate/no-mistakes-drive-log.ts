@@ -1,4 +1,4 @@
-import { missingReason, parseRun, type NoMistakesFinding, type OpenQuestion, type ParkedGate, type ParsedRun } from "./no-mistakes-gate"
+import { missingReason, ownerFindingsIn, parseRun, type NoMistakesFinding, type OpenQuestion, type ParkedGate, type ParsedRun } from "./no-mistakes-gate"
 import { scalar } from "../../shared/lib/index"
 
 type NoMistakesStatus = "passed" | "refused" | "failed"
@@ -90,10 +90,13 @@ export const openDriveLog = (started: string): DriveLog => {
       gatesAnswered += 1
     },
     refuse,
-    awaitAnswers: (gate, missing, asked) => ({
-      ...refuse(gate, missingReason(missing)),
-      openQuestions: missing.map((finding) => ({ id: finding.id, text: finding.description, ...(asked === null ? {} : { asked }) }))
-    }),
+    awaitAnswers: (gate, missing, asked) => {
+      const owned = new Set(ownerFindingsIn(missing).map((finding) => finding.id))
+      return {
+        ...refuse(gate, missingReason(missing)),
+        openQuestions: missing.map((finding) => ({ id: finding.id, text: finding.description, ...(asked === null ? {} : { asked }), ...(owned.has(finding.id) ? { owner: "user" as const } : {}) }))
+      }
+    },
     fail,
     finish: (parsed) =>
       greenOutcomes.has(parsed.outcome) && prLink !== null

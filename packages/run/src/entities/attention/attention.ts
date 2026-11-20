@@ -64,6 +64,7 @@ interface AskedQuestion {
   readonly asked?: string | undefined
   readonly blocks?: boolean | undefined
   readonly options?: ReadonlyArray<AskOption>
+  readonly owner?: "user" | undefined
 }
 
 const reviewQuestionItem = (
@@ -77,7 +78,7 @@ const reviewQuestionItem = (
     text: question.text,
     ...(question.options === undefined ? {} : { options: question.options }),
     asked: question.asked ?? "",
-    owner: question.id === loopQuestionId ? "user" : "decider"
+    owner: question.owner ?? (question.id === loopQuestionId ? "user" : "decider")
   }
   return { id, asked }
 }

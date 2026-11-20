@@ -1,3 +1,4 @@
+import { ownerFindingsIn } from "./no-mistakes-gate"
 import { Console, Duration, Effect, FileSystem, Schema } from "effect"
 import { readJsonFileIfPresent, writeWhole } from "../../shared/config/index"
 import { OrcRunError } from "../../shared/lib/index"
@@ -16,7 +17,8 @@ const AskingQuestion = Schema.Struct({
   text: Schema.String,
   options: Schema.optionalKey(Schema.Array(AskOption)),
   blocks: Schema.optional(Schema.Boolean),
-  asked: Schema.optional(Schema.String)
+  asked: Schema.optional(Schema.String),
+  owner: Schema.optional(Schema.Literal("user"))
 })
 
 type AskingQuestion = typeof AskingQuestion.Type
@@ -79,7 +81,7 @@ const readRelayed = (file: string, asked: string): Effect.Effect<ReadonlyArray<Q
   )
 
 export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: string) =>
-  (missing: ReadonlyArray<Pick<NoMistakesFinding, "id" | "description">>): Effect.Effect<WaitResult, never, FileSystem.FileSystem> =>
+  (missing: ReadonlyArray<Pick<NoMistakesFinding, "id" | "description" | "action">>): Effect.Effect<WaitResult, never, FileSystem.FileSystem> =>
     Effect.gen(function*() {
       const fs = yield* FileSystem.FileSystem
       const asking = runDir + "/" + askingFileName
@@ -93,7 +95,8 @@ export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: stri
       const asked = previous?.asked ?? now
       const deadline = Date.now() + waitSeconds * 1000
       const until = new Date(deadline).toISOString()
-      const fresh: ReadonlyArray<AskingQuestion> = missing.map((finding) => ({ id: finding.id, text: finding.description, blocks: true, asked: now }))
+      const owned = new Set(ownerFindingsIn(missing).map((finding) => finding.id))
+      const fresh: ReadonlyArray<AskingQuestion> = missing.map((finding) => ({ id: finding.id, text: finding.description, blocks: true, asked: now, ...(owned.has(finding.id) ? { owner: "user" as const } : {}) }))
       const kept = (previous?.questions ?? []).filter((question) => !missing.some((finding) => finding.id === question.id))
       const merged = [...kept, ...fresh]
       if (!(yield* writeWhole(asking, JSON.stringify({ asked, until, questions: merged })))) {

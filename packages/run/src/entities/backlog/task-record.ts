@@ -55,6 +55,7 @@ export interface ParkedQuestion {
   readonly asked: string
   readonly blocks: boolean
   readonly answer: ParkedAnswer | null
+  readonly owner?: "user" | undefined
 }
 
 const HoldQuestion = Schema.Struct({ id: Schema.String, text: Schema.String, answer: Schema.NullOr(Answer) })
@@ -176,7 +177,8 @@ const QuestionFront = Schema.Struct({
   relayed_to: Schema.optional(Schema.String),
   used: Schema.optional(Schema.Boolean),
   answered_by: Schema.optional(Schema.Literals(deciderAnswerKinds)),
-  overturned: Schema.optional(OverturnedFront)
+  overturned: Schema.optional(OverturnedFront),
+  owner: Schema.optional(Schema.Literal("user"))
 })
 
 const Frontmatter = Schema.Struct({
@@ -252,7 +254,8 @@ const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: str
     text: question.text,
     asked: question.asked_at ?? "",
     blocks: question.blocks ?? true,
-    answer: answer === null ? null : parkedAnswerOf(question, answer)
+    answer: answer === null ? null : parkedAnswerOf(question, answer),
+    ...(question.owner === undefined ? {} : { owner: question.owner })
   }))
 
 const holdQuestionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: string): Array<HoldQuestion> | string =>

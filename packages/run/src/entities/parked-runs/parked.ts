@@ -17,9 +17,13 @@ const parkedQuestions = (
     (known.answer === null || answersAsking(known.answer, asking))
   const kept = prior.filter((known) => known.answer !== null && answersAsking(known.answer, asking) && !open.some((question) => question.id === known.id))
   return Arr.appendAll(
-    Arr.map(open, (question): ParkedQuestion =>
-      prior.find((known) => stillAsked(known, question)) ??
-      { id: question.id, text: question.text, asked: askedOf(question), blocks: question.blocks ?? true, answer: null }),
+    Arr.map(open, (question): ParkedQuestion => {
+      const known = prior.find((candidate) => stillAsked(candidate, question))
+      if (known === undefined) {
+        return { id: question.id, text: question.text, asked: askedOf(question), blocks: question.blocks ?? true, answer: null, ...(question.owner === undefined ? {} : { owner: question.owner }) }
+      }
+      return known.owner === question.owner ? known : { ...known, ...(question.owner === undefined ? {} : { owner: question.owner }) }
+    }),
     kept
   )
 }
