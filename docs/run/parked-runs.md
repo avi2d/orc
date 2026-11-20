@@ -78,6 +78,8 @@ The question's text holds the question, then `Context:` and the context, then ea
 The parked question in the task record keeps the options and the recommendation beside the text.
 The beat opens a `worker-question` item for it, as [The attention queue](attention-queue.md) shows, and hands its answer to the run the way it does at a gate.
 
+### Ask with blocking
+
 A blocking question holds Pi for 10 minutes, or for the `ORC_ANSWER_WAIT_SECONDS` its machine sets when that is shorter.
 An answer within the wait is the tool's result, and Pi carries on.
 When no answer comes, the tool tells Pi so, and orc stops Pi at the end of that turn with `orc stopped Pi when no answer to its question ask-<n> came in time` in the end reason.
