@@ -99,8 +99,11 @@ See [Merging a task's PR](merging-a-tasks-pr.md) for what follows.
 ## Model and worktree details
 
 Orc loads the implementer agent from `$ORC_HOME/agents/implementer.md`, then the project's `.orc/agents/implementer.md`, then the bundled file.
-An agent's model comes from its file, its role's model flag, or `config.json`, in that order.
-Both agents must use a configured provider, and the implementer and fixer must use the same provider.
+The fixer agent loads the same way from `fixer.md`.
+The reviewer agent file is `$ORC_HOME/agents/reviewer.md`, then the project's `.orc/agents/reviewer.md`, then the bundled `packages/run/agents/reviewer.md`.
+The bundled reviewer prints its findings as a JSON array with `id`, `file`, `line`, `severity`, `action` and `description` for each finding.
+An implementer or fixer model comes from its file, its role's model flag, or `config.json`, in that order.
+The implementer and the fixer must use a configured provider, and both must use the same provider.
 Orc refuses models absent from Pi or with a context window of 150,000 tokens or less.
 Pi compacts context at 150,000 tokens in the default sandbox.
 For `--sandbox none` with a Pi login provider, Pi uses your own compaction settings.
