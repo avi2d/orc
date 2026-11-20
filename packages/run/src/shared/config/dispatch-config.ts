@@ -97,6 +97,7 @@ const RawProject = Schema.Struct({
   mode: Schema.optionalKey(Schema.String),
   yolo: Schema.optionalKey(Schema.Unknown),
   instructions: Schema.optionalKey(Schema.Unknown),
+  floor: Schema.optionalKey(Schema.Unknown),
   upstream: Schema.optionalKey(Schema.Unknown)
 })
 type RawProject = typeof RawProject.Type
@@ -108,9 +109,10 @@ export interface Contribution {
   readonly number: number
 }
 
-export type Project = Omit<RawProject, "mode" | "yolo" | "instructions" | "upstream"> & {
+export type Project = Omit<RawProject, "mode" | "yolo" | "instructions" | "floor" | "upstream"> & {
   readonly mode?: DeliveryMode
   readonly yolo?: boolean
+  readonly floor?: number
   readonly instructions?: string
   readonly upstream?: ReadonlyArray<Contribution>
 }
@@ -156,12 +158,15 @@ const parsedUpstream = (name: string, upstream: unknown): ReadonlyArray<Contribu
 }
 
 const checkedProject = (project: RawProject): Project | string => {
-  const { mode, yolo } = project
+  const { mode, yolo, floor } = project
   if (mode !== undefined && !isDeliveryMode(mode)) {
     return unknownMode(project.name, mode)
   }
   if (yolo !== undefined && typeof yolo !== "boolean") {
     return "the project " + project.name + " names yolo " + JSON.stringify(yolo) + ", which is not true or false"
+  }
+  if (floor !== undefined && (typeof floor !== "number" || !Number.isInteger(floor) || floor < 0 || floor > 4)) {
+    return "the project " + project.name + " names the floor " + JSON.stringify(floor) + ", which is not a priority from 0 to 4"
   }
   const parsed = parsedInstructions(project)
   if (typeof parsed === "string") {
@@ -176,6 +181,7 @@ const checkedProject = (project: RawProject): Project | string => {
     checkouts: project.checkouts,
     ...(mode === undefined ? {} : { mode }),
     ...(yolo === undefined ? {} : { yolo }),
+    ...(floor === undefined ? {} : { floor }),
     ...(parsed.instructions === undefined ? {} : { instructions: parsed.instructions }),
     ...(upstream === undefined ? {} : { upstream })
   }
