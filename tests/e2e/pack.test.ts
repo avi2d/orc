@@ -237,7 +237,9 @@ const expectedFiles = [
   "src/features/seeing-runs/other-machines.ts",
   "src/features/task-thread/index.ts",
   "src/features/task-thread/note.ts",
-  "src/features/task-thread/thread.ts"
+  "src/features/task-thread/thread.ts",
+  "src/features/updating-orc/index.ts",
+  "src/features/updating-orc/update.ts"
 ]
 
 const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => {
