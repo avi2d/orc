@@ -1,5 +1,3 @@
-import { spawnSync } from "node:child_process"
-import { readFileSync } from "node:fs"
 import { Data, Effect, FileSystem, Predicate } from "effect"
 import type { PlatformError } from "effect/PlatformError"
 import { type TaskFileError, type TaskFolder, taskFolders } from "./task-record"
@@ -112,34 +110,48 @@ const grabbedFile = (
   read: fs.readFileString(grabbed).pipe(Effect.mapError(platformFailure("read " + grabbed)))
 })
 
-const procStarttime = (pid: number): string | null => {
-  try {
-    const stat = readFileSync("/proc/" + pid + "/stat", "utf8")
-    const end = stat.lastIndexOf(")")
-    if (end === -1) return null
-    const starttime = stat.slice(end + 2).split(" ")[19]
-    return starttime === undefined || starttime === "" ? null : starttime
-  } catch {
-    return null
-  }
+const starttimeOf = (stat: string): string | null => {
+  const end = stat.lastIndexOf(")")
+  if (end === -1) return null
+  const starttime = stat.slice(end + 2).split(" ").at(19)
+  return starttime === undefined || starttime === "" ? null : starttime
 }
 
-const psStart = (pid: number): string | null => {
-  const result = spawnSync("ps", ["-o", "lstart=", "-p", String(pid)], { encoding: "utf8", env: { ...process.env, LC_ALL: "C", TZ: "UTC" } })
-  const start = result.status === 0 ? result.stdout.trim() : ""
-  return start === "" ? null : Buffer.from(start).toString("hex")
-}
+const procStarttime = (pid: number): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
+  FileSystem.FileSystem.pipe(
+    Effect.flatMap((fs) => fs.readFileString("/proc/" + pid + "/stat")),
+    Effect.map(starttimeOf),
+    Effect.orElseSucceed(() => null)
+  )
 
-const processStart = (pid: number): string | null => {
-  const ticks = procStarttime(pid)
-  if (ticks !== null) return ticks
-  try {
-    readFileSync("/proc/self/stat", "utf8")
-    return null
-  } catch {
-    return psStart(pid)
-  }
-}
+const psStart = (pid: number): Effect.Effect<string | null> =>
+  Effect.tryPromise({
+    try: () => {
+      const child = Bun.spawn(["ps", "-o", "lstart=", "-p", String(pid)], {
+        stdout: "pipe",
+        stderr: "ignore",
+        env: { ...Bun.env, LC_ALL: "C", TZ: "UTC" }
+      })
+      return child.exited.then((code) => code === 0 ? new Response(child.stdout).text() : "")
+    },
+    catch: () => new BacklogError({ detail: "ps did not run" })
+  }).pipe(
+    Effect.map((start) => {
+      const text = start.trim()
+      return text === "" ? null : Buffer.from(text).toString("hex")
+    }),
+    Effect.orElseSucceed(() => null)
+  )
+
+const processStart = (pid: number): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const ticks = yield* procStarttime(pid)
+    if (ticks !== null) return ticks
+    const fs = yield* FileSystem.FileSystem
+    const self = yield* fs.readFileString("/proc/self/stat").pipe(Effect.orElseSucceed(() => null))
+    if (self !== null) return null
+    return yield* psStart(pid)
+  })
 
 const grabName = (folder: string, id: string, start: string): string => folder + "/." + id + ".grab-" + process.pid + "-" + start + "-" + crypto.randomUUID() + ".tmp"
 
@@ -172,12 +184,14 @@ const grabOwner = (name: string): { readonly id: string; readonly pid: number; r
   return grab === null ? null : { id: grab[1], pid: Number(grab[2]), start: grab[3] }
 }
 
-const grabOwnerAlive = (owner: { readonly pid: number; readonly start: string | undefined }): Effect.Effect<boolean> =>
-  ownerAlive(owner.pid).pipe(Effect.map((alive) => {
-    if (!alive || owner.start === undefined) return alive
-    const current = processStart(owner.pid)
-    return current === null || current === owner.start
-  }))
+const grabOwnerAlive = (owner: { readonly pid: number; readonly start: string | undefined }): Effect.Effect<boolean, never, FileSystem.FileSystem> =>
+  Effect.flatMap(ownerAlive(owner.pid), (alive) => {
+    if (!alive || owner.start === undefined) {
+      return Effect.succeed(alive)
+    }
+    const start = owner.start
+    return Effect.map(processStart(owner.pid), (current) => current === null || current === start)
+  })
 
 const grabAlive = (paths: BacklogPaths, id: string): Effect.Effect<boolean, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
@@ -253,7 +267,7 @@ export const grabIn = (
     const fs = yield* FileSystem.FileSystem
     const paths = backlogPaths(root)
     const file = paths.taskFile(folder, id)
-    const start = processStart(process.pid)
+    const start = yield* processStart(process.pid)
     if (start === null) {
       return yield* new BacklogError({ detail: "cannot read the current process start time" })
     }
