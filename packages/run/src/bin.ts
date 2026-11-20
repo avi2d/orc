@@ -15,7 +15,7 @@ import { decodeJson, pueue, PueueState, queuedTasks, RunnerError } from "./share
 import { formatReport, formatReportOutcome, runAgentStep, runReportStep } from "./features/running-a-task/index"
 import { backlogPaths, backlogRoot as backlogRootOf, type ReportKind, runDirFor } from "./entities/backlog/index"
 import { encodeRefusalsJson, formatHistoryError, formatRefusalsTable, listAllRuns, listRuns, openDatabase, orcHomeDir, readRefusals } from "./entities/run-history/index"
-import { encodeRunsJson, encodeShowJson, formatRunsTable, formatShow, readListedRuns, readOtherMachinesFrom, readRunsJsonRuns, readShow, readStepLog, recordStepScore, runsJson, withOtherMachines, withQueued } from "./features/seeing-runs/index"
+import { encodeMachinesJson, encodeRunsJson, encodeShowJson, encodeVersionJson, formatRunsTable, formatShow, readListedRuns, readMachineVersions, readOtherMachinesFrom, readRunsJsonRuns, readShow, readStepLog, recordStepScore, runsJson, withOtherMachines, withQueued } from "./features/seeing-runs/index"
 
 const readFailure = (error: unknown): string =>
   typeof error === "string" ? error : "orc: cannot read the run history: " + formatHistoryError(error)
@@ -123,6 +123,15 @@ const otherMachinesOf = (dispatchFile: string) =>
     )
   )
 
+const printMachines = () =>
+  Effect.gen(function*() {
+    const document = yield* readMachineVersions(backlogPaths(backlogRootOf(orcHomeDir(Bun.env.ORC_HOME))).dispatchConfig, packageJson.version).pipe(
+      Effect.provide(BunServices.layer),
+      Effect.catchTag("ConfigError", (error) => Console.error("orc: " + error.file + ": " + error.detail).pipe(Effect.andThen(Effect.fail("dispatch.json unreadable"))))
+    )
+    yield* Console.log(yield* encodeMachinesJson(document))
+  })
+
 const queuedOf = (home: string) =>
   pueue(["status", "--json"]).pipe(
     Effect.flatMap((text) => decodeJson(text, PueueState, "pueue status --json")),
@@ -210,6 +219,13 @@ const program = Effect.gen(function*() {
     case "PrintVersion": {
       yield* Console.log(`orc ${packageJson.version}`)
       break
+    }
+    case "ShowVersion": {
+      yield* Console.log(yield* encodeVersionJson(packageJson.version))
+      break
+    }
+    case "ListMachines": {
+      return yield* printMachines()
     }
     case "PrintHelp": {
       yield* Console.log(helpText(args.words))
