@@ -11,6 +11,7 @@ import {
   findingsTable,
   omittedQuestionIds,
   openQuestionsIn,
+  ownerFindingsIn,
   respondArgs,
   stepsWithFindings,
   type AllowWord,
@@ -254,7 +255,7 @@ const advanceParked = (
   Effect.gen(function*() {
     yield* appendGate(input.runDir, gate.step)
     const open = openQuestionsIn(parsed.findings, omittedQuestionIds(stdout))
-    const { missing, asking } = yield* awaitMissing(input, [...open, ...askUserFindings(parsed.findings, input.allow ?? [])], supplied)
+    const { missing, asking } = yield* awaitMissing(input, [...open, ...askUserFindings(parsed.findings, input.allow ?? []), ...ownerFindingsIn(parsed.findings)], supplied)
     if (missing.length > 0) {
       return { kind: "ending", ending: log.awaitAnswers(gate, missing, asking) }
     }

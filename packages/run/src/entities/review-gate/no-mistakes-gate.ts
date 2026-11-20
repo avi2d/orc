@@ -125,7 +125,9 @@ const questionReason = (question: NoMistakesFinding): string => {
   const quoted = question.description === "" ? "" : ` "${question.description}"`
   return isQuestion(question)
     ? `finding ${question.id} is a question${quoted} and needs your answer on a rerun with --answer ${question.id}="<answer>"`
-    : `finding ${question.id} is marked ask-user${quoted} and needs your word on a rerun with --answer ${question.id}="<answer>" or --allow ask-user`
+    : isAskUser(question)
+      ? `finding ${question.id} is marked ask-user${quoted} and needs your word on a rerun with --answer ${question.id}="<answer>" or --allow ask-user`
+      : `finding ${question.id}${quoted} needs an answer orc cannot give, so answer it on a rerun with --answer ${question.id}="<answer>"`
 }
 
 export const missingReason = (missing: ReadonlyArray<NoMistakesFinding>): string =>
@@ -142,6 +144,9 @@ export const openQuestionsIn = (findings: ReadonlyArray<NoMistakesFinding>, omit
     .map((id): NoMistakesFinding => ({ id, severity: "", file: "", line: "", action: "", description: "" }))
   return [...rendered, ...omitted]
 }
+
+export const ownerFindingsIn = (findings: ReadonlyArray<NoMistakesFinding>): ReadonlyArray<NoMistakesFinding> =>
+  findings.filter((finding) => !isQuestion(finding) && !isAskUser(finding) && finding.action !== "auto-fix" && finding.action !== "no-op")
 
 export const answerArgsFor = (question: string, answer: string): ReadonlyArray<string> =>
   ["axi", "answer", "--question", question, "--answer", answer]
@@ -174,7 +179,7 @@ export const answerForGate = (
   }
   const worded = asked.filter((finding) => !answers.some((entry) => entry.question === finding.id))
   const rest = findings.filter((finding) => !isAskUser(finding))
-  const other = rest.find((finding) => finding.action !== "auto-fix" && finding.action !== "no-op")
+  const other = ownerFindingsIn(findings).find((finding) => !answers.some((entry) => entry.question === finding.id))
   if (other !== undefined) {
     return { kind: "refuse", reason: "finding " + other.id + " needs an answer orc cannot give" }
   }

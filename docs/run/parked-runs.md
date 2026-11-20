@@ -52,8 +52,11 @@ The resumed attempt keeps the earlier completed steps and hands your answers to 
 If the resumed run stops on new questions, the task parks again with those beside the questions it kept, and it keeps the answers it already has.
 An answer given after the beat last read the waiting run is kept too.
 The resumed run records only the earlier questions that no `--answer` settled.
-When it stops at a gate with no new question, the task stays parked on its existing questions for the owner's answer instead of closing failed, and the next beat waits on the recorded run instead of starting it again.
+A gate finding orc can neither fix nor ask about waits as a question for the owner.
+When the resumed run stops on one, the task parks again with that question beside the questions it kept, and it keeps the answers it already has.
+The next beat waits on the recorded run instead of starting it again.
 The gate keeps the attention item it opened, so the owner reads it once.
+An answer to that question resumes the run, and the gate no longer stops on the answered finding.
 A task whose every blocking question has an answer can resume when its original machine and run are available.
 `orc backlog` shows a parked task as `parked (<question-ids>)`.
 `orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times, their blocking flag and their answers.
