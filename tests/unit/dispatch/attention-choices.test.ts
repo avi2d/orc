@@ -3,8 +3,10 @@ import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect } from "effect"
-import { openRunDeaths, routePullRequest, routeTaskItems } from "../../../packages/run/src/entities/attention/attention"
+import { Effect, Schema } from "effect"
+import { routeTaskItems } from "../../../packages/run/src/entities/attention/attention"
+import { AttentionItem } from "../../../packages/run/src/entities/attention/attention-item"
+import { openRunDeaths, routePullRequest } from "../../../packages/run/src/entities/attention/beat-items"
 import { routeFailingCommands } from "../../../packages/run/src/entities/attention/failing-command"
 import type { TaskRecord } from "../../../packages/run/src/entities/backlog/index"
 import type { PullRequestView } from "../../../packages/run/src/entities/pull-request/pr-view"
@@ -21,15 +23,10 @@ const withRoot = async (use: (root: string) => Promise<void>): Promise<void> => 
   }
 }
 
-interface StoredItem {
-  readonly subject?: string
-  readonly options?: ReadonlyArray<{ readonly text: string; readonly outcome?: string }>
-  readonly recommendation?: string
-}
+const stored = async (root: string, id: string): Promise<AttentionItem> =>
+  Schema.decodeSync(Schema.fromJsonString(AttentionItem))(await readFile(join(root, "attention", id + ".json"), "utf8"))
 
-const stored = async (root: string, id: string): Promise<StoredItem> => JSON.parse(await readFile(join(root, "attention", id + ".json"), "utf8")) as StoredItem
-
-const choices = (item: StoredItem): unknown => ({ subject: item.subject, options: item.options?.map((option) => [option.text, option.outcome]), recommendation: item.recommendation })
+const choices = (item: AttentionItem): unknown => ({ subject: item.subject, options: item.options?.map((option) => [option.text, option.outcome]), recommendation: item.recommendation })
 
 const pr = "https://github.com/acme/orc/pull/7"
 

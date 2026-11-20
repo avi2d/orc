@@ -1,7 +1,5 @@
 import { Effect, FileSystem, Schema } from "effect"
 import { readNames, BacklogError, isDeciderAnswer, type ParkedQuestion, platformFailure, publishOnce, readIfPresent, scratchName, type TaskRecord } from "../backlog/index"
-import type { BeatAction } from "./beat-action"
-import { checkRefusals, greenChecks, type PullRequestView, redChecks } from "../pull-request/index"
 import { isWorkerQuestion, loopQuestionId } from "../agent/index"
 
 export const deciderTimeoutMillis = 180 * 1000
@@ -36,7 +34,7 @@ const replaceItem = (root: string, id: string, before: string, encoded: string):
     return true
   })
 
-const writeItem = (root: string, id: string, item: AttentionItem): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+export const writeItem = (root: string, id: string, item: AttentionItem): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const scratch = scratchName(attentionFolder(root), id)
@@ -115,7 +113,7 @@ const readExistingItem = (root: string, id: string): Effect.Effect<{ readonly be
     return { before, item }
   })
 
-const readItem = (root: string, id: string): Effect.Effect<AttentionItem | null, BacklogError, FileSystem.FileSystem> =>
+export const readItem = (root: string, id: string): Effect.Effect<AttentionItem | null, BacklogError, FileSystem.FileSystem> =>
   Effect.map(readExistingItem(root, id), (existing) => existing?.item ?? null)
 
 type CloseOutcome = "closed" | "already closed" | "missing"
@@ -359,82 +357,6 @@ export const routeTaskItems = (root: string, tasks: ReadonlyArray<TaskRecord>, a
     const closedTasks = new Set(tasks.filter((task) => task.state.kind === "closed").map((task) => task.spec.id))
     const staleFailing = (yield* openItems(root)).filter((entry) => entry.item.kind === "failing-command" && closedTasks.has(entry.item.task))
     yield* Effect.forEach(staleFailing, (entry) => Effect.asVoid(withdrawItem(root, entry.id, "task closed", at)), { discard: true })
-  })
-
-export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
-  Effect.forEach(actions, (action) =>
-    (action.kind === "closed" && action.outcome === "failed") || action.kind === "start-failed"
-      ? Effect.asVoid(openItem(root, itemId(action.task, "run-died"), {
-        kind: "run-died",
-        task: action.task,
-        text: "the run on " + action.machine + " died: " + action.reason,
-        ...choice(
-          "the run of " + action.task + " on " + action.machine,
-          { text: "rerun", outcome: "orc backlog add queues the task again, and the next beat starts a new run" },
-          { text: "close", outcome: "the task stays closed failed, and no run starts" }
-        ),
-        asked: at,
-        owner: "user"
-      }))
-      : Effect.void, { discard: true })
-
-const openOrReopenPrItem = (root: string, id: string, asked: Asked): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const item = yield* readItem(root, id)
-    if (item === null) {
-      yield* Effect.asVoid(openItem(root, id, asked))
-    } else if (item.state.kind === "withdrawn") {
-      yield* writeItem(root, id, { ...asked, state: { kind: "open" } })
-    } else if (item.state.kind === "open" && item.text !== asked.text) {
-      yield* writeItem(root, id, { ...asked, asked: item.asked, state: { kind: "open" } })
-    }
-  })
-
-// Each head commit gets its own items, so a fix pushed after a red check opens anew.
-export const routePullRequest = (root: string, task: string, pr: string, view: PullRequestView, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const ended = view.state === "MERGED" ? "merged" : view.state === "CLOSED" ? "closed without merging" : null
-    const refusals = checkRefusals(view)
-    const red = redChecks(view)
-    const holds = (kind: AttentionItem["kind"]): boolean => ended === null && (kind === "check-red" ? refusals.length > 0 : red.length === 0)
-    const prefixes = [itemId(task, "check-red") + ".", itemId(task, "pr-ready") + "."]
-    const settled = (yield* openItems(root, (name) => prefixes.some((prefix) => name.startsWith(prefix)))).filter((entry) =>
-      !(entry.id === itemId(task, entry.item.kind, view.headRefOid) && holds(entry.item.kind))
-    )
-    yield* Effect.forEach(settled, (entry) =>
-      entry.item.kind === "pr-ready" && ended !== null
-        ? Effect.asVoid(closeItem(root, entry.id, { words: ended, at }))
-        : Effect.asVoid(withdrawItem(root, entry.id, ended === null ? "head or checks changed" : "PR " + ended, at)), { discard: true })
-    if (ended !== null) {
-      return
-    }
-    if (red.length > 0) {
-      yield* openOrReopenPrItem(root, itemId(task, "check-red", view.headRefOid), {
-        kind: "check-red",
-        task,
-        text: pr + ": the check " + red.join(", ") + " is red",
-        ...choice(
-          "the PR " + pr + " of " + task,
-          { text: "send back", outcome: "orc backlog send-back " + task + " <words> sends the PR back for another pass on the red check" },
-          { text: "close", outcome: "the PR stays open with the red check, and nothing merges" }
-        ),
-        asked: at,
-        owner: "user"
-      })
-    } else if (refusals.length === 0) {
-      yield* openOrReopenPrItem(root, itemId(task, "pr-ready", view.headRefOid), {
-        kind: "pr-ready",
-        task,
-        text: pr + " is ready to merge, checks green: " + greenChecks(view).join(", "),
-        ...choice(
-          "the PR " + pr + " of " + task,
-          { text: "merge", outcome: "orc merge " + task + " merges the PR into main, and the item closes with the answer merged" },
-          { text: "hold", outcome: "the PR stays open and unmerged, and the item stays open" }
-        ),
-        asked: at,
-        owner: "user"
-      })
-    }
   })
 
 export type AnswerItemOutcome = CloseOutcome | { readonly kind: "answered elsewhere"; readonly task: string }
