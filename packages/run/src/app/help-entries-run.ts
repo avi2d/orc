@@ -2,6 +2,7 @@ import { askUserWord } from "../entities/review-gate/index"
 import { runKinds } from "../entities/backlog/index"
 import { runDeliveries } from "../shared/config/index"
 import { sandboxKinds } from "../shared/sandbox/index"
+import { accountNames } from "../features/signing-in/index"
 import type { HelpEntry } from "./help-format"
 
 const choice = (values: ReadonlyArray<string>): string => "<" + values.join("|") + ">"
@@ -94,6 +95,14 @@ export const appInstallHelp: HelpEntry = {
   about: "Builds the orc mods from this checkout when it has their sources, and copies them and the layout into ~/.config/herdr-app. Run it again after each orc upgrade.",
   options: [],
   examples: ["orc app install"]
+}
+
+export const loginHelp: HelpEntry = {
+  usage: ["orc login <" + accountNames.join("|") + ">"],
+  summary: "Sign one account in through its vendor's own sign-in",
+  about: "Makes the account's folder under ~/.orc/accounts if it is missing and runs the vendor's sign-in with its config folder set to it, so orc never reads or copies the credential. Only claude-main signs in today, through claude auth login with CLAUDE_CONFIG_DIR set. On a machine with no browser, Claude prints a link and takes back the code the page shows.",
+  options: [],
+  examples: ["orc login claude-main"]
 }
 
 export const updateHelp: HelpEntry = {

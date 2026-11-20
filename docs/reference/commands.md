@@ -41,6 +41,9 @@ Chat and the app:
   chat       Talk to the orchestrator, which adds, holds and answers tasks
   app        Install the orc mods and layout into the Herdr App
 
+Accounts:
+  login      Sign one account in through its vendor's own sign-in
+
 Updating orc:
   update     Install the newest published orc when it is newer than this one
 
@@ -842,6 +845,23 @@ upgrade.
 
 Examples:
   orc app install
+```
+
+## Accounts
+
+### orc login
+
+```text
+Usage: orc login <claude-main|claude-second|openai|opencode>
+
+Makes the account's folder under ~/.orc/accounts if it is missing and runs the
+vendor's sign-in with its config folder set to it, so orc never reads or copies
+the credential. Only claude-main signs in today, through claude auth login with
+CLAUDE_CONFIG_DIR set. On a machine with no browser, Claude prints a link and
+takes back the code the page shows.
+
+Examples:
+  orc login claude-main
 ```
 
 ## Updating orc

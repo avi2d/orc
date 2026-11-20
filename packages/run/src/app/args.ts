@@ -3,6 +3,7 @@ import { askUserWord, type QuestionAnswer } from "../entities/review-gate/index"
 import { isRunKind, type RunKind, unknownRunKind } from "../entities/backlog/index"
 import { isRunDelivery, type RunDelivery, runDeliveries } from "../shared/config/index"
 import { sandboxKinds, type SandboxKind } from "../shared/sandbox/index"
+import { accountNames, type AccountName, isAccountName } from "../features/signing-in/index"
 export type OrcArgs =
   | { readonly kind: "PrintVersion" }
   | { readonly kind: "ShowVersion" }
@@ -18,6 +19,7 @@ export type OrcArgs =
   | { readonly kind: "Dispatch"; readonly args: Exclude<DispatchArgs, { readonly kind: "UsageError" }> }
   | { readonly kind: "Chat"; readonly sessionFile: string | null }
   | { readonly kind: "InstallApp" }
+  | { readonly kind: "Login"; readonly account: AccountName }
   | { readonly kind: "Update"; readonly json: boolean }
   | { readonly kind: "UsageError"; readonly detail: string }
 const parseShowArgs = (rest: readonly string[]): OrcArgs => {
@@ -336,6 +338,12 @@ const parseChatArgs = (rest: readonly string[]): OrcArgs => {
   }
   return { kind: "Chat", sessionFile: file }
 }
+const parseLoginArgs = (rest: readonly string[]): OrcArgs => {
+  const [account = ""] = rest
+  return rest.length === 1 && isAccountName(account)
+    ? { kind: "Login", account }
+    : { kind: "UsageError", detail: "orc login takes one account: " + accountNames.join(", ") }
+}
 
 const topLevelParsers = {
   run: parseRunArgs,
@@ -346,6 +354,7 @@ const topLevelParsers = {
   refusals: (rest: readonly string[]): OrcArgs => parseJsonListArgs(rest, "ListRefusals"),
   chat: parseChatArgs,
   app: parseAppArgs,
+  login: parseLoginArgs,
   update: (rest: readonly string[]): OrcArgs => parseJsonListArgs(rest, "Update"),
   backlog: (rest: readonly string[]): OrcArgs => toDispatch("backlog", rest),
   attention: (rest: readonly string[]): OrcArgs => toDispatch("attention", rest),

@@ -103,7 +103,7 @@ const overviewNames = (text: string): Array<string> => [...text.matchAll(/^ {2}(
 describe("orc help", () => {
   test("the overview lists every top-level command instead of a partial or padded list", () => {
     const listed = overviewNames(overview())
-    expect(listed.toSorted()).toEqual(["app", "attention", "backlog", "beat", "chat", "heavy", "log", "machines", "merge", "refusals", "run", "runner", "runs", "score", "show", "update", "version"])
+    expect(listed.toSorted()).toEqual(["app", "attention", "backlog", "beat", "chat", "heavy", "log", "login", "machines", "merge", "refusals", "run", "runner", "runs", "score", "show", "update", "version"])
     expect(listed).toEqual(expect.arrayContaining(["run", "runs", "show", "score", "chat", "backlog", "beat", "merge", "runner"]))
   })
 
