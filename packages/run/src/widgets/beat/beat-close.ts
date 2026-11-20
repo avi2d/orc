@@ -181,6 +181,24 @@ const endClosed = (
       : Option.some({ kind: "closed", task: task.spec.id, machine, outcome: ending.outcome, reason: ending.reason, pr: ending.pr, report: ending.report } satisfies BeatAction)
   })
 
+export const waitingParkOf = (task: TaskRecord, ending: RunEnding): Arr.NonEmptyReadonlyArray<OpenQuestion> | null =>
+  ending.kind === "close" && ending.outcome === "failed" && task.parked !== null
+    ? Arr.map(task.parked.questions, (question) => ({ id: question.id, text: question.text, asked: question.asked, blocks: question.blocks }))
+    : null
+
+const reparkWaiting = (
+  root: string,
+  task: TaskRecord,
+  machine: string,
+  open: Arr.NonEmptyReadonlyArray<OpenQuestion>
+): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const parked = yield* parkStartedTask(root, task.spec.id, task.parked?.branch ?? taskBranch(task.spec.id), open, yield* nowIso).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
+    return parked === null
+      ? Option.none()
+      : Option.some({ kind: "parked", task: task.spec.id, machine, branch: parked.branch, questions: open.map((question) => question.id), decider: [] } satisfies BeatAction)
+  })
+
 const endTask = (
   root: string,
   home: string,
@@ -188,8 +206,13 @@ const endTask = (
   machine: string,
   ending: RunEnding,
   run?: string
-): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> =>
-  ending.kind === "park" ? endParked(root, home, task, machine, ending, run) : ending.kind === "split" ? endSplit(root, task, machine, ending) : endClosed(root, task, machine, ending)
+): Effect.Effect<Option.Option<BeatAction>, TaskFileError, FileSystem.FileSystem> => {
+  const waiting = waitingParkOf(task, ending)
+  if (waiting !== null) {
+    return reparkWaiting(root, task, machine, waiting)
+  }
+  return ending.kind === "park" ? endParked(root, home, task, machine, ending, run) : ending.kind === "split" ? endSplit(root, task, machine, ending) : endClosed(root, task, machine, ending)
+}
 
 const askingOf = (result: RunnerResult): typeof Asking.Type | null =>
   (result.status === "running" || result.status === "paused") && result.run?.asking !== undefined ? result.run.asking : null
