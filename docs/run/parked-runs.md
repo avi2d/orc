@@ -4,7 +4,8 @@ kind: reference
 # Parked runs
 A run that no-mistakes stops on review questions waits at that gate first, as [Running a task](running-a-task.md) shows.
 It waits 30 minutes, or the `ORC_ANSWER_WAIT_SECONDS` its machine sets.
-An `ask-user` finding is one of those questions, with the finding's id and text.
+A finding marked `ask-user`, or with any action other than `auto-fix` and `no-op`, is one of those questions, with the finding's id and text.
+The question `gate-cap` is another, asked once orc has answered 20 gates in the run without an outcome.
 The next beat writes the questions into the started task's `parked_questions`.
 It prints `asking <task-id> on <machine>: the run waits until <time> for the captain's answer to <question-ids>` only for the questions the attention queue owns for you.
 `orc backlog` shows that task as `started asking (<question-ids>)`.

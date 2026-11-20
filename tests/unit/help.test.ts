@@ -49,6 +49,8 @@ const invocations: ReadonlyArray<Invocation> = [
   call(["heavy", "check"]),
   call(["heavy", "watch"]),
   call(["heavy", "watch-once"]),
+  call(["version"], [], ["--json"]),
+  call(["machines"], [], ["--json"]),
   call(["chat"]),
   call(["app", "install"])
 ]
@@ -101,7 +103,7 @@ const overviewNames = (text: string): Array<string> => [...text.matchAll(/^ {2}(
 describe("orc help", () => {
   test("the overview lists every top-level command instead of a partial or padded list", () => {
     const listed = overviewNames(overview())
-    expect(listed.toSorted()).toEqual(["app", "attention", "backlog", "beat", "chat", "heavy", "log", "merge", "refusals", "run", "runner", "runs", "score", "show"])
+    expect(listed.toSorted()).toEqual(["app", "attention", "backlog", "beat", "chat", "heavy", "log", "machines", "merge", "refusals", "run", "runner", "runs", "score", "show", "update", "version"])
     expect(listed).toEqual(expect.arrayContaining(["run", "runs", "show", "score", "chat", "backlog", "beat", "merge", "runner"]))
   })
 

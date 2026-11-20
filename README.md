@@ -34,6 +34,7 @@ To install orc:
 1. Run `orc --version` to check it.
 
 Orc prints `orc` and its version.
+A linked checkout like this one updates through `orc update` once `update.command` names its update, as [Updating orc](docs/run/updating-orc.md) shows.
 
 ## Run your first task
 
