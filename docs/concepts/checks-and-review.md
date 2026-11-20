@@ -29,6 +29,10 @@ At each of its gates orc answers for you where it safely can.
 | `auto-fix` | Asks no-mistakes to fix it |
 | `no-op` | Ignores it |
 | `ask-user` | Treats it as a question, and waits for an answer |
+| Any other action, or none | Treats it as a question, and waits for an answer |
+
+After orc answers 20 gates in one run without an outcome, it asks the question `gate-cap` before it answers more.
+An answer to `gate-cap` lets orc answer 20 more gates.
 
 A run with an open question waits at the gate for 30 minutes.
 An answer in that time carries the run on at the same gate.
