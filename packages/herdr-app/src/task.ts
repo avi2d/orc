@@ -140,7 +140,8 @@ export type AnswerTarget = { readonly kind: "question"; readonly id: string } | 
 export const answerArgv = (task: string, target: AnswerTarget, text: string): ReadonlyArray<string> | null => {
   const words = text.trim()
   if (words === "") return null
-  return ["backlog", "answer", task, target.kind === "question" ? `${target.id}=${words}` : words]
+  const said = target.kind === "question" ? `${target.id}=${words}` : words
+  return ["backlog", "answer", task, ...(said.startsWith("-") ? ["--"] : []), said]
 }
 
 export const mergeArgv = (task: string): ReadonlyArray<string> => ["merge", task, "--basis", "captain-word"]

@@ -38,13 +38,14 @@ export const answerWords = (answer: BoardAnswer): string =>
   answer.words === undefined || answer.words.trim() === "" ? answer.answer : answer.answer + " — " + answer.words
 
 export const answerArgs = (task: string, target: CardTarget, words: string, expected?: ExpectedDecision): ReadonlyArray<string> => {
-  const asked = target.kind === "question" ? target.id + "=" + words : words
+  const said = target.kind === "question" ? target.id + "=" + words : words
+  const asked = said.startsWith("-") ? ["--", said] : [said]
   if (expected === undefined) {
-    return ["backlog", "answer", task, asked]
+    return ["backlog", "answer", task, ...asked]
   }
   return expected.kind === "parked"
-    ? ["backlog", "answer", task, "--expect", "parked", asked]
-    : ["backlog", "answer", task, "--expect", "held", "--generation", String(expected.generation), asked]
+    ? ["backlog", "answer", task, "--expect", "parked", ...asked]
+    : ["backlog", "answer", task, "--expect", "held", "--generation", String(expected.generation), ...asked]
 }
 
 const escapeHtml = (text: string): string =>
