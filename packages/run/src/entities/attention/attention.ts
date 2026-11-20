@@ -63,7 +63,7 @@ interface AskedQuestion {
   readonly text: string
   readonly asked?: string | undefined
   readonly blocks?: boolean | undefined
-  readonly options?: ReadonlyArray<AskOption>
+  readonly options?: ReadonlyArray<AskOption> | undefined
 }
 
 const reviewQuestionItem = (

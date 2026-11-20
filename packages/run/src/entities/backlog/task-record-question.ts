@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import type { ParkedAnswer } from "./task-record-answer"
 
-const ParkedOption = Schema.Struct({ text: Schema.String, outcome: Schema.optionalKey(Schema.String), picture: Schema.optionalKey(Schema.String) })
+const ParkedOption = Schema.Struct({ text: Schema.String, outcome: Schema.optional(Schema.String), picture: Schema.optional(Schema.String) })
 type ParkedOption = typeof ParkedOption.Type
 
 export const ChoicesFront = {
@@ -10,8 +10,8 @@ export const ChoicesFront = {
 }
 
 interface ParkedChoices {
-  readonly options?: ReadonlyArray<ParkedOption>
-  readonly recommendation?: string
+  readonly options?: ReadonlyArray<ParkedOption> | undefined
+  readonly recommendation?: string | undefined
 }
 
 export interface ParkedQuestion extends ParkedChoices {

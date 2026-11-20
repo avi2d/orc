@@ -6,7 +6,7 @@ import { answerDecision, choicesOf, findTask, grabIn, ranClosing, type Rewrite, 
 // An answer handed to an asking that ended went into the run, so only one never handed out or handed to this asking still answers it.
 const answersAsking = (answer: ParkedAnswer, asking: string | null): boolean => answer.relayedTo === null || answer.relayedTo === asking
 
-export type AskedQuestion = OpenQuestion & { readonly options?: ReadonlyArray<AskOption>; readonly recommendation?: string }
+export type AskedQuestion = Omit<OpenQuestion, "options" | "recommendation"> & { readonly options?: ReadonlyArray<AskOption> | undefined; readonly recommendation?: string | undefined }
 
 const parkedQuestions = (
   open: Arr.NonEmptyReadonlyArray<AskedQuestion>,
