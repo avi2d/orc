@@ -60,9 +60,14 @@ const HeavyConfig = Schema.Struct({
 })
 export type HeavyConfig = typeof HeavyConfig.Type
 
+const UpdateConfig = Schema.Struct({
+  command: Schema.optional(Schema.NonEmptyArray(Schema.String.check(Schema.isNonEmpty())))
+})
+
 const OrcConfigFile = Schema.Struct({
   providers: Schema.Array(Provider),
   heavy: Schema.optional(HeavyConfig),
+  update: Schema.optional(UpdateConfig),
   models: Schema.optional(Schema.Struct({
     implementer: Schema.optional(ModelRef),
     fixer: Schema.optional(ModelRef),
