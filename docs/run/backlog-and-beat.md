@@ -383,7 +383,7 @@ A start older than 30 minutes whose log has not grown for 30 minutes closes fail
 The quiet log closes the task before the 30 minute stall flag can fire.
 A started run whose output has not grown for 30 minutes prints `stalled <task-id> on <machine>: no output since <time>` once, and again after new output stalls anew.
 A PR the beat cannot read for the chat prints `cannot read the PR of <task-id> for the chat: <reason>`.
-On a project with `"yolo": true`, the beat merges a closed ship task's open PR once every check is green, through `orc merge` with `yolo-green`, as [Merging a task's PR](merging-a-tasks-pr.md) shows.
+On a project with `"yolo": true`, the beat merges the open PR of a ship task that closed done once every check is green, through `orc merge` with `yolo-green`, as [Merging a task's PR](merging-a-tasks-pr.md) shows.
 It prints `merged <task-id> <url> on yolo-green`, or `did not merge <task-id> on yolo-green: <reason>` when `orc merge` refuses.
 A missing start command exits 127 into its log, and the task stays started until the 10 minute no-record grace or the 30 minute quiet-log grace closes it.
 Only a failure to spawn the log wrapper closes the task as `start-failed`.

@@ -83,7 +83,7 @@ export const prEvents = (
       yield* writePrState(root, id, pr, prState)
       return Option.none()
     }
-    const waits = yield* Effect.result(ownerWaits(pr, view.success, yolo))
+    const waits = yield* Effect.result(ownerWaits(pr, view.success, yolo)).pipe(Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed(Result.fail(new BacklogError({ detail: "cannot read the files of " + pr + ": the read timed out after " + prSeconds + " seconds" }))) }))
     yield* routePullRequest(root, id, pr, view.success, at, Result.isSuccess(waits) ? waits.success ?? [] : [])
     const event = prEvent(task, pr, view.success, at, yield* eventRecorded(root, id + ".pr-ready"))
     if (event !== null) {
@@ -99,5 +99,5 @@ export const prEvents = (
     if (ranClosing(task)?.outcome !== "done") {
       return Option.none()
     }
-    return Option.some(yield* yoloMerge(root, id, pr))
+    return Option.some(yield* yoloMerge(root, id, pr).pipe(Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed({ kind: "merge-refused", task: id, reason: "cannot merge " + pr + ": the merge timed out after " + prSeconds + " seconds" } as BeatAction) })))
   })
