@@ -51,6 +51,8 @@ If the latest resumable run has changed or disappeared, Orc refuses the resume i
 The resumed attempt keeps the earlier completed steps and hands your answers to no-mistakes.
 If the resumed run stops on new questions, the task parks again with those beside the questions it kept, and it keeps the answers it already has.
 An answer given after the beat last read the waiting run is kept too.
+The resumed run records only the earlier questions that no `--answer` settled.
+So a resumed run that stops at a gate with no new question closes the task failed with that gate's reason, instead of parking it on answered questions and starting it again on the next beat.
 A task whose every blocking question has an answer can resume when its original machine and run are available.
 `orc backlog` shows a parked task as `parked (<question-ids>)`.
 `orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times, their blocking flag and their answers.

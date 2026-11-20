@@ -67,7 +67,7 @@ export const askSetupFor = (
     corrected: new Map(),
     correctionsSent: 0
   },
-  priorOpen
+  priorOpen: priorOpen.filter((question) => !answered.some((answer) => answer.question === question.id))
 })
 
 export type AskedQuestion = OpenQuestion & { readonly asked: string }
