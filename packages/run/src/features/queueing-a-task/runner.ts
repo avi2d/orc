@@ -193,7 +193,9 @@ const buildRun = (
     const delivery = request.delivery === undefined ? [] : ["--delivery", request.delivery]
     const models = [
       ...(request.implementerModel === undefined ? [] : ["--implementer-model", request.implementerModel]),
-      ...(request.fixerModel === undefined ? [] : ["--fixer-model", request.fixerModel])
+      ...(request.fixerModel === undefined ? [] : ["--fixer-model", request.fixerModel]),
+      ...(request.implementerThinking === undefined ? [] : ["--implementer-thinking", request.implementerThinking]),
+      ...(request.fixerThinking === undefined ? [] : ["--fixer-thinking", request.fixerThinking])
     ]
     const instructions = request.instructions === undefined ? [] : ["--instructions", yield* writeInstructions(folder + "/" + key + ".instructions", request.instructions)]
     const resume = request.resumeRun === undefined ? [] : ["ORC_DISPATCH_RESUME_RUN=" + request.resumeRun]

@@ -56,6 +56,7 @@ Usage: orc run [<task-file>] [--kind <ship|scout|task|parent>]
            [--delivery <no-mistakes|direct-PR>] [--branch <name>]
            [--sandbox <nono|none>] [--token-file <path>] [--provider <id>]
            [--implementer-model <model>] [--fixer-model <model>]
+           [--implementer-thinking <level>] [--fixer-thinking <level>]
            [--instructions <path>] [--allow ask-user] [--answer <id>=<text>]
 
 Runs the task in the clean checkout you are in: Pi writes the change, the checks
@@ -82,6 +83,11 @@ Options:
                             config.json names.
   --fixer-model <model>     The fixer model, used instead of the one config.json
                             names.
+  --implementer-thinking <level>
+                            The implementer thinking level, used instead of the
+                            one the agent file names.
+  --fixer-thinking <level>  The fixer thinking level, used instead of the one
+                            the agent file names.
   --instructions <path>     A project instructions file handed to Pi.
   --allow ask-user          Decline findings marked exactly ask-user, on a
                             resume. Findings with any other action still wait as

@@ -188,6 +188,7 @@ const expectedFiles = [
   "src/entities/agent/pi-run.ts",
   "src/entities/agent/pi.ts",
   "src/features/running-a-task/report-run.ts",
+  "src/features/running-a-task/run-args.ts",
   "src/entities/run-history/report.ts",
   "src/features/running-a-task/run-deliverer.ts",
   "src/features/running-a-task/run-exec.ts",
