@@ -508,6 +508,8 @@ Examples:
   orc merge orc-9
   orc merge orc-9 --basis yolo-green
 ```
+With `yolo-green` orc also refuses a change that waits for the captain's word.
+[Merging a task's PR](../run/merging-a-tasks-pr.md) names each such change.
 
 ## The runner
 

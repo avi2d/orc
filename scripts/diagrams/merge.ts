@@ -3,7 +3,7 @@ import { arrow, card, svg, tall, text, zone, type Drawing, type Part } from "./k
 const title = "The merge: what orc merge checks before it lands a pull request"
 
 const desc =
-  "You, the chat and the app all merge through orc merge. It merges only when the task names a pull request, the pull request is open, every check has reported green, and the branch is not behind its base. Otherwise it refuses, names every reason, and merges nothing. It squash merges at the exact commit it checked. A merge always traces back to your word, and the decider never answers a question about merging."
+  "You, the chat, the app and the beat all merge through orc merge. It merges only when the task names a pull request, the pull request is open, every check has reported green, and the branch is not behind its base. Otherwise it refuses, names every reason, and merges nothing. It squash merges at the exact commit it checked. A merge traces back to your word or to the yolo you set, and the decider never answers a question about merging."
 
 const askers: readonly Part[] = [
   { title: "You", text: "`orc merge <task-id>`" },
@@ -23,8 +23,8 @@ const refused: Part = { title: "Refused: nothing merges", text: "The refusal nam
 
 const word: readonly Part[] = [
   { title: "Your word", text: "The default basis. You said to merge that pull request." },
-  { title: "`yolo-green`", text: "The project has `\"yolo\": true`, and you ask the chat to merge its green pull request." },
-  { title: "Never the decider", text: "It answers no question about merging, so a merge always traces back to you.", href: "attention" },
+  { title: "`yolo-green`", text: "The project has `\"yolo\": true`, and the beat merges its green pull request by itself." },
+  { title: "Never the decider", text: "It answers no question about merging, so a merge traces back to your word or yolo.", href: "attention" },
   { title: "After the merge", text: "A later beat records it, the chat posts it, and a ship task that waited on it can start.", href: "beat" }
 ]
 

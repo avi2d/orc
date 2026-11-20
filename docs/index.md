@@ -54,6 +54,7 @@ Each step below is one part of orc, and each has its own page.
    [Checks and review](concepts/checks-and-review.md) shows both gates.
 1. **You merge it.**
    For a ship task, the task closes done with its pull request, and `orc merge <task-id>` lands it once every check is green.
+   On a project with `yolo` set, the beat lands that pull request by itself.
    [The merge](concepts/merge.md) lists what the merge refuses.
 
 Two more parts sit beside that path.
