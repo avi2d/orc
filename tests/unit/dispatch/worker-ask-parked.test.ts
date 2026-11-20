@@ -30,22 +30,22 @@ describe("a worker question asked through orc_ask", () => {
         yield* openWorkerAsks(yield* FileSystem.FileSystem, setup).tick
       }))
       const asking = Schema.decodeUnknownSync(Asking)(JSON.parse(await readFile(join(runDir, askingFileName), "utf8")))
-      const question = asking.questions[0]
-      expect(question?.options).toEqual(options)
-      expect(question?.recommendation).toBe("Blue")
-      expect(question?.text).toBe("Which colour?\nA) Red\n   Leads to: The page turns red\nB) Blue\n   Leads to: The page turns blue\nRecommended: B) Blue")
+      if (!Arr.isReadonlyArrayNonEmpty(asking.questions)) {
+        throw new Error("asking.json holds no question")
+      }
+      const question = Arr.headNonEmpty(asking.questions)
+      expect(question.options).toEqual(options)
+      expect(question.recommendation).toBe("Blue")
+      expect(question.text).toBe("Which colour?\nA) Red\n   Leads to: The page turns red\nB) Blue\n   Leads to: The page turns blue\nRecommended: B) Blue")
 
       const record = await run(addTask(root, spec))
       await run(claimTask(root, record.spec.id))
       await run(writeTaken(root, { spec: record.spec, hold: null, parked: null, state: { kind: "started", claim, started: { at: "2026-10-27T10:02:00.000Z", log: root + "/logs/orc-1.log" } } }))
-      if (!Arr.isReadonlyArrayNonEmpty(asking.questions)) {
-        throw new Error("asking.json holds no question")
-      }
       expect(await run(askStartedTask(root, "orc-1", { asked: asking.asked, questions: asking.questions }))).toBe(true)
       const parked = (await run(listTasks(root))).at(0)?.parked?.questions[0]
       expect(parked?.options).toEqual(options)
       expect(parked?.recommendation).toBe("Blue")
-      expect(parked?.text).toBe(question?.text)
+      expect(parked?.text).toBe(question.text)
     } finally {
       await rm(root, { recursive: true, force: true })
     }

@@ -1,7 +1,7 @@
 import { Array as Arr, Effect, FileSystem } from "effect"
 import type { AskOption, OpenQuestion } from "../review-gate/index"
 import { openReviewQuestions } from "../attention/index"
-import { answerDecision, findTask, grabIn, ranClosing, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, platformFailure, publishOnce, takenGrab, type Hold, type HoldQuestion, isHeld, isDeciderAnswer, openQuestions, type Parked, type CaptainAnswer, type DeciderAnswer, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord, renderTaskFile } from "../backlog/index"
+import { answerDecision, choicesOf, findTask, grabIn, ranClosing, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, platformFailure, publishOnce, takenGrab, type Hold, type HoldQuestion, isHeld, isDeciderAnswer, openQuestions, type Parked, type CaptainAnswer, type DeciderAnswer, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord, renderTaskFile } from "../backlog/index"
 
 // An answer handed to an asking that ended went into the run, so only one never handed out or handed to this asking still answers it.
 const answersAsking = (answer: ParkedAnswer, asking: string | null): boolean => answer.relayedTo === null || answer.relayedTo === asking
@@ -21,15 +21,7 @@ const parkedQuestions = (
   return Arr.appendAll(
     Arr.map(open, (question): ParkedQuestion =>
       prior.find((known) => stillAsked(known, question)) ??
-      ({
-        id: question.id,
-        text: question.text,
-        asked: askedOf(question),
-        blocks: question.blocks ?? true,
-        ...(question.options === undefined ? {} : { options: question.options }),
-        ...(question.recommendation === undefined ? {} : { recommendation: question.recommendation }),
-        answer: null
-      })),
+      { id: question.id, text: question.text, asked: askedOf(question), blocks: question.blocks ?? true, ...choicesOf(question), answer: null }),
     kept
   )
 }
