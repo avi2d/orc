@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { attentionJson, attentionText } from "../../../packages/run/src/features/attention-list/index"
+import { serveCorrections } from "../../../packages/run/src/widgets/beat/beat-close"
 import { claimDeciding, openItems, readAttention, routeTaskItems } from "../../../packages/run/src/entities/attention/attention"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/entities/backlog/index"
 import { type AskDecider, DeciderUnheard, decideReviewQuestions, type DeciderRequest } from "../../../packages/run/src/features/decider/index"
@@ -150,6 +151,22 @@ describe("the decider", () => {
         expect(at !== undefined && at >= before && at <= after).toBe(true)
       }
     })
+  })
+
+  test("a verbatim bullet with quoted text is accepted instead of escalated", async () => {
+    await withAskingTask(async (root) => {
+      const reply = JSON.stringify({ decision: "answer", answer: "Two retries", rule: '- "Retry twice."', reason: "the intent says twice" })
+      await decide(root, replies({ [r2.text]: reply }))
+      expect(await itemFile(root, r2Item)).toMatchObject({ decision: { kind: "answered", rule: { quote: "Retry twice." } }, state: { kind: "closed", answer: { words: "Two retries" } } })
+    }, [r2], '# Retry\n- "Retry twice."\n')
+  })
+
+  test("a policy sentence outside its rules section escalates instead of authorizing an answer", async () => {
+    await withAskingTask(async (root) => {
+      const reply = JSON.stringify({ decision: "answer", answer: "Two retries", rule: "Answer it only when it is routine.", reason: "routine" })
+      await decide(root, replies({ [r2.text]: reply }))
+      expect(await itemFile(root, r2Item)).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+    }, [r2])
   })
 
   test("an escalated question turns to the user and stays open with the decider's reason, instead of being answered", async () => {
@@ -541,6 +558,25 @@ describe("the decider", () => {
         throw new Error("the task is gone")
       }
       expect(correctionsDue(task).map((question) => [question.id, question.answer.words, question.answer.overturned.words])).toEqual([["r2", "Three retries", "Two retries"]])
+    }, [r2])
+  })
+
+  test("a correction queued after the last Pi session is not reported as delivered", async () => {
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [r2.text]: answer }))
+      await run(markAnswersRelayed(root, "orc-1", asked, [{ id: "r2", asked, words: "Two retries" }]))
+      await run(answerTask(root, "orc-1", "r2=Three retries", "2099-01-01T00:00:00.000Z"))
+      const task = (await run(listTasks(root))).at(0)
+      assert.ok(task)
+      const file = join(root, "corrections.json")
+      const result = await run(serveCorrections(task, "linux", (corrections) =>
+        Effect.promise(async () => {
+          await writeFile(file, JSON.stringify({ corrections }))
+          return "queued"
+        })))
+      expect(JSON.parse(await readFile(file, "utf8"))).toEqual({ corrections: [{ question: "r2", answer: "Three retries" }] })
+      expect(result).toMatchObject({ kind: "answer-failed", task: "orc-1" })
+      expect((await run(listTasks(root))).at(0)?.parked?.questions.at(0)?.answer?.relayedTo).toBeNull()
     }, [r2])
   })
 
