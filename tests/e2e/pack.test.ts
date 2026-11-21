@@ -99,6 +99,7 @@ const expectedFiles = [
   "src/entities/token/index.ts",
   "src/entities/task-copy/index.ts",
   "src/entities/attention/beat-action.ts",
+  "src/entities/attention/beat-items.ts",
   "src/widgets/beat/beat-attention.ts",
   "src/widgets/beat/beat-close.ts",
   "src/widgets/beat/beat-origin.ts",
