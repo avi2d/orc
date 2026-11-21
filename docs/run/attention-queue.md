@@ -29,6 +29,9 @@ A question that names no action goes through a topic check instead.
 Orc sends questions about deletion, security, credentials, merging, pushing, releasing, spending, irreversible actions, site appearance, legal text, and logins to you.
 The topic check uses the fixed word list in `packages/run/src/features/decider/decider-guard.ts`.
 Rules and policy do not widen either check.
+No-mistakes does not write this column yet.
+A question without it keeps the topic check.
+The writing half ships as later work.
 
 The decider can:
 
