@@ -99,7 +99,7 @@ export const openDriveLog = (started: string): DriveLog => {
     refuse,
     awaitAnswers: (gate, missing, asked) => ({
       ...refuse(gate, missingReason(missing)),
-      openQuestions: missing.map((finding) => ({ id: finding.id, text: finding.description, ...(asked === null ? {} : { asked }) }))
+      openQuestions: missing.map((finding) => ({ id: finding.id, text: finding.description, ...(finding.asks === undefined ? {} : { asks: finding.asks }), ...(asked === null ? {} : { asked }) }))
     }),
     fail,
     finish: (parsed) =>

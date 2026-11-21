@@ -14,6 +14,7 @@ export interface OpenQuestion {
   readonly blocks?: boolean | undefined
   readonly options?: ReadonlyArray<{ readonly text: string; readonly outcome?: string | undefined; readonly picture?: string | undefined }> | undefined
   readonly recommendation?: string | undefined
+  readonly asks?: string | undefined
 }
 
 export interface NoMistakesFinding {
@@ -23,6 +24,7 @@ export interface NoMistakesFinding {
   readonly line: string
   readonly action: string
   readonly description: string
+  readonly asks?: string | undefined
 }
 
 export interface ParkedGate {
@@ -51,6 +53,8 @@ export type GateResponse = Exclude<GateAnswer, { readonly kind: "refuse" }>
 
 const terminalStatuses = new Set(["completed", "failed", "cancelled", "checks_passed"])
 
+const askedOf = (asks: string): { readonly asks?: string } => asks === "" ? {} : { asks }
+
 export const findingsTable = (output: string): ReadonlyArray<NoMistakesFinding> =>
   table(output, "findings").map((row) => ({
     id: row.get("id") ?? "",
@@ -58,7 +62,8 @@ export const findingsTable = (output: string): ReadonlyArray<NoMistakesFinding> 
     file: row.get("file") ?? "",
     line: row.get("line") ?? "",
     action: row.get("action") ?? "",
-    description: row.get("description") ?? ""
+    description: row.get("description") ?? "",
+    ...askedOf((row.get("asks") ?? "").trim())
   }))
 
 export const stepsWithFindings = (output: string): ReadonlyArray<string> =>
