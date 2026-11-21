@@ -10,7 +10,7 @@ It prints `asking <task-id> on <machine>: the run waits until <time> for the cap
 `orc backlog` shows that task as `started asking (<question-ids>)`.
 The chat posts only the questions the attention queue owns for you, as it does a parked task's.
 Each question also waits in `orc attention` until an answer or a withdraw takes it out, as [The attention queue](attention-queue.md) shows.
-The beat first gives each question to the decider, which answers a routine one in that beat or escalates it to you, as [The decider](attention-queue.md#the-decider) shows.
+The beat first gives each question the attention queue owns for the decider to the decider, which answers a routine one in that beat or escalates it to you, as [The decider](attention-queue.md#the-decider) shows.
 Answer one with `orc backlog answer <task-id> <question-id>=<text>`, and the next beat hands every answer the run waits on to it through `orc runner answer` on its machine.
 It prints `handed <question-ids> to the run of <task-id> on <machine>`, and the run carries on at the same gate with no new dispatch.
 A wait on several questions gets every answer given so far each time the beat hands one more.
