@@ -1,15 +1,18 @@
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, Layer } from "effect"
+import { Array as Arr, Effect, Layer, Schema } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { addTask, claimTask, findTask, listTasks, writeTaken } from "../../packages/run/src/entities/backlog/index"
-import { answerTask, askStartedTask, handAnswersToResume } from "../../packages/run/src/entities/parked-runs/index"
+import { answerTask, askStartedTask, handAnswersToResume, parkStartedTask } from "../../packages/run/src/entities/parked-runs/index"
 import { decideReviewQuestions, type AskDecider, type DeciderRequest } from "../../packages/run/src/features/decider/index"
 import { askSetupFor } from "../../packages/run/src/entities/agent/index"
 import { driveNoMistakes, type NoMistakesRecord, type NoMistakesReply, type NoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
+import { waitForAnswers } from "../../packages/run/src/entities/review-gate/answer-wait"
+import { Asking } from "../../packages/run/src/entities/review-gate/index"
+import { endingFromResult, readResultThrough } from "../../packages/run/src/features/queueing-a-task/index"
 import type { GateResponse } from "../../packages/run/src/entities/review-gate/no-mistakes-gate"
 import { openDatabase, openQuestionsForRun, recordRun, recordSignal, recordStep } from "../../packages/run/src/entities/run-history/index"
 import { recordOpenAsks } from "../../packages/run/src/features/running-a-task/history-write"
@@ -76,9 +79,9 @@ const beatWith = (root: string, statusJson: string, sources = quietSources()) =>
   return Effect.runPromise(runBeat(root, root, sources).pipe(Effect.provide(Layer.merge(BunServices.layer, spawner))))
 }
 
-const driveGate = async (runs: string, name: string, overrides: { start: string; respond?: (response: GateResponse) => Effect.Effect<NoMistakesReply>; answers: ReadonlyArray<{ question: string; answer: string }> }): Promise<NoMistakesRecord> => {
+const driveGate = async (runs: string, name: string, overrides: { start: string; respond?: (response: GateResponse) => Effect.Effect<NoMistakesReply>; answers: ReadonlyArray<{ question: string; answer: string }>; waitSeconds?: number }): Promise<NoMistakesRecord> => {
   await mkdir(join(runs, name), { recursive: true })
-  return run(driveNoMistakes({ runner: runnerFor(overrides.start, overrides.respond), taskFile: runs + "/task.md", runDir: runs + "/" + name, answers: overrides.answers, waitForAnswers: () => Effect.succeed({ answers: [], asked: null }) }))}
+  return run(driveNoMistakes({ runner: runnerFor(overrides.start, overrides.respond), taskFile: runs + "/task.md", runDir: runs + "/" + name, answers: overrides.answers, waitForAnswers: overrides.waitSeconds === undefined ? () => Effect.succeed({ answers: [], asked: null }) : waitForAnswers(join(runs, name), overrides.waitSeconds, "no-mistakes") }))}
 
 const parkedTable = (findings: ReadonlyArray<string>): string =>
   ["run:", "  status: awaiting_approval", "  awaiting_agent: parked 2m10s", "  head: abc1234", '  pr: ""', "  findings[" + findings.length.toString() + "]{id,severity,file,line,action,description}:", ...findings.map((row) => "    " + row), "gate: review"].join("\n")
@@ -294,6 +297,98 @@ describe("a run parked on a gate orc cannot answer", () => {
       }
       expect(heard).toEqual([])
       expect((await run(findTask(root, "orc-1")))?.parked?.questions.map((question) => question.answer)).toEqual([null])
+      expect(await openReviewItems(root)).toHaveLength(1)
+    })
+  })
+
+  test("a remote parked gate keeps the owner routing instead of dispatching", async () => {
+    await withDirs(async (root, runs) => {
+      await startOrc1(root, "2026-11-18T10:00:00.000Z")
+      const document = {
+        schema: "orc.runner.v1",
+        result: {
+          task: "orc-1", status: "failed", pueueTask: 11,
+          started: "2026-11-18T10:00:00.000Z", ended: "2026-11-18T10:01:00.000Z",
+          reason: "review-1 needs a human",
+          run: { id: "run-9", status: "failed", prLink: null, endReason: "review-1 needs a human", openQuestions: [{ id: "review-1", text: "needs a human", owner: "user" }] }
+        }
+      }
+      await writeFile(join(runs, "remote.json"), JSON.stringify(document))
+      await writeFile(join(runs, "remote.sh"), "#!/bin/sh\ncat " + JSON.stringify(join(runs, "remote.json")) + "\n")
+      const reach: [string, ...Array<string>] = ["sh", join(runs, "remote.sh")]
+      const decoded = await run(readResultThrough(reach, "orc-1"))
+      const ending = endingFromResult(decoded, "ship")
+      if (ending?.kind !== "park") {
+        throw new Error("the remote gate should park")
+      }
+      await run(parkStartedTask(root, "orc-1", "orc/orc-1", ending.questions, "2026-11-18T10:01:00.000Z", "run-9"))
+      expect((await run(findTask(root, "orc-1")))?.parked?.questions.map((question) => question.owner ?? null)).toEqual(["user"])
+      const stored = await run(openItems(root))
+      const review = stored.filter((entry) => entry.item.kind === "review-question" && entry.item.task === "orc-1")
+      expect(review.map((entry) => entry.item.owner)).toEqual(["user"])
+      const heard: Array<DeciderRequest> = []
+      const sources = { ...quietSources(), askDecider: answeringDecider("# Fix the thing", heard) }
+      for (const [start, end] of [["2026-11-18T10:01:00.000Z", "2026-11-18T10:03:00.000Z"], ["2026-11-18T10:03:00.000Z", "2026-11-18T10:05:00.000Z"]] as const) {
+        const waiting = await beatWith(root, doneStatus(root, start, end), sources)
+        const kinds = actionKinds(waiting.actions)
+        expect(kinds.filter((kind) => kind === "started:orc-1")).toEqual([])
+        expect(kinds).toContain("waits:orc-1")
+      }
+      expect(heard).toEqual([])
+      expect((await run(findTask(root, "orc-1")))?.parked?.questions.map((question) => question.answer)).toEqual([null])
+      expect(await openReviewItems(root)).toHaveLength(1)
+    })
+  })
+
+  test("a gate that opens mid-batch is reported once instead of once per timestamp", async () => {
+    await withDirs(async (root, runs) => {
+      const batch = "2026-11-18T10:00:00.000Z"
+      await startOrc1(root, batch)
+      await mkdir(join(runs, "run-2"), { recursive: true })
+      await writeFile(join(runs, "run-2", "asking.json"), JSON.stringify({ asked: batch, until: batch, questions: [{ id: "ask-7", text: "Worker question?", blocks: false, asked: batch }] }))
+      const live: { current: typeof Asking.Type | null } = { current: null }
+      const watch = (async () => {
+        const end = Date.now() + 8000
+        while (Date.now() < end) {
+          const text = await readFile(join(runs, "run-2", "asking.json"), "utf8").catch(() => null)
+          let asking: typeof Asking.Type | null = null
+          if (text !== null) {
+            try {
+              asking = Schema.decodeUnknownSync(Asking)(JSON.parse(text))
+            } catch {
+              asking = null
+            }
+          }
+          if (asking !== null && asking.questions.some((question) => question.id === "review-1")) {
+            live.current = asking
+            return
+          }
+          await new Promise((resolve) => setTimeout(resolve, 25))
+        }
+      })()
+      const runB = await driveGate(runs, "run-2", { start: parkedTable(["review-1,warning,,,manual,needs a human"]), answers: [], waitSeconds: 1 })
+      await watch
+      const snapshot = live.current
+      if (snapshot === null) {
+        throw new Error("the live asking never carried the gate")
+      }
+      expect(snapshot.questions.find((question) => question.id === "review-1")?.asked).toEqual(batch)
+      expect(runB.openQuestions).toEqual([{ id: "review-1", text: "needs a human", asked: batch, owner: "user" }])
+      await recordGateRun(root, "run-2", "2026-11-18T10:03:00.000Z", runB, runB.result)
+      if (!Arr.isReadonlyArrayNonEmpty(snapshot.questions)) {
+        throw new Error("the live asking holds no questions")
+      }
+      await run(askStartedTask(root, "orc-1", { asked: snapshot.asked, questions: snapshot.questions }))
+      const parked = await beatWith(root, doneStatus(root, "2026-11-18T10:02:00.000Z", "2026-11-18T10:05:00.000Z"))
+      expect(actionKinds(parked.actions)).toContain("parked:orc-1")
+      expect(await openReviewItems(root)).toHaveLength(1)
+      const heard: Array<DeciderRequest> = []
+      const sources = { ...quietSources(), askDecider: answeringDecider("# Fix the thing", heard) }
+      const later = await beatWith(root, doneStatus(root, "2026-11-18T10:02:00.000Z", "2026-11-18T10:05:00.000Z"), sources)
+      const kinds = actionKinds(later.actions)
+      expect(kinds.filter((kind) => kind === "started:orc-1")).toEqual([])
+      expect(kinds).toContain("waits:orc-1")
+      expect(heard).toEqual([])
       expect(await openReviewItems(root)).toHaveLength(1)
     })
   })

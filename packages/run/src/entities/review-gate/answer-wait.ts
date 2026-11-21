@@ -96,7 +96,7 @@ export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: stri
       const deadline = Date.now() + waitSeconds * 1000
       const until = new Date(deadline).toISOString()
       const owned = new Set(ownerFindingsIn(missing).map((finding) => finding.id))
-      const fresh: ReadonlyArray<AskingQuestion> = missing.map((finding) => ({ id: finding.id, text: finding.description, blocks: true, asked: now, ...(owned.has(finding.id) ? { owner: "user" as const } : {}) }))
+      const fresh: ReadonlyArray<AskingQuestion> = missing.map((finding) => ({ id: finding.id, text: finding.description, blocks: true, asked: asked, ...(owned.has(finding.id) ? { owner: "user" as const } : {}) }))
       const kept = (previous?.questions ?? []).filter((question) => !missing.some((finding) => finding.id === question.id))
       const merged = [...kept, ...fresh]
       if (!(yield* writeWhole(asking, JSON.stringify({ asked, until, questions: merged })))) {
