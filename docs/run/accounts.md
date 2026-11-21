@@ -32,7 +32,9 @@ Open the link on any device, sign in, and paste the code the page shows back int
 
 ## No copy
 
-The vendor's sign-in runs with the terminal's input and output, and it writes its credential into the account folder itself.
+The vendor's sign-in runs with the terminal's input and output, with its config held in the account folder.
+On Linux the credential stays in that folder.
+On macOS the credential stays in the login keychain under a name tied to that folder.
 Orc never reads, prints or copies a credential, and it opens no file inside the account folder.
 `tests/e2e/login.test.ts` holds both rules: the sign-in sees only its own folder, and the command prints no token-shaped value and opens no credential file.
 

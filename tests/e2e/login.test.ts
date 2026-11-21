@@ -78,7 +78,7 @@ describe("orc login", () => {
       expect(await readdir(second)).toEqual(["kept"])
       expect(await readFile(join(second, "kept"), "utf8")).toBe("second account")
       expect(ran.stdout).toContain("Login successful.")
-      expect(ran.stdout).toContain("the sign-in is kept in " + main)
+      expect(ran.stdout).toContain("signed in with CLAUDE_CONFIG_DIR=" + main)
     })
   }, 30_000)
 
