@@ -17,6 +17,7 @@ interface WorkerAsk {
   readonly question: string
   readonly text: string
   readonly options: ReadonlyArray<AskOption> | undefined
+  readonly recommendation: string | undefined
   readonly deadline: number | null
   readonly askedAt: string
   replied: boolean
@@ -76,6 +77,7 @@ const AskArgs = Schema.Struct({
   question: Schema.String,
   context: Schema.optional(Schema.String),
   options: Schema.optional(Schema.Array(AskOption)),
+  recommendation: Schema.optional(Schema.String),
   blocks: Schema.Boolean
 })
 
@@ -86,13 +88,21 @@ const decodeAskArgs = Schema.decodeUnknownOption(AskArgs)
 const letter = (index: number): string => String.fromCharCode(65 + index)
 
 const optionLine = (option: AskOption, index: number): string =>
-  letter(index) + ") " + option.text + (option.picture === undefined ? "" : " (picture: " + option.picture + ")")
+  letter(index) + ") " + option.text +
+  (option.picture === undefined ? "" : " (picture: " + option.picture + ")") +
+  (option.outcome === undefined ? "" : "\n   Leads to: " + option.outcome)
 
-const workerQuestionText = (args: Pick<AskArgs, "question" | "context" | "options">): string =>
+const recommendationLine = (options: ReadonlyArray<AskOption>, recommendation: string): string => {
+  const index = options.findIndex((option) => option.text === recommendation)
+  return "Recommended: " + (index === -1 ? recommendation : letter(index) + ") " + recommendation)
+}
+
+const workerQuestionText = (args: Pick<AskArgs, "question" | "context" | "options" | "recommendation">): string =>
   [
     args.question.trim(),
     ...(args.context === undefined || args.context.trim() === "" ? [] : ["Context: " + args.context.trim()]),
-    ...(args.options ?? []).map(optionLine)
+    ...(args.options ?? []).map(optionLine),
+    ...(args.recommendation === undefined ? [] : [recommendationLine(args.options ?? [], args.recommendation)])
   ].join("\n")
 
 export const liveAskQuestions = (setup: AskSetup): ReadonlyArray<OpenQuestion> =>
@@ -100,7 +110,9 @@ export const liveAskQuestions = (setup: AskSetup): ReadonlyArray<OpenQuestion> =
     id: ask.id,
     text: ask.text,
     asked: ask.askedAt,
-    blocks: ask.deadline !== null
+    blocks: ask.deadline !== null,
+    ...(ask.options === undefined ? {} : { options: [...ask.options] }),
+    ...(ask.recommendation === undefined ? {} : { recommendation: ask.recommendation })
   }))
 
 export interface WorkerAsks {
@@ -148,6 +160,7 @@ const registerNew = (fs: FileSystem.FileSystem, setup: AskSetup): Effect.Effect<
         question: decoded.question.trim(),
         text: workerQuestionText(decoded),
         options: decoded.options,
+        recommendation: decoded.recommendation,
         deadline: decoded.blocks ? Date.parse(now) + setup.waitSeconds * 1000 : null,
         askedAt: now,
         replied: false
@@ -174,6 +187,7 @@ const writeAsking = (fs: FileSystem.FileSystem, setup: AskSetup): Effect.Effect<
         id: ask.id,
         text: ask.text,
         ...(ask.options === undefined ? {} : { options: [...ask.options] }),
+        ...(ask.recommendation === undefined ? {} : { recommendation: ask.recommendation }),
         blocks: ask.deadline !== null,
         asked: ask.askedAt
       }))
@@ -265,7 +279,14 @@ export const openWorkerAsks = (fs: FileSystem.FileSystem, setup: AskSetup): Work
   tick: Effect.andThen(serveAsks(fs, setup), relayCorrections(fs, setup)),
   timedOut: () => {
     const timedOut = setup.state.timedOut
-    return timedOut === null ? null : { id: timedOut.id, text: timedOut.text, asked: timedOut.askedAt }
+    return timedOut === null ? null : {
+      id: timedOut.id,
+      text: timedOut.text,
+      asked: timedOut.askedAt,
+      blocks: timedOut.deadline !== null,
+      ...(timedOut.options === undefined ? {} : { options: [...timedOut.options] }),
+      ...(timedOut.recommendation === undefined ? {} : { recommendation: timedOut.recommendation })
+    }
   }
 })
 

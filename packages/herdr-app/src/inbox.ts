@@ -57,7 +57,9 @@ const cardItem = (task: TaskDetail, card: ThreadCard, attention: ReadonlyArray<A
   if (card.line.kind !== "question") return null
   const item = attention.find((entry) => entry.id === card.line.id)
   if (card.line.who === "beat") return null
-  return { ...base, kind: item?.escalated === true ? "decision" : "question", ask: card.ask ?? askText(card.line.text) }
+  return item?.escalated === true
+    ? { ...base, kind: "decision", ask: card.ask ?? askText(card.line.text), recommendation: item.recommendation }
+    : { ...base, kind: "question", ask: card.ask ?? askText(card.line.text) }
 }
 
 const prItem = (task: TaskDetail): InboxItem | null => {

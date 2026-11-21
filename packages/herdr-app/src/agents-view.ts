@@ -8,6 +8,7 @@ import { type Reading, readText } from "./orc-read"
 import type { palette } from "./palette"
 import { type Turn } from "./turns"
 import { turnsView } from "./turns-view"
+import { openInbox } from "./views"
 
 type Palette = ReturnType<typeof palette>
 
@@ -83,7 +84,7 @@ const monospace = (): string => {
 }
 
 const chip = (t: Palette, id: string, label: string, on: boolean, pick: (cx: Context) => void): Element =>
-  div().id(id).px(8).py(2).rounded(4).cursor_pointer()
+  h_flex().gap(4).id(id).px(8).py(2).rounded(4).cursor_pointer()
     .bg(on ? t.selected : t.surface).text_color(on ? t.foreground : t.muted)
     .hover((style) => style.bg(t.hover))
     .on_click((_event, cx) => pick(cx))
@@ -102,7 +103,10 @@ const filters = (t: Palette, all: ReadonlyArray<Card>, filter: Filter, act: Agen
       .child(chip(t, "status-all", "All", filter.status === null, (cx) => act.setFilter(cx, { ...filter, status: null })))
       .children(cardStatuses.map((status) => {
         const count = byProject.filter((entry) => entry.standing.status === status).length
-        return chip(t, `status-${status}`, `${status} ${count}`, filter.status === status, (cx) => act.setFilter(cx, { ...filter, status }))
+        const shown = chip(t, `status-${status}`, status, filter.status === status, (cx) => act.setFilter(cx, { ...filter, status }))
+        if (status !== "Awaiting you") return shown.child(String(count))
+        return shown.child(div().id("inbox-count").px(4).rounded(4).hover((style) => style.bg(t.raised).text_color(t.foreground))
+          .on_click((_event, cx) => openInbox(cx)).child(String(count)))
       })))
 }
 

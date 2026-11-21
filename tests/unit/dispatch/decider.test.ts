@@ -161,6 +161,25 @@ describe("the decider", () => {
     })
   })
 
+  test("an escalation's recommended option shows in orc attention --json, instead of only its reason", async () => {
+    const options = { id: "r3", text: "Keep the old flag name?\nA) Keep it\nB) Rename it" }
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [options.text]: JSON.stringify({ decision: "escalate", reason: "the intent leaves the flag name open", recommendation: "Rename it" }) }))
+      const view: unknown = JSON.parse(await run(attentionText(true, root)))
+      expect(view).toMatchObject({ schema: "orc.attention.v1", items: [{ id: r3Item, owner: "user", decision: { kind: "escalated", reason: "the intent leaves the flag name open", recommendation: "Rename it" } }] })
+    }, [options])
+  })
+
+  test("an escalation recommending no option of its question keeps its reason and drops the recommendation, instead of marking a made-up option", async () => {
+    const options = { id: "r3", text: "Keep the old flag name?\nA) Keep it\nB) Rename it" }
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [options.text]: JSON.stringify({ decision: "escalate", reason: "the intent leaves the flag name open", recommendation: "Drop the flag" }) }))
+      const filed = await itemFile(root, r3Item)
+      expect(filed).toMatchObject({ decision: { kind: "escalated", reason: "the intent leaves the flag name open" } })
+      expect(filedAt(filed, "decision", "recommendation")).toBeUndefined()
+    }, [options])
+  })
+
   test("each question gets its own call carrying the task intent and the written policy, not one call for the batch", async () => {
     await withAskingTask(async (root) => {
       const heard: Array<DeciderRequest> = []

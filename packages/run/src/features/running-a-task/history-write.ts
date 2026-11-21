@@ -9,7 +9,7 @@ import { OrcRunError } from "../../shared/lib/index"
 import { historyFailure, insertEvidence, insertRun, insertSignal, insertStep, recordEvidence, recordSignal, recordStep, sqlite, stepIdFor, updateRun, updateStep } from "../../entities/run-history/index"
 import type { EvidenceInput, SignalInput, StepInput } from "../../entities/run-history/index"
 import { measuredSignals, noMistakesSignals, openQuestionSignal } from "../../entities/run-history/index"
-import type { AgentStep, ResumePlan, RunCheckpoints } from "./run-ops"
+import { ciWaitingQuestionId, type AgentStep, type ResumePlan, type RunCheckpoints } from "./run-ops"
 import type { AgentFile } from "../../entities/agent/index"
 import { liveAskQuestions, type AskSetup } from "../../entities/agent/index"
 import { taskOfBranch } from "../../entities/backlog/index"
@@ -163,10 +163,16 @@ export const recordResumePublish = (db: Database, run: HistoryRun, resume: Resum
     catch: (cause) => historyFailure("publish the resumed run in", cause)
   })
 
-export const finishRun = (db: Database, runId: string, report: OrcRunReport, ended: string): Effect.Effect<void, OrcRunError> =>
-  updateRun(db, runId, { status: report.completed ? "succeeded" : "failed", ended, prLink: report.prLink, endReason: report.endReason }).pipe(
+export const finishRun = (db: Database, runId: string, report: OrcRunReport, ended: string): Effect.Effect<void, OrcRunError> => {
+  if (report.waitingOnCi) {
+    return updateRun(db, runId, { status: "running", ended, prLink: report.prLink, endReason: report.endReason }).pipe(
+      Effect.mapError((cause) => historyFailure("record the waiting run in", cause))
+    )
+  }
+  return updateRun(db, runId, { status: report.completed ? "succeeded" : "failed", ended, prLink: report.prLink, endReason: report.endReason }).pipe(
     Effect.mapError((cause) => historyFailure("record the run in", cause))
   )
+}
 
 export const recordImplementStart = (db: Database, run: HistoryRun, started: string, piSessionFile?: string | null): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
@@ -204,7 +210,8 @@ export const recordOpenAsks = (
 ): Effect.Effect<void, OrcRunError> =>
   Effect.gen(function*() {
     const seen = new Set<string>()
-    for (const question of [...seed, ...liveAskQuestions(setup), ...setup.priorOpen]) {
+    const inherited = setup.priorOpen.filter((prior) => prior.id !== ciWaitingQuestionId)
+    for (const question of [...seed, ...liveAskQuestions(setup), ...inherited]) {
       if (seen.has(question.id) || setup.state.recorded.has(question.id)) {
         continue
       }

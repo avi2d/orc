@@ -22,7 +22,7 @@ A question the run asks again at a later wait is open again, and the chat posts 
 A run whose wait ends with a question unanswered parks its task instead of closing it failed.
 The beat moves the task back to `new` with `parked_branch`, `parked_origin`, and `parked_questions` in its file.
 The origin records the machine and run id.
-Each question keeps its id, text, and the time it was asked.
+Each question keeps its id, text, blocking flag, and the time it was asked.
 It prints `parked <task-id> on <branch> for the captain's answer to <question-ids>`.
 A question the attention queue owns for the decider shows as `the decider's answer to <question-ids>` instead, after an `and` when you answer the others.
 Each later beat prints `waits <task-id>: parked on <branch> for the captain's answer to <question-ids>` and never starts it.
@@ -54,7 +54,7 @@ If the resumed run stops on new questions, the task parks again with those besid
 An answer given after the beat last read the waiting run is kept too.
 A task whose every blocking question has an answer can resume when its original machine and run are available.
 `orc backlog` shows a parked task as `parked (<question-ids>)`.
-`orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times, their blocking flag and their answers.
+`orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times, their blocking flag, their answers, and for a worker question its options and recommendation.
 Older parked records have no `origin` field.
 
 ## A looping run
@@ -69,11 +69,16 @@ A report run has no branch to park on, so a wait that ends unanswered ends it fa
 
 ## A worker question
 Pi asks you a question mid-run with the `orc_ask` tool, as [How orc runs Pi](how-orc-runs-pi.md) shows.
-The tool takes the `question`, an optional `context`, optional `options` each with a `text` and an optional `picture`, and `blocks`.
+The tool takes the `question`, an optional `context`, the `options` each with a `text`, an `outcome` and an optional `picture`, a `recommendation`, and `blocks`.
+The `outcome` says what choosing that option leads to, and the `recommendation` repeats the text of the option Pi recommends.
+The tool refuses a question with no options, an option with no outcome, or a recommendation that names none of the options, and tells Pi why so it can ask again.
 Pi sets `blocks` to true when it cannot go on without the answer.
 Orc names each question `ask-<n>`, numbering from the highest id the task ever asked, and writes it to the run's `asking.json` beside the gate and loop questions.
-The question's text holds the question, then `Context:` and the context, then each option lettered `A)`, `B)` and on.
+The question's text holds the question, then `Context:` and the context, then each option lettered `A)`, `B)` and on with `Leads to:` and its outcome, then `Recommended:` and the recommended option.
+The parked question in the task record keeps the options and the recommendation beside the text.
 The beat opens a `worker-question` item for it, as [The attention queue](attention-queue.md) shows, and hands its answer to the run the way it does at a gate.
+
+### Ask with blocking
 
 A blocking question holds Pi for 10 minutes, or for the `ORC_ANSWER_WAIT_SECONDS` its machine sets when that is shorter.
 An answer within the wait is the tool's result, and Pi carries on.

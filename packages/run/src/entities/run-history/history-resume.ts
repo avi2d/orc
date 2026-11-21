@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite"
 import { Effect, Schema } from "effect"
 import { GateRefusalSchema, refusalSignalName, type GateRefusal } from "./gate-refusals"
-import type { OpenQuestion } from "../review-gate/index"
+import { AskOption, type OpenQuestion } from "../review-gate/index"
 import { openQuestionSignal } from "./report"
 import { sqlite, type RunRecord, type SqliteFailure } from "./run-history"
 import { decodedRunRow, runColumns, RunSqlRowSchema, runRecordOf, StepSqlRowSchema } from "./run-history-read"
@@ -83,7 +83,7 @@ export const stepsForRun = (
     Effect.map((rows) => rows.map((row) => ({ name: row.name, status: row.status, attempt: row.attempt, piSessionFile: row.pi_session_file, agentFile: row.agent_file, model: row.model, thinking: row.thinking })))
   )
 
-const SignalValues = Schema.Array(Schema.Struct({ value: Schema.fromJsonString(Schema.Struct({ id: Schema.String, text: Schema.String, asked: Schema.optional(Schema.String), blocks: Schema.optional(Schema.Boolean) })) }))
+const SignalValues = Schema.Array(Schema.Struct({ value: Schema.fromJsonString(Schema.Struct({ id: Schema.String, text: Schema.String, asked: Schema.optional(Schema.String), blocks: Schema.optional(Schema.Boolean), options: Schema.optional(Schema.Array(AskOption)), recommendation: Schema.optional(Schema.String) })) }))
 
 export const openQuestionsForRun = (
   db: Database,

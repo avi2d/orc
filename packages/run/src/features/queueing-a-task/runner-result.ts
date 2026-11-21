@@ -6,7 +6,7 @@ import type { OpenQuestion } from "../../entities/review-gate/index"
 import { formatHistoryError, openDatabase, stoppedEndReason, type RunRecord, RunStatusSchema } from "../../entities/run-history/index"
 import { writtenReport } from "../../entities/run-history/index"
 import { gateLogFileName } from "../../entities/review-gate/index"
-import { Asking, askingFileName, hasBlockingQuestion, isBlockingQuestion } from "../../entities/review-gate/index"
+import { Asking, AskOption, askingFileName, hasBlockingQuestion, isBlockingQuestion } from "../../entities/review-gate/index"
 import { readJsonFileIfPresent, throughFor, type Machine } from "../../shared/config/index"
 import { FailingMark, failingFileName, failingText } from "../../entities/agent/index"
 import { runDirFor, type TaskKind, TaskId, readPlanDocument, SplitDocument, type SplitPlan, splitReasonPrefix, parentBranch, taskBranch } from "../../entities/backlog/index"
@@ -23,7 +23,7 @@ const RunSummary = Schema.Struct({
   status: RunStatusSchema,
   prLink: Schema.NullOr(Schema.String),
   endReason: Schema.NullOr(Schema.String),
-  openQuestions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String, asked: Schema.optional(Schema.String) })),
+  openQuestions: Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String, asked: Schema.optional(Schema.String), blocks: Schema.optional(Schema.Boolean), options: Schema.optional(Schema.Array(AskOption)), recommendation: Schema.optional(Schema.String) })),
   report: Schema.optional(Schema.String),
   asking: Schema.optional(Asking),
   failing: Schema.optional(FailingMark),

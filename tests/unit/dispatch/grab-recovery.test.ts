@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { addTask, listTasks } from "../../../packages/run/src/entities/backlog/index"
+import { newGrab } from "../../../packages/run/src/entities/backlog/backlog-write"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -50,6 +51,28 @@ describe("a grab left by a killed process", () => {
       expect(tasks.map((task) => task.spec.title)).toEqual(["Fix the other thing"])
       expect(await readdir(join(root, "new"))).toEqual(["orc-1.md"])
       expect(await readFile(file, "utf8")).toBe(rewritten)
+    })
+  })
+
+  test("recovers a grab when a live process has reused its owner's pid", async () => {
+    await withRoot(async (root) => {
+      await run(addTask(root, spec))
+      const file = join(root, "new", "orc-1.md")
+      const text = await readFile(file, "utf8")
+      const grabbed = ".orc-1.grab-" + process.pid + "-0-" + crypto.randomUUID() + ".tmp"
+      await rename(file, join(root, "new", grabbed))
+      expect((await run(listTasks(root))).map((task) => task.spec.id)).toEqual(["orc-1"])
+      expect(await readFile(file, "utf8")).toBe(text)
+    })
+  })
+
+  test("does not recover a grab still held by its original owner", async () => {
+    await withRoot(async (root) => {
+      await run(addTask(root, spec))
+      const grab = await run(newGrab(root, "orc-1"))
+      expect(await run(listTasks(root))).toEqual([])
+      await run(grab.putBack)
+      expect((await run(listTasks(root))).map((task) => task.spec.id)).toEqual(["orc-1"])
     })
   })
 

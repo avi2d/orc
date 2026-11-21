@@ -8,7 +8,7 @@ import type { HelpEntry } from "./help-format"
 const choice = (values: ReadonlyArray<string>): string => "<" + values.join("|") + ">"
 
 export const runHelp: HelpEntry = {
-  usage: ["orc run [<task-file>] [--kind " + choice(runKinds) + "] [--delivery " + choice(runDeliveries) + "] [--branch <name>] [--sandbox " + choice(sandboxKinds) + "] [--token-file <path>] [--provider <id>] [--implementer-model <model>] [--fixer-model <model>] [--instructions <path>] [--allow " + askUserWord + "] [--answer <id>=<text>]"],
+  usage: ["orc run [<task-file>] [--kind " + choice(runKinds) + "] [--delivery " + choice(runDeliveries) + "] [--branch <name>] [--sandbox " + choice(sandboxKinds) + "] [--token-file <path>] [--provider <id>] [--implementer-model <model>] [--fixer-model <model>] [--implementer-thinking <level>] [--fixer-thinking <level>] [--instructions <path>] [--allow " + askUserWord + "] [--answer <id>=<text>]"],
   summary: "Run one task file in this checkout and end in a PR or a report",
   about: "Runs the task in the clean checkout you are in: Pi writes the change, the checks run, and no-mistakes reviews it and opens the PR. Give --branch with no task file to resume a stopped run on that branch.",
   options: [
@@ -20,6 +20,8 @@ export const runHelp: HelpEntry = {
     { flag: "--provider <id>", meaning: "The provider id from config.json the run must use." },
     { flag: "--implementer-model <model>", meaning: "The implementer model, used instead of the one config.json names." },
     { flag: "--fixer-model <model>", meaning: "The fixer model, used instead of the one config.json names." },
+    { flag: "--implementer-thinking <level>", meaning: "The implementer thinking level, used instead of the one the agent file names." },
+    { flag: "--fixer-thinking <level>", meaning: "The fixer thinking level, used instead of the one the agent file names." },
     { flag: "--instructions <path>", meaning: "A project instructions file handed to Pi." },
     { flag: "--allow " + askUserWord, meaning: "Decline findings marked exactly ask-user, on a resume. Findings with any other action still wait as questions." },
     { flag: "--answer <id>=<text>", meaning: "Answer a review question or an ask-user finding by its id, on a resume. Give it once per answer." }

@@ -130,7 +130,12 @@ describe("orc run with Pi asking the captain mid-run", () => {
       if (tool === undefined) {
         throw new Error("the copied extension registers no orc_ask tool")
       }
-      const nonBlocking = await tool.execute("call-check", { question: "Keep the old flag?", blocks: false })
+      const nonBlocking = await tool.execute("call-check", {
+        question: "Keep the old flag?",
+        options: [{ text: "Keep the old flag", outcome: "Both callers keep working" }, { text: "Drop the old flag", outcome: "Both callers need a change" }],
+        recommendation: "Keep the old flag",
+        blocks: false
+      })
       expect(nonBlocking.content.map((block) => block.text).join("")).toContain("Carry on")
     })
   }, 60_000)

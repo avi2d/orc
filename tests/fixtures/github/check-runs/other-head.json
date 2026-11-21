@@ -1,0 +1,7 @@
+{
+  "total_count": 2,
+  "check_runs": [
+    {"id": 3001, "head_sha": "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d", "node_id": "CR_kwDOAbc3001", "external_id": "", "url": "https://api.github.com/repos/o/r/check-runs/3001", "html_url": "https://github.com/o/r/actions/runs/912/job/3001", "details_url": "https://github.com/o/r/actions/runs/912/job/3001", "status": "completed", "conclusion": "success", "started_at": "2026-11-20T19:02:01Z", "completed_at": "2026-11-20T19:05:01Z", "output": {"title": null, "summary": null, "text": null, "annotations_count": 0, "annotations_url": "https://api.github.com/repos/o/r/check-runs/3001/annotations"}, "name": "test", "check_suite": {"id": 5121}, "app": {"id": 15368, "slug": "github-actions", "name": "GitHub Actions"}},
+    {"id": 3002, "head_sha": "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d", "node_id": "CR_kwDOAbc3002", "external_id": "", "url": "https://api.github.com/repos/o/r/check-runs/3002", "html_url": "https://github.com/o/r/actions/runs/912/job/3002", "details_url": "https://github.com/o/r/actions/runs/912/job/3002", "status": "completed", "conclusion": "success", "started_at": "2026-11-20T19:02:02Z", "completed_at": "2026-11-20T19:05:02Z", "output": {"title": null, "summary": null, "text": null, "annotations_count": 0, "annotations_url": "https://api.github.com/repos/o/r/check-runs/3002/annotations"}, "name": "lint", "check_suite": {"id": 5121}, "app": {"id": 15368, "slug": "github-actions", "name": "GitHub Actions"}}
+  ]
+}

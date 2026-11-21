@@ -12,6 +12,8 @@ export interface OpenQuestion {
   readonly text: string
   readonly asked?: string | undefined
   readonly blocks?: boolean | undefined
+  readonly options?: ReadonlyArray<{ readonly text: string; readonly outcome?: string | undefined; readonly picture?: string | undefined }> | undefined
+  readonly recommendation?: string | undefined
 }
 
 export interface NoMistakesFinding {

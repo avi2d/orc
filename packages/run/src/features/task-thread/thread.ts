@@ -1,5 +1,5 @@
 import { Effect, type FileSystem } from "effect"
-import { decisionText, reviewQuestionId, taskItems, type OpenItem } from "../../entities/attention/index"
+import { decisionText, reviewQuestionId, taskItems, type Decision, type OpenItem } from "../../entities/attention/index"
 import { findTask, isDeciderAnswer, readNotes, type BacklogError, type Hold, type HoldQuestion, type ParkedQuestion, type TaskFileError, type TaskRecord } from "../../entities/backlog/index"
 import { formatTable } from "../../shared/lib/index"
 
@@ -16,6 +16,7 @@ interface ThreadEntry {
   readonly kind: ThreadKind
   readonly id: string | null
   readonly text: string
+  readonly recommendation?: string
 }
 
 interface ThreadJson {
@@ -91,12 +92,17 @@ const parkedExchange = (task: string, question: ParkedQuestion, items: ReadonlyM
 
 const askerOf = (item: OpenItem): ThreadWho => item.item.kind === "review-question" || item.item.kind === "worker-question" ? "worker" : "beat"
 
+const decisionEntry = (id: string, decision: Decision): ThreadEntry => ({
+  ...entry(decision.at, "decider", "decision", id, decision.kind + ": " + decisionText(decision)),
+  ...(decision.kind === "escalated" && decision.recommendation !== undefined ? { recommendation: decision.recommendation } : {})
+})
+
 // A later park replaces the task's parked questions, so only an item whose question the task file still holds leaves its question and answer to that file.
 const itemExchanges = (mirrored: ReadonlySet<string>) => (item: OpenItem): ReadonlyArray<Exchange> => {
   const { id, item: { decision, state } } = item
   const told = mirrored.has(id)
   const asked = told ? [] : [[entry(item.item.asked, askerOf(item), "question", id, item.item.text)]]
-  const decided = decision === undefined ? [] : [[entry(decision.at, "decider", "decision", id, decision.kind + ": " + decisionText(decision))]]
+  const decided = decision === undefined ? [] : [[decisionEntry(id, decision)]]
   const beatClosure = item.item.kind === "pr-ready" && state.kind === "closed" && (state.answer.words === "merged" || state.answer.words === "closed without merging")
   const settled = state.kind === "withdrawn"
     ? [[entry(state.at, "beat", "withdrawn", id, state.reason)]]

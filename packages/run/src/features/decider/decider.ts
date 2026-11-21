@@ -27,7 +27,7 @@ const Reply = Schema.Union([
   Schema.Struct({ decision: Schema.Literal("answer"), answer: Words, rule: Words, reason: Words }),
   Schema.Struct({ decision: Schema.Literal("ask-back"), question: Words }),
   Schema.Struct({ decision: Schema.Literal("duplicate"), of: Words }),
-  Schema.Struct({ decision: Schema.Literal("escalate"), reason: Words })
+  Schema.Struct({ decision: Schema.Literal("escalate"), reason: Words, recommendation: Schema.optionalKey(Schema.Unknown) })
 ])
 
 type Reply = typeof Reply.Type
@@ -46,7 +46,7 @@ type Basis = { readonly kind: "rule"; readonly quote: string; readonly source: s
 type Verdict =
   | { readonly kind: "answered"; readonly words: string; readonly basis: Basis }
   | { readonly kind: "asked-back"; readonly question: string }
-  | { readonly kind: "escalated"; readonly reason: string }
+  | { readonly kind: "escalated"; readonly reason: string; readonly recommendation?: string }
 
 const decodeReply = Schema.decodeUnknownOption(Schema.fromJsonString(Reply))
 
@@ -147,10 +147,26 @@ const askedBackEarlier = (items: ReadonlyArray<OpenItem>, current: OpenItem): Re
       ? [{ id, text: item.text, question: item.decision.question }]
       : [])
 
-const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlier: ReadonlyArray<Earlier>, kind: AttentionItem["kind"]): Verdict => {
+const optionLine = /^[A-Z]\) (.*?)(?: \(picture: .+\))?$/
+
+// orc_ask folds its options into the question's text, so the options the decider may recommend are read back from that text.
+const optionTexts = (question: string): ReadonlyArray<string> =>
+  question.split("\n").flatMap((line) => {
+    const found = optionLine.exec(line.trim())
+    return found === null ? [] : [found.at(1) ?? ""]
+  })
+
+const escalation = (reply: Extract<Reply, { readonly decision: "escalate" }>, question: string): Verdict => {
+  const recommended = typeof reply.recommendation === "string" ? reply.recommendation.trim() : undefined
+  return recommended !== undefined && recommended !== "" && optionTexts(question).includes(recommended)
+    ? { kind: "escalated", reason: reply.reason, recommendation: recommended }
+    : { kind: "escalated", reason: reply.reason }
+}
+
+const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlier: ReadonlyArray<Earlier>, kind: AttentionItem["kind"], question: string): Verdict => {
   switch (reply.decision) {
     case "escalate": {
-      return { kind: "escalated", reason: reply.reason }
+      return escalation(reply, question)
     }
     case "answer": {
       const found = quotedSource(reply.rule, sources)
@@ -230,7 +246,7 @@ const askOne = (ask: AskDecider, policy: string, root: string, task: TaskRecord,
     return yield* ask.ask({ policy, prompt }).pipe(
       Effect.map((text): Verdict => {
         const reply = readReply(text)
-        return typeof reply === "string" ? { kind: "escalated", reason: reply } : checkedVerdict(reply, quotable, earlier, entry.item.kind)
+        return typeof reply === "string" ? { kind: "escalated", reason: reply } : checkedVerdict(reply, quotable, earlier, entry.item.kind, question.text)
       }),
       Effect.catchTag("DeciderUnheard", (error) => Effect.succeed<Verdict>({ kind: "escalated", reason: "the decider was not heard: " + error.reason }))
     )
@@ -250,7 +266,7 @@ const settle = (root: string, task: TaskRecord, question: ParkedQuestion, entry:
   Effect.gen(function*() {
     const item = entry.id
     if (verdict.kind === "escalated") {
-      yield* recordDecision(root, item, { kind: "escalated", reason: verdict.reason, at })
+      yield* recordDecision(root, item, { kind: "escalated", reason: verdict.reason, ...(verdict.recommendation === undefined ? {} : { recommendation: verdict.recommendation }), at })
       return verdict
     }
     yield* recordDecision(root, item, decisionOf(verdict, at))
