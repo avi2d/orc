@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { capturedSession, cleanFinish, commitOnBranch, ghPrLink, git, readyToCheck, runDirectPrStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
+import { runStatus } from "../../packages/run/src/entities/run-history/index"
+import { capturedSession, cleanFinish, commitOnBranch, ghPrLink, git, readyToCheck, runDirectPrResume, runDirectPrStep, sandboxResult, sessionEnding, withHome, withRepo } from "./run-helpers"
+
+const isNamedSignal = (value: unknown): value is { readonly name: string } =>
+  typeof value === "object" && value !== null && "name" in value && typeof value.name === "string"
 
 const withOrigin = async (dir: string, use: (origin: string) => Promise<void>): Promise<void> => {
   const origin = await mkdtemp(join(tmpdir(), "orc-origin-"))
@@ -36,13 +40,17 @@ describe("a direct-PR run opens its own PR after the checks", () => {
           expect(branchOn(origin)).toBe(sha)
           expect(callLines(outcome.ghCalls)).toEqual([
             "pr list --head orc/test --state open --json url --jq .[0].url // empty",
-            "pr create --head orc/test --title work --body-file " + bodyFile
+            "pr create --head orc/test --title work --body-file " + bodyFile,
+            "api --hostname github.com repos/o/r/commits/" + sha + "/check-runs?per_page=100"
           ])
-          expect(outcome.report.completed).toBe(true)
+          expect(outcome.report.completed).toBe(false)
+          expect(outcome.report.waitingOnCi).toBe(true)
+          expect(outcome.report.endReason).toContain("CI verdict for " + sha.slice(0, 12) + ": pending, waiting on CI because no check run has reported on " + sha + " yet.")
           expect(outcome.report.noMistakes).toBeNull()
           expect(outcome.report.prLink).toBe(ghPrLink)
           expect(outcome.run?.prLink).toBe(ghPrLink)
-          expect(outcome.run?.status).toBe("succeeded")
+          expect(outcome.run?.status).toBe("running")
+          expect(outcome.signals).toContainEqual({ name: "open-question", value: expect.stringContaining('"id":"ci-waiting"') })
           expect(outcome.steps).toContainEqual({ name: "pr", status: "passed" })
           expect(outcome.steps).not.toContainEqual(expect.objectContaining({ name: "no-mistakes" }))
           const body = await readFile(bodyFile, "utf8")
@@ -63,7 +71,48 @@ describe("a direct-PR run opens its own PR after the checks", () => {
           expect(callLines(outcome.ghCalls)[0]).toBe("pr list --head orc/test --state open --json url --jq .[0].url // empty")
           expect(callLines(outcome.ghCalls).some((line) => line.startsWith("pr create --head orc/test"))).toBe(true)
           expect(outcome.report.prLink).toBe(ghPrLink)
-          expect(outcome.report.completed).toBe(true)
+          expect(outcome.report.completed).toBe(false)
+          expect(outcome.report.waitingOnCi).toBe(true)
+          expect(outcome.run?.status).toBe("running")
+        })
+      })
+    })
+  })
+
+  test("a failed CI check run on the pushed head ends the run failed with the check's name", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        await withOrigin(dir, async () => {
+          const sha = await readyToCheck(dir, home)
+          const checkRuns = JSON.stringify({ total_count: 1, check_runs: [{ id: 1, name: "test", head_sha: sha, status: "completed", conclusion: "failure" }] })
+          const outcome = await runDirectPrStep(dir, home, sandboxResult(sha), lintPasses, checkRuns)
+          expect(outcome.report.prLink).toBe(ghPrLink)
+          expect(outcome.report.completed).toBe(false)
+          expect(outcome.report.waitingOnCi).toBe(false)
+          expect(outcome.run?.status).toBe("failed")
+          expect(outcome.run?.endReason).toContain("CI verdict for " + sha.slice(0, 12) + ": failed, the check test failed.")
+          expect(runStatus(outcome.report)).toBe("CI failed")
+          expect(outcome.signals).not.toContainEqual(expect.objectContaining({ name: "open-question" }))
+        })
+      })
+    })
+  })
+
+  test("a resumed run that finds failed CI closes failed without keeping the waiting question", async () => {
+    await withRepo(async (dir) => {
+      await withHome(async (home) => {
+        await withOrigin(dir, async () => {
+          const sha = await readyToCheck(dir, home)
+          const first = await runDirectPrStep(dir, home, sandboxResult(sha), lintPasses)
+          expect(first.run?.status).toBe("running")
+          const failedRuns = JSON.stringify({ total_count: 1, check_runs: [{ id: 1, name: "test", head_sha: sha, status: "completed", conclusion: "failure" }] })
+          const second = await runDirectPrResume(dir, home, sandboxResult(sha), lintPasses, failedRuns, [{ question: "ci-waiting", answer: "CI finished, read the verdict again" }])
+          expect(second.report.completed).toBe(false)
+          expect(second.report.waitingOnCi).toBe(false)
+          expect(second.run?.status).toBe("failed")
+          expect(second.run?.endReason).toContain("CI verdict for " + sha.slice(0, 12) + ": failed, the check test failed.")
+          const rows = Array.isArray(second.runSignals) ? second.runSignals : []
+          expect(rows.filter(isNamedSignal).filter((signal) => signal.name === "open-question")).toEqual([])
         })
       })
     })
