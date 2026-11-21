@@ -7,7 +7,7 @@ import { readPlanDocument, splitReasonPrefix } from "../../entities/backlog/inde
 import { idleSpan, type PiEnd } from "../../entities/agent/index"
 import { OrcRunError } from "../../shared/lib/index"
 import { askOnLoop, loopAnswerOf, loopContinuePrompt, loopGuidance, loopingNote, RunStopped } from "./loop-pause"
-import { askedNote, sentBackContinuePrompt, sentBackGuidance, sentBackWordsOf, workerAnswersOf, workerContinuePrompt, workerGuidance } from "./worker-question"
+import { askedNote, holdReleaseGuidance, holdReleaseWordsOf, sentBackContinuePrompt, sentBackGuidance, sentBackWordsOf, workerAnswersOf, workerContinuePrompt, workerGuidance } from "./worker-question"
 import { finishAfterChecks } from "./run-finish"
 import { readFailure } from "../../shared/config/index"
 import { countSessionSize, handoverImplementPrompt } from "../../entities/agent/index"
@@ -130,6 +130,7 @@ const implementPrompt = (run: HistoryRun, plan: Pick<ResumePlan, "handover" | "i
   const loop = loopAnswerOf(plan.answers)
   const worker = workerAnswersOf(plan.answers)
   const sentBack = sentBackWordsOf(plan.answers)
+  const released = holdReleaseWordsOf(plan.answers)
   if (sentBack.length > 0 && plan.implementSessionFile !== null) {
     return sentBackContinuePrompt(sentBack)
   }
@@ -141,7 +142,7 @@ const implementPrompt = (run: HistoryRun, plan: Pick<ResumePlan, "handover" | "i
   }
   const taskFile = run.path.join(run.piSessionDir, "task.md")
   const base = plan.handover === null ? buildImplementPrompt(run.agent, taskFile) : handoverImplementPrompt(run.agent, taskFile, plan.handover)
-  const guidance = [...(sentBack.length === 0 ? [] : [sentBackGuidance(sentBack)]), ...(loop?.kind === "continue" ? [loopGuidance(loop.words)] : []), ...(worker.length > 0 ? [workerGuidance(worker)] : [])]
+  const guidance = [...(sentBack.length === 0 ? [] : [sentBackGuidance(sentBack)]), ...(loop?.kind === "continue" ? [loopGuidance(loop.words)] : []), ...(worker.length > 0 ? [workerGuidance(worker)] : []), ...(released.length === 0 ? [] : [holdReleaseGuidance(released)])]
   return [base, ...guidance].join("\n")
 }
 
@@ -247,7 +248,8 @@ const resumedFix = (plan: Pick<ResumePlan, "fixSessionFile" | "answers">): { rea
   }
   const loop = loopAnswerOf(plan.answers)
   const worker = workerAnswersOf(plan.answers)
-  const guidance = [...(loop?.kind === "continue" ? [loopGuidance(loop.words)] : []), ...(worker.length > 0 ? [workerGuidance(worker)] : [])]
+  const released = holdReleaseWordsOf(plan.answers)
+  const guidance = [...(loop?.kind === "continue" ? [loopGuidance(loop.words)] : []), ...(worker.length > 0 ? [workerGuidance(worker)] : []), ...(released.length === 0 ? [] : [holdReleaseGuidance(released)])]
   return { session: plan.fixSessionFile, guidance: guidance.length === 0 ? null : guidance.join("\n") }
 }
 

@@ -43,6 +43,7 @@ const holdFields = (hold: Hold | null): ReadonlyArray<string> =>
     ? []
     : [
       field("hold_reason", hold.reason),
+      ...(hold.repeat === true ? [field("hold_repeat", true)] : []),
       ...(hold.history === undefined ? [] : [field("hold_history", hold.history)]),
       ...(hold.until === null ? [] : [field("hold_until", hold.until)]),
       ...(hold.at === null ? [] : [field("held_at", hold.at)]),

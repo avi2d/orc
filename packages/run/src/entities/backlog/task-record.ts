@@ -59,7 +59,8 @@ const AnsweredHold = Schema.Struct({
   until: Schema.NullOr(Schema.String),
   questions: Schema.Array(HoldQuestion),
   answer: Answer,
-  at: Schema.optional(Schema.String)
+  at: Schema.optional(Schema.String),
+  repeat: Schema.optional(Schema.Boolean)
 })
 
 export interface Hold {
@@ -68,6 +69,7 @@ export interface Hold {
   readonly questions: ReadonlyArray<HoldQuestion>
   readonly answer: Answer | null
   readonly at: string | null
+  readonly repeat?: boolean
   readonly history?: ReadonlyArray<typeof AnsweredHold.Type>
 }
 
@@ -191,6 +193,7 @@ const Frontmatter = Schema.Struct({
   priority: Schema.optional(Schema.Literals(taskPriorities)),
   created: Schema.String,
   hold_reason: Schema.optional(Schema.String),
+  hold_repeat: Schema.optional(Schema.Boolean),
   hold_until: Schema.optional(Schema.String),
   held_at: Schema.optional(Schema.String),
   hold_questions: Schema.optional(Schema.Array(QuestionFront)),
@@ -280,7 +283,7 @@ const holdOf = (front: Frontmatter): Hold | null | string => {
     return answer
   }
   if (front.hold_reason === undefined) {
-    return front.hold_until === undefined && front.held_at === undefined && front.hold_questions === undefined && front.hold_history === undefined && answer === null ? null : "a hold names no reason"
+    return front.hold_until === undefined && front.held_at === undefined && front.hold_questions === undefined && front.hold_history === undefined && front.hold_repeat === undefined && answer === null ? null : "a hold names no reason"
   }
   if (front.hold_reason.trim() === "") {
     return "a hold names no reason"
@@ -295,7 +298,7 @@ const holdOf = (front: Frontmatter): Hold | null | string => {
   if (answer === null && questions.length > 0 && questions.every((question) => question.answer !== null)) {
     return "a hold answers every question and names no answer"
   }
-  return { reason: front.hold_reason, until: front.hold_until ?? null, questions, answer, at: front.held_at ?? null, ...(front.hold_history === undefined ? {} : { history: front.hold_history }) }
+  return { reason: front.hold_reason, until: front.hold_until ?? null, questions, answer, at: front.held_at ?? null, ...(front.hold_repeat === true ? { repeat: true } : {}), ...(front.hold_history === undefined ? {} : { history: front.hold_history }) }
 }
 
 const stateOf = (folder: TaskFolder, front: Frontmatter): TaskState | string => {

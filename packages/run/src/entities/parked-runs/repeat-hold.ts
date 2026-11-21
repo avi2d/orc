@@ -7,11 +7,15 @@ export const repeatsResume = (record: TaskRecord, questions: Parked["questions"]
     return false
   }
   const started = Date.parse(record.state.started.at)
-  return questions.filter(isBlockingQuestion).every((question) => question.answer !== null && Date.parse(question.answer.at) < started)
+  const blockingReady = questions.filter(isBlockingQuestion).every((question) => question.answer !== null)
+  const fresh = questions.some((question) => question.answer !== null && Date.parse(question.answer.at) >= started)
+  return blockingReady && !fresh
 }
+
+export const holdReleaseId = "hold-release"
 
 export const repeatHold = (record: TaskRecord, run: string | undefined, ended: string | undefined, at: string): Hold => {
   const reason = "the resumed run " + (run ?? record.parked?.origin?.run ?? "") + " ended with no new question and no answer given during it" +
     (ended === undefined || ended.trim() === "" ? "" : " (" + ended.trim() + ")") + ", so the beat stops resuming it with the same answers"
-  return nextHold(record.hold, { reason, until: null, questions: [], answer: null, at })
+  return nextHold(record.hold, { reason, until: null, questions: [], answer: null, at, repeat: true })
 }

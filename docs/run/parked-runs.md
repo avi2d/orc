@@ -57,6 +57,7 @@ A resumed run can park again with no open question and no answer given since it 
 Resuming it again would hand it the same answers, so the beat holds the task for you instead.
 The hold reason names the run and its end reason, and each later beat prints `waits <task-id>: held for the captain: <reason>`.
 Run `orc backlog answer <task-id> <words>` to release the hold, and the next beat resumes the task.
+Those words travel with the resume, so the retried run reads them as your guidance.
 `orc backlog` shows a parked task as `parked (<question-ids>)`.
 `orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times, their blocking flag, their answers, and for a worker question its options and recommendation.
 Older parked records have no `origin` field.

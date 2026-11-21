@@ -2,12 +2,17 @@ import { Effect, FileSystem, Option, Path, Schema } from "effect"
 import { AbsolutePath, readDispatchConfig, readFailure } from "../../shared/config/index"
 import { ModelRef, ProviderId } from "../../shared/config/index"
 import { TaskId, backlogPaths, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type TaskRecord, withDecisions } from "../../entities/backlog/index"
-import { latestPerId } from "../../entities/parked-runs/index"
+import { holdReleaseId, latestPerId } from "../../entities/parked-runs/index"
 import { TaskInstructions, readInstructions } from "./runner-instructions"
 import { RunnerError } from "../../shared/process/index"
 import { isRunDelivery } from "../../shared/config/index"
 import { decodeTokenText, LabelArg, tokenDocumentNote, tokenFields } from "../../entities/token/index"
 import { isThinkingLevel, piThinkingLevels } from "../../entities/agent/index"
+
+const AnswerArg = Schema.Struct({
+  question: Schema.String.check(Schema.isPattern(/^[^\s=]+$/)),
+  answer: Schema.String.check(Schema.isNonEmpty())
+})
 
 const taskFields = {
   task: TaskId,
@@ -24,10 +29,7 @@ const taskFields = {
   resumeRun: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
   machine: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
   slots: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-  answers: Schema.optional(Schema.Array(Schema.Struct({
-    question: Schema.String.check(Schema.isPattern(/^[^\s=]+$/)),
-    answer: Schema.String.check(Schema.isNonEmpty())
-  }))),
+  answers: Schema.optional(Schema.Array(AnswerArg)),
   instructions: Schema.optional(TaskInstructions)
 }
 
@@ -80,10 +82,15 @@ const decidedBody = (path: Path.Path, file: string, record: TaskRecord): Effect.
 
 const takenBody = (record: TaskRecord): string => {
   const hold = record.hold
-  const decisions = hold === null ? [] : [...hold.history ?? [], ...(record.parked === null ? [hold] : [])]
-  return record.spec.body + decisions.flatMap((decision) => decision.answer === null ? [] : [
+  const decisions = hold === null ? [] : [...hold.history ?? [], hold]
+  return record.spec.body + decisions.flatMap((decision) => decision.answer === null || decision.repeat === true ? [] : [
     "\n\nHeld for the captain: " + decision.reason + "\nThe captain answered: " + decision.answer.words
   ]).join("")
+}
+
+const releaseAnswerOf = (record: TaskRecord): ReadonlyArray<typeof AnswerArg.Type> => {
+  const release = record.hold !== null && record.hold.repeat === true ? record.hold.answer : null
+  return release === null || release.words.trim() === "" ? [] : [{ question: holdReleaseId, answer: release.words }]
 }
 
 const takenResume = (task: string, record: TaskRecord): Effect.Effect<Record<string, unknown>, RunnerError> => {
@@ -95,7 +102,7 @@ const takenResume = (task: string, record: TaskRecord): Effect.Effect<Record<str
     : {
       branch: record.parked.branch,
       resumeRun: record.parked.origin?.run,
-      answers: latestPerId(record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ ...question, answer: question.answer }])).map((question) => ({ question: question.id, answer: question.answer.words }))
+      answers: [...latestPerId(record.parked.questions.flatMap((question) => question.answer === null ? [] : [{ ...question, answer: question.answer }])).map((question) => ({ question: question.id, answer: question.answer.words })), ...releaseAnswerOf(record)]
     })
 }
 
