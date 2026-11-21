@@ -41,7 +41,7 @@
     ]
   },
   "devDependencies": {
-    "@avi2dg/checks": "0.96.3",
+    "@avi2dg/checks": "0.111.1",
     "@avi2dg/orc-alerts": "workspace:*",
     "@avi2dg/orc-attention": "workspace:*",
     "@avi2dg/orc-cli": "workspace:*",

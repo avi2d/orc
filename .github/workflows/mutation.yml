@@ -2,8 +2,105 @@ name: mutation
 
 on:
   workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: mutation-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  RUNNER_ENVIRONMENT: github-hosted
 
 jobs:
-  mutation:
-    uses: avi2d/workflows/.github/workflows/mutation.yml@v2
-    permissions: { contents: read, actions: write, pull-requests: write }
+  refresh-plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      shards: ${{ steps.shards.outputs.shards }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: restore the last full report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bunx checks-mutation-baseline --full "$RUNNER_TEMP/last-full/mutation.json"
+      - id: shards
+        name: split the tree into shards
+        env:
+          SHARDS: "4"
+        run: bunx checks-ci mutation shards
+
+  refresh-shard:
+    needs: refresh-plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        shard: ${{ fromJSON(needs.refresh-plan.outputs.shards) }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: run one shard
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: bunx stryker run --mutate "$SHARD"
+      # A lone shard's artifact downloads with no folder of its own, so only the file's name tells the reports apart.
+      - name: name the report after its shard
+        env:
+          INDEX: ${{ strategy.job-index }}
+        run: mv reports/mutation/mutation.json "reports/mutation/shard-$INDEX.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutation-shard-${{ strategy.job-index }}
+          path: reports/mutation/shard-${{ strategy.job-index }}.json
+          retention-days: 1
+          if-no-files-found: error
+
+  refresh-merge:
+    needs: [refresh-plan, refresh-shard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: mutation-shard-*
+          path: shards
+          merge-multiple: true
+      - name: merge the shard reports
+        run: bunx checks-mutation-merge reports/mutation/mutation.json shards/shard-*.json
+      - if: always()
+        name: score the refresh
+        run: bunx checks-ci mutation score
+      - name: slim the merged report
+        run: bunx checks-mutation-baseline --slim reports/mutation/mutation.json "$RUNNER_TEMP/full/mutation.json"
+      - name: save the merged report as the state a baseline starts from
+        run: cp "$RUNNER_TEMP/full/mutation.json" "$RUNNER_TEMP/full/stryker-incremental.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutation-baseline-full
+          path: ${{ runner.temp }}/full/
+          retention-days: 30
+          if-no-files-found: error
+      - name: prune superseded baselines
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bunx checks-mutation-baseline --prune
