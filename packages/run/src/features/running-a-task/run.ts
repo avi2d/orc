@@ -325,6 +325,7 @@ export const runWithHistory = (db: Database, run: HistoryRun, ops: SandboxOps): 
             tokens: outcome.tokens,
             sessionSize: outcome.sessionSize,
             completed: false,
+            waitingOnCi: false,
             markerVerified: outcome.markerVerified,
             implementPassed: outcome.completed,
             checksRounds: null,

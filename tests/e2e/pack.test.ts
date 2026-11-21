@@ -72,6 +72,7 @@ const expectedFiles = [
   "src/features/running-a-task/context-mark.ts",
   "src/shared/config/delivery.ts",
   "src/shared/config/index.ts",
+  "src/entities/pull-request/ci-verdict.ts",
   "src/entities/pull-request/direct-pr.ts",
   "src/entities/events/alert-events.ts",
   "src/features/queueing-a-task/alert-stream.ts",
