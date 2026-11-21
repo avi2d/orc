@@ -20,7 +20,7 @@ export const views = [
   { id: "orc-inbox", label: "Inbox", key: "⌘4" }
 ] as const
 
-export const inboxSelect = { command: "layout.select", args: { stack: viewsStack, child: "orc-inbox" } } as const
+const inboxSelect = { command: "layout.select", args: { stack: viewsStack, child: "orc-inbox" } } as const
 
 export const openInbox = (cx: Context): void => {
   cx.stop_propagation()
