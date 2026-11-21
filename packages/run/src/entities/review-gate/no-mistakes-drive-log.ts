@@ -1,4 +1,5 @@
 import { missingReason, ownerFindingsIn, parseRun, type NoMistakesFinding, type OpenQuestion, type ParkedGate, type ParsedRun } from "./no-mistakes-gate"
+import type { AskedAt } from "./answer-wait"
 import { scalar } from "../../shared/lib/index"
 
 type NoMistakesStatus = "passed" | "refused" | "failed"
@@ -31,7 +32,7 @@ export interface DriveLog {
   readonly gatesAnswered: () => number
   readonly countGate: () => void
   readonly refuse: (gate: ParkedGate | null, reason: string) => Ending
-  readonly awaitAnswers: (gate: ParkedGate, missing: ReadonlyArray<NoMistakesFinding>, asked: string | null) => Ending
+  readonly awaitAnswers: (gate: ParkedGate, missing: ReadonlyArray<NoMistakesFinding>, asked: string | null, askedAt: ReadonlyArray<AskedAt>) => Ending
   readonly fail: (reason: string) => Ending
   readonly finish: (parsed: ParsedRun) => Ending
   readonly close: (ending: Ending) => NoMistakesRecord
@@ -90,11 +91,15 @@ export const openDriveLog = (started: string): DriveLog => {
       gatesAnswered += 1
     },
     refuse,
-    awaitAnswers: (gate, missing, asked) => {
+    awaitAnswers: (gate, missing, asked, askedAt) => {
       const owned = new Set(ownerFindingsIn(missing).map((finding) => finding.id))
+      const at = (finding: NoMistakesFinding): string | null => askedAt.find((entry) => entry.question === finding.id)?.asked ?? asked
       return {
         ...refuse(gate, missingReason(missing)),
-        openQuestions: missing.map((finding) => ({ id: finding.id, text: finding.description, ...(asked === null ? {} : { asked }), ...(owned.has(finding.id) ? { owner: "user" as const } : {}) }))
+        openQuestions: missing.map((finding) => {
+          const time = at(finding)
+          return { id: finding.id, text: finding.description, ...(time === null ? {} : { asked: time }), ...(owned.has(finding.id) ? { owner: "user" as const } : {}) }
+        })
       }
     },
     fail,

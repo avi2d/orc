@@ -54,7 +54,7 @@ describe("waitForAnswers", () => {
       expect(asking).toMatchObject({ questions: [{ id: "r2", text: "changes product behavior" }] })
       const answers = [{ question: "other", answer: "ignored" }, { question: "r2", answer: "Keep it" }]
       await writeFile(join(dir, "answers.json"), JSON.stringify({ asking: asking.asked, answers }))
-      expect(await waiting).toEqual({ asked: asking.asked, answers: [{ question: "r2", answer: "Keep it" }] })
+      expect(await waiting).toEqual({ asked: asking.asked, answers: [{ question: "r2", answer: "Keep it" }], askedAt: [{ question: "r2", asked: asking.asked }] })
       expect(await readdir(dir)).toEqual([])
     })
   }, 15_000)
@@ -64,7 +64,7 @@ describe("waitForAnswers", () => {
       const waiting = Effect.runPromise(waitForAnswers(dir, 2, "no-mistakes")([finding("r2", "changes product behavior")]).pipe(Effect.provide(BunServices.layer)))
       const asking = await askingOnceWritten(dir)
       await writeFile(join(dir, "answers.json"), JSON.stringify({ asking: "2026-11-02T10:00:00.000Z", answers: [{ question: "r2", answer: "Stale" }] }))
-      expect(await waiting).toEqual({ asked: asking.asked, answers: [] })
+      expect(await waiting).toEqual({ asked: asking.asked, answers: [], askedAt: [{ question: "r2", asked: asking.asked }] })
     })
   }, 15_000)
 
@@ -82,7 +82,15 @@ describe("waitForAnswers", () => {
         await Bun.sleep(10)
       }
       await writeFile(join(dir, "answers.json"), JSON.stringify({ asking: old, answers: [{ question: "r2", answer: "Fresh" }] }))
-      expect(await waiting).toEqual({ asked: old, answers: [{ question: "r2", answer: "Fresh" }] })
+      const waited = await waiting
+      expect(waited.asked).toEqual(old)
+      expect(waited.answers).toEqual([{ question: "r2", answer: "Fresh" }])
+      expect(waited.askedAt.map((entry) => entry.question)).toEqual(["r2"])
+      const at = waited.askedAt[0]?.asked
+      if (at === undefined) {
+        throw new Error("the second r2 asking carries no time")
+      }
+      expect(at).not.toEqual(old)
     })
   }, 15_000)
 

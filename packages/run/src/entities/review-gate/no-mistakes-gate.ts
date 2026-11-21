@@ -162,6 +162,14 @@ export const answeredAskUser = (
 ): ReadonlyArray<NoMistakesFinding> =>
   findings.filter(isAskUser).filter((finding) => answers.some((entry) => entry.question === finding.id))
 
+export const answeredOwnerFindings = (
+  findings: ReadonlyArray<NoMistakesFinding>,
+  answers: ReadonlyArray<QuestionAnswer>
+): ReadonlyArray<NoMistakesFinding> => {
+  const owned = new Set(ownerFindingsIn(findings).map((finding) => finding.id))
+  return findings.filter((finding) => owned.has(finding.id) && answers.some((entry) => entry.question === finding.id))
+}
+
 export const answerForGate = (
   gate: ParkedGate,
   findings: ReadonlyArray<NoMistakesFinding>,
@@ -173,14 +181,14 @@ export const answerForGate = (
     return { kind: "refuse", reason: missingReason(open) }
   }
   const asked = findings.filter(isAskUser)
-  const settled = answeredAskUser(findings, answers)
+  const settled = [...answeredAskUser(findings, answers), ...answeredOwnerFindings(findings, answers)]
   const unsettled = askUserFindings(asked.filter((finding) => !answers.some((entry) => entry.question === finding.id)), allow)
   if (unsettled.length > 0) {
     return { kind: "refuse", reason: missingReason(unsettled) }
   }
   const worded = asked.filter((finding) => !answers.some((entry) => entry.question === finding.id))
   const rest = findings.filter((finding) => !isAskUser(finding))
-  const other = rest.find((finding) => finding.action !== "auto-fix" && finding.action !== "no-op")
+  const other = rest.find((finding) => finding.action !== "auto-fix" && finding.action !== "no-op" && !answers.some((entry) => entry.question === finding.id))
   if (other !== undefined) {
     return { kind: "refuse", reason: "finding " + other.id + " needs an answer orc cannot give" }
   }

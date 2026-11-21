@@ -35,9 +35,15 @@ export const AnswersFile = Schema.Struct({ asking: Schema.String, answers: Relay
 
 export const CorrectionsFile = Schema.Struct({ corrections: RelayedAnswers })
 
+export interface AskedAt {
+  readonly question: string
+  readonly asked: string
+}
+
 export interface WaitResult {
   readonly asked: string | null
   readonly answers: ReadonlyArray<QuestionAnswer>
+  readonly askedAt: ReadonlyArray<AskedAt>
 }
 
 const defaultAnswerWaitSeconds = 30 * 60
@@ -87,8 +93,8 @@ export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: stri
       const asking = runDir + "/" + askingFileName
       const relayed = runDir + "/" + answersFileName
       if (waitSeconds === 0) {
-        return { asked: null, answers: [] }
-      }
+        return { asked: null, answers: [], askedAt: [] }
+}
       const now = new Date().toISOString()
       const previous = yield* readJsonFileIfPresent(asking, Asking).pipe(Effect.orElseSucceed(() => null))
       yield* dropAnswersFor(relayed, missing, previous?.asked ?? now)
@@ -96,11 +102,11 @@ export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: stri
       const deadline = Date.now() + waitSeconds * 1000
       const until = new Date(deadline).toISOString()
       const owned = new Set(ownerFindingsIn(missing).map((finding) => finding.id))
-      const fresh: ReadonlyArray<AskingQuestion> = missing.map((finding) => ({ id: finding.id, text: finding.description, blocks: true, asked: asked, ...(owned.has(finding.id) ? { owner: "user" as const } : {}) }))
+      const fresh: ReadonlyArray<AskingQuestion> = missing.map((finding) => ({ id: finding.id, text: finding.description, blocks: true, asked: now, ...(owned.has(finding.id) ? { owner: "user" as const } : {}) }))
       const kept = (previous?.questions ?? []).filter((question) => !missing.some((finding) => finding.id === question.id))
       const merged = [...kept, ...fresh]
       if (!(yield* writeWhole(asking, JSON.stringify({ asked, until, questions: merged })))) {
-        return { asked: null, answers: [] }
+        return { asked: null, answers: [], askedAt: [] }
       }
       yield* Console.log("orc: " + waiter + " waits until " + until + " for the captain's answer to " + missing.map((finding) => finding.id).join(", ") + ", read from " + relayed)
       const answeredOf = (answers: ReadonlyArray<QuestionAnswer>) => answers.filter((entry) => missing.some((finding) => finding.id === entry.question))
@@ -117,5 +123,5 @@ export const waitForAnswers = (runDir: string, waitSeconds: number, waiter: stri
         const nextUntil = remaining.some(isBlockingQuestion) ? until : asked
         yield* writeWhole(asking, JSON.stringify({ asked, until: nextUntil, questions: remaining })).pipe(Effect.orElseSucceed(() => false))
       }
-      return { asked, answers: answered }
+      return { asked, answers: answered, askedAt: merged.map((question) => ({ question: question.id, asked: question.asked ?? asked })) }
     })

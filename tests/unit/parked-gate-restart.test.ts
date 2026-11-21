@@ -36,7 +36,7 @@ const withDirs = async (body: (root: string, runs: string) => Promise<void>): Pr
   }
 }
 
-const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: 0 as const, created: "2026-11-18T09:00:00.000Z", body: "# Fix the thing\\n" }
+const spec = { title: "Fix the thing", project: "orc", kind: "ship" as const, internal: false, machine: null, parent: null, split: null, dependsOn: [], priority: 0 as const, created: "2026-11-18T09:00:00.000Z", body: "# Fix the thing\n" }
 
 const claim = { beat: "beat-1", machine: "mac", account: "main", takenAt: "2026-11-18T10:00:00.000Z" }
 
@@ -81,7 +81,7 @@ const beatWith = (root: string, statusJson: string, sources = quietSources()) =>
 
 const driveGate = async (runs: string, name: string, overrides: { start: string; respond?: (response: GateResponse) => Effect.Effect<NoMistakesReply>; answers: ReadonlyArray<{ question: string; answer: string }>; waitSeconds?: number }): Promise<NoMistakesRecord> => {
   await mkdir(join(runs, name), { recursive: true })
-  return run(driveNoMistakes({ runner: runnerFor(overrides.start, overrides.respond), taskFile: runs + "/task.md", runDir: runs + "/" + name, answers: overrides.answers, waitForAnswers: overrides.waitSeconds === undefined ? () => Effect.succeed({ answers: [], asked: null }) : waitForAnswers(join(runs, name), overrides.waitSeconds, "no-mistakes") }))}
+  return run(driveNoMistakes({ runner: runnerFor(overrides.start, overrides.respond), taskFile: runs + "/task.md", runDir: runs + "/" + name, answers: overrides.answers, waitForAnswers: overrides.waitSeconds === undefined ? () => Effect.succeed({ answers: [], asked: null, askedAt: [] }) : waitForAnswers(join(runs, name), overrides.waitSeconds, "no-mistakes") }))}
 
 const parkedTable = (findings: ReadonlyArray<string>): string =>
   ["run:", "  status: awaiting_approval", "  awaiting_agent: parked 2m10s", "  head: abc1234", '  pr: ""', "  findings[" + findings.length.toString() + "]{id,severity,file,line,action,description}:", ...findings.map((row) => "    " + row), "gate: review"].join("\n")
@@ -98,15 +98,6 @@ const runnerFor = (start: string, respond?: (response: GateResponse) => Effect.E
   status: () => Effect.die("no recorded findings in this test"),
   logs: () => Effect.die("no recorded findings in this test")
 })
-
-const refusingRespond = (seen: Array<GateResponse>) => (response: GateResponse) =>
-  Effect.sync(() => {
-    seen.push(response)
-    const covered = new Set([...(response.kind === "fix" ? response.ids : []), ...(response.kind === "fix" ? response.ignore : [])])
-    return response.kind === "fix" && covered.has("review-1")
-      ? { stdout: "responded", stderr: "", exitCode: 0 }
-      : { stdout: 'error: "finding review-1 is undecided"', stderr: "", exitCode: 1 }
-  })
 
 const dbOf = async (root: string) => run(openDatabase(root))
 
@@ -215,7 +206,7 @@ describe("a run parked on a gate orc cannot answer", () => {
     })
   })
 
-  test("an answered unanswerable finding closes the run once instead of parking it again", async () => {
+  test("an answered owner finding beside an auto-fix finding is sent as one fix instead of refusing the gate", async () => {
     await withDirs(async (root, runs) => {
       const responses: Array<GateResponse> = []
       const runA = await driveGate(runs, "run-1", { start: parkedA, answers: [] })
@@ -231,24 +222,44 @@ describe("a run parked on a gate orc cannot answer", () => {
       await run(answerTask(root, "orc-1", "review-1=Keep it", "2026-11-18T10:06:00.000Z"))
       const answersC = await answersOf(root)
       expect(answersC).toEqual([{ question: "q1", answer: "Table B" }, { question: "review-1", answer: "Keep it" }])
-      const runC = await driveGate(runs, "run-3", { start: parkedB, respond: refusingRespond(responses), answers: answersC })
+      const reraised = (table: string) => (response: GateResponse) =>
+        Effect.sync(() => {
+          responses.push(response)
+          const covered = new Set([...(response.kind === "fix" ? response.ids : []), ...(response.kind === "fix" ? response.ignore : [])])
+          return response.kind === "fix" && covered.has("review-1")
+            ? { stdout: table, stderr: "", exitCode: 0 }
+            : { stdout: 'error: "finding review-1 is undecided"', stderr: "", exitCode: 1 }
+        })
+      const runC = await driveGate(runs, "run-3", { start: parkedB, respond: reraised(parkedB), answers: answersC })
+      expect(responses).toEqual([{
+        kind: "fix",
+        ids: ["r1", "review-1"],
+        ignore: [],
+        instructions: "The captain answered these findings; fix each as the answer says:\nreview-1: Keep it"
+      }])
       expect(runC.status).toEqual("refused")
-      expect(runC.openQuestions).toEqual([])
-      expect(runC.result).toContain("needs an answer orc cannot give")
-      expect(runC.result).not.toContain("refused the answer")
-      expect(responses).toEqual([])
-      await recordGateRun(root, "run-3", "2026-11-18T10:06:00.000Z", runC, runC.result)
-      await restartOrc1(root, "beat-3", "2026-11-18T10:06:00.000Z")
-      const last = await beatWith(root, doneStatus(root, "2026-11-18T10:06:00.000Z", "2026-11-18T10:08:00.000Z"))
-      const kinds = actionKinds(last.actions)
-      expect(kinds).toContain("closed:orc-1")
-      expect(kinds.filter((kind) => kind === "started:orc-1")).toEqual([])
-      const closed = (await run(listTasks(root))).find((task) => task.spec.id === "orc-1")
-      expect(closed?.state.kind).toEqual("closed")
-      if (closed?.state.kind === "closed") {
-        expect(closed.state.closing.outcome).toEqual("failed")
-        expect(closed.state.closing.reason).toContain("needs an answer orc cannot give")
-      }
+      expect(runC.openQuestions).toEqual([{ id: "review-1", text: "needs a human", owner: "user" }])
+    })
+  })
+
+  test("an answered owner finding alone is sent as a fix carrying the owner's words instead of refusing the gate", async () => {
+    await withDirs(async (_root, runs) => {
+      const responses: Array<GateResponse> = []
+      const table = parkedTable(["review-1,warning,,,manual,needs a human"])
+      const reraising = (response: GateResponse) =>
+        Effect.sync(() => {
+          responses.push(response)
+          return { stdout: table, stderr: "", exitCode: 0 }
+        })
+      const record = await driveGate(runs, "run-9", { start: table, respond: reraising, answers: [{ question: "review-1", answer: "Keep it" }] })
+      expect(responses).toEqual([{
+        kind: "fix",
+        ids: ["review-1"],
+        ignore: [],
+        instructions: "The captain answered these findings; fix each as the answer says:\nreview-1: Keep it"
+      }])
+      expect(record.status).toEqual("refused")
+      expect(record.openQuestions).toEqual([{ id: "review-1", text: "needs a human", owner: "user" }])
     })
   })
 
@@ -372,8 +383,12 @@ describe("a run parked on a gate orc cannot answer", () => {
       if (snapshot === null) {
         throw new Error("the live asking never carried the gate")
       }
-      expect(snapshot.questions.find((question) => question.id === "review-1")?.asked).toEqual(batch)
-      expect(runB.openQuestions).toEqual([{ id: "review-1", text: "needs a human", asked: batch, owner: "user" }])
+      const gated = snapshot.questions.find((question) => question.id === "review-1")
+      if (gated === undefined) {
+        throw new Error("the live asking never carried the gate")
+      }
+      expect(gated.asked).not.toEqual(batch)
+      expect(runB.openQuestions).toEqual([{ id: "review-1", text: "needs a human", asked: gated.asked, owner: "user" }])
       await recordGateRun(root, "run-2", "2026-11-18T10:03:00.000Z", runB, runB.result)
       if (!Arr.isReadonlyArrayNonEmpty(snapshot.questions)) {
         throw new Error("the live asking holds no questions")
@@ -390,6 +405,70 @@ describe("a run parked on a gate orc cannot answer", () => {
       expect(kinds).toContain("waits:orc-1")
       expect(heard).toEqual([])
       expect(await openReviewItems(root)).toHaveLength(1)
+    })
+  })
+
+  test("a repeated asking beside a retained worker question is asked anew instead of reusing its old answer", async () => {
+    await withDirs(async (root, runs) => {
+      const batch = "2026-11-18T10:00:00.000Z"
+      await startOrc1(root, batch)
+      await mkdir(join(runs, "run-9"), { recursive: true })
+      const first = {
+        asked: batch,
+        questions: [
+          { id: "ask-7", text: "Worker question?", blocks: false, asked: batch },
+          { id: "r2", text: "changes product behavior", blocks: true, asked: batch }
+        ]
+      }
+      if (!Arr.isReadonlyArrayNonEmpty(first.questions)) {
+        throw new Error("the first asking holds no questions")
+      }
+      await run(askStartedTask(root, "orc-1", { asked: first.asked, questions: first.questions }))
+      await run(answerTask(root, "orc-1", "r2=Table B", "2026-11-18T10:01:00.000Z"))
+      await writeFile(join(runs, "run-9", "asking.json"), JSON.stringify({ asked: batch, until: batch, questions: [{ id: "ask-7", text: "Worker question?", blocks: false, asked: batch }] }))
+      const live: { current: typeof Asking.Type | null } = { current: null }
+      const watch = (async () => {
+        const end = Date.now() + 8000
+        while (Date.now() < end) {
+          const text = await readFile(join(runs, "run-9", "asking.json"), "utf8").catch(() => null)
+          let asking: typeof Asking.Type | null = null
+          if (text !== null) {
+            try {
+              asking = Schema.decodeUnknownSync(Asking)(JSON.parse(text))
+            } catch {
+              asking = null
+            }
+          }
+          if (asking !== null && asking.questions.some((question) => question.id === "r2")) {
+            live.current = asking
+            return
+          }
+          await new Promise((resolve) => setTimeout(resolve, 25))
+        }
+      })()
+      const record = await driveGate(runs, "run-9", { start: parkedTable(["r2,warning,lint.go,,ask-user,changes product behavior"]), answers: [], waitSeconds: 1 })
+      await watch
+      const snapshot = live.current
+      if (snapshot === null) {
+        throw new Error("the live asking never carried the second r2")
+      }
+      const second = snapshot.questions.find((question) => question.id === "r2")
+      if (second?.asked === undefined) {
+        throw new Error("the second r2 asking carries no time")
+      }
+      expect(second.asked).not.toEqual(batch)
+      expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior", asked: second.asked }])
+      await recordGateRun(root, "run-9", "2026-11-18T10:02:00.000Z", record, record.result)
+      const heard: Array<DeciderRequest> = []
+      const sources = { ...quietSources(), askDecider: answeringDecider("# Fix the thing", heard) }
+      const parked = await beatWith(root, doneStatus(root, "2026-11-18T10:01:00.000Z", "2026-11-18T10:04:00.000Z"), sources)
+      const kinds = actionKinds(parked.actions)
+      expect(kinds).toContain("parked:orc-1")
+      expect(kinds).toContain("started:orc-1")
+      const reopened = (await run(findTask(root, "orc-1")))?.parked?.questions.find((question) => question.id === "r2")
+      expect(reopened?.asked).toEqual(second.asked)
+      expect(reopened?.answer?.by ?? null).toEqual("decider")
+      expect(heard).toHaveLength(1)
     })
   })
 })

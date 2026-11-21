@@ -40,7 +40,7 @@ export const askOnLoop = (runDir: string, waitSeconds: number, end: Looping): Ef
   Effect.gen(function*() {
     const text = loopQuestionText(end.label)
     const waited = yield* waitForAnswers(runDir, waitSeconds, "the paused run")([{ id: loopQuestionId, description: text, action: "" }])
-    return loopAnswerOf(waited.answers) ?? { kind: "unanswered", question: { id: loopQuestionId, text, asked: waited.asked ?? new Date().toISOString() } }
+    return loopAnswerOf(waited.answers) ?? { kind: "unanswered", question: { id: loopQuestionId, text, asked: waited.askedAt.find((entry) => entry.question === loopQuestionId)?.asked ?? waited.asked ?? new Date().toISOString() } }
   })
 
 export const loopGuidance = (words: string): string =>

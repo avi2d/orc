@@ -531,7 +531,7 @@ describe("driveNoMistakes", () => {
     }
     const wait: Wait = (missing) => {
       waitedOn.push(missing.map((finding) => finding.id))
-      return Effect.succeed({ asked, answers: [{ question: "r2", answer: "Keep the old behavior" }] })
+      return Effect.succeed({ asked, answers: [{ question: "r2", answer: "Keep the old behavior" }], askedAt: [{ question: "r2", asked }] })
     }
     const { record, gate } = await driveIn(answering, [], [], wait)
     expect(waitedOn).toEqual([["r2"]])
@@ -553,7 +553,7 @@ describe("driveNoMistakes", () => {
     let waited = 0
     const wait: Wait = () => {
       waited += 1
-      return Effect.succeed(waited === 1 ? { asked, answers: [{ question: "r2", answer: "Keep the old behavior" }] } : { asked: "2026-11-02T10:40:00.000Z", answers: [] })
+      return Effect.succeed(waited === 1 ? { asked, answers: [{ question: "r2", answer: "Keep the old behavior" }], askedAt: [{ question: "r2", asked }] } : { asked: "2026-11-02T10:40:00.000Z", answers: [], askedAt: [{ question: "r2", asked: "2026-11-02T10:40:00.000Z" }] })
     }
     const { record } = await driveIn(answering, [], [], wait)
     expect(sent).toMatchObject([{ kind: "fix", ids: ["r1", "r2"] }])
@@ -571,7 +571,7 @@ describe("driveNoMistakes", () => {
         return Effect.succeed({ stdout: failedRun, stderr: "", exitCode: 0 })
       }
     }
-    const { record } = await driveIn(asking, [], [], () => Effect.succeed({ asked, answers: [] }))
+    const { record } = await driveIn(asking, [], [], () => Effect.succeed({ asked, answers: [], askedAt: [{ question: "r2", asked }] }))
     expect(sent).toEqual([])
     expect(record.openQuestions).toEqual([{ id: "r2", text: "changes product behavior", asked }])
   })
