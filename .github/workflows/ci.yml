@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   changes:
-    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
@@ -44,7 +44,7 @@ jobs:
   static:
     needs: changes
     if: (needs.changes.outputs.release != 'true' || needs.changes.outputs.check-release == 'true')
-    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
@@ -80,7 +80,7 @@ jobs:
   test:
     needs: changes
     if: (needs.changes.outputs.release != 'true' || needs.changes.outputs.check-release == 'true') && needs.changes.outputs.docs-only != 'true'
-    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
@@ -111,7 +111,7 @@ jobs:
   checks:
     needs: [changes, static, test]
     if: always()
-    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read

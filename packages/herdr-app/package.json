@@ -19,6 +19,6 @@
     "copy-app-types": "bun scripts/copy-app-types.ts"
   },
   "devDependencies": {
-    "@avi2dg/checks": "0.111.1"
+    "@avi2dg/checks": "0.112.0"
   }
 }
