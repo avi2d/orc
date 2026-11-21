@@ -80,7 +80,7 @@ const decidedBody = (path: Path.Path, file: string, record: TaskRecord): Effect.
 
 const takenBody = (record: TaskRecord): string => {
   const hold = record.hold
-  const decisions = hold === null ? [] : [...hold.history ?? [], hold]
+  const decisions = hold === null ? [] : [...hold.history ?? [], ...(record.parked === null ? [hold] : [])]
   return record.spec.body + decisions.flatMap((decision) => decision.answer === null ? [] : [
     "\n\nHeld for the captain: " + decision.reason + "\nThe captain answered: " + decision.answer.words
   ]).join("")

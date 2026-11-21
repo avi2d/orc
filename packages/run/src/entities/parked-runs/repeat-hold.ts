@@ -1,4 +1,5 @@
 import { nextHold, type Hold, type Parked, type TaskRecord } from "../backlog/index"
+import { isBlockingQuestion } from "../review-gate/index"
 
 // A resume hands back only the answers the task already holds, so a resumed run that parks with nothing open and nothing answered during it would end the same way on every beat.
 export const repeatsResume = (record: TaskRecord, questions: Parked["questions"]): boolean => {
@@ -6,7 +7,7 @@ export const repeatsResume = (record: TaskRecord, questions: Parked["questions"]
     return false
   }
   const started = Date.parse(record.state.started.at)
-  return questions.every((question) => question.answer !== null && Date.parse(question.answer.at) < started)
+  return questions.filter(isBlockingQuestion).every((question) => question.answer !== null && Date.parse(question.answer.at) < started)
 }
 
 export const repeatHold = (record: TaskRecord, run: string | undefined, ended: string | undefined, at: string): Hold => {

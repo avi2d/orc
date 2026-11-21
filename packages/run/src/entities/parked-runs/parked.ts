@@ -244,8 +244,13 @@ const answerHoldOn = (id: string, words: string, at: string, expected: ExpectedD
   return Effect.succeed({ kind: "write", record: { ...fresh, hold: answered }, result: { kind: "hold", hold: answered } })
 }
 
+const namesParkedQuestion = (words: string, questions: ReadonlyArray<ParkedQuestion>): boolean => {
+  const cut = words.indexOf("=")
+  return cut !== -1 && questions.some((question) => question.id === words.slice(0, cut))
+}
+
 const answerOn = (id: string, words: string, at: string, expected: ExpectedDecision | undefined, by: AnswerBy) => (fresh: TaskRecord): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
-  if (fresh.parked !== null && !(isHeld(fresh) && openQuestions(fresh).length === 0)) {
+  if (fresh.parked !== null && (!isHeld(fresh) || namesParkedQuestion(words, fresh.parked.questions))) {
     if (expected !== undefined && expected.kind !== "parked") {
       return Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" }))
     }
