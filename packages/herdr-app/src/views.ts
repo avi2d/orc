@@ -1,5 +1,5 @@
 import type { AsyncContext, Context } from "gpui-kit"
-import { layout } from "herdr"
+import { layout, run } from "herdr"
 
 export const viewsStack = "orc-views"
 export const selectedTaskKey = "orc.board.selected"
@@ -19,6 +19,13 @@ export const views = [
   { id: "orc-agents", label: "Agents", key: "⌘3" },
   { id: "orc-inbox", label: "Inbox", key: "⌘4" }
 ] as const
+
+const inboxSelect = { command: "layout.select", args: { stack: viewsStack, child: "orc-inbox" } } as const
+
+export const openInbox = (cx: Context): void => {
+  cx.stop_propagation()
+  run(inboxSelect.command, inboxSelect.args)
+}
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value)

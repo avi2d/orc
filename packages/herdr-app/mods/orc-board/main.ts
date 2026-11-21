@@ -1,7 +1,7 @@
 import { type AsyncContext, type Context, type Element, type FocusHandle, View, div } from "gpui-kit"
 import { ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { run, setShared, shared } from "herdr"
-import { refreshWhenShown, selectedTaskKey } from "../../src/views"
+import { openInbox, refreshWhenShown, selectedTaskKey } from "../../src/views"
 import { type BoardTask, type Lane, type LaneView, type QueuedRun, cardBox, cardHeight, clampedLaneView, clickedSelection, kindLabel, laneJump, lanes, panelCommand, queueLine, selectionOnBoard, tasksInLane, titleClip, wheelOffset } from "../../src/board"
 import { type BoardAttention, type BoardBacklog, boardAttention, boardBacklog, boardQueue } from "../../src/guard-board"
 import { type Reading, readJson } from "../../src/orc-read"
@@ -122,11 +122,18 @@ export default class OrcBoard extends View {
         .children(lanes.map((lane) => this.lane(t, lane, tasksInLane(backlog.tasks, lane, this.project, owned), queued))))
   }
 
+  count(t: Palette, lane: Lane, count: number): Element {
+    const shown = div().text_color(t.muted).child(String(count))
+    if (lane !== "Awaiting you") return shown
+    return shown.id("inbox-count").px(4).rounded(4).hover((style) => style.bg(t.raised).text_color(t.foreground))
+      .on_click((_event, cx) => openInbox(cx))
+  }
+
   lane(t: Palette, lane: Lane, tasks: ReadonlyArray<BoardTask>, queued: ReadonlyArray<QueuedRun>): Element {
     const folded = this.folded.has(lane)
     const header = h_flex().id(`toggle-${lane}`).h(44).flex_shrink_0().px(8).gap(6).items_center().cursor_pointer()
       .hover((style) => style.bg(t.hover)).on_click((_event, cx) => this.toggle(cx, lane))
-      .child(div().flex_1().child(lane)).child(div().text_color(t.muted).child(String(tasks.length)))
+      .child(div().flex_1().child(lane)).child(this.count(t, lane, tasks.length))
       .child(div().text_color(t.muted).child(folded ? "»" : "«"))
     const column = v_flex().id(`lane-${lane}`).h_full().min_h_0().flex_shrink_0().w(folded ? 110 : 260)
       .bg(t.chrome).border_r(1).border_color(t.border).child(header)
