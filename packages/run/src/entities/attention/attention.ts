@@ -1,13 +1,11 @@
 import { Effect, FileSystem, Schema } from "effect"
 import { readNames, BacklogError, isDeciderAnswer, type ParkedQuestion, platformFailure, publishOnce, readIfPresent, scratchName, type TaskRecord } from "../backlog/index"
-import type { BeatAction } from "./beat-action"
-import { checkRefusals, greenChecks, type PullRequestView, redChecks } from "../pull-request/index"
 import { isWorkerQuestion, loopQuestionId } from "../agent/index"
 
 export const deciderTimeoutMillis = 180 * 1000
 const deciderClaimMillis = deciderTimeoutMillis + 60 * 1000
 
-import { AttentionItem, type Asked, type Decision, type ItemAnswer } from "./attention-item"
+import { AttentionItem, type Asked, type AttentionOption, type Decision, type ItemAnswer } from "./attention-item"
 import { AskOption } from "../review-gate/index"
 
 export type { Asked }
@@ -36,7 +34,7 @@ const replaceItem = (root: string, id: string, before: string, encoded: string):
     return true
   })
 
-const writeItem = (root: string, id: string, item: AttentionItem): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+export const writeItem = (root: string, id: string, item: AttentionItem): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const fs = yield* FileSystem.FileSystem
     const scratch = scratchName(attentionFolder(root), id)
@@ -47,6 +45,18 @@ const writeItem = (root: string, id: string, item: AttentionItem): Effect.Effect
 
 // The same parts always name one file, so routing an item again opens nothing new.
 export const itemId = (...parts: ReadonlyArray<string>): string => parts.map((part) => part.replace(/[^A-Za-z0-9_-]/g, "_")).join(".")
+
+type Choice = Pick<Asked, "subject" | "options" | "recommendation">
+
+// The recommended option comes first, so an item cannot recommend an option it does not list.
+export const choice = (subject: string, recommended: AttentionOption, ...others: ReadonlyArray<AttentionOption>): Choice =>
+  ({ subject, options: [recommended, ...others], recommendation: recommended.text })
+
+const choiceOf = (asked: Asked): Choice => ({
+  ...(asked.subject === undefined ? {} : { subject: asked.subject }),
+  ...(asked.options === undefined ? {} : { options: asked.options }),
+  ...(asked.recommendation === undefined ? {} : { recommendation: asked.recommendation })
+})
 
 export const reviewQuestionId = (task: string, question: string, asked: string): string => itemId(task, question, asked)
 
@@ -103,7 +113,7 @@ const readExistingItem = (root: string, id: string): Effect.Effect<{ readonly be
     return { before, item }
   })
 
-const readItem = (root: string, id: string): Effect.Effect<AttentionItem | null, BacklogError, FileSystem.FileSystem> =>
+export const readItem = (root: string, id: string): Effect.Effect<AttentionItem | null, BacklogError, FileSystem.FileSystem> =>
   Effect.map(readExistingItem(root, id), (existing) => existing?.item ?? null)
 
 type CloseOutcome = "closed" | "already closed" | "missing"
@@ -227,7 +237,12 @@ const overdueWait = (task: TaskRecord, at: string): { readonly id: string; reado
   const generation = hold.history?.length ?? 0
   const id = generation === 0 ? itemId(task.spec.id, "overdue-wait", hold.until) : itemId(task.spec.id, "overdue-wait", hold.until, String(generation))
   const text = "held for the captain: " + hold.reason + ", until " + hold.until + " passed"
-  const asked: Asked | null = Date.parse(at) >= passed ? { kind: "overdue-wait", task: task.spec.id, text, asked: new Date(passed).toISOString(), owner: "user" } : null
+  const options = choice(
+    "the hold on " + task.spec.id + ": " + hold.reason,
+    { text: "answer", outcome: "orc backlog answer " + task.spec.id + " <words> answers the hold, and the task can start" },
+    { text: "drop", outcome: "orc backlog drop " + task.spec.id + " <reason> drops the task, and it never starts" }
+  )
+  const asked: Asked | null = Date.parse(at) >= passed ? { kind: "overdue-wait", task: task.spec.id, text, ...options, asked: new Date(passed).toISOString(), owner: "user" } : null
   return { id, asked, answer: hold.answer }
 }
 
@@ -239,7 +254,7 @@ const openOrReopenTaskItem = (root: string, id: string, asked: Asked): Effect.Ef
     }
     const existing = yield* readExistingItem(root, id)
     if (existing !== null && existing.item.state.kind === "withdrawn") {
-      yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...existing.item, text: asked.text, state: { kind: "open" } }))
+      yield* replaceItem(root, id, existing.before, yield* encodeItem(id, { ...existing.item, text: asked.text, ...choiceOf(asked), state: { kind: "open" } }))
     }
   })
 
@@ -342,49 +357,6 @@ export const routeTaskItems = (root: string, tasks: ReadonlyArray<TaskRecord>, a
     const closedTasks = new Set(tasks.filter((task) => task.state.kind === "closed").map((task) => task.spec.id))
     const staleFailing = (yield* openItems(root)).filter((entry) => entry.item.kind === "failing-command" && closedTasks.has(entry.item.task))
     yield* Effect.forEach(staleFailing, (entry) => Effect.asVoid(withdrawItem(root, entry.id, "task closed", at)), { discard: true })
-  })
-
-export const openRunDeaths = (root: string, actions: ReadonlyArray<BeatAction>, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
-  Effect.forEach(actions, (action) =>
-    (action.kind === "closed" && action.outcome === "failed") || action.kind === "start-failed"
-      ? Effect.asVoid(openItem(root, itemId(action.task, "run-died"), { kind: "run-died", task: action.task, text: "the run on " + action.machine + " died: " + action.reason, asked: at, owner: "user" }))
-      : Effect.void, { discard: true })
-
-const openOrReopenPrItem = (root: string, id: string, asked: Asked): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const item = yield* readItem(root, id)
-    if (item === null) {
-      yield* Effect.asVoid(openItem(root, id, asked))
-    } else if (item.state.kind === "withdrawn") {
-      yield* writeItem(root, id, { ...asked, state: { kind: "open" } })
-    } else if (item.state.kind === "open" && item.text !== asked.text) {
-      yield* writeItem(root, id, { ...asked, asked: item.asked, state: { kind: "open" } })
-    }
-  })
-
-// Each head commit gets its own items, so a fix pushed after a red check opens anew.
-export const routePullRequest = (root: string, task: string, pr: string, view: PullRequestView, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
-  Effect.gen(function*() {
-    const ended = view.state === "MERGED" ? "merged" : view.state === "CLOSED" ? "closed without merging" : null
-    const refusals = checkRefusals(view)
-    const red = redChecks(view)
-    const holds = (kind: AttentionItem["kind"]): boolean => ended === null && (kind === "check-red" ? refusals.length > 0 : red.length === 0)
-    const prefixes = [itemId(task, "check-red") + ".", itemId(task, "pr-ready") + "."]
-    const settled = (yield* openItems(root, (name) => prefixes.some((prefix) => name.startsWith(prefix)))).filter((entry) =>
-      !(entry.id === itemId(task, entry.item.kind, view.headRefOid) && holds(entry.item.kind))
-    )
-    yield* Effect.forEach(settled, (entry) =>
-      entry.item.kind === "pr-ready" && ended !== null
-        ? Effect.asVoid(closeItem(root, entry.id, { words: ended, at }))
-        : Effect.asVoid(withdrawItem(root, entry.id, ended === null ? "head or checks changed" : "PR " + ended, at)), { discard: true })
-    if (ended !== null) {
-      return
-    }
-    if (red.length > 0) {
-      yield* openOrReopenPrItem(root, itemId(task, "check-red", view.headRefOid), { kind: "check-red", task, text: pr + ": the check " + red.join(", ") + " is red", asked: at, owner: "user" })
-    } else if (refusals.length === 0) {
-      yield* openOrReopenPrItem(root, itemId(task, "pr-ready", view.headRefOid), { kind: "pr-ready", task, text: pr + " is ready to merge, checks green: " + greenChecks(view).join(", "), asked: at, owner: "user" })
-    }
   })
 
 export type AnswerItemOutcome = CloseOutcome | { readonly kind: "answered elsewhere"; readonly task: string }

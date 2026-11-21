@@ -1,6 +1,8 @@
 import { Schema } from "effect"
 import { AskOption } from "../review-gate/index"
 
+const AttentionOption = Schema.Struct({ ...AskOption.fields, outcome: Schema.optionalKey(Schema.String) })
+
 const Answer = Schema.Struct({ words: Schema.String, at: Schema.String })
 
 const QuotedRule = Schema.Struct({ quote: Schema.String, source: Schema.String })
@@ -16,7 +18,9 @@ export const AttentionItem = Schema.Struct({
   kind: Schema.Literals(["review-question", "worker-question", "run-died", "check-red", "pr-ready", "overdue-wait", "failing-command"]),
   task: Schema.String,
   text: Schema.String,
-  options: Schema.optionalKey(Schema.Array(AskOption)),
+  subject: Schema.optionalKey(Schema.String),
+  options: Schema.optionalKey(Schema.Array(AttentionOption)),
+  recommendation: Schema.optionalKey(Schema.String),
   asked: Schema.String,
   owner: Schema.Literals(["decider", "user"]),
   decision: Schema.optionalKey(Decision),
@@ -30,6 +34,7 @@ export const AttentionItem = Schema.Struct({
 
 export type AttentionItem = typeof AttentionItem.Type
 export type Asked = Omit<AttentionItem, "state" | "decision" | "deciding">
+export type AttentionOption = typeof AttentionOption.Type
 export type ItemAnswer = typeof Answer.Type
 export type Decision = typeof Decision.Type
 
