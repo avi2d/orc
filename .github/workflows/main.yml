@@ -48,5 +48,4 @@ jobs:
           registry-url: https://registry.npmjs.org
       - env:
           GH_TOKEN: ${{ github.token }}
-          CHECKS_PUBLISH_WORKSPACES: "true"
         run: bunx checks-release-tag
