@@ -73,8 +73,15 @@ interface AskedQuestion {
   readonly text: string
   readonly asked?: string | undefined
   readonly blocks?: boolean | undefined
-  readonly options?: ReadonlyArray<AskOption>
+  readonly options?: ReadonlyArray<AskOption> | undefined
 }
+
+const toStoredOptions = (options: ReadonlyArray<AskOption>): NonNullable<Asked["options"]> =>
+  options.map((option) => ({
+    text: option.text,
+    ...(option.outcome === undefined ? {} : { outcome: option.outcome }),
+    ...(option.picture === undefined ? {} : { picture: option.picture })
+  }))
 
 const reviewQuestionItem = (
   task: string,
@@ -85,7 +92,7 @@ const reviewQuestionItem = (
     kind: isWorkerQuestion(question.id) ? "worker-question" : "review-question",
     task,
     text: question.text,
-    ...(question.options === undefined ? {} : { options: question.options }),
+    ...(question.options === undefined ? {} : { options: toStoredOptions(question.options) }),
     asked: question.asked ?? "",
     owner: question.id === loopQuestionId ? "user" : "decider"
   }

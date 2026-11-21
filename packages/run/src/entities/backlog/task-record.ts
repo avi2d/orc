@@ -1,10 +1,12 @@
 import { Array as Arr, Data, Effect, Schema } from "effect"
 import { Answer, answerOf, decisionStateOf, type AnsweredClosing } from "./task-record-decision"
 import { isTaskKind, type TaskKind, unknownKind } from "./task-kind"
-import { deciderAnswerKinds, OverturnedFront, type ParkedAnswer, parkedAnswerOf } from "./task-record-answer"
+import { deciderAnswerKinds, OverturnedFront, parkedAnswerOf } from "./task-record-answer"
+import { ChoicesFront, choicesOf, type ParkedQuestion } from "./task-record-question"
 
 export { isDeciderAnswer } from "./task-record-answer"
 export type { CaptainAnswer, DeciderAnswer, ParkedAnswer } from "./task-record-answer"
+export type { ParkedQuestion } from "./task-record-question"
 
 export const taskFolders = ["new", "taken", "closed"] as const
 export type TaskFolder = typeof taskFolders[number]
@@ -47,14 +49,6 @@ export interface Claim {
 export interface Started {
   readonly at: string
   readonly log: string
-}
-
-export interface ParkedQuestion {
-  readonly id: string
-  readonly text: string
-  readonly asked: string
-  readonly blocks: boolean
-  readonly answer: ParkedAnswer | null
 }
 
 const HoldQuestion = Schema.Struct({ id: Schema.String, text: Schema.String, answer: Schema.NullOr(Answer) })
@@ -177,6 +171,7 @@ const QuestionFront = Schema.Struct({
   answered_at: Schema.optional(Schema.String),
   asked_at: Schema.optional(Schema.String),
   blocks: Schema.optional(Schema.Boolean),
+  ...ChoicesFront,
   relayed_to: Schema.optional(Schema.String),
   used: Schema.optional(Schema.Boolean),
   answered_by: Schema.optional(Schema.Literals(deciderAnswerKinds)),
@@ -256,6 +251,7 @@ const questionsOf = (fronts: ReadonlyArray<typeof QuestionFront.Type>, what: str
     text: question.text,
     asked: question.asked_at ?? "",
     blocks: question.blocks ?? true,
+    ...choicesOf(question),
     answer: answer === null ? null : parkedAnswerOf(question, answer)
   }))
 
