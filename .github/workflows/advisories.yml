@@ -9,4 +9,4 @@ jobs:
     permissions:
       contents: read
       issues: write
-    uses: avi2d/workflows/.github/workflows/advisories.yml@v1
+    uses: avi2d/workflows/.github/workflows/advisories.yml@v3
