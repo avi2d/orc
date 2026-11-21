@@ -100,6 +100,26 @@ export const answersFor = (record: TaskRecord, asking: LiveAsking): ReadonlyArra
       : []
   ))
 
+// A resume hands back only the answers the task already holds, so a resumed run that parks with nothing open and nothing answered during it would end the same way on every beat.
+const repeatsResume = (record: TaskRecord, questions: Parked["questions"]): boolean => {
+  if (record.state.kind !== "started" || record.parked?.origin === undefined) {
+    return false
+  }
+  const started = Date.parse(record.state.started.at)
+  return questions.every((question) => question.answer !== null && Date.parse(question.answer.at) < started)
+}
+
+const repeatHold = (record: TaskRecord, run: string | undefined, ended: string | undefined, at: string): Hold => {
+  const previous = record.hold
+  const history = previous === null || previous.answer === null ? [] : [
+    ...previous.history ?? [],
+    { reason: previous.reason, until: previous.until, questions: previous.questions, answer: previous.answer, ...(previous.at === null ? {} : { at: previous.at }) }
+  ]
+  const reason = "the resumed run " + (run ?? record.parked?.origin?.run ?? "") + " ended with no new question and no answer given during it" +
+    (ended === undefined || ended.trim() === "" ? "" : " (" + ended.trim() + ")") + ", so the beat stops resuming it with the same answers"
+  return { reason, until: null, questions: [], answer: null, at, ...(history.length === 0 ? {} : { history }) }
+}
+
 // rename(2) takes the taken file at most once, so of two beats parking one run exactly one moves it back to new.
 export const parkStartedTask = (
   root: string,
@@ -107,7 +127,8 @@ export const parkStartedTask = (
   branch: string,
   asked: Arr.NonEmptyReadonlyArray<AskedQuestion>,
   at: string,
-  run?: string
+  run?: string,
+  ended?: string
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const open = latestAskings(asked)
@@ -123,7 +144,8 @@ export const parkStartedTask = (
       yield* openReviewQuestions(root, id, questions.filter((question) => question.answer === null))
       const sentPr = record.parked?.origin?.pr
       const origin = run === undefined ? record.parked?.origin : { machine: record.state.claim.machine, run, ...(sentPr === undefined ? {} : { pr: sentPr }) }
-      const parked: TaskRecord = { ...record, parked: { branch, questions, ...(origin === undefined ? {} : { origin }) }, state: { kind: "new" } }
+      const hold = repeatsResume(record, questions) ? repeatHold(record, run, ended, at) : record.hold
+      const parked: TaskRecord = { ...record, hold, parked: { branch, questions, ...(origin === undefined ? {} : { origin }) }, state: { kind: "new" } }
       if (!(yield* publishOnce(paths.folder("new"), id + ".md", renderTaskFile(parked)))) {
         return yield* new BacklogError({ detail: "new/ already holds " + id })
       }
@@ -221,7 +243,7 @@ const answerHeldQuestionOn = (id: string, words: string, at: string, fresh: Task
 }
 
 const answerOn = (id: string, words: string, at: string, expected: ExpectedDecision | undefined, by: AnswerBy) => (fresh: TaskRecord): Effect.Effect<Rewrite<AnswerOutcome>, BacklogError> => {
-  if (fresh.parked !== null) {
+  if (fresh.parked !== null && !(isHeld(fresh) && openQuestions(fresh).length === 0)) {
     if (expected !== undefined && expected.kind !== "parked") {
       return Effect.fail(new BacklogError({ detail: id + " moved while orc read it, so run the command again" }))
     }
