@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: avi2d/workflows/setup@v1
+      - uses: avi2d/workflows/setup@v3
         with:
           fetch-depth: 0
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
