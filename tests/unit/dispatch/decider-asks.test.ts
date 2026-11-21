@@ -129,18 +129,32 @@ describe("the asked action of a no-mistakes review question", () => {
     await withStartedTask(async (root) => {
       const runDir = await mkdtemp(join(tmpdir(), "orc-decider-asks-live-"))
       try {
-        const wait = waitForAnswers(runDir, 1, "the gate")([{ id: "question-1", description: "Is this branch ready?", asks: "merge" }])
+        const wait = waitForAnswers(runDir, 30, "the gate")([{ id: "question-1", description: "Is this branch ready?", asks: "merge" }])
         const fiber = Effect.runFork(wait.pipe(Effect.provide(BunServices.layer)))
-        await Bun.sleep(200)
-        const asking = Schema.decodeUnknownSync(Schema.fromJsonString(Asking))(await readFile(join(runDir, askingFileName), "utf8"))
-        await Effect.runPromise(Fiber.interrupt(fiber))
-        expect(asking.questions.map((question) => question.asks)).toEqual(["merge"])
-        assert.ok(Arr.isReadonlyArrayNonEmpty(asking.questions))
-        await run(askStartedTask(root, "orc-1", { asked: asking.asked, questions: asking.questions }))
-        const heard: Array<DeciderRequest> = []
-        const decided = await decideAll(root, heard)
-        expect(heard.length).toBe(0)
-        expect(decided.map((entry) => entry.verdict.kind)).toEqual(["escalated"])
+        try {
+          const deadline = Date.now() + 5000
+          let raw: string | null = null
+          while (raw === null) {
+            try {
+              raw = await readFile(join(runDir, askingFileName), "utf8")
+            } catch {
+              if (Date.now() >= deadline) {
+                throw new Error("asking.json never appeared")
+              }
+              await Bun.sleep(10)
+            }
+          }
+          const asking = Schema.decodeUnknownSync(Schema.fromJsonString(Asking))(raw)
+          expect(asking.questions.map((question) => question.asks)).toEqual(["merge"])
+          assert.ok(Arr.isReadonlyArrayNonEmpty(asking.questions))
+          await run(askStartedTask(root, "orc-1", { asked: asking.asked, questions: asking.questions }))
+          const heard: Array<DeciderRequest> = []
+          const decided = await decideAll(root, heard)
+          expect(heard.length).toBe(0)
+          expect(decided.map((entry) => entry.verdict.kind)).toEqual(["escalated"])
+        } finally {
+          await Effect.runPromise(Fiber.interrupt(fiber))
+        }
       } finally {
         await rm(runDir, { recursive: true, force: true })
       }
