@@ -67,6 +67,9 @@ export {
   choicesOf,
 } from "./task-record-question"
 export {
+  nextHold,
+} from "./hold-history"
+export {
   isHeld,
   isDeciderAnswer,
   openQuestions,
