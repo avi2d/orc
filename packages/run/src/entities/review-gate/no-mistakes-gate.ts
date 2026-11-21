@@ -7,6 +7,14 @@ export interface QuestionAnswer {
   readonly answer: string
 }
 
+export const holdReleaseId = "hold-release"
+
+export const holdReleaseWordsOf = (answers: ReadonlyArray<QuestionAnswer>): ReadonlyArray<string> =>
+  answers.filter((entry) => entry.question === holdReleaseId).map((entry) => entry.answer)
+
+export const holdReleaseGuidance = (words: ReadonlyArray<string>): string =>
+  "The captain released the repeat hold with: " + words.join("\nThe captain also wrote: ") + "\nFollow that guidance as you retry the task."
+
 export interface OpenQuestion {
   readonly id: string
   readonly text: string
@@ -185,23 +193,31 @@ export const answerForGate = (
   const rest = findings.filter((finding) => !isAskUser(finding))
   const fixable = [...rest.filter((finding) => finding.action === "auto-fix"), ...settled]
   const ignore = [...rest.filter((finding) => finding.action === "no-op"), ...worded].map((finding) => finding.id)
+  const released = holdReleaseWordsOf(answers)
+  const releasedGuidance = released.length === 0 ? null : holdReleaseGuidance(released)
+  const instructionsOf = (resolved: ReadonlyArray<NoMistakesFinding>): string | undefined => {
+    const parts = [...(resolved.length === 0 ? [] : [answeredGuidance(resolved, answers)]), ...(releasedGuidance === null ? [] : [releasedGuidance])]
+    return parts.length === 0 ? undefined : parts.join("\n")
+  }
   if (gate.stage === "fix-review") {
     if (settled.length === 0) {
       return { kind: "approve" }
     }
+    const answered = answeredGuidance(settled, answers)
     return {
       kind: "fix",
       ids: fixable.map((finding) => finding.id),
       ignore,
-      instructions: answeredGuidance(settled, answers)
+      instructions: releasedGuidance === null ? answered : answered + "\n" + releasedGuidance
     }
   }
   if (fixable.length > 0) {
+    const instructions = instructionsOf(settled)
     return {
       kind: "fix",
       ids: fixable.map((finding) => finding.id),
       ignore,
-      ...(settled.length === 0 ? {} : { instructions: answeredGuidance(settled, answers) })
+      ...(instructions === undefined ? {} : { instructions })
     }
   }
   if (rest.length > 0 || worded.length > 0) {

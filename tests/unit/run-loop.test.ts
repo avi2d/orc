@@ -27,6 +27,7 @@ import {
 } from "../../packages/run/src/features/running-a-task/history-write"
 import { buildResumePlan } from "../../packages/run/src/features/running-a-task/run-resume"
 import { subprocessNoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
+import { holdReleaseId } from "../../packages/run/src/entities/review-gate/index"
 import type { HistoryRun } from "../../packages/run/src/features/running-a-task/run-record"
 import { runFull } from "../../packages/run/src/features/running-a-task/run-loop"
 import type { AgentRun, RunCheckpoints } from "../../packages/run/src/features/running-a-task/run-ops"
@@ -475,6 +476,120 @@ describe("a run Pi loops in", () => {
       const exit = await Effect.runPromiseExit(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
       expect(calls).toBe(0)
       expect(JSON.stringify(exit)).toContain("RunStopped")
+    })
+  })
+})
+
+describe("a hold release reaches the resumed worker", () => {
+  test("a resumed implement prompt carries the hold release instead of dropping it", async () => {
+    await withLoopRun(0, async (db, run) => {
+      const prompts: Array<string> = []
+      const ops = fakeOps({
+        runAgent: async (agentRun) => {
+          prompts.push(agentRun.prompt)
+          return { commits: [] }
+        },
+        execCheck: async () => {
+          throw new Error("checks ran before the implement finished")
+        }
+      }, run.hostSessionsDir)
+      const plan = { ...freshPlan, answers: [{ question: holdReleaseId, answer: "Fix the lint failure first" }] }
+      const report = await Effect.runPromise(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
+      expect(prompts.length).toBe(1)
+      expect(prompts[0]).toContain("Do the task.")
+      expect(prompts[0]).toContain("Fix the lint failure first")
+      expect(report.implementPassed).toBe(false)
+    })
+  })
+
+  test("a resumed worker continuation carries the hold release beside the worker answer", async () => {
+    await withLoopRun(0, async (db, run) => {
+      const prompts: Array<string> = []
+      const ops = fakeOps({
+        runAgent: async (agentRun) => {
+          prompts.push(agentRun.prompt)
+          return { commits: [] }
+        },
+        execCheck: async () => {
+          throw new Error("checks ran before the implement finished")
+        }
+      }, run.hostSessionsDir)
+      const plan = {
+        ...freshPlan,
+        implementSessionFile: "/sessions/first.jsonl",
+        answers: [{ question: "ask-1", answer: "Use the cache" }, { question: holdReleaseId, answer: "Fix the lint failure first" }]
+      }
+      await Effect.runPromise(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
+      expect(prompts.length).toBe(1)
+      expect(prompts[0]).toContain("Use the cache")
+      expect(prompts[0]).toContain("Fix the lint failure first")
+    })
+  })
+
+  test("a fresh fix attempt carries the hold release instead of starting bare", async () => {
+    await withLoopRun(0, async (db, run) => {
+      await mkdir(run.piSessionDir, { recursive: true })
+      await writeFile(join(run.worktreeDir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
+      const prompts: Array<string> = []
+      const ops = fakeOps({
+        runAgent: async (agentRun) => {
+          prompts.push(agentRun.prompt)
+          return { commits: [] }
+        },
+        execCheck: async () => ({ stdout: "lint broken", stderr: "", exitCode: 1 })
+      }, run.hostSessionsDir)
+      const plan = {
+        ...freshPlan,
+        skipImplement: true,
+        implementSessionId: "aaa111",
+        implementSessionFile: "/sessions/first.jsonl",
+        answers: [{ question: holdReleaseId, answer: "Fix the lint failure first" }]
+      }
+      const report = await Effect.runPromise(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
+      expect(prompts.length).toBeGreaterThan(0)
+      expect(prompts[0]).toContain("Fix the lint failure first")
+      expect(report.fixAttempts).toBe(3)
+    })
+  })
+
+  test("a looping-continuation retry carries the hold release beside the loop guidance", async () => {
+    await withLoopRun(0, async (db, run) => {
+      await mkdir(run.piSessionDir, { recursive: true })
+      await writeFile(join(run.worktreeDir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
+      const prompts: Array<string> = []
+      const ops = fakeOps({
+        runAgent: async (agentRun) => {
+          prompts.push(agentRun.prompt)
+          return { commits: [] }
+        },
+        execCheck: async () => ({ stdout: "lint broken", stderr: "", exitCode: 1 })
+      }, run.hostSessionsDir)
+      const plan = {
+        ...freshPlan,
+        skipImplement: true,
+        implementSessionId: "aaa111",
+        implementSessionFile: "/sessions/first.jsonl",
+        fixSessionId: "bbb222",
+        fixSessionFile: "/sessions/second.jsonl",
+        inheritedFixes: [{
+          attempt: 1,
+          status: "failed" as const,
+          started: "2026-10-19T09:22:00.000Z",
+          ended: "2026-10-19T09:23:00.000Z",
+          agentFile: fixer.path,
+          sessionFile: null,
+          model: fixer.model,
+          thinking: fixer.thinking,
+          evidenceIn: "checks-1.md",
+          commits: 0,
+          tokens: { input: 0, output: 0 }
+        }],
+        answers: [{ question: "looping", answer: "continue with the new plan" }, { question: holdReleaseId, answer: "Fix the lint failure first" }]
+      }
+      await Effect.runPromise(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
+      expect(prompts.length).toBeGreaterThan(0)
+      expect(prompts[0]).toContain("continue with the new plan")
+      expect(prompts[0]).toContain("Fix the lint failure first")
     })
   })
 })

@@ -1,5 +1,5 @@
 import { type AskedQuestion, isWorkerQuestion } from "../../entities/agent/index"
-import { holdReleaseId, isSendBackQuestion } from "../../entities/parked-runs/index"
+import { isSendBackQuestion } from "../../entities/parked-runs/index"
 import type { QuestionAnswer } from "../../entities/review-gate/index"
 
 export const askedNote = (question: AskedQuestion): string =>
@@ -23,8 +23,3 @@ export const sentBackGuidance = (words: ReadonlyArray<string>): string =>
 export const sentBackContinuePrompt = (words: ReadonlyArray<string>): string =>
   sentBackGuidance(words) + "\nThen end it the way the first prompt said."
 
-export const holdReleaseWordsOf = (answers: ReadonlyArray<QuestionAnswer>): ReadonlyArray<string> =>
-  answers.filter((answer) => answer.question === holdReleaseId).map((answer) => answer.answer)
-
-export const holdReleaseGuidance = (words: ReadonlyArray<string>): string =>
-  "The captain released the repeat hold with: " + words.join("\nThe captain also wrote: ") + "\nFollow that guidance as you retry the task."

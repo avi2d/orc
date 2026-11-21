@@ -12,8 +12,6 @@ export const repeatsResume = (record: TaskRecord, questions: Parked["questions"]
   return blockingReady && !fresh
 }
 
-export const holdReleaseId = "hold-release"
-
 export const repeatHold = (record: TaskRecord, run: string | undefined, ended: string | undefined, at: string): Hold => {
   const reason = "the resumed run " + (run ?? record.parked?.origin?.run ?? "") + " ended with no new question and no answer given during it" +
     (ended === undefined || ended.trim() === "" ? "" : " (" + ended.trim() + ")") + ", so the beat stops resuming it with the same answers"

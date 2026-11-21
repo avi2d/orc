@@ -7,7 +7,7 @@ import { Effect } from "effect"
 import { addTask, answerWait, claimTask, listTasks, renderTaskFile, writeTaken, type ParkedQuestion, type TaskRecord } from "../../../packages/run/src/entities/backlog/index"
 import { answerTask, askStartedTask, handAnswersToResume, parkStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
 import { readRequest } from "../../../packages/run/src/features/queueing-a-task/runner-request"
-import { holdReleaseGuidance, holdReleaseWordsOf } from "../../../packages/run/src/features/running-a-task/worker-question"
+import { holdReleaseGuidance, holdReleaseWordsOf } from "../../../packages/run/src/entities/review-gate/index"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
