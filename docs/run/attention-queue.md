@@ -21,9 +21,15 @@ The call has no tools.
 It receives the task, earlier answers, the question, `<ORC_HOME>/orchestrator.md`, and the project's instructions when present.
 Its policy is in `packages/run/agents/decider-policy.md`.
 
-Orc sends questions about deletion, security, credentials, merging, pushing, releasing, spending, irreversible actions, site appearance, legal text, and logins to you instead.
+A no-mistakes review question can name the action it asks of you in the `asks` column of its `question-<id>` finding.
+Orc carries that value through `asking.json`, the run history and the parked question in the task file.
+When a question names `none`, orc sends it to the decider.
+When it names `merge`, `delete` for deleting unlanded work, `login`, or any other value, orc sends it to you.
+
+A question that names no action goes through a topic check instead.
+Orc sends questions about deletion, security, credentials, merging, pushing, releasing, spending, irreversible actions, site appearance, legal text, and logins to you.
 The topic check uses the fixed word list in `packages/run/src/features/decider/decider-guard.ts`.
-Rules and policy do not widen it.
+Rules and policy do not widen either check.
 
 ### Reply to a question
 
