@@ -35,6 +35,8 @@ The decider can:
 - **Link a duplicate** to an earlier answered question on the same task.
   Orc escalates a link to a missing or unanswered item.
 - **Escalate** to you, with a reason.
+  When the question lists lettered options, the decider may name the one it recommends.
+  The escalated decision keeps that option's text as `recommendation`, and orc drops a recommendation that is no option of the question.
 
 A failed call, unreadable reply or rules file, or missing decider model also escalates the item.
 

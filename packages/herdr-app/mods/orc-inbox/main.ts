@@ -144,7 +144,8 @@ export default class OrcInbox extends View {
   }
 
   option(t: Palette, item: InboxItem, option: AskOption): Element {
-    const shown = optionView(t, `option-${item.key}-${option.letter}`, option)
+    const plain = optionView(t, `option-${item.key}-${option.letter}`, option)
+    const shown = option.text === item.recommendation ? plain.border(2).border_color(t.accent) : plain
     const target = answerTarget(item)
     if (target === null || target.kind !== "question" || this.sent.get(item.key)?.kind === "sending") return shown
     return shown.cursor_pointer().hover((style) => style.bg(t.hover))

@@ -9,7 +9,7 @@ const QuotedRule = Schema.Struct({ quote: Schema.String, source: Schema.String }
 
 export const Decision = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("answered"), reason: Schema.String, rule: Schema.optionalKey(QuotedRule), at: Schema.String }),
-  Schema.Struct({ kind: Schema.Literal("escalated"), reason: Schema.String, at: Schema.String }),
+  Schema.Struct({ kind: Schema.Literal("escalated"), reason: Schema.String, recommendation: Schema.optionalKey(Schema.String), at: Schema.String }),
   Schema.Struct({ kind: Schema.Literal("asked-back"), question: Schema.String, at: Schema.String }),
   Schema.Struct({ kind: Schema.Literal("duplicate"), of: Schema.String, at: Schema.String })
 ])
