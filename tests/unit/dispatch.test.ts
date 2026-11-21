@@ -367,6 +367,18 @@ describe("placeTask", () => {
     const onlyMac: ReadonlyArray<Project> = [{ name: "orc", checkouts: { mac: "/Users/a/orc" } }]
     expect(placeTask(newTask("linux"), config, onlyMac, room).kind).toBe("waits")
   })
+  const linuxFull = [{ machine: "mac", slots: 1, busy: 0 }, { machine: "linux", slots: 4, busy: 4 }]
+  test("an unmarked task goes to the idle mac while the other machine is full instead of waiting", () => {
+    const placement = placeTask(newTask(null), config, projects, linuxFull)
+    expect(placement.kind === "place" ? placement.machine.name : placement.reason).toBe("mac")
+  })
+  test("a task parked on a full machine waits for it instead of resuming on the idle mac", () => {
+    const parked: TaskRecord = {
+      ...newTask(null),
+      parked: { origin: { machine: "linux", run: "run-1" }, branch: "orc/task-1", questions: [{ id: "ask-1", text: "Which one?", asked: "2026-10-27T10:05:00.000Z", blocks: true, answer: null }] }
+    }
+    expect(placeTask(parked, config, projects, linuxFull)).toEqual({ kind: "waits", reason: "linux has no room" })
+  })
 })
 
 describe("the backlog folders", () => {
