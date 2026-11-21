@@ -13,12 +13,8 @@ To run the checks:
 1. Run `bun run typecheck` to run `tsc` and the Effect language service diagnostics.
 1. Run `bun run build` to bundle every tool and the `orc-dash` command into each package's `dist/` and write the changelog.
 
-CI runs `bunx checks-test --changed` to run the unit and e2e test files the change reaches on a pull request.
+CI runs the tests the change reaches on a pull request.
 The release pull request runs the full unit and e2e suites, and the release commit runs `bun run test --full`.
-
-`bunx checks-test --changed` also reads the working tree edits and the untracked files.
-It never widens to the whole suite.
-The pull request run covers what a shared file reaches.
 
 ## Find the code
 
