@@ -14,7 +14,7 @@ const guarded: Part = {
   ...bullets(["deleting, or anything that cannot be undone", "security, keys and logins", "merging, pushing, releasing", "spending", "a site's look, and legal text"])
 }
 const decider: Part = { title: "The decider", text: "A model answers routine questions from written instructions, or asks you.", cls: "card-ask" }
-const quote: Part = { title: "Can it answer?", text: "It can quote a rule, the task or its policy, reuse an earlier answer, or ask the worker for more detail.", cls: "card-ask" }
+const quote: Part = { title: "Can it answer?", text: "It can quote a rule, the task or the Rules section of its policy, reuse an earlier answer, or ask the worker for more detail.", cls: "card-ask" }
 const you: Part = { title: "You answer", text: "In the chat, in the app, or with `orc backlog answer`. Your answer replaces the decider's.", href: "chat" }
 const answered: Part = { title: "Answered", text: "The run carries on where it waited." }
 
@@ -28,7 +28,7 @@ const wide = (): Drawing => {
     card(240, 42, 216, 108, queue),
     card(240, 196, 216, 190, guarded),
     card(486, 42, 216, 124, decider),
-    card(486, 226, 216, 110, quote),
+    card(486, 226, 216, 126, quote),
     card(742, 42, 200, 84, answered),
     card(742, 226, 200, 140, you),
     arrow([[198, 90], [238, 90]], "ask"),

@@ -141,7 +141,7 @@ export const parts: readonly MapPart[] = [
 
   { id: "decider", inside: "plans", title: "The decider", tone: "ask", text: "A model answers routine questions from written instructions, or asks you.", page: "concepts/attention" },
   { id: "dec-reads", inside: "decider", title: "What it reads", tone: "ask", text: "Your rules, the project instructions, the task, and earlier answers. It has no tools." },
-  { id: "dec-quote", inside: "decider", title: "Can it answer?", tone: "ask", text: "It can quote a rule, the task or its policy, reuse an earlier answer, or ask the worker for more detail." },
+  { id: "dec-quote", inside: "decider", title: "Can it answer?", tone: "ask", text: "It can quote a rule, the task or the Rules section of its policy, reuse an earlier answer, or ask the worker for more detail." },
 
   { id: "runner", inside: "works", title: "The runner", text: "A queue on the machine, a few tasks at a time.", page: "concepts/runner" },
   { id: "runner-start", mono: true, inside: "runner", title: "orc runner start", text: "Reads the task and queues the run. The beat never waits for it." },
