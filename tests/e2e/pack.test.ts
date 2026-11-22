@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, test } from "bun:test"
+import { Schema } from "effect"
 import runManifest from "../../packages/run/package.json" with { type: "json" }
 
 const packageDir = new URL("../../packages/run/", import.meta.url).pathname
@@ -249,27 +250,39 @@ const expectedFiles = [
   "src/features/updating-orc/update.ts"
 ]
 
+const PackReport = Schema.Array(Schema.Struct({
+  filename: Schema.String,
+  files: Schema.Array(Schema.Struct({ path: Schema.String }))
+}))
+
 const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => {
-  const result = Bun.spawnSync([process.execPath, "pm", "pack", "--dry-run"], { cwd: packageDir })
-  const text = result.stdout.toString() + result.stderr.toString()
+  const result = Bun.spawnSync(["npm", "pack", "--dry-run", "--json"], { cwd: packageDir })
   if (result.exitCode !== 0) {
-    throw new Error("bun pm pack --dry-run failed: " + text)
+    throw new Error("npm pack --dry-run failed: " + result.stdout.toString() + result.stderr.toString())
   }
-  const files = text
-    .split("\n")
-    .filter((line) => line.startsWith("packed "))
-    .map((line) => line.split(/\s+/).at(-1) ?? "")
-    .filter((file) => file !== "")
-  const tarball = text.split("\n").map((line) => line.trim()).find((line) => /^[A-Za-z0-9][^/]*[.]tgz$/.test(line)) ?? ""
-  return { files, tarball }
+  const [report] = Schema.decodeUnknownSync(Schema.fromJsonString(PackReport))(result.stdout.toString())
+  if (report === undefined) {
+    throw new Error("npm pack --dry-run reported no tarball")
+  }
+  return { files: report.files.map((file) => file.path), tarball: report.filename }
 }
 
-describe("the trial pack", () => {
+describe("the npm pack dry run", () => {
   test("the scoped tarball keeps every file the orc tarball held instead of dropping the copied changelog", () => {
     expect([...packedTarball().files].sort()).toEqual([...expectedFiles].sort())
   })
 
   test("the tarball takes the scoped name instead of the taken orc name", () => {
     expect(packedTarball().tarball).toBe(`avi2dg-orc-${runManifest.version}.tgz`)
+  })
+
+  test("the tarball holds the file the orc bin entry names", () => {
+    expect(packedTarball().files).toContain(runManifest.bin.orc)
+  })
+})
+
+describe("the run manifest", () => {
+  test("names the repository in the form npm's trusted publish matches against the workflow's repository", () => {
+    expect(runManifest.repository).toEqual({ type: "git", url: "git+https://github.com/avi2d/orc.git" })
   })
 })
