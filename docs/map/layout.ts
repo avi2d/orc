@@ -50,7 +50,7 @@ const stackGap = 28
 const labelGap = 6
 const titleHeight = 34
 const pageLink = { width: 104, height: 22, inset: 8 }
-const detailsButton = 28
+const detailsButton = { room: 28, size: 24, inset: 7 }
 
 const moved = (box: Box, x: number, y: number): Box => ({
   size: box.size,
@@ -201,7 +201,7 @@ export const layoutMap = (measures: Measures): MapLayout => {
           stackGap,
           true
         )
-    const header = titleWidth(part) + detailsButton + (part.page === undefined ? 0 : pageLink.width + pageLink.inset * 2)
+    const header = titleWidth(part) + detailsButton.room + (part.page === undefined ? 0 : pageLink.width + pageLink.inset * 2)
     const whole = { width: Math.max(stack.size.width + edge * 2, header), height: stack.size.height + headRoom + edge }
     const body = moved(stack, (whole.width - stack.size.width) / 2, headRoom)
     return { size: whole, parts: [{ part, rect: { x: 0, y: 0, ...whole }, open: true, depth }, ...body.parts] }
@@ -216,9 +216,10 @@ export const layoutMap = (measures: Measures): MapLayout => {
   const titles = opened.map((placed) => ({ ...placed.rect, width: Math.min(placed.rect.width, titleWidth(placed.part)), height: titleHeight }))
   const pageLinks = opened
     .filter((placed) => placed.part.page !== undefined)
-    .map((placed) => ({ x: placed.rect.x + placed.rect.width - pageLink.width - pageLink.inset, y: placed.rect.y + pageLink.inset, width: pageLink.width, height: pageLink.height }))
+    .map((placed) => ({ x: placed.rect.x + placed.rect.width - detailsButton.room - pageLink.width - pageLink.inset, y: placed.rect.y + pageLink.inset, width: pageLink.width, height: pageLink.height }))
+  const infoButtons = opened.map((placed) => ({ x: placed.rect.x + placed.rect.width - detailsButton.inset - detailsButton.size, y: placed.rect.y + detailsButton.inset, width: detailsButton.size, height: detailsButton.size }))
   const cards = drawn.parts.filter((placed) => !placed.open)
-  const solid = [...cards.map((placed) => placed.rect), ...titles, ...pageLinks]
+  const solid = [...cards.map((placed) => placed.rect), ...titles, ...pageLinks, ...infoButtons]
   const route = createRouter(solid)
   const rectOf = new Map(cards.map((placed) => [placed.part.id, placed.rect]))
   const reach = (link: ShownLink): number => {

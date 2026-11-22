@@ -12,6 +12,7 @@ const button = ref<HTMLButtonElement>()
 const panel = ref<HTMLElement>()
 const panelId = useId()
 let leaving: ReturnType<typeof setTimeout> | undefined
+let following = 0
 
 const send = (event: DetailsEvent): boolean => {
   clearTimeout(leaving)
@@ -22,12 +23,19 @@ const send = (event: DetailsEvent): boolean => {
 
 const refocus = (): void => button.value?.focus({ preventScroll: true })
 
+const focusLost = (): boolean => document.activeElement === null || document.activeElement === document.body
+
+const focusInside = (): boolean => {
+  const at = document.activeElement
+  return at !== null && (button.value?.contains(at) === true || panel.value?.contains(at) === true)
+}
+
 // A press moves focus after its pointerdown, at mousedown for a mouse and at the later mousedown of a tap, so focus returns once the press ends.
 const refocusAfter = (press: PointerEvent): void => {
   const ends = press.pointerType === "touch" ? ["click", "pointercancel"] : ["pointerup", "pointercancel"]
   const done = (): void => {
     for (const name of ends) document.removeEventListener(name, done, true)
-    if (document.activeElement === null || document.activeElement === document.body) refocus()
+    if (focusLost()) refocus()
   }
   for (const name of ends) document.addEventListener(name, done, true)
 }
@@ -50,7 +58,7 @@ const pressAnywhere = (event: PointerEvent): void => {
 }
 
 const keyAnywhere = (event: KeyboardEvent): void => {
-  if (event.key === "Escape" && send("escape")) refocus()
+  if (event.key === "Escape" && send("escape") && (focusInside() || focusLost())) refocus()
 }
 
 const place = (): void => {
@@ -65,6 +73,12 @@ const place = (): void => {
   box.style.top = Math.max(8, below + box.offsetHeight > window.innerHeight - 8 && above >= 8 ? above : below).toString() + "px"
 }
 
+// The map moves its nodes by transform on zoom, pan and refit, which no resize or scroll event reports, so the details follow the button each frame.
+const follow = (): void => {
+  place()
+  following = requestAnimationFrame(follow)
+}
+
 const listen = (on: boolean): void => {
   const method = on ? "addEventListener" : "removeEventListener"
   document[method]("pointerdown", pressAnywhere, true)
@@ -76,13 +90,17 @@ watch(details, (now, before) => {
   if (shown === (before !== "closed")) return
   if (shown) {
     panel.value?.showPopover()
-    place()
-  } else panel.value?.hidePopover()
+    follow()
+  } else {
+    cancelAnimationFrame(following)
+    panel.value?.hidePopover()
+  }
   listen(shown)
 })
 
 onBeforeUnmount(() => {
   clearTimeout(leaving)
+  cancelAnimationFrame(following)
   listen(false)
 })
 </script>
@@ -106,7 +124,7 @@ onBeforeUnmount(() => {
     >
       <span aria-hidden="true">i</span><span class="sr">Details about {{ part.title }}</span>
     </button>
-    <div :id="panelId" ref="panel" popover="manual" class="part-details" role="region" :aria-label="part.title" @pointerenter="enter" @pointerleave="leave">
+    <div :id="panelId" ref="panel" popover="manual" class="part-details nodrag nopan nowheel" role="region" :aria-label="part.title" @pointerenter="enter" @pointerleave="leave">
       <p class="part-title" :class="{ mono: part.mono }">{{ part.title }}</p>
       <p v-if="part.text" class="part-text">{{ part.text }}</p>
       <ul v-if="part.points" class="part-points">
