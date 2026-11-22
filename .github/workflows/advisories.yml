@@ -1,12 +1,26 @@
 name: advisories
+
 on:
+  workflow_dispatch:
   schedule:
     - cron: "51 5 * * 1"
-  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   advisories:
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 15
     permissions:
       contents: read
       issues: write
-    uses: avi2d/workflows/.github/workflows/advisories.yml@v1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: run the scan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bunx checks-advisories --all --issue

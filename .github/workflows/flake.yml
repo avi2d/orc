@@ -1,18 +1,28 @@
 name: flake
+
 on:
   workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
   flake:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 60
+    permissions:
+      contents: read
     steps:
-      - uses: avi2d/workflows/setup@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
       - run: bunx checks-flake --runs 10 --report flake-report.json
-      - uses: actions/upload-artifact@v7
-        if: failure()
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: flake-report
           path: flake-report.json
           retention-days: 7
+          if-no-files-found: ignore
