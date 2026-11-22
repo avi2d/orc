@@ -64,7 +64,7 @@ const login = async (fixture: Fixture, account: string, env: Record<string, stri
     stdout: "pipe",
     stderr: "pipe",
     cwd: fixture.dir,
-    env: { ...process.env, ORC_HOME: fixture.home, PATH: fixture.bin + ":" + (process.env.PATH ?? ""), SSH_CONNECTION: "", SSH_TTY: "", ...env }
+    env: { ...process.env, ORC_HOME: fixture.home, PATH: fixture.bin + ":" + (process.env.PATH ?? ""), SSH_CONNECTION: "", SSH_TTY: "", DISPLAY: ":0", WAYLAND_DISPLAY: "", ...env }
   })
   let killed = false
   const deadline = setTimeout(() => {
