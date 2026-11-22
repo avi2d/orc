@@ -15,9 +15,9 @@ A panel reports a missing tool without stopping the rest of the screen.
 | --- | --- |
 | `quota-axi` 0.1.56 | Quota windows not in harness logs |
 | `nvidia-smi` | NVIDIA GPU usage |
-| `herdr` 0.9.5 | Agent sessions named by pane |
+| [`herdr`](https://herdr.dev) 0.9.5 | Agent sessions named by pane |
 | `pueue` 4.0.4 | Queued and running jobs |
-| `no-mistakes` | Full review fix stages |
+| [`no-mistakes`](https://github.com/kunchenguid/no-mistakes) | Full review fix stages |
 | `orc` | Orc run stages and the attention queue |
 | `gh` | GitHub Actions and runner repositories |
 

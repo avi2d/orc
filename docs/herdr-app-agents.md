@@ -3,7 +3,7 @@ kind: how-to
 ---
 # Follow runs and chat in the Herdr App
 
-Select **Agents** or press `cmd-3` to follow a run.
+Select **Agents** or press `cmd-3` in the [Herdr App](https://herdr.dev) to follow a run.
 Press `cmd-k` to open or close the chat drawer.
 
 ## Follow a run in the Agents tab
