@@ -138,7 +138,7 @@ export type AnswerOutcome =
   | { readonly kind: "hold"; readonly hold: Hold }
   | { readonly kind: "decision" }
   | { readonly kind: "held question"; readonly question: string; readonly open: ReadonlyArray<HoldQuestion> }
-  | { readonly kind: "question"; readonly question: string; readonly branch: string; readonly live: boolean; readonly open: ReadonlyArray<ParkedQuestion> }
+  | { readonly kind: "question"; readonly question: string; readonly branch: string; readonly live: boolean; readonly correction: boolean; readonly open: ReadonlyArray<ParkedQuestion> }
 
 const unanswered = <Q extends { readonly answer: { readonly words: string; readonly at: string } | null }>(questions: ReadonlyArray<Q>): ReadonlyArray<Q> => questions.filter((question) => question.answer === null)
 
@@ -192,7 +192,8 @@ const answerQuestionOn = (id: string, words: string, at: string, fresh: TaskReco
   return answerOneOf(id, words, at, fresh.parked.questions, "parked", fresh, overturns).pipe(Effect.map(({ asked, answer }) => {
     const questions = Arr.map(fresh.parked.questions, (candidate): ParkedQuestion => candidate === asked ? { ...asked, answer: givenAnswer(answer, by, asked.answer) } : candidate)
     const record: TaskRecord = { ...fresh, parked: { ...fresh.parked, questions } }
-    return { kind: "write", record, result: { kind: "question", question: asked.id, branch: fresh.parked.branch, live: fresh.state.kind === "started", open: openQuestions(record) } }
+    const replaced = asked.answer
+    return { kind: "write", record, result: { kind: "question", question: asked.id, branch: fresh.parked.branch, live: fresh.state.kind === "started", correction: fresh.state.kind === "started" && replaced !== null && isDeciderAnswer(replaced) && replaced.relayedTo !== null, open: openQuestions(record) } }
   }))
 }
 

@@ -10,6 +10,9 @@ The written rules are what a review already holds a change to: keep the change s
 ## Rules
 
 When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure.
+
+## How to answer
+
 The two escalation bullets for open product choices and uncertainty apply only to a question that names no recommended option.
 For such an answer, put the sentence that starts with "When a question names a recommended option" in rule, and quote in reason the words of the question that name the option.
 
