@@ -5,11 +5,31 @@ import runManifest from "../../packages/run/package.json" with { type: "json" }
 const packageDir = new URL("../../packages/run/", import.meta.url).pathname
 const repoRoot = new URL("../../", import.meta.url).pathname
 
+const PackReport = Schema.Tuple([Schema.Struct({
+  filename: Schema.String,
+  files: Schema.Array(Schema.Struct({ path: Schema.String }))
+})])
+
+const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => {
+  const result = Bun.spawnSync(["npm", "pack", "--dry-run", "--json"], { cwd: packageDir })
+  if (result.exitCode !== 0) {
+    throw new Error("npm pack --dry-run failed: " + result.stdout.toString() + result.stderr.toString())
+  }
+  const [report] = Schema.decodeSync(Schema.fromJsonString(PackReport))(result.stdout.toString())
+  return { files: report.files.map((file) => file.path), tarball: report.filename }
+}
+
+let packedFiles: ReadonlyArray<string> = []
+let packedTarballName = ""
+
 beforeAll(() => {
   const result = Bun.spawnSync([process.execPath, "run", "build"], { cwd: repoRoot })
   if (result.exitCode !== 0) {
     throw new Error("bun run build failed: " + result.stdout.toString() + result.stderr.toString())
   }
+  const packed = packedTarball()
+  packedFiles = packed.files
+  packedTarballName = packed.tarball
 }, 120_000)
 
 const expectedFiles = [
@@ -254,31 +274,17 @@ const expectedFiles = [
   "src/features/updating-orc/update.ts"
 ]
 
-const PackReport = Schema.Tuple([Schema.Struct({
-  filename: Schema.String,
-  files: Schema.Array(Schema.Struct({ path: Schema.String }))
-})])
-
-const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => {
-  const result = Bun.spawnSync(["npm", "pack", "--dry-run", "--json"], { cwd: packageDir })
-  if (result.exitCode !== 0) {
-    throw new Error("npm pack --dry-run failed: " + result.stdout.toString() + result.stderr.toString())
-  }
-  const [report] = Schema.decodeSync(Schema.fromJsonString(PackReport))(result.stdout.toString())
-  return { files: report.files.map((file) => file.path), tarball: report.filename }
-}
-
 describe("the npm pack dry run", () => {
   test("the scoped tarball keeps every file the orc tarball held instead of dropping the copied changelog", () => {
-    expect([...packedTarball().files].sort()).toEqual([...expectedFiles].sort())
+    expect([...packedFiles].sort()).toEqual([...expectedFiles].sort())
   })
 
   test("the tarball takes the scoped name instead of the taken orc name", () => {
-    expect(packedTarball().tarball).toBe(`avi2dg-orc-${runManifest.version}.tgz`)
+    expect(packedTarballName).toBe(`avi2dg-orc-${runManifest.version}.tgz`)
   })
 
   test("the tarball holds the file the orc bin entry names", () => {
-    expect(packedTarball().files).toContain(runManifest.bin.orc)
+    expect(packedFiles).toContain(runManifest.bin.orc)
   })
 })
 
