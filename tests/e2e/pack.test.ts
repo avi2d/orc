@@ -250,20 +250,17 @@ const expectedFiles = [
   "src/features/updating-orc/update.ts"
 ]
 
-const PackReport = Schema.Array(Schema.Struct({
+const PackReport = Schema.Tuple([Schema.Struct({
   filename: Schema.String,
   files: Schema.Array(Schema.Struct({ path: Schema.String }))
-}))
+})])
 
 const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => {
   const result = Bun.spawnSync(["npm", "pack", "--dry-run", "--json"], { cwd: packageDir })
   if (result.exitCode !== 0) {
     throw new Error("npm pack --dry-run failed: " + result.stdout.toString() + result.stderr.toString())
   }
-  const [report] = Schema.decodeUnknownSync(Schema.fromJsonString(PackReport))(result.stdout.toString())
-  if (report === undefined) {
-    throw new Error("npm pack --dry-run reported no tarball")
-  }
+  const [report] = Schema.decodeSync(Schema.fromJsonString(PackReport))(result.stdout.toString())
   return { files: report.files.map((file) => file.path), tarball: report.filename }
 }
 
