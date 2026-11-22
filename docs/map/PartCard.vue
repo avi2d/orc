@@ -126,18 +126,14 @@ onBeforeUnmount(() => {
     </button>
     <div :id="panelId" ref="panel" popover="manual" class="part-details nodrag nopan nowheel" role="region" :aria-label="part.title" @pointerenter="enter" @pointerleave="leave">
       <p class="part-title" :class="{ mono: part.mono }">{{ part.title }}</p>
-      <p v-if="part.text" class="part-text">{{ part.text }}</p>
-      <ul v-if="part.points" class="part-points">
-        <li v-for="point in part.points" :key="point">{{ point }}</li>
+      <p v-if="!part.details" class="part-text">{{ part.short }}</p>
+      <p v-if="part.details?.text" class="part-text">{{ part.details.text }}</p>
+      <ul v-if="part.details?.points" class="part-points">
+        <li v-for="point in part.details.points" :key="point">{{ point }}</li>
       </ul>
     </div>
     <a v-if="open && part.page" class="part-page nodrag nopan" :href="withBase('/' + part.page)">Read the page<span class="sr"> about {{ part.title }}</span></a>
-    <template v-if="!open">
-      <p v-if="part.text" class="part-text">{{ part.text }}</p>
-      <ul v-if="part.points" class="part-points">
-        <li v-for="point in part.points" :key="point">{{ point }}</li>
-      </ul>
-    </template>
+    <p v-if="!open" class="part-text">{{ part.short }}</p>
   </div>
 </template>
 

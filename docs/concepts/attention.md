@@ -29,7 +29,7 @@ An open item is overdue once more than 5 minutes have passed since it was asked.
 
 Each beat hands every open item the decider owns to the decider, one short model call per question, with no tools.
 The decider reads your rules in `~/.orc/orchestrator.md`, the instructions file of the task's project, the task itself, and earlier answers.
-It can quote a rule, the task or its policy, reuse an earlier answer, or ask the worker for more detail.
+It can quote a rule, the task or the Rules section of its policy, reuse an earlier answer, or ask the worker for more detail.
 Anything else goes to you instead.
 
 Some questions never reach the decider.

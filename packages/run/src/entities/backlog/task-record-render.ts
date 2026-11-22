@@ -28,7 +28,8 @@ const questionFronts = (questions: ReadonlyArray<ParkedQuestion>) =>
     ...(question.blocks ? {} : { blocks: false }),
     ...choicesOf(question),
     ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at, ...answerFronts(question.answer) }),
-    ...(question.answer?.relayedTo == null ? {} : { relayed_to: question.answer.relayedTo })
+    ...(question.answer?.relayedTo == null ? {} : { relayed_to: question.answer.relayedTo }),
+    ...(question.answer !== null && !isDeciderAnswer(question.answer) && question.answer.correctionQueued === true ? { correction_queued: true } : {})
   }))
 
 const holdQuestionFronts = (questions: ReadonlyArray<HoldQuestion>) =>
