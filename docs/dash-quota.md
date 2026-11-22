@@ -10,7 +10,7 @@ The quota panel shows account limits.
 To run the live quota panel, run `orc-dash panel quota`.
 
 The panel reads `quota-axi` on the machine it runs on and paints again every 30 seconds.
-Two Claude accounts share the Claude brand clay, and Codex and OpenCode Go keep their own colours.
+Two [Claude](https://claude.com) accounts share the Claude brand clay, and [Codex](https://github.com/openai/codex) and [OpenCode Go](https://opencode.ai) keep their own colours.
 Each account gets its own block, titled with its account key.
 A provider `quota-axi` reports as not set up gets no block, so the panel shows only the Claude, Codex and OpenCode Go accounts you use.
 When no provider is set up, the panel shows `no provider is set up in quota-axi`.
@@ -18,7 +18,7 @@ An exhaustion projection made early in a window reads muted and marked `early` i
 Press `q` or Control C to quit.
 
 
-The panel reads available Codex and Claude Code quota from local logs and asks `quota-axi` for missing readings.
+The panel reads available Codex and [Claude Code](https://claude.com/product/claude-code) quota from local logs and asks `quota-axi` for missing readings.
 A reading at least an hour old shows its age instead of a percentage and countdown.
 OpenCode Go always uses `quota-axi`.
 When `CLAUDE_CODE_OAUTH_TOKEN` or `CLAUDE_SECURESTORAGE_CONFIG_DIR` selects a Claude account, the panel cannot tie log readings to it and does not use them.

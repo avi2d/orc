@@ -53,3 +53,13 @@ test.each(indentedFences)("rejects counting a URL inside an indented %s fence wi
   ].join("\n")
   expect(unlinked(source)).toEqual(["nono"])
 })
+
+test("rejects a longer registry name counting as a mention of the shorter tool inside it", () => {
+  const claude = [
+    { name: "Claude", url: "https://claude.com" },
+    { name: "Claude Code", url: "https://claude.com/product/claude-code" }
+  ]
+  const names = (source: string): Array<string> => unlinkedTools(source, claude).map((tool) => tool.name)
+  expect(names("Run [Claude Code](https://claude.com/product/claude-code).\nClaude Code reruns it.\n")).toEqual([])
+  expect(names("Run [Claude Code](https://claude.com/product/claude-code) with a Claude login.\n")).toEqual(["Claude"])
+})

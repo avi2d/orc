@@ -67,7 +67,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 
 | Path | What it holds |
 | --- | --- |
-| `packages/run/src/features/chat/chat.ts` | The `orc chat` start of Pi on the orchestrator model with the chat tools |
+| `packages/run/src/features/chat/chat.ts` | The `orc chat` start of [Pi](https://pi.dev) on the orchestrator model with the chat tools |
 | `packages/run/src/features/chat/chat-tools.ts` | The chat tools and the poll that posts each closed task and each event into the chat once |
 | `packages/run/src/features/chat/chat-parked.ts` | The chat's listing of parked questions, once per start and once per park |
 | `packages/run/src/features/chat/chat-board.ts` | The chat's decision boards: the cards, the answers they record and the listing at each start |
@@ -76,7 +76,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/chat/chat-backlog.ts` | The chat view of the backlog: the open and closed task shapes and the held or parked decision a task waits on |
 | `packages/run/src/features/chat/chat-board-bind.ts` | The binding of waiting decisions to board records and the words a finished card posts |
 | `packages/run/src/features/chat/chat-closed.ts` | The closed task shape and the line the chat posts for it |
-| `packages/run/src/features/chat/chat-command.ts` | The shell a chat tool runs through the shared Bun layers |
+| `packages/run/src/features/chat/chat-command.ts` | The shell a chat tool runs through the shared [Bun](https://bun.com) layers |
 | `packages/run/src/features/chat/chat-error.ts` | The error a chat tool fails with |
 | `packages/run/src/features/chat/chat-inputs.ts` | The chat tool input shapes for add, hold, priority, edit, answer, board and merge |
 | `packages/run/src/features/chat/chat-posts.ts` | The backlog read and the walk that delivers each closed task and event once |
@@ -119,7 +119,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 
 | Path | What it holds |
 | --- | --- |
-| `packages/run/src/features/queueing-a-task/alert-stream.ts` | The one alert stream `orc runner start` queues in pueue |
+| `packages/run/src/features/queueing-a-task/alert-stream.ts` | The one alert stream `orc runner start` queues in [pueue](https://github.com/Nukesor/pueue) |
 | `packages/run/src/features/queueing-a-task/runner.ts` | The runner: the start, the kill and the token renewal through pueue |
 | `packages/run/src/features/queueing-a-task/runner-instructions.ts` | The project instructions a start carries to the machine that queues the run |
 | `packages/run/src/features/queueing-a-task/runner-result.ts` | The reading of a task's result and the `orc.runner.v1` JSON |
@@ -258,7 +258,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/entities/run-history/report.ts` | The `report.md` shape and the signal facts it carries |
-| `packages/run/src/entities/run-history/run-history.ts` | The records home, the SQLite run history and `orc runs` |
+| `packages/run/src/entities/run-history/run-history.ts` | The records home, the [SQLite](https://sqlite.org) run history and `orc runs` |
 | `packages/run/src/entities/run-history/gate-refusals.ts` | The gate and rule parse from a failed check’s output, the `refusal` history signals and `orc refusals` |
 | `packages/run/src/entities/run-history/history-resume.ts` | The resume reads from the run history: the latest run for a branch, its steps, its check rounds and its fixes |
 
@@ -266,7 +266,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 
 | Path | What it holds |
 | --- | --- |
-| `packages/run/src/entities/task-copy/checkout.ts` | The checks on the checkout a run starts from: its git root, refused markers, uncommitted changes and branch name |
+| `packages/run/src/entities/task-copy/checkout.ts` | The checks on the checkout a run starts from: its [git](https://git-scm.com) root, refused markers, uncommitted changes and branch name |
 | `packages/run/src/entities/task-copy/worktree-excludes.ts` | The registered worktrees inside a checkout that its clean check leaves out |
 | `packages/run/src/entities/task-copy/task-copy.ts` | The task copy under `$ORC_HOME/worktrees`, keyed by the project folder's name, a hash of its real path and the branch, its reuse and removal, and the agent's git identity |
 | `packages/run/src/entities/task-copy/refresh.ts` | The fast-forward of the checkout's default branch when a run starts |
@@ -275,7 +275,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 
 | Path | What it holds |
 | --- | --- |
-| `packages/run/src/entities/token/token.ts` | The `orc.token.v1` document, the token command and the Claude credentials reading |
+| `packages/run/src/entities/token/token.ts` | The `orc.token.v1` document, the token command and the [Claude](https://claude.com) credentials reading |
 | `packages/run/src/entities/token/held-token.ts` | The owner-only token folder a run on another machine reads |
 
 ## shared/config

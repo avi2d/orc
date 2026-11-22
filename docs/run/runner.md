@@ -3,8 +3,8 @@ kind: reference
 ---
 # The runner
 
-Run `orc runner start` to queue a task from the beat in pueue.
-The run survives the beat and a dropped SSH connection.
+Run `orc runner start` to queue a task from the beat in [pueue](https://github.com/Nukesor/pueue).
+The run survives the beat and a dropped [SSH](https://www.openssh.com) connection.
 
 ## Queue a task
 
@@ -32,7 +32,7 @@ They stay unset until the routes task lands.
 
 ### Queue limits and files
 
-The runner updates the checkout's default branch and needs Git 2.48 or later.
+The runner updates the checkout's default branch and needs [Git](https://git-scm.com) 2.48 or later.
 It sets the pueue group's limit from the machine's slots.
 Zero slots becomes one because pueue treats zero as unlimited.
 A task already queued or running for this home is not queued again.

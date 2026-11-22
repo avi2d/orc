@@ -18,13 +18,13 @@ To print one frame of plain text instead, run `orc-dash panel session-quota --pr
 
 ## Session logs and flags
 
-The session panel reads the Pi logs under `HOME`, the Codex logs under `CODEX_HOME`, or `~/.codex`, and the Claude Code logs under `CLAUDE_CONFIG_DIR`, or `~/.claude`.
+The session panel reads the [Pi](https://pi.dev) logs under `HOME`, the [Codex](https://github.com/openai/codex) logs under `CODEX_HOME`, or `~/.codex`, and the [Claude Code](https://claude.com/product/claude-code) logs under `CLAUDE_CONFIG_DIR`, or `~/.claude`.
 Those are the homes of the logins `quota-axi` reads.
 It counts each model call once.
 It splits a window's used points across the sessions that made those calls.
 It flags each live session spending over its fair share of a window that runs ahead of pace and is past its first tenth.
 It flags only when the window runs out before its reset.
-Quota-axi's runway gives the verdict for a window it names.
+[Quota-axi](https://github.com/kunchenguid/quota-axi)'s runway gives the verdict for a window it names.
 An early or unknown projection leaves the live rate to decide.
 A runway naming another window means this one runs to its reset.
 A harvested window or one with no runway reads its pace from its live sessions' total rate against the sustainable rate.

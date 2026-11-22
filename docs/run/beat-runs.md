@@ -27,7 +27,7 @@ Its detached start command writes to `~/.orc/backlog/logs/<task-id>.log`.
 Later beats read the result and close the task, park it on unanswered questions, or apply a split proposal.
 See [Parked runs](parked-runs.md) and [A worker split proposal](task-kinds.md#a-worker-split-proposal).
 
-A runner task with no pueue record after 10 minutes closes failed.
+A runner task with no [pueue](https://github.com/Nukesor/pueue) record after 10 minutes closes failed.
 A result that remains unreadable for 10 minutes also closes failed.
 A run still waiting for an answer stays started and the beat relays the answer.
 To stop a task yourself, run `orc backlog stop <task-id>` where the backlog lives, as [Stop a task](backlog-tasks.md#stop-a-task) describes.

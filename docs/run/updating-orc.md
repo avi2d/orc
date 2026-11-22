@@ -4,7 +4,7 @@ kind: how-to
 # Updating orc
 
 Run `orc update` on a machine to move its orc to the newest published release.
-The command installs only when the npm registry holds a newer version than the orc that runs it.
+The command installs only when the [npm](https://www.npmjs.com) registry holds a newer version than the orc that runs it.
 
 ## Update orc
 

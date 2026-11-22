@@ -4,7 +4,7 @@ kind: reference
 # Configuring providers
 Orc ships with no provider and no model, so a run needs `config.json` in `$ORC_HOME`, default `~/.orc/config.json`.
 It names each provider orc may run and, under `models`, the implementer, fixer, orchestrator, planner and decider models.
-This example names opencode-go through a Pi login, anthropic through a token file and claude-bridge through its Pi package:
+This example names opencode-go through a [Pi](https://pi.dev) login, anthropic through a token file and claude-bridge through its Pi package:
 
 ```json
 {
@@ -49,11 +49,11 @@ Each provider names its Pi provider `id`, the part of a model name before the `/
 A `package` provider hands the run no key, since the provider's own Pi package reaches its service.
 It takes no `tokenFile` or `tokenCommand`, so it completes the `credential` list beside `pi-login` and `token-file`:
 
-- `packages` lists the Pi package sources, in the form Pi's `settings.json` takes: `npm:`, `git:`, a git URL or an absolute path.
+- `packages` lists the Pi package sources, in the form Pi's `settings.json` takes: `npm:`, `git:`, a [git](https://git-scm.com) URL or an absolute path.
 - Orc writes them into the run's Pi folder, `session/agent/settings.json`, so the run's Pi loads the package your Pi loads.
 - Pi installs an `npm:` or `git:` source into the run's folder on the first model list, so each run fetches it again.
 - An absolute path to a package already on the machine, such as one under `~/.pi/agent/git`, loads without the fetch.
-- `env` names variables orc sets for the run's Pi over your environment, for the chat's Pi when `models.orchestrator` names this provider, for the planner's Pi when `models.planner` does, and for the decider's Pi when `models.decider` does, such as the `CLAUDE_CONFIG_DIR` of the account a Claude Code package runs on.
+- `env` names variables orc sets for the run's Pi over your environment, for the chat's Pi when `models.orchestrator` names this provider, for the planner's Pi when `models.planner` does, and for the decider's Pi when `models.decider` does, such as the `CLAUDE_CONFIG_DIR` of the account a [Claude Code](https://claude.com/product/claude-code) package runs on.
 - The nono sandbox carries only a Pi login, so a package provider runs only with `--sandbox none`.
 
 ## Validation and token files

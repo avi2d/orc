@@ -2,13 +2,13 @@
 kind: reference
 ---
 # The heavy queue
-Without `through` set, each machine queues its heavy shell calls through one pueue group named `heavy` with one slot.
+Without `through` set, each machine queues its heavy shell calls through one [pueue](https://github.com/Nukesor/pueue) group named `heavy` with one slot.
 Heavy calls are test runs, builds and browser runs through tools like `bun`, `bunx`, `npm`, `npx`, `pnpm`, `yarn`, `vitest`, `playwright`, `jest`, `go`, `cargo`, `pytest`, `tsc`, `oxlint`, `eslint`, `xcodebuild` and `xcrun`.
 The queue keeps two such calls from overloading the machine at the same time.
 
 ## How calls reach the queue
 `orc run` and `orc runner start` write a stand in for each heavy tool into `~/.orc/heavy/bin`.
-A stand in is a launcher of three shell lines that starts orc's TypeScript helper through the absolute path of its bun.
+A stand in is a launcher of three shell lines that starts orc's TypeScript helper through the absolute path of its [bun](https://bun.com).
 `orc run` puts that folder first on `PATH` for the agent it starts.
 A stand in queues the call with `pueue add` into the `heavy` group, or hands it to the `through` command when one is set, and waits for its turn, then prints the call output and exits with its exit code.
 Without `through` set, the wait message names how many queued calls stand ahead, counting higher priority calls and earlier calls at the same priority.

@@ -15,5 +15,5 @@ Its first read prints a `flagged` line for each flag already up.
 | `flag` | The same object as an entry of the report's `flags` |
 
 Each session's flag rises and clears on its own, so two sessions over their share of one window print two `flagged` lines.
-A flag follows its account's `credentialKey`, so an account read from a harness log on one read and from quota-axi on the next raises no edge.
+A flag follows its account's `credentialKey`, so an account read from a harness log on one read and from [quota-axi](https://github.com/kunchenguid/quota-axi) on the next raises no edge.
 A supervisor reads it line by line, as in `orc-dash report session-quota-alerts | while read -r line; do ...; done`.

@@ -58,7 +58,7 @@ A task whose every blocking question has an answer can resume when its original 
 Older parked records have no `origin` field.
 
 ## A looping run
-A run whose Pi fails one command 6 times in a row pauses the run and asks the question `looping`, as [How orc runs Pi](how-orc-runs-pi.md) shows.
+A run whose [Pi](https://pi.dev) fails one command 6 times in a row pauses the run and asks the question `looping`, as [How orc runs Pi](how-orc-runs-pi.md) shows.
 It waits for your answer the way a run waits at its gate, with the same `asking.json`, wait and hand-off.
 The attention queue owns that question for you, so the decider never answers it.
 An answer that opens with `continue` resumes the same Pi session, and the rest of the answer reaches Pi as your guidance.

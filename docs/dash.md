@@ -7,7 +7,7 @@ kind: how-to
 
 ## Before you begin
 
-Install the Bun version pinned in `.bun-version`.
+Install the [Bun](https://bun.com) version pinned in `.bun-version`.
 The other tools below are optional.
 A panel reports a missing tool without stopping the rest of the screen.
 
@@ -19,7 +19,7 @@ A panel reports a missing tool without stopping the rest of the screen.
 | `pueue` 4.0.4 | Queued and running jobs |
 | [`no-mistakes`](https://github.com/kunchenguid/no-mistakes) | Full review fix stages |
 | `orc` | Orc run stages and the attention queue |
-| `gh` | GitHub Actions and runner repositories |
+| `gh` | [GitHub Actions](https://github.com/features/actions) and runner repositories |
 
 Put the tools you use on `PATH`.
 For GPU usage on WSL, the panel also checks `/usr/lib/wsl/lib`.
@@ -70,7 +70,7 @@ See [the second machine](dash-resources.md#show-the-resources-of-a-second-machin
 
 <div id="run-the-queues-tool"><span id="run-the-dispatch-tool"></span></div>
 
-[Queues](dash-queues.md) shows pueue and GitHub Actions.
+[Queues](dash-queues.md) shows [pueue](https://github.com/Nukesor/pueue) and GitHub Actions.
 [Dispatch](dash-dispatch.md) shows the backlog and machine slots.
 
 <div id="run-the-attention-tool"></div>
@@ -110,7 +110,7 @@ If `claude saved` is unreachable, run `sh -c "$ORC_DASH_SAVED_PROFILES"` and che
 
 ### The other machine's resources panel says it is unreachable
 
-The panel reports why the configured command failed, such as `sh exited 255` from SSH.
+The panel reports why the configured command failed, such as `sh exited 255` from [SSH](https://www.openssh.com).
 Run `sh -c "$ORC_DASH_REMOTE_RESOURCES"` locally and check that its output contains only the version 1 report.
 
 `sh exited 127` means the remote shell could not find `bun`.

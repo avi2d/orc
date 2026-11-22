@@ -36,7 +36,7 @@ The account's kind says where its credential lives.
 | --- | --- |
 | `token-file` | The path of a token file that exists on the machine, never the token |
 | `token-command` | A token the command prints, sent on standard input and renewed each beat |
-| `claude-config` | The path of that account's Claude config directory on the machine |
+| `claude-config` | The path of that account's [Claude](https://claude.com) config directory on the machine |
 | `none` | Nothing, since the provider's own package logs in |
 
 A token command account is for a token that lives on the dispatching machine and rolls over.

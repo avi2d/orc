@@ -4,7 +4,7 @@ kind: reference
 # Running a task
 
 In a clean project checkout, run `orc run <task-file>`.
-A ship run creates an isolated worktree, asks Pi to make the change, runs the project's checks, and opens a PR.
+A ship run creates an isolated worktree, asks [Pi](https://pi.dev) to make the change, runs the project's checks, and opens a PR.
 
 ## Before you run
 
@@ -17,7 +17,7 @@ If the provider uses a Pi login, check it with `pi auth check --provider <id>`.
 A key held only in the keychain or an environment variable is not available to the run.
 A login Pi's `/login` stores in `~/.pi/agent/auth.json` works, so write a key held only in an environment variable to that file first.
 nono reads that login with only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE` and `TERM` set.
-In the sandbox, Pi and the checks get those same variables beside the temp folder, git config and Pi folder orc sets for the run.
+In the sandbox, Pi and the checks get those same variables beside the temp folder, [git](https://git-scm.com) config and Pi folder orc sets for the run.
 On the host they get a short list that adds the shell, the temp folder, `XDG_RUNTIME_DIR` and the proxy and the certificate variables.
 No `ORC_` variable reaches Pi or the checks.
 With the default sandbox, if nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc names that error in the result.
@@ -92,7 +92,7 @@ It also leaves a reused worktree outside `$ORC_HOME` in place.
 ## Results
 
 A no-mistakes ship run succeeds when Pi completes with `ORC_COMPLETE` on its own line, the branch has a new commit, the checks pass, and no-mistakes opens the PR and reports green CI.
-A direct-PR run succeeds when Pi completes, the branch has a new commit, the checks pass, the PR opens, and the GitHub CI verdict on the pushed head is `passed`.
+A direct-PR run succeeds when Pi completes, the branch has a new commit, the checks pass, the PR opens, and the [GitHub](https://github.com) CI verdict on the pushed head is `passed`.
 A `pending` verdict ends the run waiting on CI without success.
 The waiting run records an open `ci-waiting` question and keeps its history row running, so the beat parks the task instead of closing it failed or done.
 A stopped or failed run exits with status 1 and records the reason.

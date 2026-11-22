@@ -18,7 +18,7 @@ A report run shows only Agent.
 A resumed run lists carried steps under their original run.
 Select a step to read its output.
 
-Pi steps open in Turns, with a card for each reply.
+[Pi](https://pi.dev) steps open in Turns, with a card for each reply.
 Select Raw to follow the log, or Turns to return to the cards.
 Steps without a Pi session show their log.
 

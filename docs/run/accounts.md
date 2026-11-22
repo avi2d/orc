@@ -29,16 +29,16 @@ Orc sets the vendor's variable to the account's own folder over any value the sh
 
 Orc treats a machine as having no browser when `SSH_CONNECTION` or `SSH_TTY` is set, or on Linux when neither `DISPLAY` nor `WAYLAND_DISPLAY` is set.
 On such a machine orc prints a note before the sign-in starts.
-Claude Code has no separate flag for this case: `claude auth login` prints a link when no browser opens.
+[Claude Code](https://claude.com/product/claude-code) has no separate flag for this case: `claude auth login` prints a link when no browser opens.
 Open the link on any device, sign in, and paste the code the page shows back into the terminal.
-For `openai` orc runs `codex login --device-auth` instead, which is Codex's device-code sign-in.
+For `openai` orc runs `codex login --device-auth` instead, which is [Codex](https://github.com/openai/codex)'s device-code sign-in.
 Codex prints a link and a code.
 Open the link on any device, sign in, and enter the code there.
 
 ## No copy
 
 The vendor's sign-in runs with the terminal's input and output, with its config held in the account folder.
-For Claude on Linux the credential stays in that folder.
+For [Claude](https://claude.com) on Linux the credential stays in that folder.
 For Claude on macOS the credential stays in the login keychain under a name tied to that folder.
 Codex keeps the credential in `auth.json` in that folder by default.
 Orc never reads, prints or copies a credential, and it opens no file inside the account folder.

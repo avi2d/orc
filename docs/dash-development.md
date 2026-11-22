@@ -9,8 +9,8 @@ The orc-dash workspace contains the panels, dashboard, and their checks.
 
 To run the checks:
 
-1. Run `bun run lint` to run oxlint and every kit lint gate.
-1. Run `bun run typecheck` to run `tsc` and the Effect language service diagnostics.
+1. Run `bun run lint` to run [oxlint](https://oxc.rs) and every kit lint gate.
+1. Run `bun run typecheck` to run `tsc` and the [Effect](https://effect.website) language service diagnostics.
 1. Run `bun run build` to bundle every tool and the `orc-dash` command into each package's `dist/` and write the changelog.
 
 CI runs the tests the change reaches on a pull request.

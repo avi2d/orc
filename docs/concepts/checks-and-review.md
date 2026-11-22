@@ -14,7 +14,7 @@ Each runs inside the run, so a pull request that reaches you has already passed 
 ## The checks
 
 The project names its checks in a `.no-mistakes.yaml` file at its root, under `commands`.
-Orc runs them in the run's copy after Pi finishes.
+Orc runs them in the run's copy after [Pi](https://pi.dev) finishes.
 When a check fails, orc starts a fixer Pi with the failing output, then runs the checks again.
 After 3 fix attempts with a check still red, the run ends failed and no pull request opens.
 

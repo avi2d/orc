@@ -3,7 +3,7 @@ kind: reference
 ---
 # Capture usage as it happens
 The writer `orc-dash-capture` appends one record to the capture ledger each time a hook calls it.
-The ledger keeps Claude statusline and headless readings, which no log keeps, and Pi calls whose log was rotated or deleted.
+The ledger keeps [Claude](https://claude.com) statusline and headless readings, which no log keeps, and [Pi](https://pi.dev) calls whose log was rotated or deleted.
 The readers prefer the ledger where it holds a call, and count from the logs where it does not.
 
 ## Build the writer
@@ -34,7 +34,7 @@ It writes nothing for a message with no usage.
 
 ## Capture Claude readings from the statusline
 
-Run the writer with `claude-statusline` from the Claude Code statusline command, and pass it the statusline's stdin unchanged.
+Run the writer with `claude-statusline` from the [Claude Code](https://claude.com/product/claude-code) statusline command, and pass it the statusline's stdin unchanged.
 The writer keeps `session_id`, `cwd`, `cost.total_api_duration_ms` and the `five_hour` and `seven_day` windows of `rate_limits`.
 It drops the model, the cost, the context window and every other field.
 It writes nothing before Claude Code's first response, when the statusline carries no rate limits.
