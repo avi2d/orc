@@ -64,10 +64,14 @@ export {
   renderTaskFile,
 } from "./task-record-render"
 export {
+  choicesOf,
+} from "./task-record-question"
+export {
   isHeld,
   isDeciderAnswer,
   openQuestions,
   taskPr,
+  fullPrUrl,
   ranClosing,
   decisionAnswer,
   decisionWait,

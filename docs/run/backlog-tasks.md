@@ -131,6 +131,7 @@ A note does not hold a task or answer a question.
 
 Run `orc backlog thread <task-id>` to read a task's questions, answers, decisions, and notes in time order.
 Add `--json` for an `orc.thread.v1` document.
+A decision entry for an escalated question carries the decider's recommended option as `recommendation`.
 Its fields are defined in `packages/run/src/features/task-thread/thread.ts`.
 The thread includes closed tasks.
 Orc refuses an unknown task ID.

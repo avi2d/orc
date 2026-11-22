@@ -7,8 +7,8 @@ import type { FailingMark } from "../../entities/agent/index"
 import type { DispatchConfig } from "../../shared/config/index"
 import { ownedBySweep, throughFor } from "../../shared/config/index"
 import { logWrittenAt, stallMillis } from "./stall"
-import { answersFor, askStartedTask, correctionsDue, markAnswersRelayed, markCorrectionsRelayed, parkStartedTask } from "../../entities/parked-runs/index"
-import { Asking, askingFileName, hasBlockingQuestion, type OpenQuestion, type QuestionAnswer } from "../../entities/review-gate/index"
+import { answersFor, askStartedTask, type AskedQuestion, correctionsDue, markAnswersRelayed, markCorrectionsQueued, parkStartedTask } from "../../entities/parked-runs/index"
+import { Asking, askingFileName, hasBlockingQuestion, type QuestionAnswer } from "../../entities/review-gate/index"
 import { readJsonFileIfPresent } from "../../shared/config/index"
 import { type RunnerRequirements } from "../../features/queueing-a-task/index"
 import { type RunnerError } from "../../shared/process/index"
@@ -80,12 +80,24 @@ const endParked = (
     const id = task.spec.id
     const branch = task.parked?.branch ?? taskBranch(id)
     const live = yield* (run === undefined
-      ? Effect.succeed<ReadonlyArray<OpenQuestion>>([])
+      ? Effect.succeed<ReadonlyArray<AskedQuestion>>([])
       : readJsonFileIfPresent(runDirFor(home, run) + "/" + askingFileName, Asking).pipe(
-        Effect.map((asking) => asking === null ? [] as ReadonlyArray<OpenQuestion> : [...asking.questions]),
-        Effect.orElseSucceed(() => [] as ReadonlyArray<OpenQuestion>)
+        Effect.map((asking) => asking === null ? [] as ReadonlyArray<AskedQuestion> : [...asking.questions]),
+        Effect.orElseSucceed(() => [] as ReadonlyArray<AskedQuestion>)
       ))
-    const open = Arr.appendAll(ending.questions, live.filter((question) => !ending.questions.some((known) => known.id === question.id)))
+    const liveById = new Map(live.map((question) => [question.id, question] as const))
+    const merged = Arr.map(ending.questions, (question) => {
+      const rich = liveById.get(question.id)
+      if (rich === undefined) {
+        return question
+      }
+      return {
+        ...question,
+        ...(rich.options !== undefined ? { options: rich.options } : {}),
+        ...(rich.recommendation !== undefined ? { recommendation: rich.recommendation } : {})
+      }
+    })
+    const open = Arr.appendAll(merged, live.filter((question) => !ending.questions.some((known) => known.id === question.id)))
     const parked = yield* parkStartedTask(root, id, branch, open, yield* nowIso, run).pipe(Effect.catchTag("BacklogError", () => Effect.succeed(null)))
     return parked === null
       ? Option.none()
@@ -240,8 +252,8 @@ const serveAsking = (
     )
   })
 
-const serveCorrections = (
-  context: CloseContext,
+export const serveCorrections = (
+  root: string,
   task: TaskRecord,
   machine: string,
   correct: (corrections: ReadonlyArray<QuestionAnswer>) => Effect.Effect<string, RunnerError, RunnerRequirements>
@@ -252,8 +264,8 @@ const serveCorrections = (
   }
   const id = task.spec.id
   return correct(due.map((question) => ({ question: question.id, answer: question.answer.words }))).pipe(
-    Effect.andThen(markCorrectionsRelayed(context.root, id, due).pipe(Effect.catchTags({ BacklogError: () => Effect.void, TaskFileError: () => Effect.void }))),
-    Effect.as<BeatAction>({ kind: "answered", task: id, machine, questions: due.map((question) => question.id) }),
+    Effect.andThen(markCorrectionsQueued(root, id, due).pipe(Effect.catchTags({ BacklogError: () => Effect.void, TaskFileError: () => Effect.void }))),
+    Effect.as<BeatAction>({ kind: "answer-failed", task: id, machine, reason: "the correction was queued, but delivery to the run is not confirmed" }),
     Effect.catchTag("RunnerError", (error) => Effect.succeed<BeatAction>({ kind: "answer-failed", task: id, machine, reason: error.detail })),
     Effect.timeoutOrElse({
       duration: Duration.seconds(closeSeconds),
@@ -279,7 +291,7 @@ const serveRunning = (
       through === null
         ? relayAnswers(context.home, task.spec.id, Effect.succeed(JSON.stringify({ label, corrections })))
         : correctThrough(through, task.spec.id, label, corrections)
-    return (asking === null ? null : yield* serveAsking(context, task, machine, asking, relay)) ?? (yield* serveCorrections(context, task, machine, correct))
+    return (asking === null ? null : yield* serveAsking(context, task, machine, asking, relay)) ?? (yield* serveCorrections(context.root, task, machine, correct))
   })
 
 const readClose = (

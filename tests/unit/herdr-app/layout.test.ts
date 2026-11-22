@@ -25,3 +25,22 @@ test("floats only blocks with content, never a column Herdr refuses with the who
   expect(entries.length).toBeGreaterThan(0)
   expect(entries.filter((entry) => !holdsContent(entry))).toEqual([])
 })
+
+const stackChildren = (node: unknown, stack: string): ReadonlyArray<string> => {
+  if (!isRecord(node)) return []
+  const children = Array.isArray(node["children"]) ? node["children"] : []
+  if (node["id"] === stack) return children.flatMap((entry) => isRecord(entry) && typeof entry["id"] === "string" ? [entry["id"]] : [])
+  return children.flatMap((entry) => stackChildren(entry, stack))
+}
+
+test("selects with each layout:orc key a child the orc-views stack holds, so cmd-4 opens the Inbox instead of nothing", async () => {
+  const root = join(import.meta.dir, "../../../packages/herdr-app")
+  const layout: unknown = JSON.parse(await readFile(join(root, "layouts/orc.json"), "utf8"))
+  const keys: unknown = JSON.parse(await readFile(join(root, "keys.json"), "utf8"))
+  const children = stackChildren(layout, "orc-views")
+  expect(children).toContain("orc-inbox")
+  const section = isRecord(keys) && isRecord(keys["layout:orc"]) ? keys["layout:orc"] : {}
+  expect(section["cmd-4"]).toEqual({ command: "layout.select", args: { stack: "orc-views", child: "orc-inbox" } })
+  const selected = Object.values(section).flatMap((binding) => isRecord(binding) && isRecord(binding["args"]) ? [binding["args"]["child"]] : [])
+  expect(selected.filter((child) => typeof child !== "string" || !children.includes(child))).toEqual([])
+})

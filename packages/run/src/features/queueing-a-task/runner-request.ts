@@ -7,6 +7,7 @@ import { TaskInstructions, readInstructions } from "./runner-instructions"
 import { RunnerError } from "../../shared/process/index"
 import { isRunDelivery } from "../../shared/config/index"
 import { decodeTokenText, LabelArg, tokenDocumentNote, tokenFields } from "../../entities/token/index"
+import { isThinkingLevel, piThinkingLevels } from "../../entities/agent/index"
 
 const taskFields = {
   task: TaskId,
@@ -14,6 +15,8 @@ const taskFields = {
   provider: ProviderId,
   implementerModel: Schema.optional(ModelRef),
   fixerModel: Schema.optional(ModelRef),
+  implementerThinking: Schema.optional(Schema.Literals(piThinkingLevels)),
+  fixerThinking: Schema.optional(Schema.Literals(piThinkingLevels)),
   body: Schema.String,
   kind: Schema.optional(Schema.Literals(reportKinds)),
   delivery: Schema.optional(Schema.Literal("direct-PR")),
@@ -105,6 +108,22 @@ const handedModels = (env: Readonly<Record<string, string | undefined>>): Record
   return { ...(implementer === "" ? {} : { implementerModel: implementer }), ...(fixer === "" ? {} : { fixerModel: fixer }) }
 }
 
+const handedThinking = (env: Readonly<Record<string, string | undefined>>): Effect.Effect<Record<string, string>, RunnerError> =>
+  Effect.gen(function*() {
+    const handed: Record<string, string> = {}
+    for (const [name, key] of [["ORC_TASK_IMPLEMENTER_THINKING", "implementerThinking"], ["ORC_TASK_FIXER_THINKING", "fixerThinking"]] as const) {
+      const level = env[name] ?? ""
+      if (level === "") {
+        continue
+      }
+      if (!isThinkingLevel(level)) {
+        return yield* refuse("orc runner start reads " + name + " as one of " + piThinkingLevels.join(", ") + ", not " + level)
+      }
+      handed[key] = level
+    }
+    return handed
+  })
+
 const readRequestFields = (
   task: string,
   checkout: string,
@@ -128,7 +147,8 @@ const readRequestFields = (
     const machineName = env["ORC_RUN_MACHINE"] ?? ""
     const machine = machineName === "" ? {} : { machine: machineName }
     const models = handedModels(env)
-    return yield* Schema.decodeEffect(RequestSchema)({ task, checkout, provider, body, ...models, ...kind, ...delivery, ...instructions, ...machine, ...resume }).pipe(
+    const thinking = yield* handedThinking(env)
+    return yield* Schema.decodeEffect(RequestSchema)({ task, checkout, provider, body, ...models, ...thinking, ...kind, ...delivery, ...instructions, ...machine, ...resume }).pipe(
       Effect.mapError((error) => new RunnerError({ detail: "orc runner start cannot queue " + task + ": " + error.message }))
     )
   })

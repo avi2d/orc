@@ -195,6 +195,23 @@ describe("orc backlog thread", () => {
       })
     }))
 
+  test("an escalated decision's JSON entry names the decider's recommended option instead of only its reason", () =>
+    withBacklog(async (root) => {
+      await startedTask(root)
+      const asked = "2026-11-02T10:20:00.000Z"
+      await run(askStartedTask(root, "orc-1", { asked, questions: [{ id: "r3", text: "Keep the old flag name?\nA) Keep it\nB) Rename it" }] }))
+      await run(routeTaskItems(root, await run(listTasks(root)), asked))
+      const ask: AskDecider = { home: "/nonexistent/orc-home", ask: () => Effect.succeed(JSON.stringify({ decision: "escalate", reason: "the intent leaves the flag name open", recommendation: "Keep it" })) }
+      await run(decideReviewQuestions(root, await run(listTasks(root)), ask))
+      const thread: unknown = JSON.parse(await run(threadText(root, "orc-1", true)))
+      expect(thread).toMatchObject({
+        entries: [
+          { kind: "question", id: reviewQuestionId("orc-1", "r3", asked) },
+          { kind: "decision", who: "decider", id: reviewQuestionId("orc-1", "r3", asked), text: "escalated: the intent leaves the flag name open", recommendation: "Keep it" }
+        ]
+      })
+    }))
+
   test("a decision matches its question by id before a later park replaces it and after", () => {
     const earlier = "2026-11-02T10:00:00.000Z"
     const decided = "2026-11-02T10:05:00.000Z"

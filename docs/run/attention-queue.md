@@ -26,7 +26,7 @@ Rules and policy do not widen it.
 
 The decider can:
 
-- **Answer** with a reason and an exact rule from the task, your rules, project instructions, or policy.
+- **Answer** with a reason and an exact rule from the task, your rules, project instructions, or the policy's Rules section.
   Orc escalates an answer whose quote is no whole clause of them, after whitespace is collapsed and surrounding quotes and a leading list or quote marker are stripped on both sides.
   A quote matches a whole line, a sentence within a line, a whole paragraph joined across its lines, a sentence of that joined paragraph, where the quote starts at the start or after a period, exclamation mark, question mark, colon or semicolon and ends at the end, just before one of those marks, or on one of those marks.
 - **Ask back** to a worker question.
@@ -35,6 +35,8 @@ The decider can:
 - **Link a duplicate** to an earlier answered question on the same task.
   Orc escalates a link to a missing or unanswered item.
 - **Escalate** to you, with a reason.
+  When the question lists lettered options, the decider may name the one it recommends.
+  The escalated decision keeps that option's text as `recommendation`, and orc drops a recommendation that is no option of the question.
 
 A failed call, unreadable reply or rules file, or missing decider model also escalates the item.
 
@@ -44,7 +46,10 @@ To replace an answer the decider gave, run `orc backlog answer <task-id> <questi
 Your answer stands, and the task file keeps the decider's answer beside it under `overturned`.
 The item keeps the decider's answer under `overturned` in its `closed` state, and its `answer` is yours.
 A run that has not received the decider's answer gets only yours.
-A live run that already has it gets yours as a correction after its next tool call.
+If a run already took the decider's answer, orc queues your answer as a correction but reports it as not delivered.
+The task file marks it `correction_queued`, and later beats do not queue it again.
+A Pi worker may receive the correction after its next tool call.
+No Pi worker reads corrections during a no-mistakes gate or after the last Pi session ends.
 A closed task refuses the answer, because its run is over.
 A second answer never replaces yours.
 
@@ -66,7 +71,19 @@ The beat opens an item for each run event, owned by the user:
   Merging the PR closes it with the answer `merged`.
   Closing the PR without merging closes it with the answer `closed without merging`.
 
-To answer one of these, run `orc attention answer <item-id> <words>`.
+## Recording a choice
+
+Each item the beat opens names its `subject` and lists its `options`, each with the `outcome` it leads to, and its `recommendation` names one of them:
+
+- A `run-died` item offers `rerun` or `close`, and recommends `rerun`.
+- A `check-red` item offers `send back` or `close`, and recommends `send back`.
+- A `pr-ready` item offers `merge` or `hold`, and recommends `merge`.
+- A `failing-command` item offers `continue` or `stop`, and recommends `continue`.
+- An `overdue-wait` item offers `answer` or `drop`, and recommends `answer`.
+
+To record a choice on a `run-died`, `check-red`, `pr-ready` or `failing-command` item, run `orc attention answer <item-id> <words>`.
+Run the command the outcome names to carry out the option.
+`orc attention answer` only records the choice and closes the item.
 It refuses a review question, a worker question or an overdue wait and names the task to answer with `orc backlog answer` instead.
 
 A held task whose `--until` date has passed opens an `overdue-wait` item, owned by the user and asked at the start of the next day on the machine local clock.
@@ -78,6 +95,7 @@ Each beat reads the queue before it starts a new task, and prints one `needs the
 Run `orc attention` to see open items in age order.
 The text view shows the decider's answers under `Decided:`.
 Run `orc attention --json` for an `orc.attention.v1` document with `at`, `items`, and `decided`.
+An open item in `items` carries its `subject`, `options` and `recommendation` when it has them.
 The output shape is in `packages/run/src/features/attention-list/attention-view.ts`.
 An answered item leaves `decided` when its task closes.
 

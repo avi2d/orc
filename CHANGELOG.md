@@ -2,6 +2,39 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.18.0
+
+Released 2026-11-20.
+
+### Features
+
+- **run:** take implementer and fixer thinking levels from the beat [#261](https://github.com/avi2d/orc/pull/261)
+- **herdr-app:** add Inbox tab on cmd-4 with answer and Approve actions [#265](https://github.com/avi2d/orc/pull/265)
+- **run:** add reviewer agent with bundled prompt and override chain [#266](https://github.com/avi2d/orc/pull/266)
+- **chat:** add attention queue read and answer tools [#260](https://github.com/avi2d/orc/pull/260)
+- **run:** add orc update to install the newest published orc [#259](https://github.com/avi2d/orc/pull/259)
+- **run:** report the orc version running on each machine [#256](https://github.com/avi2d/orc/pull/256)
+- **run:** add chat tools for stop, drop, send-back, note, depend and thread [#255](https://github.com/avi2d/orc/pull/255)
+- **run:** orc merge updates a PR behind its base and merges after checks pass [#234](https://github.com/avi2d/orc/pull/234)
+- **docs:** give map colours one meaning each and add a legend [#247](https://github.com/avi2d/orc/pull/247)
+- **docs:** open docs pages from the home scheme and link the map in its bar [#245](https://github.com/avi2d/orc/pull/245)
+- **docs:** keep several map blocks open and correct run question paths [#244](https://github.com/avi2d/orc/pull/244)
+- **docs:** give the docs site the watercolor paper look [#243](https://github.com/avi2d/orc/pull/243)
+- **docs:** give the docs site the Paint look [#240](https://github.com/avi2d/orc/pull/240)
+- **herdr-app:** add inbox model for open questions, decisions, holds and PR approvals [#238](https://github.com/avi2d/orc/pull/238)
+- **run:** read quota-axi per-provider JSON in beat quota reader [#232](https://github.com/avi2d/orc/pull/232)
+- **run:** hand the implementer and fixer models from the beat to orc run [#225](https://github.com/avi2d/orc/pull/225)
+
+### Fixes
+
+- **run:** keep flags out of backlog answer words [#262](https://github.com/avi2d/orc/pull/262)
+- **run:** park unanswerable review findings and gate cap as questions [#258](https://github.com/avi2d/orc/pull/258)
+- **run:** answer repeated parked question on its open entry [#235](https://github.com/avi2d/orc/pull/235)
+- **run:** accept decider quotes that sit inside a longer line [#233](https://github.com/avi2d/orc/pull/233)
+- **docs:** hide the heading anchor on every h1 [#249](https://github.com/avi2d/orc/pull/249)
+- **herdr-app:** scroll each Board column on its own [#236](https://github.com/avi2d/orc/pull/236)
+- **run:** group resumed run carried steps under their origin run [#230](https://github.com/avi2d/orc/pull/230)
+
 ## 0.17.0
 
 Released 2026-11-15.

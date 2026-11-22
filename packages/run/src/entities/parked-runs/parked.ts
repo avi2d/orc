@@ -1,13 +1,15 @@
 import { Array as Arr, Effect, FileSystem } from "effect"
 import type { AskOption, OpenQuestion } from "../review-gate/index"
 import { openReviewQuestions } from "../attention/index"
-import { answerDecision, findTask, grabIn, ranClosing, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, platformFailure, publishOnce, takenGrab, type Hold, type HoldQuestion, isHeld, isDeciderAnswer, openQuestions, type Parked, type CaptainAnswer, type DeciderAnswer, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord, renderTaskFile } from "../backlog/index"
+import { answerDecision, choicesOf, findTask, grabIn, ranClosing, type Rewrite, rewriteNew, rewriteTaken, taskBranch, BacklogError, platformFailure, publishOnce, takenGrab, type Hold, type HoldQuestion, isHeld, isDeciderAnswer, openQuestions, type Parked, type CaptainAnswer, type DeciderAnswer, type ParkedAnswer, type ParkedQuestion, parseTaskFile, type TaskFileError, type TaskRecord, renderTaskFile } from "../backlog/index"
 
 // An answer handed to an asking that ended went into the run, so only one never handed out or handed to this asking still answers it.
 const answersAsking = (answer: ParkedAnswer, asking: string | null): boolean => answer.relayedTo === null || answer.relayedTo === asking
 
+export type AskedQuestion = Omit<OpenQuestion, "options" | "recommendation"> & { readonly options?: ReadonlyArray<AskOption> | undefined; readonly recommendation?: string | undefined }
+
 const parkedQuestions = (
-  open: Arr.NonEmptyReadonlyArray<OpenQuestion>,
+  open: Arr.NonEmptyReadonlyArray<AskedQuestion>,
   prior: ReadonlyArray<ParkedQuestion>,
   asking: string | null,
   askedOf: (question: OpenQuestion) => string
@@ -19,13 +21,13 @@ const parkedQuestions = (
   return Arr.appendAll(
     Arr.map(open, (question): ParkedQuestion =>
       prior.find((known) => stillAsked(known, question)) ??
-      { id: question.id, text: question.text, asked: askedOf(question), blocks: question.blocks ?? true, answer: null }),
+      { id: question.id, text: question.text, asked: askedOf(question), blocks: question.blocks ?? true, ...choicesOf(question), answer: null }),
     kept
   )
 }
 
 // A resumed run carries the open-question signals of the run it resumes, so one id can come back from an earlier asking beside the latest one.
-const latestAskings = (open: Arr.NonEmptyReadonlyArray<OpenQuestion>): Arr.NonEmptyReadonlyArray<OpenQuestion> =>
+const latestAskings = (open: Arr.NonEmptyReadonlyArray<AskedQuestion>): Arr.NonEmptyReadonlyArray<AskedQuestion> =>
   Arr.dedupeWith(
     Arr.map(open, (question) => open.reduce((latest, other) => other.id === latest.id && (other.asked ?? "") >= (latest.asked ?? "") ? other : latest, question)),
     (left, right) => left.id === right.id
@@ -36,7 +38,7 @@ const sameQuestions = (left: ReadonlyArray<ParkedQuestion>, right: ReadonlyArray
 
 export interface LiveAsking {
   readonly asked: string
-  readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion & { readonly options?: ReadonlyArray<AskOption> }>
+  readonly questions: Arr.NonEmptyReadonlyArray<AskedQuestion>
 }
 
 // The live run keeps its claim, so its questions sit on the started task and orc backlog answer reaches them there.
@@ -103,7 +105,7 @@ export const parkStartedTask = (
   root: string,
   id: string,
   branch: string,
-  asked: Arr.NonEmptyReadonlyArray<OpenQuestion>,
+  asked: Arr.NonEmptyReadonlyArray<AskedQuestion>,
   at: string,
   run?: string
 ): Effect.Effect<TaskRecord, BacklogError | TaskFileError, FileSystem.FileSystem> =>
@@ -136,7 +138,7 @@ export type AnswerOutcome =
   | { readonly kind: "hold"; readonly hold: Hold }
   | { readonly kind: "decision" }
   | { readonly kind: "held question"; readonly question: string; readonly open: ReadonlyArray<HoldQuestion> }
-  | { readonly kind: "question"; readonly question: string; readonly branch: string; readonly live: boolean; readonly open: ReadonlyArray<ParkedQuestion> }
+  | { readonly kind: "question"; readonly question: string; readonly branch: string; readonly live: boolean; readonly correction: boolean; readonly open: ReadonlyArray<ParkedQuestion> }
 
 const unanswered = <Q extends { readonly answer: { readonly words: string; readonly at: string } | null }>(questions: ReadonlyArray<Q>): ReadonlyArray<Q> => questions.filter((question) => question.answer === null)
 
@@ -190,7 +192,8 @@ const answerQuestionOn = (id: string, words: string, at: string, fresh: TaskReco
   return answerOneOf(id, words, at, fresh.parked.questions, "parked", fresh, overturns).pipe(Effect.map(({ asked, answer }) => {
     const questions = Arr.map(fresh.parked.questions, (candidate): ParkedQuestion => candidate === asked ? { ...asked, answer: givenAnswer(answer, by, asked.answer) } : candidate)
     const record: TaskRecord = { ...fresh, parked: { ...fresh.parked, questions } }
-    return { kind: "write", record, result: { kind: "question", question: asked.id, branch: fresh.parked.branch, live: fresh.state.kind === "started", open: openQuestions(record) } }
+    const replaced = asked.answer
+    return { kind: "write", record, result: { kind: "question", question: asked.id, branch: fresh.parked.branch, live: fresh.state.kind === "started", correction: fresh.state.kind === "started" && replaced !== null && isDeciderAnswer(replaced) && replaced.relayedTo !== null, open: openQuestions(record) } }
   }))
 }
 
@@ -345,14 +348,14 @@ type Corrected = ParkedQuestion & { readonly answer: CaptainAnswer & { readonly 
 
 const isDueCorrection = (question: ParkedQuestion): question is Corrected => {
   const answer = question.answer
-  return answer !== null && !isDeciderAnswer(answer) && answer.relayedTo === null && answer.overturned !== undefined && answer.overturned.relayedTo !== null
+  return answer !== null && !isDeciderAnswer(answer) && answer.relayedTo === null && answer.correctionQueued !== true && answer.overturned !== undefined && answer.overturned.relayedTo !== null
 }
 
 // Only an overturned answer the run already took needs a correction, because one it never took is replaced in the relay itself.
 export const correctionsDue = (record: TaskRecord): ReadonlyArray<Corrected> =>
   record.state.kind === "started" ? (record.parked?.questions ?? []).flatMap((question) => isDueCorrection(question) ? [question] : []) : []
 
-export const markCorrectionsRelayed = (
+export const markCorrectionsQueued = (
   root: string,
   id: string,
   corrected: ReadonlyArray<{ readonly id: string; readonly asked: string }>
@@ -360,7 +363,7 @@ export const markCorrectionsRelayed = (
   relayTakenQuestions(root, id, (prior) =>
     Arr.map(prior, (question): ParkedQuestion =>
       isDueCorrection(question) && corrected.some((entry) => entry.id === question.id && entry.asked === question.asked)
-        ? { ...question, answer: { ...question.answer, relayedTo: question.answer.overturned.relayedTo } }
+        ? { ...question, answer: { ...question.answer, correctionQueued: true as const } }
         : question
     ))
 export const answerTask = (

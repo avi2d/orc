@@ -3,9 +3,13 @@ export {
   bundledAgentsDir,
   agentFileCandidates,
   resolveAgentFile,
+  piThinkingLevels,
+  isThinkingLevel,
 } from "./agents"
 export type {
   AgentFile,
+  AgentKind,
+  PiThinkingLevel,
 } from "./agents"
 export {
   handoverFileName,

@@ -9,7 +9,7 @@ import { attentionJson, attentionText } from "../../../packages/run/src/features
 import { claimDeciding, openItems, readAttention, routeTaskItems } from "../../../packages/run/src/entities/attention/attention"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/entities/backlog/index"
 import { type AskDecider, DeciderUnheard, decideReviewQuestions, type DeciderRequest } from "../../../packages/run/src/features/decider/index"
-import { answersFor, answerTask, askStartedTask, correctionsDue, markAnswersRelayed, parkStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
+import { answerTask, askStartedTask, parkStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -152,6 +152,31 @@ describe("the decider", () => {
     })
   })
 
+  test("a verbatim bullet with quoted text is accepted instead of escalated", async () => {
+    await withAskingTask(async (root) => {
+      const reply = JSON.stringify({ decision: "answer", answer: "Two retries", rule: '- "Retry twice."', reason: "the intent says twice" })
+      await decide(root, replies({ [r2.text]: reply }))
+      expect(await itemFile(root, r2Item)).toMatchObject({ decision: { kind: "answered", rule: { quote: "Retry twice." } }, state: { kind: "closed", answer: { words: "Two retries" } } })
+    }, [r2], '# Retry\n- "Retry twice."\n')
+  })
+
+  test("a policy sentence outside its rules section escalates instead of authorizing an answer", async () => {
+    await withAskingTask(async (root) => {
+      const reply = JSON.stringify({ decision: "answer", answer: "Two retries", rule: "Answer it only when it is routine.", reason: "routine" })
+      await decide(root, replies({ [r2.text]: reply }))
+      expect(await itemFile(root, r2Item)).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+    }, [r2])
+  })
+
+  test("a recommended-option rule from the policy rules section is answered instead of escalated", async () => {
+    await withAskingTask(async (root) => {
+      const rule = "When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure."
+      const reply = JSON.stringify({ decision: "answer", answer: "Two retries", rule, reason: "the question names Two retries" })
+      await decide(root, replies({ [r2.text]: reply }))
+      expect(await itemFile(root, r2Item)).toMatchObject({ owner: "decider", decision: { kind: "answered", rule: { quote: rule, source: "decider policy" } }, state: { kind: "closed", answer: { words: "Two retries" } } })
+    }, [r2])
+  })
+
   test("an escalated question turns to the user and stays open with the decider's reason, instead of being answered", async () => {
     await withAskingTask(async (root) => {
       await decide(root, replies({ [r2.text]: answer, [r3.text]: escalate }))
@@ -159,6 +184,25 @@ describe("the decider", () => {
       expect(await itemFile(root, r3Item)).toMatchObject({ owner: "user", decision: { kind: "escalated", reason: "the intent leaves the flag name open" }, state: { kind: "open" } })
       expect((await run(listTasks(root))).at(0)?.parked?.questions.find((question) => question.id === "r3")?.answer).toBeNull()
     })
+  })
+
+  test("an escalation's recommended option shows in orc attention --json, instead of only its reason", async () => {
+    const options = { id: "r3", text: "Keep the old flag name?\nA) Keep it\nB) Rename it" }
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [options.text]: JSON.stringify({ decision: "escalate", reason: "the intent leaves the flag name open", recommendation: "Rename it" }) }))
+      const view: unknown = JSON.parse(await run(attentionText(true, root)))
+      expect(view).toMatchObject({ schema: "orc.attention.v1", items: [{ id: r3Item, owner: "user", decision: { kind: "escalated", reason: "the intent leaves the flag name open", recommendation: "Rename it" } }] })
+    }, [options])
+  })
+
+  test("an escalation recommending no option of its question keeps its reason and drops the recommendation, instead of marking a made-up option", async () => {
+    const options = { id: "r3", text: "Keep the old flag name?\nA) Keep it\nB) Rename it" }
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [options.text]: JSON.stringify({ decision: "escalate", reason: "the intent leaves the flag name open", recommendation: "Drop the flag" }) }))
+      const filed = await itemFile(root, r3Item)
+      expect(filed).toMatchObject({ decision: { kind: "escalated", reason: "the intent leaves the flag name open" } })
+      expect(filedAt(filed, "decision", "recommendation")).toBeUndefined()
+    }, [options])
   })
 
   test("each question gets its own call carrying the task intent and the written policy, not one call for the batch", async () => {
@@ -478,66 +522,6 @@ describe("the decider", () => {
     await withAskingTask(async (root) => {
       await decide(root, replies({ [r2.text]: JSON.stringify({ decision: "ask-back", question: "Does the upload run in CI?" }) }))
       expect(await itemFile(root, r2Item)).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
-    }, [r2])
-  })
-
-  test("an overturned answer the run has not taken is the one the run receives, not the decider's", async () => {
-    await withAskingTask(async (root) => {
-      await decide(root, replies({ [r2.text]: answer }))
-      await run(answerTask(root, "orc-1", "r2=Three retries", "2099-01-01T00:00:00.000Z"))
-      await run(routeTaskItems(root, await run(listTasks(root)), "2099-01-01T00:00:00.000Z"))
-      const task = (await run(listTasks(root))).at(0)
-      if (task === undefined) {
-        throw new Error("the task is gone")
-      }
-      expect(answersFor(task, { asked, questions: [r2] }).map((question) => question.answer.words)).toEqual(["Three retries"])
-      expect(task.parked?.questions.at(0)?.answer).toMatchObject({ words: "Three retries", overturned: { words: "Two retries", by: "decider" } })
-      expect(correctionsDue(task)).toEqual([])
-      expect(await itemFile(root, r2Item)).toMatchObject({ state: { kind: "closed", answer: { words: "Three retries" }, overturned: { words: "Two retries" } } })
-      expect(await run(attentionText(false, root))).toContain("answered " + r2Item + ": Three retries (the captain replaced the decider's answer \"Two retries\")")
-    }, [r2])
-  })
-
-  test("a late mark of the relayed decider words leaves the captain's answer unmarked and due, instead of marking words the run never got", async () => {
-    await withAskingTask(async (root) => {
-      await decide(root, replies({ [r2.text]: answer }))
-      await run(answerTask(root, "orc-1", "r2=Three retries", "2099-01-01T00:00:00.000Z"))
-      await run(markAnswersRelayed(root, "orc-1", asked, [{ id: "r2", asked, words: "Two retries" }]))
-      const task = (await run(listTasks(root))).at(0)
-      if (task === undefined) {
-        throw new Error("the task is gone")
-      }
-      expect(task.parked?.questions.at(0)?.answer).toMatchObject({ words: "Three retries", relayedTo: null })
-      expect(correctionsDue(task).map((question) => [question.id, question.answer.words, question.answer.overturned.words])).toEqual([["r2", "Three retries", "Two retries"]])
-    }, [r2])
-  })
-
-  test("an overturned answer the run already took is due to it as a correction, instead of standing unsent", async () => {
-    await withAskingTask(async (root) => {
-      await decide(root, replies({ [r2.text]: answer }))
-      await run(markAnswersRelayed(root, "orc-1", asked, [{ id: "r2", asked, words: "Two retries" }]))
-      await run(answerTask(root, "orc-1", "r2=Three retries", "2099-01-01T00:00:00.000Z"))
-      const task = (await run(listTasks(root))).at(0)
-      if (task === undefined) {
-        throw new Error("the task is gone")
-      }
-      expect(correctionsDue(task).map((question) => [question.id, question.answer.words, question.answer.overturned.words])).toEqual([["r2", "Three retries", "Two retries"]])
-    }, [r2])
-  })
-
-  test("the captain's answer is never replaced by a second one, unlike a decider's", async () => {
-    await withAskingTask(async (root) => {
-      await run(answerTask(root, "orc-1", "r2=Two retries", "2026-11-02T10:22:00.000Z"))
-      await assert.rejects(run(answerTask(root, "orc-1", "r2=Three retries", "2026-11-02T10:23:00.000Z")))
-    })
-  })
-
-  test("a closed task refuses an overturn instead of rewriting an answer its run took", async () => {
-    await withAskingTask(async (root) => {
-      await decide(root, replies({ [r2.text]: answer }))
-      await run(closeStartedTask(root, "orc-1", "done", "the upload retries", { pr: null, report: null }, "2026-11-02T10:40:00.000Z"))
-      await assert.rejects(run(answerTask(root, "orc-1", "r2=Three retries", "2099-01-01T00:00:00.000Z")))
-      expect((await run(listTasks(root))).at(0)?.parked?.questions.at(0)?.answer).toMatchObject({ words: "Two retries" })
     }, [r2])
   })
 })

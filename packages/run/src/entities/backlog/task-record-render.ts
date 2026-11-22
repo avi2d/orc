@@ -1,4 +1,5 @@
 import { decisionAnswer, fence, type Claim, type Hold, type HoldQuestion, isDeciderAnswer, type Parked, type ParkedAnswer, type ParkedQuestion, ranClosing, type Started, type TaskRecord } from "./task-record"
+import { choicesOf } from "./task-record-question"
 
 const field = (key: string, value: unknown): string => key + ": " + JSON.stringify(value)
 
@@ -25,8 +26,10 @@ const questionFronts = (questions: ReadonlyArray<ParkedQuestion>) =>
     text: question.text,
     asked_at: question.asked,
     ...(question.blocks ? {} : { blocks: false }),
+    ...choicesOf(question),
     ...(question.answer === null ? {} : { answer: question.answer.words, answered_at: question.answer.at, ...answerFronts(question.answer) }),
-    ...(question.answer?.relayedTo == null ? {} : { relayed_to: question.answer.relayedTo })
+    ...(question.answer?.relayedTo == null ? {} : { relayed_to: question.answer.relayedTo }),
+    ...(question.answer !== null && !isDeciderAnswer(question.answer) && question.answer.correctionQueued === true ? { correction_queued: true } : {})
   }))
 
 const holdQuestionFronts = (questions: ReadonlyArray<HoldQuestion>) =>

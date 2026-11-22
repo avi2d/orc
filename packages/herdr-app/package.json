@@ -11,13 +11,14 @@
     "./orc-agents": "./mods/orc-agents/main.ts",
     "./orc-task": "./mods/orc-task/main.ts",
     "./orc-drawer": "./mods/orc-drawer/main.ts",
-    "./orc-changes": "./mods/orc-changes/main.ts"
+    "./orc-changes": "./mods/orc-changes/main.ts",
+    "./orc-inbox": "./mods/orc-inbox/main.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && bun scripts/build.ts",
     "copy-app-types": "bun scripts/copy-app-types.ts"
   },
   "devDependencies": {
-    "@avi2dg/checks": "0.96.3"
+    "@avi2dg/checks": "0.112.0"
   }
 }

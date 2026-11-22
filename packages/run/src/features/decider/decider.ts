@@ -27,7 +27,7 @@ const Reply = Schema.Union([
   Schema.Struct({ decision: Schema.Literal("answer"), answer: Words, rule: Words, reason: Words }),
   Schema.Struct({ decision: Schema.Literal("ask-back"), question: Words }),
   Schema.Struct({ decision: Schema.Literal("duplicate"), of: Words }),
-  Schema.Struct({ decision: Schema.Literal("escalate"), reason: Words })
+  Schema.Struct({ decision: Schema.Literal("escalate"), reason: Words, recommendation: Schema.optionalKey(Schema.Unknown) })
 ])
 
 type Reply = typeof Reply.Type
@@ -46,7 +46,7 @@ type Basis = { readonly kind: "rule"; readonly quote: string; readonly source: s
 type Verdict =
   | { readonly kind: "answered"; readonly words: string; readonly basis: Basis }
   | { readonly kind: "asked-back"; readonly question: string }
-  | { readonly kind: "escalated"; readonly reason: string }
+  | { readonly kind: "escalated"; readonly reason: string; readonly recommendation?: string }
 
 const decodeReply = Schema.decodeUnknownOption(Schema.fromJsonString(Reply))
 
@@ -118,8 +118,10 @@ const holdsClause = (segment: string, wanted: string): boolean => {
   return false
 }
 
+const normalizedQuote = (quote: string): string => unquoted(stripMarker(unquoted(quote)))
+
 const quotedSource = (quote: string, sources: ReadonlyArray<RuleSource>): RuleSource | undefined => {
-  const wanted = stripMarker(unquoted(quote))
+  const wanted = normalizedQuote(quote)
   return wanted === "" ? undefined : sources.find((source) => sentencesAndLinesOf(source.text).some((segment) => holdsClause(segment, wanted)))
 }
 
@@ -147,16 +149,32 @@ const askedBackEarlier = (items: ReadonlyArray<OpenItem>, current: OpenItem): Re
       ? [{ id, text: item.text, question: item.decision.question }]
       : [])
 
-const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlier: ReadonlyArray<Earlier>, kind: AttentionItem["kind"]): Verdict => {
+const optionLine = /^[A-Z]\) (.*?)(?: \(picture: .+\))?$/
+
+// orc_ask folds its options into the question's text, so the options the decider may recommend are read back from that text.
+const optionTexts = (question: string): ReadonlyArray<string> =>
+  question.split("\n").flatMap((line) => {
+    const found = optionLine.exec(line.trim())
+    return found === null ? [] : [found.at(1) ?? ""]
+  })
+
+const escalation = (reply: Extract<Reply, { readonly decision: "escalate" }>, question: string): Verdict => {
+  const recommended = typeof reply.recommendation === "string" ? reply.recommendation.trim() : undefined
+  return recommended !== undefined && recommended !== "" && optionTexts(question).includes(recommended)
+    ? { kind: "escalated", reason: reply.reason, recommendation: recommended }
+    : { kind: "escalated", reason: reply.reason }
+}
+
+const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlier: ReadonlyArray<Earlier>, kind: AttentionItem["kind"], question: string): Verdict => {
   switch (reply.decision) {
     case "escalate": {
-      return { kind: "escalated", reason: reply.reason }
+      return escalation(reply, question)
     }
     case "answer": {
       const found = quotedSource(reply.rule, sources)
       return found === undefined
         ? { kind: "escalated", reason: "the decider answered " + JSON.stringify(reply.answer) + " on a rule in none of the rules it read word for word from a clause start to a clause end: " + JSON.stringify(reply.rule) }
-        : { kind: "answered", words: reply.answer.trim(), basis: { kind: "rule", quote: stripMarker(unquoted(reply.rule)), source: found.source, reason: reply.reason } }
+        : { kind: "answered", words: reply.answer.trim(), basis: { kind: "rule", quote: normalizedQuote(reply.rule), source: found.source, reason: reply.reason } }
     }
     case "duplicate": {
       const linked = earlier.find((entry) => entry.id === reply.of.trim())
@@ -171,6 +189,8 @@ const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlie
     }
   }
 }
+
+const policyRules = (policy: string): string => /^## Rules\s*\n([\s\S]*?)(?=^##\s|$(?![\s\S]))/m.exec(policy)?.[1] ?? ""
 
 const deciderPolicyFile = (): string => bundledAgentsDir() + "/decider-policy.md"
 
@@ -222,7 +242,7 @@ const askOne = (ask: AskDecider, policy: string, root: string, task: TaskRecord,
     if (rules.kind === "unread") {
       return { kind: "escalated", reason: rules.reason } satisfies Verdict
     }
-    const quotable: ReadonlyArray<RuleSource> = [...rules.written, { source: "decider policy", text: policy }, { source: "task " + task.spec.id, text: task.spec.body }]
+    const quotable: ReadonlyArray<RuleSource> = [...rules.written, { source: "decider policy", text: policyRules(policy) }, { source: "task " + task.spec.id, text: task.spec.body }]
     const items = yield* taskItems(root, task.spec.id)
     const earlier = answeredEarlier(items, entry.id)
     const askedBack = askedBackEarlier(items, entry)
@@ -230,7 +250,7 @@ const askOne = (ask: AskDecider, policy: string, root: string, task: TaskRecord,
     return yield* ask.ask({ policy, prompt }).pipe(
       Effect.map((text): Verdict => {
         const reply = readReply(text)
-        return typeof reply === "string" ? { kind: "escalated", reason: reply } : checkedVerdict(reply, quotable, earlier, entry.item.kind)
+        return typeof reply === "string" ? { kind: "escalated", reason: reply } : checkedVerdict(reply, quotable, earlier, entry.item.kind, question.text)
       }),
       Effect.catchTag("DeciderUnheard", (error) => Effect.succeed<Verdict>({ kind: "escalated", reason: "the decider was not heard: " + error.reason }))
     )
@@ -250,7 +270,7 @@ const settle = (root: string, task: TaskRecord, question: ParkedQuestion, entry:
   Effect.gen(function*() {
     const item = entry.id
     if (verdict.kind === "escalated") {
-      yield* recordDecision(root, item, { kind: "escalated", reason: verdict.reason, at })
+      yield* recordDecision(root, item, { kind: "escalated", reason: verdict.reason, ...(verdict.recommendation === undefined ? {} : { recommendation: verdict.recommendation }), at })
       return verdict
     }
     yield* recordDecision(root, item, decisionOf(verdict, at))

@@ -13,11 +13,22 @@ It uses `orc/<task-id>`, or `orc/<task-id>-parent` for a parent.
 The run uses `--sandbox none` and the selected provider.
 A token account also supplies `--token-file`.
 
-### Select models
+### Select models and thinking levels
 
 `ORC_TASK_IMPLEMENTER_MODEL` and `ORC_TASK_FIXER_MODEL` select the run's models.
 A model in an agent file takes precedence.
 Without the variables, the run uses its config or agent files.
+
+`ORC_TASK_IMPLEMENTER_THINKING` and `ORC_TASK_FIXER_THINKING` select the run's thinking levels.
+The runner passes them to `orc run` as `--implementer-thinking` and `--fixer-thinking`.
+A handed level takes precedence over the `thinking` line of the agent file.
+The level is one of `off`, `minimal`, `low`, `medium`, `high` or `xhigh`.
+The runner refuses any other level before it queues the run.
+The run history records the handed level on the step row.
+Without the variables, the run uses the agent file's `thinking` line.
+
+The beat sets none of these four variables yet.
+They stay unset until the routes task lands.
 
 ### Queue limits and files
 

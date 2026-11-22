@@ -49,6 +49,8 @@ const invocations: ReadonlyArray<Invocation> = [
   call(["heavy", "check"]),
   call(["heavy", "watch"]),
   call(["heavy", "watch-once"]),
+  call(["version"], [], ["--json"]),
+  call(["machines"], [], ["--json"]),
   call(["chat"]),
   call(["app", "install"])
 ]
@@ -66,9 +68,9 @@ const entryOf = (invocation: Invocation) => {
   return topic.entry
 }
 
-const parserFlags = ["--json", "--local", "--kind", "--delivery", "--branch", "--sandbox", "--token-file", "--provider", "--implementer-model", "--fixer-model", "--instructions", "--allow", "--answer", "--internal", "--machine", "--parent", "--depends-on", "--reason", "--until", "--question", "--expect", "--generation", "--on", "--clear", "--drop", "--basis", "--priority", "--label", "--stdin-label", "--force", "--dry-run", "--all", "--verbose", "--session"]
+const parserFlags = ["--json", "--local", "--kind", "--delivery", "--branch", "--sandbox", "--token-file", "--provider", "--implementer-model", "--fixer-model", "--implementer-thinking", "--fixer-thinking", "--instructions", "--allow", "--answer", "--internal", "--machine", "--parent", "--depends-on", "--reason", "--until", "--question", "--expect", "--generation", "--on", "--clear", "--drop", "--basis", "--priority", "--label", "--stdin-label", "--force", "--dry-run", "--all", "--verbose", "--session"]
 
-const values = ["", "x", "1", "orc-1", "q=1", "2026-12-01", "ship", "no-mistakes", "none", "ask-user", "parked", "yolo-green"]
+const values = ["", "x", "1", "orc-1", "q=1", "2026-12-01", "ship", "no-mistakes", "none", "ask-user", "parked", "yolo-green", "high"]
 
 const flagPlacements = (invocation: Invocation, probe: ReadonlyArray<string>): Array<Array<string>> => {
   const [first = "", ...rest] = invocation.positionals
@@ -101,7 +103,7 @@ const overviewNames = (text: string): Array<string> => [...text.matchAll(/^ {2}(
 describe("orc help", () => {
   test("the overview lists every top-level command instead of a partial or padded list", () => {
     const listed = overviewNames(overview())
-    expect(listed.toSorted()).toEqual(["app", "attention", "backlog", "beat", "chat", "heavy", "log", "merge", "refusals", "run", "runner", "runs", "score", "show"])
+    expect(listed.toSorted()).toEqual(["app", "attention", "backlog", "beat", "chat", "heavy", "log", "machines", "merge", "refusals", "run", "runner", "runs", "score", "show", "update", "version"])
     expect(listed).toEqual(expect.arrayContaining(["run", "runs", "show", "score", "chat", "backlog", "beat", "merge", "runner"]))
   })
 

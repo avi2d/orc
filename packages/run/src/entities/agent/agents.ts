@@ -5,13 +5,13 @@ export class AgentFileError extends Data.TaggedError("AgentFileError")<{
   readonly message: string
 }> {}
 
-export type AgentKind = "implementer" | "fixer"
+export type AgentKind = "implementer" | "fixer" | "reviewer"
 
 type AgentSource = "personal" | "project" | "bundled"
 
-const piThinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh"] as const
+export const piThinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh"] as const
 
-type PiThinkingLevel = typeof piThinkingLevels[number]
+export type PiThinkingLevel = typeof piThinkingLevels[number]
 
 export interface AgentFile {
   readonly kind: AgentKind
@@ -41,7 +41,7 @@ export interface ParsedAgentFile extends Omit<AgentFile, "model"> {
 
 const isHeaderKey = (key: string): key is HeaderKey => (headerKeys as ReadonlyArray<string>).includes(key)
 
-const isThinkingLevel = (value: string): value is PiThinkingLevel =>
+export const isThinkingLevel = (value: string): value is PiThinkingLevel =>
   (piThinkingLevels as ReadonlyArray<string>).includes(value)
 
 const fail = (path: string, detail: string): Effect.Effect<never, AgentFileError> =>
@@ -153,6 +153,7 @@ export const resolveAgentFile = (
     readonly orcHome: string
     readonly agentsDir?: string | undefined
     readonly configModel: { readonly file: string; readonly model: string | undefined }
+    readonly thinking?: PiThinkingLevel | undefined
   }
 ): Effect.Effect<AgentFile, AgentFileError, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function*() {
@@ -167,7 +168,7 @@ export const resolveAgentFile = (
         if (model === undefined) {
           return yield* fail(location.path, "names no model and " + options.configModel.file + " names no " + kind + " model, so name one in either")
         }
-        return { ...parsed, model }
+        return { ...parsed, model, thinking: options.thinking ?? parsed.thinking }
       }
     }
     return yield* new AgentFileError({ message: "orc: no " + kind + ".md agent file found beside the bundled ones" })

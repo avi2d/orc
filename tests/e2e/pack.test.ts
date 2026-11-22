@@ -18,6 +18,7 @@ const expectedFiles = [
   "agents/decider-policy.md",
   "agents/fixer.md",
   "agents/implementer.md",
+  "agents/reviewer.md",
   "dist/herdr-app/keys.json",
   "dist/herdr-app/layouts/orc.json",
   "dist/herdr-app/layouts/orc.svg",
@@ -29,6 +30,8 @@ const expectedFiles = [
   "dist/herdr-app/mods/orc-changes/mod.json",
   "dist/herdr-app/mods/orc-drawer/main.js",
   "dist/herdr-app/mods/orc-drawer/mod.json",
+  "dist/herdr-app/mods/orc-inbox/main.js",
+  "dist/herdr-app/mods/orc-inbox/mod.json",
   "dist/herdr-app/mods/orc-resources/main.js",
   "dist/herdr-app/mods/orc-resources/mod.json",
   "dist/herdr-app/mods/orc-tabs/main.js",
@@ -69,6 +72,7 @@ const expectedFiles = [
   "src/features/running-a-task/context-mark.ts",
   "src/shared/config/delivery.ts",
   "src/shared/config/index.ts",
+  "src/entities/pull-request/ci-verdict.ts",
   "src/entities/pull-request/direct-pr.ts",
   "src/entities/events/alert-events.ts",
   "src/features/queueing-a-task/alert-stream.ts",
@@ -95,6 +99,7 @@ const expectedFiles = [
   "src/entities/token/index.ts",
   "src/entities/task-copy/index.ts",
   "src/entities/attention/beat-action.ts",
+  "src/entities/attention/beat-items.ts",
   "src/widgets/beat/beat-attention.ts",
   "src/widgets/beat/beat-close.ts",
   "src/widgets/beat/beat-origin.ts",
@@ -185,6 +190,7 @@ const expectedFiles = [
   "src/entities/agent/pi-run.ts",
   "src/entities/agent/pi.ts",
   "src/features/running-a-task/report-run.ts",
+  "src/features/running-a-task/run-args.ts",
   "src/entities/run-history/report.ts",
   "src/features/running-a-task/run-deliverer.ts",
   "src/features/running-a-task/run-exec.ts",
@@ -212,6 +218,7 @@ const expectedFiles = [
   "src/entities/task-copy/task-copy.ts",
   "src/entities/backlog/task-kind.ts",
   "src/entities/backlog/task-record-decision.ts",
+  "src/entities/backlog/task-record-question.ts",
   "src/shared/lib/index.ts",
   "src/shared/process/index.ts",
   "src/shared/sandbox/index.ts",
@@ -233,10 +240,13 @@ const expectedFiles = [
   "src/features/decider/index.ts",
   "src/features/merging-a-pr/index.ts",
   "src/features/seeing-runs/index.ts",
+  "src/features/seeing-runs/machine-versions.ts",
   "src/features/seeing-runs/other-machines.ts",
   "src/features/task-thread/index.ts",
   "src/features/task-thread/note.ts",
-  "src/features/task-thread/thread.ts"
+  "src/features/task-thread/thread.ts",
+  "src/features/updating-orc/index.ts",
+  "src/features/updating-orc/update.ts"
 ]
 
 const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => {

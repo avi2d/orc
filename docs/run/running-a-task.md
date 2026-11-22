@@ -74,7 +74,8 @@ If the wait ends without an answer, the task parks.
 
 To resume a refused gate, pass `--answer question-<id>="<text>"`.
 To give no-mistakes guidance for a finding, use `--answer <finding-id>="<text>"`.
-Use `--allow ask-user` to decline the questions and accept the other findings.
+Use `--allow ask-user` to decline findings marked exactly `ask-user`.
+Findings with any other action still wait as questions.
 For another refusal, rerun with `--allow` and the kind named in the report.
 
 ## Resume a run
@@ -91,15 +92,20 @@ It also leaves a reused worktree outside `$ORC_HOME` in place.
 ## Results
 
 A no-mistakes ship run succeeds when Pi completes with `ORC_COMPLETE` on its own line, the branch has a new commit, the checks pass, and no-mistakes opens the PR and reports green CI.
-A direct-PR run succeeds when Pi completes, the branch has a new commit, the checks pass, and the PR opens.
+A direct-PR run succeeds when Pi completes, the branch has a new commit, the checks pass, the PR opens, and the GitHub CI verdict on the pushed head is `passed`.
+A `pending` verdict ends the run waiting on CI without success.
+The waiting run records an open `ci-waiting` question and keeps its history row running, so the beat parks the task instead of closing it failed or done.
 A stopped or failed run exits with status 1 and records the reason.
 See [Merging a task's PR](merging-a-tasks-pr.md) for what follows.
 
 ## Model and worktree details
 
 Orc loads the implementer agent from `$ORC_HOME/agents/implementer.md`, then the project's `.orc/agents/implementer.md`, then the bundled file.
-An agent's model comes from its file, its role's model flag, or `config.json`, in that order.
-Both agents must use a configured provider, and the implementer and fixer must use the same provider.
+The fixer agent loads the same way from `fixer.md`.
+The reviewer agent file is `$ORC_HOME/agents/reviewer.md`, then the project's `.orc/agents/reviewer.md`, then the bundled `packages/run/agents/reviewer.md`.
+The bundled reviewer prints its findings as a JSON array with `id`, `file`, `line`, `severity`, `action` and `description` for each finding.
+An implementer or fixer model comes from its file, its role's model flag, or `config.json`, in that order.
+The implementer and the fixer must use a configured provider, and both must use the same provider.
 Orc refuses models absent from Pi or with a context window of 150,000 tokens or less.
 Pi compacts context at 150,000 tokens in the default sandbox.
 For `--sandbox none` with a Pi login provider, Pi uses your own compaction settings.

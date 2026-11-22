@@ -39,6 +39,8 @@ const withAskDir = async (body: (dir: string) => Promise<void>): Promise<void> =
 const reply = (dir: string, stem: string, words: string): Promise<void> =>
   writeFile(join(dir, stem + replySuffix), JSON.stringify({ kind: "answer", id: "ask-1", question: "Which colour?", words }))
 
+const colour = { question: "Which colour?", options: [{ text: "Red", outcome: "The page turns red" }, { text: "Blue", outcome: "The page turns blue" }], recommendation: "Red" }
+
 const texts = (result: { readonly content: ReadonlyArray<unknown> } | undefined): ReadonlyArray<unknown> =>
   (result?.content ?? []).map((block) => typeof block === "object" && block !== null && "text" in block ? block.text : block)
 
@@ -47,7 +49,7 @@ describe("the orc_ask tool inside Pi", () => {
     await withAskDir(async (dir) => {
       const { tool } = loadAsk(dir)
       let settled = false
-      const pending = tool.execute("call-1", { question: "Which colour?", blocks: true }).then((result) => {
+      const pending = tool.execute("call-1", { ...colour, blocks: true }).then((result) => {
         settled = true
         return result
       })
@@ -63,7 +65,7 @@ describe("the orc_ask tool inside Pi", () => {
     await withAskDir(async (dir) => {
       const { tool, afterTool } = loadAsk(dir)
       const started = Date.now()
-      const result = await tool.execute("call-1", { question: "Which colour?", blocks: false })
+      const result = await tool.execute("call-1", { ...colour, blocks: false })
       expect(Date.now() - started).toBeLessThan(500)
       expect(result.content.map((block) => block.text).join("")).toContain("Carry on with the task")
       expect(afterTool({ content: [{ type: "text", text: "ls output" }] })).toBeUndefined()
@@ -76,9 +78,9 @@ describe("the orc_ask tool inside Pi", () => {
   test("a blocking ask writes its validated question to an ask file instead of relying on the raw tool args", async () => {
     await withAskDir(async (dir) => {
       const { tool } = loadAsk(dir)
-      const pending = tool.execute("call-7", { question: "  Which colour? ", context: "  ", options: [{ text: "  Red ", picture: " " }, { nope: 1 }], blocks: true, extra: "dropped" })
+      const pending = tool.execute("call-7", { question: "  Which colour? ", context: "  ", options: [{ text: "  Red ", outcome: " The page turns red ", picture: " " }], recommendation: " Red ", blocks: true, extra: "dropped" })
       const stored = JSON.parse(await readFile(join(dir, "call-7.ask.json"), "utf8"))
-      expect(stored).toEqual({ question: "Which colour?", blocks: true, options: [{ text: "Red" }] })
+      expect(stored).toEqual({ question: "Which colour?", blocks: true, options: [{ text: "Red", outcome: "The page turns red" }], recommendation: "Red" })
       await reply(dir, "call-7", "B")
       await pending
     })
@@ -88,7 +90,27 @@ describe("the orc_ask tool inside Pi", () => {
     await withAskDir(async (dir) => {
       const { tool } = loadAsk(dir)
       const result = await tool.execute("call-9", { question: "   ", blocks: true })
-      expect(result.content.map((block) => block.text).join("")).toContain("not asked")
+      expect(result.content.map((block) => block.text).join("")).toContain("did not ask the question")
+      expect(await readdir(dir)).toEqual([])
+    })
+  })
+
+  test("an option without an outcome is refused and never asked, instead of reaching the captain without what it leads to", async () => {
+    await withAskDir(async (dir) => {
+      const { tool } = loadAsk(dir)
+      const result = await tool.execute("call-3", { ...colour, options: [{ text: "Red", outcome: "The page turns red" }, { text: "Blue", outcome: "  " }], blocks: true })
+      expect(result.content.map((block) => block.text).join("")).toContain("option \"Blue\" has no outcome")
+      expect(await readdir(dir)).toEqual([])
+    })
+  })
+
+  test("a recommendation that names no listed option is refused and never asked, instead of reaching the captain without a pick", async () => {
+    await withAskDir(async (dir) => {
+      const { tool } = loadAsk(dir)
+      const missing = await tool.execute("call-4", { ...colour, recommendation: "Green", blocks: true })
+      expect(missing.content.map((block) => block.text).join("")).toContain("the recommendation \"Green\" names none of the listed options")
+      const absent = await tool.execute("call-5", { question: "Which colour?", options: colour.options, blocks: true })
+      expect(absent.content.map((block) => block.text).join("")).toContain("names none of the listed options")
       expect(await readdir(dir)).toEqual([])
     })
   })
@@ -96,7 +118,7 @@ describe("the orc_ask tool inside Pi", () => {
   test("a blocking ask's own answer is not also added to a later tool result", async () => {
     await withAskDir(async (dir) => {
       const { tool, afterTool } = loadAsk(dir)
-      const pending = tool.execute("call-1", { question: "Which colour?", blocks: true })
+      const pending = tool.execute("call-1", { ...colour, blocks: true })
       await reply(dir, "call-1", "B")
       await pending
       expect(afterTool({ content: [] })).toBeUndefined()
@@ -106,7 +128,7 @@ describe("the orc_ask tool inside Pi", () => {
   test("a correction to an answer already delivered joins the next tool result as a replacement once, instead of being dropped or read as a second answer", async () => {
     await withAskDir(async (dir) => {
       const { tool, afterTool } = loadAsk(dir)
-      const pending = tool.execute("call-1", { question: "Which colour?", blocks: true })
+      const pending = tool.execute("call-1", { ...colour, blocks: true })
       await reply(dir, "call-1", "B")
       await pending
       await writeFile(join(dir, "correction-ask-1-1" + replySuffix), JSON.stringify({ kind: "correction", id: "ask-1", question: "Which colour?", words: "R" }))

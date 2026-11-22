@@ -1,6 +1,6 @@
 {
   "name": "orc",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "private": true,
   "description": "One chat to run your AI agent work on all your machines and models, with a backlog, live monitoring and Herdr App dashboards.",
   "license": "MIT",
@@ -35,13 +35,8 @@
     "tasks-live-json": "bun packages/cli/src/bin.ts report tasks-live",
     "tasks-sample": "bun packages/cli/src/bin.ts sample tasks"
   },
-  "checks": {
-    "smoke": [
-      "tests/e2e/retired-name.test.ts"
-    ]
-  },
   "devDependencies": {
-    "@avi2dg/checks": "0.96.3",
+    "@avi2dg/checks": "0.112.0",
     "@avi2dg/orc-alerts": "workspace:*",
     "@avi2dg/orc-attention": "workspace:*",
     "@avi2dg/orc-cli": "workspace:*",

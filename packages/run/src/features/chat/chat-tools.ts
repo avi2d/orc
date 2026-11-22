@@ -1,10 +1,11 @@
 import { Effect, Schema } from "effect"
 import { isOpenHeld, type OpenHeld } from "./chat-backlog"
 import { type BoardHost, type Boards, boardsVar, decisionBoards } from "./chat-board"
+import { answerArgs } from "./chat-board-page"
 import type { Env } from "./chat-command"
 import { ChatToolError } from "./chat-error"
 import { type Deliver, postUnposted, type PostState, readBacklog } from "./chat-posts"
-import { AddTaskInput, AnswerInput, BoardInput, EditInput, HoldInput, MergeInput } from "./chat-inputs"
+import { AddTaskInput, AnswerInput, AttentionAnswerInput, BoardInput, EditInput, HoldInput, MergeInput } from "./chat-inputs"
 import { lavishLauncher } from "./chat-lavish"
 import { AttentionJson, parkedListing } from "./chat-parked"
 import { type ChatTool, decodeInput, runOrc, runTool, textResult } from "./chat-run"
@@ -82,6 +83,34 @@ const postOpenHeld = (env: Env, deliver: Deliver, state: PostState): Effect.Effe
     )
   )
 
+const attentionTools = (env: Env): ReadonlyArray<ChatTool> => [
+  {
+    name: "orc_attention",
+    label: "Read the orc attention queue",
+    description:
+      "Returns orc attention --json: every open item that waits on the captain or the decider, oldest first, with its id, kind, task, text, asked time and owner. Besides review questions it holds the check-red item for a PR whose check is red, the run-died item for a run that died on its machine, and the pr-ready item for a PR whose checks are green. orc_backlog_answer does not answer a check-red, run-died or pr-ready item; orc_attention_answer does.",
+    parameters: noParameters,
+    execute: () => Effect.runPromise(runOrc(env, ["attention", "--json"], null).pipe(Effect.map(textResult)))
+  },
+  {
+    name: "orc_attention_answer",
+    label: "Answer an orc attention item",
+    description:
+      "Records the captain's words through orc attention answer, word for word, and closes the one item named. Use it for a check-red, run-died or pr-ready item, which orc_backlog_answer does not answer. A review question, a worker question or an overdue wait is answered with orc_backlog_answer instead, and orc attention answer leaves it open.",
+    parameters: Schema.toJsonSchemaDocument(AttentionAnswerInput).schema,
+    execute: (_toolCallId, params) =>
+      runTool(AttentionAnswerInput, "orc_attention_answer", params, env, (input) => ["attention", "answer", input.id, input.words])
+  }
+]
+
+const machinesTool = (env: Env): ChatTool => ({
+  name: "orc_machines",
+  label: "Read the orc version on each machine",
+  description: "Returns orc machines --json: each dispatch machine with the orc version it runs, or the error for a machine that did not answer orc version --json --local through its start command within 10 seconds.",
+  parameters: noParameters,
+  execute: () => Effect.runPromise(runOrc(env, ["machines", "--json"], null).pipe(Effect.map(textResult)))
+})
+
 const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
   {
     name: "orc_backlog_add",
@@ -135,6 +164,7 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
       ])
   },
   priorityTool(env),
+  machinesTool(env),
   ...taskTools(env),
   {
     name: "orc_backlog_edit",
@@ -158,8 +188,9 @@ const chatTools = (env: Env, boards: Boards): ReadonlyArray<ChatTool> => [
     parameters: Schema.toJsonSchemaDocument(AnswerInput).schema,
     execute: (_toolCallId, params) =>
       runTool(AnswerInput, "orc_backlog_answer", params, env, (input) =>
-        ["backlog", "answer", input.id, input.question === undefined ? input.words : input.question + "=" + input.words])
+        answerArgs(input.id, input.question === undefined ? { kind: "reason" } : { kind: "question", id: input.question }, input.words))
   },
+  ...attentionTools(env),
   {
     name: "merge_task",
     label: "Merge an orc task's PR",
