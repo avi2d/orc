@@ -156,6 +156,44 @@ describe("the heavy stand-in", () => {
     expect(child.stdout).not.toContain("previous-run-tool")
   })
 
+  test("a stand-in written with no real tool runs the project's node_modules/.bin tool instead of exiting 127", async () => {
+    const root = await mkdtemp(join(tmpdir(), "orc-heavy-project-"))
+    harnesses.push({ root, bin: "", env: {}, pueueLog: async () => "" })
+    const bin = join(root, "bin")
+    const tools = join(root, "project", "node_modules", ".bin")
+    const inner = join(root, "project", "packages", "inner")
+    await mkdir(bin, { recursive: true })
+    await mkdir(tools, { recursive: true })
+    await mkdir(inner, { recursive: true })
+    await writeFile(join(tools, "oxlint"), "#!/bin/sh\necho project-oxlint \"$@\"\n", { mode: 0o755 })
+    const savedPath = process.env.PATH
+    let script = ""
+    try {
+      process.env.PATH = bin
+      script = await scriptOf("oxlint", { home: root, group: "heavy", wrap: "", through: null }, [])
+    } finally {
+      if (savedPath === undefined) {
+        delete process.env.PATH
+      } else {
+        process.env.PATH = savedPath
+      }
+    }
+    const missing = "/nonexistent-bun-for-heavy-test"
+    await writeFile(join(bin, "oxlint"), script, { mode: 0o755 })
+    await writeFile(join(bin, "oxlint-nobun"), script.split(process.execPath).join(missing), { mode: 0o755 })
+    for (const standin of ["oxlint", "oxlint-nobun"]) {
+      const child = spawnSync(join(bin, standin), ["src"], {
+        cwd: inner,
+        env: { PATH: bin + ":/usr/bin:/bin", HEAVY_QUEUE_BYPASS: "project tool test" },
+        encoding: "utf8",
+        timeout: 10_000
+      })
+      expect(child.error).toBeUndefined()
+      expect(child.status).toBe(0)
+      expect(child.stdout).toContain("project-oxlint src")
+    }
+  }, 30_000)
+
   test("a stand-in whose folder appears twice on PATH runs the real tool instead of itself", async () => {
     const harness = harnesses[harnesses.push(await setup(["bun"])) - 1]
     const child = spawnSync(join(harness.bin, "bun"), ["--version"], {
