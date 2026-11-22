@@ -102,7 +102,7 @@ On a machine without a backlog, the JSON command prints an empty queue.
 ## Run the attention tool
 
 To run the live attention panel, run `orc-dash panel attention`.
-It runs alone in a plain terminal or in a Herdr pane.
+It runs alone in a plain terminal or in a [Herdr](https://herdr.dev) pane.
 The panel reads `orc attention --json` on the machine it runs on and nothing else, and paints again every 10 seconds.
 The dashboard shows it by default, above the resources panel in a wide layout and second in the narrow glance, as [Lay out the dashboard](../dash-dashboard.md#lay-out-the-dashboard) shows.
 It shows each open item oldest first, with its task, its owner, its age and its kind, and its text below.

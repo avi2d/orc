@@ -10,7 +10,7 @@ Run one task by hand, to see a run from the task file to its pull request before
 - Bun, at the version `.bun-version` pins.
 - Git 2.48 or later, and Node.
 - Pi, the `@earendil-works/pi-coding-agent` npm package, logged in to a model provider.
-- no-mistakes, installed as [Installing no-mistakes](../run/installing-no-mistakes.md) says.
+- [no-mistakes](https://github.com/kunchenguid/no-mistakes), installed as [Installing no-mistakes](../run/installing-no-mistakes.md) says.
 - A project in a git checkout with a remote that no-mistakes can open a pull request on, such as GitHub.
 
 ## Install orc
@@ -62,7 +62,7 @@ To run it:
 
 Orc prints the branch, its commits, the checks, the review and the pull request link.
 `--sandbox none` runs the agent on the host as your user.
-With nono from https://nono.sh installed, drop the flag and the run works inside the nono sandbox.
+With [nono](https://nono.sh) installed, drop the flag and the run works inside the nono sandbox.
 
 ## See what happened
 

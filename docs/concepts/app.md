@@ -5,7 +5,7 @@ kind: explanation
 ---
 # The app and the dashboard
 
-Orc has two screens, a layout for the Herdr App and the `orc-dash` terminal dashboard, and neither holds any state of its own.
+Orc has two screens, a layout for the [Herdr App](https://herdr.dev) and the `orc-dash` terminal dashboard, and neither holds any state of its own.
 Both only run the `orc` commands and draw what those commands print, so the screens and the command line never disagree.
 
 ![The app and the dashboard: two screens over the same commands](../diagrams/app.svg)

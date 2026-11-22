@@ -3,7 +3,7 @@ kind: how-to
 ---
 # Show orc in the Herdr App
 
-The `orc` layout adds Board, Resources, Agents, and Inbox tabs to the Herdr App, with chat available on each tab.
+The `orc` layout adds Board, Resources, Agents, and Inbox tabs to the [Herdr App](https://herdr.dev), with chat available on each tab.
 Run `orc app install` after each orc upgrade to update the mods.
 The command builds mods from a checkout, so a separate `bun run build` is not needed.
 
