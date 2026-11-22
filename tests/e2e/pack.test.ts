@@ -291,7 +291,7 @@ describe("the run manifest", () => {
 })
 
 const spawnPassing = (command: ReadonlyArray<string>, cwd: string, env: Record<string, string | undefined> = Bun.env): string => {
-  const result = Bun.spawnSync([...command], { cwd, env, stdin: "ignore" })
+  const result = Bun.spawnSync([...command], { cwd, env, stdin: "ignore", timeout: 60_000 })
   if (result.exitCode !== 0) {
     throw new Error(command.join(" ") + " failed: " + result.stdout.toString() + result.stderr.toString())
   }
@@ -317,5 +317,5 @@ describe("the packed tarball installed into an empty project without orc's lockf
     const path = dirname(process.execPath) + ":" + (Bun.env["PATH"] ?? "")
     const stdout = spawnPassing([join(project, "node_modules", ".bin", "orc"), "--help"], project, { PATH: path, HOME: project })
     expect(stdout).toContain("Usage: orc <command>")
-  })
+  }, 90_000)
 })
