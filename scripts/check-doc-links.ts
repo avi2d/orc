@@ -19,7 +19,7 @@ const escaped = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, 
 const bare = (url: string): string => url.replace(/[#?].*$/, "").replace(/\/+$/, "")
 const pageOf = (source: string): string => source.replace(/^---\n[\s\S]*?\n---\n/, "").replace(fencePattern, "")
 const targetsOf = (page: string): Set<string> =>
-  new Set(targetPatterns.flatMap((pattern) => [...page.matchAll(pattern)].map((match) => bare(match[1] ?? ""))))
+  new Set(targetPatterns.flatMap((pattern) => [...page.matchAll(pattern)].map((match) => bare(match[1]))))
 const proseOf = (page: string): string => proseCuts.reduce((text, cut) => text.replace(cut, " "), page)
 const names = (prose: string, tool: OutsideTool): boolean =>
   new RegExp("(?<![\\p{L}\\p{N}_./-])" + escaped(tool.name) + "(?![\\p{L}\\p{N}_-])", "iu").test(prose)
