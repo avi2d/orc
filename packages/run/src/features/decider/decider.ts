@@ -118,8 +118,10 @@ const holdsClause = (segment: string, wanted: string): boolean => {
   return false
 }
 
+const normalizedQuote = (quote: string): string => unquoted(stripMarker(unquoted(quote)))
+
 const quotedSource = (quote: string, sources: ReadonlyArray<RuleSource>): RuleSource | undefined => {
-  const wanted = stripMarker(unquoted(quote))
+  const wanted = normalizedQuote(quote)
   return wanted === "" ? undefined : sources.find((source) => sentencesAndLinesOf(source.text).some((segment) => holdsClause(segment, wanted)))
 }
 
@@ -172,7 +174,7 @@ const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlie
       const found = quotedSource(reply.rule, sources)
       return found === undefined
         ? { kind: "escalated", reason: "the decider answered " + JSON.stringify(reply.answer) + " on a rule in none of the rules it read word for word from a clause start to a clause end: " + JSON.stringify(reply.rule) }
-        : { kind: "answered", words: reply.answer.trim(), basis: { kind: "rule", quote: stripMarker(unquoted(reply.rule)), source: found.source, reason: reply.reason } }
+        : { kind: "answered", words: reply.answer.trim(), basis: { kind: "rule", quote: normalizedQuote(reply.rule), source: found.source, reason: reply.reason } }
     }
     case "duplicate": {
       const linked = earlier.find((entry) => entry.id === reply.of.trim())
@@ -187,6 +189,8 @@ const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlie
     }
   }
 }
+
+const policyRules = (policy: string): string => /^## Rules\s*\n([\s\S]*?)(?=^##\s|$(?![\s\S]))/m.exec(policy)?.[1] ?? ""
 
 const deciderPolicyFile = (): string => bundledAgentsDir() + "/decider-policy.md"
 
@@ -238,7 +242,7 @@ const askOne = (ask: AskDecider, policy: string, root: string, task: TaskRecord,
     if (rules.kind === "unread") {
       return { kind: "escalated", reason: rules.reason } satisfies Verdict
     }
-    const quotable: ReadonlyArray<RuleSource> = [...rules.written, { source: "decider policy", text: policy }, { source: "task " + task.spec.id, text: task.spec.body }]
+    const quotable: ReadonlyArray<RuleSource> = [...rules.written, { source: "decider policy", text: policyRules(policy) }, { source: "task " + task.spec.id, text: task.spec.body }]
     const items = yield* taskItems(root, task.spec.id)
     const earlier = answeredEarlier(items, entry.id)
     const askedBack = askedBackEarlier(items, entry)

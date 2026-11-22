@@ -49,7 +49,7 @@ const correctInto = (home: string, task: string, label: string | null, correctio
     if (!(yield* writeWhole(file, JSON.stringify({ corrections: [...kept, ...corrections] })))) {
       return yield* refuse("cannot write " + file)
     }
-    return "handed the corrected " + corrections.map((entry) => entry.question).join(", ") + " to run " + run.id + " of " + task
+    return "queued corrections for " + corrections.map((entry) => entry.question).join(", ") + " for run " + run.id + " of " + task + "; delivery is not confirmed"
   })
 
 export const relayAnswers = (home: string, task: string, stdin: Effect.Effect<string, RunnerError>): Effect.Effect<string, RunnerError, RunnerRequirements> =>

@@ -14,6 +14,7 @@ export interface DeciderAnswer extends RelayedAnswer {
 export interface CaptainAnswer extends RelayedAnswer {
   readonly by?: "captain"
   readonly overturned?: DeciderAnswer
+  readonly correctionQueued?: boolean
 }
 
 export type ParkedAnswer = CaptainAnswer | DeciderAnswer
@@ -33,6 +34,7 @@ interface AnswerFront {
   readonly used?: boolean | undefined
   readonly answered_by?: typeof deciderAnswerKinds[number] | undefined
   readonly overturned?: typeof OverturnedFront.Type | undefined
+  readonly correction_queued?: boolean | undefined
 }
 
 export const parkedAnswerOf = (question: AnswerFront, answer: Answer): ParkedAnswer => {
@@ -41,7 +43,8 @@ export const parkedAnswerOf = (question: AnswerFront, answer: Answer): ParkedAns
     return { ...answer, relayedTo, by: question.answered_by }
   }
   const overturned = question.overturned
+  const queued = question.correction_queued === true ? { correctionQueued: true as const } : {}
   return overturned === undefined
-    ? { ...answer, relayedTo }
-    : { ...answer, relayedTo, overturned: { words: overturned.answer, at: overturned.answered_at, by: overturned.answered_by, relayedTo: overturned.relayed_to ?? null } }
+    ? { ...answer, relayedTo, ...queued }
+    : { ...answer, relayedTo, ...queued, overturned: { words: overturned.answer, at: overturned.answered_at, by: overturned.answered_by, relayedTo: overturned.relayed_to ?? null } }
 }

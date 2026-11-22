@@ -123,7 +123,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/queueing-a-task/runner.ts` | The runner: the start, the kill and the token renewal through pueue |
 | `packages/run/src/features/queueing-a-task/runner-instructions.ts` | The project instructions a start carries to the machine that queues the run |
 | `packages/run/src/features/queueing-a-task/runner-result.ts` | The reading of a task's result and the `orc.runner.v1` JSON |
-| `packages/run/src/features/queueing-a-task/runner-answer.ts` | `orc runner answer`: the answers it hands an asking run and the corrected answers it hands a live run, locally or through a machine's command |
+| `packages/run/src/features/queueing-a-task/runner-answer.ts` | `orc runner answer`: the answers it hands an asking run and the corrected answers it queues for a live run, locally or through a machine's command |
 | `packages/run/src/features/queueing-a-task/hold.ts` | `orc runner hold`: the wait for a live token, the rerun and the folder removal |
 | `packages/run/src/features/queueing-a-task/cli-stop.ts` | The stop of a started task: the kill, the result read and the close as stopped |
 
