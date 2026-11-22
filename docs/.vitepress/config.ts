@@ -134,6 +134,7 @@ const reference = [
   page("How orc runs Pi", "/run/how-orc-runs-pi"),
   page("Running without a sandbox", "/run/running-without-a-sandbox"),
   page("Configuring providers", "/run/configuring-providers"),
+  page("Account folders and orc login", "/run/accounts"),
   page("The runner", "/run/runner"),
   page("The heavy queue", "/run/heavy-queue"),
   page("Parked runs", "/run/parked-runs"),
