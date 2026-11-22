@@ -66,7 +66,7 @@ A window past its reset holds no trailing-hour spend once that reset is an hour 
 ## Headless processes
 
 A headless process takes its folder's newest log only when it is the only process of its harness there.
-It also needs no Herdr pane of that harness to name a log there or run there.
+It also needs no [Herdr](https://herdr.dev) pane of that harness to name a log there or run there.
 Otherwise the panel names the processes that share the folder, and the folder's logs read as ended.
 
 ## Print reports and alerts
