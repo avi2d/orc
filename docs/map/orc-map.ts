@@ -16,7 +16,7 @@ export const arrowMeanings = {
   ask: "A question or news on its way, and the answer back"
 } satisfies Record<LinkTone, string>
 
-export interface PartDetails {
+interface PartDetails {
   readonly text?: string
   readonly points?: readonly string[]
 }
@@ -341,7 +341,7 @@ export const links: readonly MapLink[] = [
 ]
 
 // A phone card is 168 px wide, which fits about 23 characters of 12.5 px text a line, so 40 characters stay within two lines.
-export const shortLimit = 40
+const shortLimit = 40
 
 export const overLimit = (list: readonly MapPart[]): readonly string[] =>
   list.filter((part) => part.short.length > shortLimit).map((part) => `${part.id} has ${part.short.length.toString()} characters of short text, over ${shortLimit.toString()}`)
