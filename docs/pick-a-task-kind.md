@@ -15,7 +15,7 @@ Add `--kind scout`, `--kind task` or `--kind parent` to `orc run`.
 A decision never runs, so `orc run --kind decision` is refused.
 To split a large task, add a parent and its children, as [Parent tasks](run/task-kinds.md#parent-tasks) shows.
 To split an over budget request at intake, name a planner model, as [Splitting at intake](run/task-kinds.md#splitting-at-intake) shows.
-A scout or task run skips no-mistakes and the pull request.
+A scout or task run skips [no-mistakes](https://github.com/kunchenguid/no-mistakes) and the pull request.
 Pi works in the run folder and writes `agent-report.md` there.
 A scout or task closes done with the report's path, or closes failed when no report exists.
 To keep a task on one machine, add `--machine <name>`, and it waits for room there instead of starting elsewhere.
