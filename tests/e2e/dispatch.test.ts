@@ -296,6 +296,25 @@ describe("orc beat", () => {
     })
   }, beatTimeout)
 
+  test("subquo read --json resolves account second instead of naming it unusable, and orc-quota still runs after the switch back", async () => {
+    await withFixture({ mac: 1, linux: 0, floorPercent: 15 }, async (fixture) => {
+      const observedAt = new Date().toISOString()
+      const validUntil = new Date(Date.parse(observedAt) + 600_000).toISOString()
+      const fresh = (percentLeft: number) => ({ status: "fresh", observedAt, source: "provider", validUntil, windows: [{ id: "weekly", scope: "all", percentLeft, resetsAt: validUntil }] })
+      const snapshot = { version: "subquo.v1", writtenAt: observedAt, accounts: [{ id: "main", provider: "claude", observation: fresh(40) }, { id: "second", provider: "claude", observation: fresh(80) }] }
+      await writeFile(join(fixture.dir, "bin", "subquo"), "#!/bin/sh\n[ \"$*\" = 'read --json' ] || exit 3\ncat <<'J'\n" + JSON.stringify(snapshot) + "\nJ\n")
+      await chmod(join(fixture.dir, "bin", "subquo"), 0o755)
+      const dispatch = join(fixture.dir, "home", "backlog", "dispatch.json")
+      const machines = [{ name: "mac", slots: 1, start: ["true"] }, { name: "linux", slots: 0, start: ["true"] }]
+      await writeFile(dispatch, JSON.stringify({ machines, quota: { ...quotaConfig(15), command: ["subquo", "read", "--json"] } }))
+      await addTasks(fixture, 1)
+      expect(await orcOk(fixture, ["beat"])).toContain("second 80% left until " + validUntil + ", floor 15%: runs use second\nroom: mac 0 of 1 busy, linux 0 of 0 busy\nstarted orc-1 on mac with second")
+      await writeFile(dispatch, JSON.stringify({ machines: machines.map((machine) => ({ ...machine, slots: machine.name === "mac" ? 2 : 0 })), quota: quotaConfig(15) }))
+      await addTasks(fixture, 1)
+      expect(await orcOk(fixture, ["beat"])).toMatch(/quota: main 40% left, second 80% left, floor 15%: runs use second\n.*\nstarted orc-2 on mac with second/)
+    })
+  }, beatTimeout)
+
   test("a quota command that fails starts nothing instead of running on an unread account", async () => {
     await withFixture({ mac: 4, linux: 4, floorPercent: 15 }, async (fixture) => {
       await writeFile(join(fixture.dir, "bin", "orc-quota"), "#!/bin/sh\nexit 4\n")

@@ -15,15 +15,22 @@ You name the accounts and the command that reads their room once, in the `quota`
 Each beat runs the quota command with no input, before it takes any task.
 The command prints one JSON document with an entry for each account.
 The entry gives the percent of room left, from 0 to 100, or the reason the account cannot run.
-Orc reads two shapes: its own `orc.quota.v1` document, and the document `quota-axi --full --json --provider <id>` prints.
-A command that fails, runs past 15 seconds or prints anything else leaves the quota unread, and that beat starts nothing.
+Orc reads three shapes: its own `orc.quota.v1` document, the document `quota-axi --full --json --provider <id>` prints, and the `subquo.v1` snapshot `subquo read --json` prints.
+A command that is not installed, fails, runs past 15 seconds or prints anything else leaves the quota unread, and that beat starts nothing.
+
+To read quota from subquo, set the quota command to `["subquo", "read", "--json"]`.
+To go back to the earlier reader, such as clauth, set the command back to it.
+An account's room in a subquo snapshot is the smallest `percentLeft` among its windows with scope `all`.
+A window that covers one model only does not limit the account.
+An account whose reading is stale, unavailable, past its `validUntil` or has an unknown percent or reset cannot run.
+A quota account the snapshot does not name leaves the whole quota unread, since the subquo account list and the quota accounts then differ.
 
 ## The choice
 
 An account can run when its room is above 0% and at or above `floorPercent`.
 Without a `floorPercent` there is no floor.
 Among the accounts that can run, the beat picks the one with the most room, and the tasks that beat starts take it.
-An account the quota document does not name cannot run.
+An account an `orc.quota.v1` or quota-axi document does not name cannot run.
 
 The quota names one provider, and every account in it belongs to that provider.
 That provider is one `~/.orc/config.json` defines on each machine that runs tasks.

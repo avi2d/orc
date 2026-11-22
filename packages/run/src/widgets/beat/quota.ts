@@ -1,11 +1,8 @@
-import { DateTime, Duration, Effect, Result, Schema } from "effect"
+import { Clock, DateTime, Effect, Result, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { spawnedQuiet } from "../../shared/process/index"
 import { duplicateOf } from "../../shared/config/index"
-
-type AccountReading =
-  | { readonly account: string; readonly kind: "usable"; readonly remainingPercent: number; readonly resetsAt?: string }
-  | { readonly account: string; readonly kind: "unusable"; readonly reason: string }
+import { type AccountReading, runQuotaCommand } from "./quota-command"
+import { decodeSubquo, isSubquoDocument } from "./subquo"
 
 export type QuotaReading =
   | { readonly kind: "unread"; readonly reason: string }
@@ -51,8 +48,6 @@ const QuotaAxiProvider = Schema.Struct({
 type QuotaAxiProvider = typeof QuotaAxiProvider.Type
 
 const QuotaAxiDocument = Schema.Struct({ schemaVersion: Schema.Finite, providers: Schema.Array(QuotaAxiProvider) })
-
-const quotaSeconds = 15
 
 const accountKeysOf = (entry: QuotaAxiProvider): ReadonlyArray<string> => [...new Set([...(entry.accountKey === undefined ? [] : [entry.accountKey]), ...(entry.accountKeys ?? [])])]
 
@@ -120,11 +115,7 @@ const readAccounts = (document: unknown, settings: QuotaSettings): QuotaReading 
   return settings.accounts.map(({ name }) => readAccount(decoded.success.accounts.find((entry) => entry.name === name), name))
 }
 
-export const assessQuota = (document: unknown, settings: QuotaSettings): QuotaReading => {
-  const accounts = readAccounts(document, settings)
-  if ("kind" in accounts) {
-    return accounts
-  }
+const choose = (accounts: ReadonlyArray<AccountReading>, settings: QuotaSettings): QuotaReading => {
   let pick: { readonly account: string; readonly remainingPercent: number } | null = null
   for (const reading of accounts) {
     if (reading.kind === "usable" && reading.remainingPercent > 0 && reading.remainingPercent >= settings.floorPercent && reading.remainingPercent > (pick?.remainingPercent ?? -1)) {
@@ -134,29 +125,28 @@ export const assessQuota = (document: unknown, settings: QuotaSettings): QuotaRe
   return { kind: "read", floorPercent: settings.floorPercent, accounts, pick: pick?.account ?? null }
 }
 
+export const assessQuota = (document: unknown, settings: QuotaSettings): QuotaReading => {
+  const accounts = readAccounts(document, settings)
+  return "kind" in accounts ? accounts : choose(accounts, settings)
+}
+
+export const assessSubquo = (document: unknown, settings: QuotaSettings, nowMillis: number): QuotaReading => {
+  const read = decodeSubquo(document, settings.accounts.map((account) => account.name), nowMillis)
+  return read.kind === "ok" ? choose(read.accounts, settings) : { kind: "unread", reason: read.reason }
+}
+
 export const readQuota = (
   settings: QuotaSettings
-): Effect.Effect<QuotaReading, never, ChildProcessSpawner.ChildProcessSpawner> => {
-  const [program, ...args] = settings.command
-  return Effect.gen(function*() {
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const [stdout, exitCode] = yield* spawnedQuiet(spawner, program, args)
-    if (exitCode !== 0) {
-      return { kind: "unread", reason: "the quota command " + program + " exited " + exitCode } satisfies QuotaReading
+): Effect.Effect<QuotaReading, never, ChildProcessSpawner.ChildProcessSpawner> =>
+  Effect.gen(function*() {
+    const run = yield* runQuotaCommand(settings.command)
+    if (run.kind === "failed") {
+      return { kind: "unread", reason: run.reason } satisfies QuotaReading
     }
-    const parsed = yield* Effect.try({ try: (): unknown => JSON.parse(stdout), catch: () => "the quota command " + program + " printed no JSON" })
-    return assessQuota(parsed, settings)
-  }).pipe(
-    Effect.scoped,
-    Effect.timeoutOrElse({
-      duration: Duration.seconds(quotaSeconds),
-      orElse: () => Effect.fail("the quota command " + program + " ran past " + quotaSeconds + " seconds")
-    }),
-    Effect.catch((error) =>
-      Effect.succeed<QuotaReading>({ kind: "unread", reason: typeof error === "string" ? error : "the quota command " + program + " did not run: " + error.message })
-    )
-  )
-}
+    return isSubquoDocument(run.document)
+      ? assessSubquo(run.document, settings, yield* Clock.currentTimeMillis)
+      : assessQuota(run.document, settings)
+  })
 
 export const describeQuota = (reading: QuotaReading): string => {
   if (reading.kind === "unread") {
