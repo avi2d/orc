@@ -23,7 +23,7 @@
     "test:live": "checks-test --tier=live",
     "docs:diagrams": "bun scripts/docs-diagrams.ts",
     "docs:dev": "vitepress dev docs",
-    "docs:check": "bun scripts/check-doc-sections.ts && bun scripts/check-doc-links.ts",
+    "docs:check": "bun scripts/check-doc-sections.ts",
     "docs:build": "bun run docs:check && vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "dashboard": "bun packages/cli/src/bin.ts",

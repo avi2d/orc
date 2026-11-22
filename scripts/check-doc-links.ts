@@ -11,7 +11,7 @@ class CheckDocLinksError extends Data.TaggedError("CheckDocLinksError")<{
   readonly message: string
 }> {}
 
-const fencePattern = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[^\n]*$/gm
+const fencePattern = /^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?^[ \t]*\1[^\n]*$/gm
 const targetPatterns = [/\]\(\s*<?([^)\s>]+)/g, /^\s*\[[^\]]+\]:\s*<?(\S+?)>?(?:\s|$)/gm, /<(https?:\/\/[^>\s]+)>/g, /href="([^"]+)"/g]
 const proseCuts = [/`+[^`\n]*`+/g, /!?\[[^\]]*\]\([^)]*\)/g, /!?\[[^\]]*\]\[[^\]]*\]/g, /^\s*\[[^\]]+\]:.*$/gm, /<[^>\n]*>/g, /https?:\/\/\S+/g]
 

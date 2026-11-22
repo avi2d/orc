@@ -33,3 +33,23 @@ test("rejects a mention in code, link text, a path or a longer word failing the 
   ].join("\n")
   expect(unlinked(source)).toEqual([])
 })
+
+const indentedFences = ["```", "~~~"].flatMap((fence) => ["  ", "\t"].map((indent) => [fence, indent]))
+
+test.each(indentedFences)("rejects counting tool mentions inside an indented %s fence with %j indentation", (fence, indent) => {
+  const source = ["1. Run:", indent + fence + "sh", indent + "nono run", indent + fence, ""].join("\n")
+  expect(unlinked(source)).toEqual([])
+  expect(unlinked(source + "\nnono is a sandbox.\n")).toEqual(["nono"])
+})
+
+test.each(indentedFences)("rejects counting a URL inside an indented %s fence with %j indentation as a page link", (fence, indent) => {
+  const source = [
+    "1. Run:",
+    indent + fence + "md",
+    indent + "[sandbox](https://nono.sh)",
+    indent + fence,
+    "",
+    "nono is a sandbox."
+  ].join("\n")
+  expect(unlinked(source)).toEqual(["nono"])
+})

@@ -29,11 +29,13 @@ Keep one topic on a page, use short sections with descriptive headings, and move
 Keep facts and examples readers need, but remove repetition and vague or promotional language.
 Read the rendered page as well as the source, and follow its links.
 `bun run docs:check` requires at most 300 words between consecutive headings.
-The check does not scan decision records.
-The same command fails a page that names a tool from `scripts/outside-tools.json` and never links that tool's URL, and `bun run lint` runs that link check too.
-Link the tool at its first mention, and add a new outside tool to that file with its home page.
-The check cannot judge whether the prose is clear, so review the text as well.
+The section check does not scan decision records.
+The section check cannot judge whether the prose is clear, so review the text as well.
 Generated references and decision records keep the structure their content needs.
+
+`bun run lint` also checks outside tool links.
+The link check fails a page that names a tool from `scripts/outside-tools.json` and never links that tool's URL.
+Link the tool at its first mention, and add a new outside tool to that file with its home page.
 
 ## Preview the docs site
 
