@@ -20,7 +20,7 @@ After 3 fix attempts with a check still red, the run ends failed and no pull req
 
 ## The review
 
-On a `no-mistakes` run, orc hands the checked branch to no-mistakes with the task as its intent.
+On a `no-mistakes` run, orc hands the checked branch to [no-mistakes](https://github.com/kunchenguid/no-mistakes) with the task as its intent.
 No-mistakes reviews the branch, pushes it, opens the pull request and reports when CI is green.
 At each of its gates orc answers for you where it safely can.
 

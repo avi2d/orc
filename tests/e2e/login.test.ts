@@ -7,7 +7,8 @@ import { join } from "node:path"
 const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathname
 
 const token = "sk-ant-oat01-" + "Q7f".repeat(30)
-const tokenShaped = /sk-ant-[A-Za-z0-9_-]{8,}/
+const codexToken = "sk-proj-" + "Z4k".repeat(30)
+const tokenShaped = /sk-(ant|proj)-[A-Za-z0-9_-]{8,}/
 const signInLink = "https://claude.ai/oauth/authorize?code=true"
 
 interface Fixture {
@@ -16,6 +17,7 @@ interface Fixture {
   readonly bin: string
   readonly claudeLog: string
   readonly browserLog: string
+  readonly codexLog: string
 }
 
 // The fake keeps the token in a regular file and makes the credential file a FIFO, so any read of it by orc blocks until the test kills orc.
@@ -39,18 +41,30 @@ const fakeTools = (browserLog: string): Record<string, string> => ({
   open: "#!/bin/sh\nprintf 'open %s\\n' \"$*\" >> '" + browserLog + "'\n"
 })
 
+const fakeCodex = (log: string): string =>
+  [
+    "#!/bin/sh",
+    "printf 'args=%s\\n' \"$*\" >> '" + log + "'",
+    "env >> '" + log + "'",
+    "printf '{\"token\":\"" + codexToken + "\"}' > \"$CODEX_HOME/session.json\"",
+    "mkfifo \"$CODEX_HOME/auth.json\"",
+    "echo 'Successfully logged in'",
+    ""
+  ].join("\n")
+
 const withFixture = async (body: (fixture: Fixture) => Promise<void>): Promise<void> => {
   const dir = await mkdtemp(join(tmpdir(), "orc-login-e2e-"))
   try {
     const bin = join(dir, "bin")
     const claudeLog = join(dir, "claude.log")
     const browserLog = join(dir, "browser.log")
+    const codexLog = join(dir, "codex.log")
     await mkdir(bin, { recursive: true })
-    for (const [name, script] of Object.entries({ claude: fakeClaude(claudeLog), ...fakeTools(browserLog) })) {
+    for (const [name, script] of Object.entries({ claude: fakeClaude(claudeLog), codex: fakeCodex(codexLog), ...fakeTools(browserLog) })) {
       await writeFile(join(bin, name), script)
       await chmod(join(bin, name), 0o755)
     }
-    await body({ dir, home: join(dir, "home"), bin, claudeLog, browserLog })
+    await body({ dir, home: join(dir, "home"), bin, claudeLog, browserLog, codexLog })
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
@@ -62,7 +76,7 @@ const login = async (fixture: Fixture, account: string, env: Record<string, stri
     stdout: "pipe",
     stderr: "pipe",
     cwd: fixture.dir,
-    env: { ...process.env, ORC_HOME: fixture.home, PATH: fixture.bin + ":" + (process.env.PATH ?? ""), SSH_CONNECTION: "", SSH_TTY: "", BROWSER: "", FAKE_ACCOUNT: account, ...env }
+    env: { ...process.env, ORC_HOME: fixture.home, PATH: fixture.bin + ":" + (process.env.PATH ?? ""), SSH_CONNECTION: "", SSH_TTY: "", DISPLAY: ":0", WAYLAND_DISPLAY: "", BROWSER: "", FAKE_ACCOUNT: account, ...env }
   })
   let killed = false
   const deadline = setTimeout(() => {
@@ -104,6 +118,27 @@ describe("orc login", () => {
       expect(await readFile(join(second, "account"), "utf8")).toBe("claude-second")
     })
   }, 60_000)
+
+  test("runs the Claude sign-in with only the claude-main folder and leaves every other account folder alone", async () => {
+    await withFixture(async (fixture) => {
+      const main = join(fixture.home, "accounts", "claude-main")
+      const second = join(fixture.home, "accounts", "claude-second")
+      await mkdir(second, { recursive: true })
+      await writeFile(join(second, "kept"), "second account")
+      const ran = await login(fixture, "claude-main", { CLAUDE_CONFIG_DIR: second })
+      expect(ran.stderr).toBe("")
+      expect(ran.exitCode).toBe(0)
+      const log = await readFile(fixture.claudeLog, "utf8")
+      expect(log).toContain("args=auth login\n")
+      expect(log).toContain("CLAUDE_CONFIG_DIR=" + main + "\n")
+      expect(log.split("\n").filter((line) => line.includes(join(fixture.home, "accounts")))).toEqual(["CLAUDE_CONFIG_DIR=" + main])
+      expect((await readdir(join(fixture.home, "accounts"))).toSorted()).toEqual(["claude-main", "claude-second"])
+      expect(await readdir(second)).toEqual(["kept"])
+      expect(await readFile(join(second, "kept"), "utf8")).toBe("second account")
+      expect(ran.stdout).toContain("Login successful.")
+      expect(ran.stdout).toContain("signed in with CLAUDE_CONFIG_DIR=" + main)
+    })
+  }, 30_000)
 
   for (const account of ["claude-main", "claude-second"]) {
     test(account + " prints no token-shaped value and opens no credential file", async () => {
@@ -160,13 +195,55 @@ describe("orc login", () => {
     }, 30_000)
   }
 
-  test("refuses an account that is not wired yet and makes no folder for it", async () => {
+  test("runs the Codex sign-in with only the openai folder and leaves every other account folder alone", async () => {
+    await withFixture(async (fixture) => {
+      const openai = join(fixture.home, "accounts", "openai")
+      const main = join(fixture.home, "accounts", "claude-main")
+      await mkdir(main, { recursive: true })
+      await writeFile(join(main, "kept"), "claude account")
+      const ran = await login(fixture, "openai", { CODEX_HOME: main })
+      expect(ran.stderr).toBe("")
+      expect(ran.exitCode).toBe(0)
+      const log = await readFile(fixture.codexLog, "utf8")
+      expect(log).toContain("args=login\n")
+      expect(log).toContain("CODEX_HOME=" + openai + "\n")
+      expect(log.split("\n").filter((line) => line.includes(join(fixture.home, "accounts")))).toEqual(["CODEX_HOME=" + openai])
+      expect((await readdir(join(fixture.home, "accounts"))).toSorted()).toEqual(["claude-main", "openai"])
+      expect(await readdir(main)).toEqual(["kept"])
+      expect(existsSync(fixture.claudeLog)).toBe(false)
+      expect(ran.stdout).toContain("Successfully logged in")
+      expect(ran.stdout).toContain("signed in with CODEX_HOME=" + openai)
+    })
+  }, 30_000)
+
+  test("prints no token-shaped value and opens no credential file for openai", async () => {
     await withFixture(async (fixture) => {
       const ran = await login(fixture, "openai", {})
+      expect(ran.killed).toBe(false)
+      expect(ran.exitCode).toBe(0)
+      expect(await readFile(join(fixture.home, "accounts", "openai", "session.json"), "utf8")).toContain(codexToken)
+      expect(ran.stdout).not.toMatch(tokenShaped)
+      expect(ran.stderr).not.toMatch(tokenShaped)
+    })
+  }, 30_000)
+
+  test("runs the Codex device-code sign-in on a machine reached over SSH", async () => {
+    await withFixture(async (fixture) => {
+      const ran = await login(fixture, "openai", { SSH_TTY: "/dev/ttys001" })
+      expect(ran.exitCode).toBe(0)
+      expect(await readFile(fixture.codexLog, "utf8")).toContain("args=login --device-auth\n")
+      expect(ran.stdout).toContain("This machine has no browser, so Codex signs in with a device code")
+    })
+  }, 30_000)
+
+  test("refuses an account that is not wired yet and makes no folder for it", async () => {
+    await withFixture(async (fixture) => {
+      const ran = await login(fixture, "opencode", {})
       expect(ran.exitCode).not.toBe(0)
-      expect(ran.stderr).toContain("orc login openai is not available yet")
+      expect(ran.stderr).toContain("orc login opencode is not available yet")
       expect(existsSync(fixture.claudeLog)).toBe(false)
-      expect(existsSync(join(fixture.home, "accounts", "openai"))).toBe(false)
+      expect(existsSync(fixture.codexLog)).toBe(false)
+      expect(existsSync(join(fixture.home, "accounts", "opencode"))).toBe(false)
     })
   }, 30_000)
 })

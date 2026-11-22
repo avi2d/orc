@@ -14,23 +14,39 @@ class SignInError extends Data.TaggedError("SignInError")<{
 interface VendorSignIn {
   readonly vendor: string
   readonly command: Command
+  readonly noBrowserCommand: Command
   readonly folderVar: string
   readonly noBrowserNote: string
   readonly privateBrowserVar: string | null
 }
 
+export interface SignedIn {
+  readonly folder: string
+  readonly folderVar: string
+}
+
 const claudeSignIn: VendorSignIn = {
   vendor: "Claude",
   command: ["claude", "auth", "login"],
+  noBrowserCommand: ["claude", "auth", "login"],
   folderVar: "CLAUDE_CONFIG_DIR",
   noBrowserNote: "This machine has no browser, so Claude prints a link instead of opening one. Open the link on any device, sign in, and paste the code the page shows back here.",
+  privateBrowserVar: null
+}
+
+const codexSignIn: VendorSignIn = {
+  vendor: "Codex",
+  command: ["codex", "login"],
+  noBrowserCommand: ["codex", "login", "--device-auth"],
+  folderVar: "CODEX_HOME",
+  noBrowserNote: "This machine has no browser, so Codex signs in with a device code. Open the link Codex prints on any device, sign in, and enter the code it shows.",
   privateBrowserVar: null
 }
 
 const signIns: Record<AccountName, VendorSignIn | null> = {
   "claude-main": claudeSignIn,
   "claude-second": { ...claudeSignIn, privateBrowserVar: "BROWSER" },
-  openai: null,
+  openai: codexSignIn,
   opencode: null
 }
 
@@ -84,11 +100,11 @@ export const signIn = (
   account: AccountName,
   env: Env,
   platform: NodeJS.Platform
-): Effect.Effect<string, SignInError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
+): Effect.Effect<SignedIn, SignInError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const vendor = signIns[account]
     if (vendor === null) {
-      return yield* new SignInError({ message: "orc login " + account + " is not available yet. Only claude-main and claude-second sign in today." })
+      return yield* new SignInError({ message: "orc login " + account + " is not available yet. Only claude-main, claude-second and openai sign in today." })
     }
     const folder = accountFolder(yield* Path.Path, orcHome, account)
     yield* readyFolder(folder)
@@ -98,16 +114,16 @@ export const signIn = (
       yield* Console.log(vendor.noBrowserNote)
     }
     const browserEnv = yield* privateBrowserEnv(account, vendor, noBrowser, env, platform)
-    const [program, ...args] = vendor.command
+    const command = noBrowser ? vendor.noBrowserCommand : vendor.command
+    const [program, ...args] = command
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     // The vendor's sign-in talks to the person on the terminal, and orc never reads what it prints or stores.
-    const handle = yield* spawner.spawn(ChildProcess.make(program, args, { env: { ...browserEnv, [vendor.folderVar]: folder }, extendEnv: true, stdin: "inherit", stdout: "inherit", stderr: "inherit" }))
-    const exitCode = yield* handle.exitCode
+    const exitCode = yield* spawner.spawn(ChildProcess.make(program, args, { env: { ...browserEnv, [vendor.folderVar]: folder }, extendEnv: true, stdin: "inherit", stdout: "inherit", stderr: "inherit" })).pipe(
+      Effect.flatMap((handle) => handle.exitCode),
+      Effect.catchTag("PlatformError", (error) => Effect.fail(new SignInError({ message: "orc login " + account + ": cannot start " + command.join(" ") + ": " + error.message })))
+    )
     if (exitCode !== 0) {
-      return yield* new SignInError({ message: "orc login " + account + ": " + vendor.command.join(" ") + " exited " + String(exitCode) })
+      return yield* new SignInError({ message: "orc login " + account + ": " + command.join(" ") + " exited " + String(exitCode) })
     }
-    return folder
-  }).pipe(
-    Effect.scoped,
-    Effect.catchTag("PlatformError", (error) => Effect.fail(new SignInError({ message: "orc login " + account + ": cannot start " + (signIns[account]?.command.join(" ") ?? account) + ": " + error.message })))
-  )
+    return { folder, folderVar: vendor.folderVar }
+  }).pipe(Effect.scoped)

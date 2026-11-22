@@ -4,7 +4,7 @@ kind: reference
 # Pick a delivery mode
 Each project in `projects.json` can name a `mode` that decides how its ship tasks reach a pull request:
 
-- `no-mistakes`, the default, runs the checks and then no-mistakes, which opens the pull request.
+- `no-mistakes`, the default, runs the checks and then [no-mistakes](https://github.com/kunchenguid/no-mistakes), which opens the pull request.
 - `direct-PR` runs the checks, then pushes the branch and opens the pull request itself.
 - `no-mistakes-prod-only` runs no-mistakes unless a task is marked internal, and then works as `direct-PR`.
 

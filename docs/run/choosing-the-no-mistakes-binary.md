@@ -2,7 +2,7 @@
 kind: how-to
 ---
 # Choosing the no-mistakes binary
-To drive a no-mistakes binary the PATH does not find first:
+To drive a [no-mistakes](https://github.com/kunchenguid/no-mistakes) binary the PATH does not find first:
 
 1. Set `ORC_NO_MISTAKES_BIN` to the path of that binary.
 1. Run the task as usual.

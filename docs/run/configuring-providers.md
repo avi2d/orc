@@ -35,7 +35,7 @@ This example names opencode-go through a Pi login, anthropic through a token fil
 Each provider names its Pi provider `id`, the part of a model name before the `/`, and its `credential`:
 
 - `pi-login` checks the Pi login for that provider before the run, as [Running a task](running-a-task.md) describes.
-  Its `nono` entry names the `upstream` URL the nono sandbox proxies with that login's key.
+  Its `nono` entry names the `upstream` URL the [nono](https://nono.sh) sandbox proxies with that login's key.
   Its `nono` entry may name `injectHeader` and `credentialFormat`.
   `injectHeader` names the HTTP header the proxy fills with the key and defaults to `Authorization`.
   `credentialFormat` names the header value with `{}` where the key goes and defaults to `Bearer {}`.

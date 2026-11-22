@@ -11,7 +11,7 @@ A `no-mistakes-prod-only` project gives `direct-PR` to a task marked `internal: 
 `orc runner start` reads a missing `ORC_TASK_DELIVERY` as `no-mistakes` and queues a `direct-PR` ship run as `orc run <task-file> --delivery direct-PR`.
 
 ## Open the PR
-A `direct-PR` run never starts no-mistakes and does not need it installed.
+A `direct-PR` run never starts [no-mistakes](https://github.com/kunchenguid/no-mistakes) and does not need it installed.
 Once the checks pass, it runs `git push --set-upstream origin <branch>` from the run's worktree.
 It reuses the open PR for the branch when `gh pr list --head <branch> --state open` finds one, and otherwise runs `gh pr create`.
 The PR's title is the head commit's subject, and its body lists the branch's commits and the checks that passed.

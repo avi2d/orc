@@ -2,7 +2,7 @@
 kind: reference
 ---
 # Parked runs
-A run that no-mistakes stops on review questions waits at that gate first, as [Running a task](running-a-task.md) shows.
+A run that [no-mistakes](https://github.com/kunchenguid/no-mistakes) stops on review questions waits at that gate first, as [Running a task](running-a-task.md) shows.
 It waits 30 minutes, or the `ORC_ANSWER_WAIT_SECONDS` its machine sets.
 A finding marked `ask-user`, or with any action other than `auto-fix` and `no-op`, is one of those questions, with the finding's id and text.
 The question `gate-cap` is another, asked once orc has answered 20 gates in the run without an outcome.
