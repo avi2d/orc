@@ -1,7 +1,7 @@
 import { Console, Data, Effect, FileSystem, Path, type Scope } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { Command } from "../../shared/process/index"
-import { findPrivateWindow, openerScript } from "./private-window"
+import { findPrivateWindow, openerScript, type PrivateWindow } from "./private-window"
 
 export const accountNames = ["claude-main", "claude-second", "openai", "opencode"] as const
 export type AccountName = typeof accountNames[number]
@@ -53,17 +53,15 @@ const privateBrowserEnv = (
     if (browserVar === null) {
       return {}
     }
-    if (noBrowser) {
-      // An opener the shell exports, such as an editor's remote helper, would open the link outside a private window.
-      return { [browserVar]: "" }
-    }
-    const window = yield* findPrivateWindow(env, platform)
+    const window: PrivateWindow = noBrowser ? { browser: "none", command: null } : yield* findPrivateWindow(env, platform)
     const fs = yield* FileSystem.FileSystem
     const opener = (yield* Path.Path).join(yield* fs.makeTempDirectoryScoped({ prefix: "orc-login-" }), "open-private")
     yield* fs.writeFileString(opener, openerScript(window), { mode: 0o700 })
-    yield* Console.log(window.command === null
-      ? "orc login " + account + ": orc knows no private window for the default browser " + window.browser + ", so " + vendor.vendor + " prints the link instead. Open it in a private window, so the claude-main browser session is not reused."
-      : "orc login " + account + ": " + vendor.vendor + " opens the sign-in link in a private window of " + window.browser + ", so the claude-main browser session is not reused.")
+    if (!noBrowser) {
+      yield* Console.log(window.command === null
+        ? "orc login " + account + ": orc knows no private window for the default browser " + window.browser + ", so " + vendor.vendor + " prints the link instead. Open it in a private window, so the claude-main browser session is not reused."
+        : "orc login " + account + ": " + vendor.vendor + " opens the sign-in link in a private window of " + window.browser + ", so the claude-main browser session is not reused.")
+    }
     return { [browserVar]: opener }
   }).pipe(Effect.catchTag("PlatformError", (error) => Effect.fail(new SignInError({ message: "orc login " + account + " cannot write the private-window opener: " + error.message }))))
 

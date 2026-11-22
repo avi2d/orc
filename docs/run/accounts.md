@@ -34,7 +34,7 @@ The script runs the browser with its private-window flag, and orc removes the fo
 
 | Browser | Private-window flag |
 | --- | --- |
-| Firefox and LibreWolf | `--private-window` |
+| Firefox, and LibreWolf on Linux only | `--private-window` |
 | Chrome, Chromium, Brave and Vivaldi | `--incognito` |
 | Edge | `--inprivate` |
 
@@ -48,7 +48,7 @@ Claude then prints the link, and you open it in a private window yourself.
 
 Orc treats a machine as having no browser when `SSH_CONNECTION` or `SSH_TTY` is set, or on Linux when neither `DISPLAY` nor `WAYLAND_DISPLAY` is set.
 On such a machine orc prints a note before the sign-in starts.
-For `claude-second`, orc also sets `BROWSER` to an empty value, so an opener the shell exports does not open the link in a normal window.
+For `claude-second`, orc sets `BROWSER` to an opener script that opens nothing, so neither an opener the shell exports nor the system opener opens the link in a normal window.
 Claude Code has no separate flag for this case: `claude auth login` prints a link when no browser opens.
 Open the link on any device, sign in, and paste the code the page shows back into the terminal.
 

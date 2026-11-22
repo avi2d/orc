@@ -36,7 +36,7 @@ const decodeLaunchServices = Schema.decodeOption(Schema.fromJsonString(LaunchSer
 
 const printed = (command: readonly [string, ...Array<string>]): Effect.Effect<string | null, never, ChildProcessSpawner.ChildProcessSpawner> =>
   capture(command, null).pipe(
-    Effect.map((result) => result.exitCode === 0 ? result.stdout.trim() : null),
+    Effect.map((result) => result.exitCode === 0 && result.stdout.trim() !== "" ? result.stdout.trim() : null),
     Effect.catchTag("RunnerError", () => Effect.succeed(null))
   )
 

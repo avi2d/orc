@@ -154,7 +154,6 @@ describe("orc login", () => {
         expect(ran.exitCode).toBe(0)
         expect(ran.stdout).toContain("This machine has no browser, so Claude prints a link")
         if (account === "claude-second") {
-          expect(await takeLog(fixture)).toContain("\nBROWSER=\n")
           expect(existsSync(fixture.browserLog)).toBe(false)
         }
       })
