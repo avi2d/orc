@@ -49,7 +49,7 @@ A run that has not received the decider's answer gets only yours.
 If a run already took the decider's answer, orc queues your answer as a correction but reports it as not delivered.
 The task file marks it `correction_queued`, and later beats do not queue it again.
 A Pi worker may receive the correction after its next tool call.
-No Pi worker reads corrections during a no-mistakes gate or after the last Pi session ends.
+No Pi worker reads corrections during a [no-mistakes](https://github.com/kunchenguid/no-mistakes) gate or after the last Pi session ends.
 A closed task refuses the answer, because its run is over.
 A second answer never replaces yours.
 
