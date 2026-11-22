@@ -205,7 +205,7 @@ export const parts: readonly MapPart[] = [
     title: "Can it answer?",
     tone: "ask",
     short: "Only when a rule or answer covers it",
-    details: { text: "It can quote a rule, the task or its policy, reuse an earlier answer, or ask the worker for more detail." }
+    details: { text: "It can quote a rule, the task or the Rules section of its policy, reuse an earlier answer, or ask the worker for more detail." }
   },
 
   { id: "runner", inside: "works", title: "The runner", short: "A queue of a few tasks per machine", page: "concepts/runner", details: { text: "A queue on the machine, a few tasks at a time." } },
