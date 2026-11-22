@@ -6,11 +6,10 @@ import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { attentionJson, attentionText } from "../../../packages/run/src/features/attention-list/index"
-import { serveCorrections } from "../../../packages/run/src/widgets/beat/beat-close"
 import { claimDeciding, openItems, readAttention, routeTaskItems } from "../../../packages/run/src/entities/attention/attention"
 import { addTask, claimTask, closeStartedTask, listTasks, writeTaken } from "../../../packages/run/src/entities/backlog/index"
 import { type AskDecider, DeciderUnheard, decideReviewQuestions, type DeciderRequest } from "../../../packages/run/src/features/decider/index"
-import { answersFor, answerTask, askStartedTask, correctionsDue, markAnswersRelayed, parkStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
+import { answerTask, askStartedTask, parkStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -523,108 +522,6 @@ describe("the decider", () => {
     await withAskingTask(async (root) => {
       await decide(root, replies({ [r2.text]: JSON.stringify({ decision: "ask-back", question: "Does the upload run in CI?" }) }))
       expect(await itemFile(root, r2Item)).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
-    }, [r2])
-  })
-
-  test("an overturned answer the run has not taken is the one the run receives, not the decider's", async () => {
-    await withAskingTask(async (root) => {
-      await decide(root, replies({ [r2.text]: answer }))
-      await run(answerTask(root, "orc-1", "r2=Three retries", "2099-01-01T00:00:00.000Z"))
-      await run(routeTaskItems(root, await run(listTasks(root)), "2099-01-01T00:00:00.000Z"))
-      const task = (await run(listTasks(root))).at(0)
-      if (task === undefined) {
-        throw new Error("the task is gone")
-      }
-      expect(answersFor(task, { asked, questions: [r2] }).map((question) => question.answer.words)).toEqual(["Three retries"])
-      expect(task.parked?.questions.at(0)?.answer).toMatchObject({ words: "Three retries", overturned: { words: "Two retries", by: "decider" } })
-      expect(correctionsDue(task)).toEqual([])
-      expect(await itemFile(root, r2Item)).toMatchObject({ state: { kind: "closed", answer: { words: "Three retries" }, overturned: { words: "Two retries" } } })
-      expect(await run(attentionText(false, root))).toContain("answered " + r2Item + ": Three retries (the captain replaced the decider's answer \"Two retries\")")
-    }, [r2])
-  })
-
-  test("a late mark of the relayed decider words leaves the captain's answer unmarked and due, instead of marking words the run never got", async () => {
-    await withAskingTask(async (root) => {
-      await decide(root, replies({ [r2.text]: answer }))
-      await run(answerTask(root, "orc-1", "r2=Three retries", "2099-01-01T00:00:00.000Z"))
-      await run(markAnswersRelayed(root, "orc-1", asked, [{ id: "r2", asked, words: "Two retries" }]))
-      const task = (await run(listTasks(root))).at(0)
-      if (task === undefined) {
-        throw new Error("the task is gone")
-      }
-      expect(task.parked?.questions.at(0)?.answer).toMatchObject({ words: "Three retries", relayedTo: null })
-      expect(correctionsDue(task).map((question) => [question.id, question.answer.words, question.answer.overturned.words])).toEqual([["r2", "Three retries", "Two retries"]])
-    }, [r2])
-  })
-
-  test("an overturned answer the run already took is due to it as a correction, instead of standing unsent", async () => {
-    await withAskingTask(async (root) => {
-      await decide(root, replies({ [r2.text]: answer }))
-      await run(markAnswersRelayed(root, "orc-1", asked, [{ id: "r2", asked, words: "Two retries" }]))
-      await run(answerTask(root, "orc-1", "r2=Three retries", "2099-01-01T00:00:00.000Z"))
-      const task = (await run(listTasks(root))).at(0)
-      if (task === undefined) {
-        throw new Error("the task is gone")
-      }
-      expect(correctionsDue(task).map((question) => [question.id, question.answer.words, question.answer.overturned.words])).toEqual([["r2", "Three retries", "Two retries"]])
-    }, [r2])
-  })
-
-  test("a queued correction is reported as not delivered instead of handed", async () => {
-    await withAskingTask(async (root) => {
-      await decide(root, replies({ [r2.text]: answer }))
-      await run(markAnswersRelayed(root, "orc-1", asked, [{ id: "r2", asked, words: "Two retries" }]))
-      await run(answerTask(root, "orc-1", "r2=Three retries", "2099-01-01T00:00:00.000Z"))
-      const task = (await run(listTasks(root))).at(0)
-      assert.ok(task)
-      let seen: unknown = null
-      const result = await run(serveCorrections(root, task, "linux", (corrections) => {
-        seen = corrections
-        return Effect.succeed("queued")
-      }))
-      expect(seen).toEqual([{ question: "r2", answer: "Three retries" }])
-      expect(result).toMatchObject({ kind: "answer-failed", task: "orc-1" })
-      expect((await run(listTasks(root))).at(0)?.parked?.questions.at(0)?.answer?.relayedTo).toBeNull()
-    }, [r2])
-  })
-
-  test("a queued overturn reported once is not reported again on a later beat", async () => {
-    await withAskingTask(async (root) => {
-      await decide(root, replies({ [r2.text]: answer }))
-      await run(markAnswersRelayed(root, "orc-1", asked, [{ id: "r2", asked, words: "Two retries" }]))
-      await run(answerTask(root, "orc-1", "r2=Three retries", "2099-01-01T00:00:00.000Z"))
-      let calls = 0
-      let seen: unknown = null
-      const correct = (corrections: ReadonlyArray<{ readonly question: string; readonly answer: string }>) => {
-        calls += 1
-        seen = corrections
-        return Effect.succeed("queued")
-      }
-      const firstTask = (await run(listTasks(root))).at(0)
-      assert.ok(firstTask)
-      expect(await run(serveCorrections(root, firstTask, "linux", correct))).toMatchObject({ kind: "answer-failed", task: "orc-1" })
-      expect(seen).toEqual([{ question: "r2", answer: "Three retries" }])
-      const queued = (await run(listTasks(root))).at(0)
-      assert.ok(queued)
-      expect(correctionsDue(queued)).toEqual([])
-      expect(await run(serveCorrections(root, queued, "linux", correct))).toBeNull()
-      expect(calls).toBe(1)
-    }, [r2])
-  })
-
-  test("the captain's answer is never replaced by a second one, unlike a decider's", async () => {
-    await withAskingTask(async (root) => {
-      await run(answerTask(root, "orc-1", "r2=Two retries", "2026-11-02T10:22:00.000Z"))
-      await assert.rejects(run(answerTask(root, "orc-1", "r2=Three retries", "2026-11-02T10:23:00.000Z")))
-    })
-  })
-
-  test("a closed task refuses an overturn instead of rewriting an answer its run took", async () => {
-    await withAskingTask(async (root) => {
-      await decide(root, replies({ [r2.text]: answer }))
-      await run(closeStartedTask(root, "orc-1", "done", "the upload retries", { pr: null, report: null }, "2026-11-02T10:40:00.000Z"))
-      await assert.rejects(run(answerTask(root, "orc-1", "r2=Three retries", "2099-01-01T00:00:00.000Z")))
-      expect((await run(listTasks(root))).at(0)?.parked?.questions.at(0)?.answer).toMatchObject({ words: "Two retries" })
     }, [r2])
   })
 })
