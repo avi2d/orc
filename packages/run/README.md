@@ -64,6 +64,7 @@ An unknown command or subcommand that is one or two typos away from exactly one 
 - [Running a task](https://github.com/avi2d/orc/blob/main/docs/run/running-a-task.md)
 - [Running without a sandbox](https://github.com/avi2d/orc/blob/main/docs/run/running-without-a-sandbox.md)
 - [Configuring providers](https://github.com/avi2d/orc/blob/main/docs/run/configuring-providers.md)
+- [Account folders and orc login](https://github.com/avi2d/orc/blob/main/docs/run/accounts.md)
 - [Installing no-mistakes](https://github.com/avi2d/orc/blob/main/docs/run/installing-no-mistakes.md)
 - [Choosing the no-mistakes binary](https://github.com/avi2d/orc/blob/main/docs/run/choosing-the-no-mistakes-binary.md)
 - [What the no-mistakes fork adds](https://github.com/avi2d/orc/blob/main/docs/run/no-mistakes-fork.md)

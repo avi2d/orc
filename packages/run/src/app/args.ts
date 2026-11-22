@@ -1,5 +1,6 @@
 import { type DispatchArgs, parseDispatchArgs } from "./dispatch-args"
 import { parseRunArgs, type RunAgentArgs } from "../features/running-a-task/index"
+import { type LoginArgs, parseLoginArgs } from "./login-args"
 export type OrcArgs =
   | { readonly kind: "PrintVersion" }
   | { readonly kind: "ShowVersion" }
@@ -15,6 +16,7 @@ export type OrcArgs =
   | { readonly kind: "Dispatch"; readonly args: Exclude<DispatchArgs, { readonly kind: "UsageError" }> }
   | { readonly kind: "Chat"; readonly sessionFile: string | null }
   | { readonly kind: "InstallApp" }
+  | LoginArgs
   | { readonly kind: "Update"; readonly json: boolean }
   | { readonly kind: "UsageError"; readonly detail: string }
 const parseShowArgs = (rest: readonly string[]): OrcArgs => {
@@ -165,6 +167,7 @@ const topLevelParsers = {
   refusals: (rest: readonly string[]): OrcArgs => parseJsonListArgs(rest, "ListRefusals"),
   chat: parseChatArgs,
   app: parseAppArgs,
+  login: parseLoginArgs,
   update: (rest: readonly string[]): OrcArgs => parseJsonListArgs(rest, "Update"),
   backlog: (rest: readonly string[]): OrcArgs => toDispatch("backlog", rest),
   attention: (rest: readonly string[]): OrcArgs => toDispatch("attention", rest),
