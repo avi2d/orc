@@ -1,1 +1,1 @@
-export { accountNames, type AccountName, isAccountName, signIn } from "./sign-in"
+export { accountNames, type AccountName, isAccountName, type SignedIn, signIn } from "./sign-in"
