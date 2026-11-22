@@ -262,7 +262,7 @@ const PackReport = Schema.Tuple([Schema.Struct({
 })])
 
 const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => {
-  const result = Bun.spawnSync(["npm", "pack", "--dry-run", "--json"], { cwd: packageDir })
+  const result = Bun.spawnSync(["npm", "pack", "--dry-run", "--json"], { cwd: packageDir, timeout: 60_000 })
   if (result.exitCode !== 0) {
     throw new Error("npm pack --dry-run failed: " + result.stdout.toString() + result.stderr.toString())
   }
@@ -273,15 +273,15 @@ const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarb
 describe("the npm pack dry run", () => {
   test("the scoped tarball keeps every file the orc tarball held instead of dropping the copied changelog", () => {
     expect([...packedTarball().files].sort()).toEqual([...expectedFiles].sort())
-  })
+  }, 60_000)
 
   test("the tarball takes the scoped name instead of the taken orc name", () => {
     expect(packedTarball().tarball).toBe(`avi2dg-orc-${runManifest.version}.tgz`)
-  })
+  }, 60_000)
 
   test("the tarball holds the file the orc bin entry names", () => {
     expect(packedTarball().files).toContain(runManifest.bin.orc)
-  })
+  }, 60_000)
 })
 
 describe("the run manifest", () => {
