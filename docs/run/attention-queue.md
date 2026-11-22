@@ -47,6 +47,7 @@ Your answer stands, and the task file keeps the decider's answer beside it under
 The item keeps the decider's answer under `overturned` in its `closed` state, and its `answer` is yours.
 A run that has not received the decider's answer gets only yours.
 If a run already took the decider's answer, orc queues your answer as a correction but reports it as not delivered.
+The task file marks it `correction_queued`, and later beats do not queue it again.
 A Pi worker may receive the correction after its next tool call.
 No Pi worker reads corrections during a no-mistakes gate or after the last Pi session ends.
 A closed task refuses the answer, because its run is over.
