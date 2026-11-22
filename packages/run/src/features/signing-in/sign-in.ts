@@ -14,7 +14,7 @@ interface VendorSignIn {
   readonly vendor: string
   readonly command: Command
   readonly folderVar: string
-  readonly noBrowserNote: string
+  readonly noBrowserNote: string | null
 }
 
 const claudeSignIn: VendorSignIn = {
@@ -24,11 +24,18 @@ const claudeSignIn: VendorSignIn = {
   noBrowserNote: "This machine has no browser, so Claude prints a link instead of opening one. Open the link on any device, sign in, and paste the code the page shows back here."
 }
 
+const opencodeSignIn: VendorSignIn = {
+  vendor: "OpenCode",
+  command: ["opencode", "auth", "login"],
+  folderVar: "XDG_DATA_HOME",
+  noBrowserNote: null
+}
+
 const signIns: Record<AccountName, VendorSignIn | null> = {
   "claude-main": claudeSignIn,
   "claude-second": null,
   openai: null,
-  opencode: null
+  opencode: opencodeSignIn
 }
 
 type Env = Readonly<Record<string, string | undefined>>
@@ -52,21 +59,26 @@ const readyFolder = (folder: string): Effect.Effect<void, SignInError, FileSyste
     )
   })
 
+interface SignedIn {
+  readonly folder: string
+  readonly folderVar: string
+}
+
 export const signIn = (
   orcHome: string,
   account: AccountName,
   env: Env,
   platform: NodeJS.Platform
-): Effect.Effect<string, SignInError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
+): Effect.Effect<SignedIn, SignInError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function*() {
     const vendor = signIns[account]
     if (vendor === null) {
-      return yield* new SignInError({ message: "orc login " + account + " is not available yet. Only claude-main signs in today." })
+      return yield* new SignInError({ message: "orc login " + account + " is not available yet. Only claude-main and opencode sign in today." })
     }
     const folder = accountFolder(yield* Path.Path, orcHome, account)
     yield* readyFolder(folder)
     yield* Console.log("orc login " + account + ": " + vendor.vendor + " signs in with " + vendor.folderVar + " set to " + folder)
-    if (hasNoBrowser(env, platform)) {
+    if (vendor.noBrowserNote !== null && hasNoBrowser(env, platform)) {
       yield* Console.log(vendor.noBrowserNote)
     }
     const [program, ...args] = vendor.command
@@ -77,7 +89,7 @@ export const signIn = (
     if (exitCode !== 0) {
       return yield* new SignInError({ message: "orc login " + account + ": " + vendor.command.join(" ") + " exited " + String(exitCode) })
     }
-    return folder
+    return { folder, folderVar: vendor.folderVar }
   }).pipe(
     Effect.scoped,
     Effect.catchTag("PlatformError", (error) => Effect.fail(new SignInError({ message: "orc login " + account + ": cannot start " + (signIns[account]?.command.join(" ") ?? account) + ": " + error.message })))

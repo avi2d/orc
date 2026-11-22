@@ -8,12 +8,14 @@ const binPath = new URL("../../packages/run/src/bin.ts", import.meta.url).pathna
 
 const token = "sk-ant-oat01-" + "Q7f".repeat(30)
 const tokenShaped = /sk-ant-[A-Za-z0-9_-]{8,}/
+const apiKey = "sk-or-v1-" + "k3P".repeat(20)
 
 interface Fixture {
   readonly dir: string
   readonly home: string
   readonly bin: string
   readonly claudeLog: string
+  readonly opencodeLog: string
 }
 
 // The fake keeps the token in a regular file and makes the credential file a FIFO, so any read of it by orc blocks until the test kills orc.
@@ -28,23 +30,42 @@ const fakeClaude = (log: string): string =>
     ""
   ].join("\n")
 
+// The fake takes the key from the stdin orc passes through and stores it only in OpenCode's data folder.
+const fakeOpencode = (log: string): string =>
+  [
+    "#!/bin/sh",
+    "printf 'args=%s\\n' \"$*\" >> '" + log + "'",
+    "env >> '" + log + "'",
+    "read -r key",
+    "mkdir -p \"$XDG_DATA_HOME/opencode\"",
+    "printf '{\"key\":\"%s\"}' \"$key\" > \"$XDG_DATA_HOME/opencode/auth.json\"",
+    "echo 'Login successful.'",
+    ""
+  ].join("\n")
+
+const filesUnder = async (dir: string): Promise<readonly string[]> =>
+  (await readdir(dir, { recursive: true, withFileTypes: true })).filter((entry) => entry.isFile()).map((entry) => join(entry.parentPath, entry.name))
+
 const withFixture = async (body: (fixture: Fixture) => Promise<void>): Promise<void> => {
   const dir = await mkdtemp(join(tmpdir(), "orc-login-e2e-"))
   try {
     const bin = join(dir, "bin")
     const claudeLog = join(dir, "claude.log")
+    const opencodeLog = join(dir, "opencode.log")
     await mkdir(bin, { recursive: true })
     await writeFile(join(bin, "claude"), fakeClaude(claudeLog))
     await chmod(join(bin, "claude"), 0o755)
-    await body({ dir, home: join(dir, "home"), bin, claudeLog })
+    await writeFile(join(bin, "opencode"), fakeOpencode(opencodeLog))
+    await chmod(join(bin, "opencode"), 0o755)
+    await body({ dir, home: join(dir, "home"), bin, claudeLog, opencodeLog })
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
 }
 
-const login = async (fixture: Fixture, account: string, env: Record<string, string>) => {
+const login = async (fixture: Fixture, account: string, env: Record<string, string>, typed?: string) => {
   const proc = Bun.spawn([process.execPath, binPath, "login", account], {
-    stdin: "ignore",
+    stdin: typed === undefined ? "ignore" : new Blob([typed]),
     stdout: "pipe",
     stderr: "pipe",
     cwd: fixture.dir,
@@ -98,6 +119,42 @@ describe("orc login", () => {
       const ran = await login(fixture, "claude-main", { SSH_CONNECTION: "10.0.0.2 52000 10.0.0.1 22" })
       expect(ran.exitCode).toBe(0)
       expect(ran.stdout).toContain("This machine has no browser, so Claude prints a link")
+    })
+  }, 30_000)
+
+  test("runs the OpenCode sign-in with only the opencode data folder and leaves every other account folder alone", async () => {
+    await withFixture(async (fixture) => {
+      const opencode = join(fixture.home, "accounts", "opencode")
+      const main = join(fixture.home, "accounts", "claude-main")
+      await mkdir(main, { recursive: true })
+      await writeFile(join(main, "kept"), "main account")
+      const ran = await login(fixture, "opencode", { XDG_DATA_HOME: main, SSH_CONNECTION: "10.0.0.2 52000 10.0.0.1 22" }, apiKey + "\n")
+      expect(ran.stderr).toBe("")
+      expect(ran.exitCode).toBe(0)
+      const log = await readFile(fixture.opencodeLog, "utf8")
+      expect(log).toContain("args=auth login\n")
+      expect(log.split("\n").filter((line) => line.includes(join(fixture.home, "accounts")))).toEqual(["XDG_DATA_HOME=" + opencode])
+      expect((await readdir(join(fixture.home, "accounts"))).toSorted()).toEqual(["claude-main", "opencode"])
+      expect(await readdir(main)).toEqual(["kept"])
+      expect(ran.stdout).toContain("signed in with XDG_DATA_HOME=" + opencode)
+      expect(ran.stdout).not.toContain("no browser")
+    })
+  }, 30_000)
+
+  test("keeps the pasted OpenCode key out of orc's output and out of every file outside the opencode folder", async () => {
+    await withFixture(async (fixture) => {
+      const opencode = join(fixture.home, "accounts", "opencode")
+      const ran = await login(fixture, "opencode", {}, apiKey + "\n")
+      expect(ran.killed).toBe(false)
+      expect(ran.exitCode).toBe(0)
+      expect(await readFile(join(opencode, "opencode", "auth.json"), "utf8")).toContain(apiKey)
+      expect(ran.stdout).not.toContain(apiKey)
+      expect(ran.stderr).not.toContain(apiKey)
+      const outside = (await filesUnder(fixture.dir)).filter((file) => !file.startsWith(opencode + "/"))
+      expect(outside.length).toBeGreaterThan(0)
+      for (const file of outside) {
+        expect({ file, holdsKey: (await readFile(file, "utf8")).includes(apiKey) }).toEqual({ file, holdsKey: false })
+      }
     })
   }, 30_000)
 

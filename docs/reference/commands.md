@@ -862,12 +862,15 @@ Usage: orc login <claude-main|claude-second|openai|opencode>
 
 Makes the account's folder under ~/.orc/accounts if it is missing and runs the
 vendor's sign-in with its config folder set to it, so orc never reads or copies
-the credential. Only claude-main signs in today, through claude auth login with
-CLAUDE_CONFIG_DIR set. On a machine with no browser, Claude prints a link and
-takes back the code the page shows.
+the credential. claude-main signs in through claude auth login with
+CLAUDE_CONFIG_DIR set. opencode signs in through opencode auth login with
+XDG_DATA_HOME set, and the API key is pasted into OpenCode's own prompt. On a
+machine with no browser, Claude prints a link and takes back the code the page
+shows.
 
 Examples:
   orc login claude-main
+  orc login opencode
 ```
 
 ## Updating orc
