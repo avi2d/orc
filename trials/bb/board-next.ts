@@ -101,11 +101,11 @@ const laterNext = (task: TaskDetail): NextAction => {
   return failed ? { waits: "failed-run", actor: "owner" } : { waits: "nothing" }
 }
 
-const taskNext = (task: TaskDetail, { waiting, sentPr }: Unread): TaskNext => ({
+const taskNext = (task: TaskDetail, extra: Unread): TaskNext => ({
   task: task.id,
-  next: task.state.status === "new" && waiting !== null ? newNext(task, waiting) : laterNext(task),
-  detail: waiting?.detail ?? null,
-  pr: prOf(task, sentPr)
+  next: task.state.status === "new" && extra.waiting !== null ? newNext(task, extra.waiting) : laterNext(task),
+  detail: extra.waiting?.detail ?? null,
+  pr: prOf(task, extra.sentPr)
 })
 
 export const boardNext: Guard<ReadonlyArray<TaskNext>> = (value, at) => {
