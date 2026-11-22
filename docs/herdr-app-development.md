@@ -3,7 +3,7 @@ kind: how-to
 ---
 # Develop the orc Herdr App mods
 
-Use a scratch App to check a mod without driving your own App.
+Use a scratch App to check a mod without driving your own [Herdr App](https://herdr.dev).
 
 ## Start a scratch App
 

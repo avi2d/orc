@@ -10,7 +10,7 @@ kind: explanation
 import MapLegend from "./map/MapLegend.vue"
 </script>
 
-One chat to run your AI agent work on all your machines and models, with a backlog, live monitoring and Herdr App dashboards.
+One chat to run your AI agent work on all your machines and models, with a backlog, live monitoring and [Herdr App](https://herdr.dev) dashboards.
 
 <img class="home-hero-art" src="./images/orc-hero-1120.webp" srcset="./images/orc-hero-640.webp 640w, ./images/orc-hero-1120.webp 1120w" sizes="(min-width: 860px) 560px, 90vw" width="1120" height="747" alt="A calm, grey-haired orc arranging three task tiles at a desk." fetchpriority="high">
 
@@ -50,7 +50,7 @@ Each step below is one part of orc, and each has its own page.
    [A run](concepts/run.md) follows it step by step.
 1. **The checks and the review judge it.**
    Orc runs the project's own checks, and Pi fixes what they refuse.
-   The delivery mode then decides whether no-mistakes reviews the branch before orc opens the pull request.
+   The delivery mode then decides whether [no-mistakes](https://github.com/kunchenguid/no-mistakes) reviews the branch before orc opens the pull request.
    [Checks and review](concepts/checks-and-review.md) shows both gates.
 1. **You merge it.**
    For a ship task, the task closes done with its pull request, and `orc merge <task-id>` lands it once every check is green.
@@ -95,7 +95,7 @@ Its state is files on disk and queues in pueue, so a restart picks up where it s
 | Pi | The coding agent orc runs, and the only one |
 | no-mistakes | The review tool that takes a checked branch to a pull request with green CI |
 | pueue | The queue on each machine that holds the runs |
-| nono | The sandbox a run you start by hand works in by default |
+| [nono](https://nono.sh) | The sandbox a run you start by hand works in by default |
 | Decider | The model that answers a run's routine questions from written instructions |
 
 ## Related topics
