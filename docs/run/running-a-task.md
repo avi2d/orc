@@ -8,7 +8,7 @@ A ship run creates an isolated worktree, asks Pi to make the change, runs the pr
 
 ## Before you run
 
-Install `git`, `nono`, `pi`, `node`, and `no-mistakes` on the host `PATH`.
+Install `git`, [`nono`](https://nono.sh), `pi`, `node`, and [`no-mistakes`](https://github.com/kunchenguid/no-mistakes) on the host `PATH`.
 A `direct-PR` run does not need `no-mistakes`, and `--sandbox none` does not need `nono`.
 For no-mistakes delivery, use version 1.90.0 or later.
 
