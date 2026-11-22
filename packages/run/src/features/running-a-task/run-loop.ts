@@ -328,7 +328,7 @@ const runChecksFixLoop = (
       }
       const attempt = fixes.length + 1
       yield* checkpoints.fixStart(attempt, new Date().toISOString())
-      const fixed = yield* fixOnce(run, ops.runAgent, outcome.file, attempt, attempt === 1 ? (resumedFix(plan) ?? freshFixOf(plan)) : null, checkpoints)
+      const fixed = yield* fixOnce(run, ops.runAgent, outcome.file, attempt, (attempt === 1 ? resumedFix(plan) : null) ?? freshFixOf(plan), checkpoints)
       fixes.push(fixed.fix)
       yield* checkpoints.fixDone(fixed.fix)
       commits.push(...fixed.commits)

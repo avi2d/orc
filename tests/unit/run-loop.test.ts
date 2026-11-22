@@ -526,7 +526,7 @@ describe("a hold release reaches the resumed worker", () => {
     })
   })
 
-  test("a fresh fix attempt carries the hold release instead of starting bare", async () => {
+  test("every fresh fix attempt carries the hold release instead of starting bare", async () => {
     await withLoopRun(0, async (db, run) => {
       await mkdir(run.piSessionDir, { recursive: true })
       await writeFile(join(run.worktreeDir, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
@@ -546,8 +546,8 @@ describe("a hold release reaches the resumed worker", () => {
         answers: [{ question: holdReleaseId, answer: "Fix the lint failure first" }]
       }
       const report = await Effect.runPromise(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
-      expect(prompts.length).toBeGreaterThan(0)
-      expect(prompts[0]).toContain("Fix the lint failure first")
+      expect(prompts.length).toBeGreaterThan(1)
+      expect(prompts.every((prompt) => prompt.includes("Fix the lint failure first"))).toBe(true)
       expect(report.fixAttempts).toBe(3)
     })
   })
