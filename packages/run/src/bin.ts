@@ -8,6 +8,7 @@ import packageJson from "../package.json" with { type: "json" }
 import { appHomeDir, bundledAppDir, formatAppInstall, herdrAppSourceDir, installApp, readyBundledApp } from "./features/installing-the-app/index"
 import { type OrcArgs, parseArgs } from "./app/args"
 import { runChat } from "./features/chat/index"
+import { type AccountName, signIn } from "./features/signing-in/index"
 import { encodeUpdateJson, formatUpdate, runUpdate } from "./features/updating-orc/index"
 import { helpText, overview, usageErrorText } from "./app/help"
 import { runDispatch } from "./app/dispatch-cli"
@@ -206,6 +207,12 @@ const runInstallApp = Effect.gen(function*() {
   yield* Console.log(formatAppInstall(result))
 })
 
+const login = (account: AccountName) => signIn(orcHomeDir(Bun.env.ORC_HOME), account, Bun.env, process.platform).pipe(
+  Effect.provide(BunServices.layer),
+  Effect.catchTag("SignInError", (error) => Console.error(error.message).pipe(Effect.andThen(Effect.fail("orc login refused")))),
+  Effect.flatMap((folder) => Console.log("orc login " + account + ": signed in with CLAUDE_CONFIG_DIR=" + folder))
+)
+
 const update = (args: Extract<OrcArgs, { readonly kind: "Update" }>) =>
   Effect.gen(function*() {
     const result = yield* runUpdate({ home: orcHomeDir(Bun.env.ORC_HOME), env: Bun.env, running: packageJson.version }).pipe(Effect.provide(BunServices.layer))
@@ -261,6 +268,9 @@ const program = Effect.gen(function*() {
     }
     case "InstallApp": {
       return yield* runInstallApp
+    }
+    case "Login": {
+      return yield* login(args.account)
     }
     case "Chat": {
       return yield* chat(args.sessionFile)

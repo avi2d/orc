@@ -10,13 +10,14 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/app/args.ts` | The flag parsing for the orc command |
+| `packages/run/src/app/login-args.ts` | The `orc login` argument parsing |
 | `packages/run/src/app/dispatch-args.ts` | The flag parsing for `orc backlog`, `orc attention`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` |
 | `packages/run/src/app/dispatch-cli.ts` | The `orc backlog`, `orc attention`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
 | `packages/run/src/app/dispatch-args-runner.ts` | The `orc runner` verb parsing and the shared `--json` flag and reach split |
 | `packages/run/src/app/dispatch-args-heavy.ts` | The `orc heavy` verb parsing |
 | `packages/run/src/app/help.ts` | The help pages: the overview, the per-command help, the usage error text and the closest-command suggestion |
 | `packages/run/src/app/help-format.ts` | The help layout: wrapping to 80 columns, the usage block and the name and text tables |
-| `packages/run/src/app/help-entries-run.ts` | The help entries for `orc run`, the run history commands, `orc chat`, `orc app` and `orc update` |
+| `packages/run/src/app/help-entries-run.ts` | The help entries for `orc run`, the run history commands, `orc chat`, `orc app`, `orc login` and `orc update` |
 | `packages/run/src/app/help-entries-backlog.ts` | The help entries for `orc backlog` and its subcommands, `orc attention`, `orc beat` and `orc merge` |
 | `packages/run/src/app/help-entries-runner.ts` | The help entries for `orc runner` and `orc heavy` and their subcommands, and for `orc version` and `orc machines` |
 
@@ -101,6 +102,12 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/features/installing-the-app/app-install.ts` | The `orc app install` copy of the built [Herdr App](https://herdr.dev) mods, layout and keys merge |
+
+## features/signing-in
+
+| Path | What it holds |
+| --- | --- |
+| `packages/run/src/features/signing-in/sign-in.ts` | The `orc login` account set, the account folder and the vendor sign-in it runs there |
 
 ## features/merging-a-pr
 
