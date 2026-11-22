@@ -50,6 +50,7 @@ const stackGap = 28
 const labelGap = 6
 const titleHeight = 34
 const pageLink = { width: 104, height: 22, inset: 8 }
+const detailsButton = 28
 
 const moved = (box: Box, x: number, y: number): Box => ({
   size: box.size,
@@ -200,7 +201,7 @@ export const layoutMap = (measures: Measures): MapLayout => {
           stackGap,
           true
         )
-    const header = titleWidth(part) + (part.page === undefined ? 0 : pageLink.width + pageLink.inset * 2)
+    const header = titleWidth(part) + detailsButton + (part.page === undefined ? 0 : pageLink.width + pageLink.inset * 2)
     const whole = { width: Math.max(stack.size.width + edge * 2, header), height: stack.size.height + headRoom + edge }
     const body = moved(stack, (whole.width - stack.size.width) / 2, headRoom)
     return { size: whole, parts: [{ part, rect: { x: 0, y: 0, ...whole }, open: true, depth }, ...body.parts] }
