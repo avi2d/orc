@@ -244,6 +244,7 @@ const expectedFiles = [
   "src/features/seeing-runs/machine-versions.ts",
   "src/features/seeing-runs/other-machines.ts",
   "src/features/signing-in/index.ts",
+  "src/features/signing-in/private-window.ts",
   "src/features/signing-in/sign-in.ts",
   "src/features/task-thread/index.ts",
   "src/features/task-thread/note.ts",

@@ -102,9 +102,9 @@ export const appInstallHelp: HelpEntry = {
 export const loginHelp: HelpEntry = {
   usage: ["orc login <" + accountNames.join("|") + ">"],
   summary: "Sign one account in through its vendor's own sign-in",
-  about: "Makes the account's folder under ~/.orc/accounts if it is missing and runs the vendor's sign-in with its config folder set to it, so orc never reads or copies the credential. Only claude-main signs in today, through claude auth login with CLAUDE_CONFIG_DIR set. On a machine with no browser, Claude prints a link and takes back the code the page shows.",
+  about: "Makes the account's folder under ~/.orc/accounts if it is missing and runs the vendor's sign-in with its config folder set to it, so orc never reads or copies the credential. claude-main and claude-second sign in today, through claude auth login with CLAUDE_CONFIG_DIR set. For claude-second, Claude opens the sign-in link in a private window of the default browser, so the claude-main browser session is not reused. On a machine with no browser, Claude prints a link and takes back the code the page shows.",
   options: [],
-  examples: ["orc login claude-main"]
+  examples: ["orc login claude-main", "orc login claude-second"]
 }
 
 export const updateHelp: HelpEntry = {

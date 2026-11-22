@@ -108,6 +108,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/features/signing-in/sign-in.ts` | The `orc login` account set, the account folder and the vendor sign-in it runs there |
+| `packages/run/src/features/signing-in/private-window.ts` | The default browser's private-window command and the opener script `orc login claude-second` hands to Claude |
 
 ## features/merging-a-pr
 
