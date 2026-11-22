@@ -90,7 +90,7 @@ export const signIn = (
     yield* readyFolder(folder)
     yield* Console.log("orc login " + account + ": " + vendor.vendor + " signs in with " + vendor.folderVar + " set to " + folder)
     const noBrowser = hasNoBrowser(env, platform)
-    if (noBrowser && vendor.noBrowserNote !== null) {
+    if (vendor.noBrowserNote !== null && noBrowser) {
       yield* Console.log(vendor.noBrowserNote)
     }
     const command = noBrowser ? vendor.noBrowserCommand : vendor.command

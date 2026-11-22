@@ -47,7 +47,8 @@ For `opencode` you paste the key into OpenCode's own prompt, which reads the ter
 Orc never reads, prints or copies a credential, and it opens no file inside the account folder.
 `tests/e2e/login.test.ts` holds these rules for `claude-main`, `openai` and `opencode`.
 The sign-in reads no other account folder from `CLAUDE_CONFIG_DIR`, `CODEX_HOME` or `XDG_DATA_HOME`.
-The Claude and Codex sign-ins print no token-shaped value and open no credential file.
+The Claude sign-in prints no token-shaped value and opens no credential file.
+The Codex sign-in prints no token-shaped value and opens no credential file.
 The OpenCode sign-in keeps the pasted key out of orc's output and out of every file outside the `opencode` folder.
 
 ## Related topics
