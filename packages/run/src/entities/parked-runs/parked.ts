@@ -347,14 +347,14 @@ type Corrected = ParkedQuestion & { readonly answer: CaptainAnswer & { readonly 
 
 const isDueCorrection = (question: ParkedQuestion): question is Corrected => {
   const answer = question.answer
-  return answer !== null && !isDeciderAnswer(answer) && answer.relayedTo === null && answer.overturned !== undefined && answer.overturned.relayedTo !== null
+  return answer !== null && !isDeciderAnswer(answer) && answer.relayedTo === null && answer.correctionQueued !== true && answer.overturned !== undefined && answer.overturned.relayedTo !== null
 }
 
 // Only an overturned answer the run already took needs a correction, because one it never took is replaced in the relay itself.
 export const correctionsDue = (record: TaskRecord): ReadonlyArray<Corrected> =>
   record.state.kind === "started" ? (record.parked?.questions ?? []).flatMap((question) => isDueCorrection(question) ? [question] : []) : []
 
-export const markCorrectionsRelayed = (
+export const markCorrectionsQueued = (
   root: string,
   id: string,
   corrected: ReadonlyArray<{ readonly id: string; readonly asked: string }>
@@ -362,7 +362,7 @@ export const markCorrectionsRelayed = (
   relayTakenQuestions(root, id, (prior) =>
     Arr.map(prior, (question): ParkedQuestion =>
       isDueCorrection(question) && corrected.some((entry) => entry.id === question.id && entry.asked === question.asked)
-        ? { ...question, answer: { ...question.answer, relayedTo: question.answer.overturned.relayedTo } }
+        ? { ...question, answer: { ...question.answer, correctionQueued: true as const } }
         : question
     ))
 export const answerTask = (

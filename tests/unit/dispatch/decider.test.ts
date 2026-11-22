@@ -169,6 +169,15 @@ describe("the decider", () => {
     }, [r2])
   })
 
+  test("a recommended-option rule from the policy rules section is answered instead of escalated", async () => {
+    await withAskingTask(async (root) => {
+      const rule = "When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure."
+      const reply = JSON.stringify({ decision: "answer", answer: "Two retries", rule, reason: "the question names Two retries" })
+      await decide(root, replies({ [r2.text]: reply }))
+      expect(await itemFile(root, r2Item)).toMatchObject({ owner: "decider", decision: { kind: "answered", rule: { quote: rule, source: "decider policy" } }, state: { kind: "closed", answer: { words: "Two retries" } } })
+    }, [r2])
+  })
+
   test("an escalated question turns to the user and stays open with the decider's reason, instead of being answered", async () => {
     await withAskingTask(async (root) => {
       await decide(root, replies({ [r2.text]: answer, [r3.text]: escalate }))
@@ -561,22 +570,45 @@ describe("the decider", () => {
     }, [r2])
   })
 
-  test("a correction queued after the last Pi session is not reported as delivered", async () => {
+  test("a queued correction is reported as not delivered instead of handed", async () => {
     await withAskingTask(async (root) => {
       await decide(root, replies({ [r2.text]: answer }))
       await run(markAnswersRelayed(root, "orc-1", asked, [{ id: "r2", asked, words: "Two retries" }]))
       await run(answerTask(root, "orc-1", "r2=Three retries", "2099-01-01T00:00:00.000Z"))
       const task = (await run(listTasks(root))).at(0)
       assert.ok(task)
-      const file = join(root, "corrections.json")
-      const result = await run(serveCorrections(task, "linux", (corrections) =>
-        Effect.promise(async () => {
-          await writeFile(file, JSON.stringify({ corrections }))
-          return "queued"
-        })))
-      expect(JSON.parse(await readFile(file, "utf8"))).toEqual({ corrections: [{ question: "r2", answer: "Three retries" }] })
+      let seen: unknown = null
+      const result = await run(serveCorrections(root, task, "linux", (corrections) => {
+        seen = corrections
+        return Effect.succeed("queued")
+      }))
+      expect(seen).toEqual([{ question: "r2", answer: "Three retries" }])
       expect(result).toMatchObject({ kind: "answer-failed", task: "orc-1" })
       expect((await run(listTasks(root))).at(0)?.parked?.questions.at(0)?.answer?.relayedTo).toBeNull()
+    }, [r2])
+  })
+
+  test("a queued overturn reported once is not reported again on a later beat", async () => {
+    await withAskingTask(async (root) => {
+      await decide(root, replies({ [r2.text]: answer }))
+      await run(markAnswersRelayed(root, "orc-1", asked, [{ id: "r2", asked, words: "Two retries" }]))
+      await run(answerTask(root, "orc-1", "r2=Three retries", "2099-01-01T00:00:00.000Z"))
+      let calls = 0
+      let seen: unknown = null
+      const correct = (corrections: ReadonlyArray<{ readonly question: string; readonly answer: string }>) => {
+        calls += 1
+        seen = corrections
+        return Effect.succeed("queued")
+      }
+      const firstTask = (await run(listTasks(root))).at(0)
+      assert.ok(firstTask)
+      expect(await run(serveCorrections(root, firstTask, "linux", correct))).toMatchObject({ kind: "answer-failed", task: "orc-1" })
+      expect(seen).toEqual([{ question: "r2", answer: "Three retries" }])
+      const queued = (await run(listTasks(root))).at(0)
+      assert.ok(queued)
+      expect(correctionsDue(queued)).toEqual([])
+      expect(await run(serveCorrections(root, queued, "linux", correct))).toBeNull()
+      expect(calls).toBe(1)
     }, [r2])
   })
 

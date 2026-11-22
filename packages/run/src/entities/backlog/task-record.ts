@@ -175,7 +175,8 @@ const QuestionFront = Schema.Struct({
   relayed_to: Schema.optional(Schema.String),
   used: Schema.optional(Schema.Boolean),
   answered_by: Schema.optional(Schema.Literals(deciderAnswerKinds)),
-  overturned: Schema.optional(OverturnedFront)
+  overturned: Schema.optional(OverturnedFront),
+  correction_queued: Schema.optional(Schema.Boolean)
 })
 
 const Frontmatter = Schema.Struct({
