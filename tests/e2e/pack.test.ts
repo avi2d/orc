@@ -1,4 +1,7 @@
-import { beforeAll, describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { dirname, join } from "node:path"
 import { Schema } from "effect"
 import runManifest from "../../packages/run/package.json" with { type: "json" }
 
@@ -284,5 +287,35 @@ describe("the npm pack dry run", () => {
 describe("the run manifest", () => {
   test("names the repository in the form npm's trusted publish matches against the workflow's repository", () => {
     expect(runManifest.repository).toEqual({ type: "git", url: "git+https://github.com/avi2d/orc.git" })
+  })
+})
+
+const spawnPassing = (command: ReadonlyArray<string>, cwd: string, env: Record<string, string | undefined> = Bun.env): string => {
+  const result = Bun.spawnSync([...command], { cwd, env, stdin: "ignore" })
+  if (result.exitCode !== 0) {
+    throw new Error(command.join(" ") + " failed: " + result.stdout.toString() + result.stderr.toString())
+  }
+  return result.stdout.toString()
+}
+
+describe("the packed tarball installed into an empty project without orc's lockfile", () => {
+  let project = ""
+
+  beforeAll(async () => {
+    project = await mkdtemp(join(tmpdir(), "orc-clean-install-"))
+    const report = spawnPassing(["npm", "pack", "--json", "--pack-destination", project], packageDir)
+    const [packed] = Schema.decodeSync(Schema.fromJsonString(PackReport))(report)
+    await writeFile(join(project, "package.json"), JSON.stringify({ name: "orc-clean-install", private: true }))
+    spawnPassing([process.execPath, "add", join(project, packed.filename)], project)
+  }, 180_000)
+
+  afterAll(async () => {
+    await rm(project, { recursive: true, force: true })
+  })
+
+  test("orc --help prints its usage instead of failing on an effect module a newer resolved dependency asks for", () => {
+    const path = dirname(process.execPath) + ":" + (Bun.env["PATH"] ?? "")
+    const stdout = spawnPassing([join(project, "node_modules", ".bin", "orc"), "--help"], project, { PATH: path, HOME: project })
+    expect(stdout).toContain("Usage: orc <command>")
   })
 })
