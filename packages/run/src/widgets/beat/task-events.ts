@@ -53,6 +53,36 @@ export const taskPrState = (root: string, task: TaskRecord): Effect.Effect<PrSta
     return yield* readPrState(root, task.spec.id, pr)
   })
 
+const readPrView = (pr: string, read: ReadPullRequest) =>
+  read(pr).pipe(Effect.result, Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed(Result.fail(new BacklogError({ detail: "cannot read " + pr + ": the read timed out after " + prSeconds + " seconds" }))) }))
+
+const readWaits = (pr: string, view: PullRequestView, yolo: boolean) =>
+  Effect.result(ownerWaits(pr, view, yolo)).pipe(Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed(Result.fail(new BacklogError({ detail: "cannot read the files of " + pr + ": the read timed out after " + prSeconds + " seconds" }))) }))
+
+const mergeTimed = (root: string, id: string, pr: string) =>
+  yoloMerge(root, id, pr).pipe(Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed<BeatAction>({ kind: "merge-refused", task: id, reason: "cannot merge " + pr + ": the merge timed out after " + prSeconds + " seconds" }) }))
+
+const prStateOf = (state: string): PrState | null =>
+  state === "OPEN" ? "open" : state === "CLOSED" ? "closed" : state === "MERGED" ? "merged" : null
+
+const recordObservation = (
+  root: string,
+  task: TaskRecord,
+  pr: string,
+  view: PullRequestView,
+  at: string,
+  waits: Result.Result<ReadonlyArray<string> | null, BacklogError | RunnerError>,
+  prState: PrState
+): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    yield* routePullRequest(root, task.spec.id, pr, view, at, Result.isSuccess(waits) ? waits.success ?? [] : [])
+    const event = prEvent(task, pr, view, at, yield* eventRecorded(root, task.spec.id + ".pr-ready"))
+    if (event !== null) {
+      yield* recordEvent(root, event)
+    }
+    yield* writePrState(root, task.spec.id, pr, prState)
+  })
+
 export const prEvents = (
   root: string,
   task: TaskRecord,
@@ -70,26 +100,20 @@ export const prEvents = (
     if (recorded === "merged" || recorded === "closed") {
       return Option.none()
     }
-    const view = yield* read(pr).pipe(Effect.result, Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed(Result.fail(new BacklogError({ detail: "cannot read " + pr + ": the read timed out after " + prSeconds + " seconds" }))) }))
+    const view = yield* readPrView(pr, read)
     if (Result.isFailure(view)) {
       return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: view.failure.detail })
     }
-    const state = view.success.state
-    if (state !== "OPEN" && state !== "CLOSED" && state !== "MERGED") {
-      return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: "unknown PR state " + state })
+    const prState = prStateOf(view.success.state)
+    if (prState === null) {
+      return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: "unknown PR state " + view.success.state })
     }
-    const prState = state === "OPEN" ? "open" : state === "CLOSED" ? "closed" : "merged"
     if (task.spec.kind !== "ship") {
       yield* writePrState(root, id, pr, prState)
       return Option.none()
     }
-    const waits = yield* Effect.result(ownerWaits(pr, view.success, yolo)).pipe(Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed(Result.fail(new BacklogError({ detail: "cannot read the files of " + pr + ": the read timed out after " + prSeconds + " seconds" }))) }))
-    yield* routePullRequest(root, id, pr, view.success, at, Result.isSuccess(waits) ? waits.success ?? [] : [])
-    const event = prEvent(task, pr, view.success, at, yield* eventRecorded(root, id + ".pr-ready"))
-    if (event !== null) {
-      yield* recordEvent(root, event)
-    }
-    yield* writePrState(root, id, pr, prState)
+    const waits = yield* readWaits(pr, view.success, yolo)
+    yield* recordObservation(root, task, pr, view.success, at, waits, prState)
     if (Result.isFailure(waits)) {
       return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: waits.failure.detail })
     }
@@ -99,5 +123,5 @@ export const prEvents = (
     if (ranClosing(task)?.outcome !== "done") {
       return Option.none()
     }
-    return Option.some(yield* yoloMerge(root, id, pr).pipe(Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed({ kind: "merge-refused", task: id, reason: "cannot merge " + pr + ": the merge timed out after " + prSeconds + " seconds" } as BeatAction) })))
+    return Option.some(yield* mergeTimed(root, id, pr))
   })

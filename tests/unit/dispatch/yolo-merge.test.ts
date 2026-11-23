@@ -47,7 +47,13 @@ const closeWith = async (root: string, outcome: "done" | "failed" | "stopped"): 
   await run(closeStartedTask(root, "task-1", outcome, "", { pr, report: null }, "2026-11-18T11:00:00.000Z"))
 }
 
-const taskOf = async (root: string) => (await run(listTasks(root))).find((candidate) => candidate.spec.id === "task-1")!
+const taskOf = async (root: string) => {
+  const task = (await run(listTasks(root))).find((candidate) => candidate.spec.id === "task-1")
+  if (task === undefined) {
+    throw new Error("task-1 missing from the backlog")
+  }
+  return task
+}
 
 const ghLayer = (current: PullRequestView, files: string | null, merges: Array<string>): Layer.Layer<ChildProcessSpawner.ChildProcessSpawner> =>
   Layer.effect(ChildProcessSpawner.ChildProcessSpawner, Effect.gen(function*() {
@@ -58,7 +64,7 @@ const ghLayer = (current: PullRequestView, files: string | null, merges: Array<s
       if (!ChildProcess.isStandardCommand(command) || command.command !== "gh") {
         return real.spawn(command)
       }
-      const args = (command as unknown as { args: ReadonlyArray<string> }).args ?? []
+      const args = command.args
       const text = "gh " + args.join(" ")
       if (args[0] === "pr" && args[1] === "view") {
         return reply(JSON.stringify({ state: current.state, headRefOid: current.headRefOid, baseRefName: current.baseRefName, statusCheckRollup: current.statusCheckRollup }))
@@ -137,7 +143,7 @@ describe("the beat merges a yolo project's green PR", () => {
   })
 
   test("a package.json without a readable patch waits as a release instead of merging", async () => {
-    await withBacklog(true, async (root) => {
+    await withBacklog(true, async () => {
       const merges: Array<string> = []
       const layer = ghLayer(view(), filesOf([{ status: "modified", path: "package.json", previous: null, patch: null }]), merges)
       const files = await Effect.runPromise(readChangedFiles(pr).pipe(Effect.provide(Layer.merge(BunServices.layer, layer))))
