@@ -2,6 +2,33 @@
 
 Every release of `orc`, newest first, written by the release from its conventional commits.
 
+## 0.19.0
+
+Released 2026-11-23.
+
+### Features
+
+- **run:** derive each board task next action from backlog JSON [#296](https://github.com/avi2d/orc/pull/296)
+- **run:** sign opencode in with orc login in its own account folder [#287](https://github.com/avi2d/orc/pull/287)
+- **run:** sign claude-second in through a private browser window [#288](https://github.com/avi2d/orc/pull/288)
+- **run:** add openai sign-in through Codex login [#286](https://github.com/avi2d/orc/pull/286)
+- **run:** add orc login with per-account folders and Claude sign-in [#263](https://github.com/avi2d/orc/pull/263)
+- **docs:** keep map node text under 40 characters, with details in the control [#282](https://github.com/avi2d/orc/pull/282)
+- **docs:** add details control to every map node [#280](https://github.com/avi2d/orc/pull/280)
+- **herdr-app:** open Inbox from Awaiting you counts [#277](https://github.com/avi2d/orc/pull/277)
+- **run:** gate direct PR runs on GitHub CI check verdict [#271](https://github.com/avi2d/orc/pull/271)
+- **run:** require outcomes and recommendation on orc_ask questions [#272](https://github.com/avi2d/orc/pull/272)
+- **run:** report the decider's recommended option and mark it in the Inbox [#268](https://github.com/avi2d/orc/pull/268)
+- **run:** give beat attention items subject, options with outcomes and recommendation [#270](https://github.com/avi2d/orc/pull/270)
+
+### Fixes
+
+- **run:** fall back to project tool when heavy stand-in has no recorded path [#290](https://github.com/avi2d/orc/pull/290)
+- **run:** pin platform-node-shared so packed CLI starts after clean install [#289](https://github.com/avi2d/orc/pull/289)
+- **run:** prove scoped tarball with npm pack and use object repository form [#285](https://github.com/avi2d/orc/pull/285)
+- **run:** report overturned answers as undelivered and narrow decider quotes [#281](https://github.com/avi2d/orc/pull/281)
+- **run:** recover grabs after owner pid reuse [#269](https://github.com/avi2d/orc/pull/269)
+
 ## 0.18.0
 
 Released 2026-11-20.
