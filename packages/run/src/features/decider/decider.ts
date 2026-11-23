@@ -90,7 +90,7 @@ const collectParagraph = (out: Array<string>, paragraph: string): void => {
   if (lines.length === 0) {
     return
   }
-  const joined = spaced(lines.join(" "))
+  const joined = spaced(lines.filter((line) => !/^#{1,6}\s/.test(line)).join(" "))
   pushOnce(out, unquoted(joined))
   collectSentences(out, joined)
 }
@@ -120,9 +120,14 @@ const holdsClause = (segment: string, wanted: string): boolean => {
 
 const normalizedQuote = (quote: string): string => unquoted(stripMarker(unquoted(quote)))
 
+const comparisonWords = (text: string): string =>
+  spaced(text.replace(/["'“”‘’`]/g, "").replace(/[\p{P}\p{S}]+/gu, " "))
+
 const quotedSource = (quote: string, sources: ReadonlyArray<RuleSource>): RuleSource | undefined => {
   const wanted = normalizedQuote(quote)
-  return wanted === "" ? undefined : sources.find((source) => sentencesAndLinesOf(source.text).some((segment) => holdsClause(segment, wanted)))
+  const words = comparisonWords(wanted)
+  return words === "" ? undefined : sources.find((source) =>
+    sentencesAndLinesOf(source.text).some((segment) => holdsClause(segment, wanted) || comparisonWords(segment) === words))
 }
 
 interface Earlier {
