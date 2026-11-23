@@ -49,13 +49,9 @@ const finalOutcome = (status: string, outcome: string, pr: string): NoMistakesRe
   exitCode: outcome === "failed" || outcome === "cancelled" ? 1 : 0
 })
 
-const exists = (file: string): Promise<boolean> => access(file).then(() => true, () => false)
-
 const lintPasses = async () => ({ stdout: "lint ok", stderr: "", exitCode: 0 })
 
-const nmCallLines = (calls: string): ReadonlyArray<string> => calls.split("\n").filter((line) => line !== "")
-
-const axiCalls = (calls: string): ReadonlyArray<string> => nmCallLines(calls).filter((line) => line.startsWith("axi "))
+const axiCalls = (calls: string): ReadonlyArray<string> => calls.split("\n").filter((line) => line.startsWith("axi "))
 
 const startCall = (path: string): string => "axi run --intent-file " + path + " --skip test"
 
@@ -456,7 +452,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
       await withHome(async (home) => {
         const sha = await readyToCheck(dir, home)
         const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [fixableGate, fixReviewGate, checksPassedWhileMonitoring, recordedNothing])
-        expect(nmCallLines(outcome.nmCalls).filter((line) => line.startsWith("axi "))).toEqual([
+        expect(axiCalls(outcome.nmCalls)).toEqual([
           startCall(join(home, "runs", "step-run-1", "task.md")),
           fixCall(),
           "axi respond --action approve",
@@ -474,7 +470,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
         const sha = await readyToCheck(dir, home)
         const mixedGate: NoMistakesReply = { stdout: fixableGate.stdout.replace("findings[1]", "findings[2]").replace("auto-fix,spelling", "auto-fix,spelling\n    R8,info,notes.md,,no-op,style note") }
         const outcome = await runStep(dir, home, sandboxResult(sha), lintPasses, [mixedGate, checksPassedWhileMonitoring, recordedNothing])
-        expect(nmCallLines(outcome.nmCalls)).toContain(fixCall(" --ignore R8"))
+        expect(axiCalls(outcome.nmCalls)).toContain(fixCall(" --ignore R8"))
         expect(outcome.report.completed).toBe(true)
         expect(outcome.report.noMistakes?.findings.map((finding) => finding.id)).toEqual(["R7", "R8"])
       })
@@ -566,7 +562,7 @@ describe("runWithHistory hands the branch to no-mistakes", () => {
           return { stdout: "lint ok", stderr: "", exitCode: 0 }
         }
         await runStep(dir, home, sandboxResult(sha), checkWritesConfig, [passedWithPr, recordedNothing])
-        expect(await exists(marker)).toBe(false)
+        expect(await access(marker).then(() => true, () => false)).toBe(false)
       })
     })
   }, 60_000)

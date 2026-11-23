@@ -15,7 +15,6 @@ import type { AgentOutcome, AgentRun, AgentRunResult, AgentStep, ResumePlan, Run
 import { recordOpenAsks } from "./history-write"
 import { type ChecksRoundSummary, type HistoryRun, type OrcRunCommit, type OrcRunReport, type RecordedFixAttempt } from "./run-record"
 
-
 const collectCommits = (
   run: HistoryRun,
   made: ReadonlyArray<{ readonly sha: string }>
