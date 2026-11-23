@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { bypassLine, callerTool, parseStandinCall, standinMarker, type StandinCall } from "../../../packages/run/src/entities/heavy-queue/heavy-standin-runtime"
+import { bypassLine, callerTool, parseStandinCall, projectTool, standinMarker, type StandinCall } from "../../../packages/run/src/entities/heavy-queue/heavy-standin-runtime"
 
 const call: StandinCall = {
   tool: "cargo",
@@ -84,5 +84,25 @@ describe("callerTool", () => {
     const { standins, copies, standin } = await folders()
     expect(callerTool("bun", [standins, copies].join(":"), standin)).toBe("")
     expect(callerTool("bun", "", standin)).toBe("")
+  })
+})
+
+describe("projectTool", () => {
+  let root = ""
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true })
+  })
+
+  test("the nearest node_modules/.bin tool above the folder wins instead of nothing", async () => {
+    root = await mkdtemp(join(tmpdir(), "orc-project-tool-"))
+    const outer = join(root, "node_modules", ".bin")
+    const inner = join(root, "packages", "lint")
+    await mkdir(outer, { recursive: true })
+    await mkdir(join(inner, "node_modules", ".bin"), { recursive: true })
+    await writeFile(join(outer, "oxlint"), "#!/bin/sh\nexit 0\n", { mode: 0o755 })
+    await writeFile(join(inner, "node_modules", ".bin", "oxlint"), "#!/bin/sh\n# " + standinMarker + ".\n", { mode: 0o755 })
+    expect(projectTool("oxlint", join(inner, "src"))).toBe(join(outer, "oxlint"))
+    expect(projectTool("tsc", inner)).toBe("")
   })
 })

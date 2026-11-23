@@ -1,4 +1,5 @@
 import { accessSync, appendFileSync, closeSync, constants, mkdirSync, openSync, readSync, statSync } from "node:fs"
+import { dirname, join } from "node:path"
 import { classifyHeavyCall } from "./heavy-classify"
 import { ancestry, insideSlot, insideThrough, parseProcessTable } from "./heavy-process-tree"
 import { exitCodeOf, queuedAhead, slotTasks, taskState, type TaskState } from "./heavy-pueue-task"
@@ -105,6 +106,18 @@ export const callerTool = (tool: string, pathValue: string, standin: string): st
   return ""
 }
 
+export const projectTool = (tool: string, directory: string): string => {
+  for (let folder = directory, parent = dirname(folder); ; folder = parent, parent = dirname(folder)) {
+    const candidate = join(folder, "node_modules", ".bin", tool)
+    if (isExecutableFile(candidate) && !isStandin(candidate)) {
+      return candidate
+    }
+    if (parent === folder) {
+      return ""
+    }
+  }
+}
+
 const unloggable = /[\n\r\t"\\]/g
 
 export const bypassLine = (reason: string, command: string, at: Date): string =>
@@ -168,9 +181,9 @@ const refuse = (message: string): StandinPlan => {
 }
 
 export const planCall = (call: StandinCall, standin: string, args: ReadonlyArray<string>): StandinPlan => {
-  const real = callerTool(call.tool, Bun.env.PATH ?? "", standin) || call.real
+  const real = callerTool(call.tool, Bun.env.PATH ?? "", standin) || call.real || projectTool(call.tool, workingDirectory())
   if (real === "") {
-    return refuse("no " + call.tool + " found when the stand-in was written")
+    return refuse("no " + call.tool + " on PATH, recorded when the stand-in was written, or in node_modules/.bin above " + workingDirectory())
   }
   if (!isExecutableFile(real) || sameFile(real, standin)) {
     return refuse("no " + call.tool + " at " + real)
