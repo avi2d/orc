@@ -7,9 +7,11 @@ import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
 import { askSetupFor } from "../../packages/run/src/entities/agent/index"
-import { openDatabase, recordChecksDone, recordFixDone, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
+import { openDatabase, recordRun, recordStep } from "../../packages/run/src/entities/run-history/index"
 import {
+  recordChecksDone,
   recordChecksStart,
+  recordFixDone,
   recordFixStart,
   recordImplementDone,
   recordImplementStart,

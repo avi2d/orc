@@ -198,6 +198,7 @@ const expectedFiles = [
   "src/shared/sandbox/git-config.ts",
   "src/shared/process/git-run.ts",
   "src/entities/run-history/history-resume.ts",
+  "src/features/running-a-task/fix-guidance.ts",
   "src/features/running-a-task/history-write.ts",
   "src/features/running-a-task/index.ts",
   "src/features/running-a-task/loop-pause.ts",
