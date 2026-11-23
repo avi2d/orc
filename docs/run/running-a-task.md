@@ -31,11 +31,10 @@ commands:
 ```
 
 Orc runs only `build`, `lint`, and `typecheck` as local checks.
-It warns with the names of commands it skips, except `prepare`, which runs before Pi starts.
-If no local checks are configured, orc records the checks round as skipped and continues to CI.
-GitHub CI decides whether the run completes.
-Keep test runners out of those commands and the `prepare` command.
-GitHub CI runs repository tests.
+It names skipped commands, except `prepare`, which runs before Pi starts.
+Without local checks, orc skips that round and continues to CI.
+GitHub CI runs repository tests and decides completion.
+Keep test runners out of those commands and `prepare`.
 Orc starts no-mistakes without its local Test step.
 Orc refuses a checkout with uncommitted changes or unsafe local git configuration.
 Set `ORC_REFUSE_MARKERS` to comma-separated names to reject a marker in the checkout or its parent.
