@@ -45,7 +45,7 @@ for (const kind of ["file", "symlink"] as const) {
       else await symlink(join(dir, "missing-preferences"), prefs)
       const result = run()
       expect(result.exitCode).toBe(1)
-      expect(result.stderr.toString()).toContain(prefs)
+      expect((result.stderr?.toString() ?? "")).toContain(prefs)
       expect(await Bun.file(join(dir, "ports")).exists()).toBe(false)
       if (kind === "file") expect(await readFile(prefs, "utf8")).toBe("personal preferences")
     })
@@ -57,7 +57,7 @@ test("bb trial ignores the port override when checking both fixed ports", async 
     const result = run()
     expect(result.exitCode).toBe(1)
     expect(await readFile(join(dir, "ports"), "utf8")).toBe("-nP\n-iTCP:38986\n-iTCP:38987\n-sTCP:LISTEN\n")
-    expect(result.stderr.toString()).not.toContain("BB_TRIAL_PORT")
+    expect((result.stderr?.toString() ?? "")).not.toContain("BB_TRIAL_PORT")
   })
 })
 
