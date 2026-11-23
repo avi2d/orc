@@ -9,6 +9,7 @@ import { OrcRunError } from "../../shared/lib/index"
 import { askOnLoop, loopAnswerOf, loopContinuePrompt, loopGuidance, loopingNote, RunStopped } from "./loop-pause"
 import { askedNote, sentBackContinuePrompt, sentBackGuidance, sentBackWordsOf, workerAnswersOf, workerContinuePrompt, workerGuidance } from "./worker-question"
 import { holdReleaseGuidance, holdReleaseWordsOf } from "../../entities/review-gate/index"
+import { freshFixOf, resumedFix } from "./fix-guidance"
 import { finishAfterChecks } from "./run-finish"
 import { readFailure } from "../../shared/config/index"
 import { countSessionSize, handoverImplementPrompt } from "../../entities/agent/index"
@@ -243,22 +244,6 @@ const readProjectChecks = (run: HistoryRun): Effect.Effect<ReadonlyArray<ChecksC
   )
 
 type ImplementBase = Parameters<typeof finishAfterChecks>[1]
-
-const answerGuidanceOf = (answers: Pick<ResumePlan, "answers">["answers"]): string | null => {
-  const loop = loopAnswerOf(answers)
-  const worker = workerAnswersOf(answers)
-  const released = holdReleaseWordsOf(answers)
-  const guidance = [...(loop?.kind === "continue" ? [loopGuidance(loop.words)] : []), ...(worker.length > 0 ? [workerGuidance(worker)] : []), ...(released.length === 0 ? [] : [holdReleaseGuidance(released)])]
-  return guidance.length === 0 ? null : guidance.join("\n")
-}
-
-const freshFixOf = (plan: Pick<ResumePlan, "answers">): { readonly session: null; readonly guidance: string } | null => {
-  const guidance = answerGuidanceOf(plan.answers)
-  return guidance === null ? null : { session: null, guidance }
-}
-
-const resumedFix = (plan: Pick<ResumePlan, "fixSessionFile" | "answers">): { readonly session: string; readonly guidance: string | null } | null =>
-  plan.fixSessionFile === null ? null : { session: plan.fixSessionFile, guidance: answerGuidanceOf(plan.answers) }
 
 const retryParkedFix = (run: HistoryRun, ops: SandboxOps, base: ImplementBase, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, commits: Array<OrcRunCommit>, plan: ResumePlan, checkpoints: RunCheckpoints): Effect.Effect<OrcRunReport | null, OrcRunError | RunStopped> =>
   Effect.gen(function*() {
