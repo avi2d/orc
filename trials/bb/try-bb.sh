@@ -1,28 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 if [ "$#" -ne 0 ]; then
-  echo "usage: try-bb.sh (set BB_TRIAL_HOME to choose the scratch folder and BB_TRIAL_PORT to choose the server port)" >&2
+  echo "usage: try-bb.sh" >&2
   exit 2
 fi
 version=0.50.1
 dmg_sha=94388d439f6a1b81b00e5e1819c031f112b5188115cd23fb91f1d3c9da1e4a1f
-port=${BB_TRIAL_PORT:-38986}
+port=38986
 here=$(cd "$(dirname "$0")" && pwd)
 plugin=$here/plugin
 real_home=$(eval echo "~$(id -un)")
 prefs=$real_home/Library/Preferences/dev.bb.desktop.plist
+if [ -e "$prefs" ] || [ -L "$prefs" ]; then
+  echo "refusing to run while $prefs exists" >&2
+  exit 1
+fi
 real_data=("$real_home/.bb" "$real_home/Library/Application Support/bb" "$prefs")
-scratch=${BB_TRIAL_HOME:-$here/.scratch}
-mkdir -p "$scratch"
-scratch=$(cd "$scratch" && pwd -P)
-for path in "${real_data[@]}"; do
-  case "$scratch/" in
-    "$path/"*)
-      echo "scratch folder $scratch sits inside the real bb data at $path" >&2
-      exit 1
-      ;;
-  esac
-done
+scratch=$here/.scratch
 for tool in curl hdiutil ditto shasum jq lsof sqlite3 orc screencapture; do
   if ! command -v "$tool" >/dev/null; then
     echo "missing tool: $tool" >&2
@@ -34,7 +28,7 @@ if pgrep -f "/bb.app/Contents/MacOS/bb" >/dev/null; then
   exit 1
 fi
 if lsof -nP -iTCP:"$port" -iTCP:"$((port + 1))" -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "port $port or $((port + 1)) is taken; set BB_TRIAL_PORT to a free pair" >&2
+  echo "port $port or $((port + 1)) is taken; stop the process using it and run again" >&2
   exit 1
 fi
 app=$scratch/bb.app
@@ -52,7 +46,6 @@ snapshot() {
   done
 }
 snapshot > "$proof/real-before"
-prefs_before=$([ -e "$prefs" ] && echo present || echo missing)
 if [ ! -d "$app" ]; then
   dmg=$scratch/bb-$version-arm64.dmg
   [ -f "$dmg" ] || curl -fL --retry 3 -o "$dmg" "https://github.com/get-bb/bb/releases/download/desktop-v$version/bb-$version-arm64.dmg"
@@ -94,7 +87,7 @@ cleanup() {
   set +e
   stop_bb
   # Electron sets its launch defaults through NSUserDefaults, which writes under the login home whatever HOME says.
-  if [ "$prefs_before" = missing ] && [ -e "$prefs" ]; then
+  if [ -e "$prefs" ]; then
     defaults delete dev.bb.desktop >/dev/null 2>&1
     rm -f "$prefs"
     echo "removed $prefs, which Electron wrote at launch and the trial found missing"
