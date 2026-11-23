@@ -86,10 +86,10 @@ describe("waitForAnswers", () => {
       expect(waited.asked).toEqual(old)
       expect(waited.answers).toEqual([{ question: "r2", answer: "Fresh" }])
       expect(waited.askedAt.map((entry) => entry.question)).toEqual(["r2"])
-      const at = waited.askedAt[0]?.asked
-      if (at === undefined) {
+      if (waited.askedAt.length === 0) {
         throw new Error("the second r2 asking carries no time")
       }
+      const at = waited.askedAt[0].asked
       expect(at).not.toEqual(old)
     })
   }, 15_000)

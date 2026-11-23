@@ -146,8 +146,8 @@ const restartOrc1 = async (root: string, beat: string, at: string): Promise<void
 
 const answersOf = async (root: string): Promise<Array<{ question: string; answer: string }>> => {
   const record = await run(findTask(root, "orc-1"))
-  const resumed = record === null ? null : handAnswersToResume(record)
-  return (resumed?.parked?.questions ?? []).flatMap((question) =>
+  const resumed = handAnswersToResume(record)
+  return (resumed.parked?.questions ?? []).flatMap((question) =>
     question.answer === null ? [] : [{ question: question.id, answer: question.answer.words }]).toSorted((left, right) => left.question < right.question ? -1 : 1)
 }
 
@@ -166,7 +166,7 @@ describe("a run parked on a gate orc cannot answer", () => {
       await startOrc1(root, "2026-11-18T10:00:00.000Z")
       const firstBeat = await beatWith(root, doneStatus(root, "2026-11-18T10:00:00.000Z", "2026-11-18T10:01:00.000Z"))
       expect(actionKinds(firstBeat.actions)).toContain("parked:orc-1")
-      expect((await run(findTask(root, "orc-1")))?.parked?.questions.map((question) => question.id)).toEqual(["q1"])
+      expect((await run(findTask(root, "orc-1"))).parked?.questions.map((question) => question.id)).toEqual(["q1"])
       await run(answerTask(root, "orc-1", "q1=Table B", "2026-11-18T10:02:00.000Z"))
       const answersB = await answersOf(root)
       expect(answersB).toEqual([{ question: "q1", answer: "Table B" }])
@@ -180,8 +180,8 @@ describe("a run parked on a gate orc cannot answer", () => {
       expect((await run(listTasks(root))).map((task) => task.spec.id + ":" + task.state.kind)).toEqual(["orc-1:new"])
       expect(actionKinds(first.actions)).toContain("parked:orc-1")
       const parked = await run(findTask(root, "orc-1"))
-      expect(parked?.parked?.origin.run).toEqual("run-2")
-      expect(parked?.parked?.questions.map((question) => question.id)).toEqual(["review-1", "q1"])
+      expect(parked.parked?.origin.run).toEqual("run-2")
+      expect(parked.parked?.questions.map((question) => question.id)).toEqual(["review-1", "q1"])
       expect(await openReviewItems(root)).toHaveLength(1)
       const later = await beatWith(root, doneStatus(root, "2026-11-18T10:02:00.000Z", "2026-11-18T10:05:00.000Z"))
       const kinds = actionKinds(later.actions)
@@ -290,7 +290,7 @@ describe("a run parked on a gate orc cannot answer", () => {
       await startOrc1(root, "2026-11-18T10:00:00.000Z")
       const parked = await beatWith(root, doneStatus(root, "2026-11-18T10:00:00.000Z", "2026-11-18T10:01:00.000Z"))
       expect(actionKinds(parked.actions)).toContain("parked:orc-1")
-      expect((await run(findTask(root, "orc-1")))?.parked?.questions.map((question) => question.owner ?? null)).toEqual(["user"])
+      expect((await run(findTask(root, "orc-1"))).parked?.questions.map((question) => question.owner ?? null)).toEqual(["user"])
       const stored = await run(openItems(root))
       const review = stored.filter((entry) => entry.item.kind === "review-question" && entry.item.task === "orc-1")
       expect(review.map((entry) => entry.item.owner)).toEqual(["user"])
@@ -307,7 +307,7 @@ describe("a run parked on a gate orc cannot answer", () => {
         expect(waiting.actions.filter((action) => action.kind === "attention" && action.task === "orc-1")).toHaveLength(1)
       }
       expect(heard).toEqual([])
-      expect((await run(findTask(root, "orc-1")))?.parked?.questions.map((question) => question.answer)).toEqual([null])
+      expect((await run(findTask(root, "orc-1"))).parked?.questions.map((question) => question.answer)).toEqual([null])
       expect(await openReviewItems(root)).toHaveLength(1)
     })
   })
@@ -333,7 +333,7 @@ describe("a run parked on a gate orc cannot answer", () => {
         throw new Error("the remote gate should park")
       }
       await run(parkStartedTask(root, "orc-1", "orc/orc-1", ending.questions, "2026-11-18T10:01:00.000Z", "run-9"))
-      expect((await run(findTask(root, "orc-1")))?.parked?.questions.map((question) => question.owner ?? null)).toEqual(["user"])
+      expect((await run(findTask(root, "orc-1"))).parked?.questions.map((question) => question.owner ?? null)).toEqual(["user"])
       const stored = await run(openItems(root))
       const review = stored.filter((entry) => entry.item.kind === "review-question" && entry.item.task === "orc-1")
       expect(review.map((entry) => entry.item.owner)).toEqual(["user"])
@@ -346,7 +346,7 @@ describe("a run parked on a gate orc cannot answer", () => {
         expect(kinds).toContain("waits:orc-1")
       }
       expect(heard).toEqual([])
-      expect((await run(findTask(root, "orc-1")))?.parked?.questions.map((question) => question.answer)).toEqual([null])
+      expect((await run(findTask(root, "orc-1"))).parked?.questions.map((question) => question.answer)).toEqual([null])
       expect(await openReviewItems(root)).toHaveLength(1)
     })
   })
@@ -465,7 +465,7 @@ describe("a run parked on a gate orc cannot answer", () => {
       const kinds = actionKinds(parked.actions)
       expect(kinds).toContain("parked:orc-1")
       expect(kinds).toContain("started:orc-1")
-      const reopened = (await run(findTask(root, "orc-1")))?.parked?.questions.find((question) => question.id === "r2")
+      const reopened = (await run(findTask(root, "orc-1"))).parked?.questions.find((question) => question.id === "r2")
       expect(reopened?.asked).toEqual(second.asked)
       expect(reopened?.answer?.by ?? null).toEqual("decider")
       expect(heard).toHaveLength(1)
