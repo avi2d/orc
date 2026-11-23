@@ -416,6 +416,23 @@ describe("the decider", () => {
     }, [question])
   })
 
+  test("misquoted filenames, globs and negation escalate instead of conferring authority", async () => {
+    const examples = [
+      { source: "Use the file `_worker.js`.", quote: "Use the file `worker.js`." },
+      { source: "Check `src/*.ts`.", quote: "Check `src/.ts`." },
+      { source: "Return ! ready.", quote: "Return ready." }
+    ]
+    for (const example of examples) {
+      await withAskingTask(async (root) => {
+        const home = join(root, "home")
+        await mkdir(home)
+        await writeFile(join(home, "orchestrator.md"), "## Rules\n- " + example.source + "\n")
+        await decide(root, replies({ [r2.text]: JSON.stringify({ decision: "answer", answer: "Proceed", rule: example.quote, reason: "the rule says so" }) }, [], home))
+        expect(await itemFile(root, r2Item)).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+      }, [r2])
+    }
+  })
+
   test("recorded lint and CI quotations absent from the owner's rules still escalate", async () => {
     const question = { id: "ci-1", text: "CI check failing: changes - provider reported failure" }
     await withAskingTask(async (root) => {

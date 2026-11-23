@@ -120,12 +120,11 @@ const holdsClause = (segment: string, wanted: string): boolean => {
 
 const normalizedQuote = (quote: string): string => unquoted(stripMarker(unquoted(quote)))
 
-// Only quote, emphasis and clause marks are dropped: a mark such as >= or ~ carries the rule's meaning.
 const comparisonWords = (text: string): string =>
   spaced(
     text
-      .replace(/["'“”‘’`]|(?<![\p{L}\p{N}])[*_]+|[*_]+(?![\p{L}\p{N}])/gu, "")
-      .replace(/[.,;:!?]+(?=\s|$)|\s[-–—]+(?=\s)/g, " ")
+      .replace(/["'“”‘’`]/g, "")
+      .replace(/[.,;:?]+(?=\s|$)|\s[-–—]+(?=\s)/g, " ")
   )
 
 interface Quoted {
