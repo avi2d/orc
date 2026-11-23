@@ -54,7 +54,7 @@ If the resumed run stops on new questions, the task parks again with those besid
 An answer given after the beat last read the waiting run is kept too.
 A task whose every blocking question has an answer can resume when its original machine and run are available.
 `orc backlog` shows a parked task as `parked (<question-ids>)`.
-`orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times, their blocking flag, their answers, and for a worker question its options and recommendation.
+`orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times, their blocking flag, whether the decider owns them, their answers, and for a worker question its options and recommendation.
 Older parked records have no `origin` field.
 
 ## A looping run
