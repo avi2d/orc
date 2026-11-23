@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import packageJson from "../../package.json" with { type: "json" }
@@ -45,10 +45,13 @@ const homeWithPack = async (name: string, pack: unknown): Promise<string> => {
   return home
 }
 
-const lint = (home: string, head: string): { readonly exitCode: number; readonly output: string } => {
-  const env = Object.fromEntries(
+const cleanEnv = (): Record<string, string | undefined> =>
+  Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !key.startsWith("GITHUB_") && key !== "CHECKS_SECRETS_PACK" && key !== "CI")
   )
+
+const lint = (home: string, head: string): { readonly exitCode: number; readonly output: string } => {
+  const env = cleanEnv()
   const result = Bun.spawnSync([process.execPath, "run", "lint", base, head], { cwd: clone, env: { ...env, HOME: home } })
   return { exitCode: result.exitCode, output: result.stdout.toString() + result.stderr.toString() }
 }
@@ -66,6 +69,19 @@ beforeAll(async () => {
     throw new Error("bun install failed in the clone: " + installed.stderr.toString())
   }
   base = git(["rev-parse", "HEAD"])
+  // checks-lint runs every gate, and checks-docs alone reads every living doc, which on a loaded runner outlasts a test's timeout.
+  const bin = join(clone, "node_modules", ".bin")
+  await rm(join(bin, "checks-lint"))
+  await symlink("../@avi2dg/checks/src/delivery/secrets.ts", join(bin, "checks-lint"))
+  // The lint script points HOME at the clone's .orc-home, so without this scan the first test downloads gitleaks into its cache.
+  await mkdir(join(clone, ".orc-home"), { recursive: true })
+  const fetched = Bun.spawnSync([process.execPath, join(bin, "checks-secrets"), base], {
+    cwd: clone,
+    env: { ...cleanEnv(), HOME: join(clone, ".orc-home") }
+  })
+  if (fetched.exitCode !== 0) {
+    throw new Error("the gitleaks fetch failed in the clone: " + fetched.stdout.toString() + fetched.stderr.toString())
+  }
 }, 120_000)
 
 afterAll(async () => {
