@@ -75,9 +75,12 @@ const quoteSingle = (value: string): string => "'" + value.replaceAll("'", "'\\'
 const launcher = (call: StandinCall): string => {
   const [bun = "", ...flags] = helperCommand
   const main = flags.at(-1) ?? ""
-  const fallback = call.real === "" ? "no " + call.tool + " was found when it was written" : "running " + call.real + " unqueued"
+  const fallback = call.real === "" ? "running the nearest node_modules/.bin/" + call.tool + " unqueued" : "running " + call.real + " unqueued"
   const warning = "orc heavy: no bun at " + bun + " or no stand-in helper at " + main + "; " + fallback + ", rerun orc to rewrite the stand-ins"
-  const direct = call.real === "" ? "exit 127" : "exec " + quoteSingle(call.real) + ' "$@"'
+  const project = quoteSingle("/node_modules/.bin/" + call.tool)
+  const direct = call.real === ""
+    ? 'd=$PWD; while [ -n "$d" ]; do [ -x "$d"' + project + ' ] && exec "$d"' + project + ' "$@"; d=${d%/*}; done; exit 127'
+    : "exec " + quoteSingle(call.real) + ' "$@"'
   return `#!/bin/sh
 # ${standinMarker}. Regenerated on every run of that command.
 [ -x ${quoteSingle(bun)} ] && [ -f ${quoteSingle(main)} ] && exec ${helperCommand.map(quoteSingle).join(" ")} ${quoteSingle(JSON.stringify(call))} "$0" "$@"

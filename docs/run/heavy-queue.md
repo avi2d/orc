@@ -22,9 +22,9 @@ The helper runs the real tool once the queue hands it the turn.
 The helper finds the tool, decides whether the call queues, and runs, queues or waits for it, and never decides through itself.
 The helper stays the caller's process for the whole call, passes the tool's exit code back, and passes on a stop or hangup signal to the tool.
 It reads no `.env` or `bunfig.toml` from the caller's folder.
-If the bun or helper is gone, the launcher warns once on stderr to rerun orc and runs the recorded tool with no queue.
+If the bun or helper is gone, the launcher warns once on stderr to rerun orc and runs the recorded tool with no queue, or the nearest node_modules/.bin copy above the working folder when orc recorded no path.
 A queued call runs under the same helper in its pueue task, which stops the call once the stand in that queued it is gone.
-A stand in runs the first copy of the tool on its caller's PATH that is not an orc stand in, falls back to the absolute path recorded when orc wrote it, and refuses with exit 127 when neither exists.
+A stand in runs the first copy of the tool on its caller's PATH that is not an orc stand in, then the absolute path recorded when orc wrote it, then the nearest node_modules/.bin copy above the working folder that is not an orc stand in, and refuses with exit 127 when none exists.
 Without `through` set, a call that a queued call starts runs at once instead of queuing again.
 The stand in trusts the process tree above the call, never an exported group variable on its own.
 Set `HEAVY_QUEUE_BYPASS` to a reason to skip the queue for one command, and the reason is logged to the alerts file and counted by the check command.
