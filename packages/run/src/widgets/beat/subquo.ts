@@ -16,6 +16,8 @@ const Window = Schema.Struct({
   percentLeft: Schema.NullOr(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 }))),
   resetsAt: Schema.NullOr(Timestamp)
 })
+type SubquoWindow = typeof Window.Type
+type KnownWindow = SubquoWindow & { readonly percentLeft: number; readonly resetsAt: string }
 const Windows = Schema.NonEmptyArray(Window)
 const Observation = Schema.Union([
   Schema.Struct({ status: Schema.Literal("fresh"), observedAt: Timestamp, source: Schema.Literal("provider"), validUntil: Timestamp, windows: Windows }),
@@ -36,6 +38,8 @@ type SubquoRead =
 
 const everyModel = "all"
 
+const isKnown = (window: SubquoWindow): window is KnownWindow => window.percentLeft !== null && window.resetsAt !== null
+
 export const isSubquoDocument = (document: unknown): boolean => typeof document === "object" && document !== null && "version" in document
 
 const figureOf = (entry: SubquoAccount, nowMillis: number): AccountReading => {
@@ -54,15 +58,15 @@ const figureOf = (entry: SubquoAccount, nowMillis: number): AccountReading => {
   if (limits.length === 0) {
     return { account, kind: "unusable", reason: "subquo reads no window with scope " + everyModel }
   }
-  const unknown = limits.find((window) => window.percentLeft === null || window.resetsAt === null)
+  const unknown = limits.find((window) => !isKnown(window))
   if (unknown !== undefined) {
     return { account, kind: "unusable", reason: "subquo reads an unknown percent or reset in the " + unknown.id + " window" }
   }
-  const known = limits.flatMap((window) => window.percentLeft === null || window.resetsAt === null ? [] : [{ percentLeft: window.percentLeft, resetsAt: window.resetsAt }])
-  const remainingPercent = Math.min(...known.map((window) => window.percentLeft))
   // Tied limiting windows all hold the account at that percent, so room returns only when the last of them resets.
-  const resetsAt = known.filter((window) => window.percentLeft === remainingPercent).map((window) => window.resetsAt).toSorted().at(-1)
-  return resetsAt === undefined ? { account, kind: "usable", remainingPercent } : { account, kind: "usable", remainingPercent, resetsAt }
+  const limiting = limits.filter(isKnown).reduce((held, window) =>
+    window.percentLeft < held.percentLeft || (window.percentLeft === held.percentLeft && window.resetsAt > held.resetsAt) ? window : held
+  )
+  return { account, kind: "usable", remainingPercent: limiting.percentLeft, resetsAt: limiting.resetsAt }
 }
 
 export const decodeSubquo = (document: unknown, names: ReadonlyArray<string>, nowMillis: number): SubquoRead => {

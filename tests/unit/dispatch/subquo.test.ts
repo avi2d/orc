@@ -12,10 +12,10 @@ type Fixture = { readonly [key: string]: unknown; readonly accounts: ReadonlyArr
 const isFixture = (value: unknown): value is Fixture =>
   typeof value === "object" && value !== null && "accounts" in value && Array.isArray(value.accounts)
 
-const fixture = (): Fixture => {
-  const parsed: unknown = JSON.parse(readFileSync(join(import.meta.dir, "../../fixtures/subquo/read.json"), "utf8"))
+const schemaBuiltSnapshot = (): Fixture => {
+  const parsed: unknown = JSON.parse(readFileSync(join(import.meta.dir, "../../fixtures/subquo/schema-built-read.json"), "utf8"))
   if (!isFixture(parsed)) {
-    throw new Error("the subquo fixture holds no accounts")
+    throw new Error("the schema-built subquo snapshot holds no accounts")
   }
   return parsed
 }
@@ -25,13 +25,13 @@ const settings = (...names: ReadonlyArray<string>) => ({ command: ["subquo", "re
 const now = Date.parse("2026-11-22T20:00:40.000Z")
 
 const withAccount = (id: string, observation: object) => {
-  const snapshot = fixture()
+  const snapshot = schemaBuiltSnapshot()
   return { ...snapshot, accounts: snapshot.accounts.map((entry) => entry["id"] === id ? { ...entry, observation } : entry) }
 }
 
-describe("assessSubquo on a subquo read --json snapshot", () => {
+describe("assessSubquo on a snapshot built from subquo's published subquo.v1 schema", () => {
   test("account second is resolved and picked instead of unusable for want of an entry", () => {
-    expect(assessSubquo(fixture(), settings("main", "second"), now)).toEqual({
+    expect(assessSubquo(schemaBuiltSnapshot(), settings("main", "second"), now)).toEqual({
       kind: "read",
       floorPercent: 15,
       accounts: [
@@ -42,31 +42,31 @@ describe("assessSubquo on a subquo read --json snapshot", () => {
     })
   })
   test("headroom is the smallest all-model window instead of the sum or the first window", () => {
-    const reading = assessSubquo(fixture(), settings("main"), now)
+    const reading = assessSubquo(schemaBuiltSnapshot(), settings("main"), now)
     expect(reading.kind === "read" ? reading.accounts[0] : null).toMatchObject({ remainingPercent: 41 })
   })
   test("a model-scoped window does not limit the account instead of holding every job at its percent", () => {
-    const reading = assessSubquo(fixture(), settings("main"), now)
+    const reading = assessSubquo(schemaBuiltSnapshot(), settings("main"), now)
     expect(reading.kind === "read" ? reading.pick : null).toBe("main")
   })
   test("a missing account is a parse error instead of an unusable account", () => {
-    expect(decodeSubquo(fixture(), ["main", "third"], now)).toEqual({
+    expect(decodeSubquo(schemaBuiltSnapshot(), ["main", "third"], now)).toEqual({
       kind: "error",
       cause: "account-missing",
       reason: "the subquo snapshot names no account third, so its account list and the quota accounts differ"
     })
-    expect(assessSubquo(fixture(), settings("main", "third"), now).kind).toBe("unread")
+    expect(assessSubquo(schemaBuiltSnapshot(), settings("main", "third"), now).kind).toBe("unread")
   })
   test("an unavailable account keeps subquo's code instead of being picked", () => {
-    const reading = assessSubquo(fixture(), settings("codex-home"), now)
+    const reading = assessSubquo(schemaBuiltSnapshot(), settings("codex-home"), now)
     expect(reading).toEqual({ kind: "read", floorPercent: 15, accounts: [{ account: "codex-home", kind: "unusable", reason: "subquo reads it unavailable: rate_limited" }], pick: null })
   })
   test("a stale reading is unusable instead of picked from its old percent", () => {
-    const reading = assessSubquo(fixture(), settings("go"), now)
+    const reading = assessSubquo(schemaBuiltSnapshot(), settings("go"), now)
     expect(reading.kind === "read" ? reading.accounts : []).toEqual([{ account: "go", kind: "unusable", reason: "subquo's reading from 2026-11-22T19:51:00.000Z is stale: timeout" }])
   })
   test("a fresh reading past its validUntil is unusable instead of trusted at the time of use", () => {
-    const reading = assessSubquo(fixture(), settings("second"), Date.parse("2026-11-22T20:02:05.000Z"))
+    const reading = assessSubquo(schemaBuiltSnapshot(), settings("second"), Date.parse("2026-11-22T20:02:05.000Z"))
     expect(reading.kind === "read" ? reading.pick : "unread").toBeNull()
   })
   test("an unknown percent is unusable instead of read as room", () => {
@@ -81,7 +81,7 @@ describe("assessSubquo on a subquo read --json snapshot", () => {
     expect(reading.kind === "read" ? reading.accounts : []).toEqual([{ account: "second", kind: "unusable", reason: "subquo reads an unknown percent or reset in the weekly window" }])
   })
   test("another snapshot version is a schema error instead of read as orc.quota.v1", () => {
-    const read = decodeSubquo({ ...fixture(), version: "subquo.v2" }, ["main"], now)
+    const read = decodeSubquo({ ...schemaBuiltSnapshot(), version: "subquo.v2" }, ["main"], now)
     expect(read.kind === "error" ? [read.cause, read.reason] : []).toEqual(["schema", "the quota command printed no subquo.v1 snapshot: Expected \"subquo.v1\"\n  at [\"version\"]"])
   })
   test("percent above 100 is a schema error instead of room", () => {
@@ -95,7 +95,7 @@ describe("assessSubquo on a subquo read --json snapshot", () => {
     expect(decodeSubquo(snapshot, ["second"], now)).toMatchObject({ kind: "error", cause: "schema" })
   })
   test("an account named twice is a schema error instead of taking either reading", () => {
-    const snapshot = fixture()
+    const snapshot = schemaBuiltSnapshot()
     expect(decodeSubquo({ ...snapshot, accounts: [...snapshot.accounts, snapshot.accounts[0]] }, ["main"], now)).toEqual({
       kind: "error",
       cause: "schema",
