@@ -210,7 +210,7 @@ const runInstallApp = Effect.gen(function*() {
 const login = (account: AccountName) => signIn(orcHomeDir(Bun.env.ORC_HOME), account, Bun.env, process.platform).pipe(
   Effect.provide(BunServices.layer),
   Effect.catchTag("SignInError", (error) => Console.error(error.message).pipe(Effect.andThen(Effect.fail("orc login refused")))),
-  Effect.flatMap((signed) => Console.log("orc login " + account + ": signed in with " + signed.folderVar + "=" + signed.folder))
+  Effect.flatMap((signedIn) => Console.log("orc login " + account + ": signed in with " + signedIn.folderVar + "=" + signedIn.folder))
 )
 
 const update = (args: Extract<OrcArgs, { readonly kind: "Update" }>) =>

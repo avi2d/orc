@@ -1,18 +1,38 @@
-import { beforeAll, describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { dirname, join } from "node:path"
 import { Schema } from "effect"
 import runManifest from "../../packages/run/package.json" with { type: "json" }
 
 const packageDir = new URL("../../packages/run/", import.meta.url).pathname
 const repoRoot = new URL("../../", import.meta.url).pathname
 
-let cachedPack: { readonly files: ReadonlyArray<string>; readonly tarball: string } | null = null
+const PackReport = Schema.Tuple([Schema.Struct({
+  filename: Schema.String,
+  files: Schema.Array(Schema.Struct({ path: Schema.String }))
+})])
+
+const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => {
+  const result = Bun.spawnSync(["npm", "pack", "--dry-run", "--json"], { cwd: packageDir, timeout: 60_000 })
+  if (result.exitCode !== 0) {
+    throw new Error("npm pack --dry-run failed: " + result.stdout.toString() + result.stderr.toString())
+  }
+  const [report] = Schema.decodeSync(Schema.fromJsonString(PackReport))(result.stdout.toString())
+  return { files: report.files.map((file) => file.path), tarball: report.filename }
+}
+
+let packedFiles: ReadonlyArray<string> = []
+let packedTarballName = ""
 
 beforeAll(() => {
   const result = Bun.spawnSync([process.execPath, "run", "build"], { cwd: repoRoot })
   if (result.exitCode !== 0) {
     throw new Error("bun run build failed: " + result.stdout.toString() + result.stderr.toString())
   }
-  cachedPack = packedTarball()
+  const packed = packedTarball()
+  packedFiles = packed.files
+  packedTarballName = packed.tarball
 }, 120_000)
 
 const expectedFiles = [
@@ -248,6 +268,7 @@ const expectedFiles = [
   "src/features/seeing-runs/machine-versions.ts",
   "src/features/seeing-runs/other-machines.ts",
   "src/features/signing-in/index.ts",
+  "src/features/signing-in/private-window.ts",
   "src/features/signing-in/sign-in.ts",
   "src/features/task-thread/index.ts",
   "src/features/task-thread/note.ts",
@@ -256,38 +277,52 @@ const expectedFiles = [
   "src/features/updating-orc/update.ts"
 ]
 
-const PackReport = Schema.Tuple([Schema.Struct({
-  filename: Schema.String,
-  files: Schema.Array(Schema.Struct({ path: Schema.String }))
-})])
-
-const packedTarball = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => {
-  const result = Bun.spawnSync(["npm", "pack", "--dry-run", "--json"], { cwd: packageDir })
-  if (result.exitCode !== 0) {
-    throw new Error("npm pack --dry-run failed: " + result.stdout.toString() + result.stderr.toString())
-  }
-  const [report] = Schema.decodeSync(Schema.fromJsonString(PackReport))(result.stdout.toString())
-  return { files: report.files.map((file) => file.path), tarball: report.filename }
-}
-
-const packed = (): { readonly files: ReadonlyArray<string>; readonly tarball: string } => (cachedPack ??= packedTarball())
-
 describe("the npm pack dry run", () => {
   test("the scoped tarball keeps every file the orc tarball held instead of dropping the copied changelog", () => {
-    expect([...packed().files].sort()).toEqual([...expectedFiles].sort())
-  })
+    expect([...packedFiles].sort()).toEqual([...expectedFiles].sort())
+  }, 60_000)
 
   test("the tarball takes the scoped name instead of the taken orc name", () => {
-    expect(packed().tarball).toBe(`avi2dg-orc-${runManifest.version}.tgz`)
-  })
+    expect(packedTarballName).toBe(`avi2dg-orc-${runManifest.version}.tgz`)
+  }, 60_000)
 
   test("the tarball holds the file the orc bin entry names", () => {
-    expect(packed().files).toContain(runManifest.bin.orc)
-  })
+    expect(packedFiles).toContain(runManifest.bin.orc)
+  }, 60_000)
 })
 
 describe("the run manifest", () => {
   test("names the repository in the form npm's trusted publish matches against the workflow's repository", () => {
     expect(runManifest.repository).toEqual({ type: "git", url: "git+https://github.com/avi2d/orc.git" })
   })
+})
+
+const spawnPassing = (command: ReadonlyArray<string>, cwd: string, env: Record<string, string | undefined> = Bun.env): string => {
+  const result = Bun.spawnSync([...command], { cwd, env, stdin: "ignore", timeout: 60_000 })
+  if (result.exitCode !== 0) {
+    throw new Error(command.join(" ") + " failed: " + result.stdout.toString() + result.stderr.toString())
+  }
+  return result.stdout.toString()
+}
+
+describe("the packed tarball installed into an empty project without orc's lockfile", () => {
+  let project = ""
+
+  beforeAll(async () => {
+    project = await mkdtemp(join(tmpdir(), "orc-clean-install-"))
+    const report = spawnPassing(["npm", "pack", "--json", "--pack-destination", project], packageDir)
+    const [packed] = Schema.decodeSync(Schema.fromJsonString(PackReport))(report)
+    await writeFile(join(project, "package.json"), JSON.stringify({ name: "orc-clean-install", private: true }))
+    spawnPassing([process.execPath, "add", join(project, packed.filename)], project)
+  }, 180_000)
+
+  afterAll(async () => {
+    await rm(project, { recursive: true, force: true })
+  })
+
+  test("orc --help prints its usage instead of failing on an effect module a newer resolved dependency asks for", () => {
+    const path = dirname(process.execPath) + ":" + (Bun.env["PATH"] ?? "")
+    const stdout = spawnPassing([join(project, "node_modules", ".bin", "orc"), "--help"], project, { PATH: path, HOME: project })
+    expect(stdout).toContain("Usage: orc <command>")
+  }, 90_000)
 })
