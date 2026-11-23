@@ -4,7 +4,7 @@ kind: reference
 # Running a task
 
 In a clean project checkout, run `orc run <task-file>`.
-A ship run creates an isolated worktree, asks Pi to make the change, runs the project's checks, and opens a PR.
+A ship run creates an isolated worktree, asks Pi to make the change, runs the project's local checks, and opens a PR.
 
 ## Before you run
 
