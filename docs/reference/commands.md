@@ -41,6 +41,9 @@ Chat and the app:
   chat       Talk to the orchestrator, which adds, holds and answers tasks
   app        Install the orc mods and layout into the Herdr App
 
+Accounts:
+  login      Sign one account in through its vendor's own sign-in
+
 Updating orc:
   update     Install the newest published orc when it is newer than this one
 
@@ -848,6 +851,31 @@ upgrade.
 
 Examples:
   orc app install
+```
+
+## Accounts
+
+### orc login
+
+```text
+Usage: orc login <claude-main|claude-second|openai|opencode>
+
+Makes the account's folder under ~/.orc/accounts if it is missing and runs the
+vendor's sign-in with its config folder set to it, so orc never reads or copies
+the credential. claude-main and claude-second sign in through claude auth login
+with CLAUDE_CONFIG_DIR set, openai through codex login with CODEX_HOME set, and
+opencode through opencode auth login with XDG_DATA_HOME set, and the API key is
+pasted into OpenCode's own prompt. For claude-second, Claude opens the sign-in
+link in a private window of the default browser, so the claude-main browser
+session is not reused. On a machine with no browser, Claude prints a link and
+takes back the code the page shows, and orc runs codex login --device-auth,
+which prints a link and a code.
+
+Examples:
+  orc login claude-main
+  orc login claude-second
+  orc login openai
+  orc login opencode
 ```
 
 ## Updating orc

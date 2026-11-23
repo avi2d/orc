@@ -26,7 +26,7 @@ Rules and policy do not widen it.
 
 The decider can:
 
-- **Answer** with a reason and an exact rule from the task, your rules, project instructions, or policy.
+- **Answer** with a reason and an exact rule from the task, your rules, project instructions, or the policy's Rules section.
   Orc escalates an answer whose quote is no whole clause of them, after whitespace is collapsed and surrounding quotes and a leading list or quote marker are stripped on both sides.
   A quote matches a whole line, a sentence within a line, a whole paragraph joined across its lines, a sentence of that joined paragraph, where the quote starts at the start or after a period, exclamation mark, question mark, colon or semicolon and ends at the end, just before one of those marks, or on one of those marks.
 - **Ask back** to a worker question.
@@ -46,7 +46,11 @@ To replace an answer the decider gave, run `orc backlog answer <task-id> <questi
 Your answer stands, and the task file keeps the decider's answer beside it under `overturned`.
 The item keeps the decider's answer under `overturned` in its `closed` state, and its `answer` is yours.
 A run that has not received the decider's answer gets only yours.
-A live run that already has it gets yours as a correction after its next tool call.
+If a run already took the decider's answer, `orc backlog answer` says the next beat queues your answer as a correction and that delivery is not confirmed.
+The next beat writes the correction to `corrections.json`, and that write fails if the run has already ended.
+The task file marks it `correction_queued`, and later beats do not queue it again.
+A Pi worker may receive the correction after its next tool call.
+No Pi worker reads corrections during a [no-mistakes](https://github.com/kunchenguid/no-mistakes) gate or after the last Pi session ends.
 A closed task refuses the answer, because its run is over.
 A second answer never replaces yours.
 
@@ -102,7 +106,7 @@ On a machine without a backlog, the JSON command prints an empty queue.
 ## Run the attention tool
 
 To run the live attention panel, run `orc-dash panel attention`.
-It runs alone in a plain terminal or in a Herdr pane.
+It runs alone in a plain terminal or in a [Herdr](https://herdr.dev) pane.
 The panel reads `orc attention --json` on the machine it runs on and nothing else, and paints again every 10 seconds.
 The dashboard shows it by default, above the resources panel in a wide layout and second in the narrow glance, as [Lay out the dashboard](../dash-dashboard.md#lay-out-the-dashboard) shows.
 It shows each open item oldest first, with its task, its owner, its age and its kind, and its text below.

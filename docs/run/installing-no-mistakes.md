@@ -2,7 +2,7 @@
 kind: how-to
 ---
 # Installing no-mistakes
-Upstream's install script fetches the release GitHub marks latest, and upstream marks releases after v1.84.0 as prereleases, so the script installs a release orc refuses.
+The install script of [no-mistakes](https://github.com/kunchenguid/no-mistakes) fetches the release GitHub marks latest, and upstream marks releases after v1.84.0 as prereleases, so the script installs a release orc refuses.
 To install v1.100.2 instead:
 
 1. Pick the archive for your machine: `no-mistakes-v1.100.2-darwin-arm64.tar.gz`, `no-mistakes-v1.100.2-darwin-amd64.tar.gz`, `no-mistakes-v1.100.2-linux-arm64.tar.gz` or `no-mistakes-v1.100.2-linux-amd64.tar.gz`.

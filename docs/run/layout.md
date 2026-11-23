@@ -10,13 +10,14 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/app/args.ts` | The flag parsing for the orc command |
+| `packages/run/src/app/login-args.ts` | The `orc login` argument parsing |
 | `packages/run/src/app/dispatch-args.ts` | The flag parsing for `orc backlog`, `orc attention`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` |
 | `packages/run/src/app/dispatch-cli.ts` | The `orc backlog`, `orc attention`, `orc beat`, `orc runner`, `orc merge` and `orc heavy` commands |
 | `packages/run/src/app/dispatch-args-runner.ts` | The `orc runner` verb parsing and the shared `--json` flag and reach split |
 | `packages/run/src/app/dispatch-args-heavy.ts` | The `orc heavy` verb parsing |
 | `packages/run/src/app/help.ts` | The help pages: the overview, the per-command help, the usage error text and the closest-command suggestion |
 | `packages/run/src/app/help-format.ts` | The help layout: wrapping to 80 columns, the usage block and the name and text tables |
-| `packages/run/src/app/help-entries-run.ts` | The help entries for `orc run`, the run history commands, `orc chat`, `orc app` and `orc update` |
+| `packages/run/src/app/help-entries-run.ts` | The help entries for `orc run`, the run history commands, `orc chat`, `orc app`, `orc login` and `orc update` |
 | `packages/run/src/app/help-entries-backlog.ts` | The help entries for `orc backlog` and its subcommands, `orc attention`, `orc beat` and `orc merge` |
 | `packages/run/src/app/help-entries-runner.ts` | The help entries for `orc runner` and `orc heavy` and their subcommands, and for `orc version` and `orc machines` |
 
@@ -100,7 +101,14 @@ Each path below sits in the run package or the workspace tests that cover it.
 
 | Path | What it holds |
 | --- | --- |
-| `packages/run/src/features/installing-the-app/app-install.ts` | The `orc app install` copy of the built Herdr App mods, layout and keys merge |
+| `packages/run/src/features/installing-the-app/app-install.ts` | The `orc app install` copy of the built [Herdr App](https://herdr.dev) mods, layout and keys merge |
+
+## features/signing-in
+
+| Path | What it holds |
+| --- | --- |
+| `packages/run/src/features/signing-in/sign-in.ts` | The `orc login` account set, the account folder and the vendor sign-in it runs there |
+| `packages/run/src/features/signing-in/private-window.ts` | The default browser's private-window command and the opener script `orc login claude-second` hands to Claude |
 
 ## features/merging-a-pr
 
@@ -116,7 +124,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/queueing-a-task/runner.ts` | The runner: the start, the kill and the token renewal through pueue |
 | `packages/run/src/features/queueing-a-task/runner-instructions.ts` | The project instructions a start carries to the machine that queues the run |
 | `packages/run/src/features/queueing-a-task/runner-result.ts` | The reading of a task's result and the `orc.runner.v1` JSON |
-| `packages/run/src/features/queueing-a-task/runner-answer.ts` | `orc runner answer`: the answers it hands an asking run and the corrected answers it hands a live run, locally or through a machine's command |
+| `packages/run/src/features/queueing-a-task/runner-answer.ts` | `orc runner answer`: the answers it hands an asking run and the corrected answers it queues for a live run, locally or through a machine's command |
 | `packages/run/src/features/queueing-a-task/hold.ts` | `orc runner hold`: the wait for a live token, the rerun and the folder removal |
 | `packages/run/src/features/queueing-a-task/cli-stop.ts` | The stop of a started task: the kill, the result read and the close as stopped |
 
@@ -129,7 +137,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | `packages/run/src/features/running-a-task/run-record.ts` | The terminal run report, its evidence files and the `report.md` write |
 | `packages/run/src/features/running-a-task/run-exec.ts` | The sandbox a run opens, the install that prepares the copy and the steps that run in it |
 | `packages/run/src/features/running-a-task/run-loop.ts` | The implement, check and fix steps of one run |
-| `packages/run/src/features/running-a-task/run-finish.ts` | The finish of a run after its checks pass: the direct PR or the no-mistakes gate |
+| `packages/run/src/features/running-a-task/run-finish.ts` | The finish of a run after its checks pass: the direct PR or the [no-mistakes](https://github.com/kunchenguid/no-mistakes) gate |
 | `packages/run/src/features/running-a-task/run-resume.ts` | The prior run's session and passed steps a resume starts from |
 | `packages/run/src/features/running-a-task/checks.ts` | The check commands `.no-mistakes.yaml` names and their run in the copy |
 | `packages/run/src/features/running-a-task/run-folders.ts` | A run's folders, its copy of the task file and the instructions file `--instructions` names |
@@ -305,7 +313,7 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/shared/sandbox/sandbox-kind.ts` | The sandbox kinds a run takes |
-| `packages/run/src/shared/sandbox/nono.ts` | The nono sandbox environment, its roots and the `nono why` check of a rendered profile |
+| `packages/run/src/shared/sandbox/nono.ts` | The [nono](https://nono.sh) sandbox environment, its roots and the `nono why` check of a rendered profile |
 | `packages/run/src/shared/sandbox/nono-exec.ts` | The opening of the nono sandbox a run's commands go through: the runtimes, the shims and the checked profile |
 | `packages/run/src/shared/sandbox/standin-dir.ts` | The stand in folder suffix nono strips from the host path |
 | `packages/run/src/shared/sandbox/agent-exec.ts` | The one way a run starts Pi and the checks, in `nono run` or on the host, with the environment built from an allow list |

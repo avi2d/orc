@@ -206,6 +206,9 @@ const answerNow = (args: Extract<CommandArgs, { readonly kind: "AnswerTask" }>, 
         ? "answered " + answered.question + " on " + args.id + ", so the beat may start it"
         : "answered " + answered.question + " on " + args.id + ", and it stays held for " + answered.open.map((question) => question.id).join(", ")
     }
+    if (answered.correction) {
+      return "answered " + answered.question + " on " + args.id + ", so the next beat queues it as a correction for the run on " + answered.branch + ", but delivery to the run is not confirmed"
+    }
     if (answered.live) {
       return "answered " + answered.question + " on " + args.id + ", so the next beat hands it to the run waiting on " + answered.branch
     }

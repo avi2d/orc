@@ -7,7 +7,7 @@ import type { FailingMark } from "../../entities/agent/index"
 import type { DispatchConfig } from "../../shared/config/index"
 import { ownedBySweep, throughFor } from "../../shared/config/index"
 import { logWrittenAt, stallMillis } from "./stall"
-import { answersFor, askStartedTask, type AskedQuestion, correctionsDue, markAnswersRelayed, markCorrectionsRelayed, parkStartedTask } from "../../entities/parked-runs/index"
+import { answersFor, askStartedTask, type AskedQuestion, correctionsDue, markAnswersRelayed, markCorrectionsQueued, parkStartedTask } from "../../entities/parked-runs/index"
 import { Asking, askingFileName, hasBlockingQuestion, type QuestionAnswer } from "../../entities/review-gate/index"
 import { readJsonFileIfPresent } from "../../shared/config/index"
 import { type RunnerRequirements } from "../../features/queueing-a-task/index"
@@ -252,8 +252,8 @@ const serveAsking = (
     )
   })
 
-const serveCorrections = (
-  context: CloseContext,
+export const serveCorrections = (
+  root: string,
   task: TaskRecord,
   machine: string,
   correct: (corrections: ReadonlyArray<QuestionAnswer>) => Effect.Effect<string, RunnerError, RunnerRequirements>
@@ -264,8 +264,8 @@ const serveCorrections = (
   }
   const id = task.spec.id
   return correct(due.map((question) => ({ question: question.id, answer: question.answer.words }))).pipe(
-    Effect.andThen(markCorrectionsRelayed(context.root, id, due).pipe(Effect.catchTags({ BacklogError: () => Effect.void, TaskFileError: () => Effect.void }))),
-    Effect.as<BeatAction>({ kind: "answered", task: id, machine, questions: due.map((question) => question.id) }),
+    Effect.andThen(markCorrectionsQueued(root, id, due).pipe(Effect.catchTags({ BacklogError: () => Effect.void, TaskFileError: () => Effect.void }))),
+    Effect.as<BeatAction>({ kind: "answer-failed", task: id, machine, reason: "the correction was queued, but delivery to the run is not confirmed" }),
     Effect.catchTag("RunnerError", (error) => Effect.succeed<BeatAction>({ kind: "answer-failed", task: id, machine, reason: error.detail })),
     Effect.timeoutOrElse({
       duration: Duration.seconds(closeSeconds),
@@ -291,7 +291,7 @@ const serveRunning = (
       through === null
         ? relayAnswers(context.home, task.spec.id, Effect.succeed(JSON.stringify({ label, corrections })))
         : correctThrough(through, task.spec.id, label, corrections)
-    return (asking === null ? null : yield* serveAsking(context, task, machine, asking, relay)) ?? (yield* serveCorrections(context, task, machine, correct))
+    return (asking === null ? null : yield* serveAsking(context, task, machine, asking, relay)) ?? (yield* serveCorrections(context.root, task, machine, correct))
   })
 
 const readClose = (

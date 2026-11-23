@@ -7,3 +7,4 @@ reports/
 repos/*
 docs/.vitepress/dist/
 docs/.vitepress/cache/
+trials/bb/.scratch/

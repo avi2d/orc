@@ -2,7 +2,7 @@
 kind: reference
 ---
 # Parked runs
-A run that no-mistakes stops on review questions waits at that gate first, as [Running a task](running-a-task.md) shows.
+A run that [no-mistakes](https://github.com/kunchenguid/no-mistakes) stops on review questions waits at that gate first, as [Running a task](running-a-task.md) shows.
 It waits 30 minutes, or the `ORC_ANSWER_WAIT_SECONDS` its machine sets.
 A finding marked `ask-user`, or with any action other than `auto-fix` and `no-op`, is one of those questions, with the finding's id and text.
 The question `gate-cap` is another, asked once orc has answered 20 gates in the run without an outcome.
@@ -60,7 +60,7 @@ Run `orc backlog answer <task-id> <words>` to release the hold, and the next bea
 To correct a parked answer on that held task, use `orc backlog answer <task-id> <question-id>=<text>`.
 Those words travel with the resume, so the retried run reads them as your guidance.
 `orc backlog` shows a parked task as `parked (<question-ids>)`.
-`orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times, their blocking flag, their answers, and for a worker question its options and recommendation.
+`orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times, their blocking flag, whether the decider owns them, their answers, and for a worker question its options and recommendation.
 Older parked records have no `origin` field.
 
 ## A looping run

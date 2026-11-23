@@ -130,7 +130,7 @@ describe("a parked run", () => {
       await startOnLinux(fixture)
       await writeFile(join(fixture.home, "config.json"), JSON.stringify({ providers: [], models: { decider: "acme/small" } }))
       const pi = join(fixture.dir, "bin", "pi")
-      const answer = JSON.stringify({ decision: "answer", answer: "Two retries", rule: "Answer it only when it is routine.", reason: "the intent says twice" })
+      const answer = JSON.stringify({ decision: "answer", answer: "Two retries", rule: "When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure.", reason: "the intent says twice" })
       const escalate = JSON.stringify({ decision: "escalate", reason: "only the captain knows" })
       await writeFile(pi, "#!/bin/sh\nif grep -q 'stopped on, question-4' ; then printf '%s\\n' '" + answer + "' ; else printf '%s\\n' '" + escalate + "' ; fi\n")
       await chmod(pi, 0o755)
@@ -230,7 +230,7 @@ describe("a parked run", () => {
       if (!isRecord(first)) {
         throw new Error("backlog task holds no parked question")
       }
-      expect(Object.keys(first).sort()).toEqual(["answer", "asked", "id", "text"])
+      expect(Object.keys(first).sort()).toEqual(["answer", "asked", "blocks", "deciderOwns", "id", "text"])
       if (!isRecord(first.answer)) {
         throw new Error("parked question holds no answer")
       }
@@ -308,7 +308,7 @@ describe("a parked run", () => {
       await startOnLinux(fixture)
       await writeFile(join(fixture.home, "config.json"), JSON.stringify({ providers: [], models: { decider: "acme/small" } }))
       const pi = join(fixture.dir, "bin", "pi")
-      const reply = JSON.stringify({ decision: "answer", answer: "Keep it", rule: "Answer it only when it is routine.", reason: "the task keeps the old flag" })
+      const reply = JSON.stringify({ decision: "answer", answer: "Keep it", rule: "When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure.", reason: "the task keeps the old flag" })
       await writeFile(pi, "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + join(fixture.dir, "pi-args") + "\ncat > " + join(fixture.dir, "pi-prompt") + "\nprintf '%s\\n' '" + reply + "'\n")
       await chmod(pi, 0o755)
       const runDir = await askWhileRunning(fixture)

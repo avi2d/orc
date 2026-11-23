@@ -3,7 +3,7 @@ kind: how-to
 ---
 # Show orc in the Herdr App
 
-The `orc` layout adds Board, Resources, Agents, and Inbox tabs to the Herdr App, with chat available on each tab.
+The `orc` layout adds Board, Resources, Agents, and Inbox tabs to the [Herdr App](https://herdr.dev), with chat available on each tab.
 Run `orc app install` after each orc upgrade to update the mods.
 The command builds mods from a checkout, so a separate `bun run build` is not needed.
 
@@ -65,10 +65,12 @@ When a command fails, the item shows the command and the first line of its error
 <div id="read-the-board-tab"><span id="read-a-task"></span><span id="read-the-resources-tab"></span></div>
 
 [Board and Resources](herdr-app-board.md) covers tasks, quota, and machine capacity.
+On the Board tab, click the count in the **Awaiting you** lane header to open the Inbox, as `cmd-4` does.
 
 <div id="follow-a-run-in-the-agents-tab"><span id="approve-a-run-s-pr"></span><span id="read-a-run-s-changes"></span><span id="chat-with-orc"></span></div>
 
 [Runs and chat](herdr-app-agents.md) covers the Agents tab and chat drawer.
+On the Agents tab, click the count on the **Awaiting you** status filter to open the Inbox, as `cmd-4` does.
 
 <div id="start-a-scratch-app"><span id="recapture-the-board-screenshots"></span><span id="change-the-mods"></span></div>
 
