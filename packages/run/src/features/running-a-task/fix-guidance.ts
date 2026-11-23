@@ -3,7 +3,7 @@ import { loopAnswerOf, loopGuidance } from "./loop-pause"
 import type { ResumePlan } from "./run-ops"
 import { workerAnswersOf, workerGuidance } from "./worker-question"
 
-export const answerGuidanceOf = (answers: Pick<ResumePlan, "answers">["answers"]): string | null => {
+const answerGuidanceOf = (answers: Pick<ResumePlan, "answers">["answers"]): string | null => {
   const loop = loopAnswerOf(answers)
   const worker = workerAnswersOf(answers)
   const released = holdReleaseWordsOf(answers)
