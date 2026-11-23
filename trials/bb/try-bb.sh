@@ -123,8 +123,9 @@ jq -e '.generalSettings.telemetryEnabled == false' "$proof/settings.json" >/dev/
 echo "telemetryEnabled is false in $proof/settings.json, and BB_TELEMETRY=false held from the first start"
 "$cli" plugin install "$plugin" --yes >/dev/null
 "$cli" plugin rpc call orc-board board | jq -S . > "$proof/page.json"
+jq -S '{ kind, tasks: [(.tasks // [])[] | { id, title }] }' "$proof/page.json" > "$proof/page-tasks.json"
 orc backlog --json | jq -S '{ kind: "ok", tasks: [.tasks[] | { id, title }] }' > "$proof/cli.json"
-if ! cmp -s "$proof/page.json" "$proof/cli.json"; then
+if ! cmp -s "$proof/page-tasks.json" "$proof/cli.json"; then
   echo "the plugin read differs from orc backlog --json; compare $proof/page.json with $proof/cli.json" >&2
   exit 1
 fi
