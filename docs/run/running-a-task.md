@@ -22,15 +22,18 @@ On the host they get a short list that adds the shell, the temp folder, `XDG_RUN
 No `ORC_` variable reaches Pi or the checks.
 With the default sandbox, if nono cannot read the key during the run, its proxy answers Pi with `503 Service Unavailable`, and orc names that error in the result.
 
-Commit a `.no-mistakes.yaml` at the project root with at least one named check for a ship run.
+For a ship run, commit a `.no-mistakes.yaml` at the project root with at least one command.
 For example:
 
 ```yaml
 commands:
-  test: bun test
+  lint: bun run lint
 ```
 
-Replace the example with the project's check command.
+Orc runs only `build`, `lint`, and `typecheck` as local checks.
+Keep test runners out of those commands and the `prepare` command.
+GitHub CI runs repository tests.
+Orc starts no-mistakes without its local Test step.
 Orc refuses a checkout with uncommitted changes or unsafe local git configuration.
 Set `ORC_REFUSE_MARKERS` to comma-separated names to reject a marker in the checkout or its parent.
 

@@ -300,7 +300,7 @@ describe("answerForGate refuses only what needs your word", () => {
       instructions: "The captain answered these findings; fix each as the answer says:\nr2: Keep the old behavior behind a flag"
     })
     if (answer.kind === "fix") {
-      expect(respondArgs(answer).slice(-2)).toEqual(["--instructions", "The captain answered these findings; fix each as the answer says:\nr2: Keep the old behavior behind a flag"])
+      expect(respondArgs(answer).slice(-2)).toEqual(["--instructions", "Leave repository tests to GitHub CI. Do not run them locally. You may run build, lint, or typecheck.\n\nThe captain answered these findings; fix each as the answer says:\nr2: Keep the old behavior behind a flag"])
     }
   })
 
