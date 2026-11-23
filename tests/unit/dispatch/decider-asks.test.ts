@@ -75,6 +75,19 @@ const parkThroughGate = async (root: string, stdout: string): Promise<void> => {
 
 const decideAll = async (root: string, heard: Array<DeciderRequest>) => run(decideReviewQuestions(root, await run(listTasks(root)), listening(heard)))
 
+const readAskingRaw = async (runDir: string, deadline: number): Promise<string> => {
+  while (true) {
+    try {
+      return await readFile(join(runDir, askingFileName), "utf8")
+    } catch {
+      if (Date.now() >= deadline) {
+        throw new Error("asking.json never appeared")
+      }
+      await Bun.sleep(10)
+    }
+  }
+}
+
 describe("the asked action of a no-mistakes review question", () => {
   test("a routine question with action none reaches the decider even when its words name a guarded topic", async () => {
     await withStartedTask(async (root) => {
@@ -132,18 +145,7 @@ describe("the asked action of a no-mistakes review question", () => {
         const wait = waitForAnswers(runDir, 30, "the gate")([{ id: "question-1", description: "Is this branch ready?", asks: "merge" }])
         const fiber = Effect.runFork(wait.pipe(Effect.provide(BunServices.layer)))
         try {
-          const deadline = Date.now() + 5000
-          let raw: string | null = null
-          while (raw === null) {
-            try {
-              raw = await readFile(join(runDir, askingFileName), "utf8")
-            } catch {
-              if (Date.now() >= deadline) {
-                throw new Error("asking.json never appeared")
-              }
-              await Bun.sleep(10)
-            }
-          }
+          const raw = await readAskingRaw(runDir, Date.now() + 5000)
           const asking = Schema.decodeUnknownSync(Schema.fromJsonString(Asking))(raw)
           expect(asking.questions.map((question) => question.asks)).toEqual(["merge"])
           assert.ok(Arr.isReadonlyArrayNonEmpty(asking.questions))
