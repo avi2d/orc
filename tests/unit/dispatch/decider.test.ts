@@ -410,9 +410,7 @@ describe("the decider", () => {
     await withAskingTask(async (root) => {
       const home = join(root, "home")
       await mkdir(home)
-      await writeFile(join(home, "orchestrator.md"), "## Coverage
-- Coverage must stay >= 80%.
-")
+      await writeFile(join(home, "orchestrator.md"), "## Coverage\n- Coverage must stay >= 80%.\n")
       await decide(root, replies({ [question.text]: JSON.stringify({ decision: "answer", answer: "Lower the coverage.", rule: "Coverage must stay <= 80%.", reason: "the rule caps coverage" }) }, [], home))
       expect(await itemFile(root, "orc-1.ci-1.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
     }, [question])
