@@ -1,0 +1,36 @@
+{
+  "name": "bb-plugin-orc-board",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./server": "./server.ts",
+    "./app": "./app.tsx"
+  },
+  "engines": {
+    "bb": ">=0.50.1",
+    "bbPluginSdk": ">=0.6.157"
+  },
+  "bb": {
+    "name": "orc Board [Experimental]",
+    "description": "List the tasks that orc backlog --json prints, by id and title.",
+    "branding": {
+      "icon": "Columns"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": []
+  },
+  "dependencies": {
+    "effect": "4.0.0"
+  },
+  "peerDependencies": {
+    "@get-bb/plugin-sdk": "^0.6.157",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.6.157",
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0"
+  }
+}
