@@ -136,7 +136,7 @@ export const runChecksRound = (
       finished.push(sectionOf(outcome, result.stdout, result.stderr))
       yield* rewrite()
     }
-    yield* append("\n")
+    yield* append(outcomes.length === 0 ? "No local checks ran. GitHub CI decides completion.\n" : "\n")
     return { round, file, outcomes }
   })
 

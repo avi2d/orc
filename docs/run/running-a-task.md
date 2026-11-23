@@ -31,6 +31,9 @@ commands:
 ```
 
 Orc runs only `build`, `lint`, and `typecheck` as local checks.
+It warns with the names of commands it skips, except `prepare`, which runs before Pi starts.
+If no local checks are configured, orc records the checks round as skipped and continues to CI.
+GitHub CI decides whether the run completes.
 Keep test runners out of those commands and the `prepare` command.
 GitHub CI runs repository tests.
 Orc starts no-mistakes without its local Test step.
@@ -94,8 +97,8 @@ It also leaves a reused worktree outside `$ORC_HOME` in place.
 
 ## Results
 
-A no-mistakes ship run succeeds when Pi completes with `ORC_COMPLETE` on its own line, the branch has a new commit, the checks pass, and no-mistakes opens the PR and reports green CI.
-A direct-PR run succeeds when Pi completes, the branch has a new commit, the checks pass, the PR opens, and the GitHub CI verdict on the pushed head is `passed`.
+A no-mistakes ship run succeeds when Pi completes with `ORC_COMPLETE` on its own line, the branch has a new commit, the configured local checks pass, and no-mistakes opens the PR and reports green CI.
+A direct-PR run succeeds when Pi completes, the branch has a new commit, the configured local checks pass, the PR opens, and the GitHub CI verdict on the pushed head is `passed`.
 A `pending` verdict ends the run waiting on CI without success.
 The waiting run records an open `ci-waiting` question and keeps its history row running, so the beat parks the task instead of closing it failed or done.
 A stopped or failed run exits with status 1 and records the reason.

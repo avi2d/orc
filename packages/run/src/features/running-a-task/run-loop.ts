@@ -1,4 +1,4 @@
-import { Effect, FileSystem, Result } from "effect"
+import { Console, Effect, FileSystem, Result } from "effect"
 import { buildFixPrompt, localChecksOf, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
 import { distinctRefusals } from "../../entities/run-history/index"
 import { branchCommits, runGit } from "../../shared/process/index"
@@ -230,15 +230,20 @@ const fixOnce = (
   })
 
 const readProjectChecks = (run: HistoryRun): Effect.Effect<ReadonlyArray<ChecksCommand>, OrcRunError> =>
-  run.fs.readFileString(run.path.join(run.worktreeDir, ".no-mistakes.yaml")).pipe(
-    Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the checks config .no-mistakes.yaml: " + readFailure(cause) })),
-    Effect.flatMap((text) =>
-      readChecksCommands(text, ".no-mistakes.yaml").pipe(
-        Effect.map(localChecksOf),
-        Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
-      )
+  Effect.gen(function*() {
+    const text = yield* run.fs.readFileString(run.path.join(run.worktreeDir, ".no-mistakes.yaml")).pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the checks config .no-mistakes.yaml: " + readFailure(cause) }))
     )
-  )
+    const commands = yield* readChecksCommands(text, ".no-mistakes.yaml").pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
+    )
+    const local = localChecksOf(commands)
+    const skipped = commands.filter((check) => check.name !== "prepare" && !local.includes(check)).map((check) => check.name)
+    if (skipped.length > 0 || local.length === 0) {
+      yield* Console.warn("orc: warning: " + (skipped.length === 0 ? "" : "skipped local commands: " + skipped.join(", ") + ". ") + (local.length === 0 ? "No local checks ran. " : "") + "GitHub CI decides completion.")
+    }
+    return local
+  })
 
 type ImplementBase = Parameters<typeof finishAfterChecks>[1]
 
@@ -296,7 +301,7 @@ const runChecksFixLoop = (
         file: outcome.file,
         started,
         ended,
-        passed: failed.length === 0,
+        passed: outcome.outcomes.length > 0 && failed.length === 0,
         failed,
         checks: outcome.outcomes.map((check) => ({ name: check.name, passed: check.passed })),
         refusals: distinctRefusals(outcome.outcomes.flatMap((check) => check.refusals))

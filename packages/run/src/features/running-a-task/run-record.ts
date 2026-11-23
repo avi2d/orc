@@ -65,6 +65,7 @@ export const formatReport = (report: OrcRunReport): string =>
     "handover: " + (report.sessionSize !== null && longSessionWarning(report.sessionSize) !== null ? toFileUrl(report.runDir + "/" + handoverFileName) : "none"),
     "checks: " + (report.checksRounds === null
       ? "never ran"
+      : report.checksRounds.every((round) => round.checks.length === 0) ? "no local checks run"
       : report.checksRounds.length.toString() + (report.checksRounds.length === 1 ? " round" : " rounds") + ", " + report.fixAttempts.toString() + (report.fixAttempts === 1 ? " fix attempt" : " fix attempts")),
     "pr: " + (report.prLink ?? "none"),
     "no-mistakes: " + (report.noMistakes === null ? "never ran" : noMistakesSummary(report.noMistakes)),
@@ -130,7 +131,9 @@ export const writeEvidence = (run: HistoryRun, report: OrcRunReport): Effect.Eff
     ...(report.checksRounds === null
       ? []
       : [
-        "Checks ran " + report.checksRounds.length.toString() + (report.checksRounds.length === 1 ? " round" : " rounds") + " with " + report.fixAttempts.toString() + (report.fixAttempts === 1 ? " fix attempt" : " fix attempts") + ".",
+        report.checksRounds.every((round) => round.checks.length === 0)
+          ? "No local checks ran."
+          : "Checks ran " + report.checksRounds.length.toString() + (report.checksRounds.length === 1 ? " round" : " rounds") + " with " + report.fixAttempts.toString() + (report.fixAttempts === 1 ? " fix attempt" : " fix attempts") + ".",
         "Checks evidence: " + report.checksRounds.map((round) => run.path.basename(round.file)).join(", ") + "."
       ]),
     report.endReason
