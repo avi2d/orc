@@ -126,7 +126,7 @@ echo "telemetryEnabled is false in $proof/settings.json, and BB_TELEMETRY=false 
 jq -S '{ kind, tasks: [(.tasks // [])[] | { id, title }] }' "$proof/page.json" > "$proof/page-tasks.json"
 orc backlog --json | jq -S '{ kind: "ok", tasks: [.tasks[] | { id, title }] }' > "$proof/cli.json"
 if ! cmp -s "$proof/page-tasks.json" "$proof/cli.json"; then
-  echo "the plugin read differs from orc backlog --json; compare $proof/page.json with $proof/cli.json" >&2
+  echo "the plugin read differs from orc backlog --json; compare $proof/page-tasks.json with $proof/cli.json" >&2
   exit 1
 fi
 echo "the plugin reads the same $(jq '.tasks | length' "$proof/cli.json") tasks as orc backlog --json"
