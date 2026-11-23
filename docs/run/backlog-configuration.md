@@ -74,7 +74,15 @@ The account's reset time is the `resetsAt` of the scope's limiting window, the l
 An account without a window or percentage cannot run.
 A document with no windows or duplicate account keys leaves the quota unread.
 
-A command that exits non-zero, runs past 15 seconds or prints any other document leaves the quota unread, and the beat starts nothing.
+### Quota from subquo
+
+The quota command may instead print the `subquo.v1` snapshot `subquo read --json` prints, such as `["subquo", "read", "--json"]`.
+Orc reads the account room as the smallest `percentLeft` among its windows with scope `all`, so a window that covers one model only does not limit the account.
+The reset time is the `resetsAt` of the limiting window, the latest one when several tie.
+An account with a stale or unavailable reading, a fresh reading past its `validUntil`, or an unknown percent or reset cannot run.
+A snapshot that names no quota account, names one account twice, or breaks the `subquo.v1` shape leaves the whole quota unread.
+
+A command that is not installed, exits non-zero, runs past 15 seconds or prints any other document leaves the quota unread, and the beat starts nothing.
 
 ### Token command accounts
 
