@@ -230,7 +230,7 @@ describe("a parked run", () => {
       if (!isRecord(first)) {
         throw new Error("backlog task holds no parked question")
       }
-      expect(Object.keys(first).sort()).toEqual(["answer", "asked", "id", "text"])
+      expect(Object.keys(first).sort()).toEqual(["answer", "asked", "blocks", "deciderOwns", "id", "text"])
       if (!isRecord(first.answer)) {
         throw new Error("parked question holds no answer")
       }
