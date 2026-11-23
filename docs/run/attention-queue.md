@@ -26,9 +26,12 @@ Rules and policy do not widen it.
 
 The decider can:
 
-- **Answer** with a reason and an exact rule from the task, your rules, project instructions, or the policy's Rules section.
+- **Answer** with a reason and a rule from the task, your rules, project instructions, or the policy's Rules section.
   Orc escalates an answer whose quote is no whole clause of them, after whitespace is collapsed and surrounding quotes and a leading list or quote marker are stripped on both sides.
   A quote matches a whole line, a sentence within a line, a whole paragraph joined across its lines, a sentence of that joined paragraph, where the quote starts at the start or after a period, exclamation mark, question mark, colon or semicolon and ends at the end, just before one of those marks, or on one of those marks.
+  Quote marks and clause punctuation may differ between the quote and the source.
+  Orc then records the source wording as evidence.
+  Marks that change meaning stay exact, so a quote that changes them escalates.
 - **Ask back** to a worker question.
   The worker receives the question and the item stays open.
   A review question cannot be asked back and is escalated instead.
