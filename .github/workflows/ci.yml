@@ -3,6 +3,8 @@ name: ci
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -77,7 +79,22 @@ jobs:
       - run: git diff --exit-code
       - run: bun run typecheck
 
-  test:
+  docs:
+    needs: changes
+    if: (needs.changes.outputs.release != 'true' || needs.changes.outputs.check-release == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: bun run docs:build
+
+  unit:
     needs: changes
     if: (needs.changes.outputs.release != 'true' || needs.changes.outputs.check-release == 'true') && needs.changes.outputs.docs-only != 'true'
     runs-on: ubuntu-latest
@@ -100,6 +117,39 @@ jobs:
       - id: test
         env:
           CHECK_RELEASE: ${{ needs.changes.outputs.check-release }}
+          TEST_TIER: unit
+        run: bunx checks-ci test
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: artifacts-${{ job.check_run_id }}
+          path: artifacts/
+          if-no-files-found: ignore
+
+  e2e:
+    needs: changes
+    if: (needs.changes.outputs.release != 'true' || needs.changes.outputs.check-release == 'true') && needs.changes.outputs.docs-only != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: cancel the run when a push to a draft pull request started it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+        run: bunx checks-ci draft-hold
+      - id: test
+        env:
+          CHECK_RELEASE: ${{ needs.changes.outputs.check-release }}
+          TEST_TIER: e2e
         run: bunx checks-ci test
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -109,7 +159,7 @@ jobs:
           if-no-files-found: ignore
 
   checks:
-    needs: [changes, static, test]
+    needs: [changes, static, docs, unit, e2e]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -126,7 +176,7 @@ jobs:
       - name: require every result to be success
         env:
           RESULTS: ${{ toJSON(needs) }}
-          SKIPS: ${{ needs.changes.outputs.release == 'true' && needs.changes.outputs.check-release != 'true' && 'static test' || needs.changes.outputs.docs-only == 'true' && 'test' || '' }}
+          SKIPS: ${{ needs.changes.outputs.release == 'true' && needs.changes.outputs.check-release != 'true' && 'static docs unit e2e' || needs.changes.outputs.docs-only == 'true' && 'unit e2e' || '' }}
         run: bunx checks-ci require-success
       # GitHub keeps a dispatched run's checks off the pull request, so the release pull request reads these statuses.
       - if: always() && github.event_name == 'workflow_dispatch'
