@@ -14,7 +14,7 @@ The account set is closed, and `orc login` refuses any other name.
 | `claude-main` | `claude auth login` with `CLAUDE_CONFIG_DIR` set to the account folder |
 | `claude-second` | `claude auth login` with `CLAUDE_CONFIG_DIR` set to the account folder, in a private browser window |
 | `openai` | `codex login` with `CODEX_HOME` set to the account folder |
-| `opencode` | Not available yet |
+| `opencode` | `opencode auth login` with `XDG_DATA_HOME` set to the account folder |
 
 ## Folder layout
 
@@ -22,8 +22,9 @@ Each account has one folder, `~/.orc/accounts/<account>`, or `$ORC_HOME/accounts
 `orc login` makes the folder with mode `0700` when it is missing.
 `orc login` makes no folder for an account with no sign-in yet.
 Two accounts never share a folder, and `orc login` refuses an account folder that is a link.
-The sign-in reads no other account folder from `CLAUDE_CONFIG_DIR` or `CODEX_HOME`.
+The sign-in reads no other account folder from `CLAUDE_CONFIG_DIR`, `CODEX_HOME` or `XDG_DATA_HOME`.
 Orc sets the vendor's variable to the account's own folder over any value the shell exports.
+OpenCode keeps its data in the `opencode` folder inside `XDG_DATA_HOME`, so its key file is `accounts/opencode/opencode/auth.json`.
 
 ## Private window
 
@@ -48,13 +49,14 @@ Claude then prints the link, and you open it in a private window yourself.
 ## No browser
 
 Orc treats a machine as having no browser when `SSH_CONNECTION` or `SSH_TTY` is set, or on Linux when neither `DISPLAY` nor `WAYLAND_DISPLAY` is set.
-On such a machine orc prints a note before the sign-in starts.
+On such a machine orc prints a note before the Claude or Codex sign-in starts.
 For `claude-second`, orc sets `BROWSER` to an opener script that opens nothing, so neither an opener the shell exports nor the system opener opens the link in a normal window.
 Claude Code has no separate flag for this case: `claude auth login` prints a link when no browser opens.
 Open the link on any device, sign in, and paste the code the page shows back into the terminal.
 For `openai` orc runs `codex login --device-auth` instead, which is Codex's device-code sign-in.
 Codex prints a link and a code.
 Open the link on any device, sign in, and enter the code there.
+The OpenCode sign-in asks for a provider's API key and opens no browser, so orc prints no note for `opencode`.
 
 ## No copy
 
@@ -62,11 +64,14 @@ The vendor's sign-in runs with the terminal's input and output, with its config 
 For Claude on Linux the credential stays in that folder.
 For Claude on macOS the credential stays in the login keychain under a name tied to that folder.
 Codex keeps the credential in `auth.json` in that folder by default.
+For `opencode` you paste the key into OpenCode's own prompt, which reads the terminal's input, and the key stays in that folder.
 Orc never reads, prints or copies a credential, and it opens no file inside the account folder.
-`tests/e2e/login.test.ts` holds both rules for `claude-main`, `claude-second` and `openai`.
+`tests/e2e/login.test.ts` holds these rules for `claude-main`, `claude-second`, `openai` and `opencode`.
 It signs the Claude accounts in side by side, and each sign-in sees only its own folder in `CLAUDE_CONFIG_DIR` and writes only there.
-The sign-in reads no other account folder from `CLAUDE_CONFIG_DIR` or `CODEX_HOME`.
-For each account the command prints no token-shaped value and opens no credential file.
+The sign-in reads no other account folder from `CLAUDE_CONFIG_DIR`, `CODEX_HOME` or `XDG_DATA_HOME`.
+The Claude sign-in prints no token-shaped value and opens no credential file.
+The Codex sign-in prints no token-shaped value and opens no credential file.
+The OpenCode sign-in keeps the pasted key out of orc's output and out of every file outside the `opencode` folder.
 
 ## Related topics
 

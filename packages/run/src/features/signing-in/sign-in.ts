@@ -16,7 +16,7 @@ interface VendorSignIn {
   readonly command: Command
   readonly noBrowserCommand: Command
   readonly folderVar: string
-  readonly noBrowserNote: string
+  readonly noBrowserNote: string | null
   readonly privateBrowserVar: string | null
 }
 
@@ -43,11 +43,20 @@ const codexSignIn: VendorSignIn = {
   privateBrowserVar: null
 }
 
+const opencodeSignIn: VendorSignIn = {
+  vendor: "OpenCode",
+  command: ["opencode", "auth", "login"],
+  noBrowserCommand: ["opencode", "auth", "login"],
+  folderVar: "XDG_DATA_HOME",
+  noBrowserNote: null,
+  privateBrowserVar: null
+}
+
 const signIns: Record<AccountName, VendorSignIn | null> = {
   "claude-main": claudeSignIn,
   "claude-second": { ...claudeSignIn, privateBrowserVar: "BROWSER" },
   openai: codexSignIn,
-  opencode: null
+  opencode: opencodeSignIn
 }
 
 type Env = Readonly<Record<string, string | undefined>>
@@ -104,13 +113,13 @@ export const signIn = (
   Effect.gen(function*() {
     const vendor = signIns[account]
     if (vendor === null) {
-      return yield* new SignInError({ message: "orc login " + account + " is not available yet. Only claude-main, claude-second and openai sign in today." })
+      return yield* new SignInError({ message: "orc login " + account + " is not available yet. Only claude-main, claude-second, openai and opencode sign in today." })
     }
     const folder = accountFolder(yield* Path.Path, orcHome, account)
     yield* readyFolder(folder)
     yield* Console.log("orc login " + account + ": " + vendor.vendor + " signs in with " + vendor.folderVar + " set to " + folder)
     const noBrowser = hasNoBrowser(env, platform)
-    if (noBrowser) {
+    if (vendor.noBrowserNote !== null && noBrowser) {
       yield* Console.log(vendor.noBrowserNote)
     }
     const browserEnv = yield* privateBrowserEnv(account, vendor, noBrowser, env, platform)
