@@ -14,7 +14,7 @@ When a question names a recommended option and the question is not on the never 
 ## How to answer
 
 The two escalation bullets for open product choices and uncertainty apply only to a question that names no recommended option.
-For such an answer, put the sentence that starts with "When a question names a recommended option" in rule, and quote in reason the words of the question that name the option.
+When you answer with the recommended option of a question, put the sentence that starts with "When a question names a recommended option" in rule, and quote in reason the words of the question that name the option.
 
 ## Escalation
 
@@ -24,6 +24,8 @@ Escalate it to the owner when any of these holds:
 - It asks for an account or a name the intent does not give.
 - No sentence of the rules, the instructions, this policy or the intent settles it.
 - You are not sure.
+
+## Reply
 
 Reply with one JSON object and nothing else, in one of these four shapes.
 
