@@ -401,7 +401,21 @@ describe("the decider", () => {
         const id = "orc-1." + question.id + ".2026-11-02T10_20_00_000Z"
         expect(await itemFile(root, id)).toMatchObject({ decision: { kind: "answered" }, state: { kind: "closed", answer: { words: answers[questions.indexOf(question)] } } })
       }
+      expect(await itemFile(root, "orc-1.lint-1.2026-11-02T10_20_00_000Z")).toMatchObject({ decision: { rule: { quote: "Hold engineering signals to the same standard; a lint failure, a failing test, a flaky test." } } })
     }, questions)
+  })
+
+  test("a quotation that differs from the owner's rule only in a meaning mark such as <= for >= escalates instead of answering", async () => {
+    const question = { id: "ci-1", text: "CI check failing: coverage - provider reported failure" }
+    await withAskingTask(async (root) => {
+      const home = join(root, "home")
+      await mkdir(home)
+      await writeFile(join(home, "orchestrator.md"), "## Coverage
+- Coverage must stay >= 80%.
+")
+      await decide(root, replies({ [question.text]: JSON.stringify({ decision: "answer", answer: "Lower the coverage.", rule: "Coverage must stay <= 80%.", reason: "the rule caps coverage" }) }, [], home))
+      expect(await itemFile(root, "orc-1.ci-1.2026-11-02T10_20_00_000Z")).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+    }, [question])
   })
 
   test("recorded lint and CI quotations absent from the owner's rules still escalate", async () => {
