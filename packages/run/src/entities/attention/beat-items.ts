@@ -35,7 +35,7 @@ const openOrReopenPrItem = (root: string, id: string, asked: Asked): Effect.Effe
   })
 
 // Each head commit gets its own items, so a fix pushed after a red check opens anew.
-export const routePullRequest = (root: string, task: string, pr: string, view: PullRequestView, at: string): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+export const routePullRequest = (root: string, task: string, pr: string, view: PullRequestView, at: string, waits: ReadonlyArray<string> = []): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const ended = view.state === "MERGED" ? "merged" : view.state === "CLOSED" ? "closed without merging" : null
     const refusals = checkRefusals(view)
@@ -69,7 +69,7 @@ export const routePullRequest = (root: string, task: string, pr: string, view: P
       yield* openOrReopenPrItem(root, itemId(task, "pr-ready", view.headRefOid), {
         kind: "pr-ready",
         task,
-        text: pr + " is ready to merge, checks green: " + greenChecks(view).join(", "),
+        text: pr + " is ready to merge, checks green: " + greenChecks(view).join(", ") + waits.map((wait) => "; it " + wait).join(""),
         ...choice(
           "the PR " + pr + " of " + task,
           { text: "merge", outcome: "orc merge " + task + " merges the PR into main, and the item closes with the answer merged" },

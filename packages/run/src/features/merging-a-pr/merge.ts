@@ -5,7 +5,7 @@ import { isYolo, readDispatchConfig, readProjects } from "../../shared/config/in
 import type { ConfigError } from "../../shared/config/index"
 import type { RunnerError } from "../../shared/process/index"
 import type { MergeBasis } from "../../entities/pull-request/index"
-import { checkRefusals, gh, greenChecks, prPattern, type PullRequestView, readPullRequest, redChecks } from "../../entities/pull-request/index"
+import { checkRefusals, gh, greenChecks, ownerWordChanges, readChangedFiles, prPattern, type PullRequestView, readPullRequest, redChecks } from "../../entities/pull-request/index"
 import { branchUpdate, compare, refusal, refuse } from "./branch-update"
 import { clearPendingUpdate, readPendingUpdate, savePendingUpdate, type PendingUpdate } from "./pending-update"
 
@@ -181,6 +181,12 @@ class MergeBehind extends Schema.TaggedError<MergeBehind>()("MergeBehind", { det
 
 const mergeAt = (landing: Landing, view: PullRequestView) =>
   Effect.gen(function*() {
+    if (landing.basis === "yolo-green") {
+      const waits = ownerWordChanges(yield* readChangedFiles(landing.url))
+      if (waits.length > 0) {
+        return yield* refuse(refusal(landing.id, landing.url, waits))
+      }
+    }
     const merged = yield* gh(["pr", "merge", landing.url, "--squash", "--match-head-commit", view.headRefOid])
     if (merged.exitCode !== 0) {
       const detail = "gh pr merge refused " + landing.url + ": " + merged.said

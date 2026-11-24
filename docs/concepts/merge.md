@@ -5,8 +5,8 @@ kind: explanation
 ---
 # The merge
 
-Orc never lands a pull request on its own judgment: `orc merge <task-id>` merges a closed task's pull request, and only when it is safe.
-The command exists so that the chat, the App and you all merge through one set of refusals.
+`orc merge <task-id>` merges a closed task's pull request, and only when it is safe.
+The command exists so that the chat, the App, the beat and you all merge through one set of refusals.
 
 ![The merge: what orc merge checks before it lands a pull request](../diagrams/merge.svg)
 
@@ -35,10 +35,12 @@ A merge carries a basis, the reason it is allowed.
 | Basis | When it applies |
 | --- | --- |
 | `captain-word`, the default | You said to merge that pull request |
-| `yolo-green` | The project has `"yolo": true` in `projects.json`, and you ask the chat to merge its green pull request |
+| `yolo-green` | The project has `"yolo": true` in `projects.json`, and the beat finds its pull request green or you ask the chat to merge it |
 
 Either basis meets every refusal above.
-The decider never answers a question about merging, so a merge always traces back to you.
+`yolo-green` also refuses a release, a deletion, a workflow file change or a secret change, which wait for your word and show in `orc attention`.
+The decider never answers a question about merging, so a merge traces back to your word or to the `yolo` you set.
+The beat merges only a task that closed done, and a task that closed stopped or failed never auto-merges.
 
 ## After the merge
 

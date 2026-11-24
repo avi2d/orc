@@ -54,3 +54,9 @@ A runner task with no new output for 30 minutes reports a stall.
 
 Run `orc beat --json` for the `orc.beat.v1` action document.
 It reports starts, closures, parked questions, stalls, upstream changes, and attention items.
+
+## Merging a task's PR
+
+On a project with `"yolo": true`, the beat merges a green PR for a ship task that closed done through `orc merge` with `yolo-green`.
+The beat leaves a stopped or failed task's PR open.
+Releases, deletions, workflow file changes, and secret changes wait for your merge word, as [Merging a task's PR](merging-a-tasks-pr.md) describes.

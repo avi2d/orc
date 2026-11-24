@@ -14,7 +14,10 @@ It owns the loop from backlog to dashboard: a task waits, a machine with room ru
 
 ## The captain decides
 
-- Orc pushes the task branch, opens the proposal and records the refusal, and only the captain merges, pushes to main or deletes, and that caution costs a click on every landing.
+- Orc pushes the task branch, opens the proposal and records the refusal.
+- The captain merges, except on a project with yolo true, where the beat merges a closed done task's PR once every check is green.
+- A release, a deletion, a workflow file change or a secret change still waits for the captain's merge word, even on a yolo project.
+- Only the captain pushes to main or deletes.
 
 ## Small units that each end in a check
 

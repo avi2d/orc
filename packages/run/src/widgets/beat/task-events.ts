@@ -1,16 +1,17 @@
-import { Duration, Effect, type FileSystem, Option, Result } from "effect"
+import { Duration, Effect, type FileSystem, Option, type Path, Result } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
-import { BacklogError, taskPr, type TaskRecord } from "../../entities/backlog/index"
+import { BacklogError, ranClosing, taskPr, type TaskRecord } from "../../entities/backlog/index"
 import type { BeatAction, StalledAction } from "../../entities/attention/index"
 import type { ChatEvent, PrState } from "../../entities/events/index"
 import { routePullRequest } from "../../entities/attention/index"
 import { eventRecorded, readPrState, recordEvent, writePrState } from "../../entities/events/index"
 import { checkRefusals, greenChecks, type PullRequestView } from "../../entities/pull-request/index"
 import type { RunnerError } from "../../shared/process/index"
+import { ownerWaits, yoloMerge } from "./yolo-merge"
 
 export type ReadPullRequest = (url: string) => Effect.Effect<PullRequestView, BacklogError | RunnerError, ChildProcessSpawner.ChildProcessSpawner>
 
-type Requirements = FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
+type Requirements = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
 
 const prSeconds = 30
 
@@ -52,11 +53,43 @@ export const taskPrState = (root: string, task: TaskRecord): Effect.Effect<PrSta
     return yield* readPrState(root, task.spec.id, pr)
   })
 
+const readPrView = (pr: string, read: ReadPullRequest) =>
+  read(pr).pipe(Effect.result, Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed(Result.fail(new BacklogError({ detail: "cannot read " + pr + ": the read timed out after " + prSeconds + " seconds" }))) }))
+
+const readWaits = (pr: string, view: PullRequestView, yolo: boolean) =>
+  Effect.result(ownerWaits(pr, view, yolo)).pipe(Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed(Result.fail(new BacklogError({ detail: "cannot read the files of " + pr + ": the read timed out after " + prSeconds + " seconds" }))) }))
+
+const mergeTimed = (root: string, id: string, pr: string, home: string) =>
+  yoloMerge(root, id, pr, home).pipe(Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed<BeatAction>({ kind: "merge-refused", task: id, reason: "cannot merge " + pr + ": the merge timed out after " + prSeconds + " seconds" }) }))
+
+const prStateOf = (state: string): PrState | null =>
+  state === "OPEN" ? "open" : state === "CLOSED" ? "closed" : state === "MERGED" ? "merged" : null
+
+const recordObservation = (
+  root: string,
+  task: TaskRecord,
+  pr: string,
+  view: PullRequestView,
+  at: string,
+  waits: Result.Result<ReadonlyArray<string> | null, BacklogError | RunnerError>,
+  prState: PrState
+): Effect.Effect<void, BacklogError, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    yield* routePullRequest(root, task.spec.id, pr, view, at, Result.isSuccess(waits) ? waits.success ?? [] : [])
+    const event = prEvent(task, pr, view, at, yield* eventRecorded(root, task.spec.id + ".pr-ready"))
+    if (event !== null) {
+      yield* recordEvent(root, event)
+    }
+    yield* writePrState(root, task.spec.id, pr, prState)
+  })
+
 export const prEvents = (
   root: string,
   task: TaskRecord,
   read: ReadPullRequest,
-  at: string
+  at: string,
+  yolo = false,
+  home = root
 ): Effect.Effect<Option.Option<BeatAction>, BacklogError, Requirements> =>
   Effect.gen(function*() {
     const pr = taskPr(task)
@@ -68,24 +101,28 @@ export const prEvents = (
     if (recorded === "merged" || recorded === "closed") {
       return Option.none()
     }
-    const view = yield* read(pr).pipe(Effect.result, Effect.timeoutOrElse({ duration: Duration.seconds(prSeconds), orElse: () => Effect.succeed(Result.fail(new BacklogError({ detail: "cannot read " + pr + ": the read timed out after " + prSeconds + " seconds" }))) }))
+    const view = yield* readPrView(pr, read)
     if (Result.isFailure(view)) {
       return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: view.failure.detail })
     }
-    const state = view.success.state
-    if (state !== "OPEN" && state !== "CLOSED" && state !== "MERGED") {
-      return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: "unknown PR state " + state })
+    const prState = prStateOf(view.success.state)
+    if (prState === null) {
+      return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: "unknown PR state " + view.success.state })
     }
-    const prState = state === "OPEN" ? "open" : state === "CLOSED" ? "closed" : "merged"
     if (task.spec.kind !== "ship") {
       yield* writePrState(root, id, pr, prState)
       return Option.none()
     }
-    yield* routePullRequest(root, id, pr, view.success, at)
-    const event = prEvent(task, pr, view.success, at, yield* eventRecorded(root, id + ".pr-ready"))
-    if (event !== null) {
-      yield* recordEvent(root, event)
+    const waits = yield* readWaits(pr, view.success, yolo)
+    yield* recordObservation(root, task, pr, view.success, at, waits, prState)
+    if (Result.isFailure(waits)) {
+      return Option.some<BeatAction>({ kind: "pr-unread", task: id, reason: waits.failure.detail })
     }
-    yield* writePrState(root, id, pr, prState)
-    return Option.none()
+    if (waits.success === null || waits.success.length > 0) {
+      return Option.none()
+    }
+    if (ranClosing(task)?.outcome !== "done") {
+      return Option.none()
+    }
+    return Option.some(yield* mergeTimed(root, id, pr, home))
   })
