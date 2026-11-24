@@ -369,7 +369,7 @@ describe("the Project row", () => {
       run("20261113-090000-aaaaaa", { status: "failed", endReason: "known failure" }),
       run("20261113-080000-bbbbbb", { status: "failed", endReason: "clone failure", project: "/work/orc-clone" })
     ]),
-    backlog([task("orc-7", { project: "tui-dash" })], [], configured("orc"))
+    backlog([task("orc-7", { project: "other-tool" })], [], configured("orc"))
   )
 
   test("a run of a project orc does not know is hidden by default, not counted in the list", () => {
@@ -377,7 +377,7 @@ describe("the Project row", () => {
   })
 
   test("All runs still shows the runs of projects orc does not know, not only the known ones", () => {
-    expect(filterCards(mixed, { project: null, status: null, allRuns: true }).map((card) => card.project)).toEqual(["tui-dash", "orc", "orc-clone"])
+    expect(filterCards(mixed, { project: null, status: null, allRuns: true }).map((card) => card.project)).toEqual(["other-tool", "orc", "orc-clone"])
   })
 
   test("the Project row offers only projects in orc's projects file, not every project a run names", () => {
