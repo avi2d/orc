@@ -1,7 +1,7 @@
 import { Effect, Stream } from "effect"
 import { ChildProcess, type ChildProcessSpawner } from "effect/process"
 import { runHostCommand } from "./host"
-import { OrcRunError } from "../lib/index"
+import { ciOnlyTestsEnv, OrcRunError } from "../lib/index"
 
 export interface CommandResult {
   readonly stdout: string
@@ -53,7 +53,7 @@ export const hostExec = (cwd: string, hostEnv: Readonly<Record<string, string | 
 export const nonoRunArgs = (profilePath: string, argv: Argv): ReadonlyArray<string> => ["run", "--silent", "--profile", profilePath, "--", ...argv]
 
 export const agentCommand = (exec: AgentExec, argv: Argv, stdin: ChildProcess.CommandInput = "ignore"): ChildProcess.Command => {
-  const options = { cwd: exec.cwd, env: exec.env, extendEnv: false, stdin, forceKillAfter: "1 second" } as const
+  const options = { cwd: exec.cwd, env: { ...exec.env, ...ciOnlyTestsEnv }, extendEnv: false, stdin, forceKillAfter: "1 second" } as const
   return exec.kind === "none"
     ? ChildProcess.make(argv[0], argv.slice(1), options)
     : ChildProcess.make(exec.nonoBinary, [...nonoRunArgs(exec.profilePath, argv)], options)

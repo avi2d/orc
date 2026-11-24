@@ -6,6 +6,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect, FileSystem, Path } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { hostExec } from "../../packages/run/src/shared/sandbox/agent-exec"
+import { ciOnlyTestsInstruction } from "../../packages/run/src/shared/lib/index"
 import type { AgentFile } from "../../packages/run/src/entities/agent/index"
 import { askSetupFor, type PiRun, runPi } from "../../packages/run/src/entities/agent/index"
 
@@ -92,7 +93,7 @@ describe("runPi", () => {
         "ORC_COMPLETE",
         ""
       ].join("\n"))
-      expect(await readFile(join(fixture.dir, "stdin"), "utf8")).toBe("Do the task.")
+      expect(await readFile(join(fixture.dir, "stdin"), "utf8")).toBe(ciOnlyTestsInstruction + "\n\nDo the task.")
       expect((await readFile(join(fixture.dir, "argv"), "utf8")).split("\n")).toContain(fixture.sessionDir)
     })
   }, 20_000)

@@ -36,7 +36,7 @@ A ship run records success only when all of these hold.
 
 1. Pi's final reply stopped cleanly with `ORC_COMPLETE` on its own line.
 1. The branch holds at least one new commit.
-1. The project's checks pass.
+1. The configured local checks pass.
 1. The pull request is open, and on a `no-mistakes` run CI is green.
 
 A scout or task run makes no branch and no pull request.

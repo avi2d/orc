@@ -12,9 +12,9 @@ A `no-mistakes-prod-only` project gives `direct-PR` to a task marked `internal: 
 
 ## Open the PR
 A `direct-PR` run never starts [no-mistakes](https://github.com/kunchenguid/no-mistakes) and does not need it installed.
-Once the checks pass, it runs `git push --set-upstream origin <branch>` from the run's worktree.
+Once the configured local checks pass, it runs `git push --set-upstream origin <branch>` from the run's worktree.
 It reuses the open PR for the branch when `gh pr list --head <branch> --state open` finds one, and otherwise runs `gh pr create`.
-The PR's title is the head commit's subject, and its body lists the branch's commits and the checks that passed.
+The PR's title is the head commit's subject, and its body lists the branch's commits and the local checks that passed.
 To resume a direct-PR run, add `--delivery direct-PR` to the resume command, and a resume without it runs no-mistakes.
 Orc keeps that body as `pr-body.md` in the run folder and records the step as `pr`.
 
