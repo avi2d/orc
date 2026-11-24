@@ -79,13 +79,35 @@ describe("CI-only runtime launchers", () => {
     expect(child.stderr.toString()).toContain("sets run.bun = true")
   })
 
-  test.each([[["scripts/build.ts"]], [["run", "scripts/build.ts"]]] satisfies ReadonlyArray<readonly [ReadonlyArray<string>]>)("run.bun does not refuse bun %j on an existing file, which gets no node link", async (args) => {
+  test.each([
+    [["scripts/build.ts"]],
+    [["./scripts/build.ts"]],
+    [["run", "./scripts/build.ts"]],
+    [["./scripts/x.sh"]]
+  ] satisfies ReadonlyArray<readonly [ReadonlyArray<string>]>)("run.bun does not refuse bun %j, a file form that gets no node link", async (args) => {
     await writeFile(join(root, "bunfig.toml"), "[run]\nbun = true\n")
     await mkdir(join(root, "scripts"))
     await writeFile(join(root, "scripts/build.ts"), "")
+    await writeFile(join(root, "scripts/x.sh"), "")
     const child = launch("bun", args)
     expect(child.exitCode).toBe(0)
     expect(child.stdout.toString()).toBe([join(root, "real/bun"), ...args].join("\n") + "\n")
+  })
+
+  test.each([
+    [["run", "scripts/build.ts"]],
+    [["run", "build.js"]],
+    [["scripts/x.sh"]]
+  ] satisfies ReadonlyArray<readonly [ReadonlyArray<string>]>)("run.bun refuses bun %j, a file form that gets Bun's node link", async (args) => {
+    await writeFile(join(root, "bunfig.toml"), "[run]\nbun = true\n")
+    await mkdir(join(root, "scripts"))
+    await writeFile(join(root, "scripts/build.ts"), "")
+    await writeFile(join(root, "build.js"), "")
+    await writeFile(join(root, "scripts/x.sh"), "")
+    const child = launch("bun", args)
+    expect(child.exitCode).toBe(1)
+    expect(child.stdout.toString()).toBe("")
+    expect(child.stderr.toString()).toContain("sets run.bun = true")
   })
 
   test("run.bun refuses bun run on a file that a package script of the same name shadows", async () => {

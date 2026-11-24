@@ -141,8 +141,7 @@ export const bunRuntimeOverride = (tool: string, args: Args, cwd: string): strin
   if (first.kind === "none" || (tool === "bun" && bunBuiltins.includes(first.file))) {
     return null
   }
-  const started = tool !== "bun" ? null : inner === null ? first.file : first.file === "run" && inner.kind === "script" ? inner.file : null
-  if (started !== null && runsFile(directory, started)) {
+  if (tool === "bun" && runsFileWithoutLink(directory, first, inner)) {
     return null
   }
   const file = resolve(directory, config)
@@ -157,17 +156,21 @@ const isFile = (file: string): boolean => {
   }
 }
 
-const hasScript = (manifest: unknown, name: string): boolean => {
-  if (typeof manifest !== "object" || manifest === null || !("scripts" in manifest)) {
+const sourceExtensions: Args = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"]
+
+const isPathWord = (word: string): boolean => word.startsWith("/") || word.startsWith("./") || word.startsWith("../")
+
+// Under run.bun, Bun 1.4.3 gives a child its node link for any other file form, `bun run scripts/x.ts` and `bun scripts/x.sh` included.
+const runsFileWithoutLink = (directory: string, first: Launch, inner: Launch | null): boolean => {
+  if (first.kind !== "script") {
     return false
   }
-  const { scripts } = manifest
-  return typeof scripts === "object" && scripts !== null && Object.hasOwn(scripts, name)
+  if (inner === null) {
+    const direct = isPathWord(first.file) || sourceExtensions.some((extension) => first.file.endsWith(extension))
+    return direct && isFile(resolve(directory, first.file))
+  }
+  return first.file === "run" && inner.kind === "script" && isPathWord(inner.file) && isFile(resolve(directory, inner.file))
 }
-
-// A package script of the same name can run in place of the file, and a script gets Bun's node link.
-const runsFile = (directory: string, word: string): boolean =>
-  isFile(resolve(directory, word)) && !hasScript(owningPackage(join(directory, "package.json"))?.manifest, word)
 
 const readText = (file: string): string | null => {
   try {
