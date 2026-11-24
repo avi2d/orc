@@ -1,19 +1,20 @@
 import { type AsyncContext, type Context, type Element, View } from "gpui-kit"
 import { InputState, ScrollHandle, h_flex } from "gpui-base"
 import { layout, readTextFile, run, setShared, shared } from "herdr"
-import { type Card, type Filter, type RunAgent, buildCards, filterCards, goesOn, openedFilter, opensTurns, runAgent } from "../../src/agents"
+import { type Card, type Filter, type RunAgent, cardAnswers, filterCards, goesOn, openedFilter, opensTurns, runAgent } from "../../src/agents"
+import { readAgents } from "../../src/agents-read"
 import { type AgentsActions, type Chosen, type DetailShown, type Keyed, type Pane, approvalOf, askMerge, detailView, logLines, runsColumn, sendBackBar, stepsColumn, submitSendBack } from "../../src/agents-view"
 import { type Merge, mergeCommand, mergedNote, runMerge, watchMerges } from "../../src/agents-merge"
 import { type RunChanges, changesKey } from "../../src/changes"
 import { readChanges } from "../../src/changes-read"
-import { backlog, runs, show, type Show, type ShownStep } from "../../src/guard"
+import { show, type Show, type ShownStep } from "../../src/guard"
+import { InboxAnswers } from "../../src/inbox-view"
 import { type Reading, readJson, readText } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 import { type Turn, sessionTurns } from "../../src/turns"
 import { activeChild, agentsOpenKey, openAsk, viewsStack } from "../../src/views"
 
 type Palette = ReturnType<typeof palette>
-
 const everyMs = 4000
 const thisView = "orc-agents"
 const changesBlock = "orc-changes"
@@ -54,6 +55,8 @@ export default class OrcAgents extends View {
   turnsScroll = ScrollHandle.new()
   review = InputState.new({ placeholder: "What to change before this PR merges" })
   sent: Keyed<string> | null = null
+  answers = new InboxAnswers((cx) => this.refresh(cx))
+  unread: ReadonlyMap<string, string> = new Map()
 
   override init(_props: unknown, cx: AsyncContext): void {
     this.review.on("submit", (_event, submitted) => this.sendBack(submitted))
@@ -78,7 +81,7 @@ export default class OrcAgents extends View {
     this.busy = true
     this.stale = false
     cx.spawn((task) =>
-      this.readAll().then(() => {
+      this.readAll(task).then(() => {
         this.busy = false
         task.notify()
         this.labelRuns(task)
@@ -89,16 +92,14 @@ export default class OrcAgents extends View {
     )
   }
 
-  readAll(): Promise<void> {
-    return Promise.all([
-      readJson("orc", ["runs", "--json", "--local"], runs),
-      readJson("orc", ["backlog", "--json"], backlog)
-    ]).then(([runsReading, backlogReading]) => {
-      this.cards = runsReading.kind !== "ok"
-        ? runsReading
-        : backlogReading.kind !== "ok"
-        ? backlogReading
-        : { kind: "ok", value: buildCards(runsReading.value, backlogReading.value) }
+  readAll(cx: Context): Promise<void> {
+    return readAgents().then((reading) => {
+      this.cards = reading.kind === "ok" ? { kind: "ok", value: reading.value.cards } : reading
+      if (reading.kind === "ok") {
+        this.unread = reading.value.unread
+        this.answers.sync(cx, reading.value.cards.flatMap(cardAnswers), this.unread)
+      }
+      cx.notify()
       if (this.selectedKey !== null && !this.visibleCards().some((card) => card.key === this.selectedKey) && this.review.value() !== "") {
         this.review.set_value("")
       }
@@ -357,11 +358,17 @@ export default class OrcAgents extends View {
       setFilter: (spot, filter) => this.setFilter(spot, filter),
       choose: (spot, chosen) => this.choose(spot, chosen),
       setPane: (spot, pane) => this.setPane(spot, pane),
-      askMerge: (asked, approval) => askMerge(asked, approval, `${thisView}.${mergeCommand}${asked.id}`)
+      askMerge: (asked, approval) => askMerge(approval, `${thisView}.${mergeCommand}${asked.id}`)
     }
     return h_flex().id("root").size_full().bg(t.surface).text_size(13).text_color(t.foreground)
       .child(runsColumn(t, { cards: this.cards, filter: this.filter, selectedKey: card?.key ?? null, agents: this.agents, folded: this.folded }, act))
-      .child(stepsColumn(t, card, card === null ? null : this.currentSteps(card), this.target(), this.changesProblem, act))
+      .child(stepsColumn(t, card, {
+        reading: card === null ? null : this.currentSteps(card),
+        target: this.target(),
+        answers: (item) => this.answers.item(t, item),
+        threadProblem: card === null ? null : this.unread.get(card.id) ?? null,
+        changesProblem: this.changesProblem
+      }, act))
       .child(this.detail(t, card, act))
   }
 
