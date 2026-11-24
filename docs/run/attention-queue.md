@@ -21,7 +21,7 @@ The call has no tools.
 It receives the task, earlier answers, the question, `<ORC_HOME>/orchestrator.md`, and the project's instructions when present.
 Its policy is in `packages/run/agents/decider-policy.md`.
 
-A no-mistakes review question names the action it asks of you in the `question_action` column of its `question-<id>` finding.
+No-mistakes names the action it asks of you in the `question_action` column of each `ask-user` finding and each `question-<id>` finding.
 Orc carries that value through `asking.json`, the run history and the parked question in the task file.
 When a question names `none`, orc sends it to the decider.
 When it names `merge`, `delete` for deleting unlanded work, `login`, or any other value, orc sends it to you.

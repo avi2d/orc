@@ -127,6 +127,37 @@ describe("the asked action of a no-mistakes review question", () => {
     })
   })
 
+  test("an ask-user finding with action none bypasses guarded words instead of escalating", async () => {
+    await withStartedTask(async (root) => {
+      await parkThroughGate(root, gateAsking("3,warning,,ask-user,Should the report look at both retry counters?,none"))
+      expect((await run(listTasks(root))).at(0)?.parked?.questions.at(0)?.asks).toBe("none")
+      const heard: Array<DeciderRequest> = []
+      const decided = await decideAll(root, heard)
+      expect(heard.length).toBe(1)
+      expect(decided.map((entry) => entry.verdict.kind)).toEqual(["answered"])
+    })
+  })
+
+  test.each([
+    ["merge", "Land this before the schema change?", "merge"],
+    ["delete", "Clear the stale branch orc/old?", "delete unlanded work"],
+    ["login", "Refresh the GitHub session first?", "log in"],
+    ["push", "Send this branch upstream?", "push"],
+    ["release", "Ship this version now?", "release"]
+  ])("an ask-user finding requesting %s reaches the owner instead of the decider", async (asks, text, named) => {
+    await withStartedTask(async (root) => {
+      await parkThroughGate(root, gateAsking("3,warning,,ask-user," + text + "," + asks))
+      expect((await run(listTasks(root))).at(0)?.parked?.questions.at(0)?.asks).toBe(asks)
+      const heard: Array<DeciderRequest> = []
+      const decided = await decideAll(root, heard)
+      expect(heard.length).toBe(0)
+      const verdict = decided.at(0)?.verdict
+      expect(verdict?.kind).toBe("escalated")
+      expect(verdict?.kind === "escalated" ? verdict.reason : "").toContain("asks the owner to " + named)
+      expect((await run(openItems(root))).map((entry) => entry.item.owner)).toEqual(["user"])
+    })
+  })
+
   test("an action orc does not know goes to the owner", async () => {
     await withStartedTask(async (root) => {
       await parkThroughGate(root, gateAsking("question-1,warning,,ask-user,Is this branch ready?,unknown"))

@@ -79,7 +79,7 @@ export const findingsTable = (output: string): ReadonlyArray<NoMistakesFinding> 
     line: row.get("line") ?? "",
     action: row.get("action") ?? "",
     description: row.get("description") ?? "",
-    ...askedOf((row.get("id") ?? "").startsWith("question-") ? (row.get("question_action") ?? "").trim() : "")
+    ...askedOf((row.get("question_action") ?? "").trim())
   }))
 
 export const stepsWithFindings = (output: string): ReadonlyArray<string> =>
