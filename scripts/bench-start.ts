@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { arch, cpus, platform, release } from "node:os"
 import { Console, Data, Effect } from "effect"
+import { helperCommand } from "../packages/run/src/entities/heavy-queue/heavy-standin-runtime"
 
 class BenchStartError extends Data.TaggedError("BenchStartError")<{
   readonly message: string
@@ -46,16 +47,15 @@ const parseOptions = (words: ReadonlyArray<string>): Effect.Effect<Options, Benc
     return options
   })
 
-const isScript = (file: string): boolean => /\.(?:[cm]?[jt]s)$/.test(file)
+const isScript = (file: string): boolean => /\.[jt]s$/.test(file)
 
 const orcArgv = (target: string): ReadonlyArray<string> =>
   isScript(target) ? [process.execPath, target, "--help"] : [target, "--help"]
 
 const standinCall = JSON.stringify({ tool: "bun", commands: [], home: "", group: "heavy", wrap: "", real: "", through: null, timing: null })
 
-// The flags match helperCommand in heavy-standin-runtime.ts, so a source run pays the same startup as a real stand-in.
 const standinArgv = (target: string): ReadonlyArray<string> => [
-  ...(isScript(target) ? [process.execPath, "--no-env-file", "--config=/dev/null", target] : [target]),
+  ...(isScript(target) ? [process.execPath, ...helperCommand.slice(1, -1), target] : [target]),
   standinCall, "bench-standin", "test", "x"
 ]
 
