@@ -76,6 +76,7 @@ const expectedFiles = [
   "src/app/help-format.ts",
   "src/app/help.ts",
   "src/app/login-args.ts",
+  "src/app/quota-cli.ts",
   "src/bin.ts",
   "src/features/chat/chat-backlog.ts",
   "src/features/chat/chat-board-bind.ts",

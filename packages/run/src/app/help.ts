@@ -1,7 +1,7 @@
 import { type AppWord, type CommandWord, commandWords, isCommandWord } from "./args"
 import type { AttentionWord } from "./dispatch-args"
 import { appHelp, appInstallHelp, chatHelp, logHelp, loginHelp, refusalsHelp, runHelp, runsHelp, scoreHelp, showHelp, updateHelp } from "./help-entries-run"
-import { attentionAnswerHelp, attentionHelp, backlogHelp, backlogVerbHelp, beatHelp, mergeHelp } from "./help-entries-backlog"
+import { attentionAnswerHelp, attentionHelp, backlogHelp, backlogVerbHelp, beatHelp, mergeHelp, quotaHelp } from "./help-entries-backlog"
 import { heavyHelp, heavyVerbHelp, machinesHelp, runnerHelp, runnerVerbHelp, versionHelp } from "./help-entries-runner"
 import { formatHelp, formatOverview, type HelpEntry, type OverviewGroup, type Row, usageBlock, wrap, terminalWidth } from "./help-format"
 
@@ -18,6 +18,7 @@ const commandGroup: Record<CommandWord, Group> = {
   backlog: "The backlog and the beat:",
   attention: "The backlog and the beat:",
   beat: "The backlog and the beat:",
+  quota: "The backlog and the beat:",
   merge: "The backlog and the beat:",
   runner: "The runner:",
   heavy: "The runner:",
@@ -39,6 +40,7 @@ const commandHelp: Record<CommandWord, HelpEntry> = {
   backlog: backlogHelp,
   attention: attentionHelp,
   beat: beatHelp,
+  quota: quotaHelp,
   merge: mergeHelp,
   runner: runnerHelp,
   heavy: heavyHelp,
