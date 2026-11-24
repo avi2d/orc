@@ -1,4 +1,5 @@
 import type { Path } from "effect"
+import { isTestCall } from "../../entities/heavy-queue/index"
 import type { ShellCall } from "./shell-calls"
 
 type Target =
@@ -11,9 +12,6 @@ const suite: Target = { kind: "suite" }
 const leafName = (word: string): string => word.split(/[/\\]/).at(-1) ?? ""
 const executableName = (word: string): string => leafName(word).replace(/@[^@]+$/, "").replace(/\.(?:exe|cmd|bat)$/, "")
 const isE2eTarget = (word: string): boolean => /(^|[:_-])e2e(?:[:_.-]|$)/.test(leafName(word))
-const isScriptTarget = (word: string): boolean => word === "test" || word.startsWith("test:") || isE2eTarget(word)
-
-const startsRunner = (word: string): boolean => executableName(word) === "checks-test" || isE2eTarget(word)
 
 const bunValueOptions = new Set([
   "--cwd", "--filter", "-F", "--elide-lines", "--env-file", "--config", "-c",
@@ -45,24 +43,24 @@ const takeOptions = (call: ShellCall, path: Path.Path): ShellCall => {
 }
 
 const toolTarget = (word: string | null | undefined): Target | null =>
-  typeof word === "string" && startsRunner(word) ? suite : null
+  typeof word === "string" && (isTestCall(executableName(word), []) || isE2eTarget(word)) ? suite : null
 
 const scriptTarget = (call: ShellCall): Target | null => {
   const [name] = call.words
   if (typeof name !== "string") return null
-  if (isScriptTarget(name) || startsRunner(name)) return suite
+  if (isTestCall("bun", ["run", name]) || toolTarget(name) !== null) return suite
   return { kind: "script", cwd: call.cwd, name }
 }
 
 export const testTargetOf = ({ words, cwd }: ShellCall, path: Path.Path): Target | null => {
   const [program, ...args] = words
   if (typeof program !== "string") return null
-  if (startsRunner(program)) return suite
+  if (isTestCall(executableName(program), args.filter((word) => word !== null)) || isE2eTarget(program)) return suite
   switch (executableName(program)) {
     case "bun": {
       const call = takeOptions({ cwd, words: args }, path)
       const [verb, ...rest] = call.words
-      if (verb === "test") return suite
+      if (isTestCall("bun", call.words.filter((word) => word !== null))) return suite
       if (verb === "x") return toolTarget(takeOptions({ cwd: call.cwd, words: rest }, path).words[0])
       if (verb === "run") return scriptTarget(takeOptions({ cwd: call.cwd, words: rest }, path))
       return scriptTarget(call)
@@ -75,6 +73,7 @@ export const testTargetOf = ({ words, cwd }: ShellCall, path: Path.Path): Target
     case "yarn": {
       const call = takeOptions({ cwd, words: args }, path)
       const [verb, ...rest] = call.words
+      if (isTestCall(executableName(program), call.words.filter((word) => word !== null))) return suite
       if (verb === "exec" || verb === "dlx") return toolTarget(takeOptions({ cwd: call.cwd, words: rest }, path).words[0])
       if (verb === "run" || verb === "run-script") return scriptTarget(takeOptions({ cwd: call.cwd, words: rest }, path))
       return scriptTarget(call)

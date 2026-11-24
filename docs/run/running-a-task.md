@@ -38,7 +38,13 @@ commands:
 Orc runs only `build`, `lint`, and `typecheck` as local checks.
 In the first checks round, orc prints a warning on stderr naming skipped commands.
 The `prepare` command runs before Pi starts.
-Orc skips `prepare` or a local check if it finds a test runner in the command or in a package script the command calls.
+Orc refuses `prepare` or a local check if it finds a test runner in the command or in a package script the command calls.
+The error names the command and the test call.
+Orc follows package scripts recursively, including their `pre` and `post` scripts.
+The shared test-call rule recognizes `checks-test`, `bun test`, test executables such as Vitest and Jest, and `e2e` executable or leaf targets.
+Recognized package scripts include `test`, `tests`, `t`, `tst`, `e2e`, `coverage`, and `mutation`.
+The rule also recognizes `test:*`, `tests:*`, `e2e:*`, `coverage:*`, and `mutation:*`.
+A linter argument or an ancestor directory named `e2e` is not a test target.
 Without local checks, orc records the round as `skipped`.
 Orc then hands off to no-mistakes or opens the direct PR.
 GitHub CI runs repository tests and decides completion.

@@ -54,20 +54,14 @@ export const installCopy = (
       Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed<string | null>(null)),
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read " + file + ": " + String(cause) }))
     )
-    const commandsBeforeFiltering = text === null ? [] : yield* readChecksCommands(text, file).pipe(
+    const configured = text === null ? [] : yield* readChecksCommands(text, file).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
     )
-    const configured = commandsBeforeFiltering.filter((check) => check.name === "prepare")
-    const commands = yield* localRunCommands(fs, path, exec.cwd, configured).pipe(
+    const commands = yield* localRunCommands(fs, path, exec.cwd, configured.filter((check) => check.name === "prepare")).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
     )
     const prepare = prepareCommandOf(commands)
-    if (prepare === null) {
-      if (configured.length > 0) {
-        yield* Console.warn("orc: warning: skipped prepare because it starts a local test suite")
-      }
-      return
-    }
+    if (prepare === null) return
     yield* Console.log("orc: preparing the copy with " + prepare)
     const result = yield* shellInAgent(spawner, exec, prepare)
     yield* fs.writeFileString(logFile, "$ " + prepare + "\n" + result.stdout + result.stderr + "exit " + result.exitCode.toString() + "\n").pipe(

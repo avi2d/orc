@@ -52,6 +52,27 @@ describe("readChecksCommands", () => {
 })
 
 describe("runChecksRound", () => {
+  test("keeps the CI explanation instead of writing a blank empty-round evidence file", async () => {
+    const dir = await mkdtemp(join(process.cwd(), ".review-checks-"))
+    try {
+      const calls: Array<string> = []
+      const evidence = await provide(Effect.gen(function*() {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const outcome = yield* runChecksRound((command) => {
+          calls.push(command)
+          return Effect.succeed({ stdout: "", stderr: "", exitCode: 0 })
+        }, fs, path, dir, 1, [])
+        return { outcome, text: yield* fs.readFileString(outcome.file) }
+      }))
+      expect(calls).toEqual([])
+      expect(evidence.outcome.outcomes).toEqual([])
+      expect(evidence.text).toBe("No local checks ran. GitHub CI decides completion.\n")
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   test("writes one evidence file with each command, its output and its pass or fail", async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-checks-"))
     try {
@@ -132,6 +153,7 @@ describe("checks evidence names", () => {
   test("the fix prompt hands the failed output file and keeps the completion marker", () => {
     const prompt = buildFixPrompt(fixer, "/runs/abc/checks-1.txt")
     expect(prompt).toContain("Fix the failure.")
+    expect(prompt).toContain("Rerun the failed build, lint, or typecheck command to confirm the fix.")
     expect(prompt).toContain("/runs/abc/checks-1.txt")
     expect(prompt).toContain(orcCompletionLine)
   })

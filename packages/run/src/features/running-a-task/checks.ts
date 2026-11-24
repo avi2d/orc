@@ -118,11 +118,11 @@ export const localRunCommands = Effect.fnUntraced(function*(
     for (const dir of searched) packagesByDirectory.set(dir, found)
     return found
   })
-  const hasTestInvocation = Effect.fnUntraced(function*(
+  const testInvocation = Effect.fnUntraced(function*(
     command: string,
     directory: string,
     visited: Set<string>
-  ): Effect.fn.Return<boolean, ChecksError> {
+  ): Effect.fn.Return<string | null, ChecksError> {
     const calls = yield* Effect.try({
       try: () => shellCalls(command, directory, path),
       catch: (cause) => new ChecksError({ message: "orc: cannot read the shell command " + command + ": " + String(cause) })
@@ -130,9 +130,10 @@ export const localRunCommands = Effect.fnUntraced(function*(
     for (const call of calls) {
       const target = testTargetOf(call, path)
       if (target === null) continue
-      if (target.kind === "suite") return true
+      if (target.kind === "suite") return call.words.map((word) => word ?? "<dynamic>").join(" ")
       if (target.kind === "shell") {
-        if (yield* hasTestInvocation(target.command, target.cwd, visited)) return true
+        const invocation = yield* testInvocation(target.command, target.cwd, visited)
+        if (invocation !== null) return invocation
         continue
       }
       const pkg = yield* packageAt(target.cwd)
@@ -142,16 +143,22 @@ export const localRunCommands = Effect.fnUntraced(function*(
       visited.add(key)
       for (const name of ["pre" + target.name, target.name, "post" + target.name]) {
         const script = Object.hasOwn(pkg.scripts, name) ? pkg.scripts[name] : undefined
-        if (script !== undefined && (yield* hasTestInvocation(script, pkg.cwd, visited))) return true
+        if (script === undefined) continue
+        const invocation = yield* testInvocation(script, pkg.cwd, visited)
+        if (invocation !== null) return invocation
       }
     }
-    return false
+    return null
   })
 
   const local: Array<ChecksCommand> = []
   for (const check of commands) {
     if (!localRunCommandNames.has(check.name)) continue
-    if (!(yield* hasTestInvocation(check.command, cwd, new Set()))) local.push(check)
+    const invocation = yield* testInvocation(check.command, cwd, new Set())
+    if (invocation !== null) {
+      return yield* fail("orc: refusing " + check.name + " command " + JSON.stringify(check.command) + " because it invokes local tests: " + invocation + ". Leave repository tests to GitHub CI.")
+    }
+    local.push(check)
   }
   return local
 })
@@ -220,7 +227,7 @@ export const runChecksRound = (
       finished.push(sectionOf(outcome, result.stdout, result.stderr))
       yield* rewrite()
     }
-    yield* append("\n")
+    yield* append(outcomes.length === 0 ? "No local checks ran. GitHub CI decides completion.\n" : "\n")
     return { round, file, outcomes }
   })
 
@@ -229,6 +236,6 @@ export const buildFixPrompt = (agent: AgentFile, evidenceFile: string): string =
     agent.body,
     "",
     "The failed checks output sits in " + evidenceFile + ".",
-    "Read that file and fix what failed, then run each check that failed and confirm that it passes.",
+    "Read that file and fix what failed. Rerun the failed build, lint, or typecheck command to confirm the fix.",
     "When the fix is committed on this branch, print " + orcCompletionLine + " on its own line and stop."
   ].join("\n")

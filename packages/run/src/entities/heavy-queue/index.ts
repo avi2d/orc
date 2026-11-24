@@ -1,3 +1,4 @@
+export { isTestCall } from "./heavy-classify"
 export { heavyBinDir, withHeavyPath } from "./heavy"
 export { ensureHeavyQueue, ensureHeavySetup, readHeavySettings } from "./heavy-setup"
 export { standinTools } from "./heavy-standin"

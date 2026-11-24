@@ -16,7 +16,12 @@ Each runs inside the run, so a pull request that reaches you has already passed 
 The project names its checks in a `.no-mistakes.yaml` file at its root, under `commands`.
 Orc runs only `build`, `lint`, and `typecheck` as local checks in the run's copy after Pi finishes.
 It runs `prepare` before Pi starts and skips every other command.
-Orc skips any of those four commands that invoke `checks-test`, `bun test`, or an `e2e` executable or script target.
+Orc refuses any of those four commands that invoke a local test runner and names the test call in the error.
+It follows package scripts, including their `pre` and `post` scripts, to find test calls.
+The shared rule also blocks tests in Pi sessions through the heavy-queue stand-ins.
+It recognizes `checks-test`, `bun test`, test executables such as Vitest and Jest, and `e2e` executable or leaf targets.
+Recognized package scripts include `test`, `tests`, `t`, `tst`, `e2e`, `coverage`, and `mutation`.
+The rule also recognizes `test:*`, `tests:*`, `e2e:*`, `coverage:*`, and `mutation:*`.
 A path passed to another tool, such as `tests/e2e` passed to a linter, does not name a test runner.
 GitHub CI runs repository tests and decides whether the run completes.
 When a local check fails, orc starts a fixer Pi with the failing output, then runs the local checks again.

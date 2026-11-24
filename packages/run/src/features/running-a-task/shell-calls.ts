@@ -12,6 +12,10 @@ const isCall = (node: sh.Node): node is sh.CallExpr => syntax.NodeType(node) ===
 const isStatement = (node: sh.Node): node is sh.Stmt => syntax.NodeType(node) === "Stmt"
 const isBinary = (node: sh.Node): node is sh.BinaryCmd => syntax.NodeType(node) === "BinaryCmd"
 const isBlock = (node: sh.Node): node is sh.Block => syntax.NodeType(node) === "Block"
+const isIf = (node: sh.Node): node is sh.IfClause => syntax.NodeType(node) === "IfClause"
+const isWhile = (node: sh.Node): node is sh.WhileClause => syntax.NodeType(node) === "WhileClause"
+const isFor = (node: sh.Node): node is sh.ForClause => syntax.NodeType(node) === "ForClause"
+const isCase = (node: sh.Node): node is sh.CaseClause => syntax.NodeType(node) === "CaseClause"
 const isSubshell = (node: sh.Node): node is sh.Subshell => syntax.NodeType(node) === "Subshell"
 const isSubstitution = (node: sh.Node): node is sh.CmdSubst => syntax.NodeType(node) === "CmdSubst"
 const isLiteral = (node: sh.Node): node is sh.Lit => syntax.NodeType(node) === "Lit"
@@ -41,8 +45,9 @@ export const shellCalls = (command: string, cwd: string, path: Path.Path): Reado
   const bytes = new TextEncoder().encode(command)
   const text = new TextDecoder()
   const calls: Array<ShellCall> = []
-  const sequence = (statements: ReadonlyArray<sh.Stmt | null>, directory: string): string =>
-    statements.reduce((dir, statement) => visit(statement, dir), directory)
+  const unique = (directories: ReadonlyArray<string>): Array<string> => [...new Set(directories)]
+  const sequence = (statements: ReadonlyArray<sh.Stmt | null>, directory: string): Array<string> =>
+    statements.reduce((directories, statement) => unique(directories.flatMap((dir) => visit(statement, dir))), [directory])
   const nested = (node: sh.Node, directory: string) => {
     syntax.Walk(node, (child) => {
       if (child === null) return false
@@ -52,36 +57,63 @@ export const shellCalls = (command: string, cwd: string, path: Path.Path): Reado
       return false
     })
   }
-  const visit = (node: sh.Node | null, directory: string): string => {
-    if (node === null) return directory
+  const visit = (node: sh.Node | null, directory: string): Array<string> => {
+    if (node === null) return [directory]
     if (isStatement(node)) {
       for (const redirection of node.Redirs ?? []) {
         if (redirection !== null) nested(redirection, directory)
       }
       const next = visit(node.Cmd, directory)
-      return node.Background ? directory : next
+      return node.Background ? [directory] : next
     }
     if (isCall(node)) {
       nested(node, directory)
       const words = (node.Args ?? []).map((word) => word === null ? null : wordOf(word.Parts))
       const [tool, dest] = words
       if (tool === "cd" && typeof dest === "string" && !dest.startsWith("-")) {
-        return path.resolve(directory, dest)
+        return [path.resolve(directory, dest)]
       }
       if (words.length > 0) calls.push({ cwd: directory, words })
-      return directory
+      return tool === "exit" ? [] : [directory]
     }
     if (isBinary(node)) {
       const afterLeft = visit(node.X, directory)
       const operator = node.OpPos.Offset()
-      const andThen = text.decode(bytes.subarray(operator, operator + 2)) === "&&"
-      const afterRight = visit(node.Y, andThen ? afterLeft : directory)
-      return andThen ? afterRight : directory
+      const op = text.decode(bytes.subarray(operator, operator + 2))
+      if (op === "&&" || op === "||") {
+        const rightDirectories = op === "&&" ? afterLeft : unique([directory, ...afterLeft])
+        return unique([...afterLeft, ...rightDirectories.flatMap((dir) => visit(node.Y, dir))])
+      }
+      visit(node.Y, directory)
+      return [directory]
+    }
+    if (isIf(node)) {
+      return unique(sequence(node.Cond ?? [], directory).flatMap((dir) => [
+        ...sequence(node.Then ?? [], dir), ...visit(node.Else, dir)
+      ]))
+    }
+    if (isWhile(node)) {
+      const afterCondition = sequence(node.Cond ?? [], directory)
+      return unique([...afterCondition, ...afterCondition.flatMap((dir) => sequence(node.Do ?? [], dir))])
+    }
+    if (isFor(node)) {
+      nested(node.Loop, directory)
+      return unique([directory, ...sequence(node.Do ?? [], directory)])
+    }
+    if (isCase(node)) {
+      if (node.Word !== null) nested(node.Word, directory)
+      return unique([directory, ...(node.Items ?? []).flatMap((item) => {
+        if (item === null) return []
+        for (const pattern of item.Patterns ?? []) {
+          if (pattern !== null) nested(pattern, directory)
+        }
+        return sequence(item.Stmts ?? [], directory)
+      })])
     }
     if (isBlock(node)) return sequence(node.Stmts ?? [], directory)
     if (isSubshell(node) || isSubstitution(node)) sequence(node.Stmts ?? [], directory)
     else nested(node, directory)
-    return directory
+    return [directory]
   }
   sequence(file.Stmts ?? [], cwd)
   return calls
