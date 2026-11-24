@@ -31,13 +31,14 @@ export const openAgentExec = (
         HEAVY_TESTS_CI_ONLY: "1",
         ...(plan.own === null ? {} : { PI_CODING_AGENT_DIR: plan.own.piAgentDir, ...plan.own.env })
       })
-      if (exec.env.PI_CODING_AGENT_DIR === undefined) {
+      const agentDir = new Map(Object.entries(exec.env)).get("PI_CODING_AGENT_DIR")
+      if (agentDir === undefined) {
         return exec
       }
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const home = hostEnv.HOME || homedir()
-      if (path.resolve(copyDir, exec.env.PI_CODING_AGENT_DIR) === path.join(home, ".pi", "agent")) {
+      if (path.resolve(copyDir, agentDir) === path.join(home, ".pi", "agent")) {
         return exec
       }
       const piExtension = yield* toolTimeCap(fs, path, home).pipe(

@@ -72,6 +72,21 @@ const run = (fixture: Fixture, pacing: { readonly tickMillis: number; readonly i
     }, pacing)
   }).pipe(Effect.provide(BunServices.layer)))
 
+const expectedAgentDir = (agentDir: "run" | "inherited" | "home" | "default", dir: string): string => {
+  if (agentDir === "run") return join(dir, "session", "agent")
+  if (agentDir === "inherited") return join(dir, "operator-agent")
+  return agentDir === "home" ? join(dir, ".pi", "agent") : ""
+}
+
+const expectRoleArgv = (role: "implementer" | "fixer" | "reviewer", argv: ReadonlyArray<string>): void => {
+  if (role === "reviewer") {
+    expect(argv.slice(argv.indexOf("--session"), argv.indexOf("--session") + 2)).toEqual(["--session", "previous-session.jsonl"])
+    expect(argv).not.toContain("--extension")
+  } else {
+    expect(argv).toContain("--extension")
+  }
+}
+
 describe("runPi", () => {
   for (const agentDir of ["run", "inherited", "home", "default"] as const) {
     for (const installed of [true, false]) {
@@ -120,16 +135,8 @@ describe("runPi", () => {
             const caps = argv.flatMap((arg, index) => arg === "-e" ? [argv[index + 1]] : [])
             const isolated = agentDir === "run" || agentDir === "inherited"
             expect(caps).toEqual(installed && isolated ? [cap] : [])
-            const expectedAgentDir = agentDir === "run" ? join(fixture.dir, "session", "agent")
-              : agentDir === "inherited" ? join(fixture.dir, "operator-agent")
-              : agentDir === "home" ? join(fixture.dir, ".pi", "agent") : ""
-            expect(await readFile(join(fixture.dir, "agent-dir"), "utf8")).toBe(expectedAgentDir)
-            if (role === "reviewer") {
-              expect(argv.slice(argv.indexOf("--session"), argv.indexOf("--session") + 2)).toEqual(["--session", "previous-session.jsonl"])
-              expect(argv).not.toContain("--extension")
-            } else {
-              expect(argv).toContain("--extension")
-            }
+            expect(await readFile(join(fixture.dir, "agent-dir"), "utf8")).toBe(expectedAgentDir(agentDir, fixture.dir))
+            expectRoleArgv(role, argv)
           }
         })
       })
