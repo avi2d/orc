@@ -1,0 +1,88 @@
+import type { Path } from "effect"
+import sh from "mvdan-sh"
+
+export interface ShellCall {
+  readonly cwd: string
+  readonly words: ReadonlyArray<string | null>
+}
+
+const { syntax } = sh
+
+const isCall = (node: sh.Node): node is sh.CallExpr => syntax.NodeType(node) === "CallExpr"
+const isStatement = (node: sh.Node): node is sh.Stmt => syntax.NodeType(node) === "Stmt"
+const isBinary = (node: sh.Node): node is sh.BinaryCmd => syntax.NodeType(node) === "BinaryCmd"
+const isBlock = (node: sh.Node): node is sh.Block => syntax.NodeType(node) === "Block"
+const isSubshell = (node: sh.Node): node is sh.Subshell => syntax.NodeType(node) === "Subshell"
+const isSubstitution = (node: sh.Node): node is sh.CmdSubst => syntax.NodeType(node) === "CmdSubst"
+const isLiteral = (node: sh.Node): node is sh.Lit => syntax.NodeType(node) === "Lit"
+const isSingleQuoted = (node: sh.Node): node is sh.SglQuoted => syntax.NodeType(node) === "SglQuoted"
+const isDoubleQuoted = (node: sh.Node): node is sh.DblQuoted => syntax.NodeType(node) === "DblQuoted"
+
+const wordOf = (parts: ReadonlyArray<sh.WordPart>, quoted = false): string | null => {
+  let word = ""
+  for (const part of parts) {
+    if (isLiteral(part)) {
+      word += part.Value.replace(quoted ? /\\([$\u0060"\\\n])/g : /\\(.)/gs, (_, escaped: string) => escaped === "\n" ? "" : escaped)
+    } else if (isSingleQuoted(part)) {
+      word += part.Value
+    } else if (isDoubleQuoted(part)) {
+      const text = wordOf(part.Parts, true)
+      if (text === null) return null
+      word += text
+    } else {
+      return null
+    }
+  }
+  return word
+}
+
+export const shellCalls = (command: string, cwd: string, path: Path.Path): ReadonlyArray<ShellCall> => {
+  const file = syntax.NewParser().Parse(command)
+  const bytes = new TextEncoder().encode(command)
+  const text = new TextDecoder()
+  const calls: Array<ShellCall> = []
+  const sequence = (statements: ReadonlyArray<sh.Stmt | null>, directory: string): string =>
+    statements.reduce((dir, statement) => visit(statement, dir), directory)
+  const nested = (node: sh.Node, directory: string) => {
+    syntax.Walk(node, (child) => {
+      if (child === null) return false
+      if (child === node) return true
+      if (!isStatement(child) && !isSubstitution(child)) return true
+      visit(child, directory)
+      return false
+    })
+  }
+  const visit = (node: sh.Node | null, directory: string): string => {
+    if (node === null) return directory
+    if (isStatement(node)) {
+      for (const redirection of node.Redirs ?? []) {
+        if (redirection !== null) nested(redirection, directory)
+      }
+      const next = visit(node.Cmd, directory)
+      return node.Background ? directory : next
+    }
+    if (isCall(node)) {
+      nested(node, directory)
+      const words = (node.Args ?? []).map((word) => word === null ? null : wordOf(word.Parts))
+      const [tool, dest] = words
+      if (tool === "cd" && typeof dest === "string" && !dest.startsWith("-")) {
+        return path.resolve(directory, dest)
+      }
+      if (words.length > 0) calls.push({ cwd: directory, words })
+      return directory
+    }
+    if (isBinary(node)) {
+      const afterLeft = visit(node.X, directory)
+      const operator = node.OpPos.Offset()
+      const andThen = text.decode(bytes.subarray(operator, operator + 2)) === "&&"
+      const afterRight = visit(node.Y, andThen ? afterLeft : directory)
+      return andThen ? afterRight : directory
+    }
+    if (isBlock(node)) return sequence(node.Stmts ?? [], directory)
+    if (isSubshell(node) || isSubstitution(node)) sequence(node.Stmts ?? [], directory)
+    else nested(node, directory)
+    return directory
+  }
+  sequence(file.Stmts ?? [], cwd)
+  return calls
+}

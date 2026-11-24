@@ -37,14 +37,15 @@ commands:
 
 Orc runs only `build`, `lint`, and `typecheck` as local checks.
 In the first checks round, orc prints a warning on stderr naming skipped commands.
-The `prepare` command runs before Pi starts and is not skipped.
+The `prepare` command runs before Pi starts.
+Orc skips `prepare` or a local check if it finds a test runner in the command or in a package script the command calls.
 Without local checks, orc records the round as `skipped`.
 Orc then hands off to no-mistakes or opens the direct PR.
 GitHub CI runs repository tests and decides completion.
 Keep test runners out of those commands and `prepare`.
-With `--sandbox none`, the heavy-queue stand-ins refuse recognized test runners and test scripts in Pi sessions, `prepare`, and local checks.
-Commands that do not go through a stand-in are not blocked.
-In the default `nono` sandbox and in no-mistakes review, Orc relies on instructions instead of blocking test commands.
+The heavy-queue stand-ins also refuse recognized test runners and test scripts in Pi sessions, `prepare`, and local checks.
+The stand-ins cannot block commands that do not use them.
+Orc tells the no-mistakes review fixer to leave tests to CI.
 Orc starts no-mistakes without its local Test step.
 
 ## Choose the run

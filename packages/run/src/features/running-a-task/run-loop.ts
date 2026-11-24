@@ -1,5 +1,5 @@
 import { Console, Effect, FileSystem, Result } from "effect"
-import { buildFixPrompt, localChecksOf, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
+import { buildFixPrompt, localRunCommands, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
 import { distinctRefusals } from "../../entities/run-history/index"
 import { branchCommits, runGit } from "../../shared/process/index"
 import { buildImplementPrompt, finalReplyError, finalReplyText, orcCompletionLine, orcSplitLine, sessionPrintedSignal, sumPiUsage, textAfterSignal, type PiTokenUse } from "../../entities/agent/index"
@@ -236,7 +236,10 @@ const readProjectChecks = (run: HistoryRun, round: number): Effect.Effect<Readon
     const commands = yield* readChecksCommands(text, ".no-mistakes.yaml").pipe(
       Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
     )
-    const local = localChecksOf(commands)
+    const eligible = yield* localRunCommands(run.fs, run.path, run.worktreeDir, commands).pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
+    )
+    const local = eligible.filter((command) => command.name !== "prepare")
     const skipped = commands.filter((check) => check.name !== "prepare" && !local.includes(check)).map((check) => check.name)
     if (round === 1 && (skipped.length > 0 || local.length === 0)) {
       yield* Console.warn("orc: warning: " + (skipped.length === 0 ? "" : "skipped local commands: " + skipped.join(", ") + ". ") + (local.length === 0 ? "No local checks ran. " : "") + "GitHub CI decides completion.")

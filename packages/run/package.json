@@ -26,9 +26,11 @@
   "dependencies": {
     "@effect/platform-bun": "4.0.0",
     "@effect/platform-node-shared": "4.0.0",
-    "effect": "4.0.0"
+    "effect": "4.0.0",
+    "mvdan-sh": "0.10.1"
   },
   "devDependencies": {
-    "@avi2dg/checks": "0.115.0"
+    "@avi2dg/checks": "0.115.0",
+    "@types/mvdan-sh": "0.10.9"
   }
 }

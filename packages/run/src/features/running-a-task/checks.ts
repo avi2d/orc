@@ -1,8 +1,10 @@
-import { Data, Effect, FileSystem, type Path } from "effect"
+import { Data, Effect, FileSystem, type Path, Schema } from "effect"
 import { refusalsIn, type GateRefusal } from "../../entities/run-history/index"
 import type { AgentFile } from "../../entities/agent/index"
 import { orcCompletionLine } from "../../entities/agent/index"
 import type { CommandResult } from "../../shared/sandbox/index"
+import { shellCalls } from "./shell-calls"
+import { testTargetOf } from "./test-invocation"
 
 export class ChecksError extends Data.TaggedError("ChecksError")<{
   readonly message: string
@@ -67,13 +69,95 @@ export const readChecksCommands = (
     return commands
   })
 
+const packageManifest = Schema.fromJsonString(Schema.Struct({
+  scripts: Schema.optionalKey(Schema.Record(Schema.String, Schema.String))
+}))
+const decodePackage = Schema.decodeUnknownEffect(packageManifest)
+type Scripts = NonNullable<typeof packageManifest.Type["scripts"]>
+
+const readScripts = Effect.fnUntraced(function*(fs: FileSystem.FileSystem, file: string) {
+  const text = yield* fs.readFileString(file).pipe(
+    Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)),
+    Effect.mapError((cause) => new ChecksError({ message: "orc: cannot read " + file + ": " + String(cause) }))
+  )
+  if (text === null) return null
+  const manifest = yield* decodePackage(text).pipe(
+    Effect.mapError((cause) => new ChecksError({ message: "orc: cannot read scripts in " + file + ": " + cause.message }))
+  )
+  return manifest.scripts ?? {}
+})
+
+const localRunCommandNames = new Set(["prepare", "build", "lint", "typecheck"])
+
+export const localRunCommands = Effect.fnUntraced(function*(
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  cwd: string,
+  commands: ReadonlyArray<ChecksCommand>
+) {
+  const packagesByDirectory = new Map<string, { readonly cwd: string; readonly scripts: Scripts } | null>()
+  const packageAt = Effect.fnUntraced(function*(directory: string) {
+    const searched: Array<string> = []
+    let cwd = directory
+    let found = packagesByDirectory.get(cwd)
+    while (found === undefined) {
+      searched.push(cwd)
+      const scripts = yield* readScripts(fs, path.join(cwd, "package.json"))
+      if (scripts !== null) {
+        found = { cwd, scripts }
+        break
+      }
+      const parent = path.dirname(cwd)
+      if (parent === cwd) {
+        found = null
+        break
+      }
+      cwd = parent
+      found = packagesByDirectory.get(cwd)
+    }
+    for (const dir of searched) packagesByDirectory.set(dir, found)
+    return found
+  })
+  const hasTestInvocation = Effect.fnUntraced(function*(
+    command: string,
+    directory: string,
+    visited: Set<string>
+  ): Effect.fn.Return<boolean, ChecksError> {
+    const calls = yield* Effect.try({
+      try: () => shellCalls(command, directory, path),
+      catch: (cause) => new ChecksError({ message: "orc: cannot read the shell command " + command + ": " + String(cause) })
+    })
+    for (const call of calls) {
+      const target = testTargetOf(call, path)
+      if (target === null) continue
+      if (target.kind === "suite") return true
+      if (target.kind === "shell") {
+        if (yield* hasTestInvocation(target.command, target.cwd, visited)) return true
+        continue
+      }
+      const pkg = yield* packageAt(target.cwd)
+      if (pkg === null || !Object.hasOwn(pkg.scripts, target.name)) continue
+      const key = JSON.stringify([pkg.cwd, target.name])
+      if (visited.has(key)) continue
+      visited.add(key)
+      for (const name of ["pre" + target.name, target.name, "post" + target.name]) {
+        const script = Object.hasOwn(pkg.scripts, name) ? pkg.scripts[name] : undefined
+        if (script !== undefined && (yield* hasTestInvocation(script, pkg.cwd, visited))) return true
+      }
+    }
+    return false
+  })
+
+  const local: Array<ChecksCommand> = []
+  for (const check of commands) {
+    if (!localRunCommandNames.has(check.name)) continue
+    if (!(yield* hasTestInvocation(check.command, cwd, new Set()))) local.push(check)
+  }
+  return local
+})
+
 export const prepareCommandOf = (commands: ReadonlyArray<ChecksCommand>): string | null =>
   commands.find((check) => check.name === "prepare")?.command ?? null
-
-const localCheckNames = new Set(["build", "lint", "typecheck"])
-
-export const localChecksOf = (commands: ReadonlyArray<ChecksCommand>): ReadonlyArray<ChecksCommand> =>
-  commands.filter((check) => localCheckNames.has(check.name))
 
 const sectionOf = (outcome: CheckOutcome, stdout: string, stderr: string): string => {
   const output = (stdout + stderr).trim()
@@ -136,7 +220,7 @@ export const runChecksRound = (
       finished.push(sectionOf(outcome, result.stdout, result.stderr))
       yield* rewrite()
     }
-    yield* append(outcomes.length === 0 ? "No local checks ran. GitHub CI decides completion.\n" : "\n")
+    yield* append("\n")
     return { round, file, outcomes }
   })
 
@@ -145,6 +229,6 @@ export const buildFixPrompt = (agent: AgentFile, evidenceFile: string): string =
     agent.body,
     "",
     "The failed checks output sits in " + evidenceFile + ".",
-    "Read that file and fix what failed. Rerun the failed build, lint, or typecheck command to confirm the fix.",
+    "Read that file and fix what failed, then run each check that failed and confirm that it passes.",
     "When the fix is committed on this branch, print " + orcCompletionLine + " on its own line and stop."
   ].join("\n")

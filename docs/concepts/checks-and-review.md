@@ -15,7 +15,9 @@ Each runs inside the run, so a pull request that reaches you has already passed 
 
 The project names its checks in a `.no-mistakes.yaml` file at its root, under `commands`.
 Orc runs only `build`, `lint`, and `typecheck` as local checks in the run's copy after Pi finishes.
-It skips every other command except `prepare`, which runs before Pi starts.
+It runs `prepare` before Pi starts and skips every other command.
+Orc skips any of those four commands that invoke `checks-test`, `bun test`, or an `e2e` executable or script target.
+A path passed to another tool, such as `tests/e2e` passed to a linter, does not name a test runner.
 GitHub CI runs repository tests and decides whether the run completes.
 When a local check fails, orc starts a fixer Pi with the failing output, then runs the local checks again.
 After 3 fix attempts with a local check still red, the run ends failed and no pull request opens.
@@ -25,6 +27,7 @@ Follow the local check and GitHub CI policy in [Local checks and CI](../run/runn
 
 On a `no-mistakes` run, orc hands the checked branch to [no-mistakes](https://github.com/kunchenguid/no-mistakes) with the task as its intent.
 No-mistakes reviews the branch, pushes it, opens the pull request and reports when CI is green.
+Orc skips the local Test step and tells the review fixer to leave repository tests to CI.
 At each of its gates orc answers for you where it safely can.
 
 | Finding marked | What orc does |
