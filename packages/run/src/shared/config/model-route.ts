@@ -44,7 +44,7 @@ export const routeOfAgents = (
   if (providerOfModel(models.fixer) !== agentProvider.id) {
     return Result.fail("orc: the implementer runs on " + models.agent + " and the fixer on " + models.fixer + ", and orc runs both agents of a run on one provider, so name models from one provider")
   }
-  if (models.reviewer !== undefined && providerOf(models.reviewer) !== agentProvider.id) {
+  if (models.reviewer !== undefined && providerOfModel(models.reviewer) !== agentProvider.id) {
     return Result.fail("orc: the implementer runs on " + models.agent + " and the reviewer on " + models.reviewer + ", and orc runs all agents of a run on one provider, so name models from one provider")
   }
   return Result.succeed(agentProvider)
