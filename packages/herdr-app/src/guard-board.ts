@@ -1,5 +1,5 @@
 import type { BoardTask, QueuedRun } from "./board"
-import { type Guard, type Guarded, arrayOf, boardKinds, child, fields, literal, nullableString, number, ok, oneOf, prStates, runsHead, schemaTasks, string, taskHead } from "./guard"
+import { type Guard, type Guarded, arrayOf, boardKinds, child, fields, literal, nullableString, number, ok, oneOf, prStates, projectName, runsHead, schemaTasks, string, taskHead } from "./guard"
 
 const boardStatuses = ["new", "taken", "started", "closed"] as const
 
@@ -52,11 +52,6 @@ const boardTask: Guard<BoardTask> = (value, at) => {
   return ok({ ...head.value, created: created.value, held: held.value, parked: parked.value, prState: prState.value })
 }
 
-const boardProject: Guard<string> = (value, at) => {
-  const project = fields(value, at)
-  return project.kind === "refused" ? project : string(project.value, "name", at)
-}
-
 export interface BoardBacklog {
   readonly tasks: ReadonlyArray<BoardTask>
   readonly projects: ReadonlyArray<string> | null
@@ -67,7 +62,7 @@ export const boardBacklog: Guard<BoardBacklog> = (value, at) => {
   if (record.kind === "refused") return record
   const head = schemaTasks(record.value, at, boardTask)
   if (head.kind === "refused") return head
-  const projects = record.value["projects"] === null ? ok(null) : arrayOf(record.value, "projects", at, boardProject)
+  const projects = record.value["projects"] === null ? ok(null) : arrayOf(record.value, "projects", at, projectName)
   if (projects.kind === "refused") return projects
   return ok({ tasks: head.value.tasks, projects: projects.value })
 }
