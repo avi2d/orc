@@ -60,6 +60,24 @@ const insideSandbox = Bun.env.PI_SESSION_FILE !== undefined || Bun.env.NONO_CAP_
 const sandboxTimeout = 30_000
 
 describe("the agent directory", () => {
+  test.skipIf(noNono || insideSandbox)(skipReason("needs nono on PATH to create a sandbox", "lets the sandbox read the home tool-time cap without granting its directory"), async () => {
+    const dir = await makeNonoFixtureDir("orc-nono-cap-")
+    try {
+      const { worktree, session } = await checkoutWithSession(dir)
+      const home = await realpath(dir)
+      const extensions = join(home, ".pi", "agent", "extensions")
+      await mkdir(extensions, { recursive: true })
+      const file = join(extensions, "tool-time-cap.ts")
+      await writeFile(file, "fixture-cap")
+      await writeFile(join(extensions, "private"), "secret")
+      const result = await runNonoShell(sandboxFor({ worktree, session, hostEnv: { HOME: home } }), '/bin/cat "' + file + '" && if /bin/cat "' + join(extensions, "private") + '" >/dev/null 2>&1; then exit 1; fi')
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toBe("fixture-cap")
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, sandboxTimeout)
+
   test.skipIf(noNono || insideSandbox)(skipReason("needs nono on PATH to create a sandbox", "exposes the agent dir the caller passes inside the sandbox"), async () => {
     const dir = await mkdtemp(join(tmpdir(), "orc-nono-agent-"))
     try {
