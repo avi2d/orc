@@ -131,7 +131,7 @@ describe("compiled orc", () => {
       for (const args of [["init", "-q"], ["add", "task.md"], ["-c", "user.name=orc", "-c", "user.email=orc@example.com", "commit", "-qm", "task"]]) {
         expect((await run(["git", ...args], {}, repo)).exitCode).toBe(0)
       }
-      const agent = await run([compiledOrc, "run", "task.md"], env, repo)
+      const agent = await run([compiledOrc, "run", "task.md"], { ...env, HEAVY_QUEUE_BYPASS: "compiled e2e fixture without a pueue daemon" }, repo)
       expect(agent.exitCode).not.toBe(0)
       expect(agent.stdout + agent.stderr).toMatch(/the agent file \/\$bunfs\/root\/implementer-\w+\.md names no model/)
     })
