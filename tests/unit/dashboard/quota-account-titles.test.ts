@@ -3,12 +3,10 @@ import { DateTime, Effect, Layer } from "effect";
 import { TestClock, TestConsole } from "effect/testing";
 import { printSessionQuotaFrame } from "@avi2dg/orc-session-quota";
 import { dashboardSources, printedDashboard, recordedAnswer } from "../../lib/dashboard-sources";
-import { fixture } from "../../lib/fixtures";
 import { orcQuotaText } from "../../lib/orc-quota";
 import { recordedNow } from "../../lib/session-fixture";
 
 test("names the matching Claude account in both frames, not the next dispatch pick", async () => {
-  const quotaAxi = fixture("quota-axi/full.json").replace(/"accountKeys": \[\s*"default"\s*\]/u, '"accountKeys": ["default", "second"]');
   const asked: Array<string> = [];
   const sources = dashboardSources({
     run: (command) => {
@@ -17,7 +15,7 @@ test("names the matching Claude account in both frames, not the next dispatch pi
         asked.push(argv);
         return Effect.succeed(orcQuotaText("main-second"));
       }
-      return Effect.succeed(command.argv[0] === "quota-axi" ? quotaAxi : recordedAnswer(command));
+      return Effect.succeed(recordedAnswer(command));
     },
   });
   const frameOf = <E>(print: Effect.Effect<void, E>): Promise<string> =>

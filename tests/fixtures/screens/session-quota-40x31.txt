@@ -1,7 +1,7 @@
 estimates from local logs, upper bounds
 never quota
   session           price  raw  ≤pp pp/h
-● claude · assumed the only login
+● claude second · assumed the only login
 5h window 2pp used · fair 27.3pp/h each
 behind pace
 ● shop-a1b…/1 w1A:p2  55%  52% ≤1.2 0.96

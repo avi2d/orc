@@ -55,6 +55,7 @@ import { type ConversationReader, ConversationSource, conversationSourceLive } f
 import { fixture } from "./fixtures";
 import { fixtureActionsRepo, queueAnswers } from "./queues-fixture";
 import { fixtureHomeEnvironment } from "./session-fixture";
+import { orcQuotaText, recordedOrcQuota } from "./orc-quota";
 
 export const tasksCommand = "tasks-report --json";
 
@@ -79,7 +80,7 @@ const recordedAnswers: ReadonlyArray<readonly [string, string]> = [
   [`sh -c ${tasksCommand}`, fixture("tasks/east.json")],
   ["orc heavy check --json", fixture("heavy/check.json")],
   ["orc attention --json", fixture("attention/open.json")],
-  ["orc quota --json", fixture("orc-quota/second-login-expired.json")],
+  ["orc quota --json", orcQuotaText(recordedOrcQuota)],
   ...queueAnswers,
 ];
 

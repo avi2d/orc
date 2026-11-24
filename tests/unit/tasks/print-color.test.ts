@@ -32,7 +32,7 @@ import { fixture } from "../../lib/fixtures";
 import { escape, stripSgr } from "../../e2e/lib/print-color";
 import { queueAnswers } from "../../lib/queues-fixture";
 import { fixtureHomeEnvironment } from "../../lib/session-fixture";
-import { orcQuotaText } from "../../lib/orc-quota";
+import { orcQuotaText, recordedOrcQuota } from "../../lib/orc-quota";
 
 const tasksCommand = "tasks-report --json";
 
@@ -77,7 +77,7 @@ const recordedAnswers: ReadonlyArray<readonly [string, string]> = [
 
 const recordedRun = (command: Command): Effect.Effect<string> => {
   if (command.argv[0] === "quota-axi") return Effect.succeed(fixture("quota-axi/full.json"));
-  if (command.argv.join(" ") === "orc quota --json") return Effect.succeed(orcQuotaText("second-login-expired"));
+  if (command.argv.join(" ") === "orc quota --json") return Effect.succeed(orcQuotaText(recordedOrcQuota));
   if (command.argv.join(" ").startsWith(`sh -c ${tasksCommand}`)) return Effect.sync(eastTasksNow);
   return Effect.succeed(recordedAnswers.find(([asked]) => command.argv.join(" ").startsWith(asked))?.[1] ?? "");
 };

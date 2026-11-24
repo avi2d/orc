@@ -16,7 +16,7 @@ import { harvestLogSourceLive, printSessionQuotaFrame, sessionLogSourceLive } fr
 import { fixture } from "../../lib/fixtures";
 import { copyFixtureHome, recordedNow } from "../../lib/session-fixture";
 import { escape, stripSgr } from "../../e2e/lib/print-color";
-import { orcQuotaText } from "../../lib/orc-quota";
+import { orcQuotaText, recordedOrcQuota } from "../../lib/orc-quota";
 
 let home = "";
 
@@ -45,7 +45,7 @@ const printed = (color: boolean): Promise<string> =>
               Layer.succeed(CommandRunner, {
                 run: (command) => {
                   if (command.argv[0] === "quota-axi") return Effect.succeed(fixture("quota-axi/full.json"));
-                  if (command.argv.join(" ") === "orc quota --json") return Effect.succeed(orcQuotaText("second-login-expired"));
+                  if (command.argv.join(" ") === "orc quota --json") return Effect.succeed(orcQuotaText(recordedOrcQuota));
                   if (command.argv[0] === "herdr") return Effect.succeed(atHome(fixture("session-logs/herdr-agents.json")));
                   return Effect.succeed(atHome(fixture("session-logs/harness-processes.txt")));
                 },

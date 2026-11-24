@@ -36,7 +36,7 @@ import {
   relocated,
   unrelocated,
 } from "../../lib/session-fixture";
-import { orcQuotaText } from "../../lib/orc-quota";
+import { orcQuotaText, recordedOrcQuota } from "../../lib/orc-quota";
 
 let home = "";
 
@@ -82,7 +82,7 @@ const recordedReads = (herdrAnswer: Effect.Effect<void> = Effect.void, remote: R
             roundsStarted += 1;
             return Effect.succeed(fixture("quota-axi/full.json"));
           }
-          if (command.argv.join(" ") === "orc quota --json") return Effect.succeed(orcQuotaText("second-login-expired"));
+          if (command.argv.join(" ") === "orc quota --json") return Effect.succeed(orcQuotaText(recordedOrcQuota));
           if (program === "herdr") return Effect.as(herdrAnswer, atHome(fixture("session-logs/herdr-agents.json")));
           return Effect.succeed(atHome(fixture("session-logs/harness-processes.txt")));
         },

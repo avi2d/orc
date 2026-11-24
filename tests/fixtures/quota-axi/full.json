@@ -169,7 +169,8 @@
         ]
       },
       "accountKeys": [
-        "default"
+        "default",
+        "second"
       ]
     },
     {

@@ -130,11 +130,11 @@ describe("the session quota panel's rows", () => {
   test("leaves only the caption and each flag, with its window and rate against fair share, below one row a window", () => {
     expect(flagLines(fixtureSessionView(), 60, 24).map(plain)).toEqual([
       "estimates from local logs, upper bounds, never quota",
-      "⚑ shop-a1b2c3/1 w1A:p2 · claude 7d window",
+      "⚑ shop-a1b2c3/1 w1A:p2 · claude second 7d window",
       "  30.8pp/h, fair 0.15",
-      "⚑ ~/my-home w2B:p2 · claude 7d window",
+      "⚑ ~/my-home w2B:p2 · claude second 7d window",
       "  2.38pp/h, fair 0.15",
-      "⚑ no-mistakes 0RUN42 pid 4242 · claude 7d window",
+      "⚑ no-mistakes 0RUN42 pid 4242 · claude second 7d window",
       "  4.89pp/h, fair 0.15",
       "⚑ ~/my-home w2B:p2 · opencode-go 31d window",
       "  6.06pp/h, fair 0.13",
@@ -286,9 +286,9 @@ describe("the session quota panel's rows", () => {
   test("puts the notes after the flags once only the flags fit, and counts the notes it leaves out", () => {
     expect(flagLines(noted(), 60, 6).map(plain)).toEqual([
       "estimates from local logs, upper bounds, never quota",
-      "⚑ shop-a1b2c3/1 w1A:p2 7d claude · 30.8pp/h, fair 0.15",
-      "⚑ ~/my-home w2B:p2 7d claude · 2.38pp/h, fair 0.15",
-      "⚑ no-mistakes 0RUN42 pid 4242 7d claude",
+      "⚑ shop-a1b2c3/1 w1A:p2 7d claude second",
+      "⚑ ~/my-home w2B:p2 7d claude second · 2.38pp/h, fair 0.15",
+      "⚑ no-mistakes 0RUN42 pid 4242 7d claude second",
       "⚑ ~/my-home w2B:p2 31d opencode-go · 6.06pp/h, fair 0.13",
       "+2 more rows",
     ]);
@@ -395,7 +395,7 @@ describe("the live session quota panel inside the terminal's rows where flags de
     return {
       ...view,
       accounts: view.accounts.flatMap((account) => {
-        if (account.title !== "claude" || account.body.kind !== "windows") return [];
+        if (account.provider !== "claude" || account.body.kind !== "windows") return [];
         const found = account.body.windows.find((window) => window.id === "seven_day");
         if (found === undefined) return [];
         const week = { ...found, sessions: found.sessions.map((row) => ({ ...row, flagged: row.session.id === "pane:w1A:p2" })) };
@@ -415,11 +415,11 @@ describe("the live session quota panel inside the terminal's rows where flags de
     expect(frame.split("\n").map((row) => row.trimEnd()).filter((row) => row !== "")).toEqual([
       "estimates from local logs",
       "upper bounds, never quota",
-      "⚑ sho…/1 w1A:p2 1h claude",
-      "⚑ sho…/1 w1A:p2 2h claude",
-      "⚑ sho…/1 w1A:p2 3h claude",
-      "⚑ sho…/1 w1A:p2 4h claude",
-      "⚑ sho…/1 w1A:p2 5h claude",
+      "⚑ s…/1 w1A:p2 1h claude second",
+      "⚑ s…/1 w1A:p2 2h claude second",
+      "⚑ s…/1 w1A:p2 3h claude second",
+      "⚑ s…/1 w1A:p2 4h claude second",
+      "⚑ s…/1 w1A:p2 5h claude second",
       "+2 bun run session-quota-json",
     ]);
   });
@@ -433,11 +433,11 @@ describe("the live session quota panel inside the terminal's rows where flags de
   test("keeps the two-line flags when they fit, and gives the note's rows up to them", () => {
     expect(flagLines({ ...fixtureSessionView(), unmatched: noted().unmatched }, 60, 10).map(plain)).toEqual([
       "estimates from local logs, upper bounds, never quota",
-      "⚑ shop-a1b2c3/1 w1A:p2 · claude 7d window",
+      "⚑ shop-a1b2c3/1 w1A:p2 · claude second 7d window",
       "  30.8pp/h, fair 0.15",
-      "⚑ ~/my-home w2B:p2 · claude 7d window",
+      "⚑ ~/my-home w2B:p2 · claude second 7d window",
       "  2.38pp/h, fair 0.15",
-      "⚑ no-mistakes 0RUN42 pid 4242 · claude 7d window",
+      "⚑ no-mistakes 0RUN42 pid 4242 · claude second 7d window",
       "  4.89pp/h, fair 0.15",
       "⚑ ~/my-home w2B:p2 · opencode-go 31d window",
       "  6.06pp/h, fair 0.13",

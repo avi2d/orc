@@ -152,10 +152,10 @@ describe("the dashboard says how much is left, whether it lasts, and when it res
 describe("the dashboard names each agent spending over its share of a running-ahead limit", () => {
   test("by its project, beside the account and the limit", () => {
     expect(printed().filter((line) => line.startsWith("⚑")).toSorted()).toEqual([
-      "⚑ a no-mistakes run is spending over its share of claude's week",
-      "⚑ my-home is spending over its share of claude's week",
+      "⚑ a no-mistakes run is spending over its share of claude second's week",
+      "⚑ my-home is spending over its share of claude second's week",
       "⚑ my-home is spending over its share of opencode-go's month",
-      "⚑ shop is spending over its share of claude's week",
+      "⚑ shop is spending over its share of claude second's week",
     ]);
   });
 
