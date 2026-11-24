@@ -3,8 +3,9 @@ import { refusalsIn, type GateRefusal } from "../../entities/run-history/index"
 import type { AgentFile } from "../../entities/agent/index"
 import { orcCompletionLine } from "../../entities/agent/index"
 import type { CommandResult } from "../../shared/sandbox/index"
+import { readFailure } from "../../shared/config/index"
 import { shellCalls } from "./shell-calls"
-import { testTargetOf } from "./test-invocation"
+import { isTestExecutable, testTargetOf } from "./test-invocation"
 
 export class ChecksError extends Data.TaggedError("ChecksError")<{
   readonly message: string
@@ -98,26 +99,46 @@ export const localRunCommands = Effect.fnUntraced(function*(
   const packagesByDirectory = new Map<string, { readonly cwd: string; readonly scripts: Scripts } | null>()
   const packageAt = Effect.fnUntraced(function*(directory: string) {
     const searched: Array<string> = []
-    let cwd = directory
-    let found = packagesByDirectory.get(cwd)
+    let location = directory
+    let found = packagesByDirectory.get(location)
     while (found === undefined) {
-      searched.push(cwd)
-      const scripts = yield* readScripts(fs, path.join(cwd, "package.json"))
+      searched.push(location)
+      const scripts = yield* readScripts(fs, path.join(location, "package.json"))
       if (scripts !== null) {
-        found = { cwd, scripts }
+        found = { cwd: location, scripts }
         break
       }
-      const parent = path.dirname(cwd)
-      if (parent === cwd) {
+      const parent = path.dirname(location)
+      if (parent === location) {
         found = null
         break
       }
-      cwd = parent
-      found = packagesByDirectory.get(cwd)
+      location = parent
+      found = packagesByDirectory.get(location)
     }
     for (const dir of searched) packagesByDirectory.set(dir, found)
     return found
   })
+  const testInScript = Effect.fnUntraced(function*(
+    target: Extract<ReturnType<typeof testTargetOf>, { readonly kind: "script" }>,
+    invocation: string,
+    visited: Set<string>
+  ): Effect.fn.Return<string | null, ChecksError> {
+    const pkg = yield* packageAt(target.cwd)
+    if (pkg === null || !Object.hasOwn(pkg.scripts, target.name)) {
+      return target.executableFallback && isTestExecutable(target.name) ? invocation : null
+    }
+    const key = JSON.stringify([pkg.cwd, target.name])
+    if (visited.has(key)) return null
+    visited.add(key)
+    for (const name of ["pre" + target.name, target.name, "post" + target.name]) {
+      if (!Object.hasOwn(pkg.scripts, name)) continue
+      const found = yield* testInvocation(pkg.scripts[name], pkg.cwd, visited)
+      if (found !== null) return found
+    }
+    return null
+  })
+
   const testInvocation = Effect.fnUntraced(function*(
     command: string,
     directory: string,
@@ -130,23 +151,12 @@ export const localRunCommands = Effect.fnUntraced(function*(
     for (const call of calls) {
       const target = testTargetOf(call, path)
       if (target === null) continue
-      if (target.kind === "suite") return call.words.map((word) => word ?? "<dynamic>").join(" ")
-      if (target.kind === "shell") {
-        const invocation = yield* testInvocation(target.command, target.cwd, visited)
-        if (invocation !== null) return invocation
-        continue
-      }
-      const pkg = yield* packageAt(target.cwd)
-      if (pkg === null || !Object.hasOwn(pkg.scripts, target.name)) continue
-      const key = JSON.stringify([pkg.cwd, target.name])
-      if (visited.has(key)) continue
-      visited.add(key)
-      for (const name of ["pre" + target.name, target.name, "post" + target.name]) {
-        const script = Object.hasOwn(pkg.scripts, name) ? pkg.scripts[name] : undefined
-        if (script === undefined) continue
-        const invocation = yield* testInvocation(script, pkg.cwd, visited)
-        if (invocation !== null) return invocation
-      }
+      const display = call.words.map((word) => word ?? "<dynamic>").join(" ")
+      if (target.kind === "suite") return display
+      const found = yield* (target.kind === "shell"
+        ? testInvocation(target.command, target.cwd, visited)
+        : testInScript(target, display, visited))
+      if (found !== null) return found
     }
     return null
   })
@@ -161,6 +171,18 @@ export const localRunCommands = Effect.fnUntraced(function*(
     local.push(check)
   }
   return local
+})
+
+export const readProjectLocalChecks = Effect.fnUntraced(function*(fs: FileSystem.FileSystem, path: Path.Path, cwd: string) {
+  const source = ".no-mistakes.yaml"
+  const text = yield* fs.readFileString(path.join(cwd, source)).pipe(
+    Effect.mapError((cause) => new ChecksError({ message: "orc: cannot read the checks config " + source + ": " + readFailure(cause) }))
+  )
+  const configured = yield* readChecksCommands(text, source)
+  const eligible = yield* localRunCommands(fs, path, cwd, configured)
+  const commands = eligible.filter((check) => check.name !== "prepare")
+  const skipped = configured.filter((check) => check.name !== "prepare" && !commands.includes(check)).map((check) => check.name)
+  return { commands, skipped }
 })
 
 export const prepareCommandOf = (commands: ReadonlyArray<ChecksCommand>): string | null =>

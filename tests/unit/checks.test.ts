@@ -53,7 +53,7 @@ describe("readChecksCommands", () => {
 
 describe("runChecksRound", () => {
   test("keeps the CI explanation instead of writing a blank empty-round evidence file", async () => {
-    const dir = await mkdtemp(join(process.cwd(), ".review-checks-"))
+    const dir = await mkdtemp(join(tmpdir(), "orc-empty-checks-"))
     try {
       const calls: Array<string> = []
       const evidence = await provide(Effect.gen(function*() {

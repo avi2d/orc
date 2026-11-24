@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
-import { Effect, FileSystem, Path, Sink, Stream } from "effect"
+import { Effect, FileSystem, Path, Result, Sink, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { askSetupFor, type AgentFile } from "../../packages/run/src/entities/agent/index"
 import { subprocessNoMistakesRunner } from "../../packages/run/src/entities/review-gate/no-mistakes"
@@ -126,6 +127,10 @@ const fixtureCases = [
   { forbidden: "./scripts/e2e", invocation: "./scripts/e2e", allowed: "bun run tools/e2e/build.ts" },
   { forbidden: "bun run e2e", invocation: "bun run e2e", allowed: "bunx ./tools/e2e/oxlint" },
   { forbidden: 'bun run "test:e2e"', invocation: "bun run test:e2e", allowed: "bun run build" },
+  { forbidden: "bun run verify:e2e", invocation: "bun test", allowed: "bun run lint:e2e" },
+  { forbidden: "pnpm -C packages/web run ci-verify", invocation: "bun test", allowed: "pnpm -C packages/web run verify-build" },
+  { forbidden: "env -C packages/web bun run ci-verify", invocation: "bun test", allowed: "env -C packages/web bun run verify-build" },
+  { forbidden: "bash -lc 'bun test'", invocation: "bun test", allowed: "bash -lc 'printf OK'" },
   { forbidden: "bun run verify-all", invocation: "bun test", allowed: "bun run typecheck" },
   { forbidden: "bun --filter web test", invocation: "bun --filter web test", allowed: "test -f README.md" },
   { forbidden: "bun run --cwd packages/web ci-verify", invocation: "bun test", allowed: "bun run --cwd packages/web verify-build" },
@@ -183,6 +188,8 @@ const seedProject = async (project: string, commands: Readonly<Record<string, st
       "verify-all": "bun run verify-tests",
       "verify-tests": "bun test",
       "test:e2e": "checks-test --tier=e2e",
+      "lint:e2e": "bunx oxlint tests/e2e",
+      "verify:e2e": "bun run verify-tests",
       "verify-build": "bun test",
       stage: "bun run build",
       prestage: "bun test",
@@ -206,13 +213,12 @@ for (const sandbox of ["none", "nono"] as const) {
   describe("the steps of a " + sandbox + " run and its review handoff", () => {
     for (const name of ["prepare", "build", "lint", "typecheck"] as const) {
       test.each(fixtureCases)("rejects a pipeline that spawns $forbidden in " + name + " instead of silently skipping it", async (fixture) => {
-        const home = await mkdtemp(join(process.cwd(), ".review-test-"))
+        const home = await mkdtemp(join(tmpdir(), "orc-spawn-"))
         try {
           const project = join(home, "project")
           await seedProject(project, { ...localCommands, [name]: fixture.forbidden })
           const { result, spawned, agentRuns } = await Effect.runPromise(runPipeline(project, home, sandbox))
-          expect(result._tag).toBe("Failure")
-          if (result._tag !== "Failure") throw new Error("Test-containing command was accepted")
+          if (Result.isSuccess(result)) throw new Error("Test-containing command was accepted")
           expect(String(result.failure)).toContain("refusing " + name + " command")
           expect(String(result.failure)).toContain(JSON.stringify(fixture.forbidden))
           expect(String(result.failure)).toContain(fixture.invocation)
@@ -228,7 +234,7 @@ for (const sandbox of ["none", "nono"] as const) {
     }
 
     test.each(fixtureCases)("keeps permitted $allowed checks and preparation reachable through review instead of dropping them", async (fixture) => {
-      const home = await mkdtemp(join(process.cwd(), ".review-test-"))
+      const home = await mkdtemp(join(tmpdir(), "orc-spawn-"))
       try {
         const project = join(home, "project")
         await seedProject(project, {
@@ -239,8 +245,7 @@ for (const sandbox of ["none", "nono"] as const) {
           verify: fixture.forbidden
         })
         const { result, spawned, agentRuns, taskPath } = await Effect.runPromise(runPipeline(project, home, sandbox))
-        expect(result._tag).toBe("Success")
-        if (result._tag !== "Success") throw new Error(String(result.failure))
+        if (Result.isFailure(result)) throw new Error(String(result.failure))
         expect(spawned).toEqual([
           [...shellPrefix(sandbox, home), localCommands.prepare],
           ["/usr/bin/git", "log", "-1", "--format=%s", "c1"],
@@ -262,14 +267,14 @@ for (const sandbox of ["none", "nono"] as const) {
     })
 
     test.each(["(cd packages/web)", 'printf "%s" "$(cd packages/web)"'])("does not leak a directory change from %s into following checks", async (prefix) => {
-      const home = await mkdtemp(join(process.cwd(), ".review-test-"))
+      const home = await mkdtemp(join(tmpdir(), "orc-spawn-"))
       try {
         const project = join(home, "project")
         await seedProject(project, { ...localCommands, build: prefix + "; bun run verify-all" })
         await writeFile(join(project, "package.json"), JSON.stringify({ scripts: { "verify-all": "bun run build.ts" } }))
         await writeFile(join(project, "packages/web/package.json"), JSON.stringify({ scripts: { "verify-all": "bun test" } }))
         const { result, spawned } = await Effect.runPromise(runPipeline(project, home, sandbox))
-        expect(result._tag).toBe("Success")
+        if (Result.isFailure(result)) throw new Error(String(result.failure))
         expect(spawned).toContainEqual([...shellPrefix(sandbox, home), prefix + "; bun run verify-all"])
       } finally {
         await rm(home, { recursive: true, force: true })
