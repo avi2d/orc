@@ -66,6 +66,9 @@ const recommendedRule = "When a review question names a recommended option and t
 const escalateOn = (rule: string | undefined): string =>
   JSON.stringify({ decision: "escalate", reason: "the decider would not pick", ...(rule === undefined ? {} : { rule }) })
 
+const answerOn = (answer: string): string =>
+  JSON.stringify({ decision: "answer", answer, rule: recommendedRule, reason: "the question names its recommended option" })
+
 const twoRemedies = { id: "r2", text: "The retry count is not configurable.\nA) Keep two retries\nB) Read the count from config\nRecommended: Keep two retries" }
 
 describe("a review question with a Recommended: line", () => {
@@ -108,6 +111,13 @@ describe("a review question with a Recommended: line", () => {
     })
   }
 
+  test("answered by the decider on the recommended-option rule with the other remedy is answered with its Recommended: option, instead of the remedy the question did not recommend", async () => {
+    await withAskingTask([twoRemedies], async (root) => {
+      await decide(root, replying(answerOn("Read the count from config")))
+      expect(await itemFile(root, itemOf(twoRemedies))).toMatchObject({ owner: "decider", state: { kind: "closed", answer: { words: "Keep two retries" } } })
+    })
+  })
+
   test("that the decider never answered stays with the owner when the decider is not heard, instead of being answered with its option", async () => {
     await withAskingTask([twoRemedies], async (root) => {
       await decide(root, replying(""))
@@ -134,7 +144,25 @@ describe("a review question with a Recommended: line", () => {
   })
 })
 
+describe("a review question with no Recommended: line", () => {
+  test("answered by the decider on the recommended-option rule stays with the owner, instead of closing on a remedy the question never recommended", async () => {
+    const unrecommended = { id: "r2", text: "The retry count is not configurable.\nA) Keep two retries\nB) Read the count from config" }
+    await withAskingTask([unrecommended], async (root) => {
+      await decide(root, replying(answerOn("Keep two retries")))
+      expect(await itemFile(root, itemOf(unrecommended))).toMatchObject({ owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+    })
+  })
+})
+
 describe("a worker question with a Recommended: line", () => {
+  test("answered by the decider on the rule for review questions stays with the owner, instead of closing on the worker's own preference", async () => {
+    const flag = { id: "ask-1", text: "Name the flag --retries or --attempts?\nRecommended: --retries" }
+    await withAskingTask([flag], async (root) => {
+      await decide(root, replying(answerOn("--retries")))
+      expect(await itemFile(root, itemOf(flag))).toMatchObject({ kind: "worker-question", owner: "user", decision: { kind: "escalated" }, state: { kind: "open" } })
+    })
+  })
+
   test("escalated by the decider on an open product choice stays with the owner, instead of orc answering with the worker's own preference", async () => {
     const flag = { id: "ask-1", text: "Name the flag --retries or --attempts?\nRecommended: --retries" }
     await withAskingTask([flag], async (root) => {

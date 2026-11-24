@@ -6,7 +6,8 @@ import { backlogPaths, findTask, type BacklogError, type ParkedQuestion, type Ta
 import { readInstructions, readOrcRules } from "../../entities/orc-rules/index"
 import { answerTask } from "../../entities/parked-runs/index"
 import { askBackWords, neverDecidedReason } from "./decider-guard"
-import { quotedSource, recommendedAnswer, type RuleSource, spaced, type Verdict } from "./recommended"
+import { quotedSource, type RuleSource, spaced, type Verdict } from "./quoted-source"
+import { answerOnRule, recommendedAnswer } from "./recommended"
 
 export class DeciderUnheard extends Data.TaggedError("DeciderUnheard")<{
   readonly reason: string
@@ -96,7 +97,7 @@ const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlie
       const found = quotedSource(reply.rule, sources)
       return found === undefined
         ? { kind: "escalated", reason: "the decider answered " + JSON.stringify(reply.answer) + " on a rule in none of the rules it read word for word from a clause start to a clause end: " + JSON.stringify(reply.rule) }
-        : { kind: "answered", words: reply.answer.trim(), basis: { kind: "rule", quote: found.quote, source: found.source, reason: reply.reason } }
+        : answerOnRule(found, reply, kind, question)
     }
     case "duplicate": {
       const linked = earlier.find((entry) => entry.id === reply.of.trim())
