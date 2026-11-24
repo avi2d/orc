@@ -184,7 +184,8 @@ describe("a parked run", () => {
         db.close()
       }
       const beat = await orcOk(fixture, ["beat"])
-      expect(beat).toContain("parked orc-1 on orc/orc-1 for the captain's answer to r2")
+      expect(beat).toContain("parked orc-1 on orc/orc-1\n")
+      expect(beat).not.toContain("for the captain's answer to r2")
       expect(beat).toContain("started orc-1")
       const added = await queuedArgs(fixture)
       expect(added?.slice(added.indexOf("--answer"), added.indexOf("--answer") + 2)).toEqual(["--answer", "r2=Yes"])

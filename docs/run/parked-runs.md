@@ -63,7 +63,6 @@ An unchanged gate keeps its attention item, so you read the question once while 
 Your answer to a finding goes into the fix as instructions.
 The response declines every finding it does not fix.
 A task whose every blocking question has an answer can resume when its original machine and run are available.
-A [resume that parks again](#a-resume-that-parks-again) stays held instead until you release it.
 `orc backlog` shows a parked task as `parked (<question-ids>)`.
 `orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times, their blocking flag, whether the decider owns them, their answers, and for a worker question its options and recommendation.
 Older parked records have no `origin` field.
