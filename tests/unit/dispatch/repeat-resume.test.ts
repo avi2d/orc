@@ -6,7 +6,7 @@ import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
 import { addTask, answerWait, claimTask, listTasks, renderTaskFile, writeTaken, type ParkedQuestion, type TaskRecord } from "../../../packages/run/src/entities/backlog/index"
 import { answerTask, askStartedTask, handAnswersToResume, parkStartedTask } from "../../../packages/run/src/entities/parked-runs/index"
-import { readRequest } from "../../../packages/run/src/features/queueing-a-task/runner-request"
+import { readRequest, type QueueRequest } from "../../../packages/run/src/features/queueing-a-task/runner-request"
 import { parseRunArgs } from "../../../packages/run/src/features/running-a-task/run-args"
 import { buildResumePlan } from "../../../packages/run/src/features/running-a-task/run-resume"
 import { runFull } from "../../../packages/run/src/features/running-a-task/run-loop"
@@ -46,6 +46,42 @@ const current = async (root: string): Promise<TaskRecord> => {
     throw new Error("the backlog holds no task")
   }
   return task
+}
+
+const promptsOfResume = async (root: string, file: string, rereleased: QueueRequest): Promise<Array<string>> => {
+  const parsed = parseRunArgs(["task.md", "--branch", "orc/orc-1", ...(rereleased.answers ?? []).flatMap((answer) => ["--answer", answer.question + "=" + answer.answer])])
+  if (parsed.kind !== "RunAgent") {
+    throw new Error(parsed.detail)
+  }
+  const db = await openDb(root)
+  try {
+    const git = await stubGit(root)
+    const base = await Effect.runPromise(historyFor("run-5", root, root, "2026-10-27T10:57:00.000Z", git, ""))
+    if (parsed.branch === undefined || rereleased.resumeRun === undefined) {
+      throw new Error("the released task has no resume branch or run")
+    }
+    const workerRun = { ...base, branch: parsed.branch, resumeRun: rereleased.resumeRun, answers: parsed.answers }
+    await mkdir(workerRun.runDir, { recursive: true })
+    await writeFile(workerRun.taskPath, rereleased.body)
+    await Effect.runPromise(recordRun(db, { id: rereleased.resumeRun, project: root, branch: parsed.branch, taskFile: file, status: "failed", started: "2026-10-27T10:47:00.000Z" }).pipe(Effect.asVoid))
+    const plan = await Effect.runPromise(buildResumePlan(db, workerRun))
+    expect(plan.priorDir).toBe(join(root, "runs", "run-4"))
+    await Effect.runPromise(recordResumePublish(db, workerRun, plan))
+    const prompts: Array<string> = []
+    const ops = fakeOps({
+      runAgent: async (agentRun) => {
+        prompts.push(agentRun.prompt)
+        return { commits: [] }
+      },
+      execCheck: async () => {
+        throw new Error("checks ran before the implement finished")
+      }
+    }, workerRun.hostSessionsDir)
+    await Effect.runPromise(runFull(workerRun, ops, plan, runLoopCheckpoints(db, workerRun)))
+    return prompts
+  } finally {
+    db.close()
+  }
 }
 
 describe("a resumed run that parks again", () => {
@@ -173,40 +209,9 @@ describe("a resumed run that parks again", () => {
       expect(rereleased.body).toBe(first.body)
       const guidance = "Earlier repeat hold release: fix the lint finding first\nCurrent guidance: try the other flag instead"
       expect(rereleased.answers).toEqual([{ question: "r2", answer: "Keep it" }, { question: "hold-release", answer: guidance }])
-      const parsed = parseRunArgs(["task.md", "--branch", "orc/orc-1", ...(rereleased.answers ?? []).flatMap((answer) => ["--answer", answer.question + "=" + answer.answer])])
-      if (parsed.kind !== "RunAgent") {
-        throw new Error(parsed.detail)
-      }
-      const db = await openDb(root)
-      try {
-        const git = await stubGit(root)
-        const base = await Effect.runPromise(historyFor("run-5", root, root, "2026-10-27T10:57:00.000Z", git, ""))
-        if (parsed.branch === undefined || rereleased.resumeRun === undefined) {
-          throw new Error("the released task has no resume branch or run")
-        }
-        const workerRun = { ...base, branch: parsed.branch, resumeRun: rereleased.resumeRun, answers: parsed.answers }
-        await mkdir(workerRun.runDir, { recursive: true })
-        await writeFile(workerRun.taskPath, rereleased.body)
-        await Effect.runPromise(recordRun(db, { id: rereleased.resumeRun, project: root, branch: parsed.branch, taskFile: file, status: "failed", started: "2026-10-27T10:47:00.000Z" }).pipe(Effect.asVoid))
-        const plan = await Effect.runPromise(buildResumePlan(db, workerRun))
-        expect(plan.priorDir).toBe(join(root, "runs", "run-4"))
-        await Effect.runPromise(recordResumePublish(db, workerRun, plan))
-        const prompts: Array<string> = []
-        const ops = fakeOps({
-          runAgent: async (agentRun) => {
-            prompts.push(agentRun.prompt)
-            return { commits: [] }
-          },
-          execCheck: async () => {
-            throw new Error("checks ran before the implement finished")
-          }
-        }, workerRun.hostSessionsDir)
-        await Effect.runPromise(runFull(workerRun, ops, plan, runLoopCheckpoints(db, workerRun)))
-        expect(prompts).toHaveLength(1)
-        expect(prompts[0]).toContain(guidance)
-      } finally {
-        db.close()
-      }
+      const prompts = await promptsOfResume(root, file, rereleased)
+      expect(prompts).toHaveLength(1)
+      expect(prompts[0]).toContain(guidance)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
