@@ -12,7 +12,7 @@ A `no-mistakes-prod-only` project gives `direct-PR` to a task marked `internal: 
 
 ## Review the branch
 A `direct-PR` run never starts [no-mistakes](https://github.com/kunchenguid/no-mistakes) and does not need it installed.
-Once the checks pass, orc writes the branch diff to `diff.md` in the session folder and runs one Pi turn with the reviewer agent over that diff and the task file.
+Once the configured local checks pass, orc writes the branch diff to `diff.md` in the session folder and runs one Pi turn with the reviewer agent over that diff and the task file.
 Orc decodes the findings JSON array from the reviewer's last reply and writes it to `review.json` in the run folder.
 An unreadable reply gets one rerun on the same session, and a second unreadable reply fails the review turn.
 The run's end reason names the finding count or the review failure.
@@ -20,9 +20,9 @@ The review turn fixes nothing and blocks nothing, so the PR opens after it eithe
 A resumed direct-PR run runs the review turn again.
 
 ## Open the PR
-Orc runs `git push --set-upstream origin <branch>` from the run's worktree.
+Once the configured local checks pass, it runs `git push --set-upstream origin <branch>` from the run's worktree.
 It reuses the open PR for the branch when `gh pr list --head <branch> --state open` finds one, and otherwise runs `gh pr create`.
-The PR's title is the head commit's subject, and its body lists the branch's commits and the checks that passed.
+The PR's title is the head commit's subject, and its body lists the branch's commits and the local checks that passed.
 To resume a direct-PR run, add `--delivery direct-PR` to the resume command, and a resume without it runs no-mistakes.
 Orc keeps that body as `pr-body.md` in the run folder and records the step as `pr`.
 

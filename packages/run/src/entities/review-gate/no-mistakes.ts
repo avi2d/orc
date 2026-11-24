@@ -111,7 +111,7 @@ const spawnBinary = (options: NoMistakesHost, cwd: string, args: ReadonlyArray<s
 export const subprocessNoMistakesRunner = (options: SubprocessRunnerOptions): NoMistakesRunner => {
   const spawn = (args: ReadonlyArray<string>) => spawnBinary(options, options.worktreeDir, args)
   return {
-    start: (intentFile) => spawn(["axi", "run", "--intent-file", intentFile]),
+    start: (intentFile) => spawn(["axi", "run", "--intent-file", intentFile, "--skip", "test"]),
     reattach: spawn(["axi", "run"]),
     respond: (response) => spawn(respondArgs(response)),
     answer: (reply) => spawn(answerArgsFor(reply.question, reply.answer)),

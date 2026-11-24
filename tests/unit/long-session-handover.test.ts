@@ -104,7 +104,7 @@ describe("a handover after a passed implement", () => {
       try {
         const project = join(home, "project")
         await mkdir(project, { recursive: true })
-        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  test: bun test\n")
+        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
         const logFile = join(home, "branch-log.txt")
         await writeFile(logFile, "")
         const git = await branchLogGit(home, logFile)
@@ -163,7 +163,7 @@ describe("a handover written after no-mistakes", () => {
       try {
         const project = join(home, "project")
         await mkdir(project, { recursive: true })
-        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  test: bun test\n")
+        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
         const logFile = join(home, "branch-log.txt")
         await writeFile(logFile, "abc1234\x1fImplement A\n")
         const git = await branchLogGit(home, logFile)
@@ -256,7 +256,7 @@ describe("a long session survives a later failure", () => {
       try {
         const project = join(home, "project")
         await mkdir(project, { recursive: true })
-        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  test: bun test\n")
+        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
         const logFile = join(home, "branch-log.txt")
         await writeFile(logFile, "")
         const git = await branchLogGit(home, logFile)

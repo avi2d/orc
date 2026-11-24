@@ -70,6 +70,11 @@ export const readChecksCommands = (
 export const prepareCommandOf = (commands: ReadonlyArray<ChecksCommand>): string | null =>
   commands.find((check) => check.name === "prepare")?.command ?? null
 
+const localCheckNames = new Set(["build", "lint", "typecheck"])
+
+export const localChecksOf = (commands: ReadonlyArray<ChecksCommand>): ReadonlyArray<ChecksCommand> =>
+  commands.filter((check) => localCheckNames.has(check.name))
+
 const sectionOf = (outcome: CheckOutcome, stdout: string, stderr: string): string => {
   const output = (stdout + stderr).trim()
   return [
@@ -131,7 +136,7 @@ export const runChecksRound = (
       finished.push(sectionOf(outcome, result.stdout, result.stderr))
       yield* rewrite()
     }
-    yield* append("\n")
+    yield* append(outcomes.length === 0 ? "No local checks ran. GitHub CI decides completion.\n" : "\n")
     return { round, file, outcomes }
   })
 
@@ -140,6 +145,6 @@ export const buildFixPrompt = (agent: AgentFile, evidenceFile: string): string =
     agent.body,
     "",
     "The failed checks output sits in " + evidenceFile + ".",
-    "Read that file and fix what failed, then run each check that failed and confirm that it passes.",
+    "Read that file and fix what failed. Rerun the failed build, lint, or typecheck command to confirm the fix.",
     "When the fix is committed on this branch, print " + orcCompletionLine + " on its own line and stop."
   ].join("\n")

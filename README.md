@@ -54,9 +54,10 @@ To run one task in a project:
 
 ```yaml
 commands:
-  test: bun test
+  lint: bun run lint
 ```
 
+GitHub CI runs repository tests.
 Orc prints the branch, its commits, the checks, the PR link when its run opened one, and the review on a `no-mistakes` run.
 `--sandbox none` runs the agent on the host as your user.
 With nono from https://nono.sh installed, drop the flag and the run works inside the nono sandbox.

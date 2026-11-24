@@ -11,7 +11,7 @@ import { reviewSentence, runReviewTurn } from "./review-turn"
 
 export const finishAfterChecks = (run: HistoryRun, base: { readonly runId: string; readonly runDir: string; readonly branch: string; readonly agentPath: string; readonly agentSource: string; readonly model: string; readonly sessionId: string | null; readonly sessionFile: string | null; readonly tokens: PiTokenUse | null; readonly sessionSize: LongSessionCounts | null; readonly markerVerified: boolean; readonly implementPassed: boolean; readonly prLink: null; readonly noMistakes: null }, commits: Array<OrcRunCommit>, rounds: Array<ChecksRoundSummary>, fixes: Array<RecordedFixAttempt>, allow: ReadonlyArray<AllowWord>, answers: ReadonlyArray<QuestionAnswer>, checkpoints: RunCheckpoints, runAgent: SandboxOps["runAgent"]): Effect.Effect<OrcRunReport, OrcRunError> =>
   Effect.gen(function*() {
-    const checked = "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + ", and the checks passed. "
+    const checked = "Pi made " + commits.length.toString() + (commits.length === 1 ? " commit" : " commits") + " on " + run.branch + (rounds.at(-1)?.passed === true ? ", and the checks passed. " : ". No local checks ran. ")
     const settled = { ...base, commits, checksRounds: rounds, fixes, fixAttempts: fixes.length }
     if (run.delivery.kind === "direct-PR") {
       const review = yield* runReviewTurn(run, runAgent, run.delivery.reviewer)
@@ -55,7 +55,9 @@ const ciVerdictOfHead = (run: HistoryRun, opener: PullRequestOpener, prLink: str
 
 const prBody = (subjects: ReadonlyArray<string>, rounds: ReadonlyArray<ChecksRoundSummary>): string => {
   const passed = rounds.at(-1)?.checks.map((check) => check.name) ?? []
-  const closing = "orc opened this PR after " + (passed.length === 0 ? "the checks" : passed.join(", ")) + " passed, without no-mistakes.\n"
+  const closing = passed.length === 0
+    ? "orc opened this PR without local checks or no-mistakes. GitHub CI decides completion.\n"
+    : "orc opened this PR after " + passed.join(", ") + " passed, without no-mistakes.\n"
   return subjects.length === 0 ? closing : subjects.map((subject) => "- " + subject).join("\n") + "\n\n---\n\n" + closing
 }
 
