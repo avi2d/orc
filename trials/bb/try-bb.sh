@@ -12,6 +12,7 @@ plugin=$here/plugin
 real_home=$(eval echo "~$(id -un)")
 prefs=$real_home/Library/Preferences/dev.bb.desktop.plist
 trial_id=dev.bb.desktop.orc-trial
+trial_prefs=$real_home/Library/Preferences/$trial_id.plist
 real_data=("$real_home/.bb" "$real_home/Library/Application Support/bb" "$prefs")
 scratch=$here/.scratch
 for tool in curl hdiutil ditto shasum jq lsof sqlite3 orc screencapture codesign defaults; do
@@ -94,6 +95,8 @@ cleanup() {
   if defaults delete "$trial_id" >/dev/null 2>&1; then
     echo "removed launch defaults for $trial_id"
   fi
+  # cfprefsd empties the domain but leaves its plist file behind.
+  rm -f "$trial_prefs"
   snapshot > "$proof/real-after"
   if cmp -s "$proof/real-before" "$proof/real-after"; then
     echo "real bb data untouched: ${real_data[*]}"
