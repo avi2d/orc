@@ -2,7 +2,7 @@ check typecheck: bun run typecheck
 $ tsc --noEmit && effect-tsgo diagnostics --project tsconfig.json --format text --strict
 Checked 700 files out of 700 files.
 0 errors, 0 warnings and 0 messages.
-exit 0: passed in 21.4s
+exit 0: passed
 
 check unit: bun test tests/unit
 bun test v1.4.3 (c6da4a4d3) 3x PARALLEL
@@ -18,7 +18,7 @@ tests/unit/dispatch/task-ids.test.ts:
  0 fail
  9 expect() calls
 Ran 3 tests across 2 files. [412.00ms]
-exit 0: passed in 1.9s
+exit 0: passed
 
 check e2e: bun test tests/e2e
 bun test v1.4.3 (c6da4a4d3) 3x PARALLEL
@@ -53,4 +53,4 @@ error: expect(received).toEqual(expected)
  1 fail
  11 expect() calls
 Ran 4 tests across 2 files. [3.10s]
-exit 1: failed in 4.2s
+exit 1: failed

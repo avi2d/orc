@@ -2,7 +2,7 @@ import { ScrollHandle } from "gpui-base"
 import { readTextFile } from "herdr"
 import { opensTurns } from "./agents"
 import type { Keyed } from "./agents-view"
-import { type CheckSummary, checkIndexFile, checksSummary, logLines, parseCheckIndex } from "./checks"
+import { type ChecksSummary, checkIndexFile, checksSummary, logLines, parseCheckIndex } from "./checks"
 import type { ShownStep } from "./guard"
 import { type Reading, readText } from "./orc-read"
 import type { Pane } from "./step-bar"
@@ -10,7 +10,7 @@ import { type Turn, sessionTurns } from "./turns"
 
 export class StepOutput {
   log: Keyed<string> | null = null
-  summary: Keyed<ReadonlyArray<CheckSummary>> | null = null
+  summary: Keyed<ChecksSummary> | null = null
   turns: Keyed<ReadonlyArray<Turn>> | null = null
   readonly logScroll = ScrollHandle.new()
   readonly turnsScroll = ScrollHandle.new()
@@ -33,7 +33,7 @@ export class StepOutput {
       () => ({ kind: "refused", reason: `Cannot read ${file}` }) as const
     )
     return index.then((bounds) => this.readLog(of, runId, step.id).then((log) => {
-      const reading: Reading<ReadonlyArray<CheckSummary>> = log.kind !== "ok" ? log
+      const reading: Reading<ChecksSummary> = log.kind !== "ok" ? log
         : bounds?.kind === "refused" ? { kind: "failed", reason: bounds.reason }
         : { kind: "ok", value: checksSummary(log.value, step.status, bounds?.value ?? null) }
       if (this.summary?.of !== of) this.checksScroll.scroll_to_item(0)

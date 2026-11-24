@@ -1,7 +1,7 @@
 import { type Context, type Element, div } from "gpui-kit"
 import { type ScrollHandle, h_flex, v_flex } from "gpui-base"
-import { settings } from "herdr"
-import { type CheckFailure, type CheckSummary, checkTime } from "./checks"
+import { monospace } from "./fonts"
+import { type CheckFailure, type CheckSummary, type ChecksSummary, checkTime } from "./checks"
 import type { Reading } from "./orc-read"
 import type { palette } from "./palette"
 
@@ -11,11 +11,6 @@ export interface ChecksShown {
   readonly of: string
   readonly flipped: ReadonlySet<string>
   readonly flip: (key: string, cx: Context) => void
-}
-
-const monospace = (): string => {
-  const family = settings()["font_family"]
-  return typeof family === "string" ? family : "Menlo"
 }
 
 const block = (t: Palette, lines: ReadonlyArray<string>): Element =>
@@ -60,11 +55,12 @@ const checkView = (t: Palette, check: CheckSummary, shown: ChecksShown): Element
   return open ? v_flex().child(toggle).child(failureView(t, outcome.failure)) : toggle
 }
 
-export const checksView = (t: Palette, reading: Reading<ReadonlyArray<CheckSummary>>, shown: ChecksShown, scroll: ScrollHandle): Element => {
+export const checksView = (t: Palette, reading: Reading<ChecksSummary>, shown: ChecksShown, scroll: ScrollHandle): Element => {
   const note = (text: string, color: Palette[keyof Palette]): Element => div().p(16).text_color(color).child(text)
   if (reading.kind === "reading") return note("Reading the step's output", t.muted)
   if (reading.kind === "failed") return note(reading.reason, t.blocked)
   const checks = reading.value
+  if (checks === null) return note("No check boundaries recorded. Select Raw to see the full log.", t.muted)
   if (checks.length === 0) return note("No checks recorded", t.muted)
   return v_flex().id("checks").size_full().overflow_y_scrollbar().track_scroll(scroll).p(12).gap(2).text_size(13).text_color(t.foreground)
     .children(checks.map((check) => checkView(t, check, shown)))

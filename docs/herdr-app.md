@@ -89,7 +89,8 @@ A merged PR shows its run as Done, and a closed PR shows its run as Failed.
 
 On the **Agents** tab, select a run and then select a **Checks** step.
 It opens in **Summary**, with one row per check showing its name, result, and time.
-Older logs that did not record times leave the time blank.
+If a log has no recorded check boundaries, **Summary** shows a note instead of check rows.
+Select **Raw** to read that log.
 
 Passed checks stay folded.
 A failed check opens below its row.

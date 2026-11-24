@@ -1,8 +1,9 @@
 import { type Color, type Context, type Element, div } from "gpui-kit"
 import { Input, type InputState, type ScrollHandle, h_flex, v_flex } from "gpui-base"
-import { openOverlay, settings } from "herdr"
+import { openOverlay } from "herdr"
+import { monospace } from "./fonts"
 import { type Card, type CardStatus, type Filter, type Mark, type RunAgent, type StepRow, approveRow, cardAnswers, cardPlace, cardStatuses, filterCards, namedModels, opensTurns, prNumber, projectsOf, railLabel, sendBackArgs, stepRows } from "./agents"
-import { type CheckSummary, logLines } from "./checks"
+import { type ChecksSummary, logLines } from "./checks"
 import { checksView } from "./checks-view"
 import type { Show, ShownStep } from "./guard"
 import { optionView } from "./ask-view"
@@ -70,11 +71,6 @@ const markColor = (t: Palette, mark: Mark): Color => {
     case "○":
       return t.dim
   }
-}
-
-const monospace = (): string => {
-  const family = settings()["font_family"]
-  return typeof family === "string" ? family : "Menlo"
 }
 
 const chip = (t: Palette, id: string, label: string, on: boolean, pick: (cx: Context) => void): Element =>
@@ -340,7 +336,7 @@ export interface DetailShown {
   readonly pane: Pane
   readonly turns: Reading<ReadonlyArray<Turn>>
   readonly log: Reading<string>
-  readonly summary: Reading<ReadonlyArray<CheckSummary>>
+  readonly summary: Reading<ChecksSummary>
   readonly thinking: ReadonlySet<string>
   readonly calls: ReadonlySet<string>
   readonly checks: ReadonlySet<string>

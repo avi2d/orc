@@ -21,21 +21,18 @@ export interface CheckSummary {
   readonly outcome: CheckOutcome
 }
 
+export type ChecksSummary = ReadonlyArray<CheckSummary> | null
+
 const escapeSequence = new RegExp(String.fromCharCode(27) + "\\[[0-9;?]*[A-Za-z]", "g")
 
 export const logLines = (text: string): ReadonlyArray<string> =>
   text.replace(escapeSequence, "").replace(/\n$/, "").split("\n")
 
 const tailLines = 20
-const headerLine = /^check (.+?): /
-const exitLine = /^exit -?\d+: (passed|failed)(?: in (\d+(?:\.\d+)?)s)?$/
 const testLine = /^\((pass|fail|skip|todo)\) (.+?)(?: \[[\d.]+m?s\])?$/
 const testFile = /^\S.*\.(test|spec)\.[cm]?[jt]sx?:$/
 const bunRunner = /^bun test v\d+/
 const bunFailedRecap = /^\d+ tests? failed:$/
-
-const startsLegacyCheck = (lines: ReadonlyArray<string>, at: number): boolean =>
-  headerLine.test(lines[at] ?? "") && (at === 0 || (lines[at - 1] === "" && exitLine.test(lines[at - 2] ?? "")))
 
 const trimBlank = (lines: ReadonlyArray<string>): ReadonlyArray<string> => {
   const start = lines.findIndex((line) => line.trim() !== "")
@@ -83,20 +80,6 @@ const unfinished = (name: string, stepStatus: ShownStep["status"], output: Reado
   seconds: null,
   outcome: stepStatus === "running" ? { kind: "running" } : { kind: "interrupted", failure: failureOf(output) }
 })
-
-const legacySummary = (lines: ReadonlyArray<string>, stepStatus: ShownStep["status"]): CheckSummary => {
-  const name = headerLine.exec(lines[0] ?? "")?.[1] ?? ""
-  const body = trimBlank(lines.slice(1))
-  const exit = exitLine.exec(body.at(-1) ?? "")
-  if (exit === null) {
-    return unfinished(name, stepStatus, body)
-  }
-  const time = exit.at(2)
-  const seconds = time === undefined ? null : Number(time)
-  return exit[1] === "passed"
-    ? { name, seconds, outcome: { kind: "passed" } }
-    : { name, seconds, outcome: { kind: "failed", failure: failureOf(body.slice(0, -1)) } }
-}
 
 interface CheckBoundary {
   readonly name: string
@@ -158,13 +141,8 @@ const indexedSummary = (text: string, stepStatus: ShownStep["status"], entry: Ch
 export const checksSummary = (
   text: string,
   stepStatus: ShownStep["status"],
-  index: ReadonlyArray<CheckBoundary> | null = null
-): ReadonlyArray<CheckSummary> => {
-  if (index !== null) return index.map((entry) => indexedSummary(text, stepStatus, entry))
-  const lines = logLines(text)
-  const starts = lines.flatMap((_line, at) => startsLegacyCheck(lines, at) ? [at] : [])
-  return starts.map((start, position) => legacySummary(lines.slice(start, starts[position + 1] ?? lines.length), stepStatus))
-}
+  index: ReadonlyArray<CheckBoundary> | null
+): ChecksSummary => index === null ? null : index.map((entry) => indexedSummary(text, stepStatus, entry))
 
 export const checkTime = (seconds: number | null): string => {
   if (seconds === null) return ""
