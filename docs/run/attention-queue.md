@@ -91,6 +91,7 @@ The beat opens an item for each run event, owned by the user:
   Merging the PR or closing it without merging withdraws it.
 - A closed ship task's PR with every check reporting green opens a `pr-ready` item for its head commit.
   A red check or a new commit withdraws it.
+  On a project with `yolo` true, the item text names each change that waits for your merge word.
   Merging the PR closes it with the answer `merged`.
   Closing the PR without merging closes it with the answer `closed without merging`.
 

@@ -16,6 +16,7 @@ When a check from before the update never reports again, run `orc merge <task-id
 When the update conflicts, or a check turns red while the command waits, orc merges nothing and sends the task back for a fix.
 
 The chat merges on your word.
-To let it merge a yolo project's PR when you ask and the PR is green, add `"yolo": true` to that project in `projects.json`.
+To let the beat merge a yolo project's green PR on its own, and to let the chat merge it when you ask, add `"yolo": true` to that project in `projects.json`.
+The beat merges only a task that closed done, and a release, a deletion, a workflow file change or a secret change still waits for your word.
 Orc refuses a `yolo` that is not `true` or `false`, and a project with no `yolo` waits for your word.
 [Merging a task's PR](run/merging-a-tasks-pr.md) names every refusal.

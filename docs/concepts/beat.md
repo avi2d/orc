@@ -49,6 +49,7 @@ A beat is also how every finished or waiting run gets attention.
 - It hands your answers to a run that still waits at its gate.
 - It opens and withdraws items in the attention queue, and gives the decider its questions.
 - It reads the pull request of each closed ship task and records when it turns green, merges or closes.
+- On a project with `yolo` true, it merges the green pull request of a task that closed done, as [The merge](merge.md) describes.
 - It flags a run whose output has not grown for 30 minutes as stalled.
 - On a token command account, it sends each started task its account's fresh token.
 

@@ -57,7 +57,8 @@ It reports starts, closures, parked questions, stalls, upstream changes, and att
 
 ## Merging a task's PR
 
-On a project with `"yolo": true`, the beat merges the green PR of a ship task that closed done.
-It uses `orc merge` with `yolo-green`.
+On a project with `"yolo": true`, the beat merges, through `orc merge` with `yolo-green`, the green PR of a ship task that closed done.
 The beat leaves a stopped or failed task's PR open.
+The beat also leaves a PR open when you answered `hold` to its `pr-ready` item for the current head commit.
+A merge the beat attempts and `orc merge` refuses shows in `orc beat` as a line naming the task and the reason.
 Releases, deletions, workflow file changes, and secret changes wait for your merge word, as [Merging a task's PR](merging-a-tasks-pr.md) describes.
