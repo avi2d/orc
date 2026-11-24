@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises"
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { closeTask, type Fixture, orchestratorConfig, ranClosing, runOrc, sessionFor, withFixture } from "./chat-helpers"
 
@@ -287,6 +287,45 @@ describe("chat merge returns without waiting for CI", () => {
       const refused = await session.call("merge_task", { id: "orc-1", basis: "captain-word" }).then(String, refusalOf)
       expect(refused).toContain("changed after its checks were read")
       expect(await mergeCalls(fixture)).toEqual([])
+    })
+  }, 60_000)
+
+  test("a conflict send-back drops the saved update, so the fixed head is judged on its own checks instead of refused as changed", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      await stubRunner(fixture)
+      await stubGh(fixture, { behind: 1, update: "conflicts", parents: foreignHead, afterUpdate: [{ head: newHead, checks: [passed("lint"), passed("test")] }] })
+      const closed = await taskFile(fixture)
+      const session = sessionFor(fixture)
+      const sentBack = await session.call("merge_task", { id: "orc-1", basis: "captain-word" }).then(String, refusalOf)
+      expect(sentBack).toContain("has a merge conflict with main")
+      expect(sentBack).toContain("sent orc-1 back")
+
+      await rm(join(fixture.home, "backlog", "new", "orc-1.md"))
+      await writeFile(join(fixture.home, "backlog", "closed", "orc-1.md"), closed)
+      await writeFile(join(fixture.dir, "views", "updated"), "")
+      expect(await session.call("merge_task", { id: "orc-1", basis: "captain-word" })).toBe("merged orc-1 " + prUrl)
+      expect(await mergeCalls(fixture)).toEqual(["pr merge " + prUrl + " --squash --match-head-commit " + newHead])
+    })
+  }, 60_000)
+
+  test("a saved check the new head never runs keeps merge_task refusing, and plain orc merge waits for the new head's own checks instead of staying blocked", async () => {
+    await withFixture(orchestratorConfig, 0, async (fixture) => {
+      await closedWithPr(fixture)
+      const unitGreen: Rollup = { ...running("unit"), status: "COMPLETED", conclusion: "SUCCESS" }
+      const unitRunning = { head: newHead, checks: [passed("lint"), running("unit")] }
+      await stubGh(fixture, { behind: 1, afterUpdate: [unitRunning, unitRunning, unitRunning, { head: newHead, checks: [passed("lint"), unitGreen] }] })
+      const session = sessionFor(fixture)
+      expect(await session.call("merge_task", { id: "orc-1", basis: "captain-word" })).toContain("requested branch update for orc-1")
+
+      const refused = await session.call("merge_task", { id: "orc-1", basis: "captain-word" }).then(String, refusalOf)
+      expect(refused).toContain("the check test was green before the update and has not reported green on its new head " + newHead)
+      expect(refused).toContain("or run orc merge orc-1 --basis captain-word to wait for the new head's own checks")
+      expect(await mergeCalls(fixture)).toEqual([])
+
+      const merged = await runOrc(fixture, ["merge", "orc-1", "--basis", "captain-word"])
+      expect(merged.stdout.trim()).toEndWith("merged orc-1 " + prUrl)
+      expect(await forgeSteps(fixture)).toEqual(["view", "update", "view", "view", "view", "view", "pr merge " + prUrl + " --squash --match-head-commit " + newHead])
     })
   }, 60_000)
 })

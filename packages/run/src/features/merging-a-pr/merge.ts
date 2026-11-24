@@ -54,7 +54,8 @@ const longestPollSeconds = 15
 const commits = (count: number): string => String(count) + " commit" + (count === 1 ? "" : "s")
 
 const refuseAndSendBack = (landing: Landing, reason: string, words: string) =>
-  landing.sendBack(words).pipe(
+  clearPendingUpdate(landing.root, landing.id).pipe(
+    Effect.flatMap(() => landing.sendBack(words)),
     Effect.catch((error) => Effect.succeed("orc backlog send-back could not send " + landing.id + " back: " + ("file" in error ? error.file + ": " : "") + error.detail)),
     Effect.flatMap((sent) => refuse(refusal(landing.id, landing.url, [reason]) + "; " + sent))
   )
@@ -209,17 +210,15 @@ const refuseUnsettled = (landing: Landing, approved: Approved, settled: Unsettle
     )
   })
 
-const retryCommand = (landing: Landing): string => "orc merge " + landing.id + " --basis " + landing.basis + " --no-wait"
+const waitCommand = (landing: Landing): string => "orc merge " + landing.id + " --basis " + landing.basis
 
-const landUpdated = (landing: Landing, checked: PullRequestView, approved: Approved, noWait: boolean) =>
+const retryCommand = (landing: Landing): string => waitCommand(landing) + " --no-wait"
+
+const retryAdvice = (landing: Landing): string =>
+  "run " + retryCommand(landing) + " again once the new head's checks have reported, or run " + waitCommand(landing) + " to wait for the new head's own checks instead of the ones saved before the update"
+
+const awaitUpdatedAndMerge = (landing: Landing, checked: PullRequestView, approved: Approved) =>
   Effect.gen(function*() {
-    if (noWait) {
-      yield* savePendingUpdate(landing.root, landing.id, { url: landing.url, ...approved })
-    }
-    yield* updateBranch(landing, checked)
-    if (noWait) {
-      return "requested branch update for " + landing.id + " " + landing.url + "; not merged. Run " + retryCommand(landing) + " again once the new head checks are green."
-    }
     yield* Console.log("Checks running")
     const unreadable = yield* Ref.make<string | null>(null)
     const settled = yield* awaitNewHead(landing.url, approved, 0, unreadable).pipe(
@@ -245,6 +244,18 @@ const landUpdated = (landing: Landing, checked: PullRequestView, approved: Appro
     return yield* mergeAt(landing, view)
   })
 
+const landUpdated = (landing: Landing, checked: PullRequestView, approved: Approved, noWait: boolean) =>
+  Effect.gen(function*() {
+    if (noWait) {
+      yield* savePendingUpdate(landing.root, landing.id, { url: landing.url, ...approved })
+    }
+    yield* updateBranch(landing, checked)
+    if (noWait) {
+      return "requested branch update for " + landing.id + " " + landing.url + "; not merged. Run " + retryCommand(landing) + " again once the new head checks are green."
+    }
+    return yield* awaitUpdatedAndMerge(landing, checked, approved)
+  })
+
 const checkUpdatedHead = (landing: Landing, pending: PendingUpdate, view: PullRequestView) =>
   Effect.gen(function*() {
     const judged = yield* judgeHead(landing.url, pending, view, undefined)
@@ -259,7 +270,7 @@ const checkUpdatedHead = (landing: Landing, pending: PendingUpdate, view: PullRe
       return yield* refuse(refusal(landing.id, landing.url, [
         ...checkRefusals(view),
         ...(missing.length === 0 ? [] : ["the check " + missing.join(", ") + " was green before the update and has not reported green on its new head " + view.headRefOid]),
-        "run " + retryCommand(landing) + " again once the new head's checks have reported"
+        retryAdvice(landing)
       ]))
     }
     yield* clearPendingUpdate(landing.root, landing.id)
@@ -309,7 +320,14 @@ export const mergeTask = (
     }
     const landing: Landing = { root, id, url, basis, sendBack }
     const saved = yield* readPendingUpdate(root, id)
-    const pending = saved?.url === url ? saved : null
+    const savedHere = saved?.url === url ? saved : null
+    if (!options.noWait && savedHere !== null) {
+      yield* clearPendingUpdate(root, id)
+      if (savedHere.head !== view.headRefOid) {
+        return yield* awaitUpdatedAndMerge(landing, view, { head: savedHere.head, green: [] })
+      }
+    }
+    const pending = options.noWait ? savedHere : null
     if (pending !== null && pending.head !== view.headRefOid) {
       yield* checkUpdatedHead(landing, pending, view)
     }
@@ -325,7 +343,7 @@ export const mergeTask = (
       return yield* landUpdated(landing, view, approved, options.noWait)
     }
     if (sameHead !== null) {
-      return yield* refuse(refusal(id, url, ["its branch update has not produced a new head, so run " + retryCommand(landing) + " again once the new head's checks have reported"]))
+      return yield* refuse(refusal(id, url, ["its branch update has not produced a new head, so " + retryAdvice(landing)]))
     }
     return yield* mergeAt(landing, view)
   })

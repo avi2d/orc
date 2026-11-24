@@ -36,8 +36,14 @@ The next call reads the current head and merges nothing in these cases:
 - A check that was green on the checked head has not reported green on the head, such as a status context that has not posted yet.
 - A check has not reported.
 
-Once those hold, the call continues as a merge without a saved update, so a head that is behind its base again gets another update request.
-Without `--no-wait`, the command waits as described above.
+When none of those holds, the call continues as a merge without a saved update, so a head that is behind its base again gets another update request.
+A merge conflict or a red check that sends the task back also drops the saved update, so the next call judges the fixed head on its own checks.
+
+A saved check may never report again, for example when the base renamed that CI job.
+Each `--no-wait` call keeps refusing until it reports green.
+To get past it, run `orc merge <task-id> --basis <basis>` without `--no-wait`.
+That call drops the saved checks, waits as described above for every check on the new head to report green, and merges only then.
+A red check still stops it and sends the task back.
 
 ## When an update fails
 

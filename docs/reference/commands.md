@@ -546,7 +546,9 @@ Options:
   --no-wait                 When behind, return after requesting a branch update
                             without waiting for CI or merging. Run merge again
                             with the same basis once the new head checks are
-                            green. The chat uses this option.
+                            green. Without --no-wait, a later call drops the
+                            checks saved before the update and waits for the new
+                            head's own checks. The chat uses this option.
 
 Examples:
   orc merge orc-9
