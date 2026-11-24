@@ -23,7 +23,7 @@ const claim = { beat: "beat-1", machine: "linux", account: "main", takenAt: "202
 
 const answer = JSON.stringify({ decision: "answer", answer: "Two retries", rule: "Retry a failed upload twice, then give up.", reason: "the intent says twice" })
 
-const gateAsking = (row: string, columns = "id,severity,file,line,action,asks,description"): string => [
+const gateAsking = (row: string, columns = "id,severity,file,action,description,question_action"): string => [
   "run:",
   "  id: \"01RUN\"",
   "  branch: orc/orc-1",
@@ -89,9 +89,19 @@ const readAskingRaw = async (runDir: string, deadline: number): Promise<string> 
 }
 
 describe("the asked action of a no-mistakes review question", () => {
+  test("a routine question with action none reaches the decider without a guarded word", async () => {
+    await withStartedTask(async (root) => {
+      await parkThroughGate(root, gateAsking("question-1,warning,,ask-user,How many retries?,none"))
+      const heard: Array<DeciderRequest> = []
+      const decided = await decideAll(root, heard)
+      expect(heard.length).toBe(1)
+      expect(decided.map((entry) => entry.verdict.kind)).toEqual(["answered"])
+    })
+  })
+
   test("a routine question with action none reaches the decider even when its words name a guarded topic", async () => {
     await withStartedTask(async (root) => {
-      await parkThroughGate(root, gateAsking("question-1,info,,,ask-user,none,Should the report look at both retry counters?"))
+      await parkThroughGate(root, gateAsking("question-1,warning,,ask-user,Should the report look at both retry counters?,none"))
       expect((await run(listTasks(root))).at(0)?.parked?.questions.at(0)?.asks).toBe("none")
       const heard: Array<DeciderRequest> = []
       const decided = await decideAll(root, heard)
@@ -106,7 +116,7 @@ describe("the asked action of a no-mistakes review question", () => {
     ["login", "Refresh the GitHub session first?", "log in"]
   ])("a question that asks the owner to %s goes to the owner although no guarded word appears", async (asks, text, named) => {
     await withStartedTask(async (root) => {
-      await parkThroughGate(root, gateAsking("question-1,info,,,ask-user," + asks + "," + text))
+      await parkThroughGate(root, gateAsking("question-1,warning,,ask-user," + text + "," + asks))
       const heard: Array<DeciderRequest> = []
       const decided = await decideAll(root, heard)
       expect(heard.length).toBe(0)
@@ -119,7 +129,7 @@ describe("the asked action of a no-mistakes review question", () => {
 
   test("an action orc does not know goes to the owner", async () => {
     await withStartedTask(async (root) => {
-      await parkThroughGate(root, gateAsking("question-1,info,,,ask-user,rotate,Is this branch ready?"))
+      await parkThroughGate(root, gateAsking("question-1,warning,,ask-user,Is this branch ready?,unknown"))
       const heard: Array<DeciderRequest> = []
       const decided = await decideAll(root, heard)
       expect(heard.length).toBe(0)

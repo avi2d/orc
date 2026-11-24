@@ -79,7 +79,7 @@ export const findingsTable = (output: string): ReadonlyArray<NoMistakesFinding> 
     line: row.get("line") ?? "",
     action: row.get("action") ?? "",
     description: row.get("description") ?? "",
-    ...askedOf((row.get("asks") ?? "").trim())
+    ...askedOf((row.get("id") ?? "").startsWith("question-") ? (row.get("question_action") ?? "").trim() : "")
   }))
 
 export const stepsWithFindings = (output: string): ReadonlyArray<string> =>
@@ -171,7 +171,7 @@ export const openQuestionsIn = (findings: ReadonlyArray<NoMistakesFinding>, omit
   const known = new Set(rendered.map((finding) => finding.id))
   const omitted = omittedIds
     .filter((id) => !known.has(id))
-    .map((id): NoMistakesFinding => ({ id, severity: "", file: "", line: "", action: "", description: "" }))
+    .map((id): NoMistakesFinding => ({ id, severity: "", file: "", line: "", action: "", description: "", asks: "unknown" }))
   return [...rendered, ...omitted]
 }
 

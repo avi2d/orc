@@ -38,7 +38,7 @@ const neverDecided: ReadonlyArray<NeverDecided> = [
   { topic: "logins", asks: /\b(log-?ins?|log in|sign[- ]in|auth|authn|authz|authenticat\w*|authoriz\w*|oauth\w*)\b(?!\s+(?:header|fixture|test|mock|stub|helper|type)s?\b)/i }
 ]
 
-const neverDecidedReason = (question: string): string | null => {
+export const neverDecidedReason = (question: string): string | null => {
   for (const entry of neverDecided) {
     const found = entry.asks.exec(question)
     if (found !== null) {
@@ -50,7 +50,7 @@ const neverDecidedReason = (question: string): string | null => {
 
 const routineAction = "none"
 
-const actionWords: ReadonlyMap<string, string> = new Map([["merge", "merge"], ["delete", "delete unlanded work"], ["login", "log in"]])
+const actionWords: ReadonlyMap<string, string> = new Map([["merge", "merge"], ["delete", "delete unlanded work"], ["login", "log in"], ["push", "push"], ["release", "release"]])
 
 const askedActionReason = (asks: string): string | null => {
   if (asks === routineAction) {
@@ -62,7 +62,6 @@ const askedActionReason = (asks: string): string | null => {
     : "the review question asks the owner to " + named + ", and orc hands every asked action to the owner"
 }
 
-// A question that names no asked action falls back to the word list, so a missing field never lets a guarded question through.
 export const guardReason = (question: { readonly text: string; readonly asks?: string | undefined }): string | null =>
   question.asks === undefined ? neverDecidedReason(question.text) : askedActionReason(question.asks)
 
