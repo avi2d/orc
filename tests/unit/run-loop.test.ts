@@ -7,7 +7,7 @@ import { listRuns, openQuestionsForRun, recordRun, recordStep } from "../../pack
 import { stepsForRun } from "../../packages/run/src/entities/run-history/index"
 import { recordFixDone, recordFixStart, recordResumePublish } from "../../packages/run/src/features/running-a-task/history-write"
 import { buildResumePlan } from "../../packages/run/src/features/running-a-task/run-resume"
-import { holdReleaseId } from "../../packages/run/src/entities/review-gate/index"
+import { carriedHoldReleaseId, holdReleaseId } from "../../packages/run/src/entities/review-gate/index"
 import type { HistoryRun } from "../../packages/run/src/features/running-a-task/run-record"
 import { runFull } from "../../packages/run/src/features/running-a-task/run-loop"
 import type { AgentRun, RunCheckpoints } from "../../packages/run/src/features/running-a-task/run-ops"
@@ -312,41 +312,58 @@ describe("a run Pi loops in", () => {
   })
 })
 
+const resumeAfterSpentFixes = async (db: Database, home: string, release: string): Promise<HistoryRun> => {
+  const project = join(home, "project")
+  const priorDir = join(home, "runs", "prior-a")
+  await mkdir(project, { recursive: true })
+  await mkdir(priorDir, { recursive: true })
+  const priorFix = join(priorDir, "2026-10-19T09-30-00-000Z_bbb222.jsonl")
+  await writeFile(priorFix, JSON.stringify({ type: "session", id: "bbb222" }) + "\n")
+  await Effect.runPromise(recordRun(db, {
+    id: "prior-a", project, branch: "orc/test", taskFile: join(priorDir, "task.md"),
+    status: "failed", started: "2026-10-19T09:00:00.000Z"
+  }))
+  await Effect.runPromise(recordStep(db, {
+    runId: "prior-a", name: "implement", attempt: 1, status: "passed",
+    started: "2026-10-19T09:00:00.000Z", agentFile: implementer.path, piSessionFile: null
+  }))
+  await Effect.runPromise(recordStep(db, {
+    runId: "prior-a", name: "checks", attempt: 4, status: "failed",
+    started: "2026-10-19T09:40:00.000Z", agentFile: null, piSessionFile: null
+  }))
+  for (const attempt of [1, 2, 3]) {
+    await Effect.runPromise(recordFixDone(db, "prior-a", {
+      attempt, status: "failed", started: "2026-10-19T09:22:00.000Z", ended: "2026-10-19T09:23:00.000Z",
+      agentFile: fixer.path, sessionFile: priorFix, model: fixer.model, thinking: fixer.thinking,
+      evidenceIn: join(priorDir, "checks-1.md"), commits: 0, tokens: null
+    }))
+  }
+  const git = await stubGit(home)
+  const base = await Effect.runPromise(historyFor("released-b", home, project, "2026-10-19T10:00:00.000Z", git, ""))
+  await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
+  return { ...base, answers: [{ question: release, answer: "Fix the lint failure first" }] }
+}
+
 describe("a hold release reaches the resumed worker", () => {
+  test("a resume after a release that an earlier resume already got keeps the spent fixes and the fixer session instead of a second fresh budget", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const plan = await Effect.runPromise(buildResumePlan(db, await resumeAfterSpentFixes(db, home, carriedHoldReleaseId)))
+        expect(plan.inheritedFixes).toHaveLength(3)
+        expect(plan.fixSessionId).toBe("bbb222")
+      } finally {
+        db.close()
+      }
+    })
+  })
+
   test("a released resume with three spent fixes does not end before a fresh fixer sees the release", async () => {
     await withHome(async (home) => {
       const db = await openDb(home)
       try {
-        const project = join(home, "project")
-        const priorDir = join(home, "runs", "prior-a")
-        await mkdir(project, { recursive: true })
-        await mkdir(priorDir, { recursive: true })
-        const priorFix = join(priorDir, "2026-10-19T09-30-00-000Z_bbb222.jsonl")
-        await writeFile(priorFix, JSON.stringify({ type: "session", id: "bbb222" }) + "\n")
-        await Effect.runPromise(recordRun(db, {
-          id: "prior-a", project, branch: "orc/test", taskFile: join(priorDir, "task.md"),
-          status: "failed", started: "2026-10-19T09:00:00.000Z"
-        }))
-        await Effect.runPromise(recordStep(db, {
-          runId: "prior-a", name: "implement", attempt: 1, status: "passed",
-          started: "2026-10-19T09:00:00.000Z", agentFile: implementer.path, piSessionFile: null
-        }))
-        await Effect.runPromise(recordStep(db, {
-          runId: "prior-a", name: "checks", attempt: 4, status: "failed",
-          started: "2026-10-19T09:40:00.000Z", agentFile: null, piSessionFile: null
-        }))
-        for (const attempt of [1, 2, 3]) {
-          await Effect.runPromise(recordFixDone(db, "prior-a", {
-            attempt, status: "failed", started: "2026-10-19T09:22:00.000Z", ended: "2026-10-19T09:23:00.000Z",
-            agentFile: fixer.path, sessionFile: priorFix, model: fixer.model, thinking: fixer.thinking,
-            evidenceIn: join(priorDir, "checks-1.md"), commits: 0, tokens: null
-          }))
-        }
-        const git = await stubGit(home)
-        const base = await Effect.runPromise(historyFor("released-b", home, project, "2026-10-19T10:00:00.000Z", git, ""))
-        const run = { ...base, answers: [{ question: holdReleaseId, answer: "Fix the lint failure first" }] }
+        const run = await resumeAfterSpentFixes(db, home, holdReleaseId)
         await mkdir(run.piSessionDir, { recursive: true })
-        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
         const plan = await Effect.runPromise(buildResumePlan(db, run))
         await Effect.runPromise(recordResumePublish(db, run, plan))
         const delivered: Array<AgentRun> = []

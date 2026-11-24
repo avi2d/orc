@@ -8,9 +8,13 @@ export interface QuestionAnswer {
 }
 
 export const holdReleaseId = "hold-release"
+export const carriedHoldReleaseId = "hold-release-carried"
 
 export const holdReleaseWordsOf = (answers: ReadonlyArray<QuestionAnswer>): ReadonlyArray<string> =>
-  answers.filter((entry) => entry.question === holdReleaseId).map((entry) => entry.answer)
+  answers.filter((entry) => entry.question === holdReleaseId || entry.question === carriedHoldReleaseId).map((entry) => entry.answer)
+
+export const isNewHoldRelease = (answers: ReadonlyArray<QuestionAnswer>): boolean =>
+  answers.some((entry) => entry.question === holdReleaseId)
 
 export const holdReleaseGuidance = (words: ReadonlyArray<string>): string =>
   "The captain released the repeat hold with: " + words.join("\nThe captain also wrote: ") + "\nFollow that guidance as you retry the task."

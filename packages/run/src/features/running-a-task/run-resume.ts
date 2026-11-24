@@ -10,7 +10,7 @@ import type { ResumePlan } from "./run-ops"
 import { handoverFileName, inheritedHandoverFileName } from "../../entities/agent/index"
 import { OrcRunError } from "../../shared/lib/index"
 import { sentBackWordsOf } from "./worker-question"
-import { holdReleaseWordsOf } from "../../entities/review-gate/index"
+import { isNewHoldRelease } from "../../entities/review-gate/index"
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
 
@@ -197,6 +197,23 @@ const carrySession = (run: HistoryRun, source: string | null, sessionId: string 
     return { id: sessionId, file: target }
   })
 
+interface FixCarry {
+  readonly sessionId: string | null
+  readonly sessionFile: string | null
+  readonly running: boolean
+  readonly storedFixes: ReadonlyArray<StoredFix>
+}
+
+const fixCarryOf = (run: HistoryRun, progress: PriorProgress, reset: boolean): Effect.Effect<FixCarry, OrcRunError> =>
+  reset
+    ? Effect.succeed({ sessionId: null, sessionFile: null, running: false, storedFixes: [] })
+    : carrySession(run, progress.fixSource, progress.fixSessionId).pipe(Effect.map((carried) => ({
+      sessionId: carried?.id ?? null,
+      sessionFile: carried?.file ?? null,
+      running: progress.fixRunning,
+      storedFixes: progress.storedFixes
+    })))
+
 const inheritedCompletion = (
   db: Database,
   run: HistoryRun,
@@ -259,13 +276,11 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
     const fresh = !progress.implementPassed && (own !== null || (forwarded !== null && progress.implementSessionId === null))
     const carriedImplement = fresh ? null : yield* carrySession(run, progress.implementSource, progress.implementSessionId)
     const sentBack = sentBackWordsOf(answers).length > 0
-    const released = holdReleaseWordsOf(answers).length > 0
-    const resetFixes = sentBack || released
-    const carriedFix = resetFixes ? null : yield* carrySession(run, progress.fixSource, progress.fixSessionId)
+    const fixCarry = yield* fixCarryOf(run, progress, sentBack || isNewHoldRelease(answers))
     const skipImplement = progress.implementPassed && !sentBack
     const skipChecks = skipImplement && progress.checksComplete
     const inherited = skipImplement
-      ? yield* inheritedCompletion(db, run, progress.priorId, released ? [] : progress.storedFixes)
+      ? yield* inheritedCompletion(db, run, progress.priorId, fixCarry.storedFixes)
       : { inheritedRounds: [], inheritedFixes: [] }
     return {
       implementSessionId: carriedImplement?.id ?? null,
@@ -277,9 +292,9 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       answers,
       inheritedRounds: inherited.inheritedRounds,
       inheritedFixes: inherited.inheritedFixes,
-      fixSessionId: carriedFix?.id ?? null,
-      fixSessionFile: carriedFix?.file ?? null,
-      fixRunning: !resetFixes && progress.fixRunning,
+      fixSessionId: fixCarry.sessionId,
+      fixSessionFile: fixCarry.sessionFile,
+      fixRunning: fixCarry.running,
       handover,
       priorDir
     }

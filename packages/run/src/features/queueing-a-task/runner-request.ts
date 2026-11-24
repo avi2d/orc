@@ -3,7 +3,7 @@ import { AbsolutePath, readDispatchConfig, readFailure } from "../../shared/conf
 import { ModelRef, ProviderId } from "../../shared/config/index"
 import { TaskId, backlogPaths, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type TaskRecord, withDecisions } from "../../entities/backlog/index"
 import { latestPerId } from "../../entities/parked-runs/index"
-import { holdReleaseId } from "../../entities/review-gate/index"
+import { carriedHoldReleaseId, holdReleaseId } from "../../entities/review-gate/index"
 import { TaskInstructions, readInstructions } from "./runner-instructions"
 import { RunnerError } from "../../shared/process/index"
 import { isRunDelivery } from "../../shared/config/index"
@@ -89,14 +89,25 @@ const takenBody = (record: TaskRecord): string => {
   ]).join("")
 }
 
+const timeOf = (at: string): number => {
+  const time = Date.parse(at)
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time
+}
+
+const parkedSince = (record: TaskRecord): number =>
+  Math.max(Number.NEGATIVE_INFINITY, ...(record.parked?.questions ?? []).flatMap((question) =>
+    [timeOf(question.asked), ...(question.answer === null ? [] : [timeOf(question.answer.at)])]))
+
+// A run that parks after a release asks or is answered after it, so a release later than all of the park is one no resume has seen.
 const releaseAnswerOf = (record: TaskRecord): ReadonlyArray<typeof AnswerArg.Type> => {
   const hold = record.hold
   const decisions = hold === null ? [] : [...hold.history ?? [], hold]
   const releases = decisions.flatMap((decision) =>
-    decision.repeat === true && decision.answer !== null && decision.answer.words.trim() !== "" ? [decision.answer.words] : [])
-  return releases.length === 0 ? [] : [{
-    question: holdReleaseId,
-    answer: releases.map((words, index) => (index === releases.length - 1 ? "Current guidance: " : "Earlier repeat hold release: ") + words).join("\n")
+    decision.repeat === true && decision.answer !== null && decision.answer.words.trim() !== "" ? [decision.answer] : [])
+  const latest = releases.at(-1)
+  return latest === undefined ? [] : [{
+    question: timeOf(latest.at) > parkedSince(record) ? holdReleaseId : carriedHoldReleaseId,
+    answer: releases.map((release, index) => (index === releases.length - 1 ? "Current guidance: " : "Earlier repeat hold release: ") + release.words).join("\n")
   }]
 }
 

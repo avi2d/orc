@@ -113,7 +113,7 @@ describe("a resumed run that parks again", () => {
         expect(report.actions).toContainEqual({ kind: "parked", task: "orc-1", machine: "mac", branch: "orc/orc-1", questions: ["r3"], decider: [] })
         expect(lines).toContain("parked orc-1 on orc/orc-1 for the captain's answer to r3")
       } else {
-        const reason = (await current(root)).hold?.reason
+        const reason = (await current(root)).hold?.reason ?? ""
         expect(reason).toContain("run-2")
         expect(report.actions).toContainEqual({ kind: "held", task: "orc-1", machine: "mac", reason })
         expect(lines).toContain("held orc-1 on mac: " + reason)
@@ -194,6 +194,26 @@ describe("a resumed run that parks again", () => {
       expect(after.body).toBe(before.body)
       expect(after.body).not.toContain("Held for the captain")
       expect(after.answers).toEqual([{ question: "r2", answer: "Keep it" }, { question: "hold-release", answer: "Current guidance: fix the lint finding first" }])
+    })
+  })
+  test("a resume after the fixer's question marks the release as carried instead of handing it as new again", async () => {
+    await withResumed(async (root) => {
+      await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked }], "2026-10-27T10:35:00.000Z", "run-2", lint))
+      await run(answerTask(root, "orc-1", "fix the lint finding first", "2026-10-27T10:40:00.000Z"))
+      const file = join(root, "new", "orc-1.md")
+      const queued = () => run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: file, ORC_TASK_CHECKOUT: join(root, "checkout"), ORC_TASK_PROVIDER: "test-provider" }, Effect.succeed("")))
+      expect((await queued()).answers).toContainEqual({ question: "hold-release", answer: "Current guidance: fix the lint finding first" })
+      await run(claimTask(root, "orc-1"))
+      await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:45:00.000Z", log: root + "/logs/orc-1.log" } } }))
+      const fixerAsks = { id: "ask-1", text: "Pin the linter version?", asked: "2026-10-27T10:50:00.000Z", blocks: true }
+      const parked = await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked }, fixerAsks], "2026-10-27T10:55:00.000Z", "run-3", lint))
+      expect(answerWait(parked, () => false)).not.toStartWith("held for the captain: ")
+      await run(answerTask(root, "orc-1", "ask-1=Pin it", "2026-10-27T11:00:00.000Z"))
+      expect((await queued()).answers).toEqual([
+        { question: "r2", answer: "Keep it" },
+        { question: "ask-1", answer: "Pin it" },
+        { question: "hold-release-carried", answer: "Current guidance: fix the lint finding first" }
+      ])
     })
   })
   test("an answer to a non-blocking question given during the run resumes it instead of holding it", async () => {

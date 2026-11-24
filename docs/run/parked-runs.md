@@ -67,7 +67,9 @@ The hold reason names the run and its end reason.
 The closing beat prints `held <task-id> on <machine>: <reason>`.
 Each later beat prints `waits <task-id>: held for the captain: <reason>`.
 Run `orc backlog answer <task-id> <words>` to release the hold, and the next beat resumes the task.
-The release gives the resumed run a fresh budget of three fix attempts without repeating a passed implement step.
+The first resume after a release gets a fresh budget of three fix attempts without repeating a passed implement step.
+A later resume of that task keeps its fixer and the fix attempts it used, so an answer to a question that fixer asked reaches it.
+That later resume still carries every release as guidance.
 Your words reach any implementer or fixer the resume starts, and any review fixes it requests.
 If checks pass and review approves without fixes, no worker reads the release.
 Each resume receives every repeat hold release in order, oldest first, with the latest marked as current guidance.

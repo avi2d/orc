@@ -1,4 +1,4 @@
-export { askUserWord, holdReleaseGuidance, holdReleaseId, holdReleaseWordsOf } from "./no-mistakes-gate"
+export { askUserWord, carriedHoldReleaseId, holdReleaseGuidance, holdReleaseId, holdReleaseWordsOf, isNewHoldRelease } from "./no-mistakes-gate"
 export type { QuestionAnswer, OpenQuestion, NoMistakesFinding, AllowWord } from "./no-mistakes-gate"
 export { gateLogFileName, subprocessNoMistakesRunner, driveNoMistakes, noMistakesBinary, noMistakesVersionProblem } from "./no-mistakes"
 export { AskOption, Asking, askingFileName, AnswersFile, answersFileName, CorrectionsFile, correctionsFileName, waitForAnswers, answerWaitFromEnv, isBlockingQuestion, hasBlockingQuestion } from "./answer-wait"
