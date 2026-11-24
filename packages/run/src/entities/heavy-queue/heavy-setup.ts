@@ -1,8 +1,8 @@
 import { Effect, FileSystem } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { readOrcConfig } from "../../shared/config/index"
-import { ciOnlyBinDir, heavyBinDir, resolveHeavy, type HeavySettings } from "./heavy"
-import { ciOnlyScript, ciOnlyTools, detectWrap, standinScripts, type HeavyPlatform, type StandinSettings } from "./heavy-standin"
+import { ciOnlyBashFile, ciOnlyBinDir, heavyBinDir, resolveHeavy, type HeavySettings } from "./heavy"
+import { ciOnlyBashScript, ciOnlyScript, ciOnlyTools, detectWrap, standinScripts, type HeavyPlatform, type StandinSettings } from "./heavy-standin"
 import { RunnerError } from "../../shared/process/index"
 import { ensureGroup } from "../../shared/process/index"
 
@@ -60,6 +60,13 @@ export const writeHeavyBin = (
     const wrap = detectWrap(platform, settings.limit)
     const standins: StandinSettings = { home, group: settings.group, wrap, through: settings.through }
     yield* writeStandinDir(ciOnlyBinDir(home), Object.fromEntries(ciOnlyTools.map((tool) => [tool, ciOnlyScript(tool)])))
+    const fs = yield* FileSystem.FileSystem
+    const bashFile = ciOnlyBashFile(home)
+    const staging = bashFile + ".pending-" + process.pid
+    yield* fs.writeFileString(staging, ciOnlyBashScript()).pipe(
+      Effect.andThen(fs.rename(staging, bashFile)),
+      Effect.mapError((error) => new RunnerError({ detail: "cannot write " + bashFile + ": " + error.message }))
+    )
     return yield* writeStandinDir(heavyBinDir(home), yield* standinScripts(standins, settings.commands))
   })
 

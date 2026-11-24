@@ -27,6 +27,7 @@ export const openAgentExec = (
     ? Effect.succeed(hostExec(copyDir, hostEnv, {
       GIT_CONFIG_GLOBAL: agentGitConfig(folders),
       HEAVY_TESTS_CI_ONLY: "1",
+      BASH_ENV: hostEnv["BASH_ENV"] ?? "",
       ...(plan.own === null ? {} : { PI_CODING_AGENT_DIR: plan.own.piAgentDir, ...plan.own.env })
     }))
     : openNonoExec({

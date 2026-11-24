@@ -1,6 +1,6 @@
 import { Effect, FileSystem, Option } from "effect"
 import { defaultHeavyTools } from "./heavy"
-import { ciOnlyMarker, ciOnlyWord, helperCommand, standinMarker, type StandinCall, type StandinTiming } from "./heavy-standin-runtime"
+import { ciOnlyMarker, ciOnlyPathWord, ciOnlyWord, helperCommand, standinMarker, type StandinCall, type StandinTiming } from "./heavy-standin-runtime"
 
 export type { StandinTiming } from "./heavy-standin-runtime"
 
@@ -91,6 +91,25 @@ echo ${quoteSingle(warning)} >&2
 }
 
 export const ciOnlyTools: ReadonlyArray<string> = ["node", "checks-test"]
+
+export const ciOnlyBashScript = (): string => `if [ "$HEAVY_TESTS_CI_ONLY" = 1 ]; then
+  orc_ci_only_command() {
+    local -a words
+    local refusal
+    read -r -a words <<< "$BASH_COMMAND"
+    case "\${words[0]}" in
+      */node_modules/.bin/*)
+        refusal=$(${helperCommand.map(quoteSingle).join(" ")} ${quoteSingle(ciOnlyPathWord)} "\${words[@]}" 2>&1) || {
+          printf '%s (BASH_ENV command-shape guard)\\n' "$refusal" >&2
+          exit 1
+        }
+        ;;
+    esac
+  }
+  set -o functrace
+  trap orc_ci_only_command DEBUG
+fi
+`
 
 // A missing helper cannot tell a test run from any other call, so the stand-in refuses rather than run the tool unchecked.
 export const ciOnlyScript = (tool: string): string => {

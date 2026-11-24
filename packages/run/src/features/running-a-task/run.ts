@@ -29,7 +29,7 @@ import { subprocessDeliverer } from "./run-deliverer"
 import type { RunDelivery } from "../../shared/config/index"
 import { closeTaskCopy, openTaskCopy, writeAgentGitConfig } from "../../entities/task-copy/index"
 import { ensureHeavyQueue, readHeavySettings } from "../../entities/heavy-queue/index"
-import { runStepPath, withHeavyPath } from "../../entities/heavy-queue/index"
+import { ciOnlyBashFile, runStepPath, withHeavyPath } from "../../entities/heavy-queue/index"
 import { agentGitConfig, agentOps, installCopy, openAgentExec } from "./run-exec"
 import { askSetupFor, type PiPacing } from "../../entities/agent/index"
 
@@ -183,7 +183,7 @@ export const runReportStep = (
       return yield* refuse("orc: a " + kind + " run starts Pi on the host in its run folder, so it takes --sandbox none and refuses --sandbox " + opened.sandboxKind)
     }
     const { folders, agent, plan } = yield* prepareRunAgents(opened, request).pipe(Effect.onError(() => removeRunDir(opened)))
-    const exec = yield* openAgentExec(plan, folders, folders.runDir, toolchain, { ...Bun.env, PATH: runStepPath(opened.home, Bun.env.PATH ?? "") })
+    const exec = yield* openAgentExec(plan, folders, folders.runDir, toolchain, { ...Bun.env, PATH: runStepPath(opened.home, Bun.env.PATH ?? ""), BASH_ENV: ciOnlyBashFile(opened.home) })
     const run: ReportRun = {
       kind, runId: opened.runId, runDir: folders.runDir, projectDir: opened.checkout.projectDir, branch: opened.checkout.branch, machine: opened.machine, sandbox: opened.sandboxKind,
       taskPath: folders.taskPath, instructions: folders.instructionsPath, hostSessionsDir: folders.hostSessionsDir, agent, started: new Date().toISOString(),
@@ -215,7 +215,7 @@ export const runAgentStep = (
     const copy = yield* openTaskCopy(fs, path, spawner, git, checkout, home)
     yield* Effect.addFinalizer(() => closeTaskCopy(spawner, git, checkout.projectDir, copy).pipe(Effect.catch((error) => Console.log(error.message))))
     yield* writeAgentGitConfig(spawner, git, Bun.which("git") ?? "git", checkout.projectDir, copy.dir, agentGitConfig(folders))
-    const exec = yield* openAgentExec(plan, folders, copy.dir, toolchain, { ...Bun.env, PATH: runStepPath(home, Bun.env.PATH ?? "") })
+    const exec = yield* openAgentExec(plan, folders, copy.dir, toolchain, { ...Bun.env, PATH: runStepPath(home, Bun.env.PATH ?? ""), BASH_ENV: ciOnlyBashFile(home) })
     yield* installCopy(spawner, fs, path, exec, path.join(folders.runDir, "prepare.log"))
     const priorOpen = request.resumeRun === undefined ? [] : yield* Effect.acquireUseRelease(
       openDatabase(home).pipe(Effect.mapError((cause) => historyFailure("open", cause))),
