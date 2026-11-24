@@ -37,37 +37,15 @@ commands:
 
 Orc runs only `build`, `lint`, and `typecheck` as local checks.
 In the first checks round, orc prints a warning on stderr naming skipped commands.
-The `prepare` command runs before Pi starts.
+The `prepare` command runs before Pi starts and is not skipped.
 Without local checks, orc records the round as `skipped`.
 Orc then hands off to no-mistakes or opens the direct PR.
 GitHub CI runs repository tests and decides completion.
-Orc tells the no-mistakes review fixer to leave tests to CI.
+Keep test runners out of those commands and `prepare`.
+With `--sandbox none`, the heavy-queue stand-ins refuse recognized test runners and test scripts in Pi sessions, `prepare`, and local checks.
+Commands that do not go through a stand-in are not blocked.
+In the default `nono` sandbox and in no-mistakes review, Orc relies on instructions instead of blocking test commands.
 Orc starts no-mistakes without its local Test step.
-
-### Test calls orc refuses
-
-Keep test runners out of `prepare`, `build`, `lint`, and `typecheck`.
-Orc reads each of these commands, and each package script it calls, for a test call.
-It follows package scripts recursively, including their `pre` and `post` scripts.
-A package manager's own command, such as `npm ci` or `bun install`, does not count as a call to the script of the same name.
-
-Orc reads all four commands before Pi starts.
-It reads `build`, `lint`, and `typecheck` again before each checks round, so a test call Pi adds is caught before it runs.
-When orc finds a test call, the run ends failed and no pull request opens.
-The error names the command and the test call.
-
-These count as test calls:
-
-- `checks-test`, `bun test`, and test executables such as Vitest and Jest.
-- An executable or a leaf target named `e2e`, such as `./scripts/e2e`.
-- The package scripts `test`, `tests`, `t`, `tst`, `e2e`, `coverage`, `mutation`, `vitest`, `jest`, `pytest`, and `playwright`.
-- The package scripts `test:*`, `tests:*`, `e2e:*`, `coverage:*`, and `mutation:*`.
-- The package-manager commands that run the `test` script: `npm it`, `npm cit`, `npm install-test`, `npm install-ci-test`, `pnpm it`, and `pnpm install-test`.
-
-A linter argument or an ancestor directory named `e2e` is not a test target.
-
-The heavy-queue stand-ins also refuse these test calls in Pi sessions, `prepare`, and local checks.
-The stand-ins cannot block commands that do not use them.
 
 ## Choose the run
 

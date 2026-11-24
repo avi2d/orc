@@ -1,11 +1,8 @@
-import { Data, Effect, FileSystem, type Path, Schema } from "effect"
+import { Data, Effect, FileSystem, type Path } from "effect"
 import { refusalsIn, type GateRefusal } from "../../entities/run-history/index"
 import type { AgentFile } from "../../entities/agent/index"
 import { orcCompletionLine } from "../../entities/agent/index"
 import type { CommandResult } from "../../shared/sandbox/index"
-import { readFailure } from "../../shared/config/index"
-import { shellCalls } from "./shell-calls"
-import { isTestExecutable, testTargetOf } from "./test-invocation"
 
 export class ChecksError extends Data.TaggedError("ChecksError")<{
   readonly message: string
@@ -70,122 +67,13 @@ export const readChecksCommands = (
     return commands
   })
 
-const packageManifest = Schema.fromJsonString(Schema.Struct({
-  scripts: Schema.optionalKey(Schema.Record(Schema.String, Schema.String))
-}))
-const decodePackage = Schema.decodeUnknownEffect(packageManifest)
-type Scripts = NonNullable<typeof packageManifest.Type["scripts"]>
-
-const readScripts = Effect.fnUntraced(function*(fs: FileSystem.FileSystem, file: string) {
-  const text = yield* fs.readFileString(file).pipe(
-    Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(null)),
-    Effect.mapError((cause) => new ChecksError({ message: "orc: cannot read " + file + ": " + String(cause) }))
-  )
-  if (text === null) return null
-  const manifest = yield* decodePackage(text).pipe(
-    Effect.mapError((cause) => new ChecksError({ message: "orc: cannot read scripts in " + file + ": " + cause.message }))
-  )
-  return manifest.scripts ?? {}
-})
-
-const localRunCommandNames = new Set(["prepare", "build", "lint", "typecheck"])
-
-export const localRunCommands = Effect.fnUntraced(function*(
-  fs: FileSystem.FileSystem,
-  path: Path.Path,
-  cwd: string,
-  commands: ReadonlyArray<ChecksCommand>
-) {
-  const packagesByDirectory = new Map<string, { readonly cwd: string; readonly scripts: Scripts } | null>()
-  const packageAt = Effect.fnUntraced(function*(directory: string) {
-    const searched: Array<string> = []
-    let location = directory
-    let found = packagesByDirectory.get(location)
-    while (found === undefined) {
-      searched.push(location)
-      const scripts = yield* readScripts(fs, path.join(location, "package.json"))
-      if (scripts !== null) {
-        found = { cwd: location, scripts }
-        break
-      }
-      const parent = path.dirname(location)
-      if (parent === location) {
-        found = null
-        break
-      }
-      location = parent
-      found = packagesByDirectory.get(location)
-    }
-    for (const dir of searched) packagesByDirectory.set(dir, found)
-    return found
-  })
-  const testInScript = Effect.fnUntraced(function*(
-    target: Extract<ReturnType<typeof testTargetOf>, { readonly kind: "script" }>,
-    invocation: string,
-    visited: Set<string>
-  ): Effect.fn.Return<string | null, ChecksError> {
-    const pkg = yield* packageAt(target.cwd)
-    if (pkg === null || !Object.hasOwn(pkg.scripts, target.name)) {
-      return target.executableFallback && isTestExecutable(target.name) ? invocation : null
-    }
-    const key = JSON.stringify([pkg.cwd, target.name])
-    if (visited.has(key)) return null
-    visited.add(key)
-    for (const name of ["pre" + target.name, target.name, "post" + target.name]) {
-      if (!Object.hasOwn(pkg.scripts, name)) continue
-      const found = yield* testInvocation(pkg.scripts[name], pkg.cwd, visited)
-      if (found !== null) return found
-    }
-    return null
-  })
-
-  const testInvocation = Effect.fnUntraced(function*(
-    command: string,
-    directory: string,
-    visited: Set<string>
-  ): Effect.fn.Return<string | null, ChecksError> {
-    const calls = yield* Effect.try({
-      try: () => shellCalls(command, directory, path),
-      catch: (cause) => new ChecksError({ message: "orc: cannot read the shell command " + command + ": " + String(cause) })
-    })
-    for (const call of calls) {
-      const target = testTargetOf(call, path)
-      if (target === null) continue
-      const display = call.words.map((word) => word ?? "<dynamic>").join(" ")
-      if (target.kind === "suite") return display
-      const found = yield* (target.kind === "shell"
-        ? testInvocation(target.command, target.cwd, visited)
-        : testInScript(target, display, visited))
-      if (found !== null) return found
-    }
-    return null
-  })
-
-  const local: Array<ChecksCommand> = []
-  for (const check of commands) {
-    if (!localRunCommandNames.has(check.name)) continue
-    const invocation = yield* testInvocation(check.command, cwd, new Set())
-    if (invocation !== null) {
-      return yield* fail("orc: refusing " + check.name + " command " + JSON.stringify(check.command) + " because it invokes local tests: " + invocation + ". Leave repository tests to GitHub CI.")
-    }
-    local.push(check)
-  }
-  return local
-})
-
-export const readProjectLocalChecks = Effect.fnUntraced(function*(fs: FileSystem.FileSystem, path: Path.Path, cwd: string) {
-  const source = ".no-mistakes.yaml"
-  const text = yield* fs.readFileString(path.join(cwd, source)).pipe(
-    Effect.mapError((cause) => new ChecksError({ message: "orc: cannot read the checks config " + source + ": " + readFailure(cause) }))
-  )
-  const checks = (yield* readChecksCommands(text, source)).filter((check) => check.name !== "prepare")
-  const commands = yield* localRunCommands(fs, path, cwd, checks)
-  const skipped = checks.filter((check) => !commands.includes(check)).map((check) => check.name)
-  return { commands, skipped }
-})
-
 export const prepareCommandOf = (commands: ReadonlyArray<ChecksCommand>): string | null =>
   commands.find((check) => check.name === "prepare")?.command ?? null
+
+const localCheckNames = new Set(["build", "lint", "typecheck"])
+
+export const localChecksOf = (commands: ReadonlyArray<ChecksCommand>): ReadonlyArray<ChecksCommand> =>
+  commands.filter((check) => localCheckNames.has(check.name))
 
 const sectionOf = (outcome: CheckOutcome, stdout: string, stderr: string): string => {
   const output = (stdout + stderr).trim()

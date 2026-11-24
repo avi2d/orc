@@ -1,5 +1,5 @@
 import { Console, Effect, FileSystem, Result } from "effect"
-import { buildFixPrompt, maxFixAttempts, readProjectLocalChecks, runChecksRound, type ChecksCommand } from "./checks"
+import { buildFixPrompt, localChecksOf, maxFixAttempts, readChecksCommands, runChecksRound, type ChecksCommand } from "./checks"
 import { distinctRefusals } from "../../entities/run-history/index"
 import { branchCommits, runGit } from "../../shared/process/index"
 import { buildImplementPrompt, finalReplyError, finalReplyText, orcCompletionLine, orcSplitLine, sessionPrintedSignal, sumPiUsage, textAfterSignal, type PiTokenUse } from "../../entities/agent/index"
@@ -11,6 +11,7 @@ import { askedNote, sentBackContinuePrompt, sentBackGuidance, sentBackWordsOf, w
 import { holdReleaseGuidance, holdReleaseWordsOf } from "../../entities/review-gate/index"
 import { freshFixOf, releaseGuidanceOf, resumedFix } from "./fix-guidance"
 import { finishAfterChecks } from "./run-finish"
+import { readFailure } from "../../shared/config/index"
 import { countSessionSize, handoverImplementPrompt } from "../../entities/agent/index"
 import type { AgentOutcome, AgentRun, AgentRunResult, AgentStep, ResumePlan, RunCheckpoints, SandboxOps } from "./run-ops"
 import { recordOpenAsks } from "./history-write"
@@ -233,13 +234,18 @@ const fixOnce = (
 
 const readProjectChecks = (run: HistoryRun, round: number): Effect.Effect<ReadonlyArray<ChecksCommand>, OrcRunError> =>
   Effect.gen(function*() {
-    const { commands, skipped } = yield* readProjectLocalChecks(run.fs, run.path, run.worktreeDir).pipe(
+    const text = yield* run.fs.readFileString(run.path.join(run.worktreeDir, ".no-mistakes.yaml")).pipe(
+      Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read the checks config .no-mistakes.yaml: " + readFailure(cause) }))
+    )
+    const commands = yield* readChecksCommands(text, ".no-mistakes.yaml").pipe(
       Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
     )
-    if (round === 1 && (skipped.length > 0 || commands.length === 0)) {
-      yield* Console.warn("orc: warning: " + (skipped.length === 0 ? "" : "skipped local commands: " + skipped.join(", ") + ". ") + (commands.length === 0 ? "No local checks ran. " : "") + "GitHub CI decides completion.")
+    const local = localChecksOf(commands)
+    const skipped = commands.filter((check) => check.name !== "prepare" && !local.includes(check)).map((check) => check.name)
+    if (round === 1 && (skipped.length > 0 || local.length === 0)) {
+      yield* Console.warn("orc: warning: " + (skipped.length === 0 ? "" : "skipped local commands: " + skipped.join(", ") + ". ") + (local.length === 0 ? "No local checks ran. " : "") + "GitHub CI decides completion.")
     }
-    return commands
+    return local
   })
 
 type ImplementBase = Parameters<typeof finishAfterChecks>[1]

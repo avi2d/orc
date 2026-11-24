@@ -1,7 +1,7 @@
 import { Console, Effect, type FileSystem, type Path, type Scope } from "effect"
 import type { ChildProcessSpawner } from "effect/process"
 import { type AgentExec, hostExec, shellInAgent, streamShellInAgent } from "../../shared/sandbox/index"
-import { localRunCommands, prepareCommandOf, readChecksCommands } from "./checks"
+import { prepareCommandOf, readChecksCommands } from "./checks"
 import { commitsSince, headOf } from "../../shared/process/index"
 import { openNonoExec } from "../../shared/sandbox/index"
 import type { ToolchainResolver } from "../../shared/sandbox/index"
@@ -55,14 +55,13 @@ export const installCopy = (
       Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed<string | null>(null)),
       Effect.mapError((cause) => new OrcRunError({ message: "orc: cannot read " + file + ": " + String(cause) }))
     )
-    const configured = text === null ? [] : yield* readChecksCommands(text, file).pipe(
-      Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
-    )
-    const commands = yield* localRunCommands(fs, path, exec.cwd, configured).pipe(
+    const commands = text === null ? [] : yield* readChecksCommands(text, file).pipe(
       Effect.mapError((cause) => new OrcRunError({ message: cause.message }))
     )
     const prepare = prepareCommandOf(commands)
-    if (prepare === null) return
+    if (prepare === null) {
+      return
+    }
     yield* Console.log("orc: preparing the copy with " + prepare)
     const result = yield* shellInAgent(spawner, exec, prepare)
     yield* fs.writeFileString(logFile, "$ " + prepare + "\n" + result.stdout + result.stderr + "exit " + result.exitCode.toString() + "\n").pipe(
