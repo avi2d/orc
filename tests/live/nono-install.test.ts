@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { skipReason } from "@avi2dg/checks/scripts/test-skips.ts"
 import type { NonoExecOptions } from "../../packages/run/src/shared/sandbox/nono-exec"
+import { standinHelper } from "../../packages/run/src/entities/heavy-queue/index"
 import { makeNonoFixtureDir } from "../lib/nono-home"
 import { runNonoShell } from "../lib/nono-shell"
 
@@ -37,6 +38,7 @@ describe("the copy's install under nono", () => {
     worktree: copy,
     piSessionDir: sessions,
     sessionsDir: sessions,
+    standinHelper,
     hostEnv: { ...Bun.env, HOME: home },
     env: {}
   })

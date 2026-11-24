@@ -158,6 +158,12 @@ describe("buildSandboxEnv", () => {
     expect(env.PATH).toBe("/r/bun/bin:/r/node/bin:/usr/bin:/bin")
   })
 
+  test("puts the heavy stand-in folder ahead of the runtimes and refuses test runs", () => {
+    const env = buildSandboxEnv({ ...hostEnv, PATH: "/o/heavy/bin:/usr/bin:/bin" }, "/tmp/orc-test/session", ["/r/bun/bin"])
+    expect(env.PATH).toBe("/o/heavy/bin:/r/bun/bin:/usr/bin:/bin")
+    expect(env["HEAVY_TESTS_CI_ONLY"]).toBe("1")
+  })
+
   test("host git reads no global or system config and no credential from the env", () => {
     const env = buildHostGitEnv(hostEnv)
     expect(env).toEqual({

@@ -13,7 +13,7 @@
   },
   "bb": {
     "name": "orc Board [Experimental]",
-    "description": "List the tasks that orc backlog --json prints, by id and title.",
+    "description": "Show one line per task from orc backlog --json: what it waits for, who acts and its pull request.",
     "branding": {
       "icon": "Columns"
     },
