@@ -26,6 +26,8 @@ export const buildSandboxEnv = (
     ...env,
     PATH: [...new Set(standins), ...runtimeBinDirs, ...(hostEnv.PATH === undefined || rest.length === 0 ? [] : [rest.join(":")])].join(":"),
     HEAVY_TESTS_CI_ONLY: "1",
+    // The sandbox grants no pueue socket, so a queued call there could never start.
+    HEAVY_QUEUE_UNREACHABLE: "1",
     TMPDIR: `${piSessionDir}/tmp`,
     // xcrun finds its default cache through confstr, not TMPDIR, and without a writable cache every /usr/bin/git call reruns xcodebuild -find.
     xcrun_db: `${piSessionDir}/tmp/xcrun_db`,
