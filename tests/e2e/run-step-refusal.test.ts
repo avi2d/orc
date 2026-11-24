@@ -93,7 +93,7 @@ describe("orc run refuses test runners in its own steps", () => {
       const pi = await readFile(piFile, "utf8")
       await writeFile(piFile, pi.replace("echo hello > greeting.txt", "sh forms.sh pi\necho hello > greeting.txt"))
       const result = await runOrc(["run", "task.md", "--branch", "orc/test", "--sandbox", "none"], repo, env)
-      expect({ exitCode: result.exitCode, pr: result.stdout.includes(prUrl) }).toEqual({ exitCode: 0, pr: true })
+      expect({ exitCode: result.exitCode, pr: result.stdout.includes(prUrl), output: result.exitCode === 0 ? "" : result.stdout + result.stderr }).toEqual({ exitCode: 0, pr: true, output: "" })
       expect((await readFile(attempts, "utf8")).trim().split("\n")).toEqual([...expectedAttempts(["prepare", "pi", "build"])])
       const lintStartsPerStep = permittedForms.filter((form) => form.includes("lint")).length
       const lintCheckStarts = 1
