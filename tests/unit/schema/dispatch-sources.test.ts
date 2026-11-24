@@ -97,6 +97,11 @@ describe("the dispatch panel reader", () => {
     expect(machines.kind).toBe("unreachable");
     if (machines.kind === "unreachable") expect(machines.reason).toContain("the account alt takes kind none and names no login");
   });
+  test("keeps an account with its own provider and models instead of reporting them as unknown keys", async () => {
+    const openai = { name: "openai", provider: "codex", models: { implementer: "codex/gpt-5.5", fixer: "codex/gpt-5.5" }, tokenFile: "/b" };
+    const machines = await machinesAt(backlogWith({ machines: [machine], quota: { ...quota, accounts: [{ name: "main", tokenFile: "/a" }, openai] } }));
+    expect(machines.kind).toBe("ok");
+  });
   test("keeps several token accounts when no account is kind none", async () => {
     const machines = await machinesAt(
       backlogWith({ machines: [machine], quota: { ...quota, accounts: [{ name: "main", tokenFile: "/a" }, { name: "alt", tokenFile: "/b" }] } }),
