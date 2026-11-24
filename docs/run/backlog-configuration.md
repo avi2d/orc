@@ -8,7 +8,7 @@ Both files live in `$ORC_HOME/backlog`, or `~/.orc/backlog` when `ORC_HOME` is u
 
 ## Dispatch configuration
 
-`dispatch.json` defines machines, their slot limits and commands, and the provider's quota and accounts.
+`dispatch.json` defines machines, their slot limits and commands, and the quota and accounts.
 Each slot limit also sets the pueue `orc` group's parallel limit when `orc runner start` queues a task.
 
 Each account has one credential kind:
