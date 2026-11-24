@@ -27,10 +27,12 @@ const Reply = Schema.Union([
   Schema.Struct({ decision: Schema.Literal("answer"), answer: Words, rule: Words, reason: Words }),
   Schema.Struct({ decision: Schema.Literal("ask-back"), question: Words }),
   Schema.Struct({ decision: Schema.Literal("duplicate"), of: Words }),
-  Schema.Struct({ decision: Schema.Literal("escalate"), reason: Words, recommendation: Schema.optionalKey(Schema.Unknown) })
+  Schema.Struct({ decision: Schema.Literal("escalate"), reason: Words, rule: Schema.optionalKey(Schema.Unknown), recommendation: Schema.optionalKey(Schema.Unknown) })
 ])
 
 type Reply = typeof Reply.Type
+
+type EscalateReply = Extract<Reply, { readonly decision: "escalate" }>
 
 interface RuleSource {
   readonly source: string
@@ -184,17 +186,41 @@ const optionTexts = (question: string): ReadonlyArray<string> =>
     return found === null ? [] : [found.at(1) ?? ""]
   })
 
-const escalation = (reply: Extract<Reply, { readonly decision: "escalate" }>, question: string): Verdict => {
+const escalation = (reply: EscalateReply, question: string): Verdict => {
   const recommended = typeof reply.recommendation === "string" ? reply.recommendation.trim() : undefined
   return recommended !== undefined && recommended !== "" && optionTexts(question).includes(recommended)
     ? { kind: "escalated", reason: reply.reason, recommendation: recommended }
     : { kind: "escalated", reason: reply.reason }
 }
 
+const recommendedLine = /^[\t ]*Recommended:[\t ]*(\S.*)$/m
+
+const recommendedOption = (question: string): string | undefined => recommendedLine.exec(question)?.[1]?.trim()
+
+const recommendedRule = "When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure."
+
+// The policy lifts only these two escalation bullets for a question that names a recommended option, so every other reason still escalates.
+const liftedBullets: ReadonlyArray<string> = ["It picks between product choices that the intent leaves open.", "You are not sure."]
+
+const restsOnLiftedBullet = (rule: unknown): rule is string =>
+  typeof rule === "string" && liftedBullets.some((bullet) => comparisonWords(normalizedQuote(rule)) === comparisonWords(bullet))
+
+// A worker question keeps the decider's escalation, because its Recommended: line is the worker's own preference.
+const recommendedAnswer = (reply: EscalateReply, sources: ReadonlyArray<RuleSource>, kind: AttentionItem["kind"], question: string): Verdict | undefined => {
+  const option = recommendedOption(question)
+  if (kind !== "review-question" || option === undefined || !restsOnLiftedBullet(reply.rule)) {
+    return undefined
+  }
+  const found = quotedSource(recommendedRule, sources)
+  return found === undefined
+    ? undefined
+    : { kind: "answered", words: option, basis: { kind: "rule", quote: found.quote, source: found.source, reason: "the question names " + JSON.stringify(option) + " on its Recommended: line, and the decider escalated only on the policy bullet " + JSON.stringify(reply.rule) } }
+}
+
 const checkedVerdict = (reply: Reply, sources: ReadonlyArray<RuleSource>, earlier: ReadonlyArray<Earlier>, kind: AttentionItem["kind"], question: string): Verdict => {
   switch (reply.decision) {
     case "escalate": {
-      return escalation(reply, question)
+      return recommendedAnswer(reply, sources, kind, question) ?? escalation(reply, question)
     }
     case "answer": {
       const found = quotedSource(reply.rule, sources)

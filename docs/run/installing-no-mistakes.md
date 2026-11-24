@@ -23,3 +23,22 @@ With `agent: auto` it takes the first agent it finds, so to review with Pi:
 
 no-mistakes opens the PR only for an origin on a provider it supports, such as GitHub.
 For another origin it pushes the branch and skips the `pr` and `ci` steps, and orc's result names that skip and its reason.
+
+## Ask each review question for a recommended option
+
+Orc's decider answers a review question with its recommended option only when a line of the question starts with `Recommended:`.
+no-mistakes follows review instructions from `review.path_instructions` in its config, and treats the run's intent as data, so the rule goes in your config.
+Orc never writes `~/.no-mistakes/config.yaml`, so add the rule yourself:
+
+Add this entry under `review.path_instructions` in `~/.no-mistakes/config.yaml`, beside any entries already there:
+
+```yaml
+review:
+  path_instructions:
+    - path: "**/*"
+      instructions: |
+        Every question the review asks names one recommended option.
+        Put that option on its own line that starts with "Recommended:", followed by the option's words.
+```
+
+The entry applies to every repository no-mistakes gates on this machine, from its next run.

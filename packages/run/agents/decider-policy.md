@@ -9,6 +9,7 @@ The written rules are what a review already holds a change to: keep the change s
 
 ## Rules
 
+A line of the question that starts with "Recommended:" names its recommended option, and the words after it are that option.
 When a question names a recommended option and the question is not on the never list, answer with that option even when it picks between product choices the intent leaves open or you are not sure.
 
 ## How to answer
@@ -18,7 +19,7 @@ When you answer with the recommended option of a question, put the sentence that
 
 ## Escalation
 
-Escalate it to the owner when any of these holds:
+Escalate it to the owner when any of these holds, and put the one bullet your escalation rests on in rule, word for word:
 - It picks between product choices that the intent leaves open.
 - It would widen the task beyond its intent.
 - It asks for an account or a name the intent does not give.
@@ -43,7 +44,7 @@ Duplicate, when an answered question of this task already asked the same thing. 
 
 Escalate, for everything else:
 
-{"decision":"escalate","reason":"<the note the owner reads with the question>","recommendation":"<the option you recommend>"}
+{"decision":"escalate","reason":"<the note the owner reads with the question>","rule":"<the bullet of the Escalation list it rests on, word for word>","recommendation":"<the option you recommend>"}
 
 Give recommendation only when the question lists lettered options and you recommend one of them.
 Copy the text of that option word for word, without its letter.

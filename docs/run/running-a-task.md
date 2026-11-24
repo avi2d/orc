@@ -67,6 +67,11 @@ A running tool is not interrupted by the idle limit.
 
 ## Answer a review question
 
+Orc starts no-mistakes with `review-intent.md` in the run folder, which holds the task and a section asking that each review question name one recommended option on a line that starts with `Recommended:`.
+no-mistakes reads that file as the run's intent, so its reviewer may not follow the section, and [Installing no-mistakes](installing-no-mistakes.md#ask-each-review-question-for-a-recommended-option) shows the reviewer instruction that asks for the line.
+If orc cannot make `review-intent.md`, it starts no-mistakes with the task file and writes a line to `gate.log` in the run folder saying the run has no `Recommended:` rule.
+The decider reads the `Recommended:` line, as [The attention queue](attention-queue.md#the-decider) shows.
+
 A no-mistakes run waits 30 minutes for an unanswered review question.
 Set `ORC_ANSWER_WAIT_SECONDS` to change the wait, or set it to `0` to refuse the gate immediately.
 The beat delivers answers from `orc backlog answer`, as [Parked runs](parked-runs.md) describes.

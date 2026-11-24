@@ -44,6 +44,17 @@ export interface NoMistakesRunner {
 
 export const gateLogFileName = "gate.log"
 
+const reviewIntentFileName = "review-intent.md"
+
+const reviewQuestionRule = [
+  "## Review questions",
+  "",
+  "This section asks nothing of the change under review.",
+  "It sets the form of each question the review asks the author.",
+  "Every question the review asks names one recommended option.",
+  "Put that option on its own line that starts with \"Recommended:\", followed by the option's words."
+].join("\n")
+
 export interface NoMistakesInput {
   readonly runner: NoMistakesRunner
   readonly taskFile: string
@@ -296,11 +307,27 @@ const advanceParked = (
     return { kind: "next", current, sent: { kind: "respond", gate } }
   })
 
+// A review that cannot get the rule still runs on the bare task, because a question without a Recommended: line only escalates as it did before.
+const reviewIntentFile = (input: NoMistakesInput): Effect.Effect<string, never, FileSystem.FileSystem> =>
+  Effect.gen(function*() {
+    const fs = yield* FileSystem.FileSystem
+    const file = input.runDir + "/" + reviewIntentFileName
+    const task = yield* fs.readFileString(input.taskFile)
+    yield* fs.writeFileString(file, task.trimEnd() + "\n\n" + reviewQuestionRule + "\n")
+    return file
+  }).pipe(
+    Effect.catch((error) =>
+      appendGate(input.runDir, "orc could not make " + reviewIntentFileName + " (" + error.message + "), so the review runs on " + input.taskFile + " without the Recommended: rule").pipe(
+        Effect.as(input.taskFile)
+      ))
+  )
+
 const drive = (input: NoMistakesInput, log: DriveLog): Effect.Effect<Ending, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     let sent: Sent = { kind: "start" }
+    const intentFile = yield* reviewIntentFile(input)
     yield* appendGate(input.runDir, "start")
-    let current = yield* input.runner.start(input.taskFile)
+    let current = yield* input.runner.start(intentFile)
     const supplied = new Map((input.answers ?? []).filter((entry) => entry.question !== gateCapQuestionId).map((entry) => [entry.question, entry.answer] as const))
     for (;;) {
       const step: CurrentStep = yield* stepCurrent(input, log, sent, current)

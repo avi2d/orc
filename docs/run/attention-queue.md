@@ -35,9 +35,15 @@ The decider can:
   A review question cannot be asked back and is escalated instead.
 - **Link a duplicate** to an earlier answered question on the same task.
   Orc escalates a link to a missing or unanswered item.
-- **Escalate** to you, with a reason.
+- **Escalate** to you, with a reason and the bullet of the policy's Escalation list it rests on.
   When the question lists lettered options, the decider may name the one it recommends.
   The escalated decision keeps that option's text as `recommendation`, and orc drops a recommendation that is no option of the question.
+
+A line of a question that starts with `Recommended:` names its recommended option, and leading whitespace before it is allowed.
+The policy tells the decider to answer such a question with that option, even when it picks between product choices the intent leaves open or the decider is not sure.
+When the decider still escalates a review question with that line on one of those two bullets, orc answers it with the recommended option and records the policy's Rules sentence as the rule.
+An escalation on any other bullet, or with no bullet, stays with you, and so does a question on the topic list above.
+Orc's override skips a worker question, though the decider may still answer one by the policy.
 
 A failed call, unreadable reply or rules file, or missing decider model also escalates the item.
 
