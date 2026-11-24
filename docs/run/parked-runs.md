@@ -34,6 +34,7 @@ To answer one question, run `orc backlog answer <task-id> <question-id>=<text>`.
 When a later round asks an id it already asked, the answer goes to the entry that is still open.
 The task file keeps your text and its time on that question, and the other questions stay parked.
 Once every question has an answer, the next beat resumes the task on its original machine and branch with `--answer <question-id>=<text>` for each id.
+A [resume that parks again](#a-resume-that-parks-again) stays held instead until you release it.
 When an id was asked more than once, the resume hands the latest answer for that id.
 A machine with more room cannot take that resume.
 The beat waits if the original machine has no room or no configured checkout, or if the runner cannot find the recorded run.
@@ -53,6 +54,7 @@ The resumed attempt keeps the earlier completed steps and hands your answers to 
 If the resumed run stops on new questions, the task parks again with those beside the questions it kept, and it keeps the answers it already has.
 An answer given after the beat last read the waiting run is kept too.
 A task whose every blocking question has an answer can resume when its original machine and run are available.
+A [resume that parks again](#a-resume-that-parks-again) stays held instead until you release it.
 `orc backlog` shows a parked task as `parked (<question-ids>)`.
 `orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times, their blocking flag, whether the decider owns them, their answers, and for a worker question its options and recommendation.
 Older parked records have no `origin` field.
