@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BunServices } from "@effect/platform-bun"
 import { Effect } from "effect"
-import { type DispatchConfig, readDispatchConfig } from "../../packages/run/src/shared/config/dispatch-config"
+import { type DispatchConfig, providerOf, readDispatchConfig } from "../../packages/run/src/shared/config/dispatch-config"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -152,6 +152,36 @@ describe("readDispatchConfig", () => {
       const machines = config.machines.map((machine) => ({ ...machine, renew: ["true"] }))
       await writeFile(file, JSON.stringify({ machines, quota: { ...config.quota, accounts: [{ name: "main", tokenFile: "/a" }, { name: "alt", tokenCommand: ["my-token-command", "alt"] }] } }))
       expect((await run(readDispatchConfig(file))).quota.accounts).toEqual([{ name: "main", kind: "token-file", tokenFile: "/a" }, { name: "alt", kind: "token-command", tokenCommand: ["my-token-command", "alt"] }])
+    })
+  })
+  test("keeps an account's own provider and falls back to the quota provider instead of one provider for every account", async () => {
+    await withBacklog(async (root) => {
+      const file = join(root, "dispatch.json")
+      const models = { implementer: "codex/gpt-5.5", fixer: "codex/gpt-5.5" }
+      await writeFile(file, JSON.stringify({ machines: config.machines, quota: { ...config.quota, accounts: [{ name: "main", tokenFile: "/a" }, { name: "openai", provider: "codex", models, tokenFile: "/b" }] } }))
+      const quota = (await run(readDispatchConfig(file))).quota
+      expect(quota.accounts.map((account) => providerOf(quota, account))).toEqual(["keyed", "codex"])
+    })
+  })
+  test("refuses an account provider that is no provider id instead of handing it to the run", async () => {
+    await withBacklog(async (root) => {
+      const problem = await configProblem(root, { accounts: [{ name: "main", provider: "no such", tokenFile: "/a" }] })
+      expect(problem).toContain("the account main")
+      expect(problem).toContain('["provider"]')
+      expect(problem).toContain("RegExp")
+    })
+  })
+  test("refuses an account on another provider that names no models instead of running it on the quota provider's models", async () => {
+    await withBacklog(async (root) => {
+      expect(await configProblem(root, { accounts: [{ name: "main", tokenFile: "/a" }, { name: "openai", provider: "codex", tokenFile: "/b" }] }))
+        .toBe("the account openai runs on the provider codex, not the quota's provider keyed, so name the implementer and fixer models from codex in its models")
+    })
+  })
+  test("refuses an account model from another provider instead of handing the run a model its credential cannot reach", async () => {
+    await withBacklog(async (root) => {
+      const models = { implementer: "codex/gpt-5.5", fixer: "keyed/claude-sonnet" }
+      expect(await configProblem(root, { accounts: [{ name: "openai", provider: "codex", models, tokenFile: "/b" }] }))
+        .toBe("the account openai runs on the provider codex and names the model keyed/claude-sonnet, which is not from codex")
     })
   })
 })

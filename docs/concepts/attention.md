@@ -23,6 +23,7 @@ Each item names who must answer it, and a model called the decider takes the rou
 | `pr-ready` | Every check is green on a closed task's pull request | You |
 | `overdue-wait` | A hold's date has passed | You |
 
+A gate finding whose action is not `auto-fix`, `no-op`, or `ask-user` stays with you, as [The attention queue](../run/attention-queue.md) shows.
 An open item is overdue once more than 5 minutes have passed since it was asked.
 
 ## The decider
