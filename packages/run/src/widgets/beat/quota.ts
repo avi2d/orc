@@ -1,6 +1,6 @@
 import { Clock, DateTime, Effect, Result, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { duplicateOf } from "../../shared/config/index"
+import { duplicateOf, providerOf } from "../../shared/config/index"
 import { type AccountReading, runQuotaCommand } from "./quota-command"
 import { decodeSubquo, isSubquoDocument } from "./subquo"
 
@@ -15,7 +15,8 @@ export type QuotaReading =
 
 export interface QuotaSettings {
   readonly command: readonly [string, ...Array<string>]
-  readonly accounts: ReadonlyArray<{ readonly name: string }>
+  readonly provider: string
+  readonly accounts: ReadonlyArray<{ readonly name: string; readonly provider?: string }>
   readonly floorPercent: number
 }
 
@@ -131,7 +132,7 @@ export const assessQuota = (document: unknown, settings: QuotaSettings): QuotaRe
 }
 
 export const assessSubquo = (document: unknown, settings: QuotaSettings, nowMillis: number): QuotaReading => {
-  const read = decodeSubquo(document, settings.accounts.map((account) => account.name), nowMillis)
+  const read = decodeSubquo(document, settings.accounts.map((account) => ({ name: account.name, provider: providerOf(settings, account) })), nowMillis)
   return read.kind === "ok" ? choose(read.accounts, settings) : { kind: "unread", reason: read.reason }
 }
 

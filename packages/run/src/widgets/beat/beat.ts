@@ -93,7 +93,8 @@ const startTask = (
   task: TaskRecord,
   claim: Claim,
   place: Placed,
-  credential: Credential
+  credential: Credential,
+  models: Account["models"]
 ): Effect.Effect<BeatAction, BacklogError | TaskFileError, BeatRequirements> =>
   Effect.gen(function*() {
     const machine = place.machine
@@ -117,6 +118,8 @@ const startTask = (
       ORC_RUN_MACHINE: machine.name,
       ORC_TASK_PROVIDER: credential.provider,
       ORC_TASK_ACCOUNT: claim.account,
+      ORC_TASK_IMPLEMENTER_MODEL: models?.implementer ?? "",
+      ORC_TASK_FIXER_MODEL: models?.fixer ?? "",
       ORC_TASK_TOKEN_FILE: credential.kind === "file" ? credential.tokenFile : "",
       ORC_TASK_CLAUDE_CONFIG_DIR: credential.kind === "claude-config" ? credential.configDirs[machine.name] ?? "" : ""
     }
@@ -208,7 +211,7 @@ const considerTask = (
       slot.busy += 1
     }
     const claim: Claim = { beat: context.beat, machine: placement.machine.name, account: context.account.name, takenAt: yield* nowIso }
-    const action = yield* startTask(context.root, claimed.record, claim, placement, credential)
+    const action = yield* startTask(context.root, claimed.record, claim, placement, credential, context.account.models)
     if (slot !== undefined) {
       if (action.kind === "given-back") {
         slot.busy = slot.slots

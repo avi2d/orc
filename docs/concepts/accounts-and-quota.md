@@ -36,6 +36,13 @@ The quota names a default provider, and an account may name its own, so one quot
 The beat compares every account in the quota, whatever its provider, and the run it starts takes the picked account's provider.
 Each provider is one `~/.orc/config.json` defines on each machine that runs tasks.
 
+The models in `~/.orc/config.json` serve the quota's provider.
+An account on another provider names its own implementer and fixer models from that provider, and the run it starts takes them.
+Orc refuses a `dispatch.json` with an account on another provider that names no models, or a model from a provider other than the account's.
+
+A `subquo.v1` snapshot also names each account's vendor, such as `claude` or `codex`.
+When two accounts on one provider read different vendors, the beat leaves the quota unread and starts nothing, since one of them would hand its credential to the other vendor's route.
+
 ## How the credential reaches the run
 
 The account's kind says where its credential lives.

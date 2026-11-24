@@ -183,7 +183,7 @@ describe("orc beat", () => {
     })
   }, beatTimeout)
 
-  test("subquo's roomiest account starts the run with that account's own provider instead of the quota provider", async () => {
+  test("subquo's roomiest account starts the run with that account's own provider and models instead of the quota provider's", async () => {
     await withFixture({ mac: 1, linux: 0, floorPercent: 15 }, async (fixture) => {
       const observedAt = new Date().toISOString()
       const validUntil = new Date(Date.parse(observedAt) + 600_000).toISOString()
@@ -192,12 +192,13 @@ describe("orc beat", () => {
       await writeFile(join(fixture.dir, "bin", "subquo"), "#!/bin/sh\ncat <<'J'\n" + JSON.stringify(snapshot) + "\nJ\n")
       await chmod(join(fixture.dir, "bin", "subquo"), 0o755)
       const seen = join(fixture.dir, "credential")
-      const machines = [{ name: "mac", slots: 1, start: ["sh", "-c", "echo \"$ORC_TASK_PROVIDER $ORC_TASK_ACCOUNT\" > '" + seen + "'"] }, { name: "linux", slots: 0, start: ["true"] }]
-      const accounts = [{ name: "main", tokenFile: "/secrets/main-token" }, { name: "openai", provider: "codex", tokenFile: "/secrets/openai-token" }]
+      const machines = [{ name: "mac", slots: 1, start: ["sh", "-c", "echo \"$ORC_TASK_PROVIDER $ORC_TASK_ACCOUNT $ORC_TASK_IMPLEMENTER_MODEL $ORC_TASK_FIXER_MODEL\" > '" + seen + "'"] }, { name: "linux", slots: 0, start: ["true"] }]
+      const models = { implementer: "codex/gpt-5.5", fixer: "codex/gpt-5.5-mini" }
+      const accounts = [{ name: "main", tokenFile: "/secrets/main-token" }, { name: "openai", provider: "codex", models, tokenFile: "/secrets/openai-token" }]
       await writeFile(join(fixture.dir, "home", "backlog", "dispatch.json"), JSON.stringify({ machines, quota: { ...quotaConfig(15), command: ["subquo", "read", "--json"], accounts } }))
       await addTasks(fixture, 1)
       expect(await orcOk(fixture, ["beat"])).toContain("runs use openai")
-      expect(await eventually(() => readFile(seen, "utf8").catch(() => ""), (text) => text !== "")).toBe("codex openai\n")
+      expect(await eventually(() => readFile(seen, "utf8").catch(() => ""), (text) => text !== "")).toBe("codex openai codex/gpt-5.5 codex/gpt-5.5-mini\n")
     })
   }, beatTimeout)
 

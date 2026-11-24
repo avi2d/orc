@@ -293,7 +293,7 @@ describe("readDispatchConfig", () => {
 })
 
 describe("assessQuota", () => {
-  const settings = (...names: ReadonlyArray<string>) => ({ command: ["orc-quota"] as const, accounts: names.map((name) => ({ name })), floorPercent: 15 })
+  const settings = (...names: ReadonlyArray<string>) => ({ command: ["orc-quota"] as const, provider: "anthropic", accounts: names.map((name) => ({ name })), floorPercent: 15 })
   const document = (accounts: ReadonlyArray<object>) => ({ schema: "orc.quota.v1", accounts })
   test("runs use the account with most room, not the first listed", () => {
     const reading = assessQuota(document([{ name: "main", remainingPercent: 40 }, { name: "second", remainingPercent: 80 }]), settings("main", "second"))
@@ -309,7 +309,7 @@ describe("assessQuota", () => {
     expect(reading.kind === "read" ? reading.pick : "unread").toBeNull()
   })
   test("accounts at 0% wait for room instead of starting on an empty login", () => {
-    const noFloor = { command: ["orc-quota"] as const, accounts: [{ name: "main" }, { name: "second" }], floorPercent: 0 }
+    const noFloor = { command: ["orc-quota"] as const, provider: "anthropic", accounts: [{ name: "main" }, { name: "second" }], floorPercent: 0 }
     const reading = assessQuota(document([{ name: "main", remainingPercent: 0 }, { name: "second", remainingPercent: 0 }]), noFloor)
     expect(reading.kind === "read" ? reading.pick : "unread").toBeNull()
   })

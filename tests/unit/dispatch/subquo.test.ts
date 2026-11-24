@@ -20,7 +20,11 @@ const schemaBuiltSnapshot = (): Fixture => {
   return parsed
 }
 
-const settings = (...names: ReadonlyArray<string>) => ({ command: ["subquo", "read", "--json"] as const, accounts: names.map((name) => ({ name })), floorPercent: 15 })
+const routed = (...accounts: ReadonlyArray<{ readonly name: string; readonly provider?: string }>) => ({ command: ["subquo", "read", "--json"] as const, provider: "anthropic", accounts, floorPercent: 15 })
+
+const settings = (...names: ReadonlyArray<string>) => routed(...names.map((name) => ({ name })))
+
+const routes = (...names: ReadonlyArray<string>) => names.map((name) => ({ name, provider: "anthropic" }))
 
 const now = Date.parse("2026-11-22T20:00:40.000Z")
 
@@ -57,11 +61,21 @@ describe("assessSubquo on a snapshot built from subquo's published subquo.v1 sch
       validUntil: "2026-11-22T20:02:10.000Z",
       windows: [{ id: "weekly", scope: "all", percentLeft: 90, resetsAt: "2026-11-29T08:00:00.000Z" }]
     })
-    const reading = assessSubquo(snapshot, settings("main", "second", "codex-home", "go"), now)
+    const reading = assessSubquo(snapshot, routed({ name: "main" }, { name: "second" }, { name: "codex-home", provider: "openai-codex" }, { name: "go", provider: "opencode" }), now)
     expect(reading.kind === "read" ? [reading.pick, reading.accounts.map((entry) => entry.kind)] : reading.reason).toEqual(["codex-home", ["usable", "usable", "usable", "unusable"]])
   })
+  test("a Codex account under the quota's Claude provider leaves the quota unread instead of handing the Claude route a Codex credential", () => {
+    expect(assessSubquo(schemaBuiltSnapshot(), settings("main", "codex-home"), now)).toEqual({
+      kind: "unread",
+      reason: "the subquo snapshot reads the account main on claude and codex-home on codex, and both run on the provider anthropic, so name each account's own provider in the quota"
+    })
+  })
+  test("two accounts of one vendor under two providers are read instead of refused as mixed", () => {
+    const reading = assessSubquo(schemaBuiltSnapshot(), routed({ name: "main" }, { name: "second", provider: "anthropic-token" }), now)
+    expect(reading.kind === "read" ? reading.pick : reading.reason).toBe("second")
+  })
   test("a missing account is a parse error instead of an unusable account", () => {
-    expect(decodeSubquo(schemaBuiltSnapshot(), ["main", "third"], now)).toEqual({
+    expect(decodeSubquo(schemaBuiltSnapshot(), routes("main", "third"), now)).toEqual({
       kind: "error",
       cause: "account-missing",
       reason: "the subquo snapshot names no account third, so its account list and the quota accounts differ"
@@ -92,7 +106,7 @@ describe("assessSubquo on a snapshot built from subquo's published subquo.v1 sch
     expect(reading.kind === "read" ? reading.accounts : []).toEqual([{ account: "second", kind: "unusable", reason: "subquo reads an unknown percent or reset in the weekly window" }])
   })
   test("another snapshot version is a schema error instead of read as orc.quota.v1", () => {
-    const read = decodeSubquo({ ...schemaBuiltSnapshot(), version: "subquo.v2" }, ["main"], now)
+    const read = decodeSubquo({ ...schemaBuiltSnapshot(), version: "subquo.v2" }, routes("main"), now)
     expect(read.kind === "error" ? [read.cause, read.reason] : []).toEqual(["schema", "the quota command printed no subquo.v1 snapshot: Expected \"subquo.v1\"\n  at [\"version\"]"])
   })
   test("percent above 100 is a schema error instead of room", () => {
@@ -103,11 +117,11 @@ describe("assessSubquo on a snapshot built from subquo's published subquo.v1 sch
       validUntil: "2026-11-22T20:02:05.000Z",
       windows: [{ id: "weekly", scope: "all", percentLeft: 140, resetsAt: "2026-11-28T12:00:00.000Z" }]
     })
-    expect(decodeSubquo(snapshot, ["second"], now)).toMatchObject({ kind: "error", cause: "schema" })
+    expect(decodeSubquo(snapshot, routes("second"), now)).toMatchObject({ kind: "error", cause: "schema" })
   })
   test("an account named twice is a schema error instead of taking either reading", () => {
     const snapshot = schemaBuiltSnapshot()
-    expect(decodeSubquo({ ...snapshot, accounts: [...snapshot.accounts, snapshot.accounts[0]] }, ["main"], now)).toEqual({
+    expect(decodeSubquo({ ...snapshot, accounts: [...snapshot.accounts, snapshot.accounts[0]] }, routes("main"), now)).toEqual({
       kind: "error",
       cause: "schema",
       reason: "the subquo snapshot names the account main twice"

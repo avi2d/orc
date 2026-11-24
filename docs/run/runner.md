@@ -27,8 +27,8 @@ The runner refuses any other level before it queues the run.
 The run history records the handed level on the step row.
 Without the variables, the run uses the agent file's `thinking` line.
 
-The beat sets none of these four variables yet.
-They stay unset until the routes task lands.
+The beat sets the two model variables from the picked account's `models` in `dispatch.json`, and leaves them empty for an account that names none.
+It sets neither thinking variable yet.
 
 ### Queue limits and files
 
