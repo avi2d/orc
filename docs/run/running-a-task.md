@@ -81,6 +81,8 @@ A running tool is not interrupted by the idle limit.
 
 ## Answer a review question
 
+To ask each review question for a recommended option, add the `review.path_instructions` entry in [Installing no-mistakes](installing-no-mistakes.md#ask-each-review-question-for-a-recommended-option).
+
 A no-mistakes run waits 30 minutes for an unanswered review question.
 Set `ORC_ANSWER_WAIT_SECONDS` to change the wait, or set it to `0` to refuse the gate immediately.
 The beat delivers answers from `orc backlog answer`, as [Parked runs](parked-runs.md) describes.
