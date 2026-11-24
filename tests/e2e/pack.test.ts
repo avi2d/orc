@@ -257,6 +257,7 @@ const expectedFiles = [
   "src/features/seeing-runs/show.ts",
   "src/features/seeing-runs/step-log.ts",
   "src/shared/sandbox/standin-dir.ts",
+  "src/shared/sandbox/tool-time-cap.ts",
   "src/shared/lib/table.ts",
   "src/entities/task-copy/task-copy.ts",
   "src/entities/backlog/task-kind.ts",
