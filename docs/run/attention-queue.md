@@ -48,8 +48,8 @@ A line of a review question that starts with `Recommended:` names its recommende
 The policy tells the decider to answer such a question with that option, even when it picks between product choices the intent leaves open or the decider is not sure.
 When the decider still escalates a review question with that line on one of those two bullets, orc answers it with the recommended option and records the policy's Rules sentence as the rule.
 An escalation on any other bullet, or with no bullet, stays with you, and so does a question on the topic list above.
-When the decider answers on that Rules sentence, orc records the question's `Recommended:` option as the answer, whatever option the reply named.
-Orc escalates such an answer to a question with no `Recommended:` line.
+When the decider answers a review question on that Rules sentence, orc records the question's `Recommended:` option as the answer, whatever option the reply named.
+Orc escalates such an answer to a review question with no `Recommended:` line, and to a worker question.
 The rule and the override apply only to review questions, so a worker question that leaves a product choice open still escalates, even when the worker recommends an option.
 
 ### Handle a failed call
