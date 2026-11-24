@@ -1,6 +1,6 @@
 import { Effect, FileSystem } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import type { WaitResult } from "./answer-wait"
+import type { AskedAt, WaitResult } from "./answer-wait"
 import { collectOutput } from "../../shared/process/index"
 import { hostGitSafetyEnv } from "../../shared/sandbox/index"
 import {
@@ -230,11 +230,11 @@ const awaitMissing = (
   input: NoMistakesInput,
   asked: ReadonlyArray<NoMistakesFinding>,
   supplied: Map<string, string>
-): Effect.Effect<{ readonly missing: ReadonlyArray<NoMistakesFinding>; readonly asking: string | null }, never, FileSystem.FileSystem> =>
+): Effect.Effect<{ readonly missing: ReadonlyArray<NoMistakesFinding>; readonly asking: string | null; readonly askedAt: ReadonlyArray<AskedAt> }, never, FileSystem.FileSystem> =>
   Effect.gen(function*() {
     const unanswered = () => asked.filter((finding) => !supplied.has(finding.id))
     if (unanswered().length === 0 || input.waitForAnswers === undefined) {
-      return { missing: unanswered(), asking: null }
+      return { missing: unanswered(), asking: null, askedAt: [] }
     }
     yield* appendGate(input.runDir, "asking")
     const waited = yield* input.waitForAnswers(unanswered())
@@ -242,7 +242,7 @@ const awaitMissing = (
       supplied.set(entry.question, entry.answer)
     }
     yield* appendGate(input.runDir, "answered")
-    return { missing: unanswered(), asking: waited.asked }
+    return { missing: unanswered(), asking: waited.asked, askedAt: waited.askedAt }
   })
 
 type ParkedAdvance =
@@ -262,15 +262,15 @@ const advanceParked = (
     if (log.gatesSinceCap() >= maxGatesAnswered) {
       const cap = yield* awaitMissing(input, [gateCapQuestion(gate)], supplied)
       if (cap.missing.length > 0) {
-        return { kind: "ending", ending: log.awaitAnswers(gate, cap.missing, cap.asking) }
+        return { kind: "ending", ending: log.awaitAnswers(gate, cap.missing, cap.asking, cap.askedAt) }
       }
       supplied.delete(gateCapQuestionId)
       log.liftCap()
     }
     const open = openQuestionsIn(parsed.findings, omittedQuestionIds(stdout))
-    const { missing, asking } = yield* awaitMissing(input, [...open, ...askUserFindings(parsed.findings, input.allow ?? [])], supplied)
+    const { missing, asking, askedAt } = yield* awaitMissing(input, [...open, ...askUserFindings(parsed.findings, input.allow ?? [])], supplied)
     if (missing.length > 0) {
-      return { kind: "ending", ending: log.awaitAnswers(gate, missing, asking) }
+      return { kind: "ending", ending: log.awaitAnswers(gate, missing, asking, askedAt) }
     }
     if (open.length > 0) {
       const outcome: OpenOutcome = yield* serveOpenQuestions(input, log, gate, open, supplied)

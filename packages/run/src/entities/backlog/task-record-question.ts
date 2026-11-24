@@ -20,6 +20,7 @@ export interface ParkedQuestion extends ParkedChoices {
   readonly asked: string
   readonly blocks: boolean
   readonly answer: ParkedAnswer | null
+  readonly owner?: "user" | undefined
 }
 
 export const choicesOf = (question: { readonly options?: ReadonlyArray<ParkedOption> | undefined; readonly recommendation?: string | undefined }): ParkedChoices => ({

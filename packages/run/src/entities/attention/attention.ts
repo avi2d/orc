@@ -74,6 +74,7 @@ interface AskedQuestion {
   readonly asked?: string | undefined
   readonly blocks?: boolean | undefined
   readonly options?: ReadonlyArray<AskOption> | undefined
+  readonly owner?: "user" | undefined
 }
 
 const toStoredOptions = (options: ReadonlyArray<AskOption>): NonNullable<Asked["options"]> =>
@@ -94,7 +95,7 @@ const reviewQuestionItem = (
     text: question.text,
     ...(question.options === undefined ? {} : { options: toStoredOptions(question.options) }),
     asked: question.asked ?? "",
-    owner: question.id === loopQuestionId ? "user" : "decider"
+    owner: question.owner ?? (question.id === loopQuestionId ? "user" : "decider")
   }
   return { id, asked }
 }

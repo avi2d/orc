@@ -11,7 +11,7 @@ It prints `asking <task-id> on <machine>: the run waits until <time> for the cap
 `orc backlog` shows that task as `started asking (<question-ids>)`.
 The chat posts only the questions the attention queue owns for you, as it does a parked task's.
 Each question also waits in `orc attention` until an answer or a withdraw takes it out, as [The attention queue](attention-queue.md) shows.
-The beat first gives each question to the decider, which answers a routine one in that beat or escalates it to you, as [The decider](attention-queue.md#the-decider) shows.
+The beat first gives each question the attention queue owns for the decider to the decider, which answers a routine one in that beat or escalates it to you, as [The decider](attention-queue.md#the-decider) shows.
 Answer one with `orc backlog answer <task-id> <question-id>=<text>`, and the next beat hands every answer the run waits on to it through `orc runner answer` on its machine.
 It prints `handed <question-ids> to the run of <task-id> on <machine>`, and the run carries on at the same gate with no new dispatch.
 A wait on several questions gets every answer given so far each time the beat hands one more.
@@ -52,6 +52,13 @@ If the latest resumable run has changed or disappeared, Orc refuses the resume i
 The resumed attempt keeps the earlier completed steps and hands your answers to no-mistakes.
 If the resumed run stops on new questions, the task parks again with those beside the questions it kept, and it keeps the answers it already has.
 An answer given after the beat last read the waiting run is kept too.
+The resumed run records only the earlier questions that no `--answer` settled.
+A gate finding orc can neither fix nor ask about waits as a question for the owner, and the attention queue owns that question for the owner so the decider never answers it.
+When the resumed run stops on one, the task parks again with that question beside the questions it kept, and it keeps the answers it already has.
+The next beat waits on the recorded run instead of starting it again.
+The gate keeps the attention item it opened, so the owner reads it once.
+An answer to that question is recorded on the task.
+An answer to that question goes into the fix with the owner's words, and the response declines every finding it does not fix, so a resumed run carries on instead of closing failed.
 A task whose every blocking question has an answer can resume when its original machine and run are available.
 `orc backlog` shows a parked task as `parked (<question-ids>)`.
 `orc backlog --json` gives every task a `parked`, either `null` or the branch, the recorded origin, and the questions with their times, their blocking flag, whether the decider owns them, their answers, and for a worker question its options and recommendation.
