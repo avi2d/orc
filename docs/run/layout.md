@@ -222,14 +222,14 @@ Each path below sits in the run package or the workspace tests that cover it.
 | Path | What it holds |
 | --- | --- |
 | `packages/run/src/entities/heavy-queue/heavy.ts` | The heavy settings, the stand in folder and the default heavy tool list |
-| `packages/run/src/entities/heavy-queue/heavy-setup.ts` | The reading of the heavy settings and the writing of the stand in folder |
-| `packages/run/src/entities/heavy-queue/heavy-standin.ts` | The three line stand in launchers that start the helper for each heavy tool |
+| `packages/run/src/entities/heavy-queue/heavy-setup.ts` | The reading of the heavy settings and the writing of the stand in folder and of the `ci-only.bash` guard file |
+| `packages/run/src/entities/heavy-queue/heavy-standin.ts` | The three line stand in launchers that start the helper for each heavy tool, and the `BASH_ENV` guard script |
 | `packages/run/src/entities/heavy-queue/heavy-agent-wrapper.ts` | The agent wrappers that start a no-mistakes review or fix agent under `HEAVY_TESTS_CI_ONLY=1` and the stand in folders |
 | `packages/run/src/entities/heavy-queue/heavy-classify.ts` | The per tool decision of which calls queue and which targeted calls take priority |
 | `packages/run/src/entities/heavy-queue/heavy-standin-main.ts` | The helper a stand in launcher starts by the real bun path, and the waiter a queued pueue task starts |
 | `packages/run/src/entities/heavy-queue/heavy-standin-exec.ts` | The helper's run of a call: the classify probe, the real tool as a child, the through command and the queued call waiter |
 | `packages/run/src/entities/heavy-queue/heavy-standin-runtime.ts` | The stand in runtime: the helper command, the real tool lookup, the bypass event, the plan of a call and the queue wait |
-| `packages/run/src/entities/heavy-queue/heavy-standin-refusal.ts` | The refusal of a test run, or of a Bun runtime override, under `HEAVY_TESTS_CI_ONLY=1` |
+| `packages/run/src/entities/heavy-queue/heavy-standin-refusal.ts` | The refusal of a test run, of a test runner called by path, or of a Bun runtime override, under `HEAVY_TESTS_CI_ONLY=1` |
 | `packages/run/src/entities/heavy-queue/heavy-runner-entry.ts` | The reading of the script file a `bun` or `node` call starts, to find a test runner bin, and the check for Bun runtime overrides |
 | `packages/run/src/entities/heavy-queue/heavy-process-tree.ts` | The process tree walk that finds a call inside a held slot or under the through command |
 | `packages/run/src/entities/heavy-queue/heavy-pueue-task.ts` | The reading of pueue status and log JSON for the queue wait and the exit code |

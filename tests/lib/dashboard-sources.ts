@@ -55,7 +55,7 @@ import { type ConversationReader, ConversationSource, conversationSourceLive } f
 import { fixture } from "./fixtures";
 import { fixtureActionsRepo, queueAnswers } from "./queues-fixture";
 import { fixtureHomeEnvironment } from "./session-fixture";
-import { isSavedProfilesCall, recordedSavedProfilesLayer } from "./saved-profiles";
+import { orcQuotaText, recordedOrcQuota } from "./orc-quota";
 
 export const tasksCommand = "tasks-report --json";
 
@@ -80,13 +80,12 @@ const recordedAnswers: ReadonlyArray<readonly [string, string]> = [
   [`sh -c ${tasksCommand}`, fixture("tasks/east.json")],
   ["orc heavy check --json", fixture("heavy/check.json")],
   ["orc attention --json", fixture("attention/open.json")],
-  ["orc quota --json", fixture("orc-quota/second-login-expired.json")],
+  ["orc quota --json", orcQuotaText(recordedOrcQuota)],
   ...queueAnswers,
 ];
 
 export const recordedAnswer = (command: Command): string => {
   if (command.argv[0] === "quota-axi") return fixture("quota-axi/full.json");
-  if (isSavedProfilesCall(command)) return fixture("saved-profiles/status.json");
   return recordedAnswers.find(([asked]) => command.argv.join(" ").startsWith(asked))?.[1] ?? "";
 };
 
@@ -132,7 +131,6 @@ const recordedSources = (
     quotaSourceLayer,
     orcQuotaSourceLayer,
     attentionSourceLayer,
-    recordedSavedProfilesLayer,
     macHostSourceLayer,
     macProcessesSourceLayer,
     macDiskSourceLayer,

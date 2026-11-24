@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { DateTime } from "effect";
 import {
   type CountedCall,
-  decodeSavedProfiles,
   decodeQuota,
   type Session,
   type SessionQuotaReport,
@@ -11,7 +10,7 @@ import {
   type WindowView,
 } from "@avi2dg/orc-schema";
 import { composedSessionQuota, sessionQuotaReport, sessionQuotaViewOf } from "@avi2dg/orc-schema";
-import { fixture } from "../../lib/fixtures";
+import { noOrcAccounts } from "../../lib/orc-quota";
 import { valueOf } from "../../lib/outcomes";
 import { quotaAxiRead } from "../../lib/quota-read";
 import { call, ended, fifthIn, hour, ledgerOf, six, viewOf, windowOf } from "../../lib/quota-view-fixture";
@@ -213,11 +212,10 @@ describe("a burst on a healthy month shows its multiple without a flag", () => {
 
   const monthView = (runway: unknown): SessionQuotaView => {
     const quota = decodeQuota(monthReport(runway));
-    const savedProfiles = decodeSavedProfiles(fixture("saved-profiles/status.json"));
     const now = DateTime.makeUnsafe(monthNow);
     return sessionQuotaView({
       quota: quotaAxiRead({ ...quota, capturedAt: now }),
-      savedProfiles: { ...savedProfiles, capturedAt: now },
+      orcQuota: noOrcAccounts(now),
       panes: undefined,
       processes: undefined,
       ledger: ledgerOf(calls),
@@ -297,7 +295,6 @@ describe("a harvested window judges exhaustion by its live sessions' total rate,
 
   const week = (): WindowView => {
     const quota = decodeQuota(codexReport());
-    const savedProfiles = decodeSavedProfiles(fixture("saved-profiles/status.json"));
     const now = DateTime.makeUnsafe(weekNow);
     const view = sessionQuotaView({
       quota: quotaAxiRead({ ...quota, capturedAt: now }, [
@@ -314,7 +311,7 @@ describe("a harvested window judges exhaustion by its live sessions' total rate,
           file: "/logs/rollout.jsonl",
         },
       ]),
-      savedProfiles: { ...savedProfiles, capturedAt: now },
+      orcQuota: noOrcAccounts(now),
       panes: undefined,
       processes: undefined,
       ledger: ledgerOf(calls),
@@ -375,7 +372,6 @@ describe("an exhausted harvested window reads as exhausting before its reset, ne
 
   test("marks the dry week exhausting with no flags while its sessions sit idle", () => {
     const quota = decodeQuota(codexReport());
-    const savedProfiles = decodeSavedProfiles(fixture("saved-profiles/status.json"));
     const now = DateTime.makeUnsafe(weekNow);
     const view = sessionQuotaView({
       quota: quotaAxiRead({ ...quota, capturedAt: now }, [
@@ -392,7 +388,7 @@ describe("an exhausted harvested window reads as exhausting before its reset, ne
           file: "/logs/rollout.jsonl",
         },
       ]),
-      savedProfiles: { ...savedProfiles, capturedAt: now },
+      orcQuota: noOrcAccounts(now),
       panes: undefined,
       processes: undefined,
       ledger: ledgerOf([codex(a, weekNow - 30 * hour, 5000), codex(b, weekNow - 30 * hour, 4000)]),

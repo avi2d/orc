@@ -124,7 +124,6 @@ describe("a stale reading's reset on the dashboard", () => {
   });
 });
 
-// Claude main's week read 13 hours before the dashboard at 0 percent left, whose pace flagged three agents.
 const staleWeekSessions = () =>
   sessionViewOfQuota(
     fixture("quota-axi/full.json")
