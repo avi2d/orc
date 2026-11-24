@@ -73,8 +73,8 @@ const findRealTool = (tool: string, pathValue: string): Effect.Effect<string, ne
 const quoteSingle = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'"
 
 const launcher = (call: StandinCall): string => {
-  const [bun = "", ...flags] = helperCommand
-  const main = flags.at(-1) ?? ""
+  const bun = helperCommand[0] ?? ""
+  const main = helperCommand.at(-1) ?? ""
   const fallback = call.real === "" ? "running the nearest node_modules/.bin/" + call.tool + " unqueued" : "running " + call.real + " unqueued"
   const warning = "orc heavy: no bun at " + bun + " or no stand-in helper at " + main + "; " + fallback + ", rerun orc to rewrite the stand-ins"
   const project = quoteSingle("/node_modules/.bin/" + call.tool)
@@ -94,8 +94,8 @@ export const ciOnlyTools: ReadonlyArray<string> = ["node", "checks-test"]
 
 // A missing helper cannot tell a test run from any other call, so the stand-in refuses rather than run the tool unchecked.
 export const ciOnlyScript = (tool: string): string => {
-  const [bun = "", ...flags] = helperCommand
-  const main = flags.at(-1) ?? ""
+  const bun = helperCommand[0] ?? ""
+  const main = helperCommand.at(-1) ?? ""
   const missing = "orc heavy: no bun at " + bun + " or no stand-in helper at " + main + "; rerun orc to rewrite the stand-ins"
   return `#!/bin/sh
 # ${ciOnlyMarker}. Regenerated on every run of that command.

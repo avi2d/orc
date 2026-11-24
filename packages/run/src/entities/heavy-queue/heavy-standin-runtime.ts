@@ -9,10 +9,16 @@ export const standinMarker = "Written by orc heavy path"
 
 export const ciOnlyMarker = standinMarker + " CI-only"
 
+const embeddedRoot = /^(?:\/\$bunfs\/|[A-Za-z]:[\\/]~BUN[\\/])/
+
+// A compiled file hands every argument to its own code and resolves modules inside its embedded file system, so it runs itself with no flags and no source path.
 // Bun would otherwise load the caller's .env and bunfig.toml preloads into the stand-in.
-export const helperCommand: ReadonlyArray<string> = [
-  process.execPath, "--no-env-file", "--config=/dev/null", Bun.fileURLToPath(import.meta.resolve("./heavy-standin-main.ts"))
-]
+export const helperCommandOf = (runtime: string, modulePath: string, main: string): ReadonlyArray<string> =>
+  embeddedRoot.test(modulePath) ? [runtime] : [runtime, "--no-env-file", "--config=/dev/null", main]
+
+export const helperCommand: ReadonlyArray<string> = helperCommandOf(
+  process.execPath, import.meta.path, Bun.fileURLToPath(import.meta.resolve("./heavy-standin-main.ts"))
+)
 
 export const standinHelper = { runtime: helperCommand[0] ?? "", folder: dirname(helperCommand.at(-1) ?? "") }
 
