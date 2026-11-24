@@ -95,7 +95,7 @@ const timeOf = (at: string): number => {
 }
 
 // An answer given while the task sits parked is no run, so only an ask or a hold placement marks a run that ended.
-const lastRunEndedAt = (decisions: ReadonlyArray<{ readonly at?: string | null }>, parked: Parked): number =>
+const lastRunEndedAt = (decisions: ReadonlyArray<{ readonly at?: string | null | undefined }>, parked: Parked): number =>
   Math.max(Number.NEGATIVE_INFINITY,
     ...parked.questions.map((question) => timeOf(question.asked)),
     ...decisions.flatMap((decision) => decision.at === undefined || decision.at === null ? [] : [timeOf(decision.at)]))
