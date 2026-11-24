@@ -203,12 +203,12 @@ export const answerForGate = (
     if (settled.length === 0) {
       return { kind: "approve" }
     }
-    const answered = answeredGuidance(settled, answers)
+    const instructions = instructionsOf(settled)
     return {
       kind: "fix",
       ids: fixable.map((finding) => finding.id),
       ignore,
-      instructions: releasedGuidance === null ? answered : answered + "\n" + releasedGuidance
+      ...(instructions === undefined ? {} : { instructions })
     }
   }
   if (fixable.length > 0) {

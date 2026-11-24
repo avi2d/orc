@@ -14,6 +14,9 @@ import { recordResumePublish } from "../../../packages/run/src/features/running-
 import { recordRun } from "../../../packages/run/src/entities/run-history/index"
 import { fakeOps } from "../../lib/fake-ops"
 import { historyFor, openDb, runLoopCheckpoints, stubGit } from "../../lib/run-loop-helpers"
+import { runBeat } from "../../../packages/run/src/widgets/beat/beat"
+import { formatBeat } from "../../../packages/run/src/widgets/beat/board"
+import { quietSources } from "../../lib/beat-sources"
 
 const run = <A, E>(effect: Effect.Effect<A, E, BunServices.BunServices>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.provide(BunServices.layer)))
@@ -85,6 +88,40 @@ const promptsOfResume = async (root: string, file: string, rereleased: QueueRequ
 }
 
 describe("a resumed run that parks again", () => {
+  test.each([false, true])("the closing beat reports the current wait instead of answered questions, with new question %s", async (newQuestion) => {
+    await withResumed(async (root) => {
+      const questions = [{ ...r2, asked }, ...(newQuestion ? [{ id: "r3", text: "Drop the old docs?", asked: "2026-10-27T10:30:00.000Z" }] : [])]
+      const resultFile = join(root, "runner-result.json")
+      await writeFile(resultFile, JSON.stringify({
+        schema: "orc.runner.v1",
+        result: {
+          task: "orc-1", status: "failed", pueueTask: 1,
+          started: "2026-10-27T10:10:00.000Z", ended: "2026-10-27T10:35:00.000Z", reason: lint,
+          run: { id: "run-2", status: "failed", prLink: null, endReason: lint, openQuestions: questions }
+        }
+      }))
+      const quotaReply = JSON.stringify({ schema: "orc.quota.v1", accounts: [{ name: "main", remainingPercent: 80 }] })
+      await writeFile(join(root, "dispatch.json"), JSON.stringify({
+        machines: [{ name: "mac", slots: 1, start: ["orc", "runner", "start", "--", "sh", "-c", 'cat "$1"', "runner-result", resultFile] }],
+        quota: { provider: "keyed", command: ["sh", "-c", "printf '%s' '" + quotaReply + "'"], accounts: [{ name: "main", kind: "none" }], floorPercent: 15 }
+      }))
+      await writeFile(join(root, "projects.json"), JSON.stringify({ projects: [{ name: "orc", checkouts: { mac: root } }] }))
+      const report = await run(runBeat(root, root, quietSources()))
+      const lines = formatBeat(report).split("\n")
+      expect(lines).not.toContain("parked orc-1 on orc/orc-1 for the captain's answer to r2")
+      if (newQuestion) {
+        expect(report.actions).toContainEqual({ kind: "parked", task: "orc-1", machine: "mac", branch: "orc/orc-1", questions: ["r3"], decider: [] })
+        expect(lines).toContain("parked orc-1 on orc/orc-1 for the captain's answer to r3")
+      } else {
+        const reason = (await current(root)).hold?.reason
+        expect(reason).toContain("run-2")
+        expect(report.actions).toContainEqual({ kind: "held", task: "orc-1", machine: "mac", reason })
+        expect(lines).toContain("held orc-1 on mac: " + reason)
+        expect(await run(answerTask(root, "orc-1", "fix the lint finding first", "2026-10-27T10:40:00.000Z"))).toMatchObject({ kind: "hold" })
+      }
+    })
+  })
+
   test("parking on only the answers handed to it holds the task with the run's end reason instead of resuming it on the next beat", async () => {
     await withResumed(async (root) => {
       const parked = await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked }], "2026-10-27T10:35:00.000Z", "run-2", lint))

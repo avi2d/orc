@@ -280,7 +280,11 @@ const actionLine = (action: BeatAction): string => {
       return "close failed " + action.task + " on " + action.machine + ": " + action.reason
     }
     case "parked": {
-      return "parked " + action.task + " on " + action.branch + " for " + answersAwaited(action.questions, action.decider)
+      const waiting = action.questions.length + action.decider.length > 0
+      return "parked " + action.task + " on " + action.branch + (waiting ? " for " + answersAwaited(action.questions, action.decider) : "")
+    }
+    case "held": {
+      return "held " + action.task + " on " + action.machine + ": " + action.reason
     }
     case "asking": {
       return "asking " + action.task + " on " + action.machine + ": the run waits until " + action.until + " for the captain's answer to " + action.questions.join(", ")

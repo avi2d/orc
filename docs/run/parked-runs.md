@@ -61,9 +61,13 @@ Older parked records have no `origin` field.
 
 A resumed run can park again with no open blocking question and no answer given since it started.
 Resuming it again would hand it the same answers, so the beat holds the task for you instead.
-The hold reason names the run and its end reason, and each later beat prints `waits <task-id>: held for the captain: <reason>`.
+The hold reason names the run and its end reason.
+The closing beat prints `held <task-id> on <machine>: <reason>`.
+Each later beat prints `waits <task-id>: held for the captain: <reason>`.
 Run `orc backlog answer <task-id> <words>` to release the hold, and the next beat resumes the task.
-Those words travel with the resume, so the retried run reads them as your guidance.
+The release gives the resumed run a fresh budget of three fix attempts without repeating a passed implement step.
+Your words reach any implementer or fixer the resume starts, and any review fixes it requests.
+If checks pass and review approves without fixes, no worker reads the release.
 Each resume receives every repeat hold release in order, oldest first, with the latest marked as current guidance.
 To [overturn a decider's answer](attention-queue.md#overturning-a-decider-answer) on that held task, use `orc backlog answer <task-id> <question-id>=<text>`.
 The hold stays until you release it.

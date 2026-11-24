@@ -10,6 +10,7 @@ import type { ResumePlan } from "./run-ops"
 import { handoverFileName, inheritedHandoverFileName } from "../../entities/agent/index"
 import { OrcRunError } from "../../shared/lib/index"
 import { sentBackWordsOf } from "./worker-question"
+import { holdReleaseWordsOf } from "../../entities/review-gate/index"
 
 const refuse = (message: string): Effect.Effect<never, OrcRunError> => Effect.fail(new OrcRunError({ message }))
 
@@ -258,11 +259,13 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
     const fresh = !progress.implementPassed && (own !== null || (forwarded !== null && progress.implementSessionId === null))
     const carriedImplement = fresh ? null : yield* carrySession(run, progress.implementSource, progress.implementSessionId)
     const sentBack = sentBackWordsOf(answers).length > 0
-    const carriedFix = sentBack ? null : yield* carrySession(run, progress.fixSource, progress.fixSessionId)
+    const released = holdReleaseWordsOf(answers).length > 0
+    const resetFixes = sentBack || released
+    const carriedFix = resetFixes ? null : yield* carrySession(run, progress.fixSource, progress.fixSessionId)
     const skipImplement = progress.implementPassed && !sentBack
     const skipChecks = skipImplement && progress.checksComplete
     const inherited = skipImplement
-      ? yield* inheritedCompletion(db, run, progress.priorId, progress.storedFixes)
+      ? yield* inheritedCompletion(db, run, progress.priorId, released ? [] : progress.storedFixes)
       : { inheritedRounds: [], inheritedFixes: [] }
     return {
       implementSessionId: carriedImplement?.id ?? null,
@@ -276,7 +279,7 @@ export const buildResumePlan = (db: Database, run: HistoryRun): Effect.Effect<Re
       inheritedFixes: inherited.inheritedFixes,
       fixSessionId: carriedFix?.id ?? null,
       fixSessionFile: carriedFix?.file ?? null,
-      fixRunning: !sentBack && progress.fixRunning,
+      fixRunning: !resetFixes && progress.fixRunning,
       handover,
       priorDir
     }

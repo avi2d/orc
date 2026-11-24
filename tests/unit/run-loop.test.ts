@@ -313,6 +313,63 @@ describe("a run Pi loops in", () => {
 })
 
 describe("a hold release reaches the resumed worker", () => {
+  test("a released resume with three spent fixes does not end before a fresh fixer sees the release", async () => {
+    await withHome(async (home) => {
+      const db = await openDb(home)
+      try {
+        const project = join(home, "project")
+        const priorDir = join(home, "runs", "prior-a")
+        await mkdir(project, { recursive: true })
+        await mkdir(priorDir, { recursive: true })
+        const priorFix = join(priorDir, "2026-10-19T09-30-00-000Z_bbb222.jsonl")
+        await writeFile(priorFix, JSON.stringify({ type: "session", id: "bbb222" }) + "\n")
+        await Effect.runPromise(recordRun(db, {
+          id: "prior-a", project, branch: "orc/test", taskFile: join(priorDir, "task.md"),
+          status: "failed", started: "2026-10-19T09:00:00.000Z"
+        }))
+        await Effect.runPromise(recordStep(db, {
+          runId: "prior-a", name: "implement", attempt: 1, status: "passed",
+          started: "2026-10-19T09:00:00.000Z", agentFile: implementer.path, piSessionFile: null
+        }))
+        await Effect.runPromise(recordStep(db, {
+          runId: "prior-a", name: "checks", attempt: 4, status: "failed",
+          started: "2026-10-19T09:40:00.000Z", agentFile: null, piSessionFile: null
+        }))
+        for (const attempt of [1, 2, 3]) {
+          await Effect.runPromise(recordFixDone(db, "prior-a", {
+            attempt, status: "failed", started: "2026-10-19T09:22:00.000Z", ended: "2026-10-19T09:23:00.000Z",
+            agentFile: fixer.path, sessionFile: priorFix, model: fixer.model, thinking: fixer.thinking,
+            evidenceIn: join(priorDir, "checks-1.md"), commits: 0, tokens: null
+          }))
+        }
+        const git = await stubGit(home)
+        const base = await Effect.runPromise(historyFor("released-b", home, project, "2026-10-19T10:00:00.000Z", git, ""))
+        const run = { ...base, answers: [{ question: holdReleaseId, answer: "Fix the lint failure first" }] }
+        await mkdir(run.piSessionDir, { recursive: true })
+        await writeFile(join(project, ".no-mistakes.yaml"), "commands:\n  lint: bun run lint\n")
+        const plan = await Effect.runPromise(buildResumePlan(db, run))
+        await Effect.runPromise(recordResumePublish(db, run, plan))
+        const delivered: Array<AgentRun> = []
+        const ops = fakeOps({
+          runAgent: async (agentRun) => {
+            delivered.push(agentRun)
+            return { commits: [] }
+          },
+          execCheck: async () => ({ stdout: "lint broken", stderr: "", exitCode: 1 })
+        }, run.hostSessionsDir)
+        const report = await Effect.runPromise(runFull(run, ops, plan, runLoopCheckpoints(db, run)))
+        expect(delivered.length).toBeGreaterThan(0)
+        expect(delivered[0]?.resumeSession).toBeNull()
+        expect(delivered[0]?.prompt).toContain("Fix the lint failure first")
+        expect(delivered.every((agentRun) => agentRun.agent.path === fixer.path)).toBe(true)
+        expect(report.implementPassed).toBe(true)
+        expect(report.fixAttempts).toBe(3)
+      } finally {
+        db.close()
+      }
+    })
+  })
+
   test("a resumed implement prompt carries the hold release instead of dropping it", async () => {
     await withLoopRun(0, async (db, run) => {
       const prompts: Array<string> = []
