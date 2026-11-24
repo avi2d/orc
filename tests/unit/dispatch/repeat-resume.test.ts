@@ -229,6 +229,24 @@ describe("a resumed run that parks again", () => {
       expect(queued.answers).toEqual([{ question: "send-back", answer: "rename the flag" }])
     })
   })
+  test("a fixer that loops again after a release keeps the release instead of dropping it with the replaced loop question", async () => {
+    await withResumed(async (root) => {
+      await run(parkStartedTask(root, "orc-1", "orc/orc-1", [{ ...r2, asked }], "2026-10-27T10:35:00.000Z", "run-2", lint))
+      await run(answerTask(root, "orc-1", "fix the lint finding first", "2026-10-27T10:40:00.000Z"))
+      await run(claimTask(root, "orc-1"))
+      await run(writeTaken(root, { ...handAnswersToResume(await current(root)), state: { kind: "started", claim, started: { at: "2026-10-27T10:45:00.000Z", log: root + "/logs/orc-1.log" } } }))
+      const loopsAgain = { id: "looping", text: "One command failed 6 times in a row. Continue?", asked: "2026-10-27T10:50:00.000Z", blocks: true }
+      await run(parkStartedTask(root, "orc-1", "orc/orc-1", [loopsAgain], "2026-10-27T10:55:00.000Z", "run-3", lint))
+      expect((await current(root)).parked?.questions.map((question) => question.id)).toEqual(["looping"])
+      await run(answerTask(root, "orc-1", "looping=continue", "2026-10-27T11:00:00.000Z"))
+      const file = join(root, "new", "orc-1.md")
+      const queued = await run(readRequest({ ORC_TASK_ID: "orc-1", ORC_TASK_FILE: file, ORC_TASK_CHECKOUT: join(root, "checkout"), ORC_TASK_PROVIDER: "test-provider" }, Effect.succeed("")))
+      expect(queued.answers).toEqual([
+        { question: "looping", answer: "continue" },
+        { question: "hold-release-carried", answer: "Current guidance: fix the lint finding first" }
+      ])
+    })
+  })
   test("an answer to a non-blocking question given during the run resumes it instead of holding it", async () => {
     const root = await mkdtemp(join(tmpdir(), "orc-repeat-"))
     try {

@@ -2,7 +2,7 @@ import { Effect, FileSystem, Option, Path, Schema } from "effect"
 import { AbsolutePath, readDispatchConfig, readFailure } from "../../shared/config/index"
 import { ModelRef, ProviderId } from "../../shared/config/index"
 import { TaskId, backlogPaths, missingOriginWait, parseTaskFile, readAnsweredDependencies, reportKinds, parentBranch, type Parked, type TaskRecord, withDecisions } from "../../entities/backlog/index"
-import { latestPerId } from "../../entities/parked-runs/index"
+import { isSendBackQuestion, latestPerId } from "../../entities/parked-runs/index"
 import { carriedHoldReleaseId, holdReleaseId } from "../../entities/review-gate/index"
 import { TaskInstructions, readInstructions } from "./runner-instructions"
 import { RunnerError } from "../../shared/process/index"
@@ -98,14 +98,17 @@ const parkedSince = (parked: Parked): number =>
   Math.max(Number.NEGATIVE_INFINITY, ...parked.questions.flatMap((question) =>
     [timeOf(question.asked), ...(question.answer === null ? [] : [timeOf(question.answer.at)])]))
 
-const parkOpened = (parked: Parked): number =>
-  Math.min(Number.POSITIVE_INFINITY, ...parked.questions.map((question) => timeOf(question.asked)))
+// A looping fixer replaces its question inside one park, so only the send-back marks where a park starts.
+const sentBackAt = (parked: Parked): number => {
+  const sentBack = parked.questions.flatMap((question) => isSendBackQuestion(question.id) ? [timeOf(question.asked)] : [])
+  return sentBack.length === 0 ? Number.NEGATIVE_INFINITY : Math.min(...sentBack)
+}
 
-// A send-back opens a new park, so a release older than the park's first question answered a failure this park does not hold.
+// A send-back opens a new park, so a release older than it answered a failure the merged work already resolved.
 // A run that parks after a release asks or is answered after it, so a release later than all of the park is one no resume has seen.
 const releaseAnswerOf = (hold: TaskRecord["hold"], parked: Parked): ReadonlyArray<typeof AnswerArg.Type> => {
   const decisions = hold === null ? [] : [...hold.history ?? [], hold]
-  const opened = parkOpened(parked)
+  const opened = sentBackAt(parked)
   const releases = decisions.flatMap((decision) =>
     decision.repeat === true && decision.answer !== null && decision.answer.words.trim() !== "" && timeOf(decision.answer.at) > opened ? [decision.answer] : [])
   const latest = releases.at(-1)
