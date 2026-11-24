@@ -319,7 +319,7 @@ describe("the session quota panel's rows", () => {
     expect(wide).toContain("5h window 19pp used · from codex rollout 38m ago · fair 23.1pp/h each · behind pace");
     const headings = wide.filter((row) => row.startsWith("● ")).map((row) => wide.indexOf(row));
     expect(headings.map((index) => wide[index])).toEqual([
-      "● claude · assumed the only login",
+      "● claude main · assumed the only login",
       "● codex · joined by credential key",
       "● opencode-go · assumed the only login",
     ]);
