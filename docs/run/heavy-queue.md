@@ -68,11 +68,12 @@ With `through` set, `orc heavy check` and `orc heavy watch-once` fail with a lin
 `orc run` sets `HEAVY_TESTS_CI_ONLY=1` for the Pi agent it starts, under the [nono](https://nono.sh) sandbox and under `--sandbox none`.
 Under that variable a stand in refuses a test run with exit 1 and a line naming the command, and leaves the tests to GitHub CI.
 A test run is one of these calls, watch and UI runs included:
-- `bun test`, `npm t`, `go test` and `cargo test`.
+- `bun test`, `npm t`, `go test`, `cargo test` and `cargo t`.
 - A `test`, `tests`, `test:*`, `e2e` or `e2e:*` script, or a script named `vitest`, `jest` or `pytest`, through `bun`, `npm`, `pnpm` or `yarn`.
 - `vitest`, `jest`, `pytest` or `playwright test`, directly or through `bunx`, `npx`, `bun x`, or a manager's `exec` or `dlx`.
 
-Every other call, such as a build, a lint or a typecheck, queues as it does without the variable.
+Under `--sandbox none` every other call, such as a build, a lint or a typecheck, queues as it does without the variable.
+Under the nono sandbox it runs at once, as the next section says.
 The checks of a run go through the same stand ins, so a check command that starts a test run fails.
 
 ## Sandboxed runs
