@@ -322,7 +322,7 @@ describe("answerForGate refuses only what needs your word", () => {
       instructions: "The captain released the repeat hold with: Fix the lint failure first\nFollow that guidance as you retry the task."
     })
     if (answer.kind === "fix") {
-      expect(respondArgs(answer).slice(-2)).toEqual(["--instructions", "The captain released the repeat hold with: Fix the lint failure first\nFollow that guidance as you retry the task."])
+      expect(respondArgs(answer).slice(-2)).toEqual(["--instructions", "Leave repository tests to GitHub CI. Do not run them locally. You may run build, lint, or typecheck.\n\nThe captain released the repeat hold with: Fix the lint failure first\nFollow that guidance as you retry the task."])
     }
   })
 
