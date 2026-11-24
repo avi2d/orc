@@ -131,8 +131,10 @@ export const bunRuntimeOverride = (tool: string, args: Args, cwd: string): strin
     return null
   }
   const first = launchOf(args, bunValueOptions)
-  const nested = tool === "bun" && first.kind === "script" && ["run", "x", "exec"].includes(first.file)
-  const inner = nested && first.kind === "script" ? launchOf(first.args, bunValueOptions) : null
+  const inner =
+    tool === "bun" && first.kind === "script" && ["run", "x", "exec"].includes(first.file)
+      ? launchOf(first.args, bunValueOptions)
+      : null
   const options = inner === null ? first.options : [...first.options, ...inner.options]
   const { directory, config, bunFlag } = bunOptionsOf(options, cwd)
   if (bunFlag !== null) {

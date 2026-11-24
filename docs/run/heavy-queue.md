@@ -91,7 +91,7 @@ It also refuses package script and bin-name calls when the effective `bunfig.tom
 The stand-in finds that file from the call's working directory, `--cwd` and `--config`.
 A file call runs when its path starts with `/`, `./` or `../`, in both `bun <file>` and `bun run <file>`.
 A `bun <file>` call on a bare path that ends in `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.mts` or `.cts` runs too.
-Every other file call is refused, such as `bun run scripts/build.ts` or `bun scripts/x.sh`, because Bun gives it the same `node` link.
+Every other file call is refused, such as `bun run` on a bare path or `bun` on a `.sh` file, because Bun gives it the same `node` link.
 
 ### What is not blocked
 - A `node` runner started from a Yarn 1 or Yarn Berry script, which puts a `node` wrapper first on the script's `PATH`, though no run has confirmed that route.
