@@ -1,7 +1,8 @@
 import { type Color, type Context, type Element, div } from "gpui-kit"
 import { Input, type InputState, type ScrollHandle, h_flex, v_flex } from "gpui-base"
 import { openOverlay, settings } from "herdr"
-import { type Card, type CardStatus, type Filter, type Mark, type RunAgent, type StepRow, agentLabel, approveRow, cardAnswers, cardPlace, cardStatuses, filterCards, namedModels, opensTurns, prNumber, projectsOf, railLabel, sendBackArgs, stepRows } from "./agents"
+import { type Card, type Mark, type StepRow, agentLabel, approveRow, cardAnswers, namedModels, opensTurns, prNumber, sendBackArgs, stepRows } from "./agents"
+import type { RunsActions } from "./runs-view"
 import type { Show, ShownStep } from "./guard"
 import { optionView } from "./ask-view"
 import type { InboxAnswer, InboxApproval } from "./inbox"
@@ -11,7 +12,6 @@ import { type Reading, readText } from "./orc-read"
 import type { palette } from "./palette"
 import { type Turn } from "./turns"
 import { turnsView } from "./turns-view"
-import { openInbox } from "./views"
 
 type Palette = ReturnType<typeof palette>
 
@@ -21,40 +21,14 @@ export type Pane = "turns" | "raw"
 
 export type MergeOutcome = { readonly kind: "merging" } | { readonly kind: "failed"; readonly reason: string }
 
-export interface AgentsActions {
-  readonly select: (cx: Context, key: string) => void
-  readonly toggleFold: (cx: Context) => void
-  readonly setFilter: (cx: Context, filter: Filter) => void
+export interface AgentsActions extends RunsActions {
   readonly choose: (cx: Context, chosen: Chosen) => void
   readonly setPane: (cx: Context, pane: Pane) => void
   readonly askMerge: (card: Card, approval: InboxApproval) => void
 }
 
-export interface RunsShown {
-  readonly cards: Reading<ReadonlyArray<Card>>
-  readonly filter: Filter
-  readonly selectedKey: string | null
-  readonly agents: ReadonlyMap<string, RunAgent | null>
-  readonly folded: boolean
-}
-
 export const approvalOf = (card: Card | null): InboxApproval | null =>
   card?.standing.status === "Awaiting you" && card.standing.waiting.on === "approval" ? card.standing.waiting.item : null
-
-const statusColor = (t: Palette, status: CardStatus): Color => {
-  switch (status) {
-    case "Awaiting you":
-      return t.blocked
-    case "Running":
-      return t.working
-    case "Queued":
-      return t.muted
-    case "Failed":
-      return t.ansi1
-    case "Done":
-      return t.done
-  }
-}
 
 const markColor = (t: Palette, mark: Mark): Color => {
   switch (mark) {
@@ -79,96 +53,6 @@ export const logLines = (text: string): ReadonlyArray<string> =>
 const monospace = (): string => {
   const family = settings()["font_family"]
   return typeof family === "string" ? family : "Menlo"
-}
-
-const chip = (t: Palette, id: string, label: string, on: boolean, pick: (cx: Context) => void): Element =>
-  h_flex().gap(4).id(id).px(8).py(2).rounded(4).cursor_pointer()
-    .bg(on ? t.selected : t.surface).text_color(on ? t.foreground : t.muted)
-    .hover((style) => style.bg(t.hover))
-    .on_click((_event, cx) => pick(cx))
-    .child(label)
-
-const filters = (t: Palette, all: ReadonlyArray<Card>, filter: Filter, act: AgentsActions): Element => {
-  const byProject = filterCards(all, { ...filter, status: null })
-  return v_flex().gap(6).px(12).pb(8).border_b(1).border_color(t.border)
-    .child(h_flex().gap(4).flex_wrap().items_center()
-      .child(div().w(52).text_color(t.dim).child("Project"))
-      .child(chip(t, "project-all", "All", filter.project === null && !filter.allRuns, (cx) => act.setFilter(cx, { ...filter, project: null, allRuns: false })))
-      .children(projectsOf(all).map((project) =>
-        chip(t, `project-${project}`, project, filter.project === project, (cx) => act.setFilter(cx, { ...filter, project, allRuns: false }))))
-      .child(chip(t, "project-all-runs", "All runs", filter.project === null && filter.allRuns, (cx) => act.setFilter(cx, { ...filter, project: null, allRuns: true }))))
-    .child(h_flex().gap(4).flex_wrap().items_center()
-      .child(div().w(52).text_color(t.dim).child("Status"))
-      .child(chip(t, "status-all", "All", filter.status === null, (cx) => act.setFilter(cx, { ...filter, status: null })))
-      .children(cardStatuses.map((status) => {
-        const count = byProject.filter((entry) => entry.standing.status === status).length
-        const shown = chip(t, `status-${status}`, status, filter.status === status, (cx) => act.setFilter(cx, { ...filter, status }))
-        if (status !== "Awaiting you") return shown.child(String(count))
-        return shown.child(div().id("inbox-count").px(4).rounded(4).hover((style) => style.bg(t.raised).text_color(t.foreground))
-          .on_click((_event, cx) => openInbox(cx)).child(String(count)))
-      })))
-}
-
-const cardView = (t: Palette, card: Card, selected: boolean, agent: RunAgent | null, act: AgentsActions): Element => {
-  const color = statusColor(t, card.standing.status)
-  return v_flex().id(`card-${card.key}`).p(10).gap(3).rounded(6).cursor_pointer().border_l(3).border_color(color)
-    .bg(selected ? t.selected : t.background)
-    .hover((style) => style.bg(selected ? t.selected : t.hover))
-    .on_click((_event, cx) => act.select(cx, card.key))
-    .child(h_flex().justify_between().gap(8)
-      .child(h_flex().gap(6).min_w_0()
-        .child(div().font_semibold().truncate().child(card.id))
-        .children(card.kind === null ? [] : [div().text_color(t.dim).flex_shrink_0().child(card.kind)]))
-      .child(div().flex_shrink_0().text_size(12).text_color(color).child(card.standing.status)))
-    .child(div().truncate().child(card.title))
-    .child(div().truncate().text_color(t.muted).child(cardPlace(card, agent)))
-}
-
-const foldButton = (t: Palette, id: string, label: string, act: AgentsActions): Element =>
-  div().id(id).px(8).py(2).rounded(4).cursor_pointer().text_size(15).text_color(t.muted)
-    .hover((style) => style.bg(t.hover))
-    .on_click((_event, cx) => act.toggleFold(cx))
-    .child(label)
-
-const listBody = (t: Palette, shown: RunsShown, visible: ReadonlyArray<Card>, act: AgentsActions): Element => {
-  if (shown.cards.kind === "failed") {
-    return div().p(12).text_color(t.blocked).child(shown.cards.reason)
-  }
-  if (shown.cards.kind === "reading") {
-    return div().p(12).text_color(t.muted).child("Reading orc runs --json --local")
-  }
-  if (visible.length === 0) {
-    return div().p(12).text_color(t.muted).child("No run matches these filters")
-  }
-  return v_flex().id("cards").flex_1().overflow_y_scrollbar().px(8).py(8).gap(6)
-    .children(visible.map((card) =>
-      cardView(t, card, card.key === shown.selectedKey, card.runId === null ? null : shown.agents.get(card.runId) ?? null, act)))
-}
-
-const rail = (t: Palette, shown: RunsShown, visible: ReadonlyArray<Card>, act: AgentsActions): Element =>
-  v_flex().id("rail").w(96).h_full().flex_shrink_0().bg(t.chrome).border_r(1).border_color(t.border)
-    .child(h_flex().h(44).px(8).items_center().child(foldButton(t, "unfold", "»", act)))
-    .child(v_flex().id("rail-ids").flex_1().overflow_y_scrollbar().px(6).gap(2)
-      .children(visible.map((card) =>
-        div().id(`rail-${card.key}`).px(6).py(3).rounded(4).cursor_pointer().truncate()
-          .text_color(statusColor(t, card.standing.status))
-          .bg(card.key === shown.selectedKey ? t.selected : t.chrome)
-          .hover((style) => style.bg(t.hover))
-          .on_click((_event, cx) => act.select(cx, card.key))
-          .child(railLabel(card)))))
-
-export const runsColumn = (t: Palette, shown: RunsShown, act: AgentsActions): Element => {
-  const all = shown.cards.kind === "ok" ? shown.cards.value : []
-  const visible = filterCards(all, shown.filter)
-  if (shown.folded) {
-    return rail(t, shown, visible, act)
-  }
-  return v_flex().w(380).h_full().flex_shrink_0().bg(t.chrome).border_r(1).border_color(t.border)
-    .child(h_flex().px(12).h(44).items_center().justify_between()
-      .child(div().text_size(15).font_semibold().child("Runs"))
-      .child(foldButton(t, "fold", "«", act)))
-    .child(filters(t, all, shown.filter, act))
-    .child(listBody(t, shown, visible, act))
 }
 
 const rowTarget = (row: StepRow): Chosen | null => {

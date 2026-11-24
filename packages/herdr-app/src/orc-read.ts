@@ -19,6 +19,17 @@ export const readText = (command: string, args: ReadonlyArray<string>): Promise<
   )
 }
 
+export const inBatches = <A>(items: ReadonlyArray<A>, size: number, each: (item: A) => Promise<void>, settled: () => void): Promise<void> => {
+  const from = (start: number): Promise<void> =>
+    start >= items.length
+      ? Promise.resolve()
+      : Promise.all(items.slice(start, start + size).map(each)).then(() => {
+        settled()
+        return from(start + size)
+      })
+  return from(0)
+}
+
 export const readJson = <A>(command: string, args: ReadonlyArray<string>, guard: Guard<A>): Promise<Reading<A>> =>
   readText(command, args).then((reading): Reading<A> => {
     if (reading.kind !== "ok") {

@@ -3,13 +3,14 @@ import { InputState, ScrollHandle, h_flex } from "gpui-base"
 import { layout, readTextFile, run, setShared, shared } from "herdr"
 import { type Card, type Filter, type RunAgent, cardAnswers, filterCards, goesOn, openedFilter, opensTurns, runAgent } from "../../src/agents"
 import { readAgents } from "../../src/agents-read"
-import { type AgentsActions, type Chosen, type DetailShown, type Keyed, type Pane, approvalOf, askMerge, detailView, logLines, runsColumn, sendBackBar, stepsColumn, submitSendBack } from "../../src/agents-view"
+import { type AgentsActions, type Chosen, type DetailShown, type Keyed, type Pane, approvalOf, askMerge, detailView, logLines, sendBackBar, stepsColumn, submitSendBack } from "../../src/agents-view"
+import { type MenuName, runsColumn } from "../../src/runs-view"
 import { type Merge, mergeCommand, mergedNote, runMerge, watchMerges } from "../../src/agents-merge"
 import { type RunChanges, changesKey } from "../../src/changes"
 import { readChanges } from "../../src/changes-read"
 import { show, type Show, type ShownStep } from "../../src/guard"
 import { InboxAnswers } from "../../src/inbox-view"
-import { type Reading, readJson, readText } from "../../src/orc-read"
+import { type Reading, inBatches, readJson, readText } from "../../src/orc-read"
 import { palette } from "../../src/palette"
 import { type Turn, sessionTurns } from "../../src/turns"
 import { activeChild, agentsOpenKey, openAsk, viewsStack } from "../../src/views"
@@ -31,6 +32,7 @@ const readingOf = <A>(keyed: Keyed<A> | null, of: string | null): Reading<A> =>
 export default class OrcAgents extends View {
   cards: Reading<ReadonlyArray<Card>> = { kind: "reading" }
   filter: Filter = { project: null, status: null, allRuns: false }
+  menu: MenuName | null = null
   selectedKey: string | null = null
   chosen: Chosen | null = null
   pane: Pane = "turns"
@@ -206,14 +208,7 @@ export default class OrcAgents extends View {
           this.agents.set(runId, runAgent(reading.value.steps))
         }
       })
-    const from = (start: number, task: AsyncContext): Promise<void> =>
-      start >= wanted.length
-        ? Promise.resolve()
-        : Promise.all(wanted.slice(start, start + showsAtOnce).map(label)).then(() => {
-          task.notify()
-          return from(start + showsAtOnce, task)
-        })
-    cx.spawn((task) => from(0, task).then(() => {
+    cx.spawn((task) => inBatches(wanted, showsAtOnce, label, () => task.notify()).then(() => {
       this.labelling = false
     }))
   }
@@ -293,6 +288,7 @@ export default class OrcAgents extends View {
   moveSelection(cx: Context, change: () => void): void {
     const before = this.selectedCard()?.key ?? null
     this.chosen = null
+    this.menu = null
     change()
     if ((this.selectedCard()?.key ?? null) !== before) {
       this.changesProblem = null
@@ -328,6 +324,7 @@ export default class OrcAgents extends View {
 
   toggleFold(cx: Context): void {
     this.folded = !this.folded
+    this.menu = null
     cx.notify()
   }
 
@@ -337,6 +334,11 @@ export default class OrcAgents extends View {
 
   setFilter(cx: Context, filter: Filter): void {
     this.moveSelection(cx, () => { this.filter = filter })
+  }
+
+  openMenu(cx: Context, menu: MenuName | null): void {
+    this.menu = menu
+    cx.notify()
   }
 
   openAsked(cx: Context): void {
@@ -356,12 +358,13 @@ export default class OrcAgents extends View {
       select: (spot, key) => this.select(spot, key),
       toggleFold: (spot) => this.toggleFold(spot),
       setFilter: (spot, filter) => this.setFilter(spot, filter),
+      openMenu: (spot, menu) => this.openMenu(spot, menu),
       choose: (spot, chosen) => this.choose(spot, chosen),
       setPane: (spot, pane) => this.setPane(spot, pane),
       askMerge: (asked, approval) => askMerge(approval, `${thisView}.${mergeCommand}${asked.id}`)
     }
     return h_flex().id("root").size_full().bg(t.surface).text_size(13).text_color(t.foreground)
-      .child(runsColumn(t, { cards: this.cards, filter: this.filter, selectedKey: card?.key ?? null, agents: this.agents, folded: this.folded }, act))
+      .child(runsColumn(t, { cards: this.cards, filter: this.filter, menu: this.menu, selectedKey: card?.key ?? null, agents: this.agents, folded: this.folded }, act))
       .child(stepsColumn(t, card, {
         reading: card === null ? null : this.currentSteps(card),
         target: this.target(),
